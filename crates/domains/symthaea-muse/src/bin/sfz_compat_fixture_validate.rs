@@ -420,7 +420,8 @@ fn validate_asset(root: &Path, asset: &AssetRecordV1) -> AssetValidationV1 {
     let metadata_ok = asset.sample_rate_hz == 44_100
         && asset.channels == 1
         && asset.frames > 0
-        && asset.encoding == "RIFF_WAVE_PCM_S16LE";
+        && asset.encoding == "RIFF_WAVE_PCM_S16LE"
+        && wav_header_matches(&bytes, asset);
     let failure = if !sha_ok {
         Some("asset SHA-256 mismatch".to_owned())
     } else if !len_ok {
@@ -510,6 +511,51 @@ fn validate_timeline(
     results
 }
 
+/// Verify the actual WAV container header instead of trusting manifest metadata.
+fn wav_header_matches(bytes: &[u8], asset: &AssetRecordV1) -> bool {
+    fn read_u16(bytes: &[u8], start: usize) -> Option<u16> {
+        Some(u16::from_le_bytes(bytes.get(start..start + 2)?.try_into().ok()?))
+    }
+    fn read_u32(bytes: &[u8], start: usize) -> Option<u32> {
+        Some(u32::from_le_bytes(bytes.get(start..start + 4)?.try_into().ok()?))
+    }
+
+    if bytes.len() < 44
+        || bytes.get(0..4) != Some(b"RIFF")
+        || bytes.get(8..12) != Some(b"WAVE")
+        || bytes.get(12..16) != Some(b"fmt ")
+        || bytes.get(36..40) != Some(b"data")
+    {
+        return false;
+    }
+    let Some(riff_len) = read_u32(bytes, 4) else { return false; };
+    let Some(format_len) = read_u32(bytes, 16) else { return false; };
+    let Some(audio_format) = read_u16(bytes, 20) else { return false; };
+    let Some(channels) = read_u16(bytes, 22) else { return false; };
+    let Some(sample_rate) = read_u32(bytes, 24) else { return false; };
+    let Some(byte_rate) = read_u32(bytes, 28) else { return false; };
+    let Some(block_align) = read_u16(bytes, 32) else { return false; };
+    let Some(bits_per_sample) = read_u16(bytes, 34) else { return false; };
+    let Some(data_len) = read_u32(bytes, 40) else { return false; };
+
+    let expected_data_len = asset.frames.checked_mul(usize::from(asset.channels)).and_then(|value| value.checked_mul(2));
+    let expected_byte_rate = asset.sample_rate_hz.checked_mul(u32::from(asset.channels)).and_then(|value| value.checked_mul(2));
+    let expected_block_align = asset.channels.checked_mul(2);
+
+    usize::try_from(riff_len).ok() == Some(bytes.len().saturating_sub(8))
+        && format_len == 16
+        && audio_format == 1
+        && channels == asset.channels
+        && sample_rate == asset.sample_rate_hz
+        && expected_byte_rate == Some(byte_rate)
+        && expected_block_align == Some(block_align)
+        && bits_per_sample == 16
+        && usize::try_from(data_len).ok() == expected_data_len
+        && bytes.len() == 44_usize.saturating_add(data_len as usize)
+        && usize::try_from(data_len).ok().is_some_and(|len| len % 2 == 0)
+        && usize::try_from(data_len).ok().and_then(|len| len.checked_div(usize::from(asset.channels) * 2)) == Some(asset.frames)
+}
+
 fn pack_tree_sha256(root: &Path) -> Result<String, Box<dyn Error>> {
     fn collect_files(directory: &Path, root: &Path, files: &mut Vec<PathBuf>) -> Result<(), Box<dyn Error>> {
         for entry in fs::read_dir(directory)? {
@@ -577,6 +623,43 @@ mod tests {
         assert!(safe_join(root, "../escape.wav").is_err());
         assert!(safe_join(root, "/absolute.wav").is_err());
         assert!(safe_join(root, "fixture/sample.wav").is_ok());
+    }
+
+    #[test]
+    fn wav_header_validator_rejects_untrusted_manifest_metadata() {
+        let asset = AssetRecordV1 {
+            path: "sample.wav".to_owned(),
+            sha256: String::new(),
+            byte_len: 46,
+            sample_rate_hz: 44_100,
+            channels: 1,
+            frames: 1,
+            encoding: "RIFF_WAVE_PCM_S16LE".to_owned(),
+        };
+        let mut bytes = vec![0_u8; 46];
+        bytes[0..4].copy_from_slice(b"RIFF");
+        bytes[4..8].copy_from_slice(&38_u32.to_le_bytes());
+        bytes[8..12].copy_from_slice(b"WAVE");
+        bytes[12..16].copy_from_slice(b"fmt ");
+        bytes[16..20].copy_from_slice(&16_u32.to_le_bytes());
+        bytes[20..22].copy_from_slice(&1_u16.to_le_bytes());
+        bytes[22..24].copy_from_slice(&1_u16.to_le_bytes());
+        bytes[24..28].copy_from_slice(&44_100_u32.to_le_bytes());
+        bytes[28..32].copy_from_slice(&88_200_u32.to_le_bytes());
+        bytes[32..34].copy_from_slice(&2_u16.to_le_bytes());
+        bytes[34..36].copy_from_slice(&16_u16.to_le_bytes());
+        bytes[36..40].copy_from_slice(b"data");
+        bytes[40..44].copy_from_slice(&2_u32.to_le_bytes());
+        bytes[44..46].copy_from_slice(&123_i16.to_le_bytes());
+        assert!(wav_header_matches(&bytes, &asset));
+
+        let mut wrong_rate = bytes.clone();
+        wrong_rate[24..28].copy_from_slice(&48_000_u32.to_le_bytes());
+        assert!(!wav_header_matches(&wrong_rate, &asset));
+
+        let mut wrong_frames = bytes;
+        wrong_frames[40..44].copy_from_slice(&4_u32.to_le_bytes());
+        assert!(!wav_header_matches(&wrong_frames, &asset));
     }
 
     #[test]
