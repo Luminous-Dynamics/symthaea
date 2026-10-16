@@ -476,6 +476,25 @@ pub enum InoculationPath {
     InoculateAndAttune,
 }
 
+/// One-session authorization for generating a Lanzaboote configuration.
+///
+/// This record binds explicit user consent to an exact device/firmware/software
+/// profile and the currently observed hardware profile. It is not persisted, so
+/// a restart cannot silently reuse an earlier authorization.
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub struct SecureBootProfileApproval {
+    pub profile_id: String,
+    pub target_model: String,
+    pub firmware_revision: String,
+    pub nixos_release: String,
+    pub lanzaboote_revision: String,
+    pub observed_secure_boot_state: String,
+    pub hardware_profile_blake3: String,
+    pub user_confirmed: bool,
+    pub exact_profile_qualified: bool,
+    pub recovery_path_verified: bool,
+}
+
 // ============================================================================
 // Orchestrator — ties everything together
 // ============================================================================
@@ -484,6 +503,7 @@ pub enum InoculationPath {
 ///
 /// Coordinates the entire process from attestation to first breath.
 #[derive(Debug, Clone, Serialize, Deserialize)]
+#[serde(default)]
 pub struct InoculationOrchestrator {
     /// Selected inoculation mode
     pub mode: InoculationMode,
@@ -519,6 +539,9 @@ pub struct InoculationOrchestrator {
     pub lanzaboote_enabled: bool,
     /// Whether explicit Secure Boot key enrollment is required
     pub secure_boot_enrollment_required: bool,
+    /// Same-session profile authorization; not serialized or persisted.
+    #[serde(skip)]
+    secure_boot_profile_approval: Option<SecureBootProfileApproval>,
     /// Detected or user-specified platform
     pub target_platform: TargetPlatform,
 }
@@ -553,6 +576,7 @@ impl Default for InoculationOrchestrator {
             secure_boot_state: None,
             lanzaboote_enabled: true,
             secure_boot_enrollment_required: false,
+            secure_boot_profile_approval: None,
             target_platform: TargetPlatform::Unknown,
         }
     }
@@ -643,52 +667,119 @@ impl InoculationOrchestrator {
         self.path == InoculationPath::InoculateAndAttune
     }
 
-    /// Returns true if MOK enrollment is needed — Secure Boot is enabled and
-    /// lanzaboote will be used, so our self-signed keys must be enrolled.
-    pub fn needs_mok_enrollment(&self) -> bool {
-        self.lanzaboote_enabled
-            && self
-                .secure_boot_state
-                .as_deref()
-                .map(|s| s == "Enabled")
-                .unwrap_or(false)
+    /// Authorize a profile-bound Lanzaboote configuration for this live session.
+    ///
+    /// This validates the operator decision, exact profile metadata, a known
+    /// target-side Secure Boot state, and the hash of the currently observed
+    /// hardware profile. It does not enroll firmware keys or claim that the
+    /// resulting boot chain is verified.
+    pub fn authorize_secure_boot_configuration(
+        &mut self,
+        approval: SecureBootProfileApproval,
+    ) -> Result<(), String> {
+        self.validate_secure_boot_profile_approval(&approval)?;
+        self.secure_boot_enrollment_required = self.lanzaboote_enabled;
+        self.secure_boot_profile_approval = Some(approval);
+        Ok(())
+    }
+
+    fn validate_secure_boot_profile_approval(
+        &self,
+        approval: &SecureBootProfileApproval,
+    ) -> Result<(), String> {
+        if !self.lanzaboote_enabled {
+            return Err("Lanzaboote is not selected for this target".to_string());
+        }
+        if !approval.user_confirmed {
+            return Err("explicit operator confirmation is required".to_string());
+        }
+        if !approval.exact_profile_qualified {
+            return Err("the exact device/firmware/NixOS/Lanzaboote profile is not qualified".to_string());
+        }
+        if !approval.recovery_path_verified {
+            return Err("an independently verified recovery path is required".to_string());
+        }
+        for (name, value) in [
+            ("profile_id", approval.profile_id.as_str()),
+            ("target_model", approval.target_model.as_str()),
+            ("firmware_revision", approval.firmware_revision.as_str()),
+            ("nixos_release", approval.nixos_release.as_str()),
+            ("lanzaboote_revision", approval.lanzaboote_revision.as_str()),
+        ] {
+            if value.trim().is_empty() {
+                return Err(format!("{name} must be non-empty"));
+            }
+        }
+
+        if self.target_platform != TargetPlatform::Linux {
+            return Err("Lanzaboote profile authorization requires an identified Linux target".to_string());
+        }
+        let observed_state = self.secure_boot_state.as_deref().ok_or_else(|| {
+            "Secure Boot state is unknown; probe the exact target before generating configuration".to_string()
+        })?;
+        if !matches!(observed_state, "Enabled" | "Disabled" | "SetupMode") {
+            return Err("Secure Boot state is unresolved; repeat the probe before generating configuration".to_string());
+        }
+        if approval.observed_secure_boot_state != observed_state {
+            return Err("the authorized Secure Boot state does not match the current observation".to_string());
+        }
+
+        let profile = self.hardware_profile.as_ref().ok_or_else(|| {
+            "hardware profile is required before Secure Boot configuration".to_string()
+        })?;
+        let bytes = serde_json::to_vec(profile)
+            .map_err(|error| format!("cannot serialize hardware profile: {error}"))?;
+        let fingerprint = blake3::hash(&bytes).to_hex().to_string();
+        if approval.hardware_profile_blake3 != fingerprint {
+            return Err("hardware profile changed after review; authorize the current exact profile again".to_string());
+        }
+        Ok(())
+    }
+
+    /// True only after an explicit profile-bound authorization and while the
+    /// exact observed state/profile still match that authorization.
+    pub fn needs_secure_boot_enrollment(&self) -> bool {
+        if !self.lanzaboote_enabled || !self.secure_boot_enrollment_required {
+            return false;
+        }
+        self.secure_boot_profile_approval.as_ref().is_some_and(|approval| {
+            self.validate_secure_boot_profile_approval(approval).is_ok()
+        })
     }
 
     /// Generate boot configuration Nix module.
     ///
-    /// Returns either standard systemd-boot config or lanzaboote Secure Boot
-    /// integration depending on `lanzaboote_enabled`.
-    pub fn generate_boot_config_nix(&self) -> String {
-        if self.lanzaboote_enabled {
-            r#"{ pkgs, lib, ... }: {
-  # Sovereign Boot: lanzaboote Secure Boot integration
-  # The Microsoft-signed shim bridges UEFI trust to our self-signed kernel.
-  # MOK enrollment required on first boot — the machine consents to trust us.
+    /// Lanzaboote configuration is fail-closed: it requires same-session
+    /// operator confirmation, an exact qualified profile, known current
+    /// Secure Boot state, and a verified recovery path. The generated fragment
+    /// delegates key generation to Lanzaboote using /var/lib/sbctl; it does not
+    /// automatically enroll keys into firmware.
+    pub fn generate_boot_config_nix(&self) -> Result<String, String> {
+        if !self.lanzaboote_enabled {
+            return Ok(r#"{ ... }: {
+  # Standard systemd-boot. No Secure Boot assurance is claimed here.
+  boot.loader.systemd-boot.enable = true;
+  boot.loader.efi.canTouchEfiVariables = true;
+}"#.to_string());
+        }
+
+        let approval = self.secure_boot_profile_approval.as_ref().ok_or_else(|| {
+            "explicit, profile-bound Secure Boot authorization is required before generating Lanzaboote configuration".to_string()
+        })?;
+        self.validate_secure_boot_profile_approval(approval)?;
+
+        Ok(r#"{ lib, pkgs, ... }: {
+  # Explicitly authorized Secure Boot profile. This does not enroll keys in firmware.
   boot.loader.systemd-boot.enable = lib.mkForce false;
   boot.lanzaboote = {
     enable = true;
-    pkiBundle = "/etc/secureboot";
+    pkiBundle = "/var/lib/sbctl";
+    autoGenerateKeys.enable = true;
   };
-
-  # Generate signing keys on first activation if they don't exist
-  system.activationScripts.secureboot-keys = ''
-    if [ ! -d /etc/secureboot ]; then
-      ${pkgs.sbctl}/bin/sbctl create-keys
-    fi
-  '';
-
   environment.systemPackages = [ pkgs.sbctl ];
-}"#
-            .to_string()
-        } else {
-            r#"{ ... }: {
-  # Standard systemd-boot (no Secure Boot signing)
-  boot.loader.systemd-boot.enable = true;
-  boot.loader.efi.canTouchEfiVariables = true;
-}"#
-            .to_string()
-        }
+}"#.to_string())
     }
+
 
     /// Generate the disko configuration for a standard Guardian node.
     ///
@@ -916,6 +1007,25 @@ impl InoculationOrchestrator {
 mod tests {
     use super::*;
 
+    fn authorize_synthetic_profile(orch: &mut InoculationOrchestrator) {
+        let profile = orch.hardware_profile.as_ref().expect("test hardware profile configured");
+        let bytes = serde_json::to_vec(profile).expect("test profile serializes");
+        let approval = SecureBootProfileApproval {
+            profile_id: "synthetic-test-profile-v1".to_string(),
+            target_model: "Synthetic Lab Device".to_string(),
+            firmware_revision: "synthetic-firmware-1".to_string(),
+            nixos_release: "nixos-unstable-test".to_string(),
+            lanzaboote_revision: "synthetic-locked-revision".to_string(),
+            observed_secure_boot_state: orch.secure_boot_state.clone().expect("known test Secure Boot state"),
+            hardware_profile_blake3: blake3::hash(&bytes).to_hex().to_string(),
+            user_confirmed: true,
+            exact_profile_qualified: true,
+            recovery_path_verified: true,
+        };
+        orch.authorize_secure_boot_configuration(approval).expect("synthetic profile approval passes");
+    }
+
+
     #[test]
     fn test_orchestrator_default() {
         let orch = InoculationOrchestrator::default();
@@ -1033,44 +1143,103 @@ mod tests {
     }
 
     #[test]
-    fn test_needs_mok_enrollment() {
+    fn test_secure_boot_enrollment_requires_profile_bound_authorization() {
         let mut orch = InoculationOrchestrator::default();
+        orch.lanzaboote_enabled = true;
         orch.secure_boot_state = Some("Enabled".to_string());
-        orch.lanzaboote_enabled = true;
-        assert!(orch.needs_mok_enrollment());
+        orch.target_platform = TargetPlatform::Linux;
+        orch.hardware_profile = Some(serde_json::json!({
+            "model": "synthetic-test",
+            "device_memory_gb": 16.0,
+        }));
+
+        assert!(!orch.needs_secure_boot_enrollment());
+        assert!(orch.generate_boot_config_nix().is_err());
+
+        authorize_synthetic_profile(&mut orch);
+        assert!(orch.needs_secure_boot_enrollment());
+
+        let config = orch.generate_boot_config_nix().expect("approved profile generates Nix config");
+        assert!(config.contains("lanzaboote"));
+        assert!(config.contains("pkiBundle = \"/var/lib/sbctl\""));
+        assert!(config.contains("autoGenerateKeys.enable = true"));
+        assert!(config.contains("pkgs.sbctl"));
+        assert!(!config.contains("autoEnrollKeys"));
+        assert!(!config.contains("sbctl create-keys"));
+        assert!(!config.contains("/etc/secureboot"));
     }
 
     #[test]
-    fn test_no_mok_without_secure_boot() {
-        let orch = InoculationOrchestrator::default();
-        // secure_boot_state is None by default
-        assert!(!orch.needs_mok_enrollment());
-
-        // Also false when secure boot is disabled
-        let mut orch2 = InoculationOrchestrator::default();
-        orch2.secure_boot_state = Some("Disabled".to_string());
-        orch2.lanzaboote_enabled = true;
-        assert!(!orch2.needs_mok_enrollment());
-    }
-
-    #[test]
-    fn test_boot_config_lanzaboote() {
+    fn test_unknown_state_blocks_secure_boot_config() {
         let mut orch = InoculationOrchestrator::default();
         orch.lanzaboote_enabled = true;
-        let config = orch.generate_boot_config_nix();
-        assert!(config.contains("lanzaboote"));
-        assert!(config.contains("pkiBundle"));
-        assert!(config.contains("sbctl"));
-        assert!(config.contains("lib.mkForce false"));
+        orch.secure_boot_state = Some("Unknown".to_string());
+        orch.target_platform = TargetPlatform::Linux;
+        orch.hardware_profile = Some(serde_json::json!({"model": "synthetic-test"}));
+        assert!(orch.generate_boot_config_nix().is_err());
+        assert!(!orch.needs_secure_boot_enrollment());
     }
 
     #[test]
-    fn test_boot_config_standard() {
+    fn test_hardware_profile_mutation_invalidates_authorization() {
+        let mut orch = InoculationOrchestrator::default();
+        orch.lanzaboote_enabled = true;
+        orch.secure_boot_state = Some("Enabled".to_string());
+        orch.target_platform = TargetPlatform::Linux;
+        orch.hardware_profile = Some(serde_json::json!({"model": "synthetic-test"}));
+        authorize_synthetic_profile(&mut orch);
+        assert!(orch.generate_boot_config_nix().is_ok());
+
+        orch.hardware_profile = Some(serde_json::json!({"model": "different-target"}));
+        assert!(orch.generate_boot_config_nix().is_err());
+        assert!(!orch.needs_secure_boot_enrollment());
+    }
+
+    #[test]
+    fn test_stale_secure_boot_observation_invalidates_authorization() {
+        let mut orch = InoculationOrchestrator::default();
+        orch.lanzaboote_enabled = true;
+        orch.secure_boot_state = Some("Enabled".to_string());
+        orch.target_platform = TargetPlatform::Linux;
+        orch.hardware_profile = Some(serde_json::json!({"model": "synthetic-test"}));
+        authorize_synthetic_profile(&mut orch);
+
+        orch.secure_boot_state = Some("SetupMode".to_string());
+        assert!(orch.generate_boot_config_nix().is_err());
+    }
+
+    #[test]
+    fn test_boot_config_standard_needs_no_secure_boot_authorization() {
         let mut orch = InoculationOrchestrator::default();
         orch.lanzaboote_enabled = false;
-        let config = orch.generate_boot_config_nix();
+        let config = orch.generate_boot_config_nix().expect("standard boot does not enroll firmware keys");
         assert!(config.contains("systemd-boot.enable = true"));
         assert!(!config.contains("lanzaboote"));
+    }
+
+    #[test]
+    fn test_secure_boot_profile_rejects_missing_operator_consent() {
+        let mut orch = InoculationOrchestrator::default();
+        orch.lanzaboote_enabled = true;
+        orch.secure_boot_state = Some("Enabled".to_string());
+        orch.target_platform = TargetPlatform::Linux;
+        orch.hardware_profile = Some(serde_json::json!({"model": "synthetic-test"}));
+        let profile = orch.hardware_profile.as_ref().unwrap();
+        let bytes = serde_json::to_vec(profile).unwrap();
+        let approval = SecureBootProfileApproval {
+            profile_id: "synthetic-test-profile-v1".to_string(),
+            target_model: "Synthetic Lab Device".to_string(),
+            firmware_revision: "synthetic-firmware-1".to_string(),
+            nixos_release: "nixos-unstable-test".to_string(),
+            lanzaboote_revision: "synthetic-locked-revision".to_string(),
+            observed_secure_boot_state: "Enabled".to_string(),
+            hardware_profile_blake3: blake3::hash(&bytes).to_hex().to_string(),
+            user_confirmed: false,
+            exact_profile_qualified: true,
+            recovery_path_verified: true,
+        };
+        assert!(orch.authorize_secure_boot_configuration(approval).is_err());
+        assert!(orch.generate_boot_config_nix().is_err());
     }
 
     #[test]
