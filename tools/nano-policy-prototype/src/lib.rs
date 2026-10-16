@@ -502,9 +502,14 @@ pub fn select(request: &Request) -> Result<Response, String> {
             .collect();
 
         scored.sort_by(|left, right| {
-            right
-                .1
-                .total_cmp(&left.1)
+            let score_order = right.1.total_cmp(&left.1);
+            let coverage_tie_break = if request.policy == Policy::BalancedExtremes {
+                right.2.total_cmp(&left.2)
+            } else {
+                std::cmp::Ordering::Equal
+            };
+            score_order
+                .then(coverage_tie_break)
                 .then_with(|| request.candidates[left.0].id.cmp(&request.candidates[right.0].id))
         });
 
