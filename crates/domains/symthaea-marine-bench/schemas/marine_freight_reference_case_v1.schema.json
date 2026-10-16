@@ -1,0 +1,441 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://github.com/Luminous-Dynamics/symthaea/blob/main/crates/domains/symthaea-marine-bench/schemas/marine_freight_reference_case_v1.schema.json",
+  "title": "Symthaea marine freight reference case v1",
+  "description": "Input contract for bounded screening arithmetic. Validation of provenance references, physical applicability, and calculation semantics is performed separately by the Rust evaluator.",
+  "type": "object",
+  "additionalProperties": false,
+  "required": [
+    "schema_version",
+    "case_id",
+    "evidence_class",
+    "decision_use",
+    "system_boundary",
+    "provenance",
+    "route",
+    "vessel",
+    "duty_cycle",
+    "energy_system",
+    "terminal",
+    "claim_ceiling"
+  ],
+  "properties": {
+    "schema_version": {
+      "const": "1.0.0"
+    },
+    "case_id": {
+      "type": "string",
+      "minLength": 1
+    },
+    "evidence_class": {
+      "$ref": "#/$defs/evidence_class"
+    },
+    "decision_use": {
+      "$ref": "#/$defs/decision_use"
+    },
+    "system_boundary": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "includes",
+        "excludes"
+      ],
+      "properties": {
+        "includes": {
+          "type": "array",
+          "minItems": 1,
+          "items": {
+            "type": "string",
+            "minLength": 1
+          }
+        },
+        "excludes": {
+          "type": "array",
+          "minItems": 1,
+          "items": {
+            "type": "string",
+            "minLength": 1
+          }
+        }
+      }
+    },
+    "provenance": {
+      "type": "array",
+      "minItems": 1,
+      "items": {
+        "type": "object",
+        "additionalProperties": false,
+        "required": [
+          "id",
+          "class",
+          "description",
+          "source_uri"
+        ],
+        "properties": {
+          "id": {
+            "type": "string",
+            "minLength": 1
+          },
+          "class": {
+            "$ref": "#/$defs/evidence_class"
+          },
+          "description": {
+            "type": "string",
+            "minLength": 1
+          },
+          "source_uri": {
+            "type": [
+              "string",
+              "null"
+            ]
+          }
+        }
+      }
+    },
+    "route": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "maximum_vessel_length_m",
+        "maximum_vessel_beam_m",
+        "maximum_vessel_draft_m",
+        "available_water_depth_m",
+        "minimum_under_keel_clearance_m"
+      ],
+      "properties": {
+        "maximum_vessel_length_m": {
+          "$ref": "#/$defs/quantity_m"
+        },
+        "maximum_vessel_beam_m": {
+          "$ref": "#/$defs/quantity_m"
+        },
+        "maximum_vessel_draft_m": {
+          "$ref": "#/$defs/quantity_m"
+        },
+        "available_water_depth_m": {
+          "$ref": "#/$defs/quantity_m"
+        },
+        "minimum_under_keel_clearance_m": {
+          "$ref": "#/$defs/quantity_m"
+        }
+      }
+    },
+    "vessel": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "length_overall_m",
+        "beam_m",
+        "design_draft_m",
+        "cargo_capacity_tonnes"
+      ],
+      "properties": {
+        "length_overall_m": {
+          "$ref": "#/$defs/quantity_m"
+        },
+        "beam_m": {
+          "$ref": "#/$defs/quantity_m"
+        },
+        "design_draft_m": {
+          "$ref": "#/$defs/quantity_m"
+        },
+        "cargo_capacity_tonnes": {
+          "$ref": "#/$defs/quantity_t"
+        }
+      }
+    },
+    "duty_cycle": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "loaded_leg_propulsion_kwh",
+        "loaded_leg_auxiliary_kwh",
+        "return_leg_propulsion_kwh",
+        "return_leg_auxiliary_kwh",
+        "required_payload_tonnes",
+        "round_trip_duration_h"
+      ],
+      "properties": {
+        "loaded_leg_propulsion_kwh": {
+          "$ref": "#/$defs/quantity_kwh"
+        },
+        "loaded_leg_auxiliary_kwh": {
+          "$ref": "#/$defs/quantity_kwh"
+        },
+        "return_leg_propulsion_kwh": {
+          "$ref": "#/$defs/quantity_kwh"
+        },
+        "return_leg_auxiliary_kwh": {
+          "$ref": "#/$defs/quantity_kwh"
+        },
+        "required_payload_tonnes": {
+          "$ref": "#/$defs/quantity_t"
+        },
+        "round_trip_duration_h": {
+          "$ref": "#/$defs/quantity_h"
+        }
+      }
+    },
+    "energy_system": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "architecture_id",
+        "nominal_battery_kwh",
+        "temperature_capacity_factor",
+        "end_of_life_capacity_factor",
+        "reserve_fraction",
+        "charger_power_kw"
+      ],
+      "properties": {
+        "architecture_id": {
+          "type": "string",
+          "minLength": 1
+        },
+        "nominal_battery_kwh": {
+          "$ref": "#/$defs/quantity_kwh"
+        },
+        "temperature_capacity_factor": {
+          "$ref": "#/$defs/quantity_fraction"
+        },
+        "end_of_life_capacity_factor": {
+          "$ref": "#/$defs/quantity_fraction"
+        },
+        "reserve_fraction": {
+          "$ref": "#/$defs/quantity_fraction"
+        },
+        "charger_power_kw": {
+          "$ref": "#/$defs/quantity_kw"
+        }
+      }
+    },
+    "terminal": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "berth_length_m",
+        "berth_beam_limit_m",
+        "shore_connection_power_kw",
+        "charging_efficiency",
+        "available_charge_window_h",
+        "available_service_window_h"
+      ],
+      "properties": {
+        "berth_length_m": {
+          "$ref": "#/$defs/quantity_m"
+        },
+        "berth_beam_limit_m": {
+          "$ref": "#/$defs/quantity_m"
+        },
+        "shore_connection_power_kw": {
+          "$ref": "#/$defs/quantity_kw"
+        },
+        "charging_efficiency": {
+          "$ref": "#/$defs/quantity_fraction"
+        },
+        "available_charge_window_h": {
+          "$ref": "#/$defs/quantity_h"
+        },
+        "available_service_window_h": {
+          "$ref": "#/$defs/quantity_h"
+        }
+      }
+    },
+    "claim_ceiling": {
+      "const": "Arithmetic screening of declared inputs only; no hydrodynamic optimization, structural qualification, seaworthiness, environmental benefit, regulatory compliance, or operating authority."
+    }
+  },
+  "$defs": {
+    "known_quantity": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "status",
+        "value",
+        "unit",
+        "provenance_id"
+      ],
+      "properties": {
+        "status": {
+          "const": "known"
+        },
+        "value": {
+          "type": "number"
+        },
+        "unit": {
+          "enum": [
+            "m",
+            "t",
+            "kWh",
+            "kW",
+            "h",
+            "fraction"
+          ]
+        },
+        "provenance_id": {
+          "type": "string",
+          "minLength": 1
+        }
+      }
+    },
+    "unknown_quantity": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "status",
+        "reason"
+      ],
+      "properties": {
+        "status": {
+          "const": "unknown"
+        },
+        "reason": {
+          "type": "string",
+          "minLength": 1
+        }
+      }
+    },
+    "evidence_class": {
+      "enum": [
+        "synthetic_illustration",
+        "engineering_assumption",
+        "measured",
+        "validated_solver_output",
+        "published_reference",
+        "unknown"
+      ]
+    },
+    "decision_use": {
+      "enum": [
+        "not_for_decision",
+        "research_screening_only"
+      ]
+    },
+    "quantity_m": {
+      "oneOf": [
+        {
+          "allOf": [
+            {
+              "$ref": "#/$defs/known_quantity"
+            },
+            {
+              "properties": {
+                "unit": {
+                  "const": "m"
+                }
+              }
+            }
+          ]
+        },
+        {
+          "$ref": "#/$defs/unknown_quantity"
+        }
+      ]
+    },
+    "quantity_t": {
+      "oneOf": [
+        {
+          "allOf": [
+            {
+              "$ref": "#/$defs/known_quantity"
+            },
+            {
+              "properties": {
+                "unit": {
+                  "const": "t"
+                }
+              }
+            }
+          ]
+        },
+        {
+          "$ref": "#/$defs/unknown_quantity"
+        }
+      ]
+    },
+    "quantity_kwh": {
+      "oneOf": [
+        {
+          "allOf": [
+            {
+              "$ref": "#/$defs/known_quantity"
+            },
+            {
+              "properties": {
+                "unit": {
+                  "const": "kWh"
+                }
+              }
+            }
+          ]
+        },
+        {
+          "$ref": "#/$defs/unknown_quantity"
+        }
+      ]
+    },
+    "quantity_kw": {
+      "oneOf": [
+        {
+          "allOf": [
+            {
+              "$ref": "#/$defs/known_quantity"
+            },
+            {
+              "properties": {
+                "unit": {
+                  "const": "kW"
+                }
+              }
+            }
+          ]
+        },
+        {
+          "$ref": "#/$defs/unknown_quantity"
+        }
+      ]
+    },
+    "quantity_h": {
+      "oneOf": [
+        {
+          "allOf": [
+            {
+              "$ref": "#/$defs/known_quantity"
+            },
+            {
+              "properties": {
+                "unit": {
+                  "const": "h"
+                }
+              }
+            }
+          ]
+        },
+        {
+          "$ref": "#/$defs/unknown_quantity"
+        }
+      ]
+    },
+    "quantity_fraction": {
+      "oneOf": [
+        {
+          "allOf": [
+            {
+              "$ref": "#/$defs/known_quantity"
+            },
+            {
+              "properties": {
+                "unit": {
+                  "const": "fraction"
+                }
+              }
+            }
+          ]
+        },
+        {
+          "$ref": "#/$defs/unknown_quantity"
+        }
+      ]
+    }
+  }
+}
