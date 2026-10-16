@@ -1092,22 +1092,18 @@ mod tests {
     #[test]
     fn classifies_improvement_only_when_margin_is_met_and_interval_excludes_zero() {
         let mut ledger = fixture();
-        for observation in &mut ledger.arms[0]
-            .target_queries
-            .iter_mut()
-            .flat_map(|target| target.observations.iter_mut())
-        {
-            if observation.status == ObservationStatus::Evaluated {
-                observation.loss = Some(0.5);
+        for target in &mut ledger.arms[0].target_queries {
+            for observation in &mut target.observations {
+                if observation.status == ObservationStatus::Evaluated {
+                    observation.loss = Some(0.5);
+                }
             }
         }
-        for observation in &mut ledger.arms[1]
-            .target_queries
-            .iter_mut()
-            .flat_map(|target| target.observations.iter_mut())
-        {
-            if observation.status == ObservationStatus::Evaluated {
-                observation.loss = Some(0.001);
+        for target in &mut ledger.arms[1].target_queries {
+            for observation in &mut target.observations {
+                if observation.status == ObservationStatus::Evaluated {
+                    observation.loss = Some(0.001);
+                }
             }
         }
 
