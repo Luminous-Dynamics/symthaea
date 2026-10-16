@@ -1657,7 +1657,7 @@ mod tests {
         assert!(!orch.is_configuration_authorized());
         assert!(orch.generate_nix_config().is_err());
         assert!(orch.boot_chain.as_ref().unwrap().stages.iter()
-            .all(|stage| matches!(stage.status, BootStageStatus::Indeterminate { .. })));
+            .all(|stage| matches!(&stage.status, BootStageStatus::Indeterminate { .. })));
     }
 
     #[test]
@@ -1875,7 +1875,7 @@ mod tests {
         );
         assert!(!chain.fully_verified());
         assert_eq!(
-            chain.stages.iter().filter(|stage| matches!(stage.status, BootStageStatus::Indeterminate { .. })).count(),
+            chain.stages.iter().filter(|stage| matches!(&stage.status, BootStageStatus::Indeterminate { .. })).count(),
             5
         );
     }
