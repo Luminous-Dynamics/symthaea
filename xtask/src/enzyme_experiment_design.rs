@@ -264,7 +264,7 @@ fn select_condition(
         let chosen = available
             .iter()
             .copied()
-            .min_by(|a, b| (a - preferred).abs().total_cmp(&(b - preferred).abs()))
+            .min_by(|a, b| (*a - preferred).abs().total_cmp(&(*b - preferred).abs()))
             .context("candidate pool must contain the precommitted condition")?;
         return Ok(Selection {
             substrate: chosen,
