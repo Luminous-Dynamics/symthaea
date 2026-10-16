@@ -40,6 +40,15 @@ fn run() -> Result<(), ReplayError> {
         let event_base = 1_000_000 + event_index as u64 * 100_000;
         let mut positive_signals = 0usize;
 
+        // Exactly one outcome-revealing observation per event, timestamped after every horizon.
+        // Repeating it once per horizon would create duplicate event/method/timestamp keys.
+        observations.push(ForecastObservation::new(
+            event_id.clone(),
+            "oracle_future_only",
+            event_base + RESOLUTION_OFFSET - 1,
+            if outcome { 0.999 } else { 0.001 },
+        )?);
+
         for (horizon_index, (horizon_id, cutoff_offset)) in HORIZONS.iter().enumerate() {
             let cutoff = event_base + *cutoff_offset;
             let target = ForecastTarget::new(
@@ -87,14 +96,6 @@ fn run() -> Result<(), ReplayError> {
                 )?);
             }
 
-            // Negative control: an outcome-revealing forecast is timestamped after every target cutoff.
-            // It can never be selected for any horizon in this event.
-            observations.push(ForecastObservation::new(
-                event_id.clone(),
-                "oracle_future_only",
-                event_base + RESOLUTION_OFFSET - 1,
-                if outcome { 0.999 } else { 0.001 },
-            )?);
         }
     }
 
