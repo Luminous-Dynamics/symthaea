@@ -107,6 +107,8 @@ Use Mycelix for consented participation, provenance/attestation, proposals, cont
 
 Render scenarios and trade-offs on the geographic model: who gains access, which critical networks fail, how heat/cooling access shifts, where water stress accumulates, and which assumptions are uncertain. Visual layers must show data timestamps and confidence, and allow a user to distinguish source observation from simulation output.
 
+**Next qualification target:** [Living City Policy Robustness Benchmark v0.2](https://github.com/Luminous-Dynamics/symthaea/blob/research/urban-systems-lab-v0-1/docs/research/LIVING_CITY_POLICY_ROBUSTNESS_BENCHMARK_V0_2.md) specifies matched policy baselines, held-out compound hazards, sensor/action delays, service-loss and recovery measures, and anti-leakage controls. Its implementation is tracked in [#7618](https://github.com/Luminous-Dynamics/symthaea/issues/7618); this is a specification, not an executed benchmark or a real-city validation claim.
+
 ## First benchmark release: LCB-0.1
 
 The current branch adds a small pure-standard-library evaluator in the Symthaea scenario crate. It separates **locally configured hard floors** from a ten-metric Pareto comparison. It has no embedded universal city thresholds and no weighted “one number to rule them all.” Its tests use synthetic fixtures only.
