@@ -162,6 +162,24 @@ The research motivation is established rather than novel: group-weighted conform
 
 Research task: [CRISPR-OT-006 #7615 — robust target-mixture transportability](https://github.com/Luminous-Dynamics/symthaea/issues/7615).
 
+### O. From shift envelopes to a robustness radius
+
+The bounded transportability envelope tells whether any allowed target mixture can change the sign of a policy gain. The next useful question is: **how far must the group composition move from the observed source cohort before the nominal gain disappears?**
+
+The shift-radius utility reports the minimum total-variation (TV) distance between source and target context weights that reaches a non-positive weighted effect, respecting the declared target-prevalence bounds. TV is half the L1 distance: a radius of 0.05 means five percentage points of population mass must be reallocated.
+
+It calculates two different quantities:
+- **Nominal radius:** use each context's preregistered point-estimate delta.
+- **Conservative radius:** use each context's supplied lower effect bound.
+
+A zero nominal radius means the source point estimate is already non-positive. A zero conservative radius means robust positivity is absent already at the source mix, even if the nominal estimate is positive. If no feasible target mixture can erase a positive effect within the declared bounds, the result is not erasable within those bounds. These are sensitivity outcomes, not statistical confidence intervals.
+
+The implementation is [scripts/crispr_shift_robustness_radius.rs](../../scripts/crispr_shift_robustness_radius.rs). The exact optimization transfers mass from higher-effect to lower-effect contexts until the weighted effect reaches zero or the declared target-mixture capacities are exhausted. It validates witness weights and checks that TV distance equals half the L1 change. All group-effect values and target-prevalence bounds remain supplied inputs with independent provenance requirements.
+
+This is an established robustness idea rather than a novelty claim. Ma and Glynn analyze the minimum distribution shift needed to violate a performance tolerance ([Operations Research](https://doi.org/10.1287/opre.2022.0658)); the 2026 Iterative Robust Satisficing work explicitly minimizes fragility under distribution shift ([PMLR 306](https://proceedings.mlr.press/v306/agirman26a.html)). This CRISPR-specific integration exposes the sign-change radius for paired Recall@K deltas alongside the nominal and conservative transportability envelope.
+
+Research task: [CRISPR-OT-007 #7623 — minimum population-shift robustness radius](https://github.com/Luminous-Dynamics/symthaea/issues/7623).
+
 ## 2. Required benchmark tracks
 
 | Track | Question | Primary measures | Cannot establish |
@@ -180,6 +198,7 @@ Research task: [CRISPR-OT-006 #7615 — robust target-mixture transportability](
 | T11 Decision-critical measurement allocation | Which unknown outcomes most directly resolve disagreement in a preregistered top-K policy comparison? | differential unknown labels resolved at fixed declared cost, residual numerator-ambiguity count, context coverage, before/after paired label-sensitivity bounds | full expected value of information, total uncertainty resolved, experimental savings, biological safety |
 | T12 Interval-aware robust frontier | Which policy dominance claims survive interval uncertainty in every objective? | robust frontier, definitely dominated policies, robust dominance pairs, possible-only dominance pairs, point-frontier disagreements | intervals generated, simultaneous coverage, biological/clinical safety |
 | T13 Target-mixture transportability | Does policy improvement survive every preregistered plausible target-context mixture? | lower/upper target-mixture delta, endpoint witness weights, robust-positive/non-positive/inconclusive classification, source-versus-target sign change | unsupported contexts, target-population truth beyond declared bounds, clinical safety |
+| T14 Shift robustness radius | How much feasible context-composition change erases a nominal or conservative policy gain? | nominal and lower-bound TV radius, sign-change witness, source effect and target bounds | real-world shift size, unseen contexts, clinical safety |
 
 Tracks are reported separately. A composite “CRISPR score” that hides failed nomination, calibration, or generalization is prohibited.
 
@@ -323,7 +342,7 @@ The credible breakthrough would be evidence that a general-purpose reasoning/evi
 
 ## 11. Synthetic contract fixtures
 
-The machine-readable companion contract contains twelve synthetic fixtures intended to become deterministic unit tests for the Rust scorer/verifier:
+The machine-readable companion contract contains thirteen synthetic fixtures intended to become deterministic unit tests for the Rust scorer/verifier:
 
 1. **F1 — nomination vs seeded ranking.** Four eligible positives, two in the native nominations: expected native coverage is 2/4 = 0.5. Later seeding the two missing positives into a ranking universe allows Recall@5 to reach 1.0, but native nomination coverage remains 0.5.
 2. **F2 — unknown is not negative.** If an unknown/unassayed candidate is inside the review set, precision is not estimable under the declared label semantics; it may not be silently counted as a true negative.
@@ -405,3 +424,11 @@ The dependency-free implementation is [scripts/crispr_transportability.rs](../..
     /tmp/crispr-transport-tests
 
 An independent grid oracle checked all 12 feasible tenth-step prevalence vectors for F12 and all 8 endpoint combinations of the three context delta intervals (96 assignments total). A broader deterministic oracle checked 2,000 feasible three-context fixtures, 10,856 feasible prevalence vectors, and 86,848 endpoint assignments on 0.1 grids, with zero mismatches against exhaustive enumeration. It reproduced the exact lower bound -0.076 at [0.2, 0.4, 0.4] and upper bound +0.073 at [0.5, 0.4, 0.1]. This is a direct synthetic calculation, not Rust execution or biological evidence.
+
+
+13. **F13 — population-shift robustness radius.** Use F12's source weights A=0.35, B=0.45, C=0.20; nominal context deltas A=0.10, B=0.045, C=-0.20; lower bounds A=0.08, B=0.02, C=-0.25; and target bounds A=[0.2,0.5], B=[0.3,0.6], C=[0.1,0.4]. The nominal source-mixture effect is +0.01525. The minimum nominal TV shift to reach zero is 0.0508333333, with witness A=0.2991666667, B=0.45, C=0.2508333333. The conservative source mixture is already -0.013, so the lower-bound radius is 0. This exposes the difference between a point estimate with a nonzero robustness radius and a conservative conclusion that is not positive even before any shift.
+
+Thirteen Rust tests are authored in the new module; they are not compiled/executed because `rustc` is unavailable. An independent vertex-enumeration oracle compared the greedy radius with exact feasible-polytope vertices on 2,500 deterministic three-context fixtures, for both nominal and lower-bound effects (5,000 comparisons). There were zero mismatches, including 4,041 erasable and 959 non-erasable cases. The oracle included source-weight breakpoints for the TV objective. This checks the mathematical optimizer against the tested finite-dimensional formulation, not the Rust source or biological truth.
+
+    rustc --edition=2024 --test scripts/crispr_shift_robustness_radius.rs -o /tmp/crispr-shift-radius-tests
+    /tmp/crispr-shift-radius-tests
