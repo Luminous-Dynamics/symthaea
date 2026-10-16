@@ -244,5 +244,94 @@
     "https://doi.org/10.1177/10430342261466407",
     "https://www.nature.com/articles/s42003-025-08275-6",
     "https://academic.oup.com/bib/article/27/2/bbag140/8559621"
+  ],
+  "synthetic_contract_fixtures": [
+    {
+      "id": "F1_nomination_is_not_seeded_ranking",
+      "purpose": "Prove that adding measured positives to a ranking universe cannot improve the native candidate-generator's historical nomination coverage.",
+      "eligible_positive_ids": [
+        "p1",
+        "p2",
+        "p3",
+        "p4"
+      ],
+      "native_nominated_ids": [
+        "p1",
+        "p3",
+        "n1"
+      ],
+      "post_seeded_ranking": [
+        "p1",
+        "n1",
+        "p3",
+        "p2",
+        "p4",
+        "n2"
+      ],
+      "expected": {
+        "native_positive_coverage": 0.5,
+        "uncaptured_positive_ids": [
+          "p2",
+          "p4"
+        ],
+        "recall_at_k": {
+          "3": 0.5,
+          "5": 1
+        },
+        "invariant": "native nomination coverage stays 0.5 even when ranking on the post-seeded universe later reaches recall 1.0"
+      }
+    },
+    {
+      "id": "F2_unknown_is_not_negative",
+      "purpose": "Ensure unassayed outcomes are not silently turned into true negatives or used to claim precision.",
+      "ranked_candidates": [
+        {
+          "id": "u1",
+          "label": "unknown_unassayed"
+        },
+        {
+          "id": "p1",
+          "label": "positive"
+        },
+        {
+          "id": "n1",
+          "label": "assay_defined_negative"
+        }
+      ],
+      "review_budget": 2,
+      "expected": {
+        "positives_in_top_k": 1,
+        "eligible_positive_denominator": 1,
+        "recall_at_k": 1,
+        "precision_at_k": "not_estimable_due_to_unknown_in_review_set"
+      }
+    },
+    {
+      "id": "F3_digest_mismatch_blocks_replay",
+      "purpose": "A source digest mismatch must stop metric execution rather than allow an unqualified report.",
+      "input_manifest_sha256": "fixture:expected-digest",
+      "observed_artifact_sha256": "fixture:changed-digest",
+      "expected": {
+        "replay_status": "blocked",
+        "metric_claim_allowed": false
+      }
+    },
+    {
+      "id": "F4_group_leakage_blocks_generalization",
+      "purpose": "The same guide/Cas9 group cannot appear in both train and held-out partitions when group holdout is the declared split.",
+      "group_id": "guide-cas9-group-07",
+      "train_group_ids": [
+        "guide-cas9-group-01",
+        "guide-cas9-group-07"
+      ],
+      "held_out_group_ids": [
+        "guide-cas9-group-07",
+        "guide-cas9-group-18"
+      ],
+      "expected": {
+        "split_status": "invalid",
+        "generalization_claim_allowed": false
+      }
+    }
   ]
 }
