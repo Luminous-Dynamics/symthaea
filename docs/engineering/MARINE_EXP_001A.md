@@ -40,7 +40,7 @@ When an experiment is selected, its simulator outcome narrows only the declared 
 ## Policies
 
 - `cheapest_first` — deterministic lower-cost experiment selection.
-- `round_robin` — rotates across parameter families to prevent a single cheap target from consuming the budget.
+- `round_robin` — rotates across parameter families, with the starting parameter rotated by paired seed. This avoids degenerating into the same order as cheapest-first because of catalog ordering.
 - `seeded_random` — seeded baseline reproducible for paired comparisons.
 - `constraint_criticality` — a transparent heuristic that prioritizes normalized interval width reduction per credit on currently indeterminate constraints.
 - `exhaustive_toy_oracle` — enumerates every subset of the 12 catalog entries within the budget and selects the best resulting synthetic outcome by resolved hard constraints, normalized interval-width reduction, then lower cost. It sees hidden synthetic truth and is **not a deployable policy**; its bound is only for this finite toy outcome model.
@@ -60,7 +60,7 @@ The report binds:
 - paired strategy summaries;
 - scope limitations;
 - hash of the generated scenario corpus;
-- hash of the ordered policy/seed execution trace;
+- hash of the ordered policy/seed execution trace, including the experiment IDs selected for each scenario;
 - SHA-256 of the serialized benchmark body.
 
 The receipt structure is specified in `crates/domains/symthaea-marine-bench/schemas/marine_experiment_selection_receipt_v1.schema.json`. These digests are tamper-evident when recomputed, but SHA-256 is not a signature and does not authenticate who supplied data.
