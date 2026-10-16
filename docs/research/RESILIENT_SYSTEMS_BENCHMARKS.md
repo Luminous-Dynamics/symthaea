@@ -281,7 +281,7 @@ Scenario weights must sum to one, but they are **not probabilities** unless just
 
 A fifth Rust module, [rolling_horizon_repair.rs](../../crates/domains/symthaea-engineering/src/rolling_horizon_repair.rs), adds **event-triggered recourse** to the fixed-plan baseline. At each observed completion/release event it rebuilds the eligible set from completed prerequisites, available qualified crews, outage release times, and remaining spare stock. It then dispatches one repair at a time per free crew. Parts are consumed only when a repair starts.
 
-The information boundary is deliberately narrow: nominal duration ranks pending jobs; the realized duration is looked up only after the job has been selected, and only schedules the job's completion event. The report records decision time, eligible job IDs, completed jobs observed, available crews, dispatch choice, remaining stock, and service-unit-step loss. This is a simulation contract—not cryptographic proof of nonanticipativity and not field validation.
+The information boundary is deliberately narrow: nominal duration ranks pending jobs; the realized duration is looked up only after the job has been selected, and only schedules the job's completion event. The report records decision time, eligible job IDs, completed jobs observed, available crews, dispatch choice, remaining stock, and service-unit-step loss. This is a simulation contract—not cryptographic proof of nonanticipativity and not field validation. The paired fixed-versus-adaptive scenario harness is implemented separately in [repair_policy_comparison.rs](../../crates/domains/symthaea-engineering/src/repair_policy_comparison.rs); empirical calibration, a versioned holdout corpus, and statistical confidence intervals remain future work.
 
 The paradigm shift is from treating the schedule as a commitment that must remain fixed to treating it as a **revisable policy operating on observed state**. A scenario can therefore change the next decision through completion timing, newly released jobs, dependency availability, or stock depletion, without granting the policy future repair durations. The fixed robust replay stays important as a paired baseline; adaptive dispatch must not be assumed superior in every case.
 
@@ -313,7 +313,7 @@ These are targets, not measured results or universal standards.
 
 The initial adaptive fixture is synthetic. On its one-crew, three-job trace, fixed nominal dispatch order is A→C→B. With A taking 10 rather than its nominal 1 step and B becoming eligible at step 5, event-triggered priority dispatch reorders the still-pending work to A→B→C. The fixed-order realized loss is 922 versus 724 for adaptive dispatch on the declared weights: a 21.5% reduction for this one designed witness. This is a reproducible scenario claim only; it is not an average improvement claim, nor evidence of real-world predictive value.
 
-Current source-level coverage is 11 authored unit tests for this module. None of the Rust tests in this portfolio have been compiled or run in the current environment; the full rolling-horizon benchmark protocol is not implemented as a batch statistical evaluator.
+Current source-level coverage is 11 authored unit tests for this module. None of the Rust tests in this portfolio have been compiled or run in the current environment. The paired evaluator now runs a deterministic batch comparison, but it does not yet estimate statistical confidence intervals or calibrate scenarios against operational records.
 
 
 ## 9. Paired fixed-plan versus adaptive evaluation
