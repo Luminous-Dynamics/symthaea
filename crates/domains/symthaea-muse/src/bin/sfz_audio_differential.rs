@@ -421,7 +421,6 @@ fn comparison_metrics(
 
     let count = sample_count as f64;
     let waveform_rmse = (squared_error / count).sqrt();
-    let candidate_overlap_rms = (sum_candidate_squared / count).sqrt();
     let reference_overlap_rms = (sum_reference_squared / count).sqrt();
     let covariance = sum_product / count - (sum_candidate / count) * (sum_reference / count);
     let candidate_variance = (sum_candidate_squared / count - (sum_candidate / count).powi(2)).max(0.0);
@@ -465,7 +464,7 @@ fn average_magnitude_spectrum(samples: &[f32], channels: usize, frames: usize) -
     let mut window = vec![0.0_f32; FFT_SIZE];
     for (index, coefficient) in window.iter_mut().enumerate() {
         *coefficient = if FFT_SIZE > 1 {
-            0.5 - 0.5 * (std::f32::consts::TAU * index as f32 / (FFT_SIZE - 1) as f32).cos() * 0.5
+            0.5 - 0.5 * (std::f32::consts::TAU * index as f32 / (FFT_SIZE - 1) as f32).cos()
         } else {
             1.0
         };
@@ -508,7 +507,6 @@ fn spectrum_distances(candidate: &[f64], reference: &[f64]) -> (f64, f64, f64) {
     let mut log_squared = 0.0_f64;
     let mut candidate_power_sum = 0.0_f64;
     let mut reference_power_sum = 0.0_f64;
-    let mut power_difference_sum = 0.0_f64;
     let mut magnitude_dot = 0.0_f64;
     let mut candidate_magnitude_squared = 0.0_f64;
     let mut reference_magnitude_squared = 0.0_f64;
@@ -523,7 +521,6 @@ fn spectrum_distances(candidate: &[f64], reference: &[f64]) -> (f64, f64, f64) {
         let rp = reference[index] * reference[index];
         candidate_power_sum += cp;
         reference_power_sum += rp;
-        power_difference_sum += (cp - rp).abs();
         magnitude_dot += candidate[index] * reference[index];
         candidate_magnitude_squared += candidate[index] * candidate[index];
         reference_magnitude_squared += reference[index] * reference[index];
@@ -541,7 +538,6 @@ fn spectrum_distances(candidate: &[f64], reference: &[f64]) -> (f64, f64, f64) {
                 (candidate_power - reference_power).abs()
             })
             .sum::<f64>();
-    let _ = power_difference_sum; // Kept explicit above to ease future raw-power diagnostics.
     let denominator = (candidate_magnitude_squared * reference_magnitude_squared).sqrt();
     let cosine = if denominator > METRIC_EPSILON {
         (magnitude_dot / denominator).clamp(0.0, 1.0)
