@@ -79,9 +79,9 @@ jobs:
           trap 'rm -f "$receipts"' EXIT
           cargo run --locked --quiet --features evidence-benchmark --bin evidence_action_benchmark -- trajectory-audit "$dataset"
           cargo run --locked --quiet --features evidence-benchmark --bin evidence_action_benchmark -- trajectory-evaluate "$dataset" "$receipts" trajectory-policy-v1 1 false
-          cargo run --locked --quiet --features evidence-benchmark --bin evidence_action_benchmark -- trajectory-score "$dataset" "$receipts" trajectory-policy-v1
+          cargo run --locked --quiet --features evidence-benchmark --bin evidence_action_benchmark -- trajectory-score "$dataset" "$receipts" trajectory-policy-v1 1 false
           set +e
-          cargo run --locked --quiet --features evidence-benchmark --bin evidence_action_benchmark -- trajectory-score "$dataset" "$unsafe_dataset" trajectory-policy-v1
+          cargo run --locked --quiet --features evidence-benchmark --bin evidence_action_benchmark -- trajectory-score "$dataset" "$unsafe_dataset" trajectory-policy-v1 1 false
           status=$?
           set -e
           if [[ "$status" -ne 3 ]]; then
