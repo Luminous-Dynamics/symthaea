@@ -71,6 +71,8 @@ pub struct BioacousticAnnotation {
 pub struct BioacousticUnscoredRegion {
     pub interval: crate::TimeSpan,
     pub reason: String,
+    /// Provenance for the human/model annotation decision to exclude this span.
+    pub annotation_source: String,
 }
 
 #[derive(Clone, Debug, PartialEq, Serialize, Deserialize)]
@@ -306,6 +308,7 @@ pub fn validate_bioacoustic_corpus(
                 || region.interval.end_s <= region.interval.start_s
                 || region.interval.end_s > duration_s
                 || region.reason.trim().is_empty()
+                || region.annotation_source.trim().is_empty()
             {
                 return Err(format!(
                     "sample {} has an invalid unscored region",
@@ -589,6 +592,7 @@ mod tests {
                 end_s: 0.4,
             },
             reason: "uncertain caller".into(),
+                annotation_source: "expert-reviewed-uncertainty-v1".into(),
         });
         assert_ne!(
             manifest().computed_manifest_blake3().unwrap(),
@@ -700,6 +704,7 @@ mod tests {
                     end_s: 0.4,
                 },
                 reason: "caller overlap".into(),
+                annotation_source: "expert-reviewed-uncertainty-v1".into(),
             },
             BioacousticUnscoredRegion {
                 interval: TimeSpan {
@@ -707,6 +712,7 @@ mod tests {
                     end_s: 0.6,
                 },
                 reason: "low signal-to-noise".into(),
+                annotation_source: "expert-reviewed-uncertainty-v1".into(),
             },
         ];
         assert!(validate_bioacoustic_corpus(&corpus, BioacousticSplitPolicy::default()).is_ok());
@@ -722,6 +728,7 @@ mod tests {
                     end_s: 0.6,
                 },
                 reason: "uncertain".into(),
+                annotation_source: "expert-reviewed-uncertainty-v1".into(),
             },
             BioacousticUnscoredRegion {
                 interval: TimeSpan {
@@ -729,6 +736,7 @@ mod tests {
                     end_s: 0.7,
                 },
                 reason: "uncertain".into(),
+                annotation_source: "expert-reviewed-uncertainty-v1".into(),
             },
         ];
         assert!(validate_bioacoustic_corpus(&corpus, BioacousticSplitPolicy::default()).is_err());
@@ -741,6 +749,7 @@ mod tests {
                     end_s: 0.6,
                 },
                 reason: "later".into(),
+                annotation_source: "expert-reviewed-uncertainty-v1".into(),
             },
             BioacousticUnscoredRegion {
                 interval: TimeSpan {
@@ -748,6 +757,7 @@ mod tests {
                     end_s: 0.4,
                 },
                 reason: "earlier".into(),
+                annotation_source: "expert-reviewed-uncertainty-v1".into(),
             },
         ];
         assert!(validate_bioacoustic_corpus(&corpus, BioacousticSplitPolicy::default()).is_err());
@@ -762,6 +772,7 @@ mod tests {
                 end_s: 0.25,
             },
             reason: "annotation ambiguous".into(),
+                annotation_source: "expert-reviewed-uncertainty-v1".into(),
         });
         assert!(validate_bioacoustic_corpus(&corpus, BioacousticSplitPolicy::default()).is_err());
     }
