@@ -1255,6 +1255,7 @@ mod tests {
         assert!(!binding.quality_qualified);
         assert!(binding.failures.len() >= 5);
     }
+
     #[test]
     fn comparison_binding_requires_complete_finite_metrics_and_nonempty_capture() {
         let candidate_hash = "a".repeat(64);
@@ -1313,6 +1314,14 @@ mod tests {
         let rejected = validate_comparison_binding(&bytes, &candidate_hash, &reference_hash);
         assert!(!rejected.metrics_present);
         assert!(!rejected.failures.is_empty());
+        assert!(!rejected.quality_qualified);
+
+        let mut out_of_range_metrics = receipt.clone();
+        out_of_range_metrics["comparison"]["metrics"]["normalized_power_spectrum_l1"] =
+            serde_json::json!(3.0);
+        let bytes = serde_json::to_vec(&out_of_range_metrics).unwrap();
+        let rejected = validate_comparison_binding(&bytes, &candidate_hash, &reference_hash);
+        assert!(!rejected.metrics_present);
         assert!(!rejected.quality_qualified);
 
         let zero_frames = serde_json::json!({
