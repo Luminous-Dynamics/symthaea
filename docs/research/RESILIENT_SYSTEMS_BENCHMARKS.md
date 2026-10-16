@@ -380,3 +380,26 @@ This extension aligns with established multi-skilled resource-constrained projec
 - **Policy gaps:** report exact optimum, heuristic loss, absolute gap and relative gap for each policy; a negative gap beyond tolerance is a correctness failure.
 - **External reproducibility:** port a small subset of a published MS-RCPSP or iMOPSE benchmark with clear mapping assumptions, preserve the original source identifiers, and compare optimal values/bounds only where the objective and constraints match exactly.
 - **Next expansion:** add finite spare stocks or repair-material constraints as a separate oracle dimension with a fresh negative-control corpus. Do not silently apply the present exact results to constraints this module excludes.
+
+
+## 12. Independent repair-schedule certificate verification
+
+**Paradigm shift: separate the schedule producer from the schedule checker.** The new Rust module `repair_schedule_certificate.rs` accepts a proposed job/crew timeline and a claimed weighted-completion loss. It independently verifies job coverage and uniqueness, identifier validity, skill eligibility, duration consistency, crew non-overlap, precedence, the currently supported model assumptions, and the objective arithmetic. It intentionally does not call the exhaustive search or heuristic scheduler.
+
+The checker is deliberately narrower than a full operational validator: zero outage start, crews available at step zero, positive integer durations, one required skill per repair, and no spare-parts requirements. Unsupported cases fail closed. A successful check validates feasibility and the arithmetic of the reported objective; **it does not prove that the schedule is globally optimal**. Optimality still depends on the exhaustive oracle's search argument or a separate proof/lower bound.
+
+### Certificate-verifier acceptance targets
+
+- **Negative controls:** 100% rejection of the explicitly enumerated invalid certificate fixtures, including missing/duplicate jobs, unknown identifiers, unqualified crew assignment, overlapping jobs, precedence violation, incorrect durations, unsupported constraints, invalid numbers, and false objective claims.
+- **Mutation campaign:** at least 10,000 deterministic schedule mutations across valid tiny fixtures; zero invalid mutated schedule may be accepted. Record seed, mutation operators, corpus version, verifier revision, rejected/accepted counts, and minimized counterexamples.
+- **Differential check:** for every generated tiny oracle result, run the independent verifier on the returned schedule and compare its recomputed objective to the oracle report. Any disagreement blocks the result.
+- **Determinism:** same inputs and certificate produce the same accept/reject outcome and computed objective; reorder input jobs and crews and retain the same semantic result.
+- **Scope guard:** any expansion to parts, travel, shifts, release times, or uncertainty must add explicit certificate fields/checks and negative controls before it is used by the planner.
+
+This verifier is a small, independently implemented trust boundary for later solvers, not an operational safety certification. Its Rust unit tests are authored but have not been executed in the current environment.
+
+## External benchmark route: multi-skill scheduling
+
+Do not claim the three synthetic MC fixtures establish external validity. Snauwaert and Vanhoucke publish a classification and multiple datasets for multi-skilled resource-constrained project scheduling, including comparison with seven empirical software/railway cases ([EJOR 2023](https://doi.org/10.1016/j.ejor.2022.05.049)). The iMOPSE work publishes a 36-instance benchmark and true Pareto fronts for six smaller cases across five objectives ([Applied Soft Computing 2022](https://doi.org/10.1016/j.asoc.2022.109253)); its objectives and model are not automatically equivalent to this repair-loss objective.
+
+The next reproducible benchmark step is a versioned adapter with preserved upstream IDs and documented mapping/exclusion rules. Report feasibility rate, objective/best-known gap only where objectives match, runtime distribution, number of evaluated candidates, skill-flexibility sensitivity, schedule stability under perturbations, and a Pareto front for service loss versus labor/cost or skill overuse. Keep tuning instances separate from held-out instances. The current PR does not yet import or run either external dataset.
