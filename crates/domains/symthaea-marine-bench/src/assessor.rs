@@ -84,7 +84,7 @@ impl std::error::Error for AssessmentError {}
 /// or overall PASS is generated. Unknown, malformed, or unproven inputs result
 /// in an indeterminate finding rather than being replaced by zero.
 pub fn assess(case: &MarineFreightCase) -> Result<AssessmentReport, AssessmentError> {
-    if case.schema_version != "1.0.0" {
+    if case.schema_version != "2.0.0" {
         return Err(AssessmentError::UnsupportedSchema(case.schema_version.clone()));
     }
     if case.case_id.trim().is_empty() {
@@ -189,7 +189,7 @@ pub fn assess(case: &MarineFreightCase) -> Result<AssessmentReport, AssessmentEr
     ));
 
     Ok(AssessmentReport {
-        schema_version: "1.0.0".to_owned(),
+        schema_version: "2.0.0".to_owned(),
         case_id: case.case_id.clone(),
         evidence_class: case.evidence_class.clone(),
         decision_use: case.decision_use.clone(),
@@ -503,7 +503,7 @@ mod tests {
     use crate::model::EvidenceValue;
 
     const FIXTURE: &str =
-        include_str!("../fixtures/marine_freight_reference_case_v1.synthetic.json");
+        include_str!("../fixtures/marine_freight_reference_case_v2.synthetic.json");
 
     fn case() -> MarineFreightCase {
         serde_json::from_str(FIXTURE).expect("the checked-in reference fixture must parse")
@@ -528,7 +528,7 @@ mod tests {
     fn synthetic_reference_case_matches_hand_calculated_baseline() {
         let case = case();
         let report = assess(&case).expect("valid synthetic case");
-        assert_eq!(report.case_id, "marine-freight-synthetic-screen-v1");
+        assert_eq!(report.case_id, "marine-freight-synthetic-screen-v2");
         assert_eq!(report.findings.len(), 10);
         assert!(report.findings.iter().all(|f| f.status == FindingStatus::WithinDeclaredBound));
 
