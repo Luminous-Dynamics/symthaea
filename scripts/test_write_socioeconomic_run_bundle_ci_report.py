@@ -32,7 +32,7 @@ class ExecutionReportTests(unittest.TestCase):
             path.write_text("def test_example():\n    assert True\n", encoding="utf-8")
         log = self.root / TEST_LOG_PATH
         log.parent.mkdir(parents=True, exist_ok=True)
-        log.write_text("Ran 1 test; OK\n", encoding="utf-8")
+        log.write_text("Ran 1 test in 0.001s\n\nOK\nRan 1 test in 0.001s\n\nOK\n", encoding="utf-8")
 
         subprocess.run(["git", "init", "-q"], cwd=self.root, check=True)
         subprocess.run(["git", "config", "user.name", "Test Runner"], cwd=self.root, check=True)
@@ -82,6 +82,14 @@ class ExecutionReportTests(unittest.TestCase):
         broken["CIVOS_SOURCE_REVISION"] = "0" * 40
         with self.assertRaisesRegex(ReportFailure, "does not match CIVOS_SOURCE_REVISION"):
             build_report(self.root, broken, TEST_LOG_PATH)
+
+    def test_test_log_must_report_each_suite_with_exact_count(self) -> None:
+        (self.root / TEST_LOG_PATH).write_text(
+            "Ran 99 tests in 0.001s\n\nOK\nRan 1 test in 0.001s\n\nOK\n",
+            encoding="utf-8",
+        )
+        with self.assertRaisesRegex(ReportFailure, "test log summaries do not match"):
+            build_report(self.root, self.env, TEST_LOG_PATH)
 
     def test_empty_test_log_is_rejected(self) -> None:
         (self.root / TEST_LOG_PATH).write_bytes(b"")
