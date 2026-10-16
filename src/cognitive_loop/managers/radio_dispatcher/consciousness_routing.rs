@@ -166,13 +166,14 @@ impl ConsciousnessAwareRouter {
             return;
         }
 
-        // Delayed packets must not roll a peer's state backward. This is not a
-        // substitute for authenticated sequence numbers, but avoids overwriting a
-        // newer accepted sample with an obviously older cycle.
+        // Each peer may contribute at most one accepted sample per cycle.
+        // Reject both older samples and duplicate-cycle replays before changing
+        // state or increasing trust. This local cycle guard is not a substitute
+        // for authenticated monotonic sequence numbers at the transport boundary.
         if self
             .peer_phi
             .get(&peer_id)
-            .is_some_and(|state| current_cycle < state.last_update_cycle)
+            .is_some_and(|state| current_cycle <= state.last_update_cycle)
         {
             return;
         }
@@ -779,5 +780,27 @@ mod peer_report_validation_tests {
         assert_eq!(accepted.consciousness_level, 0.7);
         assert_eq!(accepted.governance_tier, 2);
         assert_eq!(accepted.last_update_cycle, 10);
+    }
+
+    #[test]
+    fn duplicate_cycle_replay_cannot_inflate_trust_or_change_peer_state() {
+        let mut router = ConsciousnessAwareRouter::default();
+        let peer = [10; 8];
+
+        router.update_peer(peer, 0.8, 0.7, 2, 10);
+        let before = router.peer_phi.get(&peer).expect("peer was inserted").clone();
+
+        // An attacker replaying the same cycle with a more favorable report
+        // must not alter the cached value or gain trust through repeated sends.
+        for _ in 0..100 {
+            router.update_peer(peer, 1.0, 1.0, 4, 10);
+        }
+
+        let after = router.peer_phi.get(&peer).expect("peer remains present");
+        assert_eq!(after.phi, before.phi);
+        assert_eq!(after.consciousness_level, before.consciousness_level);
+        assert_eq!(after.governance_tier, before.governance_tier);
+        assert_eq!(after.last_update_cycle, before.last_update_cycle);
+        assert_eq!(after.trust, before.trust);
     }
 }
