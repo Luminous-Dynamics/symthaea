@@ -661,7 +661,7 @@ mod tests {
             let p50 = samples[REPEATS / 2];
             let p95 = samples[(REPEATS * 95 + 99) / 100 - 1];
             println!(
-                "nodes={} edges={} selected={} repeats={} p50_ns={} p95_ns={} median_ns_per_node={}",
+                "nodes={} edges={} selected={} reps={} p50={} p95={} ns/node={}",
                 graph.nodes.len(),
                 graph.edges.len(),
                 selected.len(),
