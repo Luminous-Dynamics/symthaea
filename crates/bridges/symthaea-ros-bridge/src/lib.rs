@@ -809,36 +809,11 @@ impl RosBridgeNode {
         }
     }
 
-    /// Converts ROS2 joint state arrays back into Symthaea's HumanoidState.
-    /// Since ROS2 JointState lacks root pose/IMU, those defaults are injected or assumed.
-    pub fn ros_joint_states_to_humanoid(
-        &self,
-        positions: &[f64],
-        velocities: &[f64],
-        head_height: f64,
-        torso_vertical: [f64; 3],
-        com_velocity: [f64; 3],
-        timestamp: f64,
-    ) -> symthaea_humanoid::types::HumanoidState {
-        // HumanoidState::from_mujoco expects qpos (root 7 + joints) and qvel (root 6 + joints)
-        let mut qpos = vec![0.0; 7]; // Root pose stub: [x, y, z, qw, qx, qy, qz]
-        qpos[2] = 1.0; // Assume upright root height
-        qpos[3] = 1.0; // Quaternion w
-        qpos.extend_from_slice(positions);
+    // No JointState-only -> HumanoidState converter is exposed here: the
+    // available ROS topics do not provide a complete, qualified root pose and
+    // linear-velocity observation. See get_current_humanoid_state(), which fails
+    // closed until those evidence sources exist.
 
-        let mut qvel = vec![0.0; 6]; // Root vel stub: [vx, vy, vz, wx, wy, wz]
-        qvel.extend_from_slice(velocities);
-
-        symthaea_humanoid::types::HumanoidState::from_mujoco(
-            &qpos,
-            &qvel,
-            head_height,
-            torso_vertical,
-            &[0.0, 0.0, 0.0, 0.0], // Extremities stub
-            com_velocity,
-            timestamp,
-        )
-    }
 }
 
 #[cfg(test)]
