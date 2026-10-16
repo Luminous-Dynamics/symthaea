@@ -74,6 +74,19 @@ Both synthetic fixtures record an explicit `seed` and the audit report echoes it
 
 The schemas are in `schema/simulator-call-ledger.schema.json` and `schema/simulator-call-audit.schema.json`; the implementation is `symthaea_nano_policy::sim_budget`, and the source-specific denominator analysis is in [SIMULATOR_BUDGET_LEDGER.md](./SIMULATOR_BUDGET_LEDGER.md). This structural audit does not dereference receipts or prove external process execution; a simulator supervisor must retain one start and terminal receipt for every actual call. These fixtures are synthetic, not MEEP results.
 
+## Campaign seed-roster audit (NANO-006)
+
+The separate `nano-policy-campaign-audit` CLI checks that every policy arm has exactly one digest-pinned per-run ledger for each seed in a frozen expected roster, and that each ledger identity and actual-call audit matches the campaign contract.
+
+```bash
+cargo run --locked -p symthaea-nano-policy --bin nano-policy-campaign-audit -- \
+  --manifest crates/domains/symthaea-nano-policy/fixtures/synthetic-sim-budget-campaign.json \
+  --ledger-root crates/domains/symthaea-nano-policy/fixtures \
+  > simulator-campaign-audit.json
+```
+
+The synthetic manifest uses two policy arms and one seed for plumbing only. For real confirmatory experiments, preregister the actual seed list; use at least 20 paired seeds or a documented power analysis; and obtain raw run receipts/manifests before resolving any historical replicate-count mismatch. Schemas are in `schema/simulator-campaign-manifest.schema.json` and `schema/simulator-campaign-audit.schema.json`; the full protocol is in [SIMULATOR_BUDGET_CAMPAIGN_AUDIT.md](./SIMULATOR_BUDGET_CAMPAIGN_AUDIT.md).
+
 ## Fail-closed contract
 
 - Unknown fields are rejected. Target/label fields, optical target spectra, test membership and oracle observations must not be included.
