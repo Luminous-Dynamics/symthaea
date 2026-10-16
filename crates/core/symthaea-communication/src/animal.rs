@@ -104,6 +104,56 @@ fn ratio(numerator: u64, denominator: u64) -> Option<f64> {
     (denominator > 0).then(|| numerator as f64 / denominator as f64)
 }
 
+/// Tie-aware stepwise average precision for binary labels and scores.
+/// Scores must be finite values in [0, 1]; a split with no positive labels
+/// is rejected because recall and average precision are undefined.
+pub fn binary_average_precision(truth: &[bool], scores: &[f64]) -> Result<f64, String> {
+    if truth.is_empty() || truth.len() != scores.len() {
+        return Err("average precision requires equal, non-empty labels and scores".into());
+    }
+    if scores.iter().any(|score| !score.is_finite() || !(0.0..=1.0).contains(score)) {
+        return Err("average precision scores must be finite and within [0, 1]".into());
+    }
+
+    let positive_count = truth.iter().filter(|&&label| label).count();
+    if positive_count == 0 {
+        return Err("average precision is undefined without positive labels".into());
+    }
+
+    let canonical_score = |score: f64| if score == 0.0 { 0.0 } else { score };
+    let mut order: Vec<usize> = (0..scores.len()).collect();
+    order.sort_by(|left, right| {
+        canonical_score(scores[*right]).total_cmp(&canonical_score(scores[*left]))
+    });
+
+    let mut true_positives = 0usize;
+    let mut false_positives = 0usize;
+    let mut area = 0.0;
+    let mut index = 0;
+
+    while index < order.len() {
+        let score = canonical_score(scores[order[index]]);
+        let mut group_true_positives = 0usize;
+        let mut group_false_positives = 0usize;
+        while index < order.len() && canonical_score(scores[order[index]]) == score {
+            if truth[order[index]] {
+                group_true_positives += 1;
+            } else {
+                group_false_positives += 1;
+            }
+            index += 1;
+        }
+        true_positives += group_true_positives;
+        false_positives += group_false_positives;
+        let seen = true_positives + false_positives;
+        let precision = true_positives as f64 / seen as f64;
+        let recall_increment = group_true_positives as f64 / positive_count as f64;
+        area += precision * recall_increment;
+    }
+
+    Ok(area)
+}
+
 /// Declared source lineage for one dataset split. IDs refer to provenance
 /// records, not authenticated facts; this type prevents accidental leakage
 /// when the caller supplies complete and truthful source metadata.
@@ -470,6 +520,32 @@ mod tests {
         assert_eq!(counts.precision(), None);
         assert_eq!(counts.f1(), None);
         assert_eq!(counts.balanced_accuracy(), None);
+    }
+
+    #[test]
+    fn binary_average_precision_scores_a_ranked_presence_detector() {
+        let score = binary_average_precision(
+            &[true, false, true, false],
+            &[0.9, 0.8, 0.4, 0.1],
+        )
+        .unwrap();
+        assert!((score - 5.0 / 6.0).abs() < 1e-12);
+    }
+
+    #[test]
+    fn binary_average_precision_groups_tied_scores_without_order_bias() {
+        let score = binary_average_precision(&[true, false], &[0.5, 0.5]).unwrap();
+        assert_eq!(score, 0.5);
+        assert_eq!(binary_average_precision(&[true, false], &[0.0, -0.0]).unwrap(), 0.5);
+    }
+
+    #[test]
+    fn binary_average_precision_rejects_invalid_or_positive_free_splits() {
+        assert!(binary_average_precision(&[], &[]).is_err());
+        assert!(binary_average_precision(&[true], &[]).is_err());
+        assert!(binary_average_precision(&[false, false], &[0.8, 0.1]).is_err());
+        assert!(binary_average_precision(&[true], &[f64::NAN]).is_err());
+        assert!(binary_average_precision(&[true], &[1.1]).is_err());
     }
 
     #[test]
