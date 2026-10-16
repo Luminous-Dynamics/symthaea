@@ -532,6 +532,18 @@ fn check_artifact(root: &Path, role: &str, reference: &FileReferenceV1) -> Artif
             Some(metadata.len()),
         );
     }
+    let structured_data_limit = match role {
+        "fixture_pack_receipt" => Some(4 * 1024_u64),
+        "fixture_manifest" | "comparison_receipt" => Some(64 * 1024 * 1024_u64),
+        _ => None,
+    };
+    if structured_data_limit.is_some_and(|limit| metadata.len() > limit) {
+        return fail(
+            format!("structured evidence artifact exceeds {} byte limit", structured_data_limit.unwrap_or(0)),
+            None,
+            Some(metadata.len()),
+        );
+    }
     let actual = match sha256_file(&path) {
         Ok(actual) => actual,
         Err(error) => return fail(error.to_string(), None, Some(metadata.len())),
