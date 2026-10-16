@@ -246,8 +246,8 @@
       "validation_method": "Route-level energy balance plus independently reviewed fuel/electricity emission factors; later validate against measured voyage data."
     },
     {
-      "metric": "direct_combustion_emissions_at_berth",
-      "unit": "percent_of_berth_energy",
+      "metric": "onboard_fuel_burn_at_berth",
+      "unit": "percent_of_total_berth_energy_from_onboard_fuel",
       "target_value": 0,
       "direction": "threshold",
       "status": "provisional_target",
