@@ -974,7 +974,7 @@ pub enum DatasetProvenance {
         generator: String,
         seed: u64,
         num_shots: usize,
-        disruption_probability: f64,
+        disruption_probability: f32,
         samples_per_shot: usize,
         sample_interval_ms: f64,
         warning_window_ms: f64,
