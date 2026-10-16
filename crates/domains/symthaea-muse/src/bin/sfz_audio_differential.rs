@@ -552,10 +552,14 @@ fn spectrum_distances(candidate: &[f64], reference: &[f64]) -> (f64, f64, f64) {
         })
         .sum::<f64>();
     let denominator = (candidate_magnitude_squared * reference_magnitude_squared).sqrt();
-    let cosine = if denominator > METRIC_EPSILON {
+    let cosine = if candidate_magnitude_squared <= METRIC_EPSILON
+        && reference_magnitude_squared <= METRIC_EPSILON
+    {
+        1.0
+    } else if denominator > METRIC_EPSILON {
         (magnitude_dot / denominator).clamp(0.0, 1.0)
     } else {
-        1.0
+        0.0
     };
 
     (log_spectral_distance_db, normalized_power_spectrum_l1, cosine)
@@ -634,6 +638,24 @@ mod tests {
         assert_eq!(metrics.waveform_correlation, None);
         assert!(metrics.waveform_rmse.is_finite());
         assert!(metrics.log_spectral_distance_db.is_finite());
+    }
+
+    #[test]
+    fn spectral_similarity_detects_silence_against_non_silent_audio() {
+        let candidate = sine(440.0, 44_100, 12_000);
+        let reference = vec![0.0_f32; candidate.len()];
+        let metrics = comparison_metrics(
+            &candidate,
+            &reference,
+            1,
+            candidate.len(),
+            0.5 / 2.0_f64.sqrt(),
+            0.0,
+            44_100,
+        );
+        assert!(metrics.spectral_magnitude_cosine_similarity < 1.0e-9);
+        assert!(metrics.normalized_power_spectrum_l1 > 0.9);
+        assert!(metrics.log_spectral_distance_db > 1.0);
     }
 
     #[test]
