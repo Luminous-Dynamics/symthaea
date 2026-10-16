@@ -99,7 +99,7 @@ jobs:
             (.abstention_control_summary | has("false_decisive_rate")) and
             .paired_policy_comparison.control_case_count == 48 and
             (.paired_policy_comparison | has("in_sample_false_decisive_rate") and has("held_out_false_decisive_rate") and has("false_decisive_count_reduction")) and
-            (.cases | all(has("decision_reason") and has("observed_decision") and has("target_hit") and has("decision_gates") and has("observations") and has("held_out_prediction_gap_in_noise_sd") and has("best_held_out_rmse_in_noise_sd"))) and
+            (.cases | all(has("decision_reason") and has("observed_decision") and has("target_hit") and has("decision_gates") and has("observations") and has("held_out_prediction_gap_in_noise_sd") and has("best_held_out_rmse_in_noise_sd") and has("in_sample_baseline"))) and
             (.cases | all(.training_count + .held_out_count == .observation_count)) and
             (.cases | all(.observations | map(select(.partition == "held_out")) | length > 0)) and
             (.decision_policy.holdout_rule | contains("do not participate in fitting or BIC")) and
