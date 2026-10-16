@@ -62,7 +62,8 @@ pub use causal_reasoning_bridge::CausalReasoningBridge;
 pub use encoding::{FactEncoding, KnowledgeEncoder, RoleBoundVector};
 pub use evidence_action_policy::{
     EvidenceAction, EvidenceActionDecision, EvidenceActionInput, EvidenceActionPolicy,
-    EvidenceActionReason, EvidenceCondition, ProvenanceCondition, QuestionCondition,
+    EvidenceActionReason, EvidenceActionSession, EvidenceCondition, EvidenceLifecycleEvent,
+    ProvenanceCondition, QuestionCondition,
 };
 pub use evidence_lineage::{
     EvidenceLineageAbstentionReason, EvidenceLineageAssessment, EvidenceLineageDecision,
