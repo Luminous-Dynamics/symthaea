@@ -154,17 +154,35 @@ Never generalize a result beyond the supported element, chemistry, size, surface
 
 ## 12. Implementation sequence
 
-1. **Protocol-only:** finish metric definitions, baseline eligibility, data rights, task card, and leakage checks.
-2. **Baseline-only pilot:** freeze one manageable task with ground truth; produce manifest, per-episode costs, metric reconstruction, and negative-control results before asserting any model advantage.
-3. **Selector comparison:** evaluate current and strong baselines with paired budgets and held-out material groups.
-4. **Reference-in-the-loop:** add active learning only after its label-eligibility, stopping, and budget accounting are independently verified.
-5. **Prospective experiment:** only where real experimental capacity and data rights exist, run blinded confirmation under a separate protocol.
+1. **Adopt before rebuilding:** audit the public MADE (MAterials Discovery Environments) release and its official benchmark tasks/metrics; use a compatible, rights-cleared task as the first closed-loop baseline rather than building a second discovery simulator from scratch.
+2. **Reproduce an upstream baseline:** run a small, official MADE baseline with the original harness, freeze the exact commit/config/data identifiers, and preserve the upstream result artifacts. This is a research comparator only, not a Symthaea runtime dependency.
+3. **Independent Rust verification:** write a Rust-first, read-only parser/metric checker for exported episode records. Verify candidate counts, oracle-call budgets, hit/regret summaries, cost accounting, and provenance independently. Do not port an unverified upstream metric by name alone; freeze formulas and test fixtures from the paper/release.
+4. **Adapt Symthaea policies through a boundary:** add the current cost-aware selector and later Symthaea planning as policy implementations behind the environment/oracle interface, without making the benchmark depend on a Python production runtime.
+5. **Extend beyond convex-hull tasks:** add trajectory reliability, structural exploration and dynamics checks from NANO-008, and only then add experimental qualification for tasks with rights-cleared independent measurements.
+6. **Paired held-out evaluation:** compare against upstream random and generative baselines plus appropriate diversity, uncertainty and expected-improvement policies, with fixed oracle budgets and grouped test systems.
 
 Current Symthaea molecular AIMD uses molecular, non-periodic RHF/STO-3G with finite-difference forces and is not an eligible periodic nanocrystal reference. A new benchmark must not use it as experimental truth or imply it is a qualified nanocrystal simulator. NANO-008 separately covers trajectory reliability.
 
-## 13. Research references
+## 13. Interoperability with MADE (ICML 2026)
+
+Before inventing a new closed-loop benchmark stack, evaluate [MADE: Benchmark Environments for Closed-Loop Materials Discovery](https://proceedings.mlr.press/v306/malik26a.html) and its [official implementation](https://github.com/diffractivelabs/MADE). MADE models discovery as an iterative campaign under a constrained oracle budget, using convex-hull stability tasks and interchangeable generators, filters, scorers, planners and oracles. Its release lists AF, EF, AUDC and mSUN as discovery metrics and provides per-episode trajectories, summaries, configs and logs. The ICML 2026 paper reports that adaptive planning becomes more important as the search space grows.
+
+This changes our plan: **reuse and reproduce a credible upstream benchmark first; add Symthaea-specific trustworthiness and physical-evidence gates around it**. Do not claim a novel benchmark is needed until this compatibility audit shows a real gap.
+
+- Stage A: verify upstream license, data-source terms, supported oracle access, reproducibility, metric formulas, and whether a small task can run without paid/secret services. MIT licensing of the code does not automatically settle licenses for downloaded datasets, model weights, APIs, or derived structures.
+- Stage B: run the smallest official baseline task and archive its source commit, resolved config, dataset/system hashes, oracle version, per-episode trajectories, stdout/logs and resource accounting.
+- Stage C: independently reconstruct official discovery metrics from raw episode records. Add a Rust implementation for integrity checking and metric reconstruction; keep the upstream benchmark harness as an optional external research tool rather than introducing Python into Symthaea's production runtime.
+- Stage D: adapt a Symthaea policy only after the baseline reproduces; maintain exact same oracle budgets, allowed information, task candidates, and seed/episode definitions.
+- Stage E: report separate results for convex-hull discovery, atomistic trajectory reliability, and experimental confirmation. MADE's convex-hull task does not certify nanocrystal dynamics or laboratory outcomes.
+
+If upstream reproduction is blocked by API keys, data licensing, or irreproducible dependencies, document the blocker and select a rights-cleared alternative. Do not silently substitute a different oracle or reuse the official method name for a changed metric.
+
+## 14. Research references
 
 - Usman et al. (2026), *Benchmarking Machine-Learning Interatomic Potentials for Dynamical Stability in Inorganic Semiconductor Nanocrystals: A CdSe Case Study*, preprint: https://arxiv.org/abs/2609.15299
 - Xu et al. (2026), *Benchmarking universal machine learning interatomic potentials for supported nanoparticles: decoupling energy accuracy from structural exploration*, npj Computational Materials 12, 189: https://www.nature.com/articles/s41524-026-02043-8
 - Tahmasbi et al. (2026), *Benchmarking universal machine learning interatomic potentials on elemental systems*, npj Computational Materials 12, 251: https://www.nature.com/articles/s41524-026-02251-2
 - *UniFFBench: evaluating universal machine learning force fields against experimental measurements* (2026), Nature Computational Science: https://www.nature.com/articles/s43588-026-01019-4
+- Malik et al. (2026), *MADE: Benchmark Environments for Closed-Loop Materials Discovery*, ICML / PMLR 306: https://proceedings.mlr.press/v306/malik26a.html; official implementation: https://github.com/diffractivelabs/MADE
+- Ho, Ortner & Wang (2026), *Flexible uncertainty calibration for machine-learned interatomic potentials*, npj Computational Materials: https://www.nature.com/articles/s41524-026-02080-3
+- Wang et al. (2026), *Training-free active learning framework in materials science with large language models*, npj Computational Materials: https://www.nature.com/articles/s41524-026-02136-4
