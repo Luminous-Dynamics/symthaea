@@ -250,5 +250,6 @@
       "digest helper checks canonical SHA-256 string identity but does not hash artifact bytes",
       "Rust unit tests not executed because rustc was unavailable in the authoring environment"
     ]
-  }
+  },
+  "updated_on": "2026-10-16"
 }
