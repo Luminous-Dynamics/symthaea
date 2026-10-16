@@ -14,6 +14,8 @@ The public `symthaea-stt` crate already contains:
 
 The repository's own `crates/core/symthaea-stt/README.md` and `docs/communication-capability-inventory.md` describe cetacean modules as research prototypes with synthetic or heuristic labels and cap the evidence claim at acoustic structure. That is the right claim ceiling until source-pinned, recording-disjoint results exist.
 
+**Legacy example integrity correction:** `whale_validation.rs` and `whale_validation_v2.rs` through `v4` previously used file-list-position splits and inferred secondary species labels from filename substrings while printing “SUCCESS” language about learning/generalization. The research branch now labels them exploratory diagnostics, adds evidence-limit warnings, changes misleading headings/summary labels, and removes those success claims. They still do not implement source/encounter-grouped evaluation or independent species ground truth; the outputs must not be cited as validation.
+
 **Immediate audit priority:** inspect and replace validation examples that derive labels from filename substrings or split sorted files by position. A train/test file split is not independent evidence when related crops, encounters or recorders are shared. Generated whistles/codas are software fixtures only—not field or communication evidence.
 
 ## 2. Engineering hardening now in the working PR branch
@@ -138,7 +140,7 @@ A communication claim requires a species/population-specific, ethically reviewed
 
 ## 6. Code-specific next steps
 
-1. Run the new classifier and whale configuration tests on a real Rust toolchain; inspect formatting / Clippy and do not call skipped CI a pass.
+1. Run the new classifier and whale configuration tests on a real Rust toolchain; inspect formatting / Clippy and do not call skipped CI a pass. The legacy whale validation examples are now explicitly exploratory, but still need to be replaced by a source/encounter-grouped evaluation harness with independent labels.
 2. Audit current whale validation examples for filename-derived labels and sequential file splits; replace these with manifests and recording/encounter group splits.
 3. Build a Rust-first metadata-only corpus manifest and preflight validator. It should verify sample-rate/channel manifests, content hashes, annotation coverage, source IDs, labels and license decisions without copying raw audio into the repo.
 4. Build the first permissible small subset / metadata preflight only after rights admission; prioritize whistle contours (rich labels) and coda timing as two separate tracks rather than one blended metric.
