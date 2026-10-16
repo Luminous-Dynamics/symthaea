@@ -320,5 +320,14 @@
       "cannot account for true sites omitted from every nomination method",
       "does not establish biological safety or clinical utility"
     ]
+  },
+  "method_validation": {
+    "paired_label_sensitivity_formula_check": {
+      "status": "passed_independent_formula_check_only",
+      "executed_on": "2026-10-16",
+      "deterministic_paired_ranking_cases": 1763520,
+      "result": "Closed-form bounds matched exhaustive label-assignment extrema in every tested case.",
+      "scope_limit": "Formula design checked; Rust implementation and biological source benchmark remain unexecuted."
+    }
   }
 }
