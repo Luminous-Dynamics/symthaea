@@ -364,3 +364,19 @@ Fresh research reinforces the direction toward feedback-driven restoration: a 20
 - **Heuristic quality:** compute per-instance absolute and relative optimality gaps for all three greedy policies; publish full instance-level rows, not only aggregate averages. ORACLE-01 expects priority-first loss 1,110 (absolute gap 999; relative gap 9.0, or 900%), while shortest-job-first and weighted-recovery both match loss 111.
 - **Determinism:** stable objective and lexicographic tie-break under input permutation.
 - **Benchmark hygiene:** the hand-built corpus is a correctness suite, not a statistical holdout. Build separate versioned training/tuning and holdout seeds before making general policy-quality claims.
+
+## 11. Exact multi-crew repair oracle
+
+The new [multi-crew oracle](../../crates/domains/symthaea-engineering/src/multi_crew_repair_oracle.rs) enumerates precedence-ready job choices and skill-qualified crew assignments on tiny instances (maximum six jobs, three crews). It computes an exact minimum for weighted service loss / weighted completion under its declared restrictions and reports optimality gaps for priority-first, shortest-job-first, and weighted-recovery list schedulers.
+
+The first [multi-crew corpus](./multi_crew_repair_oracle_corpus.json) has three independent arithmetic fixtures: (MC-01) skill-constrained parallel scheduling, optimum 41; (MC-02) a cross-crew power→pump prerequisite, optimum 52; and (MC-03) preserving a multi-skilled crew for a plumbing-only repair, optimum 42. The source-level unit tests assert each objective, key start/finish times and dispatch-sequence counts. These cases are synthetic correctness fixtures, not field evidence.
+
+This extension aligns with established multi-skilled resource-constrained project scheduling (MS-RCPSP), a mature field with published instance classes and empirical datasets. Snauwaert and Vanhoucke classify MS-RCPSP variants and compare generated instances with published benchmarks and seven empirical software/railway cases ([EJOR 2023](https://doi.org/10.1016/j.ejor.2022.05.049)). The iMOPSE multi-objective benchmark reports true Pareto fronts for six small instances and approximate fronts for 36 larger instances ([Applied Soft Computing 2022](https://doi.org/10.1016/j.asoc.2022.109253)). A review of multi-skilling scheduling covers 160 studies and identifies skills, objective choice and resource flexibility as major model dimensions ([Computers & Industrial Engineering 2021](https://doi.org/10.1016/j.cie.2020.107004)). Those are candidate external validation sources; the current module does not yet import or implement their full data formats.
+
+### Multi-crew acceptance targets
+
+- **Exact reference:** 100% agreement with MC-01–MC-03, including skills, precedence, non-overlap, weighted objective and deterministic tie-breaking.
+- **Instance size:** stay within the explicitly bounded 6-job / 3-crew oracle; do not raise bounds without measuring the combinatorial growth and retaining an execution budget.
+- **Policy gaps:** report exact optimum, heuristic loss, absolute gap and relative gap for each policy; a negative gap beyond tolerance is a correctness failure.
+- **External reproducibility:** port a small subset of a published MS-RCPSP or iMOPSE benchmark with clear mapping assumptions, preserve the original source identifiers, and compare optimal values/bounds only where the objective and constraints match exactly.
+- **Next expansion:** add finite spare stocks or repair-material constraints as a separate oracle dimension with a fresh negative-control corpus. Do not silently apply the present exact results to constraints this module excludes.
