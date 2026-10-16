@@ -301,3 +301,46 @@ Minimum stress set: baseline operations, design heat event, drought case, 72-hou
 ## Decision rule
 
 Automate all work that can be made explicit, repeatable and independently checked. Use AI to expand the design space and learn from feedback. Keep safety-critical claims tied to domain models, measurements, applicable codes, accountable professional judgement and field evidence.
+
+## 14. Paradigm shift and first executable benchmark suite
+
+The next shift is from testing isolated predictions to testing whether a proposed settlement remains safe and useful when interacting systems fail together. This is **robust, evidence-constrained design**, not just bigger simulations or a single optimizer score.
+
+The active Rust registry is crates/domains/symthaea-scenarios/src/living_city_benchmarks.rs. It defines a versioned initial suite with one baseline, three individual hazards, and three compound hazards:
+
+| Case ID | Stress | Required model domains |
+|---|---|---|
+| baseline-operating-envelope | Baseline / business-as-usual reference | Thermal, energy, water, mobility, critical services, housing/access, ecology/materials |
+| heat-design-event | Locally defined extreme heat | Thermal, cooling access, energy, critical services |
+| drought-design-case | Locally defined drought | Water, energy, ecology/materials |
+| critical-services-72h-grid-outage | 72-hour grid outage for named critical assets | Energy, water, communications, critical services, emergency access |
+| heat-plus-72h-grid-outage | Heat + 72-hour grid outage | Thermal, cooling access, energy, communications, critical services |
+| drought-plus-energy-shortfall | Drought + constrained energy availability | Water, energy, critical services, ecology/materials |
+| flood-plus-communications-failure | Flood + loss of communications | Stormwater, communications, emergency access, critical services, mobility |
+
+These IDs are test definitions, **not pre-filled hazard severities or claims about any real site**. The profile for each case must be selected and versioned for the study area; its evidence bundle must contain the site/climate/boundary conditions and relevant local assumptions. The 72-hour outage is an initial test condition, not a universal design requirement or a claim that any system will survive that duration.
+
+### Initial software acceptance criteria
+
+- Registry contains exactly one baseline, correctly formed single-hazard and compound-hazard cases, unique IDs and at least one declared model domain per case.
+- Every required case has exactly one local profile binding with an evidence digest.
+- Unknown/duplicate execution records are rejected.
+- A PASS record requires independent verifier identity/version and a digest of the exact result artifact.
+- A failed mandatory case yields FAILED; missing, blocked or not-run mandatory cases yield BLOCKED; only a fully recorded suite is eligible for the next workflow stage.
+- Negative controls show that stale/missing records and deliberately failed compound-hazard cases are detected.
+- Passing this software contract means only that coverage/result metadata meets the workflow contract. It does not validate the underlying physical equations, prove calibrated predictions, or authorize construction.
+
+### Paradigm shifts to prioritize
+
+1. **From nominal optimization to robust feasibility.** First satisfy locally authorized rights and safety constraints; then test worst-case/compound conditions and uncertainty. Do not let average performance hide a critical failure in one neighbourhood or cohort.
+2. **From one giant digital twin to federated evidence-backed models.** Retain domain-specific models and connect them through explicit units, boundary conditions and provenance. Each model should own its validity limits; the orchestrator should expose disagreement rather than blend it away.
+3. **From generative confidence to independent falsification.** Give the verifier a separate code path, preserve negative controls, and deliberately corrupt artifacts/configurations to prove the verifier catches them.
+4. **From data accumulation to decision-relevant evidence.** Use sensitivity analysis and value-of-information experiments to identify which new survey, sensor, simulation, or field test is most likely to change a design decision. Do not collect data merely to make the twin look comprehensive.
+5. **From design completion to a digital thread.** Keep requirement IDs, model inputs, outputs, BIM objects, quantities, construction changes, commissioning tests and post-occupancy observations linked across versions.
+6. **From sustainability proxies to lifecycle accounting.** Count embodied and operational impacts, upstream/downstream effects, maintenance and end-of-life. Keep ecological indicators and social outcomes distinct rather than claiming one score represents flourishing.
+
+### Research anchors
+
+- NIST, On Methods of Uncertainty Quantification in Computational Modeling and Simulation: Harmonizing Modeling and Metrology Practices, NIST AMS 100-85 (published 5 October 2026): https://doi.org/10.6028/NIST.AMS.100-85. Use its risk-based credibility framing: verification and uncertainty effort should scale with model influence and decision consequence.
+- NASA-STD-7009B, Standard for Models and Simulations (active version listed by NASA): https://standards.nasa.gov/standard/nasa/nasa-std-7009. Useful reference for defining project-specific acceptance criteria and model credibility evidence.
+- buildingSMART official standards server: https://standards.buildingsmart.org/. Pin the released IFC 4.3.2.0 / ISO 16739-1:2024 and IDS 1.0 releases for the initial information-exchange workflow rather than silently tracking in-development schemas.
