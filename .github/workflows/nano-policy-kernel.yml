@@ -32,6 +32,6 @@ jobs:
       - uses: actions/checkout@v4
       - uses: dtolnay/rust-toolchain@stable
       - name: Verify formatting
-        run: rustfmt --edition 2024 --check crates/domains/symthaea-nano-policy/src/lib.rs crates/domains/symthaea-nano-policy/src/main.rs
+        run: rustfmt --edition 2024 --check crates/domains/symthaea-nano-policy/src/lib.rs crates/domains/symthaea-nano-policy/src/main.rs crates/domains/symthaea-nano-policy/src/receipt.rs
       - name: Test selector contract and policies
         run: cargo test --locked -p symthaea-nano-policy --all-targets
