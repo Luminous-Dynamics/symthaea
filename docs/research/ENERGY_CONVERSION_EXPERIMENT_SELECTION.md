@@ -67,6 +67,12 @@ A preferred experiment must try to distinguish the favored design from its best 
 
 Physical experiments require an approved protocol, trained operators, calibrated instrumentation, safety interlocks, abort criteria, raw-data retention, and independent review. Model-based experiment ranking must never bypass ordinary engineering controls.
 
+## Known-answer harness
+
+The `symthaea-energy-bench::experiment_benchmark` module provides a deterministic oracle-backed testbed comparing Phase A, seeded random, cheapest-first, one-dimensional space-filling, and an exhaustive oracle upper bound under the same per-scenario resource budget and admission gates. It generates deceptive-proxy scenarios by construction and reports utility, regret, resolution, costs, selected IDs, and rejection records. A 1,000-scenario regression test is authored.
+
+Its oracle is intentionally narrow: independent per-experiment probabilities combine as `1 - product(1 - gain)`. It tests selector behavior against a known answer under a declared toy model. It does not calculate physical energy, realistic thermodynamic information gain, or validate model assumptions. The exhaustive oracle is only an upper bound for this toy synthetic objective.
+
 ## Acceptance targets and fair comparison
 
 Use the staged acceptance targets in [ENERGY_CONVERSION_BENCHMARK_TARGETS.md](ENERGY_CONVERSION_BENCHMARK_TARGETS.md). In particular, compare Phase A against random and deterministic space-filling baselines under equal resource budgets and paired held-out scenarios. Report decision regret, budget to a correct registered decision, false-feasible and false-superiority rates, calibration when predictive distributions exist, selection robustness, and replay/audit completeness. The proposed 20%/25% cost-regret goals are targets to test, not established results or universal standards.
