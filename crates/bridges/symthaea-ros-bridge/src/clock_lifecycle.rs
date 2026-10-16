@@ -285,7 +285,11 @@ impl RosClockLifecycleTrackerV1 {
         }
 
         if delta_ns == 0 {
-            let baseline = self.baseline.as_mut().expect("baseline was checked above");
+            let Some(baseline) = self.baseline.as_mut() else {
+                return RosClockLifecycleDispositionV1::InvalidObservation {
+                    reason: "clock baseline unexpectedly disappeared".into(),
+                };
+            };
             baseline.last_observation_received_monotonic_ns =
                 observation.received_monotonic_ns;
             let elapsed_since_progress_ns = captured_monotonic_ns
@@ -298,7 +302,11 @@ impl RosClockLifecycleTrackerV1 {
             };
         }
 
-        let baseline = self.baseline.as_mut().expect("baseline was checked above");
+        let Some(baseline) = self.baseline.as_mut() else {
+            return RosClockLifecycleDispositionV1::InvalidObservation {
+                reason: "clock baseline unexpectedly disappeared".into(),
+            };
+        };
         baseline.timestamp_ns = observation.timestamp_ns;
         baseline.last_observation_received_monotonic_ns = observation.received_monotonic_ns;
         baseline.last_progress_received_monotonic_ns = observation.received_monotonic_ns;
