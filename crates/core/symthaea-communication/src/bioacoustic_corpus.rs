@@ -346,6 +346,22 @@ pub fn validate_bioacoustic_corpus(
                     annotation.annotation_id, recording.sample_id
                 ));
             }
+            let first_possible_unscored_region = recording
+                .unscored_regions
+                .partition_point(|region| {
+                    region.interval.end_s <= annotation.interval.start_s
+                });
+            if recording
+                .unscored_regions
+                .get(first_possible_unscored_region)
+                .is_some_and(|region| region.interval.start_s < annotation.interval.end_s)
+            {
+                return Err(format!(
+                    "annotation {} overlaps an explicitly unscored region in sample {}",
+                    annotation.annotation_id, recording.sample_id
+                ));
+            }
+
             match (annotation.frequency_min_hz, annotation.frequency_max_hz) {
                 (None, None) => {}
                 (Some(min_hz), Some(max_hz)) => {
@@ -657,6 +673,82 @@ mod tests {
 
         let mut corpus = manifest();
         corpus.recordings[0].annotations[0].label = " ".into();
+        assert!(validate_bioacoustic_corpus(&corpus, BioacousticSplitPolicy::default()).is_err());
+    }
+
+    #[test]
+    fn accepts_sorted_non_overlapping_unscored_regions() {
+        let mut corpus = manifest();
+        corpus.recordings[0].unscored_regions = vec![
+            BioacousticUnscoredRegion {
+                interval: TimeSpan {
+                    start_s: 0.3,
+                    end_s: 0.4,
+                },
+                reason: "caller overlap".into(),
+            },
+            BioacousticUnscoredRegion {
+                interval: TimeSpan {
+                    start_s: 0.5,
+                    end_s: 0.6,
+                },
+                reason: "low signal-to-noise".into(),
+            },
+        ];
+        assert!(validate_bioacoustic_corpus(&corpus, BioacousticSplitPolicy::default()).is_ok());
+    }
+
+    #[test]
+    fn rejects_overlapping_or_unsorted_unscored_regions() {
+        let mut corpus = manifest();
+        corpus.recordings[0].unscored_regions = vec![
+            BioacousticUnscoredRegion {
+                interval: TimeSpan {
+                    start_s: 0.3,
+                    end_s: 0.6,
+                },
+                reason: "uncertain".into(),
+            },
+            BioacousticUnscoredRegion {
+                interval: TimeSpan {
+                    start_s: 0.5,
+                    end_s: 0.7,
+                },
+                reason: "uncertain".into(),
+            },
+        ];
+        assert!(validate_bioacoustic_corpus(&corpus, BioacousticSplitPolicy::default()).is_err());
+
+        let mut corpus = manifest();
+        corpus.recordings[0].unscored_regions = vec![
+            BioacousticUnscoredRegion {
+                interval: TimeSpan {
+                    start_s: 0.5,
+                    end_s: 0.6,
+                },
+                reason: "later".into(),
+            },
+            BioacousticUnscoredRegion {
+                interval: TimeSpan {
+                    start_s: 0.3,
+                    end_s: 0.4,
+                },
+                reason: "earlier".into(),
+            },
+        ];
+        assert!(validate_bioacoustic_corpus(&corpus, BioacousticSplitPolicy::default()).is_err());
+    }
+
+    #[test]
+    fn rejects_positive_annotations_overlapping_unscored_regions() {
+        let mut corpus = manifest();
+        corpus.recordings[0].unscored_regions.push(BioacousticUnscoredRegion {
+            interval: TimeSpan {
+                start_s: 0.15,
+                end_s: 0.25,
+            },
+            reason: "annotation ambiguous".into(),
+        });
         assert!(validate_bioacoustic_corpus(&corpus, BioacousticSplitPolicy::default()).is_err());
     }
 
