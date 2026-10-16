@@ -81,6 +81,7 @@ pub enum EvidenceLineageAbstentionReason {
     NoEvidence,
     MissingEvidenceIdentity,
     InvalidContentDigest,
+    ConflictingOriginAssertions,
     UnknownLineage,
     InsufficientDistinctOrigins,
 }
@@ -304,6 +305,10 @@ impl EvidenceLineageAssessment {
             origin_ids.sort();
             origin_ids.dedup();
 
+            if origin_ids.len() > 1 {
+                push_reason_once(&mut reasons, R::ConflictingOriginAssertions);
+            }
+
             let origin_attributed = !origin_ids.is_empty();
             if origin_attributed {
                 attributed_origin_group_count += 1;
@@ -420,6 +425,7 @@ mod tests {
         assert_eq!(result.duplicate_witness_count, 1);
         assert_eq!(result.attributed_origin_group_count, 1);
         assert_eq!(result.groups[0].origin_ids, vec!["origin-A", "origin-B"]);
+        assert!(result.reasons.contains(&EvidenceLineageAbstentionReason::ConflictingOriginAssertions));
         assert_eq!(result.decision, EvidenceLineageDecision::Abstain);
     }
 
