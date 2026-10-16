@@ -101,22 +101,25 @@ Reproduction requires:
 
 If the original protocol cannot be reproduced under the available hardware/budget, report the exact deviation and treat any result as an adaptation, not a reproduction.
 
-### Phase 3 — Add one Symthaea policy, not an entire cognitive stack
+### Phase 3 — Add the implemented Symthaea BinaryHV policy, not an entire cognitive stack
 
-Start with a transparent and deterministic selector based on a single justified contribution (for example, diversity-aware grouping/retrieval over available candidate metadata or a bounded expected-value-of-information policy). Do not use HDC similarity, Phi, coherence, or internal confidence as a physical energy or calibrated probability.
+The first implementation is [PR #7628](https://github.com/Luminous-Dynamics/symthaea/pull/7628): a research-only Rust CLI with `random`, Euclidean `maximin`, and `hdc_maximin`. The HDC policy uses the existing `symthaea-core::hdc::binary_hv::BinaryHV` type, a deterministic correlated 256-level scalar codebook, dimension-role binding and bundling, then normalized Hamming distance for greedy diverse selection. It is a real Symthaea representation ablation, but it is not an atomistic model, energy predictor or calibrated uncertainty estimator.
 
-Keep the generator, oracle, candidate restrictions, stopping rule and total oracle budget fixed. Make the Symthaea policy's allowed input fields explicit. For a strict clean interface, use a research-only adapter between MADE and a Rust Symthaea component (e.g. versioned JSON Lines over stdin/stdout); do not add Python to Symthaea production runtime. The adapter itself must be versioned and covered by contract tests.
+For MADE, define a frozen candidate descriptor schema that is meaningful for the specific discovery environment (for example composition/stoichiometry features that can be computed before an oracle query). The HDC policy's hard bounds are 10,000 candidates and 256 descriptor features. Do not feed it formation energies, energy-above-hull, oracle values, hidden convex-hull membership, or features derived from the unacquired label. Candidate IDs must be opaque and must not encode target status.
 
-Inputs may contain the current eligible candidates, observations returned so far, explicit metadata, remaining budget and declared constraints. Inputs must not contain hidden ground-truth labels, unrevealed oracle results, convex-hull membership unavailable to the agent, future trajectory fields, or evaluation-only metrics.
+Keep the generator, oracle, candidate restrictions, stopping rule and total oracle budget fixed. Compare random, Euclidean maximin, Symthaea HDC maximin, and the strongest applicable task-native baseline. Keep a research-only adapter between MADE and the Rust selector (e.g. a versioned JSON request/response over stdin/stdout); do not add Python to Symthaea production runtime. The adapter must be versioned, enforce the same allowed-input contract and preserve exact input/output receipts.
+
+Allowed inputs: eligible candidate IDs, predeclared unlabeled descriptors, previously revealed observations only when the acquisition contract permits them, remaining budget, and declared constraints. Forbidden inputs include hidden ground-truth labels, unrevealed oracle results, future trajectory fields, evaluation-only metrics, and test membership if that membership would reveal outcomes.
 
 ### Phase 4 — Controlled evaluation
 
 Freeze and run:
-1. random baseline;
-2. strongest comparable published non-Symthaea baseline;
-3. the Symthaea policy;
-4. ablations that disable its specific added component;
-5. negative-control policies (e.g. shuffled or corrupted features where meaningful).
+1. seeded random acquisition;
+2. Euclidean descriptor maximin (selector baseline);
+3. Symthaea `hdc_maximin` (HDC representation arm);
+4. strongest applicable published/task-native non-Symthaea baseline;
+5. an HDC ablation using the same pool/budget but Euclidean maximin distance;
+6. negative-control policies (e.g. shuffled descriptors/features, leakage canary, or randomized policy where meaningful).
 
 Use held-out chemical systems and repeated episodes. Avoid counting episodes from the same system as independent scientific systems. Evaluate at multiple fixed query budgets when feasible; do not allow one arm more oracle calls or a more expensive oracle.
 
