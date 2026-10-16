@@ -295,6 +295,34 @@ mod tests {
     }
 
     #[test]
+    fn identical_curves_have_zero_rms_deviation_and_constant_offset_is_preserved() {
+        let measured = [(100.0, 2.0), (300.0, 4.0), (1_000.0, 6.0)];
+        let target = [(100.0, 0.0), (300.0, 2.0), (1_000.0, 4.0)];
+        assert_eq!(
+            log_frequency_rms_deviation_db(&measured, &measured, 100.0, 1_000.0).unwrap(),
+            0.0
+        );
+        assert!(
+            (log_frequency_rms_deviation_db(&measured, &target, 100.0, 1_000.0).unwrap() - 2.0)
+                .abs()
+                < 1e-12
+        );
+    }
+
+    #[test]
+    fn mean_interpolates_declared_band_edges() {
+        let curve = [(100.0, 0.0), (200.0, 10.0), (1_000.0, 0.0)];
+        // This triangular curve has a mean of 5 dB over each log-frequency segment,
+        // so the full-band log-frequency mean is 5 dB as well.
+        assert!(
+            (log_frequency_mean_db(&curve, 100.0, 1_000.0).unwrap() - 5.0).abs() < 1e-12
+        );
+        let partial_mean = log_frequency_mean_db(&curve, 150.0, 500.0).unwrap();
+        assert!(partial_mean.is_finite());
+        assert!(partial_mean > 0.0 && partial_mean < 10.0);
+    }
+
+    #[test]
     fn invalid_bands_fail_closed() {
         let curve = [(100.0, 0.0), (1_000.0, 10.0)];
         assert_eq!(
