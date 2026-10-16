@@ -43,7 +43,7 @@ When an experiment is selected, its simulator outcome narrows only the declared 
 - `round_robin` — rotates across parameter families, with the starting parameter rotated by paired seed. This avoids degenerating into the same order as cheapest-first because of catalog ordering.
 - `seeded_random` — seeded baseline reproducible for paired comparisons.
 - `constraint_criticality` — a transparent heuristic that prioritizes normalized interval width reduction per credit on currently indeterminate constraints.
-- `exhaustive_toy_oracle` — enumerates every subset of the 12 catalog entries within the budget and selects the best resulting synthetic outcome by resolved hard constraints, normalized interval-width reduction, then lower cost. It sees hidden synthetic truth and is **not a deployable policy**; its bound is only for this finite toy outcome model.
+- `exhaustive_toy_oracle` — enumerates every subset of the 12 catalog entries within the budget and selects the best resulting synthetic outcome by resolved hard constraints, then lower total cost, then normalized interval-width reduction as a tie-breaker. It sees hidden synthetic truth and is **not a deployable policy**; its bound is only for this finite toy outcome model.
 
 The criticality policy is explicitly a heuristic, not expected information gain. The oracle is an idealized comparison, not evidence that any heuristic is optimal.
 
