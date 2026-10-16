@@ -89,6 +89,7 @@ fn run() -> Result<(), String> {
     }
 
     println!("BIOACOUSTIC_ASSET_AUDIT=PASS");
+    println!("CORPUS_SCHEMA_VERSION={}", manifest.schema_version);
     println!("DATASET_ID={}", manifest.dataset_id);
     println!("DATASET_REVISION={}", manifest.dataset_revision);
     println!("MANIFEST_BLAKE3={manifest_identity}");
