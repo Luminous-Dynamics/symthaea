@@ -116,6 +116,14 @@ The new `assess_sampled_timestamp_sensitivity` helper evaluates a strictly incre
 
 A future evaluation should compare timestamp sources and inject controlled timestamp shifts (for example ±1 minute, ±5 minutes, and ±30 minutes) into synthetic fixtures, then measure score instability. For real data, report timestamp uncertainty, edge-exclusion coverage, false-positive rates on matched controls, and results by event-resolution category. The diagnostic must never be marketed as proof of insider trading, manipulation or causality.
 
+## Comparative replay protocol (v2)
+
+The implemented prequential evaluator lives in `crates/domains/symthaea-futures-market-integrity/src/replay.rs`. It selects the latest observation at or before a frozen target cutoff, excludes missing/stale data explicitly, and scores each event/horizon instead of pooling all snapshots.
+
+The same module now includes a deterministic paired cluster bootstrap over candidate-minus-baseline Brier differences. Repeated rows within the same declared event/parent-event cluster are averaged before clusters are resampled. This addresses one common pseudoreplication failure, but it does not repair bad cluster definitions, selection bias, or invalid timestamps. The bootstrap share of samples below zero is not a p-value; score intervals and primary horizons must be preregistered.
+
+See [PREDICTION_MARKET_COMPARATIVE_REPLAY_BENCHMARK_V1.md](PREDICTION_MARKET_COMPARATIVE_REPLAY_BENCHMARK_V1.md) for the full replay estimand, adversarial corpus design, inference/reporting protocol and provisional gates.
+
 ## Benchmark plan
 
 All numeric thresholds below are proposed acceptance targets. They are not measured results, current platform metrics, or evidence of superiority.
