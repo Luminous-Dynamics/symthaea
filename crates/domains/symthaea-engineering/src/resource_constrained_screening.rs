@@ -778,4 +778,101 @@ mod tests {
         let b = screen_resource_constrained_services(&services, &resources, &disruptions, &config(5, 0.8)).unwrap();
         assert_eq!(a, b);
     }
+
+    #[test]
+    fn resource_balance_conserves_stock_replenishment_and_consumption() {
+        let services = [
+            ResourceService::new("pump", 1.0, 1.0, 0, Vec::<String>::new(),
+                [ResourceRequirement::new("water", 2.0)]),
+        ];
+        let resources = [SharedResource::new("water", 2.0, 4.0, 1.0)];
+        let report =
+            screen_resource_constrained_services(&services, &resources, &[], &config(4, 0.0))
+                .unwrap();
+        let trace = &report.resources[0];
+        let mut previous = resources[0].initial_stock;
+        for step in 0..report.horizon_steps {
+            let expected = previous + trace.replenishment_added[step] - trace.consumed[step];
+            assert!((trace.inventory_after_step[step] - expected).abs() < 1.0e-9);
+            assert!(trace.inventory_after_step[step] >= 0.0);
+            assert!(trace.inventory_after_step[step] <= resources[0].storage_capacity);
+            previous = trace.inventory_after_step[step];
+        }
+    }
+
+    #[test]
+    fn service_is_limited_by_the_scarcest_of_multiple_resources() {
+        let services = [ResourceService::new(
+            "manufacture",
+            1.0,
+            1.0,
+            0,
+            Vec::<String>::new(),
+            [
+                ResourceRequirement::new("water", 1.0),
+                ResourceRequirement::new("power", 0.5),
+            ],
+        )];
+        let resources = [
+            SharedResource::new("water", 10.0, 10.0, 0.0),
+            SharedResource::new("power", 0.25, 0.25, 0.0),
+        ];
+        let report =
+            screen_resource_constrained_services(&services, &resources, &[], &config(1, 0.0))
+                .unwrap();
+        assert_eq!(report.services[0].delivered_service, vec![0.5]);
+        let power = report.resources.iter().find(|r| r.resource_id == "power").unwrap();
+        assert_eq!(power.consumed, vec![0.25]);
+    }
+
+    #[test]
+    fn unknown_and_invalid_supply_disruptions_fail_closed() {
+        let unknown = ResourceSupplyDisruption::new("unknown", 0, 1, 0.0);
+        assert!(matches!(
+            screen_resource_constrained_services(
+                &one_service(1.0, 1.0, 1.0),
+                &one_resource(1.0, 1.0, 0.0),
+                &[unknown],
+                &config(2, 0.0),
+            ),
+            Err(ResourceScreeningError::UnknownDisruptionResource(_))
+        ));
+
+        let bad_factor = ResourceSupplyDisruption::new("water", 0, 1, f64::NAN);
+        assert!(matches!(
+            screen_resource_constrained_services(
+                &one_service(1.0, 1.0, 1.0),
+                &one_resource(1.0, 1.0, 0.0),
+                &[bad_factor],
+                &config(2, 0.0),
+            ),
+            Err(ResourceScreeningError::InvalidDisruptionFactor(_))
+        ));
+    }
+
+    #[test]
+    fn duplicate_service_and_resource_ids_fail_closed() {
+        let duplicate_services = [
+            ResourceService::new("x", 1.0, 1.0, 0, Vec::<String>::new(), Vec::<ResourceRequirement>::new()),
+            ResourceService::new("x", 1.0, 1.0, 1, Vec::<String>::new(), Vec::<ResourceRequirement>::new()),
+        ];
+        assert!(matches!(
+            screen_resource_constrained_services(&duplicate_services, &[], &[], &config(1, 0.0)),
+            Err(ResourceScreeningError::DuplicateService(_))
+        ));
+
+        let duplicate_resources = [
+            SharedResource::new("water", 0.0, 1.0, 0.0),
+            SharedResource::new("water", 0.0, 1.0, 0.0),
+        ];
+        assert!(matches!(
+            screen_resource_constrained_services(
+                &one_service(1.0, 1.0, 1.0),
+                &duplicate_resources,
+                &[],
+                &config(1, 0.0),
+            ),
+            Err(ResourceScreeningError::DuplicateResource(_))
+        ));
+    }
 }
