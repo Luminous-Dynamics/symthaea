@@ -949,8 +949,11 @@ mod tests {
         assert!(run_selection_benchmark(&policy(), &scenarios, &STRATEGIES).is_err());
 
         let mut too_many = generate_synthetic_scenarios(1, 2, &policy()).remove(0);
-        too_many.experiments.push(too_many.experiments[0].clone());
-        too_many.experiments[6].proposal.experiment_id = "extra".into();
+        while too_many.experiments.len() <= 16 {
+            let mut extra = too_many.experiments[0].clone();
+            extra.proposal.experiment_id = format!("extra-{}", too_many.experiments.len());
+            too_many.experiments.push(extra);
+        }
         assert!(validate_scenario(&too_many).is_err());
     }
 }
