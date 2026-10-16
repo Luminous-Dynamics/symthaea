@@ -351,7 +351,7 @@ mod tests {
 
     #[test]
     fn bounded_reader_handles_crlf_split_across_buffer_boundary() {
-        let mut reader = io::BufReader::with_capacity(1, Cursor::new(b"oversized\\r\\nnext\\n".to_vec()));
+        let mut reader = io::BufReader::with_capacity(1, Cursor::new(b"oversized\r\nnext\n".to_vec()));
         let expected_digest = digest_hex(b"oversized");
         match read_bounded_line(&mut reader, 3).unwrap().unwrap() {
             BoundedLine::TooLarge { sha256 } => assert_eq!(sha256, expected_digest),
@@ -365,7 +365,7 @@ mod tests {
 
     #[test]
     fn bounded_reader_hashes_chunks_without_retaining_oversized_line() {
-        let mut reader = io::BufReader::with_capacity(2, Cursor::new(b"abcdefgh\\nok\\n".to_vec()));
+        let mut reader = io::BufReader::with_capacity(2, Cursor::new(b"abcdefgh\nok\n".to_vec()));
         match read_bounded_line(&mut reader, 3).unwrap().unwrap() {
             BoundedLine::TooLarge { sha256 } => assert_eq!(sha256, digest_hex(b"abcdefgh")),
             BoundedLine::Accepted(_) => panic!("oversized record must be rejected"),
