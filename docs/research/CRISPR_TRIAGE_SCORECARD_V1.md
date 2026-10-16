@@ -450,3 +450,6 @@ Dependency-free Rust module: [scripts/crispr_verification_bias.rs](../../scripts
 
     rustc --edition=2024 --test scripts/crispr_verification_bias.rs -o /tmp/crispr-verification-bias-tests
     /tmp/crispr-verification-bias-tests
+
+
+**Independent estimator oracle (2026-10-16):** exhaustive design-expectation checks covered 2,048 deterministic finite-population fixtures and 128,512 non-empty sample subsets, using unequal candidate inclusion probabilities and conditional Bernoulli selection designs. The four Horvitz–Thompson count totals (candidate count, population positives, top-K candidates, and top-K positives) matched their true finite-population totals in expectation; maximum absolute numerical error was below 6e-15. This validates the count-estimator equations on the enumerated designs. It does not establish that a real sample followed its declared design, validate ratio-estimator unbiasedness, generate confidence intervals, compile Rust, or demonstrate biological improvement.
