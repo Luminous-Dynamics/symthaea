@@ -70,16 +70,24 @@ impl ForecastObservation {
     }
 
     /// Return the event identifier.
-    pub fn event_id(&self) -> &str { &self.event_id }
+    pub fn event_id(&self) -> &str {
+        &self.event_id
+    }
 
     /// Return the forecast-method identifier.
-    pub fn forecaster_id(&self) -> &str { &self.forecaster_id }
+    pub fn forecaster_id(&self) -> &str {
+        &self.forecaster_id
+    }
 
     /// Return the Unix-second observation time.
-    pub fn observed_at_unix_seconds(&self) -> u64 { self.observed_at_unix_seconds }
+    pub fn observed_at_unix_seconds(&self) -> u64 {
+        self.observed_at_unix_seconds
+    }
 
     /// Return the validated event probability.
-    pub fn probability(&self) -> f64 { self.probability }
+    pub fn probability(&self) -> f64 {
+        self.probability
+    }
 }
 
 /// A resolved event scored at a preregistered forecast cutoff.
@@ -125,22 +133,34 @@ impl ForecastTarget {
     }
 
     /// Return the event identifier.
-    pub fn event_id(&self) -> &str { &self.event_id }
+    pub fn event_id(&self) -> &str {
+        &self.event_id
+    }
 
     /// Return the frozen horizon identifier.
-    pub fn horizon_id(&self) -> &str { &self.horizon_id }
+    pub fn horizon_id(&self) -> &str {
+        &self.horizon_id
+    }
 
     /// Return the forecast cutoff time in Unix seconds.
-    pub fn cutoff_at_unix_seconds(&self) -> u64 { self.cutoff_at_unix_seconds }
+    pub fn cutoff_at_unix_seconds(&self) -> u64 {
+        self.cutoff_at_unix_seconds
+    }
 
     /// Return the event resolution time in Unix seconds.
-    pub fn resolved_at_unix_seconds(&self) -> u64 { self.resolved_at_unix_seconds }
+    pub fn resolved_at_unix_seconds(&self) -> u64 {
+        self.resolved_at_unix_seconds
+    }
 
     /// Return the observed binary outcome.
-    pub fn outcome(&self) -> bool { self.outcome }
+    pub fn outcome(&self) -> bool {
+        self.outcome
+    }
 
     /// Return the maximum permitted forecast age in seconds.
-    pub fn max_staleness_seconds(&self) -> u64 { self.max_staleness_seconds }
+    pub fn max_staleness_seconds(&self) -> u64 {
+        self.max_staleness_seconds
+    }
 }
 
 /// Why a method/horizon pair was omitted from scoring.
@@ -251,7 +271,10 @@ pub fn replay_horizons(
         .iter()
         .map(|observation| observation.forecaster_id.clone())
         .collect::<BTreeSet<_>>();
-    let mut report = ReplayReport { scored: Vec::new(), excluded: Vec::new() };
+    let mut report = ReplayReport {
+        scored: Vec::new(),
+        excluded: Vec::new(),
+    };
 
     for target in targets {
         for forecaster_id in &forecasters {
@@ -354,8 +377,11 @@ mod tests {
             observation("e1", "market", 100, 0.8),
             observation("e1", "market", 101, 0.99),
         ];
-        let report = replay_horizons(&observations, &[target("e1", "30d", 100, 200, true, 10)])
-            .expect("valid replay");
+        let report = replay_horizons(
+            &observations,
+            &[target("e1", "30d", 100, 200, true, 10)],
+        )
+        .expect("valid replay");
         assert_eq!(report.scored.len(), 1);
         assert_eq!(report.scored[0].probability, 0.8);
         assert_eq!(report.scored[0].forecast_at_unix_seconds, 100);
@@ -379,8 +405,11 @@ mod tests {
     #[test]
     fn stale_forecast_is_not_backfilled_as_a_valid_score() {
         let observations = vec![observation("e1", "market", 80, 0.7)];
-        let report = replay_horizons(&observations, &[target("e1", "30d", 100, 200, true, 5)])
-            .expect("valid replay");
+        let report = replay_horizons(
+            &observations,
+            &[target("e1", "30d", 100, 200, true, 5)],
+        )
+        .expect("valid replay");
         assert!(report.scored.is_empty());
         assert_eq!(report.excluded[0].reason, ReplayExclusionReason::ForecastTooStale);
     }
@@ -388,8 +417,11 @@ mod tests {
     #[test]
     fn impossible_realized_outcome_has_infinite_log_loss_not_an_epsilon_clamp() {
         let observations = vec![observation("e1", "market", 100, 0.0)];
-        let report = replay_horizons(&observations, &[target("e1", "1d", 100, 200, true, 1)])
-            .expect("valid replay");
+        let report = replay_horizons(
+            &observations,
+            &[target("e1", "1d", 100, 200, true, 1)],
+        )
+        .expect("valid replay");
         assert_eq!(report.scored[0].brier_score, 1.0);
         assert!(report.scored[0].log_loss.is_infinite());
     }
@@ -462,6 +494,9 @@ mod tests {
         assert_eq!(report.scored.len(), 4);
         assert_eq!(report.scored[0].event_id, "e1");
         assert_eq!(report.scored[0].horizon_id, "90d");
-        assert!(report.scored.iter().any(|row| row.forecaster_id == "symthaea" && row.event_id == "e2"));
+        assert!(report
+            .scored
+            .iter()
+            .any(|row| row.forecaster_id == "symthaea" && row.event_id == "e2"));
     }
 }
