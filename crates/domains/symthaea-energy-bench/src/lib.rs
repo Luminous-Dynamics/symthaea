@@ -1078,6 +1078,69 @@ mod tests {
     }
 
     #[test]
+    fn registered_differential_bias_bound_reduces_the_superiority_lower_bound() {
+        let (candidate, mut baseline) = comparison_runs();
+        let unadjusted = compare_candidates(&candidate, &baseline).unwrap();
+        assert_eq!(
+            unadjusted.decision,
+            ComparisonDecision::LowerBoundClearsRegisteredMargin
+        );
+
+        baseline
+            .evaluation_policy
+            .maximum_unmodeled_differential_bias_efficiency = 0.025;
+        baseline.evaluation_policy.differential_bias_bound_basis =
+            "Synthetic unit test: known worst-case candidate-baseline bias bound.".into();
+        let mut adjusted_candidate = candidate;
+        adjusted_candidate
+            .evaluation_policy
+            .maximum_unmodeled_differential_bias_efficiency = 0.025;
+        adjusted_candidate.evaluation_policy.differential_bias_bound_basis =
+            baseline.evaluation_policy.differential_bias_bound_basis.clone();
+
+        let adjusted = compare_candidates(&adjusted_candidate, &baseline).unwrap();
+        assert!(
+            adjusted.conservative_lower_bound.unwrap()
+                < unadjusted.conservative_lower_bound.unwrap()
+        );
+        assert!(
+            (unadjusted.conservative_lower_bound.unwrap()
+                - adjusted.conservative_lower_bound.unwrap()
+                - 0.025)
+                .abs()
+                < 1e-12
+        );
+        assert_eq!(
+            adjusted.decision,
+            ComparisonDecision::LowerBoundDoesNotClearMargin
+        );
+    }
+
+    #[test]
+    fn invalid_differential_bias_bound_is_rejected() {
+        let (mut candidate, _) = comparison_runs();
+        candidate
+            .evaluation_policy
+            .maximum_unmodeled_differential_bias_efficiency = 1.01;
+        let error = validate_run(&candidate).unwrap_err();
+        assert!(
+            error.issues.iter().any(|issue| issue.contains(
+                "maximum_unmodeled_differential_bias_efficiency must be finite and in [0, 1]"
+            ))
+        );
+    }
+
+    #[test]
+    fn candidate_and_baseline_bias_bound_bases_must_match() {
+        let (candidate, mut baseline) = comparison_runs();
+        baseline
+            .evaluation_policy
+            .differential_bias_bound_basis = "different registered basis".into();
+        let error = compare_candidates(&candidate, &baseline).unwrap_err();
+        assert!(error.issues.iter().any(|issue| issue.contains("evaluation policies differ")));
+    }
+
+    #[test]
     fn large_uncertainty_does_not_turn_point_estimate_into_a_win() {
         let (mut candidate, baseline) = comparison_runs();
         candidate.intervals[1].standard_uncertainty_j.external_input = 25.0;
