@@ -1,0 +1,728 @@
+//! Deterministic synthetic stress matrix for kinetic model selection and abstention.
+//!
+//! This is an exploratory software benchmark, not a validated statistical procedure. The
+//! thresholds are preregistered policy fixtures; they require calibration against real assay
+//! residuals and independent studies before any scientific decision-making use.
+
+use anyhow::{Context, Result, ensure};
+use serde_json::{Value, json};
+use std::collections::BTreeMap;
+use std::fs;
+use std::path::Path;
+
+#[derive(Clone, Copy, Debug)]
+struct Observation {
+    substrate: f64,
+    rate: f64,
+}
+
+#[derive(Clone, Copy, Debug, PartialEq, Eq)]
+enum ModelKind {
+    MichaelisMenten,
+    SubstrateInhibition,
+}
+
+impl ModelKind {
+    fn parameter_count(self) -> usize {
+        match self {
+            Self::MichaelisMenten => 2,
+            Self::SubstrateInhibition => 3,
+        }
+    }
+}
+
+#[derive(Clone, Copy, Debug)]
+struct ModelFit {
+    kind: ModelKind,
+    vmax: f64,
+    km: f64,
+    ki: Option<f64>,
+    sse: f64,
+    rmse: f64,
+}
+
+#[derive(Clone, Copy, Debug)]
+struct Decision {
+    selected: &'static str,
+    reason: &'static str,
+    delta_bic_mm_minus_inhibition: f64,
+    held_out_prediction_gap_in_noise_sd: f64,
+    best_held_out_rmse_in_noise_sd: f64,
+    held_out_rmse_mm: f64,
+    held_out_rmse_inhibition: f64,
+    absolute_fit_gate_passed: bool,
+    prediction_gap_resolved: bool,
+    bic_decisive: bool,
+}
+
+#[derive(Clone, Copy, Debug)]
+struct Scenario {
+    stratum: &'static str,
+    truth_family: &'static str,
+    expected_decision: &'static str,
+    vmax: f64,
+    km: f64,
+    ki: f64,
+    hill_exponent: f64,
+    substrate_set: &'static [f64],
+}
+
+const WIDE_SUBSTRATES: &[f64] = &[0.25, 0.5, 1.0, 2.0, 4.0, 8.0, 16.0, 32.0, 64.0, 128.0];
+const LOW_SUBSTRATES: &[f64] = &[0.05, 0.1, 0.2, 0.4, 0.8, 1.2, 1.6, 2.0];
+const NOISE_SDS: &[f64] = &[0.25, 1.0, 5.0];
+const SEEDS: &[u64] = &[1, 2, 3, 4, 5, 6, 7, 8];
+
+const DECISIVE_DELTA_BIC: f64 = 10.0;
+const MAX_NORMALIZED_RMSE_FOR_ADEQUACY: f64 = 3.0;
+const MIN_PREDICTION_GAP_IN_NOISE_SDS: f64 = 1.0;
+
+fn michaelis_menten(substrate: f64, vmax: f64, km: f64) -> f64 {
+    vmax * substrate / (km + substrate)
+}
+
+fn substrate_inhibition(substrate: f64, vmax: f64, km: f64, ki: f64) -> f64 {
+    vmax * substrate / (km + substrate + substrate * substrate / ki)
+}
+
+fn hill_rate(substrate: f64, vmax: f64, half_saturation: f64, exponent: f64) -> f64 {
+    let s = substrate.powf(exponent);
+    vmax * s / (half_saturation.powf(exponent) + s)
+}
+
+/// Stable, deterministic pseudo-noise. Uniform noise is scaled to have the requested standard
+/// deviation; it is not intended as a biological error model.
+fn synthetic_noise(seed: u64, index: usize, sigma: f64) -> f64 {
+    let mut z = seed
+        .wrapping_mul(0x9E3779B97F4A7C15)
+        .wrapping_add((index as u64).wrapping_mul(0xBF58476D1CE4E5B9));
+    z = z.wrapping_add(0x9E3779B97F4A7C15);
+    z = (z ^ (z >> 30)).wrapping_mul(0xBF58476D1CE4E5B9);
+    z = (z ^ (z >> 27)).wrapping_mul(0x94D049BB133111EB);
+    z ^= z >> 31;
+    let unit = ((z >> 11) as f64) * (1.0 / ((1_u64 << 53) as f64));
+    (2.0 * unit - 1.0) * 3.0_f64.sqrt() * sigma
+}
+
+fn scenarios() -> [Scenario; 4] {
+    [
+        Scenario {
+            stratum: "well_separated_michaelis_menten",
+            truth_family: "michaelis_menten",
+            expected_decision: "michaelis_menten",
+            vmax: 100.0,
+            km: 2.0,
+            ki: 20.0,
+            hill_exponent: 1.0,
+            substrate_set: WIDE_SUBSTRATES,
+        },
+        Scenario {
+            stratum: "well_separated_substrate_inhibition",
+            truth_family: "substrate_inhibition",
+            expected_decision: "substrate_inhibition",
+            vmax: 100.0,
+            km: 2.0,
+            ki: 20.0,
+            hill_exponent: 1.0,
+            substrate_set: WIDE_SUBSTRATES,
+        },
+        Scenario {
+            stratum: "observationally_ambiguous_low_substrate",
+            // Generate a curve that approaches Michaelis-Menten over the observed substrate
+            // range. The system's target is to preserve ambiguity, not infer the hidden label.
+            truth_family: "substrate_inhibition_weakly_identified",
+            expected_decision: "abstain",
+            vmax: 100.0,
+            km: 2.0,
+            ki: 10_000.0,
+            hill_exponent: 1.0,
+            substrate_set: LOW_SUBSTRATES,
+        },
+        Scenario {
+            stratum: "misspecified_hill_truth",
+            truth_family: "hill",
+            // Neither candidate family is the generating model. Abstention is the intended
+            // outcome whenever the candidate pair is demonstrably inadequate.
+            expected_decision: "abstain",
+            vmax: 100.0,
+            km: 4.0,
+            ki: 20.0,
+            hill_exponent: 1.6,
+            substrate_set: WIDE_SUBSTRATES,
+        },
+    ]
+}
+
+fn observations_for(scenario: Scenario, seed: u64, sigma: f64) -> Vec<Observation> {
+    scenario
+        .substrate_set
+        .iter()
+        .enumerate()
+        .map(|(index, &substrate)| {
+            let signal = match scenario.truth_family {
+                "michaelis_menten" => michaelis_menten(substrate, scenario.vmax, scenario.km),
+                "substrate_inhibition" | "substrate_inhibition_weakly_identified" => {
+                    substrate_inhibition(substrate, scenario.vmax, scenario.km, scenario.ki)
+                }
+                "hill" => hill_rate(
+                    substrate,
+                    scenario.vmax,
+                    scenario.km,
+                    scenario.hill_exponent,
+                ),
+                _ => unreachable!("all synthetic strata have an explicit generator"),
+            };
+            Observation {
+                substrate,
+                rate: signal + synthetic_noise(seed, index, sigma),
+            }
+        })
+        .collect()
+}
+
+fn residual_sse(observations: &[Observation], kind: ModelKind, vmax: f64, km: f64, ki: f64) -> f64 {
+    observations
+        .iter()
+        .map(|obs| {
+            let estimate = match kind {
+                ModelKind::MichaelisMenten => michaelis_menten(obs.substrate, vmax, km),
+                ModelKind::SubstrateInhibition => substrate_inhibition(obs.substrate, vmax, km, ki),
+            };
+            let residual = obs.rate - estimate;
+            residual * residual
+        })
+        .sum()
+}
+
+fn fit_grid(observations: &[Observation], kind: ModelKind) -> ModelFit {
+    let mut best = ModelFit {
+        kind,
+        vmax: f64::NAN,
+        km: f64::NAN,
+        ki: None,
+        sse: f64::INFINITY,
+        rmse: f64::INFINITY,
+    };
+
+    for vmax_index in 0..=40 {
+        let vmax = 60.0 + vmax_index as f64 * 2.0;
+        for km_index in 1..=40 {
+            let km = km_index as f64 * 0.25;
+            match kind {
+                ModelKind::MichaelisMenten => {
+                    let sse = residual_sse(observations, kind, vmax, km, 20.0);
+                    if sse < best.sse {
+                        best = ModelFit {
+                            kind,
+                            vmax,
+                            km,
+                            ki: None,
+                            sse,
+                            rmse: (sse / observations.len() as f64).sqrt(),
+                        };
+                    }
+                }
+                ModelKind::SubstrateInhibition => {
+                    for ki_index in 1..=20 {
+                        let ki = ki_index as f64 * 5.0;
+                        let sse = residual_sse(observations, kind, vmax, km, ki);
+                        if sse < best.sse {
+                            best = ModelFit {
+                                kind,
+                                vmax,
+                                km,
+                                ki: Some(ki),
+                                sse,
+                                rmse: (sse / observations.len() as f64).sqrt(),
+                            };
+                        }
+                    }
+                }
+            }
+        }
+    }
+    best
+}
+
+fn bic(fit: ModelFit, observation_count: usize) -> f64 {
+    let n = observation_count as f64;
+    // The epsilon preserves finite report values if a deterministic fixture is an exact fit.
+    n * (fit.sse / n).max(1e-12).ln() + fit.kind.parameter_count() as f64 * n.ln()
+}
+
+fn predict(fit: ModelFit, substrate: f64) -> f64 {
+    match fit.kind {
+        ModelKind::MichaelisMenten => michaelis_menten(substrate, fit.vmax, fit.km),
+        ModelKind::SubstrateInhibition => {
+            substrate_inhibition(substrate, fit.vmax, fit.km, fit.ki.unwrap_or(20.0))
+        }
+    }
+}
+
+fn rmse_on(observations: &[Observation], fit: ModelFit) -> f64 {
+    (observations
+        .iter()
+        .map(|obs| {
+            let residual = obs.rate - predict(fit, obs.substrate);
+            residual * residual
+        })
+        .sum::<f64>()
+        / observations.len() as f64)
+        .sqrt()
+}
+
+/// Frozen index split: each third observation is held out. The split is deterministic and
+/// independent of the generated rates; all fitted parameters and BIC are computed on training
+/// observations only. This is a small stress-test holdout, not a substitute for independent assays.
+fn split_observations(observations: &[Observation]) -> (Vec<Observation>, Vec<Observation>) {
+    let mut training = Vec::new();
+    let mut held_out = Vec::new();
+    for (index, observation) in observations.iter().copied().enumerate() {
+        if index % 3 == 0 {
+            held_out.push(observation);
+        } else {
+            training.push(observation);
+        }
+    }
+    (training, held_out)
+}
+
+fn apply_decision_policy(
+    delta_bic_mm_minus_inhibition: f64,
+    prediction_gap_in_noise_sd: f64,
+    best_evaluation_rmse_in_noise_sd: f64,
+) -> (&'static str, &'static str, bool, bool, bool) {
+    let absolute_fit_gate_passed =
+        best_evaluation_rmse_in_noise_sd <= MAX_NORMALIZED_RMSE_FOR_ADEQUACY;
+    let prediction_gap_resolved =
+        prediction_gap_in_noise_sd >= MIN_PREDICTION_GAP_IN_NOISE_SDS;
+    let bic_decisive = delta_bic_mm_minus_inhibition.abs() >= DECISIVE_DELTA_BIC;
+
+    let (selected, reason) = if !absolute_fit_gate_passed {
+        ("abstain", "best_candidate_fails_evaluation_absolute_fit_gate")
+    } else if !prediction_gap_resolved {
+        ("abstain", "candidate_predictions_not_resolved_at_evaluation_conditions")
+    } else if !bic_decisive {
+        ("abstain", "bic_difference_below_decisive_threshold")
+    } else if delta_bic_mm_minus_inhibition < 0.0 {
+        ("michaelis_menten", "bic_favors_michaelis_menten")
+    } else {
+        ("substrate_inhibition", "bic_favors_substrate_inhibition")
+    };
+
+    (
+        selected,
+        reason,
+        absolute_fit_gate_passed,
+        prediction_gap_resolved,
+        bic_decisive,
+    )
+}
+
+fn prediction_gap_in_noise_sd(
+    evaluation: &[Observation],
+    mm: ModelFit,
+    inhibition: ModelFit,
+    sigma: f64,
+) -> f64 {
+    (evaluation
+        .iter()
+        .map(|obs| {
+            let gap = predict(mm, obs.substrate) - predict(inhibition, obs.substrate);
+            gap * gap
+        })
+        .sum::<f64>()
+        / evaluation.len() as f64)
+        .sqrt()
+        / sigma
+}
+
+fn decide(
+    training: &[Observation],
+    held_out: &[Observation],
+    mm: ModelFit,
+    inhibition: ModelFit,
+    sigma: f64,
+) -> Decision {
+    let delta_bic = bic(mm, training.len()) - bic(inhibition, training.len());
+    // Assess whether candidate predictions separate on held-out substrate conditions, not only
+    // on the points used to estimate their parameters.
+    let prediction_gap = prediction_gap_in_noise_sd(held_out, mm, inhibition, sigma);
+    let held_out_rmse_mm = rmse_on(held_out, mm);
+    let held_out_rmse_inhibition = rmse_on(held_out, inhibition);
+    let best_held_out_rmse_in_noise_sd =
+        held_out_rmse_mm.min(held_out_rmse_inhibition) / sigma;
+    let (selected, reason, absolute_fit_gate_passed, prediction_gap_resolved, bic_decisive) =
+        apply_decision_policy(delta_bic, prediction_gap, best_held_out_rmse_in_noise_sd);
+
+    Decision {
+        selected,
+        reason,
+        delta_bic_mm_minus_inhibition: delta_bic,
+        held_out_prediction_gap_in_noise_sd: prediction_gap,
+        best_held_out_rmse_in_noise_sd,
+        held_out_rmse_mm,
+        held_out_rmse_inhibition,
+        absolute_fit_gate_passed,
+        prediction_gap_resolved,
+        bic_decisive,
+    }
+}
+
+fn make_case(scenario: Scenario, seed: u64, sigma: f64) -> Value {
+    let observations = observations_for(scenario, seed, sigma);
+
+    // Paired comparator: the original in-sample policy fits and evaluates on every observation.
+    // It is retained as a benchmark baseline, not as the preferred scientific protocol.
+    let in_sample_mm = fit_grid(&observations, ModelKind::MichaelisMenten);
+    let in_sample_inhibition = fit_grid(&observations, ModelKind::SubstrateInhibition);
+    let in_sample_delta_bic =
+        bic(in_sample_mm, observations.len()) - bic(in_sample_inhibition, observations.len());
+    let in_sample_gap =
+        prediction_gap_in_noise_sd(&observations, in_sample_mm, in_sample_inhibition, sigma);
+    let in_sample_best_rmse =
+        in_sample_mm.rmse.min(in_sample_inhibition.rmse) / sigma;
+    let (
+        in_sample_selected,
+        in_sample_reason,
+        in_sample_absolute_fit_passed,
+        in_sample_prediction_gap_resolved,
+        in_sample_bic_decisive,
+    ) = apply_decision_policy(in_sample_delta_bic, in_sample_gap, in_sample_best_rmse);
+
+    // Preferred exploratory policy: fit on training observations, gate against held-out conditions.
+    let (training, held_out) = split_observations(&observations);
+    let mm = fit_grid(&training, ModelKind::MichaelisMenten);
+    let inhibition = fit_grid(&training, ModelKind::SubstrateInhibition);
+    let decision = decide(&training, &held_out, mm, inhibition, sigma);
+    let target_hit = decision.selected == scenario.expected_decision;
+    let in_sample_target_hit = in_sample_selected == scenario.expected_decision;
+
+    json!({
+        "stratum": scenario.stratum,
+        "seed": seed,
+        "measurement_sd": sigma,
+        "observation_count": observations.len(),
+        "training_count": training.len(),
+        "held_out_count": held_out.len(),
+        "substrates": scenario.substrate_set,
+        "observations": observations.iter().enumerate().map(|(index, obs)| json!({
+            "substrate": obs.substrate,
+            "observed_rate": obs.rate,
+            "partition": if index % 3 == 0 { "held_out" } else { "training" }
+        })).collect::<Vec<_>>(),
+        "truth_family": scenario.truth_family,
+        "expected_decision": scenario.expected_decision,
+        "observed_decision": decision.selected,
+        "target_hit": target_hit,
+        "in_sample_baseline": {
+            "selected": in_sample_selected,
+            "reason": in_sample_reason,
+            "target_hit": in_sample_target_hit,
+            "delta_bic_mm_minus_inhibition": in_sample_delta_bic,
+            "prediction_gap_in_noise_sd": in_sample_gap,
+            "best_rmse_in_noise_sd": in_sample_best_rmse,
+            "decision_gates": {
+                "absolute_fit_gate_passed": in_sample_absolute_fit_passed,
+                "prediction_gap_resolved": in_sample_prediction_gap_resolved,
+                "bic_decisive": in_sample_bic_decisive
+            }
+        },
+        "decision_reason": decision.reason,
+        "delta_bic_mm_minus_inhibition": decision.delta_bic_mm_minus_inhibition,
+        "held_out_prediction_gap_in_noise_sd": decision.held_out_prediction_gap_in_noise_sd,
+        "best_held_out_rmse_in_noise_sd": decision.best_held_out_rmse_in_noise_sd,
+        "decision_gates": {
+            "absolute_fit_gate_passed": decision.absolute_fit_gate_passed,
+            "prediction_gap_resolved": decision.prediction_gap_resolved,
+            "bic_decisive": decision.bic_decisive
+        },
+        "fits": {
+            "michaelis_menten": {
+                "vmax": mm.vmax,
+                "km": mm.km,
+                "training_rmse": mm.rmse,
+                "held_out_rmse": decision.held_out_rmse_mm,
+                "held_out_rmse_in_noise_sd": decision.held_out_rmse_mm / sigma,
+                "training_bic": bic(mm, training.len())
+            },
+            "substrate_inhibition": {
+                "vmax": inhibition.vmax,
+                "km": inhibition.km,
+                "ki": inhibition.ki,
+                "training_rmse": inhibition.rmse,
+                "held_out_rmse": decision.held_out_rmse_inhibition,
+                "held_out_rmse_in_noise_sd": decision.held_out_rmse_inhibition / sigma,
+                "training_bic": bic(inhibition, training.len())
+            }
+        }
+    })
+}
+
+fn build_report() -> Result<Value> {
+    let mut cases = Vec::new();
+    let mut grouped: BTreeMap<&'static str, BTreeMap<String, usize>> = BTreeMap::new();
+    let mut baseline_grouped: BTreeMap<&'static str, BTreeMap<String, usize>> = BTreeMap::new();
+    let mut target_hits: BTreeMap<&'static str, usize> = BTreeMap::new();
+    let mut baseline_target_hits: BTreeMap<&'static str, usize> = BTreeMap::new();
+    let mut target_totals: BTreeMap<&'static str, usize> = BTreeMap::new();
+
+    for scenario in scenarios() {
+        for &sigma in NOISE_SDS {
+            for &seed in SEEDS {
+                let case = make_case(scenario, seed, sigma);
+                let selected = case["observed_decision"]
+                    .as_str()
+                    .context("decision label must be a string")?;
+                let target_hit = case["target_hit"]
+                    .as_bool()
+                    .context("target_hit must be a boolean")?;
+                let baseline_selected = case["in_sample_baseline"]["selected"]
+                    .as_str()
+                    .context("in-sample baseline decision must be a string")?;
+                let baseline_target_hit = case["in_sample_baseline"]["target_hit"]
+                    .as_bool()
+                    .context("in-sample baseline target_hit must be a boolean")?;
+
+                *grouped.entry(scenario.stratum).or_default().entry(selected.to_string()).or_default() += 1;
+                *baseline_grouped.entry(scenario.stratum).or_default().entry(baseline_selected.to_string()).or_default() += 1;
+                *target_totals.entry(scenario.stratum).or_default() += 1;
+                if target_hit {
+                    *target_hits.entry(scenario.stratum).or_default() += 1;
+                }
+                if baseline_target_hit {
+                    *baseline_target_hits.entry(scenario.stratum).or_default() += 1;
+                }
+                cases.push(case);
+            }
+        }
+    }
+
+    let total_cases = cases.len();
+    let summary: Vec<Value> = scenarios()
+        .iter()
+        .map(|scenario| {
+            let outcome_counts = grouped.get(scenario.stratum).cloned().unwrap_or_default();
+            let baseline_outcome_counts = baseline_grouped.get(scenario.stratum).cloned().unwrap_or_default();
+            let total = *target_totals.get(scenario.stratum).unwrap_or(&0);
+            let hits = *target_hits.get(scenario.stratum).unwrap_or(&0);
+            let baseline_hits = *baseline_target_hits.get(scenario.stratum).unwrap_or(&0);
+            let selected_models = outcome_counts.get("michaelis_menten").copied().unwrap_or(0)
+                + outcome_counts.get("substrate_inhibition").copied().unwrap_or(0);
+            let baseline_selected_models = baseline_outcome_counts.get("michaelis_menten").copied().unwrap_or(0)
+                + baseline_outcome_counts.get("substrate_inhibition").copied().unwrap_or(0);
+            let is_abstention_control = scenario.expected_decision == "abstain";
+            json!({
+                "stratum": scenario.stratum,
+                "truth_family": scenario.truth_family,
+                "expected_decision": scenario.expected_decision,
+                "case_count": total,
+                "target_hits": hits,
+                "target_hit_rate": if total > 0 { hits as f64 / total as f64 } else { 0.0 },
+                "false_decisive_count": if is_abstention_control { json!(selected_models) } else { Value::Null },
+                "false_decisive_rate": if is_abstention_control && total > 0 { json!(selected_models as f64 / total as f64) } else { Value::Null },
+                "outcome_counts": outcome_counts,
+                "in_sample_baseline_target_hits": baseline_hits,
+                "in_sample_baseline_target_hit_rate": if total > 0 { baseline_hits as f64 / total as f64 } else { 0.0 },
+                "in_sample_baseline_false_decisive_count": if is_abstention_control { json!(baseline_selected_models) } else { Value::Null },
+                "in_sample_baseline_false_decisive_rate": if is_abstention_control && total > 0 { json!(baseline_selected_models as f64 / total as f64) } else { Value::Null },
+                "in_sample_baseline_outcome_counts": baseline_outcome_counts
+            })
+        })
+        .collect();
+
+    ensure!(total_cases == scenarios().len() * NOISE_SDS.len() * SEEDS.len(),
+        "synthetic scenario matrix has unexpected case count");
+
+    let control_case_count = cases
+        .iter()
+        .filter(|case| case["expected_decision"].as_str() == Some("abstain"))
+        .count();
+    let false_decisive_count = cases
+        .iter()
+        .filter(|case| {
+            case["expected_decision"].as_str() == Some("abstain")
+                && case["observed_decision"].as_str() != Some("abstain")
+        })
+        .count();
+    let correct_abstention_count = control_case_count - false_decisive_count;
+    let baseline_false_decisive_count = cases
+        .iter()
+        .filter(|case| {
+            case["expected_decision"].as_str() == Some("abstain")
+                && case["in_sample_baseline"]["selected"].as_str() != Some("abstain")
+        })
+        .count();
+    let baseline_correct_abstention_count = control_case_count - baseline_false_decisive_count;
+    let false_decisive_reduction = baseline_false_decisive_count as i64 - false_decisive_count as i64;
+
+    Ok(json!({
+        "schema_version": 1,
+        "benchmark_id": "enzyme-abstention-matrix-v0",
+        "status": "exploratory_synthetic_matrix_generated",
+        "scope": "Deterministic synthetic stress matrix only. Results are not calibrated biochemical evidence, not validation of a general-purpose decision rule, and not a predictive benchmark.",
+        "matrix": {
+            "strata_count": scenarios().len(),
+            "noise_levels": NOISE_SDS,
+            "seeds_per_noise_level_and_stratum": SEEDS.len(),
+            "case_count": total_cases,
+            "substrate_design": "stratum-specific frozen substrate conditions",
+            "noise_model": "deterministic bounded uniform residual with requested standard deviation",
+            "fit_method": "coarse exhaustive parameter grid; intentionally a reproducible baseline, not a production estimator",
+            "fit_grid": {
+                "vmax_min": 60.0, "vmax_max": 140.0, "vmax_step": 2.0,
+                "km_min": 0.25, "km_max": 10.0, "km_step": 0.25,
+                "ki_min": 5.0, "ki_max": 100.0, "ki_step": 5.0
+            }
+        },
+        "decision_policy": {
+            "order": [
+                "abstain if the best candidate fails the held-out absolute-fit adequacy gate",
+                "abstain if candidate predictions are unresolved on held-out substrate conditions at the assumed noise scale",
+                "abstain if the training-only absolute delta BIC is below the decisive threshold",
+                "otherwise select the candidate favored by training-only BIC after both held-out gates pass"
+            ],
+            "delta_bic_definition": "BIC(Michaelis-Menten) - BIC(substrate inhibition); negative favors Michaelis-Menten",
+            "decisive_absolute_delta_bic": DECISIVE_DELTA_BIC,
+            "maximum_best_held_out_rmse_in_noise_sds": MAX_NORMALIZED_RMSE_FOR_ADEQUACY,
+            "minimum_held_out_prediction_gap_in_noise_sds": MIN_PREDICTION_GAP_IN_NOISE_SDS,
+            "holdout_rule": "every third observation by frozen substrate-list index; holdout outcomes do not participate in fitting or BIC calculation",
+            "calibration_status": "heuristic thresholds; not calibrated against real assay residuals",
+            "semantics": "a selected label identifies the better-supported candidate among the two supplied families; it does not establish mechanistic truth or show that the candidate set is exhaustive"
+        },
+        "summary_by_stratum": summary,
+        "paired_policy_comparison": {
+            "control_case_count": control_case_count,
+            "in_sample_false_decisive_count": baseline_false_decisive_count,
+            "in_sample_false_decisive_rate": if control_case_count > 0 { baseline_false_decisive_count as f64 / control_case_count as f64 } else { 0.0 },
+            "held_out_false_decisive_count": false_decisive_count,
+            "held_out_false_decisive_rate": if control_case_count > 0 { false_decisive_count as f64 / control_case_count as f64 } else { 0.0 },
+            "false_decisive_count_reduction": false_decisive_reduction,
+            "in_sample_correct_abstention_count": baseline_correct_abstention_count,
+            "held_out_correct_abstention_count": correct_abstention_count,
+            "note": "Paired result on the same 96 known-generator synthetic cases; descriptive only, with uncalibrated heuristic thresholds."
+        },
+        "abstention_control_summary": {
+            "control_case_count": control_case_count,
+            "false_decisive_count": false_decisive_count,
+            "false_decisive_rate": if control_case_count > 0 { false_decisive_count as f64 / control_case_count as f64 } else { 0.0 },
+            "correct_abstention_count": correct_abstention_count,
+            "note": "Known-generator synthetic control summary; not an estimate of real-world false-certainty probability."
+        },
+        "cases": cases,
+        "next_gates": [
+            "increase to at least 1000 preregistered scenario/seed combinations and freeze scenario-generation code before scoring",
+            "calibrate abstention thresholds using held-out synthetic scenarios, not the reported test matrix",
+            "measure false-decisive rate separately for ambiguous and misspecified cases",
+            "assess BIC selection calibration under heteroscedastic and correlated residuals",
+            "compare with AICc, likelihood-ratio tests where valid, bootstrap model weights, and profile-likelihood diagnostics",
+            "validate against rights-cleared raw assay time courses and independent laboratory/study holdouts"
+        ]
+    }))
+}
+
+pub fn run(output: &Path) -> Result<()> {
+    let report = build_report()?;
+    if let Some(parent) = output.parent() {
+        if !parent.as_os_str().is_empty() {
+            fs::create_dir_all(parent)
+                .with_context(|| format!("create report directory {}", parent.display()))?;
+        }
+    }
+    let bytes = serde_json::to_vec_pretty(&report).context("serialize abstention matrix report")?;
+    fs::write(output, &bytes)
+        .with_context(|| format!("write abstention matrix report {}", output.display()))?;
+    println!(
+        "Synthetic enzyme abstention matrix generated: output={}, bytes={}, cases={}, scope=exploratory-synthetic-only",
+        output.display(),
+        bytes.len(),
+        report["matrix"]["case_count"].as_u64().unwrap_or(0)
+    );
+    Ok(())
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    fn fit(kind: ModelKind, vmax: f64, km: f64, ki: Option<f64>, rmse: f64) -> ModelFit {
+        ModelFit { kind, vmax, km, ki, sse: rmse * rmse * 4.0, rmse }
+    }
+
+    #[test]
+    fn observationally_equivalent_candidates_force_abstention() {
+        let observations = vec![
+            Observation { substrate: 0.5, rate: 20.0 },
+            Observation { substrate: 1.0, rate: 33.0 },
+            Observation { substrate: 2.0, rate: 50.0 },
+        ];
+        let mm = fit(ModelKind::MichaelisMenten, 100.0, 2.0, None, 0.5);
+        let inhibition = fit(ModelKind::SubstrateInhibition, 100.0, 2.0, Some(10_000.0), 0.5);
+        let decision = decide(&observations, &observations, mm, inhibition, 1.0);
+        assert_eq!(decision.selected, "abstain");
+        assert_eq!(decision.reason, "candidate_predictions_not_resolved_at_evaluation_conditions");
+    }
+
+    #[test]
+    fn gross_absolute_misfit_forces_abstention_before_model_selection() {
+        let observations = vec![
+            Observation { substrate: 1.0, rate: 20.0 },
+            Observation { substrate: 16.0, rate: 80.0 },
+            Observation { substrate: 64.0, rate: 10.0 },
+        ];
+        let mm = fit(ModelKind::MichaelisMenten, 80.0, 4.0, None, 5.0);
+        let inhibition = fit(ModelKind::SubstrateInhibition, 80.0, 4.0, Some(20.0), 4.5);
+        let decision = decide(&observations, &observations, mm, inhibition, 1.0);
+        assert_eq!(decision.selected, "abstain");
+        assert_eq!(decision.reason, "best_candidate_fails_evaluation_absolute_fit_gate");
+    }
+
+    #[test]
+    fn frozen_holdout_split_is_disjoint_and_conserves_observations() {
+        let observations: Vec<Observation> = (0..8)
+            .map(|index| Observation {
+                substrate: index as f64,
+                rate: (index as f64) * 2.0,
+            })
+            .collect();
+        let (training, held_out) = split_observations(&observations);
+
+        assert_eq!(
+            training.iter().map(|obs| obs.substrate).collect::<Vec<_>>(),
+            vec![1.0, 2.0, 4.0, 5.0, 7.0]
+        );
+        assert_eq!(
+            held_out.iter().map(|obs| obs.substrate).collect::<Vec<_>>(),
+            vec![0.0, 3.0, 6.0]
+        );
+        assert_eq!(training.len() + held_out.len(), observations.len());
+        assert!(training.iter().all(|train| held_out.iter().all(|test| train.substrate != test.substrate)));
+    }
+
+    #[test]
+    fn generated_matrix_has_fixed_denominators_and_explicit_targets() {
+        let report = build_report().expect("matrix generation should succeed");
+        assert_eq!(report["status"], "exploratory_synthetic_matrix_generated");
+        assert_eq!(report["matrix"]["case_count"].as_u64().unwrap(), (scenarios().len() * NOISE_SDS.len() * SEEDS.len()) as u64);
+        assert_eq!(report["cases"].as_array().unwrap().len(), 96);
+        assert_eq!(report["summary_by_stratum"].as_array().unwrap().len(), 4);
+        assert_eq!(report["abstention_control_summary"]["control_case_count"].as_u64().unwrap(), 48);
+        assert!(report["abstention_control_summary"]["false_decisive_rate"].as_f64().is_some());
+        assert_eq!(report["paired_policy_comparison"]["control_case_count"].as_u64().unwrap(), 48);
+        assert!(report["paired_policy_comparison"]["in_sample_false_decisive_rate"].as_f64().is_some());
+        assert!(report["paired_policy_comparison"]["held_out_false_decisive_rate"].as_f64().is_some());
+        assert!(report["cases"].as_array().unwrap().iter().all(|case| {
+            case["observed_decision"].as_str().is_some()
+                && case["decision_reason"].as_str().is_some()
+                && case["target_hit"].as_bool().is_some()
+                && case["decision_gates"]["absolute_fit_gate_passed"].as_bool().is_some()
+                && case["decision_gates"]["prediction_gap_resolved"].as_bool().is_some()
+                && case["decision_gates"]["bic_decisive"].as_bool().is_some()
+                && case["held_out_prediction_gap_in_noise_sd"].as_f64().is_some()
+                && case["best_held_out_rmse_in_noise_sd"].as_f64().is_some()
+                && case["training_count"].as_u64().unwrap_or(0) + case["held_out_count"].as_u64().unwrap_or(0) == case["observation_count"].as_u64().unwrap_or(u64::MAX)
+                && case["observations"].as_array().map(|rows| rows.len()) == case["observation_count"].as_u64().map(|count| count as usize)
+                && case["observations"].as_array().map(|rows| rows.iter().filter(|row| row["partition"] == "held_out").count()) == case["held_out_count"].as_u64().map(|count| count as usize)
+        }));
+        assert!(report["scope"].as_str().unwrap().contains("not calibrated biochemical evidence"));
+    }
+}
