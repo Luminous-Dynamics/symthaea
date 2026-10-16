@@ -588,5 +588,20 @@
       "interpretation": "A positive lower bound indicates improvement robust to every unknown-label assignment inside the shared candidate universe. Bounds spanning zero mean the observed-label delta is not robust to all assignments. Not a confidence interval, posterior or safety guarantee."
     }
   },
-  "updated_on": "2026-10-16"
+  "updated_on": "2026-10-16",
+  "method_validation": {
+    "paired_label_sensitivity_formula_check": {
+      "status": "passed_independent_formula_check_only",
+      "executed_on": "2026-10-16",
+      "deterministic_paired_ranking_cases": 1763520,
+      "method": "For each deterministically selected pair of rankings, enumerate every binary assignment to all unknown labels in the small shared candidate universe; compare exhaustive minimum/maximum of Recall@K(A)-Recall@K(B) with the closed-form lower/upper bounds.",
+      "result": "No bound mismatches found.",
+      "not_evidence_of": [
+        "Rust source compiling or unit tests passing",
+        "source cohort or publication metrics reproduced",
+        "biological validity or safety",
+        "candidate discovery beyond the declared universe"
+      ]
+    }
+  }
 }
