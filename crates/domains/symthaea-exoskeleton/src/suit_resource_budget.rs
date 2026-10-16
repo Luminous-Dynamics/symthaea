@@ -17,13 +17,11 @@ use crate::suit_interop::{
     SuitInteropReportStatus, SuitOperatingEnvironment,
 };
 use crate::suit_mission_configuration::{
-    MissionConfiguration, MissionConfigurationError, MissionConfigurationReport,
-    MissionConfigurationStatus,
+    MissionConfiguration, MissionConfigurationReport,
 };
 use crate::suit_mission_tasks::{
     evaluate_mission_tasks, MissionTaskError, MissionTaskPlanReport,
     MissionTaskPlanStatus, MissionTaskReceipt, MissionTaskRequirement,
-    verify_mission_task_receipt,
 };
 use crate::suit_profile::SuitEvidenceLevel;
 
@@ -217,16 +215,6 @@ struct PoolDemandTotals {
     optional_upper: u64,
     required_count: usize,
     optional_count: usize,
-}
-
-#[derive(Debug, Clone, Copy, Default)]
-struct PoolPolicyFacts {
-    required_provider_missing: bool,
-    required_provider_revision_mismatch: bool,
-    required_provider_unreachable: bool,
-    required_environment_mismatch: bool,
-    required_supply_evidence_insufficient: bool,
-    required_demand_evidence_insufficient: bool,
 }
 
 /// Evaluate resource pools and demand claims against freshly re-evaluated SX-032
@@ -580,9 +568,11 @@ fn validate_plan_structure(plan: &MissionResourceBudgetPlan) -> Result<(), Missi
             || !clean_identifier(&pool.provider_hardware_revision)
             || !clean_identifier(&pool.evidence_reference)
             || pool.applicable_environments.is_empty()
-            || !pool.available.is_valid()
         {
             return Err(MissionResourceBudgetError::InvalidPool);
+        }
+        if !pool.available.is_valid() {
+            return Err(MissionResourceBudgetError::InvalidQuantityInterval);
         }
         if !pool_ids.insert(pool.pool_id.as_str()) {
             return Err(MissionResourceBudgetError::DuplicatePoolId);
@@ -602,10 +592,12 @@ fn validate_plan_structure(plan: &MissionResourceBudgetPlan) -> Result<(), Missi
             || !clean_identifier(&demand.task_id)
             || !clean_identifier(&demand.pool_id)
             || !clean_identifier(&demand.evidence_reference)
-            || !demand.quantity.is_valid()
             || demand.quantity.upper == 0
         {
             return Err(MissionResourceBudgetError::InvalidDemand);
+        }
+        if !demand.quantity.is_valid() {
+            return Err(MissionResourceBudgetError::InvalidQuantityInterval);
         }
         if !demand_ids.insert(demand.demand_id.as_str()) {
             return Err(MissionResourceBudgetError::DuplicateDemandId);
@@ -939,7 +931,9 @@ fn resource_budget_status_tag(value: MissionResourceBudgetStatus) -> &'static st
     match value {
         MissionResourceBudgetStatus::Blocked => "blocked",
         MissionResourceBudgetStatus::Degraded => "degraded",
-        MissionResourceBudgetStatus::MeetsDeclaredResourcePolicy => "meets_declared_resource_policy",
+        MissionResourceBudgetStatus::MeetsDeclaredResourcePolicy => {
+            "meets_declared_resource_policy"
+        }
     }
 }
 
@@ -987,9 +981,16 @@ mod tests {
         MissionComponent, MissionComponentKind, MissionConnection,
     };
     use crate::suit_mission_tasks::MissionTaskRequirement;
-    use crate::suit_profile::{SuitCapability, SuitCapabilityClaim, SuitMissionProfile, SuitVariantDeclaration};
+    use crate::suit_profile::{
+        SuitCapability, SuitCapabilityClaim, SuitMissionProfile, SuitVariantDeclaration,
+    };
 
-    fn fixture() -> (MissionConfiguration, Vec<MissionTaskRequirement>, MissionTaskReceipt, MissionResourceBudgetPlan) {
+    fn fixture() -> (
+        MissionConfiguration,
+        Vec<MissionTaskRequirement>,
+        MissionTaskReceipt,
+        MissionResourceBudgetPlan,
+    ) {
         let variant_id = "synthetic-resource-suit";
         let suit_revision = "suit-r5";
         let lander_revision = "lander-r4";
@@ -1055,7 +1056,11 @@ mod tests {
                     component_id: "lander".into(),
                     kind: MissionComponentKind::LanderOrVehicle,
                     hardware_revision: lander_revision.into(),
-                    interfaces: make_manifest("lander", lander_revision, SuitInterfaceRole::Provider),
+                    interfaces: make_manifest(
+                        "lander",
+                        lander_revision,
+                        SuitInterfaceRole::Provider,
+                    ),
                 },
             ],
             connections: vec![MissionConnection {
@@ -1078,7 +1083,6 @@ mod tests {
             required_connection_ids: BTreeSet::from(["suit-lander-service".into()]),
             required_environments: environments.clone(),
         }];
-        let (_, task_receipt) = evaluate_mission_tasks(&configuration, &tasks).unwrap();
         let (task_report, task_receipt) =
             evaluate_mission_tasks(&configuration, &tasks).unwrap();
         let plan = MissionResourceBudgetPlan {
@@ -1165,7 +1169,7 @@ mod tests {
 
     #[test]
     fn optional_overage_degrades_without_blocking_required_budget() {
-        let (configuration, mut tasks, task_receipt, mut plan) = fixture();
+        let (configuration, mut tasks, _, mut plan) = fixture();
         tasks.push(MissionTaskRequirement {
             task_id: "optional-survey".into(),
             required: false,
@@ -1176,9 +1180,9 @@ mod tests {
                 SuitOperatingEnvironment::LunarShadowOrPolarRegion,
             ]),
         });
-        let (_, new_task_receipt) = evaluate_mission_tasks(&configuration, &tasks).unwrap();
-        plan.expected_task_plan_digest_sha256 = evaluate_mission_tasks(&configuration, &tasks)
-            .unwrap().0.task_plan_digest_sha256;
+        let (new_task_report, new_task_receipt) =
+            evaluate_mission_tasks(&configuration, &tasks).unwrap();
+        plan.expected_task_plan_digest_sha256 = new_task_report.task_plan_digest_sha256;
         plan.demands.push(MissionResourceDemand {
             demand_id: "optional-oxygen".into(),
             task_id: "optional-survey".into(),
@@ -1201,7 +1205,7 @@ mod tests {
             finding.code == MissionResourceFindingCode::OptionalDemandExceedsRemainingCapacity
                 && finding.severity == MissionResourceFindingSeverity::Degradation
         }));
-        let _ = task_receipt;
+
     }
 
     #[test]
