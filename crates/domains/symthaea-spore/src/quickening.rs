@@ -674,7 +674,7 @@ pub struct SecureBootNarrationContext {
 /// Generate context-aware Secure Boot narration entries.
 ///
 /// Selects the appropriate narration path based on the `SecureBootNarrationContext`:
-/// - Secure Boot enabled: 6 entries explaining key generation and MOK consent
+/// - Secure Boot enabled: 6 entries explaining key generation and explicit enrollment
 /// - Secure Boot disabled: 2 entries, proceed without interruption
 /// - Unknown / USB Forge mode: 6 entries with cautionary guidance
 pub fn narrate_secure_boot(context: &SecureBootNarrationContext) -> Vec<NarrationEntry> {
@@ -685,7 +685,7 @@ pub fn narrate_secure_boot(context: &SecureBootNarrationContext) -> Vec<Narratio
 
     match context.secure_boot_enabled {
         Some(true) => {
-            // Secure Boot is active — explain key generation and MOK flow
+            // Secure Boot is active — explain key generation and explicit enrollment
             vec![
                 NarrationEntry {
                     text: "The machine's firmware guards its boot chain with cryptographic vigilance.".to_string(),
@@ -1282,7 +1282,7 @@ mod tests {
     }
 
     #[test]
-    fn test_haptic_mok_enrollment() {
+    fn test_haptic_secure_boot_enrollment() {
         let haptic = haptic_for_phase(&InoculationPhase::MokEnrollment);
         match haptic {
             HapticPattern::RisingSequenceHold {
@@ -1313,7 +1313,7 @@ mod tests {
     }
 
     #[test]
-    fn test_mok_phase_ordering() {
+    fn test_secure_boot_enrollment_phase_ordering() {
         // MokEnrollment should come after last StorePopulation, before FirstBreath
         let mut state = InoculationState::new();
         let ctx = HashMap::new();
@@ -1370,7 +1370,7 @@ mod tests {
     }
 
     #[test]
-    fn test_mok_color_transition_amber_to_gold() {
+    fn test_secure_boot_enrollment_color_transition_amber_to_gold() {
         let entries = narrate_secure_boot_enrollment();
         // First entries amber, later entries solar gold
         assert_eq!(entries[0].color, COLOR_AMBER);
