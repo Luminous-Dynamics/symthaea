@@ -317,7 +317,7 @@ pub fn calibration_report(
         };
         counts[index] += 1;
         probability_sums[index] += score.probability;
-        positive_counts[index] += usize::from(score.outcome);
+        positive_counts[index] += if score.outcome { 1 } else { 0 };
     }
 
     let mut weighted_absolute_calibration_error = 0.0;
