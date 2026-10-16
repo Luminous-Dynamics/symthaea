@@ -79,11 +79,21 @@ pub enum RosClockDomainV1 {
     Named(String),
 }
 
-/// Provenance metadata preserved from one ROS Header.
+/// Monotonic reception receipt captured inside one ROS subscription callback.
+/// Sequence and time are scoped to one bridge-instance receive-clock epoch.
+#[derive(Debug, Clone, Serialize, Deserialize, PartialEq, Eq)]
+pub struct RosSampleReceiptV1 {
+    pub sequence: u64,
+    pub received_monotonic_ns: u64,
+    pub receive_epoch_id: String,
+}
+
+/// Provenance metadata preserved from one ROS Header and its local receipt.
 ///
-/// This bridge currently preserves the source stamp and frame but does not
-/// capture callback receive time, bind the ROS clock domain, or prove a
-/// calibration identity. Those unknowns stay explicit.
+/// The publisher's source clock remains unbound until a deployment profile
+/// names it. Receipt age is comparable only for samples with the same
+/// receive-epoch identity; a monotonic receipt does not synchronize publisher
+/// clocks or prove sensor calibration.
 #[derive(Debug, Clone, Serialize, Deserialize, PartialEq, Eq)]
 pub struct RosSampleMetadataV1 {
     pub stamp_sec: i32,
@@ -91,6 +101,8 @@ pub struct RosSampleMetadataV1 {
     pub frame_id: String,
     pub clock_domain: RosClockDomainV1,
     pub received_monotonic_ns: Option<u64>,
+    pub receive_sequence: Option<u64>,
+    pub receive_epoch_id: Option<String>,
     pub calibration_id: Option<String>,
 }
 
@@ -271,6 +283,7 @@ fn validate_sensor_vector(field: &str, values: [f64; 3]) -> Result<[f64; 3], Ros
 #[cfg(feature = "ros2")]
 fn ros_sample_metadata(
     header: &std_msgs::msg::Header,
+    receipt: Option<RosSampleReceiptV1>,
 ) -> Result<RosSampleMetadataV1, RosBridgeError> {
     if header.stamp.nanosec >= 1_000_000_000 {
         return Err(RosBridgeError::InvalidSensorData(
@@ -278,12 +291,23 @@ fn ros_sample_metadata(
         ));
     }
 
+    let (received_monotonic_ns, receive_sequence, receive_epoch_id) = match receipt {
+        Some(receipt) => (
+            Some(receipt.received_monotonic_ns),
+            Some(receipt.sequence),
+            Some(receipt.receive_epoch_id),
+        ),
+        None => (None, None, None),
+    };
+
     Ok(RosSampleMetadataV1 {
         stamp_sec: header.stamp.sec,
         stamp_nanosec: header.stamp.nanosec,
         frame_id: header.frame_id.clone(),
         clock_domain: RosClockDomainV1::Unbound,
-        received_monotonic_ns: None,
+        received_monotonic_ns,
+        receive_sequence,
+        receive_epoch_id,
         calibration_id: None,
     })
 }
@@ -379,6 +403,14 @@ pub struct RosBridgeNode {
     pub latest_joint_state: std::sync::Arc<std::sync::Mutex<Option<sensor_msgs::msg::JointState>>>,
     #[cfg(feature = "ros2")]
     pub latest_imu: std::sync::Arc<std::sync::Mutex<Option<sensor_msgs::msg::Imu>>>,
+    #[cfg(feature = "ros2")]
+    latest_joint_state_receipt: std::sync::Arc<std::sync::Mutex<Option<RosSampleReceiptV1>>>,
+    #[cfg(feature = "ros2")]
+    latest_imu_receipt: std::sync::Arc<std::sync::Mutex<Option<RosSampleReceiptV1>>>,
+    #[cfg(feature = "ros2")]
+    receive_epoch: std::sync::Arc<std::time::Instant>,
+    #[cfg(feature = "ros2")]
+    receive_epoch_id: String,
     #[cfg(feature = "ros2")]
     context: Option<std::sync::Arc<rclrs::Context>>,
     #[cfg(feature = "ros2")]
@@ -520,6 +552,18 @@ impl RosTrajectoryCommand {
 impl RosBridgeNode {
     /// Create a new bridge node with the given configuration.
     pub fn new(config: RosBridgeConfig) -> Self {
+        #[cfg(feature = "ros2")]
+        let receive_epoch = std::sync::Arc::new(std::time::Instant::now());
+        #[cfg(feature = "ros2")]
+        let receive_epoch_id = format!(
+            "ros-bridge:{}:{}",
+            std::process::id(),
+            std::time::SystemTime::now()
+                .duration_since(std::time::UNIX_EPOCH)
+                .map(|duration| duration.as_nanos())
+                .unwrap_or_default()
+        );
+
         Self {
             config,
             is_running: false,
@@ -534,6 +578,14 @@ impl RosBridgeNode {
             latest_joint_state: std::sync::Arc::new(std::sync::Mutex::new(None)),
             #[cfg(feature = "ros2")]
             latest_imu: std::sync::Arc::new(std::sync::Mutex::new(None)),
+            #[cfg(feature = "ros2")]
+            latest_joint_state_receipt: std::sync::Arc::new(std::sync::Mutex::new(None)),
+            #[cfg(feature = "ros2")]
+            latest_imu_receipt: std::sync::Arc::new(std::sync::Mutex::new(None)),
+            #[cfg(feature = "ros2")]
+            receive_epoch,
+            #[cfg(feature = "ros2")]
+            receive_epoch_id,
             #[cfg(feature = "ros2")]
             context: None,
             #[cfg(feature = "ros2")]
@@ -585,25 +637,59 @@ impl RosBridgeNode {
 
             // 1. Subscribe to joint states and IMU feedback
             let latest_joint_state_clone = self.latest_joint_state.clone();
+            let latest_joint_state_receipt = self.latest_joint_state_receipt.clone();
+            let joint_receive_epoch = self.receive_epoch.clone();
+            let joint_receive_epoch_id = self.receive_epoch_id.clone();
             let joint_state_sub = node
                 .create_subscription::<sensor_msgs::msg::JointState, _>(
                     "/joint_states",
                     rclrs::QOS_PROFILE_DEFAULT,
                     move |msg: sensor_msgs::msg::JointState| {
-                        let mut lock = latest_joint_state_clone.lock().unwrap();
-                        *lock = Some(msg);
+                        // Lock receipt first, then message: readers use the same
+                        // order so message and receipt remain one atomic snapshot.
+                        let mut receipt_lock = latest_joint_state_receipt.lock().unwrap();
+                        let sequence = receipt_lock
+                            .as_ref()
+                            .map_or(1, |receipt| receipt.sequence.saturating_add(1));
+                        let received_monotonic_ns = joint_receive_epoch
+                            .elapsed()
+                            .as_nanos()
+                            .min(u64::MAX as u128) as u64;
+                        let mut message_lock = latest_joint_state_clone.lock().unwrap();
+                        *message_lock = Some(msg);
+                        *receipt_lock = Some(RosSampleReceiptV1 {
+                            sequence,
+                            received_monotonic_ns,
+                            receive_epoch_id: joint_receive_epoch_id.clone(),
+                        });
                     },
                 )
                 .map_err(|e| RosBridgeError::Communication(format!("{:?}", e)))?;
 
             let latest_imu_clone = self.latest_imu.clone();
+            let latest_imu_receipt = self.latest_imu_receipt.clone();
+            let imu_receive_epoch = self.receive_epoch.clone();
+            let imu_receive_epoch_id = self.receive_epoch_id.clone();
             let imu_sub = node
                 .create_subscription::<sensor_msgs::msg::Imu, _>(
                     "/imu",
                     rclrs::QOS_PROFILE_DEFAULT,
                     move |msg: sensor_msgs::msg::Imu| {
-                        let mut lock = latest_imu_clone.lock().unwrap();
-                        *lock = Some(msg);
+                        let mut receipt_lock = latest_imu_receipt.lock().unwrap();
+                        let sequence = receipt_lock
+                            .as_ref()
+                            .map_or(1, |receipt| receipt.sequence.saturating_add(1));
+                        let received_monotonic_ns = imu_receive_epoch
+                            .elapsed()
+                            .as_nanos()
+                            .min(u64::MAX as u128) as u64;
+                        let mut message_lock = latest_imu_clone.lock().unwrap();
+                        *message_lock = Some(msg);
+                        *receipt_lock = Some(RosSampleReceiptV1 {
+                            sequence,
+                            received_monotonic_ns,
+                            receive_epoch_id: imu_receive_epoch_id.clone(),
+                        });
                     },
                 )
                 .map_err(|e| RosBridgeError::Communication(format!("{:?}", e)))?;
@@ -727,19 +813,37 @@ impl RosBridgeNode {
     pub fn get_partial_sensor_observation(
         &self,
     ) -> Result<RosPartialHumanoidObservationV1, RosBridgeError> {
-        let joint_state = self
+        // All receipt/message readers use receipt-lock then message-lock,
+        // matching each callback's write order for an atomic pair.
+        let joint_receipt_guard = self
+            .latest_joint_state_receipt
+            .lock()
+            .map_err(|_| RosBridgeError::Communication("joint-state receipt lock poisoned".into()))?;
+        let joint_state_guard = self
             .latest_joint_state
             .lock()
-            .map_err(|_| RosBridgeError::Communication("joint-state lock poisoned".into()))?
+            .map_err(|_| RosBridgeError::Communication("joint-state lock poisoned".into()))?;
+        let joint_state = joint_state_guard
             .clone()
             .ok_or(RosBridgeError::NotInitialized)?;
-        let imu = self
+        let joint_receipt = joint_receipt_guard.clone();
+        drop(joint_state_guard);
+        drop(joint_receipt_guard);
+
+        let imu_receipt_guard = self
+            .latest_imu_receipt
+            .lock()
+            .map_err(|_| RosBridgeError::Communication("IMU receipt lock poisoned".into()))?;
+        let imu_guard = self
             .latest_imu
             .lock()
-            .map_err(|_| RosBridgeError::Communication("IMU lock poisoned".into()))?
-            .clone();
+            .map_err(|_| RosBridgeError::Communication("IMU lock poisoned".into()))?;
+        let imu = imu_guard.clone();
+        let imu_receipt = imu_receipt_guard.clone();
+        drop(imu_guard);
+        drop(imu_receipt_guard);
 
-        let joint_source = ros_sample_metadata(&joint_state.header)?;
+        let joint_source = ros_sample_metadata(&joint_state.header, joint_receipt)?;
         let expected = &symthaea_humanoid::types::JOINT_NAMES;
         let positions = canonicalize_joint_values(
             &joint_state.name,
@@ -786,7 +890,7 @@ impl RosBridgeNode {
                 source: None,
             },
             Some(imu) => {
-                let source = ros_sample_metadata(&imu.header)?;
+                let source = ros_sample_metadata(&imu.header, imu_receipt.clone())?;
                 let orientation_covariance =
                     ros_covariance_v1(imu.orientation_covariance, "orientation")?;
                 let angular_velocity_covariance =
@@ -844,7 +948,7 @@ impl RosBridgeNode {
                         linear_acceleration_covariance,
                         source,
                     },
-                    source: ros_sample_metadata(&imu.header)?,
+                    source: source.clone(),
                 }
             }
         };
