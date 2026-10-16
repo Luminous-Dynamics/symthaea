@@ -1,0 +1,212 @@
+{
+  "schema_version": "1.0.0",
+  "case_id": "marine-freight-synthetic-screen-v1",
+  "evidence_class": "synthetic_illustration",
+  "decision_use": "not_for_decision",
+  "system_boundary": {
+    "includes": [
+      "declared route and berth dimensional envelopes",
+      "declared payload capacity",
+      "integrated propulsion and auxiliary energy inputs for one round trip",
+      "battery temperature and end-of-life capacity factors",
+      "declared battery reserve",
+      "shore connection, charger power, charging efficiency, and time windows"
+    ],
+    "excludes": [
+      "hull resistance or propulsive-efficiency prediction",
+      "CFD or empirical hydrodynamics",
+      "intact or damaged stability and structural strength",
+      "wave, wind, current, shallow-water, or blockage corrections",
+      "battery thermal dynamics, power taper, degradation dynamics, and fire safety",
+      "lifecycle emissions, economics, statutory approval, class approval, and operating authority"
+    ]
+  },
+  "provenance": [
+    {
+      "id": "synthetic-route",
+      "class": "synthetic_illustration",
+      "description": "Invented geometry and waterway limits used only to exercise deterministic arithmetic; not a real route or design envelope.",
+      "source_uri": null
+    },
+    {
+      "id": "synthetic-duty-cycle",
+      "class": "synthetic_illustration",
+      "description": "Invented integrated load, payload, and timing values; not measured data and not a hydrodynamics result.",
+      "source_uri": null
+    },
+    {
+      "id": "synthetic-energy-terminal",
+      "class": "synthetic_illustration",
+      "description": "Invented battery and terminal values used only for arithmetic regression tests; not equipment specifications.",
+      "source_uri": null
+    }
+  ],
+  "route": {
+    "maximum_vessel_length_m": {
+      "status": "known",
+      "value": 100.0,
+      "unit": "m",
+      "provenance_id": "synthetic-route"
+    },
+    "maximum_vessel_beam_m": {
+      "status": "known",
+      "value": 12.0,
+      "unit": "m",
+      "provenance_id": "synthetic-route"
+    },
+    "maximum_vessel_draft_m": {
+      "status": "known",
+      "value": 2.5,
+      "unit": "m",
+      "provenance_id": "synthetic-route"
+    },
+    "available_water_depth_m": {
+      "status": "known",
+      "value": 3.2,
+      "unit": "m",
+      "provenance_id": "synthetic-route"
+    },
+    "minimum_under_keel_clearance_m": {
+      "status": "known",
+      "value": 0.5,
+      "unit": "m",
+      "provenance_id": "synthetic-route"
+    }
+  },
+  "vessel": {
+    "length_overall_m": {
+      "status": "known",
+      "value": 80.0,
+      "unit": "m",
+      "provenance_id": "synthetic-route"
+    },
+    "beam_m": {
+      "status": "known",
+      "value": 9.5,
+      "unit": "m",
+      "provenance_id": "synthetic-route"
+    },
+    "design_draft_m": {
+      "status": "known",
+      "value": 2.2,
+      "unit": "m",
+      "provenance_id": "synthetic-route"
+    },
+    "cargo_capacity_tonnes": {
+      "status": "known",
+      "value": 900.0,
+      "unit": "t",
+      "provenance_id": "synthetic-route"
+    }
+  },
+  "duty_cycle": {
+    "loaded_leg_propulsion_kwh": {
+      "status": "known",
+      "value": 1850.0,
+      "unit": "kWh",
+      "provenance_id": "synthetic-duty-cycle"
+    },
+    "loaded_leg_auxiliary_kwh": {
+      "status": "known",
+      "value": 125.0,
+      "unit": "kWh",
+      "provenance_id": "synthetic-duty-cycle"
+    },
+    "return_leg_propulsion_kwh": {
+      "status": "known",
+      "value": 1150.0,
+      "unit": "kWh",
+      "provenance_id": "synthetic-duty-cycle"
+    },
+    "return_leg_auxiliary_kwh": {
+      "status": "known",
+      "value": 110.0,
+      "unit": "kWh",
+      "provenance_id": "synthetic-duty-cycle"
+    },
+    "required_payload_tonnes": {
+      "status": "known",
+      "value": 800.0,
+      "unit": "t",
+      "provenance_id": "synthetic-duty-cycle"
+    },
+    "round_trip_duration_h": {
+      "status": "known",
+      "value": 15.0,
+      "unit": "h",
+      "provenance_id": "synthetic-duty-cycle"
+    }
+  },
+  "energy_system": {
+    "architecture_id": "fixed_battery_electric_v1",
+    "nominal_battery_kwh": {
+      "status": "known",
+      "value": 5400.0,
+      "unit": "kWh",
+      "provenance_id": "synthetic-energy-terminal"
+    },
+    "temperature_capacity_factor": {
+      "status": "known",
+      "value": 0.9,
+      "unit": "fraction",
+      "provenance_id": "synthetic-energy-terminal"
+    },
+    "end_of_life_capacity_factor": {
+      "status": "known",
+      "value": 0.85,
+      "unit": "fraction",
+      "provenance_id": "synthetic-energy-terminal"
+    },
+    "reserve_fraction": {
+      "status": "known",
+      "value": 0.15,
+      "unit": "fraction",
+      "provenance_id": "synthetic-energy-terminal"
+    },
+    "charger_power_kw": {
+      "status": "known",
+      "value": 600.0,
+      "unit": "kW",
+      "provenance_id": "synthetic-energy-terminal"
+    }
+  },
+  "terminal": {
+    "berth_length_m": {
+      "status": "known",
+      "value": 95.0,
+      "unit": "m",
+      "provenance_id": "synthetic-energy-terminal"
+    },
+    "berth_beam_limit_m": {
+      "status": "known",
+      "value": 11.0,
+      "unit": "m",
+      "provenance_id": "synthetic-energy-terminal"
+    },
+    "shore_connection_power_kw": {
+      "status": "known",
+      "value": 750.0,
+      "unit": "kW",
+      "provenance_id": "synthetic-energy-terminal"
+    },
+    "charging_efficiency": {
+      "status": "known",
+      "value": 0.92,
+      "unit": "fraction",
+      "provenance_id": "synthetic-energy-terminal"
+    },
+    "available_charge_window_h": {
+      "status": "known",
+      "value": 8.0,
+      "unit": "h",
+      "provenance_id": "synthetic-energy-terminal"
+    },
+    "available_service_window_h": {
+      "status": "known",
+      "value": 24.0,
+      "unit": "h",
+      "provenance_id": "synthetic-energy-terminal"
+    }
+  },
+  "claim_ceiling": "Arithmetic screening of declared inputs only; no hydrodynamic optimization, structural qualification, seaworthiness, environmental benefit, regulatory compliance, or operating authority."
+}
