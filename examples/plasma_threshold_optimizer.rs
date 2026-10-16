@@ -261,7 +261,7 @@ fn has_valid_phi_inputs(sample: &symthaea::physics::cmod_adapter::CModSample) ->
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, Deserialize)]
 #[serde(rename_all = "snake_case")]
 pub enum ShotUnscoredReason {
-    NoValidWarningWindow,
+    NoValidSampleInWarningWindow,
     NoValidSamples,
 }
 
@@ -316,7 +316,7 @@ fn evaluate_config(config: &ThresholdConfig, shots: &[CModShot]) -> EvaluationRe
         let mut has_valid_sample = false;
         let mut valid_sample_count = 0;
         let mut invalid_sample_indices = Vec::new();
-        let mut has_observable_warning_window = false;
+        let mut has_valid_warning_sample = false;
         let mut alarm_in_warning_window = false;
         let mut alarm_in_normal_operation = false;
         // The largest time-to-disruption among matching alarms is the earliest lead-time alarm.
@@ -343,7 +343,7 @@ fn evaluate_config(config: &ThresholdConfig, shots: &[CModShot]) -> EvaluationRe
 
             if shot.disrupted {
                 if matches!(label, DisruptionLabel::Warning | DisruptionLabel::Critical) {
-                    has_observable_warning_window = true;
+                    has_valid_warning_sample = true;
                     if is_warning_or_critical {
                         alarm_in_warning_window = true;
                         if let Some(ttd) = sample
@@ -363,7 +363,7 @@ fn evaluate_config(config: &ThresholdConfig, shots: &[CModShot]) -> EvaluationRe
         }
 
         if shot.disrupted {
-            if !has_observable_warning_window {
+            if !has_valid_warning_sample {
                 unscored_disruption_shots += 1;
                 shot_records.push(ShotEvaluationRecord {
                     shot_id: shot.shot_id,
@@ -373,7 +373,7 @@ fn evaluate_config(config: &ThresholdConfig, shots: &[CModShot]) -> EvaluationRe
                     sample_count: shot.samples.len(),
                     valid_sample_count,
                     invalid_sample_indices: invalid_sample_indices.clone(),
-                    unscored_reason: Some(ShotUnscoredReason::NoValidWarningWindow),
+                    unscored_reason: Some(ShotUnscoredReason::NoValidSampleInWarningWindow),
                 });
                 continue;
             }
@@ -1706,7 +1706,7 @@ mod tests {
         assert_eq!(results.shot_records[0].shot_id, 10);
         assert_eq!(
             results.shot_records[0].unscored_reason,
-            Some(ShotUnscoredReason::NoValidWarningWindow)
+            Some(ShotUnscoredReason::NoValidSampleInWarningWindow)
         );
         assert_eq!(results.shot_records[0].sample_count, 1);
         assert_eq!(results.shot_records[0].valid_sample_count, 0);
