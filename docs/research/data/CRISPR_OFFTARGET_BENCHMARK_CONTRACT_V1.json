@@ -81,7 +81,9 @@
         "false_negative_count",
         "pr_auc_when_valid",
         "per-guide_metrics",
-        "candidate_universe_identity"
+        "candidate_universe_identity",
+        "recall_label_sensitivity_bounds",
+        "precision_label_sensitivity_bounds"
       ]
     },
     {
@@ -105,6 +107,36 @@
         "precision_tradeoff",
         "group_uncertainty",
         "runtime_compute"
+      ]
+    },
+    {
+      "id": "partial_label_sensitivity",
+      "definition": "Worst/best-case assignment of unknown/unassayed candidate labels within one exact, declared candidate universe; not a confidence interval and not a bound on candidates omitted from that universe",
+      "required_metrics": [
+        "known_label_recall_at_k",
+        "conditional_recall_lower_bound",
+        "conditional_recall_upper_bound",
+        "precision_lower_bound",
+        "precision_upper_bound",
+        "unknown_count_inside_and_outside_review_budget"
+      ],
+      "formulas": {
+        "symbols": {
+          "P": "eligible measured-positive reference count",
+          "p_k": "measured positives among top K",
+          "U": "unknown/unassayed candidates in the fixed candidate universe",
+          "u_k": "unknown/unassayed candidates among top K"
+        },
+        "recall_lower": "p_k / (P + U - u_k)",
+        "recall_upper": "(p_k + u_k) / (P + u_k)",
+        "precision_lower": "p_k / K",
+        "precision_upper": "(p_k + u_k) / K"
+      },
+      "limitations": [
+        "requires P > 0 for recall bounds and K > 0 with at least K candidates for precision bounds",
+        "bounds apply only to unknown labels inside the fixed candidate universe",
+        "cannot bound true positives omitted by every candidate nomination method",
+        "not a probability, confidence interval, posterior estimate or safety guarantee"
       ]
     }
   ],
@@ -169,6 +201,15 @@
         "no restricted data ingestion absent written permission",
         "complete provenance and group-aware evaluation"
       ]
+    },
+    {
+      "id": "G6_partial_label_sensitivity",
+      "required_when_unknown_candidates_exist": true,
+      "pass_conditions": [
+        "unknown/unassayed outcomes are never silently converted into negatives",
+        "report observed-label metrics with worst/best-case label-assignment bounds within the fixed candidate universe, or report why the metric is not estimable",
+        "state that conditional bounds do not cover sites omitted from the declared candidate universe"
+      ]
     }
   ],
   "aspirational_engineering_targets": {
@@ -195,6 +236,19 @@
     "source_cohort_reproduced": false,
     "published_metrics_recomputed": false,
     "benchmark_executed": false,
-    "symthaea_improvement_demonstrated": false
+    "symthaea_improvement_demonstrated": false,
+    "rust_metric_kernel_compiled": false,
+    "rust_unit_tests_executed": false,
+    "partial_label_bounds_executed": false
+  },
+  "implementation_artifact": {
+    "path": "scripts/crispr_triage_verifier.rs",
+    "status": "committed_source_with_unit_tests_not_compiled_in_authoring_environment",
+    "suggested_command": "rustc --edition=2024 --test scripts/crispr_triage_verifier.rs -o /tmp/crispr-triage-tests && /tmp/crispr-triage-tests",
+    "limitations": [
+      "dependency-free metric kernel does not yet parse the JSON contract",
+      "digest helper checks canonical SHA-256 string identity but does not hash artifact bytes",
+      "Rust unit tests not executed because rustc was unavailable in the authoring environment"
+    ]
   }
 }
