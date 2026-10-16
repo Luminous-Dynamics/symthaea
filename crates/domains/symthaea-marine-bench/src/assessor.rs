@@ -341,7 +341,7 @@ fn charge_duration_h(
     sources: &BTreeMap<&str, &ProvenanceRecord>,
     demand: &Result<f64, String>,
 ) -> Result<f64, String> {
-    let demand = demand.as_ref().map_err(Clone::clone)?;
+    let demand = *demand.as_ref().map_err(Clone::clone)?;
     let effective_power = effective_charge_rate_kw(case, sources)?;
     let efficiency = resolve_fraction(
         &case.terminal.charging_efficiency,
