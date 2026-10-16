@@ -135,6 +135,7 @@ impl CityAssessmentPackage {
             ));
         }
 
+        let expected_package_sha256 = self.sha256()?;
         let package_item = manifest
             .items
             .iter()
@@ -144,7 +145,7 @@ impl CityAssessmentPackage {
                 "manifest must bind the exact serialized city-assessment package",
             ))?;
         if package_item.kind == EvidenceKind::Missing
-            || package_item.content_sha256.as_deref() != Some(self.sha256()?.as_str())
+            || package_item.content_sha256.as_deref() != Some(expected_package_sha256.as_str())
         {
             return Err(invalid(
                 "city_assessment_package_evidence",
@@ -168,7 +169,8 @@ impl CityAssessmentPackage {
         }
         let metrics_bytes = serde_json::to_vec(&self.metrics)
             .map_err(|_| invalid("metrics", "metrics serialization failed"))?;
-        if metrics_payload_item.content_sha256.as_deref() != Some(sha256_hex(&metrics_bytes).as_str()) {
+        let expected_metrics_sha256 = sha256_hex(&metrics_bytes);
+        if metrics_payload_item.content_sha256.as_deref() != Some(expected_metrics_sha256.as_str()) {
             return Err(invalid(
                 "metrics_payload_evidence_item_id",
                 "retained metric payload digest must match canonical metrics values",
@@ -187,6 +189,12 @@ impl CityAssessmentPackage {
             return Err(invalid(
                 "floor_ratification_evidence_item_id",
                 "locally defined floors must cite evidence classified as governance_decision",
+            ));
+        }
+        if ratification_item.source_uri != self.floor_ratification_ref {
+            return Err(invalid(
+                "floor_ratification_ref",
+                "ratification reference must match the referenced governance evidence URI",
             ));
         }
 
