@@ -821,7 +821,7 @@ fn compare_arms(
         confidence_interval_upper: Some(upper),
         confidence_level: 0.95,
         practical_margin,
-        independent_group_count: group_means.len(),
+        independent_group_count: group_deltas.len(),
         bootstrap_replicates,
         disposition,
     })
