@@ -1174,17 +1174,28 @@ mod tests {
             hardware_revision: "worksite-r1".into(),
             interfaces: manifest("worksite", "worksite-r1", SuitInterfaceRole::Provider),
         });
-        configuration.required_connection_ids.remove("suit-lander-grounding");
-        configuration.required_connection_ids.insert("suit-lander-grounding".into());
-        configuration.connections[0].policy.minimum_evidence_level = SuitEvidenceLevel::Qualified;
+        configuration.connections.push(MissionConnection {
+            connection_id: "suit-worksite-optional".into(),
+            left_component_id: "suit".into(),
+            right_component_id: "worksite".into(),
+            policy: SuitInteropPolicy {
+                minimum_evidence_level: SuitEvidenceLevel::Qualified,
+                required_environments: BTreeSet::from([
+                    SuitOperatingEnvironment::LunarShadowOrPolarRegion,
+                ]),
+            },
+        });
         let (report, _) = evaluate_mission_configuration(&configuration).unwrap();
         assert_eq!(report.status, MissionConfigurationStatus::Blocked);
+        assert_eq!(report.compatible_required_connection_count, 1);
+        assert_eq!(report.blocked_required_connection_count, 0);
         assert!(report.findings.iter().any(|finding| {
             finding.code == MissionFindingCode::RequiredComponentDisconnected
                 && finding.subject_id == "worksite"
         }));
         assert!(report.findings.iter().any(|finding| {
-            finding.code == MissionFindingCode::RequiredConnectionBlocked
+            finding.code == MissionFindingCode::OptionalConnectionDegraded
+                && finding.subject_id == "suit-worksite-optional"
         }));
     }
 
