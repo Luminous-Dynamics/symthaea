@@ -407,6 +407,7 @@ pub fn evaluate_json_ledger(
             "The evaluator uses provided post-outcome observations; it does not run a selector, oracle, simulator, or experiment.".to_string(),
             "A report does not establish transfer to another material family, physical regime, laboratory, or application.".to_string(),
             "The selector's structural receipt must be independently checked by receipt::verify_receipt; this metrics evaluator does not replace that check.".to_string(),
+            "Pairwise 95% intervals are pointwise and unadjusted for multiple arms/metrics; use a single preregistered primary comparison for confirmatory claims or apply a declared multiplicity adjustment externally.".to_string(),
         ],
     })
 }
