@@ -417,7 +417,7 @@
         "unlike service units must not be summed without justified normalization"
       ]
     },
-    "tests_authored": 16,
+    "tests_authored": 18,
     "tests_executed": false,
     "reference_fixtures": [
       {
