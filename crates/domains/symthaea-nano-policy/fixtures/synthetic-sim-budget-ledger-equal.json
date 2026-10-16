@@ -1,0 +1,75 @@
+{
+  "schema_version": "nano-simulator-call-ledger-v1",
+  "benchmark_id": "synthetic-budget-accounting",
+  "run_id": "fixture-run-001",
+  "arm_id": "surrogate_rank",
+  "policy_id": "synthetic_policy",
+  "policy_revision": "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
+  "run_manifest_sha256": "1111111111111111111111111111111111111111111111111111111111111111",
+  "task_contract_sha256": "2222222222222222222222222222222222222222222222222222222222222222",
+  "evaluation_manifest_sha256": "3333333333333333333333333333333333333333333333333333333333333333",
+  "source_manifest_sha256": "4444444444444444444444444444444444444444444444444444444444444444",
+  "simulator_recipe_sha256": "5555555555555555555555555555555555555555555555555555555555555555",
+  "expected_simulator_calls": 2,
+  "reported_simulator_calls": 2,
+  "proposal_attempt_cap": 10,
+  "cost_unit": "cost_units",
+  "run_status": "completed",
+  "attempts": [
+    {
+      "sequence": 1,
+      "attempt_id": "attempt-0001",
+      "candidate_id": "candidate-a",
+      "candidate_sha256": "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
+      "proposal_status": "generated",
+      "preflight_status": "passed",
+      "attempt_reason": null,
+      "not_called_reason": null,
+      "proposal_cost": 0.1,
+      "proposal_elapsed_ms": 10,
+      "simulator_call": {
+        "invocation_id": "call-0001",
+        "started_receipt_sha256": "dddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddd",
+        "terminal_receipt_sha256": "eeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeee",
+        "terminal_status": "returned_finite_result",
+        "result_artifact_sha256": "ffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffff",
+        "elapsed_ms": 500,
+        "cost": 1
+      }
+    },
+    {
+      "sequence": 2,
+      "attempt_id": "attempt-0002",
+      "candidate_id": "candidate-b",
+      "candidate_sha256": "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
+      "proposal_status": "generated",
+      "preflight_status": "rejected",
+      "attempt_reason": "heuristic_drc_rejected",
+      "not_called_reason": null,
+      "proposal_cost": 0.2,
+      "proposal_elapsed_ms": 5,
+      "simulator_call": null
+    },
+    {
+      "sequence": 3,
+      "attempt_id": "attempt-0003",
+      "candidate_id": "candidate-c",
+      "candidate_sha256": "cccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccc",
+      "proposal_status": "generated",
+      "preflight_status": "passed",
+      "attempt_reason": null,
+      "not_called_reason": null,
+      "proposal_cost": 0,
+      "proposal_elapsed_ms": 2,
+      "simulator_call": {
+        "invocation_id": "call-0002",
+        "started_receipt_sha256": "dddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddd",
+        "terminal_receipt_sha256": "eeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeee",
+        "terminal_status": "failed",
+        "result_artifact_sha256": null,
+        "elapsed_ms": 700,
+        "cost": 2
+      }
+    }
+  ]
+}
