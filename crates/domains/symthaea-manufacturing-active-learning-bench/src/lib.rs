@@ -10,8 +10,17 @@ use serde::{Deserialize, Serialize};
 use sha2::{Digest, Sha256};
 use std::collections::{BTreeMap, BTreeSet};
 
+pub mod acquisition;
 pub mod analysis;
 pub mod evaluator;
+pub use acquisition::{
+    AcquisitionMetrics, AcquisitionObjective, AcquisitionRanking, DecisionAlternative,
+    ExperimentActionModel, FiniteHypothesisModel, HypothesisLikelihood, HypothesisPrior,
+    HypothesisUtility, OutcomeMarginal, OutcomeProbability, PosteriorEvidenceReceipt,
+    PosteriorState, PosteriorUpdate, RankedAction, RejectedAction, condition_posterior,
+    expected_information_gain, expected_information_gain_for_state, initial_posterior_state,
+    rank_feasible_actions, rank_feasible_actions_for_state,
+};
 pub use analysis::{
     BenchmarkSummary, CampaignEvaluationSample, PairedPolicyComparison, PolicyAggregate,
     summarize_paired_campaigns,

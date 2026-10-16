@@ -24,6 +24,31 @@ The analysis groups results by scenario and policy, verifies every expected poli
 
 These summaries are synthetic and descriptive. The intervals are not a substitute for a preregistered domain-specific inferential analysis, and no metric establishes physical manufacturing performance.
 
+## Finite-hypothesis acquisition kernel (issue #7670)
+
+The source module `acquisition.rs` provides a separate finite-hypothesis EIG / decision-value kernel. It is intentionally **not yet wired into the six-arm campaign runner**; P3 and P4 remain explicitly named novelty/leverage proxies until a declared posterior and measurement-likelihood model is supplied.
+
+A versioned model declares:
+- prior hypothesis probabilities as integer parts per million that must sum exactly to one million;
+- for each action and hypothesis, a complete categorical observation likelihood whose probabilities sum exactly to one million;
+- exact measurement-model identity and relative experiment cost;
+- a utility table for each decision across every hypothesis.
+
+The kernel computes expected posterior entropy, EIG in nats, expected sample information value (the expected improvement in the best decision utility after observing the result), and both quantities per declared cost. It ranks only feasible actions; blocked and unknown actions appear as rejected records with reasons. Incomplete likelihoods and malformed priors do not produce a fabricated score. SHA-256 binds the exact prior, likelihoods, utilities, actions, cost and model version.
+
+Posterior updates use `initial_posterior_state` followed by `condition_posterior`. Each observation requires a unique evidence ID and creates a receipt chained to the parent state digest, action, outcome, measurement-model identity and resulting posterior. Before every update, the kernel replays the existing conditioning history from the root prior and rejects duplicate evidence IDs, altered posterior weights, mismatched likelihoods or broken parent-state links. `expected_information_gain_for_state` and `rank_feasible_actions_for_state` evaluate subsequent experiments against that updated posterior rather than silently reverting to the original prior. Acquisition results report the snapshot's model digest separately from the posterior-history state digest, so a caller can bind both the probabilistic assumptions and the observations used to reach the current belief. This prevents accidentally reusing one measurement as independent evidence in normal API use; hashes still do not authenticate the external source of an observation.
+
+Hand-checkable tests cover:
+- a perfect binary observation with EIG = ln(2) and decision value = 500 synthetic utility milli-units;
+- an uninformative observation with zero EIG and zero decision value;
+- a highly informative observation that has zero decision value because it cannot change the best choice;
+- a symmetric 90/10 noisy observation;
+- a blocked high-information action that is not ranked;
+- missing likelihood rows, invalid probability mass, and model-digest changes;
+- posterior normalization after perfect/noisy observations, impossible-outcome rejection, duplicate evidence-ID rejection, tampered-state rejection, rehashed-receipt tampering, and acquisition recomputation under the updated posterior.
+
+This remains synthetic mathematics. The likelihood must be supported and calibrated for a real process before the kernel can guide physical experimentation. Passing these tests would not establish physical information gain, causal identification, manufacturing utility, or savings.
+
 ## Current policy arms
 
 - `P0-fixed-space-filling`: predeclared two-factor Latin-hypercube-like order over the normalized 11×11 grid; it does not adapt candidate order to observed outcomes.
@@ -51,7 +76,7 @@ The response oracle is deterministic and only invoked by the campaign runner for
 
 Each manifest is serialized and SHA-256 hashed. Each observation receipt binds the manifest digest, exact action, profile ID and measurement payload. The evaluator independently recomputes cost, discovery cost, conformity, best observed utility, resource totals, budget compliance, action uniqueness and factor-design excitation from the manifest and transcript; it rejects missing required measurements and inconsistent claims.
 
-The evaluator is in its own Rust source module and recomputes outcomes without calling policy selection or the synthetic oracle. It is **not yet a separately built executable or independent third-party verifier**. SHA-256 confirms receipt bytes match; it does not authenticate a physical source or prove scientific validity. Full cryptographic signing, source-qualified physical observation adapters, calibrated probabilistic information gain, uncertainty intervals and statistical analysis are future gates.
+The evaluator is in its own Rust source module and recomputes outcomes without calling policy selection or the synthetic oracle. It is **not yet a separately built executable or independent third-party verifier**. SHA-256 confirms receipt bytes match; it does not authenticate a physical source or prove scientific validity. Full cryptographic signing, source-qualified physical observation adapters, calibrated real-process likelihoods, and domain-specific inferential analysis remain future gates.
 
 ## Key distinctions
 
