@@ -622,6 +622,13 @@ mod tests {
     }
 
     #[test]
+    fn invalid_receipt_cannot_be_promoted_even_if_gate_says_pass() {
+        let mut input = receipt(GateStatus::Pass);
+        input.gates[0].verifier_id = None;
+        assert_eq!(input.promotion_state(), PromotionState::Blocked);
+    }
+
+    #[test]
     fn malformed_hashes_fail_closed() {
         let mut input = receipt(GateStatus::Pass);
         input.configuration_sha256 = "not-a-digest".into();
