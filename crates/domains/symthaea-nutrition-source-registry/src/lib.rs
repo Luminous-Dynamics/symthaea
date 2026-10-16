@@ -2060,6 +2060,45 @@ mod tests {
         assert_ne!(original.input_sha256, changed.input_sha256);
     }
 
+
+    #[test]
+    fn receipt_components_and_envelope_match_frozen_golden_hashes() {
+        let manifest = manifest();
+        let fact = fact();
+        let request = use_request();
+        let result = assess_nutrition_source(
+            &manifest,
+            &fact,
+            EVALUATION_DATE,
+            &request,
+            Some(ARTIFACT),
+        );
+
+        // Independently calculated from the canonical JSON for this synthetic,
+        // ASCII-keyed fixture. These literals detect accidental wire/hash drift.
+        assert_eq!(
+            result.manifest_sha256.as_deref(),
+            Some("5c59e2e5fb9700863c1191841cc9f9f35d78d2cfd27c4cb43ef3f25e199f9072")
+        );
+        assert_eq!(
+            result.food_fact_sha256.as_deref(),
+            Some("ba245493ae25efb399458d4899fd7a00707905ecb9782bf4de05a75f3d83ba37")
+        );
+        assert_eq!(
+            result.use_request_sha256.as_deref(),
+            Some("391f20f8333b8423256c5fa63d466dde8d47c26ba74a4803fbc9e87949189ca5")
+        );
+        assert_eq!(
+            result.input_sha256.as_deref(),
+            Some("a839efeb836d1f7bb9ce4660b8a743811884c8a5356ccf7e374302620718836d")
+        );
+        assert_eq!(result.receipt_schema_version, 2);
+        assert_eq!(
+            result.canonicalization_profile,
+            NutritionCanonicalizationProfileV1::Rfc8785JcsV1
+        );
+    }
+
     #[test]
     fn decision_receipt_changes_when_evaluation_date_changes() {
         let m = manifest();
