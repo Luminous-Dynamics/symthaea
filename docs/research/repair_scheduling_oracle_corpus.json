@@ -1,6 +1,6 @@
 {
   "schema_version": "1.0.0",
-  "status": "published_tiny_exact_oracle_correctness_corpus_not_field_data",
+  "status": "published_tiny_exact_oracle_correctness_corpus_with_independent_arithmetic_reference",
   "objective": "minimize sum(job.recovered_service_value_per_step * completion_step)",
   "scope": {
     "maximum_jobs": 8,
@@ -236,9 +236,19 @@
       ],
       "expected": {
         "feasible_permutations": 40320,
-        "minimum_weighted_completion_loss": "computed_by_exhaustive_oracle"
+        "optimal_order": [
+          "b",
+          "f",
+          "d",
+          "h",
+          "c",
+          "g",
+          "e",
+          "a"
+        ],
+        "minimum_weighted_completion_loss": 406
       },
-      "notes": "Runtime/safety fixture; expected objective and optimal order must be recorded from the executable oracle run before this is used as a golden result."
+      "notes": "Expected objective and order were independently checked by exhaustive JavaScript enumeration of all 40,320 permutations; the Rust oracle test remains authored but unexecuted here."
     }
   ],
   "acceptance": {
