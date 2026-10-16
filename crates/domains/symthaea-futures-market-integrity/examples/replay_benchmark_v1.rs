@@ -57,7 +57,7 @@ fn run() -> Result<(), ReplayError> {
             // outcome. Forecast methods only aggregate signals observed by this horizon.
             let public_signal = deterministic_unit(event_index, 10 + horizon_index as u64)
                 < latent_yes_probability;
-            positive_signals += usize::from(public_signal);
+            positive_signals += if public_signal { 1 } else { 0 };
             let signal_count = (horizon_index + 1) as f64;
             let market_probability =
                 (positive_signals as f64 / signal_count).clamp(0.02, 0.98);
