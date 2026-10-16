@@ -190,6 +190,333 @@ pub struct RosPartialHumanoidObservationV1 {
     pub extremities_world_m: RosEvidenceValueV1<Vec<f64>>,
 }
 
+/// Source-clock time supplied by a deployment-qualified clock adapter.
+#[derive(Debug, Clone, Serialize, Deserialize, PartialEq, Eq)]
+pub struct RosClockNowV1 {
+    pub domain: RosClockDomainV1,
+    pub timestamp_ns: u64,
+}
+
+/// Profile-frozen temporal limits. The source clock must be explicitly bound;
+/// these limits are not portable defaults for every robot/control loop.
+#[derive(Debug, Clone, Serialize, Deserialize, PartialEq, Eq)]
+pub struct RosTemporalPolicyV1 {
+    pub required_source_clock_domain: String,
+    pub maximum_source_age_ns: u64,
+    pub maximum_source_skew_ns: u64,
+    pub maximum_bridge_residence_age_ns: u64,
+    pub reject_zero_source_stamp: bool,
+}
+
+/// Identifies which input failed the temporal gate.
+#[derive(Debug, Clone, Copy, Serialize, Deserialize, PartialEq, Eq)]
+pub enum RosTemporalStreamV1 {
+    JointState,
+    Imu,
+}
+
+/// Temporal admission result only. `Fresh` does not establish calibration,
+/// covariance quality, frame-transform validity, complete physical state, or
+/// action authority.
+#[derive(Debug, Clone, Serialize, Deserialize, PartialEq, Eq)]
+pub enum RosTemporalDispositionV1 {
+    Fresh {
+        joint_source_age_ns: u64,
+        imu_source_age_ns: u64,
+        source_skew_ns: u64,
+        joint_bridge_residence_age_ns: u64,
+        imu_bridge_residence_age_ns: u64,
+    },
+    Unsynchronized {
+        reason: String,
+    },
+    InvalidPolicy {
+        reason: String,
+    },
+    InvalidClock {
+        stream: RosTemporalStreamV1,
+        reason: String,
+    },
+    StaleSource {
+        stream: RosTemporalStreamV1,
+        age_ns: u64,
+        maximum_age_ns: u64,
+    },
+    ExcessiveSourceSkew {
+        skew_ns: u64,
+        maximum_skew_ns: u64,
+    },
+    ReceiptUnavailable {
+        stream: RosTemporalStreamV1,
+        reason: String,
+    },
+    BridgeResidenceExpired {
+        stream: RosTemporalStreamV1,
+        age_ns: u64,
+        maximum_age_ns: u64,
+    },
+}
+
+fn ros_source_stamp_ns(
+    sample: &RosSampleMetadataV1,
+    stream: RosTemporalStreamV1,
+    reject_zero: bool,
+) -> Result<u64, RosTemporalDispositionV1> {
+    if sample.stamp_sec < 0 {
+        return Err(RosTemporalDispositionV1::InvalidClock {
+            stream,
+            reason: "negative source timestamp seconds are not admissible for this profile".into(),
+        });
+    }
+    if sample.stamp_nanosec >= 1_000_000_000 {
+        return Err(RosTemporalDispositionV1::InvalidClock {
+            stream,
+            reason: "source timestamp nanoseconds must be less than 1,000,000,000".into(),
+        });
+    }
+    let seconds = u64::try_from(sample.stamp_sec).map_err(|_| {
+        RosTemporalDispositionV1::InvalidClock {
+            stream,
+            reason: "source timestamp seconds cannot be represented as unsigned nanoseconds".into(),
+        }
+    })?;
+    let timestamp_ns = seconds
+        .checked_mul(1_000_000_000)
+        .and_then(|value| value.checked_add(sample.stamp_nanosec as u64))
+        .ok_or_else(|| RosTemporalDispositionV1::InvalidClock {
+            stream,
+            reason: "source timestamp overflows nanosecond representation".into(),
+        })?;
+    if reject_zero && timestamp_ns == 0 {
+        return Err(RosTemporalDispositionV1::InvalidClock {
+            stream,
+            reason: "zero source timestamp is prohibited by the selected profile".into(),
+        });
+    }
+    Ok(timestamp_ns)
+}
+
+fn ros_bridge_residence_age_ns(
+    sample: &RosSampleMetadataV1,
+    stream: RosTemporalStreamV1,
+    capture_epoch_id: &str,
+    captured_monotonic_ns: u64,
+) -> Result<u64, RosTemporalDispositionV1> {
+    let epoch_id = sample.receive_epoch_id.as_deref().ok_or_else(|| {
+        RosTemporalDispositionV1::ReceiptUnavailable {
+            stream,
+            reason: "receive-clock epoch identity is absent".into(),
+        }
+    })?;
+    if epoch_id != capture_epoch_id {
+        return Err(RosTemporalDispositionV1::ReceiptUnavailable {
+            stream,
+            reason: "sample receipt and capture belong to different monotonic epochs".into(),
+        });
+    }
+    let _sequence = sample.receive_sequence.ok_or_else(|| {
+        RosTemporalDispositionV1::ReceiptUnavailable {
+            stream,
+            reason: "callback receive sequence is absent".into(),
+        }
+    })?;
+    let received_ns = sample.received_monotonic_ns.ok_or_else(|| {
+        RosTemporalDispositionV1::ReceiptUnavailable {
+            stream,
+            reason: "callback monotonic receive time is absent".into(),
+        }
+    })?;
+    let declared_age = sample.receive_age_at_capture_ns.ok_or_else(|| {
+        RosTemporalDispositionV1::ReceiptUnavailable {
+            stream,
+            reason: "bridge residence age is absent".into(),
+        }
+    })?;
+    let calculated_age = captured_monotonic_ns.checked_sub(received_ns).ok_or_else(|| {
+        RosTemporalDispositionV1::ReceiptUnavailable {
+            stream,
+            reason: "callback receive time postdates snapshot capture".into(),
+        }
+    })?;
+    if declared_age != calculated_age {
+        return Err(RosTemporalDispositionV1::ReceiptUnavailable {
+            stream,
+            reason: "declared bridge residence age disagrees with receive/capture timestamps".into(),
+        });
+    }
+    Ok(calculated_age)
+}
+
+/// Deterministic admission check for a JointState + IMU temporal pair.
+///
+/// The caller must source `now` from a qualified clock adapter; passing a
+/// timestamp does not itself establish its truth. This routine never compares
+/// different or unbound publisher clocks, and its `Fresh` result is temporal
+/// evidence only—not permission to construct a full state or actuate hardware.
+pub fn evaluate_ros_temporal_pair_v1(
+    joint_state: &RosSampleMetadataV1,
+    imu: Option<&RosSampleMetadataV1>,
+    now: &RosClockNowV1,
+    policy: &RosTemporalPolicyV1,
+    capture_epoch_id: &str,
+    captured_monotonic_ns: u64,
+) -> RosTemporalDispositionV1 {
+    if policy.required_source_clock_domain.trim().is_empty() {
+        return RosTemporalDispositionV1::InvalidPolicy {
+            reason: "required source clock domain must not be empty".into(),
+        };
+    }
+
+    let imu = match imu {
+        Some(imu) => imu,
+        None => {
+            return RosTemporalDispositionV1::ReceiptUnavailable {
+                stream: RosTemporalStreamV1::Imu,
+                reason: "IMU source observation is unavailable".into(),
+            };
+        }
+    };
+
+    let expected_domain = &policy.required_source_clock_domain;
+    for (stream, sample) in [
+        (RosTemporalStreamV1::JointState, joint_state),
+        (RosTemporalStreamV1::Imu, imu),
+    ] {
+        match &sample.clock_domain {
+            RosClockDomainV1::Unbound => {
+                return RosTemporalDispositionV1::Unsynchronized {
+                    reason: format!("{stream:?} publisher clock domain is unbound"),
+                };
+            }
+            RosClockDomainV1::Named(domain) if domain.trim().is_empty() => {
+                return RosTemporalDispositionV1::InvalidClock {
+                    stream,
+                    reason: "publisher clock binding has an empty name".into(),
+                };
+            }
+            RosClockDomainV1::Named(domain) if domain != expected_domain => {
+                return RosTemporalDispositionV1::Unsynchronized {
+                    reason: format!(
+                        "{stream:?} clock domain {domain:?} does not match required domain {expected_domain:?}"
+                    ),
+                };
+            }
+            RosClockDomainV1::Named(_) => {}
+        }
+    }
+    match &now.domain {
+        RosClockDomainV1::Named(domain) if domain == expected_domain => {}
+        RosClockDomainV1::Named(domain) => {
+            return RosTemporalDispositionV1::Unsynchronized {
+                reason: format!(
+                    "current-time clock domain {domain:?} does not match required domain {expected_domain:?}"
+                ),
+            };
+        }
+        RosClockDomainV1::Unbound => {
+            return RosTemporalDispositionV1::Unsynchronized {
+                reason: "current-time clock domain is unbound".into(),
+            };
+        }
+    }
+
+    let joint_stamp = match ros_source_stamp_ns(
+        joint_state,
+        RosTemporalStreamV1::JointState,
+        policy.reject_zero_source_stamp,
+    ) {
+        Ok(value) => value,
+        Err(disposition) => return disposition,
+    };
+    let imu_stamp = match ros_source_stamp_ns(
+        imu,
+        RosTemporalStreamV1::Imu,
+        policy.reject_zero_source_stamp,
+    ) {
+        Ok(value) => value,
+        Err(disposition) => return disposition,
+    };
+
+    let joint_residence_age = match ros_bridge_residence_age_ns(
+        joint_state,
+        RosTemporalStreamV1::JointState,
+        capture_epoch_id,
+        captured_monotonic_ns,
+    ) {
+        Ok(value) => value,
+        Err(disposition) => return disposition,
+    };
+    let imu_residence_age = match ros_bridge_residence_age_ns(
+        imu,
+        RosTemporalStreamV1::Imu,
+        capture_epoch_id,
+        captured_monotonic_ns,
+    ) {
+        Ok(value) => value,
+        Err(disposition) => return disposition,
+    };
+
+    if joint_residence_age > policy.maximum_bridge_residence_age_ns {
+        return RosTemporalDispositionV1::BridgeResidenceExpired {
+            stream: RosTemporalStreamV1::JointState,
+            age_ns: joint_residence_age,
+            maximum_age_ns: policy.maximum_bridge_residence_age_ns,
+        };
+    }
+    if imu_residence_age > policy.maximum_bridge_residence_age_ns {
+        return RosTemporalDispositionV1::BridgeResidenceExpired {
+            stream: RosTemporalStreamV1::Imu,
+            age_ns: imu_residence_age,
+            maximum_age_ns: policy.maximum_bridge_residence_age_ns,
+        };
+    }
+
+    if joint_stamp > now.timestamp_ns {
+        return RosTemporalDispositionV1::InvalidClock {
+            stream: RosTemporalStreamV1::JointState,
+            reason: "JointState source stamp is later than qualified current time".into(),
+        };
+    }
+    if imu_stamp > now.timestamp_ns {
+        return RosTemporalDispositionV1::InvalidClock {
+            stream: RosTemporalStreamV1::Imu,
+            reason: "IMU source stamp is later than qualified current time".into(),
+        };
+    }
+    let joint_age = now.timestamp_ns - joint_stamp;
+    let imu_age = now.timestamp_ns - imu_stamp;
+    if joint_age > policy.maximum_source_age_ns {
+        return RosTemporalDispositionV1::StaleSource {
+            stream: RosTemporalStreamV1::JointState,
+            age_ns: joint_age,
+            maximum_age_ns: policy.maximum_source_age_ns,
+        };
+    }
+    if imu_age > policy.maximum_source_age_ns {
+        return RosTemporalDispositionV1::StaleSource {
+            stream: RosTemporalStreamV1::Imu,
+            age_ns: imu_age,
+            maximum_age_ns: policy.maximum_source_age_ns,
+        };
+    }
+
+    let skew = joint_stamp.abs_diff(imu_stamp);
+    if skew > policy.maximum_source_skew_ns {
+        return RosTemporalDispositionV1::ExcessiveSourceSkew {
+            skew_ns: skew,
+            maximum_skew_ns: policy.maximum_source_skew_ns,
+        };
+    }
+
+    RosTemporalDispositionV1::Fresh {
+        joint_source_age_ns: joint_age,
+        imu_source_age_ns: imu_age,
+        source_skew_ns: skew,
+        joint_bridge_residence_age_ns: joint_residence_age,
+        imu_bridge_residence_age_ns: imu_residence_age,
+    }
+}
+
 /// Reorder one ROS JointState value array into the bridge's explicit model order.
 ///
 /// ROS message array position is not joint identity. This helper requires an exact
