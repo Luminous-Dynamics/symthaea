@@ -24,8 +24,14 @@ CLAIM_CEILING = "synthetic_deterministic_only"
 SOURCE_PATHS = (
     "scripts/validate_socioeconomic_run_bundle.py",
     "scripts/test_validate_socioeconomic_run_bundle.py",
+    "scripts/write_socioeconomic_run_bundle_ci_report.py",
+    "scripts/test_write_socioeconomic_run_bundle_ci_report.py",
     "docs/research/finance/SYM-FIN-SYS-016_run_bundle_manifest_v1.schema.json",
     ".github/workflows/socioeconomic-run-bundle.yml",
+)
+TEST_PATHS = (
+    "scripts/test_validate_socioeconomic_run_bundle.py",
+    "scripts/test_write_socioeconomic_run_bundle_ci_report.py",
 )
 REQUIRED_ENV = (
     "GITHUB_SHA",
@@ -112,18 +118,21 @@ def build_report(
             }
         )
 
-    test_source = (root / "scripts/test_validate_socioeconomic_run_bundle.py").read_bytes()
-    test_count = count_test_functions(test_source)
+    test_count = sum(
+        count_test_functions((root / relative).read_bytes())
+        for relative in TEST_PATHS
+    )
     if test_count < 1:
-        raise ReportFailure("no test functions found in the test source")
+        raise ReportFailure("no test functions found in the test sources")
 
     try:
-        python_version = subprocess.run(
+        version_result = subprocess.run(
             [sys.executable, "--version"],
             check=True,
             capture_output=True,
             text=True,
-        ).stdout.strip()
+        )
+        python_version = (version_result.stdout or version_result.stderr).strip()
     except (OSError, subprocess.CalledProcessError) as exc:
         raise ReportFailure(f"cannot establish Python version: {exc}") from exc
 
@@ -131,7 +140,7 @@ def build_report(
         "schema": REPORT_SCHEMA,
         "claim_ceiling": CLAIM_CEILING,
         "result": "passed",
-        "scope": "run_bundle_validator_unit_tests_only",
+        "scope": "run_bundle_validator_and_execution_record_unit_tests",
         "repository": env["GITHUB_REPOSITORY"],
         "source_revision": source_revision,
         "workflow": env["GITHUB_WORKFLOW"],
@@ -141,7 +150,10 @@ def build_report(
         "run_attempt": env["GITHUB_RUN_ATTEMPT"],
         "runner_os": env["RUNNER_OS"],
         "python_version": python_version,
-        "test_command": "python3 scripts/test_validate_socioeconomic_run_bundle.py",
+        "test_commands": [
+            "python3 scripts/test_validate_socioeconomic_run_bundle.py",
+            "python3 scripts/test_write_socioeconomic_run_bundle_ci_report.py",
+        ],
         "authored_test_function_count": test_count,
         "artifacts": sorted(files, key=lambda item: item["path"]),
         "authority_boundary": {
