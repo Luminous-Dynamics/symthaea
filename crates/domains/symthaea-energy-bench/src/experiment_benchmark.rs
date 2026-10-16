@@ -69,6 +69,9 @@ pub struct ScenarioBenchmarkResult {
     pub budget_used_fraction: f64,
     pub achieved_utility: f64,
     pub oracle_utility: f64,
+    /// Exact minimum cost of any admissible subset reaching the registered
+    /// resolution threshold, if such a subset fits the budget.
+    pub oracle_minimum_cost_to_resolve: Option<f64>,
     pub decision_regret: f64,
     pub resolved: bool,
     pub oracle_resolved: bool,
@@ -84,6 +87,12 @@ pub struct StrategyBenchmarkSummary {
     pub resolution_rate: f64,
     pub oracle_resolution_rate: f64,
     pub mean_budget_used_fraction: f64,
+    /// Mean resource cost among scenarios the selector actually resolved.
+    pub mean_cost_when_resolved: Option<f64>,
+    /// Median resource cost among scenarios the selector actually resolved.
+    pub median_cost_when_resolved: Option<f64>,
+    /// Oracle lower bound on cost to resolution, averaged over resolvable scenarios.
+    pub mean_oracle_minimum_cost_to_resolve: Option<f64>,
 }
 
 #[derive(Debug, Clone, PartialEq)]
@@ -289,6 +298,11 @@ pub fn evaluate_scenario(
     }
 
     let oracle_utility = oracle_subset(&eligible, scenario.resource_budget).1;
+    let oracle_minimum_cost_to_resolve = minimum_cost_to_resolve(
+        &eligible,
+        scenario.resource_budget,
+        scenario.resolution_threshold,
+    );
     let selected = match strategy {
         ExperimentSelectionStrategy::OracleUpperBound => {
             oracle_subset(&eligible, scenario.resource_budget).0
@@ -327,6 +341,7 @@ pub fn evaluate_scenario(
         budget_used_fraction,
         achieved_utility,
         oracle_utility,
+        oracle_minimum_cost_to_resolve,
         decision_regret: regret,
         resolved,
         oracle_resolved,
@@ -407,6 +422,11 @@ fn select_greedy<'a>(
     };
 
     loop {
+        // Real selectors should stop paying when the registered decision rule
+        // is satisfied. The exhaustive oracle upper-bound strategy is separate.
+        if utility(&selected) >= scenario.resolution_threshold {
+            break;
+        }
         let affordable: Vec<usize> = remaining
             .iter()
             .enumerate()
@@ -532,6 +552,73 @@ fn oracle_subset<'a>(
     (best, best_utility)
 }
 
+/// Exact lower bound on the resource cost needed to reach the threshold, if feasible.
+fn minimum_cost_to_resolve(
+    eligible: &[&SyntheticExperiment],
+    budget: f64,
+    threshold: f64,
+) -> Option<f64> {
+    let candidates = sorted_by_id(eligible);
+    let mut best_cost: Option<f64> = None;
+    let mut best_utility = f64::NEG_INFINITY;
+
+    for mask in 0..(1usize << candidates.len()) {
+        let mut subset = Vec::new();
+        let mut cost = 0.0;
+        for (index, candidate) in candidates.iter().enumerate() {
+            if mask & (1usize << index) != 0 {
+                subset.push(*candidate);
+                cost += candidate.proposal.estimated_resource_cost.amount;
+            }
+        }
+        if cost > budget {
+            continue;
+        }
+        let score = utility(&subset);
+        if score + 1e-12 < threshold {
+            continue;
+        }
+        let better = best_cost.is_none_or(|current| cost < current - 1e-12)
+            || (best_cost.is_some_and(|current| (cost - current).abs() <= 1e-12)
+                && score > best_utility + 1e-12);
+        if better {
+            best_cost = Some(cost);
+            best_utility = score;
+        }
+    }
+    best_cost
+}
+
+fn sorted_by_id<'a>(eligible: &[&'a SyntheticExperiment]) -> Vec<&'a SyntheticExperiment> {
+    let mut candidates = eligible.to_vec();
+    candidates.sort_by(|left, right| {
+        left.proposal.experiment_id.cmp(&right.proposal.experiment_id)
+    });
+    candidates
+}
+
+fn optional_mean(values: impl Iterator<Item = f64>) -> Option<f64> {
+    let values: Vec<f64> = values.collect();
+    if values.is_empty() {
+        None
+    } else {
+        Some(values.iter().sum::<f64>() / values.len() as f64)
+    }
+}
+
+fn optional_median(mut values: Vec<f64>) -> Option<f64> {
+    if values.is_empty() {
+        return None;
+    }
+    values.sort_by(f64::total_cmp);
+    let middle = values.len() / 2;
+    Some(if values.len() % 2 == 0 {
+        (values[middle - 1] + values[middle]) / 2.0
+    } else {
+        values[middle]
+    })
+}
+
 /// Independent evidence accumulates as 1 - product(1 - gain_i).
 fn utility(experiments: &[&SyntheticExperiment]) -> f64 {
     1.0 - experiments
@@ -566,6 +653,15 @@ fn summarize_strategy(
         resolution_rate: results.iter().filter(|result| result.resolved).count() as f64 / n,
         oracle_resolution_rate: results.iter().filter(|result| result.oracle_resolved).count() as f64 / n,
         mean_budget_used_fraction: results.iter().map(|result| result.budget_used_fraction).sum::<f64>() / n,
+        mean_cost_when_resolved: optional_mean(
+            results.iter().filter(|result| result.resolved).map(|result| result.resource_used),
+        ),
+        median_cost_when_resolved: optional_median(
+            results.iter().filter(|result| result.resolved).map(|result| result.resource_used).collect(),
+        ),
+        mean_oracle_minimum_cost_to_resolve: optional_mean(
+            results.iter().filter_map(|result| result.oracle_minimum_cost_to_resolve),
+        ),
     })
 }
 
