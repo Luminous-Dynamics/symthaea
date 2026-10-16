@@ -140,6 +140,8 @@ impl RosJointQuantityV2 {
 /// Platform adapters own this mapping; the generic ROS bridge does not infer morphology.
 #[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
 pub struct RosJointActionBindingV2 {
+    /// Exact UEC profile this adapter mapping was reviewed for.
+    pub profile_id: String,
     pub action_address: String,
     pub joint_name: String,
     pub quantity: RosJointQuantityV2,
@@ -172,13 +174,20 @@ pub fn action_frame_to_ros_trajectory_v2(
     let mut addresses = std::collections::HashSet::new();
     let mut joint_fields = std::collections::HashSet::new();
     for binding in bindings {
-        if binding.action_address.trim().is_empty()
+        if binding.profile_id.trim().is_empty()
+            || binding.action_address.trim().is_empty()
             || binding.joint_name.trim().is_empty()
             || binding.unit.trim().is_empty()
         {
             return Err(RosBridgeError::InvalidTrajectory(
-                "action binding address, joint name, and unit must be non-empty".into(),
+                "action binding profile, address, joint name, and unit must be non-empty".into(),
             ));
+        }
+        if binding.profile_id != frame.profile_id {
+            return Err(RosBridgeError::InvalidTrajectory(format!(
+                "action binding profile {:?} does not match frame profile {:?}",
+                binding.profile_id, frame.profile_id
+            )));
         }
         if !addresses.insert(binding.action_address.as_str()) {
             return Err(RosBridgeError::InvalidTrajectory(format!(
@@ -919,12 +928,14 @@ mod tests {
     fn test_uec_effort_bindings() -> Vec<RosJointActionBindingV2> {
         vec![
             RosJointActionBindingV2 {
+                profile_id: "test.robot-joints.v1".into(),
                 action_address: "joint/left/effort".into(),
                 joint_name: "left_joint".into(),
                 quantity: RosJointQuantityV2::Effort,
                 unit: "N*m".into(),
             },
             RosJointActionBindingV2 {
+                profile_id: "test.robot-joints.v1".into(),
                 action_address: "joint/right/effort".into(),
                 joint_name: "right_joint".into(),
                 quantity: RosJointQuantityV2::Effort,
