@@ -649,7 +649,7 @@ pub fn generate_mok_password() -> String {
 /// exact `pkiBundle`. That keeps signing material and Lanzaboote's configured
 /// bundle on the same path instead of relying on sbctl's unrelated default.
 pub fn generate_key_enrollment_nix() -> String {
-    r#"# Secure Boot key generation is owned by the pinned Lanzaboote module.
+    r#"# Secure Boot key generation is owned by the installed Lanzaboote module.
 # This generates signing keys only; it does not enroll them into firmware.
 { ... }:
 {
@@ -1124,7 +1124,7 @@ impl SecureBootOrchestration {
     /// For disabled Secure Boot, the second module is empty.
     pub fn generate_nix_config(&self) -> (String, String) {
         let lanzaboote_nix = generate_lanzaboote_nix(&self.lanzaboote);
-        let key_enrollment = if self.lanzaboote.enabled {
+        let key_enrollment = if self.lanzaboote.enabled && self.lanzaboote.generate_keys {
             generate_key_enrollment_nix()
         } else {
             String::new()
@@ -1752,6 +1752,21 @@ mod tests {
         assert!(key_nix.contains("boot.lanzaboote.autoGenerateKeys.enable = true"));
         assert!(!key_nix.contains("sbctl create-keys"));
         assert!(!key_nix.contains("/etc/secureboot/GUID"));
+    }
+
+    #[test]
+    fn test_orchestration_respects_disabled_key_generation() {
+        let mut orch = SecureBootOrchestration::new();
+        orch.lanzaboote = LanzabooteConfig {
+            enabled: true,
+            pki_dir: "/var/lib/sbctl".to_string(),
+            generate_keys: false,
+            mok_password: None,
+        };
+
+        let (lanzaboote_nix, key_nix) = orch.generate_nix_config();
+        assert!(lanzaboote_nix.contains("pkiBundle = \"/var/lib/sbctl\""));
+        assert!(key_nix.is_empty());
     }
 
     #[test]
