@@ -160,7 +160,8 @@ pub const LIVING_CITY_BENCHMARKS: &[BenchmarkDefinition] = &[
     },
 ];
 
-#[derive(Debug, Clone, PartialEq, Eq)]
+#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
+#[serde(deny_unknown_fields)]
 pub struct BenchmarkProfileBinding {
     pub benchmark_id: String,
     pub profile_id: String,
