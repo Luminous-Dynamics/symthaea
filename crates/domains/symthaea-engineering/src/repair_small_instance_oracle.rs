@@ -249,6 +249,34 @@ mod tests {
     }
 
     #[test]
+    fn matches_three_job_reference_fixture() {
+        let jobs = [job("A", 3, 2, 1.0), job("B", 1, 0, 10.0), job("C", 2, 1, 4.0)];
+        let result = exhaustive_single_crew_repair_optimum(&jobs).unwrap();
+        assert_eq!(result.optimal_order, vec!["B", "C", "A"]);
+        assert!((result.minimum_weighted_completion_loss - 28.0).abs() < EPSILON);
+        assert_eq!(result.feasible_permutations, 6);
+    }
+
+    #[test]
+    fn matches_four_job_reference_fixture() {
+        let jobs = [job("A", 2, 3, 8.0), job("B", 3, 2, 9.0),
+            job("C", 1, 1, 2.0), job("D", 4, 0, 4.0)];
+        let result = exhaustive_single_crew_repair_optimum(&jobs).unwrap();
+        assert_eq!(result.optimal_order, vec!["A", "B", "C", "D"]);
+        assert!((result.minimum_weighted_completion_loss - 113.0).abs() < EPSILON);
+        assert_eq!(result.feasible_permutations, 24);
+    }
+
+    #[test]
+    fn one_job_fixture_has_one_feasible_permutation() {
+        let jobs = [job("only", 3, 0, 5.0)];
+        let result = exhaustive_single_crew_repair_optimum(&jobs).unwrap();
+        assert_eq!(result.optimal_order, vec!["only"]);
+        assert!((result.minimum_weighted_completion_loss - 15.0).abs() < EPSILON);
+        assert_eq!(result.feasible_permutations, 1);
+    }
+
+    #[test]
     fn rejects_scope_expansion_instead_of_silently_ignoring_constraints() {
         let jobs = [RepairJob::new(
             "dependency", "general", 1, 0, 1.0, 0, ["other"],
