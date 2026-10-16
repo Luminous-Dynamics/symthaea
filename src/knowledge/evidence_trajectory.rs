@@ -17,7 +17,7 @@ use crate::knowledge::evidence_action_policy::{
 };
 use crate::knowledge::evidence_benchmark::{
     BenchmarkAction, BenchmarkEvidenceCondition, BenchmarkInput, BenchmarkProvenanceCondition,
-    BenchmarkQuestionCondition, BenchmarkReason, DatasetSplit, DATASET_SCHEMA_VERSION,
+    BenchmarkQuestionCondition, BenchmarkReason, DatasetSplit,
 };
 use serde::{Deserialize, Serialize};
 use sha2::{Digest, Sha256};
@@ -94,7 +94,7 @@ impl HashedEvidenceTrajectory {
 #[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
 #[serde(deny_unknown_fields)]
 pub struct TrajectorySplitCount {
-    pub split: crate::knowledge::evidence_benchmark::DatasetSplit,
+    pub split: DatasetSplit,
     pub trajectories: usize,
     pub steps: usize,
     pub claim_families: usize,
@@ -136,7 +136,7 @@ pub struct EvidenceTrajectoryReceipt {
 #[serde(deny_unknown_fields)]
 pub struct TrajectoryEpisodeScore {
     pub trajectory_id: String,
-    pub split: crate::knowledge::evidence_benchmark::DatasetSplit,
+    pub split: DatasetSplit,
     pub steps: usize,
     pub correct_actions: usize,
     pub unsafe_answer_escapes: usize,
@@ -242,7 +242,7 @@ fn validate_trajectory(trajectory: &EvidenceTrajectory) -> Result<(), String> {
                     || step.input.provenance != BenchmarkProvenanceCondition::Verified =>
             {
                 return Err(format!(
-                    "{} step {}: conflict_resolved requires non-conflicting evidence and verified provenance",
+                    "{} step {}: conflict resolution requires clean provenance and non-conflicting evidence",
                     trajectory.trajectory_id, step.sequence
                 ));
             }
@@ -301,8 +301,8 @@ fn validate_trajectory_collection(trajectories: &[HashedEvidenceTrajectory]) -> 
         return Err("trajectory dataset must contain at least one trajectory".to_owned());
     }
     let mut ids = BTreeSet::new();
-    let mut claim_splits: BTreeMap<&str, crate::knowledge::evidence_benchmark::DatasetSplit> = BTreeMap::new();
-    let mut origin_splits: BTreeMap<&str, crate::knowledge::evidence_benchmark::DatasetSplit> = BTreeMap::new();
+    let mut claim_splits: BTreeMap<&str, DatasetSplit> = BTreeMap::new();
+    let mut origin_splits: BTreeMap<&str, DatasetSplit> = BTreeMap::new();
     for hashed in trajectories {
         hashed.validate_digest()?;
         let trajectory = &hashed.trajectory;
@@ -328,8 +328,8 @@ fn validate_trajectory_collection(trajectories: &[HashedEvidenceTrajectory]) -> 
     Ok(())
 }
 
-fn split_name(split: crate::knowledge::evidence_benchmark::DatasetSplit) -> &'static str {
-    use crate::knowledge::evidence_benchmark::DatasetSplit::*;
+fn split_name(split: DatasetSplit) -> &'static str {
+    use DatasetSplit::*;
     match split {
         Train => "train",
         Development => "development",
@@ -363,13 +363,16 @@ pub fn audit_trajectory_jsonl<R: BufRead>(
         for origin in &t.trajectory.origin_family_ids { origins.insert(origin.as_str()); }
     }
     let partitions = [
-        crate::knowledge::evidence_benchmark::DatasetSplit::Train,
-        crate::knowledge::evidence_benchmark::DatasetSplit::Development,
-        crate::knowledge::evidence_benchmark::DatasetSplit::Test,
+        DatasetSplit::Train,
+        DatasetSplit::Development,
+        DatasetSplit::Test,
     ].into_iter().map(|split| {
         let rows: Vec<&EvidenceTrajectory> = trajectories.iter()
             .filter(|t| t.trajectory.split == split).map(|t| &t.trajectory).collect();
-        let claim_families: BTreeSet<&str> = rows.iter().map(|t| t.claim_family_id.as_str()).collect();
+        let claim_families: BTreeSet<&str> = rows
+            .iter()
+            .map(|t| t.claim_family_id.as_str())
+            .collect();
         let origin_families: BTreeSet<&str> = rows.iter()
             .flat_map(|t| t.origin_family_ids.iter().map(String::as_str)).collect();
         TrajectorySplitCount {
@@ -427,7 +430,9 @@ fn benchmark_reason(reason: EvidenceActionReason) -> BenchmarkReason {
         },
         EvidenceActionReason::EvidenceMissing => BenchmarkReason::EvidenceMissing,
         EvidenceActionReason::EvidenceIrrelevant => BenchmarkReason::EvidenceIrrelevant,
-        EvidenceActionReason::IndependentOriginsUnknown => BenchmarkReason::IndependentOriginsUnknown,
+        EvidenceActionReason::IndependentOriginsUnknown => {
+            BenchmarkReason::IndependentOriginsUnknown
+        },
         EvidenceActionReason::IndependentOriginsBelowPolicy => {
             BenchmarkReason::IndependentOriginsBelowPolicy
         },
@@ -777,13 +782,14 @@ pub fn score_trajectory_receipts<R: BufRead>(
 #[cfg(test)]
 mod tests {
     use super::*;
-    use crate::knowledge::evidence_benchmark::DatasetSplit;
+    use DatasetSplit;
     use std::io::Cursor;
 
     const FIXTURE: &str =
         include_str!("../../docs/research/data/evidence_trajectory_benchmark.synthetic.jsonl");
-    const UNSAFE_CONTROL: &str =
-        include_str!("../../docs/research/data/evidence_trajectory_benchmark.unsafe-control.synthetic.jsonl");
+    const UNSAFE_CONTROL: &str = include_str!(
+        "../../docs/research/data/evidence_trajectory_benchmark.unsafe-control.synthetic.jsonl"
+    );
 
     #[test]
     fn committed_trajectory_fixture_audits_and_replays_without_safety_escapes() {
