@@ -4,15 +4,22 @@
 //! It does not implement nanophysics or predict a material property.
 
 use serde::{Deserialize, Serialize};
+use symthaea_core::hdc::binary_hv::BinaryHV;
 use std::collections::HashMap;
 use std::io::{Read, Write};
 
 const SCHEMA_VERSION: &str = "nano-selection-input-v1";
-const POLICY_VERSION: &str = "nano-selector-v1";
+const POLICY_VERSION: &str = "nano-selector-v2";
 const MAX_INPUT_BYTES: u64 = 64 * 1024 * 1024;
 const MAX_CANDIDATES: usize = 100_000;
 const MAX_FEATURES: usize = 4_096;
 const MAX_FEATURE_CELLS: usize = 10_000_000;
+const MAX_HDC_CANDIDATES: usize = 10_000;
+const MAX_HDC_FEATURES: usize = 256;
+const HDC_LEVEL_COUNT: usize = 256;
+const HDC_ROLE_SEED_BASE: u64 = 0x4E41_4E4F_524F_4C45;
+const HDC_LEVEL_SEED: u64 = 0x4E41_4E4F_4C45_564C;
+const HDC_BIT_ORDER_SEED: u64 = 0x4E41_4E4F_4249_5453;
 
 #[derive(Clone, Debug, Deserialize)]
 #[serde(deny_unknown_fields)]
@@ -30,6 +37,7 @@ struct Request {
 #[serde(rename_all = "snake_case")]
 enum Policy {
     Maximin,
+    HdcMaximin,
     Random,
 }
 
@@ -105,6 +113,14 @@ fn validate_and_prepare(
     }
 
     let feature_count = candidates[0].features.len();
+    if request.policy == Policy::HdcMaximin {
+        if candidates.len() > MAX_HDC_CANDIDATES {
+            return Err(format!("HDC candidate pool exceeds limit of {MAX_HDC_CANDIDATES}"));
+        }
+        if feature_count > MAX_HDC_FEATURES {
+            return Err(format!("HDC feature count exceeds limit of {MAX_HDC_FEATURES}"));
+        }
+    }
     if feature_count > MAX_FEATURES {
         return Err(format!("feature count exceeds limit of {MAX_FEATURES}"));
     }
@@ -150,7 +166,7 @@ fn validate_and_prepare(
     }
 
     let normalized = match request.policy {
-        Policy::Maximin => normalize_features(&candidates)?,
+        Policy::Maximin | Policy::HdcMaximin => normalize_features(&candidates)?,
         // The random-control arm must not pay the cost of descriptor normalization.
         Policy::Random => Vec::new(),
     };
@@ -257,6 +273,74 @@ impl SplitMix64 {
     }
 }
 
+
+/// Build a scalar level codebook whose Hamming distance from level zero grows
+/// monotonically with the normalized descriptor value.
+fn hdc_level_codebook() -> Vec<BinaryHV> {
+    let mut bit_order: Vec<usize> = (0..BinaryHV::DIM).collect();
+    let mut rng = SplitMix64::new(HDC_BIT_ORDER_SEED);
+    for index in (1..bit_order.len()).rev() {
+        let other = rng.index_below(index + 1);
+        bit_order.swap(index, other);
+    }
+
+    let mut current = BinaryHV::random(HDC_LEVEL_SEED);
+    let mut codebook = Vec::with_capacity(HDC_LEVEL_COUNT);
+    let mut flipped = 0usize;
+    for level in 0..HDC_LEVEL_COUNT {
+        let target = level * (BinaryHV::DIM / 2) / (HDC_LEVEL_COUNT - 1);
+        while flipped < target {
+            let bit = bit_order[flipped];
+            current.0[bit / 8] ^= 1u8 << (bit % 8);
+            flipped += 1;
+        }
+        codebook.push(current);
+    }
+    codebook
+}
+
+/// Encode normalized numeric descriptors using Symthaea's canonical 16,384-bit
+/// BinaryHV, binding a role vector for each descriptor dimension to a correlated
+/// scalar-level vector, then bundling the bound roles. This is an HDC descriptor
+/// encoding—not an atomistic or optical property predictor.
+fn encode_hdc_features(features: &[Vec<f64>]) -> Result<Vec<BinaryHV>, String> {
+    if features.is_empty() {
+        return Err("HDC encoding requires a non-empty candidate pool".to_owned());
+    }
+    let feature_count = features[0].len();
+    if features.len() > MAX_HDC_CANDIDATES {
+        return Err(format!("HDC candidate pool exceeds limit of {MAX_HDC_CANDIDATES}"));
+    }
+    if feature_count == 0 || feature_count > MAX_HDC_FEATURES {
+        return Err(format!("HDC feature count must be in 1..={MAX_HDC_FEATURES}"));
+    }
+    if features.iter().any(|row| row.len() != feature_count) {
+        return Err("HDC encoding requires equal feature dimensions".to_owned());
+    }
+
+    let roles: Vec<BinaryHV> = (0..feature_count)
+        .map(|dimension| BinaryHV::random(HDC_ROLE_SEED_BASE ^ dimension as u64))
+        .collect();
+    let levels = hdc_level_codebook();
+    let mut encoded = Vec::with_capacity(features.len());
+    for row in features {
+        let mut bound_roles = Vec::with_capacity(feature_count);
+        for (dimension, value) in row.iter().enumerate() {
+            if !value.is_finite() {
+                return Err("HDC encoding received a non-finite descriptor".to_owned());
+            }
+            let level = (value.clamp(0.0, 1.0) * (HDC_LEVEL_COUNT - 1) as f64).round() as usize;
+            bound_roles.push(roles[dimension].bind(&levels[level]));
+        }
+        encoded.push(BinaryHV::bundle_safe(&bound_roles));
+    }
+    Ok(encoded)
+}
+
+fn normalized_hamming_distance(left: &BinaryHV, right: &BinaryHV) -> f64 {
+    f64::from(left.hamming_distance(right)) / BinaryHV::DIM as f64
+}
+
 fn choose(
     request: &Request,
     candidates: &[Candidate],
@@ -272,6 +356,71 @@ fn choose(
     let mut selected = Vec::with_capacity(request.budget);
 
     match request.policy {
+        Policy::HdcMaximin => {
+            let hdc_candidates = encode_hdc_features(features)?;
+            if selected_indices.is_empty() {
+                let pool_bundle = BinaryHV::bundle_safe(&hdc_candidates);
+                let mut best: Option<(usize, f64)> = None;
+                for &index in &remaining {
+                    let score = normalized_hamming_distance(&hdc_candidates[index], &pool_bundle);
+                    if best.is_none_or(|(_, best_score)| score > best_score) {
+                        best = Some((index, score));
+                    }
+                }
+                let (index, score) =
+                    best.ok_or_else(|| "no eligible HDC candidate remains".to_owned())?;
+                selected.push(SelectedCandidate {
+                    id: candidates[index].id.clone(),
+                    rank: 1,
+                    score_kind: "hdc_distance_to_pool_bundle",
+                    score: Some(score),
+                });
+                selected_indices.push(index);
+                remaining.retain(|candidate| *candidate != index);
+            }
+
+            if selected.len() < request.budget {
+                let mut minimum_distances: Vec<f64> = hdc_candidates
+                    .iter()
+                    .map(|candidate| {
+                        selected_indices
+                            .iter()
+                            .map(|chosen| normalized_hamming_distance(candidate, &hdc_candidates[*chosen]))
+                            .reduce(f64::min)
+                            .unwrap_or(f64::INFINITY)
+                    })
+                    .collect();
+
+                while selected.len() < request.budget {
+                    let mut best: Option<(usize, f64)> = None;
+                    for &index in &remaining {
+                        let score = minimum_distances[index];
+                        if best.is_none_or(|(_, best_score)| score > best_score) {
+                            best = Some((index, score));
+                        }
+                    }
+                    let (index, score) =
+                        best.ok_or_else(|| "no eligible HDC candidate remains".to_owned())?;
+                    selected.push(SelectedCandidate {
+                        id: candidates[index].id.clone(),
+                        rank: selected.len() + 1,
+                        score_kind: "hdc_min_distance_to_selected",
+                        score: Some(score),
+                    });
+                    selected_indices.push(index);
+                    remaining.retain(|candidate| *candidate != index);
+
+                    if selected.len() < request.budget {
+                        for (candidate_index, candidate) in hdc_candidates.iter().enumerate() {
+                            let distance =
+                                normalized_hamming_distance(candidate, &hdc_candidates[index]);
+                            minimum_distances[candidate_index] =
+                                minimum_distances[candidate_index].min(distance);
+                        }
+                    }
+                }
+            }
+        }
         Policy::Random => {
             // The pool is sorted by opaque ID during validation, so a fixed seed
             // yields the same permutation regardless of input row order.
@@ -372,6 +521,7 @@ fn choose(
         already_selected: prior_ids,
         normalization: match request.policy {
             Policy::Maximin => "per_feature_min_max_over_candidate_pool",
+            Policy::HdcMaximin => "per_feature_min_max_then_symthaea_binary_hdc_256_levels",
             Policy::Random => "not_used_by_random_policy",
         },
         selected,
