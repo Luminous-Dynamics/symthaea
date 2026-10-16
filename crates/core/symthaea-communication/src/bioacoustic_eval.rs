@@ -240,6 +240,10 @@ pub fn evaluate_bioacoustic_events(
         .iter()
         .map(|recording| recording.sample_id.as_str())
         .collect();
+    let test_recording_by_id: std::collections::BTreeMap<_, _> = test_recordings
+        .iter()
+        .map(|recording| (recording.sample_id.as_str(), *recording))
+        .collect();
 
     let mut exhaustive_ids = BTreeSet::new();
     if bundle.exhaustive_annotation_sample_ids.iter().any(|id| {
@@ -287,9 +291,8 @@ pub fn evaluate_bioacoustic_events(
                 prediction.prediction_id
             ));
         }
-        let recording = test_recordings
-            .iter()
-            .find(|recording| recording.sample_id == prediction.sample_id)
+        let recording = test_recording_by_id
+            .get(prediction.sample_id.as_str())
             .expect("membership in test_sample_ids implies a test recording");
         let duration_s = recording.sample_count as f64 / recording.sample_rate_hz as f64;
         if prediction.interval.start_s < 0.0 || prediction.interval.end_s > duration_s {
