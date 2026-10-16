@@ -82,6 +82,14 @@ Actual local byte audit (asset URIs must be clean paths relative to the given ro
 
     cargo run -p symthaea-communication --bin bioacoustic-asset-audit -- corpus-manifest.json --asset-root ./permitted-corpus
 
+Event-level evaluation of a precomputed prediction bundle:
+
+    cargo run -p symthaea-communication --bin bioacoustic-event-eval -- corpus-manifest.json predictions-test.json
+
+The prediction bundle uses `BioacousticEventPredictionBundle` from `symthaea_communication::bioacoustic_eval`. It pins the dataset ID/revision and canonical corpus-manifest BLAKE3, model ID/SHA-256, task, target labels, matching rule, and frozen score threshold. Its `predictions` array may reference **Test samples only**. Choose `StartTolerance` for point-like events such as click onsets or `TemporalIou` for interval-like events such as whistle segments; select the rule and tolerance before examining Test results.
+
+`exhaustive_annotation_sample_ids` must exactly enumerate every Test recording, including recordings with zero target events. This is an explicit annotation-protocol assertion; the evaluator cannot independently know that unmarked events are truly absent. The evaluator rejects absent/extra Test IDs, sample/source leakage under the declared split policy, non-unique prediction IDs, predictions outside Test, invalid intervals/scores, and a mismatched manifest identity. It uses deterministic one-to-one event matching so duplicate predictions cannot count the same truth event twice. The report emits micro-aggregated and per-recording event precision/recall/F1, false alarms per hour, manifest and prediction-bundle hashes, and explicit false flags for audio-byte verification, annotation-truth authentication, model execution, prediction provenance authentication and threshold-selection authentication. Run the asset audit first; the evaluator scores precomputed outputs and does not run the detector.
+
 Evidence labels:
 
 - **Metadata admitted:** declared manifest, rights references and split relations passed checks.
