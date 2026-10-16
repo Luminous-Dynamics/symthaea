@@ -709,6 +709,9 @@ impl InoculationOrchestrator {
     /// automatically enroll keys into firmware.
     pub fn generate_boot_config_nix(&self) -> Result<String, String> {
         if !self.lanzaboote_enabled {
+            if self.target_platform != TargetPlatform::Linux {
+                return Err("standard NixOS boot configuration requires an identified Linux target".to_string());
+            }
             if self.secure_boot_state.as_deref() != Some("Disabled") {
                 return Err("standard unsigned boot configuration requires a current Disabled observation; resolve the target Secure Boot state before generating config".to_string());
             }
@@ -1189,6 +1192,7 @@ mod tests {
         orch.lanzaboote_enabled = false;
         assert!(orch.generate_boot_config_nix().is_err());
 
+        orch.target_platform = TargetPlatform::Linux;
         orch.secure_boot_state = Some("Disabled".to_string());
         let config = orch.generate_boot_config_nix().expect("observed disabled state permits standard boot configuration");
         assert!(config.contains("systemd-boot.enable = true"));
