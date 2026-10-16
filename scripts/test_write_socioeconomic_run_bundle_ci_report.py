@@ -16,6 +16,7 @@ SOURCE_PATHS = (
     "scripts/test_write_socioeconomic_run_bundle_ci_report.py",
     "docs/research/finance/SYM-FIN-SYS-016_run_bundle_manifest_v1.schema.json",
     "docs/research/finance/SYM-FIN-SYS-016_validator_execution_record_v1.schema.json",
+    "scripts/socioeconomic_run_receipt_requirements.txt",
     ".github/workflows/socioeconomic-run-bundle.yml",
 )
 TEST_LOG_PATH = "evidence/test-output.txt"
@@ -47,6 +48,7 @@ class ExecutionReportTests(unittest.TestCase):
         ).stdout.strip()
         self.env = {
             "GITHUB_SHA": self.revision,
+            "CIVOS_SOURCE_REVISION": self.revision,
             "GITHUB_REPOSITORY": "example/repo",
             "GITHUB_WORKFLOW": "run-bundle-tests",
             "GITHUB_RUN_ID": "123",
@@ -62,9 +64,10 @@ class ExecutionReportTests(unittest.TestCase):
     def test_report_binds_exact_checkout_and_input_bytes(self) -> None:
         report = build_report(self.root, self.env, TEST_LOG_PATH)
         self.assertEqual(report["source_revision"], self.revision)
+        self.assertEqual(report["event_sha"], self.revision)
         self.assertEqual(report["result"], "passed")
         self.assertEqual(report["claim_ceiling"], "synthetic_deterministic_only")
-        self.assertEqual(report["scope"], "run_bundle_validator_unit_tests_only")
+        self.assertEqual(report["scope"], "run_bundle_validator_and_execution_record_unit_tests")
         self.assertEqual(len(report["artifacts"]), len(SOURCE_PATHS) + 1)
         self.assertTrue(all(item["digest"].startswith("sha256:") for item in report["artifacts"]))
 
@@ -76,7 +79,7 @@ class ExecutionReportTests(unittest.TestCase):
 
     def test_wrong_checkout_sha_is_rejected(self) -> None:
         broken = dict(self.env)
-        broken["GITHUB_SHA"] = "0" * 40
+        broken["CIVOS_SOURCE_REVISION"] = "0" * 40
         with self.assertRaisesRegex(ReportFailure, "does not match GITHUB_SHA"):
             build_report(self.root, broken, TEST_LOG_PATH)
 
