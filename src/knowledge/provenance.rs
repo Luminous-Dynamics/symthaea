@@ -680,7 +680,7 @@ mod tests {
             let p95_index = (REPEATS * 95 + 99) / 100 - 1;
             let p95_ns = batch_ns[p95_index];
             println!(
-                "n={batch_size} reps={REPEATS} p50_ns={p50_ns} p95_ns={p95_ns} median_ns_per_item={}",
+                "n={batch_size} rep={REPEATS} p50={p50_ns} p95={p95_ns} med_ns/item={}",
                 p50_ns / batch_size as u128
             );
         }
