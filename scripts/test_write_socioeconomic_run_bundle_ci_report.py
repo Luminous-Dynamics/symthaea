@@ -80,7 +80,7 @@ class ExecutionReportTests(unittest.TestCase):
     def test_wrong_checkout_sha_is_rejected(self) -> None:
         broken = dict(self.env)
         broken["CIVOS_SOURCE_REVISION"] = "0" * 40
-        with self.assertRaisesRegex(ReportFailure, "does not match GITHUB_SHA"):
+        with self.assertRaisesRegex(ReportFailure, "does not match CIVOS_SOURCE_REVISION"):
             build_report(self.root, broken, TEST_LOG_PATH)
 
     def test_empty_test_log_is_rejected(self) -> None:
