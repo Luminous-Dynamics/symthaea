@@ -18,6 +18,9 @@
 //! ```
 
 /// Speed of sound in dry air at `temp_celsius`: `c = 331.3·√(1 + T/273.15)` (m/s).
+pub mod response_curve;
+
+/// Speed of sound in dry air at `temp_celsius`: `c = 331.3·√(1 + T/273.15)` (m/s).
 pub fn speed_of_sound_air(temp_celsius: f64) -> f64 {
     331.3 * (1.0 + temp_celsius / 273.15).sqrt()
 }
