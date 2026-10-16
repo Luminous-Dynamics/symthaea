@@ -232,8 +232,8 @@ pub enum MdInputError {
         axis: usize,
     },
     UnsupportedMultiplicity { multiplicity: u32 },
-    InvalidElectronCount { electron_count: i32 },
-    OddElectronCount { electron_count: i32 },
+    InvalidElectronCount { electron_count: i64 },
+    OddElectronCount { electron_count: i64 },
     NonFiniteTimeStep,
     NonPositiveTimeStep,
     NonFiniteTemperature,
@@ -328,12 +328,12 @@ pub fn validate_md_inputs(molecule: &Molecule, config: &MdConfig) -> Result<(), 
             multiplicity: molecule.multiplicity,
         });
     }
-    let nuclear_charge: i32 = molecule
+    let nuclear_charge: i64 = molecule
         .atoms
         .iter()
-        .map(|atom| atom.atomic_number as i32)
+        .map(|atom| atom.atomic_number as i64)
         .sum();
-    let electron_count = nuclear_charge - molecule.charge;
+    let electron_count = nuclear_charge - i64::from(molecule.charge);
     if electron_count <= 0 {
         return Err(MdInputError::InvalidElectronCount { electron_count });
     }
@@ -623,6 +623,22 @@ mod tests {
         assert_eq!(
             validate_md_inputs(&molecule, &config),
             Err(MdInputError::NonFiniteFiniteDifferenceStep)
+        );
+    }
+
+    #[test]
+    fn validation_rejects_negative_and_non_finite_temperature() {
+        let molecule = Molecule::h2();
+        let mut config = MdConfig::default();
+        config.temperature = -1.0;
+        assert_eq!(
+            validate_md_inputs(&molecule, &config),
+            Err(MdInputError::NegativeTemperature)
+        );
+        config.temperature = f64::INFINITY;
+        assert_eq!(
+            validate_md_inputs(&molecule, &config),
+            Err(MdInputError::NonFiniteTemperature)
         );
     }
 
