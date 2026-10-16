@@ -8,6 +8,8 @@ One JSON request per input line; one JSON response per output line. Example requ
 
     {"schema_version":"nano-policy-request-v1","policy":"farthest_first","budget":2,"seed":42,"feature_contract_sha256":"aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa","candidates":[{"candidate_id":"c-a","family_id":"family-a","normalized_features":[0.0,0.0]},{"candidate_id":"c-b","family_id":"family-a","normalized_features":[0.2,0.2]},{"candidate_id":"c-c","family_id":"family-b","normalized_features":[1.0,1.0]}]}
 
+The repeated `a` characters in this example are a placeholder only. Replace them with the lowercase SHA-256 of the actual frozen feature/preprocessing contract; the kernel checks the digest format but cannot independently fetch or verify that external contract.
+
 Policies:
 - random_seeded: deterministic pseudo-random sampling without replacement.
 - farthest_first: greedy max-min distance over normalized features, starting from the lexicographically smallest candidate ID.
