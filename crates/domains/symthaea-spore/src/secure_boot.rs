@@ -1205,9 +1205,10 @@ mod tests {
 
         assert_eq!(chain.stages.len(), 5, "Boot chain must have 5 stages");
 
-        // Firmware is always verified
+        // The observed firmware state is known, but the intended machine-specific
+        // trust path remains pending until deliberate enrollment and reboot evidence.
         assert_eq!(chain.stages[0].name, "Firmware");
-        assert_eq!(chain.stages[0].status, BootStageStatus::Verified);
+        assert_eq!(chain.stages[0].status, BootStageStatus::PendingEnrollment);
 
         // Lanzaboote uses a direct signed-UKI path, not shim/MOK.
         assert_eq!(chain.stages[1].name, "Shim");
