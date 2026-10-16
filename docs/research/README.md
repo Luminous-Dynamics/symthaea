@@ -344,3 +344,5 @@ Open an issue on GitHub for research discussions.
 - [Resilient Systems Benchmarks](./RESILIENT_SYSTEMS_BENCHMARKS.md) — proposed benchmark levels B0–B5, negative controls, scenario matrix RS-01–RS-14, and calibration gates.
 - [Machine-readable assumptions](./resilient_systems_baseline.json) — scenario assumptions and common metric schema.
 - [Rust service-continuity screening module](../../crates/domains/symthaea-engineering/src/resilient_service_screening.rs) — deterministic dependency/outage/recovery abstraction with unit tests; not calibrated for real-world prediction.
+
+- [Finite-resource screening module](../../crates/domains/symthaea-engineering/src/resource_constrained_screening.rs) — deterministic shared inventory, bounded replenishment, supply disruptions, resource competition and per-service traces; not calibrated for real-world prediction.
