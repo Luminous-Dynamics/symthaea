@@ -3900,3 +3900,7 @@ mod tests {
     }
 
 }
+
+// Source-native names remain distinct from renderer families and playable-bank evidence.
+#[path = "vcsl_source_identity.rs"]
+pub mod source_identity;
