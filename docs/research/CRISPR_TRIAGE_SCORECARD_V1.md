@@ -193,3 +193,15 @@ Allowed only after the corresponding gate passes: “reproduced,” “improved 
 Not allowed from this benchmark alone: “CRISPR-safe,” “clinically safer,” “treatment price reduced,” “lab costs reduced,” “validated guide,” or “new therapy discovered.”
 
 The credible breakthrough would be evidence that a general-purpose reasoning/evidence system improves a well-defined specialist workflow in a leak-resistant, independent, cost-accounted benchmark—even if the result is negative. The protocol is designed to reveal that answer rather than assume it.
+
+
+## 11. Synthetic contract fixtures
+
+The machine-readable companion contract contains four small fixtures intended to become deterministic unit tests for the future Rust scorer/verifier:
+
+1. **F1 — nomination vs seeded ranking.** Four eligible positives, two in the native nominations: expected native coverage is 2/4 = 0.5. Later seeding the two missing positives into a ranking universe allows Recall@5 to reach 1.0, but native nomination coverage remains 0.5.
+2. **F2 — unknown is not negative.** If an unknown/unassayed candidate is inside the review set, precision is not estimable under the declared label semantics; it may not be silently counted as a true negative.
+3. **F3 — digest mismatch.** An observed artifact digest that differs from the frozen manifest blocks replay and blocks metric claims.
+4. **F4 — group leakage.** A guide/Cas9 group appearing in both train and held-out partitions invalidates the declared group holdout and any associated generalization claim.
+
+At this stage the contract fixtures and expected values have been checked directly after retrieving and parsing the JSON. This is not yet a committed Rust scorer test and does not satisfy the production metric-verifier gate.
