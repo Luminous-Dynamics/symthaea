@@ -28,6 +28,7 @@ SOURCE_PATHS = (
     "scripts/test_write_socioeconomic_run_bundle_ci_report.py",
     "docs/research/finance/SYM-FIN-SYS-016_run_bundle_manifest_v1.schema.json",
     "docs/research/finance/SYM-FIN-SYS-016_validator_execution_record_v1.schema.json",
+    "scripts/socioeconomic_run_receipt_requirements.txt",
     ".github/workflows/socioeconomic-run-bundle.yml",
 )
 TEST_PATHS = (
@@ -36,6 +37,7 @@ TEST_PATHS = (
 )
 REQUIRED_ENV = (
     "GITHUB_SHA",
+    "CIVOS_SOURCE_REVISION",
     "GITHUB_REPOSITORY",
     "GITHUB_WORKFLOW",
     "GITHUB_RUN_ID",
@@ -76,8 +78,11 @@ def build_report(
     if missing:
         raise ReportFailure(f"required workflow metadata missing: {', '.join(missing)}")
 
-    source_revision = env["GITHUB_SHA"]
+    source_revision = env["CIVOS_SOURCE_REVISION"]
     if re.fullmatch(r"[0-9a-f]{40}", source_revision) is None:
+        raise ReportFailure("CIVOS_SOURCE_REVISION must be a full lowercase 40-character commit SHA")
+    event_sha = env["GITHUB_SHA"]
+    if re.fullmatch(r"[0-9a-f]{40}", event_sha) is None:
         raise ReportFailure("GITHUB_SHA must be a full lowercase 40-character commit SHA")
 
     try:
@@ -144,6 +149,7 @@ def build_report(
         "scope": "run_bundle_validator_and_execution_record_unit_tests",
         "repository": env["GITHUB_REPOSITORY"],
         "source_revision": source_revision,
+        "event_sha": event_sha,
         "workflow": env["GITHUB_WORKFLOW"],
         "job": env["GITHUB_JOB"],
         "event": env["GITHUB_EVENT_NAME"],
