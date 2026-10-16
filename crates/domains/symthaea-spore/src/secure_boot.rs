@@ -56,6 +56,69 @@ impl TargetPlatform {
     }
 }
 
+/// Explicit, one-session authorization for generating a Secure Boot configuration.
+///
+/// The authorization binds consent to a profile identity, exact device/firmware
+/// and software revisions, the observed Secure Boot state, and a hash of the
+/// current hardware profile. It is intentionally not serialized/persisted.
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub struct SecureBootProfileApproval {
+    pub profile_id: String,
+    pub target_model: String,
+    pub firmware_revision: String,
+    pub nixos_release: String,
+    pub lanzaboote_revision: String,
+    pub observed_secure_boot_state: String,
+    pub hardware_profile_blake3: String,
+    pub user_confirmed: bool,
+    pub exact_profile_qualified: bool,
+    pub recovery_path_verified: bool,
+}
+
+impl SecureBootProfileApproval {
+    /// Validate the approval against live observations before generating config.
+    pub fn validate_for_current_target(
+        &self,
+        observed_state: &str,
+        hardware_profile_blake3: &str,
+        is_linux_target: bool,
+    ) -> Result<(), String> {
+        if !self.user_confirmed {
+            return Err("explicit operator confirmation is required".to_string());
+        }
+        if !self.exact_profile_qualified {
+            return Err("the exact device/firmware/NixOS/Lanzaboote profile is not qualified".to_string());
+        }
+        if !self.recovery_path_verified {
+            return Err("an independently verified recovery path is required".to_string());
+        }
+        for (name, value) in [
+            ("profile_id", self.profile_id.as_str()),
+            ("target_model", self.target_model.as_str()),
+            ("firmware_revision", self.firmware_revision.as_str()),
+            ("nixos_release", self.nixos_release.as_str()),
+            ("lanzaboote_revision", self.lanzaboote_revision.as_str()),
+        ] {
+            if value.trim().is_empty() {
+                return Err(format!("{name} must be non-empty"));
+            }
+        }
+        if !is_linux_target {
+            return Err("Lanzaboote profile authorization requires an identified Linux target".to_string());
+        }
+        if !matches!(observed_state, "Enabled" | "Disabled" | "SetupMode") {
+            return Err("Secure Boot state is unresolved; repeat the probe before generating configuration".to_string());
+        }
+        if self.observed_secure_boot_state != observed_state {
+            return Err("the authorized Secure Boot state does not match the current observation".to_string());
+        }
+        if self.hardware_profile_blake3 != hardware_profile_blake3 {
+            return Err("hardware profile changed after review; authorize the current exact profile again".to_string());
+        }
+        Ok(())
+    }
+}
+
 // ============================================================================
 // 1. Delegated Probe (SSH-based)
 // ============================================================================
