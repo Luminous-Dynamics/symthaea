@@ -256,6 +256,7 @@ pub fn evaluate_peak_resource_usage(
     {
         return Err(PeakResourceUsageMeasurementError::ReservationReceiptDigestMismatch);
     }
+    validate_observation_references(measurement_plan, reservation_plan)?;
 
     let pools: BTreeMap<&str, _> = reservation_plan
         .pools
@@ -478,7 +479,9 @@ pub fn evaluate_peak_resource_usage(
         configuration_revision: measurement_plan.configuration_revision.clone(),
         configuration_digest_sha256: measurement_plan.expected_configuration_digest_sha256.clone(),
         task_plan_digest_sha256: measurement_plan.expected_task_plan_digest_sha256.clone(),
-        reservation_plan_digest_sha256: measurement_plan.expected_reservation_plan_digest_sha256.clone(),
+        reservation_plan_digest_sha256: measurement_plan
+            .expected_reservation_plan_digest_sha256
+            .clone(),
         reservation_report_digest_sha256: measurement_plan
             .expected_reservation_report_digest_sha256
             .clone(),
@@ -861,13 +864,17 @@ fn observation_status_tag(value: PeakUsageObservationStatus) -> &'static str {
 fn finding_code_tag(value: PeakUsageFindingCode) -> &'static str {
     match value {
         PeakUsageFindingCode::ProviderComponentMismatch => "provider_component_mismatch",
-        PeakUsageFindingCode::ProviderHardwareRevisionMismatch => "provider_hardware_revision_mismatch",
+        PeakUsageFindingCode::ProviderHardwareRevisionMismatch => {
+            "provider_hardware_revision_mismatch"
+        },
         PeakUsageFindingCode::MeasurementEvidenceBelowPolicy => "measurement_evidence_below_policy",
         PeakUsageFindingCode::SampleCountBelowPolicy => "sample_count_below_policy",
         PeakUsageFindingCode::SamplingIntervalAbovePolicy => "sampling_interval_above_policy",
         PeakUsageFindingCode::NoDeclaredForecast => "no_declared_forecast",
         PeakUsageFindingCode::ForecastMayBeUnderestimated => "forecast_may_be_underestimated",
-        PeakUsageFindingCode::ForecastDefinitelyUnderestimated => "forecast_definitely_underestimated",
+        PeakUsageFindingCode::ForecastDefinitelyUnderestimated => {
+            "forecast_definitely_underestimated"
+        },
         PeakUsageFindingCode::PossibleBudgetLimitExceeded => "possible_budget_limit_exceeded",
         PeakUsageFindingCode::DefiniteBudgetLimitExceeded => "definite_budget_limit_exceeded",
     }
@@ -890,10 +897,10 @@ mod tests {
     use crate::suit_mission_configuration::{
         MissionComponent, MissionComponentKind, MissionConnection,
     };
-    use crate::suit_peak_reservations::{
-        PeakResourcePool, PeakResourceReservation, PeakResourceWindowStatusPlaceholder,
+    use crate::suit_peak_reservations::{PeakResourcePool, PeakResourceReservation};
+    use crate::suit_profile::{
+        SuitCapability, SuitCapabilityClaim, SuitMissionProfile, SuitVariantDeclaration,
     };
-    use crate::suit_profile::{SuitCapability, SuitCapabilityClaim, SuitMissionProfile, SuitVariantDeclaration};
 
     fn fixture() -> (
         MissionConfiguration,
@@ -1213,23 +1220,23 @@ mod tests {
 
     #[test]
     fn input_order_is_invariant_and_mutation_breaks_receipt() {
-        let (config, tasks, task_receipt, reserve_plan, reserve_report, reserve_receipt, mut plan) = fixture();
-        let (report_a, receipt_a) = evaluate_peak_resource_usage(
-            &config, &tasks, &task_receipt, &reserve_plan, &reserve_report, &reserve_receipt, &plan
-        ).unwrap();
+        let (config, tasks, task_receipt, reserve_plan, reserve_report, reserve_receipt, mut plan) =
+            fixture();
         let mut second = plan.observations[0].clone();
         second.observation_id = "measurement-2".into();
         second.evidence_reference = "synthetic-observation:measurement-2".into();
         plan.observations.push(second);
+        let (report_a, receipt_a) = evaluate_peak_resource_usage(
+            &config, &tasks, &task_receipt, &reserve_plan, &reserve_report, &reserve_receipt, &plan
+        ).unwrap();
         plan.observations.reverse();
         let (report_b, receipt_b) = evaluate_peak_resource_usage(
             &config, &tasks, &task_receipt, &reserve_plan, &reserve_report, &reserve_receipt, &plan
         ).unwrap();
-        assert_eq!(
-            report_a.observations[0].status,
-            report_b.observations[0].status
-        );
-        assert_ne!(receipt_a, receipt_b);
+        assert_eq!(report_a, report_b);
+        assert_eq!(receipt_a, receipt_b);
+
+        plan.observations[0].observed_peak.upper += 1;
         assert!(!verify_peak_resource_usage_receipt(
             &config, &tasks, &task_receipt, &reserve_plan, &reserve_report,
             &reserve_receipt, &plan, &report_a, &receipt_a
