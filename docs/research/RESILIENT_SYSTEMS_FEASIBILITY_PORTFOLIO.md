@@ -509,3 +509,8 @@ The next layer is [multi_crew_repair_oracle.rs](../../crates/domains/symthaea-en
 The public [multi-crew fixture corpus](./multi_crew_repair_oracle_corpus.json) covers skill-constrained parallel work (loss 41), a power→pump prerequisite across two crews (loss 52), and preserving a multi-skilled crew for the only plumbing-qualified job (loss 42). All are deterministic synthetic correctness fixtures; none are field-calibrated. The 8 source-level tests are authored but unexecuted. The next step is to import a small published multi-skilled scheduling benchmark and document any semantic differences, then add finite-stock constraints only with their own exact fixtures.
 
 Research grounding: Snauwaert and Vanhoucke provide a classification and benchmark instances for multi-skilled resource-constrained project scheduling ([EJOR 2023](https://doi.org/10.1016/j.ejor.2022.05.049)); Myszkowski and Laszczyk publish multi-objective MS-RCPSP benchmark fronts ([Applied Soft Computing 2022](https://doi.org/10.1016/j.asoc.2022.109253)). These provide external comparison targets, not validation of this implementation.
+
+
+## Independent schedule-verification boundary
+
+The new `repair_schedule_certificate.rs` module treats each planner output as an untrusted proposal and independently checks its job coverage, skills, durations, crew conflicts, precedence and objective arithmetic. It is a feasibility/objective checker, not a proof of global optimality or a field-safety certification. The next validation phase is to run every tiny-oracle result through this checker and to build a reproducible adapter for published multi-skill scheduling datasets before claiming external benchmark performance.
