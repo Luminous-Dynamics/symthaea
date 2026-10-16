@@ -14,6 +14,12 @@ on:
       - "Cargo.lock"
       - ".github/workflows/nano-policy.yml"
   workflow_dispatch:
+    inputs:
+      run_profile:
+        description: "Run hardware-specific synthetic selector profiling (not a scientific benchmark)"
+        required: false
+        default: false
+        type: boolean
 
 permissions:
   contents: read
@@ -50,3 +56,7 @@ jobs:
 
       - name: Run Clippy
         run: cargo clippy -p symthaea-nano-policy --all-targets --locked -- -D warnings
+
+      - name: Run optional synthetic scaling profile
+        if: ${{ github.event_name == 'workflow_dispatch' && inputs.run_profile }}
+        run: /usr/bin/time -v cargo test -p symthaea-nano-policy --locked manual_profile_selector_scaling -- --ignored --nocapture
