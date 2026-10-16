@@ -452,3 +452,10 @@ A third Rust module, [`repair_crew_scheduling`](../../crates/domains/symthaea-en
 The objective measures caller-weighted service-unit-steps lost from outage until repair completion, capped at the analysis horizon. It is intended for policy comparison on identical scenarios, not as an objective ethical ranking. The implementation is a deterministic list-scheduling heuristic, not a global optimizer.
 
 The initial module has 15 authored unit tests covering policy comparison, skill eligibility, crew exclusivity, dependency ordering, finite spares, horizon accounting, deterministic output, cycle rejection and invalid inputs. The tests have not been compiled or run in the current environment. The next research target is to compare heuristic schedules against an independent exhaustive oracle on small fixtures, then add uncertain repair time and route/access dependencies.
+
+
+### Policy-comparison witness (synthetic; not empirical)
+
+An independent arithmetic check was performed on a one-crew, two-job fixture. Priority-first repairs a duration-10, service-weight-1 task before a duration-1, service-weight-100 task, yielding (10\times1 + 11\times100 = 1{,}110) weighted service-unit-steps lost. The weighted-recovery policy reverses the order and yields (1\times100 + 11\times1 = 111), a 90% reduction for this explicitly weighted objective.
+
+This demonstrates why policies should be benchmarked against each other on a disclosed objective and why the objective matters. It does **not** prove the heuristic is globally optimal or that service weights capture ethical priorities. This was a separate arithmetic oracle, not execution of the Rust test.
