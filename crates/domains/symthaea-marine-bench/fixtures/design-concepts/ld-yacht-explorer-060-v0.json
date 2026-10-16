@@ -1,0 +1,368 @@
+{
+  "schema_version": "1.0.0",
+  "concept_id": "LD-YACHT-EXPLORER-060-V0",
+  "concept_name": "Bluewater Explorer 60 — mission-adaptive expedition yacht",
+  "archetype": "expedition_yacht",
+  "maturity": "concept_hypothesis",
+  "mission": {
+    "mission_statement": "A quiet, long-range bluewater explorer for private guests, expedition equipment and remote operations; prioritise service reliability, comfort, maintainability and low lifecycle energy rather than top speed.",
+    "operating_region": "Global bluewater routes; polar and restricted-area operations are excluded until route-specific requirements and approvals are defined.",
+    "route_profile": "Provisional long-range displacement mission; route, reserve policy, weather window and resupply cadence require an explicit mission profile.",
+    "target_cruise_speed_kn": {
+      "value": 10,
+      "unit": "kn",
+      "status": "design_target",
+      "lower_bound": null,
+      "upper_bound": null,
+      "source_ref": null,
+      "rationale": "Provisional economic-speed target for trade studies; not a hydrodynamic prediction."
+    },
+    "target_range_nmi": {
+      "value": 5000,
+      "unit": "nmi",
+      "status": "design_target",
+      "lower_bound": null,
+      "upper_bound": null,
+      "source_ref": null,
+      "rationale": "Provisional range target at the declared economic speed, with reserves to be specified."
+    },
+    "voyage_duration_days": {
+      "value": 30,
+      "unit": "days",
+      "status": "design_assumption",
+      "lower_bound": null,
+      "upper_bound": null,
+      "source_ref": null,
+      "rationale": "Working mission duration to expose consumables, storage and maintenance constraints."
+    },
+    "port_calls": {
+      "value": null,
+      "unit": "calls",
+      "status": "unknown",
+      "lower_bound": null,
+      "upper_bound": null,
+      "source_ref": null,
+      "rationale": "Depends on route and resupply design."
+    }
+  },
+  "dimensions": {
+    "length_overall_m": {
+      "value": 60,
+      "unit": "m",
+      "status": "design_assumption",
+      "lower_bound": null,
+      "upper_bound": null,
+      "source_ref": null,
+      "rationale": "Archetype size selected to scope first trade studies only."
+    },
+    "beam_m": {
+      "value": null,
+      "unit": "m",
+      "status": "unknown",
+      "lower_bound": null,
+      "upper_bound": null,
+      "source_ref": null,
+      "rationale": "Set after intact/damage stability, deck arrangement and resistance trade studies."
+    },
+    "design_draft_m": {
+      "value": null,
+      "unit": "m",
+      "status": "unknown",
+      "lower_bound": null,
+      "upper_bound": null,
+      "source_ref": null,
+      "rationale": "Set against propulsor, machinery, stability and intended port constraints."
+    },
+    "air_draft_m": {
+      "value": null,
+      "unit": "m",
+      "status": "unknown",
+      "lower_bound": null,
+      "upper_bound": null,
+      "source_ref": null,
+      "rationale": "Depends on wind-assist concept, radar/communications mast and heli/tender choices."
+    },
+    "displacement_tonnes": {
+      "value": null,
+      "unit": "tonne",
+      "status": "unknown",
+      "lower_bound": null,
+      "upper_bound": null,
+      "source_ref": null,
+      "rationale": "Requires a mass and vertical-centre budget; no displacement estimate claimed."
+    }
+  },
+  "capacity": {
+    "guest_capacity": {
+      "value": 12,
+      "unit": "persons",
+      "status": "design_assumption",
+      "lower_bound": null,
+      "upper_bound": null,
+      "source_ref": null,
+      "rationale": "Working concept capacity; not a final accommodation or safe-manning decision."
+    },
+    "crew_capacity": {
+      "value": 20,
+      "unit": "persons",
+      "status": "design_assumption",
+      "lower_bound": null,
+      "upper_bound": null,
+      "source_ref": null,
+      "rationale": "Working operational assumption; requires mission, hotel services and manning review."
+    },
+    "vehicle_or_cargo_capacity": {
+      "value": null,
+      "unit": "tonne or m3",
+      "status": "unknown",
+      "lower_bound": null,
+      "upper_bound": null,
+      "source_ref": null,
+      "rationale": "Tender, science kit, stores and garage volume not yet sized."
+    }
+  },
+  "operating_profile": {
+    "service_modes": [
+      "bluewater_passage",
+      "low-noise_anchorage",
+      "port_shore_power",
+      "maneuvering",
+      "emergency_degraded_mode"
+    ],
+    "sea_state_envelope": "To be set by route/weather return-period study and stability/seakeeping analysis; no safe operating envelope implied.",
+    "weather_routing": "Compare fixed schedule with weather-aware speed and route policies; hard route/crew/guest comfort limits override fuel savings.",
+    "speed_policy": "Use economic speed as an optimisation decision, subject to schedule, sea state, machinery envelope and comfort.",
+    "availability_target": {
+      "value": 0.98,
+      "unit": "fraction",
+      "status": "design_target",
+      "lower_bound": null,
+      "upper_bound": null,
+      "source_ref": null,
+      "rationale": "Provisional mission availability target; exclude planned maintenance explicitly and validate with reliability model."
+    }
+  },
+  "energy_architecture": {
+    "distribution_architecture": "Compare zonal DC/AC microgrid layouts with segregated essential services, black-start and safe degraded modes.",
+    "propulsion_candidates": [
+      "diesel-electric hybrid baseline",
+      "battery-buffered electric propulsion with dispatchable onboard generation",
+      "battery-electric mission variant if the route/charging mass-energy balance closes"
+    ],
+    "energy_carriers_to_evaluate": [
+      "shore electricity",
+      "renewable diesel/HVO with lifecycle feedstock sensitivity",
+      "methanol pathway with toxicity/fire/storage review",
+      "hydrogen fuel-cell option with storage/volume/safety review"
+    ],
+    "battery_capacity_mwh": {
+      "value": null,
+      "unit": "MWh",
+      "status": "unknown",
+      "lower_bound": null,
+      "upper_bound": null,
+      "source_ref": null,
+      "rationale": "Size only after propulsion load curve, hotel load, reserve, thermal/fire zones and battery mass are modelled."
+    },
+    "shore_power": "Model availability and charging duration at each planned port; no universal shore-power availability is assumed.",
+    "wind_assist": "Evaluate retractable wing-sails or other wind-assist only after stability, rig loads, visibility, air-draft, tender and emergency-access analysis.",
+    "solar_assist": "Treat solar as a measured area/irradiance contribution; don't count rated peak power as continuous voyage energy.",
+    "thermal_integration": "Integrate heat pumps, heat recovery, insulated distribution and thermal storage after mode-resolved hotel-load accounting."
+  },
+  "load_budget": {
+    "propulsion_kw": {
+      "value": null,
+      "unit": "kW",
+      "status": "unknown",
+      "lower_bound": null,
+      "upper_bound": null,
+      "source_ref": null,
+      "rationale": "Requires resistance/propulsor, speed, draft, fouling and sea-state model."
+    },
+    "hotel_kw": {
+      "value": null,
+      "unit": "kW",
+      "status": "unknown",
+      "lower_bound": null,
+      "upper_bound": null,
+      "source_ref": null,
+      "rationale": "Mode-specific hotel-load inventory required."
+    },
+    "hvac_kw": {
+      "value": null,
+      "unit": "kW",
+      "status": "unknown",
+      "lower_bound": null,
+      "upper_bound": null,
+      "source_ref": null,
+      "rationale": "Climate, occupancy, envelope, ventilation and setpoint model required."
+    },
+    "freshwater_kw": {
+      "value": null,
+      "unit": "kW",
+      "status": "unknown",
+      "lower_bound": null,
+      "upper_bound": null,
+      "source_ref": null,
+      "rationale": "Freshwater production/storage schedule and waste-heat opportunities required."
+    },
+    "waste_treatment_kw": {
+      "value": null,
+      "unit": "kW",
+      "status": "unknown",
+      "lower_bound": null,
+      "upper_bound": null,
+      "source_ref": null,
+      "rationale": "Treatment rates, regulatory discharge limits and pump duty cycle required."
+    },
+    "galley_kw": {
+      "value": null,
+      "unit": "kW",
+      "status": "unknown",
+      "lower_bound": null,
+      "upper_bound": null,
+      "source_ref": null,
+      "rationale": "Appliance load inventory and meal-service duty cycle required."
+    },
+    "port_mode_kw": {
+      "value": null,
+      "unit": "kW",
+      "status": "unknown",
+      "lower_bound": null,
+      "upper_bound": null,
+      "source_ref": null,
+      "rationale": "Quiet anchorage and berth hotel-load modes need separate measurements/estimates."
+    },
+    "basis": "No kW or MWh load is fabricated at concept stage. Build hourly mode profiles and preserve uncertainty before selecting energy capacity."
+  },
+  "performance_targets": [
+    {
+      "metric": "well_to_wake_ghg_reduction_vs_matched_baseline",
+      "unit": "percent",
+      "target_value": 30,
+      "direction": "maximize",
+      "status": "aspirational_target",
+      "comparison_basis": "Same guest capacity, mission, speed/schedule and reserve policy; disclose fuel/electricity pathway and lifecycle boundaries.",
+      "validation_method": "Route-level energy balance plus independently reviewed fuel/electricity emission factors; later validate against measured voyage data."
+    },
+    {
+      "metric": "direct_combustion_emissions_at_berth",
+      "unit": "percent_of_berth_energy",
+      "target_value": 0,
+      "direction": "threshold",
+      "status": "provisional_target",
+      "comparison_basis": "Only at berths with adequate shore power or verified zero-direct-emission supply; report upstream emissions separately.",
+      "validation_method": "Port-specific power and energy-carrier ledger plus operational verification."
+    },
+    {
+      "metric": "energy_per_guest_nautical_mile",
+      "unit": "kWh_per_guest_nmi",
+      "target_value": null,
+      "direction": "minimize",
+      "status": "requires_baseline",
+      "comparison_basis": "Functionally equivalent yacht mission and guest-service specification.",
+      "validation_method": "Measured/validated route-energy model with sea-state, speed, occupancy and hotel-load sensitivity."
+    },
+    {
+      "metric": "false_robust_feasible_classifications",
+      "unit": "count",
+      "target_value": 0,
+      "direction": "threshold",
+      "status": "provisional_target",
+      "comparison_basis": "Prespecified adversarial and bounded-bias suite; feasibility remains separate from performance score.",
+      "validation_method": "Negative-control suite with evaluator-hidden truth, uncertainty and fault injections."
+    }
+  ],
+  "hard_constraints": [
+    {
+      "constraint_id": "STABILITY-001",
+      "description": "Intact and damage stability over declared loads, tank states, wind rig configurations and flooding cases.",
+      "disposition": "not_assessed",
+      "evidence_needed": "Approved stability booklet or equivalent qualified naval-architecture analyses under applicable flag/class rules."
+    },
+    {
+      "constraint_id": "STRUCTURE-001",
+      "description": "Hull, foundations, mast/wing rig and machinery foundation strength and fatigue.",
+      "disposition": "not_assessed",
+      "evidence_needed": "Structural calculations and required class/flag review."
+    },
+    {
+      "constraint_id": "FIRE-001",
+      "description": "Battery, fuel, machinery and accommodation fire detection, containment, suppression and escape routes.",
+      "disposition": "not_assessed",
+      "evidence_needed": "Energy-carrier-specific hazard analysis and applicable statutory/class review."
+    },
+    {
+      "constraint_id": "PROPULSION-001",
+      "description": "Manoeuvring, propulsion redundancy and safe degraded operation.",
+      "disposition": "not_assessed",
+      "evidence_needed": "Validated propulsion/manoeuvring analysis and trials."
+    },
+    {
+      "constraint_id": "ENV-001",
+      "description": "Sewage, greywater, bilge, garbage and emissions compliance for intended regions.",
+      "disposition": "not_assessed",
+      "evidence_needed": "Route- and flag-specific regulatory matrix and treatment/discharge evidence."
+    },
+    {
+      "constraint_id": "ROUTE-001",
+      "description": "Draft, air-draft, anchorage, port, tender and weather-window access.",
+      "disposition": "not_assessed",
+      "evidence_needed": "Geospatial route/port constraints and operating-envelope verification."
+    }
+  ],
+  "assumptions": [
+    {
+      "assumption_id": "A-Y-001",
+      "statement": "Economic low-speed displacement operation yields better mission energy than a design optimised for maximum speed.",
+      "category": "hydrodynamics",
+      "status": "untested",
+      "falsification_method": "Compare validated resistance/propulsor maps across candidate hulls, loading, fouling and sea states."
+    },
+    {
+      "assumption_id": "A-Y-002",
+      "statement": "A battery-buffered electric bus can improve quiet operation and engine dispatch without violating range or mass constraints.",
+      "category": "energy_storage",
+      "status": "untested",
+      "falsification_method": "Close an hourly power and energy budget including reserve, redundancy, thermal controls and battery mass."
+    },
+    {
+      "assumption_id": "A-Y-003",
+      "statement": "Wind assistance can deliver net benefit after stability, rig mass, operating limits and maintenance are counted.",
+      "category": "propulsion",
+      "status": "untested",
+      "falsification_method": "Use route/wind distribution, rig performance data, structural loads and matched voyage simulations."
+    }
+  ],
+  "provenance": [
+    {
+      "source_id": "sea-zero-2026",
+      "title": "Hurtigruten Sea Zero project page",
+      "uri": "https://www.hurtigruten.com/en/why-hurtigruten/sustainability/sea-zero",
+      "scope": "Project-specific reported concept features, R&D and energy-reduction claims; comparator anchor only, not independent in-service data.",
+      "rights_disposition": "public_metadata_only"
+    },
+    {
+      "source_id": "imo-sdc12-2026",
+      "title": "IMO SDC 12 ship-design and construction workplan",
+      "uri": "https://www.imo.org/en/mediacentre/meetingsummaries/pages/sdc-12.aspx",
+      "scope": "Published workplan milestones for safety frameworks concerning selected energy-transition technologies; must re-check before approval.",
+      "rights_disposition": "public_metadata_only"
+    },
+    {
+      "source_id": "imo-passenger-safety",
+      "title": "IMO passenger ship safety and environmental standards",
+      "uri": "https://www.imo.org/en/mediacentre/hottopics/pages/passengership-default.aspx",
+      "scope": "Public overview of applicable passenger-ship safety and MARPOL requirements; not a compliance checklist.",
+      "rights_disposition": "public_metadata_only"
+    },
+    {
+      "source_id": "ittc-ship-cfd",
+      "title": "ITTC Practical Guidelines for Ship CFD Applications",
+      "uri": "https://ittc.info/media/11958/75-03-02-03.pdf",
+      "scope": "Reference for ship CFD verification, validation, uncertainty and applicability; exact test data/use rights must be checked.",
+      "rights_disposition": "public_metadata_only"
+    }
+  ],
+  "claim_ceiling": "Concept hypothesis only. No resistance, displacement, stability, range, emissions, safety or class-compliance result is established."
+}
