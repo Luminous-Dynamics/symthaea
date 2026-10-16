@@ -6,7 +6,7 @@
 **Nanophotonics benchmark:** [NANOPHOTONICS_MOCLIP_BENCHMARK_SCORECARD.md](./NANOPHOTONICS_MOCLIP_BENCHMARK_SCORECARD.md)  
 **MADE benchmark:** [NANOTECHNOLOGY_CLOSED_LOOP_BENCHMARK_PLAN.md](./NANOTECHNOLOGY_CLOSED_LOOP_BENCHMARK_PLAN.md)  
 **OC22 program:** [NANOMATERIALS_RESEARCH_PROGRAM.md](./NANOMATERIALS_RESEARCH_PROGRAM.md)
-**Rust selection kernel:** [PR #7568](https://github.com/Luminous-Dynamics/symthaea/pull/7568) adds a target-blind batch-selector baseline; cost-aware/uncertainty acquisition remains a separate future arm tracked in [NANO-005](https://github.com/Luminous-Dynamics/symthaea/issues/7570).
+**Rust selection kernel:** [PR #7568](https://github.com/Luminous-Dynamics/symthaea/pull/7568) adds four target-blind batch baselines, including descriptor coverage per declared cost. Predictive uncertainty, expected improvement, and expected-value-of-information remain future arms tracked in [NANO-005](https://github.com/Luminous-Dynamics/symthaea/issues/7570); the cost-normalized geometry heuristic is not Bayesian information gain.
 
 ## 1. Core principle: no universal nanotechnology accuracy score
 
