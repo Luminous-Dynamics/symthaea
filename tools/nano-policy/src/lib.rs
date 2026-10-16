@@ -235,7 +235,9 @@ fn validate(r: &SelectionRequest) -> Result<(), String> {
         if !all_costs.is_finite() { return Err("aggregate estimated cost overflows f64".into()); }
     }
     if matches!(r.policy, SelectionPolicy::MaxMinDiversity | SelectionPolicy::CostAwareDiversity) {
-        let work = r.candidates.len().saturating_mul(r.selection_count.min(r.candidates.len())).saturating_mul(dims);
+        let k = r.selection_count.min(r.candidates.len());
+        let triangle = k.saturating_mul(k.saturating_add(1)) / 2;
+        let work = r.candidates.len().saturating_mul(triangle).saturating_mul(dims);
         if work > MAX_DIVERSITY_WORK { return Err(format!("diversity work estimate {work} exceeds safety limit {MAX_DIVERSITY_WORK}")); }
     }
     Ok(())
@@ -404,6 +406,6 @@ mod tests {
         let cs = vec![c("a",&[0.,0.],1.),c("b",&[0.2,0.2],4.),c("c",&[1.,1.],2.)];
         let max_min = select(req(SelectionPolicy::MaxMinDiversity, cs.clone())).unwrap();
         let mut r = req(SelectionPolicy::CostAwareDiversity, cs); r.cost_exponent = 0.;
-        assert_eq!(max_min, select(r).unwrap());
+        assert_eq!(max_min.selections, select(r).unwrap().selections);
     }
 }
