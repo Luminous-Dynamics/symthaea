@@ -4,7 +4,7 @@ use std::collections::{BTreeMap, BTreeSet};
 
 use symthaea_domotic::home_intelligence::{
     validate_home_proposal, ApprovalRequirement, CandidatePlan, EpistemicStatus, EvidenceRef,
-    HomeProposal, NotificationTopic, ProposalMode, ProposedEffect, RiskClass, UncertaintyLevel,
+    HomeProposal, ProposalMode, ProposedEffect, RiskClass, UncertaintyLevel,
     HOME_PROPOSAL_SCHEMA_V1,
 };
 
@@ -226,13 +226,14 @@ fn replay_frozen_home_intel_contract_corpus() {
     assert!(negative >= 20, "corpus needs broad negative-control coverage");
 
     let digest = Sha256::digest(CORPUS.as_bytes());
+    let digest_hex: String = digest.iter().map(|byte| format!("{byte:02x}")).collect();
     eprintln!(
-        "HOME_INTEL_CORPUS_REPLAY corpus={} schema={} cases={} positive={} negative={} sha256={:x}",
+        "HOME_INTEL_CORPUS_REPLAY corpus={} schema={} cases={} positive={} negative={} sha256={}",
         manifest.corpus_id,
         manifest.schema_version,
         manifest.cases.len(),
         positive,
         negative,
-        digest
+        digest_hex
     );
 }
