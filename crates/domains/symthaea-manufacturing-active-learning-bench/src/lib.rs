@@ -182,6 +182,11 @@ impl CampaignManifest {
             if candidate.cost_scale == 0 {
                 return Err(format!("candidate {} has a zero cost scale", candidate.id));
             }
+            if self.proxy_cost_units.checked_mul(candidate.cost_scale).is_none()
+                || self.reference_cost_units.checked_mul(candidate.cost_scale).is_none()
+            {
+                return Err(format!("candidate {} has an overflowing declared cost", candidate.id));
+            }
             if !candidate.proxy_available && !candidate.reference_available {
                 return Err(format!("candidate {} has no available measurement fidelity", candidate.id));
             }
