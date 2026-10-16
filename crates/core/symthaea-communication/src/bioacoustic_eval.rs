@@ -529,6 +529,24 @@ fn build_match_adjacency(
                 .then_with(|| truth[*left].id.cmp(&truth[*right].id))
         });
     }
+    // Prefix maximum ends make interval-overlap queries logarithmic before
+    // candidate checks, avoiding a scan over every earlier event for every
+    // prediction in a dense/long recording.
+    let prefix_max_end_by_key: std::collections::BTreeMap<(&str, &str), Vec<f64>> =
+        truth_by_sample_label
+            .iter()
+            .map(|(key, indices)| {
+                let mut maximum_end = f64::NEG_INFINITY;
+                let prefix = indices
+                    .iter()
+                    .map(|truth_index| {
+                        maximum_end = maximum_end.max(truth[*truth_index].interval.end_s);
+                        maximum_end
+                    })
+                    .collect();
+                (*key, prefix)
+            })
+            .collect();
 
     let mut adjacency = vec![Vec::new(); predictions.len()];
     for (prediction_index, prediction) in predictions.iter().enumerate() {
@@ -549,12 +567,19 @@ fn build_match_adjacency(
                     }),
                 )
             }
-            EventMatchRule::TemporalIou { .. } => (
-                0,
-                candidates.partition_point(|truth_index| {
-                    truth[*truth_index].interval.start_s < prediction.interval.end_s
-                }),
-            ),
+            EventMatchRule::TemporalIou { .. } => {
+                let prefix_max_ends = prefix_max_end_by_key
+                    .get(&key)
+                    .expect("every truth group has a prefix-max-end index");
+                (
+                    prefix_max_ends.partition_point(|max_end| {
+                        *max_end <= prediction.interval.start_s
+                    }),
+                    candidates.partition_point(|truth_index| {
+                        truth[*truth_index].interval.start_s < prediction.interval.end_s
+                    }),
+                )
+            }
         };
         for &truth_index in &candidates[first..last] {
             let actual = &truth[truth_index];
