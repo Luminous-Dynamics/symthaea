@@ -607,6 +607,62 @@ mod tests {
     }
 
     #[test]
+    #[ignore = "manual hardware-specific profiling; run with --ignored --nocapture"]
+    fn manual_profile_selector_scaling() {
+        use std::time::Instant;
+
+        let cases = [
+            (Policy::Random, 10_000, 64, 100),
+            (Policy::Maximin, 1_000, 8, 100),
+            (Policy::Maximin, 10_000, 64, 10),
+            (Policy::HdcMaximin, 100, 8, 10),
+            (Policy::HdcMaximin, 1_000, 8, 10),
+            (Policy::HdcMaximin, 1_000, 64, 10),
+        ];
+
+        for (policy, count, dimensions, budget) in cases {
+            let candidates = (0..count)
+                .map(|index| {
+                    let features: Vec<f64> = (0..dimensions)
+                        .map(|dimension| {
+                            ((index * 37 + dimension * 101 + (index * dimension % 97)) % 1_009)
+                                as f64
+                                / 1_008.0
+                        })
+                        .collect();
+                    candidate(&format!("candidate-{index:06}"), &features)
+                })
+                .collect();
+            let req = request(policy, budget, candidates);
+            let mut samples_ms = Vec::with_capacity(5);
+            let mut expected_digest: Option<String> = None;
+
+            for _ in 0..5 {
+                let started = Instant::now();
+                let result = select(&req).expect("synthetic profile selection succeeds");
+                samples_ms.push(started.elapsed().as_secs_f64() * 1_000.0);
+                let ids = selected_ids(&result);
+                let bytes = serde_json::to_vec(&ids).expect("serialize selected IDs");
+                let digest = blake3::hash(&bytes).to_hex().to_string();
+                if let Some(expected) = &expected_digest {
+                    assert_eq!(&digest, expected, "selection must remain deterministic");
+                } else {
+                    expected_digest = Some(digest);
+                }
+            }
+
+            samples_ms.sort_by(f64::total_cmp);
+            let median_ms = samples_ms[samples_ms.len() / 2];
+            let p95_index = (samples_ms.len() * 95).div_ceil(100).saturating_sub(1);
+            eprintln!(
+                "nano_selector_profile policy={policy:?} candidates={count} dimensions={dimensions} budget={budget} repeats=5 p50_ms={median_ms:.3} p95_ms={:.3} selected_digest={}",
+                samples_ms[p95_index],
+                expected_digest.expect("five deterministic samples")
+            );
+        }
+    }
+
+    #[test]
     fn hdc_scalar_level_codebook_preserves_ordered_distance() {
         let levels = hdc_level_codebook();
         assert_eq!(levels.len(), HDC_LEVEL_COUNT);
