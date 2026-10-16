@@ -38,6 +38,8 @@ The older infallible APIs remain for compatibility and must not be used to claim
 
 These edits and their regression tests have **not** been compiled or executed in this session.
 
+The same working branch now adds `symthaea-communication::bioacoustic_corpus`: a metadata-only `BioacousticCorpusManifest` and `validate_bioacoustic_corpus` gate shared by bird and cetacean tracks. It checks rights-decision references and intended-use agreement, hash syntax/duplicates, sample-rate/channel/sample-count validity, annotation time/frequency bounds against native duration/Nyquist, cross-split source-recording leakage, and declared session/site/individual holdout policies. If a holdout is claimed, at least two distinct split partitions are required. The validator cannot read/hash the actual audio bytes or establish that a human-entered rights decision is legally correct; the caller must compute hashes from exact assets and keep its rights evidence auditable.
+
 ## 3. Paradigm shift: one evidence system, separate acoustic tasks
 
 Do not model all cetacean sounds as one universal "cetacean phoneme" classification problem. Use shared provenance, calibration, leakage, null-control and capability-evidence contracts, but task-specific front ends and metrics.
@@ -144,7 +146,7 @@ A communication claim requires a species/population-specific, ethically reviewed
 
 1. Run the new classifier and whale configuration tests on a real Rust toolchain; inspect formatting / Clippy and do not call skipped CI a pass.
 2. Replace the list-position partitions and filename-derived labels inside the now-explicitly-exploratory `whale_validation.rs` and v2–v4 demos with a versioned annotation manifest and recording/encounter-grouped evaluation harness. The display labels have been corrected, but the underlying split/label method is still unsuitable for validation.
-3. Build a Rust-first metadata-only corpus manifest and preflight validator. It should verify sample-rate/channel manifests, content hashes, annotation coverage, source IDs, labels and license decisions without copying raw audio into the repo.
+3. Use the new shared `BioacousticCorpusManifest` / `validate_bioacoustic_corpus` contract for a Rust-first metadata-only preflight. Populate actual content hashes from the exact assets, resolve source/recording lineage, verify annotation coverage, and record a human-reviewed license decision. Do not copy raw audio into the repo.
 4. Build the first permissible small subset / metadata preflight only after rights admission; prioritize whistle contours (rich labels) and coda timing as two separate tracks rather than one blended metric.
 5. Compare the legacy Symthaea prototypes against explicit baselines and released model families; pin each model's license, weights hash and preprocessing, and record compute/hardware.
 6. Keep the shared `symthaea-communication` capability ladder: Signal → Unit → Structure → Reference → Intent → Dialogue. A passing software benchmark can establish only the declared measurement capability; it cannot establish subjective meaning or conscious understanding.
