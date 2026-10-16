@@ -338,9 +338,16 @@ pub fn evaluate_bioacoustic_events(
                 score: 1.0,
             })
             .collect();
-        let all_predictions = predictions_by_sample
+        let mut all_predictions = predictions_by_sample
             .remove(recording.sample_id.as_str())
             .unwrap_or_default();
+        all_predictions.retain(|prediction| {
+            !prediction_in_unscored_region(
+                prediction,
+                &recording.unscored_regions,
+                &bundle.matching_rule,
+            )
+        });
         let mut predicted = Vec::new();
         for prediction in &all_predictions {
             if prediction.score >= bundle.frozen_score_threshold {
@@ -414,6 +421,30 @@ pub fn evaluate_bioacoustic_events(
         model_executed_by_this_evaluator: false,
         prediction_provenance_authenticated_by_this_evaluator: false,
         validation_threshold_selection_authenticated_by_this_evaluator: false,
+    })
+}
+
+fn prediction_in_unscored_region(
+    prediction: &Event,
+    regions: &[crate::bioacoustic_corpus::BioacousticUnscoredRegion],
+    rule: &EventMatchRule,
+) -> bool {
+    regions.iter().any(|region| match rule {
+        EventMatchRule::StartTolerance { .. } => {
+            prediction.interval.start_s >= region.interval.start_s
+                && prediction.interval.start_s < region.interval.end_s
+        }
+        EventMatchRule::TemporalIou { min_iou } => {
+            let prediction_duration =
+                prediction.interval.end_s - prediction.interval.start_s;
+            if prediction_duration <= 0.0 {
+                return false;
+            }
+            let overlap = (prediction.interval.end_s.min(region.interval.end_s)
+                - prediction.interval.start_s.max(region.interval.start_s))
+                .max(0.0);
+            overlap / prediction_duration >= *min_iou
+        }
     })
 }
 
@@ -746,6 +777,7 @@ mod tests {
             site_id: Some(format!("site-{source}")),
             individual_ids: vec![format!("animal-{source}")],
             annotations,
+            unscored_regions: Vec::new(),
         }
     }
 
@@ -860,6 +892,36 @@ mod tests {
         assert!((report.metrics.average_precision.unwrap() - 5.0 / 6.0).abs() < 1e-9);
         assert!(report.exhaustive_test_annotation_coverage_asserted);
         assert!(!report.audio_bytes_verified_by_this_evaluator);
+    }
+
+    #[test]
+    fn predictions_in_explicitly_unscored_regions_are_not_counted_as_false_alarms() {
+        let (mut manifest, mut bundle) = fixture();
+        manifest.recordings[2].unscored_regions.push(
+            crate::bioacoustic_corpus::BioacousticUnscoredRegion {
+                interval: TimeSpan {
+                    start_s: 5.0,
+                    end_s: 6.0,
+                },
+                reason: "ambiguous overlapping caller".into(),
+            },
+        );
+        bundle.predictions.push(PredictedBioacousticEvent {
+            prediction_id: "pred-ambiguous".into(),
+            sample_id: "test-1".into(),
+            interval: TimeSpan {
+                start_s: 5.1,
+                end_s: 5.8,
+            },
+            label: "whistle".into(),
+            score: 0.99,
+        });
+        bundle.corpus_manifest_blake3 = manifest.computed_manifest_blake3().unwrap();
+
+        let report = evaluate_bioacoustic_events(&manifest, &bundle).unwrap();
+        assert_eq!(report.metrics.predictions_after_threshold, 2);
+        assert_eq!(report.metrics.false_positives, 1);
+        assert!((report.metrics.average_precision.unwrap() - 5.0 / 6.0).abs() < 1e-9);
     }
 
     #[test]
