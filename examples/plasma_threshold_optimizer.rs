@@ -192,11 +192,11 @@ pub struct EvaluationResults {
     pub total_samples: usize,
     /// Samples excluded because a required Phi-proxy input was missing or non-finite.
     pub invalid_samples: usize,
-    /// Disruption shots with a valid, observable warning/critical window.
+    /// Disruption shots with at least one valid sample in the warning/critical label window.
     pub scoreable_disruption_shots: usize,
     /// Non-disruption shots with at least one valid sample.
     pub scoreable_non_disruption_shots: usize,
-    /// Disruption shots that could not be scored (for example, censored warning windows).
+    /// Disruption shots with no valid sample in the warning/critical label window.
     pub unscored_disruption_shots: usize,
     /// Non-disruption shots with no valid samples.
     pub unscored_non_disruption_shots: usize,
@@ -1070,9 +1070,11 @@ pub enum DatasetProvenance {
     },
 }
 
-/// Complete optimization output
+/// Complete optimization output. Schema version 1 is the first explicitly versioned form of
+/// this previously unversioned example output.
 #[derive(Debug, Serialize, Deserialize)]
 pub struct OptimizationOutput {
+    pub schema_version: u32,
     pub dataset_provenance: DatasetProvenance,
     pub grid_search: Option<SearchResult>,
     pub random_search: Option<SearchResult>,
@@ -1386,16 +1388,20 @@ fn main() {
     // =========================================================================
 
     // Find best overall configuration by objective value
-    let (best_overall, best_overall_obj) = {
-        let candidates = [
-            (grid_result.best_config, grid_result.best_objective),
-            (random_result.best_config, random_result.best_objective),
-            (bayesian_result.best_config, bayesian_result.best_objective),
-        ];
-        candidates
-            .into_iter()
-            .max_by(|a, b| a.1.partial_cmp(&b.1).unwrap())
-            .unwrap()
+    let candidates = [
+        (grid_result.best_config, grid_result.best_objective),
+        (random_result.best_config, random_result.best_objective),
+        (bayesian_result.best_config, bayesian_result.best_objective),
+    ];
+    let selected = candidates
+        .into_iter()
+        .filter(|(_, candidate_objective)| candidate_objective.is_finite())
+        .max_by(|a, b| a.1.total_cmp(&b.1));
+    let Some((best_overall, best_overall_obj)) = selected else {
+        println!(
+            "No scoreable, feasible threshold configuration was found. Refusing to serialize or present default thresholds as an optimizer winner."
+        );
+        return;
     };
 
     println!("\n\nBEST OVERALL CONFIGURATION");
@@ -1415,6 +1421,7 @@ fn main() {
     println!("{}", "-".repeat(50));
 
     let output = OptimizationOutput {
+        schema_version: 1,
         dataset_provenance: DatasetProvenance::Synthetic {
             generator: "symthaea::physics::cmod_adapter::generate_synthetic_data".to_string(),
             seed: synth_config.seed,
@@ -1665,6 +1672,7 @@ mod tests {
         assert_eq!(results.precision(), None);
         assert_eq!(results.f1_score(), None);
         assert_eq!(results.false_positive_rate(), Some(0.0));
+        assert_eq!(objective(&ThresholdConfig::default(), &no_disruptions), f64::NEG_INFINITY);
 
         let no_negative_examples = vec![shot_for_test(2, true, &[(10.0, true)])];
         let results = evaluate_config(&ThresholdConfig::default(), &no_negative_examples);
