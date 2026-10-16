@@ -80,6 +80,7 @@ pub enum MetricError {
     DuplicateRank(usize),
     DuplicateReferencePositive(String),
     PositiveOutsideReference(String),
+    ReferenceLabelMismatch(String),
     CandidateUniverseMismatch(String),
     CandidateLabelMismatch(String),
     InvalidRecallTarget(f64),
@@ -95,6 +96,9 @@ impl fmt::Display for MetricError {
             }
             Self::PositiveOutsideReference(id) => {
                 write!(f, "positive candidate is outside the declared reference: {id}")
+            }
+            Self::ReferenceLabelMismatch(id) => {
+                write!(f, "candidate label contradicts the positive reference: {id}")
             }
             Self::CandidateUniverseMismatch(id) => {
                 write!(f, "policy candidate universes differ at candidate id: {id}")
@@ -133,8 +137,12 @@ fn validated_ranked<'a>(
         if !ranks.insert(candidate.rank) {
             return Err(MetricError::DuplicateRank(candidate.rank));
         }
-        if candidate.label == LabelState::Positive && !reference.contains(candidate.id.as_str()) {
+        let is_reference_positive = reference.contains(candidate.id.as_str());
+        if candidate.label == LabelState::Positive && !is_reference_positive {
             return Err(MetricError::PositiveOutsideReference(candidate.id.clone()));
+        }
+        if is_reference_positive && candidate.label != LabelState::Positive {
+            return Err(MetricError::ReferenceLabelMismatch(candidate.id.clone()));
         }
     }
 
@@ -693,13 +701,19 @@ mod tests {
     #[test]
     fn paired_delta_rejects_conflicting_label_mapping() {
         let reference = positives(&["p1"]);
-        let policy_a = vec![candidate("p1", 1, LabelState::Positive, true)];
-        let policy_b = vec![candidate("p1", 1, LabelState::UnknownUnassayed, true)];
+        let policy_a = vec![
+            candidate("p1", 1, LabelState::Positive, true),
+            candidate("u1", 2, LabelState::UnknownUnassayed, true),
+        ];
+        let policy_b = vec![
+            candidate("p1", 1, LabelState::Positive, true),
+            candidate("u1", 2, LabelState::AssayDefinedNegative, true),
+        ];
         assert_eq!(
             paired_recall_delta_label_sensitivity_at_k(
                 &policy_a, &policy_b, &reference, 1
             ),
-            Err(MetricError::CandidateLabelMismatch("p1".to_owned()))
+            Err(MetricError::CandidateLabelMismatch("u1".to_owned()))
         );
     }
 
