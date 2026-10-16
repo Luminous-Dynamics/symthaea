@@ -2,7 +2,8 @@
 
 **Status:** proposed acceptance targets, not demonstrated performance claims  
 **Related implementation:** [Symthaea PR #7480](https://github.com/Luminous-Dynamics/symthaea/pull/7480)  
-**Related protocol:** [Experiment Selection Protocol](ENERGY_CONVERSION_EXPERIMENT_SELECTION.md)
+**Related protocol:** [Experiment Selection Protocol](ENERGY_CONVERSION_EXPERIMENT_SELECTION.md)  
+**Bias calibration:** [Differential-Bias Calibration and Coverage Contract](ENERGY_CONVERSION_BIAS_CALIBRATION.md)
 
 ## Why the benchmark must test decisions, not just scores
 
@@ -92,7 +93,7 @@ If Phase A fails these targets, first improve the proposals, estimates, or ranki
 
 ### Gate 1B — candidate-claim false-positive controls
 
-The separate Rust `candidate_decision_benchmark` module evaluates the efficiency comparator against known synthetic truth while varying observed efficiency delta, uncertainty magnitude, correlation declaration, and the registered worst-case differential-bias bound (0, 0.02, or 0.05 efficiency fraction). The comparator subtracts this registered bound linearly from the candidate-minus-baseline lower bound after measurement uncertainty; it is not combined as a random standard uncertainty. A short registered `differential_bias_bound_basis` documents the reasoning, but does not authenticate the evidence. The 720-case grid includes deliberate disagreement between oracle truth and observed records, showing whether a declared bias bound prevents false superiority even when the energy ledger closes.
+The separate Rust `candidate_decision_benchmark` module evaluates the efficiency comparator against known synthetic truth while varying observed efficiency delta, uncertainty magnitude, correlation declaration, and the registered worst-case differential-bias bound (0, 0.02, or 0.05 efficiency fraction). The comparator subtracts this registered bound linearly from the candidate-minus-baseline lower bound after measurement uncertainty; it is not combined as a random standard uncertainty. A short registered `differential_bias_bound_basis` documents the reasoning, but does not authenticate the evidence. The 720-case grid includes deliberate disagreement between oracle truth and observed records, showing whether a declared bias bound prevents false superiority even when the energy ledger closes. The report now records the injected discrepancy (observed minus oracle truth), whether the registered bound covers its absolute magnitude, and false-superiority counts/rates split between covered and undercovered oracle-non-superior cases. This is an oracle-based software invariant, not evidence that a physical bound is calibrated.
 
 This bound can only protect against differential systematic effects that are covered by a defensible bound. A zero value must not be assumed merely because no bias was noticed; measurement-method and model-discrepancy evidence are still required. NIST guidance distinguishes systematic error from the uncertainty associated with a correction and advises including relevant effects in the measurement model: https://www.nist.gov/pml/nist-technical-note-1297/nist-tn-1297-5-combined-standard-uncertainty and https://www.nist.gov/pml/nist-technical-note-1297/nist-tn-1297-appendix-law-propagation-uncertainty.
 
@@ -109,7 +110,9 @@ These criteria apply to an expanded calibrated decision-oracle suite, not to the
 
 - **Unknown/correlated uncertainty:** 100% of cases without supported correlation propagation must abstain as `Indeterminate`; no affirmative superiority claims.
 - **Calibrated non-superior cases:** target a one-sided 95% upper confidence bound of at most 1% on the false-superiority rate across representative held-out conditions. Under an independent binomial model, observing zero false-superiority claims in 300 non-superior trials gives an upper bound of about 1%; clustered or distribution-shifted cases require an appropriate analysis, not a naïve trial count.
-- **Unmodeled bias:** the current module deliberately includes cases where the observed result looks superior while oracle truth is not. At least one such case should remain a failing negative control until an explicit model-discrepancy/systematic-error mechanism causes the system to abstain or otherwise correctly control risk. Hiding or deleting the case is not a valid fix.
+- **Bias-bound coverage invariant:** zero false-superiority claims in oracle-non-superior cases where the registered bound covers the injected discrepancy. Any such claim is a regression in the comparator or the benchmark assumptions.
+- **Undercoverage negative controls:** keep undercovered cases and at least one deliberate false-superiority case in the suite. These demonstrate the limit of an undersized bound; they must not be removed merely to improve the headline rate.
+- **Physical calibration remains separate:** held-out reference data must justify any deployed bound. See the [Differential-Bias Calibration and Coverage Contract](ENERGY_CONVERSION_BIAS_CALIBRATION.md). The synthetic grid is not a field-risk estimate.
 - **False negatives:** preregister the acceptable miss rate and its consequences for the intended engineering use before evaluating results. Do not optimize false positives in isolation if the system then rejects nearly all genuinely useful designs.
 - **Replay and calibration:** every rate must be tied to immutable scenario inputs, the decision-rule revision, calibration evidence, and an exact source revision. Report counts and confidence intervals; do not describe the current deterministic grid as an estimate of production risk.
 
