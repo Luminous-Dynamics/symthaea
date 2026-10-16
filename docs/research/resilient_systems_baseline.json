@@ -509,7 +509,7 @@
       "no_online_replanning",
       "no_policy_fairness_guarantee"
     ],
-    "tests_authored": 16,
+    "tests_authored": 17,
     "tests_executed": false,
     "reference_cases": [
       {
@@ -543,6 +543,10 @@
       {
         "id": "RCREW-08",
         "expected": "infeasible prerequisites, skills and spares fail explicitly"
+      },
+      {
+        "id": "RCREW-09",
+        "expected": "prefer_less_flexible_qualified_crew_when_assigning_an_otherwise_tied_job_to_preserve_versatile_crew_capacity"
       }
     ],
     "proposed_optimization_target": {
@@ -591,6 +595,12 @@
       "weighted_policy_loss": 111,
       "exact_optimum_loss": 111,
       "is_rust_test_executed": false
-    }
+    },
+    "heuristics": [
+      "priority_first",
+      "shortest_job_first",
+      "weighted_recovery_per_step",
+      "least_flexible_qualified_crew_as_assignment_tiebreak"
+    ]
   }
 }
