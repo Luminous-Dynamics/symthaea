@@ -576,10 +576,10 @@ fn build_report() -> Result<Value> {
         },
         "decision_policy": {
             "order": [
-                "abstain if both candidate models fail the absolute-fit adequacy gate",
-                "abstain if fitted predictions are unresolved at the assumed measurement-noise scale",
-                "abstain if absolute delta BIC is below the decisive threshold",
-                "otherwise select the model favored by BIC"
+                "abstain if the best candidate fails the held-out absolute-fit adequacy gate",
+                "abstain if candidate predictions are unresolved on held-out substrate conditions at the assumed noise scale",
+                "abstain if the training-only absolute delta BIC is below the decisive threshold",
+                "otherwise select the candidate favored by training-only BIC after both held-out gates pass"
             ],
             "delta_bic_definition": "BIC(Michaelis-Menten) - BIC(substrate inhibition); negative favors Michaelis-Menten",
             "decisive_absolute_delta_bic": DECISIVE_DELTA_BIC,
