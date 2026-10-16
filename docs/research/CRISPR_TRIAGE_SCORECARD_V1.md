@@ -102,6 +102,14 @@ The frontier keeps nondominated policies: no other policy is at least as good on
 
 **Frontier acceptance gate:** 100% of compared vectors use the same objective definitions, units, direction, held-out episodes and metric availability rules. The output includes every nondominated policy and its full vector. Frontier membership is not a benchmark win by itself: any claim of improvement still requires the primary predeclared outcome, uncertainty interval and ablations to pass.
 
+### K. From a single confidence number to selective, context-aware prediction
+
+Probability and willingness to act are separate quantities. A calibrated probability may still be inappropriate to use in every context; a high-confidence but out-of-distribution case may need abstention. Freeze the confidence/abstention policy before holdout evaluation, keep exact ties at a threshold together, and report coverage alongside selective error.
+
+On label-eligible cases, report Brier score, log loss (without silently clipping exactly wrong 0/1 predictions), fixed-bin reliability summaries and calibration-bin counts. Unknown/unassayed labels are excluded from those proper-scoring-rule denominators but counted explicitly; known-label calibration is conditional on ascertainment and is not a full-cohort guarantee. For every risk–coverage point, report observed-label risk and sharp error-rate bounds that assign each accepted unknown outcome either a correct or incorrect prediction. Those bounds are label-assignment bounds, not confidence intervals.
+
+Produce the same curve and calibration summary separately for every preregistered context (at minimum the guide/Cas9 group when supported). A pooled curve may be reported as a supplement, never as a substitute for per-context results. Contexts with no observed labels have calibration marked not estimable, while their coverage and unknown-label census remain visible.
+
 ### J. From price claims to causal cost accounting
 
 Report computational resources and review slots first. Progress to human review minutes only when measured. Report per-qualified-finding cost only when numerator and denominator are observed end-to-end. Do not convert fewer ranked candidates into claims of lower experimental costs, clinical costs, or treatment prices without prospective accounting.
@@ -114,7 +122,7 @@ Report computational resources and review slots first. Progress to human review 
 | T1 Native nomination | Which measured positive sites were in a tool's original search output? | positive coverage, missed-positive count, per-guide coverage | ranking quality after seeding |
 | T2 Conditional ranking | Given one declared universe, how well are measured positives ranked? | macro Recall@K, Precision@K, PR-AUC when labels support it, false-negative census | completeness of original nomination |
 | T3 Budgeted review | How much review is needed for an agreed level of measured-positive recall? | recall at fixed slots; slots needed to match baseline recall; precision trade-off | actual dollar savings |
-| T4 Calibration and abstention | Are scores usable as probabilities, and does the system know when it lacks evidence? | Brier/log loss where labels support them, reliability plots, risk–coverage curve, abstention rate | clinical safety |
+| T4 Calibration and abstention | Are probabilities reliable, and does the policy know when to abstain? | Brier/log loss, fixed-bin reliability, risk–coverage curve, observed-label risk and unknown-label risk bounds, per-context abstention | clinical safety or unobserved biological outcomes |
 | T5 Shift and robustness | Does the effect persist on unseen groups and independent data? | leave-guide/Cas9-group-out delta, leave-assay-family-out delta, independent-cohort delta, group-level uncertainty | universal generalization from one small cohort |
 | T6 Incrementality | Does Symthaea add value over the same specialist predictions? | paired delta at equal budget; paired partial-label bounds; ablations; runtime/resource delta | benefit attributable to an upstream model unless ablated |
 | T7 Evidence/replay integrity | Can an independent evaluator detect tampering or leakage? | deterministic replay, exact manifest, negative controls, digest/count agreement | biological truth from cryptography alone |
@@ -132,8 +140,9 @@ A **benchmark episode** is a pinned combination of source cohort, assay context,
 - **Precision@K** = measured positives among the first K candidates / K reviewed candidates, only when outcomes for the selected candidates are actually known under a declared label policy. Do not treat unassayed candidates as negatives to manufacture this value.
 - **Slots@R** = smallest K at which a policy meets a preregistered recall R on the same eligible positive reference and same candidate universe. If it never reaches R, report **not reached**, not a fabricated K.
 - **Fixed-budget delta** = Symthaea policy metric minus the strongest fair baseline metric at the same fixed K on identical episodes. The primary comparison is paired by guide/Cas9 group.
-- **Calibration:** report Brier score, log loss and reliability diagrams only for labels whose semantics support probability evaluation. PR-AUC is a ranking metric, not calibration. If the assay/reference labels are incomplete or negatives are indefensible, mark calibration **not estimable** and explain why.
-- **Risk–coverage:** for each predeclared abstention rule, report fraction of cases assigned a usable score (coverage), error/false-negative behaviour on the evaluated labelled set, and group distribution. Abstention is neither a positive nor a negative.
+- **Calibration:** on measured outcomes with defensible positive/negative semantics, report Brier score, log loss, fixed-bin reliability data and bin counts. Do not silently clip overconfident errors at probabilities 0 or 1. Report the unknown-label count next to all loss metrics; these scores are conditional on label ascertainment. ECE may be included but is not a stand-alone calibration certificate. If no valid labels exist, calibration is **not estimable**.
+- **Selective risk–coverage:** accept higher-confidence cases first under a frozen policy; cases tied exactly on confidence enter together. At each point report accepted count, coverage of the entire declared universe, observed-label coverage, label completeness among accepted cases, observed-label risk, and error-rate bounds that allow every accepted unknown label to be either correct or incorrect. The observed-label error rate is conditional on ascertainment; the bound is not a statistical confidence interval.
+- **Context stratification:** repeat calibration and the complete risk–coverage curve per preregistered context. Never use a pooled aggregate to conceal a context with no labels, high unknown fraction, or high observed error.
 - **Uncertainty interval:** resample the highest independent unit supported by the study—normally guide/Cas9 group, not individual rows—using a paired method for the policy difference. With only 26 source groups, show every group result and state that interval precision/generalization is limited. Do not use row-level bootstrap to create artificial sample size.
 - **Resource accounting:** report candidate slots and, when measured, wall-clock time, CPU/GPU model and utilization, peak memory, and human review minutes. Keep measured quantities separate from projected costs.
 
@@ -150,7 +159,16 @@ These are **project engineering targets, not published standards or clinical acc
 1. **Equal budget:** at least **+5 absolute percentage points** in macro Recall@K versus the strongest fair baseline on predeclared held-out guide/Cas9 groups at the same K; or
 2. **Equal achieved recall:** at least **20% fewer candidate review slots** to reach the baseline's preregistered recall target on the same episode set.
 
-For either alternative:
+### Secondary selective-prediction targets
+
+These are engineering aspirations for eligible, measured-label cohorts—not clinical standards:
+
+- Always publish risk–coverage points at every unique preregistered confidence tier and the full curve; do not select a favorable single threshold after seeing results.
+- Compare Brier score and log loss against the strongest fair calibrated baseline on exactly the same held-out, label-eligible cases; an aspirational target is at least a **10% relative reduction in Brier score** without worse log loss, with group-paired uncertainty reported. If the interval does not exclude no improvement, call the result inconclusive.
+- At predeclared coverage levels (50%, 80%, and 90%, where attainable without splitting confidence ties), report both observed-label risk and unknown-label error bounds. Compare only matched coverage policies and identical context episodes; an unestimable point is not replaced with the nearest available threshold.
+- Report each context's calibration, coverage and label completeness separately. No target here implies that an off-target prediction estimates clinical harm or establishes editing safety.
+
+For either primary alternative:
 
 - endpoint, K or recall target, exclusion policy, comparator, split, interval procedure and analysis are frozen before holdout reveal;
 - report precision, false negatives and per-group deltas alongside the headline;
@@ -253,7 +271,7 @@ The credible breakthrough would be evidence that a general-purpose reasoning/evi
 
 ## 11. Synthetic contract fixtures
 
-The machine-readable companion contract contains four small fixtures intended to become deterministic unit tests for the future Rust scorer/verifier:
+The machine-readable companion contract contains nine synthetic fixtures intended to become deterministic unit tests for the Rust scorer/verifier:
 
 1. **F1 — nomination vs seeded ranking.** Four eligible positives, two in the native nominations: expected native coverage is 2/4 = 0.5. Later seeding the two missing positives into a ranking universe allows Recall@5 to reach 1.0, but native nomination coverage remains 0.5.
 2. **F2 — unknown is not negative.** If an unknown/unassayed candidate is inside the review set, precision is not estimable under the declared label semantics; it may not be silently counted as a true negative.
@@ -291,3 +309,13 @@ rustc --edition=2024 --test scripts/crispr_triage_verifier.rs -o /tmp/crispr-tri
 The SHA-256 helper validates two already-computed digest claims; it does not hash artifact bytes. The production orchestrator must compute hashes from retrieved bytes using a trusted implementation.
 
 **Independent formula check (2026-10-16):** a separate deterministic checker compared the paired closed-form sensitivity bounds with brute-force assignments of all unknown labels across 1,763,520 paired-ranking cases; no bound mismatches were found. This verifies the formula design against the enumerated cases, not the Rust implementation. Rust compilation/unit tests and any biological cohort replay remain unexecuted.
+
+
+9. **F9 — calibration, abstention and unknown-aware risk.** The synthetic calibration slice contains two measured outcomes (p=0.9 positive and p=0.2 assay-defined negative) plus one unknown (p=0.8). Expected Brier score is 0.025 and five-bin expected calibration error is 0.15, with the unknown explicitly counted and excluded from the loss denominator. In a separate three-case risk slice, one of two observed outcomes is wrong and one accepted outcome is unknown; the full-coverage observed-label risk is 0.5 and the unknown-aware error-rate bounds are [1/3, 2/3]. Exact confidence ties enter as a tier, and a context with no measured labels has no calibration estimate.
+
+The new dependency-free Rust implementation is [scripts/crispr_selective_risk.rs](../../scripts/crispr_selective_risk.rs). It provides fixed-bin calibration summaries, Brier/log loss, deterministic risk–coverage curves, unknown-label error bounds, and context-stratified reports. Thirteen unit tests are authored but not compiled or executed in the current authoring environment because rustc is unavailable. When a Rust toolchain is available, run:
+
+    rustc --edition=2024 --test scripts/crispr_selective_risk.rs -o /tmp/crispr-selective-tests
+    /tmp/crispr-selective-tests
+
+These code and fixture additions are methodological tooling only. No data cohort, biological model, or Symthaea improvement has been evaluated.
