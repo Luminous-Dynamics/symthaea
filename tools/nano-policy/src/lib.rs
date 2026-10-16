@@ -148,9 +148,12 @@ pub fn parse_tsv(input: &str) -> Result<CandidateTable, String> {
         }
 
         let id = fields[0].trim();
-        if id.is_empty() || id.chars().any(|character| character.is_control()) {
+        if id.is_empty()
+            || id.starts_with('#')
+            || id.chars().any(|character| character.is_control())
+        {
             return Err(format!(
-                "line {} has an empty or control-character candidate ID",
+                "line {} has an empty, comment-like, or control-character candidate ID",
                 line_zero + 1
             ));
         }
@@ -197,6 +200,81 @@ pub fn parse_tsv(input: &str) -> Result<CandidateTable, String> {
         feature_names,
         candidates,
     })
+}
+
+fn validate_table(table: &CandidateTable) -> Result<(), String> {
+    if table.candidates.is_empty() {
+        return Err("candidate table is empty".to_string());
+    }
+    if table.candidates.len() > MAX_CANDIDATES {
+        return Err(format!(
+            "candidate count exceeds the limit of {MAX_CANDIDATES}"
+        ));
+    }
+
+    let feature_count = table.feature_names.len();
+    if feature_count == 0 || feature_count > MAX_FEATURES {
+        return Err(format!(
+            "feature count must be between 1 and {MAX_FEATURES}"
+        ));
+    }
+    let cells = table
+        .candidates
+        .len()
+        .checked_mul(feature_count)
+        .ok_or_else(|| "feature-cell count overflow".to_string())?;
+    if cells > MAX_FEATURE_CELLS {
+        return Err(format!(
+            "candidate-feature cell count exceeds the limit of {MAX_FEATURE_CELLS}"
+        ));
+    }
+
+    let mut feature_names = HashSet::with_capacity(feature_count);
+    for name in &table.feature_names {
+        if !valid_feature_name(name) {
+            return Err(format!("invalid feature name {name:?}"));
+        }
+        if !feature_names.insert(name.as_str()) {
+            return Err(format!("duplicate feature name {name:?}"));
+        }
+    }
+
+    let mut candidate_ids = HashSet::with_capacity(table.candidates.len());
+    for candidate in &table.candidates {
+        if candidate.features.len() != feature_count {
+            return Err(format!(
+                "candidate {:?} has {} features; expected {feature_count}",
+                candidate.id,
+                candidate.features.len()
+            ));
+        }
+        if candidate.id.is_empty()
+            || candidate.id.starts_with('#')
+            || candidate.id.chars().any(|character| character.is_control())
+        {
+            return Err("candidate ID is empty, comment-like, or contains control characters"
+                .to_string());
+        }
+        if !candidate_ids.insert(candidate.id.as_str()) {
+            return Err(format!("duplicate candidate ID {:?}", candidate.id));
+        }
+        for (feature_index, value) in candidate.features.iter().enumerate() {
+            if !value.is_finite() {
+                return Err(format!(
+                    "candidate {:?}, feature {} must be finite",
+                    candidate.id, table.feature_names[feature_index]
+                ));
+            }
+            if value.abs() > MAX_FEATURE_ABS {
+                return Err(format!(
+                    "candidate {:?}, feature {} exceeds the absolute-value limit of {MAX_FEATURE_ABS}",
+                    candidate.id, table.feature_names[feature_index]
+                ));
+            }
+        }
+    }
+
+    Ok(())
 }
 
 fn exact_duplicate_map(candidates: &[Candidate]) -> Vec<Option<usize>> {
@@ -318,21 +396,11 @@ pub fn select(
     budget: usize,
     seed: u64,
 ) -> Result<RunReport, String> {
+    validate_table(table)?;
     if budget == 0 {
         return Err("budget must be at least 1".to_string());
     }
-    if table.candidates.is_empty() {
-        return Err("candidate table is empty".to_string());
-    }
     let feature_count = table.feature_names.len();
-    if feature_count == 0
-        || table
-            .candidates
-            .iter()
-            .any(|row| row.features.len() != feature_count)
-    {
-        return Err("candidate table has inconsistent feature dimensions".to_string());
-    }
 
     let duplicate_of = exact_duplicate_map(&table.candidates);
     let mut remaining: Vec<usize> = duplicate_of
@@ -443,6 +511,47 @@ mod tests {
         assert_eq!(parsed.feature_names, vec!["x", "y"]);
         assert_eq!(parsed.candidates.len(), 5);
         assert_eq!(parsed.candidates[0].id, "A");
+    }
+
+    #[test]
+    fn rejects_comment_like_candidate_ids() {
+        let input = "candidate_id\\tx\\n#design\\t1\\n";
+        assert!(parse_tsv(input).unwrap_err().contains("comment-like"));
+    }
+
+    #[test]
+    fn select_rejects_invalid_programmatic_candidates() {
+        let invalid = CandidateTable {
+            feature_names: vec!["x".to_string()],
+            candidates: vec![Candidate {
+                id: "A".to_string(),
+                features: vec![f64::NAN],
+            }],
+        };
+        assert!(select(&invalid, Policy::Random, 1, 0)
+            .unwrap_err()
+            .contains("must be finite"));
+    }
+
+    #[test]
+    fn rejects_work_budget_before_distance_search() {
+        let feature_names: Vec<String> = (0..512).map(|index| format!("f{index}")).collect();
+        let candidates: Vec<Candidate> = (0..500)
+            .map(|index| {
+                let mut features = vec![0.0; 512];
+                features[0] = index as f64;
+                Candidate {
+                    id: format!("c{index}"),
+                    features,
+                }
+            })
+            .collect();
+        let oversized = CandidateTable {
+            feature_names,
+            candidates,
+        };
+        let error = select(&oversized, Policy::MaxMin, 500, 0).unwrap_err();
+        assert!(error.contains("exceeds limit"));
     }
 
     #[test]
