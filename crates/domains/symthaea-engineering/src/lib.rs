@@ -11,6 +11,9 @@ pub mod rolling_horizon_repair;
 /// Paired comparison of fixed plans and rolling-horizon repair policies.
 pub mod repair_policy_comparison;
 
+/// Exhaustive exact oracle for tiny, single-crew repair schedules.
+pub mod repair_small_instance_oracle;
+
 /// Out-of-sample repair-policy evaluation under duration uncertainty.
 pub mod robust_repair_evaluation;
 
