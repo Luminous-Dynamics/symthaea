@@ -834,7 +834,7 @@ mod tests {
     use super::*;
 
     #[test]
-    fn configured_plant_time_is_explicit_and_not_cognitive_tau() {
+    fn fixed_simulation_step_uses_only_configured_plant_dt() {
         let timing = PlantStepTimingV1::configured_simulation(42, 0.005).unwrap();
         assert_eq!(timing.step_index, 42);
         assert_eq!(timing.dt_seconds, 0.005);
