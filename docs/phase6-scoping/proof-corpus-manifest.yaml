@@ -1,0 +1,62 @@
+schema_version: 1
+status: candidate_index_only
+last_researched: "2026-10-16"
+description: >
+  Initial narrow index of public OpenAI Lean formalizations worth inspecting for
+  Symthaea's entropy/logarithm proof pilot. Entries are references and proof-pattern
+  candidates only. They are not imported dependencies, not locally re-proved, and
+  not qualified by Symthaea's approved verifier environment.
+
+policy:
+  upstream_repository: "https://github.com/openai/math"
+  upstream_commit: "1581d4cbdd69a0faf34b2089614fe2a814316a6a"
+  upstream_lean_toolchain: "leanprover/lean4:v4.34.1"
+  default_acceptance_status: "reference_only_not_symthaea_qualified"
+  no_floating_main_refs: true
+  do_not_vendor_entire_upstream_library: true
+  require_existing_approved_symthaea_mathlib_environment: true
+  accepted_proof_must_reject:
+    - sorry
+    - unexpected_axioms
+    - theorem_statement_mutation
+    - missing_domain_premises
+    - stale_environment_receipt
+    - timeout_or_incomplete_output
+
+entries:
+  - id: "OAI-ENTROPY-LPDIM-001"
+    title: "Entropy and logarithmic inequalities"
+    source_path: "lean/OAI/Analysis/LpDimension/Entropy.lean"
+    source_url: "https://github.com/openai/math/blob/1581d4cbdd69a0faf34b2089614fe2a814316a6a/lean/OAI/Analysis/LpDimension/Entropy.lean"
+    source_blob_sha: "b2b32a01166f7990231a1d16240b1f80269d9114"
+    declarations:
+      - "OAI.SubpolynomialLp.entropy_le_log_card"
+      - "OAI.SubpolynomialLp.log_ratio_lower"
+      - "OAI.SubpolynomialLp.log_mean_sq_le"
+      - "OAI.SubpolynomialLp.sub_mul_log_sub_nonneg"
+      - "OAI.SubpolynomialLp.electricalEnergy_nonneg"
+    relevance: "Proof-pattern reference for finite entropy sums, positivity premises, monotonicity/log inequalities, and explicit analytic side conditions."
+    limitations:
+      - "Not the same theorem as Symthaea issue #6220's diagonal-Gaussian entropy-delta profile."
+      - "No claim that these declarations compile in Symthaea's current canonical environment."
+      - "Do not copy theorem conclusions without preserving the exact statement and assumptions."
+    status: "reference_only_not_symthaea_qualified"
+    license: "Apache-2.0 (upstream repository license; retain applicable notices on reuse)"
+
+  - id: "OAI-RELENTROPY-SKRATIO-001"
+    title: "Finite-law relative entropy"
+    source_path: "lean/OAI/Probability/SKRatio/Entropy/Entropy.lean"
+    source_url: "https://github.com/openai/math/blob/1581d4cbdd69a0faf34b2089614fe2a814316a6a/lean/OAI/Probability/SKRatio/Entropy/Entropy.lean"
+    source_blob_sha: "76e87cc6ef21186511d27d932cff0cb6e303a304"
+    declarations:
+      - "OAI.SKRatio.FiniteLaw.relativeEntropy_nonneg"
+      - "OAI.SKRatio.FiniteLaw.entropy_density"
+      - "OAI.SKRatio.FiniteLaw.entropy_variational"
+      - "OAI.SKRatio.FiniteLaw.hellinger_le_entropy"
+    relevance: "Proof-pattern reference for non-negativity and relationships among finite relative entropy, densities, and related bounds."
+    limitations:
+      - "Requires its upstream dependencies; do not assume the declarations are directly importable from Mathlib alone."
+      - "Not direct evidence for free-energy, calibrated uncertainty, or real-world information gain."
+      - "No claim that these declarations compile in Symthaea's current canonical environment."
+    status: "reference_only_not_symthaea_qualified"
+    license: "Apache-2.0 (upstream repository license; retain applicable notices on reuse)"
