@@ -1148,3 +1148,6 @@ mod tests {
 
 /// Deterministic Phase A experiment ranking; not an active-learning claim.
 pub mod experiment_selection;
+
+/// Oracle-backed known-answer benchmarks for experiment-selection strategies.
+pub mod experiment_benchmark;
