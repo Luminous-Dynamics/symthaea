@@ -610,9 +610,37 @@ mod tests {
     }
 
     #[test]
-    fn benchmark_lineage_graph_validation_and_resolution_scaling() {
+    fn basic_graph_resolves_two_roots() {
         let result = assess(&two_origin_graph(), &["article-A", "article-B"]);
         assert_eq!(result.root_origin_ids.len(), 2);
+    }
+
+    #[test]
+    fn disconnected_cycle_invalidates_the_graph_snapshot() {
+        let graph = EvidenceProvenanceGraph {
+            nodes: vec![
+                node("origin", ProvenanceNodeKind::PrimaryOrigin),
+                node("evidence", ProvenanceNodeKind::DerivedArtifact),
+                node("cycle-A", ProvenanceNodeKind::DerivedArtifact),
+                node("cycle-B", ProvenanceNodeKind::DerivedArtifact),
+            ],
+            edges: vec![
+                edge("evidence", "origin", ProvenanceDerivationKind::DerivedFrom),
+                edge("cycle-A", "cycle-B", ProvenanceDerivationKind::DerivedFrom),
+                edge("cycle-B", "cycle-A", ProvenanceDerivationKind::RevisionOf),
+            ],
+        };
+
+        let result = assess(&graph, &["evidence"]);
+        assert!(result
+            .reasons
+            .contains(&ProvenanceGraphAbstentionReason::CycleDetected));
+        assert_eq!(result.decision, ProvenanceGraphDecision::Abstain);
+    }
+
+    #[test]
+    fn graph_policy_rejects_zero_required_origins() {
+        assert!(ProvenanceGraphPolicy::new(0, true).is_err());
     }
 
     /// Opt-in release-mode scaling benchmark of graph validation and root resolution.
