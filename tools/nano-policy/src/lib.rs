@@ -256,10 +256,23 @@ fn validate(r: &SelectionRequest) -> Result<(), String> {
         if !all_costs.is_finite() { return Err("aggregate estimated cost overflows f64".into()); }
     }
     if matches!(r.policy, SelectionPolicy::MaxMinDiversity | SelectionPolicy::CostAwareDiversity) {
-        let k = r.selection_count.min(r.candidates.len());
-        let triangle = k.saturating_mul(k.saturating_add(1)) / 2;
-        let work = r.candidates.len().saturating_mul(triangle).saturating_mul(dims);
-        if work > MAX_DIVERSITY_WORK { return Err(format!("diversity work estimate {work} exceeds safety limit {MAX_DIVERSITY_WORK}")); }
+        let candidate_count = r.candidates.len();
+        let reference_count = r.reference_features.len();
+        let k = r.selection_count.min(candidate_count);
+        // Each greedy step compares each remaining candidate with prior-reference vectors
+        // and vectors selected in this batch. Include normalization work as well.
+        let reference_comparisons = k.saturating_mul(reference_count);
+        let within_batch_comparisons = k.saturating_mul(k.saturating_sub(1)) / 2;
+        let pair_dimension_work = candidate_count
+            .saturating_mul(reference_comparisons.saturating_add(within_batch_comparisons))
+            .saturating_mul(dims);
+        let normalization_work = candidate_count
+            .saturating_add(reference_count)
+            .saturating_mul(dims);
+        let work = pair_dimension_work.saturating_add(normalization_work);
+        if work > MAX_DIVERSITY_WORK {
+            return Err(format!("diversity work estimate {work} exceeds safety limit {MAX_DIVERSITY_WORK}"));
+        }
     }
     Ok(())
 }
@@ -426,6 +439,19 @@ mod tests {
         );
         r.reference_features = vec![vec![0.5]];
         assert!(select(r).unwrap_err().contains("reference feature vector has 1 dimensions"));
+    }
+
+    #[test]
+    fn large_reference_history_cannot_bypass_diversity_work_cap() {
+        let dimensions = 100;
+        let candidates: Vec<_> = (0..1_000)
+            .map(|index| c(&format!("candidate-{index:04}"), &vec![0.0; dimensions], 1.0))
+            .collect();
+        let references = vec![vec![0.0; dimensions]; 1_000];
+        let mut request = req(SelectionPolicy::MaxMinDiversity, candidates);
+        request.selection_count = 1;
+        request.reference_features = references;
+        assert!(select(request).unwrap_err().contains("diversity work estimate"));
     }
 
     #[test]
