@@ -43,6 +43,8 @@ pub struct FlightEmbodiment {
     encoder: QuadrotorHdcEncoder,
     last_perception: Option<ContinuousHV>,
     total_steps: usize,
+    /// Simulation-clock epoch increments on reset so timestamps never rewind within one clock domain.
+    simulation_epoch: u64,
     current_safety: MotorSafetyLevel,
     safety_override: Option<MotorSafetyLevel>,
     moral_safety: Option<MotorSafetyLevel>,
@@ -56,6 +58,10 @@ impl FlightEmbodiment {
     /// Deterministic identity of this simulator instance (seed-derived; not a device certificate).
     pub fn instance_id(&self) -> &str {
         &self.instance_id
+    }
+
+    fn sim_clock_domain_id(&self) -> String {
+        format!("symthaea.multirotor.sim-time.epoch-{}", self.simulation_epoch)
     }
 
     /// Emergency descent thrust as a fraction of hover thrust.
@@ -89,6 +95,7 @@ impl FlightEmbodiment {
             encoder: QuadrotorHdcEncoder::new(genesis, 32),
             last_perception: None,
             total_steps: 0,
+            simulation_epoch: 0,
             current_safety: MotorSafetyLevel::Green,
             safety_override: None,
             moral_safety: None,
@@ -258,6 +265,7 @@ impl FlightEmbodiment {
     }
 
     pub fn reset(&mut self) {
+        self.simulation_epoch = self.simulation_epoch.saturating_add(1);
         self.simulator.reset(0.1);
         self.last_applied_command = None;
         self.controller.reset();
@@ -315,7 +323,7 @@ impl symthaea_core::embodiment_v2::EmbodimentV2Adapter for FlightEmbodiment {
             observation_schema_id: "symthaea.observation.scalar-quantity.v2".into(),
             action_schema_id: "symthaea.action.scalar-quantity.v2".into(),
             frame_graph_id: Some("world/body".into()),
-            clock_domain_id: "symthaea.multirotor.sim-time".into(),
+            clock_domain_id: self.sim_clock_domain_id(),
             actuator_capability_ids: vec![
                 "actuator/thrust".into(),
                 "actuator/roll_moment".into(),
@@ -382,7 +390,7 @@ impl symthaea_core::embodiment_v2::EmbodimentV2Adapter for FlightEmbodiment {
             profile_id: "symthaea.multirotor.simple-physics-quadrotor.v1".into(),
             instance_id: self.instance_id.clone(),
             clock: ClockStampV2 {
-                clock_domain_id: "symthaea.multirotor.sim-time".into(),
+                clock_domain_id: self.sim_clock_domain_id(),
                 sequence: Some(self.total_steps as u64),
                 timestamp_ns: Some(timestamp_ns),
             },
@@ -419,7 +427,7 @@ impl symthaea_core::embodiment_v2::EmbodimentV2Adapter for FlightEmbodiment {
             profile_id: "symthaea.multirotor.simple-physics-quadrotor.v1".into(),
             instance_id: instance_id.into(),
             clock: ClockStampV2 {
-                clock_domain_id: "symthaea.multirotor.sim-time".into(),
+                clock_domain_id: self.sim_clock_domain_id(),
                 sequence: Some(self.total_steps as u64),
                 timestamp_ns: Some((timestamp * 1_000_000_000.0).round() as u64),
             },
@@ -584,6 +592,23 @@ mod tests {
         assert_eq!(action.stage, ActionStageV2::Applied);
         assert_eq!(action.actions.len(), 4);
         validate_adapter_v2_conformance(&bridge, instance).unwrap();
+    }
+
+    #[test]
+    fn uec_v2_reset_starts_a_new_clock_domain_epoch() {
+        use symthaea_core::embodiment_v2::{validate_adapter_v2_conformance, EmbodimentV2Adapter};
+        let mut bridge = FlightEmbodiment::new(&GenesisSeed::from_phrase("uec-v2-epoch-test"));
+        let instance = bridge.instance_id().to_string();
+        let hv = ContinuousHV::random(16384, 42);
+        bridge.step(&hv, 0.002, 0.7);
+        let before = bridge.observation_frame_v2(&instance).unwrap();
+
+        bridge.reset();
+        let after = bridge.observation_frame_v2(&instance).unwrap();
+        assert_ne!(before.clock.clock_domain_id, after.clock.clock_domain_id);
+        assert_eq!(after.clock.sequence, Some(0));
+        assert_eq!(after.clock.timestamp_ns, Some(0));
+        validate_adapter_v2_conformance(&bridge, &instance).unwrap();
     }
 
     #[test]
