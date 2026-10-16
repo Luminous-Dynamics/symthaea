@@ -817,7 +817,7 @@ mod tests {
 
         let policy = EvidenceActionPolicy::bounded_default();
         let receipts = evaluate_trajectories(&dataset, "v1", &policy).unwrap();
-        let text = receipts.iter().map(serde_json::to_string).collect::<Result<Vec<_>, _>>().unwrap().join("\\n");
+        let text = receipts.iter().map(serde_json::to_string).collect::<Result<Vec<_>, _>>().unwrap().join("\n");
         let score = score_trajectory_receipts(&dataset, Cursor::new(text), "v1").unwrap();
         assert!(score.unsafe_answer_escapes >= 1);
         assert!(score.revocation_answer_escapes >= 1);
