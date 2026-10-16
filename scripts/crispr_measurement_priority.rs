@@ -369,14 +369,6 @@ mod tests {
 
     #[test]
     fn no_discordant_unknowns_returns_empty_plan() {
-        let mut cases = fixture();
-        for item in &mut cases {
-            if item.label == LabelState::UnknownUnassayed {
-                item.rank_b = item.rank_a;
-            }
-        }
-        // This deliberately duplicates ranks unless all ranks remain a permutation.
-        // Build a simpler valid shared ranking to test the no-disagreement condition.
         let cases = vec![
             candidate("u1", "g", 1, 1, LabelState::UnknownUnassayed, 1),
             candidate("u2", "g", 2, 2, LabelState::UnknownUnassayed, 1),
