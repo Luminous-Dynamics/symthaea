@@ -3041,8 +3041,15 @@ mod tests {
         let false_eligible_count = outcomes
             .iter()
             .filter(|(_, decision, should_be_eligible)| {
+                !*should_be_eligible
+                    && *decision == RelationConstrainedQueryDecision::EligibleCandidatesAvailable
+            })
+            .count();
+        let correct_decision_count = outcomes
+            .iter()
+            .filter(|(_, decision, should_be_eligible)| {
                 *should_be_eligible
-                    != (*decision == RelationConstrainedQueryDecision::EligibleCandidatesAvailable)
+                    == (*decision == RelationConstrainedQueryDecision::EligibleCandidatesAvailable)
             })
             .count();
         let selective_risk = if eligible_count == 0 {
@@ -3054,6 +3061,7 @@ mod tests {
 
         assert_eq!(eligible_count, 1);
         assert_eq!(false_eligible_count, 0);
+        assert_eq!(correct_decision_count, 5);
         assert_eq!(selective_risk, 0.0);
         assert!((selective_coverage - 0.2).abs() < f32::EPSILON);
     }
