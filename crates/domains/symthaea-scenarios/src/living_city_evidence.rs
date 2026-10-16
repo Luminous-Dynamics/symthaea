@@ -1,0 +1,632 @@
+//! Evidence manifests and scenario-run receipts for the living-city workflow.
+//!
+//! This module validates receipt structure and emits deterministic canonical
+//! bytes. It deliberately does not implement a cryptographic hash in pure std:
+//! the orchestration/verifier layer must compute SHA-256 over these bytes and
+//! independently recompute it from the retained artifacts.
+
+use std::collections::BTreeSet;
+
+/// Current schema version for evidence manifests and run receipts.
+pub const EVIDENCE_SCHEMA_VERSION: u32 = 1;
+pub const RECEIPT_SCHEMA_VERSION: u32 = 1;
+
+/// Provenance class for an evidence item. "Missing" is explicit and never zero.
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub enum EvidenceKind {
+    Measured,
+    Derived,
+    Estimated,
+    Simulated,
+    Assumed,
+    Missing,
+}
+
+impl EvidenceKind {
+    fn as_str(self) -> &'static str {
+        match self {
+            Self::Measured => "measured",
+            Self::Derived => "derived",
+            Self::Estimated => "estimated",
+            Self::Simulated => "simulated",
+            Self::Assumed => "assumed",
+            Self::Missing => "missing",
+        }
+    }
+}
+
+/// A single versioned source or an explicit record of a missing source.
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub struct EvidenceItem {
+    pub id: String,
+    pub kind: EvidenceKind,
+    pub source_uri: String,
+    /// SHA-256 of the retained source artifact, not of this metadata record.
+    pub content_sha256: Option<String>,
+    /// License, data agreement, legal basis, or an explicit "not applicable".
+    pub license_or_basis: String,
+    pub units: String,
+    pub spatial_scope: String,
+    pub temporal_scope: String,
+    pub acquired_at_utc: String,
+    pub transformation_chain: Vec<String>,
+    pub uncertainty_note: String,
+    /// Required when kind is Missing; explains what is absent and why it matters.
+    pub missing_reason: Option<String>,
+}
+
+/// Evidence manifest shared by all scenario outputs that use this input snapshot.
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub struct EvidenceManifest {
+    pub schema_version: u32,
+    pub project_id: String,
+    pub scenario_id: String,
+    pub study_boundary_id: String,
+    pub coordinate_reference_system: String,
+    pub items: Vec<EvidenceItem>,
+}
+
+/// A reproducible tool or solver invocation.
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub struct ToolExecution {
+    pub tool_id: String,
+    pub version: String,
+    /// Digest of the executable/container or build artifact, when applicable.
+    pub executable_sha256: Option<String>,
+    pub arguments_sha256: String,
+    pub status: ToolRunStatus,
+}
+
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub enum ToolRunStatus {
+    Succeeded,
+    Failed,
+    Blocked,
+}
+
+impl ToolRunStatus {
+    fn as_str(self) -> &'static str {
+        match self {
+            Self::Succeeded => "succeeded",
+            Self::Failed => "failed",
+            Self::Blocked => "blocked",
+        }
+    }
+}
+
+/// A retained output artifact associated with the run.
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub struct OutputArtifact {
+    pub id: String,
+    pub media_type: String,
+    pub sha256: String,
+}
+
+/// Explicit result of an individual verification gate.
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub enum GateStatus {
+    Pass,
+    Fail,
+    Blocked,
+    NotRun,
+    NotApplicable,
+}
+
+impl GateStatus {
+    fn as_str(self) -> &'static str {
+        match self {
+            Self::Pass => "pass",
+            Self::Fail => "fail",
+            Self::Blocked => "blocked",
+            Self::NotRun => "not_run",
+            Self::NotApplicable => "not_applicable",
+        }
+    }
+}
+
+/// A checker result tied to a verifier identity/version and supporting artifact.
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub struct ValidationGate {
+    pub gate_id: String,
+    pub required: bool,
+    pub status: GateStatus,
+    pub reason: Option<String>,
+    pub verifier_id: Option<String>,
+    /// Digest of the retained report/log/evidence supporting this gate.
+    pub evidence_sha256: Option<String>,
+}
+
+/// Promotion status for the software workflow only, not construction authorization.
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub enum PromotionState {
+    EligibleForNextWorkflowStage,
+    Failed,
+    Blocked,
+}
+
+impl PromotionState {
+    pub fn as_str(self) -> &'static str {
+        match self {
+            Self::EligibleForNextWorkflowStage => "eligible_for_next_workflow_stage",
+            Self::Failed => "failed",
+            Self::Blocked => "blocked",
+        }
+    }
+}
+
+/// Stable receipt for a scenario execution. Gate results are data, not a trusted
+/// boolean supplied by the scenario generator.
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub struct ScenarioRunReceipt {
+    pub schema_version: u32,
+    pub run_id: String,
+    pub scenario_id: String,
+    pub repository: String,
+    pub commit_sha: String,
+    pub dependency_lock_sha256: String,
+    pub build_profile: String,
+    pub toolchain: String,
+    pub evidence_manifest_sha256: String,
+    pub configuration_sha256: String,
+    pub seed: Option<u64>,
+    pub tools: Vec<ToolExecution>,
+    pub outputs: Vec<OutputArtifact>,
+    pub gates: Vec<ValidationGate>,
+}
+
+/// Contract validation error. Structural validity does not prove the referenced
+/// content is authentic: the independent verifier must recompute all digests.
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub struct EvidenceContractError {
+    pub field: &'static str,
+    pub reason: &'static str,
+}
+
+impl std::fmt::Display for EvidenceContractError {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        write!(f, "invalid evidence contract field {}: {}", self.field, self.reason)
+    }
+}
+
+impl std::error::Error for EvidenceContractError {}
+
+fn invalid(field: &'static str, reason: &'static str) -> EvidenceContractError {
+    EvidenceContractError { field, reason }
+}
+
+fn require_non_empty(field: &'static str, value: &str) -> Result<(), EvidenceContractError> {
+    if value.trim().is_empty() {
+        Err(invalid(field, "must be explicitly provided"))
+    } else {
+        Ok(())
+    }
+}
+
+fn is_lower_hex(value: &str) -> bool {
+    value
+        .bytes()
+        .all(|byte| byte.is_ascii_digit() || (b'a'..=b'f').contains(&byte))
+}
+
+fn validate_sha256(field: &'static str, value: &str) -> Result<(), EvidenceContractError> {
+    if value.len() != 64 || !is_lower_hex(value) {
+        return Err(invalid(field, "must be a 64-character lowercase SHA-256 hex digest"));
+    }
+    Ok(())
+}
+
+fn validate_commit_sha(value: &str) -> Result<(), EvidenceContractError> {
+    if !matches!(value.len(), 40 | 64) || !is_lower_hex(value) {
+        return Err(invalid("commit_sha", "must be a lowercase 40- or 64-character Git object ID"));
+    }
+    Ok(())
+}
+
+fn validate_unique_ids<'a>(
+    field: &'static str,
+    ids: impl IntoIterator<Item = &'a str>,
+) -> Result<(), EvidenceContractError> {
+    let mut seen = BTreeSet::new();
+    for id in ids {
+        require_non_empty(field, id)?;
+        if !seen.insert(id) {
+            return Err(invalid(field, "IDs must be unique within this collection"));
+        }
+    }
+    Ok(())
+}
+
+impl EvidenceManifest {
+    pub fn validate(&self) -> Result<(), EvidenceContractError> {
+        if self.schema_version != EVIDENCE_SCHEMA_VERSION {
+            return Err(invalid("schema_version", "unsupported evidence-manifest schema version"));
+        }
+        require_non_empty("project_id", &self.project_id)?;
+        require_non_empty("scenario_id", &self.scenario_id)?;
+        require_non_empty("study_boundary_id", &self.study_boundary_id)?;
+        require_non_empty("coordinate_reference_system", &self.coordinate_reference_system)?;
+        if self.items.is_empty() {
+            return Err(invalid("items", "must include sources or explicit missing-source records"));
+        }
+        validate_unique_ids("items.id", self.items.iter().map(|item| item.id.as_str()))?;
+
+        for item in &self.items {
+            require_non_empty("items.units", &item.units)?;
+            require_non_empty("items.spatial_scope", &item.spatial_scope)?;
+            require_non_empty("items.temporal_scope", &item.temporal_scope)?;
+            require_non_empty("items.uncertainty_note", &item.uncertainty_note)?;
+            if item.kind == EvidenceKind::Missing {
+                require_non_empty(
+                    "items.missing_reason",
+                    item.missing_reason.as_deref().unwrap_or(""),
+                )?;
+                if item.content_sha256.is_some() {
+                    return Err(invalid(
+                        "items.content_sha256",
+                        "a missing source cannot claim a content digest",
+                    ));
+                }
+            } else {
+                require_non_empty("items.source_uri", &item.source_uri)?;
+                require_non_empty("items.license_or_basis", &item.license_or_basis)?;
+                require_non_empty("items.acquired_at_utc", &item.acquired_at_utc)?;
+                validate_sha256(
+                    "items.content_sha256",
+                    item.content_sha256.as_deref().unwrap_or(""),
+                )?;
+            }
+            for transformation in &item.transformation_chain {
+                require_non_empty("items.transformation_chain", transformation)?;
+            }
+        }
+        Ok(())
+    }
+
+    /// Deterministic length-prefixed canonical representation. Collection order
+    /// is normalized by item ID; transformation order is preserved because it
+    /// represents the actual processing sequence. Hash these bytes with SHA-256
+    /// in the orchestration/verifier layer.
+    pub fn canonical_bytes(&self) -> Vec<u8> {
+        let mut output = Vec::new();
+        append_u64(&mut output, u64::from(self.schema_version));
+        append_field(&mut output, &self.project_id);
+        append_field(&mut output, &self.scenario_id);
+        append_field(&mut output, &self.study_boundary_id);
+        append_field(&mut output, &self.coordinate_reference_system);
+
+        let mut items: Vec<&EvidenceItem> = self.items.iter().collect();
+        items.sort_by(|a, b| a.id.cmp(&b.id));
+        append_u64(&mut output, items.len() as u64);
+        for item in items {
+            append_field(&mut output, &item.id);
+            append_field(&mut output, item.kind.as_str());
+            append_field(&mut output, &item.source_uri);
+            append_optional_field(&mut output, item.content_sha256.as_deref());
+            append_field(&mut output, &item.license_or_basis);
+            append_field(&mut output, &item.units);
+            append_field(&mut output, &item.spatial_scope);
+            append_field(&mut output, &item.temporal_scope);
+            append_field(&mut output, &item.acquired_at_utc);
+            append_u64(&mut output, item.transformation_chain.len() as u64);
+            for transformation in &item.transformation_chain {
+                append_field(&mut output, transformation);
+            }
+            append_field(&mut output, &item.uncertainty_note);
+            append_optional_field(&mut output, item.missing_reason.as_deref());
+        }
+        output
+    }
+}
+
+impl ScenarioRunReceipt {
+    pub fn validate(&self) -> Result<(), EvidenceContractError> {
+        if self.schema_version != RECEIPT_SCHEMA_VERSION {
+            return Err(invalid("schema_version", "unsupported scenario-receipt schema version"));
+        }
+        require_non_empty("run_id", &self.run_id)?;
+        require_non_empty("scenario_id", &self.scenario_id)?;
+        require_non_empty("repository", &self.repository)?;
+        validate_commit_sha(&self.commit_sha)?;
+        validate_sha256("dependency_lock_sha256", &self.dependency_lock_sha256)?;
+        require_non_empty("build_profile", &self.build_profile)?;
+        require_non_empty("toolchain", &self.toolchain)?;
+        validate_sha256("evidence_manifest_sha256", &self.evidence_manifest_sha256)?;
+        validate_sha256("configuration_sha256", &self.configuration_sha256)?;
+        if self.tools.is_empty() {
+            return Err(invalid("tools", "at least one executed tool must be recorded"));
+        }
+        validate_unique_ids("tools.tool_id", self.tools.iter().map(|tool| tool.tool_id.as_str()))?;
+        for tool in &self.tools {
+            require_non_empty("tools.version", &tool.version)?;
+            validate_sha256("tools.arguments_sha256", &tool.arguments_sha256)?;
+            if let Some(digest) = tool.executable_sha256.as_deref() {
+                validate_sha256("tools.executable_sha256", digest)?;
+            }
+        }
+        validate_unique_ids("outputs.id", self.outputs.iter().map(|output| output.id.as_str()))?;
+        for output in &self.outputs {
+            require_non_empty("outputs.media_type", &output.media_type)?;
+            validate_sha256("outputs.sha256", &output.sha256)?;
+        }
+        if self.gates.is_empty() {
+            return Err(invalid("gates", "at least one verification gate must be recorded"));
+        }
+        validate_unique_ids("gates.gate_id", self.gates.iter().map(|gate| gate.gate_id.as_str()))?;
+        for gate in &self.gates {
+            match gate.status {
+                GateStatus::Pass => {
+                    require_non_empty(
+                        "gates.verifier_id",
+                        gate.verifier_id.as_deref().unwrap_or(""),
+                    )?;
+                    validate_sha256(
+                        "gates.evidence_sha256",
+                        gate.evidence_sha256.as_deref().unwrap_or(""),
+                    )?;
+                }
+                GateStatus::NotApplicable => {
+                    require_non_empty(
+                        "gates.reason",
+                        gate.reason.as_deref().unwrap_or(""),
+                    )?;
+                }
+                GateStatus::Fail | GateStatus::Blocked | GateStatus::NotRun => {
+                    require_non_empty(
+                        "gates.reason",
+                        gate.reason.as_deref().unwrap_or(""),
+                    )?;
+                }
+            }
+            if let Some(verifier) = gate.verifier_id.as_deref() {
+                require_non_empty("gates.verifier_id", verifier)?;
+            }
+            if let Some(digest) = gate.evidence_sha256.as_deref() {
+                validate_sha256("gates.evidence_sha256", digest)?;
+            }
+        }
+        Ok(())
+    }
+
+    /// Return the gate state for promotion to the next software-workflow stage.
+    /// This is not a code-compliance decision, permit, or construction approval.
+    pub fn promotion_state(&self) -> PromotionState {
+        let required = self.gates.iter().filter(|gate| gate.required);
+        let mut blocked = false;
+        for gate in required {
+            match gate.status {
+                GateStatus::Pass | GateStatus::NotApplicable => {}
+                GateStatus::Fail => return PromotionState::Failed,
+                GateStatus::Blocked | GateStatus::NotRun => blocked = true,
+            }
+        }
+        if blocked {
+            PromotionState::Blocked
+        } else {
+            PromotionState::EligibleForNextWorkflowStage
+        }
+    }
+
+    /// Deterministic length-prefixed canonical representation. Sets of tools,
+    /// artifacts, and gates are normalized by ID before serialization.
+    pub fn canonical_bytes(&self) -> Vec<u8> {
+        let mut output = Vec::new();
+        append_u64(&mut output, u64::from(self.schema_version));
+        append_field(&mut output, &self.run_id);
+        append_field(&mut output, &self.scenario_id);
+        append_field(&mut output, &self.repository);
+        append_field(&mut output, &self.commit_sha);
+        append_field(&mut output, &self.dependency_lock_sha256);
+        append_field(&mut output, &self.build_profile);
+        append_field(&mut output, &self.toolchain);
+        append_field(&mut output, &self.evidence_manifest_sha256);
+        append_field(&mut output, &self.configuration_sha256);
+        match self.seed {
+            Some(seed) => {
+                output.push(1);
+                append_u64(&mut output, seed);
+            }
+            None => output.push(0),
+        }
+
+        let mut tools: Vec<&ToolExecution> = self.tools.iter().collect();
+        tools.sort_by(|a, b| a.tool_id.cmp(&b.tool_id));
+        append_u64(&mut output, tools.len() as u64);
+        for tool in tools {
+            append_field(&mut output, &tool.tool_id);
+            append_field(&mut output, &tool.version);
+            append_optional_field(&mut output, tool.executable_sha256.as_deref());
+            append_field(&mut output, &tool.arguments_sha256);
+            append_field(&mut output, tool.status.as_str());
+        }
+
+        let mut outputs: Vec<&OutputArtifact> = self.outputs.iter().collect();
+        outputs.sort_by(|a, b| a.id.cmp(&b.id));
+        append_u64(&mut output, outputs.len() as u64);
+        for artifact in outputs {
+            append_field(&mut output, &artifact.id);
+            append_field(&mut output, &artifact.media_type);
+            append_field(&mut output, &artifact.sha256);
+        }
+
+        let mut gates: Vec<&ValidationGate> = self.gates.iter().collect();
+        gates.sort_by(|a, b| a.gate_id.cmp(&b.gate_id));
+        append_u64(&mut output, gates.len() as u64);
+        for gate in gates {
+            append_field(&mut output, &gate.gate_id);
+            output.push(u8::from(gate.required));
+            append_field(&mut output, gate.status.as_str());
+            append_optional_field(&mut output, gate.reason.as_deref());
+            append_optional_field(&mut output, gate.verifier_id.as_deref());
+            append_optional_field(&mut output, gate.evidence_sha256.as_deref());
+        }
+        output
+    }
+}
+
+fn append_u64(output: &mut Vec<u8>, value: u64) {
+    output.extend_from_slice(&value.to_le_bytes());
+}
+
+fn append_field(output: &mut Vec<u8>, value: &str) {
+    append_u64(output, value.len() as u64);
+    output.extend_from_slice(value.as_bytes());
+}
+
+fn append_optional_field(output: &mut Vec<u8>, value: Option<&str>) {
+    match value {
+        Some(value) => {
+            output.push(1);
+            append_field(output, value);
+        }
+        None => output.push(0),
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    const HASH: &str = "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa";
+    const COMMIT: &str = "bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb";
+
+    fn measured_item(id: &str) -> EvidenceItem {
+        EvidenceItem {
+            id: id.into(),
+            kind: EvidenceKind::Measured,
+            source_uri: format!("https://example.invalid/{id}"),
+            content_sha256: Some(HASH.into()),
+            license_or_basis: "synthetic fixture license".into(),
+            units: "metres".into(),
+            spatial_scope: "synthetic test site".into(),
+            temporal_scope: "fixture instant".into(),
+            acquired_at_utc: "2026-01-01T00:00:00Z".into(),
+            transformation_chain: vec!["fixture-import-v1".into()],
+            uncertainty_note: "synthetic fixture; not field data".into(),
+            missing_reason: None,
+        }
+    }
+
+    fn manifest() -> EvidenceManifest {
+        EvidenceManifest {
+            schema_version: EVIDENCE_SCHEMA_VERSION,
+            project_id: "fixture-project".into(),
+            scenario_id: "fixture-scenario".into(),
+            study_boundary_id: "fixture-boundary".into(),
+            coordinate_reference_system: "local synthetic CRS".into(),
+            items: vec![measured_item("survey-a"), measured_item("weather-b")],
+        }
+    }
+
+    fn receipt(status: GateStatus) -> ScenarioRunReceipt {
+        ScenarioRunReceipt {
+            schema_version: RECEIPT_SCHEMA_VERSION,
+            run_id: "run-001".into(),
+            scenario_id: "fixture-scenario".into(),
+            repository: "Luminous-Dynamics/symthaea".into(),
+            commit_sha: COMMIT.into(),
+            dependency_lock_sha256: HASH.into(),
+            build_profile: "test".into(),
+            toolchain: "pinned-test-toolchain".into(),
+            evidence_manifest_sha256: HASH.into(),
+            configuration_sha256: HASH.into(),
+            seed: Some(17),
+            tools: vec![ToolExecution {
+                tool_id: "synthetic-evaluator".into(),
+                version: "0.1.0-fixture".into(),
+                executable_sha256: Some(HASH.into()),
+                arguments_sha256: HASH.into(),
+                status: ToolRunStatus::Succeeded,
+            }],
+            outputs: vec![OutputArtifact {
+                id: "metrics".into(),
+                media_type: "application/json".into(),
+                sha256: HASH.into(),
+            }],
+            gates: vec![ValidationGate {
+                gate_id: "independent-check".into(),
+                required: true,
+                status,
+                reason: (status != GateStatus::Pass).then(|| "synthetic test gate state".into()),
+                verifier_id: (status == GateStatus::Pass).then(|| "independent-test-verifier/0.1".into()),
+                evidence_sha256: (status == GateStatus::Pass).then(|| HASH.into()),
+            }],
+        }
+    }
+
+    #[test]
+    fn manifest_canonical_bytes_ignore_source_collection_order() {
+        let a = manifest();
+        let mut b = a.clone();
+        b.items.reverse();
+        assert_eq!(a.canonical_bytes(), b.canonical_bytes());
+    }
+
+    #[test]
+    fn missing_evidence_must_be_explicit_and_cannot_claim_a_digest() {
+        let mut item = measured_item("missing-groundwater");
+        item.kind = EvidenceKind::Missing;
+        item.source_uri.clear();
+        item.content_sha256 = None;
+        item.license_or_basis.clear();
+        item.acquired_at_utc.clear();
+        item.missing_reason = Some("site investigation not yet available".into());
+        let mut input = manifest();
+        input.items = vec![item];
+        assert!(input.validate().is_ok());
+
+        input.items[0].content_sha256 = Some(HASH.into());
+        assert_eq!(
+            input.validate().unwrap_err().field,
+            "items.content_sha256"
+        );
+    }
+
+    #[test]
+    fn duplicate_evidence_ids_are_rejected() {
+        let mut input = manifest();
+        input.items.push(measured_item("survey-a"));
+        assert_eq!(input.validate().unwrap_err().field, "items.id");
+    }
+
+    #[test]
+    fn required_not_run_gate_blocks_promotion() {
+        let input = receipt(GateStatus::NotRun);
+        assert!(input.validate().is_ok());
+        assert_eq!(input.promotion_state(), PromotionState::Blocked);
+    }
+
+    #[test]
+    fn required_failed_gate_fails_promotion() {
+        let input = receipt(GateStatus::Fail);
+        assert!(input.validate().is_ok());
+        assert_eq!(input.promotion_state(), PromotionState::Failed);
+    }
+
+    #[test]
+    fn passing_gate_requires_verifier_and_evidence_digest() {
+        let mut input = receipt(GateStatus::Pass);
+        input.gates[0].verifier_id = None;
+        assert_eq!(input.validate().unwrap_err().field, "gates.verifier_id");
+    }
+
+    #[test]
+    fn receipt_canonical_bytes_are_stable() {
+        let a = receipt(GateStatus::Pass);
+        let b = receipt(GateStatus::Pass);
+        assert_eq!(a.canonical_bytes(), b.canonical_bytes());
+    }
+
+    #[test]
+    fn malformed_hashes_fail_closed() {
+        let mut input = receipt(GateStatus::Pass);
+        input.configuration_sha256 = "not-a-digest".into();
+        assert_eq!(input.validate().unwrap_err().field, "configuration_sha256");
+    }
+
+    #[test]
+    fn unsupported_schema_versions_are_rejected() {
+        let mut input = manifest();
+        input.schema_version += 1;
+        assert_eq!(input.validate().unwrap_err().field, "schema_version");
+    }
+}
