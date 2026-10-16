@@ -384,6 +384,7 @@ fn independent_report_digest(report: &PeakResourceReservationReport) -> String {
         h.string(resource_tag(window.resource_kind));
         h.u64(window.window.start_ms);
         h.u64(window.window.end_ms);
+        h.usize(window.active_reservation_count);
         h.usize(window.active_reservation_ids.len());
         for id in &window.active_reservation_ids { h.string(id); }
         h.u64(window.required_demand_upper);
