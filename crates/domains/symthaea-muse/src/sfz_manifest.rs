@@ -224,7 +224,8 @@ pub struct SfzZoneSelectionV1 {
     pub selected_sample_path: Option<String>,
     pub selected_sample_asset_state: Option<String>,
     /// One of: uncovered, invalid_request, unique_candidate,
-    /// round_robin_candidate, incomplete_round_robin_set, ambiguous_zones.
+    /// round_robin_candidate, incomplete_round_robin_set, ambiguous_zones,
+    /// invalid_stream_id.
     /// None of these names imply audio decoding or rendering.
     pub decision: String,
     pub semitone_shift: Option<f64>,
@@ -359,6 +360,7 @@ pub fn plan_sfz_zone_selection(
 #[derive(Debug, Clone, PartialEq, Eq, PartialOrd, Ord)]
 struct SfzRoundRobinStreamKeyV1 {
     stream_id: String,
+    sfz_sha256: String,
     requested_key: u8,
     matching_region_indices: Vec<usize>,
 }
@@ -411,6 +413,7 @@ impl SfzRoundRobinSequencerV1 {
 
         let key = SfzRoundRobinStreamKeyV1 {
             stream_id: stream_id.to_owned(),
+            sfz_sha256: manifest.sfz_sha256.clone(),
             requested_key,
             matching_region_indices: first.matching_region_indices.clone(),
         };
@@ -847,12 +850,17 @@ mod tests {
         let a2 = router.next_selection(&manifest, "voice-a", 60, 90);
         let b1 = router.next_selection(&manifest, "voice-b", 60, 90);
         let other_key = router.next_selection(&manifest, "voice-a", 62, 90);
+        let another_manifest = parse_sfz_mapping(
+            "<group> key=60 seq_length=2\n<region> seq_position=1 sample=red.wav\n<region> seq_position=2 sample=blue.wav",
+        ).unwrap();
+        let other_bank = router.next_selection(&another_manifest, "voice-a", 60, 90);
 
         assert_eq!(a1.selected_region_index, Some(1));
         assert_eq!(a2.selected_region_index, Some(2));
         assert_eq!(b1.selected_region_index, Some(1), "another voice must start independently");
         assert_eq!(other_key.decision, "unique_candidate");
         assert_eq!(other_key.selected_region_index, Some(3));
+        assert_eq!(other_bank.selected_region_index, Some(1), "a different SFZ manifest starts a separate sequence");
         assert_eq!(router.stream_count(), 2, "unique non-sequenced zones must not create state");
 
         router.reset_stream("voice-a");
@@ -865,7 +873,7 @@ mod tests {
     #[test]
     fn round_robin_does_not_advance_on_invalid_or_ambiguous_requests() {
         let incomplete = parse_sfz_mapping(
-            "<group> key=60 seq_length=2\\n<region> seq_position=1 sample=one.wav",
+            "<group> key=60 seq_length=2\n<region> seq_position=1 sample=one.wav",
         ).unwrap();
         let mut router = SfzRoundRobinSequencerV1::new();
         let invalid = router.next_selection(&incomplete, "voice-a", 60, 90);
@@ -873,7 +881,7 @@ mod tests {
         assert_eq!(router.stream_count(), 0);
 
         let ambiguous = parse_sfz_mapping(
-            "<group> key=60\\n<region> sample=one.wav\\n<region> sample=two.wav",
+            "<group> key=60\n<region> sample=one.wav\n<region> sample=two.wav",
         ).unwrap();
         let no_selection = router.next_selection(&ambiguous, "voice-a", 60, 90);
         assert_eq!(no_selection.decision, "ambiguous_zones");
@@ -883,7 +891,7 @@ mod tests {
     #[test]
     fn round_robin_requires_a_nonblank_explicit_stream_id() {
         let manifest = parse_sfz_mapping(
-            "<group> key=60 seq_length=2\\n<region> seq_position=1 sample=one.wav\\n<region> seq_position=2 sample=two.wav",
+            "<group> key=60 seq_length=2\n<region> seq_position=1 sample=one.wav\n<region> seq_position=2 sample=two.wav",
         ).unwrap();
         let mut router = SfzRoundRobinSequencerV1::new();
         let receipt = router.next_selection(&manifest, "  ", 60, 90);
