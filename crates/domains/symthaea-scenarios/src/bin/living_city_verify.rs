@@ -257,6 +257,7 @@ fn verify_run_package(run_directory: &Path) -> Result<serde_json::Value, Box<dyn
         "manifest_sha256": manifest_sha256,
         "receipt_sha256": receipt_sha256,
         "configuration_sha256": actual_configuration_sha256,
+        "workflow_promotion_state": receipt.promotion_state().as_str(),
         "hazard_profile_id": cascade.profile_id,
         "hazard_profile_sha256": cascade.profile_sha256,
         "service_graph_sha256": graph_sha256,
