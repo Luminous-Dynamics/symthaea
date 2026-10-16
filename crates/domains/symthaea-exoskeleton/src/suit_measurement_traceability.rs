@@ -352,10 +352,12 @@ fn validate_plan(
         || plan.policy.max_calibration_chain_depth > 32
         || plan.policy.maximum_inter_sample_gap_ms == 0
         || plan.policy.reference_standards.is_empty()
-        || plan.claims.is_empty()
         || plan.claims.iter().any(|claim| claim.calibration_chain.len() > 64)
     {
         return Err(MeasurementTraceabilityError::InvalidPolicy);
+    }
+    if plan.claims.is_empty() {
+        return Err(MeasurementTraceabilityError::EmptyClaimSet);
     }
 
     let mut standards = BTreeSet::new();
