@@ -237,7 +237,8 @@ mod tests {
         let result = exhaustive_single_crew_repair_optimum(&jobs).unwrap();
         assert_eq!(result.feasible_permutations, 40_320);
         assert_eq!(result.jobs_evaluated, 8);
-        assert!(result.minimum_weighted_completion_loss.is_finite());
+        assert_eq!(result.optimal_order, vec!["b", "f", "d", "h", "c", "g", "e", "a"]);
+        assert!((result.minimum_weighted_completion_loss - 406.0).abs() < EPSILON);
     }
 
     #[test]
