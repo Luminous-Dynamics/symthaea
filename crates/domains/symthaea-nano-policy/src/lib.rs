@@ -11,6 +11,9 @@
 #![deny(unsafe_code)]
 #![warn(missing_docs)]
 
+/// Structural verifier for selector request/response receipts.
+pub mod receipt;
+
 use serde::{Deserialize, Serialize};
 use sha2::{Digest, Sha256};
 use std::collections::{BTreeMap, BTreeSet};
@@ -90,6 +93,7 @@ pub struct SelectionRequest {
 
 /// One selected candidate and its policy diagnostic.
 #[derive(Debug, Clone, Serialize, Deserialize, PartialEq)]
+#[serde(deny_unknown_fields)]
 pub struct SelectionDecision {
     /// One-based selection order.
     pub rank: usize,
@@ -108,6 +112,7 @@ pub struct SelectionDecision {
 
 /// Successful response and compact audit receipt.
 #[derive(Debug, Clone, Serialize, Deserialize, PartialEq)]
+#[serde(deny_unknown_fields)]
 pub struct SelectionResponse {
     /// Current response schema.
     pub schema_version: String,
@@ -137,6 +142,7 @@ pub struct SelectionResponse {
 
 /// Rejected request; this is not a scientific experiment outcome.
 #[derive(Debug, Clone, Serialize, Deserialize, PartialEq)]
+#[serde(deny_unknown_fields)]
 pub struct ErrorResponse {
     /// Current response schema.
     pub schema_version: String,
