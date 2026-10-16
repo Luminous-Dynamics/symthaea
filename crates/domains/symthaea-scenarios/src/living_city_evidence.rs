@@ -132,6 +132,8 @@ pub struct ValidationGate {
     pub required: bool,
     pub status: GateStatus,
     pub reason: Option<String>,
+    /// Required when NotApplicable: an explicit human/governance decision reference.
+    pub not_applicable_approval_ref: Option<String>,
     pub verifier_id: Option<String>,
     /// Digest of the retained report/log/evidence supporting this gate.
     pub evidence_sha256: Option<String>,
@@ -344,6 +346,9 @@ impl ScenarioRunReceipt {
                 validate_sha256("tools.executable_sha256", digest)?;
             }
         }
+        if self.outputs.is_empty() {
+            return Err(invalid("outputs", "at least one retained output artifact is required"));
+        }
         validate_unique_ids("outputs.id", self.outputs.iter().map(|output| output.id.as_str()))?;
         for output in &self.outputs {
             require_non_empty("outputs.media_type", &output.media_type)?;
@@ -373,6 +378,10 @@ impl ScenarioRunReceipt {
                         "gates.reason",
                         gate.reason.as_deref().unwrap_or(""),
                     )?;
+                    require_non_empty(
+                        "gates.not_applicable_approval_ref",
+                        gate.not_applicable_approval_ref.as_deref().unwrap_or(""),
+                    )?;
                 }
                 GateStatus::Fail | GateStatus::Blocked | GateStatus::NotRun => {
                     require_non_empty(
@@ -386,6 +395,16 @@ impl ScenarioRunReceipt {
             }
             if let Some(digest) = gate.evidence_sha256.as_deref() {
                 validate_sha256("gates.evidence_sha256", digest)?;
+            }
+            if gate.status == GateStatus::Pass
+                && !self.outputs.iter().any(|output| {
+                    gate.evidence_sha256.as_deref() == Some(output.sha256.as_str())
+                })
+            {
+                return Err(invalid(
+                    "gates.evidence_sha256",
+                    "passing gate evidence digest must reference a retained output artifact",
+                ));
             }
         }
         Ok(())
@@ -471,6 +490,7 @@ impl ScenarioRunReceipt {
             output.push(u8::from(gate.required));
             append_field(&mut output, gate.status.as_str());
             append_optional_field(&mut output, gate.reason.as_deref());
+            append_optional_field(&mut output, gate.not_applicable_approval_ref.as_deref());
             append_optional_field(&mut output, gate.verifier_id.as_deref());
             append_optional_field(&mut output, gate.evidence_sha256.as_deref());
         }
@@ -763,6 +783,7 @@ mod tests {
                 required: true,
                 status,
                 reason: (status != GateStatus::Pass).then(|| "synthetic test gate state".into()),
+                not_applicable_approval_ref: None,
                 verifier_id: (status == GateStatus::Pass).then(|| "independent-test-verifier/0.1".into()),
                 evidence_sha256: (status == GateStatus::Pass).then(|| HASH.into()),
             }],
@@ -830,6 +851,30 @@ mod tests {
         let a = receipt(GateStatus::Pass);
         let b = receipt(GateStatus::Pass);
         assert_eq!(a.canonical_bytes(), b.canonical_bytes());
+    }
+
+    #[test]
+    fn passing_gate_must_reference_a_retained_output_artifact() {
+        let mut input = receipt(GateStatus::Pass);
+        input.gates[0].evidence_sha256 = Some("cccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccc".into());
+        assert_eq!(input.validate().unwrap_err().field, "gates.evidence_sha256");
+        assert_eq!(input.promotion_state(), PromotionState::Blocked);
+    }
+
+    #[test]
+    fn not_applicable_gate_requires_approval_reference() {
+        let mut input = receipt(GateStatus::NotApplicable);
+        input.gates[0].not_applicable_approval_ref = None;
+        assert_eq!(
+            input.validate().unwrap_err().field,
+            "gates.not_applicable_approval_ref"
+        );
+        input.gates[0].not_applicable_approval_ref = Some("decision-record-42".into());
+        assert!(input.validate().is_ok());
+        assert_eq!(
+            input.promotion_state(),
+            PromotionState::EligibleForNextWorkflowStage
+        );
     }
 
     #[test]
