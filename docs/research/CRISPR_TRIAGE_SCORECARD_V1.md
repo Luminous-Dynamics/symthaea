@@ -104,6 +104,10 @@ The frontier keeps nondominated policies: no other policy is at least as good on
 
 **Frontier acceptance gate:** 100% of compared vectors use the same objective definitions, units, direction, held-out episodes and metric availability rules. The output includes every nondominated policy and its full vector. Frontier membership is not a benchmark win by itself: any claim of improvement still requires the primary predeclared outcome, uncertainty interval and ablations to pass.
 
+### J. From price claims to causal cost accounting
+
+Report computational resources and review slots first. Progress to human review minutes only when measured. Report per-qualified-finding cost only when numerator and denominator are observed end-to-end. Do not convert fewer ranked candidates into claims of lower experimental costs, clinical costs, or treatment prices without prospective accounting.
+
 ### K. From a single confidence number to selective, context-aware prediction
 
 This is not a claim that uncertainty modelling is new. Özden and Minary's crispAI already models off-target cleavage uncertainty with a zero-inflated negative-binomial count model and reports calibrated uncertainty estimates ([NAR 2024](https://doi.org/10.1093/nar/gkae759)). The proposed contribution here is the **evaluation and evidence contract** around selective policies: matched risk–coverage, visible unknown-label bounds, per-context reporting, and incremental comparison against qualified uncertainty-aware specialists. The July 2026 14-tool benchmark also found substantial score overlap and unassayed candidate scores overlapping observed positives, reinforcing that calibration claims must disclose the labelled denominator and unknowns ([Kaufmann et al. 2026](https://doi.org/10.1177/10430342261466407)).
@@ -157,10 +161,6 @@ Every target-relevant context must be supported by a permitted metric episode. U
 The research motivation is established rather than novel: group-weighted conformal prediction analyzes how group proportions affect coverage under covariate shift ([Bhattacharyya & Barber, 2026](https://doi.org/10.1214/26-EJS2506)); KMM-CP highlights support-overlap and selective-correction limits under shift ([UAI 2026](https://proceedings.mlr.press/v337/laghuvarapu26a.html)); and CS-WCP explicitly considers uncertain group proportions in a preprint ([2026 preprint](https://arxiv.org/abs/2609.27955)). This project does not claim novelty for shift-aware or mixture-robust evaluation. The proposed integration is the target-mixture envelope for paired CRISPR benchmark policy deltas, connected to the existing partial-label and interval-frontier contracts.
 
 Research task: [CRISPR-OT-006 #7615 — robust target-mixture transportability](https://github.com/Luminous-Dynamics/symthaea/issues/7615).
-
-### J. From price claims to causal cost accounting
-
-Report computational resources and review slots first. Progress to human review minutes only when measured. Report per-qualified-finding cost only when numerator and denominator are observed end-to-end. Do not convert fewer ranked candidates into claims of lower experimental costs, clinical costs, or treatment prices without prospective accounting.
 
 ## 2. Required benchmark tracks
 
