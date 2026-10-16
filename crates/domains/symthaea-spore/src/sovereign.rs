@@ -24,6 +24,7 @@
 //! - **LanInoculate**: nixos-anywhere over SSH to LAN/cloud target
 
 use serde::{Deserialize, Serialize};
+use crate::secure_boot::SecureBootProfileApproval;
 
 // ============================================================================
 // Core types
@@ -476,25 +477,6 @@ pub enum InoculationPath {
     InoculateAndAttune,
 }
 
-/// One-session authorization for generating a Lanzaboote configuration.
-///
-/// This record binds explicit user consent to an exact device/firmware/software
-/// profile and the currently observed hardware profile. It is not persisted, so
-/// a restart cannot silently reuse an earlier authorization.
-#[derive(Debug, Clone, PartialEq, Eq)]
-pub struct SecureBootProfileApproval {
-    pub profile_id: String,
-    pub target_model: String,
-    pub firmware_revision: String,
-    pub nixos_release: String,
-    pub lanzaboote_revision: String,
-    pub observed_secure_boot_state: String,
-    pub hardware_profile_blake3: String,
-    pub user_confirmed: bool,
-    pub exact_profile_qualified: bool,
-    pub recovery_path_verified: bool,
-}
-
 // ============================================================================
 // Orchestrator — ties everything together
 // ============================================================================
@@ -690,51 +672,22 @@ impl InoculationOrchestrator {
         if !self.lanzaboote_enabled {
             return Err("Lanzaboote is not selected for this target".to_string());
         }
-        if !approval.user_confirmed {
-            return Err("explicit operator confirmation is required".to_string());
-        }
-        if !approval.exact_profile_qualified {
-            return Err("the exact device/firmware/NixOS/Lanzaboote profile is not qualified".to_string());
-        }
-        if !approval.recovery_path_verified {
-            return Err("an independently verified recovery path is required".to_string());
-        }
-        for (name, value) in [
-            ("profile_id", approval.profile_id.as_str()),
-            ("target_model", approval.target_model.as_str()),
-            ("firmware_revision", approval.firmware_revision.as_str()),
-            ("nixos_release", approval.nixos_release.as_str()),
-            ("lanzaboote_revision", approval.lanzaboote_revision.as_str()),
-        ] {
-            if value.trim().is_empty() {
-                return Err(format!("{name} must be non-empty"));
-            }
-        }
-
-        if self.target_platform != TargetPlatform::Linux {
-            return Err("Lanzaboote profile authorization requires an identified Linux target".to_string());
-        }
         let observed_state = self.secure_boot_state.as_deref().ok_or_else(|| {
             "Secure Boot state is unknown; probe the exact target before generating configuration".to_string()
         })?;
-        if !matches!(observed_state, "Enabled" | "Disabled" | "SetupMode") {
-            return Err("Secure Boot state is unresolved; repeat the probe before generating configuration".to_string());
-        }
-        if approval.observed_secure_boot_state != observed_state {
-            return Err("the authorized Secure Boot state does not match the current observation".to_string());
-        }
-
         let profile = self.hardware_profile.as_ref().ok_or_else(|| {
             "hardware profile is required before Secure Boot configuration".to_string()
         })?;
         let bytes = serde_json::to_vec(profile)
             .map_err(|error| format!("cannot serialize hardware profile: {error}"))?;
         let fingerprint = blake3::hash(&bytes).to_hex().to_string();
-        if approval.hardware_profile_blake3 != fingerprint {
-            return Err("hardware profile changed after review; authorize the current exact profile again".to_string());
-        }
-        Ok(())
+        approval.validate_for_current_target(
+            observed_state,
+            &fingerprint,
+            self.target_platform == TargetPlatform::Linux,
+        )
     }
+
 
     /// True only after an explicit profile-bound authorization and while the
     /// exact observed state/profile still match that authorization.
