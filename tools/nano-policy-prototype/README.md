@@ -28,6 +28,7 @@ The current policies are transparent baselines, not claims that hybrid selection
 The binary reads one JSON request from stdin and writes one JSON response to stdout. Errors go to stderr and exit non-zero. The example request is diversity-only and carries no mock predictions or uncertainty estimates.
 
 - Request schema: `nano-policy-input-v1`; output schema: `nano-policy-output-v1`.
+- Machine-readable contracts: [`schema/request.schema.json`](schema/request.schema.json) and [`schema/response.schema.json`](schema/response.schema.json). Runtime checks additionally enforce policy-specific fields, fixed feature dimension, unique IDs, and normalized weight sum.
 - Each request is bound to a non-empty policy revision and a lowercase SHA-256 digest of the frozen candidate-pool manifest. The selector echoes both values; the independent harness is responsible for recomputing the digest from canonical source bytes.
 - Features must use a frozen, recorded transformation and lie in [-1, 1]. The feature space includes a lowercase SHA-256 digest of the preprocessing specification; the toy specification is preserved in `examples/feature-transform.txt`.
 - Every feature vector must have the same dimension and declared feature-space semantics.
