@@ -13,7 +13,7 @@ permissions:
   contents: read
 
 concurrency:
-  group: prediction-market-integrity-\${{ github.ref }}-\${{ github.event_name == 'workflow_dispatch' && github.run_id || 'auto' }}
+  group: prediction-market-integrity-${{ github.ref }}-${{ github.event_name == 'workflow_dispatch' && github.run_id || 'auto' }}
   cancel-in-progress: true
 
 jobs:
@@ -22,18 +22,18 @@ jobs:
     runs-on: ubuntu-24.04
     env:
       CARGO_TERM_COLOR: always
-      CARGO_TARGET_DIR: \${{ runner.temp }}/prediction-market-integrity-target
+      CARGO_TARGET_DIR: ${{ runner.temp }}/prediction-market-integrity-target
     steps:
       - name: Checkout exact event revision
         uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1
         with:
-          ref: \${{ github.event.pull_request.head.sha || github.sha }}
+          ref: ${{ github.event.pull_request.head.sha || github.sha }}
           fetch-depth: 1
           persist-credentials: false
 
       - name: Assert exact checkout revision
         env:
-          EXPECTED_SHA: \${{ github.event.pull_request.head.sha || github.sha }}
+          EXPECTED_SHA: ${{ github.event.pull_request.head.sha || github.sha }}
         run: |
           actual="$(git rev-parse HEAD)"
           test "$actual" = "$EXPECTED_SHA"
