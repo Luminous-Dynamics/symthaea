@@ -442,6 +442,8 @@ pub struct PlantStepTimingV1 {
     pub dt_seconds: f32,
     pub source: PlantStepTimeSourceV1,
     pub clock_domain_id: Option<String>,
+    /// Generation/session of the source clock; separate from the clock domain name.
+    pub clock_epoch_id: Option<String>,
     pub start_timestamp_ns: Option<u64>,
     pub end_timestamp_ns: Option<u64>,
 }
@@ -452,6 +454,7 @@ pub enum PlantStepTimingErrorV1 {
     NonPositiveDuration,
     MissingClockDomain,
     NonIncreasingTimestamps,
+    ConfiguredSourceCannotBeMeasured,
 }
 
 impl PlantStepTimingV1 {
@@ -473,6 +476,7 @@ impl PlantStepTimingV1 {
             dt_seconds,
             source: PlantStepTimeSourceV1::ConfiguredSimulationStep,
             clock_domain_id: None,
+            clock_epoch_id: None,
             start_timestamp_ns: None,
             end_timestamp_ns: None,
         })
@@ -487,14 +491,19 @@ impl PlantStepTimingV1 {
         step_index: u64,
         source: PlantStepTimeSourceV1,
         clock_domain_id: impl Into<String>,
+        clock_epoch_id: impl Into<String>,
         start_timestamp_ns: u64,
         end_timestamp_ns: u64,
     ) -> Result<Self, PlantStepTimingErrorV1> {
         if source == PlantStepTimeSourceV1::ConfiguredSimulationStep {
-            return Err(PlantStepTimingErrorV1::NonPositiveDuration);
+            return Err(PlantStepTimingErrorV1::ConfiguredSourceCannotBeMeasured);
         }
         let clock_domain_id = clock_domain_id.into();
         if clock_domain_id.trim().is_empty() {
+            return Err(PlantStepTimingErrorV1::MissingClockDomain);
+        }
+        let clock_epoch_id = clock_epoch_id.into();
+        if clock_epoch_id.trim().is_empty() {
             return Err(PlantStepTimingErrorV1::MissingClockDomain);
         }
         let elapsed_ns = end_timestamp_ns
@@ -513,6 +522,7 @@ impl PlantStepTimingV1 {
             dt_seconds,
             source,
             clock_domain_id: Some(clock_domain_id),
+            clock_epoch_id: Some(clock_epoch_id),
             start_timestamp_ns: Some(start_timestamp_ns),
             end_timestamp_ns: Some(end_timestamp_ns),
         })
@@ -764,6 +774,7 @@ mod tests {
         assert_eq!(timing.dt_seconds, 0.005);
         assert_eq!(timing.source, PlantStepTimeSourceV1::ConfiguredSimulationStep);
         assert_eq!(timing.clock_domain_id, None);
+        assert_eq!(timing.clock_epoch_id, None);
         assert_eq!(timing.start_timestamp_ns, None);
         assert_eq!(timing.end_timestamp_ns, None);
     }
@@ -774,12 +785,14 @@ mod tests {
             9,
             PlantStepTimeSourceV1::MeasuredMonotonicClock,
             "robot-steady-clock",
+            "boot-17",
             1_000_000,
             6_000_000,
         )
         .unwrap();
         assert_eq!(timing.dt_seconds, 0.005);
         assert_eq!(timing.clock_domain_id.as_deref(), Some("robot-steady-clock"));
+        assert_eq!(timing.clock_epoch_id.as_deref(), Some("boot-17"));
         assert_eq!(timing.start_timestamp_ns, Some(1_000_000));
         assert_eq!(timing.end_timestamp_ns, Some(6_000_000));
 
@@ -788,6 +801,7 @@ mod tests {
                 10,
                 PlantStepTimeSourceV1::MeasuredDeviceClock,
                 "device-ptp",
+                "session-4",
                 5,
                 5,
             ),
@@ -798,6 +812,7 @@ mod tests {
                 10,
                 PlantStepTimeSourceV1::MeasuredDeviceClock,
                 " ",
+                "session-4",
                 5,
                 6,
             ),
