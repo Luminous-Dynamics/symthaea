@@ -243,7 +243,9 @@ The machine-readable companion contract contains four small fixtures intended to
 
 6. **F6 — paired policy delta.** Two policies have the same five candidate IDs and labels, two measured positives, and three unknowns. At K=2 each finds one measured positive; they each uniquely select one different unknown, and one unknown is neutral. The observed known-label delta is 0, but the sharp paired label-sensitivity bounds are [-1/3, +1/3]. This is a comparison bound, not a confidence interval.
 
-The dependency-free Rust metric kernel is now committed at [scripts/crispr_triage_verifier.rs](../../scripts/crispr_triage_verifier.rs). It implements native nomination coverage, Recall@K, point Precision@K with unknown-label abstention, slots-at-recall, individual and paired partial-label bounds, SHA-256-claim format/match checks, and group-leakage validation. It includes unit tests for fixtures F1–F6 plus underfilled fixed budgets, invalid targets, duplicate identities/ranks, reference-label contradictions, and mismatched candidate universes.
+7. **F7 — underfilled fixed budget.** A ranking contains one candidate, but the declared review budget is K=2. Recall@2 and its partial-label sensitivity metric must return `not_estimable_at_budget_K`; neither metric may silently score the one-candidate list as a two-slot comparison.
+
+The dependency-free Rust metric kernel is now committed at [scripts/crispr_triage_verifier.rs](../../scripts/crispr_triage_verifier.rs). It implements native nomination coverage, Recall@K, point Precision@K with unknown-label abstention, slots-at-recall, individual and paired partial-label bounds, SHA-256-claim format/match checks, and group-leakage validation. It includes unit tests for fixtures F1–F7 plus underfilled fixed budgets, invalid targets, duplicate identities/ranks, reference-label contradictions, and mismatched candidate universes.
 
 Run the unit tests with an installed Rust toolchain:
 
