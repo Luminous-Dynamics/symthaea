@@ -179,7 +179,7 @@ impl ForecastTarget {
 }
 
 /// Why a method/horizon pair was omitted from scoring.
-#[derive(Debug, Clone, PartialEq, Eq)]
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
 pub enum ReplayExclusionReason {
     /// No observation for this event/method existed at or before the cutoff.
     NoForecastAtOrBeforeCutoff,
