@@ -427,6 +427,8 @@ fn evaluate_config(config: &ThresholdConfig, shots: &[CModShot]) -> EvaluationRe
             {
                 invalid_samples += 1;
                 excluded_sample_indices.push(sample_index);
+                // Do not infer a continuous trend/volatility trajectory across an unobserved point.
+                phi_history.clear();
                 continue;
             }
             if let Some((previous_time_ms, _)) = phi_history.last() {
@@ -435,6 +437,7 @@ fn evaluate_config(config: &ThresholdConfig, shots: &[CModShot]) -> EvaluationRe
                     // samples as invalid rather than silently changing the inferred dynamics.
                     invalid_samples += 1;
                     excluded_sample_indices.push(sample_index);
+                    phi_history.clear();
                     continue;
                 }
             }
@@ -974,20 +977,45 @@ pub struct CrossValidationResults {
     pub val_results: EvaluationResults,
 }
 
-/// Split shots into train/val sets (80/20)
+/// Split by complete shot identity into train/validation sets (approximately 80/20).
+///
+/// Duplicate rows carrying the same shot ID remain in one partition so they cannot leak across
+/// the split. Duplicate identities remain unscoreable within their resulting partition.
 fn train_val_split(shots: &[CModShot], seed: u64) -> (Vec<CModShot>, Vec<CModShot>) {
     let mut rng = ChaCha8Rng::seed_from_u64(seed);
-    let mut indices: Vec<usize> = (0..shots.len()).collect();
+    let mut group_positions = HashMap::<u32, usize>::new();
+    let mut groups: Vec<Vec<usize>> = Vec::new();
 
-    // Fisher-Yates shuffle
-    for i in (1..indices.len()).rev() {
-        let j = rng.r#gen_range(0..=i);
-        indices.swap(i, j);
+    // Preserve first-seen group order; do not depend on randomized HashMap iteration order.
+    for (index, shot) in shots.iter().enumerate() {
+        let group_index = match group_positions.get(&shot.shot_id) {
+            Some(&group_index) => group_index,
+            None => {
+                let group_index = groups.len();
+                group_positions.insert(shot.shot_id, group_index);
+                groups.push(Vec::new());
+                group_index
+            }
+        };
+        groups[group_index].push(index);
     }
 
-    let split_point = (shots.len() as f64 * 0.8) as usize;
-    let train_indices = &indices[..split_point];
-    let val_indices = &indices[split_point..];
+    // Shuffle groups, never individual samples/duplicate rows within a shot identity.
+    for i in (1..groups.len()).rev() {
+        let j = rng.r#gen_range(0..=i);
+        groups.swap(i, j);
+    }
+
+    let target_train_count = (shots.len() as f64 * 0.8) as usize;
+    let mut train_indices = Vec::new();
+    let mut val_indices = Vec::new();
+    for group in groups {
+        if train_indices.len() < target_train_count {
+            train_indices.extend(group);
+        } else {
+            val_indices.extend(group);
+        }
+    }
 
     let train: Vec<CModShot> = train_indices.iter().map(|&i| shots[i].clone()).collect();
     let val: Vec<CModShot> = val_indices.iter().map(|&i| shots[i].clone()).collect();
@@ -1841,6 +1869,25 @@ mod tests {
             shot.add_sample(sample_for_test(shot_id, time_ms, unstable));
         }
         shot
+    }
+
+    #[test]
+    fn train_validation_split_keeps_duplicate_shot_ids_in_one_partition() {
+        let shots = vec![
+            shot_for_test(40, false, &[(0.0, false)]),
+            shot_for_test(40, false, &[(1.0, false)]),
+            shot_for_test(41, true, &[(10.0, true)]),
+            shot_for_test(42, false, &[(0.0, false)]),
+        ];
+        let (train, validation) = train_val_split(&shots, 123);
+        for train_shot in &train {
+            assert!(
+                validation.iter().all(|validation_shot| validation_shot.shot_id != train_shot.shot_id),
+                "shot_id {} leaked across train/validation",
+                train_shot.shot_id
+            );
+        }
+        assert_eq!(train.len() + validation.len(), shots.len());
     }
 
     #[test]
