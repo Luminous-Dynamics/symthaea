@@ -366,7 +366,8 @@
         "design_weighted_recall_and_precision_ratio_estimates",
         "naive_audit_subset_metrics_for_contrast",
         "sample_size_and_effective_sample_size",
-        "design_appropriate_uncertainty_method"
+        "design_appropriate_uncertainty_method",
+        "verified_resolved_outcome_inclusion_probability_manifest"
       ],
       "rules": [
         "A complete ranking census, candidate frame, K, and probability sample design must be frozen before outcome reveal.",
@@ -375,7 +376,10 @@
         "Publish design-weighted estimates and unweighted audit-subset diagnostics side by side.",
         "Horvitz-Thompson count estimates rely on correct inclusion probabilities; ratio estimates are not finite-sample unbiased. This kernel does not compute confidence intervals.",
         "No claim applies to true candidates outside the declared candidate frame; native nomination coverage remains a separate endpoint.",
-        "Require design-appropriate uncertainty, group-aware analysis, source permissions, and independent replay before real-cohort performance claims."
+        "Require design-appropriate uncertainty, group-aware analysis, source permissions, and independent replay before real-cohort performance claims.",
+        "The inclusion probability supplied for each row must describe final inclusion in the resolved, analyzable-label sample, not just an invitation or assay attempt.",
+        "Any unresolved outcome included in the supplied audit rows blocks this point-estimate kernel; unknown outcomes are never coerced to assay-defined negatives or silently dropped.",
+        "The independent design auditor must address nonresponse/assay failure in the sampling design; this module does not estimate response propensities."
       ]
     }
   ],
@@ -550,7 +554,9 @@
         "weighted and unweighted audit-subset diagnostics are both reported",
         "the precision/recall estimators and estimability conditions are explicit",
         "design-appropriate uncertainty and group effects are addressed outside the point-estimate kernel",
-        "no claim is made about candidates outside the declared frame"
+        "no claim is made about candidates outside the declared frame",
+        "resolved-outcome inclusion probabilities, including any modeled response/nonresponse mechanism, are independently justified",
+        "unresolved audit outcomes block this kernel rather than being coerced to negative"
       ]
     }
   ],
