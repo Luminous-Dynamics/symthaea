@@ -53,7 +53,7 @@ fn fixture() -> MissionConfiguration {
             capability,
             applies_to_variant_id: variant_id.into(),
             applies_to_hardware_revision: suit_revision.into(),
-            implementation_id: format!("synthetic-{}", capability as u8),
+            implementation_id: format!("synthetic-implementation:{capability:?}"),
             evidence_level: SuitEvidenceLevel::BenchTested,
             evidence_reference: format!("synthetic-evidence:{capability:?}"),
         })
