@@ -411,7 +411,6 @@ pub fn evaluate_repair_policies_under_duration_scenarios(
 #[cfg(test)]
 mod tests {
     use super::*;
-    use crate::repair_crew_scheduling::RepairJob;
 
     fn crew(id: &str, skill: &str) -> RepairCrew {
         RepairCrew::new(id, [skill], 0)
