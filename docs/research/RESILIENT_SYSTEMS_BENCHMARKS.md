@@ -275,3 +275,42 @@ Scenario weights must sum to one, but they are **not probabilities** unless just
 
 ---
 *Integrity rule: simulated benchmarks, skipped CI, and successful source-level checks are not evidence of field reliability. Report each evidence class separately.*
+
+
+## 8. Event-triggered rolling-horizon repair dispatch
+
+A fifth Rust module, [rolling_horizon_repair.rs](../../crates/domains/symthaea-engineering/src/rolling_horizon_repair.rs), adds **event-triggered recourse** to the fixed-plan baseline. At each observed completion/release event it rebuilds the eligible set from completed prerequisites, available qualified crews, outage release times, and remaining spare stock. It then dispatches one repair at a time per free crew. Parts are consumed only when a repair starts.
+
+The information boundary is deliberately narrow: nominal duration ranks pending jobs; the realized duration is looked up only after the job has been selected, and only schedules the job's completion event. The report records decision time, eligible job IDs, completed jobs observed, available crews, dispatch choice, remaining stock, and service-unit-step loss. This is a simulation contract—not cryptographic proof of nonanticipativity and not field validation.
+
+The paradigm shift is from treating the schedule as a commitment that must remain fixed to treating it as a **revisable policy operating on observed state**. A scenario can therefore change the next decision through completion timing, newly released jobs, dependency availability, or stock depletion, without granting the policy future repair durations. The fixed robust replay stays important as a paired baseline; adaptive dispatch must not be assumed superior in every case.
+
+The method is consistent with rolling-horizon restoration research that updates the plan as information about damaged components and field conditions changes. Wei et al. describe adjustable restoration windows with repair and travel times on standard feeder cases ([2024 preprint](https://arxiv.org/abs/2404.03197)). Research on repair-sequence scheduling likewise emphasizes resource-constrained sequence quality and comparison with alternative heuristics ([Xu et al., 2019](https://doi.org/10.1111/mice.12435)). These papers motivate the experiment; they do not validate this implementation.
+
+### RH reference fixtures
+
+- **RH-01 — Nonanticipative first action:** when two cases have identical observable state but different unrealized durations, the current decision must be identical.
+- **RH-02 — Replan after observed delay:** a long realized repair can cause a newly released high-priority job to move ahead of a lower-priority pending job.
+- **RH-03 — Completion-gated dependency:** dependent work cannot start before its prerequisite is observed complete.
+- **RH-04 — Crew legality:** skill eligibility and single-job-at-a-time constraints hold at every decision.
+- **RH-05 — Stock conservation:** parts are charged at dispatch, never pre-reserved for work that never starts, and stock never becomes negative.
+- **RH-06 — Release and availability:** neither jobs nor crews are used before their declared release/availability time.
+- **RH-07 — Horizon boundaries:** a repair finishing exactly at the horizon counts as complete; a later finish remains in progress; unstarted work is explicit.
+- **RH-08 — Determinism and auditability:** identical inputs reproduce the same event trace and report.
+- **RH-09 — Paired policy comparison:** fixed-plan replay and rolling-horizon policy consume identical realized-duration scenarios. Report per-case deltas, median, mean, upper-tail CVaR and worst specified case.
+- **RH-10 — Counterexamples retained:** publish cases where adaptation loses as well as wins; do not claim adaptive dispatch dominates every scenario.
+- **RH-11 — Oracle separation:** an optional clairvoyant/ perfect-information solution is an upper bound only, never described as an implementable policy.
+
+### Proposed acceptance and performance targets
+
+These are targets, not measured results or universal standards.
+
+1. **Zero information-boundary violations** in all defined RH-01 paired cases. The current module tests only a source-level subset of this protocol; the full paired-scenario harness remains future work.
+2. **Small-instance quality:** generalize the exact oracle to a public corpus of at most eight jobs and aim to be within 10% of exact optimum on at least 95% of feasible cases. Label every instance where the heuristic exceeds the gap; do not tune on the holdout corpus.
+3. **Decision value:** on a preregistered, paired scenario suite, report the distribution of adaptive-versus-fixed service-loss deltas. Treat a median reduction of at least 10% as an aspirational research target, not a release gate; also publish any floor violation or tail-risk regression.
+4. **Proposed runtime budget:** 100 jobs, 20 crews and 20 duration scenarios in under 1 second for the complete release-build batch; stress case 500 jobs, 50 crews and 100 scenarios in under 15 seconds. Both are unmeasured targets pending a named reference host.
+5. **Evidence gate:** before predictive use, add access/travel times, resupply events and observed-duration calibration; retain deterministic negative controls and compare against a simple baseline on held-out events.
+
+The initial adaptive fixture is synthetic. On its one-crew, three-job trace, fixed nominal dispatch order is A→C→B. With A taking 10 rather than its nominal 1 step and B becoming eligible at step 5, event-triggered priority dispatch reorders the still-pending work to A→B→C. The fixed-order realized loss is 922 versus 724 for adaptive dispatch on the declared weights: a 21.5% reduction for this one designed witness. This is a reproducible scenario claim only; it is not an average improvement claim, nor evidence of real-world predictive value.
+
+Current source-level coverage is 11 authored unit tests for this module. None of the Rust tests in this portfolio have been compiled or run in the current environment; the full rolling-horizon benchmark protocol is not implemented as a batch statistical evaluator.
