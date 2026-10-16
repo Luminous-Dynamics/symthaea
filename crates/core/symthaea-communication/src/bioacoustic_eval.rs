@@ -17,7 +17,8 @@ use crate::TimeSpan;
 use serde::{Deserialize, Serialize};
 use std::collections::{BTreeMap, BTreeSet};
 
-pub const BIOACOUSTIC_EVENT_EVAL_SCHEMA_VERSION: u32 = 1;
+pub const BIOACOUSTIC_EVENT_PREDICTION_SCHEMA_VERSION: u32 = 1;
+pub const BIOACOUSTIC_EVENT_REPORT_SCHEMA_VERSION: u32 = 2;
 
 #[derive(Clone, Debug, PartialEq, Serialize, Deserialize)]
 pub enum EventMatchRule {
@@ -193,7 +194,7 @@ pub fn evaluate_bioacoustic_events(
     manifest: &BioacousticCorpusManifest,
     bundle: &BioacousticEventPredictionBundle,
 ) -> Result<BioacousticEventEvaluationReport, String> {
-    if bundle.schema_version != BIOACOUSTIC_EVENT_EVAL_SCHEMA_VERSION {
+    if bundle.schema_version != BIOACOUSTIC_EVENT_PREDICTION_SCHEMA_VERSION {
         return Err("unsupported event-evaluation bundle schema version".into());
     }
     if bundle.dataset_id != manifest.dataset_id
@@ -454,7 +455,7 @@ pub fn evaluate_bioacoustic_events(
 
     Ok(BioacousticEventEvaluationReport {
         status: "EVALUATED".into(),
-        schema_version: BIOACOUSTIC_EVENT_EVAL_SCHEMA_VERSION,
+        schema_version: BIOACOUSTIC_EVENT_REPORT_SCHEMA_VERSION,
         corpus_schema_version: manifest.schema_version,
         dataset_id: manifest.dataset_id.clone(),
         dataset_revision: manifest.dataset_revision.clone(),
@@ -915,7 +916,7 @@ mod tests {
             ],
         };
         let bundle = BioacousticEventPredictionBundle {
-            schema_version: BIOACOUSTIC_EVENT_EVAL_SCHEMA_VERSION,
+            schema_version: BIOACOUSTIC_EVENT_PREDICTION_SCHEMA_VERSION,
             dataset_id: "pilot".into(),
             dataset_revision: "rev-a".into(),
             corpus_manifest_blake3: manifest.computed_manifest_blake3().unwrap(),
