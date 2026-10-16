@@ -1522,6 +1522,8 @@ mod tests {
         assert_eq!(report.status, PeakResourceReservationStatus::MeetsDeclaredPeakResourcePolicy);
         assert!(report.windows.iter().all(|window| window.required_demand_upper == 700));
         assert!(report.windows.iter().all(|window| window.total_shortfall == 0));
+        assert!(report.windows.iter().all(|window| window.active_reservation_count == 1));
+        assert!(report.windows.iter().all(|window| window.active_reservation_ids.is_empty()));
     }
 
     #[test]
@@ -1622,6 +1624,36 @@ mod tests {
         assert_eq!(report.status, PeakResourceReservationStatus::Blocked);
         assert!(report.findings.iter().any(|finding| {
             finding.code == PeakResourceFindingCode::EnvironmentScopeMismatch
+                && finding.severity == PeakResourceFindingSeverity::Blocker
+        }));
+    }
+
+    #[test]
+    fn resource_pool_requires_a_matching_declared_interface_kind() {
+        let (configuration, tasks, task_receipt, mut plan) = fixture();
+        plan.pools[0].required_interface_kinds =
+            BTreeSet::from([crate::suit_interop::SuitInterfaceKind::GroundingAndEsd]);
+        let (report, _) =
+            evaluate_peak_resource_reservations(&configuration, &tasks, &task_receipt, &plan)
+                .unwrap();
+        assert_eq!(report.status, PeakResourceReservationStatus::Blocked);
+        assert!(report.findings.iter().any(|finding| {
+            finding.code == PeakResourceFindingCode::ProviderConnectionResourceKindMismatch
+                && finding.severity == PeakResourceFindingSeverity::Blocker
+        }));
+    }
+
+    #[test]
+    fn missing_exact_provider_connection_is_a_blocker() {
+        let (configuration, tasks, task_receipt, mut plan) = fixture();
+        plan.pools[0].required_connection_ids =
+            BTreeSet::from(["unlisted-power-contract".into()]);
+        let (report, _) =
+            evaluate_peak_resource_reservations(&configuration, &tasks, &task_receipt, &plan)
+                .unwrap();
+        assert_eq!(report.status, PeakResourceReservationStatus::Blocked);
+        assert!(report.findings.iter().any(|finding| {
+            finding.code == PeakResourceFindingCode::MissingProviderConnection
                 && finding.severity == PeakResourceFindingSeverity::Blocker
         }));
     }
