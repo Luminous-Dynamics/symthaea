@@ -394,7 +394,7 @@ mod tests {
         r.selection_count = 3; r.max_total_cost = Some(3.);
         let receipt = select(r).unwrap();
         assert_eq!(receipt.selected_count, 2);
-        assert_eq!(receipt.total_estimated_cost, 3.);
+        assert!((receipt.total_estimated_cost - 3.0).abs() <= f64::EPSILON);
         assert_eq!(receipt.candidate_audit.len(), 3);
         assert!(receipt.candidate_audit.iter().any(|d| d.disposition == CandidateDisposition::OverBudget));
     }
@@ -426,6 +426,16 @@ mod tests {
         );
         r.reference_features = vec![vec![0.5]];
         assert!(select(r).unwrap_err().contains("reference feature vector has 1 dimensions"));
+    }
+
+    #[test]
+    fn non_finite_reference_features_are_rejected() {
+        let mut r = req(
+            SelectionPolicy::MaxMinDiversity,
+            vec![c("a", &[0.0], 1.0), c("b", &[1.0], 1.0)],
+        );
+        r.reference_features = vec![vec![f64::INFINITY]];
+        assert!(select(r).unwrap_err().contains("reference feature vector contains non-finite values"));
     }
 
     #[test]
