@@ -620,6 +620,25 @@ mod tests {
     }
 
     #[test]
+    fn pinned_hdc_smoke_fixture_uses_hdc_policy_and_returns_budget() {
+        let req: Request = serde_json::from_str(include_str!("../fixtures/hdc-smoke-request.json"))
+            .expect("valid HDC smoke request");
+        let expected: serde_json::Value =
+            serde_json::from_str(include_str!("../fixtures/hdc-smoke-expected.json"))
+                .expect("valid HDC smoke expectation");
+        assert_eq!(
+            serde_json::to_value(req.policy).expect("serialize policy"),
+            expected["expected_policy"]
+        );
+        let result = select(&req).expect("HDC smoke selection succeeds");
+        assert_eq!(result.selected.len(), req.budget);
+        assert_eq!(result.normalization, "per_feature_min_max_then_symthaea_binary_hdc_256_levels");
+        assert!(result.selected.iter().all(|item| {
+            item.score.is_some_and(|score| (0.0..=1.0).contains(&score))
+        }));
+    }
+
+    #[test]
     fn hdc_maximin_is_deterministic_and_obeys_budget() {
         let first = request(
             Policy::HdcMaximin,
@@ -878,6 +897,20 @@ mod tests {
             output_schema["properties"]["input_blake3"]["pattern"].as_str(),
             Some("^[a-f0-9]{64}$")
         );
+        assert_eq!(
+            output_schema["properties"]["policy_version"]["const"].as_str(),
+            Some(POLICY_VERSION)
+        );
+        assert!(input_schema["properties"]["policy"]["enum"]
+            .as_array()
+            .expect("policy enum")
+            .iter()
+            .any(|policy| policy == "hdc_maximin"));
+        assert!(output_schema["properties"]["selected"]["items"]["properties"]["score_kind"]["enum"]
+            .as_array()
+            .expect("score kind enum")
+            .iter()
+            .any(|kind| kind == "hdc_min_distance_to_selected"));
     }
 
     #[test]
