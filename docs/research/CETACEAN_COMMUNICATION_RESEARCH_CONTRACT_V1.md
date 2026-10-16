@@ -140,8 +140,8 @@ A communication claim requires a species/population-specific, ethically reviewed
 
 ## 6. Code-specific next steps
 
-1. Run the new classifier and whale configuration tests on a real Rust toolchain; inspect formatting / Clippy and do not call skipped CI a pass. The legacy whale validation examples are now explicitly exploratory, but still need to be replaced by a source/encounter-grouped evaluation harness with independent labels.
-2. Audit current whale validation examples for filename-derived labels and sequential file splits; replace these with manifests and recording/encounter group splits.
+1. Run the new classifier and whale configuration tests on a real Rust toolchain; inspect formatting / Clippy and do not call skipped CI a pass.
+2. Replace the list-position partitions and filename-derived labels inside the now-explicitly-exploratory `whale_validation.rs` and v2–v4 demos with a versioned annotation manifest and recording/encounter-grouped evaluation harness. The display labels have been corrected, but the underlying split/label method is still unsuitable for validation.
 3. Build a Rust-first metadata-only corpus manifest and preflight validator. It should verify sample-rate/channel manifests, content hashes, annotation coverage, source IDs, labels and license decisions without copying raw audio into the repo.
 4. Build the first permissible small subset / metadata preflight only after rights admission; prioritize whistle contours (rich labels) and coda timing as two separate tracks rather than one blended metric.
 5. Compare the legacy Symthaea prototypes against explicit baselines and released model families; pin each model's license, weights hash and preprocessing, and record compute/hardware.
