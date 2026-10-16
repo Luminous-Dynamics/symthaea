@@ -75,6 +75,7 @@ pub struct SfzMappingManifestV1 {
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
 enum Scope {
     Global,
+    Control,
     Group,
     Region,
 }
@@ -84,7 +85,7 @@ type Opcodes = std::collections::BTreeMap<String, String>;
 /// Parse SFZ numeric MIDI key/velocity mappings and preserve enough metadata
 /// to qualify externally authored sample banks.
 ///
-/// Supported mapping opcodes: sample, default_path, key, lokey, hikey,
+/// Supported sections are control, global, group and region. Mapping opcodes include sample, default_path, key, lokey, hikey,
 /// pitch_keycenter, lovel, hivel, tune, seq_length, and seq_position. Other
 /// opcodes are listed in unhandled_opcodes; this function does not claim full
 /// playback fidelity or execute opcodes.
@@ -95,6 +96,7 @@ type Opcodes = std::collections::BTreeMap<String, String>;
 pub fn parse_sfz_mapping(source: &str) -> Result<SfzMappingManifestV1, SfzParseError> {
     let mut scope = Scope::Global;
     let mut global: Opcodes = Opcodes::new();
+    let mut control: Opcodes = Opcodes::new();
     let mut group: Opcodes = Opcodes::new();
     let mut region: Option<(Opcodes, usize)> = None;
     let mut regions = Vec::new();
@@ -111,19 +113,23 @@ pub fn parse_sfz_mapping(source: &str) -> Result<SfzMappingManifestV1, SfzParseE
             if token.starts_with('<') && token.ends_with('>') {
                 let section = token[1..token.len() - 1].to_ascii_lowercase();
                 match section.as_str() {
+                    "control" => {
+                        finalize_region(&mut region, &mut regions, &mut unhandled_opcodes, &control)?;
+                        scope = Scope::Control;
+                    }
                     "global" => {
-                        finalize_region(&mut region, &mut regions, &mut unhandled_opcodes)?;
+                        finalize_region(&mut region, &mut regions, &mut unhandled_opcodes, &control)?;
                         global.clear();
                         group = global.clone();
                         scope = Scope::Global;
                     }
                     "group" => {
-                        finalize_region(&mut region, &mut regions, &mut unhandled_opcodes)?;
+                        finalize_region(&mut region, &mut regions, &mut unhandled_opcodes, &control)?;
                         group = global.clone();
                         scope = Scope::Group;
                     }
                     "region" => {
-                        finalize_region(&mut region, &mut regions, &mut unhandled_opcodes)?;
+                        finalize_region(&mut region, &mut regions, &mut unhandled_opcodes, &control)?;
                         region = Some((group.clone(), line_number));
                         scope = Scope::Region;
                     }
@@ -157,6 +163,9 @@ pub fn parse_sfz_mapping(source: &str) -> Result<SfzMappingManifestV1, SfzParseE
                 Scope::Global => {
                     global.insert(key.to_ascii_lowercase(), value.to_owned());
                 }
+                Scope::Control => {
+                    control.insert(key.to_ascii_lowercase(), value.to_owned());
+                }
                 Scope::Group => {
                     group.insert(key.to_ascii_lowercase(), value.to_owned());
                 }
@@ -173,7 +182,7 @@ pub fn parse_sfz_mapping(source: &str) -> Result<SfzMappingManifestV1, SfzParseE
         }
     }
 
-    finalize_region(&mut region, &mut regions, &mut unhandled_opcodes)?;
+    finalize_region(&mut region, &mut regions, &mut unhandled_opcodes, &control)?;
     if regions.is_empty() {
         return Err(parse_error(1, "no region entries with sample mappings found"));
     }
@@ -203,12 +212,17 @@ fn finalize_region(
     pending: &mut Option<(Opcodes, usize)>,
     output: &mut Vec<SfzRegionMappingV1>,
     unhandled: &mut BTreeSet<String>,
+    control: &Opcodes,
 ) -> Result<(), SfzParseError> {
     let Some((opcodes, source_line)) = pending.take() else {
         return Ok(());
     };
     let sample_value = get_required(&opcodes, "sample", source_line)?;
-    let default_path = opcodes.get("default_path").map(String::as_str).unwrap_or("");
+    let default_path = opcodes
+        .get("default_path")
+        .or_else(|| control.get("default_path"))
+        .map(String::as_str)
+        .unwrap_or("");
     let sample_path = normalize_sample_path(default_path, sample_value, source_line)?;
     let single_key = opcodes.get("key").map(|value| parse_u8(value, "key", source_line)).transpose()?;
 
@@ -417,8 +431,17 @@ pub fn inspect_sample_reference(
 
     let metadata = std::fs::metadata(&current)?;
     let digest = if hash_content {
-        let bytes = std::fs::read(&current)?;
-        Some(format!("{:x}", Sha256::digest(&bytes)))
+        let mut file = std::fs::File::open(&current)?;
+        let mut hasher = Sha256::new();
+        let mut buffer = [0_u8; 64 * 1024];
+        loop {
+            let count = file.read(&mut buffer)?;
+            if count == 0 {
+                break;
+            }
+            hasher.update(&buffer[..count]);
+        }
+        Some(format!("{:x}", hasher.finalize()))
     } else {
         None
     };
@@ -488,6 +511,13 @@ mod tests {
 
         let invalid_sequence = "<group> seq_length=2\n<region> seq_position=3 sample=samples/test.wav";
         assert!(parse_sfz_mapping(invalid_sequence).unwrap_err().message.contains("exceeds"));
+    }
+
+    #[test]
+    fn control_default_path_is_applied_to_relative_samples() {
+        let source = "<control> default_path=samples\n<region> sample=test.wav";
+        let manifest = parse_sfz_mapping(source).unwrap();
+        assert_eq!(manifest.regions[0].sample_path, "samples/test.wav");
     }
 
     #[test]
