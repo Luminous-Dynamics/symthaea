@@ -1,0 +1,103 @@
+name: Enzyme benchmark admission checker
+
+on:
+  pull_request:
+    paths:
+      - "xtask/src/enzyme_bench.rs"
+      - "xtask/src/enzyme_calibration.rs"
+      - "xtask/src/enzyme_evidence_graph.rs"
+      - "xtask/src/enzyme_model_falsification.rs"
+      - "xtask/src/main.rs"
+      - "xtask/Cargo.toml"
+      - "Cargo.toml"
+      - "Cargo.lock"
+      - "docs/research/INDUSTRIAL_ENZYME_BENCHMARK_V0.md"
+      - "docs/research/ENZYME_KINETICS_PARADIGM_SHIFT_ROADMAP_V0.md"
+      - "docs/research/ENZYME_EVIDENCE_GRAPH_CONTRACT_V0.json"
+      - "docs/research/ENZYME_EVIDENCE_GRAPH_VERIFIER_V0.md"
+      - "docs/research/ENZYME_MODEL_FALSIFICATION_BENCHMARK_V0.md"
+      - "docs/research/KCAT_ADMISSION_PROFILE_V0.json"
+      - "docs/research/SLAC_CALIBRATION_REFERENCE_MANIFEST.json"
+      - ".github/workflows/enzyme-bench-checker.yml"
+  push:
+    branches: [main]
+    paths:
+      - "xtask/src/enzyme_bench.rs"
+      - "xtask/src/enzyme_calibration.rs"
+      - "xtask/src/enzyme_evidence_graph.rs"
+      - "xtask/src/enzyme_model_falsification.rs"
+      - "xtask/src/main.rs"
+      - "xtask/Cargo.toml"
+      - "Cargo.toml"
+      - "Cargo.lock"
+      - "docs/research/INDUSTRIAL_ENZYME_BENCHMARK_V0.md"
+      - "docs/research/ENZYME_KINETICS_PARADIGM_SHIFT_ROADMAP_V0.md"
+      - "docs/research/ENZYME_EVIDENCE_GRAPH_CONTRACT_V0.json"
+      - "docs/research/ENZYME_EVIDENCE_GRAPH_VERIFIER_V0.md"
+      - "docs/research/ENZYME_MODEL_FALSIFICATION_BENCHMARK_V0.md"
+      - "docs/research/KCAT_ADMISSION_PROFILE_V0.json"
+      - "docs/research/SLAC_CALIBRATION_REFERENCE_MANIFEST.json"
+      - ".github/workflows/enzyme-bench-checker.yml"
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+concurrency:
+  group: enzyme-bench-checker-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  admission-unit-tests:
+    name: Enzyme benchmark admission unit tests
+    runs-on: ubuntu-latest
+    timeout-minutes: 20
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Install pinned Rust toolchain
+        uses: dtolnay/rust-toolchain@1.96.0
+
+      - name: Test admission, calibration, evidence-graph, and synthetic falsification fixtures
+        run: cargo test -p xtask --bin xtask
+
+      - name: Execute synthetic model-falsification report and assert its contract
+        shell: bash
+        run: |
+          set -euo pipefail
+          report="$RUNNER_TEMP/enzyme_model_falsification_v0.json"
+          cargo run -p xtask -- enzyme-model-falsification --out "$report"
+          jq -e '
+            .schema_version == 1 and
+            .status == "synthetic_fixture_passed" and
+            .parameter_recovery.fixture_gate_passed == true and
+            .model_selection_falsification.michaelis_menten_truth.selected_model == "michaelis_menten" and
+            .model_selection_falsification.michaelis_menten_truth.delta_bic_mm_minus_inhibition < -10.0 and
+            .model_selection_falsification.substrate_inhibition_truth.selected_model == "substrate_inhibition" and
+            .model_selection_falsification.substrate_inhibition_truth.delta_bic_mm_minus_inhibition > 10.0 and
+            .model_discrimination_design.selected_condition == 100.0 and
+            .km_design_proxy.selected_condition == 2.0
+          ' "$report" >/dev/null
+
+      - name: Fetch pinned CC BY calibration references (temporary runner workspace only)
+        shell: bash
+        run: |
+          set -euo pipefail
+          mirror_commit="737c57b54f3cf9c9914c53f3d8b7f7790c76b5c5"
+          dest="research-data/enzyme-benchmark/slac-calibration"
+          mkdir -p "$dest"
+          for file in \
+            ABTS_standard_25.0C.json \
+            ABTS_standard_30.0C.json \
+            ABTS_standard_35.5C.json \
+            ABTS_standard_40.0C.json \
+            ABTS_standard_45.0C.json; do
+            curl --fail --location --silent --show-error --retry 3 \
+              "https://raw.githubusercontent.com/EnzymeML/slac_modeling/${mirror_commit}/data/calibrations/${file}" \
+              --output "${dest}/${file}"
+          done
+          echo "Source: Max Häußler (2024), DaRUS version 1.0, DOI 10.18419/DARUS-3867, CC BY 4.0."
+          echo "Mirror: EnzymeML/slac_modeling at ${mirror_commit}; files remain temporary and are not committed."
+
+      - name: Verify five real calibration payloads and independently refit
+        run: cargo run -p xtask -- enzyme-calibration-suite-check --manifest docs/research/SLAC_CALIBRATION_REFERENCE_MANIFEST.json

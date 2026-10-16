@@ -24621,10 +24621,13 @@ dependencies = [
  "anyhow",
  "clap",
  "csv",
+ "md-5 0.10.6",
  "serde",
  "serde_json",
+ "sha1 0.10.6",
  "sha2 0.10.9",
  "toml 0.8.23",
+ "url 2.5.8",
 ]
 
 [[package]]
