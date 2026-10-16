@@ -76,6 +76,14 @@ Then, where P > 0 and K slots are available:
 
 The lower recall case treats selected unknowns as negative and all unselected unknowns as positive; the upper case does the reverse. Report the observed estimate and bounds together. Never report an unknown as a negative merely to obtain a point estimate. These are **label-uncertainty bounds**, distinct from group-aware statistical uncertainty intervals.
 
+For a **paired policy comparison**, do not infer superiority merely from overlap/non-overlap of each policy's separate bounds. Both policies must have the same candidate IDs and label mapping, and an unknown site must receive the same latent label in both. At fixed K, let d = known-positive hits for A minus known-positive hits for B; a = unknown IDs selected by A but not B; b = unknown IDs selected by B but not A; n = all remaining unknown IDs in the universe (selected by both or neither). With P measured positives:
+
+- lower numerator = d - b; lower denominator = P + b, plus n only if the lower numerator is positive;
+- upper numerator = d + a; upper denominator = P + a, plus n only if the upper numerator is negative;
+- paired label-sensitivity bounds = [lower numerator / lower denominator, upper numerator / upper denominator].
+
+This is a sharp worst/best-case bound for Recall@K(A) - Recall@K(B) under unrestricted binary assignments to unknown labels inside the shared universe. A positive lower bound supports label-robust superiority *within that universe*; a bound spanning zero means observed-label improvement is not robust to all unresolved-label assignments. Neither outcome addresses positive sites omitted from every nomination method.
+
 ### I. From price claims to causal cost accounting
 
 Report computational resources and review slots first. Progress to human review minutes only when measured. Report per-qualified-finding cost only when numerator and denominator are observed end-to-end. Do not convert fewer ranked candidates into claims of lower experimental costs, clinical costs, or treatment prices without prospective accounting.
@@ -90,7 +98,7 @@ Report computational resources and review slots first. Progress to human review 
 | T3 Budgeted review | How much review is needed for an agreed level of measured-positive recall? | recall at fixed slots; slots needed to match baseline recall; precision trade-off | actual dollar savings |
 | T4 Calibration and abstention | Are scores usable as probabilities, and does the system know when it lacks evidence? | Brier/log loss where labels support them, reliability plots, risk–coverage curve, abstention rate | clinical safety |
 | T5 Shift and robustness | Does the effect persist on unseen groups and independent data? | leave-guide/Cas9-group-out delta, leave-assay-family-out delta, independent-cohort delta, group-level uncertainty | universal generalization from one small cohort |
-| T6 Incrementality | Does Symthaea add value over the same specialist predictions? | paired delta at equal budget; ablations; runtime/resource delta | benefit attributable to an upstream model unless ablated |
+| T6 Incrementality | Does Symthaea add value over the same specialist predictions? | paired delta at equal budget; paired partial-label bounds; ablations; runtime/resource delta | benefit attributable to an upstream model unless ablated |
 | T7 Evidence/replay integrity | Can an independent evaluator detect tampering or leakage? | deterministic replay, exact manifest, negative controls, digest/count agreement | biological truth from cryptography alone |
 | T8 Partial-label identification | How much do unresolved labels change metric interpretation? | observed-label estimate, worst/best-case recall and precision bounds, unknown-label census | sites omitted from every nomination method; truth outside the fixed candidate universe |
 
@@ -127,7 +135,8 @@ For either alternative:
 
 - endpoint, K or recall target, exclusion policy, comparator, split, interval procedure and analysis are frozen before holdout reveal;
 - report precision, false negatives and per-group deltas alongside the headline;
-- the paired group-aware interval must exclude no improvement for a “demonstrated improvement” claim;
+- where unknown candidates exist, report the paired label-sensitivity bound for the policy delta; call the gain label-robust within the fixed universe only when its worst-case lower bound is above zero;
+- the paired group-aware statistical interval must exclude no improvement for a “demonstrated improvement” claim;
 - if the interval includes no improvement or the eligible sample is inadequate, report **null/inconclusive**, not success;
 - cross-dataset robustness requires at least one separate, independently sourced cohort with explicit permission for the intended use.
 
@@ -231,7 +240,9 @@ The machine-readable companion contract contains four small fixtures intended to
 
 5. **F5 — partial-label sensitivity bounds.** Two measured positives and two unknown candidates with K=2 produce observed known-label recall 0.5, conditional recall bounds [1/3, 2/3], and precision bounds [0.5, 1.0]. The bounds vary unknown labels only inside this exact universe.
 
-The dependency-free Rust metric kernel is now committed at [scripts/crispr_triage_verifier.rs](../../scripts/crispr_triage_verifier.rs). It implements native nomination coverage, Recall@K, point Precision@K with unknown-label abstention, slots-at-recall, partial-label bounds, SHA-256-claim format/match checks, and group-leakage validation. It includes unit tests for fixtures F1–F5 plus invalid targets and duplicate identities.
+6. **F6 — paired policy delta.** Two policies have the same five candidate IDs and labels, two measured positives, and three unknowns. At K=2 each finds one measured positive; they each uniquely select one different unknown, and one unknown is neutral. The observed known-label delta is 0, but the sharp paired label-sensitivity bounds are [-1/3, +1/3]. This is a comparison bound, not a confidence interval.
+
+The dependency-free Rust metric kernel is now committed at [scripts/crispr_triage_verifier.rs](../../scripts/crispr_triage_verifier.rs). It implements native nomination coverage, Recall@K, point Precision@K with unknown-label abstention, slots-at-recall, individual and paired partial-label bounds, SHA-256-claim format/match checks, and group-leakage validation. It includes unit tests for fixtures F1–F6 plus invalid targets, duplicate identities/ranks, reference-label contradictions, and mismatched candidate universes.
 
 Run the unit tests with an installed Rust toolchain:
 
