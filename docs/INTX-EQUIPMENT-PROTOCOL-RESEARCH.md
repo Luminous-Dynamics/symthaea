@@ -94,3 +94,17 @@ A library's open-source license, protocol support list, recent release, or local
 ## Explicit nonclaims
 
 This note does not establish that Symthaea currently implements OPC UA or Modbus, that the candidate crates pass Symthaea's toolchain or security gates, that either server/client is fully certified, or that any real equipment is compatible. The proposed interoperability tests are not functional-safety certification or field qualification.
+
+
+## Existing Symthaea equipment-control baseline
+
+A separate source audit on the default-branch commit `5e83cea4986ba3845aa50e0d5dd03493c5adeddf` found an existing domain-specific 3D-printing/machine-control path:
+
+- `crates/domains/symthaea-fabrication-kernel/src/printer_control.rs` contains `PrinterApi`, `MockPrinter`, typed status/temperature results, and OctoPrint/Moonraker client stubs that fail closed with `BackendUnavailable`.
+- `src/machine.rs` includes typed machine profiles/capabilities, bounded timed sessions, negotiation and `ValidatedGCode`.
+- `src/submission.rs` adds a single-use print authorization path bound to G-code and machine-profile fingerprints, attestation/release evidence, and session lease.
+- `src/session.rs` adds sequence/nonce/expiry anti-replay tracking; `src/operator_command.rs` includes signed bounded operator commands; `src/execution_guard.rs` ties containment decisions to verified machine telemetry.
+
+This is a better immediate bridge target than building another machine-control stack from scratch. However, it is **not** a generic industrial adapter, and the live OctoPrint/Moonraker clients are still stubs at that baseline. The next focused issue is [INTX-FAB-ADAPTER-001 / #7706](https://github.com/Luminous-Dynamics/symthaea/issues/7706): expose read-only observations and artifact evidence while preserving the current machine/session/authorization owners, and only later evaluate real transport. It must not expose raw G-code submission directly to cognition.
+
+This domain adapter is a complementary first implementation slice; the independently implemented OPC UA test-server pilot in [#7704](https://github.com/Luminous-Dynamics/symthaea/issues/7704) remains the standards-based industrial interoperability tranche. Neither should be advertised as generalized support for existing medical, utility, or factory devices.
