@@ -1,0 +1,10 @@
+candidate_id	period_nm	minimum_feature_nm	primitive_count	fill_fraction
+design-a	300	50	2	0.20
+design-b	400	50	3	0.30
+design-c	500	60	2	0.35
+design-d	600	80	4	0.40
+design-e	300	100	1	0.18
+design-f	400	120	3	0.55
+design-g	500	90	2	0.62
+design-h	600	70	4	0.48
+design-c-duplicate	500	60	2	0.35
