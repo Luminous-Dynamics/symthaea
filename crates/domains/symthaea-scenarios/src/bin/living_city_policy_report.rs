@@ -194,13 +194,19 @@ mod tests {
     }
 
     #[test]
-    fn report_does_not_require_every_policy_to_qualify() {
+    fn report_records_failures_without_calling_the_suite_blocked() {
         let report = build_report().unwrap();
+        let no_intervention = report
+            .payload
+            .policy_assessments
+            .iter()
+            .find(|assessment| assessment.policy == PolicyKind::NoIntervention)
+            .unwrap();
+        assert_eq!(no_intervention.state, PolicySuiteState::Failed);
         assert!(report
             .payload
             .policy_assessments
             .iter()
-            .any(|assessment| assessment.state == PolicySuiteState::Failed
-                || assessment.state == PolicySuiteState::Qualified));
+            .all(|assessment| assessment.state != PolicySuiteState::Blocked));
     }
 }
