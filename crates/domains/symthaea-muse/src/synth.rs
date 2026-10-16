@@ -183,6 +183,7 @@ pub fn render_arrangement(
         state,
         config,
         &std::collections::HashMap::new(),
+        &std::collections::HashMap::new(),
     )
     .audio
 }
@@ -205,6 +206,33 @@ pub fn render_arrangement_with_sample_styles(
         state,
         config,
         styles_by_voice_index,
+        &std::collections::HashMap::new(),
+    )
+}
+
+/// Render with voice defaults plus explicit per-note style overrides.
+///
+/// A note-specific request wins over the voice-level default. Invalid voice/note
+/// indices receive deterministic fallback receipts instead of being ignored.
+/// This enables mixed articulations within one voice without changing the
+/// legacy renderer API or the voice-level convenience entry point.
+pub fn render_arrangement_with_sample_style_plan(
+    arrangement: &Arrangement,
+    sample_rate: u32,
+    total_samples: usize,
+    state: &MusicalState,
+    config: &MuseConfig,
+    styles_by_voice_index: &std::collections::HashMap<usize, String>,
+    styles_by_note_index: &std::collections::HashMap<(usize, usize), String>,
+) -> StyledArrangementRender {
+    render_arrangement_internal(
+        arrangement,
+        sample_rate,
+        total_samples,
+        state,
+        config,
+        styles_by_voice_index,
+        styles_by_note_index,
     )
 }
 
@@ -215,6 +243,7 @@ fn render_arrangement_internal(
     state: &MusicalState,
     config: &MuseConfig,
     styles_by_voice_index: &std::collections::HashMap<usize, String>,
+    styles_by_note_index: &std::collections::HashMap<(usize, usize), String>,
 ) -> StyledArrangementRender {
     let mut style_receipts = Vec::new();
     for (&voice_index, style_name) in styles_by_voice_index {
@@ -227,6 +256,30 @@ fn render_arrangement_internal(
                 decision: "voice_index_out_of_range",
                 rendered_path: "not_rendered",
             });
+        }
+    }
+    for (&(voice_index, note_index), style_name) in styles_by_note_index {
+        if voice_index >= arrangement.voices.len() {
+            style_receipts.push(SampleStyleRenderReceipt {
+                voice_index,
+                note_index: Some(note_index),
+                instrument: None,
+                requested_style: style_name.clone(),
+                decision: "voice_index_out_of_range",
+                rendered_path: "not_rendered",
+            });
+        } else {
+            let voice = &arrangement.voices[voice_index];
+            if note_index >= voice.notes.len() {
+                style_receipts.push(SampleStyleRenderReceipt {
+                    voice_index,
+                    note_index: Some(note_index),
+                    instrument: voice.instrument,
+                    requested_style: style_name.clone(),
+                    decision: "note_index_out_of_range",
+                    rendered_path: "not_rendered",
+                });
+            }
         }
     }
     let sr = sample_rate as f32;
@@ -271,8 +324,8 @@ fn render_arrangement_internal(
     let mut br = vec![0.0f32; total_samples];
 
     for (voice_index, voice) in arrangement.voices.iter().enumerate() {
-        let requested_style = styles_by_voice_index.get(&voice_index);
-        if let Some(style_name) = requested_style
+        let voice_style = styles_by_voice_index.get(&voice_index);
+        if let Some(style_name) = voice_style
             && voice.notes.is_empty()
         {
             style_receipts.push(SampleStyleRenderReceipt {
@@ -302,6 +355,9 @@ fn render_arrangement_internal(
             .unwrap_or(adsr);
 
         for (ni, note) in voice.notes.iter().enumerate() {
+            let requested_style = styles_by_note_index
+                .get(&(voice_index, ni))
+                .or(voice_style);
             // Legato: when the previous note in this voice ends where this
             // one begins (within 35ms) AND the motion is stepwise, the
             // recorded ATTACK of the incoming sample is the enemy — a fresh
@@ -1490,6 +1546,70 @@ mod tests {
             "voice_index_out_of_range"
         );
         assert_eq!(rendered.style_receipts[1].rendered_path, "not_rendered");
+    }
+
+    #[test]
+    fn per_note_style_plan_overrides_voice_default_and_receipts_invalid_indices() {
+        let arrangement = Arrangement {
+            voices: vec![Voice {
+                role: VoiceRole::Lead,
+                notes: vec![
+                    Note {
+                        frequency: 440.0,
+                        start_time: 0.0,
+                        duration: 0.04,
+                        velocity: 0.7,
+                    },
+                    Note {
+                        frequency: 493.883,
+                        start_time: 0.05,
+                        duration: 0.04,
+                        velocity: 0.7,
+                    },
+                ],
+                pitch_range: (220.0, 880.0),
+                volume: 1.0,
+                pan: 0.0,
+                instrument: Some(Instrument::Violin),
+            }],
+        };
+        let voice_styles =
+            std::collections::HashMap::from([(0usize, "voice default".to_string())]);
+        let note_styles = std::collections::HashMap::from([
+            ((0usize, 1usize), "note override".to_string()),
+            ((0usize, 7usize), "missing note".to_string()),
+            ((7usize, 0usize), "missing voice".to_string()),
+        ]);
+
+        let rendered = render_arrangement_with_sample_style_plan(
+            &arrangement,
+            22050,
+            4410,
+            &MusicalState::default(),
+            &MuseConfig::default(),
+            &voice_styles,
+            &note_styles,
+        );
+
+        assert_eq!(rendered.style_receipts.len(), 4);
+        assert_eq!(rendered.style_receipts[0].voice_index, 0);
+        assert_eq!(rendered.style_receipts[0].note_index, Some(0));
+        assert_eq!(rendered.style_receipts[0].requested_style, "voice default");
+        assert_eq!(
+            rendered.style_receipts[0].decision,
+            "unknown_style_for_instrument_fell_back"
+        );
+        assert_eq!(rendered.style_receipts[1].note_index, Some(1));
+        assert_eq!(rendered.style_receipts[1].requested_style, "note override");
+        assert_eq!(
+            rendered.style_receipts[1].decision,
+            "unknown_style_for_instrument_fell_back"
+        );
+        assert_eq!(rendered.style_receipts[2].note_index, Some(7));
+        assert_eq!(rendered.style_receipts[2].decision, "note_index_out_of_range");
+        assert_eq!(rendered.style_receipts[3].voice_index, 7);
+        assert_eq!(rendered.style_receipts[3].note_index, Some(0));
+        assert_eq!(rendered.style_receipts[3].decision, "voice_index_out_of_range");
     }
 
     #[cfg(not(target_arch = "wasm32"))]
