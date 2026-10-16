@@ -6,7 +6,7 @@
 
 use crate::experiment_selection::{
     rank_experiments, DecisionRelevance, ExperimentProposal, RejectedExperiment,
-    ResourceBasis, SafetyReview, SelectionError, SelectionPolicy,
+    SafetyReview, SelectionError, SelectionPolicy,
 };
 use std::collections::{BTreeMap, BTreeSet};
 use std::fmt;
@@ -799,6 +799,7 @@ mod tests {
         first.proposal.expected_uncertainty_reduction_fraction = 0.99;
         first.proposal.estimated_resource_cost.amount = 1.0;
         first.oracle_information_gain = 0.90;
+        let first_id = first.proposal.experiment_id.clone();
 
         let result = evaluate_scenario(
             &policy(),
@@ -808,7 +809,7 @@ mod tests {
         .unwrap();
 
         assert!(result.resolved);
-        assert_eq!(result.selected_experiment_ids, vec![first.proposal.experiment_id.clone()]);
+        assert_eq!(result.selected_experiment_ids, vec![first_id]);
         assert!((result.resource_used - 1.0).abs() <= 1e-12);
         assert_eq!(result.oracle_minimum_cost_to_resolve, Some(1.0));
     }
