@@ -48,6 +48,7 @@ impl BinaryDetectionCounts {
     }
 
     pub fn precision(&self) -> Option<f64> {
+        self.sample_count()?;
         ratio(
             self.true_positives,
             self.true_positives.checked_add(self.false_positives)?,
@@ -55,6 +56,7 @@ impl BinaryDetectionCounts {
     }
 
     pub fn recall(&self) -> Option<f64> {
+        self.sample_count()?;
         ratio(
             self.true_positives,
             self.true_positives.checked_add(self.false_negatives)?,
@@ -62,6 +64,7 @@ impl BinaryDetectionCounts {
     }
 
     pub fn specificity(&self) -> Option<f64> {
+        self.sample_count()?;
         ratio(
             self.true_negatives,
             self.true_negatives.checked_add(self.false_positives)?,
@@ -69,6 +72,7 @@ impl BinaryDetectionCounts {
     }
 
     pub fn false_positive_rate(&self) -> Option<f64> {
+        self.sample_count()?;
         ratio(
             self.false_positives,
             self.false_positives.checked_add(self.true_negatives)?,
@@ -76,6 +80,7 @@ impl BinaryDetectionCounts {
     }
 
     pub fn f1(&self) -> Option<f64> {
+        self.sample_count()?;
         let doubled_true_positives = self.true_positives.checked_mul(2)?;
         let denominator = doubled_true_positives
             .checked_add(self.false_positives)?
