@@ -23,66 +23,76 @@ pub struct BinaryDetectionCounts {
 impl BinaryDetectionCounts {
     pub fn from_predictions(truth: &[bool], predicted: &[bool]) -> Result<Self, String> {
         if truth.is_empty() || truth.len() != predicted.len() {
-            return Err("binary evaluation requires equal, non-empty truth and prediction lists".into());
+            return Err(
+                "binary evaluation requires equal, non-empty truth and prediction lists".into(),
+            );
         }
 
         let mut counts = Self::default();
         for (actual, estimate) in truth.iter().zip(predicted) {
             match (*actual, *estimate) {
-                (true, true) => counts.true_positives += 1,
-                (false, true) => counts.false_positives += 1,
-                (false, false) => counts.true_negatives += 1,
-                (true, false) => counts.false_negatives += 1,
+                (true, true) => increment(&mut counts.true_positives)?,
+                (false, true) => increment(&mut counts.false_positives)?,
+                (false, false) => increment(&mut counts.true_negatives)?,
+                (true, false) => increment(&mut counts.false_negatives)?,
             }
         }
         Ok(counts)
     }
 
-    pub fn sample_count(&self) -> u64 {
+    pub fn sample_count(&self) -> Option<u64> {
         self.true_positives
-            + self.false_positives
-            + self.true_negatives
-            + self.false_negatives
+            .checked_add(self.false_positives)?
+            .checked_add(self.true_negatives)?
+            .checked_add(self.false_negatives)
     }
 
     pub fn precision(&self) -> Option<f64> {
         ratio(
             self.true_positives,
-            self.true_positives + self.false_positives,
+            self.true_positives.checked_add(self.false_positives)?,
         )
     }
 
     pub fn recall(&self) -> Option<f64> {
         ratio(
             self.true_positives,
-            self.true_positives + self.false_negatives,
+            self.true_positives.checked_add(self.false_negatives)?,
         )
     }
 
     pub fn specificity(&self) -> Option<f64> {
         ratio(
             self.true_negatives,
-            self.true_negatives + self.false_positives,
+            self.true_negatives.checked_add(self.false_positives)?,
         )
     }
 
     pub fn false_positive_rate(&self) -> Option<f64> {
         ratio(
             self.false_positives,
-            self.false_positives + self.true_negatives,
+            self.false_positives.checked_add(self.true_negatives)?,
         )
     }
 
     pub fn f1(&self) -> Option<f64> {
-        ratio(
-            2 * self.true_positives,
-            2 * self.true_positives + self.false_positives + self.false_negatives,
-        )
+        let doubled_true_positives = self.true_positives.checked_mul(2)?;
+        let denominator = doubled_true_positives
+            .checked_add(self.false_positives)?
+            .checked_add(self.false_negatives)?;
+        ratio(doubled_true_positives, denominator)
     }
 
     pub fn balanced_accuracy(&self) -> Option<f64> {
         Some((self.recall()? + self.specificity()?) / 2.0)
     }
+}
+
+fn increment(value: &mut u64) -> Result<(), String> {
+    *value = value
+        .checked_add(1)
+        .ok_or_else(|| "binary detection count overflow".to_string())?;
+    Ok(())
 }
 
 fn ratio(numerator: u64, denominator: u64) -> Option<f64> {
@@ -417,7 +427,7 @@ mod tests {
             &[true, true, false, false],
         )
         .unwrap();
-        assert_eq!(counts.sample_count(), 4);
+        assert_eq!(counts.sample_count(), Some(4));
         assert_eq!(counts.true_positives, 2);
         assert_eq!(counts.true_negatives, 2);
         assert_eq!(counts.precision(), Some(1.0));
@@ -455,6 +465,19 @@ mod tests {
         assert_eq!(counts.precision(), None);
         assert_eq!(counts.f1(), None);
         assert_eq!(counts.balanced_accuracy(), None);
+    }
+
+    #[test]
+    fn binary_detection_counts_handle_overflowed_external_counts() {
+        let counts = BinaryDetectionCounts {
+            true_positives: u64::MAX,
+            false_positives: 1,
+            true_negatives: 0,
+            false_negatives: 0,
+        };
+        assert_eq!(counts.sample_count(), None);
+        assert_eq!(counts.precision(), None);
+        assert_eq!(counts.f1(), None);
     }
 
     #[test]
