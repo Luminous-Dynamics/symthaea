@@ -66,7 +66,7 @@ fn run() -> Result<(), ReplayError> {
 
             observations.push(ForecastObservation::new(
                 event_id.clone(),
-                "market",
+                "signal_pool",
                 cutoff,
                 market_probability,
             )?);
@@ -138,7 +138,7 @@ fn run() -> Result<(), ReplayError> {
             .filter(|score| score.horizon_id == *horizon)
             .collect::<Vec<_>>();
 
-        for method in ["base_rate", "market", "shrinkage_candidate"] {
+        for method in ["base_rate", "signal_pool", "shrinkage_candidate"] {
             let method_scores = horizon_scores
                 .iter()
                 .filter(|score| score.forecaster_id == method)
@@ -171,7 +171,7 @@ fn run() -> Result<(), ReplayError> {
         }
 
         let mut metric_rows = Vec::new();
-        for method in ["base_rate", "market", "shrinkage_candidate"] {
+        for method in ["base_rate", "signal_pool", "shrinkage_candidate"] {
             let scores = horizon_scores
                 .iter()
                 .filter(|score| score.forecaster_id == method)
@@ -188,9 +188,9 @@ fn run() -> Result<(), ReplayError> {
             metric_rows.push((method, count, coverage, mean_brier, mean_log_loss));
         }
 
-        let market_by_event = horizon_scores
+        let signal_pool_by_event = horizon_scores
             .iter()
-            .filter(|score| score.forecaster_id == "market")
+            .filter(|score| score.forecaster_id == "signal_pool")
             .map(|score| (score.event_id.clone(), *score))
             .collect::<BTreeMap<_, _>>();
         let candidate_scores = horizon_scores
@@ -198,7 +198,7 @@ fn run() -> Result<(), ReplayError> {
             .filter(|score| score.forecaster_id == "shrinkage_candidate");
         let mut paired = Vec::new();
         for candidate in candidate_scores {
-            let Some(baseline) = market_by_event.get(&candidate.event_id) else {
+            let Some(baseline) = signal_pool_by_event.get(&candidate.event_id) else {
                 continue;
             };
             let key = (candidate.event_id.clone(), candidate.horizon_id.clone());
