@@ -1945,18 +1945,22 @@ mod tests {
             RosClockDomainV1::Named("robot-sim-clock".into()),
         );
 
+        let now = RosClockNowV1 {
+            domain: RosClockDomainV1::Named("robot-sim-clock".into()),
+            timestamp_ns: 100_010_000_000,
+        };
         assert_eq!(
             evaluate_ros_temporal_pair_v1(
                 &joint,
                 Some(&imu),
-                &temporal_test_now(),
+                &now,
                 &temporal_test_policy(),
                 "receipt-epoch",
                 100,
             ),
             RosTemporalDispositionV1::Fresh {
-                joint_source_age_ns: 0,
-                imu_source_age_ns: 0,
+                joint_source_age_ns: 10_000_000,
+                imu_source_age_ns: 5_000_000,
                 source_skew_ns: 5_000_000,
                 joint_bridge_residence_age_ns: 10,
                 imu_bridge_residence_age_ns: 10,
@@ -2080,11 +2084,15 @@ mod tests {
             100_000_000,
             RosClockDomainV1::Named("robot-sim-clock".into()),
         );
+        let now = RosClockNowV1 {
+            domain: RosClockDomainV1::Named("robot-sim-clock".into()),
+            timestamp_ns: 100_200_000_000,
+        };
         assert!(matches!(
             evaluate_ros_temporal_pair_v1(
                 &imu,
                 Some(&skewed),
-                &temporal_test_now(),
+                &now,
                 &temporal_test_policy(),
                 "receipt-epoch",
                 100
@@ -2148,8 +2156,8 @@ mod tests {
             0,
             RosClockDomainV1::Named("robot-sim-clock".into()),
         );
-        joint.receive_age_at_capture_ns = Some(2_000);
-        joint.received_monotonic_ns = Some(100 - 2_000);
+        joint.receive_age_at_capture_ns = Some(10_000);
+        joint.received_monotonic_ns = Some(90_000);
         assert!(matches!(
             evaluate_ros_temporal_pair_v1(
                 &joint,
@@ -2157,7 +2165,7 @@ mod tests {
                 &temporal_test_now(),
                 &temporal_test_policy(),
                 "receipt-epoch",
-                100
+                100_000
             ),
             RosTemporalDispositionV1::BridgeResidenceExpired {
                 stream: RosTemporalStreamV1::JointState,
