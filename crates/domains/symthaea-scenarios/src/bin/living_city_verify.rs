@@ -293,6 +293,11 @@ fn main() {
 #[cfg(test)]
 mod tests {
     use super::*;
+    use symthaea_scenarios::living_city_benchmarks::Hazard;
+    use symthaea_scenarios::living_city_dependencies::{DependencyMode, ServiceDomain};
+    use symthaea_scenarios::living_city_hazard_profiles::{
+        HAZARD_PROFILE_SCHEMA_VERSION, HazardParameter, InitiatingFailure,
+    };
 
     #[test]
     fn verifier_rejects_empty_absolute_and_parent_traversal_paths() {
@@ -306,10 +311,13 @@ mod tests {
     #[test]
     fn bundle_parser_rejects_unknown_fields() {
         let bundle = r#"{
-            "schema_version": 1,
+            "schema_version": 2,
             "manifest_path": "manifest.json",
             "receipt_path": "receipt.json",
             "receipt_sha256_path": "receipt.sha256",
+            "hazard_profile_path": "hazard-profile.json",
+            "profile_binding_path": "profile-binding.json",
+            "service_graph_path": "service-graph.json",
             "source_files": [],
             "output_files": [],
             "unexpected_authority": "trusted"
@@ -328,31 +336,49 @@ mod tests {
         fs::create_dir_all(root.join("sources")).unwrap();
         fs::create_dir_all(root.join("outputs")).unwrap();
 
-        let source_bytes = b"synthetic survey source bytes";
+        let heat_bytes = b"synthetic heat design basis";
+        let outage_bytes = b"synthetic correlated outage basis";
         let output_bytes = b"synthetic living-city metrics bytes";
-        fs::write(root.join("sources/survey.dat"), source_bytes).unwrap();
+        fs::write(root.join("sources/heat.dat"), heat_bytes).unwrap();
+        fs::write(root.join("sources/outage.dat"), outage_bytes).unwrap();
         fs::write(root.join("outputs/metrics.dat"), output_bytes).unwrap();
 
         let manifest = EvidenceManifest {
             schema_version: EVIDENCE_SCHEMA_VERSION,
             project_id: "integration-test-project".into(),
-            scenario_id: "integration-test-scenario".into(),
+            scenario_id: "heat-plus-72h-grid-outage".into(),
             study_boundary_id: "synthetic-boundary".into(),
             coordinate_reference_system: "synthetic-local-crs".into(),
-            items: vec![EvidenceItem {
-                id: "survey".into(),
-                kind: EvidenceKind::Measured,
-                source_uri: "fixture://survey".into(),
-                content_sha256: Some(sha256_hex(source_bytes)),
-                license_or_basis: "synthetic test fixture".into(),
-                units: "metres".into(),
-                spatial_scope: "synthetic site".into(),
-                temporal_scope: "synthetic instant".into(),
-                acquired_at_utc: "2026-01-01T00:00:00Z".into(),
-                transformation_chain: vec!["fixture-generator/1".into()],
-                uncertainty_note: "synthetic fixture only".into(),
-                missing_reason: None,
-            }],
+            items: vec![
+                EvidenceItem {
+                    id: "heat-basis".into(),
+                    kind: EvidenceKind::Assumed,
+                    source_uri: "fixture://heat-basis".into(),
+                    content_sha256: Some(sha256_hex(heat_bytes)),
+                    license_or_basis: "synthetic test fixture assumption".into(),
+                    units: "degree_Celsius".into(),
+                    spatial_scope: "synthetic site".into(),
+                    temporal_scope: "synthetic heat design event".into(),
+                    acquired_at_utc: "2026-01-01T00:00:00Z".into(),
+                    transformation_chain: vec!["fixture-generator/1".into()],
+                    uncertainty_note: "assumption only; not field evidence".into(),
+                    missing_reason: None,
+                },
+                EvidenceItem {
+                    id: "outage-basis".into(),
+                    kind: EvidenceKind::Assumed,
+                    source_uri: "fixture://outage-basis".into(),
+                    content_sha256: Some(sha256_hex(outage_bytes)),
+                    license_or_basis: "synthetic test fixture assumption".into(),
+                    units: "hour".into(),
+                    spatial_scope: "synthetic critical services".into(),
+                    temporal_scope: "synthetic 72-hour outage".into(),
+                    acquired_at_utc: "2026-01-01T00:00:00Z".into(),
+                    transformation_chain: vec!["fixture-generator/1".into()],
+                    uncertainty_note: "assumption only; not field evidence".into(),
+                    missing_reason: None,
+                },
+            ],
         };
         let manifest_digest = evidence_manifest_sha256(&manifest).unwrap();
         fs::write(
@@ -361,18 +387,98 @@ mod tests {
         )
         .unwrap();
 
+        let profile = HazardProfile {
+            schema_version: HAZARD_PROFILE_SCHEMA_VERSION,
+            profile_id: "synthetic-compound-profile".into(),
+            profile_revision: "r1".into(),
+            benchmark_id: "heat-plus-72h-grid-outage".into(),
+            study_area_id: "synthetic-area".into(),
+            jurisdiction: "test jurisdiction".into(),
+            time_horizon: "synthetic 72-hour stress window".into(),
+            hazard_parameters: vec![
+                HazardParameter {
+                    hazard: Hazard::ExtremeHeat,
+                    parameter_name: "design_dry_bulb_temperature".into(),
+                    value: 42.0,
+                    unit: "degree_Celsius".into(),
+                    evidence_item_id: "heat-basis".into(),
+                },
+                HazardParameter {
+                    hazard: Hazard::GridOutage72Hours,
+                    parameter_name: "critical_asset_outage_duration".into(),
+                    value: 72.0,
+                    unit: "hour".into(),
+                    evidence_item_id: "outage-basis".into(),
+                },
+            ],
+            initiating_failures: vec![InitiatingFailure {
+                service_id: "grid".into(),
+                cause: Hazard::GridOutage72Hours,
+                evidence_item_id: "outage-basis".into(),
+                rationale: "synthetic test condition; not a real outage prediction".into(),
+            }],
+        };
+        let profile_binding = profile.binding().unwrap();
+        fs::write(
+            root.join("hazard-profile.json"),
+            serde_json::to_vec_pretty(&profile).unwrap(),
+        )
+        .unwrap();
+        fs::write(
+            root.join("profile-binding.json"),
+            serde_json::to_vec_pretty(&profile_binding).unwrap(),
+        )
+        .unwrap();
+
+        let service_graph = ServiceGraphPackage {
+            schema_version: SERVICE_GRAPH_SCHEMA_VERSION,
+            nodes: vec![
+                ServiceNode {
+                    id: "grid".into(),
+                    domain: ServiceDomain::Electricity,
+                },
+                ServiceNode {
+                    id: "cooling-centre".into(),
+                    domain: ServiceDomain::Cooling,
+                },
+                ServiceNode {
+                    id: "hospital".into(),
+                    domain: ServiceDomain::Healthcare,
+                },
+            ],
+            dependencies: vec![
+                ServiceDependency {
+                    dependent_id: "cooling-centre".into(),
+                    prerequisite_id: "grid".into(),
+                    mode: DependencyMode::Required,
+                },
+                ServiceDependency {
+                    dependent_id: "hospital".into(),
+                    prerequisite_id: "cooling-centre".into(),
+                    mode: DependencyMode::Required,
+                },
+            ],
+        };
+        fs::write(
+            root.join("service-graph.json"),
+            serde_json::to_vec_pretty(&service_graph).unwrap(),
+        )
+        .unwrap();
+        let configuration_sha256 =
+            scenario_configuration_sha256(&profile, &profile_binding, &service_graph).unwrap();
+
         let output_digest = sha256_hex(output_bytes);
         let receipt = ScenarioRunReceipt {
             schema_version: RECEIPT_SCHEMA_VERSION,
             run_id: "integration-run-001".into(),
-            scenario_id: "integration-test-scenario".into(),
+            scenario_id: "heat-plus-72h-grid-outage".into(),
             repository: "Luminous-Dynamics/symthaea".into(),
             commit_sha: "b".repeat(40),
             dependency_lock_sha256: "1".repeat(64),
             build_profile: "test-fixture".into(),
             toolchain: "test-fixture".into(),
             evidence_manifest_sha256: manifest_digest,
-            configuration_sha256: "2".repeat(64),
+            configuration_sha256,
             seed: Some(7),
             tools: vec![ToolExecution {
                 tool_id: "synthetic-model".into(),
@@ -409,8 +515,12 @@ mod tests {
             "manifest_path": "manifest.json",
             "receipt_path": "receipt.json",
             "receipt_sha256_path": "receipt.sha256",
+            "hazard_profile_path": "hazard-profile.json",
+            "profile_binding_path": "profile-binding.json",
+            "service_graph_path": "service-graph.json",
             "source_files": [
-                {"id": "survey", "path": "sources/survey.dat"}
+                {"id": "heat-basis", "path": "sources/heat.dat"},
+                {"id": "outage-basis", "path": "sources/outage.dat"}
             ],
             "output_files": [
                 {"id": "metrics", "path": "outputs/metrics.dat"}
@@ -429,8 +539,11 @@ mod tests {
         let root = write_valid_test_package();
         let report = verify_run_package(&root).unwrap();
         assert_eq!(report["package_integrity"], "verified");
-        assert_eq!(report["verified_source_count"], 1);
+        assert_eq!(report["verified_source_count"], 2);
         assert_eq!(report["verified_output_count"], 1);
+        assert_eq!(report["hazard_profile_id"], "synthetic-compound-profile/r1");
+        assert_eq!(report["failed_service_ids"], serde_json::json!(["cooling-centre", "grid", "hospital"]));
+        assert!(report["dependency_propagation_rounds"].as_u64().unwrap() >= 1);
         fs::remove_dir_all(root).unwrap();
     }
 
@@ -465,11 +578,14 @@ mod tests {
     #[test]
     fn bundle_parser_accepts_the_declared_schema() {
         let bundle = r#"{
-            "schema_version": 1,
+            "schema_version": 2,
             "manifest_path": "manifest.json",
             "receipt_path": "receipt.json",
             "receipt_sha256_path": "receipt.sha256",
-            "source_files": [{"id": "survey", "path": "sources/survey.geojson"}],
+            "hazard_profile_path": "hazard-profile.json",
+            "profile_binding_path": "profile-binding.json",
+            "service_graph_path": "service-graph.json",
+            "source_files": [{"id": "heat-basis", "path": "sources/heat.geojson"}],
             "output_files": [{"id": "metrics", "path": "outputs/metrics.json"}]
         }"#;
         let parsed = serde_json::from_str::<VerificationBundle>(bundle).unwrap();
