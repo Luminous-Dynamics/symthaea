@@ -13,7 +13,7 @@ This crate provides four policy arms over the same predeclared feature vectors:
 - `max_min_diversity`: greedily maximize the nearest-distance to already selected candidates;
 - `cost_aware_diversity`: the same coverage heuristic, discounted by declared relative cost.
 
-The first diversity selection is chosen by distance from the normalized feature centroid; later selections maximize minimum RMS distance from prior selections. Features are min-max normalized per dimension across the supplied unlabeled candidate pool. The cost-aware score is:
+If no prior references are supplied, the first diversity selection is chosen by distance from the normalized feature centroid. If reference feature vectors from previously evaluated candidates are supplied, the first selection maximizes distance from those references; later selections maximize minimum RMS distance from both references and new selections. Features are min-max normalized per dimension across the current candidates and references, so callers can preserve the same pool scale during sequential selection. The cost-aware score is:
 
 `score = nearest_feature_distance * (candidate_cost / minimum_pool_cost)^(-cost_exponent)`
 
