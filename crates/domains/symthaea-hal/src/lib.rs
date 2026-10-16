@@ -38,7 +38,11 @@
 //!
 //! ## Usage
 //!
-//! ```rust,no_run
+//! Legacy humanoid-command example below requires the `humanoid` feature and is
+//! intentionally excluded from doctest compilation so `--no-default-features`
+//! can verify the reusable hardware interfaces independently.
+//!
+//! ```ignore
 //! use symthaea_hal::{
 //!     CalibrationProfile, SafetyInterlock, ServoOutput,
 //!     mock::MockI2cBus,
