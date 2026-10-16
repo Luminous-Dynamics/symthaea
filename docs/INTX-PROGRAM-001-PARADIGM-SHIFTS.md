@@ -139,7 +139,7 @@ Do not create a single “industrial readiness score” that lets throughput off
 
 1. Keep the first pilot offline and device-free.
 2. Use the dependency-free corpus package for focused feedback, while explicitly acknowledging that it validates corpus structure only.
-3. Implement [INTX-PROGRAM-BENCH-001 / #7702](https://github.com/Luminous-Dynamics/symthaea/issues/7702): bind each seed to the existing authority and reconciliation paths through synthetic adapters; do not create a second action runtime.
+3. Implement [INTX-PROGRAM-BENCH-001 / #7702](https://github.com/Luminous-Dynamics/symthaea/issues/7702): first map each seed to its actual owning API and qualification evidence. INTX-001 / #4399 and INTX-002 / #4400 are still open design predecessors; bind tests only when the exact required API exists and is qualified. Mark missing prerequisites as blocked/deferred, never as a pass, and do not create a second action runtime.
 4. Confirm exact action-runtime/INTX API ownership at the tested branch head before writing the integration layer.
 5. Next, add one read-only OPC UA profile against a reference/test server and preserve native status/time/type metadata. Keep it separate from any later effectful programming profile.
 6. Introduce offline source/configuration generation and differential validation only after the target language/vendor toolchain and exact target profile are declared.
