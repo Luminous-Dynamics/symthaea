@@ -392,8 +392,8 @@ fn evaluate_config(config: &ThresholdConfig, shots: &[CModShot]) -> EvaluationRe
                 predicted_disruption: Some(detected),
                 warning_lead_time_ms: lead_time,
                 sample_count: shot.samples.len(),
-                    valid_sample_count,
-                    invalid_sample_indices: invalid_sample_indices.clone(),
+                valid_sample_count,
+                invalid_sample_indices: invalid_sample_indices.clone(),
                 unscored_reason: None,
             });
         } else if !has_valid_sample {
@@ -404,8 +404,8 @@ fn evaluate_config(config: &ThresholdConfig, shots: &[CModShot]) -> EvaluationRe
                 predicted_disruption: None,
                 warning_lead_time_ms: None,
                 sample_count: shot.samples.len(),
-                    valid_sample_count,
-                    invalid_sample_indices: invalid_sample_indices.clone(),
+                valid_sample_count,
+                invalid_sample_indices: invalid_sample_indices.clone(),
                 unscored_reason: Some(ShotUnscoredReason::NoValidSamples),
             });
         } else {
@@ -422,8 +422,8 @@ fn evaluate_config(config: &ThresholdConfig, shots: &[CModShot]) -> EvaluationRe
                 predicted_disruption: Some(predicted_disruption),
                 warning_lead_time_ms: None,
                 sample_count: shot.samples.len(),
-                    valid_sample_count,
-                    invalid_sample_indices: invalid_sample_indices.clone(),
+                valid_sample_count,
+                invalid_sample_indices: invalid_sample_indices.clone(),
                 unscored_reason: None,
             });
         }
