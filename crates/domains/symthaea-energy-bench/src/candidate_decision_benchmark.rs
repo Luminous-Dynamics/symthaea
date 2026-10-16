@@ -35,6 +35,8 @@ pub struct CandidateDecisionScenario {
     pub candidate_correlation_model: String,
     /// Absolute efficiency-fraction margin required by the decision policy.
     pub superiority_margin: f64,
+    /// Registered worst-case bound on differential systematic bias.
+    pub maximum_unmodeled_differential_bias_efficiency: f64,
 }
 
 #[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
@@ -43,6 +45,7 @@ pub struct CandidateDecisionResult {
     pub oracle_true_efficiency_difference: f64,
     pub observed_efficiency_difference: Option<f64>,
     pub registered_margin: f64,
+    pub registered_bias_bound_efficiency: f64,
     pub comparator_decision: String,
     pub conservative_lower_bound: Option<f64>,
     pub false_superiority: bool,
@@ -108,6 +111,7 @@ pub fn generate_candidate_decision_scenarios() -> Vec<CandidateDecisionScenario>
     let observed_deltas = [-0.03, 0.0, 0.01, 0.025, 0.05];
     let uncertainty_scales = [0.25, 1.0, 10.0];
     let correlation_models = ["independent", "unknown"];
+    let bias_bounds = [0.0, 0.02, 0.05];
     let mut cases = Vec::new();
 
     for (truth_index, truth) in truth_deltas.iter().enumerate() {
@@ -118,16 +122,19 @@ pub fn generate_candidate_decision_scenarios() -> Vec<CandidateDecisionScenario>
                 for (correlation_index, correlation_model) in
                     correlation_models.iter().enumerate()
                 {
+                    for (bias_index, bias_bound) in bias_bounds.iter().enumerate() {
                     cases.push(CandidateDecisionScenario {
                         scenario_id: format!(
-                            "candidate-decision-t{truth_index:02}-o{observed_index:02}-u{uncertainty_index:02}-c{correlation_index:02}"
+                            "candidate-decision-t{truth_index:02}-o{observed_index:02}-u{uncertainty_index:02}-c{correlation_index:02}-b{bias_index:02}"
                         ),
                         oracle_true_efficiency_difference: *truth,
                         observed_efficiency_difference: *observed,
                         candidate_uncertainty_scale: *uncertainty_scale,
                         candidate_correlation_model: (*correlation_model).into(),
                         superiority_margin: 0.02,
+                        maximum_unmodeled_differential_bias_efficiency: *bias_bound,
                     });
+                    }
                 }
             }
         }
@@ -170,6 +177,8 @@ pub fn run_candidate_decision_benchmark(
             oracle_true_efficiency_difference: scenario.oracle_true_efficiency_difference,
             observed_efficiency_difference: comparison.estimated_efficiency_difference,
             registered_margin: scenario.superiority_margin,
+            registered_bias_bound_efficiency: scenario
+                .maximum_unmodeled_differential_bias_efficiency,
             comparator_decision: decision_label(&comparison),
             conservative_lower_bound: comparison.conservative_lower_bound,
             false_superiority: affirmed && !truly_superior,
@@ -240,6 +249,8 @@ fn comparison_runs(
     baseline.evaluation_policy.baseline_id = BASELINE_ID.into();
     baseline.evaluation_policy.comparison_metric_id = "net_cycle_efficiency".into();
     baseline.evaluation_policy.minimum_superiority_margin = scenario.superiority_margin;
+    baseline.evaluation_policy.maximum_unmodeled_differential_bias_efficiency =
+        scenario.maximum_unmodeled_differential_bias_efficiency;
     baseline.evaluation_policy.selection_rule =
         "Synthetic negative-control benchmark only; no physical decision permitted.".into();
 
@@ -295,6 +306,13 @@ fn validate_scenario(
     {
         return Err(CandidateDecisionBenchmarkError {
             reason: "superiority margin must be finite and in [0, 1]".into(),
+        });
+    }
+    if !scenario.maximum_unmodeled_differential_bias_efficiency.is_finite()
+        || !(0.0..=1.0).contains(&scenario.maximum_unmodeled_differential_bias_efficiency)
+    {
+        return Err(CandidateDecisionBenchmarkError {
+            reason: "maximum unmodeled differential bias efficiency bound must be finite and in [0, 1]".into(),
         });
     }
     let truth_delta = scenario.oracle_true_efficiency_difference;
@@ -401,7 +419,7 @@ mod tests {
         let scenarios = generate_candidate_decision_scenarios();
         let report = run_candidate_decision_benchmark(&scenarios).unwrap();
 
-        assert_eq!(report.scenario_inputs.len(), 240);
+        assert_eq!(report.scenario_inputs.len(), 720);
         assert_eq!(report.results.len(), scenarios.len());
         assert!(report.summary.false_superiority_rate.is_some());
         assert!(report.summary.false_negative_rate.is_some());
@@ -423,6 +441,7 @@ mod tests {
         scenario.candidate_uncertainty_scale = 0.25;
         scenario.candidate_correlation_model = "independent".into();
         scenario.superiority_margin = 0.02;
+        scenario.maximum_unmodeled_differential_bias_efficiency = 0.0;
 
         let report = run_candidate_decision_benchmark(&[scenario]).unwrap();
         let result = &report.results[0];
@@ -439,10 +458,32 @@ mod tests {
         scenario.observed_efficiency_difference = 0.05;
         scenario.candidate_uncertainty_scale = 0.25;
         scenario.candidate_correlation_model = "unknown".into();
+        scenario.maximum_unmodeled_differential_bias_efficiency = 0.0;
 
         let report = run_candidate_decision_benchmark(&[scenario]).unwrap();
         assert!(report.results[0].indeterminate);
         assert!(!report.results[0].false_superiority);
+    }
+
+    #[test]
+    fn declared_differential_bias_bound_blocks_apparent_win() {
+        let mut scenario = generate_candidate_decision_scenarios().remove(0);
+        scenario.scenario_id = "bounded-systematic-bias-negative-control".into();
+        scenario.oracle_true_efficiency_difference = 0.0;
+        scenario.observed_efficiency_difference = 0.05;
+        scenario.candidate_uncertainty_scale = 0.25;
+        scenario.candidate_correlation_model = "independent".into();
+        scenario.superiority_margin = 0.02;
+        scenario.maximum_unmodeled_differential_bias_efficiency = 0.05;
+
+        let report = run_candidate_decision_benchmark(&[scenario]).unwrap();
+        let result = &report.results[0];
+        assert!(!result.false_superiority);
+        assert_ne!(
+            result.comparator_decision,
+            "lower_bound_clears_registered_margin"
+        );
+        assert_eq!(result.registered_bias_bound_efficiency, 0.05);
     }
 
     #[test]
