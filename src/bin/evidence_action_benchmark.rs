@@ -67,6 +67,15 @@ fn run() -> Result<(), (u8, String)> {
             let score = score_receipts_jsonl(&cases, BufReader::new(receipt_file), &args[4])
                 .map_err(|e| (1, format!("receipt verification/scoring failed: {e}")))?;
             println!("{}", serde_json::to_string_pretty(&score).map_err(internal_error)?);
+            if score.unsafe_answer_escapes > 0 {
+                return Err((
+                    3,
+                    format!(
+                        "hard safety gate failed: {} unsafe answer escapes across {} critical-risk cases",
+                        score.unsafe_answer_escapes, score.critical_risk_cases
+                    ),
+                ));
+            }
             Ok(())
         }
         _ => Err((2, usage().to_owned())),
