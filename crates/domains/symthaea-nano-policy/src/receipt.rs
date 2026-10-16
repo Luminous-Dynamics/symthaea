@@ -34,6 +34,8 @@ pub struct ReceiptAudit {
     pub status: String,
     /// Digest of exact request-line bytes, excluding a line terminator.
     pub request_sha256: String,
+    /// Digest of exact response-line bytes, excluding a line terminator.
+    pub response_sha256: String,
     /// Individual checks; every failed check is preserved.
     pub checks: Vec<ReceiptCheck>,
     /// Limits of what structural verification proves.
@@ -110,11 +112,17 @@ fn push_check(
     });
 }
 
-fn failed_early(request_sha256: &str, check: &str, detail: String) -> ReceiptAudit {
+fn failed_early(
+    request_sha256: &str,
+    response_sha256: &str,
+    check: &str,
+    detail: String,
+) -> ReceiptAudit {
     ReceiptAudit {
         schema_version: SCHEMA_VERSION.to_owned(),
         status: "failed".to_owned(),
         request_sha256: request_sha256.to_owned(),
+        response_sha256: response_sha256.to_owned(),
         checks: vec![ReceiptCheck {
             check: check.to_owned(),
             passed: false,
@@ -138,9 +146,11 @@ fn failed_early(request_sha256: &str, check: &str, detail: String) -> ReceiptAud
 /// request contract before the receipt can be accepted.
 pub fn verify_receipt(request_line: &str, response_line: &str) -> ReceiptAudit {
     let request_sha256 = digest(request_line.as_bytes());
+    let response_sha256 = digest(response_line.as_bytes());
     if request_line.len() > crate::MAX_LINE_BYTES {
         return failed_early(
             &request_sha256,
+            &response_sha256,
             "request_size",
             format!("Request line exceeds {} bytes.", crate::MAX_LINE_BYTES),
         );
@@ -148,6 +158,7 @@ pub fn verify_receipt(request_line: &str, response_line: &str) -> ReceiptAudit {
     if response_line.len() > crate::MAX_LINE_BYTES {
         return failed_early(
             &request_sha256,
+            &response_sha256,
             "response_size",
             format!("Response line exceeds {} bytes.", crate::MAX_LINE_BYTES),
         );
@@ -158,6 +169,7 @@ pub fn verify_receipt(request_line: &str, response_line: &str) -> ReceiptAudit {
         Err(error) => {
             return failed_early(
                 &request_sha256,
+                &response_sha256,
                 "request_parse",
                 format!("Request is invalid or includes forbidden fields: {error}"),
             );
@@ -168,6 +180,7 @@ pub fn verify_receipt(request_line: &str, response_line: &str) -> ReceiptAudit {
         Err(error) => {
             return failed_early(
                 &request_sha256,
+                &response_sha256,
                 "response_parse",
                 format!("Response is not a valid successful selection receipt: {error}"),
             );
@@ -371,6 +384,7 @@ pub fn verify_receipt(request_line: &str, response_line: &str) -> ReceiptAudit {
         schema_version: SCHEMA_VERSION.to_owned(),
         status: if passed { "passed" } else { "failed" }.to_owned(),
         request_sha256,
+        response_sha256,
         checks,
         limitations: vec![
             "This verifies structural consistency, not whether the selector chose the best candidates."
