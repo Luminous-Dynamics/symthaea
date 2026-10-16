@@ -103,6 +103,9 @@ pub struct RosSampleMetadataV1 {
     pub received_monotonic_ns: Option<u64>,
     pub receive_sequence: Option<u64>,
     pub receive_epoch_id: Option<String>,
+    /// Time this sample had resided in this bridge when the snapshot was assembled.
+    /// This is not publisher-side sample age; source clock binding remains separate.
+    pub receive_age_at_capture_ns: Option<u64>,
     pub calibration_id: Option<String>,
 }
 
@@ -162,6 +165,9 @@ pub struct RosImuObservationV1 {
 pub struct RosPartialHumanoidObservationV1 {
     pub schema_version: u16,
     pub morphology_profile_id: String,
+    /// Snapshot assembly time in the bridge-instance monotonic receive epoch.
+    pub captured_monotonic_ns: u64,
+    pub receive_epoch_id: String,
     pub joint_state: RosJointStateObservationV1,
     pub imu: RosEvidenceValueV1<RosImuObservationV1>,
     pub root_position_world_m: RosEvidenceValueV1<[f64; 3]>,
@@ -284,6 +290,7 @@ fn validate_sensor_vector(field: &str, values: [f64; 3]) -> Result<[f64; 3], Ros
 fn ros_sample_metadata(
     header: &std_msgs::msg::Header,
     receipt: Option<RosSampleReceiptV1>,
+    captured_monotonic_ns: u64,
 ) -> Result<RosSampleMetadataV1, RosBridgeError> {
     if header.stamp.nanosec >= 1_000_000_000 {
         return Err(RosBridgeError::InvalidSensorData(
@@ -291,13 +298,19 @@ fn ros_sample_metadata(
         ));
     }
 
-    let (received_monotonic_ns, receive_sequence, receive_epoch_id) = match receipt {
+    let (
+        received_monotonic_ns,
+        receive_sequence,
+        receive_epoch_id,
+        receive_age_at_capture_ns,
+    ) = match receipt {
         Some(receipt) => (
             Some(receipt.received_monotonic_ns),
             Some(receipt.sequence),
             Some(receipt.receive_epoch_id),
+            Some(captured_monotonic_ns.saturating_sub(receipt.received_monotonic_ns)),
         ),
-        None => (None, None, None),
+        None => (None, None, None, None),
     };
 
     Ok(RosSampleMetadataV1 {
@@ -308,6 +321,7 @@ fn ros_sample_metadata(
         received_monotonic_ns,
         receive_sequence,
         receive_epoch_id,
+        receive_age_at_capture_ns,
         calibration_id: None,
     })
 }
@@ -843,7 +857,19 @@ impl RosBridgeNode {
         drop(imu_guard);
         drop(imu_receipt_guard);
 
-        let joint_source = ros_sample_metadata(&joint_state.header, joint_receipt)?;
+        // Capture after taking both snapshots so the receipt-age estimate cannot
+        // predate a message that was selected while waiting for the locks.
+        let captured_monotonic_ns = self
+            .receive_epoch
+            .elapsed()
+            .as_nanos()
+            .min(u64::MAX as u128) as u64;
+        let receive_epoch_id = self.receive_epoch_id.clone();
+        let joint_source = ros_sample_metadata(
+            &joint_state.header,
+            joint_receipt,
+            captured_monotonic_ns,
+        )?;
         let expected = &symthaea_humanoid::types::JOINT_NAMES;
         let positions = canonicalize_joint_values(
             &joint_state.name,
@@ -890,7 +916,11 @@ impl RosBridgeNode {
                 source: None,
             },
             Some(imu) => {
-                let source = ros_sample_metadata(&imu.header, imu_receipt.clone())?;
+                let source = ros_sample_metadata(
+                    &imu.header,
+                    imu_receipt.clone(),
+                    captured_monotonic_ns,
+                )?;
                 let orientation_covariance =
                     ros_covariance_v1(imu.orientation_covariance, "orientation")?;
                 let angular_velocity_covariance =
@@ -956,6 +986,8 @@ impl RosBridgeNode {
         Ok(RosPartialHumanoidObservationV1 {
             schema_version: 1,
             morphology_profile_id: "symthaea.humanoid.dmc21".into(),
+            captured_monotonic_ns,
+            receive_epoch_id,
             joint_state: RosJointStateObservationV1 {
                 joint_names: expected.iter().map(|name| (*name).to_string()).collect(),
                 positions: RosEvidenceValueV1::Available {
