@@ -20,6 +20,8 @@ midly = "0.5"
 roxmltree = "0.20"
 serde_json = { workspace = true }
 sha2 = "0.10"
+# Real sample decoding for SFZ verification/rendering; WAV/AIFF/FLAC + PCM.
+symphonia = { version = "0.5", default-features = false, features = ["aiff", "flac", "pcm", "wav"] }
 bevy = { version = "0.18", default-features = false, optional = true }
 symthaea-vocal-tract = { path = "../symthaea-vocal-tract", optional = true }
 symthaea-broca = { path = "../symthaea-broca", optional = true }
