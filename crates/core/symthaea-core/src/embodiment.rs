@@ -611,9 +611,12 @@ pub trait EmbodimentBridge: Send + Sync {
     /// phi is the current consciousness level for safety gating.
     fn step(&mut self, thought_hv: &ContinuousHV, dt: f32, phi: f64) -> EmbodimentResult;
 
-    /// Step using an explicit timing record. The default preserves compatibility
-    /// with legacy bridges by forwarding only the duration. It intentionally does
-    /// not claim that legacy implementations consume the provenance metadata.
+    /// Step using an explicit timing record.
+    ///
+    /// The compatibility adapter forwards configured simulation steps to legacy
+    /// bridges using their dt-only method. Measured-clock records are rejected:
+    /// a legacy method cannot consume or preserve their clock provenance. A hardware
+    /// bridge must override this method and explicitly validate its timing contract.
     fn step_with_timing(
         &mut self,
         thought_hv: &ContinuousHV,
