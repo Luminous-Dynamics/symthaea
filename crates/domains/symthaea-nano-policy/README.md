@@ -56,6 +56,8 @@ Schemas:
 - Post-outcome ledger: `schema/outcome-ledger.schema.json`
 - Metrics report: `schema/benchmark-metrics-report.schema.json`
 
+Each observation's `cost` is the all-in cost for selecting and evaluating that attempt in the ledger's common unit. For end-to-end efficiency claims, include selector/runtime plus oracle costs; if only oracle cost is logged, label the metric accordingly rather than implying total pipeline cost.
+
 The checked-in ledger is a synthetic unit/smoke fixture, not scientific data. Real scored comparisons still require the source/rights, holdout, oracle, and independent structural-receipt gates described in `BENCHMARK.md`.
 
 ## Fail-closed contract
