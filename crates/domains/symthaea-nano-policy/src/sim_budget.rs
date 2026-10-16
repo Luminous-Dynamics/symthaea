@@ -325,6 +325,12 @@ fn validate_ledger(ledger: &SimulatorBudgetLedger) -> Result<(), String> {
             "proposal_attempt_cap must be in 1..={MAX_PROPOSAL_ATTEMPTS}"
         ));
     }
+    if ledger.proposal_attempt_cap < ledger.expected_simulator_calls {
+        return Err(format!(
+            "proposal_attempt_cap {} cannot fund expected_simulator_calls {}; each actual call requires a proposal attempt",
+            ledger.proposal_attempt_cap, ledger.expected_simulator_calls
+        ));
+    }
     if ledger.attempts.len() > ledger.proposal_attempt_cap {
         return Err(format!(
             "attempt count {} exceeds proposal_attempt_cap {}",
@@ -913,6 +919,15 @@ mod tests {
         assert_eq!(audit.generation_failures, 1);
         assert_eq!(audit.observed_simulator_calls, 2);
         assert_eq!(audit.disposition, AuditDisposition::IncompleteUnderBudget);
+    }
+
+    #[test]
+    fn proposal_attempt_cap_must_cover_expected_actual_call_budget() {
+        let mut ledger = sample_ledger(RunStatus::Completed);
+        ledger.expected_simulator_calls = 4;
+        ledger.proposal_attempt_cap = 3;
+        let error = audit_json_ledger(&serialized(&ledger)).unwrap_err();
+        assert!(error.contains("cannot fund expected_simulator_calls"));
     }
 
     #[test]
