@@ -21,7 +21,8 @@
       "enum": [
         "random_seeded",
         "farthest_first",
-        "group_balanced_farthest_first"
+        "group_balanced_farthest_first",
+        "cost_aware_farthest_first"
       ]
     },
     "budget": {
@@ -69,9 +70,48 @@
               "minimum": 0,
               "maximum": 1
             }
+          },
+          "estimated_cost": {
+            "type": [
+              "number",
+              "null"
+            ],
+            "exclusiveMinimum": 0,
+            "description": "Optional externally declared positive cost in a single frozen cost unit. Required for cost_aware_farthest_first."
           }
         }
       }
     }
-  }
+  },
+  "allOf": [
+    {
+      "if": {
+        "properties": {
+          "policy": {
+            "const": "cost_aware_farthest_first"
+          }
+        },
+        "required": [
+          "policy"
+        ]
+      },
+      "then": {
+        "properties": {
+          "candidates": {
+            "items": {
+              "required": [
+                "estimated_cost"
+              ],
+              "properties": {
+                "estimated_cost": {
+                  "type": "number",
+                  "exclusiveMinimum": 0
+                }
+              }
+            }
+          }
+        }
+      }
+    }
+  ]
 }
