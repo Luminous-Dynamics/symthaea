@@ -36,7 +36,7 @@ A versioned model declares:
 
 The kernel computes expected posterior entropy, EIG in nats, expected sample information value (the expected improvement in the best decision utility after observing the result), and both quantities per declared cost. It ranks only feasible actions; blocked and unknown actions appear as rejected records with reasons. Incomplete likelihoods and malformed priors do not produce a fabricated score. SHA-256 binds the exact prior, likelihoods, utilities, actions, cost and model version.
 
-Posterior updates use `initial_posterior_state` followed by `condition_posterior`. Each observation requires a unique evidence ID and creates a receipt chained to the parent state digest, action, outcome, measurement-model identity and resulting posterior. Before every update, the kernel replays the existing conditioning history from the root prior and rejects duplicate evidence IDs, altered posterior weights, mismatched likelihoods or broken parent-state links. `expected_information_gain_for_state` and `rank_feasible_actions_for_state` evaluate subsequent experiments against that updated posterior rather than silently reverting to the original prior. This prevents accidentally reusing one measurement as independent evidence in normal API use; hashes still do not authenticate the external source of an observation.
+Posterior updates use `initial_posterior_state` followed by `condition_posterior`. Each observation requires a unique evidence ID and creates a receipt chained to the parent state digest, action, outcome, measurement-model identity and resulting posterior. Before every update, the kernel replays the existing conditioning history from the root prior and rejects duplicate evidence IDs, altered posterior weights, mismatched likelihoods or broken parent-state links. `expected_information_gain_for_state` and `rank_feasible_actions_for_state` evaluate subsequent experiments against that updated posterior rather than silently reverting to the original prior. Acquisition results report the snapshot's model digest separately from the posterior-history state digest, so a caller can bind both the probabilistic assumptions and the observations used to reach the current belief. This prevents accidentally reusing one measurement as independent evidence in normal API use; hashes still do not authenticate the external source of an observation.
 
 Hand-checkable tests cover:
 - a perfect binary observation with EIG = ln(2) and decision value = 500 synthetic utility milli-units;
@@ -44,7 +44,8 @@ Hand-checkable tests cover:
 - a highly informative observation that has zero decision value because it cannot change the best choice;
 - a symmetric 90/10 noisy observation;
 - a blocked high-information action that is not ranked;
-- missing likelihood rows, invalid probability mass, and model-digest changes.
+- missing likelihood rows, invalid probability mass, and model-digest changes;
+- posterior normalization after perfect/noisy observations, impossible-outcome rejection, duplicate evidence-ID rejection, tampered-state rejection, and acquisition recomputation under the updated posterior.
 
 This remains synthetic mathematics. The likelihood must be supported and calibrated for a real process before the kernel can guide physical experimentation. Passing these tests would not establish physical information gain, causal identification, manufacturing utility, or savings.
 
