@@ -3,6 +3,7 @@ name: Enzyme benchmark admission checker
 on:
   pull_request:
     paths:
+      - "xtask/src/enzyme_abstention_matrix.rs"
       - "xtask/src/enzyme_bench.rs"
       - "xtask/src/enzyme_calibration.rs"
       - "xtask/src/enzyme_evidence_graph.rs"
@@ -15,6 +16,7 @@ on:
       - "docs/research/ENZYME_KINETICS_PARADIGM_SHIFT_ROADMAP_V0.md"
       - "docs/research/ENZYME_EVIDENCE_GRAPH_CONTRACT_V0.json"
       - "docs/research/ENZYME_EVIDENCE_GRAPH_VERIFIER_V0.md"
+      - "docs/research/ENZYME_ABSTENTION_STRESS_MATRIX_V0.md"
       - "docs/research/ENZYME_MODEL_FALSIFICATION_BENCHMARK_V0.md"
       - "docs/research/KCAT_ADMISSION_PROFILE_V0.json"
       - "docs/research/SLAC_CALIBRATION_REFERENCE_MANIFEST.json"
@@ -77,6 +79,22 @@ jobs:
             .model_selection_falsification.substrate_inhibition_truth.delta_bic_mm_minus_inhibition > 10.0 and
             .model_discrimination_design.selected_condition == 100.0 and
             .km_design_proxy.selected_condition == 2.0
+          ' "$report" >/dev/null
+
+      - name: Execute synthetic abstention matrix and check its evidence contract
+        shell: bash
+        run: |
+          set -euo pipefail
+          report="$RUNNER_TEMP/enzyme_abstention_matrix_v0.json"
+          cargo run -p xtask -- enzyme-abstention-matrix --out "$report"
+          jq -e '
+            .schema_version == 1 and
+            .status == "exploratory_synthetic_matrix_generated" and
+            .matrix.case_count == 96 and
+            (.cases | length) == 96 and
+            (.summary_by_stratum | length) == 4 and
+            (.cases | all(has("decision_reason") and has("observed_decision") and has("target_hit"))) and
+            (.decision_policy.calibration_status | contains("not calibrated"))
           ' "$report" >/dev/null
 
       - name: Fetch pinned CC BY calibration references (temporary runner workspace only)
