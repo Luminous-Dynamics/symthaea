@@ -258,7 +258,11 @@ impl EvidenceProvenance {
     /// The function is deterministic and side-effect free. It never performs
     /// I/O, trusts a locator as proof, or silently converts unknown status into
     /// an active/verified state.
-    pub fn assess(&self, policy: &ProvenancePolicy, now_ms: ProvenanceTimestampMillis) -> ProvenanceAssessment {
+    pub fn assess(
+        &self,
+        policy: &ProvenancePolicy,
+        now_ms: ProvenanceTimestampMillis,
+    ) -> ProvenanceAssessment {
         use ProvenanceAbstentionReason as R;
 
         let mut reasons = Vec::new();
@@ -515,7 +519,9 @@ mod tests {
         assert!(assessment.reasons.contains(&ProvenanceAbstentionReason::PublicationTimeInFuture));
         assert!(assessment.reasons.contains(&ProvenanceAbstentionReason::VerificationTimeInFuture));
         assert!(assessment.reasons.contains(&ProvenanceAbstentionReason::SourceStatusTimeInFuture));
-        assert!(assessment.reasons.contains(&ProvenanceAbstentionReason::InvalidClaimValidityInterval));
+        assert!(assessment
+            .reasons
+            .contains(&ProvenanceAbstentionReason::InvalidClaimValidityInterval));
     }
 
     #[test]
@@ -574,7 +580,9 @@ mod tests {
         let assessment = provenance.assess(&policy, NOW);
         assert_eq!(assessment.decision, ProvenanceDecision::Abstain);
         assert!(assessment.reasons.contains(&ProvenanceAbstentionReason::MissingRightsReference));
-        assert!(assessment.reasons.contains(&ProvenanceAbstentionReason::UnsupportedDigestAlgorithm));
+        assert!(assessment
+            .reasons
+            .contains(&ProvenanceAbstentionReason::UnsupportedDigestAlgorithm));
     }
 
     #[test]
