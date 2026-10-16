@@ -96,6 +96,8 @@ Recent work in ship design optimization explores constraint-aware sample selecti
 
 Physical-model integration must use suitable external reference and validation procedures. The ITTC provides a [ship resistance/propulsion benchmark repository](https://www.ittc.info/benchmark-repository/), a [CFD validation database procedure for resistance and propulsion](https://ittc.info/search/?q=5415), and a [practical ship-CFD application guide](https://ittc.info/media/11958/75-03-02-03.pdf). The experiment-selection code does not execute a CFD solver.
 
+The ITTC's 2024 Practical Guidelines for Ship CFD Applications distinguish numerical uncertainty from modelling uncertainty (the gap between a mathematical model solution and reality), state that numerical uncertainty can be estimated through numerical studies while experimental data is needed to estimate modelling error, and warn that design rankings must be considered alongside uncertainty ([ITTC guideline, §4.2](https://ittc.info/media/11958/75-03-02-03.pdf)). This drives a required future evidence model: keep solver/discretization uncertainty, experimental measurement uncertainty, model discrepancy/systematic bias, and operating-domain applicability as separate fields. A converged residual is not a calibration result.
+
 ## Next steps after the software crucible
 
 1. Add frozen, content-addressed receipts for the exact synthetic case corpus and expected output.
