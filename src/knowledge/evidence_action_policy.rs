@@ -432,4 +432,80 @@ mod tests {
         assert!(!EvidenceAction::AcquireMoreEvidence.permits_answer());
         assert!(!EvidenceAction::Abstain.permits_answer());
     }
+    #[test]
+    fn exhaustive_policy_state_space_preserves_safety_invariants() {
+        let p = EvidenceActionPolicy::new(2, true).unwrap();
+        let evidence_states = [
+            EvidenceCondition::FullSupport,
+            EvidenceCondition::PartialSupport,
+            EvidenceCondition::Irrelevant,
+            EvidenceCondition::Missing,
+            EvidenceCondition::Conflicting,
+        ];
+        let provenance_states = [
+            ProvenanceCondition::Verified,
+            ProvenanceCondition::Incomplete,
+            ProvenanceCondition::Invalid,
+        ];
+        let question_states = [QuestionCondition::Clear, QuestionCondition::Ambiguous];
+        let origin_states: [Option<u32>; 4] = [None, Some(0), Some(1), Some(2)];
+
+        let mut evaluated = 0usize;
+        for evidence in evidence_states {
+            for provenance in provenance_states {
+                for question in question_states {
+                    for independent_origins in origin_states {
+                        for scoped_answer_available in [false, true] {
+                            for acquisition_budget_available in [false, true] {
+                                let x = EvidenceActionInput {
+                                    evidence,
+                                    provenance,
+                                    question,
+                                    independent_origins,
+                                    scoped_answer_available,
+                                    acquisition_budget_available,
+                                };
+                                let decision = p.decide(x);
+                                evaluated += 1;
+
+                                if decision.action.permits_answer() {
+                                    assert_eq!(provenance, ProvenanceCondition::Verified);
+                                    assert_eq!(question, QuestionCondition::Clear);
+                                    assert_ne!(evidence, EvidenceCondition::Conflicting);
+                                    assert!(independent_origins
+                                        .is_some_and(|count| count >= p.minimum_independent_origins));
+                                }
+
+                                if decision.action == EvidenceAction::Answer {
+                                    assert_eq!(evidence, EvidenceCondition::FullSupport);
+                                }
+
+                                if decision.action == EvidenceAction::AnswerWithScopeLimit {
+                                    assert_eq!(evidence, EvidenceCondition::PartialSupport);
+                                    assert!(scoped_answer_available);
+                                    assert!(p.allow_scoped_partial_answer);
+                                }
+
+                                if decision.action == EvidenceAction::AskClarification {
+                                    assert_eq!(question, QuestionCondition::Ambiguous);
+                                    assert_eq!(provenance, ProvenanceCondition::Verified);
+                                    assert_ne!(evidence, EvidenceCondition::Conflicting);
+                                }
+
+                                if decision.action == EvidenceAction::AcquireMoreEvidence {
+                                    assert!(acquisition_budget_available);
+                                }
+
+                                if decision.action == EvidenceAction::Abstain {
+                                    assert!(!acquisition_budget_available);
+                                }
+                            }
+                        }
+                    }
+                }
+            }
+        }
+        assert_eq!(evaluated, 480);
+    }
+
 }
