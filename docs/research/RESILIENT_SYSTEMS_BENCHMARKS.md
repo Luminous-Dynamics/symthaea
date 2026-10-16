@@ -60,7 +60,7 @@ These are essential because no ground-truth field dataset may exist for many pro
 - **Capacity monotonicity:** increasing nominal capacity must not worsen any service fulfillment in this model.
 - **Dependency propagation:** removing a required upstream service must affect its downstream dependents according to the declared dependency contract.
 - **Ordering invariance:** permuting an acyclic service list must not change service traces by identifier.
-- **Fail-closed control:** malformed inputs never yield a seemingly valid report.
+- **Fail-closed control:** malformed inputs never yield a seemingly valid report.\n- **Resource conservation:** shared resource stocks remain within [0, storage capacity]; consumption is no more than stock plus actual replenishment.\n- **Stockout control:** if replenishment stops and a required resource is exhausted, affected services cannot keep receiving uncharged outputs.
 
 **Acceptance target:** every required property has a named test and a deliberate negative control. A test passing validates this implementation property, not a prediction about the physical world.
 
@@ -99,6 +99,27 @@ These are **unmeasured engineering targets**, not results or guaranteed requirem
 - **Traceability:** record CPU, OS, `rustc -Vv`, build profile, commit SHA, configuration digest, service count, dependency-edge count, disruption count, horizon and timing statistic.
 
 If the implementation misses a budget, profile it before weakening model detail. Do not reduce time resolution, discard per-service traces, skip validation or drop scenarios merely to meet a speed target. These targets should be revised using measured data from a documented reference machine before becoming normative.
+
+## Resource-coupling benchmark extension
+
+The next paradigm step is from independent service curves to **finite shared resource dynamics**. This reduces a common modeling failure: a system appears resilient because every service has nominal capacity, while real operations compete for the same finite energy, water, fuel, materials, storage, or repair resources.
+
+A first deterministic implementation is available in [`resource_constrained_screening.rs`](../../crates/domains/symthaea-engineering/src/resource_constrained_screening.rs). It treats supplies as explicit stocks with bounded replenishment and storage, lets a declared service priority policy allocate shared stocks, and reports each service and resource trajectory. The priority policy is intentionally visible: lower-priority services can be starved. It is a research abstraction, not a claim that fixed priorities are ethically or operationally optimal.
+
+Add the following reference fixtures before using it as a planning model:
+
+- **RC-01 stock conservation:** inventory remains non-negative and never exceeds storage capacity.
+- **RC-02 consumption conservation:** resource consumed equals the sum of delivered output times declared per-unit use, and cannot exceed available stock.
+- **RC-03 finite stockout:** with no replenishment, a service requiring the resource must become resource-limited once stock is exhausted.
+- **RC-04 supply interruption:** a supply event affects replenishment, not previously stored inventory; recovery follows the explicit event rule.
+- **RC-05 dependency + resource bottleneck:** upstream service availability and finite materials can both limit downstream delivery.
+- **RC-06 explicit allocation policy:** competing services obey the declared priority and a stable identifier tie-break; report per-service impacts so aggregate metrics do not hide starvation.
+- **RC-07 storage bound:** excess replenishment is curtailed at the declared storage limit and does not accumulate off-ledger.
+- **RC-08 resource substitution (future):** a declared substitute resource is credited only when its conversion, quality, qualification and switching delay are separately represented.
+
+Acceptance targets: resource conservation error within a predeclared floating-point tolerance for valid inputs; zero negative stock; zero storage-capacity overshoot; no hidden replenishment; deterministic traces; and a negative control showing service shortfall after stocks and substitute supplies are removed. Any normalization across unlike service units must be justified and documented. Prefer vectors of per-service deficit and recovery to an unqualified cross-service sum.
+
+Recent evidence supports explicitly modeling time, resource interruptions and recovery rather than static component counts. A 2025 open-access island-microgrid study models load and energy management under resource interruptions ([Scientific Reports](https://doi.org/10.1038/s41598-025-99974-x)); a 2026 study compares centralized and decentralized reconfiguration under physical microgrid vulnerability ([Scientific Reports, July 20, 2026](https://www.nature.com/articles/s41598-026-63123-9)); and a 2026 supply-chain study combines disruption-propagation simulation with calibration and optimization ([Computers & Industrial Engineering, July 2026](https://doi.org/10.1016/j.cie.2026.112063)). These inform model structure; they do not validate our parameters or code.
 
 ## 5. Initial benchmark suite
 
@@ -187,7 +208,7 @@ It does **not** yet model queues, inventory depletion, stochastic demand, repair
 - [Resilience in Cyber-Physical Infrastructures: R-KPI prioritization](https://doi.org/10.1016/j.jnlssr.2024.12.005), 2025.
 - [Modeling and operation of water-energy microgrids considering resilience assessment](https://doi.org/10.1016/j.nexus.2025.100590), 2025.
 - Shi et al., [Temporal modeling and resilience analysis of supply chain networks under cascading failures](https://doi.org/10.1016/j.ress.2025.111763), 2026.
-- Prasetia, [Agents of collaborative adaptation: modelling temporal resilience in supply chains](https://link.springer.com/article/10.1007/s10479-026-07406-4), published September 3, 2026.
+- Prasetia, [Agents of collaborative adaptation: modelling temporal resilience in supply chains](https://link.springer.com/article/10.1007/s10479-026-07406-4), published September 3, 2026.\n- Hosseina, Moghaddam & Hassannia (2025), [Optimizing energy and load management in island microgrids for enhancing resilience against resource interruptions](https://doi.org/10.1038/s41598-025-99974-x).\n- Pourramezani et al. (2026), [Physical vulnerability-oriented reconfiguration of microgrids: centralized vs. decentralized control](https://www.nature.com/articles/s41598-026-63123-9).\n- [Simulation-driven optimization for resilient and sustainable supply chain operations](https://doi.org/10.1016/j.cie.2026.112063), July 2026.
 
 ---
 *Integrity rule: simulated benchmarks, skipped CI, and successful source-level checks are not evidence of field reliability. Report each evidence class separately.*
