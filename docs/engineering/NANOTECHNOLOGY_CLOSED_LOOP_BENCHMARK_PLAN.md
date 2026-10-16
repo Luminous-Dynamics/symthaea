@@ -7,6 +7,7 @@
 **OC22 track:** [Evidence-bounded research program](./NANOMATERIALS_RESEARCH_PROGRAM.md)  
 **Tracking issue:** [NANO-003](https://github.com/Luminous-Dynamics/symthaea/issues/7519) (closed-loop policy evaluation)
 **Run manifest contract:** [NANOTECHNOLOGY_CLOSED_LOOP_RUN_MANIFEST.schema.json](./NANOTECHNOLOGY_CLOSED_LOOP_RUN_MANIFEST.schema.json)
+**Rust selector baseline:** [PR #7568](https://github.com/Luminous-Dynamics/symthaea/pull/7568), tracked by [NANO-005](https://github.com/Luminous-Dynamics/symthaea/issues/7570). Its three policies are batch-selection baselines only; it is not yet adaptive active learning and has not passed tests.
 
 ## 1. Decision
 
