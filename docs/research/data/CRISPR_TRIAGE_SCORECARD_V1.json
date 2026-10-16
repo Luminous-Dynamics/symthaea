@@ -1035,7 +1035,7 @@
       ]
     },
     "decision_critical_allocation_fixture": {
-      "status": "not_executed_direct_expected_plan_only",
+      "status": "passed_direct_fixture_calculation_only",
       "expected": {
         "selected_ids": [
           "u-b"
@@ -1045,7 +1045,18 @@
         "unspent_units": 1,
         "unresolved_differential_unknown_count": 1
       },
-      "scope_limit": "Expected outcome follows from the synthetic contract by inspection and has not been checked by compiling or running the Rust source. No biological validation or model improvement evidence follows."
+      "note": "The F10 top-K memberships and cheapest eligible item were evaluated directly from the synthetic contract and matched the expected plan; this is not Rust execution."
+    },
+    "measurement_allocation_cost_optimality_check": {
+      "status": "passed_independent_cost_selection_oracle_only",
+      "executed_on": "2026-10-16",
+      "eligible_candidate_cost_vectors": 21844,
+      "budget_comparisons": 240284,
+      "cost_values_checked": "integer cost units in [1,4]",
+      "candidate_count_range": "1..=7",
+      "budget_range": "0..=10",
+      "result": "Cheapest-first maximized the number of selected unit-value candidates under every enumerated budget; zero mismatches against exhaustive subset enumeration.",
+      "scope_limit": "This validates the narrow cheapest-first cardinality rule only. It does not compile or test the Rust source, verify rank input from a real source cohort, estimate expected value of information, or establish biological/clinical benefit."
     }
   },
   "follow_on_issue": "https://github.com/Luminous-Dynamics/symthaea/issues/7571",
