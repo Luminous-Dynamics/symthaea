@@ -177,7 +177,7 @@ pub fn assess_dependency_failures(
                 "every initiating failure must reference a declared service",
             ));
         }
-        if !initial.insert(id.clone()) {
+        if !initial.insert(id.as_str().to_owned()) {
             return Err(invalid(
                 "initiating_failures",
                 "initiating failure IDs must be unique",
