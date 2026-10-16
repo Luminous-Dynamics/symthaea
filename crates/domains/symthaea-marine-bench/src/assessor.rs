@@ -222,8 +222,8 @@ pub fn assess(case: &MarineFreightCase) -> Result<AssessmentReport, AssessmentEr
             )
             .to_owned(),
             concat!(
-                "Energy demand is supplied by the case; this evaluator does not derive hull resistance ",
-                "or propulsion loads.",
+                "Energy demand is supplied by the case; this evaluator does not derive ",
+                "hull resistance or propulsion loads.",
             )
             .to_owned(),
             concat!(
@@ -231,7 +231,11 @@ pub fn assess(case: &MarineFreightCase) -> Result<AssessmentReport, AssessmentEr
                 "thermal limits, grid dynamics, and degradation during the cycle are not modeled.",
             )
             .to_owned(),
-            "No overall PASS, weighted score, design ranking, or operating authority is produced.".to_owned(),
+            concat!(
+                "No overall PASS, weighted score, design ranking, or operating authority is ",
+                "produced.",
+            )
+            .to_owned(),
         ],
     })
 }
@@ -861,5 +865,4 @@ mod tests {
             }
         }
     }
-
 }
