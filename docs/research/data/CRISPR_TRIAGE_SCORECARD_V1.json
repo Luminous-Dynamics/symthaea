@@ -28,7 +28,10 @@
     "selective_risk_kernel_compiled": false,
     "selective_risk_unit_tests_executed": false,
     "calibration_metrics_executed": false,
-    "risk_coverage_metrics_executed": false
+    "risk_coverage_metrics_executed": false,
+    "measurement_allocator_compiled": false,
+    "measurement_allocator_unit_tests_executed": false,
+    "measurement_allocation_fixture_executed": false
   },
   "label_states": [
     {
@@ -201,6 +204,22 @@
       "abstention_policy": "Freeze the confidence score and acceptance rule before holdout reveal. Accept confidence tiers in descending order; exact ties enter together. Predicted positive iff probability_positive > 0.5; score endpoints are not clipped to hide overconfident errors.",
       "denominator_rule": "Calibration losses use measured positives and assay-defined negatives only; report unknowns explicitly and do not call conditional known-label metrics full-cohort calibration. Error bounds over accepted cases assign unknown outcomes best/worst for the prediction. These bounds are not confidence intervals.",
       "acceptance": "Publish full curves and context-specific summaries; calibration is not estimable if a context has no valid measured labels. Missing thresholds and not-estimable metrics are reported explicitly."
+    },
+    {
+      "id": "T11_decision_critical_measurement",
+      "required_when_unknown_outcomes_and_multiple_policies_exist": true,
+      "metrics": [
+        "differential_unknown_labels_resolved_at_declared_cost_budget",
+        "residual_direct_paired_numerator_ambiguity_count",
+        "measurement_cost_units_spent_and_unused",
+        "per_context_allocation_counts",
+        "paired_recall_label_sensitivity_bounds_before_after_observed_labels"
+      ],
+      "objective_definition": "Maximize count of unknown candidates whose top-K membership differs between policies A and B that can be measured under the declared cost-unit budget, for one frozen shared candidate universe and K. Each such label has unit impact on the paired positive-hit-count numerator if positive.",
+      "allocation_policy": "Compute top-K membership from complete one-based ranks under both policies; consider only UnknownUnassayed candidates selected by exactly one policy; select lowest declared positive cost units first, breaking ties deterministically by context and candidate ID.",
+      "exclusions": "Same-membership unknowns are counted but not selected by this narrow objective. This does not resolve denominator uncertainty, unknown labels in both/ neither top-K sets, positives omitted from the candidate universe, or the full paired sensitivity interval.",
+      "baseline_requirement": "Compare against random, highest-confidence/score-first, and top-ranked-unknown-first allocations at equal declared cost on identical preregistered episodes.",
+      "acceptance": "Same complete candidate universe, exact one-based full rankings, identical K, explicit costs, deterministic output, exact spend accounting, and explicit residual ambiguity. This is a measurement allocation heuristic, not an expected-value-of-information or lab-savings claim."
     }
   ],
   "primary_targets": {
@@ -245,6 +264,19 @@
         "No target is a clinical standard or claim of safety.",
         "Calibration and risk estimates may be conditional on label ascertainment.",
         "Bins, confidence policy and thresholds must be fixed before held-out outcomes are revealed."
+      ]
+    },
+    "secondary_measurement_allocation": {
+      "status": "aspirational_engineering_targets_not_clinical_standards",
+      "targets": [
+        "At equal declared cost budget, resolve at least 20% more policy-differential unknown labels than random allocation on preregistered synthetic/stress-test episodes, if the fixture mix makes that comparison estimable.",
+        "On permitted real cohorts, compare the same policy against random, confidence-first and top-ranked-unknown baselines; publish measured result, context coverage, spend and residual paired sensitivity bounds.",
+        "Never describe direct paired-numerator ambiguity resolution as resolving all label uncertainty or proving expected experimental value."
+      ],
+      "caveats": [
+        "Unit cost is a preregistered cost proxy, not actual laboratory cost or dollars.",
+        "No biological source data or assay outcomes were used for this planning contract.",
+        "The planner is not a wet-lab protocol or clinical decision system."
       ]
     }
   },
@@ -303,6 +335,11 @@
       "id": "G10_selective_prediction_integrity",
       "target": "100% of calibration/risk-coverage reports identify measured-label denominators, unknown counts, fixed bins, abstention/confidence policy, tie handling, and per-context results.",
       "failure_action": "Reject silent unknown-to-negative conversion, post-hoc threshold/bin selection, clipped overconfident errors, or pooled summaries that hide contexts with no labels."
+    },
+    {
+      "id": "G11_decision_critical_measurement_integrity",
+      "target": "100% of measurement plans derive policy-exclusive top-K membership from full rankings over the same candidate universe, respect K and declared cost units, and publish residual ambiguity.",
+      "failure_action": "Reject caller-supplied unverified disagreement flags, rank overlap/gaps, unknown-to-negative conversion, underfilled fixed-budget comparisons, post-hoc allocation, or claims that the narrow numerator objective resolves all uncertainty."
     }
   ],
   "comparator_policies": [
@@ -754,6 +791,76 @@
         "no_label_context_calibration": "not_estimable"
       },
       "interpretation": "Synthetic method check only; not biological data or performance evidence."
+    },
+    {
+      "id": "F10_decision_critical_measurement_allocation",
+      "purpose": "Resolve unknown labels whose outcome can directly change the paired positive-hit-count numerator for a fixed top-K policy comparison.",
+      "review_budget_k": 3,
+      "budget_units": 2,
+      "candidate_universe": [
+        {
+          "id": "u-a",
+          "context": "guide-a",
+          "rank_a": 1,
+          "rank_b": 5,
+          "label": "unknown_unassayed",
+          "assay_cost_units": 2
+        },
+        {
+          "id": "u-b",
+          "context": "guide-a",
+          "rank_a": 5,
+          "rank_b": 2,
+          "label": "unknown_unassayed",
+          "assay_cost_units": 1
+        },
+        {
+          "id": "u-common",
+          "context": "guide-a",
+          "rank_a": 2,
+          "rank_b": 1,
+          "label": "unknown_unassayed",
+          "assay_cost_units": 3
+        },
+        {
+          "id": "p1",
+          "context": "guide-a",
+          "rank_a": 3,
+          "rank_b": 3,
+          "label": "positive",
+          "assay_cost_units": 1
+        },
+        {
+          "id": "n1",
+          "context": "guide-b",
+          "rank_a": 4,
+          "rank_b": 4,
+          "label": "assay_defined_negative",
+          "assay_cost_units": 1
+        },
+        {
+          "id": "u-neither",
+          "context": "guide-b",
+          "rank_a": 6,
+          "rank_b": 6,
+          "label": "unknown_unassayed",
+          "assay_cost_units": 1
+        }
+      ],
+      "expected": {
+        "initial_unknown_count": 4,
+        "initially_differential_unknown_count": 2,
+        "unknown_a_only_count": 1,
+        "unknown_b_only_count": 1,
+        "unknown_same_membership_count": 2,
+        "selected_ids": [
+          "u-b"
+        ],
+        "selected_cost_units": 1,
+        "unspent_cost_units": 1,
+        "unresolved_differential_unknown_count": 1
+      },
+      "interpretation": "Synthetic allocation fixture only. Does not represent experimental outcomes, full value of information, laboratory savings, or biological safety."
     }
   ],
   "implementation_artifact": {
@@ -777,7 +884,8 @@
     ],
     "additional_source_paths": [
       "scripts/crispr_decision_frontier.rs",
-      "scripts/crispr_selective_risk.rs"
+      "scripts/crispr_selective_risk.rs",
+      "scripts/crispr_measurement_priority.rs"
     ],
     "additional_test_suites": [
       {
@@ -798,6 +906,21 @@
           "risk-coverage tiers with exact confidence ties grouped together",
           "unknown accepted labels widen error-rate bounds rather than become negatives",
           "context-stratified sorted output and unlabelled context handling"
+        ]
+      },
+      {
+        "path": "scripts/crispr_measurement_priority.rs",
+        "unit_test_count": 19,
+        "suggested_command": "rustc --edition=2024 --test scripts/crispr_measurement_priority.rs -o /tmp/crispr-measurement-tests && /tmp/crispr-measurement-tests",
+        "execution_status": "not_compiled_rustc_unavailable_in_authoring_environment",
+        "test_coverage_summary": [
+          "only unknown policy-exclusive top-K cases are selected for this narrow objective",
+          "cheapest-first fixed-cost allocation and deterministic tie breaks",
+          "explicit A/B numerator contribution sign for a positive label",
+          "same-membership unknowns counted but not overclaimed as direct numerator value",
+          "no unknown-to-negative coercion",
+          "zero budget/zero K/underfilled universe handling",
+          "duplicate IDs, duplicate/gapped per-policy rankings, blank context and zero costs rejected"
         ]
       }
     ]
@@ -910,6 +1033,19 @@
         "candidate discovery beyond the declared universe",
         "Symthaea performance improvement"
       ]
+    },
+    "decision_critical_allocation_fixture": {
+      "status": "not_executed_direct_expected_plan_only",
+      "expected": {
+        "selected_ids": [
+          "u-b"
+        ],
+        "initially_differential_unknown_count": 2,
+        "spent_units": 1,
+        "unspent_units": 1,
+        "unresolved_differential_unknown_count": 1
+      },
+      "scope_limit": "Expected outcome follows from the synthetic contract by inspection and has not been checked by compiling or running the Rust source. No biological validation or model improvement evidence follows."
     }
   },
   "follow_on_issue": "https://github.com/Luminous-Dynamics/symthaea/issues/7571",
@@ -925,6 +1061,12 @@
       "number": 7580,
       "url": "https://github.com/Luminous-Dynamics/symthaea/issues/7580",
       "scope": "selective prediction and calibration"
+    },
+    {
+      "id": "CRISPR-OT-004",
+      "number": 7589,
+      "url": "https://github.com/Luminous-Dynamics/symthaea/issues/7589",
+      "scope": "decision-critical unknown-label measurement allocation"
     }
   ]
 }
