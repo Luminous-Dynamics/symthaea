@@ -1,0 +1,165 @@
+{
+  "schema_version": 1,
+  "benchmark_id": "synthetic-generator-cycle-v1",
+  "evidence_class": "synthetic_fixture",
+  "not_for_decision": true,
+  "mission": {
+    "mission_id": "synthetic-start-load-stop",
+    "description": "Accounting-only fixture that exercises startup, loaded operation, and shutdown while storage first charges and then discharges.",
+    "platform": "synthetic energy-conversion system",
+    "duty_cycle_id": "fixture-3660s",
+    "expected_duration_s": 3660,
+    "required_phases": [
+      "startup",
+      "loaded",
+      "shutdown"
+    ]
+  },
+  "boundary": {
+    "boundary_id": "fixture-system-boundary-v1",
+    "input_definition": "Synthetic external energy crossing into the entire conversion-system boundary.",
+    "useful_output_definition": "Synthetic useful energy delivered outside the registered boundary after internal auxiliaries are accounted for separately.",
+    "auxiliary_treatment": "separate_nonuseful_energy",
+    "storage_treatment": "signed_change_in_stored_energy",
+    "upstream_scope": "device_only",
+    "energy_unit": "J",
+    "power_unit": "W"
+  },
+  "candidate": {
+    "candidate_id": "synthetic-accounting-fixture",
+    "architecture_family": "not-a-physical-design",
+    "description": "Hand-authored values constructed only to test schema shape and exact first-law bookkeeping."
+  },
+  "solver": {
+    "method": "hand-authored accounting fixture; no physical solver",
+    "version": "1",
+    "code_revision": "5623ea3a19d0f923fd3e767838d446cde00d6c42",
+    "model_fidelity": "analytical",
+    "random_seed": null,
+    "calibration_dataset_ids": []
+  },
+  "intervals": [
+    {
+      "index": 0,
+      "phase": "startup",
+      "start_s": 0,
+      "end_s": 60,
+      "energy_j": {
+        "external_input": 10,
+        "net_useful_output": 0.5,
+        "auxiliary": 1,
+        "rejected_or_loss": 6.5,
+        "stored_energy_change": 2
+      },
+      "standard_uncertainty_j": {
+        "external_input": 0.05,
+        "net_useful_output": 0.01,
+        "auxiliary": 0.01,
+        "rejected_or_loss": 0.05,
+        "stored_energy_change": 0.1
+      },
+      "source_artifact_ids": [
+        "synthetic-values"
+      ]
+    },
+    {
+      "index": 1,
+      "phase": "loaded",
+      "start_s": 60,
+      "end_s": 3600,
+      "energy_j": {
+        "external_input": 100,
+        "net_useful_output": 35,
+        "auxiliary": 5,
+        "rejected_or_loss": 59,
+        "stored_energy_change": 1
+      },
+      "standard_uncertainty_j": {
+        "external_input": 0.5,
+        "net_useful_output": 0.2,
+        "auxiliary": 0.05,
+        "rejected_or_loss": 0.5,
+        "stored_energy_change": 0.2
+      },
+      "source_artifact_ids": [
+        "synthetic-values"
+      ]
+    },
+    {
+      "index": 2,
+      "phase": "shutdown",
+      "start_s": 3600,
+      "end_s": 3660,
+      "energy_j": {
+        "external_input": 2,
+        "net_useful_output": 0.2,
+        "auxiliary": 0.1,
+        "rejected_or_loss": 4.7,
+        "stored_energy_change": -3
+      },
+      "standard_uncertainty_j": {
+        "external_input": 0.02,
+        "net_useful_output": 0.01,
+        "auxiliary": 0.01,
+        "rejected_or_loss": 0.05,
+        "stored_energy_change": 0.1
+      },
+      "source_artifact_ids": [
+        "synthetic-values"
+      ]
+    }
+  ],
+  "uncertainty": {
+    "quantity_type": "combined_standard_uncertainty",
+    "coverage_factor": 2,
+    "correlation_model": "unknown",
+    "method": "Placeholder values demonstrate manifest structure only; no uncertainty propagation has been performed.",
+    "assumptions": [
+      "Uncertainty values are synthetic placeholders, not derived from instruments or calibrated models.",
+      "Correlation is unknown. This fixture must not be used to claim a confidence interval or superiority."
+    ]
+  },
+  "data_provenance": [
+    {
+      "artifact_id": "synthetic-values",
+      "kind": "synthetic_fixture",
+      "description": "Hand-authored numbers satisfying the intended accounting identity; not measured, published, or simulated physical-system data."
+    },
+    {
+      "artifact_id": "synthetic-bias-calibration-placeholder",
+      "kind": "synthetic_fixture",
+      "description": "Synthetic placeholder used only to test calibration-reference integrity; not calibrated evidence.",
+      "sha256": "8736745084b1d9c41d93d15fc6e9700607126e94fb619a5e0d0420234e2d7d62"
+    }
+  ],
+  "computed_metrics": {
+    "total_external_input_j": 112,
+    "total_net_useful_output_j": 35.7,
+    "net_stored_energy_change_j": 0,
+    "net_cycle_efficiency": 0.31875,
+    "uncertainty_bound_method": "not computed",
+    "candidate_beats_baseline": null
+  },
+  "limitations": [
+    "This is a schema and bookkeeping fixture, not an engine or generator model.",
+    "The example efficiency is arithmetic over invented values and has no physical or comparative evidentiary value.",
+    "A verifier must independently check interval continuity, interval ordering and uniqueness, required phase presence, first-law closure for each interval and aggregate totals, stored-energy closure, and consistency of the cached computed metrics.",
+    "An uncertainty-aware superiority claim requires a declared propagation method and correlation treatment, plus comparable baseline evidence."
+  ],
+  "evaluation_policy": {
+    "policy_id": "synthetic-fixture-policy-v1",
+    "registered_before_search": true,
+    "preregistered_at": "2026-10-15T00:00:00Z",
+    "relative_balance_tolerance": 1e-9,
+    "time_continuity_tolerance_s": 1e-9,
+    "minimum_superiority_margin": 0.05,
+    "maximum_unmodeled_differential_bias_efficiency": 0,
+    "differential_bias_bound_basis": "Synthetic fixture only; not evidence that real systematic bias is zero.",
+    "baseline_id": "none-synthetic-only",
+    "selection_rule": "No decision permitted: fixture exists only to validate schema and verifier behavior.",
+    "search_started_at": "2026-10-15T01:00:00Z",
+    "comparison_metric_id": "net_cycle_efficiency",
+    "differential_bias_calibration_artifact_id": "synthetic-bias-calibration-placeholder",
+    "differential_bias_calibration_artifact_sha256": "8736745084b1d9c41d93d15fc6e9700607126e94fb619a5e0d0420234e2d7d62"
+  }
+}
