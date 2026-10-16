@@ -5,12 +5,14 @@
 //! magnitudes come from a site-specific, versioned profile and evidence manifest.
 //! The registry is a test protocol, not evidence that any solver is valid.
 
+use serde::{Deserialize, Serialize};
 use std::collections::BTreeSet;
 
 /// Bump when the meaning, membership, or required domains of the suite change.
 pub const LIVING_CITY_BENCHMARK_SUITE_VERSION: u32 = 1;
 
-#[derive(Debug, Clone, Copy, PartialEq, Eq, PartialOrd, Ord)]
+#[derive(Debug, Clone, Copy, PartialEq, Eq, PartialOrd, Ord, Serialize, Deserialize)]
+#[serde(rename_all = "snake_case")]
 pub enum Hazard {
     ExtremeHeat,
     Drought,
