@@ -387,6 +387,17 @@ mod tests {
     }
 
     #[test]
+    fn ratification_reference_must_match_governance_evidence_source() {
+        let mut input = package();
+        input.floor_ratification_ref = "fixture://unrelated-record".into();
+        let evidence = manifest(&input);
+        assert_eq!(
+            input.assess(&evidence).unwrap_err().field,
+            "floor_ratification_ref"
+        );
+    }
+
+    #[test]
     fn every_metric_needs_non_missing_lineage() {
         let mut input = package();
         input.metric_evidence.pop();
