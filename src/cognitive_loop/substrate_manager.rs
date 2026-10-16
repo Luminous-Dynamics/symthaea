@@ -1267,20 +1267,23 @@ mod tests {
     }
 
     #[test]
-    fn test_budget_exhaustion_kills_viability() {
+    fn test_budget_exhaustion_kills_viability_after_wall_time_window() {
         let mut cfg = default_config();
         cfg.enable_energy_budget = true;
-        // Set budget to exactly 1 cycle's worth of energy
         let mgr_ref = SubstrateManager::new(&cfg);
         cfg.energy_budget_joules_per_sec = Some(mgr_ref.energy_per_cycle * 0.5);
         let mut mgr = SubstrateManager::new(&cfg);
+        let window_start = std::time::Instant::now();
+        mgr.energy_rate_window_started_at = window_start;
         assert!(mgr.consciousness_viable);
-        // One tick should exceed the budget
-        mgr.tick_energy(&cfg);
+
+        mgr.tick_energy_at(&cfg, window_start + std::time::Duration::from_secs(1));
         assert!(
             !mgr.consciousness_viable,
-            "Exceeding energy budget should kill viability"
+            "Model-estimated average watts above the budget should trip the gate"
         );
+        assert!(mgr.estimated_energy_rate_watts > cfg.energy_budget_joules_per_sec.unwrap());
+        assert!((mgr.energy_rate_window_seconds - 1.0).abs() < f64::EPSILON);
     }
 
     #[test]
@@ -1314,8 +1317,38 @@ mod tests {
     }
 
     #[test]
+    fn test_rate_budget_does_not_compare_joules_to_watts_before_window_closes() {
+        let mut config = default_config();
+        config.enable_energy_budget = true;
+        let mut mgr = SubstrateManager::new(&config);
+        let window_start = std::time::Instant::now();
+        mgr.energy_rate_window_started_at = window_start;
+        config.energy_budget_joules_per_sec = Some(1e-20);
+
+        mgr.tick_energy_at(&config, window_start + std::time::Duration::from_millis(100));
+        assert!(
+            mgr.total_energy_spent > config.energy_budget_joules_per_sec.unwrap(),
+            "test requires cumulative joules to exceed the numeric watts budget"
+        );
+        assert!(
+            mgr.consciousness_viable,
+            "a numeric joule-vs-watt comparison must not trip the rate budget"
+        );
+        assert_eq!(mgr.estimated_energy_rate_watts, 0.0);
+
+        mgr.tick_energy_at(&config, window_start + std::time::Duration::from_secs(1));
+        assert!(
+            !mgr.consciousness_viable,
+            "a completed measured window above budget must trip the rate gate"
+        );
+        assert!(mgr.estimated_energy_rate_watts > config.energy_budget_joules_per_sec.unwrap());
+    }
+
+    #[test]
     fn test_energy_scales_with_tau() {
-        // Photonic (fast, tau > 1.0) should burn more energy per tick
+        // Faster photonic substrate has tau > 1.0 under the current seconds/op model.
+        // The modeled per-cycle energy estimate scales with that rate factor; the
+        // watts budget itself is evaluated only after a monotonic wall-time window.
         let mut config = default_config();
         config.enable_energy_budget = true;
         config.enable_substrate_speed_modulation = true;
@@ -1324,13 +1357,13 @@ mod tests {
         let mut mgr = SubstrateManager::new(&config);
         let initial_energy = mgr.energy_per_cycle;
         mgr.tick_energy(&config);
-        // With tau > 1.0, energy spent should exceed base energy_per_cycle
         assert!(
-            mgr.total_energy_spent > initial_energy,
-            "Photonic substrate should burn more energy: {} vs {}",
-            mgr.total_energy_spent,
+            mgr.last_energy_spent > initial_energy,
+            "Photonic tau-adjusted cycle energy {} should exceed base estimate {}",
+            mgr.last_energy_spent,
             initial_energy
         );
+        assert!(mgr.consciousness_viable, "no full wall-time window has elapsed");
     }
 
     #[test]
@@ -1350,16 +1383,18 @@ mod tests {
     }
 
     #[test]
-    fn test_should_degrade_when_energy_exhausted() {
+    fn test_should_degrade_when_energy_rate_exceeds_budget() {
         let mut config = default_config();
         config.enable_energy_budget = true;
-        config.energy_budget_joules_per_sec = Some(1e-20); // impossibly small budget
+        config.energy_budget_joules_per_sec = Some(1e-20); // impossibly small modeled-watt budget
         let mut mgr = SubstrateManager::new(&config);
+        let window_start = std::time::Instant::now();
+        mgr.energy_rate_window_started_at = window_start;
         assert!(!mgr.should_degrade_consciousness());
-        mgr.tick_energy(&config);
+        mgr.tick_energy_at(&config, window_start + std::time::Duration::from_secs(1));
         assert!(
             mgr.should_degrade_consciousness(),
-            "Should degrade after energy exhaustion"
+            "Should degrade after the model-estimated energy rate exceeds the rate budget"
         );
     }
 
