@@ -73,6 +73,9 @@ jobs:
       - name: Run deterministic integrity tests
         run: cargo test --manifest-path crates/domains/symthaea-futures-market-integrity/Cargo.toml
 
+      - name: Run deterministic synthetic replay negative controls
+        run: cargo run --manifest-path crates/domains/symthaea-futures-market-integrity/Cargo.toml --example replay_benchmark_v1
+
       - name: Enforce strict Clippy
         run: cargo clippy --manifest-path crates/domains/symthaea-futures-market-integrity/Cargo.toml --all-targets -- -D warnings
 
