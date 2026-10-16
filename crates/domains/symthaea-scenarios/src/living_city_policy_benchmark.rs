@@ -778,10 +778,9 @@ mod tests {
         );
         assert_eq!(receipt.config_sha256, cfg.sha256().unwrap());
         assert_eq!(receipt.run_sha256, run.sha256().unwrap());
-        assert_eq!(
-            serde_json::from_slice::<PolicyRunReceipt>(&receipt.canonical_bytes().unwrap()).unwrap(),
-            receipt
-        );
+        let receipt_bytes = receipt.canonical_bytes().unwrap();
+        let decoded = serde_json::from_slice::<PolicyRunReceipt>(&receipt_bytes).unwrap();
+        assert_eq!(decoded, receipt);
     }
 
     #[test]
