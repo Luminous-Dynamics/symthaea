@@ -74,6 +74,16 @@ The key paradigm shift is **bounded computation with an error certificate**: the
 - Publish exact commit, toolchain, command line, raw outputs, seed, and test-corpus counts. Queued or skipped CI is not a pass.
 - Define a primary metric and minimum practical improvement before each optimization; retain per-workload regressions instead of collapsing them into a single score.
 
+## Provisional numeric project targets (not universal standards)
+
+Use these as initial decision thresholds and revise only after the exact baseline and intended application error budget are recorded.
+
+- **Spherical API:** all valid finite latitude/longitude inputs return finite distance; distance is symmetric within 1e-9 km on the deterministic fixture corpus; coincident points are within 1e-9 km of zero; output remains in [0, pi * EARTH_RADIUS_KM] within floating-point tolerance. Test the model's own reference truth, not WGS84 truth.
+- **Ellipsoidal API (future work):** use GeographicLib / Karney test vectors and independent seeded cases. Initial goal: absolute distance error no greater than 1 mm versus the reference on the qualified WGS84 inverse corpus. Treat bearings near coincident or antipodal configurations as ill-conditioned/ambiguous and define explicit API behavior instead of forcing a misleading tolerance.
+- **Spatial index:** zero false negatives after exact post-filtering. Broadphase false positives are measured as work, not treated as a correctness failure.
+- **Algorithm-selection win:** target at least 15% lower p95 batch latency or 25% less work on two or more held-out workload families at the same required result quality. A learned selector must beat the best fixed-threshold policy by at least 10% on a predeclared held-out objective with a 95% paired confidence interval excluding zero; otherwise prefer the simpler policy.
+- **No quality-for-speed substitution:** any candidate that crosses its declared distance/area/path error budget is rejected even if faster.
+
 ## Proposed acceptance gates
 
 1. No NaN / infinity for valid finite coordinates in the defined input domain.
