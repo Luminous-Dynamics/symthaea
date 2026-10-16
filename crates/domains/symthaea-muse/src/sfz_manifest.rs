@@ -136,7 +136,7 @@ pub fn parse_sfz_mapping(source: &str) -> Result<SfzMappingManifestV1, SfzParseE
                     other => {
                         return Err(parse_error(
                             line_number,
-                            format!("unsupported section <{other}>; this parser accepts only global/group/region"),
+                            format!("unsupported section <{other}>; this parser accepts only control/global/group/region"),
                         ));
                     }
                 }
