@@ -52,12 +52,12 @@ cargo test -p symthaea-nano-policy --locked
 cargo run -p symthaea-nano-policy --release --locked < request.json
 ~~~
 
-This crate uses workspace-pinned serde, serde_json, and blake3 plus the existing symthaea-core BinaryHV API. That path dependency pulls in Symthaea core's scientific/utility dependency graph. A dedicated targeted workflow checks format, tests, and Clippy. If the Rust toolchain is unavailable locally, don't claim local compilation; rely on exact-head workflow evidence only when its job actually completes successfully.
+This crate uses workspace-pinned serde, serde_json, and blake3 plus Symthaea core's BinaryHV API. That path dependency pulls in Symthaea core's scientific/utility dependency graph. A dedicated targeted workflow checks format, tests, and Clippy. If the Rust toolchain is unavailable locally, don't claim local compilation; rely on exact-head workflow evidence only when its job actually completes successfully.
 
 ## Prototype acceptance and performance profile
 
 Software acceptance before scientific use:
-- all 20 unit tests pass on the exact commit;
+- all 21 unit tests pass on the exact commit;
 - formatting and Clippy pass with warnings denied;
 - same canonical request produces the same ordered IDs for all three policies, independent of input row order;
 - unknown target/outcome fields fail parsing;
