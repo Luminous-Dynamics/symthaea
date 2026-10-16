@@ -443,11 +443,7 @@ fn comparison_metrics(
 
     let candidate_spectrum = average_magnitude_spectrum(candidate, channels, frames);
     let reference_spectrum = average_magnitude_spectrum(reference, channels, frames);
-    let (
-        log_spectral_distance_db,
-        normalized_power_spectrum_l1,
-        spectral_magnitude_cosine_similarity,
-    ) =
+    let (log_spectral_distance_db, normalized_power_spectrum_l1, spectral_magnitude_cosine_similarity) =
         spectrum_distances(&candidate_spectrum, &reference_spectrum);
     let candidate_centroid = spectral_centroid_hz(&candidate_spectrum, sample_rate);
     let reference_centroid = spectral_centroid_hz(&reference_spectrum, sample_rate);
@@ -594,6 +590,30 @@ mod tests {
             .collect()
     }
 
+    fn audio_fixture(samples: Vec<f32>, sample_rate_hz: u32, channels: u16, name: &str) -> LoadedAudio {
+        let frames = samples.len() / usize::from(channels);
+        let finite_samples = samples.iter().all(|sample| sample.is_finite());
+        let (peak_absolute, rms, dc_offset) = signal_summary(&samples, finite_samples);
+        LoadedAudio {
+            evidence: AudioEvidenceV1 {
+                file_name: name.to_owned(),
+                sha256: format!("hash-{name}"),
+                byte_len: (samples.len() * std::mem::size_of::<f32>()) as u64,
+                sample_rate_hz,
+                channels,
+                bits_per_sample: 32,
+                sample_format: "ieee_float_32bit".to_owned(),
+                frames,
+                duration_seconds: frames as f64 / f64::from(sample_rate_hz),
+                finite_samples,
+                peak_absolute,
+                rms,
+                dc_offset,
+            },
+            samples,
+        }
+    }
+
     #[test]
     fn identical_audio_has_zero_waveform_error_and_zero_spectral_distance() {
         let signal = sine(440.0, 44_100, 12_000);
@@ -656,6 +676,34 @@ mod tests {
         assert!(metrics.spectral_magnitude_cosine_similarity < 1.0e-9);
         assert!(metrics.normalized_power_spectrum_l1 > 0.9);
         assert!(metrics.log_spectral_distance_db > 1.0);
+    }
+
+    #[test]
+    fn sample_rate_mismatch_is_reported_as_not_comparable() {
+        let candidate = audio_fixture(vec![0.1, -0.1], 44_100, 1, "candidate.wav");
+        let reference = audio_fixture(vec![0.1, -0.1], 48_000, 1, "reference.wav");
+        let receipt = build_receipt(candidate, reference);
+        assert_eq!(receipt.comparison.status, "not_comparable_sample_rate_mismatch");
+        assert_eq!(receipt.comparison.metrics.is_none(), true);
+    }
+
+    #[test]
+    fn non_finite_samples_are_reported_without_scoring() {
+        let candidate = audio_fixture(vec![f32::NAN, 0.1], 44_100, 1, "candidate.wav");
+        let reference = audio_fixture(vec![0.0, 0.1], 44_100, 1, "reference.wav");
+        let receipt = build_receipt(candidate, reference);
+        assert_eq!(receipt.comparison.status, "invalid_non_finite_samples");
+        assert_eq!(receipt.comparison.metrics.is_none(), true);
+    }
+
+    #[test]
+    fn duration_mismatch_records_common_prefix_and_frame_delta() {
+        let candidate = audio_fixture(vec![0.1, 0.2, 0.3], 44_100, 1, "candidate.wav");
+        let reference = audio_fixture(vec![0.1, 0.2], 44_100, 1, "reference.wav");
+        let receipt = build_receipt(candidate, reference);
+        assert_eq!(receipt.comparison.status, "measured_not_quality_qualified");
+        assert_eq!(receipt.comparison.candidate_minus_reference_frames, 1);
+        assert_eq!(receipt.comparison.compared_frames, Some(2));
     }
 
     #[test]
