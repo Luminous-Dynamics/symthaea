@@ -18,7 +18,8 @@ pub use acquisition::{
     ExperimentActionModel, FiniteHypothesisModel, HypothesisLikelihood, HypothesisPrior,
     HypothesisUtility, OutcomeMarginal, OutcomeProbability, PosteriorEvidenceReceipt,
     PosteriorState, PosteriorUpdate, RankedAction, RejectedAction, condition_posterior,
-    expected_information_gain, initial_posterior_state, rank_feasible_actions,
+    expected_information_gain, expected_information_gain_for_state, initial_posterior_state,
+    rank_feasible_actions, rank_feasible_actions_for_state,
 };
 pub use analysis::{
     BenchmarkSummary, CampaignEvaluationSample, PairedPolicyComparison, PolicyAggregate,
