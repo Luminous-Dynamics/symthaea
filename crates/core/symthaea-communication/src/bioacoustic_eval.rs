@@ -15,7 +15,7 @@ use crate::bioacoustic_corpus::{
 };
 use crate::TimeSpan;
 use serde::{Deserialize, Serialize};
-use std::collections::BTreeSet;
+use std::collections::{BTreeMap, BTreeSet};
 
 pub const BIOACOUSTIC_EVENT_EVAL_SCHEMA_VERSION: u32 = 1;
 
@@ -499,11 +499,16 @@ fn prediction_in_unscored_region(
     }
 }
 
+type SourceAssetCoverage<'a> = (
+    &'a crate::bioacoustic_corpus::BioacousticRecording,
+    f64,
+    f64,
+);
+
 fn validate_non_overlapping_source_coverage(
     test_recordings: &[&crate::bioacoustic_corpus::BioacousticRecording],
 ) -> Result<(), String> {
-    let mut by_source: std::collections::BTreeMap<&str, Vec<(&crate::bioacoustic_corpus::BioacousticRecording, f64, f64)>> =
-        std::collections::BTreeMap::new();
+    let mut by_source: BTreeMap<&str, Vec<SourceAssetCoverage<'_>>> = BTreeMap::new();
 
     for recording in test_recordings {
         let source_id = recording
