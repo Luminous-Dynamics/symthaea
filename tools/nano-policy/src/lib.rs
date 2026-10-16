@@ -143,9 +143,9 @@ pub fn select(request: SelectionRequest) -> Result<SelectionReceipt, String> {
             while selections.len() < limit {
                 mark_over_budget(&request, spent, &mut work);
                 let mut best: Option<usize> = None;
-                for i in 0..n {
+                for (i, candidate) in request.candidates.iter().enumerate() {
                     if work[i].disposition.is_some() { continue; }
-                    if best.is_none_or(|j| cost_then_id(&request.candidates[i], &request.candidates[j]) == Ordering::Less) {
+                    if best.is_none_or(|j| cost_then_id(candidate, &request.candidates[j]) == Ordering::Less) {
                         best = Some(i);
                     }
                 }
@@ -157,7 +157,7 @@ pub fn select(request: SelectionRequest) -> Result<SelectionReceipt, String> {
             while selections.len() < limit {
                 mark_over_budget(&request, spent, &mut work);
                 let mut best: Option<(usize, f64, Option<f64>)> = None;
-                for i in 0..n {
+                for (i, candidate) in request.candidates.iter().enumerate() {
                     if work[i].disposition.is_some() { continue; }
                     let nearest = if chosen.is_empty() {
                         None
