@@ -125,6 +125,10 @@ pub struct EvaluationPolicy {
     /// Evidence/reasoning used to justify the registered bound. This text is
     /// an audit aid, not independent authentication of the evidence.
     pub differential_bias_bound_basis: String,
+    /// Content-addressed reference to the calibration record in data_provenance.
+    /// The caller must separately verify the referenced artifact's exact bytes.
+    pub differential_bias_calibration_artifact_id: String,
+    pub differential_bias_calibration_artifact_sha256: String,
     pub baseline_id: String,
     pub selection_rule: String,
     pub comparison_metric_id: String,
@@ -333,9 +337,10 @@ pub fn validate_run(run: &BenchmarkRun) -> Result<VerifiedTotals, ValidationErro
         || policy.baseline_id.trim().is_empty()
         || policy.selection_rule.trim().is_empty()
         || policy.differential_bias_bound_basis.trim().is_empty()
+        || policy.differential_bias_calibration_artifact_id.trim().is_empty()
     {
         issues.push(
-            "policy ID, baseline ID, selection rule, and differential-bias-bound basis must be non-empty"
+            "policy ID, baseline ID, selection rule, differential-bias-bound basis, and calibration artifact ID must be non-empty"
                 .into(),
         );
     }
@@ -396,6 +401,11 @@ pub fn validate_run(run: &BenchmarkRun) -> Result<VerifiedTotals, ValidationErro
     if run.data_provenance.is_empty() {
         issues.push("at least one provenance artifact is required".into());
     }
+    if !valid_sha256(&policy.differential_bias_calibration_artifact_sha256) {
+        issues.push(
+            "evaluation_policy.differential_bias_calibration_artifact_sha256 must be a 64-character lowercase hexadecimal SHA-256".into(),
+        );
+    }
     let mut artifact_ids = BTreeSet::new();
     for artifact in &run.data_provenance {
         if artifact.artifact_id.trim().is_empty()
@@ -427,6 +437,20 @@ pub fn validate_run(run: &BenchmarkRun) -> Result<VerifiedTotals, ValidationErro
                 artifact.artifact_id
             ));
         }
+    }
+
+    match run.data_provenance.iter().find(|artifact| {
+        artifact.artifact_id == policy.differential_bias_calibration_artifact_id
+    }) {
+        Some(artifact)
+            if artifact.sha256.as_deref()
+                == Some(policy.differential_bias_calibration_artifact_sha256.as_str()) => {}
+        Some(_) => issues.push(
+            "evaluation policy calibration artifact SHA-256 does not match its provenance entry".into(),
+        ),
+        None => issues.push(
+            "evaluation policy calibration artifact ID is not present in data_provenance".into(),
+        ),
     }
 
     let required_phases: BTreeSet<&str> = run
@@ -757,6 +781,10 @@ pub fn compare_candidates(
         || cp.maximum_unmodeled_differential_bias_efficiency
             != bp.maximum_unmodeled_differential_bias_efficiency
         || cp.differential_bias_bound_basis != bp.differential_bias_bound_basis
+        || cp.differential_bias_calibration_artifact_id
+            != bp.differential_bias_calibration_artifact_id
+        || cp.differential_bias_calibration_artifact_sha256
+            != bp.differential_bias_calibration_artifact_sha256
         || cp.selection_rule != bp.selection_rule
         || cp.baseline_id != bp.baseline_id
         || cp.comparison_metric_id != bp.comparison_metric_id
@@ -1040,6 +1068,27 @@ mod tests {
                 .iter()
                 .any(|issue| issue.contains("cached metric total_external_input_j"))
         );
+    }
+
+    #[test]
+    fn missing_bias_calibration_artifact_reference_is_rejected() {
+        let mut run: BenchmarkRun = serde_json::from_str(FIXTURE).unwrap();
+        run.evaluation_policy.differential_bias_calibration_artifact_id =
+            "missing-calibration-artifact".into();
+        let error = validate_run(&run).unwrap_err();
+        assert!(error.issues.iter().any(|issue| {
+            issue.contains("calibration artifact ID is not present in data_provenance")
+        }));
+    }
+
+    #[test]
+    fn bias_calibration_hash_must_match_its_provenance_entry() {
+        let mut run: BenchmarkRun = serde_json::from_str(FIXTURE).unwrap();
+        run.evaluation_policy.differential_bias_calibration_artifact_sha256 = "0".repeat(64);
+        let error = validate_run(&run).unwrap_err();
+        assert!(error.issues.iter().any(|issue| {
+            issue.contains("calibration artifact SHA-256 does not match its provenance entry")
+        }));
     }
 
     fn comparison_runs() -> (BenchmarkRun, BenchmarkRun) {
