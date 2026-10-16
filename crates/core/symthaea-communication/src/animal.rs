@@ -122,7 +122,7 @@ pub fn binary_brier_score(truth: &[bool], scores: &[f64]) -> Result<f64, String>
         .zip(scores)
         .map(|(actual, score)| {
             let target = if *actual { 1.0 } else { 0.0 };
-            (score - target).powi(2)
+            (*score - target).powi(2)
         })
         .sum();
     Ok(squared_error_sum / truth.len() as f64)
@@ -591,8 +591,8 @@ impl AnimalEvaluationBundle {
             hold_out_individuals: true,
             hold_out_sites: true,
         };
-        if validate_animal_split_lineage(&lineage, &lineage_policy).is_err()
-            || self.representation_baseline.trim().is_empty()
+        validate_animal_split_lineage(&lineage, &lineage_policy)?;
+        if self.representation_baseline.trim().is_empty()
             || !unique_nonempty(&self.train_individuals)
             || !unique_nonempty(&self.test_individuals)
             || !unique_nonempty(&self.train_sites)
