@@ -1,0 +1,43 @@
+name: Socioeconomic Run Bundle Integrity
+
+on:
+  pull_request:
+    paths:
+      - "scripts/validate_socioeconomic_run_bundle.py"
+      - "scripts/test_validate_socioeconomic_run_bundle.py"
+      - "docs/research/finance/SYM-FIN-SYS-016_run_bundle_manifest_v1.schema.json"
+      - "docs/research/finance/SYM-FIN-SYS-016_RUN_BUNDLE_V1.md"
+      - ".github/workflows/socioeconomic-run-bundle.yml"
+  push:
+    branches:
+      - "**"
+    paths:
+      - "scripts/validate_socioeconomic_run_bundle.py"
+      - "scripts/test_validate_socioeconomic_run_bundle.py"
+      - "docs/research/finance/SYM-FIN-SYS-016_run_bundle_manifest_v1.schema.json"
+      - "docs/research/finance/SYM-FIN-SYS-016_RUN_BUNDLE_V1.md"
+      - ".github/workflows/socioeconomic-run-bundle.yml"
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+concurrency:
+  group: socioeconomic-run-bundle-${{ github.event.pull_request.number || github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  exact-head-bundle-tests:
+    name: Exact-head run-bundle negative controls
+    runs-on: ubuntu-24.04
+    timeout-minutes: 5
+    steps:
+      - name: Check out event revision
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1 immutable commit
+      - name: Record exact revision
+        run: |
+          printf 'repository=%s\n' "$GITHUB_REPOSITORY"
+          printf 'sha=%s\n' "$GITHUB_SHA"
+          git status --short
+      - name: Run standard-library adversarial tests
+        run: python3 scripts/test_validate_socioeconomic_run_bundle.py
