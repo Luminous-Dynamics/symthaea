@@ -396,7 +396,7 @@ The checker is deliberately narrower than a full operational validator: zero out
 - **Determinism:** same inputs and certificate produce the same accept/reject outcome and computed objective; reorder input jobs and crews and retain the same semantic result.
 - **Scope guard:** any expansion to parts, travel, shifts, release times, or uncertainty must add explicit certificate fields/checks and negative controls before it is used by the planner.
 
-This verifier is a small, independently implemented trust boundary for later solvers, not an operational safety certification. Its Rust unit tests are authored but have not been executed in the current environment.
+This verifier is a small, independently implemented trust boundary for later solvers, not an operational safety certification. Its source includes a deterministic 10,000-case mutation campaign covering ten invalidation operators; the campaign is authored but has not been executed in the current environment.
 
 ## External benchmark route: multi-skill scheduling
 
