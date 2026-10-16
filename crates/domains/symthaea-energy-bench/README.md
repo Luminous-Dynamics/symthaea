@@ -57,3 +57,10 @@ The v1 comparator only supports charge-sustaining net cycle efficiency. It is no
 The crate does not fetch URIs, read arbitrary filesystem paths, check external signatures, or prove that a timestamp was not falsified. A real run's benchmark policy and manifest digest must be immutably anchored before candidate search (for example in a reviewed pre-search commit or signed append-only registry); a self-reported boolean or timestamp is not proof of preregistration. Uncertainty propagation currently uses a first-order delta-method approximation for the ratio of aggregate useful output to aggregate external input, with root-sum-of-squares and an explicit mutual-independence assumption across channels, intervals, and candidate/baseline measurements. Correlated or unknown cases are `Indeterminate`; covariance-matrix and Monte Carlo propagation are not implemented. The decision enum reports only whether the calculated lower bound clears the preregistered margin; it does not authenticate pre-search anchoring or prove physical superiority. The output is model-level evidence only: the crate does not validate the physical solver or dataset representativeness.
 
 The synthetic fixture under docs/research/examples is for tests only. It is marked `not_for_decision: true` and must never be reported as measured performance.
+Run the full example benchmark (1,000 scenarios, Phase A, cheapest-first, space-filling, oracle upper bound, and 30 seeded random baselines) from the repository root:
+
+```bash
+cargo run -p symthaea-energy-bench --example selector_benchmark > energy-selector-benchmark.json
+```
+
+This writes the complete input-and-results receipt to JSON. Record `git rev-parse HEAD` alongside the artifact; the input digests identify the policy and scenarios, not the executable revision. The example has been authored but is not claimed to have compiled or run until this exact revision is tested.
