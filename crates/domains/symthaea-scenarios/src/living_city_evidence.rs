@@ -22,6 +22,7 @@ pub enum EvidenceKind {
     Estimated,
     Simulated,
     Assumed,
+    GovernanceDecision,
     Missing,
 }
 
@@ -33,6 +34,7 @@ impl EvidenceKind {
             Self::Estimated => "estimated",
             Self::Simulated => "simulated",
             Self::Assumed => "assumed",
+            Self::GovernanceDecision => "governance_decision",
             Self::Missing => "missing",
         }
     }
