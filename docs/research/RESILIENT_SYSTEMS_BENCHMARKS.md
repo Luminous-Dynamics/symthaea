@@ -60,7 +60,9 @@ These are essential because no ground-truth field dataset may exist for many pro
 - **Capacity monotonicity:** increasing nominal capacity must not worsen any service fulfillment in this model.
 - **Dependency propagation:** removing a required upstream service must affect its downstream dependents according to the declared dependency contract.
 - **Ordering invariance:** permuting an acyclic service list must not change service traces by identifier.
-- **Fail-closed control:** malformed inputs never yield a seemingly valid report.\n- **Resource conservation:** shared resource stocks remain within [0, storage capacity]; consumption is no more than stock plus actual replenishment.\n- **Stockout control:** if replenishment stops and a required resource is exhausted, affected services cannot keep receiving uncharged outputs.
+- **Fail-closed control:** malformed inputs never yield a seemingly valid report.
+- **Resource conservation:** shared resource stocks remain within [0, storage capacity]; consumption is no more than stock plus actual replenishment.
+- **Stockout control:** if replenishment stops and a required resource is exhausted, affected services cannot keep receiving uncharged outputs.
 
 **Acceptance target:** every required property has a named test and a deliberate negative control. A test passing validates this implementation property, not a prediction about the physical world.
 
