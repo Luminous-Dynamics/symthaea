@@ -221,6 +221,14 @@ fn replay_blocks_required_shortfall_and_detects_budget_mutation() {
     assert_eq!(report.status, MissionResourceBudgetStatus::Blocked);
     assert_eq!(report.pools[0].required_shortfall, 1);
     assert!(!report.findings.is_empty());
+    assert_eq!(
+        receipt.report_digest_sha256,
+        independent_resource_report_digest(&report)
+    );
+    assert_eq!(
+        receipt.receipt_digest_sha256,
+        independent_resource_receipt_digest(&receipt)
+    );
 
     let mut changed = plan.clone();
     changed.demands[0].quantity.upper += 1;
