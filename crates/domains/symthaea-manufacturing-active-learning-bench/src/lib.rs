@@ -387,6 +387,45 @@ pub fn run_campaign(
     let mut history: Vec<ObservationForPolicy> = Vec::new();
     let mut spent = 0u32;
 
+    // Seed a shared prior history before policy selection. Its cost counts toward
+    // each arm's total budget so no policy receives free extra experiments.
+    for action in &manifest.initial_actions {
+        let candidate = public_view
+            .candidates
+            .iter()
+            .find(|candidate| candidate.id == action.candidate_id)
+            .ok_or_else(|| "initial action references a missing candidate".to_string())?;
+        let cost = public_view.action_cost(candidate, action.fidelity);
+        if cost == 0 || cost > manifest.budget_units.saturating_sub(spent) {
+            return Err("initial design exceeds the remaining budget".into());
+        }
+        let measurements = synthetic_oracle(manifest, candidate, action.fidelity);
+        let claimed_conforming = measurements
+            .quality_margin_milli
+            .is_some_and(|margin| margin >= public_view.minimum_quality_margin_milli);
+        let measurement_digest = measurement_digest(
+            &manifest_digest,
+            action,
+            &candidate.process_profile_id,
+            &measurements,
+        )?;
+        records.push(ExperimentRecord {
+            step_index: records.len() as u32,
+            action: action.clone(),
+            reported_cost_units: cost,
+            measurements: measurements.clone(),
+            claimed_conforming,
+            measurement_digest,
+        });
+        history.push(ObservationForPolicy {
+            action: action.clone(),
+            factor_x: candidate.factor_x,
+            factor_y: candidate.factor_y,
+            measurements,
+        });
+        spent += cost;
+    }
+
     loop {
         let selected = choose_action(
             &public_view,
@@ -690,6 +729,15 @@ pub fn evaluate_transcript(
         return Err("manifest digest mismatch".into());
     }
 
+    if transcript.records.len() < manifest.initial_actions.len() {
+        return Err("transcript omitted required initial observations".into());
+    }
+    for (index, expected_action) in manifest.initial_actions.iter().enumerate() {
+        if transcript.records[index].action != *expected_action {
+            return Err("initial observations are missing or out of order".into());
+        }
+    }
+
     let candidates: BTreeMap<&str, &Candidate> = manifest
         .candidates
         .iter()
@@ -908,6 +956,26 @@ mod tests {
                 }
             }
         }
+    }
+
+    #[test]
+    fn confounded_scenario_starts_with_collinear_history_and_can_break_rank() {
+        let manifest = CampaignManifest::reference(ScenarioFamily::ConfoundedFactors, 9, 20);
+        assert_eq!(manifest.initial_actions.len(), 3);
+        assert_eq!(
+            manifest.initial_actions.iter().map(|action| action.candidate_id.as_str()).collect::<Vec<_>>(),
+            vec!["C02-02", "C05-05", "C08-08"]
+        );
+        let transcript =
+            run_campaign(&manifest, Policy::FixedSpaceFilling, 77).unwrap();
+        let report = evaluate_transcript(&manifest, &transcript).unwrap();
+        assert_eq!(transcript.records[0].action, manifest.initial_actions[0]);
+        assert!(transcript.records.iter().all(|record| record.claimed_conforming
+            == record.measurements.quality_margin_milli
+                .is_some_and(|margin| margin >= manifest.minimum_quality_margin_milli)));
+        assert!(report.total_cost_units <= manifest.budget_units);
+        assert!(report.factor_design_full_rank, "selector should add an off-diagonal experiment");
+        assert!(report.first_conforming_cost_units.is_some());
     }
 
     #[test]
