@@ -25,9 +25,31 @@ The evidence-record lookup goes beyond a non-empty-string check: unknown or dupl
 
 
 - Every evaluation returns a self-describing decision receipt containing a separate receipt-schema version and an explicit `rfc8785_jcs_v1` canonicalization-profile ID, evaluation date, source/record IDs, input schema versions, declared and actually supplied artifact digests, per-component SHA-256 digests for the source manifest, food fact and caller use request, an overall input-envelope SHA-256, and a `decision_sha256` over the complete reported receipt with that digest field omitted. The profile ID is part of the input-envelope preimage, so a future hashing-profile change is not silent. Receipt schema version 2 also records evaluator package name/version, a separate evaluator-contract version and an optional build ID supplied through `LUMINOUS_BUILD_ID`; a missing build ID remains explicit rather than being invented. The decision digest binds the emitted status and issue fields to the receipt, but is unkeyed: it is a consistency/tamper-evidence checksum, not a signature or proof of who issued the receipt.
-- The input envelope includes the complete manifest, food fact, use request, evaluation date and supplied artifact-byte digest; JSON object keys are recursively sorted before hashing. The fact's `value_scaled`, `value_scale` and `basis_grams` are decimal strings on the JSON wire (missing `value_scaled` is `null`) so `u64` precision is not lost by JSON clients that use IEEE-754 numbers. The digest binds the exact input values for replay and change detection, not truth, authorship or legal validity.
+- The input envelope includes the complete manifest, food fact, use request, evaluation date and supplied artifact-byte digest; its bytes are produced by the pinned RFC 8785 JCS canonicalizer. The fact's `value_scaled`, `value_scale` and `basis_grams` are decimal strings on the JSON wire (missing `value_scaled` is `null`) so `u64` precision is not lost by JSON clients that use IEEE-754 numbers. The digest binds the exact input values for replay and change detection, not truth, authorship or legal validity.
 - The `decision_sha256` is recomputed over the receipt after omitting that single field; a verifier must follow the documented omission rule. It detects inconsistent receipt fields when compared with a trusted copy of the digest, but an attacker able to rewrite the receipt can recompute it. It is not a digital signature, publisher authentication, proof of legal permission or proof of nutrient truth.
 - The receipt schema was bumped to version 2 for the canonicalization/profile, outcome-digest and evaluator-identity contract. It uses the pinned `serde_json_canonicalizer = 0.3.2` implementation and identifies the profile as `rfc8785_jcs_v1`; hashes are computed over RFC 8785 JCS bytes rather than a custom key-sorting encoding. Wide nutrient quantities remain decimal strings because JCS numeric values are IEEE-754 based. The profile transition changes digest values and must be treated as a receipt-hash version migration. Two RFC-derived number/string and UTF-16 property-ordering vectors include fixed canonical-byte SHA-256 values. A separate fixture test pins component hashes for manifest, fact and use request plus the overall input envelope, detecting unintended typed-wire or receipt-preimage changes. These local tests do not replace an independent replay checker; exact-head CI and independent golden-vector verification must pass before claiming conformance. Any raw JSON verifier must reject duplicate object property names before typed parsing. JCS does not authenticate a source, authorize reuse or prove legal sufficiency.
+
+## Independent receipt verification
+
+The package includes a separate verifier binary that recomputes component digests, the input-envelope digest and the decision-receipt digest without calling the primary assessment function. It rejects duplicate property names at every level of the incoming JSON before converting to typed structs.
+
+The JSON bundle must contain the exact evaluation inputs and the serialized assessment:
+
+- `manifest`: exact NutritionSourceManifestV1 input;
+- `fact`: exact NutritionFoodFactV1 input;
+- `evaluation_date`: exact date string supplied to the evaluator;
+- `use_request`: exact SourceUseRequestV1 input;
+- `assessment`: the full serialized NutritionRegistryAssessmentV1 result.
+
+Run:
+
+```sh
+cargo run --locked -p symthaea-nutrition-source-registry --bin nutrition-receipt-verify -- bundle.json [artifact-bytes.bin]
+```
+
+When the assessment records supplied artifact bytes, pass a local file containing those exact bytes as the optional final argument. The verifier reads and hashes that file; it does not copy artifact contents into the JSON bundle. If no supplied artifact digest is recorded, omit the argument.
+
+A successful result means only that the receipt's input/component/outcome digests are internally consistent with the supplied bundle and bytes. The checker shares the declared Rust wire types and pinned JCS library, but does not call the production assessor or independently recalculate its eligibility rules. It does not prove publisher authenticity, source permissions, nutrition truth or field validity. Exact-head formatter/tests/Clippy and an independent cross-language replay remain required.
 
 ## Validation
 
