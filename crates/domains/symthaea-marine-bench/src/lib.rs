@@ -20,4 +20,8 @@ pub use model::{
 };
 
 /// Frozen maximum claim for this evaluator generation.
-pub const CLAIM_CEILING: &str = "Arithmetic screening of declared inputs only; no hydrodynamic optimization, structural qualification, seaworthiness, environmental benefit, regulatory compliance, or operating authority.";
+pub const CLAIM_CEILING: &str = concat!(
+    "Arithmetic screening of declared inputs only; no hydrodynamic optimization, structural ",
+    "qualification, seaworthiness, environmental benefit, regulatory compliance, or operating ",
+    "authority.",
+);
