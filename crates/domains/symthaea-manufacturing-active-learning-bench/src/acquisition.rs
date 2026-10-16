@@ -611,6 +611,31 @@ pub fn expected_information_gain(
 ) -> Result<AcquisitionMetrics, String> {
     model.validate()?;
     let digest = model.digest()?;
+    expected_information_gain_with_digest(model, action_id, digest)
+}
+
+/// Compute acquisition metrics under a previously validated posterior state.
+pub fn expected_information_gain_for_state(
+    model: &FiniteHypothesisModel,
+    state: &PosteriorState,
+    action_id: &str,
+) -> Result<AcquisitionMetrics, String> {
+    validate_posterior_state(model, state)?;
+    let mut posterior_model = model.clone();
+    posterior_model.prior = state.current_prior.clone();
+    posterior_model.validate()?;
+    expected_information_gain_with_digest(
+        &posterior_model,
+        action_id,
+        state.state_digest.clone(),
+    )
+}
+
+fn expected_information_gain_with_digest(
+    model: &FiniteHypothesisModel,
+    action_id: &str,
+    digest: String,
+) -> Result<AcquisitionMetrics, String> {
     let action = model
         .actions
         .iter()
@@ -625,6 +650,27 @@ pub fn rank_feasible_actions(
 ) -> Result<AcquisitionRanking, String> {
     model.validate()?;
     let model_digest = model.digest()?;
+    rank_actions_with_digest(model, objective, model_digest)
+}
+
+/// Rank candidate experiments under the supplied replay-validated posterior state.
+pub fn rank_feasible_actions_for_state(
+    model: &FiniteHypothesisModel,
+    state: &PosteriorState,
+    objective: AcquisitionObjective,
+) -> Result<AcquisitionRanking, String> {
+    validate_posterior_state(model, state)?;
+    let mut posterior_model = model.clone();
+    posterior_model.prior = state.current_prior.clone();
+    posterior_model.validate()?;
+    rank_actions_with_digest(&posterior_model, objective, state.state_digest.clone())
+}
+
+fn rank_actions_with_digest(
+    model: &FiniteHypothesisModel,
+    objective: AcquisitionObjective,
+    model_digest: String,
+) -> Result<AcquisitionRanking, String> {
     let mut ranked_actions = Vec::new();
     let mut rejected_actions = Vec::new();
 
