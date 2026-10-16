@@ -482,7 +482,11 @@ mod tests {
         };
         assert_eq!(counts.sample_count(), None);
         assert_eq!(counts.precision(), None);
+        assert_eq!(counts.recall(), None);
+        assert_eq!(counts.specificity(), None);
+        assert_eq!(counts.false_positive_rate(), None);
         assert_eq!(counts.f1(), None);
+        assert_eq!(counts.balanced_accuracy(), None);
     }
 
     #[test]
