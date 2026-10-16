@@ -268,6 +268,15 @@ The machine-readable companion contract contains four small fixtures intended to
 
 The second dependency-free Rust helper, [scripts/crispr_decision_frontier.rs](../../scripts/crispr_decision_frontier.rs), implements objective-direction-aware dominance and sorted Pareto membership, rejecting duplicate IDs/objective names, non-finite or incomplete vectors. Its 10 unit tests are authored but have not been compiled or executed because `rustc` is unavailable in this authoring environment.
 
+Run its tests when a Rust toolchain is available:
+
+```sh
+rustc --edition=2024 --test scripts/crispr_decision_frontier.rs -o /tmp/crispr-frontier-tests
+/tmp/crispr-frontier-tests
+```
+
+The follow-on research task is [CRISPR-OT-002: context-stratified Pareto frontier for evidence triage (#7571)](https://github.com/Luminous-Dynamics/symthaea/issues/7571).
+
 7. **F7 — underfilled fixed budget.** A ranking contains one candidate, but the declared review budget is K=2. Recall@2 and its partial-label sensitivity metric must return `not_estimable_at_budget_K`; neither metric may silently score the one-candidate list as a two-slot comparison.
 
 The dependency-free Rust metric kernel is now committed at [scripts/crispr_triage_verifier.rs](../../scripts/crispr_triage_verifier.rs). It implements native nomination coverage, Recall@K, point Precision@K with unknown-label abstention, slots-at-recall, individual and paired partial-label bounds, SHA-256-claim format/match checks, and group-leakage validation. It includes unit tests for fixtures F1–F7 plus underfilled fixed budgets, invalid targets, duplicate identities/ranks, reference-label contradictions, and mismatched candidate universes.
