@@ -289,6 +289,9 @@ fn run() -> Result<ExitCode, Box<dyn Error>> {
 
     let integrity_passed = failures.is_empty()
         && artifact_checks.iter().all(|check| check.passed)
+        && fixture_pack_digest_content_matches
+        && fixture_pack_tree_recomputed_matches
+        && fixture_manifest_identity_matches
         && comparison_binding.comparison_schema_verified
         && comparison_binding.candidate_output_hash_matches
         && comparison_binding.reference_output_hash_matches
