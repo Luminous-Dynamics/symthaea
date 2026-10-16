@@ -740,7 +740,10 @@ pub fn assess_policy_suite(
     let mut duplicate_scenario_ids = BTreeSet::new();
     for scenario in scenarios {
         if scenario.scenario_id.trim().is_empty() || scenario.steps.is_empty() {
-            blockers.insert(format!("scenario {} has invalid identity or empty steps", scenario.scenario_id));
+            blockers.insert(format!(
+                "scenario {} has invalid identity or empty steps",
+                scenario.scenario_id
+            ));
         }
         if !scenario_ids.insert(scenario.scenario_id.as_str()) {
             duplicate_scenario_ids.insert(scenario.scenario_id.clone());
@@ -764,7 +767,10 @@ pub fn assess_policy_suite(
         blockers.insert(format!("missing scenario inputs: {}", missing_scenario_inputs.join(",")));
     }
     if !unexpected_scenario_inputs.is_empty() {
-        blockers.insert(format!("unexpected scenario inputs: {}", unexpected_scenario_inputs.join(",")));
+        blockers.insert(format!(
+            "unexpected scenario inputs: {}",
+            unexpected_scenario_inputs.join(",")
+        ));
     }
 
     let mut run_ids = BTreeSet::new();
@@ -1116,18 +1122,13 @@ mod tests {
             ],
         )];
         let required = vec!["forecast-case".to_string()];
-        let candidate = evaluate_suite(
-            &scenarios,
-            &[PolicyKind::FloorFirst],
-            config(),
-        )
-        .unwrap();
-        let baseline = evaluate_suite(
-            &scenarios,
-            &[PolicyKind::ReactiveGreedy],
-            config(),
-        )
-        .unwrap();
+        let mut cfg = config();
+        cfg.deployment_delay_steps = 1;
+        cfg.backup_duration_steps = 2;
+        let candidate =
+            evaluate_suite(&scenarios, &[PolicyKind::FloorFirst], cfg).unwrap();
+        let baseline =
+            evaluate_suite(&scenarios, &[PolicyKind::ReactiveGreedy], cfg).unwrap();
         let assessment = assess_policy_robustness(
             &required,
             &scenarios,
@@ -1135,7 +1136,7 @@ mod tests {
             &candidate,
             PolicyKind::ReactiveGreedy,
             &baseline,
-            config(),
+            cfg,
         )
         .unwrap();
 
@@ -1197,8 +1198,9 @@ mod tests {
             config(),
         )
         .unwrap();
+        let extra_scenarios = vec![case.clone(), extra_case_fixture()];
         let extra = evaluate_suite(
-            &[scenario("extra-case", vec![step(10, 10, observed(10, 10))])],
+            &extra_scenarios,
             &[PolicyKind::FloorFirst],
             config(),
         )
@@ -1217,9 +1219,9 @@ mod tests {
 
         let extra_result = assess_policy_suite(
             &required,
-            &[case.clone(), extra_case_fixture()],
+            &extra_scenarios,
             PolicyKind::FloorFirst,
-            &good,
+            &extra,
             config(),
         )
         .unwrap();
@@ -1294,8 +1296,10 @@ mod tests {
     fn paired_run_comparison_rejects_same_id_with_different_hidden_truth() {
         let candidate_case = scenario("same-id", vec![step(5, 10, observed(5, 10))]);
         let baseline_case = scenario("same-id", vec![step(4, 10, observed(5, 10))]);
-        let candidate = evaluate_policy(&candidate_case, PolicyKind::FloorFirst, config()).unwrap();
-        let baseline = evaluate_policy(&baseline_case, PolicyKind::ReactiveGreedy, config()).unwrap();
+        let candidate =
+            evaluate_policy(&candidate_case, PolicyKind::FloorFirst, config()).unwrap();
+        let baseline =
+            evaluate_policy(&baseline_case, PolicyKind::ReactiveGreedy, config()).unwrap();
         assert_eq!(
             compare_service_loss(&candidate, &baseline).unwrap_err().field,
             "paired_run"
