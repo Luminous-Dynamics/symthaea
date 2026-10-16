@@ -43,8 +43,8 @@ pub enum ReplayError {
         /// Horizon whose comparison key collided.
         horizon_id: String,
     },
-    /// Bootstrap replication count was below the documented minimum.
-    InvalidBootstrapReplicates,
+    /// Bootstrap replication count was too small or the reproducibility seed was invalid.
+    InvalidBootstrapConfig,
     /// A non-finite numeric input was supplied to the comparison evaluator.
     InvalidComparisonValue,
 }
@@ -452,7 +452,7 @@ pub fn paired_cluster_bootstrap(
         return Err(ReplayError::EmptyComparisonSet);
     }
     if bootstrap_replicates < 1_000 || seed == 0 {
-        return Err(ReplayError::InvalidBootstrapReplicates);
+        return Err(ReplayError::InvalidBootstrapConfig);
     }
 
     let mut seen_pairs = BTreeSet::new();
@@ -490,7 +490,7 @@ pub fn paired_cluster_bootstrap(
     for _ in 0..bootstrap_replicates {
         let mut sum = 0.0;
         for _ in 0..cluster_count {
-            let index = (next_replay_random(&mut rng_state) as usize) % cluster_count;
+            let index = next_replay_index(&mut rng_state, cluster_count);
             sum += cluster_means[index];
         }
         let mean = sum / cluster_count as f64;
@@ -522,7 +522,18 @@ fn next_replay_random(state: &mut u64) -> u64 {
     *state ^= *state >> 12;
     *state ^= *state << 25;
     *state ^= *state >> 27;
-    state.wrapping_mul(0x2545_F491_4F6C_DD1D)
+    (*state).wrapping_mul(0x2545_F491_4F6C_DD1D)
+}
+
+fn next_replay_index(state: &mut u64, upper_exclusive: usize) -> usize {
+    let bound = upper_exclusive as u64;
+    let rejection_threshold = bound.wrapping_neg() % bound;
+    loop {
+        let value = next_replay_random(state);
+        if value >= rejection_threshold {
+            return (value % bound) as usize;
+        }
+    }
 }
 
 #[cfg(test)]
@@ -578,17 +589,17 @@ mod tests {
     #[test]
     fn clustered_bootstrap_weights_clusters_not_repeated_horizons() {
         let rows = vec![
-            paired("a", "h1", "parent-a", true, 0.1, 0.9),
-            paired("a", "h2", "parent-a", true, 0.1, 0.9),
-            paired("a", "h3", "parent-a", true, 0.1, 0.9),
-            paired("a", "h4", "parent-a", true, 0.1, 0.9),
-            paired("a", "h5", "parent-a", true, 0.1, 0.9),
-            paired("a", "h6", "parent-a", true, 0.1, 0.9),
-            paired("a", "h7", "parent-a", true, 0.1, 0.9),
-            paired("a", "h8", "parent-a", true, 0.1, 0.9),
-            paired("a", "h9", "parent-a", true, 0.1, 0.9),
-            paired("a", "h10", "parent-a", true, 0.1, 0.9),
-            paired("b", "h1", "parent-b", true, 0.9, 0.1),
+            paired("a", "h1", "parent-a", true, 0.9, 0.1),
+            paired("a", "h2", "parent-a", true, 0.9, 0.1),
+            paired("a", "h3", "parent-a", true, 0.9, 0.1),
+            paired("a", "h4", "parent-a", true, 0.9, 0.1),
+            paired("a", "h5", "parent-a", true, 0.9, 0.1),
+            paired("a", "h6", "parent-a", true, 0.9, 0.1),
+            paired("a", "h7", "parent-a", true, 0.9, 0.1),
+            paired("a", "h8", "parent-a", true, 0.9, 0.1),
+            paired("a", "h9", "parent-a", true, 0.9, 0.1),
+            paired("a", "h10", "parent-a", true, 0.9, 0.1),
+            paired("b", "h1", "parent-b", true, 0.1, 0.9),
         ];
         let summary = paired_cluster_bootstrap(&rows, 2_000, 123).expect("valid bootstrap");
         assert_eq!(summary.comparison_count, 11);
@@ -612,11 +623,11 @@ mod tests {
         );
         assert_eq!(
             paired_cluster_bootstrap(&[paired("e", "h", "c", true, 0.4, 0.5)], 999, 1),
-            Err(ReplayError::InvalidBootstrapReplicates)
+            Err(ReplayError::InvalidBootstrapConfig)
         );
         assert_eq!(
             paired_cluster_bootstrap(&[paired("e", "h", "c", true, 0.4, 0.5)], 1_000, 0),
-            Err(ReplayError::InvalidBootstrapReplicates)
+            Err(ReplayError::InvalidBootstrapConfig)
         );
         assert_eq!(
             PairedForecastComparison::new("e", "h", "c", true, f64::NAN, 0.5),
@@ -631,9 +642,9 @@ mod tests {
     #[test]
     fn clustered_bootstrap_difference_is_candidate_minus_baseline() {
         let rows = vec![
-            paired("e1", "30d", "p1", true, 0.2, 0.8),
-            paired("e2", "30d", "p2", true, 0.3, 0.9),
-            paired("e3", "30d", "p3", true, 0.1, 0.7),
+            paired("e1", "30d", "p1", true, 0.8, 0.2),
+            paired("e2", "30d", "p2", true, 0.9, 0.3),
+            paired("e3", "30d", "p3", true, 0.7, 0.1),
         ];
         let summary = paired_cluster_bootstrap(&rows, 1_000, 7).expect("valid bootstrap");
         assert!(summary.mean_brier_difference > 0.0);
