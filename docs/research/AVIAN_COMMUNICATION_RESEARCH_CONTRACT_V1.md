@@ -39,7 +39,7 @@ No level implies access to subjective experience. Keep observed call, behavioral
 
 ### Suite A — Detection and taxonomic context
 
-Use a pinned subset of **BEANS** for standardized animal-audio detection/classification. For strong event-boundary evaluation, assess **WABAD** only after its license is resolved (see Section 6): its expert annotations include vocalization start/end times and frequency bounds. Where bird species labels and model/data licenses allow, compare against a suitable published taxonomic detector (e.g. BirdNET) as a reference baseline, not as a semantic oracle. Report precision, recall, PR-AUC and false positives at both event and recording/site level.
+Use a pinned subset of **BEANS** for standardized animal-audio detection/classification, and consider **BEANS-ZERO** for zero-shot generalization to unfamiliar species and vocalizations. For strong event-boundary evaluation, assess **WABAD** only under its declared non-commercial scope and after per-recording terms are reviewed: its expert annotations include vocalization start/end times and frequency bounds. Compare multiple baseline families where lawful and technically compatible: a taxonomic detector such as BirdNET, and a self-supervised representation such as BirdAVES/AVES. They are complementary baselines, not semantic oracles. Report precision, recall, PR-AUC and false positives at event, recording, site, taxon and region levels.
 
 The global BirdNET assessment used 4,224 one-minute recordings from 67 sites and reported substantial geographic and species-level variation, with recall generally more heterogeneous than precision. That argues against random clip-only splits and aggregate-only reporting.
 
@@ -63,7 +63,7 @@ Use a defined observable target, such as the next annotated call class or a blin
 - temporal-permutation;
 - held-out-individual and held-out-site evaluation.
 
-All data splits must be grouped by original recording/session and must not share source segments. Train/test individuals and sites must be disjoint for the corresponding generalization claim. If individual identities are unknown, say so and do not claim individual-level generalization.
+All data splits must be grouped by original recording/session and must not share source segments. Symthaea now has an animal-specific `AnimalSplitLineage` validator that rejects cross-split sample and source-recording overlap, requires non-empty provenance IDs, and optionally enforces disjoint individual/site holdouts. This validates declared IDs only; it does not authenticate the source metadata. Train/test individuals and sites must be disjoint for the corresponding generalization claim. If individual identities are unknown, say so and do not claim individual-level generalization.
 
 ### Suite D — Grounded function
 
@@ -97,7 +97,8 @@ If a target proves unrealistic on an independently characterized corpus, amend t
 
 - Partition original recordings and related session/source material before extracting clips or windows.
 - Where available, provide three separate evaluations: held-out individuals, held-out sites, and held-out time periods. Do not treat these as interchangeable.
-- Keep multiple clips from the same underlying vocalization on one side of the split.
+- Keep multiple clips/crops from the same source recording on one side of the split. Require non-empty source-recording IDs and run `validate_animal_split_lineage`; the fixture where two differently named crops share one source recording must fail.
+- Pin baseline embedding extraction details. AVES/BirdAVES documentation warns that padding can change embeddings even when sequence lengths are supplied; for a padded encoder baseline, use and report the documented safe extraction strategy (including batch-size-one precomputation where required), then add a batch/padding sensitivity check. Baseline preprocessing is part of model identity, not an incidental implementation detail.
 - Freeze label ontology and annotation rules before confirmatory scoring; record disagreement and ambiguous labels.
 - Include no-call/silence, background-only and non-target sound controls when represented in the task.
 - Preserve negative results, null predictions, abstentions, failed model runs and data exclusions.
@@ -107,11 +108,13 @@ If a target proves unrealistic on an independently characterized corpus, amend t
 
 Candidate starting points:
 - BEANS benchmark and datasets: https://arxiv.org/abs/2210.12300 and https://github.com/earthspecies/beans
-- WABAD data paper: https://doi.org/10.1002/ecy.70317; full dataset record: https://zenodo.org/records/17293588
+- WABAD data paper: https://doi.org/10.1002/ecy.70317; full dataset record and dataset description: https://zenodo.org/records/17293588
+- AVES/BirdAVES reference implementation and documented embedding/batching caveat: https://github.com/earthspecies/aves
+- BEANS-ZERO background via Earth Species Project benchmarks: https://earthspecies.org/what-we-do/
 - BirdNET model documentation (including model scope and license): https://birdnet-team.github.io/BirdNET-Analyzer/stable/models.html
 - Global BirdNET evaluation: https://doi.org/10.1016/j.ecolind.2025.114550
 
-**WABAD license-admission gate:** the 2026 data paper describes the dataset as CC BY 4.0, while the current Zenodo record labels it CC BY-NC 4.0. Do not treat the conflict as resolved. For now, treat commercial use as blocked, do not republish recordings/derived dataset bundles, and seek clarification from the dataset maintainers before selecting an intended-use license. A future corpus manifest must record both the source record and the license decision/evidence.
+**WABAD license-admission gate:** the dataset description on the Zenodo record states CC BY-NC 4.0 for the dataset; the journal article itself is published under CC BY-NC-ND 4.0. These refer to distinct assets and should not be described as a CC BY 4.0 grant. Treat commercial use of the dataset as blocked unless rights holders give clear permission. Before use, verify the terms attached to the exact files and their underlying recording sources, determine whether contemplated derived artifacts or redistribution are permitted, and preserve this decision with source evidence in the corpus manifest. No recordings should be checked into the repo.
 
 WABAD is a high-value candidate for passive validation because it reports 5,047 minutes and 91,931 expert-annotated vocalizations from 1,192 species across 72 sites, with vocalization start/end times and frequency bounds. These counts describe the published dataset, not data already downloaded, audited or usable by this repository.
 
@@ -119,7 +122,7 @@ Pin the exact dataset/version and each artifact's license before use. Public ava
 
 ## 7. Implementation sequence
 
-1. **Contract hardening (this tranche):** require all registered context controls; reject incomplete/duplicate/blank split identities and non-finite temporal-permutation evidence.
+1. **Contract hardening (this tranche):** require all registered context controls; reject incomplete/duplicate/blank split identities, non-finite temporal-permutation evidence, and train/test overlap in source-recording lineage.
 2. **Passive corpus audit:** choose one legally usable bird corpus, inspect taxa/site/recording imbalance, pin a manifest and split by source session/site/identity where known. No training claim yet.
 3. **Baseline harness:** emit BEANS-compatible detection results and a separate unit-discovery report using Symthaea's existing immutable run bundle.
 4. **Context prediction:** preregister one observable target and run every required control on held-out identities/sites/time.
