@@ -167,6 +167,9 @@ impl Default for ThresholdConfig {
 // EVALUATION RESULTS
 // =============================================================================
 
+const WARNING_WINDOW_MS: f64 = 100.0;
+const CRITICAL_WINDOW_MS: f64 = 20.0;
+
 /// Results from evaluating a threshold configuration. Every confusion-matrix count uses a
 /// shot/event as its unit. Censored or unobservable shots are excluded and reported separately.
 #[derive(Debug, Clone, Serialize, Deserialize)]
@@ -201,6 +204,8 @@ pub struct EvaluationResults {
     pub total_disruption_shots: usize,
     /// All non-disruption shots in the corpus, including unscored shots.
     pub total_non_disruption_shots: usize,
+    /// Per-shot decisions and explicit censoring reasons for audit/replay.
+    pub shot_records: Vec<ShotEvaluationRecord>,
 }
 
 impl EvaluationResults {
@@ -252,11 +257,29 @@ fn has_valid_phi_inputs(sample: &symthaea::physics::cmod_adapter::CModSample) ->
 // EVALUATION FUNCTION
 // =============================================================================
 
+/// Reason an event could not be scored because the required observations were unavailable.
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, Deserialize)]
+#[serde(rename_all = "snake_case")]
+pub enum ShotUnscoredReason {
+    NoValidWarningWindow,
+    NoValidSamples,
+}
+
+/// Per-shot audit record. A missing prediction means that this shot was not scoreable.
+#[derive(Debug, Clone, Serialize, Deserialize)]
+pub struct ShotEvaluationRecord {
+    pub shot_id: u32,
+    pub actual_disruption: bool,
+    pub predicted_disruption: Option<bool>,
+    pub warning_lead_time_ms: Option<f64>,
+    pub unscored_reason: Option<ShotUnscoredReason>,
+}
+
 /// Evaluate a threshold configuration with event-level, fail-closed scoring.
 fn evaluate_config(config: &ThresholdConfig, shots: &[CModShot]) -> EvaluationResults {
     let label_config = LabelConfig {
-        warning_window_ms: 100.0,
-        critical_window_ms: 20.0,
+        warning_window_ms: WARNING_WINDOW_MS,
+        critical_window_ms: CRITICAL_WINDOW_MS,
     };
 
     let mut true_positives = 0;
@@ -272,6 +295,7 @@ fn evaluate_config(config: &ThresholdConfig, shots: &[CModShot]) -> EvaluationRe
     let mut unscored_non_disruption_shots = 0;
     let mut total_disruption_shots = 0;
     let mut total_non_disruption_shots = 0;
+    let mut shot_records = Vec::with_capacity(shots.len());
 
     for shot in shots {
         if shot.disrupted {
@@ -331,26 +355,55 @@ fn evaluate_config(config: &ThresholdConfig, shots: &[CModShot]) -> EvaluationRe
         if shot.disrupted {
             if !has_observable_warning_window {
                 unscored_disruption_shots += 1;
+                shot_records.push(ShotEvaluationRecord {
+                    shot_id: shot.shot_id,
+                    actual_disruption: true,
+                    predicted_disruption: None,
+                    warning_lead_time_ms: None,
+                    unscored_reason: Some(ShotUnscoredReason::NoValidWarningWindow),
+                });
                 continue;
             }
             scoreable_disruption_shots += 1;
-            if alarm_in_warning_window {
+            let detected = alarm_in_warning_window;
+            let lead_time = if detected { earliest_warning_ttd } else { None };
+            if let Some(ttd) = lead_time {
                 true_positives += 1;
-                if let Some(ttd) = earliest_warning_ttd {
-                    warning_times_ms.push(ttd);
-                }
+                warning_times_ms.push(ttd);
             } else {
                 false_negatives += 1;
             }
+            shot_records.push(ShotEvaluationRecord {
+                shot_id: shot.shot_id,
+                actual_disruption: true,
+                predicted_disruption: Some(detected),
+                warning_lead_time_ms: lead_time,
+                unscored_reason: None,
+            });
         } else if !has_valid_sample {
             unscored_non_disruption_shots += 1;
+            shot_records.push(ShotEvaluationRecord {
+                shot_id: shot.shot_id,
+                actual_disruption: false,
+                predicted_disruption: None,
+                warning_lead_time_ms: None,
+                unscored_reason: Some(ShotUnscoredReason::NoValidSamples),
+            });
         } else {
             scoreable_non_disruption_shots += 1;
-            if alarm_in_normal_operation {
+            let predicted_disruption = alarm_in_normal_operation;
+            if predicted_disruption {
                 false_positives += 1;
             } else {
                 true_negatives += 1;
             }
+            shot_records.push(ShotEvaluationRecord {
+                shot_id: shot.shot_id,
+                actual_disruption: false,
+                predicted_disruption: Some(predicted_disruption),
+                warning_lead_time_ms: None,
+                unscored_reason: None,
+            });
         }
     }
 
@@ -388,6 +441,7 @@ fn evaluate_config(config: &ThresholdConfig, shots: &[CModShot]) -> EvaluationRe
         unscored_non_disruption_shots,
         total_disruption_shots,
         total_non_disruption_shots,
+        shot_records,
     }
 }
 
@@ -979,12 +1033,17 @@ pub enum DatasetProvenance {
         sample_interval_ms: f64,
         warning_window_ms: f64,
         critical_window_ms: f64,
+        time_alignment: String,
+        label_definition: String,
+        generator_version: String,
+        source_revision: String,
         qualification_note: String,
     },
     Measured {
         dataset_id: String,
         dataset_version: String,
         content_sha256: String,
+        time_alignment: String,
         label_definition: String,
     },
 }
@@ -1341,8 +1400,12 @@ fn main() {
             disruption_probability: synth_config.disruption_probability,
             samples_per_shot: synth_config.samples_per_shot,
             sample_interval_ms: synth_config.sample_interval_ms,
-            warning_window_ms: 100.0,
-            critical_window_ms: 20.0,
+            warning_window_ms: WARNING_WINDOW_MS,
+            critical_window_ms: CRITICAL_WINDOW_MS,
+            time_alignment: "sample time is milliseconds from shot start; time-to-disruption is disruption_time_ms minus sample.time_ms".to_string(),
+            label_definition: "Warning when 20 ms < time-to-disruption <= 100 ms; Critical when 0 <= time-to-disruption <= 20 ms; post-disruption samples are not detections".to_string(),
+            generator_version: "synthetic-cmod-generator-v1".to_string(),
+            source_revision: option_env!("GIT_COMMIT_SHA").unwrap_or("unrecorded-at-build").to_string(),
             qualification_note: "Synthetic demonstration only; not measured evidence and not qualified for device operation or safety decisions.".to_string(),
         },
         grid_search: Some(grid_result),
@@ -1499,6 +1562,7 @@ mod tests {
             unscored_non_disruption_shots: 0,
             total_disruption_shots: 95,
             total_non_disruption_shots: 110,
+            shot_records: Vec::new(),
         };
 
         assert!((results.recall().unwrap() - 0.947).abs() < 0.01);
@@ -1602,6 +1666,12 @@ mod tests {
         assert_eq!(results.unscored_disruption_shots, 1);
         assert_eq!(results.false_negatives, 0);
         assert_eq!(results.recall(), None);
+        assert_eq!(results.shot_records.len(), 1);
+        assert_eq!(results.shot_records[0].shot_id, 10);
+        assert_eq!(
+            results.shot_records[0].unscored_reason,
+            Some(ShotUnscoredReason::NoValidWarningWindow)
+        );
     }
 
     #[test]
