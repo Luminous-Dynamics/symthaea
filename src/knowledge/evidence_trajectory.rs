@@ -630,9 +630,14 @@ pub fn score_trajectory_receipts<R: BufRead>(
     trajectories: &[HashedEvidenceTrajectory],
     reader: R,
     expected_policy_version: &str,
+    expected_minimum_independent_origins: u32,
+    expected_allow_scoped_partial_answer: bool,
 ) -> Result<TrajectoryScore, String> {
     if expected_policy_version.trim().is_empty() {
         return Err("empty expected policy version".to_owned());
+    }
+    if expected_minimum_independent_origins == 0 {
+        return Err("expected minimum independent origins must be greater than zero".to_owned());
     }
     validate_trajectory_collection(trajectories)?;
     let by_id: BTreeMap<&str, &HashedEvidenceTrajectory> = trajectories
@@ -659,6 +664,15 @@ pub fn score_trajectory_receipts<R: BufRead>(
         if receipt.policy_minimum_independent_origins == 0 {
             return Err(format!(
                 "invalid origin threshold in trajectory receipt {}",
+                receipt.trajectory_id
+            ));
+        }
+        if receipt.policy_minimum_independent_origins != expected_minimum_independent_origins
+            || receipt.policy_allow_scoped_partial_answer
+                != expected_allow_scoped_partial_answer
+        {
+            return Err(format!(
+                "policy configuration mismatch for trajectory {}",
                 receipt.trajectory_id
             ));
         }
@@ -893,6 +907,8 @@ mod tests {
             &dataset,
             Cursor::new(receipt_text),
             "trajectory-policy-v1",
+            1,
+            false,
         )
         .unwrap();
         assert_eq!(score.trajectory_count, 5);
@@ -911,6 +927,8 @@ mod tests {
             &dataset,
             Cursor::new(UNSAFE_CONTROL),
             "trajectory-policy-v1",
+            1,
+            false,
         )
         .unwrap();
         assert!(score.unsafe_answer_escapes >= 2);
@@ -930,6 +948,21 @@ mod tests {
     }
 
     #[test]
+    fn scorer_rejects_a_consistently_wrong_policy_configuration() {
+        let (dataset, _) = audit_trajectory_jsonl(Cursor::new(FIXTURE)).unwrap();
+        let receipts =
+            evaluate_trajectories(&dataset, "v1", &EvidenceActionPolicy::bounded_default())
+                .unwrap();
+        let text = receipts
+            .iter()
+            .map(serde_json::to_string)
+            .collect::<Result<Vec<_>, _>>()
+            .unwrap()
+            .join("\n");
+        assert!(score_trajectory_receipts(&dataset, Cursor::new(text), "v1", 2, false).is_err());
+    }
+
+    #[test]
     fn rejects_missing_receipts_and_policy_mixing() {
         let (dataset, _) = audit_trajectory_jsonl(Cursor::new(FIXTURE)).unwrap();
         let receipts =
@@ -942,7 +975,7 @@ mod tests {
             .collect::<Result<Vec<_>, _>>()
             .unwrap()
             .join("\n");
-        assert!(score_trajectory_receipts(&dataset, Cursor::new(text), "v1").is_err());
+        assert!(score_trajectory_receipts(&dataset, Cursor::new(text), "v1", 1, false).is_err());
         let mut mixed = receipts.clone();
         mixed[1].policy_minimum_independent_origins = 2;
         let text = mixed
@@ -951,7 +984,7 @@ mod tests {
             .collect::<Result<Vec<_>, _>>()
             .unwrap()
             .join("\n");
-        assert!(score_trajectory_receipts(&dataset, Cursor::new(text), "v1").is_err());
+        assert!(score_trajectory_receipts(&dataset, Cursor::new(text), "v1", 1, false).is_err());
     }
 
     #[test]
@@ -1031,7 +1064,7 @@ mod tests {
             .collect::<Result<Vec<_>, _>>()
             .unwrap()
             .join("\n");
-        let score = score_trajectory_receipts(&dataset, Cursor::new(text), "v1").unwrap();
+        let score = score_trajectory_receipts(&dataset, Cursor::new(text), "v1", 1, false).unwrap();
         assert_eq!(score.unsafe_answer_escapes, 0);
         assert_eq!(score.revocation_answer_escapes, 0);
     }
@@ -1062,7 +1095,7 @@ mod tests {
             .collect::<Result<Vec<_>, _>>()
             .unwrap()
             .join("\n");
-        let score = score_trajectory_receipts(&dataset, Cursor::new(text), "v1").unwrap();
+        let score = score_trajectory_receipts(&dataset, Cursor::new(text), "v1", 1, false).unwrap();
         assert!(score.unsafe_answer_escapes >= 1);
         assert!(score.revocation_answer_escapes >= 1);
     }
@@ -1094,7 +1127,7 @@ mod tests {
             .collect::<Result<Vec<_>, _>>()
             .unwrap()
             .join("\n");
-        let score = score_trajectory_receipts(&expanded, Cursor::new(text), "v1").unwrap();
+        let score = score_trajectory_receipts(&expanded, Cursor::new(text), "v1", 1, false).unwrap();
         assert_eq!(score.budget_violations, 1);
     }
 
@@ -1125,7 +1158,7 @@ mod tests {
             .collect::<Result<Vec<_>, _>>()
             .unwrap()
             .join("\n");
-        let score = score_trajectory_receipts(&expanded, Cursor::new(text), "v1").unwrap();
+        let score = score_trajectory_receipts(&expanded, Cursor::new(text), "v1", 1, false).unwrap();
         assert_eq!(score.budget_violations, 0);
     }
 
@@ -1152,7 +1185,7 @@ mod tests {
             .collect::<Result<Vec<_>, _>>()
             .unwrap()
             .join("\n");
-        let score = score_trajectory_receipts(&dataset, Cursor::new(text), "v1").unwrap();
+        let score = score_trajectory_receipts(&dataset, Cursor::new(text), "v1", 1, false).unwrap();
         assert_eq!(score.budget_violations, 1);
     }
 }
