@@ -303,7 +303,7 @@ pub fn risk_coverage_curve(
             observed_label_accepted,
             unknown_accepted,
             observed_label_risk: (observed_label_accepted > 0)
-                .then_some(errors as f64 / known_f),
+                .then(|| errors as f64 / known_f),
             error_rate_bounds: ErrorRateBounds {
                 lower: errors as f64 / accepted_f,
                 upper: (errors + unknown_accepted) as f64 / accepted_f,
