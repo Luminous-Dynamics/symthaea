@@ -485,13 +485,21 @@ mod tests {
 
     #[test]
     fn rejects_mixed_feature_dimensions() {
-        let req = request(Policy::Maximin, 1, vec![candidate("a", &[0.0]), candidate("b", &[0.5, 0.6])]);
+        let req = request(
+            Policy::Maximin,
+            1,
+            vec![candidate("a", &[0.0]), candidate("b", &[0.5, 0.6])],
+        );
         assert!(select(&req).unwrap_err().contains("same feature dimension"));
     }
 
     #[test]
     fn rejects_invalid_prior_selection_and_over_budget() {
-        let mut req = request(Policy::Maximin, 1, vec![candidate("a", &[0.0]), candidate("b", &[1.0])]);
+        let mut req = request(
+            Policy::Maximin,
+            1,
+            vec![candidate("a", &[0.0]), candidate("b", &[1.0])],
+        );
         req.already_selected = vec!["missing".to_owned()];
         assert!(select(&req).unwrap_err().contains("absent from candidate pool"));
         req.already_selected = vec!["a".to_owned(), "b".to_owned()];
@@ -500,7 +508,11 @@ mod tests {
 
     #[test]
     fn constant_feature_dimensions_are_safe() {
-        let req = request(Policy::Maximin, 2, vec![candidate("b", &[5.0, 1.0]), candidate("a", &[5.0, 1.0])]);
+        let req = request(
+            Policy::Maximin,
+            2,
+            vec![candidate("b", &[5.0, 1.0]), candidate("a", &[5.0, 1.0])],
+        );
         let result = select(&req).expect("constant dimensions are valid");
         assert_eq!(selected_ids(&result), vec!["a", "b"]);
         assert!(result.selected.iter().all(|item| item.score == Some(0.0)));
