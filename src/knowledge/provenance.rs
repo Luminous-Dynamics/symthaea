@@ -558,4 +558,87 @@ mod tests {
         assert_eq!(assessment.decision, ProvenanceDecision::Abstain);
         assert!(assessment.reasons.contains(&ProvenanceAbstentionReason::SourceWithdrawn));
     }
+
+
+    #[test]
+    fn required_rights_and_unsupported_digest_algorithm_are_explicit() {
+        let mut provenance = complete_provenance();
+        provenance.source.rights_reference = None;
+        provenance.source.content_digest = Some(ContentDigest {
+            algorithm: "sha512".to_owned(),
+            value: "a".repeat(128),
+        });
+        let mut policy = ProvenancePolicy::strict();
+        policy.require_rights_reference = true;
+
+        let assessment = provenance.assess(&policy, NOW);
+        assert_eq!(assessment.decision, ProvenanceDecision::Abstain);
+        assert!(assessment.reasons.contains(&ProvenanceAbstentionReason::MissingRightsReference));
+        assert!(assessment.reasons.contains(&ProvenanceAbstentionReason::UnsupportedDigestAlgorithm));
+    }
+
+    #[test]
+    fn integrity_attestation_revocation_is_not_source_status_revocation() {
+        let mut provenance = complete_provenance();
+        provenance.integrity = IntegrityStatus::Revoked {
+            checked_at_ms: NOW,
+            reason: "fixture verifier credential revoked".to_owned(),
+        };
+        provenance.source_status = SourceStatus::Active {
+            checked_at_ms: NOW,
+        };
+        let permissive = ProvenancePolicy {
+            require_publisher_id: false,
+            require_revision_id: false,
+            require_content_digest: false,
+            require_locator: false,
+            require_retrieved_at: false,
+            require_rights_reference: false,
+            require_verified_integrity: false,
+            require_active_source: false,
+            max_retrieval_age_ms: None,
+            max_status_age_ms: None,
+        };
+
+        let assessment = provenance.assess(&permissive, NOW);
+        assert_eq!(assessment.decision, ProvenanceDecision::Abstain);
+        assert!(assessment.reasons.contains(&ProvenanceAbstentionReason::IntegrityRevoked));
+        assert!(!assessment.reasons.contains(&ProvenanceAbstentionReason::SourceRevoked));
+    }
+
+    #[test]
+    fn source_identity_is_required_even_when_other_gates_are_relaxed() {
+        let mut provenance = complete_provenance();
+        provenance.source.source_id = "  ".to_owned();
+        let permissive = ProvenancePolicy {
+            require_publisher_id: false,
+            require_revision_id: false,
+            require_content_digest: false,
+            require_locator: false,
+            require_retrieved_at: false,
+            require_rights_reference: false,
+            require_verified_integrity: false,
+            require_active_source: false,
+            max_retrieval_age_ms: None,
+            max_status_age_ms: None,
+        };
+
+        let assessment = provenance.assess(&permissive, NOW);
+        assert_eq!(assessment.decision, ProvenanceDecision::Abstain);
+        assert!(assessment.reasons.contains(&ProvenanceAbstentionReason::MissingSourceId));
+    }
+
+    #[test]
+    fn claim_cannot_be_used_before_its_valid_from_boundary() {
+        let mut provenance = complete_provenance();
+        provenance.claim_validity = ClaimValidity {
+            valid_from_ms: Some(NOW + 1),
+            valid_until_ms: Some(NOW + 100),
+        };
+
+        let assessment = provenance.assess(&ProvenancePolicy::strict(), NOW);
+        assert_eq!(assessment.decision, ProvenanceDecision::Abstain);
+        assert!(assessment.reasons.contains(&ProvenanceAbstentionReason::ClaimNotYetValid));
+    }
+
 }
