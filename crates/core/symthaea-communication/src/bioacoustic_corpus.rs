@@ -764,6 +764,20 @@ mod tests {
     }
 
     #[test]
+    fn rejects_unscored_regions_without_annotation_provenance() {
+        let mut corpus = manifest();
+        corpus.recordings[0].unscored_regions.push(BioacousticUnscoredRegion {
+            interval: TimeSpan {
+                start_s: 0.3,
+                end_s: 0.4,
+            },
+            reason: "ambiguous caller".into(),
+            annotation_source: " ".into(),
+        });
+        assert!(validate_bioacoustic_corpus(&corpus, BioacousticSplitPolicy::default()).is_err());
+    }
+
+    #[test]
     fn rejects_positive_annotations_overlapping_unscored_regions() {
         let mut corpus = manifest();
         corpus.recordings[0].unscored_regions.push(BioacousticUnscoredRegion {
