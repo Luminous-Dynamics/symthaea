@@ -87,6 +87,11 @@ jobs:
                   print(f"FAIL: {list(error.absolute_path)}: {error.message}")
               raise SystemExit(1)
           print("PASS: execution record satisfies the versioned schema")
+          suite_counts = report.get("executed_test_counts_by_suite")
+          if not isinstance(suite_counts, list) or len(suite_counts) != len(report.get("test_commands", [])):
+              raise SystemExit("FAIL: executed suite counts do not match declared test commands")
+          if sum(suite_counts) != report.get("executed_test_count") or report.get("executed_test_count") != report.get("authored_test_function_count"):
+              raise SystemExit("FAIL: authored, per-suite, and executed test counts disagree")
           predicate_schema = json.loads(Path("docs/research/finance/SYM-FIN-SYS-016_validator_attestation_predicate_v1.schema.json").read_text())
           predicate = json.loads(Path("evidence/attestation-predicate.json").read_text())
           Draft202012Validator.check_schema(predicate_schema)
@@ -100,7 +105,10 @@ jobs:
           expected = "sha256:" + hashlib.sha256(report_bytes).hexdigest()
           if predicate.get("execution_record_digest") != expected:
               raise SystemExit("FAIL: attestation predicate does not bind exact report bytes")
-          print("PASS: attestation predicate schema and exact report-byte binding verified")
+          for field in ("claim_ceiling", "scope", "result", "repository", "source_revision", "event_sha", "workflow", "run_id", "run_attempt", "executed_test_count", "executed_test_counts_by_suite", "authority_boundary"):
+              if predicate.get(field) != report.get(field):
+                  raise SystemExit(f"FAIL: predicate field {field!r} disagrees with the execution report")
+          print("PASS: attestation predicate schema, exact report-byte binding, and report-field agreement verified")
           PY
       - name: Upload exact-head test evidence
         uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9 # v7.0.2
