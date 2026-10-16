@@ -167,75 +167,92 @@ impl Default for ThresholdConfig {
 // EVALUATION RESULTS
 // =============================================================================
 
-/// Results from evaluating a threshold configuration
+/// Results from evaluating a threshold configuration. Every confusion-matrix count uses a
+/// shot/event as its unit. Censored or unobservable shots are excluded and reported separately.
 #[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct EvaluationResults {
-    /// True positive count (disruptions correctly predicted)
+    /// Disruption shots detected in the configured warning/critical window.
     pub true_positives: usize,
-    /// False positive count (false alarms)
+    /// Non-disruption shots with one or more alarms.
     pub false_positives: usize,
-    /// True negative count (normal operation correctly identified)
+    /// Non-disruption shots with no alarms.
     pub true_negatives: usize,
-    /// False negative count (missed disruptions)
+    /// Disruption shots with an observed warning window but no alarm in that window.
     pub false_negatives: usize,
-    /// Mean warning time in ms (for true positives)
+    /// Mean warning lead time in ms (one earliest alarm per detected disruption shot).
     pub mean_warning_time_ms: f64,
-    /// Median warning time in ms
+    /// Median warning lead time in ms.
     pub median_warning_time_ms: f64,
-    /// Minimum warning time in ms
+    /// Minimum warning lead time in ms.
     pub min_warning_time_ms: f64,
-    /// Total samples evaluated
+    /// Total raw samples, including excluded invalid samples.
     pub total_samples: usize,
-    /// Total disruption shots
+    /// Samples excluded because a required Phi-proxy input was missing or non-finite.
+    pub invalid_samples: usize,
+    /// Disruption shots with a valid, observable warning/critical window.
+    pub scoreable_disruption_shots: usize,
+    /// Non-disruption shots with at least one valid sample.
+    pub scoreable_non_disruption_shots: usize,
+    /// Disruption shots that could not be scored (for example, censored warning windows).
+    pub unscored_disruption_shots: usize,
+    /// Non-disruption shots with no valid samples.
+    pub unscored_non_disruption_shots: usize,
+    /// All disruption shots in the corpus, including unscored shots.
     pub total_disruption_shots: usize,
-    /// Total non-disruption shots
+    /// All non-disruption shots in the corpus, including unscored shots.
     pub total_non_disruption_shots: usize,
 }
 
 impl EvaluationResults {
-    /// Calculate recall (sensitivity): TP / (TP + FN)
-    pub fn recall(&self) -> f64 {
+    /// Event-level recall; undefined if there are no scoreable disruption shots.
+    pub fn recall(&self) -> Option<f64> {
         let denominator = self.true_positives + self.false_negatives;
-        if denominator == 0 {
-            return 1.0; // No disruptions to detect
-        }
-        self.true_positives as f64 / denominator as f64
+        (denominator > 0).then(|| self.true_positives as f64 / denominator as f64)
     }
 
-    /// Calculate precision: TP / (TP + FP)
-    pub fn precision(&self) -> f64 {
+    /// Event-level precision; undefined if there are no alarmed shots.
+    pub fn precision(&self) -> Option<f64> {
         let denominator = self.true_positives + self.false_positives;
-        if denominator == 0 {
-            return 1.0; // No positive predictions
-        }
-        self.true_positives as f64 / denominator as f64
+        (denominator > 0).then(|| self.true_positives as f64 / denominator as f64)
     }
 
-    /// Calculate false positive rate: FP / (FP + TN)
-    pub fn false_positive_rate(&self) -> f64 {
+    /// Event-level false-positive rate; undefined if there are no scoreable non-disruption shots.
+    pub fn false_positive_rate(&self) -> Option<f64> {
         let denominator = self.false_positives + self.true_negatives;
-        if denominator == 0 {
-            return 0.0; // No negative samples
-        }
-        self.false_positives as f64 / denominator as f64
+        (denominator > 0).then(|| self.false_positives as f64 / denominator as f64)
     }
 
-    /// Calculate F1 score: 2 * (precision * recall) / (precision + recall)
-    pub fn f1_score(&self) -> f64 {
-        let p = self.precision();
-        let r = self.recall();
-        if p + r == 0.0 {
-            return 0.0;
-        }
-        2.0 * p * r / (p + r)
+    /// Event-level F1; undefined if precision or recall is undefined.
+    pub fn f1_score(&self) -> Option<f64> {
+        let p = self.precision()?;
+        let r = self.recall()?;
+        Some(if p + r == 0.0 { 0.0 } else { 2.0 * p * r / (p + r) })
     }
+}
+
+/// Render undefined metrics visibly instead of converting them to perfect-looking scores.
+fn metric_display(value: Option<f64>) -> String {
+    match value.filter(|value| value.is_finite()) {
+        Some(value) => format!("{value:.4}"),
+        None => "NotScoreable".to_string(),
+    }
+}
+
+/// Inputs used by the Phi proxy must be present and finite before a sample can count.
+fn has_valid_phi_inputs(sample: &symthaea::physics::cmod_adapter::CModSample) -> bool {
+    sample.time_ms.is_finite()
+        && sample.ip.is_finite()
+        && sample.ne.is_finite()
+        && sample.te.is_finite()
+        && sample.q95.is_finite()
+        && sample.prad.is_finite()
 }
 
 // =============================================================================
 // EVALUATION FUNCTION
 // =============================================================================
 
-/// Evaluate a threshold configuration on shot data
+/// Evaluate a threshold configuration with event-level, fail-closed scoring.
 fn evaluate_config(config: &ThresholdConfig, shots: &[CModShot]) -> EvaluationResults {
     let label_config = LabelConfig {
         warning_window_ms: 100.0,
@@ -248,6 +265,11 @@ fn evaluate_config(config: &ThresholdConfig, shots: &[CModShot]) -> EvaluationRe
     let mut false_negatives = 0;
     let mut warning_times_ms = Vec::new();
     let mut total_samples = 0;
+    let mut invalid_samples = 0;
+    let mut scoreable_disruption_shots = 0;
+    let mut scoreable_non_disruption_shots = 0;
+    let mut unscored_disruption_shots = 0;
+    let mut unscored_non_disruption_shots = 0;
     let mut total_disruption_shots = 0;
     let mut total_non_disruption_shots = 0;
 
@@ -263,61 +285,76 @@ fn evaluate_config(config: &ThresholdConfig, shots: &[CModShot]) -> EvaluationRe
             label_config.warning_window_ms,
             label_config.critical_window_ms,
         );
-        let mut first_warning_issued = false;
-        let mut warning_issued_at_ttd: Option<f64> = None;
+        let mut has_valid_sample = false;
+        let mut has_observable_warning_window = false;
+        let mut alarm_in_warning_window = false;
+        let mut alarm_in_normal_operation = false;
+        // The largest time-to-disruption among matching alarms is the earliest lead-time alarm.
+        let mut earliest_warning_ttd: Option<f64> = None;
 
         for (sample, label) in shot.samples.iter().zip(labels.iter()) {
             total_samples += 1;
+            if !has_valid_phi_inputs(sample) {
+                invalid_samples += 1;
+                continue;
+            }
+            has_valid_sample = true;
 
-            // Simulate Phi-based stability assessment
-            // In a real scenario, we'd compute Phi from encoded plasma state
-            // Here we use a proxy: normalized sensor values
             let phi_proxy = compute_phi_proxy(sample);
             let regime = classify_regime(phi_proxy, config);
-
-            // Track predictions vs ground truth
             let is_warning_or_critical = matches!(
                 regime,
                 StabilityRegime::Warning | StabilityRegime::Critical | StabilityRegime::Emergency
             );
 
-            match (is_warning_or_critical, label) {
-                // True positive: Predicted warning/critical during actual warning/critical
-                (true, DisruptionLabel::Warning | DisruptionLabel::Critical) => {
-                    if !first_warning_issued {
-                        true_positives += 1;
-                        first_warning_issued = true;
-                        if let Some(ttd) = sample.time_to_disruption_ms {
-                            warning_issued_at_ttd = Some(ttd);
-                            warning_times_ms.push(ttd);
+            if shot.disrupted {
+                if matches!(label, DisruptionLabel::Warning | DisruptionLabel::Critical) {
+                    has_observable_warning_window = true;
+                    if is_warning_or_critical {
+                        alarm_in_warning_window = true;
+                        if let Some(ttd) = sample
+                            .time_to_disruption_ms
+                            .filter(|ttd| ttd.is_finite() && *ttd >= 0.0)
+                        {
+                            earliest_warning_ttd = Some(
+                                earliest_warning_ttd.map_or(ttd, |current| current.max(ttd)),
+                            );
                         }
                     }
                 }
-                // False positive: Predicted warning during normal operation
-                (true, DisruptionLabel::Normal) => {
-                    if !shot.disrupted {
-                        false_positives += 1;
-                    }
-                }
-                // True negative: Predicted normal during actual normal
-                (false, DisruptionLabel::Normal) => {
-                    if !shot.disrupted {
-                        true_negatives += 1;
-                    }
-                }
-                // Note: We count at shot level for TP/FN, at sample level for FP/TN
-                _ => {}
+            } else if is_warning_or_critical && *label == DisruptionLabel::Normal {
+                // All alarms within a non-disruption shot collapse to one event-level FP.
+                alarm_in_normal_operation = true;
             }
         }
 
-        // Check if we missed the disruption entirely (false negative)
-        if shot.disrupted && warning_issued_at_ttd.is_none() {
-            false_negatives += 1;
+        if shot.disrupted {
+            if !has_observable_warning_window {
+                unscored_disruption_shots += 1;
+                continue;
+            }
+            scoreable_disruption_shots += 1;
+            if alarm_in_warning_window {
+                true_positives += 1;
+                if let Some(ttd) = earliest_warning_ttd {
+                    warning_times_ms.push(ttd);
+                }
+            } else {
+                false_negatives += 1;
+            }
+        } else if !has_valid_sample {
+            unscored_non_disruption_shots += 1;
+        } else {
+            scoreable_non_disruption_shots += 1;
+            if alarm_in_normal_operation {
+                false_positives += 1;
+            } else {
+                true_negatives += 1;
+            }
         }
     }
 
-    // Calculate warning time statistics
-    warning_times_ms.sort_by(|a, b| a.partial_cmp(b).unwrap());
+    warning_times_ms.sort_by(f64::total_cmp);
     let mean_warning_time_ms = if warning_times_ms.is_empty() {
         0.0
     } else {
@@ -344,6 +381,11 @@ fn evaluate_config(config: &ThresholdConfig, shots: &[CModShot]) -> EvaluationRe
         median_warning_time_ms,
         min_warning_time_ms,
         total_samples,
+        invalid_samples,
+        scoreable_disruption_shots,
+        scoreable_non_disruption_shots,
+        unscored_disruption_shots,
+        unscored_non_disruption_shots,
         total_disruption_shots,
         total_non_disruption_shots,
     }
@@ -398,15 +440,18 @@ fn classify_regime(phi: f64, config: &ThresholdConfig) -> StabilityRegime {
 fn objective(config: &ThresholdConfig, shots: &[CModShot]) -> f64 {
     let results = evaluate_config(config, shots);
 
-    // Constraint: Recall must be >= 0.95
-    if results.recall() < 0.95 {
+    let Some(recall) = results.recall() else {
+        return f64::NEG_INFINITY;
+    };
+    if recall < 0.95 {
+        return f64::NEG_INFINITY;
+    }
+    let Some(false_positive_rate) = results.false_positive_rate() else {
         return f64::NEG_INFINITY;
     }
 
-    // Objective: Maximize warning time, minimize false positive rate
-    // warning_time is in ms, FPR is in [0, 1]
-    // Scale FPR penalty to be comparable (100ms warning time = 1% FPR penalty)
-    results.mean_warning_time_ms - 100.0 * results.false_positive_rate()
+    // Synthetic-example objective only; this is not a validated operational safety criterion.
+    results.mean_warning_time_ms - 100.0 * false_positive_rate
 }
 
 // =============================================================================
@@ -727,13 +772,18 @@ fn compute_pareto_frontier(shots: &[CModShot], n_samples: usize, seed: u64) -> V
         let config = ThresholdConfig::random(&mut rng);
         let results = evaluate_config(&config, shots);
 
-        // Only include feasible points (recall >= 0.95)
-        if results.recall() >= 0.95 {
+        // Undefined/degenerate metrics cannot qualify as feasible Pareto points.
+        let (Some(recall), Some(false_positive_rate)) =
+            (results.recall(), results.false_positive_rate())
+        else {
+            continue;
+        };
+        if recall >= 0.95 {
             points.push(ParetoPoint {
                 config,
                 warning_time_ms: results.mean_warning_time_ms,
-                false_positive_rate: results.false_positive_rate(),
-                recall: results.recall(),
+                false_positive_rate,
+                recall,
             });
         }
     }
@@ -916,9 +966,33 @@ fn print_pareto_frontier(pareto: &[ParetoPoint]) {
 // SAVE RESULTS
 // =============================================================================
 
+/// Machine-readable provenance for the corpus used by an optimization run.
+#[derive(Debug, Clone, Serialize, Deserialize)]
+#[serde(tag = "kind", rename_all = "snake_case")]
+pub enum DatasetProvenance {
+    Synthetic {
+        generator: String,
+        seed: u64,
+        num_shots: usize,
+        disruption_probability: f64,
+        samples_per_shot: usize,
+        sample_interval_ms: f64,
+        warning_window_ms: f64,
+        critical_window_ms: f64,
+        qualification_note: String,
+    },
+    Measured {
+        dataset_id: String,
+        dataset_version: String,
+        content_sha256: String,
+        label_definition: String,
+    },
+}
+
 /// Complete optimization output
 #[derive(Debug, Serialize, Deserialize)]
 pub struct OptimizationOutput {
+    pub dataset_provenance: DatasetProvenance,
     pub grid_search: Option<SearchResult>,
     pub random_search: Option<SearchResult>,
     pub bayesian_search: Option<SearchResult>,
@@ -985,11 +1059,16 @@ fn main() {
         "  Phi thresholds: stable={:.2}, warning={:.2}, critical={:.2}",
         baseline_config.phi_stable, baseline_config.phi_warning, baseline_config.phi_critical
     );
-    println!("  Recall:           {:.4}", baseline_results.recall());
-    println!("  Precision:        {:.4}", baseline_results.precision());
+    println!("  Event-level Recall: {}", metric_display(baseline_results.recall()));
+    println!("  Event-level Precision: {}", metric_display(baseline_results.precision()));
+    println!("  Event-level False Positive Rate: {}", metric_display(baseline_results.false_positive_rate()));
     println!(
-        "  False Positive Rate: {:.4}",
-        baseline_results.false_positive_rate()
+        "  Scoreable shots: {} disruption, {} non-disruption; unscored: {} disruption, {} non-disruption; invalid samples: {}",
+        baseline_results.scoreable_disruption_shots,
+        baseline_results.scoreable_non_disruption_shots,
+        baseline_results.unscored_disruption_shots,
+        baseline_results.unscored_non_disruption_shots,
+        baseline_results.invalid_samples
     );
     println!(
         "  Mean Warning Time: {:.1} ms",
@@ -1029,12 +1108,12 @@ fn main() {
     );
     println!("  Objective:       {:.2}", grid_result.best_objective);
     println!(
-        "  Recall:          {:.4}",
-        grid_result.best_results.recall()
+        "  Event-level Recall: {}",
+        metric_display(grid_result.best_results.recall())
     );
     println!(
-        "  FPR:             {:.4}",
-        grid_result.best_results.false_positive_rate()
+        "  Event-level FPR: {}",
+        metric_display(grid_result.best_results.false_positive_rate())
     );
     println!(
         "  Warning Time:    {:.1} ms",
@@ -1075,12 +1154,12 @@ fn main() {
     );
     println!("  Objective:       {:.2}", random_result.best_objective);
     println!(
-        "  Recall:          {:.4}",
-        random_result.best_results.recall()
+        "  Event-level Recall: {}",
+        metric_display(random_result.best_results.recall())
     );
     println!(
-        "  FPR:             {:.4}",
-        random_result.best_results.false_positive_rate()
+        "  Event-level FPR: {}",
+        metric_display(random_result.best_results.false_positive_rate())
     );
     println!(
         "  Warning Time:    {:.1} ms",
@@ -1126,12 +1205,12 @@ fn main() {
     );
     println!("  Objective:       {:.2}", bayesian_result.best_objective);
     println!(
-        "  Recall:          {:.4}",
-        bayesian_result.best_results.recall()
+        "  Event-level Recall: {}",
+        metric_display(bayesian_result.best_results.recall())
     );
     println!(
-        "  FPR:             {:.4}",
-        bayesian_result.best_results.false_positive_rate()
+        "  Event-level FPR: {}",
+        metric_display(bayesian_result.best_results.false_positive_rate())
     );
     println!(
         "  Warning Time:    {:.1} ms",
@@ -1158,21 +1237,15 @@ fn main() {
     println!("  Val Objective:      {:.2}", cv_results.val_objective);
     println!("  Generalization Gap: {:.2}", cv_results.generalization_gap);
     println!("\n  Train Metrics:");
-    println!("    Recall:       {:.4}", cv_results.train_results.recall());
-    println!(
-        "    FPR:          {:.4}",
-        cv_results.train_results.false_positive_rate()
-    );
+    println!("    Event-level Recall: {}", metric_display(cv_results.train_results.recall()));
+    println!("    Event-level FPR: {}", metric_display(cv_results.train_results.false_positive_rate()));
     println!(
         "    Warning Time: {:.1} ms",
         cv_results.train_results.mean_warning_time_ms
     );
     println!("\n  Validation Metrics:");
-    println!("    Recall:       {:.4}", cv_results.val_results.recall());
-    println!(
-        "    FPR:          {:.4}",
-        cv_results.val_results.false_positive_rate()
-    );
+    println!("    Event-level Recall: {}", metric_display(cv_results.val_results.recall()));
+    println!("    Event-level FPR: {}", metric_display(cv_results.val_results.false_positive_rate()));
     println!(
         "    Warning Time: {:.1} ms",
         cv_results.val_results.mean_warning_time_ms
@@ -1200,35 +1273,30 @@ fn main() {
     );
     println!("{}", "-".repeat(70));
     println!(
-        "{:<25} {:>12.2} {:>12.4} {:>12.4} {:>10}",
-        "Baseline (Default)",
-        baseline_objective,
-        baseline_results.recall(),
-        baseline_results.false_positive_rate(),
-        "-"
+        "{:<25} {:>12.2} {:>12} {:>12} {:>10}",
+        "Baseline (Default)", baseline_objective,
+        metric_display(baseline_results.recall()),
+        metric_display(baseline_results.false_positive_rate()), "-"
     );
     println!(
-        "{:<25} {:>12.2} {:>12.4} {:>12.4} {:>10}",
-        "Grid Search",
-        grid_result.best_objective,
-        grid_result.best_results.recall(),
-        grid_result.best_results.false_positive_rate(),
+        "{:<25} {:>12.2} {:>12} {:>12} {:>10}",
+        "Grid Search", grid_result.best_objective,
+        metric_display(grid_result.best_results.recall()),
+        metric_display(grid_result.best_results.false_positive_rate()),
         grid_result.search_time_ms
     );
     println!(
-        "{:<25} {:>12.2} {:>12.4} {:>12.4} {:>10}",
-        "Random Search (500)",
-        random_result.best_objective,
-        random_result.best_results.recall(),
-        random_result.best_results.false_positive_rate(),
+        "{:<25} {:>12.2} {:>12} {:>12} {:>10}",
+        "Random Search (500)", random_result.best_objective,
+        metric_display(random_result.best_results.recall()),
+        metric_display(random_result.best_results.false_positive_rate()),
         random_result.search_time_ms
     );
     println!(
-        "{:<25} {:>12.2} {:>12.4} {:>12.4} {:>10}",
-        "Bayesian (200)",
-        bayesian_result.best_objective,
-        bayesian_result.best_results.recall(),
-        bayesian_result.best_results.false_positive_rate(),
+        "{:<25} {:>12.2} {:>12} {:>12} {:>10}",
+        "Bayesian (200)", bayesian_result.best_objective,
+        metric_display(bayesian_result.best_results.recall()),
+        metric_display(bayesian_result.best_results.false_positive_rate()),
         bayesian_result.search_time_ms
     );
 
@@ -1266,6 +1334,17 @@ fn main() {
     println!("{}", "-".repeat(50));
 
     let output = OptimizationOutput {
+        dataset_provenance: DatasetProvenance::Synthetic {
+            generator: "symthaea::physics::cmod_adapter::generate_synthetic_data".to_string(),
+            seed: synth_config.seed,
+            num_shots: synth_config.num_shots,
+            disruption_probability: synth_config.disruption_probability,
+            samples_per_shot: synth_config.samples_per_shot,
+            sample_interval_ms: synth_config.sample_interval_ms,
+            warning_window_ms: 100.0,
+            critical_window_ms: 20.0,
+            qualification_note: "Synthetic demonstration only; not measured evidence and not qualified for device operation or safety decisions.".to_string(),
+        },
         grid_search: Some(grid_result),
         random_search: Some(random_result),
         bayesian_search: Some(bayesian_result),
@@ -1285,11 +1364,12 @@ fn main() {
     // Apply to PlasmaControlConfig
     // =========================================================================
 
-    println!("\n\nAPPLYING OPTIMIZED THRESHOLDS");
+    println!("\n\nCREATING EXPLORATORY CONFIG (SYNTHETIC DATA ONLY; NO ACTUATION)");
     println!("{}", "-".repeat(50));
 
     let optimized_plasma_config = best_overall.to_plasma_control_config();
-    println!("  Created PlasmaControlConfig with optimized thresholds:");
+    println!("  Created an in-memory config from synthetic optimization outputs.");
+    println!("  This config is unvalidated and must not be used for device operation or safety decisions.");
     println!(
         "    phi_stable_threshold:   {:.3}",
         optimized_plasma_config.phi_stable_threshold
@@ -1328,32 +1408,33 @@ fn main() {
 
     println!(
         "
-1. OPTIMIZATION IMPROVED THRESHOLD SELECTION
+1. SYNTHETIC DEMONSTRATION ONLY
    - Baseline objective: {:.2}
-   - Best optimized:     {:.2}
-   - Improvement:        {:.2} ({:+.1}%)
+   - Best optimized objective: {:.2}
+   - Difference: {:.2} ({:+.1}%)
+   - These values describe generated data, not a physical device.
 
-2. SEARCH METHOD EFFICIENCY
-   - Grid Search: Exhaustive but slow ({} configs)
-   - Random Search: Fast and competitive (often within 5% of optimal)
-   - Bayesian: Efficient use of evaluation budget
+2. SEARCH METHODS
+   - Grid search: exhaustive over valid grid configurations.
+   - Random search: stochastic baseline.
+   - Bayesian-inspired search: adaptive random sampling, not full GP Bayesian optimization.
 
-3. CONSTRAINT SATISFACTION
-   - All optimized solutions maintain Recall >= 0.95
-   - This ensures we catch 95%+ of disruptions
+3. CONSTRAINT INTERPRETATION
+   - Recall >= 0.95 is checked only on scoreable synthetic shots.
+   - This does not establish real-device recall, stability, or safety.
 
-4. TRADEOFF ANALYSIS
-   - Pareto frontier shows the warning time vs FPR tradeoff
-   - Users can select operating point based on risk tolerance
+4. EVENT-LEVEL METRICS
+   - Confusion counts are per shot, not per sample.
+   - Repeated alarms count once per shot; invalid/censored cases are reported separately.
 
-5. GENERALIZATION
-   - Cross-validation gap indicates overfitting risk
-   - Smaller gap = better generalization to new data
+5. NEXT RESEARCH STEP
+   - Replace generated data with source-pinned, provenance-verified measured shots.
+   - Split evaluation by shot/device/campaign and evaluate on a held-out corpus.
+   - Report warning lead-time distributions, alarm burden, censoring, and uncertainty.
 
-6. RECOMMENDED USAGE:
-   - Use optimized thresholds in PlasmaControlConfig
-   - Monitor performance on real data
-   - Re-optimize periodically as plasma behavior changes
+6. NOT FOR OPERATION
+   - This example does not authorize hardware actuation or device-operation thresholds.
+   - Independent validation is required for the exact target regime and diagnostics.
 ",
         baseline_objective,
         best_overall_obj,
@@ -1411,18 +1492,134 @@ mod tests {
             median_warning_time_ms: 45.0,
             min_warning_time_ms: 10.0,
             total_samples: 1000,
+            invalid_samples: 0,
+            scoreable_disruption_shots: 95,
+            scoreable_non_disruption_shots: 110,
+            unscored_disruption_shots: 0,
+            unscored_non_disruption_shots: 0,
             total_disruption_shots: 95,
             total_non_disruption_shots: 110,
         };
 
-        // Recall = 90 / (90 + 5) = 0.947
-        assert!((results.recall() - 0.947).abs() < 0.01);
+        assert!((results.recall().unwrap() - 0.947).abs() < 0.01);
+        assert!((results.precision().unwrap() - 0.9).abs() < 0.01);
+        assert!((results.false_positive_rate().unwrap() - 0.091).abs() < 0.01);
+        assert!(results.f1_score().is_some());
+    }
 
-        // Precision = 90 / (90 + 10) = 0.9
-        assert!((results.precision() - 0.9).abs() < 0.01);
+    fn sample_for_test(shot_id: u32, time_ms: f64, unstable: bool) -> symthaea::physics::cmod_adapter::CModSample {
+        use symthaea::physics::cmod_adapter::CModSample;
+        let mut sample = CModSample::new(shot_id, time_ms);
+        if unstable {
+            sample.ip = 0.2;
+            sample.te = 0.5;
+            sample.ne = 4.0;
+            sample.q95 = 1.5;
+            sample.prad = 4.5;
+        } else {
+            sample.ip = 1.0;
+            sample.te = 5.0;
+            sample.ne = 1.5;
+            sample.q95 = 3.5;
+            sample.prad = 1.0;
+        }
+        sample
+    }
 
-        // FPR = 10 / (10 + 100) = 0.091
-        assert!((results.false_positive_rate() - 0.091).abs() < 0.01);
+    fn shot_for_test(shot_id: u32, disrupted: bool, sample_specs: &[(f64, bool)]) -> CModShot {
+        let mut shot = CModShot::new(shot_id);
+        shot.disrupted = disrupted;
+        shot.disruption_time_ms = disrupted.then_some(100.0);
+        for &(time_ms, unstable) in sample_specs {
+            shot.add_sample(sample_for_test(shot_id, time_ms, unstable));
+        }
+        shot
+    }
+
+    #[test]
+    fn event_metrics_are_invariant_to_pure_oversampling() {
+        let coarse = vec![
+            shot_for_test(1, true, &[(10.0, true)]),
+            shot_for_test(2, false, &[(0.0, false)]),
+        ];
+        let dense_normal_samples: Vec<(f64, bool)> =
+            (0..=40).map(|index| (index as f64, false)).collect();
+        let dense = vec![
+            shot_for_test(1, true, &[(0.0, false), (5.0, false), (10.0, true)]),
+            shot_for_test(2, false, &dense_normal_samples),
+        ];
+
+        let coarse_results = evaluate_config(&ThresholdConfig::default(), &coarse);
+        let dense_results = evaluate_config(&ThresholdConfig::default(), &dense);
+
+        assert_eq!(coarse_results.true_positives, 1);
+        assert_eq!(coarse_results.false_positives, 0);
+        assert_eq!(coarse_results.true_negatives, 1);
+        assert_eq!(coarse_results.false_negatives, 0);
+        assert_eq!(coarse_results.true_positives, dense_results.true_positives);
+        assert_eq!(coarse_results.false_positives, dense_results.false_positives);
+        assert_eq!(coarse_results.true_negatives, dense_results.true_negatives);
+        assert_eq!(coarse_results.false_negatives, dense_results.false_negatives);
+        assert_eq!(coarse_results.recall(), dense_results.recall());
+        assert_eq!(coarse_results.precision(), dense_results.precision());
+        assert_eq!(coarse_results.false_positive_rate(), dense_results.false_positive_rate());
+    }
+
+    #[test]
+    fn undefined_metrics_are_not_scoreable() {
+        let no_disruptions = vec![shot_for_test(1, false, &[(0.0, false)])];
+        let results = evaluate_config(&ThresholdConfig::default(), &no_disruptions);
+        assert_eq!(results.recall(), None);
+        assert_eq!(results.precision(), None);
+        assert_eq!(results.f1_score(), None);
+        assert_eq!(results.false_positive_rate(), Some(0.0));
+
+        let no_negative_examples = vec![shot_for_test(2, true, &[(10.0, true)])];
+        let results = evaluate_config(&ThresholdConfig::default(), &no_negative_examples);
+        assert_eq!(results.recall(), Some(1.0));
+        assert_eq!(results.precision(), Some(1.0));
+        assert_eq!(results.false_positive_rate(), None);
+        assert_eq!(results.f1_score(), Some(1.0));
+
+        let no_predictions = vec![shot_for_test(3, true, &[(10.0, false)])];
+        let results = evaluate_config(&ThresholdConfig::default(), &no_predictions);
+        assert_eq!(results.recall(), Some(0.0));
+        assert_eq!(results.precision(), None);
+        assert_eq!(results.f1_score(), None);
+    }
+
+    #[test]
+    fn missing_inputs_censor_unobservable_shots_instead_of_scoring_them() {
+        let mut shot = CModShot::new(10);
+        shot.disrupted = true;
+        shot.disruption_time_ms = Some(100.0);
+        let mut invalid = sample_for_test(10, 10.0, true);
+        invalid.ip = f32::NAN;
+        shot.add_sample(invalid);
+
+        let results = evaluate_config(&ThresholdConfig::default(), &[shot]);
+        assert_eq!(results.invalid_samples, 1);
+        assert_eq!(results.unscored_disruption_shots, 1);
+        assert_eq!(results.false_negatives, 0);
+        assert_eq!(results.recall(), None);
+    }
+
+    #[test]
+    fn post_disruption_alarm_does_not_count_as_a_true_positive() {
+        let shot = shot_for_test(11, true, &[(10.0, false), (110.0, true)]);
+        let results = evaluate_config(&ThresholdConfig::default(), &[shot]);
+        assert_eq!(results.true_positives, 0);
+        assert_eq!(results.false_negatives, 1);
+        assert_eq!(results.recall(), Some(0.0));
+    }
+
+    #[test]
+    fn repeated_alarms_count_once_and_keep_earliest_lead_time() {
+        let shot = shot_for_test(12, true, &[(10.0, true), (15.0, true)]);
+        let results = evaluate_config(&ThresholdConfig::default(), &[shot]);
+        assert_eq!(results.true_positives, 1);
+        assert_eq!(results.false_negatives, 0);
+        assert_eq!(results.mean_warning_time_ms, 90.0);
     }
 
     #[test]
