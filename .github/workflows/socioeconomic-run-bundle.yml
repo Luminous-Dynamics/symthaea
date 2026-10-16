@@ -28,6 +28,11 @@ on:
       - "docs/research/finance/SYM-FIN-SYS-016_RUN_BUNDLE_V1.md"
       - ".github/workflows/socioeconomic-run-bundle.yml"
   workflow_dispatch:
+    inputs:
+      source_revision:
+        description: "Full commit SHA from this repository to qualify; blank uses the default-branch workflow commit"
+        required: false
+        type: string
 
 permissions:
   contents: read
@@ -42,13 +47,13 @@ jobs:
     runs-on: ubuntu-24.04
     timeout-minutes: 8
     env:
-      CIVOS_SOURCE_REVISION: ${{ github.event.pull_request.head.sha || github.sha }}
+      CIVOS_SOURCE_REVISION: ${{ github.event.pull_request.head.sha || inputs.source_revision || github.sha }}
     steps:
       - name: Check out exact source head
         uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1 immutable commit
         with:
           repository: ${{ github.event.pull_request.head.repo.full_name || github.repository }}
-          ref: ${{ github.event.pull_request.head.sha || github.sha }}
+          ref: ${{ github.event.pull_request.head.sha || inputs.source_revision || github.sha }}
       - name: Record and verify exact revision
         run: |
           actual="$(git rev-parse HEAD)"
@@ -120,7 +125,7 @@ jobs:
   attest-qualification-report:
     name: Sign exact-head qualification report
     needs: exact-head-bundle-tests
-    if: github.event_name != 'pull_request' || github.event.pull_request.head.repo.full_name == github.repository
+    if: github.event_name == 'workflow_dispatch' && github.ref == 'refs/heads/main'
     runs-on: ubuntu-24.04
     timeout-minutes: 5
     permissions:
