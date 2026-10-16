@@ -1058,6 +1058,77 @@ mod tests {
     }
 
     #[test]
+    fn fixture_identity_binds_exact_sample_paths_hashes_and_lengths() {
+        let root = std::env::temp_dir().join(format!(
+            "muse-fixture-identity-{}",
+            std::process::id()
+        ));
+        let _ = fs::remove_dir_all(&root);
+        let fixture_dir = root.join("fixture-pack/rr");
+        fs::create_dir_all(&fixture_dir).unwrap();
+
+        let sfz_bytes = b"<region> key=60 sample=sample.wav\n";
+        let sample_bytes = b"deterministic PCM placeholder";
+        fs::write(fixture_dir.join("instrument.sfz"), sfz_bytes).unwrap();
+        fs::write(fixture_dir.join("sample.wav"), sample_bytes).unwrap();
+
+        let sfz_hash = sha256_hex(sfz_bytes);
+        let sample_hash = sha256_hex(sample_bytes);
+        let fixture_json = serde_json::json!({
+            "schema": "muse-sfz-compat-fixture-pack-v1",
+            "fixtures": [{
+                "fixture_id": "rr",
+                "sfz_file": "rr/instrument.sfz",
+                "sfz_sha256": sfz_hash,
+                "sfz_byte_len": sfz_bytes.len(),
+                "sample_assets": [{
+                    "path": "sample.wav",
+                    "sha256": sample_hash,
+                    "byte_len": sample_bytes.len()
+                }]
+            }]
+        });
+        let manifest_bytes = serde_json::to_vec(&fixture_json).unwrap();
+        fs::write(root.join("fixture-pack/fixtures.json"), &manifest_bytes).unwrap();
+
+        let sfz = FileReferenceV1 {
+            path: "fixture-pack/rr/instrument.sfz".to_owned(),
+            sha256: sfz_hash,
+        };
+        let assets = vec![FileReferenceV1 {
+            path: "fixture-pack/rr/sample.wav".to_owned(),
+            sha256: sample_hash,
+        }];
+
+        let exact = verify_fixture_manifest_identity(
+            &manifest_bytes,
+            "fixture-pack/fixtures.json",
+            "rr",
+            &sfz,
+            &assets,
+            &root,
+        );
+        assert_eq!(exact, (true, None));
+
+        let wrong_slot = vec![FileReferenceV1 {
+            path: "fixture-pack/other/sample.wav".to_owned(),
+            sha256: sample_hash,
+        }];
+        let mismatched = verify_fixture_manifest_identity(
+            &manifest_bytes,
+            "fixture-pack/fixtures.json",
+            "rr",
+            &sfz,
+            &wrong_slot,
+            &root,
+        );
+        assert!(!mismatched.0);
+        assert!(mismatched.1.is_some());
+
+        fs::remove_dir_all(root).unwrap();
+    }
+
+    #[test]
     fn comparison_binding_rejects_wrong_wav_hashes_and_quality_claims() {
         let json = br#"{
             "schema": "muse-sfz-audio-differential-receipt-v1",
