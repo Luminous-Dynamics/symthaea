@@ -51,6 +51,8 @@ pub enum AssessmentError {
     EmptyProvenanceDescription(String),
     DuplicateProvenanceId(String),
     ClaimCeilingMismatch,
+    UnsupportedEvidenceClass(String),
+    UnsupportedDecisionUse,
 }
 
 impl fmt::Display for AssessmentError {
@@ -64,6 +66,8 @@ impl fmt::Display for AssessmentError {
             }
             Self::DuplicateProvenanceId(id) => write!(f, "duplicate provenance ID: {id}"),
             Self::ClaimCeilingMismatch => write!(f, "case claim ceiling does not match this evaluator's frozen ceiling"),
+            Self::UnsupportedEvidenceClass(class) => write!(f, "v1 accepts synthetic illustrations only; received evidence class {class}"),
+            Self::UnsupportedDecisionUse => write!(f, "v1 accepts not_for_decision cases only"),
         }
     }
 }
@@ -82,6 +86,12 @@ pub fn assess(case: &MarineFreightCase) -> Result<AssessmentReport, AssessmentEr
     }
     if case.claim_ceiling != CLAIM_CEILING {
         return Err(AssessmentError::ClaimCeilingMismatch);
+    }
+    if case.evidence_class != EvidenceClass::SyntheticIllustration {
+        return Err(AssessmentError::UnsupportedEvidenceClass(format!("{:?}", case.evidence_class)));
+    }
+    if case.decision_use != DecisionUse::NotForDecision {
+        return Err(AssessmentError::UnsupportedDecisionUse);
     }
 
     let sources = validate_provenance(&case.provenance)?;
@@ -587,6 +597,23 @@ mod tests {
             assess(&case),
             Err(AssessmentError::DuplicateProvenanceId(_))
         ));
+    }
+
+    #[test]
+    fn measured_case_is_rejected_until_uncertainty_and_bias_bounds_exist() {
+        let mut case = case();
+        case.evidence_class = EvidenceClass::Measured;
+        assert!(matches!(
+            assess(&case),
+            Err(AssessmentError::UnsupportedEvidenceClass(_))
+        ));
+    }
+
+    #[test]
+    fn decision_use_cannot_be_promoted_in_v1() {
+        let mut case = case();
+        case.decision_use = DecisionUse::ResearchScreeningOnly;
+        assert_eq!(assess(&case), Err(AssessmentError::UnsupportedDecisionUse));
     }
 
     #[test]
