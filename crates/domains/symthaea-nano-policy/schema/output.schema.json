@@ -113,6 +113,74 @@
       "if": {
         "properties": {
           "policy": {
+            "const": "maximin"
+          }
+        },
+        "required": [
+          "policy"
+        ]
+      },
+      "then": {
+        "properties": {
+          "selected": {
+            "items": {
+              "properties": {
+                "score": {
+                  "type": "number",
+                  "minimum": 0
+                },
+                "score_kind": {
+                  "enum": [
+                    "distance_to_pool_centroid",
+                    "min_distance_to_selected"
+                  ]
+                }
+              },
+              "required": [
+                "score",
+                "score_kind"
+              ]
+            }
+          }
+        }
+      }
+    },
+    {
+      "if": {
+        "properties": {
+          "policy": {
+            "const": "random"
+          }
+        },
+        "required": [
+          "policy"
+        ]
+      },
+      "then": {
+        "properties": {
+          "selected": {
+            "items": {
+              "properties": {
+                "score": {
+                  "type": "null"
+                },
+                "score_kind": {
+                  "const": "random_order"
+                }
+              },
+              "required": [
+                "score",
+                "score_kind"
+              ]
+            }
+          }
+        }
+      }
+    },
+    {
+      "if": {
+        "properties": {
+          "policy": {
             "const": "hdc_maximin"
           }
         },
@@ -126,7 +194,9 @@
             "items": {
               "properties": {
                 "score": {
-                  "type": "number"
+                  "type": "number",
+                  "minimum": 0,
+                  "maximum": 1
                 },
                 "score_kind": {
                   "enum": [
