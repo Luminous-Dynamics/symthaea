@@ -1955,6 +1955,10 @@ mod tests {
         let canonical = serde_json_canonicalizer::to_string(&value).expect("JCS canonicalizes");
         let expected = r#"{"literals":[null,true,false],"numbers":[333333333.3333333,1e+30,4.5,0.002,1e-27],"string":"€$\u000f\nA'B\"\\\\\"/"}"#;
         assert_eq!(canonical, expected);
+        assert_eq!(
+            sha256_hex(canonical.as_bytes()),
+            "2d5e01a318d0f0879ab568c4be289c8b1f64ef8921a53c6277d5e069978baacb"
+        );
     }
 
     #[test]
@@ -1967,6 +1971,10 @@ mod tests {
             '\u{80}'
         );
         assert_eq!(canonical, expected);
+        assert_eq!(
+            sha256_hex(canonical.as_bytes()),
+            "5e321556d22018a9656991a9e94f77ec175fa193e52a2429d312f8419ec8b08c"
+        );
     }
 
     #[test]
