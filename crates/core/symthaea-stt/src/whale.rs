@@ -97,7 +97,10 @@ impl WhaleConfig {
         self.validate()?;
         if source_rate_hz != self.sample_rate {
             return Err(format!(
-                "source rate {source_rate_hz} Hz does not match sentinel clock {} Hz; resample with a verified pipeline or configure the native rate",
+                concat!(
+                    "source rate {source_rate_hz} Hz does not match sentinel clock {} Hz; ",
+                    "resample with a verified pipeline or configure the native rate"
+                ),
                 self.sample_rate
             ));
         }
