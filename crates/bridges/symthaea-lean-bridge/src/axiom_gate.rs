@@ -132,8 +132,10 @@ fn run_lean_capture(path: &Path, bin: &str) -> Result<String, ProofAuditOutcome>
     Ok(combined)
 }
 
-/// Run Lean on a proof file (which must already contain a `#print axioms`
-/// command, e.g. via [`with_axiom_probe`]) and gate the axiom output.
+/// Run Lean on a proof file ending with the exact `#print axioms <theorem>`
+/// probe (normally produced by [`with_axiom_probe`]) and gate the axiom output.
+/// The terminal probe is checked before launching Lean; arbitrary report-like
+/// output emitted by the proof file is not accepted as evidence.
 ///
 /// `proved_statement` is the theorem statement the generator emitted;
 /// `expected_statement` is the pinned spec it must match.
@@ -237,6 +239,31 @@ mod tests {
         );
         assert!(r.audit.is_clean());
         assert!(!r.accepted());
+    }
+
+    #[test]
+    fn audit_rejects_missing_terminal_probe_before_running_lean() {
+        let path = std::env::temp_dir().join(format!(
+            "symthaea-proof-audit-no-probe-{}.lean",
+            std::process::id()
+        ));
+        std::fs::write(&path, "#eval IO.println \"'t' does not depend on any axioms\"")
+            .unwrap();
+
+        let outcome = audit_lean_file(
+            &path,
+            "t",
+            "True",
+            "True",
+            &AxiomPolicy::constitutional(),
+        );
+        let _ = std::fs::remove_file(&path);
+
+        assert!(matches!(
+            outcome,
+            ProofAuditOutcome::ProcessError(message)
+                if message.contains("must end with the exact axiom probe")
+        ));
     }
 
     #[test]
