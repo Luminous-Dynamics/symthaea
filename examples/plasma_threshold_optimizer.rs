@@ -278,8 +278,8 @@ pub struct ShotEvaluationRecord {
     pub warning_lead_time_ms: Option<f64>,
     pub sample_count: usize,
     pub valid_sample_count: usize,
-    /// Zero-based indices into the original shot sample sequence.
-    pub invalid_sample_indices: Vec<usize>,
+    /// Zero-based indices excluded from scoring due to invalid inputs, ordering, or shot identity.
+    pub excluded_sample_indices: Vec<usize>,
     pub unscored_reason: Option<ShotUnscoredReason>,
 }
 
@@ -319,8 +319,7 @@ fn evaluate_config(config: &ThresholdConfig, shots: &[CModShot]) -> EvaluationRe
         // Count raw samples even when the whole shot is rejected for duplicate identity.
         total_samples += shot.samples.len();
         if shot_id_counts.get(&shot.shot_id).copied().unwrap_or(0) > 1 {
-            invalid_samples += shot.samples.len();
-            let invalid_sample_indices = (0..shot.samples.len()).collect::<Vec<_>>();
+            let excluded_sample_indices = (0..shot.samples.len()).collect::<Vec<_>>();
             if shot.disrupted {
                 unscored_disruption_shots += 1;
             } else {
@@ -333,7 +332,7 @@ fn evaluate_config(config: &ThresholdConfig, shots: &[CModShot]) -> EvaluationRe
                 warning_lead_time_ms: None,
                 sample_count: shot.samples.len(),
                 valid_sample_count: 0,
-                invalid_sample_indices,
+                excluded_sample_indices,
                 unscored_reason: Some(ShotUnscoredReason::DuplicateShotId),
             });
             continue;
@@ -346,7 +345,7 @@ fn evaluate_config(config: &ThresholdConfig, shots: &[CModShot]) -> EvaluationRe
         );
         let mut has_valid_sample = false;
         let mut valid_sample_count = 0;
-        let mut invalid_sample_indices = Vec::new();
+        let mut excluded_sample_indices = Vec::new();
         let mut has_valid_warning_sample = false;
         let mut phi_history: Vec<(f64, f64)> = Vec::new();
         let mut alarm_in_warning_window = false;
@@ -357,9 +356,9 @@ fn evaluate_config(config: &ThresholdConfig, shots: &[CModShot]) -> EvaluationRe
         for (sample_index, (sample, label)) in
             shot.samples.iter().zip(labels.iter()).enumerate()
         {
-            if !has_valid_phi_inputs(sample) {
+            if !has_valid_phi_inputs(sample) || sample.shot_id != shot.shot_id {
                 invalid_samples += 1;
-                invalid_sample_indices.push(sample_index);
+                excluded_sample_indices.push(sample_index);
                 continue;
             }
             if let Some((previous_time_ms, _)) = phi_history.last() {
@@ -367,7 +366,7 @@ fn evaluate_config(config: &ThresholdConfig, shots: &[CModShot]) -> EvaluationRe
                     // Trend features require strictly increasing timestamps. Treat out-of-order
                     // samples as invalid rather than silently changing the inferred dynamics.
                     invalid_samples += 1;
-                    invalid_sample_indices.push(sample_index);
+                    excluded_sample_indices.push(sample_index);
                     continue;
                 }
             }
@@ -415,7 +414,7 @@ fn evaluate_config(config: &ThresholdConfig, shots: &[CModShot]) -> EvaluationRe
                     warning_lead_time_ms: None,
                     sample_count: shot.samples.len(),
                     valid_sample_count,
-                    invalid_sample_indices: invalid_sample_indices.clone(),
+                    excluded_sample_indices: excluded_sample_indices.clone(),
                     unscored_reason: Some(ShotUnscoredReason::NoValidSampleInWarningWindow),
                 });
                 continue;
@@ -436,7 +435,7 @@ fn evaluate_config(config: &ThresholdConfig, shots: &[CModShot]) -> EvaluationRe
                 warning_lead_time_ms: lead_time,
                 sample_count: shot.samples.len(),
                 valid_sample_count,
-                invalid_sample_indices: invalid_sample_indices.clone(),
+                excluded_sample_indices: excluded_sample_indices.clone(),
                 unscored_reason: None,
             });
         } else if !has_valid_sample {
@@ -448,7 +447,7 @@ fn evaluate_config(config: &ThresholdConfig, shots: &[CModShot]) -> EvaluationRe
                 warning_lead_time_ms: None,
                 sample_count: shot.samples.len(),
                 valid_sample_count,
-                invalid_sample_indices: invalid_sample_indices.clone(),
+                excluded_sample_indices: excluded_sample_indices.clone(),
                 unscored_reason: Some(ShotUnscoredReason::NoValidSamples),
             });
         } else {
@@ -466,7 +465,7 @@ fn evaluate_config(config: &ThresholdConfig, shots: &[CModShot]) -> EvaluationRe
                 warning_lead_time_ms: None,
                 sample_count: shot.samples.len(),
                 valid_sample_count,
-                invalid_sample_indices: invalid_sample_indices.clone(),
+                excluded_sample_indices: excluded_sample_indices.clone(),
                 unscored_reason: None,
             });
         }
@@ -582,6 +581,11 @@ fn time_weighted_phi_volatility(history: &[(f64, f64)], now_ms: f64) -> Option<f
     for pair in history.windows(2) {
         let (time_ms, phi) = pair[0];
         let next_time_ms = pair[1].0;
+        let gap_ms = next_time_ms - time_ms;
+        // An interval larger than this is an unobserved gap, not evidence that Phi held constant.
+        if !gap_ms.is_finite() || gap_ms <= 0.0 || gap_ms > MAX_TREND_GAP_MS {
+            continue;
+        }
         let overlap_start = time_ms.max(window_start_ms);
         let overlap_end = next_time_ms.min(now_ms);
         if overlap_end > overlap_start {
@@ -1849,7 +1853,7 @@ mod tests {
         );
         assert_eq!(results.shot_records[0].sample_count, 1);
         assert_eq!(results.shot_records[0].valid_sample_count, 0);
-        assert_eq!(results.shot_records[0].invalid_sample_indices, vec![0]);
+        assert_eq!(results.shot_records[0].excluded_sample_indices, vec![0]);
     }
 
     #[test]
@@ -1921,7 +1925,7 @@ mod tests {
         let second = shot_for_test(21, true, &[(10.0, true)]);
         let results = evaluate_config(&ThresholdConfig::default(), &[first, second]);
         assert_eq!(results.total_samples, 2);
-        assert_eq!(results.invalid_samples, 2);
+        assert_eq!(results.invalid_samples, 0);
         assert_eq!(results.unscored_non_disruption_shots, 1);
         assert_eq!(results.unscored_disruption_shots, 1);
         assert_eq!(results.true_positives, 0);
@@ -1931,6 +1935,7 @@ mod tests {
         assert!(results.shot_records.iter().all(|record| {
             record.predicted_disruption.is_none()
                 && record.unscored_reason == Some(ShotUnscoredReason::DuplicateShotId)
+                && record.excluded_sample_indices == vec![0]
         }));
     }
 
@@ -1941,7 +1946,7 @@ mod tests {
         assert_eq!(results.invalid_samples, 1);
         assert_eq!(results.shot_records[0].sample_count, 3);
         assert_eq!(results.shot_records[0].valid_sample_count, 2);
-        assert_eq!(results.shot_records[0].invalid_sample_indices, vec![1]);
+        assert_eq!(results.shot_records[0].excluded_sample_indices, vec![1]);
     }
 
     #[test]
