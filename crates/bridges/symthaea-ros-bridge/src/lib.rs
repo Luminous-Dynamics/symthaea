@@ -27,6 +27,8 @@ use thiserror::Error;
 pub enum RosBridgeError {
     #[error("ROS2 context not initialized")]
     NotInitialized,
+    #[error("ROS2 trajectory transport is unavailable; telemetry-only mode cannot report a robot command as published")]
+    RosTransportUnavailable,
     #[error("Communication error: {0}")]
     Communication(String),
     #[error("Serialization error: {0}")]
@@ -599,64 +601,61 @@ impl RosBridgeNode {
             }
         }
 
-        // 2. Consciousness-Gated Gain Scheduling
-        #[cfg(feature = "ros2")]
-        let phi = { *self.phi.lock().unwrap() };
+        // Publish only through a live ROS publisher. Telemetry-only builds and
+        // partially initialized ROS nodes must never report command success.
         #[cfg(feature = "ros2")]
         {
+            let phi = *self.phi.lock().unwrap();
             let gain_scale = self.scheduler.alpha(phi);
             for pt in &mut command.points {
                 for eff in &mut pt.efforts {
                     *eff *= gain_scale;
                 }
             }
+
+            let pub_traj = self
+                .trajectory_pub
+                .as_ref()
+                .ok_or(RosBridgeError::RosTransportUnavailable)?;
+
+            let joint_count = command.joint_names.len();
+            let point_count = command.points.len();
+            let mut msg = trajectory_msgs::msg::JointTrajectory::default();
+            msg.joint_names = command.joint_names;
+
+            for pt in command.points {
+                let mut point = trajectory_msgs::msg::JointTrajectoryPoint::default();
+                point.positions = pt.positions;
+                point.velocities = pt.velocities;
+                point.effort = pt.efforts;
+
+                let sec = (pt.time_from_start_ns / 1_000_000_000) as i32;
+                let nanosec = (pt.time_from_start_ns % 1_000_000_000) as u32;
+                point.time_from_start = builtin_interfaces::msg::Duration { sec, nanosec };
+
+                msg.points.push(point);
+            }
+
+            pub_traj
+                .publish(&msg)
+                .map_err(|e| RosBridgeError::Communication(format!("{:?}", e)))?;
+
+            tracing::debug!(
+                "ROS2 [{}] Publish Trajectory: {} joints, {} points, Φ scale={:.2}",
+                self.config.node_name,
+                joint_count,
+                point_count,
+                gain_scale
+            );
+            Ok(())
         }
 
-        let joint_count = command.joint_names.len();
-        let point_count = command.points.len();
-
-        #[cfg(feature = "ros2")]
+        #[cfg(not(feature = "ros2"))]
         {
-            if let Some(pub_traj) = &self.trajectory_pub {
-                let mut msg = trajectory_msgs::msg::JointTrajectory::default();
-                msg.joint_names = command.joint_names;
-
-                for pt in command.points {
-                    let mut point = trajectory_msgs::msg::JointTrajectoryPoint::default();
-                    point.positions = pt.positions;
-                    point.velocities = pt.velocities;
-                    point.effort = pt.efforts;
-
-                    let sec = (pt.time_from_start_ns / 1_000_000_000) as i32;
-                    let nanosec = (pt.time_from_start_ns % 1_000_000_000) as u32;
-                    point.time_from_start = builtin_interfaces::msg::Duration { sec, nanosec };
-
-                    msg.points.push(point);
-                }
-
-                pub_traj
-                    .publish(&msg)
-                    .map_err(|e| RosBridgeError::Communication(format!("{:?}", e)))?;
-            }
+            // All local validation/interlock checks above still run, but no
+            // ROS command transport exists in this build.
+            Err(RosBridgeError::RosTransportUnavailable)
         }
-        let gain_scale = {
-            #[cfg(feature = "ros2")]
-            {
-                self.scheduler.alpha(phi)
-            }
-            #[cfg(not(feature = "ros2"))]
-            {
-                1.0
-            }
-        };
-        tracing::debug!(
-            "ROS2 [{}] Publish Trajectory: {} joints, {} points, Φ scale={:.2}",
-            self.config.node_name,
-            joint_count,
-            point_count,
-            gain_scale
-        );
-        Ok(())
     }
 
     /// Process a proprioception update and return an HDC-encoded sensor vector.
@@ -800,7 +799,13 @@ mod tests {
         })
         .unwrap();
 
+        #[cfg(feature = "ros2")]
         node.publish_trajectory(normal_cmd.clone()).unwrap();
+        #[cfg(not(feature = "ros2"))]
+        assert!(matches!(
+            node.publish_trajectory(normal_cmd.clone()),
+            Err(RosBridgeError::RosTransportUnavailable)
+        ));
 
         {
             let mut interlock = node.interlock.lock().unwrap();
@@ -826,6 +831,28 @@ mod tests {
             let cmd = normal_cmd.clone();
             node.publish_trajectory(cmd).unwrap();
         }
+    }
+
+    #[cfg(not(feature = "ros2"))]
+    #[test]
+    fn telemetry_only_build_rejects_robot_trajectory_publication() {
+        let mut node = RosBridgeNode::new(RosBridgeConfig::default());
+        node.init().unwrap();
+
+        let command = RosTrajectoryCommand {
+            joint_names: vec!["joint_1".into()],
+            points: vec![RosTrajectoryPoint {
+                positions: vec![0.0],
+                velocities: Vec::new(),
+                efforts: vec![0.0],
+                time_from_start_ns: 1_000_000,
+            }],
+        };
+
+        assert!(matches!(
+            node.publish_trajectory(command),
+            Err(RosBridgeError::RosTransportUnavailable)
+        ));
     }
 
     #[test]
