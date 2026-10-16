@@ -191,7 +191,9 @@
         "worst_guide_cas9_group_recall",
         "paired_label_sensitivity_bounds",
         "calibration_loss_when_estimable",
-        "measured_runtime_and_compute"
+        "measured_runtime_and_compute",
+        "upper_unknown_aware_error_rate_bound_at_fixed_coverage",
+        "accepted_label_completeness_at_fixed_coverage"
       ],
       "acceptance": "All compared policies use same preregistered objective definitions, units, direction, episodes, and availability rules. Missing metrics are not zero-filled. Pareto membership is not by itself a performance win or biological/clinical safety finding."
     },
