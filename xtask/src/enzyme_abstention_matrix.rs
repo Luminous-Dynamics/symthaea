@@ -286,6 +286,56 @@ fn split_observations(observations: &[Observation]) -> (Vec<Observation>, Vec<Ob
     (training, held_out)
 }
 
+fn apply_decision_policy(
+    delta_bic_mm_minus_inhibition: f64,
+    prediction_gap_in_noise_sd: f64,
+    best_evaluation_rmse_in_noise_sd: f64,
+) -> (&'static str, &'static str, bool, bool, bool) {
+    let absolute_fit_gate_passed =
+        best_evaluation_rmse_in_noise_sd <= MAX_NORMALIZED_RMSE_FOR_ADEQUACY;
+    let prediction_gap_resolved =
+        prediction_gap_in_noise_sd >= MIN_PREDICTION_GAP_IN_NOISE_SDS;
+    let bic_decisive = delta_bic_mm_minus_inhibition.abs() >= DECISIVE_DELTA_BIC;
+
+    let (selected, reason) = if !absolute_fit_gate_passed {
+        ("abstain", "best_candidate_fails_evaluation_absolute_fit_gate")
+    } else if !prediction_gap_resolved {
+        ("abstain", "candidate_predictions_not_resolved_at_evaluation_conditions")
+    } else if !bic_decisive {
+        ("abstain", "bic_difference_below_decisive_threshold")
+    } else if delta_bic_mm_minus_inhibition < 0.0 {
+        ("michaelis_menten", "bic_favors_michaelis_menten")
+    } else {
+        ("substrate_inhibition", "bic_favors_substrate_inhibition")
+    };
+
+    (
+        selected,
+        reason,
+        absolute_fit_gate_passed,
+        prediction_gap_resolved,
+        bic_decisive,
+    )
+}
+
+fn prediction_gap_in_noise_sd(
+    evaluation: &[Observation],
+    mm: ModelFit,
+    inhibition: ModelFit,
+    sigma: f64,
+) -> f64 {
+    (evaluation
+        .iter()
+        .map(|obs| {
+            let gap = predict(mm, obs.substrate) - predict(inhibition, obs.substrate);
+            gap * gap
+        })
+        .sum::<f64>()
+        / evaluation.len() as f64)
+        .sqrt()
+        / sigma
+}
+
 fn decide(
     training: &[Observation],
     held_out: &[Observation],
@@ -296,38 +346,13 @@ fn decide(
     let delta_bic = bic(mm, training.len()) - bic(inhibition, training.len());
     // Assess whether candidate predictions separate on held-out substrate conditions, not only
     // on the points used to estimate their parameters.
-    let prediction_gap = (held_out
-        .iter()
-        .map(|obs| {
-            let gap = predict(mm, obs.substrate) - predict(inhibition, obs.substrate);
-            gap * gap
-        })
-        .sum::<f64>()
-        / held_out.len() as f64)
-        .sqrt()
-        / sigma;
+    let prediction_gap = prediction_gap_in_noise_sd(held_out, mm, inhibition, sigma);
     let held_out_rmse_mm = rmse_on(held_out, mm);
     let held_out_rmse_inhibition = rmse_on(held_out, inhibition);
     let best_held_out_rmse_in_noise_sd =
         held_out_rmse_mm.min(held_out_rmse_inhibition) / sigma;
-    let absolute_fit_gate_passed =
-        best_held_out_rmse_in_noise_sd <= MAX_NORMALIZED_RMSE_FOR_ADEQUACY;
-    let prediction_gap_resolved = prediction_gap >= MIN_PREDICTION_GAP_IN_NOISE_SDS;
-    let bic_decisive = delta_bic.abs() >= DECISIVE_DELTA_BIC;
-
-    // Candidate selection is conditional on acceptable held-out predictive error, a resolvable
-    // prediction gap on held-out conditions, and a decisive training-only information criterion.
-    let (selected, reason) = if !absolute_fit_gate_passed {
-        ("abstain", "best_candidate_fails_held_out_absolute_fit_gate")
-    } else if !prediction_gap_resolved {
-        ("abstain", "candidate_predictions_not_resolved_on_held_out_conditions")
-    } else if !bic_decisive {
-        ("abstain", "training_bic_difference_below_decisive_threshold")
-    } else if delta_bic < 0.0 {
-        ("michaelis_menten", "training_bic_favors_michaelis_menten_with_held_out_gates")
-    } else {
-        ("substrate_inhibition", "training_bic_favors_substrate_inhibition_with_held_out_gates")
-    };
+    let (selected, reason, absolute_fit_gate_passed, prediction_gap_resolved, bic_decisive) =
+        apply_decision_policy(delta_bic, prediction_gap, best_held_out_rmse_in_noise_sd);
 
     Decision {
         selected,
@@ -345,11 +370,32 @@ fn decide(
 
 fn make_case(scenario: Scenario, seed: u64, sigma: f64) -> Value {
     let observations = observations_for(scenario, seed, sigma);
+
+    // Paired comparator: the original in-sample policy fits and evaluates on every observation.
+    // It is retained as a benchmark baseline, not as the preferred scientific protocol.
+    let in_sample_mm = fit_grid(&observations, ModelKind::MichaelisMenten);
+    let in_sample_inhibition = fit_grid(&observations, ModelKind::SubstrateInhibition);
+    let in_sample_delta_bic =
+        bic(in_sample_mm, observations.len()) - bic(in_sample_inhibition, observations.len());
+    let in_sample_gap =
+        prediction_gap_in_noise_sd(&observations, in_sample_mm, in_sample_inhibition, sigma);
+    let in_sample_best_rmse =
+        in_sample_mm.rmse.min(in_sample_inhibition.rmse) / sigma;
+    let (
+        in_sample_selected,
+        in_sample_reason,
+        in_sample_absolute_fit_passed,
+        in_sample_prediction_gap_resolved,
+        in_sample_bic_decisive,
+    ) = apply_decision_policy(in_sample_delta_bic, in_sample_gap, in_sample_best_rmse);
+
+    // Preferred exploratory policy: fit on training observations, gate against held-out conditions.
     let (training, held_out) = split_observations(&observations);
     let mm = fit_grid(&training, ModelKind::MichaelisMenten);
     let inhibition = fit_grid(&training, ModelKind::SubstrateInhibition);
     let decision = decide(&training, &held_out, mm, inhibition, sigma);
     let target_hit = decision.selected == scenario.expected_decision;
+    let in_sample_target_hit = in_sample_selected == scenario.expected_decision;
 
     json!({
         "stratum": scenario.stratum,
@@ -368,6 +414,19 @@ fn make_case(scenario: Scenario, seed: u64, sigma: f64) -> Value {
         "expected_decision": scenario.expected_decision,
         "observed_decision": decision.selected,
         "target_hit": target_hit,
+        "in_sample_baseline": {
+            "selected": in_sample_selected,
+            "reason": in_sample_reason,
+            "target_hit": in_sample_target_hit,
+            "delta_bic_mm_minus_inhibition": in_sample_delta_bic,
+            "prediction_gap_in_noise_sd": in_sample_gap,
+            "best_rmse_in_noise_sd": in_sample_best_rmse,
+            "decision_gates": {
+                "absolute_fit_gate_passed": in_sample_absolute_fit_passed,
+                "prediction_gap_resolved": in_sample_prediction_gap_resolved,
+                "bic_decisive": in_sample_bic_decisive
+            }
+        },
         "decision_reason": decision.reason,
         "delta_bic_mm_minus_inhibition": decision.delta_bic_mm_minus_inhibition,
         "held_out_prediction_gap_in_noise_sd": decision.held_out_prediction_gap_in_noise_sd,
