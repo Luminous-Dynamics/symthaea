@@ -319,8 +319,10 @@ pub enum SecureBootGuideStep {
     InitialQuery,
     /// User says yes — provide BIOS entry guidance.
     BiosDisableGuide { manufacturer_hint: Option<String> },
-    /// User wants to keep Secure Boot — explain MOK enrollment.
+    /// Legacy serialized step: explain the explicit Secure Boot key-enrollment path.
     MokExplanation,
+    /// The user is unsure; re-probe or resolve manually before any configuration change.
+    ManualVerificationRequired,
     /// User confirms they are ready to proceed.
     Confirmed { method: SecureBootMethod },
 }
@@ -330,11 +332,11 @@ pub enum SecureBootGuideStep {
 pub enum SecureBootMethod {
     /// User will disable Secure Boot in BIOS.
     Disabled,
-    /// User will use MOK enrollment (keeps Secure Boot on).
+    /// Legacy serialized method name for explicit machine-key enrollment.
     MokEnrollment,
     /// Secure Boot was already off.
     AlreadyOff,
-    /// User is unsure — proceed with lanzaboote shim (safest default).
+    /// Legacy unresolved choice; it must never authorize a shim/default configuration.
     UseShim,
 }
 
@@ -365,12 +367,10 @@ impl SecureBootGuide {
         self.user_confirmed = true;
     }
 
-    /// The user is unsure — default to shim.
+    /// The user is unsure. Preserve uncertainty and require a fresh probe/manual review.
     pub fn choose_unsure(&mut self) {
-        self.current_step = SecureBootGuideStep::Confirmed {
-            method: SecureBootMethod::UseShim,
-        };
-        self.user_confirmed = true;
+        self.current_step = SecureBootGuideStep::ManualVerificationRequired;
+        self.user_confirmed = false;
     }
 
     /// Confirm an explicitly selected Secure Boot path.
@@ -382,7 +382,13 @@ impl SecureBootGuide {
         let method = match &self.current_step {
             SecureBootGuideStep::BiosDisableGuide { .. } => SecureBootMethod::Disabled,
             SecureBootGuideStep::MokExplanation => SecureBootMethod::MokEnrollment,
+            SecureBootGuideStep::Confirmed { method: SecureBootMethod::UseShim } => {
+                return Err("an unresolved Secure Boot choice cannot be confirmed");
+            }
             SecureBootGuideStep::Confirmed { method } => *method,
+            SecureBootGuideStep::ManualVerificationRequired => {
+                return Err("Secure Boot state is unresolved; repeat the probe or explicitly resolve it before confirmation");
+            }
             SecureBootGuideStep::InitialQuery => {
                 return Err("Secure Boot method must be explicitly selected before confirmation");
             }
@@ -460,6 +466,12 @@ fn narration_for_step(step: &SecureBootGuideStep) -> Vec<String> {
             lines
         }
 
+        SecureBootGuideStep::ManualVerificationRequired => vec![
+            "The current Secure Boot state is unresolved. I will not treat uncertainty as consent.",
+            "Repeat the target-side firmware probe or follow the exact device instructions to establish the current state.",
+            "No key generation, firmware enrollment, or trust-configuration change is authorized from this answer.",
+            "Return to the guide only after the state and recovery path are understood.",
+        ],
         SecureBootGuideStep::MokExplanation => vec![
             "There is a more sovereign path. Rather than disabling Secure Boot \
              entirely, you can enroll my cryptographic key directly into your \
@@ -964,21 +976,38 @@ impl SecureBootOrchestration {
     }
 
     /// Apply the result of the Socratic guide (USB Forge mode).
-    pub fn apply_guide_result(&mut self, method: SecureBootMethod) {
-        // Called only after the user explicitly selects a method. Probe results alone never authorize configuration generation.
-        self.configuration_authorized = true;
+    pub fn apply_guide_result(&mut self, method: SecureBootMethod) -> Result<(), &'static str> {
+        // Called only after an explicit selection. A legacy unresolved option must
+        // never become consent to configure a boot trust chain.
+        self.configuration_authorized = false;
         match method {
+            SecureBootMethod::UseShim => {
+                self.lanzaboote = LanzabooteConfig::for_disabled_secure_boot();
+                self.enrollment_guide = None;
+                self.boot_chain = Some(indeterminate_boot_chain(
+                    "the legacy unsure/shim option is not an explicit Secure Boot method",
+                ));
+                return Err("the unresolved UseShim choice cannot authorize configuration; repeat the probe or choose a concrete method");
+            }
             SecureBootMethod::Disabled | SecureBootMethod::AlreadyOff => {
                 self.lanzaboote = LanzabooteConfig::for_disabled_secure_boot();
                 self.enrollment_guide = None;
-                self.boot_chain = Some(BootChainStatus::sovereign_boot_chain(&SecureBootState::Disabled, &self.lanzaboote));
+                self.boot_chain = Some(BootChainStatus::sovereign_boot_chain(
+                    &SecureBootState::Disabled,
+                    &self.lanzaboote,
+                ));
             }
-            SecureBootMethod::MokEnrollment | SecureBootMethod::UseShim => {
+            SecureBootMethod::MokEnrollment => {
                 self.lanzaboote = LanzabooteConfig::for_secure_boot();
                 self.enrollment_guide = Some(SecureBootEnrollmentGuide::new());
-                self.boot_chain = Some(BootChainStatus::sovereign_boot_chain(&SecureBootState::SetupMode, &self.lanzaboote));
+                self.boot_chain = Some(BootChainStatus::sovereign_boot_chain(
+                    &SecureBootState::SetupMode,
+                    &self.lanzaboote,
+                ));
             }
         }
+        self.configuration_authorized = true;
+        Ok(())
     }
 
     /// Generate the complete Nix configuration for Secure Boot support.
@@ -1373,6 +1402,25 @@ mod tests {
     }
 
     #[test]
+    fn test_socratic_guide_unsure_remains_unconfirmed() {
+        let mut guide = SecureBootGuide::new();
+        guide.choose_unsure();
+        assert_eq!(guide.current_step, SecureBootGuideStep::ManualVerificationRequired);
+        assert!(!guide.user_confirmed);
+        assert!(guide.confirm().is_err());
+    }
+
+    #[test]
+    fn test_legacy_use_shim_cannot_authorize_configuration() {
+        let mut orch = SecureBootOrchestration::new();
+        assert!(orch.apply_guide_result(SecureBootMethod::UseShim).is_err());
+        assert!(!orch.configuration_authorized);
+        assert!(orch.generate_nix_config().is_err());
+        assert!(orch.boot_chain.as_ref().unwrap().stages.iter()
+            .all(|stage| matches!(stage.status, BootStageStatus::Indeterminate { .. })));
+    }
+
+    #[test]
     fn test_socratic_guide_rejects_confirmation_without_an_explicit_choice() {
         let mut guide = SecureBootGuide::new();
         let original_step = guide.current_step.clone();
@@ -1465,7 +1513,7 @@ mod tests {
     #[test]
     fn test_orchestration_generate_nix() {
         let mut orch = SecureBootOrchestration::new();
-        orch.apply_guide_result(SecureBootMethod::MokEnrollment);
+        orch.apply_guide_result(SecureBootMethod::MokEnrollment).expect("explicit enrollment selection");
 
         let (lanzaboote_nix, key_nix) = orch.generate_nix_config().expect("explicit guide choice authorizes configuration");
         assert!(lanzaboote_nix.contains("lanzaboote"));
@@ -1502,7 +1550,7 @@ mod tests {
     #[test]
     fn test_orchestration_generate_nix_disabled() {
         let mut orch = SecureBootOrchestration::new();
-        orch.apply_guide_result(SecureBootMethod::AlreadyOff);
+        orch.apply_guide_result(SecureBootMethod::AlreadyOff).expect("explicit non-Secure-Boot selection");
 
         let (lanzaboote_nix, key_nix) = orch.generate_nix_config().expect("explicit guide choice authorizes configuration");
         assert!(lanzaboote_nix.contains("systemd-boot.enable = true"));
