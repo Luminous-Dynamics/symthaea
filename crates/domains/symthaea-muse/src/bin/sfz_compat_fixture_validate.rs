@@ -44,6 +44,7 @@ struct FixtureRecordV1 {
     sample_assets: Vec<AssetRecordV1>,
     timeline: Vec<TimelineExpectationV1>,
     negative_control: bool,
+    unsupported_semantics: Vec<String>,
 }
 
 #[derive(Debug, Deserialize)]
@@ -343,6 +344,25 @@ fn validate_fixture(
         .as_ref()
         .map(|value| value.unhandled_opcodes.clone())
         .unwrap_or_default();
+    for semantic in &fixture.unsupported_semantics {
+        let opcode = if let Some((key, _)) = semantic.split_once('=') {
+            Some(key)
+        } else if !semantic.is_empty()
+            && !semantic.chars().any(char::is_whitespace)
+            && semantic.chars().all(|character| character.is_ascii_alphanumeric() || character == '_')
+        {
+            Some(semantic.as_str())
+        } else {
+            None
+        };
+        if let Some(opcode) = opcode {
+            if !unhandled_opcodes.iter().any(|actual| actual == opcode) {
+                failures.push(format!(
+                    "declared unsupported opcode {opcode:?} was not reported as unhandled by the parser"
+                ));
+            }
+        }
+    }
     let mut timeline_checks = Vec::with_capacity(fixture.timeline.len());
     if let Some(manifest) = manifest.as_ref() {
         let timeline_results = validate_timeline(manifest, &fixture.timeline);
@@ -546,10 +566,10 @@ fn wav_header_matches(bytes: &[u8], asset: &AssetRecordV1) -> bool {
     }
 
     if bytes.len() < 44
-        || bytes.get(0..4) != Some(b"RIFF")
-        || bytes.get(8..12) != Some(b"WAVE")
-        || bytes.get(12..16) != Some(b"fmt ")
-        || bytes.get(36..40) != Some(b"data")
+        || bytes.get(0..4) != Some(&b"RIFF"[..])
+        || bytes.get(8..12) != Some(&b"WAVE"[..])
+        || bytes.get(12..16) != Some(&b"fmt "[..])
+        || bytes.get(36..40) != Some(&b"data"[..])
     {
         return false;
     }
