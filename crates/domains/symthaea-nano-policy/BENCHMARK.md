@@ -1,0 +1,134 @@
+# Nano Policy Kernel — Benchmark Contract
+
+**Status:** Preregistered evaluation plan for the selector kernel; no measurements have been run.  
+**Implementation:** [symthaea-nano-policy](./README.md)  
+**MOCLIP domain plan:** https://github.com/Luminous-Dynamics/symthaea/blob/research/nano-001-atomistic-discovery/docs/engineering/NANOPHOTONICS_MOCLIP_BENCHMARK_SCORECARD.md  
+**General benchmark charter:** https://github.com/Luminous-Dynamics/symthaea/blob/research/nano-001-atomistic-discovery/docs/engineering/NANOTECHNOLOGY_BENCHMARK_CHARTER.md
+
+## 1. What this kernel can and cannot establish
+
+The crate implements three selector policies over a supplied, frozen descriptor pool: seeded random, farthest-first, and family-balanced farthest-first. It is not an atomistic or electromagnetic predictor; it does not query an oracle; and it has no HDC/FEP integration yet.
+
+The tests establish contract behavior only when executed. They cannot establish that descriptor-space diversity maps to physical utility. That must be measured using held-out outcomes in an appropriate external benchmark.
+
+## 2. Tiered acceptance plan
+
+### T0 — Contract and provenance
+
+- Exact feature/preprocessing contract is frozen and identified by SHA-256.
+- All feature transforms are fitted only on the permitted training partition.
+- Each candidate has a stable ID; duplicates and missing family lineage are handled explicitly upstream.
+- Target spectra/energies, oracle results, predictions, official split labels and post-outcome data are absent from the request.
+- All source/data/model rights and artifact identities are recorded externally.
+
+**Gate:** any target leakage, unresolved use-rights blocker, unaccounted candidate or ambiguous transform blocks a scientific comparison.
+
+### T1 — Deterministic software invariants
+
+The dedicated Rust unit tests cover:
+- no duplicate IDs in selected candidates and no selection count above budget;
+- repeatability for a fixed random seed and input;
+- deterministic farthest-first behavior independent of input-row ordering;
+- expected family spread from the group-balanced policy;
+- rejection of duplicate IDs, dimension mismatch, out-of-range/non-finite features and zero budgets;
+- rejection of unrecognized fields, including a target-energy field;
+- one-line request digesting and an end-to-end checked-in fixture.
+
+**Execution status:** these tests are authored but have not yet run in the current environment because cargo/rustc are not installed locally. Treat the focused workflow result separately; queued or skipped remains unverified.
+
+### T2 — Algorithm smoke/performance
+
+Use a clearly labelled synthetic descriptor fixture (no material claim) to compare:
+- 2,000 candidates × 64 dimensions with budgets 10, 100 and 250;
+- up to 10,000 candidates × 128 dimensions with budgets 10, 100 and 250, subject to explicit resource caps.
+
+Record exact CPU, runtime/toolchain, input digest, feature-contract digest, wall time, and peak RSS. Proposed engineering guardrail for the larger smoke case: p95 selector latency <=5 seconds on a named reference CPU, with all selected IDs unique and within the requested budget. This is a proposed feasibility threshold, not an achieved measurement and not a scientific quality target.
+
+For reproducibility, run identical inputs twice and compare full responses after verifying the same request digest. Permuting candidate row order should not affect farthest-first selected IDs. The seeded random policy should be stable for a fixed candidate set, seed and implementation revision.
+
+### T3 — Domain-specific decision utility
+
+Do not use synthetic target scores as evidence for nanotechnology. Choose one real task only after source/data rights, official split/lineage and baseline are established.
+
+**For MOCLIP-like photonics**
+- Freeze geometry/structure inputs, target spectra, wavelength grid, polarizations, units, normalization, official split membership and query budget.
+- Prefer held-out *target queries* and candidate geometries with mapped official train/validation/test assignment. The public 10k subset is not an official holdout until each row is mapped.
+- Compare random selection, nearest spectral-library retrieval (if allowed), the relevant published MOCLIP/adjoint baseline, farthest-first, family-balanced farthest-first, and a future Symthaea-specific policy.
+- Use one preregistered primary outcome: Success@K under the fixed spectral-MSE/constraint threshold, or best-so-far spectral MSE at a fixed evaluation budget.
+- Re-simulate finalist designs with an independently pinned forward solver and track robustness under frozen geometry/wavelength perturbations.
+
+**For MADE convex-hull discovery**
+- Use the exact pinned MADE environment/oracle and source-defined discovery metrics.
+- Keep policy-visible candidate features separate from hidden stability labels/convex-hull outcomes.
+- Count invalid/duplicate candidates and oracle queries against every arm's budget.
+- Report only results for the tested MADE task; this is not an OC22 or optical benchmark.
+
+Never compare MOCLIP spectral MSE with MADE discovery counts or treat one as an aggregate cross-domain score.
+
+## 3. Metrics
+
+### Contract metrics (software)
+
+- invalid-request rejection rate and error category;
+- selected count and budget compliance;
+- unique-ID rate (target 100%);
+- deterministic replay rate (target 100% for identical request bytes and revision);
+- input receipt verification rate (target 100%);
+- p50/p95 selection latency and peak RSS.
+
+### Descriptor diagnostics (not scientific outcomes)
+
+- minimum pairwise descriptor distance among selected candidates;
+- representation-space coverage and redundancy;
+- number of declared families represented;
+- family-count entropy or imbalance when family lineage is reliable.
+
+These diagnose what a policy optimizes. They are not a proxy for energy, spectral performance, novelty, safety, or synthesizability.
+
+### Scientific outcome metrics (domain-specific)
+
+- **Photonics:** Success@K, wavelength/polarization-aware spectrum error, robustness under geometry perturbation, cost per valid design.
+- **MADE:** source-implemented discovery curves and budgeted discovery utility, independently recomputed from trajectory receipts.
+- **Other domains:** task-specific metrics and units only; define them in their own scorecard before scoring.
+
+## 4. Statistical protocol
+
+- Random baseline: at least 30 fixed preregistered seeds when the system/oracle cost permits; retain every seed's outcome.
+- Deterministic selectors: use multiple independent systems/target queries and group-aware bootstrap; repeat identical requests for software determinism, not as pseudo-replicates.
+- Confidence intervals must resample the true independent unit (e.g. geometry family, chemistry system, batch, device, or target query), not correlated rows alone.
+- Do not tune the descriptor transform, budget, policy parameters or primary metric against the final holdout.
+- Report the whole budget curve when possible; do not report only the best final point.
+
+## 5. Proposed go/no-go rule
+
+For a genuine task that supports budgeted selection, compare the best Symthaea policy against the strongest eligible baseline under equal information, oracle/query budget, time constraints and candidate pool.
+
+Provisional threshold: +5 percentage points in a preregistered success-at-budget metric **or** at least 20% lower median best-achieved error/cost, with a group-aware 95% confidence interval excluding no improvement, no leakage-control failure, and 100% reconstructible scored-run receipts. These are pilot targets, not universal standards; lock the primary metric, practical margin and sample/power rationale before opening the holdout.
+
+If the policy only increases descriptor-space distance or family coverage but does not improve the task-specific outcome, report a diversity result—not a discovery improvement.
+
+## 6. Negative controls
+
+- Add a forbidden target label to a request: deserialization must reject it.
+- Permute descriptor dimensions or shuffle descriptor rows under a frozen recipe: any outcome improvement should disappear or be explicitly investigated.
+- Permute family IDs: family-balanced gains should weaken if family metadata was doing meaningful work.
+- Inject duplicate candidates: the input contract should reject duplicate IDs; upstream structure-equivalent duplicates need their own canonicalization report.
+- Hide/reveal-label canary in the benchmark adapter: selector must not change before the oracle reveals the result.
+- Enforce the exact same query budget and charge all failed/invalid/duplicate attempts as declared in the benchmark protocol.
+
+## 7. Future Symthaea-specific arm
+
+Only after the simple baselines are executed:
+1. define a versioned HDC/active-inference policy implementation that uses permitted descriptor or metadata fields;
+2. freeze the representation/model/source hash and its training exposure;
+3. compare with the same pool, query budget and baseline selectors;
+4. ablate that one Symthaea component;
+5. use an independent checker to recompute outcomes from frozen requests/observations.
+
+Do not label the present max-min selector as “Symthaea intelligence”; it is a deterministic baseline kernel intended to make future contributions falsifiable.
+
+## 8. Current status
+
+- Source files, request JSON Schema, JSONL fixture, Cargo.lock entry and focused CI workflow are committed on the draft PR branch.
+- The test definitions and fixture are not yet executed locally; no Rust compiler is installed in the current environment.
+- The focused workflow was observed queued at the last status check, while unrelated repository workflows were skipped. No pass is claimed.
