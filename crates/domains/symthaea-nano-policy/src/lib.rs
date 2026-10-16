@@ -212,7 +212,7 @@ pub fn handle_line(line: &str) -> String {
     }
 
     match serde_json::from_str::<SelectionRequest>(line) {
-        Ok(request) => match select(request, &digest) {
+        Ok(request) => match select(request, line.as_bytes()) {
             Ok(response) => serde_json::to_string(&response)
                 .unwrap_or_else(|_| fallback_error_json(&digest)),
             Err(error) => error_json(&digest, &error),
@@ -245,9 +245,10 @@ fn fallback_error_json(digest: &str) -> String {
 /// consulted by any policy implemented here.
 pub fn select(
     request: SelectionRequest,
-    request_sha256: &str,
+    request_bytes: &[u8],
 ) -> Result<SelectionResponse, SelectionError> {
     validate(&request)?;
+    let request_sha256 = sha256_hex(request_bytes);
 
     let mut sorted: Vec<usize> = (0..request.candidates.len()).collect();
     sorted.sort_by(|a, b| {
@@ -269,7 +270,7 @@ pub fn select(
         schema_version: SCHEMA_VERSION.to_owned(),
         status: "completed".to_owned(),
         policy: request.policy,
-        request_sha256: request_sha256.to_owned(),
+        request_sha256: request_sha256.clone(),
         feature_contract_sha256: request.feature_contract_sha256,
         candidate_count: request.candidates.len(),
         requested_budget: request.budget,
@@ -604,7 +605,8 @@ mod tests {
 
     #[test]
     fn farthest_first_selects_distant_candidates() {
-        let result = select(request(Policy::FarthestFirst, 2), &"b".repeat(64)).unwrap();
+        let request_bytes = b"farthest-first-test";
+        let result = select(request(Policy::FarthestFirst, 2), request_bytes).unwrap();
         assert_eq!(result.selected_count, 2);
         assert_eq!(result.selected[0].candidate_id, "candidate-a");
         assert_eq!(result.selected[1].candidate_id, "candidate-c");
@@ -614,8 +616,8 @@ mod tests {
     #[test]
     fn random_policy_is_repeatable_and_without_replacement() {
         let req = request(Policy::RandomSeeded, 3);
-        let first = select(req.clone(), &"c".repeat(64)).unwrap();
-        let second = select(req, &"c".repeat(64)).unwrap();
+        let first = select(req.clone(), b"random-test").unwrap();
+        let second = select(req, b"random-test").unwrap();
         assert_eq!(first, second);
         let ids: BTreeSet<_> = first.selected.iter().map(|item| item.candidate_id.as_str()).collect();
         assert_eq!(ids.len(), first.selected_count);
@@ -623,7 +625,7 @@ mod tests {
 
     #[test]
     fn group_balanced_policy_spreads_across_families() {
-        let result = select(request(Policy::GroupBalancedFarthestFirst, 3), &"d".repeat(64)).unwrap();
+        let result = select(request(Policy::GroupBalancedFarthestFirst, 3), b"group-test").unwrap();
         let family_count = result.selected.iter().map(|item| item.family_id.as_str()).collect::<BTreeSet<_>>();
         assert_eq!(family_count.len(), 3);
     }
@@ -633,8 +635,8 @@ mod tests {
         let first_req = request(Policy::FarthestFirst, 3);
         let mut second_req = first_req.clone();
         second_req.candidates.reverse();
-        let first = select(first_req, &"e".repeat(64)).unwrap();
-        let second = select(second_req, &"f".repeat(64)).unwrap();
+        let first = select(first_req, b"order-test-one").unwrap();
+        let second = select(second_req, b"order-test-two").unwrap();
         let first_ids: Vec<_> = first.selected.iter().map(|item| item.candidate_id.clone()).collect();
         let second_ids: Vec<_> = second.selected.iter().map(|item| item.candidate_id.clone()).collect();
         assert_eq!(first_ids, second_ids);
