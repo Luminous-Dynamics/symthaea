@@ -1714,6 +1714,40 @@ mod tests {
         }
     }
 
+    fn exhaustive_relation_conflicts_for_test<'a>(
+        queries: &[RelationObservationQuery],
+        facts: impl Iterator<Item = &'a TemporalFact>,
+    ) -> Vec<RelationConflictEvidence> {
+        let facts: Vec<&TemporalFact> = facts.collect();
+        let mut conflicts = Vec::new();
+        for (query_index, query) in queries.iter().enumerate() {
+            for fact in &facts {
+                for (stored_relation_index, stored) in fact.encoding.relations.iter().enumerate() {
+                    if same_relation_except_polarity(query, stored) {
+                        conflicts.push(RelationConflictEvidence {
+                            query_index,
+                            conflicting_fact_id: fact.id,
+                            stored_relation_index,
+                            subject: stored.subject.clone(),
+                            predicate: stored.predicate.clone(),
+                            object: stored.object.clone(),
+                            source_text: fact.encoding.source_text.clone(),
+                            query_is_negated: query.is_negated,
+                            stored_is_negated: stored.is_negated,
+                        });
+                    }
+                }
+            }
+        }
+        conflicts.sort_by(|a, b| {
+            a.query_index
+                .cmp(&b.query_index)
+                .then_with(|| a.conflicting_fact_id.cmp(&b.conflicting_fact_id))
+                .then_with(|| a.stored_relation_index.cmp(&b.stored_relation_index))
+        });
+        conflicts
+    }
+
     #[test]
     fn test_insert_and_search() {
         let mut graph = EnhancedKnowledgeGraph::new(100);
@@ -2924,6 +2958,221 @@ mod tests {
             RelationConstraintDecision::EligibleForReview
         );
         assert!(positive_result.abstention_reasons.is_empty());
+    }
+
+    #[test]
+    fn test_indexed_relation_conflict_scan_matches_exhaustive_oracle() {
+        let make_relation = |subject: &str,
+                             predicate: &str,
+                             object: &str,
+                             subject_role: SemanticRole,
+                             object_role: SemanticRole,
+                             is_causal: bool,
+                             is_negated: bool| ExtractedRelation {
+            subject: subject.to_string(),
+            predicate: predicate.to_string(),
+            object: object.to_string(),
+            subject_role,
+            object_role,
+            is_causal,
+            is_negated,
+            confidence: 0.9,
+        };
+
+        let fixtures = vec![
+            (
+                "source-one",
+                vec![
+                    make_relation("Alpha", "prevents", "Beta", SemanticRole::Agent, SemanticRole::Patient, true, false),
+                    make_relation("alpha", "PREVENTS", "beta", SemanticRole::Agent, SemanticRole::Patient, true, true),
+                ],
+            ),
+            (
+                "source-two",
+                vec![make_relation("Beta", "prevents", "Alpha", SemanticRole::Patient, SemanticRole::Agent, true, true)],
+            ),
+            (
+                "wrong-roles",
+                vec![make_relation("Alpha", "prevents", "Beta", SemanticRole::Patient, SemanticRole::Agent, true, true)],
+            ),
+            (
+                "different-predicate",
+                vec![make_relation("Alpha", "causes", "Beta", SemanticRole::Agent, SemanticRole::Patient, true, false)],
+            ),
+            (
+                "different-causality",
+                vec![make_relation("Alpha", "prevents", "Beta", SemanticRole::Agent, SemanticRole::Patient, false, true)],
+            ),
+        ];
+
+        // Insert explicit facts directly to avoid corroboration/eviction behavior
+        // becoming part of this helper-parity test.
+        let mut graph = EnhancedKnowledgeGraph::new(16);
+        for (offset, (source_text, relations)) in fixtures.into_iter().enumerate() {
+            let id = offset as u64 + 1;
+            let encoding = FactEncoding {
+                vector: BinaryHV::random(20_000 + id),
+                role_vectors: HashMap::new(),
+                role_vector_observations: Vec::new(),
+                relations,
+                source_text: source_text.to_string(),
+                confidence: 0.8,
+            };
+            graph.facts.insert(
+                id,
+                TemporalFact {
+                    id,
+                    encoding,
+                    inserted_at_cycle: 1,
+                    last_accessed_cycle: 1,
+                    confidence: 0.8,
+                    initial_confidence: 0.8,
+                    corroboration_count: 0,
+                    contradiction_count: 0,
+                    domain: None,
+                    has_causal_relations: true,
+                },
+            );
+        }
+        graph.next_id = 6;
+
+        let queries = [
+            RelationObservationQuery {
+                subject: " ALPHA ".into(),
+                predicate: "PREVENTS".into(),
+                object: " beta ".into(),
+                subject_role: SemanticRole::Agent,
+                object_role: SemanticRole::Patient,
+                is_causal: true,
+                is_negated: false,
+            },
+            RelationObservationQuery {
+                subject: "alpha".into(),
+                predicate: "prevents".into(),
+                object: "beta".into(),
+                subject_role: SemanticRole::Agent,
+                object_role: SemanticRole::Patient,
+                is_causal: true,
+                is_negated: true,
+            },
+            RelationObservationQuery {
+                subject: "beta".into(),
+                predicate: "prevents".into(),
+                object: "alpha".into(),
+                subject_role: SemanticRole::Patient,
+                object_role: SemanticRole::Agent,
+                is_causal: true,
+                is_negated: false,
+            },
+            RelationObservationQuery {
+                subject: "alpha".into(),
+                predicate: "causes".into(),
+                object: "beta".into(),
+                subject_role: SemanticRole::Agent,
+                object_role: SemanticRole::Patient,
+                is_causal: true,
+                is_negated: true,
+            },
+            RelationObservationQuery {
+                subject: "alpha".into(),
+                predicate: "prevents".into(),
+                object: "beta".into(),
+                subject_role: SemanticRole::Context,
+                object_role: SemanticRole::Patient,
+                is_causal: true,
+                is_negated: false,
+            },
+        ];
+
+        let indexed = find_relation_conflicts(&queries, graph.facts.values());
+        let exhaustive = exhaustive_relation_conflicts_for_test(&queries, graph.facts.values());
+        assert_eq!(indexed, exhaustive);
+        assert_eq!(indexed.len(), 4);
+        assert_eq!(
+            indexed.iter().map(|item| (item.query_index, item.conflicting_fact_id, item.stored_relation_index)).collect::<Vec<_>>(),
+            vec![(0, 1, 1), (1, 1, 0), (2, 2, 0), (3, 4, 0)]
+        );
+    }
+
+    #[test]
+    #[ignore = "manual non-gating relation conflict index comparison; run with --ignored --nocapture --release"]
+    fn benchmark_indexed_vs_exhaustive_relation_conflict_scan() {
+        use std::time::Instant;
+
+        for fact_count in [1_000usize, 10_000usize] {
+            let mut facts = Vec::with_capacity(fact_count);
+            for index in 0..fact_count {
+                let id = index as u64 + 1;
+                let relation = ExtractedRelation {
+                    subject: format!("benchmark-subject-{index}"),
+                    predicate: "references".into(),
+                    object: format!("benchmark-object-{index}"),
+                    subject_role: SemanticRole::Agent,
+                    object_role: SemanticRole::Patient,
+                    is_causal: false,
+                    is_negated: false,
+                    confidence: 0.8,
+                };
+                facts.push(TemporalFact {
+                    id,
+                    encoding: FactEncoding {
+                        vector: BinaryHV::random(id + 33_000),
+                        role_vectors: HashMap::new(),
+                        role_vector_observations: Vec::new(),
+                        relations: vec![relation],
+                        source_text: format!("benchmark-source-{index}"),
+                        confidence: 0.8,
+                    },
+                    inserted_at_cycle: 1,
+                    last_accessed_cycle: 1,
+                    confidence: 0.8,
+                    initial_confidence: 0.8,
+                    corroboration_count: 0,
+                    contradiction_count: 0,
+                    domain: None,
+                    has_causal_relations: false,
+                });
+            }
+
+            for query_size in [1usize, 2, 4] {
+                let queries: Vec<_> = (0..query_size)
+                    .map(|index| RelationObservationQuery {
+                        subject: format!("probe-subject-{index}"),
+                        predicate: "references".into(),
+                        object: format!("probe-object-{index}"),
+                        subject_role: SemanticRole::Agent,
+                        object_role: SemanticRole::Patient,
+                        is_causal: false,
+                        is_negated: true,
+                    })
+                    .collect();
+                let indexed_result = find_relation_conflicts(&queries, facts.iter());
+                let exhaustive_result =
+                    exhaustive_relation_conflicts_for_test(&queries, facts.iter());
+                assert_eq!(indexed_result, exhaustive_result);
+
+                let mut indexed_micros = Vec::with_capacity(7);
+                let mut exhaustive_micros = Vec::with_capacity(7);
+                for _ in 0..7 {
+                    let start = Instant::now();
+                    let _ = find_relation_conflicts(&queries, facts.iter());
+                    indexed_micros.push(start.elapsed().as_micros());
+
+                    let start = Instant::now();
+                    let _ = exhaustive_relation_conflicts_for_test(&queries, facts.iter());
+                    exhaustive_micros.push(start.elapsed().as_micros());
+                }
+                indexed_micros.sort_unstable();
+                exhaustive_micros.sort_unstable();
+                println!(
+                    "relation-conflict scan: facts={fact_count}, constraints={query_size}, indexed_p50_us={}, indexed_max_us={}, exhaustive_p50_us={}, exhaustive_max_us={}",
+                    indexed_micros[3],
+                    indexed_micros[6],
+                    exhaustive_micros[3],
+                    exhaustive_micros[6]
+                );
+            }
+        }
     }
 
     #[test]
