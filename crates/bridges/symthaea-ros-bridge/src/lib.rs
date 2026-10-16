@@ -552,7 +552,11 @@ impl RosBridgeNode {
         Ok(())
     }
 
-    /// Publish a joint trajectory command to the robot, applying gain scheduling and safety interlocks.
+    /// Submit a joint trajectory through the live ROS publisher, applying gain scheduling and safety interlocks.
+    ///
+    /// A successful return means only that the local ROS publisher accepted the
+    /// message. It does not prove subscriber delivery, controller acceptance,
+    /// actuator latch, or physical movement.
     pub fn publish_trajectory(
         &self,
         mut command: RosTrajectoryCommand,
@@ -833,11 +837,36 @@ mod tests {
         }
     }
 
+    #[cfg(feature = "ros2")]
+    #[test]
+    fn ros2_build_without_live_publisher_rejects_trajectory() {
+        let mut node = RosBridgeNode::new(RosBridgeConfig::default());
+        // Simulate inconsistent lifecycle state without constructing ROS context.
+        node.is_running = true;
+        node.trajectory_pub = None;
+
+        let command = RosTrajectoryCommand {
+            joint_names: vec!["joint_1".into()],
+            points: vec![RosTrajectoryPoint {
+                positions: vec![0.0],
+                velocities: Vec::new(),
+                efforts: vec![0.0],
+                time_from_start_ns: 1_000_000,
+            }],
+        };
+
+        assert!(matches!(
+            node.publish_trajectory(command),
+            Err(RosBridgeError::RosTransportUnavailable)
+        ));
+    }
+
     #[cfg(not(feature = "ros2"))]
     #[test]
     fn telemetry_only_build_rejects_robot_trajectory_publication() {
         let mut node = RosBridgeNode::new(RosBridgeConfig::default());
-        node.init().unwrap();
+        // Isolate command-path behavior without starting a telemetry server.
+        node.is_running = true;
 
         let command = RosTrajectoryCommand {
             joint_names: vec!["joint_1".into()],
