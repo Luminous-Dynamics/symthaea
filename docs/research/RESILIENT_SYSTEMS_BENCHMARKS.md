@@ -253,6 +253,7 @@ Scenario weights must sum to one, but they are **not probabilities** unless just
 - **DUR-04 — Dependency delay:** a slower prerequisite delays dependent restoration.
 - **DUR-05 — Valid scenario weights:** invalid, missing, repeated or unknown duration records fail closed.
 - **DUR-06 — Determinism:** identical scenarios and nominal inputs reproduce identical policy-risk summaries.
+- **DUR-08 — Crew readiness:** scenario replay preserves a crew's declared initial availability time.
 - **DUR-07 — Risk-report completeness:** expected, worst-case and CVaR results all accompany per-scenario traces; no summary silently replaces the details.
 
 ### Targets and limits
@@ -261,7 +262,7 @@ Scenario weights must sum to one, but they are **not probabilities** unless just
 - Include at least 3 duration scenarios per tiny fixture (ordinary, adverse and severe) when constructing a published stress set; use calibrated scenario weights only when historical data supports them.
 - Compare all three policies on identical scenarios and report expected loss, worst-case loss, CVaR, and scenario-by-scenario regret relative to the best *nonanticipative* plan found by an independent small-instance oracle.
 - Next, implement true rolling-horizon replanning as a separate policy class that may use only observations revealed up to the current step. Compare its regret, service-floor violations and action stability against the fixed-plan baseline.
-- Current module coverage is a starting point, not a validated uncertainty model. Scenario generation, uncertainty calibration, travel uncertainty and adaptive/online replanning remain future work.
+- Current module coverage is a starting point, not a validated uncertainty model. Scenario generation, uncertainty calibration, travel uncertainty and adaptive/online replanning remain future work. A proposed unmeasured target is 100 jobs, 20 crews and 20 duration scenarios under 1 second p95 on a documented release-build host; a 500-job/50-crew/100-scenario stress case targets under 15 seconds. Validate the harness and host before adopting either as a release gate.
 
 ## 8. Research references
 
