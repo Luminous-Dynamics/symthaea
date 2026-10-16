@@ -11,6 +11,11 @@
 //! weighted lost service through a horizon that exceeds every completion, provided
 //! all jobs start disrupted at step zero.
 //!
+//! In this narrow single-machine case, sorting by recovered-service weight divided
+//! by processing time is Smith's weighted-shortest-processing-time rule and is known
+//! to be optimal. The oracle independently checks implementation correctness and
+//! measures the other heuristics' gaps; it does not claim a new general solver.
+//!
 //! Enumerating all permutations is exponential (n!) and must stay restricted to
 //! small fixtures. The oracle is independent of the production list-scheduler code.
 
