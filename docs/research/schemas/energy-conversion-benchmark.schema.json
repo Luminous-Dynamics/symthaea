@@ -567,6 +567,8 @@
         "minimum_superiority_margin",
         "maximum_unmodeled_differential_bias_efficiency",
         "differential_bias_bound_basis",
+        "differential_bias_calibration_artifact_id",
+        "differential_bias_calibration_artifact_sha256",
         "baseline_id",
         "selection_rule",
         "search_started_at",
@@ -626,6 +628,15 @@
         "comparison_metric_id": {
           "const": "net_cycle_efficiency",
           "description": "Metric implemented by benchmark contract v1. Other metrics (e.g. heat-pump COP, specific fuel consumption, thrust-specific metrics) require their own registered metric definition and comparison implementation."
+        },
+        "differential_bias_calibration_artifact_id": {
+          "type": "string",
+          "minLength": 1,
+          "description": "Artifact ID for the calibration record; must match a data_provenance entry."
+        },
+        "differential_bias_calibration_artifact_sha256": {
+          "$ref": "#/$defs/sha256",
+          "description": "SHA-256 digest of the referenced calibration artifact. Record consistency is checked, but the verifier does not retrieve the artifact bytes."
         }
       }
     }
