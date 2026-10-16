@@ -68,6 +68,8 @@ pub struct SecureBootProfileApproval {
     pub firmware_revision: String,
     pub nixos_release: String,
     pub lanzaboote_revision: String,
+    /// Exact PKI bundle path approved for this profile.
+    pub pki_bundle: String,
     pub observed_secure_boot_state: String,
     pub hardware_profile_blake3: String,
     pub user_confirmed: bool,
@@ -98,6 +100,7 @@ impl SecureBootProfileApproval {
             ("firmware_revision", self.firmware_revision.as_str()),
             ("nixos_release", self.nixos_release.as_str()),
             ("lanzaboote_revision", self.lanzaboote_revision.as_str()),
+            ("pki_bundle", self.pki_bundle.as_str()),
         ] {
             if value.trim().is_empty() {
                 return Err(format!("{name} must be non-empty"));
@@ -105,6 +108,9 @@ impl SecureBootProfileApproval {
         }
         if !is_linux_target {
             return Err("Lanzaboote profile authorization requires an identified Linux target".to_string());
+        }
+        if self.pki_bundle != "/var/lib/sbctl" {
+            return Err("this qualification profile requires the shared /var/lib/sbctl key store".to_string());
         }
         if !matches!(observed_state, "Enabled" | "Disabled" | "SetupMode") {
             return Err("Secure Boot state is unresolved; repeat the probe before generating configuration".to_string());
@@ -1203,6 +1209,15 @@ impl SecureBootOrchestration {
         let approval = self.profile_approval.as_ref().ok_or_else(|| {
             "profile-qualified, same-session approval is required before generating Lanzaboote configuration".to_string()
         })?;
+        if !self.lanzaboote.enabled {
+            return Err("Lanzaboote must remain enabled for the explicit key-enrollment profile".to_string());
+        }
+        if !self.lanzaboote.generate_keys {
+            return Err("key generation is disabled; provide an independently verified existing-key profile or enable Lanzaboote key generation".to_string());
+        }
+        if self.lanzaboote.pki_dir != approval.pki_bundle {
+            return Err("the configured PKI bundle differs from the profile-approved key store".to_string());
+        }
         let state = self.current_observed_state().ok_or_else(|| {
             "current Secure Boot state is required before generating Lanzaboote configuration".to_string()
         })?;
@@ -1263,6 +1278,7 @@ mod tests {
             firmware_revision: "synthetic-firmware-1".to_string(),
             nixos_release: "nixos-unstable-test".to_string(),
             lanzaboote_revision: "synthetic-locked-revision".to_string(),
+            pki_bundle: "/var/lib/sbctl".to_string(),
             observed_secure_boot_state: state.to_string(),
             hardware_profile_blake3: fingerprint,
             user_confirmed: true,
@@ -1758,21 +1774,14 @@ mod tests {
     }
 
     #[test]
-    fn test_orchestration_respects_disabled_key_generation() {
+    fn test_orchestration_blocks_profile_when_key_generation_is_disabled() {
         let mut orch = SecureBootOrchestration::new();
-        orch.lanzaboote = LanzabooteConfig {
-            enabled: true,
-            pki_dir: "/var/lib/sbctl".to_string(),
-            generate_keys: false,
-            enrollment_required: false,
-        };
+        orch.record_manual_secure_boot_state(SecureBootState::SetupMode, TargetPlatform::Linux);
+        orch.apply_guide_result(SecureBootMethod::MokEnrollment).expect("explicit enrollment selection");
+        orch.lanzaboote.generate_keys = false;
         authorize_test_profile(&mut orch);
-
-        let (lanzaboote_nix, key_nix) = orch.generate_nix_config().expect("explicit guide choice authorizes configuration");
-        assert!(lanzaboote_nix.contains("pkiBundle = \"/var/lib/sbctl\""));
-        assert!(key_nix.is_empty());
+        assert!(orch.generate_nix_config().is_err());
     }
-
     #[test]
     fn test_orchestration_generate_nix_disabled() {
         let mut orch = SecureBootOrchestration::new();
