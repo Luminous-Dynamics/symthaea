@@ -123,7 +123,10 @@ pub fn validate_cases(cases: &[Case]) -> Result<(), String> {
             .contains(&case.expected_state.as_str())
             && (case.dispatch != "none" || case.reconcile != "no")
         {
-            return Err(format!("blocked case could dispatch or expects unsupported reconciliation: {}", case.id));
+            return Err(format!(
+                "blocked case could dispatch or expects unsupported reconciliation: {}",
+                case.id
+            ));
         }
         if case.expected_state == "outcome_unknown"
             && (case.dispatch != "may_have_occurred" || case.reconcile != "yes")
@@ -138,7 +141,10 @@ pub fn validate_cases(cases: &[Case]) -> Result<(), String> {
         if ["remote_rejected", "deduplicated"].contains(&case.expected_state.as_str())
             && (case.dispatch != "occurred" || case.reconcile != "no")
         {
-            return Err(format!("definitive transport result has inconsistent dispatch/reconciliation: {}", case.id));
+            return Err(format!(
+                "definitive transport result has inconsistent dispatch/reconciliation: {}",
+                case.id
+            ));
         }
         if [
             "observation_admitted",
