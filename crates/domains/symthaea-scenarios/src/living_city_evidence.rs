@@ -537,6 +537,91 @@ pub fn sha256_hex(bytes: &[u8]) -> String {
     format!("{:x}", Sha256::digest(bytes))
 }
 
+/// Stream SHA-256 over large retained artifacts without loading the whole
+/// file into memory. Suitable for large BIM, GIS and simulation result files.
+pub fn sha256_reader_hex<R: std::io::Read>(mut reader: R) -> std::io::Result<String> {
+    use sha2::{Digest, Sha256};
+
+    let mut hasher = Sha256::new();
+    let mut buffer = [0_u8; 64 * 1024];
+    loop {
+        let count = reader.read(&mut buffer)?;
+        if count == 0 {
+            break;
+        }
+        hasher.update(&buffer[..count]);
+    }
+    Ok(format!("{:x}", hasher.finalize()))
+}
+
+/// Compare independently recomputed digests for all available source items.
+/// Missing-source records remain explicit and are intentionally excluded from
+/// the digest map; whether a gap blocks a specific decision is controlled by its
+/// required verification gates.
+pub fn verify_manifest_source_digests(
+    manifest: &EvidenceManifest,
+    actual_sha256: &BTreeMap<String, String>,
+) -> Result<(), EvidenceContractError> {
+    manifest.validate()?;
+    let mut expected_ids = BTreeSet::new();
+    for item in &manifest.items {
+        if item.kind == EvidenceKind::Missing {
+            if actual_sha256.contains_key(&item.id) {
+                return Err(invalid(
+                    "source_digests",
+                    "digest supplied for an item explicitly declared missing",
+                ));
+            }
+            continue;
+        }
+        expected_ids.insert(item.id.as_str());
+        let expected = item
+            .content_sha256
+            .as_deref()
+            .ok_or_else(|| invalid("items.content_sha256", "source digest is required"))?;
+        validate_sha256("items.content_sha256", expected)?;
+        let actual = actual_sha256.get(&item.id).ok_or_else(|| {
+            invalid("source_digests", "recomputed digest missing for a manifest source")
+        })?;
+        validate_sha256("source_digests", actual)?;
+        if actual != expected {
+            return Err(invalid(
+                "items.content_sha256",
+                "recomputed source digest does not match manifest",
+            ));
+        }
+    }
+    if actual_sha256.keys().any(|id| !expected_ids.contains(id.as_str())) {
+        return Err(invalid("source_digests", "digest supplied for an unlisted source"));
+    }
+    Ok(())
+}
+
+/// Compare independently recomputed digests for every receipt output.
+pub fn verify_receipt_output_digests(
+    receipt: &ScenarioRunReceipt,
+    actual_sha256: &BTreeMap<String, String>,
+) -> Result<(), EvidenceContractError> {
+    receipt.validate()?;
+    let expected_ids: BTreeSet<&str> = receipt.outputs.iter().map(|item| item.id.as_str()).collect();
+    for artifact in &receipt.outputs {
+        let actual = actual_sha256.get(&artifact.id).ok_or_else(|| {
+            invalid("output_digests", "recomputed digest missing for a receipt output")
+        })?;
+        validate_sha256("output_digests", actual)?;
+        if actual != &artifact.sha256 {
+            return Err(invalid(
+                "outputs.sha256",
+                "recomputed output digest does not match receipt",
+            ));
+        }
+    }
+    if actual_sha256.keys().any(|id| !expected_ids.contains(id.as_str())) {
+        return Err(invalid("output_digests", "digest supplied for an unlisted output"));
+    }
+    Ok(())
+}
+
 /// Validate a manifest, then digest its canonical representation.
 pub fn evidence_manifest_sha256(
     manifest: &EvidenceManifest,
