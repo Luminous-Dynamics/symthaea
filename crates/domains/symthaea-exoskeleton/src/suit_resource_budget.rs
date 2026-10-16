@@ -226,7 +226,10 @@ pub fn evaluate_mission_resource_budget(
     tasks: &[MissionTaskRequirement],
     task_receipt: &MissionTaskReceipt,
     plan: &MissionResourceBudgetPlan,
-) -> Result<(MissionResourceBudgetReport, MissionResourceBudgetReceipt), MissionResourceBudgetError> {
+) -> Result<
+    (MissionResourceBudgetReport, MissionResourceBudgetReceipt),
+    MissionResourceBudgetError,
+> {
     validate_plan_structure(plan)?;
 
     let (task_report, recomputed_task_receipt) =
@@ -539,7 +542,9 @@ pub fn verify_mission_resource_budget_receipt(
     }
 }
 
-fn validate_plan_structure(plan: &MissionResourceBudgetPlan) -> Result<(), MissionResourceBudgetError> {
+fn validate_plan_structure(
+    plan: &MissionResourceBudgetPlan,
+) -> Result<(), MissionResourceBudgetError> {
     if plan.schema_version != 1 {
         return Err(MissionResourceBudgetError::UnsupportedSchemaVersion);
     }
@@ -1196,8 +1201,13 @@ mod tests {
             evidence_level: SuitEvidenceLevel::BenchTested,
             evidence_reference: "synthetic-demand-estimate:optional".into(),
         });
-        let (report, _) =
-            evaluate_mission_resource_budget(&configuration, &tasks, &new_task_receipt, &plan).unwrap();
+        let (report, _) = evaluate_mission_resource_budget(
+            &configuration,
+            &tasks,
+            &new_task_receipt,
+            &plan,
+        )
+        .unwrap();
         assert_eq!(report.status, MissionResourceBudgetStatus::Degraded);
         assert_eq!(report.pools[0].required_shortfall, 0);
         assert_eq!(report.pools[0].optional_shortfall, 180);
