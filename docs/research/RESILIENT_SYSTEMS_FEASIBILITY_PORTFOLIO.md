@@ -432,3 +432,14 @@ See the [resilience benchmarks and acceptance gates](./RESILIENT_SYSTEMS_BENCHMA
 - **Validation:** calibrate against observed service outage/recovery traces before making real-world predictions. Proposed target is at least three observed cases, with at least one held-out event and a simple baseline comparison.
 
 These are model-quality gates, not safety certification. Local environment lacked `cargo` and `rustc`, so the added Rust tests are authored but have not been executed locally. The current-head Actions status must be reported separately; skipped workflows are not passes.
+
+
+## Implementation update — finite shared-resource dynamics
+
+The branch now also includes [`resource_constrained_screening`](../../crates/domains/symthaea-engineering/src/resource_constrained_screening.rs), a deterministic Rust model where essential services consume finite shared inventories. Resources have initial stock, storage caps, replenishment per step, and supply-disruption/recovery events. Services have demand, capacity, dependencies, per-unit resource requirements and an explicit priority.
+
+This is a deliberate paradigm expansion: capacity is not enough if the energy, water, fuel, chemical, feedstock or other resource needed to deliver that capacity is unavailable. The module records per-service fulfillment and unmet demand as well as per-resource inventory, replenishment and consumption. It intentionally does not sum unlike service units into one “resilience” number.
+
+The policy and limitations are material: a deterministic priority order can starve lower-priority services; dependencies propagate the weakest upstream fulfillment fraction; only resource replenishment is interrupted by a resource-supply event; switching to substitutes, repair crew constraints and physical process laws are not yet modeled. These need explicit additional models and fixtures before the results can be used to predict a real settlement or supply network.
+
+The initial module contains 12 authored unit tests for finite stock, bounded replenishment, supply interruption, priority allocation, deterministic tie-breaking, dependency propagation, input validation and determinism. They are authored but have not been compiled or run in the current tool environment.
