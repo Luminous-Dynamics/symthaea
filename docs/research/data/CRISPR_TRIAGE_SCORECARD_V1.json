@@ -777,7 +777,7 @@
       },
       {
         "path": "scripts/crispr_selective_risk.rs",
-        "unit_test_count": 13,
+        "unit_test_count": 14,
         "suggested_command": "rustc --edition=2024 --test scripts/crispr_selective_risk.rs -o /tmp/crispr-selective-tests && /tmp/crispr-selective-tests",
         "execution_status": "not_compiled_rustc_unavailable_in_authoring_environment",
         "test_coverage_summary": [
@@ -881,9 +881,39 @@
       ]
     },
     "selective_risk_contract_check": {
-      "status": "pending_direct_contract_calculation",
-      "scope_limit": "Synthetic expected values can be checked independently; this does not prove Rust compilation, test execution, biological validation, or model improvement."
+      "status": "passed_direct_synthetic_calculation_only",
+      "executed_on": "2026-10-16",
+      "calculations": {
+        "f9_brier_score": 0.025,
+        "f9_five_bin_expected_calibration_error": 0.15,
+        "f9_full_coverage_observed_label_risk": 0.5,
+        "f9_full_coverage_error_rate_lower_bound": 0.3333333333333333,
+        "f9_full_coverage_error_rate_upper_bound": 0.6666666666666666,
+        "f9_equal_confidence_first_tier_accepted_count": 2
+      },
+      "result": "Direct arithmetic checks match the declared F9 expected values.",
+      "not_evidence_of": [
+        "Rust source compiling or unit tests passing",
+        "source cohort or publication metrics reproduced",
+        "biological validity or safety",
+        "candidate discovery beyond the declared universe",
+        "Symthaea performance improvement"
+      ]
     }
   },
-  "follow_on_issue": "https://github.com/Luminous-Dynamics/symthaea/issues/7571"
+  "follow_on_issue": "https://github.com/Luminous-Dynamics/symthaea/issues/7571",
+  "follow_on_issues": [
+    {
+      "id": "CRISPR-OT-002",
+      "number": 7571,
+      "url": "https://github.com/Luminous-Dynamics/symthaea/issues/7571",
+      "scope": "context-stratified Pareto frontier"
+    },
+    {
+      "id": "CRISPR-OT-003",
+      "number": 7580,
+      "url": "https://github.com/Luminous-Dynamics/symthaea/issues/7580",
+      "scope": "selective prediction and calibration"
+    }
+  ]
 }
