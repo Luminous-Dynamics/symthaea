@@ -46,7 +46,7 @@ pub struct OracleObservation {
     /// Task loss; required for evaluated attempts and forbidden for failed attempts.
     #[serde(default)]
     pub loss: Option<f64>,
-    /// Cost of the attempt in the ledger's single declared cost unit. Failed attempts count.
+    /// All-in cost for this selection/evaluation attempt in the ledger's one unit. Include selector/runtime and oracle costs when claiming end-to-end decision efficiency; failed attempts count.
     pub cost: f64,
 }
 
@@ -244,7 +244,7 @@ pub struct MetricComparison {
     pub comparison_arm_id: String,
     /// Compared metric.
     pub metric: ComparisonMetric,
-    /// Mean paired difference, weighting declared groups equally.
+    /// Mean paired difference over target queries; uncertainty resamples whole declared groups.
     pub estimated_delta: f64,
     /// Percentile 95% interval lower bound; null if groups are insufficient.
     pub confidence_interval_lower: Option<f64>,
@@ -755,13 +755,15 @@ fn compare_arms(
             .push(delta);
     }
 
-    let group_means: Vec<f64> = deltas_by_group
-        .values()
-        .map(|values| values.iter().sum::<f64>() / values.len() as f64)
-        .collect();
-    let estimated_delta = group_means.iter().sum::<f64>() / group_means.len() as f64;
+    let group_deltas: Vec<Vec<f64>> = deltas_by_group.into_values().collect();
+    let total_target_queries: usize = group_deltas.iter().map(Vec::len).sum();
+    let estimated_delta = group_deltas
+        .iter()
+        .flatten()
+        .sum::<f64>()
+        / total_target_queries as f64;
 
-    if group_means.len() < MIN_INDEPENDENT_GROUPS_FOR_INTERVAL {
+    if group_deltas.len() < MIN_INDEPENDENT_GROUPS_FOR_INTERVAL {
         return Ok(MetricComparison {
             baseline_arm_id: baseline_arm_id.to_string(),
             comparison_arm_id: candidate_arm_id.to_string(),
@@ -771,7 +773,7 @@ fn compare_arms(
             confidence_interval_upper: None,
             confidence_level: 0.95,
             practical_margin,
-            independent_group_count: group_means.len(),
+            independent_group_count: group_deltas.len(),
             bootstrap_replicates,
             disposition: ComparisonDisposition::InsufficientIndependentGroups,
         });
@@ -787,10 +789,13 @@ fn compare_arms(
     let mut sampled_means = Vec::with_capacity(bootstrap_replicates);
     for _ in 0..bootstrap_replicates {
         let mut sum = 0.0;
-        for _ in 0..group_means.len() {
-            sum += group_means[random.index(group_means.len())];
+        let mut sampled_target_count = 0usize;
+        for _ in 0..group_deltas.len() {
+            let sampled_group = &group_deltas[random.index(group_deltas.len())];
+            sum += sampled_group.iter().sum::<f64>();
+            sampled_target_count += sampled_group.len();
         }
-        sampled_means.push(sum / group_means.len() as f64);
+        sampled_means.push(sum / sampled_target_count as f64);
     }
     sampled_means.sort_by(f64::total_cmp);
     let last = sampled_means.len() - 1;
