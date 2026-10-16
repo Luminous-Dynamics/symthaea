@@ -7,7 +7,7 @@
 
 ## 1. What this kernel can and cannot establish
 
-The crate implements three selector policies over a supplied, frozen descriptor pool: seeded random, farthest-first, and family-balanced farthest-first. It is not an atomistic or electromagnetic predictor; it does not query an oracle; and it has no HDC/FEP integration yet.
+The crate implements four selector policies over a supplied, frozen descriptor pool: seeded random, farthest-first, family-balanced farthest-first, and cost-aware farthest-first. It is not an atomistic or electromagnetic predictor; it does not query an oracle; and it has no HDC/FEP integration yet.
 
 The tests establish contract behavior only when executed. They cannot establish that descriptor-space diversity maps to physical utility. That must be measured using held-out outcomes in an appropriate external benchmark.
 
@@ -29,6 +29,7 @@ The dedicated Rust unit tests cover:
 - no duplicate IDs in selected candidates and no selection count above budget;
 - repeatability for a fixed random seed and input;
 - deterministic farthest-first behavior independent of input-row ordering;
+- cost-aware anchor/selection behavior and missing/non-positive cost rejection;
 - expected family spread from the group-balanced policy;
 - rejection of duplicate IDs, dimension mismatch, out-of-range/non-finite features and zero budgets;
 - rejection of unrecognized fields, including a target-energy field;
@@ -143,9 +144,10 @@ Once a real task and data contract are admitted, extend the batch-policy compari
 1. random selection with preregistered seeds;
 2. deterministic farthest-first and family-balanced farthest-first;
 3. task-appropriate conventional selector (e.g. nearest-neighbour retrieval, expected improvement, uncertainty sampling, or adjoint optimizer);
-4. cost-aware acquisition where query costs can be measured and its utility model is frozen;
-5. one Symthaea-specific HDC/active-inference arm and a component ablation;
-6. leakage, shuffled-feature/family, duplicate, and hidden-label controls.
+4. cost-aware farthest-first as a transparent baseline when query costs are available and defensibly estimated;
+5. cost-aware active acquisition (e.g. cost-normalized expected improvement or expected value of information) where a suitable predictive model/cost model can be preregistered;
+6. one Symthaea-specific HDC/active-inference arm and a component ablation;
+7. leakage, shuffled-feature/family, duplicate, and hidden-label controls.
 
 Keep primary outcomes distinct:
 - **Discovery/selection:** success-at-budget, top-k regret/utility, best-so-far task loss, and cost to hit a predeclared goal.
