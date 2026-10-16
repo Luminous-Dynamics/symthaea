@@ -610,6 +610,47 @@ mod tests {
     }
 
     #[test]
+    fn validates_ten_thousand_recordings_with_disjoint_holdout_metadata() {
+        let mut corpus = manifest();
+        corpus.recordings.clear();
+        for index in 0..10_000_usize {
+            let sample_id = format!("sample-{index}");
+            let source_id = format!("source-{index}");
+            let split = if index % 2 == 0 {
+                BioacousticSplit::Train
+            } else {
+                BioacousticSplit::Test
+            };
+            let mut item = recording(
+                &sample_id,
+                'a',
+                &source_id,
+                split,
+                &format!("site-{index}"),
+                &format!("animal-{index}"),
+            );
+            item.content_sha256 = format!("{:064x}", index + 1);
+            item.session_id = Some(format!("session-{index}"));
+            item.annotations.clear();
+            corpus.recordings.push(item);
+        }
+
+        assert!(
+            validate_bioacoustic_corpus(
+                &corpus,
+                BioacousticSplitPolicy {
+                    require_source_recording_ids: true,
+                    hold_out_sessions: true,
+                    hold_out_sites: true,
+                    hold_out_individuals: true,
+                    ..BioacousticSplitPolicy::default()
+                },
+            )
+            .is_ok()
+        );
+    }
+
+    #[test]
     fn requires_annotations_only_for_tasks_that_need_them() {
         let mut corpus = manifest();
         corpus.recordings[0].annotations.clear();
