@@ -600,8 +600,17 @@ fn choose_action(
             let novelty = novelty_score(candidate, fidelity, history);
             let leverage = 10 + candidate.factor_x + candidate.factor_y
                 + 2 * (candidate.factor_x - candidate.factor_y).abs();
+            if policy == Policy::FixedSpaceFilling
+                && history.iter().any(|item| {
+                    item.factor_x == candidate.factor_x && item.factor_y == candidate.factor_y
+                })
+            {
+                // The baseline is a predeclared design, not an adaptive multifidelity policy.
+                // Do not spend a second fidelity measurement at a point already in its design.
+                continue;
+            }
             let score = match policy {
-                Policy::FixedSpaceFilling => novelty * 100 - i64::from(cost),
+                Policy::FixedSpaceFilling => -(fixed_design_rank(candidate) as i64),
                 Policy::RandomFeasible => {
                     i64::from(stable_random_key(selector_seed, step, &action.key()))
                 }
@@ -626,6 +635,16 @@ fn choose_action(
         }
     }
     best.map(|(_, action)| action)
+}
+
+/// Fixed 2-factor Latin-hypercube-like order over the 11×11 normalized grid.
+/// Each block holds x fixed across a permutation of y values; both factors are
+/// evenly stratified before the sequence repeats at another offset.
+fn fixed_design_rank(candidate: &Candidate) -> u32 {
+    let x = candidate.factor_x;
+    let y = candidate.factor_y;
+    let block = ((y - 4 * x).rem_euclid(11) * 4).rem_euclid(11);
+    (block * 11 + x) as u32
 }
 
 fn novelty_score(
