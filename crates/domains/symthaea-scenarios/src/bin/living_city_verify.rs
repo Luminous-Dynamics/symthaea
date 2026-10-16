@@ -23,6 +23,11 @@ use std::path::{Component, Path, PathBuf};
 use std::process;
 use std::sync::atomic::{AtomicU64, Ordering};
 
+use symthaea_scenarios::living_city::CityMetrics;
+use symthaea_scenarios::living_city_assessment_package::{
+    CITY_ASSESSMENT_PACKAGE_EVIDENCE_ID, CITY_ASSESSMENT_PACKAGE_SCHEMA_VERSION,
+    CITY_METRICS_PAYLOAD_EVIDENCE_ID, CityAssessmentPackage, REQUIRED_CITY_METRIC_IDS,
+};
 use symthaea_scenarios::living_city_benchmarks::{
     BenchmarkProfileBinding, LIVING_CITY_BENCHMARKS,
 };
@@ -45,7 +50,7 @@ use symthaea_scenarios::living_city_grid_reference::{
     GRID_REFERENCE_SUITE_VERSION, GRID_REFERENCE_VALIDATION_KIND, run_grid_reference_suite,
 };
 
-const BUNDLE_SCHEMA_VERSION: u32 = 2;
+const BUNDLE_SCHEMA_VERSION: u32 = 3;
 const SERVICE_GRAPH_SCHEMA_VERSION: u32 = 1;
 
 #[derive(Debug, Deserialize)]
@@ -58,6 +63,7 @@ struct VerificationBundle {
     hazard_profile_path: String,
     profile_binding_path: String,
     service_graph_path: String,
+    city_assessment_path: String,
     source_files: Vec<FileBinding>,
     output_files: Vec<FileBinding>,
 }
@@ -93,10 +99,12 @@ fn scenario_configuration_sha256(
     profile: &HazardProfile,
     binding: &BenchmarkProfileBinding,
     graph: &ServiceGraphPackage,
+    city_assessment: &CityAssessmentPackage,
 ) -> Result<String, Box<dyn Error>> {
     let profile_bytes = profile.canonical_bytes()?;
     let binding_bytes = serde_json::to_vec(binding)?;
     let graph_bytes = canonical_service_graph_bytes(graph)?;
+    let city_assessment_bytes = city_assessment.canonical_bytes()?;
     // Pin the built-in solver reference suite/case identity into the same
     // config digest that binds the scenario profile and dependency graph.
     let reference_suite = format!(
@@ -107,7 +115,13 @@ fn scenario_configuration_sha256(
     )
     .into_bytes();
     let mut bytes = Vec::new();
-    for component in [&profile_bytes, &binding_bytes, &graph_bytes, &reference_suite] {
+    for component in [
+        &profile_bytes,
+        &binding_bytes,
+        &graph_bytes,
+        &city_assessment_bytes,
+        &reference_suite,
+    ] {
         bytes.extend_from_slice(&(component.len() as u64).to_le_bytes());
         bytes.extend_from_slice(component);
     }
@@ -206,6 +220,8 @@ fn verify_run_package(run_directory: &Path) -> Result<serde_json::Value, Box<dyn
         read_json(&root, &bundle.profile_binding_path)?;
     let service_graph: ServiceGraphPackage =
         read_json(&root, &bundle.service_graph_path)?;
+    let city_assessment: CityAssessmentPackage =
+        read_json(&root, &bundle.city_assessment_path)?;
 
     if service_graph.schema_version != SERVICE_GRAPH_SCHEMA_VERSION {
         return Err(invalid_input("unsupported service-graph schema version").into());
@@ -226,6 +242,22 @@ fn verify_run_package(run_directory: &Path) -> Result<serde_json::Value, Box<dyn
         compute_file_digest_map(&root, &bundle.output_files, "output_files")?;
     verify_receipt_output_digests(&receipt, &output_digests)?;
 
+    // Recompute the non-compensatory city feasibility result from the exact
+    // retained assessment package and its source-linked manifest, rather than
+    // trusting a generator-supplied "feasible" flag.
+    if city_assessment.schema_version != CITY_ASSESSMENT_PACKAGE_SCHEMA_VERSION {
+        return Err(invalid_input("unsupported city-assessment package schema version").into());
+    }
+    if !source_digests.contains_key(CITY_ASSESSMENT_PACKAGE_EVIDENCE_ID)
+        || !source_digests.contains_key(CITY_METRICS_PAYLOAD_EVIDENCE_ID)
+    {
+        return Err(invalid_input(
+            "bundle must retain both the canonical city-assessment package and its exact metrics payload",
+        )
+        .into());
+    }
+    let city_assessment_result = city_assessment.assess(&manifest)?;
+
     // The profile's input evidence is not considered usable until all retained
     // source bytes passed the independent digest checks above.
     let cascade = evaluate_hazard_profile(
@@ -236,8 +268,12 @@ fn verify_run_package(run_directory: &Path) -> Result<serde_json::Value, Box<dyn
         &service_graph.dependencies,
         LIVING_CITY_BENCHMARKS,
     )?;
-    let actual_configuration_sha256 =
-        scenario_configuration_sha256(&profile, &profile_binding, &service_graph)?;
+    let actual_configuration_sha256 = scenario_configuration_sha256(
+        &profile,
+        &profile_binding,
+        &service_graph,
+        &city_assessment,
+    )?;
     if actual_configuration_sha256 != receipt.configuration_sha256 {
         return Err(invalid_input(
             "receipt configuration digest does not match canonical hazard profile, binding and service graph",
@@ -295,15 +331,44 @@ fn verify_run_package(run_directory: &Path) -> Result<serde_json::Value, Box<dyn
         }),
     };
     let grid_reference_passed = grid_reference_suite["status"] == "passed";
+    let city_feasible = city_assessment_result.is_feasible();
     let promotion_state = match receipt.promotion_state().as_str() {
         "failed" => "failed",
         "blocked" => "blocked",
+        _ if !city_feasible => "failed",
         _ if grid_reference_passed => "eligible_for_next_workflow_stage",
         _ => "failed",
     };
+    let city_violations: Vec<serde_json::Value> = city_assessment_result
+        .violations()
+        .iter()
+        .map(|violation| {
+            serde_json::json!({
+                "metric_id": violation.metric,
+                "actual": violation.actual,
+                "bound": match violation.bound {
+                    symthaea_scenarios::living_city::ConstraintBound::AtLeast => "at_least",
+                    symthaea_scenarios::living_city::ConstraintBound::AtMost => "at_most",
+                },
+                "threshold": violation.threshold,
+            })
+        })
+        .collect();
+    let city_design_feasibility = serde_json::json!({
+        "status": if city_feasible { "feasible" } else { "infeasible" },
+        "scenario_id": city_assessment_result.scenario_id(),
+        "study_area_id": city_assessment.study_area_id,
+        "jurisdiction": city_assessment.jurisdiction,
+        "floor_ratification_ref": city_assessment.floor_ratification_ref,
+        "metric_evidence": city_assessment.metric_evidence,
+        "metrics": city_assessment.metrics,
+        "floors": city_assessment.floors,
+        "violations": city_violations,
+        "scope": "Constraint evaluation of evidence-linked supplied metrics against explicitly ratified floors. This does not independently validate the physical models or establish community authorization beyond the retained ratification record."
+    });
 
     Ok(serde_json::json!({
-        "schema_version": 2,
+        "schema_version": 3,
         "package_integrity": "verified",
         "run_id": receipt.run_id,
         "scenario_id": receipt.scenario_id,
@@ -313,6 +378,7 @@ fn verify_run_package(run_directory: &Path) -> Result<serde_json::Value, Box<dyn
         "receipt_sha256": receipt_sha256,
         "configuration_sha256": actual_configuration_sha256,
         "workflow_promotion_state": promotion_state,
+        "city_design_feasibility": city_design_feasibility,
         "domain_reference_suite": grid_reference_suite,
         "hazard_profile_id": cascade.profile_id,
         "hazard_profile_sha256": cascade.profile_sha256,
