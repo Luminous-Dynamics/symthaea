@@ -123,17 +123,17 @@ pub fn generate_candidate_decision_scenarios() -> Vec<CandidateDecisionScenario>
                     correlation_models.iter().enumerate()
                 {
                     for (bias_index, bias_bound) in bias_bounds.iter().enumerate() {
-                    cases.push(CandidateDecisionScenario {
-                        scenario_id: format!(
-                            "candidate-decision-t{truth_index:02}-o{observed_index:02}-u{uncertainty_index:02}-c{correlation_index:02}-b{bias_index:02}"
-                        ),
-                        oracle_true_efficiency_difference: *truth,
-                        observed_efficiency_difference: *observed,
-                        candidate_uncertainty_scale: *uncertainty_scale,
-                        candidate_correlation_model: (*correlation_model).into(),
-                        superiority_margin: 0.02,
-                        maximum_unmodeled_differential_bias_efficiency: *bias_bound,
-                    });
+                        cases.push(CandidateDecisionScenario {
+                            scenario_id: format!(
+                                "candidate-decision-t{truth_index:02}-o{observed_index:02}-u{uncertainty_index:02}-c{correlation_index:02}-b{bias_index:02}"
+                            ),
+                            oracle_true_efficiency_difference: *truth,
+                            observed_efficiency_difference: *observed,
+                            candidate_uncertainty_scale: *uncertainty_scale,
+                            candidate_correlation_model: (*correlation_model).into(),
+                            superiority_margin: 0.02,
+                            maximum_unmodeled_differential_bias_efficiency: *bias_bound,
+                        });
                     }
                 }
             }
