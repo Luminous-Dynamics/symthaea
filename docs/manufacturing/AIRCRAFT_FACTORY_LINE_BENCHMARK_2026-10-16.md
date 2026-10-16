@@ -6,7 +6,7 @@
 
 ## Why this belongs in the existing crate
 
-Symthaea already has \`symthaea-operations-research\`, a small dependency-free library for queueing, inventory and shortest paths. Extend that owner instead of creating another optimization stack. Factory realization remains owned by [BUILT-ENV-001 #6032](https://github.com/Luminous-Dynamics/symthaea/issues/6032), engineering requirements/design evidence by [ENG-DESIGN-001 #6005](https://github.com/Luminous-Dynamics/symthaea/issues/6005), and manufacturing semantics/resource provenance by Mycelix [MFG-EVID-001 #3084](https://github.com/Luminous-Dynamics/mycelix/issues/3084) and [MFG-PROC-001 #3085](https://github.com/Luminous-Dynamics/mycelix/issues/3085).
+Symthaea already has `symthaea-operations-research`, a small dependency-free library for queueing, inventory and shortest paths. Extend that owner instead of creating another optimization stack. Factory realization remains owned by [BUILT-ENV-001 #6032](https://github.com/Luminous-Dynamics/symthaea/issues/6032), engineering requirements/design evidence by [ENG-DESIGN-001 #6005](https://github.com/Luminous-Dynamics/symthaea/issues/6005), and manufacturing semantics/resource provenance by Mycelix [MFG-EVID-001 #3084](https://github.com/Luminous-Dynamics/mycelix/issues/3084) and [MFG-PROC-001 #3085](https://github.com/Luminous-Dynamics/mycelix/issues/3085).
 
 The purpose of the first slice is narrow: give the aircraft-factory study a deterministic, inspectable baseline for whether a process graph can be scheduled with the declared worker skills, resource/tool capabilities and availability windows.
 
@@ -27,7 +27,7 @@ For the fixed test fixture, the precedence-only critical path is 90 seconds. The
 
 ## API and semantics
 
-\`plan_factory_line\` takes immutable operation definitions, qualified worker manifests and qualified resource manifests. All operations must be scheduled exactly once. Each operation reserves one worker and one resource for its full duration. Predecessor completion, skills/capabilities, interval availability, unique IDs and overflow are validated. The result reports:
+`plan_factory_line` takes immutable operation definitions, qualified worker manifests and qualified resource manifests. All operations must be scheduled exactly once. Each operation reserves one worker and one resource for its full duration. Predecessor completion, skills/capabilities, interval availability, unique IDs and overflow are validated. The result reports:
 - scheduled interval and selected worker/resource for each operation;
 - makespan;
 - a precedence-only critical-path lower bound;
@@ -65,4 +65,4 @@ Report first-pass yield, escape defects, rework, scrap, labor hours, lead time, 
 
 ## Validation and claim ceiling
 
-The code includes deterministic tests and a public independent schedule verifier that recomputes assignment and metric invariants from the emitted plan. This development environment did not execute Cargo tests or a factory simulation binary; test-source presence is not a passing result. Recheck with \`cargo test -p symthaea-operations-research\` on the exact PR head. The fixture is only an algorithmic baseline, not a qualified manufacturing process, factory layout, aircraft design or airworthiness approval.
+The code includes deterministic tests and a public independent schedule verifier that recomputes assignment and metric invariants from the emitted plan. This development environment did not execute Cargo tests or a factory simulation binary; test-source presence is not a passing result. Recheck with `cargo test -p symthaea-operations-research` on the exact PR head. The fixture is only an algorithmic baseline, not a qualified manufacturing process, factory layout, aircraft design or airworthiness approval.
