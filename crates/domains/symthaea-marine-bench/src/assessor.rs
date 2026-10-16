@@ -77,7 +77,10 @@ impl fmt::Display for AssessmentError {
                 write!(f, "case claim ceiling does not match this evaluator's frozen ceiling")
             }
             Self::UnsupportedEvidenceClass(class) => {
-                write!(f, "v2 accepts synthetic illustrations only; received evidence class {class}")
+                write!(
+                    f,
+                    "v2 accepts synthetic illustrations only; received evidence class {class}"
+                )
             }
             Self::UnsupportedDecisionUse => write!(f, "v2 accepts not_for_decision cases only"),
         }
@@ -218,7 +221,11 @@ pub fn assess(case: &MarineFreightCase) -> Result<AssessmentReport, AssessmentEr
                 "the entire constraint interval; overlapping intervals are indeterminate.",
             )
             .to_owned(),
-            "Energy demand is supplied by the case; this evaluator does not derive hull resistance or propulsion loads.".to_owned(),
+            concat!(
+                "Energy demand is supplied by the case; this evaluator does not derive hull resistance ",
+                "or propulsion loads.",
+            )
+            .to_owned(),
             concat!(
                 "Charge duration assumes constant delivered power and declared efficiency; taper, ",
                 "thermal limits, grid dynamics, and degradation during the cycle are not modeled.",
