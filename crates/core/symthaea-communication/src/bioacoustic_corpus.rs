@@ -767,6 +767,31 @@ mod tests {
     }
 
     #[test]
+    fn schema_v3_requires_explicit_crop_offset_and_unscored_regions_keys() {
+        let corpus = manifest();
+        let mut json = serde_json::to_value(corpus).unwrap();
+        let recording = json
+            .get_mut("recordings")
+            .and_then(serde_json::Value::as_array_mut)
+            .and_then(|recordings| recordings.first_mut())
+            .unwrap();
+        recording.as_object_mut().unwrap().remove("source_start_s");
+        assert!(serde_json::from_value::<BioacousticCorpusManifest>(json.clone()).is_err());
+
+        let recording = json
+            .get_mut("recordings")
+            .and_then(serde_json::Value::as_array_mut)
+            .and_then(|recordings| recordings.first_mut())
+            .unwrap();
+        recording
+            .as_object_mut()
+            .unwrap()
+            .insert("source_start_s".into(), serde_json::Value::Null);
+        recording.as_object_mut().unwrap().remove("unscored_regions");
+        assert!(serde_json::from_value::<BioacousticCorpusManifest>(json).is_err());
+    }
+
+    #[test]
     fn rejects_invalid_source_recording_offsets() {
         for offset in [-0.1, f64::NAN, f64::INFINITY, f64::MAX] {
             let mut corpus = manifest();
