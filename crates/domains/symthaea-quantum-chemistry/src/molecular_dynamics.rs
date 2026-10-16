@@ -602,10 +602,10 @@ mod tests {
     #[test]
     fn checked_runner_rejects_empty_molecule_before_solver_invocation() {
         let molecule = Molecule::new(vec![]);
-        assert_eq!(
+        assert!(matches!(
             run_md_checked(&molecule, &MdConfig::default()),
             Err(MdInputError::EmptyMolecule)
-        );
+        ));
     }
 
     #[test]
