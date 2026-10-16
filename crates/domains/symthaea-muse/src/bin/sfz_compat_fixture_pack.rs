@@ -171,7 +171,7 @@ fn run() -> Result<(), Box<dyn Error>> {
     // Hash a sorted list of every generated path plus each file content hash.
     // The digest excludes pack.sha256 itself, avoiding a self-referential hash.
     let pack_digest = pack_tree_sha256(&output_dir)?;
-    fs::write(output_dir.join("pack.sha256"), format!("{pack_digest}  fixture-pack-v1\\n"))?;
+    fs::write(output_dir.join("pack.sha256"), format!("{pack_digest}  fixture-pack-v1\n"))?;
 
     println!(
         "generated {} fixtures under {}; manifest: {}",
@@ -202,7 +202,7 @@ fn pack_tree_sha256(root: &Path) -> Result<String, Box<dyn Error>> {
     files.sort();
     let mut hasher = Sha256::new();
     for path in files {
-        let relative = path.strip_prefix(root)?.to_string_lossy().replace('\\\\', "/");
+        let relative = path.strip_prefix(root)?.to_string_lossy().replace(std::path::MAIN_SEPARATOR, "/");
         let bytes = fs::read(&path)?;
         hasher.update(relative.as_bytes());
         hasher.update([0_u8]);
