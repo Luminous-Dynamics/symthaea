@@ -217,6 +217,26 @@
         "Calibration is not estimable within a context with no valid measured labels.",
         "Calibration summaries are conditional on label ascertainment and are not clinical safety guarantees."
       ]
+    },
+    {
+      "id": "decision_critical_measurement_allocation",
+      "definition": "Select unknown outcome labels to measure when their result can directly change the paired top-K positive-hit-count numerator for a frozen comparison of two policies.",
+      "required_metrics": [
+        "eligible_differential_unknown_count",
+        "differential_unknown_labels_measured_at_budget",
+        "residual_direct_numerator_ambiguity_count",
+        "declared_cost_units_spent",
+        "context_allocation_counts",
+        "paired_label_sensitivity_bounds_before_after_observation"
+      ],
+      "rules": [
+        "Input must be the same complete candidate universe ranked fully and uniquely under both policies, with the same fixed K.",
+        "Compute policy-exclusive membership from ranks and select UnknownUnassayed candidates only; do not accept caller-asserted disagreement flags.",
+        "Cheapest-first is optimal only for maximizing the count of equal-unit differential labels measured under the declared cost budget.",
+        "Report unknown candidates with same top-K membership separately; this planner does not resolve their denominator/absolute-recall uncertainty.",
+        "Compare with random, score/confidence-first, and top-ranked-unknown baselines at equal budget.",
+        "Cost units are proxies; do not infer laboratory savings or expected value of information."
+      ]
     }
   ],
   "initial_gates": [
@@ -332,6 +352,17 @@
         "freeze calibration bins, confidence policy and thresholds before holdout reveal",
         "do not clip exact overconfident errors or count unknown outcomes as negative"
       ]
+    },
+    {
+      "id": "G11_decision_critical_measurement_integrity",
+      "required": true,
+      "pass_conditions": [
+        "policy-exclusive top-K membership derived from full one-based ranks on the same candidate universe",
+        "candidate identities and per-policy rank permutations validate and K has sufficient candidates",
+        "allocation is deterministic with explicit cost/spend/unspent accounting",
+        "unknown outcomes remain distinct and residual direct numerator ambiguity is reported",
+        "allocation policy is compared with preregistered baselines under identical cost budgets before any performance claim"
+      ]
     }
   ],
   "aspirational_engineering_targets": {
@@ -350,7 +381,12 @@
     ],
     "inferential_rule": "Describe improvement as demonstrated only if the preregistered interval excludes no improvement; otherwise report inconclusive/null.",
     "external_generalization": "Require at least one independent, use-permitted cohort before claiming robustness across datasets.",
-    "safety_rule": "No model score, rank improvement, or cryptographic receipt implies a guide, editor, or therapy is safe."
+    "safety_rule": "No model score, rank improvement, or cryptographic receipt implies a guide, editor, or therapy is safe.",
+    "measurement_allocation": {
+      "status": "proposed_not_validated_not_a_clinical_standard",
+      "target": "At equal declared cost budget, resolve at least 20% more policy-differential unknown labels than random allocation on preregistered synthetic/stress-test episodes where estimable.",
+      "caveat": "The metric resolves only the direct paired top-K numerator component; it is not full uncertainty reduction, expected value of information, experimental savings, or biological safety."
+    }
   },
   "validation_status": {
     "data_downloaded": false,
@@ -371,7 +407,10 @@
     "selective_risk_kernel_compiled": false,
     "selective_risk_unit_tests_executed": false,
     "calibration_metrics_executed": false,
-    "risk_coverage_metrics_executed": false
+    "risk_coverage_metrics_executed": false,
+    "measurement_allocator_compiled": false,
+    "measurement_allocator_unit_tests_executed": false,
+    "measurement_allocation_fixture_executed": false
   },
   "implementation_artifact": {
     "path": "scripts/crispr_triage_verifier.rs",
@@ -384,7 +423,8 @@
     ],
     "additional_source_paths": [
       "scripts/crispr_decision_frontier.rs",
-      "scripts/crispr_selective_risk.rs"
+      "scripts/crispr_selective_risk.rs",
+      "scripts/crispr_measurement_priority.rs"
     ]
   },
   "updated_on": "2026-10-16",
