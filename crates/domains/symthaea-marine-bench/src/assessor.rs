@@ -11,7 +11,7 @@ use crate::model::{
 };
 use crate::CLAIM_CEILING;
 
-#[derive(Clone, Debug, Deserialize, Serialize, PartialEq, Eq)]
+#[derive(Clone, Copy, Debug, Deserialize, Serialize, PartialEq, Eq)]
 #[serde(rename_all = "snake_case")]
 pub enum FindingStatus {
     WithinDeclaredBound,
@@ -258,9 +258,6 @@ impl Interval {
         )
     }
 
-    fn midpoint(self) -> f64 {
-        self.lower + (self.upper - self.lower) / 2.0
-    }
 }
 
 fn checked_interval(nominal: f64, lower: f64, upper: f64, label: &str) -> Result<Interval, String> {
@@ -716,7 +713,6 @@ mod tests {
             FindingStatus::Indeterminate
         );
     }
-}
 
     fn set_range(input: &mut EvidenceValue, nominal: f64, lower: f64, upper: f64) {
         match input {
