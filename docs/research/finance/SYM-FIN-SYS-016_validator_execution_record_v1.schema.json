@@ -95,33 +95,31 @@
       "pattern": "^Python [0-9]+\\.[0-9]+\\.[0-9]+"
     },
     "test_commands": {
-      "type": "array",
-      "minItems": 2,
-      "uniqueItems": true,
-      "items": {
-        "type": "string",
-        "minLength": 1
-      }
+      "const": [
+        "python3 scripts/test_validate_socioeconomic_run_bundle.py",
+        "python3 scripts/test_write_socioeconomic_run_bundle_ci_report.py"
+      ]
     },
     "authored_test_function_count": {
-      "type": "integer",
-      "minimum": 1
+      "const": 25
     },
     "executed_test_count": {
-      "type": "integer",
-      "minimum": 1
+      "const": 25
     },
     "executed_test_counts_by_suite": {
       "type": "array",
+      "prefixItems": [
+        {"const": 14},
+        {"const": 11}
+      ],
       "minItems": 2,
-      "items": {
-        "type": "integer",
-        "minimum": 1
-      }
+      "maxItems": 2,
+      "items": false
     },
     "artifacts": {
       "type": "array",
-      "minItems": 7,
+      "minItems": 10,
+      "maxItems": 10,
       "items": {
         "$ref": "#/$defs/artifact"
       }
