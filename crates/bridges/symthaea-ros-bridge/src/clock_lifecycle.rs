@@ -83,6 +83,11 @@ pub struct RosClockTransitionV1 {
     pub observed_clock_id: String,
     pub observed_clock_domain: String,
     pub observed_source_epoch_id: String,
+    /// True only when this transition was triggered by a concrete source-clock
+    /// observation. If false, the transition came from the independent watchdog;
+    /// acknowledge_transition is an explicit source rebind and its caller must
+    /// validate the candidate identity against the frozen deployment allowlist.
+    pub source_identity_observed: bool,
     pub observed_receive_epoch_id: String,
 }
 
@@ -375,6 +380,7 @@ impl RosClockLifecycleTrackerV1 {
                 observed_clock_id: baseline.clock_id.clone(),
                 observed_clock_domain: baseline.clock_domain.clone(),
                 observed_source_epoch_id: baseline.source_epoch_id.clone(),
+                source_identity_observed: false,
                 observed_receive_epoch_id: capture_receive_epoch_id.to_string(),
             };
             self.pending_transition = Some(transition.clone());
@@ -399,6 +405,7 @@ impl RosClockLifecycleTrackerV1 {
                 observed_clock_id: baseline.clock_id.clone(),
                 observed_clock_domain: baseline.clock_domain.clone(),
                 observed_source_epoch_id: baseline.source_epoch_id.clone(),
+                source_identity_observed: false,
                 observed_receive_epoch_id: baseline.receive_epoch_id.clone(),
             };
             self.pending_transition = Some(transition);
@@ -439,12 +446,13 @@ impl RosClockLifecycleTrackerV1 {
                 reason: "cannot rebind to an uninitialized zero timestamp".into(),
             };
         }
-        if observation.clock_id != transition.observed_clock_id
-            || observation.clock_domain != transition.observed_clock_domain
-            || observation.source_epoch_id != transition.observed_source_epoch_id
+        if transition.source_identity_observed
+            && (observation.clock_id != transition.observed_clock_id
+                || observation.clock_domain != transition.observed_clock_domain
+                || observation.source_epoch_id != transition.observed_source_epoch_id)
         {
             return RosClockLifecycleDispositionV1::InvalidObservation {
-                reason: "rebind observation does not match the pending transition's source identity".into(),
+                reason: "rebind observation does not match the source identity that triggered the transition".into(),
             };
         }
         if observation.receive_epoch_id != capture_receive_epoch_id {
@@ -521,6 +529,7 @@ impl RosClockLifecycleTrackerV1 {
             observed_clock_id: observation.clock_id.clone(),
             observed_clock_domain: observation.clock_domain.clone(),
             observed_source_epoch_id: observation.source_epoch_id.clone(),
+            source_identity_observed: true,
             observed_receive_epoch_id: observation.receive_epoch_id.clone(),
         };
         self.pending_transition = Some(transition.clone());
@@ -802,6 +811,30 @@ mod tests {
             tracker.observe(&observation(1_020, 62), "bridge-run-1", 62),
             RosClockLifecycleDispositionV1::Advancing { generation: 2, .. }
         ));
+    }
+
+    #[test]
+    fn silence_recovery_can_explicitly_bind_a_replacement_clock_source() {
+        let mut tracker = initialized_tracker();
+        assert!(matches!(
+            tracker.check_liveness("bridge-run-1", 52),
+            RosClockLifecycleDispositionV1::ClockSourceSilent { .. }
+        ));
+        let mut replacement = observation(50, 61);
+        replacement.clock_id = "ros:/clock-replacement".into();
+        replacement.source_epoch_id = "bag-run-2".into();
+        let outcome = tracker.acknowledge_transition(&replacement, "bridge-run-1", 61);
+        assert!(matches!(
+            outcome,
+            RosClockLifecycleDispositionV1::TransitionRebound {
+                kind: RosClockTransitionKindV1::ClockSourceSilent,
+                generation: 2,
+                timestamp_ns: 50,
+            }
+        ));
+        assert_eq!(tracker.generation(), Some(2));
+        // Rebinding is not itself permission to admit any downstream sample.
+        assert!(!outcome.permits_temporal_admission());
     }
 
     #[test]
