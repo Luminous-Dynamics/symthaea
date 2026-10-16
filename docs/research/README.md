@@ -362,3 +362,5 @@ The deterministic service, resource, crew-scheduling, uncertainty, and event-tri
 The paired comparison harness is [repair_policy_comparison.rs](../../crates/domains/symthaea-engineering/src/repair_policy_comparison.rs). It compares the fixed-plan robust baseline with event-triggered dispatch under the same realized-duration scenarios and preserves per-scenario deltas and decision traces.
 
 The tiny exact scheduling oracle is [repair_small_instance_oracle.rs](../../crates/domains/symthaea-engineering/src/repair_small_instance_oracle.rs). Its six hand-built fixtures are published in [repair_scheduling_oracle_corpus.json](./repair_scheduling_oracle_corpus.json). This corpus is designed for correctness and optimality-gap measurement, not as operational or field data.
+
+The exact-oracle module also reports per-policy absolute and relative optimality gaps for priority-first, shortest-job-first and weighted-recovery scheduling, directly supporting the published benchmark targets.
