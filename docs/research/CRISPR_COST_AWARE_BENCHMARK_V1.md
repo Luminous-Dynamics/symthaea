@@ -19,6 +19,8 @@ Compose the existing [Symthaea biology discovery program (#6271)](https://github
 
 Machine-readable planning contract and benchmark gates: [`docs/research/data/CRISPR_OFFTARGET_BENCHMARK_CONTRACT_V1.json`](data/CRISPR_OFFTARGET_BENCHMARK_CONTRACT_V1.json). Its validation flags deliberately remain false until the exact data artifacts are retrieved, rights-reviewed, and independently replayed.
 
+The companion [CRISPR triage scorecard and value-of-information protocol](CRISPR_TRIAGE_SCORECARD_V1.md) turns the paradigm shift into preregistered tracks for native nomination, conditional ranking, review-budget efficiency, calibration/abstention, shift robustness, Symthaea incrementality, and adversarial verification. Its machine-readable counterpart is [`docs/research/data/CRISPR_TRIAGE_SCORECARD_V1.json`](data/CRISPR_TRIAGE_SCORECARD_V1.json); both remain planning contracts, not execution evidence.
+
 ## Why now: research frontier
 
 These publications motivate the research questions. None proves Symthaea is competitive, and none is local qualification evidence.
