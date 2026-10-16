@@ -16,6 +16,18 @@ Policies:
 - group_balanced_farthest_first: seeded initial candidate, then prefers the least represented family before max-min distance.
 - cost_aware_farthest_first: starts with the cheapest candidate, then selects maximum minimum descriptor distance divided by declared evaluation cost. It requires a positive cost on every candidate, in one frozen unit.
 
+## Verify a receipt independently
+
+The CLI has a structural-verification mode. Each input line is a JSON object holding the two exact JSONL line contents as strings:
+
+    {"request_line":"<exact original request JSON>","response_line":"<exact original response JSON>"}
+
+Run:
+
+    cargo run -p symthaea-nano-policy -- --verify-receipt < receipt-pairs.jsonl > audits.jsonl
+
+The output includes request and response SHA-256 digests and checks for budget/count agreement, selected-ID uniqueness and membership, family/cost lineage, and independently recomputed nearest-selected descriptor distances. The verifier does not rerun the selector and cannot prove a scientific result. Malformed or extra envelope fields produce a separate `rejected_input` JSON response.
+
 ## Schemas and benchmark criteria
 
 - Request schema: schema/request.schema.json
