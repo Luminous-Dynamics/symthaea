@@ -16,6 +16,8 @@ pub const CAMPAIGN_MANIFEST_SCHEMA_VERSION: &str = "nano-simulator-campaign-mani
 pub const CAMPAIGN_AUDIT_SCHEMA_VERSION: &str = "nano-simulator-campaign-audit-v1";
 /// Maximum encoded campaign-manifest size.
 pub const MAX_CAMPAIGN_MANIFEST_BYTES: usize = 16 * 1024 * 1024;
+/// Maximum combined raw run-ledger bytes audited in one campaign.
+pub const MAX_CAMPAIGN_TOTAL_LEDGER_BYTES: usize = 512 * 1024 * 1024;
 /// Maximum number of policy arms.
 pub const MAX_CAMPAIGN_ARMS: usize = 32;
 /// Maximum seed values in one declared roster.
@@ -208,6 +210,16 @@ pub fn audit_campaign_json(
     ledger_bytes: &BTreeMap<String, Vec<u8>>,
 ) -> Result<CampaignAuditReport, String> {
     let manifest = parse_campaign_manifest(raw_manifest)?;
+    let total_ledger_bytes = ledger_bytes.values().try_fold(0usize, |total, raw| {
+        total
+            .checked_add(raw.len())
+            .ok_or_else(|| "combined ledger byte count overflow".to_string())
+    })?;
+    if total_ledger_bytes > MAX_CAMPAIGN_TOTAL_LEDGER_BYTES {
+        return Err(format!(
+            "combined run ledgers exceed the {MAX_CAMPAIGN_TOTAL_LEDGER_BYTES}-byte campaign limit"
+        ));
+    }
     let manifest_sha256 = sha256_hex(raw_manifest);
     let expected_seeds: BTreeSet<u64> = manifest.expected_seeds.iter().copied().collect();
     let mut global_run_ids = HashSet::new();
@@ -291,7 +303,9 @@ pub fn audit_campaign_json(
                 identity_blockers.push("benchmark_id differs from campaign".to_string());
             }
             if ledger.seed != reference.seed {
-                identity_blockers.push("ledger seed differs from the seed pinned by its reference".to_string());
+                identity_blockers.push(
+                    "ledger seed differs from the seed pinned by its reference".to_string(),
+                );
             }
             if ledger.arm_id != arm.arm_id {
                 identity_blockers.push("arm_id differs from campaign arm".to_string());
@@ -303,7 +317,9 @@ pub fn audit_campaign_json(
                 identity_blockers.push("policy_revision differs from campaign arm".to_string());
             }
             if ledger.expected_simulator_calls != manifest.expected_simulator_calls {
-                identity_blockers.push("expected simulator-call budget differs from campaign".to_string());
+                identity_blockers.push(
+                    "expected simulator-call budget differs from campaign".to_string(),
+                );
             }
             if ledger.proposal_attempt_cap != manifest.proposal_attempt_cap {
                 identity_blockers.push("proposal-attempt cap differs from campaign".to_string());
@@ -315,7 +331,9 @@ pub fn audit_campaign_json(
                 identity_blockers.push("task-contract digest differs from campaign".to_string());
             }
             if ledger.evaluation_manifest_sha256 != manifest.evaluation_manifest_sha256 {
-                identity_blockers.push("evaluation-manifest digest differs from campaign".to_string());
+                identity_blockers.push(
+                    "evaluation-manifest digest differs from campaign".to_string(),
+                );
             }
             if ledger.simulator_recipe_sha256 != manifest.simulator_recipe_sha256 {
                 identity_blockers.push("simulator-recipe digest differs from campaign".to_string());
@@ -430,7 +448,9 @@ fn validate_manifest(manifest: &CampaignManifest) -> Result<(), String> {
     {
         return Err("task/evaluation/recipe manifest digests must be 64 lowercase hexadecimal characters".to_string());
     }
-    if manifest.expected_simulator_calls == 0 || manifest.expected_simulator_calls > MAX_SIMULATOR_CALLS {
+    if manifest.expected_simulator_calls == 0
+        || manifest.expected_simulator_calls > MAX_SIMULATOR_CALLS
+    {
         return Err(format!(
             "expected_simulator_calls must be in 1..={MAX_SIMULATOR_CALLS}"
         ));
