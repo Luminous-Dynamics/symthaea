@@ -166,8 +166,11 @@ impl CampaignManifest {
         if self.benchmark_id != BENCHMARK_ID {
             return Err("unexpected benchmark identity".into());
         }
-        if self.oracle_version.trim().is_empty() || self.process_profile_id.trim().is_empty() {
-            return Err("oracle and process profile identities must be non-empty".into());
+        if self.oracle_version != "synthetic-oracle-v2" {
+            return Err("unsupported synthetic oracle version".into());
+        }
+        if self.process_profile_id.trim().is_empty() {
+            return Err("process profile identity must be non-empty".into());
         }
         if self.budget_units == 0 || self.proxy_cost_units == 0 || self.reference_cost_units == 0 {
             return Err("budget and fidelity costs must be positive".into());
@@ -836,6 +839,13 @@ mod tests {
                 CampaignManifest::reference(scenario, 0x4d46_4700_u64 + index as u64, 20);
             assert_eq!(manifest.digest().unwrap(), expected[index], "scenario={scenario:?}");
         }
+    }
+
+    #[test]
+    fn manifest_rejects_unknown_oracle_version() {
+        let mut manifest = CampaignManifest::reference(ScenarioFamily::SmoothResponse, 1, 20);
+        manifest.oracle_version = "synthetic-oracle-unknown".into();
+        assert!(manifest.validate().unwrap_err().contains("unsupported synthetic oracle version"));
     }
 
     #[test]
