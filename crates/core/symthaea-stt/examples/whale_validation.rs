@@ -245,8 +245,8 @@ fn main() -> std::io::Result<()> {
     let mid = all_results.len() / 2;
     let (train_set, test_set) = all_results.split_at(mid);
 
-    println!("    Training set: {} recordings", train_set.len());
-    println!("    Test set:     {} recordings", test_set.len());
+    println!("    First list partition (used for adaptation): {} recordings", train_set.len());
+    println!("    Second list partition (not a verified independent holdout):     {} recordings", test_set.len());
 
     // Train on first half
     println!("\n    Training on:");
