@@ -131,6 +131,14 @@ pub fn evaluate_transcript(
     if transcript.claimed_best_utility != best_utility {
         return Err("claimed best utility differs from recomputed utility".into());
     }
+    let expected_stop_reason = if cumulative_cost >= manifest.budget_units {
+        "BudgetExhausted"
+    } else {
+        "NoEligibleAffordableAction"
+    };
+    if transcript.stop_reason != expected_stop_reason {
+        return Err("stop reason does not match the recomputed campaign outcome".into());
+    }
 
     let blocked_count = manifest
         .candidates
