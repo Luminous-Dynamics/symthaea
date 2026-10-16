@@ -9,7 +9,7 @@
 
 use serde::{Deserialize, Serialize};
 use sha2::{Digest, Sha256};
-use std::collections::BTreeSet;
+use std::collections::{BTreeMap, BTreeSet};
 use std::fmt;
 use std::path::{Component, Path};
 
@@ -224,7 +224,8 @@ pub struct SfzZoneSelectionV1 {
     pub selected_sample_path: Option<String>,
     pub selected_sample_asset_state: Option<String>,
     /// One of: uncovered, invalid_request, unique_candidate,
-    /// round_robin_candidate, incomplete_round_robin_set, ambiguous_zones.
+    /// round_robin_candidate, incomplete_round_robin_set, ambiguous_zones,
+    /// invalid_stream_id.
     /// None of these names imply audio decoding or rendering.
     pub decision: String,
     pub semitone_shift: Option<f64>,
@@ -350,6 +351,100 @@ pub fn plan_sfz_zone_selection(
         receipt.frequency_ratio = Some(2.0_f64.powf(semitone_shift / 12.0));
     }
     receipt
+}
+
+
+/// Counter identity for a deterministic round-robin stream. The candidate-zone
+/// set isolates separate velocity layers and source mapping ranges. The caller
+/// supplies a stable stream ID so parallel parts/voices can progress separately.
+#[derive(Debug, Clone, PartialEq, Eq, PartialOrd, Ord)]
+struct SfzRoundRobinStreamKeyV1 {
+    stream_id: String,
+    sfz_sha256: String,
+    requested_key: u8,
+    matching_region_indices: Vec<usize>,
+}
+
+/// Stateful round-robin routing whose counters are scoped to explicit event
+/// streams and matching zone sets. This is a deterministic routing primitive,
+/// not a claim that every SFZ engine shares identical sequence-group semantics.
+///
+/// Callers should give each independently advancing instrument/part/voice a
+/// stable stream ID. A new sequencer starts a fresh deterministic sequence.
+#[derive(Debug, Clone, Default)]
+pub struct SfzRoundRobinSequencerV1 {
+    next_indices: BTreeMap<SfzRoundRobinStreamKeyV1, u64>,
+}
+
+impl SfzRoundRobinSequencerV1 {
+    pub fn new() -> Self {
+        Self::default()
+    }
+
+    /// Plan the next selection in one explicit stream. Only valid, complete
+    /// round-robin candidate sets advance state; ambiguous, uncovered,
+    /// malformed or single non-sequenced zones never consume a sequence step.
+    /// A blank stream ID fails closed so independent voices cannot accidentally
+    /// collide in the same implicit/global counter.
+    pub fn next_selection(
+        &mut self,
+        manifest: &SfzMappingManifestV1,
+        stream_id: &str,
+        requested_key: u8,
+        requested_velocity: u8,
+    ) -> SfzZoneSelectionV1 {
+        if stream_id.trim().is_empty() {
+            let mut receipt = plan_sfz_zone_selection(manifest, requested_key, requested_velocity, 0);
+            receipt.selected_region_index = None;
+            receipt.selected_sample_path = None;
+            receipt.selected_sample_asset_state = None;
+            receipt.semitone_shift = None;
+            receipt.frequency_ratio = None;
+            receipt.decision = "invalid_stream_id".to_owned();
+            return receipt;
+        }
+
+        // Resolve with index zero first. It validates the complete candidate set
+        // without consuming state and distinguishes ordinary unique zones.
+        let first = plan_sfz_zone_selection(manifest, requested_key, requested_velocity, 0);
+        if first.decision != "round_robin_candidate" {
+            return first;
+        }
+
+        let key = SfzRoundRobinStreamKeyV1 {
+            stream_id: stream_id.to_owned(),
+            sfz_sha256: manifest.sfz_sha256.clone(),
+            requested_key,
+            matching_region_indices: first.matching_region_indices.clone(),
+        };
+        let sequence_len = key.matching_region_indices.len() as u64;
+        if sequence_len == 0 {
+            // Defensive invariant: a round-robin decision always has at least
+            // one selected region, but don't create mutable state if malformed.
+            return first;
+        }
+        let next = *self.next_indices.get(&key).unwrap_or(&0);
+        let receipt = plan_sfz_zone_selection(manifest, requested_key, requested_velocity, next);
+        if receipt.decision == "round_robin_candidate" {
+            self.next_indices.insert(key, (next + 1) % sequence_len);
+        }
+        receipt
+    }
+
+    /// Number of independent stream/zone counters currently held.
+    pub fn stream_count(&self) -> usize {
+        self.next_indices.len()
+    }
+
+    /// Clear one stream's sequence state without disturbing other voices.
+    pub fn reset_stream(&mut self, stream_id: &str) {
+        self.next_indices.retain(|key, _| key.stream_id != stream_id);
+    }
+
+    /// Reset every sequence. Useful for deterministic replay/session restart.
+    pub fn reset_all(&mut self) {
+        self.next_indices.clear();
+    }
 }
 
 fn finalize_region(
@@ -737,6 +832,72 @@ mod tests {
         assert_eq!(overlap_plan.decision, "ambiguous_zones");
         assert_eq!(overlap_plan.matching_region_indices, vec![1, 2]);
         assert_eq!(overlap_plan.selected_region_index, None);
+    }
+
+    #[test]
+    fn round_robin_counters_are_isolated_by_stream_and_zone() {
+        let source = r#"
+<group> key=60 seq_length=2
+<region> seq_position=1 sample=one.wav
+<region> seq_position=2 sample=two.wav
+<group> key=62
+<region> sample=other.wav
+"#;
+        let manifest = parse_sfz_mapping(source).unwrap();
+        let mut router = SfzRoundRobinSequencerV1::new();
+
+        let a1 = router.next_selection(&manifest, "voice-a", 60, 90);
+        let a2 = router.next_selection(&manifest, "voice-a", 60, 90);
+        let b1 = router.next_selection(&manifest, "voice-b", 60, 90);
+        let other_key = router.next_selection(&manifest, "voice-a", 62, 90);
+        let another_manifest = parse_sfz_mapping(
+            "<group> key=60 seq_length=2\n<region> seq_position=1 sample=red.wav\n<region> seq_position=2 sample=blue.wav",
+        ).unwrap();
+        let other_bank = router.next_selection(&another_manifest, "voice-a", 60, 90);
+
+        assert_eq!(a1.selected_region_index, Some(1));
+        assert_eq!(a2.selected_region_index, Some(2));
+        assert_eq!(b1.selected_region_index, Some(1), "another voice must start independently");
+        assert_eq!(other_key.decision, "unique_candidate");
+        assert_eq!(other_key.selected_region_index, Some(3));
+        assert_eq!(other_bank.selected_region_index, Some(1), "a different SFZ manifest starts a separate sequence");
+        assert_eq!(router.stream_count(), 3, "unique non-sequenced zones must not create state");
+
+        router.reset_stream("voice-a");
+        let b2 = router.next_selection(&manifest, "voice-b", 60, 90);
+        assert_eq!(b2.selected_region_index, Some(2), "resetting voice A must not reset voice B");
+        let a_restart = router.next_selection(&manifest, "voice-a", 60, 90);
+        assert_eq!(a_restart.selected_region_index, Some(1));
+    }
+
+    #[test]
+    fn round_robin_does_not_advance_on_invalid_or_ambiguous_requests() {
+        let incomplete = parse_sfz_mapping(
+            "<group> key=60 seq_length=2\n<region> seq_position=1 sample=one.wav",
+        ).unwrap();
+        let mut router = SfzRoundRobinSequencerV1::new();
+        let invalid = router.next_selection(&incomplete, "voice-a", 60, 90);
+        assert_eq!(invalid.decision, "incomplete_round_robin_set");
+        assert_eq!(router.stream_count(), 0);
+
+        let ambiguous = parse_sfz_mapping(
+            "<group> key=60\n<region> sample=one.wav\n<region> sample=two.wav",
+        ).unwrap();
+        let no_selection = router.next_selection(&ambiguous, "voice-a", 60, 90);
+        assert_eq!(no_selection.decision, "ambiguous_zones");
+        assert_eq!(router.stream_count(), 0);
+    }
+
+    #[test]
+    fn round_robin_requires_a_nonblank_explicit_stream_id() {
+        let manifest = parse_sfz_mapping(
+            "<group> key=60 seq_length=2\n<region> seq_position=1 sample=one.wav\n<region> seq_position=2 sample=two.wav",
+        ).unwrap();
+        let mut router = SfzRoundRobinSequencerV1::new();
+        let receipt = router.next_selection(&manifest, "  ", 60, 90);
+        assert_eq!(receipt.decision, "invalid_stream_id");
+        assert_eq!(receipt.selected_region_index, None);
+        assert_eq!(router.stream_count(), 0);
     }
 
     #[test]
