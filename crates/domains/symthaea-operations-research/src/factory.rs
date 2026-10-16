@@ -305,12 +305,187 @@ pub fn plan_factory_line(
     let heuristic_gap_seconds =
         makespan_seconds.saturating_sub(critical_path_lower_bound_seconds);
 
-    Ok(FactorySchedule {
+    let result = FactorySchedule {
         operations: schedule,
         makespan_seconds,
         critical_path_lower_bound_seconds,
         heuristic_gap_seconds,
-    })
+    };
+    verify_factory_schedule(operations, workers, resources, &result)?;
+    Ok(result)
+}
+
+/// Independently verify a schedule from the declared operations, workers, resources and
+/// emitted assignments. This checks every operation exactly once, requirements, time
+/// windows, precedence, no overlap, deterministic ordering, makespan and lower-bound
+/// metadata. It does not assume that a schedule returned by the planner is trustworthy.
+pub fn verify_factory_schedule(
+    operations: &[FactoryOperation],
+    workers: &[FactoryWorker],
+    resources: &[FactoryResource],
+    schedule: &FactorySchedule,
+) -> Result<(), FactoryScheduleError> {
+    if operations.is_empty() || workers.is_empty() || resources.is_empty() {
+        return Err(FactoryScheduleError::InvalidInput(
+            "operations, workers, and resources must all be non-empty".into(),
+        ));
+    }
+    let operation_map = index_operations(operations)?;
+    validate_predecessors(operations, &operation_map)?;
+    validate_workers(workers)?;
+    validate_resources(resources)?;
+
+    if schedule.operations.len() != operations.len() {
+        return Err(FactoryScheduleError::InvalidInput(format!(
+            "schedule has {} assignments for {} operations",
+            schedule.operations.len(),
+            operations.len()
+        )));
+    }
+
+    let worker_map: BTreeMap<&str, &FactoryWorker> = workers
+        .iter()
+        .map(|worker| (worker.id.as_str(), worker))
+        .collect();
+    let resource_map: BTreeMap<&str, &FactoryResource> = resources
+        .iter()
+        .map(|resource| (resource.id.as_str(), resource))
+        .collect();
+    let mut assignments: BTreeMap<String, &ScheduledOperation> = BTreeMap::new();
+
+    for assignment in &schedule.operations {
+        let operation = operation_map
+            .get(&assignment.operation_id)
+            .ok_or_else(|| FactoryScheduleError::InvalidInput(format!(
+                "schedule references unknown operation {:?}",
+                assignment.operation_id
+            )))?;
+        if assignments.insert(assignment.operation_id.clone(), assignment).is_some() {
+            return Err(FactoryScheduleError::InvalidInput(format!(
+                "schedule contains duplicate assignment for operation {:?}",
+                assignment.operation_id
+            )));
+        }
+        if assignment.finish_seconds < assignment.start_seconds
+            || assignment.finish_seconds.checked_sub(assignment.start_seconds)
+                != Some(operation.duration_seconds)
+        {
+            return Err(FactoryScheduleError::InvalidInput(format!(
+                "assignment interval for {:?} does not equal its declared duration",
+                assignment.operation_id
+            )));
+        }
+        let recomputed_finish = assignment.start_seconds
+            .checked_add(operation.duration_seconds)
+            .ok_or_else(|| FactoryScheduleError::TimeOverflow(operation.id.clone()))?;
+        if recomputed_finish != assignment.finish_seconds {
+            return Err(FactoryScheduleError::InvalidInput(format!(
+                "assignment finish time for {:?} is inconsistent",
+                operation.id
+            )));
+        }
+
+        let worker = worker_map
+            .get(assignment.worker_id.as_str())
+            .ok_or_else(|| FactoryScheduleError::InvalidInput(format!(
+                "assignment for {:?} references unknown worker {:?}",
+                operation.id, assignment.worker_id
+            )))?;
+        let resource = resource_map
+            .get(assignment.resource_id.as_str())
+            .ok_or_else(|| FactoryScheduleError::InvalidInput(format!(
+                "assignment for {:?} references unknown resource {:?}",
+                operation.id, assignment.resource_id
+            )))?;
+
+        if !contains_all(&worker.skills, &operation.required_skills)
+            || !contains_all(&resource.capabilities, &operation.required_resource_capabilities)
+        {
+            return Err(FactoryScheduleError::NoQualifiedAssignment(operation.id.clone()));
+        }
+        if assignment.start_seconds < worker.available_from_seconds
+            || assignment.finish_seconds > worker.available_until_seconds
+            || assignment.start_seconds < resource.available_from_seconds
+            || assignment.finish_seconds > resource.available_until_seconds
+        {
+            return Err(FactoryScheduleError::NoFeasiblePlacement(operation.id.clone()));
+        }
+    }
+
+    for operation in operations {
+        let assignment = assignments.get(&operation.id).ok_or_else(|| {
+            FactoryScheduleError::InvalidInput(format!(
+                "schedule omits operation {:?}",
+                operation.id
+            ))
+        })?;
+        for predecessor in &operation.predecessors {
+            let predecessor_assignment = assignments.get(predecessor).ok_or_else(|| {
+                FactoryScheduleError::InvalidInput(format!(
+                    "schedule omits predecessor {:?}",
+                    predecessor
+                ))
+            })?;
+            if predecessor_assignment.finish_seconds > assignment.start_seconds {
+                return Err(FactoryScheduleError::InvalidInput(format!(
+                    "operation {:?} starts before predecessor {:?} finishes",
+                    operation.id, predecessor
+                )));
+            }
+        }
+    }
+
+    for left in 0..schedule.operations.len() {
+        for right in (left + 1)..schedule.operations.len() {
+            let a = &schedule.operations[left];
+            let b = &schedule.operations[right];
+            let overlaps = a.start_seconds < b.finish_seconds
+                && b.start_seconds < a.finish_seconds;
+            if overlaps && (a.worker_id == b.worker_id || a.resource_id == b.resource_id) {
+                return Err(FactoryScheduleError::InvalidInput(format!(
+                    "resource/worker overlap between {:?} and {:?}",
+                    a.operation_id, b.operation_id
+                )));
+            }
+        }
+    }
+
+    if schedule.operations.windows(2).any(|pair| {
+        (pair[0].start_seconds, pair[0].finish_seconds, &pair[0].operation_id)
+            > (pair[1].start_seconds, pair[1].finish_seconds, &pair[1].operation_id)
+    }) {
+        return Err(FactoryScheduleError::InvalidInput(
+            "schedule operations are not in canonical order".into(),
+        ));
+    }
+
+    let actual_makespan = schedule.operations
+        .iter()
+        .map(|assignment| assignment.finish_seconds)
+        .max()
+        .unwrap_or(0);
+    if schedule.makespan_seconds != actual_makespan {
+        return Err(FactoryScheduleError::InvalidInput(
+            "reported makespan does not match assignments".into(),
+        ));
+    }
+    let critical_path = critical_path_lower_bound(operations, &operation_map)?;
+    if schedule.critical_path_lower_bound_seconds != critical_path {
+        return Err(FactoryScheduleError::InvalidInput(
+            "reported critical-path lower bound does not match operation graph".into(),
+        ));
+    }
+    let gap = actual_makespan.checked_sub(critical_path).ok_or_else(|| {
+        FactoryScheduleError::InvalidInput(
+            "schedule makespan is below the precedence-only critical path".into(),
+        )
+    })?;
+    if schedule.heuristic_gap_seconds != gap {
+        return Err(FactoryScheduleError::InvalidInput(
+            "reported heuristic gap does not match makespan and lower bound".into(),
+        ));
+    }
+    Ok(())
 }
 
 fn index_operations<'a>(
@@ -634,6 +809,27 @@ mod tests {
         let harness = schedule.operations.iter().find(|op| op.operation_id == "build_harness").unwrap();
         assert_eq!(cut.start_seconds, harness.start_seconds);
         assert!(cut.finish_seconds >= harness.finish_seconds);
+    }
+
+    #[test]
+    fn independent_verifier_accepts_plan_and_rejects_mutated_schedule() {
+        let (operations, workers, resources) = aircraft_line();
+        let schedule = plan_factory_line(&operations, &workers, &resources).unwrap();
+        assert!(verify_factory_schedule(&operations, &workers, &resources, &schedule).is_ok());
+
+        let mut corrupted = schedule.clone();
+        let final_inspection = corrupted
+            .operations
+            .iter_mut()
+            .find(|assignment| assignment.operation_id == "final_inspection")
+            .unwrap();
+        final_inspection.start_seconds = 0;
+        final_inspection.finish_seconds = 15;
+        assert!(verify_factory_schedule(&operations, &workers, &resources, &corrupted).is_err());
+
+        let mut wrong_metrics = schedule.clone();
+        wrong_metrics.makespan_seconds += 1;
+        assert!(verify_factory_schedule(&operations, &workers, &resources, &wrong_metrics).is_err());
     }
 
     #[test]
