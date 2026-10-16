@@ -62,6 +62,20 @@ pub struct BioacousticEventPredictionBundle {
     pub predictions: Vec<PredictedBioacousticEvent>,
 }
 
+impl BioacousticEventPredictionBundle {
+    /// Stable BLAKE3 identity for the prediction bundle, independent of list
+    /// order where order has no scoring semantics.
+    pub fn computed_bundle_blake3(&self) -> Result<String, String> {
+        let mut canonical = self.clone();
+        canonical.target_labels.sort();
+        canonical.exhaustive_annotation_sample_ids.sort();
+        canonical.predictions.sort_by(|left, right| left.prediction_id.cmp(&right.prediction_id));
+        let bytes = serde_json::to_vec(&canonical)
+            .map_err(|error| format!("cannot serialize prediction bundle: {error}"))?;
+        Ok(blake3::hash(&bytes).to_hex().to_string())
+    }
+}
+
 #[derive(Clone, Debug, PartialEq, Serialize, Deserialize)]
 pub struct BioacousticEventMetrics {
     pub true_positives: u64,
@@ -120,6 +134,7 @@ pub struct BioacousticEventEvaluationReport {
     pub dataset_id: String,
     pub dataset_revision: String,
     pub corpus_manifest_blake3: String,
+    pub prediction_bundle_blake3: String,
     pub scored_split: BioacousticSplit,
     pub task_id: String,
     pub model_id: String,
@@ -135,6 +150,8 @@ pub struct BioacousticEventEvaluationReport {
     pub audio_bytes_verified_by_this_evaluator: bool,
     pub annotation_truth_authenticated_by_this_evaluator: bool,
     pub model_executed_by_this_evaluator: bool,
+    pub prediction_provenance_authenticated_by_this_evaluator: bool,
+    pub validation_threshold_selection_authenticated_by_this_evaluator: bool,
 }
 
 #[derive(Clone, Debug)]
@@ -167,6 +184,7 @@ pub fn evaluate_bioacoustic_events(
         return Err("prediction bundle dataset ID/revision does not match corpus manifest".into());
     }
     let computed_manifest_hash = manifest.computed_manifest_blake3()?;
+    let computed_bundle_hash = bundle.computed_bundle_blake3()?;
     if !bundle
         .corpus_manifest_blake3
         .eq_ignore_ascii_case(&computed_manifest_hash)
@@ -344,6 +362,7 @@ pub fn evaluate_bioacoustic_events(
         dataset_id: manifest.dataset_id.clone(),
         dataset_revision: manifest.dataset_revision.clone(),
         corpus_manifest_blake3: computed_manifest_hash,
+        prediction_bundle_blake3: computed_bundle_hash,
         scored_split: BioacousticSplit::Test,
         task_id: bundle.task_id.clone(),
         model_id: bundle.model_id.clone(),
@@ -359,6 +378,8 @@ pub fn evaluate_bioacoustic_events(
         audio_bytes_verified_by_this_evaluator: false,
         annotation_truth_authenticated_by_this_evaluator: false,
         model_executed_by_this_evaluator: false,
+        prediction_provenance_authenticated_by_this_evaluator: false,
+        validation_threshold_selection_authenticated_by_this_evaluator: false,
     })
 }
 
