@@ -284,6 +284,14 @@ fn validate_fixture(
     }
     let sfz_source = std::str::from_utf8(&sfz_bytes)?;
     let parse_result = parse_sfz_mapping(sfz_source);
+    if let Ok(parsed_manifest) = &parse_result {
+        if parsed_manifest.sfz_sha256 != fixture.sfz_sha256 {
+            failures.push(format!(
+                "parser manifest SFZ hash mismatch: expected {}, got {}",
+                fixture.sfz_sha256, parsed_manifest.sfz_sha256
+            ));
+        }
+    }
     let parser_outcome = match (&fixture.parser_expectation[..], &parse_result) {
         ("parse_success", Ok(_)) => "parse_success",
         ("parse_success_with_unhandled_opcode", Ok(manifest))
@@ -356,6 +364,16 @@ fn validate_fixture(
     // Missing-sample fixture is intentionally allowed to reference one absent
     // asset. Every other timeline asset reference must be represented by the
     // declared fixture asset list.
+    if fixture.fixture_id == "missing_sample_asset" {
+        match safe_join(fixture_dir, "intentionally_missing.wav") {
+            Ok(path) => match fs::symlink_metadata(&path) {
+                Err(error) if error.kind() == io::ErrorKind::NotFound => {}
+                Ok(_) => failures.push("the intentionally missing sample unexpectedly exists".to_owned()),
+                Err(error) => failures.push(format!("cannot verify intentionally missing sample: {error}")),
+            },
+            Err(error) => failures.push(format!("invalid intentionally-missing sample path: {error}")),
+        }
+    }
     for step in &fixture.timeline {
         if let Some(sample_path) = step.expected_sample_path.as_deref() {
             let declared = fixture.sample_assets.iter().any(|asset| asset.path == sample_path);
@@ -456,6 +474,13 @@ fn validate_timeline(
             failure = Some("timeline ordinal is not contiguous".to_owned());
         }
         if step.event != "note_on" {
+            if step.event != "note_off"
+                || step.expected_selection_decision != "not_applicable_note_off"
+                || step.expected_region_index.is_some()
+                || step.expected_sample_path.is_some()
+            {
+                failure = Some("non-note-on timeline entry is not an explicit non-selecting event".to_owned());
+            }
             results.push(TimelineValidationV1 {
                 ordinal: step.ordinal,
                 event: step.event.clone(),
