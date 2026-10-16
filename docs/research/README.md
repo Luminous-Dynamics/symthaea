@@ -346,3 +346,5 @@ Open an issue on GitHub for research discussions.
 - [Rust service-continuity screening module](../../crates/domains/symthaea-engineering/src/resilient_service_screening.rs) — deterministic dependency/outage/recovery abstraction with unit tests; not calibrated for real-world prediction.
 
 - [Finite-resource screening module](../../crates/domains/symthaea-engineering/src/resource_constrained_screening.rs) — deterministic shared inventory, bounded replenishment, supply disruptions, resource competition and per-service traces; not calibrated for real-world prediction.
+
+- [Repair crew scheduling module](../../crates/domains/symthaea-engineering/src/repair_crew_scheduling.rs) — deterministic policy comparison with skill constraints, task precedence, finite spare parts and horizon accounting; not an optimal solver.
