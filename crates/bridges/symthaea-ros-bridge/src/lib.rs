@@ -155,6 +155,8 @@ pub struct RosPartialHumanoidObservationV1 {
     pub root_position_world_m: RosEvidenceValueV1<[f64; 3]>,
     pub root_linear_velocity_world_mps: RosEvidenceValueV1<[f64; 3]>,
     pub center_of_mass_velocity_world_mps: RosEvidenceValueV1<[f64; 3]>,
+    pub head_height_world_m: RosEvidenceValueV1<f64>,
+    pub extremities_world_m: RosEvidenceValueV1<Vec<f64>>,
 }
 
 /// Reorder one ROS JointState value array into the bridge's explicit model order.
@@ -682,12 +684,36 @@ impl RosBridgeNode {
         if let RosEvidenceValueV1::Unavailable { reason, .. } = &imu.orientation_wxyz {
             return Err(RosBridgeError::SensorDataUnavailable(reason.clone()));
         }
+        if let RosEvidenceValueV1::Unavailable { reason, .. } =
+            &observation.joint_state.velocities
+        {
+            return Err(RosBridgeError::SensorDataUnavailable(reason.clone()));
+        }
         if let RosEvidenceValueV1::Unavailable { reason, .. } = &imu.angular_velocity_body_rad_s {
+            return Err(RosBridgeError::SensorDataUnavailable(reason.clone()));
+        }
+        if let RosEvidenceValueV1::Unavailable { reason, .. } =
+            &observation.root_linear_velocity_world_mps
+        {
+            return Err(RosBridgeError::SensorDataUnavailable(reason.clone()));
+        }
+        if let RosEvidenceValueV1::Unavailable { reason, .. } =
+            &observation.center_of_mass_velocity_world_mps
+        {
+            return Err(RosBridgeError::SensorDataUnavailable(reason.clone()));
+        }
+        if let RosEvidenceValueV1::Unavailable { reason, .. } = &observation.root_position_world_m {
+            return Err(RosBridgeError::SensorDataUnavailable(reason.clone()));
+        }
+        if let RosEvidenceValueV1::Unavailable { reason, .. } = &observation.head_height_world_m {
+            return Err(RosBridgeError::SensorDataUnavailable(reason.clone()));
+        }
+        if let RosEvidenceValueV1::Unavailable { reason, .. } = &observation.extremities_world_m {
             return Err(RosBridgeError::SensorDataUnavailable(reason.clone()));
         }
 
         Err(RosBridgeError::SensorDataUnavailable(
-            "root linear velocity and center-of-mass velocity are not available from a qualified, clock/frame-bound source; IMU acceleration cannot substitute for velocity".into(),
+            "complete humanoid state construction is blocked: every required field must be explicitly available and qualified".into(),
         ))
     }
 
@@ -847,6 +873,14 @@ impl RosBridgeNode {
             },
             center_of_mass_velocity_world_mps: RosEvidenceValueV1::Unavailable {
                 reason: "Center-of-mass velocity is not measured or estimated by this bridge".into(),
+                source: None,
+            },
+            head_height_world_m: RosEvidenceValueV1::Unavailable {
+                reason: "Head height requires qualified kinematics/model geometry or a tracked frame".into(),
+                source: None,
+            },
+            extremities_world_m: RosEvidenceValueV1::Unavailable {
+                reason: "Extremity positions require qualified kinematics and frame transforms".into(),
                 source: None,
             },
         })
@@ -1458,6 +1492,18 @@ mod tests {
             ));
             assert!(matches!(
                 partial.root_linear_velocity_world_mps,
+                RosEvidenceValueV1::Unavailable { .. }
+            ));
+            assert!(matches!(
+                partial.joint_state.efforts,
+                RosEvidenceValueV1::Unavailable { .. }
+            ));
+            assert!(matches!(
+                partial.head_height_world_m,
+                RosEvidenceValueV1::Unavailable { .. }
+            ));
+            assert!(matches!(
+                partial.extremities_world_m,
                 RosEvidenceValueV1::Unavailable { .. }
             ));
 
