@@ -10,8 +10,8 @@ use symthaea_marine_bench::experiment_selection::{
 
 fn main() -> Result<(), Box<dyn Error>> {
     let seeds: Vec<u64> = (0..DEFAULT_PAIRED_SEEDS as u64).collect();
-    let source_revision =
-        std::env::var("GITHUB_SHA").unwrap_or_else(|_| "unavailable".to_owned());
+    let source_revision = std::env::var("SYMTHAEA_SOURCE_REVISION")
+        .unwrap_or_else(|_| "unavailable".to_owned());
     let receipt = run_reference_benchmark_with_revision(
         DEFAULT_SCENARIOS,
         &seeds,
