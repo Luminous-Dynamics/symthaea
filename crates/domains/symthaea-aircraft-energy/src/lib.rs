@@ -618,6 +618,46 @@ mod tests {
     }
 
     #[test]
+    fn missing_duty_class_is_indeterminate() {
+        let profile = mission(vec![MissionSegment {
+            id: "unclassified".into(),
+            duration_s: Some(10.0),
+            required_bus_power_w: Some(100.0),
+            duty_class: None,
+        }]);
+        let result = evaluate_mission(&profile, &system(1_000.0, 0.1, 200.0, 400.0, 30.0));
+        assert_eq!(result.disposition, Disposition::Indeterminate);
+        assert!(result.findings.iter().any(|f| matches!(f, Finding::MissingInput { field } if field.ends_with("duty_class"))));
+    }
+
+    #[test]
+    fn reserve_of_one_is_rejected_as_indeterminate() {
+        let profile = mission(vec![MissionSegment::new("cruise", 60.0, 100.0, DutyClass::Continuous)]);
+        let mut invalid = system(1_000.0, 0.1, 200.0, 400.0, 30.0);
+        invalid.reserve_fraction = Some(1.0);
+        assert_eq!(evaluate_mission(&profile, &invalid).disposition, Disposition::Indeterminate);
+    }
+
+    #[test]
+    fn energy_arithmetic_overflow_is_indeterminate() {
+        let profile = mission(vec![MissionSegment::new(
+            "overflow",
+            f64::MAX,
+            f64::MAX,
+            DutyClass::Continuous,
+        )]);
+        let result = evaluate_mission(&profile, &system(1.0e300, 0.1, f64::MAX, f64::MAX, f64::MAX));
+        assert_eq!(result.disposition, Disposition::Indeterminate);
+        assert!(result.findings.iter().any(|f| matches!(f, Finding::InvalidInput { field, .. } if field == "mission.required_energy_wh")));
+    }
+
+    #[test]
+    fn zero_duration_segments_are_rejected() {
+        let profile = mission(vec![MissionSegment::new("instantaneous", 0.0, 100.0, DutyClass::Peak)]);
+        assert_eq!(evaluate_mission(&profile, &system(1_000.0, 0.1, 200.0, 400.0, 30.0)).disposition, Disposition::Indeterminate);
+    }
+
+    #[test]
     fn invalid_pack_derating_is_rejected_before_envelope_creation() {
         let pack = BatteryPackSpec {
             installed_pack_mass_kg: 10.0,
