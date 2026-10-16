@@ -124,6 +124,12 @@
       "artifact_id": "synthetic-values",
       "kind": "synthetic_fixture",
       "description": "Hand-authored numbers satisfying the intended accounting identity; not measured, published, or simulated physical-system data."
+    },
+    {
+      "artifact_id": "synthetic-bias-calibration-placeholder",
+      "kind": "synthetic_fixture",
+      "description": "Synthetic placeholder used only to test calibration-reference integrity; not calibrated evidence.",
+      "sha256": "8736745084b1d9c41d93d15fc6e9700607126e94fb619a5e0d0420234e2d7d62"
     }
   ],
   "computed_metrics": {
@@ -147,11 +153,13 @@
     "relative_balance_tolerance": 1e-9,
     "time_continuity_tolerance_s": 1e-9,
     "minimum_superiority_margin": 0.05,
-    "maximum_unmodeled_differential_bias_efficiency": 0.0,
+    "maximum_unmodeled_differential_bias_efficiency": 0,
     "differential_bias_bound_basis": "Synthetic fixture only; not evidence that real systematic bias is zero.",
     "baseline_id": "none-synthetic-only",
     "selection_rule": "No decision permitted: fixture exists only to validate schema and verifier behavior.",
     "search_started_at": "2026-10-15T01:00:00Z",
-    "comparison_metric_id": "net_cycle_efficiency"
+    "comparison_metric_id": "net_cycle_efficiency",
+    "differential_bias_calibration_artifact_id": "synthetic-bias-calibration-placeholder",
+    "differential_bias_calibration_artifact_sha256": "8736745084b1d9c41d93d15fc6e9700607126e94fb619a5e0d0420234e2d7d62"
   }
 }
