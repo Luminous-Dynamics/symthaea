@@ -1,0 +1,62 @@
+[
+  {
+    "id": "candidate-a",
+    "features": [
+      0,
+      0
+    ],
+    "predicted_goal_error": 0.12,
+    "uncertainty": 0.2,
+    "estimated_cost": 1,
+    "eligible": true,
+    "already_queried": false
+  },
+  {
+    "id": "candidate-b",
+    "features": [
+      0.02,
+      0.02
+    ],
+    "predicted_goal_error": 0.1,
+    "uncertainty": 0.3,
+    "estimated_cost": 1.1,
+    "eligible": true,
+    "already_queried": false
+  },
+  {
+    "id": "candidate-c",
+    "features": [
+      0.8,
+      0.8
+    ],
+    "predicted_goal_error": 0.2,
+    "uncertainty": 0.8,
+    "estimated_cost": 1.5,
+    "eligible": true,
+    "already_queried": false
+  },
+  {
+    "id": "candidate-d",
+    "features": [
+      -0.8,
+      0.8
+    ],
+    "predicted_goal_error": 0.25,
+    "uncertainty": 0.6,
+    "estimated_cost": 1.2,
+    "eligible": true,
+    "already_queried": false
+  },
+  {
+    "id": "candidate-e-already-queried",
+    "features": [
+      0.5,
+      -0.5
+    ],
+    "predicted_goal_error": 0.15,
+    "uncertainty": 0.4,
+    "estimated_cost": 0.9,
+    "eligible": true,
+    "already_queried": true
+  }
+]
