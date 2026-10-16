@@ -68,6 +68,25 @@ def count_test_functions(test_source: bytes) -> int:
     )
 
 
+def safe_workspace_file(root: Path, relative: str) -> Path:
+    path = Path(relative)
+    if path.is_absolute() or ".." in path.parts or not path.parts:
+        raise ReportFailure(f"unsafe evidence path: {relative!r}")
+    cursor = root
+    for part in path.parts:
+        cursor = cursor / part
+        if cursor.is_symlink():
+            raise ReportFailure(f"symlink components are forbidden in evidence paths: {relative}")
+    try:
+        resolved = cursor.resolve(strict=True)
+        resolved.relative_to(root)
+    except (OSError, ValueError) as exc:
+        raise ReportFailure(f"evidence path is missing or escapes workspace: {relative}") from exc
+    if not resolved.is_file():
+        raise ReportFailure(f"evidence path is not a regular file: {relative}")
+    return resolved
+
+
 def build_report(
     workspace: str | Path,
     env: dict[str, str],
@@ -102,16 +121,7 @@ def build_report(
 
     files: list[dict[str, Any]] = []
     for relative in (*SOURCE_PATHS, test_log_relative_path):
-        path = Path(relative)
-        if path.is_absolute() or ".." in path.parts or not path.parts:
-            raise ReportFailure(f"unsafe evidence path: {relative!r}")
-        file_path = root / path
-        if file_path.is_symlink() or not file_path.is_file():
-            raise ReportFailure(f"required evidence file is missing or unsafe: {relative}")
-        try:
-            file_path.resolve(strict=True).relative_to(root)
-        except (ValueError, OSError) as exc:
-            raise ReportFailure(f"evidence path escapes workspace: {relative}") from exc
+        file_path = safe_workspace_file(root, relative)
         data = file_path.read_bytes()
         if relative == test_log_relative_path and not data:
             raise ReportFailure("test log is empty")
@@ -183,10 +193,21 @@ def main() -> int:
     try:
         report = build_report(root, dict(os.environ), args.test_log)
         output = Path(args.output)
-        if output.is_absolute() or ".." in output.parts:
-            raise ReportFailure("output must be a relative path within the workspace")
+        if output.is_absolute() or ".." in output.parts or not output.parts:
+            raise ReportFailure("output must be a safe relative path within the workspace")
         output_path = root / output
-        output_path.parent.mkdir(parents=True, exist_ok=True)
+        parent = root
+        for part in output.parts[:-1]:
+            parent = parent / part
+            if parent.is_symlink():
+                raise ReportFailure(f"symlink components are forbidden in report output: {args.output}")
+            if parent.exists() and not parent.is_dir():
+                raise ReportFailure(f"report output parent is not a directory: {args.output}")
+        parent.mkdir(parents=True, exist_ok=True)
+        try:
+            parent.resolve(strict=True).relative_to(root)
+        except (ValueError, OSError) as exc:
+            raise ReportFailure(f"report output escapes workspace: {args.output}") from exc
         if output_path.exists() or output_path.is_symlink():
             raise ReportFailure(f"refusing to overwrite existing report: {args.output}")
         output_path.write_text(
