@@ -5,6 +5,7 @@
 //! and independent structural receipt verification.
 
 use serde::{Deserialize, Serialize};
+use sha2::{Digest, Sha256};
 use std::io::{self, BufRead, Write};
 
 /// Maximum input line size is shared with the library request contract.
@@ -26,6 +27,32 @@ struct ReceiptEnvelopeError {
     message: String,
 }
 
+enum BoundedLine {
+    Accepted(Vec<u8>),
+    TooLarge { sha256: String },
+}
+
+fn digest_hex(bytes: &[u8]) -> String {
+    format!("{:x}", Sha256::digest(bytes))
+}
+
+fn rejected_request_line(sha256: String, error_code: &str, message: &str) -> String {
+    let response = symthaea_nano_policy::ErrorResponse {
+        schema_version: symthaea_nano_policy::SCHEMA_VERSION.to_owned(),
+        status: "rejected_input".to_owned(),
+        request_sha256: sha256,
+        error_code: error_code.to_owned(),
+        message: message.chars().take(300).collect(),
+    };
+    serde_json::to_string(&response).unwrap_or_else(|_| {
+        format!(
+            "{{\"schema_version\":\"{}\",\"status\":\"internal_serialization_error\",\"request_sha256\":\"{}\"}}",
+            symthaea_nano_policy::SCHEMA_VERSION,
+            "0".repeat(64)
+        )
+    })
+}
+
 fn rejected_receipt_envelope(message: impl Into<String>) -> String {
     let response = ReceiptEnvelopeError {
         schema_version: symthaea_nano_policy::SCHEMA_VERSION.to_owned(),
@@ -39,6 +66,111 @@ fn rejected_receipt_envelope(message: impl Into<String>) -> String {
             symthaea_nano_policy::SCHEMA_VERSION
         )
     })
+}
+
+/// Commit a byte to the rolling raw-line digest and retain it only while within
+/// the configured size limit. After overflow, continue hashing and draining but
+/// never retain more bytes for this input line.
+fn commit_line_byte(
+    byte: u8,
+    max_bytes: usize,
+    line_len: &mut usize,
+    too_large: &mut bool,
+    kept: &mut Vec<u8>,
+    hasher: &mut Sha256,
+) {
+    hasher.update([byte]);
+    *line_len = line_len.saturating_add(1);
+    if *line_len > max_bytes {
+        *too_large = true;
+        kept.clear();
+    } else if !*too_large {
+        kept.push(byte);
+    }
+}
+
+/// Read one line without allowing an unterminated or oversized line to grow
+/// memory without bound. The digest excludes LF and the optional CR in CRLF.
+fn read_bounded_line<R: BufRead>(
+    reader: &mut R,
+    max_bytes: usize,
+) -> io::Result<Option<BoundedLine>> {
+    let mut kept = Vec::with_capacity(max_bytes.min(64 * 1024));
+    let mut hasher = Sha256::new();
+    let mut line_len = 0usize;
+    let mut too_large = false;
+    let mut pending: Option<u8> = None;
+    let mut saw_any_byte = false;
+
+    loop {
+        let (consumed, newline_found, chunk_len) = {
+            let available = reader.fill_buf()?;
+            if available.is_empty() {
+                if !saw_any_byte {
+                    return Ok(None);
+                }
+                break;
+            }
+
+            let newline = available.iter().position(|byte| *byte == b'\n');
+            let consumed = newline.map_or(available.len(), |position| position + 1);
+            let content_len = newline.unwrap_or(consumed);
+
+            for &byte in &available[..content_len] {
+                saw_any_byte = true;
+                if let Some(previous) = pending.replace(byte) {
+                    commit_line_byte(
+                        previous,
+                        max_bytes,
+                        &mut line_len,
+                        &mut too_large,
+                        &mut kept,
+                        &mut hasher,
+                    );
+                }
+            }
+            (consumed, newline.is_some(), content_len)
+        };
+        let _ = chunk_len;
+        reader.consume(consumed);
+
+        if newline_found {
+            // The pending CR in CRLF is a line terminator, not JSON content.
+            if let Some(last) = pending.take() {
+                if last != b'\r' {
+                    commit_line_byte(
+                        last,
+                        max_bytes,
+                        &mut line_len,
+                        &mut too_large,
+                        &mut kept,
+                        &mut hasher,
+                    );
+                }
+            }
+            break;
+        }
+    }
+
+    // EOF without LF: a pending byte is ordinary line content (including CR).
+    if let Some(last) = pending.take() {
+        commit_line_byte(
+            last,
+            max_bytes,
+            &mut line_len,
+            &mut too_large,
+            &mut kept,
+            &mut hasher,
+        );
+    }
+
+    if too_large {
+        Ok(Some(BoundedLine::TooLarge {
+            sha256: format!("{:x}", hasher.finalize()),
+        }))
+    } else {
+        Ok(Some(BoundedLine::Accepted(kept)))
+    }
 }
 
 fn handle_receipt_line(line: &str) -> String {
@@ -80,23 +212,49 @@ fn main() -> io::Result<()> {
 
     let stdin = io::stdin();
     let stdout = io::stdout();
+    let mut reader = stdin.lock();
     let mut output = stdout.lock();
 
-    for line in stdin.lock().lines() {
-        let line = match line {
-            Ok(line) => line,
-            Err(error) => {
-                eprintln!("nano-policy: unable to read stdin line: {error}");
-                return Err(error);
+    while let Some(line) = read_bounded_line(&mut reader, MAX_LINE_BYTES)? {
+        let response = match line {
+            BoundedLine::TooLarge { sha256 } => {
+                if mode {
+                    rejected_receipt_envelope(format!(
+                        "receipt envelope exceeds {MAX_LINE_BYTES} bytes"
+                    ))
+                } else {
+                    rejected_request_line(
+                        sha256,
+                        "request_too_large",
+                        &format!("request line exceeds {MAX_LINE_BYTES} bytes"),
+                    )
+                }
             }
-        };
-        if line.trim().is_empty() {
-            continue;
-        }
-        let response = if mode {
-            handle_receipt_line(&line)
-        } else {
-            symthaea_nano_policy::handle_line(&line)
+            BoundedLine::Accepted(bytes) => {
+                let line = match String::from_utf8(bytes) {
+                    Ok(line) => line,
+                    Err(error) => {
+                        if mode {
+                            rejected_receipt_envelope("input line is not valid UTF-8")
+                        } else {
+                            let raw = error.into_bytes();
+                            rejected_request_line(
+                                digest_hex(&raw),
+                                "invalid_utf8",
+                                "request line is not valid UTF-8",
+                            )
+                        }
+                    }
+                };
+                if line.trim().is_empty() {
+                    continue;
+                }
+                if mode {
+                    handle_receipt_line(&line)
+                } else {
+                    symthaea_nano_policy::handle_line(&line)
+                }
+            }
         };
         writeln!(output, "{response}")?;
     }
@@ -107,7 +265,47 @@ fn main() -> io::Result<()> {
 mod tests {
     use super::*;
     use serde_json::json;
+    use std::io::Cursor;
     use symthaea_nano_policy::receipt::ReceiptAudit;
+
+    #[test]
+    fn bounded_reader_accepts_exact_limit_and_strips_crlf() {
+        let mut reader = Cursor::new(b"abc\r\nnext".to_vec());
+        match read_bounded_line(&mut reader, 3).unwrap().unwrap() {
+            BoundedLine::Accepted(line) => assert_eq!(line, b"abc"),
+            BoundedLine::TooLarge { .. } => panic!("exact limit should pass"),
+        }
+        match read_bounded_line(&mut reader, 4).unwrap().unwrap() {
+            BoundedLine::Accepted(line) => assert_eq!(line, b"next"),
+            BoundedLine::TooLarge { .. } => panic!("EOF line should pass"),
+        }
+        assert!(read_bounded_line(&mut reader, 4).unwrap().is_none());
+    }
+
+    #[test]
+    fn bounded_reader_drains_oversized_line_and_preserves_next_record() {
+        let raw = b"abcdef\nok".to_vec();
+        let expected_digest = digest_hex(b"abcdef");
+        let mut reader = Cursor::new(raw);
+        match read_bounded_line(&mut reader, 3).unwrap().unwrap() {
+            BoundedLine::TooLarge { sha256 } => assert_eq!(sha256, expected_digest),
+            BoundedLine::Accepted(_) => panic!("oversized record must be rejected"),
+        }
+        match read_bounded_line(&mut reader, 3).unwrap().unwrap() {
+            BoundedLine::Accepted(line) => assert_eq!(line, b"ok"),
+            BoundedLine::TooLarge { .. } => panic!("next record should be independently read"),
+        }
+    }
+
+    #[test]
+    fn bounded_reader_hashes_crlf_without_terminator() {
+        let mut reader = Cursor::new(b"oversized\r\n".to_vec());
+        let expected_digest = digest_hex(b"oversized");
+        match read_bounded_line(&mut reader, 3).unwrap().unwrap() {
+            BoundedLine::TooLarge { sha256 } => assert_eq!(sha256, expected_digest),
+            BoundedLine::Accepted(_) => panic!("oversized record must be rejected"),
+        }
+    }
 
     #[test]
     fn cli_receipt_mode_accepts_an_exact_request_response_pair() {
