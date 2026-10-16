@@ -6,12 +6,14 @@
 //! essential-needs floor. Inputs must come from a versioned evidence package;
 //! do not replace missing observations with zeroes.
 
+use serde::{Deserialize, Serialize};
 use std::fmt;
 
 /// Per-resident outcomes for a fixed scenario, boundary, time horizon, and
 /// evidence snapshot. Ratios are in [0, 1]; non-ratio quantities use the units
 /// embedded in their field names. This struct deliberately carries no weights.
-#[derive(Debug, Clone, Copy, PartialEq)]
+#[derive(Debug, Clone, Copy, PartialEq, Serialize, Deserialize)]
+#[serde(deny_unknown_fields)]
 pub struct CityMetrics {
     /// Share of residents with accessible routes to locally designated essentials.
     pub essential_access_share: f64,
@@ -69,7 +71,8 @@ impl CityMetrics {
 /// Non-negotiable floors for one place and decision context. These values must
 /// be set and justified by the responsible community and domain experts; this
 /// library intentionally defines no universal default thresholds.
-#[derive(Debug, Clone, Copy, PartialEq)]
+#[derive(Debug, Clone, Copy, PartialEq, Serialize, Deserialize)]
+#[serde(deny_unknown_fields)]
 pub struct CityFloors {
     pub minimum_essential_access_share: f64,
     pub maximum_housing_cost_burden_p90: f64,
