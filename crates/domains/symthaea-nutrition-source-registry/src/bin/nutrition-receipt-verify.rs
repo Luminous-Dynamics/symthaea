@@ -232,7 +232,7 @@ fn verify_bundle(
     let input_digest = canonical_sha256(&envelope)?;
     compare_digest("input envelope", receipt.input_sha256.as_deref(), &input_digest)?;
 
-    let mut receipt_without_own_digest = receipt.clone();
+    let mut receipt_without_own_digest = (*receipt).clone();
     receipt_without_own_digest.decision_sha256 = None;
     let decision_digest = canonical_sha256(&receipt_without_own_digest)?;
     compare_digest(
