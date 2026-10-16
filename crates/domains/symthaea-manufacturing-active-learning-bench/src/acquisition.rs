@@ -1114,14 +1114,18 @@ mod tests {
             [0, 1_000_000],
             opposing_decisions(),
         );
-        let update = condition_posterior(&model, "perfect", "O1").unwrap();
+        let state = initial_posterior_state(&model).unwrap();
+        let update =
+            condition_posterior(&model, &state, "evidence-1", "perfect", "O1").unwrap();
         assert_eq!(update.posterior[0].probability_ppm, 1_000_000);
         assert_eq!(update.posterior[1].probability_ppm, 0);
         assert_eq!(
             update.posterior.iter().map(|row| row.probability_ppm).sum::<u32>(),
             1_000_000
         );
-        assert_ne!(update.parent_model_digest, update.posterior_model_digest);
+        assert_ne!(update.parent_state_digest, update.next_state.state_digest);
+        assert_ne!(model.digest().unwrap(), update.posterior_model_digest);
+        assert_eq!(update.next_state.evidence_receipts.len(), 1);
     }
 
     #[test]
@@ -1133,7 +1137,9 @@ mod tests {
             [100_000, 900_000],
             opposing_decisions(),
         );
-        let update = condition_posterior(&model, "noisy", "O1").unwrap();
+        let state = initial_posterior_state(&model).unwrap();
+        let update =
+            condition_posterior(&model, &state, "evidence-noisy-1", "noisy", "O1").unwrap();
         assert_eq!(update.posterior[0].probability_ppm, 900_000);
         assert_eq!(update.posterior[1].probability_ppm, 100_000);
     }
@@ -1147,9 +1153,52 @@ mod tests {
             [1_000_000, 0],
             opposing_decisions(),
         );
-        assert!(condition_posterior(&model, "deterministic", "O2")
+        let state = initial_posterior_state(&model).unwrap();
+        assert!(
+            condition_posterior(&model, &state, "impossible-1", "deterministic", "O2")
+                .unwrap_err()
+                .contains("zero probability")
+        );
+    }
+
+    #[test]
+    fn duplicate_evidence_id_cannot_update_posterior_twice() {
+        let model = model(
+            "noisy",
+            Feasibility::Feasible,
+            [900_000, 100_000],
+            [100_000, 900_000],
+            opposing_decisions(),
+        );
+        let initial = initial_posterior_state(&model).unwrap();
+        let first =
+            condition_posterior(&model, &initial, "same-measurement", "noisy", "O1").unwrap();
+        let error = condition_posterior(
+            &model,
+            &first.next_state,
+            "same-measurement",
+            "noisy",
+            "O1",
+        )
+        .unwrap_err();
+        assert!(error.contains("duplicate evidence ID"));
+    }
+
+    #[test]
+    fn altered_posterior_state_is_rejected_before_conditioning() {
+        let model = model(
+            "noisy",
+            Feasibility::Feasible,
+            [900_000, 100_000],
+            [100_000, 900_000],
+            opposing_decisions(),
+        );
+        let mut state = initial_posterior_state(&model).unwrap();
+        state.current_prior[0].probability_ppm -= 1;
+        state.current_prior[1].probability_ppm += 1;
+        assert!(condition_posterior(&model, &state, "evidence-1", "noisy", "O1")
             .unwrap_err()
-            .contains("zero probability"));
+            .contains("state digest"));
     }
 
     #[test]
