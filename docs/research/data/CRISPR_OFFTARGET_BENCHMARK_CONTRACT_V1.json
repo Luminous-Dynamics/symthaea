@@ -242,7 +242,9 @@
         "measured_runtime_and_compute",
         "upper_unknown_aware_error_rate_bound_at_fixed_coverage",
         "accepted_label_completeness_at_fixed_coverage",
-        "lower_target_mixture_recall_delta_when_estimable"
+        "lower_target_mixture_recall_delta_when_estimable",
+        "nominal_critical_population_shift_tv_radius_when_estimable",
+        "conservative_lower_bound_shift_tv_radius_when_estimable"
       ],
       "acceptance": "All compared policies use same preregistered objective definitions, units, direction, episodes, and availability rules. Missing metrics are not zero-filled. Pareto membership is not by itself a performance win or biological/clinical safety finding."
     },
