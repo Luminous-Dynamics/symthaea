@@ -1,12 +1,12 @@
 // Copyright (C) 2024-2026 Tristan Stoltz / Luminous Dynamics
 // SPDX-License-Identifier: AGPL-3.0-or-later
-//! Reproducible synthetic-signal qualification for the SFZ one-shot resamplers.
+//! Reproducible synthetic tone/pitch sweep for the SFZ one-shot resamplers.
 //!
 //! Run with:
 //!   cargo run --manifest-path crates/domains/symthaea-muse/Cargo.toml --bin sfz_resampler_qualification
 //!   cargo run --manifest-path crates/domains/symthaea-muse/Cargo.toml --bin sfz_resampler_qualification -- --output /tmp/sfz-resampler.json
 //!
-//! The program emits a versioned JSON receipt to stdout (and optionally a file).
+//! The program sweeps six input-tone frequencies across five pitch shifts, emits a\n//! versioned JSON receipt to stdout (and optionally a file), and keeps transition-band\n//! samples visible without using them to decide the primary passband/alias gates.
 //! It is deliberately a synthetic qualification gate, not a real-bank or
 //! perceptual-quality claim. A non-zero exit status means at least one declared
 //! numerical/performance gate failed.
@@ -31,11 +31,16 @@ use symthaea_muse::sfz_manifest::{
 const SAMPLE_RATE: u32 = 44_100;
 const SOURCE_FRAMES: usize = SAMPLE_RATE as usize;
 const REQUESTED_KEY: u8 = 72;
-const PITCH_KEYCENTER: u8 = 60;
 const VELOCITY: u8 = 100;
 const SINC_RADIUS: usize = 16;
 const REPEATS: usize = 3;
 const SOURCE_AMPLITUDE: f64 = 16_000.0 / 32_768.0;
+// Normalized input frequencies, in cycles per source frame. These include
+// passband, transition-band, and stopband candidates for the tested pitch ratios.
+const TONE_FREQUENCIES: [f64; 6] = [0.08, 0.12, 0.18, 0.24, 0.31, 0.40];
+// Pitch shifts expressed as semitones: one octave down, unshifted, fifth up,
+// one octave up, and two octaves up.
+const PITCH_SHIFTS_SEMITONES: [i16; 5] = [-12, 0, 7, 12, 24];
 
 #[derive(Debug, Serialize)]
 struct ThresholdsV1 {
@@ -83,8 +88,12 @@ struct PathMeasurementV1 {
 #[derive(Debug, Serialize)]
 struct CaseReceiptV1 {
     case_id: String,
+    pitch_shift_semitones: i16,
+    expected_frequency_ratio: f64,
     source_tone_cycles_per_frame: f64,
     expected_output_alias_cycles_per_frame: f64,
+    alias_gate_applicable: bool,
+    passband_gate_applicable: bool,
     expected_source_amplitude: f64,
     linear: PathMeasurementV1,
     lanczos_sinc: PathMeasurementV1,
@@ -101,8 +110,9 @@ struct QualificationReceiptV1 {
     harness_version: &'static str,
     environment: EnvironmentV1,
     input_fixture_frames: usize,
+    source_tone_cycles_per_frame: Vec<f64>,
+    pitch_shifts_semitones: Vec<i16>,
     requested_key: u8,
-    pitch_keycenter: u8,
     requested_velocity: u8,
     sinc_radius: usize,
     repeats_per_path: usize,
@@ -139,31 +149,35 @@ fn run() -> Result<bool, Box<dyn Error>> {
     fs::create_dir_all(&fixture_root)?;
 
     let result = (|| -> Result<QualificationReceiptV1, Box<dyn Error>> {
-        let high_name = "above_nyquist.wav";
-        let in_band_name = "in_band.wav";
-        write_tone_fixture(&fixture_root.join(high_name), 0.40)?;
-        write_tone_fixture(&fixture_root.join(in_band_name), 0.10)?;
+        let mut fixture_names = Vec::with_capacity(TONE_FREQUENCIES.len());
+        for (index, frequency) in TONE_FREQUENCIES.iter().copied().enumerate() {
+            let name = format!("tone_{index:02}.wav");
+            write_tone_fixture(&fixture_root.join(&name), frequency)?;
+            fixture_names.push(name);
+        }
 
-        let high = qualify_case(
-            &fixture_root,
-            "above_new_nyquist_alias_rejection",
-            high_name,
-            0.40,
-            None,
-            &thresholds,
-        )?;
-        let in_band = qualify_case(
-            &fixture_root,
-            "in_band_amplitude_preservation",
-            in_band_name,
-            0.10,
-            Some(SOURCE_AMPLITUDE),
-            &thresholds,
-        )?;
-        let passed = high.passed && in_band.passed;
+        let mut cases = Vec::with_capacity(
+            PITCH_SHIFTS_SEMITONES.len() * TONE_FREQUENCIES.len()
+        );
+        for pitch_shift_semitones in PITCH_SHIFTS_SEMITONES {
+            for (index, frequency) in TONE_FREQUENCIES.iter().copied().enumerate() {
+                let case_id = format!(
+                    "shift_{pitch_shift_semitones:+}_semitones_tone_{index:02}"
+                );
+                cases.push(qualify_case(
+                    &fixture_root,
+                    &case_id,
+                    &fixture_names[index],
+                    frequency,
+                    pitch_shift_semitones,
+                    &thresholds,
+                )?);
+            }
+        }
+        let passed = cases.iter().all(|case| case.passed);
         Ok(QualificationReceiptV1 {
             schema: "muse-sfz-resampler-qualification-receipt-v1",
-            harness_version: env!("CARGO_PKG_VERSION"),
+            harness_version: "synthetic-tone-sweep-v1",
             environment: EnvironmentV1 {
                 operating_system: env::consts::OS,
                 architecture: env::consts::ARCH,
@@ -171,15 +185,16 @@ fn run() -> Result<bool, Box<dyn Error>> {
                 sample_rate_hz: SAMPLE_RATE,
             },
             input_fixture_frames: SOURCE_FRAMES,
+            source_tone_cycles_per_frame: TONE_FREQUENCIES.to_vec(),
+            pitch_shifts_semitones: PITCH_SHIFTS_SEMITONES.to_vec(),
             requested_key: REQUESTED_KEY,
-            pitch_keycenter: PITCH_KEYCENTER,
             requested_velocity: VELOCITY,
             sinc_radius: SINC_RADIUS,
             repeats_per_path: REPEATS,
             thresholds,
-            cases: vec![high, in_band],
+            cases,
             passed,
-            scope_boundary: "synthetic WAV fixtures only; not a real-bank, full-SFZ-compatibility, real-time-callback, or perceptual-quality qualification",
+            scope_boundary: "synthetic WAV frequency/pitch sweep only; not a real-bank, full-SFZ-compatibility, multi-rate, real-time-callback, or perceptual-quality qualification",
         })
     })();
 
@@ -242,14 +257,30 @@ fn qualify_case(
     case_id: &str,
     sample_name: &str,
     source_tone_cycles_per_frame: f64,
-    expected_source_amplitude_for_passband_case: Option<f64>,
+    pitch_shift_semitones: i16,
     thresholds: &ThresholdsV1,
 ) -> Result<CaseReceiptV1, Box<dyn Error>> {
+    let pitch_keycenter = i16::from(REQUESTED_KEY) - pitch_shift_semitones;
+    if !(0..=127).contains(&pitch_keycenter) {
+        return Err(io::Error::new(
+            io::ErrorKind::InvalidInput,
+            format!("pitch shift {pitch_shift_semitones} maps outside MIDI key bounds"),
+        )
+        .into());
+    }
     let sfz_source = format!(
-        "<region> key={REQUESTED_KEY} pitch_keycenter={PITCH_KEYCENTER} sample={sample_name}\n"
+        "<region> key={REQUESTED_KEY} pitch_keycenter={pitch_keycenter} sample={sample_name}\\n"
     );
     let manifest = parse_sfz_mapping(&sfz_source)?;
-    let output_alias_frequency = fold_normalized_frequency(source_tone_cycles_per_frame * 2.0);
+    let expected_ratio = 2.0_f64.powf(f64::from(pitch_shift_semitones) / 12.0);
+    let source_coordinate_step = expected_ratio * f64::from(SAMPLE_RATE) / f64::from(SAMPLE_RATE);
+    let output_alias_frequency =
+        fold_normalized_frequency(source_tone_cycles_per_frame * source_coordinate_step);
+    // Leave a 20% Nyquist guard band: transition-band tones are reported but
+    // don't decide either the alias-rejection or passband-fidelity gate.
+    let alias_gate_applicable = source_tone_cycles_per_frame * source_coordinate_step > 0.5;
+    let passband_gate_applicable =
+        source_tone_cycles_per_frame * source_coordinate_step <= 0.4;
 
     let linear = measure_path(
         &manifest,
@@ -270,12 +301,15 @@ fn qualify_case(
         * (linear.measured_tone_amplitude.max(1.0e-12)
             / sinc.measured_tone_amplitude.max(1.0e-12))
         .log10();
-    let in_band_error = expected_source_amplitude_for_passband_case
-        .map(|expected| (sinc.measured_tone_amplitude - expected).abs());
+    let in_band_error = if passband_gate_applicable {
+        Some((sinc.measured_tone_amplitude - SOURCE_AMPLITUDE).abs())
+    } else {
+        None
+    };
     let ratio_linear = linear.renderer_receipt.frequency_ratio;
     let ratio_sinc = sinc.renderer_receipt.frequency_ratio;
-    let relative_pitch_ratio_error = ((ratio_linear - 2.0).abs() / 2.0)
-        .max((ratio_sinc - 2.0).abs() / 2.0);
+    let relative_pitch_ratio_error = ((ratio_linear - expected_ratio).abs() / expected_ratio)
+        .max((ratio_sinc - expected_ratio).abs() / expected_ratio);
 
     let mut failed_gates = Vec::new();
     if !linear.finite_samples || !sinc.finite_samples {
@@ -285,14 +319,14 @@ fn qualify_case(
         failed_gates.push("non-silent fixtures must not render as silence".to_owned());
     }
     if !linear.peak_within_unity || !sinc.peak_within_unity {
-        failed_gates.push("output peak must remain at or below 1.0".to_owned());
+        failed_gates.push("output peak must remain at or below the configured peak limit".to_owned());
     }
     if !linear.repeated_output_hash_stable || !sinc.repeated_output_hash_stable {
         failed_gates.push("identical same-host renders must have identical output hashes".to_owned());
     }
     if relative_pitch_ratio_error > thresholds.maximum_relative_pitch_ratio_error {
         failed_gates.push(format!(
-            "relative pitch-ratio error exceeds {}",
+            "relative pitch-ratio error {relative_pitch_ratio_error:.9e} exceeds {}",
             thresholds.maximum_relative_pitch_ratio_error
         ));
     }
@@ -304,7 +338,7 @@ fn qualify_case(
             thresholds.minimum_offline_realtime_factor
         ));
     }
-    if case_id == "above_new_nyquist_alias_rejection"
+    if alias_gate_applicable
         && alias_suppression_db < thresholds.minimum_alias_suppression_db
     {
         failed_gates.push(format!(
@@ -330,8 +364,12 @@ fn qualify_case(
 
     Ok(CaseReceiptV1 {
         case_id: case_id.to_owned(),
+        pitch_shift_semitones,
+        expected_frequency_ratio: expected_ratio,
         source_tone_cycles_per_frame,
         expected_output_alias_cycles_per_frame: output_alias_frequency,
+        alias_gate_applicable,
+        passband_gate_applicable,
         expected_source_amplitude: SOURCE_AMPLITUDE,
         linear,
         lanczos_sinc: sinc,
@@ -447,6 +485,30 @@ mod tests {
         assert!((fold_normalized_frequency(0.10 * 2.0) - 0.20).abs() < 1.0e-12);
         assert!((fold_normalized_frequency(0.75) - 0.25).abs() < 1.0e-12);
         assert!((fold_normalized_frequency(1.25) - 0.25).abs() < 1.0e-12);
+    }
+
+    #[test]
+    fn pitch_sweep_contains_alias_and_passband_cases_for_each_upshift() {
+        for shift in [7_i16, 12_i16, 24_i16] {
+            let ratio = 2.0_f64.powf(f64::from(shift) / 12.0);
+            assert!(
+                TONE_FREQUENCIES.iter().any(|tone| tone * ratio > 0.5),
+                "shift {shift} has no alias-rejection case"
+            );
+            assert!(
+                TONE_FREQUENCIES.iter().any(|tone| tone * ratio <= 0.4),
+                "shift {shift} has no passband case"
+            );
+        }
+    }
+
+    #[test]
+    fn pitch_ratios_match_equal_tempered_semitone_shifts() {
+        for shift in PITCH_SHIFTS_SEMITONES {
+            let expected = 2.0_f64.powf(f64::from(shift) / 12.0);
+            let recovered = 2.0_f64.powf(f64::from(shift) / 12.0);
+            assert!((recovered - expected).abs() / expected <= 1.0e-12);
+        }
     }
 
     #[test]
