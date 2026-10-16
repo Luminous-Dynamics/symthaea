@@ -37,7 +37,7 @@ TEST_PATHS = (
     "scripts/test_validate_socioeconomic_run_bundle.py",
     "scripts/test_write_socioeconomic_run_bundle_ci_report.py",
 )
-EXPECTED_TEST_COUNTS = (14, 10)
+EXPECTED_TEST_COUNTS = (14, 11)
 REQUIRED_ENV = (
     "GITHUB_SHA",
     "CIVOS_SOURCE_REVISION",
