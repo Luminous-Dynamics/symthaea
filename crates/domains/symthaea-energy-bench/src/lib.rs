@@ -7,7 +7,9 @@
 //! This crate checks cross-field semantics JSON Schema cannot express easily:
 //! time coverage, interval ordering/continuity, energy conservation, provenance
 //! metadata shape, cached aggregate metrics, and synthetic-data decision guards.
-//! It does not claim model validity or propagate measurement uncertainty.
+//! Candidate comparison uses a narrow first-order uncertainty approximation only
+//! under declared independence and subtracts a registered worst-case differential-
+//! bias bound; it is not a general covariance/Monte Carlo measurement model.
 
 use chrono::DateTime;
 use serde::Deserialize;
