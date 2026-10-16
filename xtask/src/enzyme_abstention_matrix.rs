@@ -461,7 +461,9 @@ fn make_case(scenario: Scenario, seed: u64, sigma: f64) -> Value {
 fn build_report() -> Result<Value> {
     let mut cases = Vec::new();
     let mut grouped: BTreeMap<&'static str, BTreeMap<String, usize>> = BTreeMap::new();
+    let mut baseline_grouped: BTreeMap<&'static str, BTreeMap<String, usize>> = BTreeMap::new();
     let mut target_hits: BTreeMap<&'static str, usize> = BTreeMap::new();
+    let mut baseline_target_hits: BTreeMap<&'static str, usize> = BTreeMap::new();
     let mut target_totals: BTreeMap<&'static str, usize> = BTreeMap::new();
 
     for scenario in scenarios() {
@@ -474,11 +476,21 @@ fn build_report() -> Result<Value> {
                 let target_hit = case["target_hit"]
                     .as_bool()
                     .context("target_hit must be a boolean")?;
+                let baseline_selected = case["in_sample_baseline"]["selected"]
+                    .as_str()
+                    .context("in-sample baseline decision must be a string")?;
+                let baseline_target_hit = case["in_sample_baseline"]["target_hit"]
+                    .as_bool()
+                    .context("in-sample baseline target_hit must be a boolean")?;
 
                 *grouped.entry(scenario.stratum).or_default().entry(selected.to_string()).or_default() += 1;
+                *baseline_grouped.entry(scenario.stratum).or_default().entry(baseline_selected.to_string()).or_default() += 1;
                 *target_totals.entry(scenario.stratum).or_default() += 1;
                 if target_hit {
                     *target_hits.entry(scenario.stratum).or_default() += 1;
+                }
+                if baseline_target_hit {
+                    *baseline_target_hits.entry(scenario.stratum).or_default() += 1;
                 }
                 cases.push(case);
             }
@@ -490,10 +502,14 @@ fn build_report() -> Result<Value> {
         .iter()
         .map(|scenario| {
             let outcome_counts = grouped.get(scenario.stratum).cloned().unwrap_or_default();
+            let baseline_outcome_counts = baseline_grouped.get(scenario.stratum).cloned().unwrap_or_default();
             let total = *target_totals.get(scenario.stratum).unwrap_or(&0);
             let hits = *target_hits.get(scenario.stratum).unwrap_or(&0);
+            let baseline_hits = *baseline_target_hits.get(scenario.stratum).unwrap_or(&0);
             let selected_models = outcome_counts.get("michaelis_menten").copied().unwrap_or(0)
                 + outcome_counts.get("substrate_inhibition").copied().unwrap_or(0);
+            let baseline_selected_models = baseline_outcome_counts.get("michaelis_menten").copied().unwrap_or(0)
+                + baseline_outcome_counts.get("substrate_inhibition").copied().unwrap_or(0);
             let is_abstention_control = scenario.expected_decision == "abstain";
             json!({
                 "stratum": scenario.stratum,
@@ -504,7 +520,12 @@ fn build_report() -> Result<Value> {
                 "target_hit_rate": if total > 0 { hits as f64 / total as f64 } else { 0.0 },
                 "false_decisive_count": if is_abstention_control { json!(selected_models) } else { Value::Null },
                 "false_decisive_rate": if is_abstention_control && total > 0 { json!(selected_models as f64 / total as f64) } else { Value::Null },
-                "outcome_counts": outcome_counts
+                "outcome_counts": outcome_counts,
+                "in_sample_baseline_target_hits": baseline_hits,
+                "in_sample_baseline_target_hit_rate": if total > 0 { baseline_hits as f64 / total as f64 } else { 0.0 },
+                "in_sample_baseline_false_decisive_count": if is_abstention_control { json!(baseline_selected_models) } else { Value::Null },
+                "in_sample_baseline_false_decisive_rate": if is_abstention_control && total > 0 { json!(baseline_selected_models as f64 / total as f64) } else { Value::Null },
+                "in_sample_baseline_outcome_counts": baseline_outcome_counts
             })
         })
         .collect();
@@ -524,6 +545,15 @@ fn build_report() -> Result<Value> {
         })
         .count();
     let correct_abstention_count = control_case_count - false_decisive_count;
+    let baseline_false_decisive_count = cases
+        .iter()
+        .filter(|case| {
+            case["expected_decision"].as_str() == Some("abstain")
+                && case["in_sample_baseline"]["selected"].as_str() != Some("abstain")
+        })
+        .count();
+    let baseline_correct_abstention_count = control_case_count - baseline_false_decisive_count;
+    let false_decisive_reduction = baseline_false_decisive_count as i64 - false_decisive_count as i64;
 
     Ok(json!({
         "schema_version": 1,
@@ -560,6 +590,17 @@ fn build_report() -> Result<Value> {
             "semantics": "a selected label identifies the better-supported candidate among the two supplied families; it does not establish mechanistic truth or show that the candidate set is exhaustive"
         },
         "summary_by_stratum": summary,
+        "paired_policy_comparison": {
+            "control_case_count": control_case_count,
+            "in_sample_false_decisive_count": baseline_false_decisive_count,
+            "in_sample_false_decisive_rate": if control_case_count > 0 { baseline_false_decisive_count as f64 / control_case_count as f64 } else { 0.0 },
+            "held_out_false_decisive_count": false_decisive_count,
+            "held_out_false_decisive_rate": if control_case_count > 0 { false_decisive_count as f64 / control_case_count as f64 } else { 0.0 },
+            "false_decisive_count_reduction": false_decisive_reduction,
+            "in_sample_correct_abstention_count": baseline_correct_abstention_count,
+            "held_out_correct_abstention_count": correct_abstention_count,
+            "note": "Paired result on the same 96 known-generator synthetic cases; descriptive only, with uncalibrated heuristic thresholds."
+        },
         "abstention_control_summary": {
             "control_case_count": control_case_count,
             "false_decisive_count": false_decisive_count,
