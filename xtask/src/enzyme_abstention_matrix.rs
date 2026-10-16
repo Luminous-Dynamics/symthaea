@@ -48,6 +48,9 @@ struct Decision {
     delta_bic_mm_minus_inhibition: f64,
     fitted_prediction_gap_in_noise_sd: f64,
     best_candidate_rmse_in_noise_sd: f64,
+    absolute_fit_gate_passed: bool,
+    prediction_gap_resolved: bool,
+    bic_decisive: bool,
 }
 
 #[derive(Clone, Copy, Debug)]
@@ -266,14 +269,17 @@ fn decide(observations: &[Observation], mm: ModelFit, inhibition: ModelFit, sigm
         .sqrt()
         / sigma;
     let best_normalized_rmse = mm.rmse.min(inhibition.rmse) / sigma;
+    let absolute_fit_gate_passed = best_normalized_rmse <= MAX_NORMALIZED_RMSE_FOR_ADEQUACY;
+    let prediction_gap_resolved = prediction_gap >= MIN_PREDICTION_GAP_IN_NOISE_SDS;
+    let bic_decisive = delta_bic.abs() >= DECISIVE_DELTA_BIC;
 
     // The ordering matters: first reject grossly inadequate candidate families, then preserve
     // observational equivalence, then allow the BIC threshold to select a family.
-    let (selected, reason) = if best_normalized_rmse > MAX_NORMALIZED_RMSE_FOR_ADEQUACY {
+    let (selected, reason) = if !absolute_fit_gate_passed {
         ("abstain", "both_candidate_models_fail_absolute_fit_gate")
-    } else if prediction_gap < MIN_PREDICTION_GAP_IN_NOISE_SDS {
+    } else if !prediction_gap_resolved {
         ("abstain", "candidate_predictions_not_resolved_at_noise_scale")
-    } else if delta_bic.abs() < DECISIVE_DELTA_BIC {
+    } else if !bic_decisive {
         ("abstain", "bic_difference_below_decisive_threshold")
     } else if delta_bic < 0.0 {
         ("michaelis_menten", "decisive_bic_favors_michaelis_menten")
@@ -287,6 +293,9 @@ fn decide(observations: &[Observation], mm: ModelFit, inhibition: ModelFit, sigm
         delta_bic_mm_minus_inhibition: delta_bic,
         fitted_prediction_gap_in_noise_sd: prediction_gap,
         best_candidate_rmse_in_noise_sd: best_normalized_rmse,
+        absolute_fit_gate_passed,
+        prediction_gap_resolved,
+        bic_decisive,
     }
 }
 
@@ -315,6 +324,11 @@ fn make_case(scenario: Scenario, seed: u64, sigma: f64) -> Value {
         "delta_bic_mm_minus_inhibition": decision.delta_bic_mm_minus_inhibition,
         "fitted_prediction_gap_in_noise_sd": decision.fitted_prediction_gap_in_noise_sd,
         "best_candidate_rmse_in_noise_sd": decision.best_candidate_rmse_in_noise_sd,
+        "decision_gates": {
+            "absolute_fit_gate_passed": decision.absolute_fit_gate_passed,
+            "prediction_gap_resolved": decision.prediction_gap_resolved,
+            "bic_decisive": decision.bic_decisive
+        },
         "fits": {
             "michaelis_menten": {
                 "vmax": mm.vmax,
@@ -430,7 +444,8 @@ fn build_report() -> Result<Value> {
             "decisive_absolute_delta_bic": DECISIVE_DELTA_BIC,
             "maximum_best_candidate_rmse_in_noise_sds": MAX_NORMALIZED_RMSE_FOR_ADEQUACY,
             "minimum_fitted_prediction_gap_in_noise_sds": MIN_PREDICTION_GAP_IN_NOISE_SDS,
-            "calibration_status": "heuristic thresholds; not calibrated against real assay residuals"
+            "calibration_status": "heuristic thresholds; not calibrated against real assay residuals",
+            "semantics": "a selected label identifies the better-supported candidate among the two supplied families; it does not establish mechanistic truth or show that the candidate set is exhaustive"
         },
         "summary_by_stratum": summary,
         "abstention_control_summary": {
@@ -521,6 +536,9 @@ mod tests {
             case["observed_decision"].as_str().is_some()
                 && case["decision_reason"].as_str().is_some()
                 && case["target_hit"].as_bool().is_some()
+                && case["decision_gates"]["absolute_fit_gate_passed"].as_bool().is_some()
+                && case["decision_gates"]["prediction_gap_resolved"].as_bool().is_some()
+                && case["decision_gates"]["bic_decisive"].as_bool().is_some()
                 && case["observations"].as_array().map(|rows| rows.len()) == case["observation_count"].as_u64().map(|count| count as usize)
         }));
         assert!(report["scope"].as_str().unwrap().contains("not calibrated biochemical evidence"));
