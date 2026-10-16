@@ -54,6 +54,20 @@
       "project_data_use_status": "blocked_until_written_permission_for_intended_use",
       "allowed_current_use": "Literature context only; do not ingest restricted study data or use it for model development without written permission",
       "note": "Published metrics are context-specific and must not be generalized across editors, cells, assays, or modalities."
+    },
+    {
+      "source_id": "Stewart-2026-Measurement-and-Clinical-Interpretation-of-CRISPR-Off-Targets",
+      "doi": "10.1038/s41588-025-02428-3",
+      "source_url": "https://doi.org/10.1038/s41588-025-02428-3",
+      "use": "literature_context_only",
+      "note": "Contextual endpoint/clinical interpretation reference; does not validate this project's model or imply that the computational benchmark can infer clinical harm."
+    },
+    {
+      "source_id": "CRISPR-therapeutics-across-scales-2026",
+      "doi": "10.1016/j.tibtech.2026.07.015",
+      "source_url": "https://doi.org/10.1016/j.tibtech.2026.07.015",
+      "use": "literature_context_only",
+      "note": "Supports separating molecular editing space from editing outcomes and therapeutic context; not a source of training labels for this benchmark."
     }
   ],
   "reported_reference_counts": {
@@ -151,6 +165,26 @@
         "cannot bound true positives omitted by every candidate nomination method",
         "not a probability, confidence interval, posterior estimate or safety guarantee"
       ]
+    },
+    {
+      "id": "multiobjective_frontier",
+      "definition": "Nondominated policies under a preregistered vector of task-relevant metrics, without universal score weights",
+      "required_metrics": [
+        "objective_definitions_units_and_directions",
+        "complete_metric_vector_per_eligible_policy",
+        "pareto_frontier_policy_ids",
+        "dominated_policy_count",
+        "excluded_policy_ids_and_reasons"
+      ],
+      "candidate_objectives": [
+        "macro_recall_at_fixed_budget",
+        "review_slots_at_fixed_recall",
+        "worst_guide_cas9_group_recall",
+        "paired_label_sensitivity_bounds",
+        "calibration_loss_when_estimable",
+        "measured_runtime_and_compute"
+      ],
+      "acceptance": "All compared policies use same preregistered objective definitions, units, direction, episodes, and availability rules. Missing metrics are not zero-filled. Pareto membership is not by itself a performance win or biological/clinical safety finding."
     }
   ],
   "initial_gates": [
@@ -244,6 +278,17 @@
         "underfilled policies report not_estimable_at_budget_K",
         "no shorter list is silently scored as the same budget"
       ]
+    },
+    {
+      "id": "G9_pareto_no_scalarization",
+      "required": true,
+      "pass_conditions": [
+        "objective names, definitions, units and directions are preregistered",
+        "all compared vectors use same episodes and metric availability rules",
+        "no missing/not-estimable metric is replaced by zero",
+        "report complete nondominated policy frontier and excluded policy reasons",
+        "do not aggregate distinct molecular, cellular, functional, delivery or clinical endpoints into a universal safety score"
+      ]
     }
   ],
   "aspirational_engineering_targets": {
@@ -277,7 +322,9 @@
     "paired_delta_label_sensitivity_bounds_executed": false,
     "fixed_budget_cardinality_fixtures_executed": false,
     "dataset_license_explicitly_verified": false,
-    "zenodo_archive_downloaded": false
+    "zenodo_archive_downloaded": false,
+    "pareto_frontier_kernel_compiled": false,
+    "pareto_frontier_unit_tests_executed": false
   },
   "implementation_artifact": {
     "path": "scripts/crispr_triage_verifier.rs",
@@ -287,6 +334,9 @@
       "dependency-free metric kernel does not yet parse the JSON contract",
       "digest helper checks canonical SHA-256 string identity but does not hash artifact bytes",
       "Rust unit tests not executed because rustc was unavailable in the authoring environment"
+    ],
+    "additional_source_paths": [
+      "scripts/crispr_decision_frontier.rs"
     ]
   },
   "updated_on": "2026-10-16",
