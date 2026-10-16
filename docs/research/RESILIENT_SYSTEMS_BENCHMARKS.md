@@ -217,7 +217,7 @@ This fills an important literature-backed gap. Xu et al.'s 2026 review describes
 - **RCREW-04 — Parts conservation:** reserved parts never exceed initial stock and remaining stock never goes negative.
 - **RCREW-05 — Horizon accounting:** a job finishing after the horizon is counted as unfinished within horizon; loss is bounded by the modeled horizon.
 - **RCREW-06 — Determinism:** identical inputs and policy produce identical schedules.
-- **RCREW-07 — Policy witness:** a declared synthetic case shows weighted recovery can beat priority-first on the stated weighted downtime objective; report the witness and objective, not a universal superiority claim.
+- **RCREW-07 — Policy witness:** a disclosed synthetic two-job case gives priority-first weighted loss 1,110 service-unit-steps and weighted-recovery loss 111 (90% lower): one duration-10 / weight-1 job has priority 0, while a duration-1 / weight-100 job has priority 1. This is a transparent fixture calculated independently of the Rust implementation, not empirical evidence or a universal superiority claim.
 - **RCREW-08 — Infeasibility honesty:** cycles, unknown skills, missing parts and insufficient spares fail explicitly.
 
 ### Scheduling benchmarks and open limitations
@@ -226,7 +226,7 @@ This fills an important literature-backed gap. Xu et al.'s 2026 review describes
 2. For small cases (initial target: no more than 8 jobs), build a separate exhaustive enumerator as a reference oracle and compare heuristic objective gap to the true best feasible schedule. Target **within 10% of optimum on at least 95% of a published deterministic fixture corpus**, but only promote that target after a fixed corpus and objective are reviewed. This is an aspiration, not a result.
 3. For 10–100 jobs, use deterministic scenario suites and compare heuristic outcomes with priority-first, shortest-job-first and a valid lower bound where available. Publish worst-case as well as average gap; do not label a heuristic optimal.
 4. Next iterations should add uncertain repair durations, travel/access times and power/transport interdependency. The model currently has none of these, no online replanning, no shared tool constraint, and no policy-level fairness guarantee.
-5. The weighted-service objective is caller-defined and can encode harmful priorities. Keep service-level floors and group impacts as explicit constraints; never treat a scalar weight as an ethical decision.
+5. The weighted-service objective is caller-defined and can encode harmful priorities. Keep service-level floors and group impacts as explicit constraints; never treat a scalar weight as an ethical decision.\n6. Initial performance target (unmeasured): 100 jobs, 20 crews, 50 part types, and 200 precedence edges below 250 ms p95 on a documented release-build host; a 1,000-job/100-crew stress case below 10 s. Profile before setting release gates, and retain feasibility checks and full traces.
 
 ## 8. Research references
 
