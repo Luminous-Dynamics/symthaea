@@ -399,3 +399,6 @@ Implementation: [scripts/crispr_verification_bias.rs](../../scripts/crispr_verif
 
 
 Independent estimator check: the conditional Bernoulli-design oracle enumerated 2,048 deterministic finite-population fixtures and 128,512 non-empty sample subsets, and confirmed design-unbiased Horvitz–Thompson candidate/positive counts (including top-K counts) to floating-point tolerance under the enumerated designs. This is mathematical estimator evidence only; it is not Rust execution, a real audit-design verification, confidence-interval coverage, biological evidence, or Symthaea improvement.
+
+
+Resolved-label guard: the Rust kernel accepts only positive, assay-defined-negative, or explicitly unknown outcome states; it rejects an unknown row and requires inclusion probabilities for the final resolved-outcome sample, not just test invitations. The sampling-design verifier must handle nonresponse/assay failure explicitly; this kernel does not estimate those propensities.
