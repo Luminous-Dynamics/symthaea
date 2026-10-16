@@ -816,6 +816,16 @@ mod tests {
     }
 
     #[test]
+    fn reference_positive_cannot_be_marked_unknown_or_negative() {
+        let reference = positives(&["p1"]);
+        let candidates = vec![candidate("p1", 1, LabelState::UnknownUnassayed, false)];
+        assert_eq!(
+            recall_at_k(&candidates, &reference, 1),
+            Err(MetricError::ReferenceLabelMismatch("p1".to_owned()))
+        );
+    }
+
+    #[test]
     fn invalid_recall_target_is_rejected() {
         let reference = positives(&["p1"]);
         let candidates = vec![candidate("p1", 1, LabelState::Positive, true)];
