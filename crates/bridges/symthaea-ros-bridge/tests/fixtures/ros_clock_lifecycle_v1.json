@@ -1,0 +1,402 @@
+{
+  "schema_version": 1,
+  "policy": {
+    "maximum_observation_age_ns": 100,
+    "maximum_forward_jump_ns": 500,
+    "pause_after_ns": 20,
+    "maximum_clock_silence_ns": 50,
+    "reject_zero_timestamp": true
+  },
+  "scenarios": [
+    {
+      "id": "zero_time_then_initialized_baseline",
+      "steps": [
+        {
+          "op": "observe",
+          "observation": {
+            "clock_id": "ros:/clock",
+            "clock_domain": "ros-sim-time",
+            "source_epoch_id": "bag-run-1",
+            "timestamp_ns": 0,
+            "received_monotonic_ns": 1,
+            "receive_epoch_id": "bridge-run-1"
+          },
+          "capture_receive_epoch_id": "bridge-run-1",
+          "captured_monotonic_ns": 1,
+          "expected": "Uninitialized",
+          "expected_admissible": false,
+          "expected_generation": null,
+          "expected_transition": null
+        },
+        {
+          "op": "observe",
+          "observation": {
+            "clock_id": "ros:/clock",
+            "clock_domain": "ros-sim-time",
+            "source_epoch_id": "bag-run-1",
+            "timestamp_ns": 10,
+            "received_monotonic_ns": 2,
+            "receive_epoch_id": "bridge-run-1"
+          },
+          "capture_receive_epoch_id": "bridge-run-1",
+          "captured_monotonic_ns": 2,
+          "expected": "BaselineEstablished",
+          "expected_admissible": false,
+          "expected_generation": 1,
+          "expected_transition": null
+        }
+      ]
+    },
+    {
+      "id": "progress_then_published_paused_time",
+      "steps": [
+        {
+          "op": "observe",
+          "observation": {
+            "clock_id": "ros:/clock",
+            "clock_domain": "ros-sim-time",
+            "source_epoch_id": "bag-run-1",
+            "timestamp_ns": 1000,
+            "received_monotonic_ns": 1,
+            "receive_epoch_id": "bridge-run-1"
+          },
+          "capture_receive_epoch_id": "bridge-run-1",
+          "captured_monotonic_ns": 1,
+          "expected": "BaselineEstablished",
+          "expected_admissible": false,
+          "expected_generation": 1,
+          "expected_transition": null
+        },
+        {
+          "op": "observe",
+          "observation": {
+            "clock_id": "ros:/clock",
+            "clock_domain": "ros-sim-time",
+            "source_epoch_id": "bag-run-1",
+            "timestamp_ns": 1000,
+            "received_monotonic_ns": 3,
+            "receive_epoch_id": "bridge-run-1"
+          },
+          "capture_receive_epoch_id": "bridge-run-1",
+          "captured_monotonic_ns": 23,
+          "expected": "NotAdvancing",
+          "expected_admissible": false,
+          "expected_generation": 1,
+          "expected_transition": null
+        },
+        {
+          "op": "watchdog",
+          "capture_receive_epoch_id": "bridge-run-1",
+          "captured_monotonic_ns": 40,
+          "expected": "ClockSourceRecentlyObserved",
+          "expected_admissible": false,
+          "expected_generation": 1,
+          "expected_transition": null
+        }
+      ]
+    },
+    {
+      "id": "silent_clock_publisher_requires_explicit_rebind",
+      "steps": [
+        {
+          "op": "observe",
+          "observation": {
+            "clock_id": "ros:/clock",
+            "clock_domain": "ros-sim-time",
+            "source_epoch_id": "bag-run-1",
+            "timestamp_ns": 1000,
+            "received_monotonic_ns": 1,
+            "receive_epoch_id": "bridge-run-1"
+          },
+          "capture_receive_epoch_id": "bridge-run-1",
+          "captured_monotonic_ns": 1,
+          "expected": "BaselineEstablished",
+          "expected_admissible": false,
+          "expected_generation": 1,
+          "expected_transition": null
+        },
+        {
+          "op": "watchdog",
+          "capture_receive_epoch_id": "bridge-run-1",
+          "captured_monotonic_ns": 52,
+          "expected": "ClockSourceSilent",
+          "expected_admissible": false,
+          "expected_generation": 1,
+          "expected_transition": "ClockSourceSilent"
+        },
+        {
+          "op": "acknowledge",
+          "observation": {
+            "clock_id": "ros:/clock",
+            "clock_domain": "ros-sim-time",
+            "source_epoch_id": "bag-run-1",
+            "timestamp_ns": 1010,
+            "received_monotonic_ns": 61,
+            "receive_epoch_id": "bridge-run-1"
+          },
+          "capture_receive_epoch_id": "bridge-run-1",
+          "captured_monotonic_ns": 61,
+          "expected": "TransitionRebound",
+          "expected_admissible": false,
+          "expected_generation": 2,
+          "expected_transition": null
+        },
+        {
+          "op": "observe",
+          "observation": {
+            "clock_id": "ros:/clock",
+            "clock_domain": "ros-sim-time",
+            "source_epoch_id": "bag-run-1",
+            "timestamp_ns": 1020,
+            "received_monotonic_ns": 62,
+            "receive_epoch_id": "bridge-run-1"
+          },
+          "capture_receive_epoch_id": "bridge-run-1",
+          "captured_monotonic_ns": 62,
+          "expected": "Advancing",
+          "expected_admissible": true,
+          "expected_generation": 2,
+          "expected_transition": null
+        }
+      ]
+    },
+    {
+      "id": "backward_jump_locks_until_rebind",
+      "steps": [
+        {
+          "op": "observe",
+          "observation": {
+            "clock_id": "ros:/clock",
+            "clock_domain": "ros-sim-time",
+            "source_epoch_id": "bag-run-1",
+            "timestamp_ns": 1000,
+            "received_monotonic_ns": 1,
+            "receive_epoch_id": "bridge-run-1"
+          },
+          "capture_receive_epoch_id": "bridge-run-1",
+          "captured_monotonic_ns": 1,
+          "expected": "BaselineEstablished",
+          "expected_admissible": false,
+          "expected_generation": 1,
+          "expected_transition": null
+        },
+        {
+          "op": "observe",
+          "observation": {
+            "clock_id": "ros:/clock",
+            "clock_domain": "ros-sim-time",
+            "source_epoch_id": "bag-run-1",
+            "timestamp_ns": 900,
+            "received_monotonic_ns": 2,
+            "receive_epoch_id": "bridge-run-1"
+          },
+          "capture_receive_epoch_id": "bridge-run-1",
+          "captured_monotonic_ns": 2,
+          "expected": "TransitionRequired",
+          "expected_admissible": false,
+          "expected_generation": 1,
+          "expected_transition": "BackwardJump"
+        },
+        {
+          "op": "observe",
+          "observation": {
+            "clock_id": "ros:/clock",
+            "clock_domain": "ros-sim-time",
+            "source_epoch_id": "bag-run-1",
+            "timestamp_ns": 910,
+            "received_monotonic_ns": 3,
+            "receive_epoch_id": "bridge-run-1"
+          },
+          "capture_receive_epoch_id": "bridge-run-1",
+          "captured_monotonic_ns": 3,
+          "expected": "AwaitingExplicitRebind",
+          "expected_admissible": false,
+          "expected_generation": 1,
+          "expected_transition": "BackwardJump"
+        },
+        {
+          "op": "acknowledge",
+          "observation": {
+            "clock_id": "ros:/clock",
+            "clock_domain": "ros-sim-time",
+            "source_epoch_id": "bag-run-1",
+            "timestamp_ns": 910,
+            "received_monotonic_ns": 3,
+            "receive_epoch_id": "bridge-run-1"
+          },
+          "capture_receive_epoch_id": "bridge-run-1",
+          "captured_monotonic_ns": 3,
+          "expected": "TransitionRebound",
+          "expected_admissible": false,
+          "expected_generation": 2,
+          "expected_transition": null
+        },
+        {
+          "op": "observe",
+          "observation": {
+            "clock_id": "ros:/clock",
+            "clock_domain": "ros-sim-time",
+            "source_epoch_id": "bag-run-1",
+            "timestamp_ns": 920,
+            "received_monotonic_ns": 4,
+            "receive_epoch_id": "bridge-run-1"
+          },
+          "capture_receive_epoch_id": "bridge-run-1",
+          "captured_monotonic_ns": 4,
+          "expected": "Advancing",
+          "expected_admissible": true,
+          "expected_generation": 2,
+          "expected_transition": null
+        }
+      ]
+    },
+    {
+      "id": "excessive_forward_jump_requires_rebind",
+      "steps": [
+        {
+          "op": "observe",
+          "observation": {
+            "clock_id": "ros:/clock",
+            "clock_domain": "ros-sim-time",
+            "source_epoch_id": "bag-run-1",
+            "timestamp_ns": 1000,
+            "received_monotonic_ns": 1,
+            "receive_epoch_id": "bridge-run-1"
+          },
+          "capture_receive_epoch_id": "bridge-run-1",
+          "captured_monotonic_ns": 1,
+          "expected": "BaselineEstablished",
+          "expected_admissible": false,
+          "expected_generation": 1,
+          "expected_transition": null
+        },
+        {
+          "op": "observe",
+          "observation": {
+            "clock_id": "ros:/clock",
+            "clock_domain": "ros-sim-time",
+            "source_epoch_id": "bag-run-1",
+            "timestamp_ns": 1501,
+            "received_monotonic_ns": 2,
+            "receive_epoch_id": "bridge-run-1"
+          },
+          "capture_receive_epoch_id": "bridge-run-1",
+          "captured_monotonic_ns": 2,
+          "expected": "TransitionRequired",
+          "expected_admissible": false,
+          "expected_generation": 1,
+          "expected_transition": "ForwardJump"
+        }
+      ]
+    },
+    {
+      "id": "stale_clock_message_does_not_advance_lifecycle",
+      "steps": [
+        {
+          "op": "observe",
+          "observation": {
+            "clock_id": "ros:/clock",
+            "clock_domain": "ros-sim-time",
+            "source_epoch_id": "bag-run-1",
+            "timestamp_ns": 1000,
+            "received_monotonic_ns": 1,
+            "receive_epoch_id": "bridge-run-1"
+          },
+          "capture_receive_epoch_id": "bridge-run-1",
+          "captured_monotonic_ns": 1,
+          "expected": "BaselineEstablished",
+          "expected_admissible": false,
+          "expected_generation": 1,
+          "expected_transition": null
+        },
+        {
+          "op": "observe",
+          "observation": {
+            "clock_id": "ros:/clock",
+            "clock_domain": "ros-sim-time",
+            "source_epoch_id": "bag-run-1",
+            "timestamp_ns": 1010,
+            "received_monotonic_ns": 2,
+            "receive_epoch_id": "bridge-run-1"
+          },
+          "capture_receive_epoch_id": "bridge-run-1",
+          "captured_monotonic_ns": 1000,
+          "expected": "ClockObservationStale",
+          "expected_admissible": false,
+          "expected_generation": 1,
+          "expected_transition": null
+        }
+      ]
+    },
+    {
+      "id": "source_epoch_change_requires_rebind",
+      "steps": [
+        {
+          "op": "observe",
+          "observation": {
+            "clock_id": "ros:/clock",
+            "clock_domain": "ros-sim-time",
+            "source_epoch_id": "bag-run-1",
+            "timestamp_ns": 1000,
+            "received_monotonic_ns": 1,
+            "receive_epoch_id": "bridge-run-1"
+          },
+          "capture_receive_epoch_id": "bridge-run-1",
+          "captured_monotonic_ns": 1,
+          "expected": "BaselineEstablished",
+          "expected_admissible": false,
+          "expected_generation": 1,
+          "expected_transition": null
+        },
+        {
+          "op": "observe",
+          "observation": {
+            "clock_id": "ros:/clock",
+            "clock_domain": "ros-sim-time",
+            "source_epoch_id": "bag-run-2",
+            "timestamp_ns": 1010,
+            "received_monotonic_ns": 2,
+            "receive_epoch_id": "bridge-run-1"
+          },
+          "capture_receive_epoch_id": "bridge-run-1",
+          "captured_monotonic_ns": 2,
+          "expected": "TransitionRequired",
+          "expected_admissible": false,
+          "expected_generation": 1,
+          "expected_transition": "SourceEpochChanged"
+        }
+      ]
+    },
+    {
+      "id": "receive_epoch_change_precedes_raw_tick_comparison",
+      "steps": [
+        {
+          "op": "observe",
+          "observation": {
+            "clock_id": "ros:/clock",
+            "clock_domain": "ros-sim-time",
+            "source_epoch_id": "bag-run-1",
+            "timestamp_ns": 1000,
+            "received_monotonic_ns": 1000,
+            "receive_epoch_id": "bridge-run-1"
+          },
+          "capture_receive_epoch_id": "bridge-run-1",
+          "captured_monotonic_ns": 1000,
+          "expected": "BaselineEstablished",
+          "expected_admissible": false,
+          "expected_generation": 1,
+          "expected_transition": null
+        },
+        {
+          "op": "watchdog",
+          "capture_receive_epoch_id": "bridge-run-2",
+          "captured_monotonic_ns": 0,
+          "expected": "TransitionRequired",
+          "expected_admissible": false,
+          "expected_generation": 1,
+          "expected_transition": "ReceiveEpochChanged"
+        }
+      ]
+    }
+  ]
+}
