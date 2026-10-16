@@ -496,6 +496,107 @@ fn append_optional_field(output: &mut Vec<u8>, value: Option<&str>) {
     }
 }
 
+/// Compute a lowercase SHA-256 digest over the exact supplied bytes.
+///
+/// This function hashes bytes, not a path or a claim in a receipt. Callers that
+/// verify a retained artifact must read the bytes independently, then compare
+/// this result with the manifest/receipt digest.
+pub fn sha256_hex(bytes: &[u8]) -> String {
+    use sha2::{Digest, Sha256};
+    format!("{:x}", Sha256::digest(bytes))
+}
+
+/// Validate a manifest, then digest its canonical representation.
+pub fn evidence_manifest_sha256(
+    manifest: &EvidenceManifest,
+) -> Result<String, EvidenceContractError> {
+    manifest.validate()?;
+    Ok(sha256_hex(&manifest.canonical_bytes()))
+}
+
+/// Independently recompute and compare a manifest's canonical digest.
+pub fn verify_evidence_manifest_digest(
+    manifest: &EvidenceManifest,
+    expected_sha256: &str,
+) -> Result<(), EvidenceContractError> {
+    validate_sha256("evidence_manifest_sha256", expected_sha256)?;
+    let actual = evidence_manifest_sha256(manifest)?;
+    if actual != expected_sha256 {
+        return Err(invalid(
+            "evidence_manifest_sha256",
+            "recomputed canonical manifest digest does not match the declared digest",
+        ));
+    }
+    Ok(())
+}
+
+/// Validate a receipt, then digest its canonical representation.
+pub fn scenario_run_receipt_sha256(
+    receipt: &ScenarioRunReceipt,
+) -> Result<String, EvidenceContractError> {
+    receipt.validate()?;
+    Ok(sha256_hex(&receipt.canonical_bytes()))
+}
+
+/// Independently recompute and compare a receipt's canonical digest.
+pub fn verify_scenario_run_receipt_digest(
+    receipt: &ScenarioRunReceipt,
+    expected_sha256: &str,
+) -> Result<(), EvidenceContractError> {
+    validate_sha256("scenario_run_receipt_sha256", expected_sha256)?;
+    let actual = scenario_run_receipt_sha256(receipt)?;
+    if actual != expected_sha256 {
+        return Err(invalid(
+            "scenario_run_receipt_sha256",
+            "recomputed canonical receipt digest does not match the declared digest",
+        ));
+    }
+    Ok(())
+}
+
+/// Recompute the digest of retained output bytes instead of trusting a
+/// generator-supplied status or hash string.
+pub fn verify_output_artifact_bytes(
+    artifact: &OutputArtifact,
+    retained_bytes: &[u8],
+) -> Result<(), EvidenceContractError> {
+    validate_sha256("outputs.sha256", &artifact.sha256)?;
+    let actual = sha256_hex(retained_bytes);
+    if actual != artifact.sha256 {
+        return Err(invalid(
+            "outputs.sha256",
+            "recomputed digest does not match retained artifact bytes",
+        ));
+    }
+    Ok(())
+}
+
+/// Verify source bytes against an evidence item's digest. Missing evidence is
+/// never verifiable and must remain an explicit blocked information gap.
+pub fn verify_evidence_item_bytes(
+    item: &EvidenceItem,
+    retained_bytes: &[u8],
+) -> Result<(), EvidenceContractError> {
+    if item.kind == EvidenceKind::Missing {
+        return Err(invalid(
+            "items.content_sha256",
+            "missing evidence cannot be verified as retained source bytes",
+        ));
+    }
+    let expected = item
+        .content_sha256
+        .as_deref()
+        .ok_or_else(|| invalid("items.content_sha256", "source digest is required"))?;
+    validate_sha256("items.content_sha256", expected)?;
+    if sha256_hex(retained_bytes) != expected {
+        return Err(invalid(
+            "items.content_sha256",
+            "recomputed digest does not match retained source bytes",
+        ));
+    }
+    Ok(())
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;
