@@ -12,11 +12,16 @@
 
 use std::collections::BTreeSet;
 
+use serde::{Deserialize, Serialize};
+
+use crate::living_city_evidence::sha256_hex as hash_sha256_hex;
+
 pub const LIVING_CITY_POLICY_BENCHMARK_VERSION: u32 = 1;
 pub const POLICY_BENCHMARK_SCHEMA_VERSION: u32 = 1;
 pub const PER_MILLE: u16 = 1_000;
 
-#[derive(Debug, Clone, Copy, PartialEq, Eq, PartialOrd, Ord)]
+#[derive(Debug, Clone, Copy, PartialEq, Eq, PartialOrd, Ord, Serialize, Deserialize)]
+#[serde(rename_all = "snake_case")]
 pub enum PolicyKind {
     /// Control baseline: never deploy backup.
     NoIntervention,
@@ -28,7 +33,8 @@ pub enum PolicyKind {
     FloorFirst,
 }
 
-#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, Deserialize)]
+#[serde(deny_unknown_fields)]
 pub struct Observation {
     /// Reported supply. None means unavailable, not zero.
     pub reported_supply_units: Option<u32>,
@@ -40,7 +46,8 @@ pub struct Observation {
     pub forecast_service_ratio_per_mille: Option<u16>,
 }
 
-#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, Deserialize)]
+#[serde(deny_unknown_fields)]
 pub struct ScenarioStep {
     /// Simulator-only ground truth; never passed to the policy function.
     pub actual_supply_units: u32,
@@ -49,13 +56,15 @@ pub struct ScenarioStep {
     pub observation: Observation,
 }
 
-#[derive(Debug, Clone, PartialEq, Eq)]
+#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
+#[serde(deny_unknown_fields)]
 pub struct PolicyScenario {
     pub scenario_id: String,
     pub steps: Vec<ScenarioStep>,
 }
 
-#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, Deserialize)]
+#[serde(deny_unknown_fields)]
 pub struct BenchmarkConfig {
     /// A backup event adds this much supply per active step.
     pub backup_capacity_units: u32,
@@ -93,7 +102,34 @@ fn invalid(field: &'static str, reason: &'static str) -> BenchmarkError {
     BenchmarkError { field, reason }
 }
 
+fn canonical_json_bytes<T: Serialize>(
+    value: &T,
+    field: &'static str,
+) -> Result<Vec<u8>, BenchmarkError> {
+    serde_json::to_vec(value)
+        .map_err(|_| invalid(field, "canonical JSON serialization failed"))
+}
+
+impl PolicyScenario {
+    /// Compact JSON in declared field order; the scenario has no unordered maps.
+    pub fn canonical_bytes(&self) -> Result<Vec<u8>, BenchmarkError> {
+        canonical_json_bytes(self, "scenario")
+    }
+
+    pub fn sha256(&self) -> Result<String, BenchmarkError> {
+        Ok(hash_sha256_hex(&self.canonical_bytes()?))
+    }
+}
+
 impl BenchmarkConfig {
+    pub fn canonical_bytes(self) -> Result<Vec<u8>, BenchmarkError> {
+        canonical_json_bytes(&self, "config")
+    }
+
+    pub fn sha256(self) -> Result<String, BenchmarkError> {
+        Ok(hash_sha256_hex(&self.canonical_bytes()?))
+    }
+
     pub fn validate(self) -> Result<(), BenchmarkError> {
         if self.backup_capacity_units == 0 {
             return Err(invalid("backup_capacity_units", "must be greater than zero"));
@@ -135,7 +171,8 @@ fn validate_scenario(scenario: &PolicyScenario) -> Result<(), BenchmarkError> {
     Ok(())
 }
 
-#[derive(Debug, Clone, PartialEq, Eq)]
+#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
+#[serde(deny_unknown_fields)]
 pub struct DeploymentRecord {
     pub requested_at_step: usize,
     pub active_from_step: usize,
@@ -143,13 +180,17 @@ pub struct DeploymentRecord {
     pub active_until_step: usize,
 }
 
-#[derive(Debug, Clone, PartialEq, Eq)]
+#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
+#[serde(deny_unknown_fields)]
 pub struct PolicyRun {
     pub schema_version: u32,
     pub suite_version: u32,
     pub scenario_id: String,
     pub policy: PolicyKind,
     pub config: BenchmarkConfig,
+    /// SHA-256 of the canonical scenario input and benchmark config.
+    pub scenario_sha256: String,
+    pub config_sha256: String,
     pub step_count: usize,
     /// Sum of abstract service units not delivered across all steps.
     pub unmet_service_units: u64,
@@ -164,7 +205,8 @@ pub struct PolicyRun {
     pub total_cost_units: u64,
 }
 
-#[derive(Debug, Clone, PartialEq, Eq)]
+#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
+#[serde(deny_unknown_fields)]
 pub struct PolicyComparison {
     pub scenario_id: String,
     pub baseline_policy: PolicyKind,
@@ -175,6 +217,50 @@ pub struct PolicyComparison {
     pub unmet_service_change_units: i128,
     /// Positive means service loss was reduced. None if baseline loss is zero.
     pub service_loss_reduction_per_mille: Option<i128>,
+}
+
+impl PolicyRun {
+    pub fn canonical_bytes(&self) -> Result<Vec<u8>, BenchmarkError> {
+        canonical_json_bytes(self, "run")
+    }
+
+    pub fn sha256(&self) -> Result<String, BenchmarkError> {
+        Ok(hash_sha256_hex(&self.canonical_bytes()?))
+    }
+
+    pub fn receipt(&self) -> Result<PolicyRunReceipt, BenchmarkError> {
+        Ok(PolicyRunReceipt {
+            schema_version: POLICY_BENCHMARK_SCHEMA_VERSION,
+            suite_version: LIVING_CITY_POLICY_BENCHMARK_VERSION,
+            scenario_id: self.scenario_id.clone(),
+            policy: self.policy,
+            scenario_sha256: self.scenario_sha256.clone(),
+            config_sha256: self.config_sha256.clone(),
+            run_sha256: self.sha256()?,
+        })
+    }
+}
+
+#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
+#[serde(deny_unknown_fields)]
+pub struct PolicyRunReceipt {
+    pub schema_version: u32,
+    pub suite_version: u32,
+    pub scenario_id: String,
+    pub policy: PolicyKind,
+    pub scenario_sha256: String,
+    pub config_sha256: String,
+    pub run_sha256: String,
+}
+
+impl PolicyRunReceipt {
+    pub fn canonical_bytes(&self) -> Result<Vec<u8>, BenchmarkError> {
+        canonical_json_bytes(self, "receipt")
+    }
+
+    pub fn sha256(&self) -> Result<String, BenchmarkError> {
+        Ok(hash_sha256_hex(&self.canonical_bytes()?))
+    }
 }
 
 fn observation_is_fresh(observation: Observation, config: BenchmarkConfig) -> bool {
@@ -241,6 +327,8 @@ pub fn evaluate_policy(
 ) -> Result<PolicyRun, BenchmarkError> {
     config.validate()?;
     validate_scenario(scenario)?;
+    let scenario_sha256 = scenario.sha256()?;
+    let config_sha256 = config.sha256()?;
 
     let mut deployments: Vec<DeploymentRecord> = Vec::new();
     let mut unmet_service_units = 0_u64;
@@ -306,6 +394,8 @@ pub fn evaluate_policy(
         scenario_id: scenario.scenario_id.clone(),
         policy,
         config,
+        scenario_sha256,
+        config_sha256,
         step_count: scenario.steps.len(),
         unmet_service_units,
         floor_breach_steps: floor_breach_step_indices.len(),
@@ -355,6 +445,50 @@ pub fn evaluate_suite(
         }
     }
     Ok(results)
+}
+
+/// Recompute the run from the exact scenario/config, then verify every digest
+/// in the receipt. This protects determinism and artifact linkage; it does not
+/// independently validate the physical truth of the synthetic model.
+pub fn verify_policy_run_receipt(
+    scenario: &PolicyScenario,
+    config: BenchmarkConfig,
+    run: &PolicyRun,
+    receipt: &PolicyRunReceipt,
+) -> Result<(), BenchmarkError> {
+    config.validate()?;
+    validate_scenario(scenario)?;
+    if receipt.schema_version != POLICY_BENCHMARK_SCHEMA_VERSION
+        || receipt.suite_version != LIVING_CITY_POLICY_BENCHMARK_VERSION
+    {
+        return Err(invalid("receipt.version", "unsupported receipt or suite version"));
+    }
+    if receipt.scenario_id != scenario.scenario_id
+        || receipt.scenario_id != run.scenario_id
+        || receipt.policy != run.policy
+    {
+        return Err(invalid("receipt.identity", "receipt identity does not match the run"));
+    }
+
+    let scenario_sha256 = scenario.sha256()?;
+    let config_sha256 = config.sha256()?;
+    if run.config != config
+        || run.scenario_sha256 != scenario_sha256
+        || run.config_sha256 != config_sha256
+        || receipt.scenario_sha256 != scenario_sha256
+        || receipt.config_sha256 != config_sha256
+    {
+        return Err(invalid("receipt.inputs", "scenario/config digest linkage failed"));
+    }
+
+    let replay = evaluate_policy(scenario, run.policy, config)?;
+    if &replay != run {
+        return Err(invalid("run", "recorded metrics/actions differ from deterministic replay"));
+    }
+    if receipt.run_sha256 != run.sha256()? {
+        return Err(invalid("receipt.run_sha256", "run digest does not match canonical run"));
+    }
+    Ok(())
 }
 
 /// Compare two policies only when their scenarios, timestep counts and full
@@ -622,6 +756,72 @@ mod tests {
                 .field,
             "forecast_service_ratio_per_mille"
         );
+    }
+
+    #[test]
+    fn receipt_binds_scenario_config_and_replayed_run() {
+        let case = scenario(
+            "receipt-fixture",
+            vec![
+                step(5, 10, observed(5, 10)),
+                step(10, 10, observed(10, 10)),
+            ],
+        );
+        let cfg = config();
+        let run = evaluate_policy(&case, PolicyKind::ReactiveGreedy, cfg).unwrap();
+        let receipt = run.receipt().unwrap();
+
+        assert!(verify_policy_run_receipt(&case, cfg, &run, &receipt).is_ok());
+        assert_eq!(
+            receipt.scenario_sha256,
+            case.sha256().unwrap()
+        );
+        assert_eq!(receipt.config_sha256, cfg.sha256().unwrap());
+        assert_eq!(receipt.run_sha256, run.sha256().unwrap());
+        assert_eq!(
+            serde_json::from_slice::<PolicyRunReceipt>(&receipt.canonical_bytes().unwrap()).unwrap(),
+            receipt
+        );
+    }
+
+    #[test]
+    fn receipt_verifier_rejects_tampered_run_metrics_and_stale_digest() {
+        let case = scenario("tamper-fixture", vec![step(5, 10, observed(5, 10))]);
+        let cfg = config();
+        let run = evaluate_policy(&case, PolicyKind::ReactiveGreedy, cfg).unwrap();
+        let receipt = run.receipt().unwrap();
+
+        let mut tampered_run = run.clone();
+        tampered_run.unmet_service_units = tampered_run.unmet_service_units.saturating_add(1);
+        assert_eq!(
+            verify_policy_run_receipt(&case, cfg, &tampered_run, &receipt)
+                .unwrap_err()
+                .field,
+            "run"
+        );
+
+        let mut tampered_receipt = receipt;
+        tampered_receipt.run_sha256 = "0".repeat(64);
+        assert_eq!(
+            verify_policy_run_receipt(&case, cfg, &run, &tampered_receipt)
+                .unwrap_err()
+                .field,
+            "receipt.run_sha256"
+        );
+    }
+
+    #[test]
+    fn scenario_and_config_digests_change_when_bound_inputs_change() {
+        let case = scenario("digest-fixture", vec![step(5, 10, observed(5, 10))]);
+        let original_scenario_digest = case.sha256().unwrap();
+        let mut changed_case = case.clone();
+        changed_case.steps[0].actual_supply_units = 4;
+        assert_ne!(original_scenario_digest, changed_case.sha256().unwrap());
+
+        let cfg = config();
+        let mut changed_config = cfg;
+        changed_config.backup_capacity_units += 1;
+        assert_ne!(cfg.sha256().unwrap(), changed_config.sha256().unwrap());
     }
 
     #[test]
