@@ -303,6 +303,10 @@ fn make_case(scenario: Scenario, seed: u64, sigma: f64) -> Value {
         "measurement_sd": sigma,
         "observation_count": observations.len(),
         "substrates": scenario.substrate_set,
+        "observations": observations.iter().map(|obs| json!({
+            "substrate": obs.substrate,
+            "observed_rate": obs.rate
+        })).collect::<Vec<_>>(),
         "truth_family": scenario.truth_family,
         "expected_decision": scenario.expected_decision,
         "observed_decision": decision.selected,
@@ -408,7 +412,12 @@ fn build_report() -> Result<Value> {
             "case_count": total_cases,
             "substrate_design": "stratum-specific frozen substrate conditions",
             "noise_model": "deterministic bounded uniform residual with requested standard deviation",
-            "fit_method": "coarse exhaustive parameter grid; intentionally a reproducible baseline, not a production estimator"
+            "fit_method": "coarse exhaustive parameter grid; intentionally a reproducible baseline, not a production estimator",
+            "fit_grid": {
+                "vmax_min": 60.0, "vmax_max": 140.0, "vmax_step": 2.0,
+                "km_min": 0.25, "km_max": 10.0, "km_step": 0.25,
+                "ki_min": 5.0, "ki_max": 100.0, "ki_step": 5.0
+            }
         },
         "decision_policy": {
             "order": [
@@ -512,6 +521,7 @@ mod tests {
             case["observed_decision"].as_str().is_some()
                 && case["decision_reason"].as_str().is_some()
                 && case["target_hit"].as_bool().is_some()
+                && case["observations"].as_array().map(|rows| rows.len()) == case["observation_count"].as_u64().map(|count| count as usize)
         }));
         assert!(report["scope"].as_str().unwrap().contains("not calibrated biochemical evidence"));
     }
