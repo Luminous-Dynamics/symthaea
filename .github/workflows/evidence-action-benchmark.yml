@@ -7,24 +7,30 @@ on:
     paths:
       - "src/knowledge/evidence_action_policy.rs"
       - "src/knowledge/evidence_benchmark.rs"
+      - "src/knowledge/evidence_trajectory.rs"
       - "src/knowledge/mod.rs"
       - "src/bin/evidence_action_benchmark.rs"
       - "Cargo.toml"
       - "Cargo.lock"
       - "docs/research/data/evidence_action_benchmark.synthetic.jsonl"
       - "docs/research/data/evidence_action_benchmark.unsafe-control.synthetic.jsonl"
+      - "docs/research/data/evidence_trajectory_benchmark.synthetic.jsonl"
+      - "docs/research/data/evidence_trajectory_benchmark.unsafe-control.synthetic.jsonl"
       - "docs/research/schemas/**"
       - ".github/workflows/evidence-action-benchmark.yml"
   pull_request:
     paths:
       - "src/knowledge/evidence_action_policy.rs"
       - "src/knowledge/evidence_benchmark.rs"
+      - "src/knowledge/evidence_trajectory.rs"
       - "src/knowledge/mod.rs"
       - "src/bin/evidence_action_benchmark.rs"
       - "Cargo.toml"
       - "Cargo.lock"
       - "docs/research/data/evidence_action_benchmark.synthetic.jsonl"
       - "docs/research/data/evidence_action_benchmark.unsafe-control.synthetic.jsonl"
+      - "docs/research/data/evidence_trajectory_benchmark.synthetic.jsonl"
+      - "docs/research/data/evidence_trajectory_benchmark.unsafe-control.synthetic.jsonl"
       - "docs/research/schemas/**"
       - ".github/workflows/evidence-action-benchmark.yml"
 
@@ -57,6 +63,29 @@ jobs:
         run: cargo test --locked --features evidence-benchmark --lib knowledge::evidence_benchmark::tests
       - name: Test benchmark CLI
         run: cargo test --locked --features evidence-benchmark --bin evidence_action_benchmark
+      - name: Format trajectory evaluator
+        run: rustfmt --check --edition 2024 --config skip_children=true src/knowledge/evidence_trajectory.rs
+      - name: Test trajectory replay contract
+        run: cargo test --locked --features evidence-benchmark --lib knowledge::evidence_trajectory::tests
+      - name: Audit and score synthetic trajectories
+        shell: bash
+        run: |
+          set -euo pipefail
+          dataset="docs/research/data/evidence_trajectory_benchmark.synthetic.jsonl"
+          unsafe_dataset="docs/research/data/evidence_trajectory_benchmark.unsafe-control.synthetic.jsonl"
+          receipts="$(mktemp)"
+          trap 'rm -f "$receipts"' EXIT
+          cargo run --locked --quiet --features evidence-benchmark --bin evidence_action_benchmark -- trajectory-audit "$dataset"
+          cargo run --locked --quiet --features evidence-benchmark --bin evidence_action_benchmark -- trajectory-evaluate "$dataset" "$receipts" trajectory-policy-v1 1 false
+          cargo run --locked --quiet --features evidence-benchmark --bin evidence_action_benchmark -- trajectory-score "$dataset" "$receipts" trajectory-policy-v1
+          set +e
+          cargo run --locked --quiet --features evidence-benchmark --bin evidence_action_benchmark -- trajectory-score "$dataset" "$unsafe_dataset" trajectory-policy-v1
+          status=$?
+          set -e
+          if [[ "$status" -ne 3 ]]; then
+            echo "Expected unsafe trajectory control to exit 3; got $status" >&2
+            exit 1
+          fi
       - name: Audit synthetic case fixture
         run: cargo run --locked --quiet --features evidence-benchmark --bin evidence_action_benchmark -- audit docs/research/data/evidence_action_benchmark.synthetic.jsonl
       - name: Evaluate and score synthetic control suite
