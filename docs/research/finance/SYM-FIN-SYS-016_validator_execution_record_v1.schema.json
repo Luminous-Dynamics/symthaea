@@ -12,6 +12,7 @@
     "scope",
     "repository",
     "source_revision",
+    "event_sha",
     "workflow",
     "job",
     "event",
@@ -42,6 +43,10 @@
       "pattern": "^[A-Za-z0-9_.-]+/[A-Za-z0-9_.-]+$"
     },
     "source_revision": {
+      "type": "string",
+      "pattern": "^[0-9a-f]{40}$"
+    },
+    "event_sha": {
       "type": "string",
       "pattern": "^[0-9a-f]{40}$"
     },
