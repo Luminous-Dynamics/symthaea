@@ -515,7 +515,7 @@ mod tests {
 
     #[test]
     fn rejects_comment_like_candidate_ids() {
-        let input = "candidate_id\\tx\\n#design\\t1\\n";
+        let input = "candidate_id\tx\n#design\t1\n";
         assert!(parse_tsv(input).unwrap_err().contains("comment-like"));
     }
 
