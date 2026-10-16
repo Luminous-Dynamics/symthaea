@@ -94,6 +94,30 @@ pub struct BioacousticCorpusManifest {
     pub recordings: Vec<BioacousticRecording>,
 }
 
+impl BioacousticCorpusManifest {
+    /// Compute a deterministic BLAKE3 identity for the declared manifest.
+    ///
+    /// Recording order, annotation order, and individual-ID order are
+    /// canonicalized because those vector orders do not change the corpus
+    /// meaning. Split assignments, rights evidence, hashes, timing, channel
+    /// metadata and all other declared fields remain identity-bearing.
+    pub fn computed_manifest_blake3(&self) -> Result<String, String> {
+        let mut canonical = self.clone();
+        canonical
+            .recordings
+            .sort_by(|left, right| left.sample_id.cmp(&right.sample_id));
+        for recording in &mut canonical.recordings {
+            recording.individual_ids.sort();
+            recording
+                .annotations
+                .sort_by(|left, right| left.annotation_id.cmp(&right.annotation_id));
+        }
+        let bytes = serde_json::to_vec(&canonical)
+            .map_err(|error| format!("cannot serialize bioacoustic manifest: {error}"))?;
+        Ok(blake3::hash(&bytes).to_hex().to_string())
+    }
+}
+
 /// Claims that an evaluation split policy intends to test.
 ///
 /// Set a holdout flag only when the corresponding IDs are sourced from
@@ -434,6 +458,22 @@ mod tests {
                 ),
             ],
         }
+    }
+
+    #[test]
+    fn manifest_hash_is_order_invariant_but_identity_sensitive() {
+        let mut left = manifest();
+        let left_hash = left.computed_manifest_blake3().unwrap();
+
+        left.recordings.reverse();
+        left.recordings[0].individual_ids.reverse();
+        let reordered_hash = left.computed_manifest_blake3().unwrap();
+        assert_eq!(left_hash, reordered_hash);
+
+        left.intended_use = BioacousticIntendedUse::CommercialResearch;
+        left.rights.intended_use = BioacousticIntendedUse::CommercialResearch;
+        let changed_rights_scope_hash = left.computed_manifest_blake3().unwrap();
+        assert_ne!(left_hash, changed_rights_scope_hash);
     }
 
     #[test]
