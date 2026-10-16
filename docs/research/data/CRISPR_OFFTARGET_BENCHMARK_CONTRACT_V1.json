@@ -629,7 +629,8 @@
       "scripts/crispr_measurement_priority.rs",
       "scripts/crispr_interval_frontier.rs",
       "scripts/crispr_transportability.rs",
-      "scripts/crispr_shift_robustness_radius.rs"
+      "scripts/crispr_shift_robustness_radius.rs",
+      "scripts/crispr_verification_bias.rs"
     ]
   },
   "updated_on": "2026-10-16",
