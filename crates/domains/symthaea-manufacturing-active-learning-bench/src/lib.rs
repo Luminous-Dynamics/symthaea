@@ -135,7 +135,7 @@ impl CampaignManifest {
             schema_version: SCHEMA_VERSION,
             benchmark_id: BENCHMARK_ID.into(),
             scenario,
-            oracle_version: "synthetic-oracle-v1".into(),
+            oracle_version: "synthetic-oracle-v2".into(),
             oracle_seed,
             budget_units,
             proxy_cost_units: 1,
