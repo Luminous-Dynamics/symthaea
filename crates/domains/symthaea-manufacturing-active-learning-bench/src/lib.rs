@@ -308,7 +308,7 @@ pub struct EvaluationReport {
     pub total_cost_units: u32,
     pub first_conforming_cost_units: Option<u32>,
     pub best_conforming_utility: Option<i64>,
-    pub best_conforming_throughput_units: Option<u32>,
+    pub max_conforming_throughput_units: Option<u32>,
     pub total_resource_units: u32,
     pub blocked_catalog_candidates: u32,
     pub unknown_catalog_candidates: u32,
@@ -711,9 +711,11 @@ pub fn evaluate_transcript(
             }
             let utility = i64::from(throughput) * 1000 - i64::from(resource) * 100
                 + i64::from(margin);
+            if best_conforming_throughput.is_none_or(|best| throughput > best) {
+                best_conforming_throughput = Some(throughput);
+            }
             if best_utility.is_none_or(|best| utility > best) {
                 best_utility = Some(utility);
-                best_conforming_throughput = Some(throughput);
             }
         }
         total_resource = total_resource
@@ -752,7 +754,7 @@ pub fn evaluate_transcript(
         total_cost_units: cumulative_cost,
         first_conforming_cost_units: first_conforming_cost,
         best_conforming_utility: best_utility,
-        best_conforming_throughput_units: best_conforming_throughput,
+        max_conforming_throughput_units: best_conforming_throughput,
         total_resource_units: total_resource,
         blocked_catalog_candidates: blocked_count,
         unknown_catalog_candidates: unknown_count,
