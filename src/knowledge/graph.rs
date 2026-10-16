@@ -1491,7 +1491,15 @@ fn same_relation_except_polarity(
     query: &RelationObservationQuery,
     stored: &ExtractedRelation,
 ) -> bool {
-    RelationIdentityKey::from_query(query) == RelationIdentityKey::from_stored(stored)
+    // Keep the oracle independent of RelationIdentityKey construction so it can
+    // catch a missing/mis-specified key component in the optimized implementation.
+    normalized_relation_text(&query.subject) == normalized_relation_text(&stored.subject)
+        && normalized_relation_text(&query.predicate)
+            == normalized_relation_text(&stored.predicate)
+        && normalized_relation_text(&query.object) == normalized_relation_text(&stored.object)
+        && query.subject_role == stored.subject_role
+        && query.object_role == stored.object_role
+        && query.is_causal == stored.is_causal
         && query.is_negated != stored.is_negated
 }
 
