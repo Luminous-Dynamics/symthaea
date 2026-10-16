@@ -86,19 +86,26 @@ impl AxiomReport {
             (*with_axioms.first().expect("exactly one marker was checked"), WITH_AXIOMS.len(), false)
         };
 
-        // Bind the theorem name to the quoted token immediately preceding the
-        // unique marker, not to the first quoted text in arbitrary compiler or
-        // user-generated output.
-        let before = &output[..marker];
-        let closing_quote = before.rfind('\'').ok_or_else(|| {
-            AxiomParseError::MalformedReport("missing quoted theorem name".into())
-        })?;
-        let before_closing = &before[..closing_quote];
-        let opening_quote = before_closing.rfind('\'').ok_or_else(|| {
-            AxiomParseError::MalformedReport("missing quoted theorem name".into())
-        })?;
-        let theorem = before_closing[opening_quote + 1..closing_quote].trim();
-        if theorem.is_empty() || theorem.chars().any(char::is_control) {
+        // The marker must be preceded on the same line by exactly one
+        // quoted theorem token. Do not mine an unrelated quote from earlier
+        // diagnostics or accept a prefixed line that merely contains a marker.
+        let line_start = output[..marker]
+            .rfind('\n')
+            .map(|index| index + 1)
+            .unwrap_or(0);
+        let report_prefix = output[line_start..marker].trim();
+        let theorem = report_prefix
+            .strip_prefix('\'')
+            .and_then(|name| name.strip_suffix('\''))
+            .ok_or_else(|| {
+                AxiomParseError::MalformedReport(
+                    "report marker must be preceded by a standalone quoted theorem name".into(),
+                )
+            })?;
+        if theorem.is_empty()
+            || theorem.contains('\'')
+            || theorem.chars().any(char::is_control)
+        {
             return Err(AxiomParseError::MalformedReport(
                 "invalid quoted theorem name".into(),
             ));
@@ -209,6 +216,15 @@ mod tests {
             "'thm' does not depend on any axioms\n",
             "'thm' depends on axioms: [sorryAx]"
         );
+        assert!(matches!(
+            AxiomReport::parse(output),
+            Err(AxiomParseError::MalformedReport(_))
+        ));
+    }
+
+    #[test]
+    fn rejects_report_marker_prefixed_by_unrelated_text() {
+        let output = "warning: spoofed 'foo' does not depend on any axioms";
         assert!(matches!(
             AxiomReport::parse(output),
             Err(AxiomParseError::MalformedReport(_))
