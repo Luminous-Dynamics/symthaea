@@ -13,7 +13,7 @@
 //! its retained bytes match the declared digests. It does not authenticate the
 //! author, validate physics, certify code compliance, or approve construction.
 
-use serde::Deserialize;
+use serde::{Deserialize, Serialize};
 use std::collections::BTreeMap;
 use std::env;
 use std::error::Error;
@@ -23,6 +23,12 @@ use std::path::{Component, Path, PathBuf};
 use std::process;
 use std::sync::atomic::{AtomicU64, Ordering};
 
+use symthaea_scenarios::living_city_benchmarks::{
+    BenchmarkProfileBinding, LIVING_CITY_BENCHMARKS,
+};
+use symthaea_scenarios::living_city_dependencies::{
+    ServiceDependency, ServiceNode,
+};
 use symthaea_scenarios::living_city_evidence::{
     EVIDENCE_SCHEMA_VERSION, RECEIPT_SCHEMA_VERSION, EvidenceItem, EvidenceKind,
     EvidenceManifest, GateStatus, OutputArtifact, ScenarioRunReceipt, ToolExecution,
@@ -31,8 +37,12 @@ use symthaea_scenarios::living_city_evidence::{
     verify_receipt_manifest_link, verify_receipt_output_digests,
     verify_scenario_run_receipt_digest,
 };
+use symthaea_scenarios::living_city_hazard_profiles::{
+    HazardProfile, evaluate_hazard_profile,
+};
 
-const BUNDLE_SCHEMA_VERSION: u32 = 1;
+const BUNDLE_SCHEMA_VERSION: u32 = 2;
+const SERVICE_GRAPH_SCHEMA_VERSION: u32 = 1;
 
 #[derive(Debug, Deserialize)]
 #[serde(deny_unknown_fields)]
@@ -41,8 +51,19 @@ struct VerificationBundle {
     manifest_path: String,
     receipt_path: String,
     receipt_sha256_path: String,
+    hazard_profile_path: String,
+    profile_binding_path: String,
+    service_graph_path: String,
     source_files: Vec<FileBinding>,
     output_files: Vec<FileBinding>,
+}
+
+#[derive(Debug, Clone, Serialize, Deserialize)]
+#[serde(deny_unknown_fields)]
+struct ServiceGraphPackage {
+    schema_version: u32,
+    nodes: Vec<ServiceNode>,
+    dependencies: Vec<ServiceDependency>,
 }
 
 #[derive(Debug, Deserialize)]
@@ -50,6 +71,34 @@ struct VerificationBundle {
 struct FileBinding {
     id: String,
     path: String,
+}
+
+fn canonical_service_graph_bytes(
+    graph: &ServiceGraphPackage,
+) -> Result<Vec<u8>, Box<dyn Error>> {
+    let mut canonical = graph.clone();
+    canonical.nodes.sort_by(|left, right| left.id.cmp(&right.id));
+    canonical.dependencies.sort();
+    Ok(serde_json::to_vec(&canonical)?)
+}
+
+/// Bind the profile, selected profile binding, and service graph into the
+/// receipt's configuration digest. Length prefixes make component boundaries
+/// unambiguous. The evidence-manifest digest remains a separate receipt field.
+fn scenario_configuration_sha256(
+    profile: &HazardProfile,
+    binding: &BenchmarkProfileBinding,
+    graph: &ServiceGraphPackage,
+) -> Result<String, Box<dyn Error>> {
+    let profile_bytes = profile.canonical_bytes()?;
+    let binding_bytes = serde_json::to_vec(binding)?;
+    let graph_bytes = canonical_service_graph_bytes(graph)?;
+    let mut bytes = Vec::new();
+    for component in [&profile_bytes, &binding_bytes, &graph_bytes] {
+        bytes.extend_from_slice(&(component.len() as u64).to_le_bytes());
+        bytes.extend_from_slice(component);
+    }
+    Ok(sha256_hex(&bytes))
 }
 
 fn invalid_input(message: impl Into<String>) -> io::Error {
