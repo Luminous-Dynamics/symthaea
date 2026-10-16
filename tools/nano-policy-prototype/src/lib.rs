@@ -738,6 +738,8 @@ mod tests {
         assert_eq!(output.candidate_pool_sha256, "a".repeat(64));
         assert_eq!(output.seed, 42);
         assert_eq!(output.policy, Policy::Hybrid);
+        assert_eq!(output.selected[0].candidate_id, "a");
+        assert_eq!(output.selected[1].candidate_id, "c");
         assert!(output.selected.iter().all(|item| item.score.is_finite()));
     }
 }
