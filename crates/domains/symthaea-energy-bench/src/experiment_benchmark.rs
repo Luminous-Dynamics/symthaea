@@ -839,6 +839,7 @@ mod tests {
         misleading.proposal.expected_uncertainty_reduction_fraction = 0.99;
         misleading.proposal.estimated_resource_cost.amount = 1.0;
         misleading.oracle_information_gain = 0.05;
+        let misleading_id = misleading.proposal.experiment_id.clone();
 
         let decisive = &mut scenario.experiments[1];
         decisive.proposal.decision_relevance = DecisionRelevance::Exploratory;
@@ -852,7 +853,7 @@ mod tests {
             ExperimentSelectionStrategy::PhaseA,
         )
         .unwrap();
-        assert_eq!(result.selected_experiment_ids, vec![misleading.proposal.experiment_id.clone()]);
+        assert_eq!(result.selected_experiment_ids, vec![misleading_id]);
         assert!(result.decision_regret > 0.85);
         assert!((result.oracle_minimum_cost_to_resolve.unwrap() - 1.0).abs() <= 1e-12);
     }
