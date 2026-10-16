@@ -577,6 +577,28 @@ mod tests {
     }
 
     #[test]
+    fn frozen_holdout_split_is_disjoint_and_conserves_observations() {
+        let observations: Vec<Observation> = (0..8)
+            .map(|index| Observation {
+                substrate: index as f64,
+                rate: (index as f64) * 2.0,
+            })
+            .collect();
+        let (training, held_out) = split_observations(&observations);
+
+        assert_eq!(
+            training.iter().map(|obs| obs.substrate).collect::<Vec<_>>(),
+            vec![1.0, 2.0, 4.0, 5.0, 7.0]
+        );
+        assert_eq!(
+            held_out.iter().map(|obs| obs.substrate).collect::<Vec<_>>(),
+            vec![0.0, 3.0, 6.0]
+        );
+        assert_eq!(training.len() + held_out.len(), observations.len());
+        assert!(training.iter().all(|train| held_out.iter().all(|test| train.substrate != test.substrate)));
+    }
+
+    #[test]
     fn generated_matrix_has_fixed_denominators_and_explicit_targets() {
         let report = build_report().expect("matrix generation should succeed");
         assert_eq!(report["status"], "exploratory_synthetic_matrix_generated");
