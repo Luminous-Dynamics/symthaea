@@ -414,7 +414,10 @@ mod tests {
             witness("e1", "s1", Some("origin-A"), Some(&digest('a'))),
             witness("e2", "s2", Some("origin-B"), Some(&digest('b'))),
         ];
-        let result = EvidenceLineageAssessment::assess(&witnesses, &EvidenceLineagePolicy::strict());
+        let result = EvidenceLineageAssessment::assess(
+            &witnesses,
+            &EvidenceLineagePolicy::strict(),
+        );
         assert_eq!(result.attributed_origin_group_count, 2);
         assert_eq!(result.unresolved_lineage_group_count, 0);
         assert_eq!(result.decision, EvidenceLineageDecision::EligibleForReview);
@@ -426,7 +429,10 @@ mod tests {
             witness("e1", "s1", Some("origin-A"), Some(&digest('a'))),
             witness("e2", "s2", Some("origin-B"), Some(&digest('a'))),
         ];
-        let result = EvidenceLineageAssessment::assess(&witnesses, &EvidenceLineagePolicy::strict());
+        let result = EvidenceLineageAssessment::assess(
+            &witnesses,
+            &EvidenceLineagePolicy::strict(),
+        );
         assert_eq!(result.duplicate_witness_count, 1);
         assert_eq!(result.attributed_origin_group_count, 1);
         assert_eq!(result.groups[0].origin_ids, vec!["origin-A", "origin-B"]);
@@ -442,7 +448,10 @@ mod tests {
             witness("e1", "url-A", None, Some(&digest('a'))),
             witness("e2", "url-B", None, Some(&digest('b'))),
         ];
-        let result = EvidenceLineageAssessment::assess(&witnesses, &EvidenceLineagePolicy::strict());
+        let result = EvidenceLineageAssessment::assess(
+            &witnesses,
+            &EvidenceLineagePolicy::strict(),
+        );
         assert_eq!(result.attributed_origin_group_count, 0);
         assert_eq!(result.unresolved_lineage_group_count, 2);
         assert!(result.reasons.contains(&EvidenceLineageAbstentionReason::UnknownLineage));
@@ -473,7 +482,10 @@ mod tests {
             witness("e2", "s2", Some("origin-B"), Some(&digest('b'))),
             witness("e3", "s3", Some("origin-C"), Some("invalid")),
         ];
-        let result = EvidenceLineageAssessment::assess(&witnesses, &EvidenceLineagePolicy::strict());
+        let result = EvidenceLineageAssessment::assess(
+            &witnesses,
+            &EvidenceLineagePolicy::strict(),
+        );
         assert!(result.reasons.contains(&EvidenceLineageAbstentionReason::InvalidContentDigest));
         assert_eq!(result.decision, EvidenceLineageDecision::Abstain);
     }
@@ -485,7 +497,10 @@ mod tests {
             witness("e2", "same-source", Some("origin-B"), Some(&digest('b'))),
             witness("e3", "other-source", Some("origin-C"), Some(&digest('c'))),
         ];
-        let result = EvidenceLineageAssessment::assess(&witnesses, &EvidenceLineagePolicy::strict());
+        let result = EvidenceLineageAssessment::assess(
+            &witnesses,
+            &EvidenceLineagePolicy::strict(),
+        );
         assert_eq!(result.duplicate_witness_count, 1);
         assert_eq!(result.attributed_origin_group_count, 2);
         assert_eq!(result.decision, EvidenceLineageDecision::Abstain);
