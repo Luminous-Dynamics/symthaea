@@ -29,7 +29,7 @@ The dedicated Rust unit tests cover:
 - no duplicate IDs in selected candidates and no selection count above budget;
 - repeatability for a fixed random seed and input;
 - deterministic farthest-first behavior independent of input-row ordering;
-- structural receipt verifier recomputes input SHA-256 binding, selected-ID membership, family/cost lineage, budget/rank invariants, and nearest-selected descriptor distances from the frozen request;
+- structural receipt verifier recomputes request/response SHA-256 binding, selected-ID membership, family/cost lineage, budget/rank invariants, and nearest-selected descriptor distances from the frozen request;
 - cost-aware anchor/selection behavior and missing/non-positive cost rejection;
 - expected family spread from the group-balanced policy;
 - rejection of duplicate IDs, dimension mismatch, out-of-range/non-finite features and zero budgets;
