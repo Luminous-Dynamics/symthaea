@@ -448,7 +448,10 @@ fn validate_manifest(manifest: &CampaignManifest) -> Result<(), String> {
         || !is_hex_digest(&manifest.evaluation_manifest_sha256, 64)
         || !is_hex_digest(&manifest.simulator_recipe_sha256, 64)
     {
-        return Err("task/evaluation/recipe manifest digests must be 64 lowercase hexadecimal characters".to_string());
+        return Err(
+            "task/evaluation/recipe manifest digests must be 64 lowercase hexadecimal characters"
+                .to_string(),
+        );
     }
     if manifest.expected_simulator_calls == 0
         || manifest.expected_simulator_calls > MAX_SIMULATOR_CALLS
@@ -461,7 +464,7 @@ fn validate_manifest(manifest: &CampaignManifest) -> Result<(), String> {
         || manifest.proposal_attempt_cap > MAX_PROPOSAL_ATTEMPTS
     {
         return Err(format!(
-            "proposal_attempt_cap must be >= expected_simulator_calls and <= {MAX_PROPOSAL_ATTEMPTS}"
+            "proposal-attempt cap must cover the simulator budget and not exceed {MAX_PROPOSAL_ATTEMPTS}"
         ));
     }
     if manifest.expected_seeds.is_empty() || manifest.expected_seeds.len() > MAX_CAMPAIGN_SEEDS {
@@ -522,7 +525,7 @@ fn validate_relative_path(path: &str) -> Result<(), String> {
         || path.split('/').any(|part| part.is_empty() || part == "." || part == "..")
     {
         return Err(format!(
-            "relative_path {path:?} must be a safe forward-slash relative path with no empty, dot, or parent components"
+            "relative_path {path:?} contains unsafe path components"
         ));
     }
     Ok(())
@@ -534,7 +537,7 @@ fn validate_text(value: &str, field: &str) -> Result<(), String> {
         || value.chars().any(char::is_control)
     {
         return Err(format!(
-            "{field} must be non-empty, at most {MAX_CAMPAIGN_TEXT_BYTES} bytes, and contain no control characters"
+            "{field} must be non-empty, short, and contain no control characters"
         ));
     }
     Ok(())
