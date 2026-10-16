@@ -414,6 +414,7 @@ mod tests {
         let crews = [crew("crew-x", &["x"]), crew("crew-y", &["y"])];
         let result = exhaustive_multi_crew_repair_optimum(&jobs, &crews).unwrap();
         assert!((result.minimum_weighted_completion_loss - 41.0).abs() < EPSILON);
+        assert_eq!(result.complete_dispatch_sequences_evaluated, 6);
         let c = result.optimal_schedule.iter().find(|repair| repair.job_id == "c").unwrap();
         let a = result.optimal_schedule.iter().find(|repair| repair.job_id == "a").unwrap();
         let b = result.optimal_schedule.iter().find(|repair| repair.job_id == "b").unwrap();
@@ -431,6 +432,7 @@ mod tests {
         let crews = [crew("electrician", &["electric"]), crew("mechanic", &["mechanical"])];
         let result = exhaustive_multi_crew_repair_optimum(&jobs, &crews).unwrap();
         assert!((result.minimum_weighted_completion_loss - 52.0).abs() < EPSILON);
+        assert_eq!(result.complete_dispatch_sequences_evaluated, 1);
         let power = result.optimal_schedule.iter().find(|r| r.job_id == "power").unwrap();
         let pump = result.optimal_schedule.iter().find(|r| r.job_id == "pump").unwrap();
         assert!(pump.start_step >= power.finish_step);
@@ -498,6 +500,7 @@ mod tests {
         ];
         let result = exhaustive_multi_crew_repair_optimum(&jobs, &crews).unwrap();
         assert!((result.minimum_weighted_completion_loss - 42.0).abs() < EPSILON);
+        assert_eq!(result.complete_dispatch_sequences_evaluated, 24);
         let sensor = result.optimal_schedule.iter().find(|r| r.job_id == "sensor").unwrap();
         let valve = result.optimal_schedule.iter().find(|r| r.job_id == "valve").unwrap();
         let relay = result.optimal_schedule.iter().find(|r| r.job_id == "relay").unwrap();
