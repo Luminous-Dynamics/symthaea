@@ -4,6 +4,7 @@ on:
   pull_request:
     paths:
       - "xtask/src/enzyme_abstention_matrix.rs"
+      - "xtask/src/enzyme_experiment_design.rs"
       - "xtask/src/enzyme_bench.rs"
       - "xtask/src/enzyme_calibration.rs"
       - "xtask/src/enzyme_evidence_graph.rs"
@@ -17,6 +18,7 @@ on:
       - "docs/research/ENZYME_EVIDENCE_GRAPH_CONTRACT_V0.json"
       - "docs/research/ENZYME_EVIDENCE_GRAPH_VERIFIER_V0.md"
       - "docs/research/ENZYME_ABSTENTION_STRESS_MATRIX_V0.md"
+      - "docs/research/ENZYME_BUDGETED_EXPERIMENT_DESIGN_V0.md"
       - "docs/research/ENZYME_MODEL_FALSIFICATION_BENCHMARK_V0.md"
       - "docs/research/KCAT_ADMISSION_PROFILE_V0.json"
       - "docs/research/SLAC_CALIBRATION_REFERENCE_MANIFEST.json"
@@ -25,6 +27,7 @@ on:
     branches: [main]
     paths:
       - "xtask/src/enzyme_abstention_matrix.rs"
+      - "xtask/src/enzyme_experiment_design.rs"
       - "xtask/src/enzyme_bench.rs"
       - "xtask/src/enzyme_calibration.rs"
       - "xtask/src/enzyme_evidence_graph.rs"
@@ -38,6 +41,7 @@ on:
       - "docs/research/ENZYME_EVIDENCE_GRAPH_CONTRACT_V0.json"
       - "docs/research/ENZYME_EVIDENCE_GRAPH_VERIFIER_V0.md"
       - "docs/research/ENZYME_ABSTENTION_STRESS_MATRIX_V0.md"
+      - "docs/research/ENZYME_BUDGETED_EXPERIMENT_DESIGN_V0.md"
       - "docs/research/ENZYME_MODEL_FALSIFICATION_BENCHMARK_V0.md"
       - "docs/research/KCAT_ADMISSION_PROFILE_V0.json"
       - "docs/research/SLAC_CALIBRATION_REFERENCE_MANIFEST.json"
@@ -105,6 +109,24 @@ jobs:
             (.decision_policy.holdout_rule | contains("do not participate in fitting or BIC")) and
             (.decision_policy.semantics | contains("does not establish mechanistic truth")) and
             (.decision_policy.calibration_status | contains("not calibrated"))
+          ' "$report" >/dev/null
+
+      - name: Execute budgeted experiment-design benchmark and validate paired budgets
+        shell: bash
+        run: |
+          set -euo pipefail
+          report="$RUNNER_TEMP/enzyme_experiment_design_v0.json"
+          cargo run -p xtask -- enzyme-experiment-design --out "$report"
+          jq -e '
+            .schema_version == 1 and
+            .status == "exploratory_synthetic_campaigns_generated" and
+            .design.campaign_count == 64 and
+            (.campaigns | length) == 64 and
+            (.summary_by_strategy | length) == 4 and
+            (.campaigns | all(.added_measurement_budget == 4 and .final_observation_count == 7 and (.selection_history | length) == 4)) and
+            (.objective_separation.model_discrimination | contains("prediction gap")) and
+            (.objective_separation.parameter_identifiability_proxy | contains("finite-difference")) and
+            (.objective_separation.warning | contains("not a full information-gain calculation"))
           ' "$report" >/dev/null
 
       - name: Fetch pinned CC BY calibration references (temporary runner workspace only)
