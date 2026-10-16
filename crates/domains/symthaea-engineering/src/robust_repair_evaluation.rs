@@ -245,6 +245,7 @@ fn validate_duration_scenarios(
 
 fn replay_nominal_plan(
     nominal_jobs: &[RepairJob],
+    crews: &[RepairCrew],
     nominal_schedule: &[super::repair_crew_scheduling::ScheduledRepair],
     scenario: &RepairDurationScenario,
     horizon_steps: usize,
@@ -257,7 +258,7 @@ fn replay_nominal_plan(
         .map(|duration| (duration.job_id.as_str(), duration.duration_steps))
         .collect();
 
-    let mut crew_available: HashMap<&str, usize> = HashMap::new();
+    let mut crew_available: HashMap<&str, usize> = crews\n        .iter()\n        .map(|crew| (crew.id.as_str(), crew.available_from_step))\n        .collect();
     let mut finish_by_job: HashMap<&str, usize> = HashMap::new();
     let mut schedule = Vec::with_capacity(nominal_schedule.len());
     let mut total_loss = 0.0_f64;
@@ -372,6 +373,7 @@ pub fn evaluate_repair_policies_under_duration_scenarios(
             .map(|scenario| {
                 replay_nominal_plan(
                     nominal_jobs,
+                    crews,
                     &nominal.schedule,
                     scenario,
                     config.horizon_steps,
@@ -611,6 +613,21 @@ mod tests {
                 ),
                 Err(RobustRepairError::InvalidCvarAlpha)
             ));
+        }
+    }
+
+    #[test]
+    fn late_crew_availability_is_preserved_in_scenario_replay() {
+        let jobs = [job("pump", 2, 0, 1.0)];
+        let crews = [RepairCrew::new("late-crew", ["mechanical"], 5)];
+        let scenarios = [scenario("short", 1.0, &[("pump", 1)])];
+        let result = evaluate_repair_policies_under_duration_scenarios(
+            &jobs, &crews, &[], &scenarios, &config(0.9),
+        ).unwrap();
+        for summary in result.policy_summaries {
+            let repair = &summary.scenarios[0].schedule[0];
+            assert_eq!(repair.start_step, 5);
+            assert_eq!(repair.finish_step, 6);
         }
     }
 
