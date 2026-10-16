@@ -94,11 +94,12 @@ struct AudioComparisonMetricsV1 {
     waveform_max_absolute_error: f64,
     waveform_correlation: Option<f64>,
     rms_delta_db_candidate_minus_reference: f64,
-    /// RMS dB difference between average Hann-windowed STFT magnitudes (4096-point FFT).
+    /// RMS dB difference between average Hann-windowed STFT magnitudes (not mean per-frame LSD).
     log_spectral_distance_db: f64,
     /// L1 distance between unit-sum power spectra; 0 is identical, larger is more different.
     normalized_power_spectrum_l1: f64,
     /// Cosine similarity between average STFT magnitude spectra.
+    /// Spectral centroid uses magnitude-weighted frequency bins.
     spectral_magnitude_cosine_similarity: f64,
     spectral_centroid_delta_hz_candidate_minus_reference: f64,
     fft_size: usize,
@@ -264,7 +265,10 @@ fn load_audio(path: &Path) -> Result<LoadedAudio, Box<dyn Error>> {
     })
 }
 
-fn decode_samples(reader: &mut WavReader<std::io::BufReader<File>>, spec: WavSpec) -> Result<Vec<f32>, Box<dyn Error>> {
+fn decode_samples(
+    reader: &mut WavReader<std::io::BufReader<File>>,
+    spec: WavSpec,
+) -> Result<Vec<f32>, Box<dyn Error>> {
     let decoded = match (spec.sample_format, spec.bits_per_sample) {
         (SampleFormat::Int, 8) => reader
             .samples::<i8>()
@@ -332,7 +336,8 @@ fn signal_summary(samples: &[f32], finite: bool) -> (Option<f64>, Option<f64>, O
 }
 
 fn build_receipt(candidate: LoadedAudio, reference: LoadedAudio) -> DifferentialReceiptV1 {
-    let sample_rate_matches = candidate.evidence.sample_rate_hz == reference.evidence.sample_rate_hz;
+    let sample_rate_matches =
+        candidate.evidence.sample_rate_hz == reference.evidence.sample_rate_hz;
     let channel_count_matches = candidate.evidence.channels == reference.evidence.channels;
     let candidate_frames = candidate.evidence.frames;
     let reference_frames = reference.evidence.frames;
@@ -422,10 +427,15 @@ fn comparison_metrics(
     let count = sample_count as f64;
     let waveform_rmse = (squared_error / count).sqrt();
     let reference_overlap_rms = (sum_reference_squared / count).sqrt();
-    let covariance = sum_product / count - (sum_candidate / count) * (sum_reference / count);
-    let candidate_variance = (sum_candidate_squared / count - (sum_candidate / count).powi(2)).max(0.0);
-    let reference_variance = (sum_reference_squared / count - (sum_reference / count).powi(2)).max(0.0);
-    let waveform_correlation = if candidate_variance > METRIC_EPSILON && reference_variance > METRIC_EPSILON {
+    let covariance =
+        sum_product / count - (sum_candidate / count) * (sum_reference / count);
+    let candidate_variance =
+        (sum_candidate_squared / count - (sum_candidate / count).powi(2)).max(0.0);
+    let reference_variance =
+        (sum_reference_squared / count - (sum_reference / count).powi(2)).max(0.0);
+    let waveform_correlation = if candidate_variance > METRIC_EPSILON
+        && reference_variance > METRIC_EPSILON
+    {
         Some((covariance / (candidate_variance * reference_variance).sqrt()).clamp(-1.0, 1.0))
     } else {
         None
@@ -433,7 +443,11 @@ fn comparison_metrics(
 
     let candidate_spectrum = average_magnitude_spectrum(candidate, channels, frames);
     let reference_spectrum = average_magnitude_spectrum(reference, channels, frames);
-    let (log_spectral_distance_db, normalized_power_spectrum_l1, spectral_magnitude_cosine_similarity) =
+    let (
+        log_spectral_distance_db,
+        normalized_power_spectrum_l1,
+        spectral_magnitude_cosine_similarity,
+    ) =
         spectrum_distances(&candidate_spectrum, &reference_spectrum);
     let candidate_centroid = spectral_centroid_hz(&candidate_spectrum, sample_rate);
     let reference_centroid = spectral_centroid_hz(&reference_spectrum, sample_rate);
@@ -530,14 +544,13 @@ fn spectrum_distances(candidate: &[f64], reference: &[f64]) -> (f64, f64, f64) {
     let log_spectral_distance_db = (log_squared / bins).sqrt();
     let candidate_power_sum = candidate_power_sum.max(METRIC_EPSILON);
     let reference_power_sum = reference_power_sum.max(METRIC_EPSILON);
-    let normalized_power_spectrum_l1 =
-        (0..length)
-            .map(|index| {
-                let candidate_power = candidate[index] * candidate[index] / candidate_power_sum;
-                let reference_power = reference[index] * reference[index] / reference_power_sum;
-                (candidate_power - reference_power).abs()
-            })
-            .sum::<f64>();
+    let normalized_power_spectrum_l1 = (0..length)
+        .map(|index| {
+            let candidate_power = candidate[index] * candidate[index] / candidate_power_sum;
+            let reference_power = reference[index] * reference[index] / reference_power_sum;
+            (candidate_power - reference_power).abs()
+        })
+        .sum::<f64>();
     let denominator = (candidate_magnitude_squared * reference_magnitude_squared).sqrt();
     let cosine = if denominator > METRIC_EPSILON {
         (magnitude_dot / denominator).clamp(0.0, 1.0)
@@ -552,10 +565,9 @@ fn spectral_centroid_hz(spectrum: &[f64], sample_rate: u32) -> f64 {
     let mut weighted_sum = 0.0_f64;
     let mut total = 0.0_f64;
     for (bin, magnitude) in spectrum.iter().copied().enumerate() {
-        let power = magnitude * magnitude;
         let frequency = bin as f64 * f64::from(sample_rate) / FFT_SIZE as f64;
-        weighted_sum += frequency * power;
-        total += power;
+        weighted_sum += frequency * magnitude;
+        total += magnitude;
     }
     if total <= METRIC_EPSILON {
         0.0
