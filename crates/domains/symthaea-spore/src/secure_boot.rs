@@ -1774,6 +1774,26 @@ mod tests {
     }
 
     #[test]
+    fn test_profile_authorization_does_not_survive_serialization() {
+        let mut orch = SecureBootOrchestration::new();
+        orch.record_manual_secure_boot_state(SecureBootState::SetupMode, TargetPlatform::Linux);
+        orch.apply_guide_result(SecureBootMethod::MokEnrollment)
+            .expect("explicit method selection");
+        authorize_test_profile(&mut orch);
+        assert!(orch.generate_nix_config().is_ok());
+
+        let serialized = serde_json::to_value(&orch).expect("orchestration serializes");
+        assert!(serialized.get("profile_approval").is_none());
+        assert!(serialized.get("selected_method").is_none());
+        assert!(serialized.get("target_hardware_profile_blake3").is_none());
+
+        let restored: SecureBootOrchestration =
+            serde_json::from_value(serialized).expect("orchestration deserializes safely");
+        assert!(restored.generate_nix_config().is_err());
+        assert!(!restored.is_configuration_authorized());
+    }
+
+    #[test]
     fn test_orchestration_blocks_profile_when_key_generation_is_disabled() {
         let mut orch = SecureBootOrchestration::new();
         orch.record_manual_secure_boot_state(SecureBootState::SetupMode, TargetPlatform::Linux);
