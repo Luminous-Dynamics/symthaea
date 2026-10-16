@@ -34,6 +34,7 @@ pub struct Candidate {
 pub enum NotEstimableReason {
     NoEligiblePositives,
     ZeroBudget,
+    TooFewCandidates { requested: usize, available: usize },
     UnknownOutcomesInSelectedSet { ids: Vec<String> },
     TargetNotReached,
 }
@@ -170,7 +171,12 @@ pub fn precision_at_k(
         return Ok(Estimate::NotEstimable(NotEstimableReason::ZeroBudget));
     }
     if ranked.len() < k {
-        return Ok(Estimate::NotEstimable(NotEstimableReason::TargetNotReached));
+        return Ok(Estimate::NotEstimable(
+            NotEstimableReason::TooFewCandidates {
+                requested: k,
+                available: ranked.len(),
+            },
+        ));
     }
 
     let selected: Vec<&Candidate> = ranked.into_iter().take(k).collect();
@@ -436,9 +442,9 @@ mod tests {
     fn invalid_recall_target_is_rejected() {
         let reference = positives(&["p1"]);
         let candidates = vec![candidate("p1", 1, LabelState::Positive, true)];
-        assert_eq!(
+        assert!(matches!(
             slots_at_recall(&candidates, &reference, f64::NAN),
-            Err(MetricError::InvalidRecallTarget(f64::NAN))
-        );
+            Err(MetricError::InvalidRecallTarget(value)) if value.is_nan()
+        ));
     }
 }
