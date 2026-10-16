@@ -208,7 +208,7 @@ pub fn calibration_summary(
         let index = ((p * bin_count as f64).floor() as usize).min(bin_count - 1);
         count[index] += 1;
         probability_sum[index] += p;
-        positive_sum[index] += usize::from(actual);
+        positive_sum[index] += if actual { 1 } else { 0 };
     }
 
     if observed_label_count == 0 {
