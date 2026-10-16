@@ -860,13 +860,26 @@ mod tests {
 
     #[test]
     fn all_strategies_use_same_registered_budget_and_admissible_set() {
-        let scenarios = generate_synthetic_scenarios(32, 0xabcd, &policy());
+        let mut scenarios = generate_synthetic_scenarios(32, 0xabcd, &policy());
+        let rejected_id = scenarios[0].experiments[0].proposal.experiment_id.clone();
+        scenarios[0].experiments[0].proposal.provenance_plan_complete = false;
         let report = run_selection_benchmark(&policy(), &scenarios, &STRATEGIES).unwrap();
         for result in &report.results {
             assert!(result.resource_used <= result.resource_budget + 1e-12);
             assert!(result.budget_used_fraction.is_finite());
             assert!((0.0..=1.0).contains(&result.achieved_utility));
             assert!((0.0..=1.0).contains(&result.oracle_utility));
+        }
+        let first_scenario_results: Vec<&ScenarioBenchmarkResult> = report
+            .results
+            .iter()
+            .filter(|result| result.scenario_id == scenarios[0].scenario_id)
+            .collect();
+        assert_eq!(first_scenario_results.len(), STRATEGIES.len());
+        for result in first_scenario_results {
+            assert!(result.selected_experiment_ids.iter().all(|id| id != &rejected_id));
+            assert_eq!(result.rejected_experiments.len(), 1);
+            assert_eq!(result.rejected_experiments[0].experiment_id, rejected_id);
         }
     }
 
