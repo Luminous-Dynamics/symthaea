@@ -128,6 +128,7 @@ Report computational resources and review slots first. Progress to human review 
 | T7 Evidence/replay integrity | Can an independent evaluator detect tampering or leakage? | deterministic replay, exact manifest, negative controls, digest/count agreement | biological truth from cryptography alone |
 | T8 Partial-label identification | How much do unresolved labels change metric interpretation? | observed-label estimate, worst/best-case recall and precision bounds, unknown-label census | sites omitted from every nomination method; truth outside the fixed candidate universe |
 | T9 Multi-objective frontier | Which policies offer genuine trade-offs without arbitrary score weights? | complete objective vectors, dominated-policy count, Pareto membership, excluded-policy reasons | a universal safety score or proof of biological/clinical improvement |
+| T10 Selective prediction | What error/uncertainty trade-off occurs as the policy abstains, and where does calibration fail? | Brier/log loss on measured labels, fixed-bin reliability, full risk–coverage curve, unknown-aware error bounds, per-context label completeness | clinical safety or outcomes missing from the evidence universe |
 
 Tracks are reported separately. A composite “CRISPR score” that hides failed nomination, calibration, or generalization is prohibited.
 
@@ -313,9 +314,11 @@ The SHA-256 helper validates two already-computed digest claims; it does not has
 
 9. **F9 — calibration, abstention and unknown-aware risk.** The synthetic calibration slice contains two measured outcomes (p=0.9 positive and p=0.2 assay-defined negative) plus one unknown (p=0.8). Expected Brier score is 0.025 and five-bin expected calibration error is 0.15, with the unknown explicitly counted and excluded from the loss denominator. In a separate three-case risk slice, one of two observed outcomes is wrong and one accepted outcome is unknown; the full-coverage observed-label risk is 0.5 and the unknown-aware error-rate bounds are [1/3, 2/3]. Exact confidence ties enter as a tier, and a context with no measured labels has no calibration estimate.
 
-The new dependency-free Rust implementation is [scripts/crispr_selective_risk.rs](../../scripts/crispr_selective_risk.rs). It provides fixed-bin calibration summaries, Brier/log loss, deterministic risk–coverage curves, unknown-label error bounds, and context-stratified reports. Thirteen unit tests are authored but not compiled or executed in the current authoring environment because rustc is unavailable. When a Rust toolchain is available, run:
+The new dependency-free Rust implementation is [scripts/crispr_selective_risk.rs](../../scripts/crispr_selective_risk.rs). It provides fixed-bin calibration summaries, Brier/log loss, deterministic risk–coverage curves, unknown-label error bounds, and context-stratified reports. Fourteen unit tests are authored but not compiled or executed in the current authoring environment because rustc is unavailable. When a Rust toolchain is available, run:
 
     rustc --edition=2024 --test scripts/crispr_selective_risk.rs -o /tmp/crispr-selective-tests
     /tmp/crispr-selective-tests
+
+Tracking issue: [CRISPR-OT-003 #7580 — calibration-first selective prediction](https://github.com/Luminous-Dynamics/symthaea/issues/7580).
 
 These code and fixture additions are methodological tooling only. No data cohort, biological model, or Symthaea improvement has been evaluated.
