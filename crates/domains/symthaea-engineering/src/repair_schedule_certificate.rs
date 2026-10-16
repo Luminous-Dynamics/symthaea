@@ -475,4 +475,29 @@ mod tests {
             Err(RepairScheduleCertificateError::DuplicateDependency { .. })
         ));
     }
+
+    #[test]
+    fn independently_verifies_a_schedule_returned_by_the_exact_oracle() {
+        let input_jobs = jobs();
+        let input_crews = crews();
+        let exact = crate::multi_crew_repair_oracle::exhaustive_multi_crew_repair_optimum(
+            &input_jobs,
+            &input_crews,
+        )
+        .unwrap();
+        let checked = verify_repair_schedule_certificate(
+            &input_jobs,
+            &input_crews,
+            &certificate(
+                exact.optimal_schedule.clone(),
+                exact.minimum_weighted_completion_loss,
+            ),
+        )
+        .unwrap();
+
+        assert_eq!(checked.jobs_verified, exact.jobs_evaluated);
+        assert!((checked.weighted_completion_loss
+            - exact.minimum_weighted_completion_loss).abs() < 1.0e-9);
+    }
+
 }
