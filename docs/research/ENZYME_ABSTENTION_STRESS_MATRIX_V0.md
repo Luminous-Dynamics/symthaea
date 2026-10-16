@@ -17,7 +17,7 @@ A low residual or a large information-criterion gap alone is not enough. Model-s
 
 ## Current synthetic matrix
 
-The first executable matrix contains 96 cases: four frozen scenario strata, three declared noise scales (0.25, 1.0, 5.0 rate units), and eight deterministic seeds per stratum/noise combination.
+The first executable matrix contains 96 cases: four frozen scenario strata, three declared noise scales (0.25, 1.0, 5.0 rate units), and eight deterministic seeds per stratum/noise combination. Each case now reports a paired comparator: the original in-sample selection policy versus the new train/held-out policy. The report computes false-decisive counts and rates on the same known-generator abstention controls, overall and per stratum. The paired comparison is descriptive for this frozen synthetic matrix only; it is not an estimate of real-world error probability.
 
 | Stratum | Data-generating curve | Intended decision |
 |---|---|---|
@@ -41,7 +41,7 @@ The current policy is deliberately explicit and ordered:
 3. **Training-only model-selection evidence:** abstain if `abs(ΔBIC) < 10`.
 4. Otherwise choose the candidate favored by training-only BIC, where `ΔBIC = BIC(Michaelis–Menten) - BIC(substrate inhibition)`; negative values favor Michaelis–Menten.
 
-These cutoffs are **heuristics, not calibrated confidence levels**. The fitted-prediction gap is a screening proxy—not a power calculation or a formal identifiability result. The absolute-fit gate is not a substitute for inspecting residual structure. The use of BIC also needs review against each model's likelihood assumptions and the actual experimental error model.
+These cutoffs are **heuristics, not calibrated confidence levels**. The fitted-prediction gap is a screening proxy—not a power calculation or a formal identifiability result. The absolute-fit gate is not a substitute for inspecting residual structure. The use of BIC also needs review against each model's likelihood assumptions and the actual experimental error model. In particular, the current synthetic residual generator uses bounded uniform noise while the SSE-based BIC approximation corresponds to a Gaussian-error likelihood with an estimated variance. That mismatch is deliberate technical debt for this baseline comparison, not a statistical guarantee; a next gate must compare likelihood-aware scoring under Gaussian, heteroscedastic, and other justified assay-error models.
 
 A hard boundary is intentional: **noise can conceal model misspecification**. In a high-noise Hill-generated case, both candidate fits may look plausible at the declared noise scale even though the known generator is outside the candidate set. The policy can then choose the better of two inadequate explanations. The report exposes this as a false-decisive outcome against the known synthetic target; that outcome must not be hidden by reporting only the winners. It also demonstrates why these controls need a power/detectability annotation before they become a pass/fail gate for a calibrated decision rule.
 
