@@ -563,7 +563,10 @@ pub struct OutcomeMarginal {
 
 #[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
 pub struct AcquisitionMetrics {
+    /// Digest of the finite-hypothesis model snapshot used for these calculations.
     pub model_digest: String,
+    /// State-chain digest when acquired from an updated posterior; None for the root prior.
+    pub posterior_state_digest: Option<String>,
     pub action_id: String,
     pub action_cost_units: u32,
     pub prior_entropy_nats: f64,
@@ -600,6 +603,7 @@ pub struct RejectedAction {
 #[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
 pub struct AcquisitionRanking {
     pub model_digest: String,
+    pub posterior_state_digest: Option<String>,
     pub objective: AcquisitionObjective,
     pub ranked_actions: Vec<RankedAction>,
     pub rejected_actions: Vec<RejectedAction>,
@@ -611,7 +615,7 @@ pub fn expected_information_gain(
 ) -> Result<AcquisitionMetrics, String> {
     model.validate()?;
     let digest = model.digest()?;
-    expected_information_gain_with_digest(model, action_id, digest)
+    expected_information_gain_with_context(model, action_id, digest, None)
 }
 
 /// Compute acquisition metrics under a previously validated posterior state.
@@ -624,24 +628,27 @@ pub fn expected_information_gain_for_state(
     let mut posterior_model = model.clone();
     posterior_model.prior = state.current_prior.clone();
     posterior_model.validate()?;
-    expected_information_gain_with_digest(
+    let model_digest = posterior_model.digest()?;
+    expected_information_gain_with_context(
         &posterior_model,
         action_id,
-        state.state_digest.clone(),
+        model_digest,
+        Some(state.state_digest.clone()),
     )
 }
 
-fn expected_information_gain_with_digest(
+fn expected_information_gain_with_context(
     model: &FiniteHypothesisModel,
     action_id: &str,
-    digest: String,
+    model_digest: String,
+    posterior_state_digest: Option<String>,
 ) -> Result<AcquisitionMetrics, String> {
     let action = model
         .actions
         .iter()
         .find(|action| action.action_id == action_id)
         .ok_or_else(|| format!("unknown acquisition action: {action_id}"))?;
-    calculate_acquisition(model, action, digest)
+    calculate_acquisition(model, action, model_digest, posterior_state_digest)
 }
 
 pub fn rank_feasible_actions(
@@ -650,7 +657,7 @@ pub fn rank_feasible_actions(
 ) -> Result<AcquisitionRanking, String> {
     model.validate()?;
     let model_digest = model.digest()?;
-    rank_actions_with_digest(model, objective, model_digest)
+    rank_actions_with_context(model, objective, model_digest, None)
 }
 
 /// Rank candidate experiments under the supplied replay-validated posterior state.
@@ -663,13 +670,20 @@ pub fn rank_feasible_actions_for_state(
     let mut posterior_model = model.clone();
     posterior_model.prior = state.current_prior.clone();
     posterior_model.validate()?;
-    rank_actions_with_digest(&posterior_model, objective, state.state_digest.clone())
+    let model_digest = posterior_model.digest()?;
+    rank_actions_with_context(
+        &posterior_model,
+        objective,
+        model_digest,
+        Some(state.state_digest.clone()),
+    )
 }
 
-fn rank_actions_with_digest(
+fn rank_actions_with_context(
     model: &FiniteHypothesisModel,
     objective: AcquisitionObjective,
     model_digest: String,
+    posterior_state_digest: Option<String>,
 ) -> Result<AcquisitionRanking, String> {
     let mut ranked_actions = Vec::new();
     let mut rejected_actions = Vec::new();
@@ -677,8 +691,12 @@ fn rank_actions_with_digest(
     for action in &model.actions {
         match &action.feasibility {
             Feasibility::Feasible => {
-                let metrics =
-                    calculate_acquisition(model, action, model_digest.clone())?;
+                let metrics = calculate_acquisition(
+                    model,
+                    action,
+                    model_digest.clone(),
+                    posterior_state_digest.clone(),
+                )?;
                 let objective_score = match objective {
                     AcquisitionObjective::ExpectedInformationGain => {
                         metrics.expected_information_gain_nats
@@ -719,6 +737,7 @@ fn rank_actions_with_digest(
 
     Ok(AcquisitionRanking {
         model_digest,
+        posterior_state_digest,
         objective,
         ranked_actions,
         rejected_actions,
@@ -729,6 +748,7 @@ fn calculate_acquisition(
     model: &FiniteHypothesisModel,
     action: &ExperimentActionModel,
     model_digest: String,
+    posterior_state_digest: Option<String>,
 ) -> Result<AcquisitionMetrics, String> {
     match &action.feasibility {
         Feasibility::Feasible => {}
@@ -863,6 +883,7 @@ fn calculate_acquisition(
     let cost = f64::from(action.cost_units);
     Ok(AcquisitionMetrics {
         model_digest,
+        posterior_state_digest,
         action_id: action.action_id.clone(),
         action_cost_units: action.cost_units,
         prior_entropy_nats: prior_entropy,
