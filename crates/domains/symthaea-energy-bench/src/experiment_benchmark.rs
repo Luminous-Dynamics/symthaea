@@ -9,6 +9,8 @@ use crate::experiment_selection::{
     SafetyReview, SelectionError, SelectionPolicy,
 };
 use std::collections::{BTreeMap, BTreeSet};
+use serde::Serialize;
+use sha2::{Digest, Sha256};
 use std::fmt;
 
 /// A synthetic experiment with separate proposer estimates and oracle-known value.
@@ -17,7 +19,7 @@ use std::fmt;
 /// experiment independently resolves the benchmark's hidden decision. This is
 /// deliberately a toy oracle model, not a thermodynamic quantity or calibrated
 /// estimate of real-world information gain.
-#[derive(Debug, Clone, PartialEq)]
+#[derive(Debug, Clone, PartialEq, Serialize)]
 pub struct SyntheticExperiment {
     pub proposal: ExperimentProposal,
     /// One-dimensional normalized design-space coordinate in [0, 1].
@@ -27,7 +29,7 @@ pub struct SyntheticExperiment {
 }
 
 /// One known-answer synthetic decision task with a fixed resource budget.
-#[derive(Debug, Clone, PartialEq)]
+#[derive(Debug, Clone, PartialEq, Serialize)]
 pub struct SyntheticScenario {
     pub scenario_id: String,
     pub resource_budget: f64,
@@ -37,7 +39,7 @@ pub struct SyntheticScenario {
     pub experiments: Vec<SyntheticExperiment>,
 }
 
-#[derive(Debug, Clone, Copy, PartialEq, Eq, PartialOrd, Ord)]
+#[derive(Debug, Clone, Copy, PartialEq, Eq, PartialOrd, Ord, Serialize)]
 pub enum ExperimentSelectionStrategy {
     PhaseA,
     Random { seed: u64 },
@@ -58,9 +60,11 @@ impl ExperimentSelectionStrategy {
     }
 }
 
-#[derive(Debug, Clone, PartialEq)]
+#[derive(Debug, Clone, PartialEq, Serialize)]
 pub struct ScenarioBenchmarkResult {
     pub scenario_id: String,
+    /// SHA-256 over deterministic JSON serialization of the complete scenario input.
+    pub scenario_sha256: String,
     pub strategy: ExperimentSelectionStrategy,
     pub selected_experiment_ids: Vec<String>,
     pub rejected_experiments: Vec<RejectedExperiment>,
@@ -77,7 +81,7 @@ pub struct ScenarioBenchmarkResult {
     pub oracle_resolved: bool,
 }
 
-#[derive(Debug, Clone, PartialEq)]
+#[derive(Debug, Clone, PartialEq, Serialize)]
 pub struct StrategyBenchmarkSummary {
     pub strategy: ExperimentSelectionStrategy,
     pub scenario_count: usize,
@@ -95,9 +99,17 @@ pub struct StrategyBenchmarkSummary {
     pub mean_oracle_minimum_cost_to_resolve: Option<f64>,
 }
 
-#[derive(Debug, Clone, PartialEq)]
+#[derive(Debug, Clone, PartialEq, Serialize)]
 pub struct BenchmarkSuiteReport {
+    pub protocol_version: u32,
+    pub policy: SelectionPolicy,
+    /// SHA-256 of the registered selection policy as serialized JSON.
+    pub policy_sha256: String,
+    /// SHA-256 of protocol version, policy, full scenario inputs, and strategies.
+    pub suite_sha256: String,
     pub scenarios: usize,
+    /// Full synthetic inputs are embedded so the receipt is independently replayable.
+    pub scenario_inputs: Vec<SyntheticScenario>,
     pub results: Vec<ScenarioBenchmarkResult>,
     pub summaries: Vec<StrategyBenchmarkSummary>,
 }
@@ -121,6 +133,33 @@ impl From<SelectionError> for BenchmarkError {
     }
 }
 
+const BENCHMARK_PROTOCOL_VERSION: u32 = 1;
+
+#[derive(Serialize)]
+struct SuiteDigestInput<'a> {
+    protocol_version: u32,
+    policy: &'a SelectionPolicy,
+    scenarios: &'a [SyntheticScenario],
+    strategies: &'a [ExperimentSelectionStrategy],
+}
+
+/// Serialize the full benchmark receipt, including raw scenario inputs and digests.
+pub fn benchmark_report_json(
+    report: &BenchmarkSuiteReport,
+) -> Result<String, BenchmarkError> {
+    serde_json::to_string_pretty(report).map_err(|error| BenchmarkError {
+        reason: format!("cannot serialize benchmark receipt: {error}"),
+    })
+}
+
+fn sha256_json<T: Serialize + ?Sized>(value: &T) -> Result<String, BenchmarkError> {
+    let bytes = serde_json::to_vec(value).map_err(|error| BenchmarkError {
+        reason: format!("cannot serialize benchmark input for hashing: {error}"),
+    })?;
+    let digest = Sha256::digest(bytes);
+    Ok(digest.iter().map(|byte| format!("{byte:02x}")).collect())
+}
+
 /// Run each strategy on each scenario using exactly the same admissible proposals.
 ///
 /// The oracle strategy exhaustively evaluates every subset for scenarios with at
@@ -142,6 +181,14 @@ pub fn run_selection_benchmark(
             reason: "benchmark suite must contain at least one strategy".into(),
         });
     }
+    let mut strategy_ids = BTreeSet::new();
+    for strategy in strategies {
+        if !strategy_ids.insert(*strategy) {
+            return Err(BenchmarkError {
+                reason: format!("duplicate strategy {}", strategy.label()),
+            });
+        }
+    }
 
     let mut scenario_ids = BTreeSet::new();
     for scenario in scenarios {
@@ -152,6 +199,14 @@ pub fn run_selection_benchmark(
         }
         validate_scenario(scenario)?;
     }
+
+    let policy_sha256 = sha256_json(policy)?;
+    let suite_sha256 = sha256_json(&SuiteDigestInput {
+        protocol_version: BENCHMARK_PROTOCOL_VERSION,
+        policy,
+        scenarios,
+        strategies,
+    })?;
 
     let mut results = Vec::with_capacity(scenarios.len() * strategies.len());
     for scenario in scenarios {
@@ -173,7 +228,12 @@ pub fn run_selection_benchmark(
     }
 
     Ok(BenchmarkSuiteReport {
+        protocol_version: BENCHMARK_PROTOCOL_VERSION,
+        policy: policy.clone(),
+        policy_sha256,
+        suite_sha256,
         scenarios: scenarios.len(),
+        scenario_inputs: scenarios.to_vec(),
         results,
         summaries,
     })
@@ -333,6 +393,7 @@ pub fn evaluate_scenario(
 
     Ok(ScenarioBenchmarkResult {
         scenario_id: scenario.scenario_id.clone(),
+        scenario_sha256: sha256_json(scenario)?,
         strategy,
         selected_experiment_ids: selected_ids,
         rejected_experiments: ranking.rejected,
