@@ -15,6 +15,7 @@ SOURCE_PATHS = (
     "scripts/write_socioeconomic_run_bundle_ci_report.py",
     "scripts/test_write_socioeconomic_run_bundle_ci_report.py",
     "docs/research/finance/SYM-FIN-SYS-016_run_bundle_manifest_v1.schema.json",
+    "docs/research/finance/SYM-FIN-SYS-016_validator_execution_record_v1.schema.json",
     ".github/workflows/socioeconomic-run-bundle.yml",
 )
 TEST_LOG_PATH = "evidence/test-output.txt"
