@@ -60,9 +60,9 @@ struct RetrievalBaseline {
 pub fn validate(path: &Path) -> Result<()> {
     let raw = fs::read_to_string(path)
         .with_context(|| format!("read proof corpus manifest {}", path.display()))?;
-    let count = validate_manifest_text(&raw)?;
+    let (entry_count, baseline_count) = validate_manifest_text(&raw)?;
     println!(
-        "proof corpus manifest structurally valid: {count} candidate entries; no theorem or verifier qualification is implied"
+        "proof corpus manifest structurally valid: {entry_count} candidate entries, {baseline_count} retrieval baselines; no theorem or verifier qualification is implied"
     );
     Ok(())
 }
@@ -74,7 +74,7 @@ fn valid_git_sha(sha: &str) -> bool {
             .all(|byte| byte.is_ascii_hexdigit() && !byte.is_ascii_uppercase())
 }
 
-fn validate_manifest_text(raw: &str) -> Result<usize> {
+fn validate_manifest_text(raw: &str) -> Result<(usize, usize)> {
     let manifest: Manifest =
         serde_yaml::from_str(raw).context("parse proof corpus YAML manifest")?;
 
@@ -223,7 +223,7 @@ fn validate_manifest_text(raw: &str) -> Result<usize> {
         }
     }
 
-    Ok(manifest.entries.len())
+    Ok((manifest.entries.len(), manifest.retrieval_baselines.len()))
 }
 
 #[cfg(test)]
@@ -278,7 +278,7 @@ entries:
 
     #[test]
     fn accepts_a_pinned_candidate_only_manifest() {
-        assert_eq!(validate_manifest_text(VALID).unwrap(), 1);
+        assert_eq!(validate_manifest_text(VALID).unwrap(), (1, 1));
     }
 
     #[test]
