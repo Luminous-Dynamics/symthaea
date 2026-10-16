@@ -597,7 +597,7 @@ mod tests {
     }
 
     #[test]
-    fn diversity_policy_spreads_a_batch_across_feature_space() {
+    fn diversity_policy_spreads_a_batch_and_is_order_invariant() {
         let mut input = request(Policy::DiversityOnly);
         input.batch_size = 2;
         let output = select(&input).expect("valid request");
@@ -605,6 +605,12 @@ mod tests {
         assert_eq!(output.selected[0].candidate_id, "a");
         assert_eq!(output.selected[1].candidate_id, "c");
         assert!(output.selected.iter().all(|item| item.score.is_finite()));
+
+        let expected_ids: Vec<_> = output.selected.iter().map(|item| item.candidate_id.clone()).collect();
+        input.candidates.reverse();
+        let reordered = select(&input).expect("valid reordered request");
+        let reordered_ids: Vec<_> = reordered.selected.iter().map(|item| item.candidate_id.clone()).collect();
+        assert_eq!(expected_ids, reordered_ids);
     }
 
     #[test]
@@ -710,6 +716,17 @@ mod tests {
         let mut input = request(Policy::Hybrid);
         input.estimate_provenance.predicted_goal_error_model_sha256 = None;
         assert!(select(&input).unwrap_err().contains("requires both a non-empty id and a SHA-256 digest"));
+    }
+
+    #[test]
+    fn invalid_feature_or_pool_digests_fail_closed() {
+        let mut input = request(Policy::DiversityOnly);
+        input.candidate_pool_sha256 = "not-a-digest".to_string();
+        assert!(select(&input).unwrap_err().contains("candidate_pool_sha256"));
+
+        let mut input = request(Policy::DiversityOnly);
+        input.feature_space.transform_sha256 = "G".repeat(64);
+        assert!(select(&input).unwrap_err().contains("feature_space.transform_sha256"));
     }
 
     #[test]
