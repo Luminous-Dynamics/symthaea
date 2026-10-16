@@ -70,7 +70,7 @@ cargo run --locked -p symthaea-nano-policy --bin nano-policy-budget-audit -- \
   > simulator-budget-audit.json
 ```
 
-The synthetic mismatch fixture deliberately declares one simulator call while recording two actual invocations. The audit must detect the difference and exit 3; the equal-count fixture exits 0 only when the run is complete, has exactly the frozen number of calls, has terminal receipts for all calls, and its source-reported count matches the observed count. Exit 2 means malformed arguments or a contract-invalid ledger.
+Both synthetic fixtures record an explicit `seed` and the audit report echoes it. The synthetic mismatch fixture deliberately declares one simulator call while recording two actual invocations. The audit must detect the difference and exit 3; the equal-count fixture exits 0 only when the run is complete, has exactly the frozen number of calls, has terminal receipts for all calls, and its source-reported count matches the observed count. Exit 2 means malformed arguments or a contract-invalid ledger.
 
 The schemas are in `schema/simulator-call-ledger.schema.json` and `schema/simulator-call-audit.schema.json`; the implementation is `symthaea_nano_policy::sim_budget`, and the source-specific denominator analysis is in [SIMULATOR_BUDGET_LEDGER.md](./SIMULATOR_BUDGET_LEDGER.md). This structural audit does not dereference receipts or prove external process execution; a simulator supervisor must retain one start and terminal receipt for every actual call. These fixtures are synthetic, not MEEP results.
 
