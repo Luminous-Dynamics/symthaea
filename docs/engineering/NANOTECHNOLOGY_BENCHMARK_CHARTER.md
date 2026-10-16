@@ -98,7 +98,42 @@ The thresholds below indicate **what to measure and how to set acceptance**, not
 | Nano-characterization / metrology | Bias, MAE/median absolute error versus traceable reference, precision, repeatability/reproducibility, limits of agreement and calibration drift | Calibrated standards/annotations, cross-instrument/operator holdouts, frozen preprocessing | Meet instrument/task uncertainty requirements; quantify uncertainty and failures. Image-segmentation IoU alone does not establish measurement accuracy. |
 | Environmental remediation / lifecycle | Removal/selectivity, regeneration cycles, energy, secondary waste, leaching/by-products, fate/exposure and life-cycle indicators | Relevant matrices and operating conditions, reference analytical methods, material-specific risk evidence | Satisfy predeclared treatment performance and lifecycle/risk constraints together; do not count removal while ignoring transformation products or spent media. |
 
-## 4. Nanophotonics targets: a worked example
+## 4. MEEP-gated power-splitter benchmark: budget audit before reuse
+
+A particularly actionable public research benchmark is [nanophotonics-inverse-design](https://github.com/pberlizov/nanophotonics-inverse-design), reviewed at immutable commit `f2475999c0ad24f8b5ae2f26982c0ad19b257236`. Its frozen `phase0_v1` target is split ratio 0.5 at 1550 nm, with in-spec defined as `abs(split_ratio_upper - 0.5) <= 0.05`. It retains documented negative results and compares search policies under configured budgets B=30, 50 and 100.
+
+The detailed results document reports a five-replicate study and, at configured B=100, these **source-reported** summaries:
+
+| Policy | In-spec count, mean ± SD | Best absolute split error, mean ± SD |
+|---|---:|---:|
+| `surrogate_rank` | 15.0 ± 3.2 | 0.0042 ± 0.0031 |
+| `hierarchical_35` | 14.8 ± 3.5 | 0.0052 ± 0.0029 |
+| `random_perturb` | 12.8 ± 1.8 | 0.0058 ± 0.0061 |
+| `sigma_meep` | 10.6 ± 4.8 | 0.0074 ± 0.0070 |
+
+The study's interpretation explicitly reports an overlap/tie between the surrogate and `hierarchical_35` for in-spec count; it does **not** show that the surrogate dominates every baseline at every budget. A robust new selector should compare against the strongest eligible baseline, not only a weak uncertainty-only arm.
+
+**Two implementation discrepancies block using these figures as a verified equal-MEEP-call reference without further audit:**
+
+1. The current README describes a **six-seed** B=100 pilot, while `docs/SIM_BUDGET_REPLICATION_RESULTS.md` says five replicates. The published summary numbers are similar, but per-run receipts/raw artifacts must resolve the provenance. See [README](https://github.com/pberlizov/nanophotonics-inverse-design/blob/f2475999c0ad24f8b5ae2f26982c0ad19b257236/README.md#L199) and [detailed results](https://github.com/pberlizov/nanophotonics-inverse-design/blob/f2475999c0ad24f8b5ae2f26982c0ad19b257236/docs/SIM_BUDGET_REPLICATION_RESULTS.md).
+2. The pinned `scripts/run_sim_budget_study.py` skips DRC-rejected proposals before calling `meep_one` in the random and sigma paths (lines 82 and 125), while `src/nano_inv/sim_budget.py` counts only rows with finite split values in `n_meep` (lines 56 and 83). Therefore proposal-loop iterations, actual MEEP invocations, failed/non-finite simulations, and reported finite rows are not demonstrably the same denominator from these summary artifacts alone. This does not prove the research result is invalid; it means an equal-actual-call comparison needs call-level instrumentation or raw ledgers. Audit tracked by [NANO-006](https://github.com/Luminous-Dynamics/symthaea/issues/7586).
+
+The repository's [recipe-sensitivity audit](https://github.com/pberlizov/nanophotonics-inverse-design/blob/f2475999c0ad24f8b5ae2f26982c0ad19b257236/docs/RECIPE_SENSITIVITY.md) also reports substantial disagreement between the legacy `phase0_v1` split at resolutions 25 and 50 for the same mask, and keeps the historical labels at r25 separate from a mesh-stability recipe. Do not mix results across these recipe identities.
+
+### Proposed confirmatory protocol for this task
+
+- Freeze exact source, configuration, candidate-generator/surrogate digests and `phase0_v1` resolution 25 before any scored run.
+- Define the primary budget as **100 actual MEEP invocations per policy/seed**, with a separately reported and capped proposal-attempt count. Failed solver invocations consume a MEEP-call budget; heuristic rejection is a proposal attempt but not a solver call.
+- Preserve a ledger of every proposal: generated, DRC-rejected, duplicate, accepted, MEEP-started, MEEP-failed/non-finite, finite-output, and in-spec. Count exact unique geometries separately.
+- Reproduce all applicable baselines with equal actual MEEP-call counts, and resolve the five/six-seed discrepancy before treating prior means as a baseline. If raw receipts are unavailable, describe numbers only as source-reported pilot results.
+- Run at least 20 paired seeds for a confirmatory comparison, or document a prospective power analysis before revealing held-out outcomes. Keep candidate source, baseline checkpoints and recipes frozen across arms.
+- Report in-spec count / 100 calls, best absolute split error, median/best-so-far error curve, insertion loss separately, failed/non-finite solver calls, DRC proposal rejection rate, unique-design rate, wall time and cost.
+- A candidate acceptance target for further work is **at least 18 in-spec designs per 100 actual calls** or **at least 20% lower best-error metric than the reproduced strongest baseline**, with paired/seed-aware 95% uncertainty intervals excluding no improvement. These are proposed go/no-go targets, not published standards. Finalize the primary endpoint/effect-size and sample size before holdout evaluation and do not switch endpoints afterwards.
+- Run mesh-stability and fabrication-robustness as separate gates. A split-ratio success under one frozen 2D TE simulation is not foundry DRC, calibrated insertion loss, fabricated yield, or a general photonic-device qualification.
+
+The Rust policy prototype in `tools/nano-policy-prototype` only selects candidates; a downstream harness owns the actual solver-call ledger and must not conflate selected IDs with completed simulations.
+
+## 5. MOCLIP metasurface inverse design: a separate worked example
 
 The MOCLIP paper provides a concrete numerical starting point for the measured metasurface task:
 - Dataset: 466,537 unique geometry–spectrum pairs after quality filtering; official split of 373,230 train, 46,654 validation and 46,653 test.
@@ -118,7 +153,7 @@ Choose a single primary measure before the held-out test:
 
 Compare against random valid candidate, spectral nearest-neighbour/library search, and the applicable MOCLIP/adjoint baseline, plus a Symthaea ablation and negative control. Target +5 percentage points Success@K or >=20% lower median best-so-far MSE, with a paired/cluster-aware 95% interval excluding no improvement, at equal budgets. Include fabrication-robustness perturbations as a separate metric, not folded silently into the same score.
 
-## 5. How to set numerical targets responsibly
+## 6. How to set numerical targets responsibly
 
 1. **Match the scientific task.** Use reported results only when target, input, split, units, oracle, and metric implementation match.
 2. **Establish the baseline first.** If the paper's run is unreproducible, report that; do not make an arbitrary target stand in for the missing baseline.
@@ -127,7 +162,7 @@ Compare against random valid candidate, spectral nearest-neighbour/library searc
 5. **Keep hard constraints hard.** No accuracy gain compensates for leakage, invalid candidates, failed rights review, unsafe data use, or missing critical controls.
 6. **Use staged claims.** Source verified → execution verified → baseline reproduced → policy improvement demonstrated → out-of-domain robustness examined → independently measured physical performance. Each is a distinct evidence state.
 
-## 6. Immediate implementation order
+## 7. Immediate implementation order
 
 1. Finish NANO-001 data admission and exact-head Rust verifier validation; do not wait idle for unrelated CI, but never relabel skipped/queued as passed.
 2. For NANO-003, pin and inspect MADE's exact source/configs, then run plumbing-only smoke and reproduce baselines before a Symthaea arm.
@@ -135,6 +170,6 @@ Compare against random valid candidate, spectral nearest-neighbour/library searc
 4. Compare nanophotonics with 2D materials and metrology on NANO-002's readiness criteria, then select one follow-on domain. Avoid concurrent uncontrolled implementations.
 5. Use a Rust-first Symthaea selector adapter only after the baseline tasks and interface semantics are frozen. Scientific tools may retain isolated research runtimes; never add an unqualified Python model stack to production Symthaea by accident.
 
-## 7. Success definition for the program
+## 8. Success definition for the program
 
 The program succeeds when it can **reproducibly show where Symthaea improves evidence-gathering decisions and where it does not**, across carefully chosen scientific tasks, while respecting distinct physical models, data rights, risk constraints, and uncertainty. Discovering a physically useful nanotechnology is a later, more demanding claim requiring independent experimental evidence.
