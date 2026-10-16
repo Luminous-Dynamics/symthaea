@@ -39,7 +39,8 @@
         "goal_only",
         "uncertainty_only",
         "diversity_only",
-        "hybrid"
+        "hybrid",
+        "balanced_extremes"
       ]
     },
     "seed": {
