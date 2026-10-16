@@ -184,6 +184,29 @@ The upstream WarpX README describes four helium RF capacitive-discharge cases fo
 
 **Critical separation:** WarpX's helium kinetic cases are not automatically comparable to the Zapdos fluid cases. First qualify each case independently. Only define a fluid-vs-PIC score if gas species, collision data, geometry, drive, boundary conditions, initial state, averaging window and observables are made commensurate; otherwise preserve them as distinct regime-specific benchmarks.
 
+## 10.1. PIC-MCC convergence and stochastic error separation
+
+A single close profile match is a first reproduction check, not sufficient numerical verification. Parodi & Petronio (2025) explicitly distinguish spatial discretization, time discretization and macroparticle statistical weight as contributors to PIC-MCC error, use repeated pseudo-random-number seeds, and apply a three-level refinement/error-estimation method. Their work also motivates staged simple/analytical checks before a fully coupled case. https://doi.org/10.1063/5.0241527
+
+Add two deliberately separate gates:
+
+**Gate A — canonical reference reproduction**
+- Freeze the exact upstream WarpX commit, case number, original input parameters, every collision-data file and actual SHA-256 computed over the downloaded bytes, compilation/build flags, RNG seed, run duration, averaging interval and analyzer commit.
+- Run the canonical upstream case, not the reduced `--test` setting. The test mode is useful for integrity and quick regression only.
+- Compare the same published observable with the same masking rule: Case 1 time-averaged ion density on the analyzer's 129-point reference grid, preserving the documented endpoint exclusions.
+- Report profile bias/error and overlay the spatial profile; report the upstream <6.5% interior RMS-relative-density criterion only as the existing reference criterion for that matched case/analyzer—not as a universal plasma accuracy tolerance.
+- Run a screening set of at least five independent RNG seeds with all physical/numerical parameters otherwise frozen, report the mean profile and confidence intervals, and increase the replication count if uncertainty straddles the registered acceptance decision.
+
+**Gate B — numerical convergence**
+- Change `Δx`, `Δt`, macroparticle weight (or its equivalent particles-per-cell setting) and averaging duration as separately traceable experimental factors. Do not change all factors simultaneously and then attribute the difference to a single cause.
+- Begin with at least three systematically refined levels for each numerical factor and at least five independent RNG seeds per level as a screening floor; grow the replication count when Monte Carlo uncertainty prevents a clear conclusion. This is a proposed project floor, not a universal theorem that five seeds are sufficient.
+- Estimate stochastic scatter separately from systematic grid/time-step/particle-weight trends. Report confidence intervals over independent seeds for the registered quantity of interest.
+- Estimate observed convergence order and a Richardson/GCI-style error only if the responses show an identifiable asymptotic convergence regime and the assumptions of that estimator are supported. If not, report non-asymptotic/inconclusive; do not force a convergence order onto noisy or non-monotone data.
+- Preserve failures, divergent runs, seed-specific outliers and non-convergent refinement levels. Do not remove them just because the resulting average is harder to qualify.
+- Use staged analytical or independently verified submodule tests wherever applicable before the coupled discharge benchmark, so an error source can be localized rather than attributed to the full physics stack.
+
+The key output is not simply one number. It is a decomposition of **reference discrepancy**, **stochastic sampling uncertainty**, **spatial/temporal discretization error**, **particle-weight error**, and **model-form/physical discrepancy**, with evidence claims kept separate. Agreement among multiple codes with the same numerical settings is useful, but it does not alone establish that the shared numerical framework is converged or experimentally valid.
+
 A new implementation/preflight work item tracks the next step: [PLASMA-PIC-REF-001 #7640](https://github.com/Luminous-Dynamics/symthaea/issues/7640). The immediate acceptance condition is exact dependency closure, independent SHA-256 computed over downloaded bytes, a frozen case manifest, and explicit canonical-vs-smoke status. No WarpX run or benchmark pass is claimed by this source inspection.
 
 ## 11. Measured disruption-prediction benchmark — separate evidence track
