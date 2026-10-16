@@ -252,7 +252,7 @@
               "null"
             ],
             "minimum": 0,
-            "maximum": 1000000000000
+            "maximum": 1000000000000000
           },
           "targets": {
             "type": "array",
@@ -326,7 +326,7 @@
                     "null"
                   ],
                   "minimum": 0,
-                  "maximum": 1000000000000
+                  "maximum": 1000000000000000
                 }
               }
             }
