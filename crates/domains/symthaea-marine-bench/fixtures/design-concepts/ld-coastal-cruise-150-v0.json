@@ -1,0 +1,369 @@
+{
+  "schema_version": "1.0.0",
+  "concept_id": "LD-COASTAL-CRUISE-150-V0",
+  "concept_name": "Coastal Expedition 150 — high-efficiency coastal passenger ship",
+  "archetype": "coastal_expedition_cruise",
+  "maturity": "concept_hypothesis",
+  "mission": {
+    "mission_statement": "A frequent-stop coastal passenger ship with an intimate expedition experience and optional community logistics, designed around minimum whole-voyage energy and zero direct combustion at berth where infrastructure supports it.",
+    "operating_region": "Illustrative northern/coastal route; no actual itinerary adopted as the final design basis.",
+    "route_profile": "Working comparator: approximately 12-day operation with many short port calls, explicitly inspired by public coastal service profiles but not claimed as an exact replica.",
+    "target_cruise_speed_kn": {
+      "value": 15,
+      "unit": "kn",
+      "status": "design_target",
+      "lower_bound": null,
+      "upper_bound": null,
+      "source_ref": null,
+      "rationale": "Provisional schedule speed for trade studies; must be solved against route timetable and energy."
+    },
+    "target_range_nmi": {
+      "value": null,
+      "unit": "nmi",
+      "status": "unknown",
+      "lower_bound": null,
+      "upper_bound": null,
+      "source_ref": null,
+      "rationale": "Actual route track, weather contingency, energy reserve and charging availability must be defined."
+    },
+    "voyage_duration_days": {
+      "value": 12,
+      "unit": "days",
+      "status": "design_assumption",
+      "lower_bound": null,
+      "upper_bound": null,
+      "source_ref": null,
+      "rationale": "A provisional voyage duration for route/port energy studies."
+    },
+    "port_calls": {
+      "value": 34,
+      "unit": "calls",
+      "status": "design_assumption",
+      "lower_bound": null,
+      "upper_bound": null,
+      "source_ref": null,
+      "rationale": "A stress-test count for frequent port calls, not a selected itinerary."
+    }
+  },
+  "dimensions": {
+    "length_overall_m": {
+      "value": 150,
+      "unit": "m",
+      "status": "design_assumption",
+      "lower_bound": null,
+      "upper_bound": null,
+      "source_ref": null,
+      "rationale": "Concept envelope aligned to a coastal cruise scale; detailed geometry not selected."
+    },
+    "beam_m": {
+      "value": null,
+      "unit": "m",
+      "status": "unknown",
+      "lower_bound": null,
+      "upper_bound": null,
+      "source_ref": null,
+      "rationale": "Set from stability, passenger decks, resistance, port envelope and layout."
+    },
+    "design_draft_m": {
+      "value": null,
+      "unit": "m",
+      "status": "unknown",
+      "lower_bound": null,
+      "upper_bound": null,
+      "source_ref": null,
+      "rationale": "Needs route bathymetry, under-keel clearance, propulsor and loading analysis."
+    },
+    "air_draft_m": {
+      "value": null,
+      "unit": "m",
+      "status": "unknown",
+      "lower_bound": null,
+      "upper_bound": null,
+      "source_ref": null,
+      "rationale": "Especially sensitive to retractable wing rigs, bridges, terminal access and emergency operations."
+    },
+    "displacement_tonnes": {
+      "value": null,
+      "unit": "tonne",
+      "status": "unknown",
+      "lower_bound": null,
+      "upper_bound": null,
+      "source_ref": null,
+      "rationale": "Must come from a compartment, system, outfit and margin mass ledger."
+    }
+  },
+  "capacity": {
+    "guest_capacity": {
+      "value": 500,
+      "unit": "persons",
+      "status": "design_assumption",
+      "lower_bound": null,
+      "upper_bound": null,
+      "source_ref": null,
+      "rationale": "Working passenger capacity for the first comparison tier."
+    },
+    "crew_capacity": {
+      "value": null,
+      "unit": "persons",
+      "status": "unknown",
+      "lower_bound": null,
+      "upper_bound": null,
+      "source_ref": null,
+      "rationale": "Determine through service, manning, hotel, lifesaving and crew-workload studies."
+    },
+    "vehicle_or_cargo_capacity": {
+      "value": null,
+      "unit": "vehicles / tonne",
+      "status": "unknown",
+      "lower_bound": null,
+      "upper_bound": null,
+      "source_ref": null,
+      "rationale": "Retain optional logistics capability only if the mission and structural layout justify it."
+    }
+  },
+  "operating_profile": {
+    "service_modes": [
+      "coastal_passage",
+      "frequent_port_calls",
+      "shore_power_charge",
+      "maneuvering",
+      "weather_delay",
+      "emergency_degraded_mode"
+    ],
+    "sea_state_envelope": "Define a real coastal route corpus with seasonal weather, wave/current exposure, port closures and refuge options.",
+    "weather_routing": "Optimise speed and route under hard arrival-time, passenger comfort, sea-state and minimum-reserve constraints.",
+    "speed_policy": "Compare schedule-preserving speed with arrival-window flexibility; quantify the energy cost of punctuality.",
+    "availability_target": {
+      "value": 0.99,
+      "unit": "fraction",
+      "status": "design_target",
+      "lower_bound": null,
+      "upper_bound": null,
+      "source_ref": null,
+      "rationale": "Provisional schedule availability target; must be reconciled with weather and maintenance assumptions."
+    }
+  },
+  "energy_architecture": {
+    "distribution_architecture": "Compare a zonal ship-wide electric architecture with segregated essential buses, battery buffering and a safe independent emergency-power strategy.",
+    "propulsion_candidates": [
+      "efficient diesel-electric reference",
+      "shore-charged battery-dominant hybrid if full route closure is proved",
+      "dispatchable hybrid-electric architecture with future-fuel options"
+    ],
+    "energy_carriers_to_evaluate": [
+      "shore electricity",
+      "renewable diesel/HVO",
+      "e-methanol or bio-methanol with pathway and hazard accounting",
+      "hydrogen fuel-cell variant as a bounded feasibility study"
+    ],
+    "battery_capacity_mwh": {
+      "value": null,
+      "unit": "MWh",
+      "status": "unknown",
+      "lower_bound": null,
+      "upper_bound": null,
+      "source_ref": null,
+      "rationale": "Do not assume Sea Zero's published 73 MWh fits this different design; size from power, range, port dwell, reserve, battery mass and charging envelope."
+    },
+    "shore_power": "Model each port's power, connection time, tariff, grid carbon intensity and availability; charge scheduling is part of itinerary design.",
+    "wind_assist": "Trade study retractable wing rigs against wind statistics, air draft, stability, passenger egress, lifeboat envelopes and port restrictions.",
+    "solar_assist": "Evaluate actual panel area, shading, orientation, salt/fouling maintenance and seasonal irradiance; use as an incremental contribution.",
+    "thermal_integration": "Treat HVAC, hot water, refrigeration, galley, laundry and pools as a first-class hotel-load and heat-recovery network."
+  },
+  "load_budget": {
+    "propulsion_kw": {
+      "value": null,
+      "unit": "kW",
+      "status": "unknown",
+      "lower_bound": null,
+      "upper_bound": null,
+      "source_ref": null,
+      "rationale": "Calculate from candidate resistance/propulsor maps and operating-speed distribution."
+    },
+    "hotel_kw": {
+      "value": null,
+      "unit": "kW",
+      "status": "unknown",
+      "lower_bound": null,
+      "upper_bound": null,
+      "source_ref": null,
+      "rationale": "Establish occupancy- and time-resolved passenger/hotel services loads."
+    },
+    "hvac_kw": {
+      "value": null,
+      "unit": "kW",
+      "status": "unknown",
+      "lower_bound": null,
+      "upper_bound": null,
+      "source_ref": null,
+      "rationale": "Climate, comfort, ventilation, envelope and cabin-use profile required."
+    },
+    "freshwater_kw": {
+      "value": null,
+      "unit": "kW",
+      "status": "unknown",
+      "lower_bound": null,
+      "upper_bound": null,
+      "source_ref": null,
+      "rationale": "Potable water, wastewater and storage schedule required."
+    },
+    "waste_treatment_kw": {
+      "value": null,
+      "unit": "kW",
+      "status": "unknown",
+      "lower_bound": null,
+      "upper_bound": null,
+      "source_ref": null,
+      "rationale": "MARPOL/route constraints and treatment train required."
+    },
+    "galley_kw": {
+      "value": null,
+      "unit": "kW",
+      "status": "unknown",
+      "lower_bound": null,
+      "upper_bound": null,
+      "source_ref": null,
+      "rationale": "Dining-service schedule, refrigeration and kitchen appliances required."
+    },
+    "port_mode_kw": {
+      "value": null,
+      "unit": "kW",
+      "status": "unknown",
+      "lower_bound": null,
+      "upper_bound": null,
+      "source_ref": null,
+      "rationale": "Berthing hotel load and simultaneous charging are to be measured or calculated separately."
+    },
+    "basis": "Build a mode-resolved 15-minute or finer load profile for sea, arrival, shore charge, port stay, peak service and emergency modes; no energy balance yet."
+  },
+  "performance_targets": [
+    {
+      "metric": "well_to_wake_ghg_reduction_per_passenger_nmi",
+      "unit": "percent",
+      "target_value": 30,
+      "direction": "maximize",
+      "status": "aspirational_target",
+      "comparison_basis": "Compare with an equivalent capacity, itinerary, stop schedule, service level and weather distribution.",
+      "validation_method": "Lifecycle fuel/electricity factors plus verified voyage-energy model; eventually validate on a held-out route."
+    },
+    {
+      "metric": "direct_combustion_emissions_at_berth",
+      "unit": "percent_of_berth_energy",
+      "target_value": 0,
+      "direction": "threshold",
+      "status": "provisional_target",
+      "comparison_basis": "Only for ports with confirmed shore power or other verified zero-direct-emission supply.",
+      "validation_method": "Port inventory, shore connection simulation and operational telemetry."
+    },
+    {
+      "metric": "total_energy_demand_reduction_vs_baseline",
+      "unit": "percent",
+      "target_value": 30,
+      "direction": "maximize",
+      "status": "aspirational_target",
+      "comparison_basis": "Same passenger capacity, hotel services, route, stops and arrival windows.",
+      "validation_method": "Independent propulsion and hotel-load accounting; model basin tests and voyage measurements."
+    },
+    {
+      "metric": "false_robust_feasible_classifications",
+      "unit": "count",
+      "target_value": 0,
+      "direction": "threshold",
+      "status": "provisional_target",
+      "comparison_basis": "All mandatory route, stability, safety, environmental and energy constraints under uncertainty.",
+      "validation_method": "Adversarial feasibility suite; no single environmental or cost score can offset a failed hard gate."
+    }
+  ],
+  "hard_constraints": [
+    {
+      "constraint_id": "SOLAS-001",
+      "description": "Applicable international passenger-ship safety obligations for the intended route and operating category.",
+      "disposition": "not_assessed",
+      "evidence_needed": "Flag/class review and a traceable SOLAS applicability/compliance matrix."
+    },
+    {
+      "constraint_id": "EVAC-001",
+      "description": "Evacuation, muster, lifeboat/rescue arrangement, accessibility and passenger flow for declared maximum persons.",
+      "disposition": "not_assessed",
+      "evidence_needed": "Timed evacuation/egress analyses and prescribed testing/review."
+    },
+    {
+      "constraint_id": "STABILITY-001",
+      "description": "Intact/damage stability, loading conditions, free surface and high-mounted wind-assist loads.",
+      "disposition": "not_assessed",
+      "evidence_needed": "Qualified stability analyses and applicable class/flag review."
+    },
+    {
+      "constraint_id": "FIRE-001",
+      "description": "Energy storage and fuel-specific fire, smoke, ventilation, containment and emergency isolation.",
+      "disposition": "not_assessed",
+      "evidence_needed": "Hazard analysis, compartment strategy and applicable approval."
+    },
+    {
+      "constraint_id": "POLLUTION-001",
+      "description": "Sewage, garbage, bilge, emissions and other pollution controls for routes and ports.",
+      "disposition": "not_assessed",
+      "evidence_needed": "MARPOL/flag/port matrix and treatment-system validation."
+    },
+    {
+      "constraint_id": "PORT-001",
+      "description": "Draft, air draft, berth geometry, charging time/power and terminal capacity across every intended stop.",
+      "disposition": "not_assessed",
+      "evidence_needed": "Verified route/port geospatial and infrastructure dataset."
+    }
+  ],
+  "assumptions": [
+    {
+      "assumption_id": "A-C-001",
+      "statement": "Hotel-load and HVAC optimization can be as material as propulsion efficiency for a passenger ship.",
+      "category": "hotel_load",
+      "status": "untested",
+      "falsification_method": "Measure or model mode-resolved electric, heating/cooling, refrigeration and water loads; report uncertainty by service mode."
+    },
+    {
+      "assumption_id": "A-C-002",
+      "statement": "Frequent port calls may create enough shore-charging opportunities to change the feasible energy architecture.",
+      "category": "operations",
+      "status": "untested",
+      "falsification_method": "Simulate each port dwell, power limit, connection reliability, route delay and seasonal grid factor."
+    },
+    {
+      "assumption_id": "A-C-003",
+      "statement": "Wind-assist and hull/propulsor improvements can compound without invalidating each other's benefit estimates.",
+      "category": "hydrodynamics",
+      "status": "untested",
+      "falsification_method": "Run coupled rather than additive sub-system estimates and validate with model tests; quantify interaction effects."
+    }
+  ],
+  "provenance": [
+    {
+      "source_id": "sea-zero-2026",
+      "title": "Hurtigruten Sea Zero project page",
+      "uri": "https://www.hurtigruten.com/en/why-hurtigruten/sustainability/sea-zero",
+      "scope": "Project-specific reported concept features, R&D and energy-reduction claims; comparator anchor only, not independent in-service data.",
+      "rights_disposition": "public_metadata_only"
+    },
+    {
+      "source_id": "imo-sdc12-2026",
+      "title": "IMO SDC 12 ship-design and construction workplan",
+      "uri": "https://www.imo.org/en/mediacentre/meetingsummaries/pages/sdc-12.aspx",
+      "scope": "Published workplan milestones for safety frameworks concerning selected energy-transition technologies; must re-check before approval.",
+      "rights_disposition": "public_metadata_only"
+    },
+    {
+      "source_id": "imo-passenger-safety",
+      "title": "IMO passenger ship safety and environmental standards",
+      "uri": "https://www.imo.org/en/mediacentre/hottopics/pages/passengership-default.aspx",
+      "scope": "Public overview of applicable passenger-ship safety and MARPOL requirements; not a compliance checklist.",
+      "rights_disposition": "public_metadata_only"
+    },
+    {
+      "source_id": "ittc-ship-cfd",
+      "title": "ITTC Practical Guidelines for Ship CFD Applications",
+      "uri": "https://ittc.info/media/11958/75-03-02-03.pdf",
+      "scope": "Reference for ship CFD verification, validation, uncertainty and applicability; exact test data/use rights must be checked.",
+      "rights_disposition": "public_metadata_only"
+    }
+  ],
+  "claim_ceiling": "Concept hypothesis only. Sea Zero is a project-specific public comparator, not a validated design basis for this vessel. No range, battery size, emissions, energy saving, safety or class result is established."
+}
