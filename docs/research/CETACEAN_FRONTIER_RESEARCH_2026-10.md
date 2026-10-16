@@ -71,6 +71,14 @@ Source: https://doi.org/10.1111/mms.70118
 
 **Symthaea experiment:** every detector report should include per-site/per-recorder performance, fixed-operating-point false alarms/hour and an explicitly held-out site where feasible. A model can earn a high pooled score while being unreliable in a new acoustic environment.
 
+### F. Borrow the right evaluation discipline from DCASE bioacoustics
+
+DCASE's few-shot bioacoustic event-detection benchmark uses event-based macro F-measure with temporal IoU and bipartite matching. It explicitly handles unknown/ambiguous labels separately rather than blindly treating them as negatives, and provides per-dataset results because conditions vary across sources: https://dcase.community/challenge2024/task-few-shot-bioacoustic-event-detection
+
+**Symthaea implication:** a credible continuous-audio scorer must support (1) one-to-one event matching, (2) declared event/onset tolerance, (3) unscored regions, (4) event-level precision-recall, (5) exposure time excluding the unscored regions, and (6) per-recording and per-domain breakdowns. The new schema-v3 corpus manifest records explicit unscored intervals and reasons; the event evaluator excludes affected predictions deterministically and reports how many were omitted. Those exclusions remain annotation assertions, not ground-truth authentication.
+
+Do not copy DCASE's exact metric blindly to every cetacean task. Sperm-whale clicks may need onset tolerance and ICI error, whistle segments may need IoU / contour error, and dyadic sequence models require proper scoring rules such as held-out NLL. Metric choice must follow task semantics and be fixed before the Test data is inspected.
+
 ## 2. The code gap being closed now
 
 Symthaea's existing public branch contains:
