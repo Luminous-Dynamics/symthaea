@@ -55,7 +55,28 @@ Compare four predeclared policies: best single specialist, simple rank fusion, s
 
 Freeze data-source and transformation digests, split IDs, model/provider/configuration, exclusions, predictions and metric implementation before the evaluator reveals holdout labels. A verifier must reconstruct counts and metrics without relying on model narration. Include deliberate corruptions and leakage fixtures that must fail closed.
 
-### H. From price claims to causal cost accounting
+### H. From closed-world labels to partial identification
+
+Published off-target benchmarks note that unsequenced high-scoring candidates may be undiscovered positives, not ordinary false positives. Treat this as an ascertainment problem: the observed label table is not automatically the complete biological truth for the declared search space. See [Kaufmann et al., 2026](https://doi.org/10.1177/10430342261466407). This complements earlier work on predictive uncertainty in off-target activity, including [crispAI](https://doi.org/10.1093/nar/gkae759).
+
+For each fixed ranked universe, report the usual metric against the measured-positive reference **and** worst/best-case label-assignment bounds whenever unknown/unassayed candidates exist. These bounds are not posterior probabilities or confidence intervals. They vary unknown labels only inside the declared candidate universe; they cannot bound sites omitted from every nomination method.
+
+Let:
+- P = number of eligible measured-positive reference sites;
+- pK = measured positives among the top K;
+- U = number of unknown/unassayed candidates in the fixed candidate universe;
+- uK = unknown/unassayed candidates among the top K.
+
+Then, where P > 0 and K slots are available:
+
+- observed known-label Recall@K = pK / P;
+- worst-case conditional recall bound = pK / (P + U - uK);
+- best-case conditional recall bound = (pK + uK) / (P + uK);
+- precision bounds = [pK / K, (pK + uK) / K].
+
+The lower recall case treats selected unknowns as negative and all unselected unknowns as positive; the upper case does the reverse. Report the observed estimate and bounds together. Never report an unknown as a negative merely to obtain a point estimate. These are **label-uncertainty bounds**, distinct from group-aware statistical uncertainty intervals.
+
+### I. From price claims to causal cost accounting
 
 Report computational resources and review slots first. Progress to human review minutes only when measured. Report per-qualified-finding cost only when numerator and denominator are observed end-to-end. Do not convert fewer ranked candidates into claims of lower experimental costs, clinical costs, or treatment prices without prospective accounting.
 
@@ -71,6 +92,7 @@ Report computational resources and review slots first. Progress to human review 
 | T5 Shift and robustness | Does the effect persist on unseen groups and independent data? | leave-guide/Cas9-group-out delta, leave-assay-family-out delta, independent-cohort delta, group-level uncertainty | universal generalization from one small cohort |
 | T6 Incrementality | Does Symthaea add value over the same specialist predictions? | paired delta at equal budget; ablations; runtime/resource delta | benefit attributable to an upstream model unless ablated |
 | T7 Evidence/replay integrity | Can an independent evaluator detect tampering or leakage? | deterministic replay, exact manifest, negative controls, digest/count agreement | biological truth from cryptography alone |
+| T8 Partial-label identification | How much do unresolved labels change metric interpretation? | observed-label estimate, worst/best-case recall and precision bounds, unknown-label census | sites omitted from every nomination method; truth outside the fixed candidate universe |
 
 Tracks are reported separately. A composite “CRISPR score” that hides failed nomination, calibration, or generalization is prohibited.
 
@@ -87,6 +109,8 @@ A **benchmark episode** is a pinned combination of source cohort, assay context,
 - **Risk–coverage:** for each predeclared abstention rule, report fraction of cases assigned a usable score (coverage), error/false-negative behaviour on the evaluated labelled set, and group distribution. Abstention is neither a positive nor a negative.
 - **Uncertainty interval:** resample the highest independent unit supported by the study—normally guide/Cas9 group, not individual rows—using a paired method for the policy difference. With only 26 source groups, show every group result and state that interval precision/generalization is limited. Do not use row-level bootstrap to create artificial sample size.
 - **Resource accounting:** report candidate slots and, when measured, wall-clock time, CPU/GPU model and utilization, peak memory, and human review minutes. Keep measured quantities separate from projected costs.
+
+- **Partial-label bounds:** If unknown candidates exist within the fixed ranking universe, report the known-label metric and worst/best-case assignments to those unknown labels. For P > 0, measured positives pK in the top K, U total unknown candidates, and uK unknown candidates in the top K, conditional recall bounds are [pK / (P + U - uK), (pK + uK) / (P + uK)]. Precision bounds are [pK/K, (pK+uK)/K] when K candidates are available and K > 0. These are not confidence intervals and do not cover positives absent from the declared candidate universe.
 
 Report macro (equal-group-weighted) and micro (pooled) summaries together. Include per-guide/Cas9 results and all invalid/omitted cases. Do not let a large group conceal a failure on a small group.
 
@@ -116,6 +140,7 @@ For either alternative:
 - Exact deterministic replay of the metric layer on the same pinned inputs produces the same canonical output and manifest digest.
 - A prediction-only or schema-valid receipt can never promote an evidence state to independently observed, assessed or replicated.
 
+- **100%** of metrics affected by unknown/unassayed candidates report partial-identification bounds or an explicit not-estimable state; no unknown label is silently coerced into a negative.
 Any failed binary gate blocks performance claims until remediated.
 
 ## 5. Fair comparator matrix
@@ -204,4 +229,15 @@ The machine-readable companion contract contains four small fixtures intended to
 3. **F3 — digest mismatch.** An observed artifact digest that differs from the frozen manifest blocks replay and blocks metric claims.
 4. **F4 — group leakage.** A guide/Cas9 group appearing in both train and held-out partitions invalidates the declared group holdout and any associated generalization claim.
 
-At this stage the contract fixtures and expected values have been checked directly after retrieving and parsing the JSON. This is not yet a committed Rust scorer test and does not satisfy the production metric-verifier gate.
+5. **F5 — partial-label sensitivity bounds.** Two measured positives and two unknown candidates with K=2 produce observed known-label recall 0.5, conditional recall bounds [1/3, 2/3], and precision bounds [0.5, 1.0]. The bounds vary unknown labels only inside this exact universe.
+
+The dependency-free Rust metric kernel is now committed at [scripts/crispr_triage_verifier.rs](../scripts/crispr_triage_verifier.rs). It implements native nomination coverage, Recall@K, point Precision@K with unknown-label abstention, slots-at-recall, partial-label bounds, SHA-256-claim format/match checks, and group-leakage validation. It includes unit tests for fixtures F1–F5 plus invalid targets and duplicate identities.
+
+Run the unit tests with an installed Rust toolchain:
+
+```sh
+rustc --edition=2024 --test scripts/crispr_triage_verifier.rs -o /tmp/crispr-triage-tests
+/tmp/crispr-triage-tests
+```
+
+The SHA-256 helper validates two already-computed digest claims; it does not hash artifact bytes. The production orchestrator must compute hashes from retrieved bytes using a trusted implementation.
