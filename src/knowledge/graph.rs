@@ -2983,25 +2983,37 @@ mod tests {
             (
                 "source-one",
                 vec![
-                    make_relation("Alpha", "prevents", "Beta", SemanticRole::Agent, SemanticRole::Patient, true, false),
-                    make_relation("alpha", "PREVENTS", "beta", SemanticRole::Agent, SemanticRole::Patient, true, true),
+                    make_relation(
+                        "Alpha", "prevents", "Beta", SemanticRole::Agent, SemanticRole::Patient, true, false,
+                    ),
+                    make_relation(
+                        "alpha", "PREVENTS", "beta", SemanticRole::Agent, SemanticRole::Patient, true, true,
+                    ),
                 ],
             ),
             (
                 "source-two",
-                vec![make_relation("Beta", "prevents", "Alpha", SemanticRole::Patient, SemanticRole::Agent, true, true)],
+                vec![make_relation(
+                    "Beta", "prevents", "Alpha", SemanticRole::Patient, SemanticRole::Agent, true, true,
+                )],
             ),
             (
                 "wrong-roles",
-                vec![make_relation("Alpha", "prevents", "Beta", SemanticRole::Patient, SemanticRole::Agent, true, true)],
+                vec![make_relation(
+                    "Alpha", "prevents", "Beta", SemanticRole::Patient, SemanticRole::Agent, true, true,
+                )],
             ),
             (
                 "different-predicate",
-                vec![make_relation("Alpha", "causes", "Beta", SemanticRole::Agent, SemanticRole::Patient, true, false)],
+                vec![make_relation(
+                    "Alpha", "causes", "Beta", SemanticRole::Agent, SemanticRole::Patient, true, false,
+                )],
             ),
             (
                 "different-causality",
-                vec![make_relation("Alpha", "prevents", "Beta", SemanticRole::Agent, SemanticRole::Patient, false, true)],
+                vec![make_relation(
+                    "Alpha", "prevents", "Beta", SemanticRole::Agent, SemanticRole::Patient, false, true,
+                )],
             ),
         ];
 
@@ -3034,8 +3046,6 @@ mod tests {
                 },
             );
         }
-        graph.next_id = 6;
-
         let queries = [
             RelationObservationQuery {
                 subject: " ALPHA ".into(),
@@ -3089,7 +3099,10 @@ mod tests {
         assert_eq!(indexed, exhaustive);
         assert_eq!(indexed.len(), 4);
         assert_eq!(
-            indexed.iter().map(|item| (item.query_index, item.conflicting_fact_id, item.stored_relation_index)).collect::<Vec<_>>(),
+            indexed
+                .iter()
+                .map(|item| (item.query_index, item.conflicting_fact_id, item.stored_relation_index))
+                .collect::<Vec<_>>(),
             vec![(0, 1, 1), (1, 1, 0), (2, 2, 0), (3, 4, 0)]
         );
     }
@@ -3165,7 +3178,10 @@ mod tests {
                 indexed_micros.sort_unstable();
                 exhaustive_micros.sort_unstable();
                 println!(
-                    "relation-conflict scan: facts={fact_count}, constraints={query_size}, indexed_p50_us={}, indexed_max_us={}, exhaustive_p50_us={}, exhaustive_max_us={}",
+                    concat!(
+                        "relation-conflict scan: facts={fact_count}, constraints={query_size}, ",
+                        "indexed_p50_us={}, indexed_max_us={}, exhaustive_p50_us={}, exhaustive_max_us={}"
+                    ),
                     indexed_micros[3],
                     indexed_micros[6],
                     exhaustive_micros[3],
