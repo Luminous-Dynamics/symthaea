@@ -90,6 +90,17 @@ These are **engineering acceptance goals to test**, not field-wide standards or 
 
 If Phase A fails these targets, first improve the proposals, estimates, or ranking policy; do not immediately add a more complex optimizer.
 
+### Gate 1B — candidate-claim false-positive controls
+
+The separate Rust `candidate_decision_benchmark` module evaluates the current efficiency comparator against known synthetic truth while varying the observed efficiency delta, uncertainty magnitude, and correlation declaration. It includes controlled disagreement between the oracle's true delta and the record's apparent delta, which reveals whether unmodeled bias can produce a false superiority decision even when per-interval and aggregate energy accounting close.
+
+The grid's outputs define:
+- **False-superiority rate:** affirmative comparator decisions when the oracle's true difference does not exceed the preregistered margin, divided by all oracle-non-superior cases.
+- **False-negative rate:** non-affirmative outcomes (including abstentions) when the oracle's true difference exceeds the margin, divided by all oracle-superior cases.
+- **Indeterminate fraction:** cases where unsupported/unknown correlations prevent a decision.
+
+Run it with `cargo run -p symthaea-energy-bench --example candidate_decision_benchmark > candidate-decision-benchmark.json`. Receipt verification replays the scenario grid against the embedded accounting fixture. The grid deliberately decouples truth from observed output; therefore it measures comparator behavior under its constructed assumptions, not an empirical deployment risk estimate. A strict physical-superiority claim also requires calibrated systematics/model discrepancy, source authenticity, and independent reference data. NIST decision-rule literature emphasizes documenting both false-acceptance and false-rejection risks rather than reporting only a point estimate: https://www.nist.gov/publications/assessment-conformity-decision-rules-and-risk-analysis and https://www.nist.gov/publications/estimating-instrument-performance-confidence-intervals-and-confidence-bounds.
+
 ### Gate 2 — calibrated multifidelity selection
 
 Only graduate to expected information gain (EIG) or expected value of sample information when there are predictive distributions and credible reference observations.
