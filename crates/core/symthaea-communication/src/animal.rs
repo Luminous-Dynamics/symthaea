@@ -236,10 +236,14 @@ pub struct AnimalEvaluationBundle {
     pub representation_baseline: String,
     pub context_prediction: ContextPredictionEvaluation,
     pub segmentation_stability: f64,
+    /// Stable sample IDs. Legacy bundles deserialize but fail validation
+    /// until these provenance fields are populated.
     #[serde(default)]
     pub train_sample_ids: Vec<String>,
     #[serde(default)]
     pub test_sample_ids: Vec<String>,
+    /// Recording-level lineage prevents different crops from leaking across
+    /// train and test. IDs are declarations, not source authentication.
     #[serde(default)]
     pub train_source_recording_ids: Vec<String>,
     #[serde(default)]
@@ -457,6 +461,20 @@ mod tests {
     }
 
     #[test]
+    fn context_prediction_rejects_non_finite_margin() {
+        let mut eval = make_context_prediction(0.80, 0.05);
+        eval.required_margin = f64::NAN;
+        assert!(!eval.passes());
+    }
+
+    #[test]
+    fn context_prediction_rejects_empty_task_name() {
+        let mut eval = make_context_prediction(0.80, 0.05);
+        eval.task = "  ".into();
+        assert!(!eval.passes());
+    }
+
+    #[test]
     fn missing_identity_or_location_control_fails_closed() {
         let mut eval = make_context_prediction(0.80, 0.05);
         eval.control_scores.remove(&AnimalControl::IdentityOnly);
@@ -516,7 +534,10 @@ mod tests {
             segmentation_stability: 0.85,
             train_sample_ids: vec!["train-sample-1".into(), "train-sample-2".into()],
             test_sample_ids: vec!["test-sample-1".into(), "test-sample-2".into()],
-            train_source_recording_ids: vec!["train-recording-1".into(), "train-recording-2".into()],
+            train_source_recording_ids: vec![
+                "train-recording-1".into(),
+                "train-recording-2".into(),
+            ],
             test_source_recording_ids: vec!["test-recording-1".into()],
             train_individuals: vec!["individual-A".into(), "individual-B".into()],
             test_individuals,
