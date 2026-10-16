@@ -334,8 +334,27 @@ pub fn score_receipts_jsonl<R: BufRead>(
 ) -> Result<BenchmarkScore, String> {
     if expected_policy_version.trim().is_empty() { return Err("empty policy version".to_owned()); }
     if cases.is_empty() { return Err("cannot score an empty dataset".to_owned()); }
+    let mut case_ids = BTreeSet::new();
+    let mut claim_split: BTreeMap<&str, DatasetSplit> = BTreeMap::new();
+    let mut origin_split: BTreeMap<&str, DatasetSplit> = BTreeMap::new();
     for signed in cases {
         signed.validate_digest()?;
+        let case = &signed.case;
+        if !case_ids.insert(case.case_id.as_str()) {
+            return Err(format!("duplicate case ID {}", case.case_id));
+        }
+        if let Some(previous) = claim_split.insert(case.claim_family_id.as_str(), case.split) {
+            if previous != case.split {
+                return Err(format!("claim-family leakage for {}", case.claim_family_id));
+            }
+        }
+        for origin in &case.origin_family_ids {
+            if let Some(previous) = origin_split.insert(origin.as_str(), case.split) {
+                if previous != case.split {
+                    return Err(format!("origin-family leakage for {origin}"));
+                }
+            }
+        }
     }
     let by_case: BTreeMap<&str, &HashedBenchmarkCase> = cases.iter()
         .map(|c| (c.case.case_id.as_str(), c)).collect();
@@ -546,6 +565,25 @@ mod tests {
         assert!(audit_dataset_jsonl(Cursor::new(dataset_text(&[a.clone(), b]))).is_err());
         let c = case("other", "family", &["origin-c"], DatasetSplit::Test, BenchmarkEvidenceCondition::FullSupport, BenchmarkProvenanceCondition::Verified, Some(1), BenchmarkAction::Answer);
         assert!(audit_dataset_jsonl(Cursor::new(dataset_text(&[a, c]))).is_err());
+    }
+
+    #[test]
+    fn scorer_rejects_family_leakage_when_audit_was_bypassed() {
+        let a = case(
+            "train-a", "shared-family", &["origin-a"], DatasetSplit::Train,
+            BenchmarkEvidenceCondition::FullSupport, BenchmarkProvenanceCondition::Verified,
+            Some(1), BenchmarkAction::Answer,
+        );
+        let b = case(
+            "test-b", "shared-family", &["origin-b"], DatasetSplit::Test,
+            BenchmarkEvidenceCondition::FullSupport, BenchmarkProvenanceCondition::Verified,
+            Some(1), BenchmarkAction::Answer,
+        );
+        let policy = EvidenceActionPolicy::bounded_default();
+        let receipts = evaluate_cases(&[a.clone(), b.clone()], "policy-v1", &policy);
+        assert!(score_receipts_jsonl(
+            &[a, b], Cursor::new(receipts_text(&receipts)), "policy-v1",
+        ).is_err());
     }
 
     #[test]
