@@ -118,6 +118,20 @@ class RunBundleValidatorTests(unittest.TestCase):
         with self.assertRaisesRegex(ValidationFailure, "expected artifact role 'world_seed'"):
             validate_bundle(self.root, "bundle-manifest.json")
 
+    def test_noncanonical_path_alias_is_rejected(self) -> None:
+        self.manifest["artifacts"][0]["path"] = "payloads//seed.json"
+        self._write_pair()
+        with self.assertRaisesRegex(ValidationFailure, "non-canonical relative path"):
+            validate_bundle(self.root, "bundle-manifest.json")
+
+    def test_symlink_payload_is_rejected(self) -> None:
+        link = self.root / "payloads" / "linked-seed.json"
+        link.symlink_to(self.root / "payloads" / "seed.json")
+        self.manifest["artifacts"][0]["path"] = "payloads/linked-seed.json"
+        self._write_pair()
+        with self.assertRaisesRegex(ValidationFailure, "symlink components are forbidden"):
+            validate_bundle(self.root, "bundle-manifest.json")
+
     def test_duplicate_artifact_identity_is_rejected(self) -> None:
         duplicate = dict(self.manifest["artifacts"][0])
         duplicate["path"] = "payloads/another.json"
