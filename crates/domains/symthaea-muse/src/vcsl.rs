@@ -128,6 +128,18 @@ fn additional_sample_style_mappings(instrument: Instrument) -> &'static [SampleS
             relative_directory: "Chordophones/Zithers/Upright Piano, Knight/Sustains",
         },
         SampleStyleMapping {
+            style_name: "Kawai grand piano legacy",
+            style_kind: "alternate_instrument_model",
+            source: Vcsl,
+            relative_directory: "Chordophones/Zithers/Grand Piano, Kawai - Legacy/Sustains",
+        },
+        SampleStyleMapping {
+            style_name: "Yamaha upright piano",
+            style_kind: "alternate_instrument_model",
+            source: Vcsl,
+            relative_directory: "Chordophones/Zithers/Upright Piano, Yamaha/Sustains",
+        },
+        SampleStyleMapping {
             style_name: "Steinway no-sustain samples",
             style_kind: "alternate_articulation",
             source: Vcsl,
@@ -194,6 +206,12 @@ fn additional_sample_style_mappings(instrument: Instrument) -> &'static [SampleS
             style_kind: "alternate_instrument_model",
             source: Vcsl,
             relative_directory: "Chordophones/Zithers/Harpsichord, Unk/Sustains",
+        },
+        SampleStyleMapping {
+            style_name: "English harpsichord release",
+            style_kind: "release_articulation",
+            source: Vcsl,
+            relative_directory: "Chordophones/Zithers/Harpsichord, English/Releases/Normal",
         },
     ];
     const XYLOPHONE_STYLES: &[SampleStyleMapping] = &[
@@ -316,6 +334,24 @@ fn additional_sample_style_mappings(instrument: Instrument) -> &'static [SampleS
             style_kind: "staccato",
             source: Vcsl,
             relative_directory: "Aerophones/Reed Aerophones/Tenor Saxophone/Staccato",
+        },
+        SampleStyleMapping {
+            style_name: "Saxello non-vibrato",
+            style_kind: "alternate_instrument_model",
+            source: Vcsl,
+            relative_directory: "Aerophones/Reed Aerophones/Saxello/Non-Vibrato",
+        },
+        SampleStyleMapping {
+            style_name: "Saxello staccato",
+            style_kind: "alternate_model_articulation",
+            source: Vcsl,
+            relative_directory: "Aerophones/Reed Aerophones/Saxello/Staccato",
+        },
+        SampleStyleMapping {
+            style_name: "Saxello vibrato",
+            style_kind: "alternate_instrument_model",
+            source: Vcsl,
+            relative_directory: "Aerophones/Reed Aerophones/Saxello/Vibrato",
         },
     ];
     const ORGAN_STYLES: &[SampleStyleMapping] = &[
@@ -2641,6 +2677,20 @@ mod tests {
                 "Player_vl1_rr1_A0.wav",
             ),
             (
+                Instrument::Piano,
+                "Kawai grand piano legacy",
+                SampleSource::Vcsl,
+                "Chordophones/Zithers/Grand Piano, Kawai - Legacy/Sustains",
+                "GrandPno_Main_Sus_A2_v1_rr1.wav",
+            ),
+            (
+                Instrument::Piano,
+                "Yamaha upright piano",
+                SampleSource::Vcsl,
+                "Chordophones/Zithers/Upright Piano, Yamaha/Sustains",
+                "Upright1_Sus_C0_vl1_rr1.wav",
+            ),
+            (
                 Instrument::Harp,
                 "Folk harp",
                 SampleSource::Vcsl,
@@ -2688,6 +2738,13 @@ mod tests {
                 SampleSource::Vcsl,
                 "Chordophones/Zithers/Harpsichord, Unk/Sustains",
                 "Harpsi4_Sus_Main_C4_rr1.wav",
+            ),
+            (
+                Instrument::Harpsichord,
+                "English harpsichord release",
+                SampleSource::Vcsl,
+                "Chordophones/Zithers/Harpsichord, English/Releases/Normal",
+                "ZuckermannKitHarpsi_Normal_Rel_A#0_rr1.wav",
             ),
             (
                 Instrument::Xylophone,
@@ -2872,6 +2929,27 @@ mod tests {
                 "BrettTenor_Staccato_Main_A#1_vl2_rr5.wav",
             ),
             (
+                Instrument::Saxophone,
+                "Saxello non-vibrato",
+                SampleSource::Vcsl,
+                "Aerophones/Reed Aerophones/Saxello/Non-Vibrato",
+                "BrettSaxello_SusNV_MainSpirit_A#2_vl2_rr2.wav",
+            ),
+            (
+                Instrument::Saxophone,
+                "Saxello staccato",
+                SampleSource::Vcsl,
+                "Aerophones/Reed Aerophones/Saxello/Staccato",
+                "BrettSaxello_Stcts_MainSpirit_A#2_vl1_rr2.wav",
+            ),
+            (
+                Instrument::Saxophone,
+                "Saxello vibrato",
+                SampleSource::Vcsl,
+                "Aerophones/Reed Aerophones/Saxello/Vibrato",
+                "BrettSaxello_SusVB_MainSpirit_A#2_vl2_rr1.wav",
+            ),
+            (
                 Instrument::Organ,
                 "Pipe organ quiet",
                 SampleSource::Vcsl,
@@ -2991,9 +3069,9 @@ mod tests {
                 .find(|item| item.instrument == format!("{instrument:?}"))
                 .unwrap();
             let expected_count = match instrument {
-                Instrument::Piano => 6,
+                Instrument::Piano => 8,
                 Instrument::Harp => 1,
-                Instrument::Harpsichord => 6,
+                Instrument::Harpsichord => 7,
                 Instrument::Xylophone => 2,
                 Instrument::UprightBass => 3,
                 Instrument::Trombone => 1,
@@ -3005,7 +3083,7 @@ mod tests {
                 Instrument::Bassoon => 1,
                 Instrument::Trumpet => 3,
                 Instrument::FrenchHorn => 1,
-                Instrument::Saxophone => 2,
+                Instrument::Saxophone => 5,
                 Instrument::Organ => 3,
                 Instrument::Vibraphone => 2,
                 Instrument::Marimba => 2,
@@ -3077,8 +3155,8 @@ mod tests {
                 );
             }
         }
-        assert_eq!(selectable_styles, 39);
-        assert_eq!(release_only_styles, 3);
+        assert_eq!(selectable_styles, 44);
+        assert_eq!(release_only_styles, 4);
 
         // These two still lack a matching sample set in either inspected source.
         assert!(sample_subdir(Instrument::Duduk).is_none());
