@@ -197,6 +197,10 @@ fn positive_fixture_replays_conservative_capacity_and_receipt() {
         independent_resource_plan_digest(&plan)
     );
     assert_eq!(
+        receipt.resource_plan_digest_sha256,
+        independent_resource_plan_digest(&plan)
+    );
+    assert_eq!(
         receipt.report_digest_sha256,
         independent_resource_report_digest(&report)
     );
@@ -335,7 +339,6 @@ fn independent_resource_plan_digest(plan: &MissionResourceBudgetPlan) -> String 
 fn independent_resource_report_digest(
     report: &symthaea_exoskeleton::suit_resource_budget::MissionResourceBudgetReport,
 ) -> String {
-    use symthaea_exoskeleton::suit_resource_budget::MissionResourceFindingCode;
     use symthaea_exoskeleton::suit_resource_budget::MissionResourceFindingSeverity;
 
     let mut writer = IndependentHashWriter::new("symthaea.sx033.resource-report.v1");
@@ -393,7 +396,6 @@ fn independent_resource_report_digest(
     writer.usize(report.optional_pool_count_over_budget);
     writer.usize(report.required_demand_count);
     writer.usize(report.optional_demand_count);
-    let _ = MissionResourceFindingCode::RequiredDemandExceedsSupply;
     writer.finish()
 }
 
