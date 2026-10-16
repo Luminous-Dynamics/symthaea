@@ -43,6 +43,7 @@ pub mod hdc_retrieval;
 pub mod llm_extraction;
 pub mod manager;
 pub mod persistence;
+pub mod provenance;
 pub mod reasoning_context;
 #[cfg(feature = "self_schema")]
 pub mod self_schema;
@@ -62,6 +63,11 @@ pub use graph::{
     RoleObservationMatch, RoleObservationSearchConfig, TemporalFact,
 };
 pub use manager::{KnowledgeManager, KnowledgeSignals, KnowledgeTelemetry};
+pub use provenance::{
+    ClaimValidity, ContentDigest, EvidenceProvenance, EvidenceSourceReference, IntegrityStatus,
+    ProvenanceAbstentionReason, ProvenanceAssessment, ProvenanceDecision, ProvenancePolicy,
+    ProvenanceTimestampMillis, SourceStatus,
+};
 pub use reasoning_context::{
     CausalChain, EpistemicState, GroundedFact, KnowledgeQueryResult, ReasoningContext,
 };
