@@ -620,7 +620,7 @@
       "jobs_completed_within_horizon"
     ],
     "scenario_weight_semantics": "weights must sum to 1 but are not probabilities without empirical support",
-    "tests_authored": 9,
+    "tests_authored": 10,
     "tests_executed": false,
     "limitations": [
       "no calibrated duration distribution",
@@ -658,12 +658,36 @@
       {
         "id": "DUR-07",
         "expected": "expected, worst-case, CVaR and scenario traces remain jointly available"
+      },
+      {
+        "id": "DUR-08",
+        "expected": "initial_crew_available_from_step_is_preserved_during_scenario_replay"
       }
     ],
     "research_sources": [
       "https://doi.org/10.1016/0360-8352(96)00119-2",
       "https://doi.org/10.1016/j.ejor.2021.04.025",
       "https://doi.org/10.1016/j.cor.2025.107379"
-    ]
+    ],
+    "proposed_performance_target": {
+      "status": "proposed_unmeasured",
+      "reference_case": {
+        "jobs": 100,
+        "crews": 20,
+        "duration_scenarios": 20,
+        "target_p95_seconds": 1
+      },
+      "stress_case": {
+        "jobs": 500,
+        "crews": 50,
+        "duration_scenarios": 100,
+        "target_seconds": 15
+      },
+      "requirements": [
+        "document_reference_host",
+        "release_build",
+        "preserve_per_scenario_schedule_traces"
+      ]
+    }
   }
 }
