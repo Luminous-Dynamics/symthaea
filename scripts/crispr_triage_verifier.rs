@@ -45,6 +45,22 @@ pub enum Estimate<T> {
     NotEstimable(NotEstimableReason),
 }
 
+/// Sharp best/worst-case bounds under unrestricted assignments of unknown
+/// labels inside the declared candidate universe. These are not confidence
+/// intervals and do not bound positives omitted from that candidate universe.
+#[derive(Clone, Copy, Debug, PartialEq)]
+pub struct MetricBounds {
+    pub lower: f64,
+    pub upper: f64,
+}
+
+/// Known-label Recall@K plus its label-uncertainty bounds.
+#[derive(Clone, Copy, Debug, PartialEq)]
+pub struct RecallLabelSensitivity {
+    pub observed_known_label_recall: f64,
+    pub bounds: MetricBounds,
+}
+
 #[derive(Clone, Debug, PartialEq)]
 pub enum MetricError {
     DuplicateCandidateId(String),
@@ -157,6 +173,88 @@ pub fn recall_at_k(
     Ok(Estimate::Value(
         hits as f64 / eligible_positive_ids.len() as f64,
     ))
+}
+
+/// Return observed Recall@K against the explicit measured-positive reference,
+/// plus sharp best/worst-case bounds if every unknown label in the fixed ranking
+/// universe were allowed to be negative or positive. The lower bound assigns
+/// selected unknowns negative and unselected unknowns positive; the upper bound
+/// does the opposite. Sites never present in this universe are outside these bounds.
+pub fn recall_label_sensitivity_at_k(
+    candidates: &[Candidate],
+    eligible_positive_ids: &[String],
+    k: usize,
+) -> Result<Estimate<RecallLabelSensitivity>, MetricError> {
+    let ranked = validated_ranked(candidates, eligible_positive_ids)?;
+    if eligible_positive_ids.is_empty() {
+        return Ok(Estimate::NotEstimable(
+            NotEstimableReason::NoEligiblePositives,
+        ));
+    }
+
+    let selected: Vec<&Candidate> = ranked.iter().copied().take(k).collect();
+    let selected_positive = selected
+        .iter()
+        .filter(|candidate| candidate.label == LabelState::Positive)
+        .count();
+    let selected_unknown = selected
+        .iter()
+        .filter(|candidate| candidate.label == LabelState::UnknownUnassayed)
+        .count();
+    let total_unknown = ranked
+        .iter()
+        .filter(|candidate| candidate.label == LabelState::UnknownUnassayed)
+        .count();
+    let unselected_unknown = total_unknown - selected_unknown;
+    let known_positive_total = eligible_positive_ids.len();
+
+    let observed = selected_positive as f64 / known_positive_total as f64;
+    let lower_denominator = known_positive_total + unselected_unknown;
+    let upper_denominator = known_positive_total + selected_unknown;
+    let lower = selected_positive as f64 / lower_denominator as f64;
+    let upper = (selected_positive + selected_unknown) as f64 / upper_denominator as f64;
+
+    Ok(Estimate::Value(RecallLabelSensitivity {
+        observed_known_label_recall: observed,
+        bounds: MetricBounds { lower, upper },
+    }))
+}
+
+/// Conservative precision interval under unrestricted label assignments for
+/// unknown candidates in the selected K slots. It does not turn unknowns into
+/// negatives and is not a statistical confidence interval.
+pub fn precision_label_sensitivity_at_k(
+    candidates: &[Candidate],
+    eligible_positive_ids: &[String],
+    k: usize,
+) -> Result<Estimate<MetricBounds>, MetricError> {
+    let ranked = validated_ranked(candidates, eligible_positive_ids)?;
+    if k == 0 {
+        return Ok(Estimate::NotEstimable(NotEstimableReason::ZeroBudget));
+    }
+    if ranked.len() < k {
+        return Ok(Estimate::NotEstimable(
+            NotEstimableReason::TooFewCandidates {
+                requested: k,
+                available: ranked.len(),
+            },
+        ));
+    }
+
+    let selected: Vec<&Candidate> = ranked.into_iter().take(k).collect();
+    let known_positive = selected
+        .iter()
+        .filter(|candidate| candidate.label == LabelState::Positive)
+        .count();
+    let unknown = selected
+        .iter()
+        .filter(|candidate| candidate.label == LabelState::UnknownUnassayed)
+        .count();
+
+    Ok(Estimate::Value(MetricBounds {
+        lower: known_positive as f64 / k as f64,
+        upper: (known_positive + unknown) as f64 / k as f64,
+    }))
 }
 
 /// Precision@K is not estimable if an unknown/unassayed candidate is in the
@@ -365,6 +463,35 @@ mod tests {
             recall_at_k(&candidates, &reference, 2).unwrap(),
             Estimate::Value(1.0)
         );
+    }
+
+    /// F5: report bounds rather than treat unknown candidates as false positives.
+    #[test]
+    fn f5_partial_labels_produce_explicit_sensitivity_bounds() {
+        let reference = positives(&["p1", "p2"]);
+        let candidates = vec![
+            candidate("p1", 1, LabelState::Positive, true),
+            candidate("u1", 2, LabelState::UnknownUnassayed, false),
+            candidate("p2", 3, LabelState::Positive, true),
+            candidate("u2", 4, LabelState::UnknownUnassayed, false),
+        ];
+
+        match recall_label_sensitivity_at_k(&candidates, &reference, 2).unwrap() {
+            Estimate::Value(result) => {
+                close(result.observed_known_label_recall, 0.5);
+                close(result.bounds.lower, 1.0 / 3.0);
+                close(result.bounds.upper, 2.0 / 3.0);
+            }
+            other => panic!("expected recall sensitivity bounds, got {other:?}"),
+        }
+
+        match precision_label_sensitivity_at_k(&candidates, &reference, 2).unwrap() {
+            Estimate::Value(bounds) => {
+                close(bounds.lower, 0.5);
+                close(bounds.upper, 1.0);
+            }
+            other => panic!("expected precision sensitivity bounds, got {other:?}"),
+        }
     }
 
     #[test]
