@@ -741,7 +741,7 @@ impl InoculationOrchestrator {
         let lanzaboote_revision = safe_comment(&approval.lanzaboote_revision);
         let profile_fingerprint = safe_comment(&approval.hardware_profile_blake3);
 
-        Ok(format!(r#"{ lib, pkgs, ... }: {{
+        Ok(format!(r#"{{ lib, pkgs, ... }}: {{
   # Explicitly authorized Secure Boot profile; firmware enrollment is still manual.
   # Profile ID: {profile_id}
   # Target model / firmware: {target_model} / {firmware_revision}
