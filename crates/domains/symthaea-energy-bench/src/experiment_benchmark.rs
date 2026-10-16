@@ -70,6 +70,9 @@ pub struct ScenarioBenchmarkResult {
     pub rejected_experiments: Vec<RejectedExperiment>,
     pub resource_budget: f64,
     pub resource_used: f64,
+    /// Actual heuristic cost when it reaches the threshold; oracle strategy reports
+    /// the exact minimum feasible subset cost instead of its max-utility plan cost.
+    pub resource_cost_to_resolution: Option<f64>,
     pub budget_used_fraction: f64,
     pub achieved_utility: f64,
     pub oracle_utility: f64,
@@ -390,6 +393,13 @@ pub fn evaluate_scenario(
     let regret = (oracle_utility - achieved_utility).max(0.0);
     let resolved = achieved_utility >= scenario.resolution_threshold;
     let oracle_resolved = oracle_utility >= scenario.resolution_threshold;
+    let resource_cost_to_resolution = if !resolved {
+        None
+    } else if strategy == ExperimentSelectionStrategy::OracleUpperBound {
+        oracle_minimum_cost_to_resolve
+    } else {
+        Some(resource_used)
+    };
 
     Ok(ScenarioBenchmarkResult {
         scenario_id: scenario.scenario_id.clone(),
@@ -399,6 +409,7 @@ pub fn evaluate_scenario(
         rejected_experiments: ranking.rejected,
         resource_budget: scenario.resource_budget,
         resource_used,
+        resource_cost_to_resolution,
         budget_used_fraction,
         achieved_utility,
         oracle_utility,
@@ -715,10 +726,10 @@ fn summarize_strategy(
         oracle_resolution_rate: results.iter().filter(|result| result.oracle_resolved).count() as f64 / n,
         mean_budget_used_fraction: results.iter().map(|result| result.budget_used_fraction).sum::<f64>() / n,
         mean_cost_when_resolved: optional_mean(
-            results.iter().filter(|result| result.resolved).map(|result| result.resource_used),
+            results.iter().filter_map(|result| result.resource_cost_to_resolution),
         ),
         median_cost_when_resolved: optional_median(
-            results.iter().filter(|result| result.resolved).map(|result| result.resource_used).collect(),
+            results.iter().filter_map(|result| result.resource_cost_to_resolution).collect(),
         ),
         mean_oracle_minimum_cost_to_resolve: optional_mean(
             results.iter().filter_map(|result| result.oracle_minimum_cost_to_resolve),
@@ -912,6 +923,7 @@ mod tests {
         assert!(result.resolved);
         assert_eq!(result.selected_experiment_ids, vec![first_id]);
         assert!((result.resource_used - 1.0).abs() <= 1e-12);
+        assert_eq!(result.resource_cost_to_resolution, Some(1.0));
         assert_eq!(result.oracle_minimum_cost_to_resolve, Some(1.0));
     }
 
