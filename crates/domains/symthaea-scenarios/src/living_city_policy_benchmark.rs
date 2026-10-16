@@ -600,7 +600,11 @@ mod tests {
             "scenario_id"
         );
         assert_eq!(
-            evaluate_suite(&[case], &[PolicyKind::NoIntervention, PolicyKind::NoIntervention], config())
+            evaluate_suite(
+                &[case],
+                &[PolicyKind::NoIntervention, PolicyKind::NoIntervention],
+                config(),
+            )
                 .unwrap_err()
                 .field,
             "policies"
