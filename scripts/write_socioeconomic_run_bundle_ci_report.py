@@ -88,7 +88,7 @@ def safe_workspace_file(root: Path, relative: str) -> Path:
 
 
 def parse_unittest_summaries(log_text: str) -> list[int]:
-    matches = re.findall(r"Ran ([0-9]+) tests? in [^\\n]+\\n\\nOK(?: \\(.*\\))?", log_text)
+    matches = re.findall(r"Ran ([0-9]+) tests? in .*\n\nOK", log_text)
     return [int(match) for match in matches]
 
 
