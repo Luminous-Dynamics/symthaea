@@ -296,7 +296,8 @@ fn choose(
                         let nearest = selected_indices
                             .iter()
                             .map(|chosen| squared_distance(&features[index], &features[*chosen]))
-                            .fold(f64::INFINITY, f64::min);
+                            .reduce(f64::min)
+                            .unwrap_or(f64::INFINITY);
                         (nearest, "min_distance_to_selected")
                     };
                     // Strict greater-than plus lexical ordering fixes tie behavior.
