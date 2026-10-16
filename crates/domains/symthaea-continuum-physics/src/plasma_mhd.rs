@@ -131,18 +131,18 @@ mod tests {
     use super::*;
 
     #[test]
-    fn test_spitzer_resistivity_against_published_si_reference() {
-        // PlasmaPy documents approximately 2.4915e-6 ohm m for T=1e6 K,
-        // electron-proton collisions and n=1e19 m^-3. With a fixed
-        // Coulomb logarithm near 19.33, this scalar classical expression
-        // should agree at the few-percent level; it is not the same
-        // collision-frequency implementation.
-        let eta = spitzer_resistivity(1.0e6, 1.0, 19.33);
-        let reference = 2.4915e-6;
+    fn test_spitzer_resistivity_against_si_formulary_reference() {
+        // Golden value independently evaluated from the SI Spitzer
+        // expression documented in the CERN plasma-physics formulary:
+        // T_e = 1e6 K, Z_eff = 1, Coulomb logarithm = 15.0 -> about
+        // 1.9339405e-6 ohm m. The fixed Coulomb logarithm makes this
+        // a formula/units fixture, not a full plasma-state calculation.
+        let eta = spitzer_resistivity(1.0e6, 1.0, 15.0);
+        let reference = 1.9339405e-6;
         let relative_error = (eta - reference).abs() / reference;
         assert!(
-            relative_error < 0.05,
-            "Spitzer resistivity = {eta:.6e} ohm m; reference = {reference:.6e}; relative error = {relative_error:.3}"
+            relative_error < 1e-5,
+            "Spitzer resistivity = {eta:.8e} ohm m; reference = {reference:.8e}; relative error = {relative_error:.3e}"
         );
     }
 
