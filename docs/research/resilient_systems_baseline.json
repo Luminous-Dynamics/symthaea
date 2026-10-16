@@ -466,5 +466,96 @@
       "https://www.nature.com/articles/s41598-026-63123-9",
       "https://doi.org/10.1016/j.cie.2026.112063"
     ]
+  },
+  "repair_crew_scheduling": {
+    "status": "deterministic_heuristic_not_optimal_or_calibrated",
+    "policies": [
+      "priority_first",
+      "shortest_job_first",
+      "weighted_recovery_per_step"
+    ],
+    "job_fields": [
+      "required_skill",
+      "duration_steps",
+      "priority",
+      "recovered_service_value_per_step",
+      "outage_start_step",
+      "prerequisite_jobs",
+      "finite_spare_parts"
+    ],
+    "crew_fields": [
+      "skills",
+      "available_from_step"
+    ],
+    "outputs": [
+      "crew_assignment",
+      "start_and_finish_steps",
+      "weighted_service_unit_steps_lost_within_horizon",
+      "jobs_completed_within_horizon",
+      "remaining_spares"
+    ],
+    "assumptions": [
+      "deterministic_repair_durations",
+      "no_crew_travel_or_access_time",
+      "parts_reserved_when_schedule_is_constructed",
+      "each repair's outage starts at its declared step",
+      "caller_weighted_service_value_is_not_an_ethical_objective"
+    ],
+    "limitations": [
+      "not_globally_optimal",
+      "no_uncertain_repair_durations",
+      "no_crew_routing_or_transport_power_interdependency",
+      "no_shared_tool_or_shift_calendar_model",
+      "no_online_replanning",
+      "no_policy_fairness_guarantee"
+    ],
+    "tests_authored": 15,
+    "tests_executed": false,
+    "reference_cases": [
+      {
+        "id": "RCREW-01",
+        "expected": "only crews with required skill can receive a job"
+      },
+      {
+        "id": "RCREW-02",
+        "expected": "no overlapping jobs per crew"
+      },
+      {
+        "id": "RCREW-03",
+        "expected": "prerequisite finish no later than dependent start"
+      },
+      {
+        "id": "RCREW-04",
+        "expected": "reserved parts do not exceed declared stock"
+      },
+      {
+        "id": "RCREW-05",
+        "expected": "unfinished repairs at horizon do not claim restoration"
+      },
+      {
+        "id": "RCREW-06",
+        "expected": "same input and policy yield same schedule"
+      },
+      {
+        "id": "RCREW-07",
+        "expected": "disclosed synthetic fixture allows policy objective comparison"
+      },
+      {
+        "id": "RCREW-08",
+        "expected": "infeasible prerequisites, skills and spares fail explicitly"
+      }
+    ],
+    "proposed_optimization_target": {
+      "status": "aspirational_unmeasured",
+      "tiny_case_max_jobs": 8,
+      "target_within_10_percent_of_exact_optimum_fraction": 0.95,
+      "must_use_independent_exhaustive_oracle": true,
+      "must_publish_fixture_corpus": true
+    },
+    "research_sources": [
+      "https://doi.org/10.1111/risa.70220",
+      "https://doi.org/10.1080/10286608.2025.2602872",
+      "https://doi.org/10.1016/j.cor.2025.107379"
+    ]
   }
 }
