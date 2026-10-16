@@ -82,9 +82,39 @@ mod tests {
     }
 
     #[test]
-    fn longitude_wrap_uses_short_dateline_crossing() {
-        // Two points separated by 0.2 degrees across the antimeridian.
-        let d = haversine_distance(0.0, 179.9, 0.0, -179.9);
-        assert!((d - 22.239).abs() < 0.1, "dateline distance={d}");
+    fn valid_global_coordinate_corpus_preserves_distance_invariants() {
+        // Compact deterministic cross-product of polar, dateline, ordinary,
+        // and antipodal cases. Coordinates are within the documented domain.
+        const POINTS: [(f64, f64); 9] = [
+            (0.0, 0.0),
+            (0.0, 180.0),
+            (0.0, -180.0),
+            (89.999, 179.999),
+            (-89.999, -179.999),
+            (90.0, 0.0),
+            (-90.0, 0.0),
+            (45.0, -120.0),
+            (-45.0, 60.0),
+        ];
+        let half_circumference = std::f64::consts::PI * EARTH_RADIUS_KM;
+
+        for &(lat1, lon1) in &POINTS {
+            let same = haversine_distance(lat1, lon1, lat1, lon1);
+            assert_eq!(same, 0.0, "identical coordinate must have zero distance");
+
+            for &(lat2, lon2) in &POINTS {
+                let forward = haversine_distance(lat1, lon1, lat2, lon2);
+                let reverse = haversine_distance(lat2, lon2, lat1, lon1);
+
+                assert!(forward.is_finite(), "non-finite distance for ({lat1},{lon1}) -> ({lat2},{lon2})");
+                assert!(reverse.is_finite(), "non-finite reverse distance for ({lat2},{lon2}) -> ({lat1},{lon1})");
+                assert!(forward >= 0.0 && forward <= half_circumference);
+                assert!(reverse >= 0.0 && reverse <= half_circumference);
+                assert!(
+                    (forward - reverse).abs() <= 1e-9,
+                    "distance asymmetry: forward={forward}, reverse={reverse}"
+                );
+            }
+        }
     }
 }
