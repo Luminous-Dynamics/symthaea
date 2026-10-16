@@ -73,16 +73,17 @@
       "pattern": "^sha256:[0-9a-f]{64}$"
     },
     "executed_test_count": {
-      "type": "integer",
-      "minimum": 1
+      "const": 25
     },
     "executed_test_counts_by_suite": {
       "type": "array",
+      "prefixItems": [
+        {"const": 14},
+        {"const": 11}
+      ],
       "minItems": 2,
-      "items": {
-        "type": "integer",
-        "minimum": 1
-      }
+      "maxItems": 2,
+      "items": false
     },
     "authority_boundary": {
       "type": "object",
