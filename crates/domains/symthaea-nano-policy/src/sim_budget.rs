@@ -158,6 +158,8 @@ pub struct SimulatorBudgetLedger {
     pub benchmark_id: String,
     /// Unique run identifier.
     pub run_id: String,
+    /// Exact PRNG seed used for this policy run; paired arms should share the declared seed set.
+    pub seed: u64,
     /// Policy arm identifier used in paired comparisons.
     pub arm_id: String,
     /// Policy name.
@@ -222,6 +224,8 @@ pub struct SimulatorBudgetAudit {
     /// Frozen run and arm identities.
     pub benchmark_id: String,
     pub run_id: String,
+    /// Seed recorded in the frozen run ledger.
+    pub seed: u64,
     pub arm_id: String,
     pub policy_id: String,
     pub run_status: RunStatus,
@@ -619,6 +623,7 @@ fn audit_ledger(ledger: &SimulatorBudgetLedger, ledger_sha256: String) -> Simula
         ledger_sha256,
         benchmark_id: ledger.benchmark_id.clone(),
         run_id: ledger.run_id.clone(),
+        seed: ledger.seed,
         arm_id: ledger.arm_id.clone(),
         policy_id: ledger.policy_id.clone(),
         run_status: ledger.run_status,
@@ -765,6 +770,7 @@ mod tests {
             schema_version: SIMULATOR_LEDGER_SCHEMA_VERSION.to_string(),
             benchmark_id: "synthetic-meep-budget-test".to_string(),
             run_id: "run-001".to_string(),
+            seed: 42,
             arm_id: "random".to_string(),
             policy_id: "random_seeded".to_string(),
             policy_revision: std::iter::repeat_n('a', 40).collect(),
@@ -1059,5 +1065,6 @@ mod tests {
         let expected = Sha256::digest(&raw);
         let expected_hex: String = expected.iter().map(|byte| format!("{byte:02x}")).collect();
         assert_eq!(audit.ledger_sha256, expected_hex);
+        assert_eq!(audit.seed, ledger.seed);
     }
 }
