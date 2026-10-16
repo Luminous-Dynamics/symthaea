@@ -318,9 +318,10 @@
         "design_weighted_precision_at_k_ratio_estimate",
         "naive_audit_sample_metrics_for_contrast",
         "overall_and_top_k_kish_effective_sample_size",
-        "frame_coverage_and_inclusion_probability_manifest"
+        "frame_coverage_and_inclusion_probability_manifest",
+        "resolved_outcome_inclusion_probability_manifest"
       ],
-      "acceptance": "Only report population-oriented estimates when the complete ranking census and audit frame are frozen and independently verified, all frame members have known nonzero inclusion probability, and selection is outcome-blind conditional on the declared design. Publish weighted estimates alongside naïve sample-only diagnostics and design details; report no claim for unobserved/unincluded candidates outside the frame. Ratio estimates are not finite-sample unbiased, and this kernel does not compute confidence intervals."
+      "acceptance": "Only report population-oriented estimates when the complete ranking census and audit frame are frozen and independently verified, all frame members have known nonzero inclusion probability, and selection is outcome-blind conditional on the declared design. Publish weighted estimates alongside naïve sample-only diagnostics and design details; report no claim for unobserved/unincluded candidates outside the frame. Ratio estimates are not finite-sample unbiased, and this kernel does not compute confidence intervals. Inclusion probabilities must apply to resolved, analyzable audit outcomes rather than merely invitations to test; any unresolved outcome in the submitted audit rows blocks this kernel instead of becoming negative."
     }
   ],
   "primary_targets": {
@@ -501,7 +502,7 @@
     {
       "id": "G15_probability_verification_integrity",
       "target": "100% of population-oriented audit estimates use a verified complete candidate frame/ranking, known nonzero inclusion probabilities and an outcome-blind probability sample declared before outcomes are revealed.",
-      "failure_action": "Reject convenience samples with unknown inclusion probabilities, zero-inclusion strata, post-outcome ranking changes, unverified ranking censuses, duplicate candidate/rank identities, or invalid propensities. Never convert unknown labels to negatives or claim coverage of candidates outside the frozen frame."
+      "failure_action": "Reject convenience samples with unknown inclusion probabilities, zero-inclusion strata, post-outcome ranking changes, unverified ranking censuses, duplicate candidate/rank identities, or invalid propensities. Never convert unknown labels to negatives or claim coverage of candidates outside the frozen frame. Inclusion probabilities must describe the final resolved-label sample, not merely audit invitations; any unresolved outcome row blocks estimation rather than being coerced to negative."
     }
   ],
   "comparator_policies": [
@@ -1227,32 +1228,33 @@
         "all_candidates_have_nonzero_inclusion_probability": true,
         "ranking_frozen_before_outcome_reveal": true,
         "selection_outcome_blind": true,
-        "full_ranking_census_verified": true
+        "full_ranking_census_verified": true,
+        "resolved_outcome_inclusion_probabilities_verified": true
       },
       "sample": [
         {
           "candidate_id": "r1",
           "rank": 1,
-          "is_positive": true,
-          "inclusion_probability": 0.5
+          "inclusion_probability": 0.5,
+          "outcome_state": "positive"
         },
         {
           "candidate_id": "r2",
           "rank": 2,
-          "is_positive": false,
-          "inclusion_probability": 0.5
+          "inclusion_probability": 0.5,
+          "outcome_state": "assay_defined_negative"
         },
         {
           "candidate_id": "r5",
           "rank": 5,
-          "is_positive": true,
-          "inclusion_probability": 0.25
+          "inclusion_probability": 0.25,
+          "outcome_state": "positive"
         },
         {
           "candidate_id": "r7",
           "rank": 7,
-          "is_positive": false,
-          "inclusion_probability": 0.5
+          "inclusion_probability": 0.5,
+          "outcome_state": "assay_defined_negative"
         }
       ],
       "expected": {
@@ -1383,7 +1385,7 @@
       },
       {
         "path": "scripts/crispr_verification_bias.rs",
-        "unit_test_count": 19,
+        "unit_test_count": 21,
         "suggested_command": "rustc --edition=2024 --test scripts/crispr_verification_bias.rs -o /tmp/crispr-verification-bias-tests && /tmp/crispr-verification-bias-tests",
         "execution_status": "not_compiled_rustc_unavailable_in_authoring_environment",
         "test_coverage_summary": [
@@ -1392,7 +1394,8 @@
           "top-K membership derived from the frozen one-based ranking",
           "non-probability designs, zero-inclusion frames, outcome-informed selection, post-outcome ranking and unverified ranking census fail closed",
           "blank and duplicate IDs, duplicate sampled ranks, invalid ranks and invalid probabilities rejected",
-          "empty/underfilled/non-positive and invalid-budget estimability cases"
+          "empty/underfilled/non-positive and invalid-budget estimability cases",
+          "unresolved outcomes in the audit sample rejected; resolved-label inclusion-probability attestation required"
         ]
       }
     ]
