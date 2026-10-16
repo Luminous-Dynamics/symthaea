@@ -66,6 +66,24 @@ impl Default for CetaceanConfig {
 }
 
 impl CetaceanConfig {
+    /// Experimental high-rate front-end profile for initial dolphin-audio
+    /// exploration. This makes the declared band/sample clock coherent; it
+    /// does not make this heuristic classifier a validated echolocation-click
+    /// detector or a whistle-contour tracker.
+    pub fn dolphin_high_rate_research() -> Self {
+        Self {
+            sample_rate: 512_000,
+            frame_duration: 0.002,
+            hop_duration: 0.001,
+            n_fft: 2048,
+            f_min: 1_000.0,
+            f_max: 150_000.0,
+            transient_threshold: 0.5,
+            harmonicity_threshold: 0.4,
+            fm_slope_threshold: 500.0,
+        }
+    }
+
     /// Validate the declared analysis band and frame geometry.
     ///
     /// The legacy 44.1 kHz default is a low-band vocalization starting point,
@@ -586,6 +604,15 @@ mod tests {
     #[test]
     fn config_validates_default_low_band_profile() {
         assert!(CetaceanConfig::default().validate().is_ok());
+    }
+
+    #[test]
+    fn dolphin_high_rate_research_profile_is_bandwidth_consistent() {
+        let config = CetaceanConfig::dolphin_high_rate_research();
+        assert!(config.validate().is_ok());
+        assert!(config.validate_source_sample_rate(512_000).is_ok());
+        assert!(config.validate_source_sample_rate(44100).is_err());
+        assert!(config.f_max < config.sample_rate as f32 / 2.0);
     }
 
     #[test]
