@@ -688,9 +688,7 @@ pub fn evaluate_peak_resource_reservations(
                 }
                 PeakWindowStatus::OptionalOversubscribed => {
                     for reservation_id in &window.active_reservation_ids {
-                        let reservation = plan.reservations.iter()
-                            .find(|item| item.reservation_id == *reservation_id)
-                            .expect("active reservation ID is from validated plan");
+                        let reservation = reservation_by_id[reservation_id.as_str()];
                         let task = task_by_id[reservation.task_id.as_str()];
                         if !task.required && reservation.demand.upper > 0 {
                             findings.push(PeakResourceFinding {
