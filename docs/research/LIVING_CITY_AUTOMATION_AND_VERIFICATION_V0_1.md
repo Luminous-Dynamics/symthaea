@@ -351,7 +351,7 @@ The Rust evidence module now implements SHA-256 over canonical manifest/receipt 
 
 Relevant APIs are sha256_hex, evidence_manifest_sha256, verify_evidence_manifest_digest, scenario_run_receipt_sha256, verify_scenario_run_receipt_digest, verify_manifest_source_bytes, verify_receipt_output_bytes, and verify_receipt_manifest_link in crates/domains/symthaea-scenarios/src/living_city_evidence.rs.
 
-An offline verifier command is now also present at crates/domains/symthaea-scenarios/src/bin/living_city_verify.rs. It independently opens the declared run-package paths, streams source/output bytes, and checks the digest graph in a separate process. It has not yet been compiled or run in the available environment, is not wired into the scenario orchestrator/CI promotion gates, and does not authenticate a trusted signer. Access-controlled artifact retention, a signing/attestation policy where authorship matters, and exact-head execution evidence remain required before this can be called a fully verified engineering pipeline. Tests have been added but were not run in the available environment because Rust/Cargo are absent; skipped CI is not a pass.
+An offline verifier command is now present at crates/domains/symthaea-scenarios/src/bin/living_city_verify.rs. Bundle schema v2 reads and validates the versioned hazard profile and profile binding plus the serialized service graph, verifies retained source/output bytes, computes a canonical configuration digest over the profile/binding/graph, and reports the deterministic dependency cascade. It is not yet wired into the scenario orchestrator/CI promotion gates and does not authenticate a trusted signer. Access-controlled artifact retention, a signing/attestation policy where authorship matters, and exact-head execution evidence remain required before this can be called a fully verified engineering pipeline. Tests have been added but were not run in the available environment because Rust/Cargo are absent; skipped CI is not a pass.
 
 ## 16. Offline run-package verifier
 
@@ -455,7 +455,7 @@ Evaluation rejects:
 
 Only after these checks does the module pass the declared initiating-failure set to the deterministic dependency propagation evaluator. The resulting causal cascade is therefore tied to a versioned profile and evidence package rather than to an unlabelled list of failed nodes.
 
-The profile bridge is a screening and provenance contract, not a physics engine. An assumed input is still an assumption even though it has an evidence ID; a profile must not label an assumed temperature, outage, flood depth or service failure as measured. The offline package verifier currently verifies source bytes against manifest digests, but it does not yet load and execute this profile evaluation from the run package. That CLI/orchestrator integration, followed by one reference-domain solver, is the next milestone.
+The profile bridge is a screening and provenance contract, not a physics engine. An assumed input is still an assumption even though it has an evidence ID; a profile must not label an assumed temperature, outage, flood depth or service failure as measured. Bundle schema v2 now loads the profile and service graph in the offline CLI, verifies the evidence bytes, recomputes the configuration digest and reports the cascade. Wiring the CLI result into scenario orchestration/promotion, followed by one reference-domain solver, remains the next milestone.
 
 ### Standards research and interoperability implications
 
