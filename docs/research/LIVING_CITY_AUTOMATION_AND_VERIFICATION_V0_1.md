@@ -355,24 +355,29 @@ An offline verifier command is now present at crates/domains/symthaea-scenarios/
 
 ## 16. Offline run-package verifier
 
-The verifier executable is at crates/domains/symthaea-scenarios/src/bin/living_city_verify.rs. Bundle schema v2 loads a typed evidence manifest, scenario-run receipt, versioned hazard profile, profile binding and service dependency graph. It uses strict JSON parsing, rejects unknown fields, constrains file paths to the canonical package root (including symlink resolution), streams SHA-256 across large source/output files, verifies exact source/output ID sets, binds the receipt to the manifest, evaluates the evidence-linked hazard profile against the declared graph, and verifies the configuration digest binds the profile, profile binding, canonical graph and built-in grid-reference suite identity.
+The verifier executable is at crates/domains/symthaea-scenarios/src/bin/living_city_verify.rs. Bundle schema v3 loads a typed evidence manifest, scenario-run receipt, versioned hazard profile, profile binding, service dependency graph, and evidence-linked city-assessment package. It uses strict JSON parsing, rejects unknown fields, constrains file paths to the canonical package root (including symlink resolution), streams SHA-256 across large source/output files, verifies exact source/output ID sets, binds the receipt to the manifest, evaluates the hazard profile against the declared graph, independently recomputes the city metrics/floor assessment, and verifies the configuration digest binds the profile, binding, canonical graph, city assessment, and built-in grid-reference suite identity.
 
 ### Package layout
 
-A run directory contains bundle.json, manifest.json, receipt.json, receipt.sha256, hazard-profile.json, profile-binding.json, service-graph.json, and all retained source/output files. A bundle schema v2 example:
+A run directory contains bundle.json, manifest.json, receipt.json, receipt.sha256, hazard-profile.json, profile-binding.json, service-graph.json, city-assessment.json, and all retained source/output files. A bundle schema v3 example:
 
 ~~~json
 {
-  "schema_version": 2,
+  "schema_version": 3,
   "manifest_path": "manifest.json",
   "receipt_path": "receipt.json",
   "receipt_sha256_path": "receipt.sha256",
   "hazard_profile_path": "hazard-profile.json",
   "profile_binding_path": "profile-binding.json",
   "service_graph_path": "service-graph.json",
+  "city_assessment_path": "city-assessment.json",
   "source_files": [
     {"id": "heat-basis", "path": "sources/heat-basis.json"},
-    {"id": "outage-basis", "path": "sources/outage-basis.json"}
+    {"id": "outage-basis", "path": "sources/outage-basis.json"},
+    {"id": "city-model-output", "path": "sources/city-model-output.json"},
+    {"id": "floor-ratification", "path": "sources/floor-ratification.json"},
+    {"id": "city-metrics-payload", "path": "sources/city-metrics.json"},
+    {"id": "city-assessment-package", "path": "city-assessment.json"}
   ],
   "output_files": [
     {"id": "metrics", "path": "outputs/metrics.json"}
@@ -403,7 +408,9 @@ The manifest and receipt use the versioned Rust types, with enum values in snake
 
 Every hazard parameter and initiating service failure must reference an item in the exact manifest for the same benchmark scenario, and the item must not be marked missing. The profile binding must identify the profile revision and match its recomputed canonical digest. Each benchmark-declared hazard needs at least one finite parameter with an explicit unit and evidence ID.
 
-The receipt's configuration_sha256 binds four canonical components: the hazard profile's canonical bytes, the serialized profile binding, the canonical service graph, and the built-in grid reference suite version, suite ID, and ordered declared case IDs. The graph canonicalizer sorts nodes by ID and dependency edges by their derived deterministic order; each component is preceded by its length as an unsigned 64-bit little-endian integer before the combined bytes are hashed. The receipt separately binds to the evidence-manifest digest. The receipt.sha256 sidecar contains the lowercase SHA-256 digest of the receipt's canonical representation, optionally followed by a newline.
+The city-assessment package contains the ten decision-bearing city metrics, six locally configured non-compensatory floors, a per-metric evidence-lineage map, and an explicit floor-ratification reference. Every metric must cite at least one non-missing evidence item; the exact canonical metrics JSON payload is retained as city-metrics-payload and its digest must match the embedded numeric values. The exact compact city-assessment JSON bytes are retained as city-assessment-package and must match its canonical digest. Floors must reference an evidence item classified governance_decision, and the ratification reference must match that item's source URI. This establishes source/digest linkage—not that the derivation formula is valid, the evidence is truthful, or a genuine public mandate exists.
+
+The receipt's configuration_sha256 binds five canonical components: the hazard profile's canonical bytes, the serialized profile binding, the canonical service graph, the canonical city-assessment package, and the built-in grid reference suite version, suite ID, and ordered declared case IDs. The graph canonicalizer sorts nodes by ID and dependency edges by their derived deterministic order; each component is preceded by its length as an unsigned 64-bit little-endian integer before the combined bytes are hashed. The receipt separately binds to the evidence-manifest digest. The receipt.sha256 sidecar contains the lowercase SHA-256 digest of the receipt's canonical representation, optionally followed by a newline.
 
 All paths must be relative and resolve to regular files inside the run directory. The verifier streams file contents instead of buffering potentially large GIS/BIM/simulation artifacts.
 
@@ -413,9 +420,9 @@ Run from a repository checkout using:
 cargo run -p symthaea-scenarios --bin living_city_verify -- path/to/run-package
 ~~~
 
-On success, stdout contains a JSON report with package_integrity set to verified, the receipt's separate workflow_promotion_state, run/scenario/commit identifiers, recomputed digests, verified source/output counts, the hazard-profile identity, the dependency pre-screen's failed/degraded service IDs and propagation rounds, and a four-case LinDistFlow analytical reference suite. It checks (1) a single branch with 7.2 kV base, 1 ohm resistance and 100 kW real load; (2) a reactive-only 100 kVAR load; (3) a two-segment radial feeder with downstream 50 kW load aggregation; and (4) -100 kW net distributed generation causing voltage rise. Each bus voltage and expected branch real power is compared against the closed-form linearized DistFlow equation using fixed regression tolerances. A failed reference case prevents workflow promotion. This checks implementation against the simplified model's analytical equations; it does not validate nonlinear AC power flow, utility-grid adequacy or actual outage behavior. Package integrity and workflow eligibility are separate: an internally consistent run can still have a failed or blocked mandatory engineering gate. The dependency cascade is only the consequence of declared initiating failures over a declared graph. It is not a prediction of actual hydraulic pressure, electrical load flow, thermal response, capacity, failure probability or restoration time. Verification errors exit with status 2 and a diagnostic on stderr.
+On success, stdout contains a JSON report with package_integrity set to verified, the receipt's separate workflow_promotion_state, run/scenario/commit identifiers, recomputed digests, verified source/output counts, a recomputed city_design_feasibility assessment, the hazard-profile identity, the dependency pre-screen's failed/degraded service IDs and propagation rounds, and a four-case LinDistFlow analytical reference suite. A city scenario that violates any configured hard floor is reported as infeasible and cannot be promoted even if all artifacts are correctly hashed and the declared service graph is internally consistent. It checks (1) a single branch with 7.2 kV base, 1 ohm resistance and 100 kW real load; (2) a reactive-only 100 kVAR load; (3) a two-segment radial feeder with downstream 50 kW load aggregation; and (4) -100 kW net distributed generation causing voltage rise. Each bus voltage and expected branch real power is compared against the closed-form linearized DistFlow equation using fixed regression tolerances. A failed reference case prevents workflow promotion. This checks implementation against the simplified model's analytical equations; it does not validate nonlinear AC power flow, utility-grid adequacy or actual outage behavior. Package integrity and workflow eligibility are separate: an internally consistent run can still have a failed or blocked mandatory engineering gate. The dependency cascade is only the consequence of declared initiating failures over a declared graph. It is not a prediction of actual hydraulic pressure, electrical load flow, thermal response, capacity, failure probability or restoration time. Verification errors exit with status 2 and a diagnostic on stderr.
 
-Tests now include end-to-end synthetic package verification plus source/output corruption, changed profile, changed graph/configuration digest, receipt-sidecar mismatch, path traversal, unknown-field, bundle-schema and graph-ordering negative controls. The cross-domain crate also contains a fixed analytical LinDistFlow reference check with its own tolerance assertions. These tests have been added but not executed in the current environment.
+Tests now include end-to-end synthetic package verification plus infeasible-city floor rejection, city-metric payload corruption, source/output corruption, changed profile, changed graph/configuration digest, receipt-sidecar mismatch, path traversal, unknown-field, bundle-schema and graph-ordering negative controls. The cross-domain crate also contains a fixed analytical LinDistFlow reference check with its own tolerance assertions. These tests have been added but not executed in the current environment.
 
 **Security and evidence scope:** the executable checks content integrity, profile/manifest linkage and declared dependency propagation. It does not authenticate the author's identity or signer's authority, prove that a declared solver ran correctly, validate physical equations, establish jurisdictional compliance, or authorize construction. A package can be internally consistent and still contain a false claim if all files are maliciously replaced together. Trusted signing/attestation and custody policy remain separate work. The CLI has not been compiled or run in this environment because Cargo/rustc are unavailable; treat it as unverified until tested on the exact head.
 ## 17. Infrastructure dependency propagation pre-screen
