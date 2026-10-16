@@ -517,8 +517,8 @@ pub struct InoculationOrchestrator {
     pub secure_boot_state: Option<String>,
     /// Whether to include lanzaboote in the generated flake (default: true)
     pub lanzaboote_enabled: bool,
-    /// Generated MOK enrollment password
-    pub mok_password: Option<String>,
+    /// Whether explicit Secure Boot key enrollment is required
+    pub secure_boot_enrollment_required: bool,
     /// Detected or user-specified platform
     pub target_platform: TargetPlatform,
 }
@@ -552,7 +552,7 @@ impl Default for InoculationOrchestrator {
             errors: Vec::new(),
             secure_boot_state: None,
             lanzaboote_enabled: true,
-            mok_password: None,
+            secure_boot_enrollment_required: false,
             target_platform: TargetPlatform::Unknown,
         }
     }
