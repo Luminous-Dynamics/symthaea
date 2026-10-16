@@ -17,7 +17,7 @@ This is the first executable crucible for that idea. It does **not** claim calib
 ## Implementation
 
 - `src/experiment_selection.rs` — deterministic scenario generator, finite experiment catalog, four executable selection policies, exhaustive toy subset oracle, separate hard-constraint metrics, paired-seed summaries, and a SHA-256-addressed report receipt.
-- `examples/experiment_selection_benchmark.rs` — runs the initial 1,000-scenario, 30-seed, 6-credit benchmark and prints a verifiable JSON receipt.
+- `examples/experiment_selection_benchmark.rs` — runs the initial 1,000-scenario, 30-seed, 6-credit benchmark and prints a verifiable JSON receipt. Set `SYMTHAEA_SOURCE_REVISION` to the exact source-head SHA to bind that revision; otherwise the receipt says `unavailable`.
 - Tests cover catalog validity, generated interval containment, target-only interval updates, robust constraint classification, budget ceilings, seeded reproducibility, oracle dominance in the toy world, receipt integrity/tamper detection, invalid seed inputs, and separate feasible/infeasible metrics.
 
 ## Synthetic decision model
@@ -59,7 +59,11 @@ The report binds:
 - full experiment catalog;
 - paired strategy summaries;
 - scope limitations;
+- hash of the generated scenario corpus;
+- hash of the ordered policy/seed execution trace;
 - SHA-256 of the serialized benchmark body.
+
+The receipt structure is specified in `crates/domains/symthaea-marine-bench/schemas/marine_experiment_selection_receipt_v1.schema.json`. These digests are tamper-evident when recomputed, but SHA-256 is not a signature and does not authenticate who supplied data.
 
 Receipt verification confirms the body digest matches. It does not authenticate measurement origins, validate scientific assumptions, or elevate synthetic evidence.
 
