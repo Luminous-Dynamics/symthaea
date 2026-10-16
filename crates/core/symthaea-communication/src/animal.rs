@@ -236,6 +236,14 @@ pub struct AnimalEvaluationBundle {
     pub representation_baseline: String,
     pub context_prediction: ContextPredictionEvaluation,
     pub segmentation_stability: f64,
+    #[serde(default)]
+    pub train_sample_ids: Vec<String>,
+    #[serde(default)]
+    pub test_sample_ids: Vec<String>,
+    #[serde(default)]
+    pub train_source_recording_ids: Vec<String>,
+    #[serde(default)]
+    pub test_source_recording_ids: Vec<String>,
     pub train_individuals: Vec<String>,
     pub test_individuals: Vec<String>,
     pub train_sites: Vec<String>,
@@ -257,7 +265,28 @@ impl AnimalEvaluationBundle {
             self.test_individuals.iter().collect();
         let train_sites: std::collections::BTreeSet<_> = self.train_sites.iter().collect();
         let test_sites: std::collections::BTreeSet<_> = self.test_sites.iter().collect();
-        if self.representation_baseline.trim().is_empty()
+        let lineage = [
+            AnimalSplitLineage {
+                split_id: "train".into(),
+                sample_ids: self.train_sample_ids.clone(),
+                source_recording_ids: self.train_source_recording_ids.clone(),
+                individual_ids: self.train_individuals.clone(),
+                site_ids: self.train_sites.clone(),
+            },
+            AnimalSplitLineage {
+                split_id: "test".into(),
+                sample_ids: self.test_sample_ids.clone(),
+                source_recording_ids: self.test_source_recording_ids.clone(),
+                individual_ids: self.test_individuals.clone(),
+                site_ids: self.test_sites.clone(),
+            },
+        ];
+        let lineage_policy = AnimalSplitPolicy {
+            hold_out_individuals: true,
+            hold_out_sites: true,
+        };
+        if validate_animal_split_lineage(&lineage, &lineage_policy).is_err()
+            || self.representation_baseline.trim().is_empty()
             || !unique_nonempty(&self.train_individuals)
             || !unique_nonempty(&self.test_individuals)
             || !unique_nonempty(&self.train_sites)
@@ -485,6 +514,10 @@ mod tests {
             representation_baseline: "cav".into(),
             context_prediction: make_context_prediction(0.80, 0.05),
             segmentation_stability: 0.85,
+            train_sample_ids: vec!["train-sample-1".into(), "train-sample-2".into()],
+            test_sample_ids: vec!["test-sample-1".into(), "test-sample-2".into()],
+            train_source_recording_ids: vec!["train-recording-1".into(), "train-recording-2".into()],
+            test_source_recording_ids: vec!["test-recording-1".into()],
             train_individuals: vec!["individual-A".into(), "individual-B".into()],
             test_individuals,
             train_sites: vec!["site-1".into(), "site-2".into()],
@@ -496,6 +529,24 @@ mod tests {
     #[test]
     fn animal_bundle_passes_when_all_conditions_met() {
         assert!(make_bundle(false).validate().is_ok());
+    }
+
+    #[test]
+    fn animal_bundle_rejects_shared_source_recording_across_splits() {
+        let mut bundle = make_bundle(false);
+        bundle.test_source_recording_ids = vec!["train-recording-1".into()];
+        assert!(bundle.validate().is_err());
+    }
+
+    #[test]
+    fn animal_bundle_rejects_missing_sample_or_recording_lineage() {
+        let mut no_samples = make_bundle(false);
+        no_samples.test_sample_ids.clear();
+        assert!(no_samples.validate().is_err());
+
+        let mut no_recordings = make_bundle(false);
+        no_recordings.train_source_recording_ids.clear();
+        assert!(no_recordings.validate().is_err());
     }
 
     #[test]
