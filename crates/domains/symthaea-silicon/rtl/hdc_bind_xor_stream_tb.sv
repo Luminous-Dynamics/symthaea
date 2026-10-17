@@ -4,8 +4,8 @@
 // Protocol/equivalence bench for the parameterized ready/valid XOR stream.
 // The top sweeps lane widths; reported cycles are simulation protocol counts,
 // not achieved hardware frequency, energy, resource, or speedup measurements.
-\`timescale 1ns/1ps
-\`default_nettype none
+`timescale 1ns/1ps
+`default_nettype none
 
 module hdc_bind_xor_stream_case #(
     parameter integer LANE_WIDTH = 256
@@ -197,4 +197,4 @@ module hdc_bind_xor_stream_tb;
     end
 endmodule
 
-\`default_nettype wire
+`default_nettype wire
