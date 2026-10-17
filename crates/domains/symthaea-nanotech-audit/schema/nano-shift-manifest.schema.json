@@ -37,7 +37,6 @@
         "additionalProperties": false,
         "required": [
           "group_id",
-          "shift_family",
           "severity",
           "split",
           "physical_rationale",
@@ -47,24 +46,14 @@
           "independence_keys",
           "sample_ids",
           "shift_kind",
-          "shift_axes"
+          "shift_axes",
+          "shift_families"
         ],
         "properties": {
           "group_id": {
             "type": "string",
             "minLength": 1,
             "maxLength": 256
-          },
-          "shift_family": {
-            "enum": [
-              "composition",
-              "surface_coordination",
-              "defects",
-              "temperature_energy",
-              "strain_pressure_phase",
-              "size_interface_passivation_substrate",
-              "compounded"
-            ]
           },
           "severity": {
             "enum": [
@@ -143,6 +132,22 @@
                 "measurement_process"
               ]
             }
+          },
+          "shift_families": {
+            "type": "array",
+            "uniqueItems": true,
+            "maxItems": 6,
+            "description": "Physical perturbation families represented in the group. This is independent of shift_kind and the statistical/physical mechanism axes.",
+            "items": {
+              "enum": [
+                "composition",
+                "surface_coordination",
+                "defects",
+                "temperature_energy",
+                "strain_pressure_phase",
+                "size_interface_passivation_substrate"
+              ]
+            }
           }
         },
         "allOf": [
@@ -192,25 +197,6 @@
                     "moderate",
                     "severe"
                   ]
-                }
-              }
-            }
-          },
-          {
-            "if": {
-              "properties": {
-                "shift_family": {
-                  "const": "compounded"
-                }
-              },
-              "required": [
-                "shift_family"
-              ]
-            },
-            "then": {
-              "properties": {
-                "shift_kind": {
-                  "const": "compounded"
                 }
               }
             }
