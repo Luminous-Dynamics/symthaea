@@ -45,20 +45,21 @@ Do not invent an accuracy threshold before the measurement task and selected ins
 
 The companion file **env-mobility-microfactory-routing-v1.json** is an explicit **planning fixture**, with illustrative durations and required skills/resources. It is not claimed to be directly consumable by the scheduler API until the schema is mapped against [FACTORY-OPS-001 #7677](https://github.com/Luminous-Dynamics/symthaea/issues/7677) / PR #7678.
 
-A separate effects-disabled fixture audit is now available in source as `cargo run -p xtask -- env-mobility-route-audit`, with route mutation tests under `cargo test -p xtask env_mobility_route`. It validates schema consistency, required worker/resource candidates, dependency cycles, mandatory operations and key test/manifest/acceptance ordering. It is **not** a scheduler run and it does not calculate makespan, worker assignment, bottleneck utilization, or real manufacturing throughput. Cargo/test status remains unverified until it is compiled and run on this exact revision.
+A separate effects-disabled fixture audit is now available in source as `cargo run -p xtask -- env-mobility-route-audit`, with route mutation tests under `cargo test -p xtask env_mobility_route`. The fixture now separates harness crimping from continuity/polarity verification because the existing factory scheduler assigns one resource per operation. It validates schema consistency, required worker/resource candidates, dependency cycles, mandatory operations and key test/manifest/acceptance ordering. It is **not** a scheduler run and it does not calculate makespan, worker assignment, bottleneck utilization, or real manufacturing throughput. Cargo/test status remains unverified until it is compiled and run on this exact revision.
 
 The target routing is:
 
 1. **Release design package** — verify requirement, CAD/drawing revisions, BOM, wiring table, firmware/configuration and calibration plan.
 2. **Incoming inspection** — match exact parts/labels and approved BOM substitutions; record lot/part evidence and physical condition.
 3. **Fabricate adapter / print non-critical fixture** — prefer a purchased plate or locally fabricated non-structural adapter based on tolerance, durability and total cost. The print fixture may be used to drill/check; it is not a flight-critical part.
-4. **Prepare harness** — cut, crimp and label an approved harness; check pinout, polarity and continuity with a repeatable fixture.
-5. **Inspect adapter and interfaces** — measure datums/fit, verify connector clearance, access, strain relief and ability to remove the module without destructive disassembly.
-6. **Assemble module** — mount sensor/logger, connect the harness and secure connectors using the released work instruction.
-7. **Electrical smoke test** — use an appropriately current-limited bench supply; log input voltage/current and function; no carrier, propulsion or actuation connection is required at this stage.
-8. **Measurement check** — compare readings with a traceable/identified reference under the declared check conditions; retain raw readings, reference identity, calibration status and residuals.
-9. **Bind build manifest** — exact article serial, components, substitutions, source/configuration digest, tool/fixture references, calibration and test artifacts.
-10. **Independent acceptance review** — verify all required gates; reject missing/failed evidence; preserve deviations and rework history instead of silently marking the unit passed.
+4. **Prepare harness** — cut, crimp and label the approved harness using the exact connector-specific tooling.
+5. **Verify harness pinout, polarity and continuity** — use the distinct continuity/polarity fixture and record the result before the harness can enter assembly.
+6. **Inspect adapter and interfaces** — measure datums/fit, verify connector clearance, access, strain relief and ability to remove the module without destructive disassembly.
+7. **Assemble module** — mount sensor/logger, connect the harness and secure connectors using the released work instruction.
+8. **Electrical functional check** — use an appropriately current-limited bench supply; log input voltage/current and function; no carrier, propulsion or actuation connection is required at this stage.
+9. **Measurement check** — compare readings with an identified reference under the declared check conditions; retain raw readings, reference identity, calibration status and residuals.
+10. **Bind build manifest** — exact article serial, components, substitutions, source/configuration digest, tool/fixture references, calibration and test artifacts.
+11. **Independent acceptance review** — verify all required gates; reject missing/failed evidence; preserve deviations and rework history instead of silently marking the unit passed.
 
 Expected durations in the JSON are initial **planning estimates only**, not measured cycle times. After five baseline units, replace them with observed time distributions separated into setup, touch labor, queue, rework, inspection and calibration.
 
