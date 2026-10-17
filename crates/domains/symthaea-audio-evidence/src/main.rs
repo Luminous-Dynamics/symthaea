@@ -48,7 +48,13 @@ fn main() -> ExitCode {
     match check_manifest_bundle(&manifest, &bundle_root) {
         Ok(count) => {
             let status = manifest.get("data_status").and_then(Value::as_str).unwrap_or("unknown");
-            println!("OK: {status}; {count} artifacts checked; compliance not assessed");
+            if status == "planned" {
+                println!("PLAN OK: no measurement verdict; {count} artifacts checked");
+            } else {
+                println!(
+                    "MANIFEST OK: status={status}; {count} artifacts checked; acoustic gate and compliance not assessed"
+                );
+            }
             ExitCode::SUCCESS
         }
         Err(error) => {
