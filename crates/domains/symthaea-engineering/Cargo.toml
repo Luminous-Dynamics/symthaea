@@ -24,6 +24,7 @@ symthaea-dsp = { path = "../symthaea-dsp" }
 symthaea-operations-research = { path = "../symthaea-operations-research" }
 uuid = { version = "1.0", features = ["v4"] }
 serde_json = "1.0"
+sha2.workspace = true
 
 
 uom.workspace = true
