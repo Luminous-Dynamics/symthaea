@@ -717,3 +717,95 @@ fn write_receipt(receipt: &Receipt, output_path: Option<&Path>) -> io::Result<()
         Ok(())
     }
 }
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    const FROZEN_MANIFEST: &[u8] = include_bytes!("../benchmarks/validator-corpus-v1.json");
+
+    fn frozen_manifest() -> Manifest {
+        serde_json::from_slice(FROZEN_MANIFEST).expect("frozen corpus must parse as JSON")
+    }
+
+    #[test]
+    fn frozen_manifest_matches_pinned_sha_and_required_case_ids() {
+        let digest = format!("{:x}", Sha256::digest(FROZEN_MANIFEST));
+        assert_eq!(
+            digest, EXPECTED_MANIFEST_SHA256,
+            "fixture bytes changed without updating the reviewed digest pin"
+        );
+
+        let manifest = frozen_manifest();
+        assert_eq!(manifest.schema_version, SCHEMA_VERSION);
+        assert_eq!(manifest.benchmark_id, BENCHMARK_ID);
+        assert_eq!(manifest.benchmark_version, BENCHMARK_VERSION);
+        assert_eq!(manifest.expected_case_count, REQUIRED_CASE_IDS.len());
+        assert_eq!(manifest.cases.len(), REQUIRED_CASE_IDS.len());
+
+        let required: BTreeSet<&str> = REQUIRED_CASE_IDS.iter().copied().collect();
+        let observed: BTreeSet<&str> = manifest.cases.iter().map(|fixture| fixture.id.as_str()).collect();
+        assert_eq!(observed, required, "manifest IDs must exactly match the runner contract");
+        assert_eq!(
+            manifest.cases.len(),
+            observed.len(),
+            "duplicate fixture IDs are prohibited"
+        );
+    }
+
+    #[test]
+    fn every_frozen_fixture_matches_its_expected_validator_outcome() {
+        let manifest = frozen_manifest();
+        let failures: Vec<String> = manifest
+            .cases
+            .iter()
+            .map(run_case)
+            .filter(|result| !result.matched_expectation)
+            .map(|result| {
+                format!(
+                    "{}: expected {} / {:?}, got {} / {:?} ({:?})",
+                    result.id,
+                    result.expected_status,
+                    result.expected_violation,
+                    result.actual_status,
+                    result.actual_violation_classes,
+                    result.detail
+                )
+            })
+            .collect();
+
+        assert!(
+            failures.is_empty(),
+            "frozen culinary validator cases failed:\n{}",
+            failures.join("\n")
+        );
+    }
+
+    #[test]
+    fn a_missing_or_mismatched_expected_head_is_not_comparable() {
+        let clean_checkout = CommitContext {
+            sha: Some("a".repeat(40)),
+            clean: Some(true),
+        };
+        assert!(checkout_not_comparable(&clean_checkout, &None));
+        assert!(checkout_not_comparable(&clean_checkout, &Some(false)));
+        assert!(!checkout_not_comparable(&clean_checkout, &Some(true)));
+    }
+
+    #[test]
+    fn special_float_tokens_preserve_adversarial_values() {
+        assert!(read_float(&Value::String("NaN".to_owned())).unwrap().is_nan());
+        assert_eq!(
+            read_float(&Value::String("Infinity".to_owned())).unwrap(),
+            f64::INFINITY
+        );
+        assert_eq!(
+            read_float(&Value::String("-Infinity".to_owned())).unwrap(),
+            f64::NEG_INFINITY
+        );
+        assert_eq!(
+            read_float(&Value::String("MAX".to_owned())).unwrap(),
+            f64::MAX
+        );
+    }
+}
