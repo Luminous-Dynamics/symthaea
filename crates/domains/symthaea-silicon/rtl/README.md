@@ -78,6 +78,24 @@ vvp /tmp/hdc_bind_xor_stream_tb.vvp
 
 Only a captured exact-head simulator receipt qualifies the RTL/protocol bench. The next comparison should use frozen oracle vectors and then pinned synthesis/implementation flows; simulated cycles under artificial backpressure are not physical performance.
 
+
+## Streaming Hamming distance
+
+`hdc_hamming_stream.sv` accumulates the exact number of differing bits across a streamed 16,384-bit vector pair and emits one integer distance per complete frame. It uses a one-entry output result buffer with backpressure and a sticky framing fault: an early or missing final-beat marker suppresses the partial result and blocks subsequent input until reset.
+
+The module's parameter precondition is `VECTOR_BITS % DATA_WIDTH == 0`. The accompanying bench covers lane widths 64, 128, 256, 512 and 16,384 bits, including distance 0, maximum distance 16,384, deterministic irregular vectors, self-distance, result backpressure and malformed-frame negative controls.
+
+Run with Icarus Verilog:
+
+```sh
+iverilog -g2012 -Wall -s hdc_hamming_stream_tb -o /tmp/hdc_hamming_stream_tb.vvp \\
+  crates/domains/symthaea-silicon/rtl/hdc_hamming_stream.sv \\
+  crates/domains/symthaea-silicon/rtl/hdc_hamming_stream_tb.sv
+vvp /tmp/hdc_hamming_stream_tb.vvp
+```
+
+The bench uses an independent bit-by-bit simulation reference to exercise arithmetic and streaming protocol; it is not yet the pinned Rust-oracle differential receipt. That remains an explicit follow-up before exact-HDC hardware correctness claims are promoted. Simulated cycle counts are not hardware latency or throughput claims.
+
 ## Semantic/evidence boundary
 
 - The canonical Rust `BinaryHV` remains the source of HDC semantics.
