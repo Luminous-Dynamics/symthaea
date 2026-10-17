@@ -12,7 +12,7 @@ use serde::{Deserialize, Serialize};
 use std::collections::HashSet;
 
 use crate::architecture_robustness::{
-    ArchitectureRobustnessReportV1, RobustArchitectureCandidateV1,
+    ArchitectureRobustnessReportV1, ARCHITECTURE_ROBUSTNESS_SCHEMA_VERSION_V1,
 };
 use crate::architecture_pareto::{
     ArchitectureEvidenceLevelV1, ArchitectureMetricV1,
@@ -180,6 +180,8 @@ pub struct MeasurementTriageReportV1 {
 pub enum MeasurementTriageFindingV1 {
     /// Unsupported triage schema.
     UnsupportedSchemaVersion { received: u16 },
+    /// Unsupported schema in the source robustness report.
+    UnsupportedSourceSchemaVersion { received: u16 },
     /// Source comparison has fewer than two candidates or incomplete pair coverage.
     IncompleteSourceComparison,
     /// Source candidate or action ID is empty, padded, or duplicated.
@@ -389,7 +391,17 @@ fn validate_source_report(
     source: &ArchitectureRobustnessReportV1,
     findings: &mut Vec<MeasurementTriageFindingV1>,
 ) {
-    if source.candidates.len() < 2 || source.task_protocol_version.trim().is_empty() {
+    if source.schema_version != ARCHITECTURE_ROBUSTNESS_SCHEMA_VERSION_V1 {
+        findings.push(
+            MeasurementTriageFindingV1::UnsupportedSourceSchemaVersion {
+                received: source.schema_version,
+            },
+        );
+    }
+    if source.candidates.len() < 2
+        || source.comparison_id.trim().is_empty()
+        || source.task_protocol_version.trim().is_empty()
+    {
         findings.push(MeasurementTriageFindingV1::IncompleteSourceComparison);
     }
 
@@ -459,10 +471,6 @@ fn validate_source_report(
 
 fn evaluate_action_gates(action: &MeasurementActionV1) -> Vec<MeasurementActionBlockerV1> {
     let mut blockers = Vec::new();
-    let required = |gate: &str, status: MeasurementGateStatusV1| {
-        status == MeasurementGateStatusV1::Satisfied
-    };
-
     for (name, status, is_required) in [
         ("protocol_frozen", action.gates.protocol_frozen, true),
         ("candidate_coverage", action.gates.candidate_coverage, true),
@@ -491,7 +499,7 @@ fn evaluate_action_gates(action: &MeasurementActionV1) -> Vec<MeasurementActionB
         ("evidence_provenance", action.gates.evidence_provenance, true),
     ] {
         let okay = if is_required {
-            required(name, status)
+            status == MeasurementGateStatusV1::Satisfied
         } else {
             matches!(
                 status,
