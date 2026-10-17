@@ -135,6 +135,7 @@ pub enum SyntheticBenchmarkError {
     UnknownPlannedOption,
     PlanOptionPartitionMismatch,
     PlanOptionPoolMismatch,
+    PlanReplayMismatch,
     PlanIndexIdMismatch,
     PlanSpendMismatch,
     PlanBudgetAccountingMismatch,
@@ -177,6 +178,9 @@ impl fmt::Display for SyntheticBenchmarkError {
             }
             Self::PlanOptionPoolMismatch => {
                 "scoring options differ from the exact pool used to create the plan"
+            }
+            Self::PlanReplayMismatch => {
+                "plan differs from deterministic replay of its declared policy and budget"
             }
             Self::PlanIndexIdMismatch => "plan indices and selected identifiers disagree",
             Self::PlanSpendMismatch => "plan spend differs from selected option costs",
@@ -472,10 +476,6 @@ fn validate_plan(
 #[cfg(test)]
 mod tests {
     use super::*;
-    use crate::experiment_selection::{
-        rank_experiments, select_under_budget, ExperimentOption, ExperimentSelectionPolicy,
-    };
-
     const SCENARIO: &str = "known-truth-acoustic-v1";
     const PROFILE: &str = "synthetic-acoustic-profile-v1";
     const COST: &str = "synthetic-cost-unit";
