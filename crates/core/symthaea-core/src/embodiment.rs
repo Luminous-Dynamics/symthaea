@@ -1753,6 +1753,20 @@ mod external_action_timing_v1_tests {
     }
 
     #[test]
+    fn rejects_source_time_when_no_observation_was_received() {
+        let mut timing = valid_timing();
+        timing.observation_received_monotonic_ns = None;
+        timing.observation_id = None;
+        timing.observation_source_timestamp_ns = Some(123);
+        timing.observation_source_clock_domain_id = Some("device.capture".into());
+        timing.observation_source_clock_epoch_id = Some("device-epoch-2".into());
+        assert_eq!(
+            timing.validate(),
+            Err(ExternalActionTimingErrorV1::SourceTimeWithoutObservation)
+        );
+    }
+
+    #[test]
     fn rejects_wrong_event_step_identity() {
         let outcome = ExternalActionEmbodimentStepV1 {
             result: EmbodimentResult {
