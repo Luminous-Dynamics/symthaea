@@ -16,7 +16,7 @@ const EXPECTED_TRACE_IDS: [&str; 21] = [
     "ADT-017", "ADT-018", "ADT-019", "ADT-020", "ADT-021",
 ];
 
-type Errors = Vec<String>;
+pub(crate) type Errors = Vec<String>;
 
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub(crate) struct Decision {
