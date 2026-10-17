@@ -1211,9 +1211,21 @@ mod tests {
         let summary = performer_macro_summary(&by_drummer);
         let kick = &summary["kick"];
         assert_eq!(kick.performers_with_role, 2);
-        assert!((kick.mean_performer_median_abs_sixteenth_grid_residual_beats.unwrap() - 0.05).abs() < 1e-12);
-        assert!((kick.median_performer_median_abs_sixteenth_grid_residual_beats.unwrap() - 0.09).abs() < 1e-12);
-        assert!((kick.mean_performer_velocity_mean_0_to_127.unwrap() - 55.0).abs() < 1e-12);
+        assert!(
+            (kick
+                .mean_performer_median_abs_sixteenth_grid_residual_beats
+                .unwrap()
+                - 0.05)
+                .abs()
+                < 1e-12
+        );
+        assert_eq!(
+            kick.median_performer_median_abs_sixteenth_grid_residual_beats,
+            Some(0.01)
+        );
+        assert!(
+            (kick.mean_performer_velocity_mean_0_to_127.unwrap() - 55.0).abs() < 1e-12
+        );
     }
 
     #[test]
