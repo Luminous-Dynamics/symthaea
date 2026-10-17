@@ -2,7 +2,7 @@
 
 **Status:** proposed portfolio and validation contract; no product is yet qualified by this document  
 **Research snapshot:** 2026-10-17  
-**Purpose:** create a coherent, fully open, repairable hi-fi line from headphones through transducers, electronics, measurement tools and room integration.
+**Purpose:** create a coherent, fully open, repairable hi-fi line from headphones through transducers, electronics, measurement tools and room integration. Tracking issue: [OPEN-AUDIO-000 #7826](https://github.com/Luminous-Dynamics/symthaea/issues/7826).
 
 ## 1. Strategy: compete on verifiable combinations of performance and openness
 
