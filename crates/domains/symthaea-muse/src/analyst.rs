@@ -300,6 +300,7 @@ fn trace_event_id(reference: ScoreEventRef) -> String {
         VoiceRole::Harmony => "harmony",
         VoiceRole::Bass => "bass",
         VoiceRole::CounterMelody => "counter",
+        VoiceRole::Unspecified => "unspecified",
     };
     format!("score-{role}-{}", reference.role_index)
 }
@@ -1764,12 +1765,14 @@ mod tests {
                 VoiceRole::Harmony,
                 VoiceRole::CounterMelody,
                 VoiceRole::Melody,
+                VoiceRole::Unspecified,
             ] {
                 let role_slug = match role {
                     VoiceRole::Melody => "melody",
                     VoiceRole::Harmony => "harmony",
                     VoiceRole::Bass => "bass",
                     VoiceRole::CounterMelody => "counter",
+                    VoiceRole::Unspecified => "unspecified",
                 };
                 let role_label = format!("{role:?}");
                 for (index, note) in realized.score.voice(role).into_iter().enumerate() {

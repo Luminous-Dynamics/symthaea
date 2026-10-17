@@ -172,12 +172,108 @@ fn default_authorization_basis() -> AuthorizationBasis {
     AuthorizationBasis::LegacyUnspecified
 }
 
+/// One exact-rational note snapshot backing a symbolic motif claim.
+///
+/// `score_note_index` is a zero-based index into the exact Score supplied to
+/// the analysis call; part index is onset-ordered within that source part.
+/// Pitch and rational timing are copied so evidence is inspectable without
+/// trusting a derived label. Indices are not durable IDs across score edits.
+#[derive(Clone, Debug, PartialEq, Eq, Serialize, Deserialize)]
+pub struct ImportedNoteReference {
+    /// Zero-based index into the analyzed Score's current note vector.
+    pub score_note_index: usize,
+    /// Zero-based index after sorting this source part by exact onset.
+    pub part_note_index: usize,
+    pub midi_pitch: u8,
+    /// Exact reduced rational onset in quarter-note beats.
+    pub onset_numerator: i64,
+    pub onset_denominator: i64,
+    /// Exact reduced positive duration in quarter-note beats.
+    pub duration_numerator: i64,
+    pub duration_denominator: i64,
+}
+
+/// One exact pitch-interval-contour match, with source note snapshots.
+/// Overlapping matches may both be represented in the evidence list.
+#[derive(Clone, Debug, PartialEq, Eq, Serialize, Deserialize)]
+pub struct ImportedMotifOccurrence {
+    pub notes: Vec<ImportedNoteReference>,
+}
+
+/// Exact beat ratio used in a motif's representative onset-spacing pattern.
+#[derive(Clone, Debug, PartialEq, Eq, Serialize, Deserialize)]
+pub struct ImportedBeatRational {
+    pub numerator: i64,
+    pub denominator: i64,
+}
+
+/// A bounded source-note snapshot accepted by the rhythm-aware near-match layer.
+/// Scores are symbolic comparison measurements, not calibrated perceptual probabilities.
+#[derive(Clone, Debug, Serialize, Deserialize)]
+pub struct ImportedMotifNearMatchOccurrence {
+    pub notes: Vec<ImportedNoteReference>,
+    /// Largest absolute difference from the representative signed interval, in semitones.
+    pub observed_max_pitch_interval_deviation_semitones: u8,
+    /// Largest absolute error between normalized onset-gap shares (range 0..=1).
+    pub observed_max_normalized_onset_gap_error: f64,
+    /// Mean absolute error between normalized onset-gap shares (range 0..=1).
+    pub observed_mean_normalized_onset_gap_error: f64,
+}
+
+/// Results from the separate, conservative pitch-and-rhythm near-match scan.
+/// Candidate windows preserve interval direction, allow at most the declared
+/// interval-magnitude deviation, and constrain every normalized onset-gap share.
+/// These rules are explicit heuristics, not a claim of motif identity.
+#[derive(Clone, Debug, Serialize, Deserialize)]
+pub struct ImportedMotifNearMatchSummary {
+    /// All accepted candidate windows, including overlapping windows.
+    pub occurrence_count: usize,
+    /// Earliest-first greedy count of accepted non-overlapping windows.
+    pub independent_occurrence_count: usize,
+    /// Inclusive bound on each candidate interval's absolute deviation.
+    pub max_allowed_pitch_interval_deviation_semitones: u8,
+    /// Inclusive bound on each normalized onset-gap share's absolute error.
+    pub max_allowed_normalized_onset_gap_error: f64,
+    /// Whether every accepted candidate has a stored note snapshot.
+    pub occurrence_evidence_complete: bool,
+    /// Bounded source-note evidence, in deterministic onset order.
+    pub occurrences: Vec<ImportedMotifNearMatchOccurrence>,
+}
+
 #[derive(Clone, Debug, Serialize, Deserialize)]
 pub struct ImportedMotifSummary {
+    /// Total exact pitch-interval-contour windows, including overlapping windows
+    /// and matches beyond the stored evidence cap.
     pub occurrence_count: usize,
     pub midi_pitches: Vec<u8>,
     pub identity_note: String,
+    /// Legacy heuristic score retained for wire compatibility; not a calibrated
+    /// probability of motif identity, listener recognition, or musical quality.
     pub confidence: f32,
+    /// Persistent source-part identity, when extraction was scoped to one known part.
+    /// Missing on legacy records; it is never inferred from register or role.
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub source_part_id: Option<u16>,
+    /// Directed semitone steps of the representative motif.
+    #[serde(default, skip_serializing_if = "Vec::is_empty")]
+    pub pitch_interval_pattern: Vec<i16>,
+    /// Exact onset spacings for the representative occurrence, in beats.
+    #[serde(default, skip_serializing_if = "Vec::is_empty")]
+    pub onset_deltas: Vec<ImportedBeatRational>,
+    /// Earliest onset-ordered sample of exact pitch-contour windows; windows may
+    /// overlap. Rhythm is evidence alongside each match, not a match gate.
+    #[serde(default, skip_serializing_if = "Vec::is_empty")]
+    pub matched_occurrences: Vec<ImportedMotifOccurrence>,
+    /// None means an older record did not state whether its evidence was complete.
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub occurrence_evidence_complete: Option<bool>,
+    /// Greedily selected non-overlapping occurrences. None means a legacy record
+    /// predates this distinction; this is not a musical-importance judgment.
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub independent_occurrence_count: Option<usize>,
+    /// Separate rhythm-aware symbolic near matches; absent in legacy records.
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub rhythm_near_matches: Option<ImportedMotifNearMatchSummary>,
 }
 
 #[derive(Clone, Debug, Serialize, Deserialize)]
@@ -215,6 +311,18 @@ pub struct ImportedWorkSummary {
     /// field existed still deserialize.
     #[serde(default)]
     pub audio_renderer: String,
+    /// True when `audition.wav` is a bounded preview rather than the whole
+    /// score. Missing in older stored summaries, so defaults to false.
+    #[serde(default)]
+    pub audition_clipped: bool,
+    /// Source-relative starting time of the preview. Non-zero only when a
+    /// long leading rest made a later clip more useful than silence.
+    #[serde(default)]
+    pub audition_start_seconds: f64,
+    /// Musical duration represented in the preview, excluding renderer tail.
+    /// Missing in older stored summaries, so defaults to zero.
+    #[serde(default)]
+    pub audition_duration_seconds: f64,
     /// Discloses that `audition.wav`'s TIMBRE is reconstructed, not
     /// preserved from the source. `parse_symbolic` extracts pitch, rhythm,
     /// tempo, meter, and voice roles into a plain `Score` -- it does not
@@ -2698,5 +2806,64 @@ mod tests {
         let json = serde_json::to_string(&event).unwrap();
         let back: PerformedNoteEvent = serde_json::from_str(&json).unwrap();
         assert!(back.source_note_id.is_none());
+    }
+
+    #[test]
+    fn imported_motif_summary_defaults_new_evidence_for_legacy_records() {
+        let legacy = r#"{
+            "occurrence_count": 2,
+            "midi_pitches": [60, 62, 64],
+            "identity_note": "legacy record",
+            "confidence": 0.42
+        }"#;
+        let decoded: ImportedMotifSummary = serde_json::from_str(legacy).unwrap();
+        assert_eq!(decoded.source_part_id, None);
+        assert_eq!(decoded.independent_occurrence_count, None);
+        assert!(decoded.pitch_interval_pattern.is_empty());
+        assert!(decoded.onset_deltas.is_empty());
+        assert!(decoded.matched_occurrences.is_empty());
+        assert_eq!(decoded.occurrence_evidence_complete, None);
+        assert!(decoded.rhythm_near_matches.is_none());
+
+        let round_trip = serde_json::to_string(&decoded).unwrap();
+        assert!(!round_trip.contains("source_part_id"));
+        assert!(!round_trip.contains("matched_occurrences"));
+        assert!(!round_trip.contains("rhythm_near_matches"));
+    }
+
+    #[test]
+    fn independent_occurrence_count_is_appended_after_legacy_wire_fields() {
+        let summary = ImportedMotifSummary {
+            occurrence_count: 5,
+            midi_pitches: vec![60, 61, 62, 63],
+            identity_note: "test contour".to_string(),
+            confidence: 0.42,
+            source_part_id: Some(1),
+            pitch_interval_pattern: vec![1, 1, 1],
+            onset_deltas: Vec::new(),
+            matched_occurrences: Vec::new(),
+            occurrence_evidence_complete: Some(true),
+            independent_occurrence_count: Some(2),
+            rhythm_near_matches: Some(ImportedMotifNearMatchSummary {
+                occurrence_count: 0,
+                independent_occurrence_count: 0,
+                max_allowed_pitch_interval_deviation_semitones: 1,
+                max_allowed_normalized_onset_gap_error: 0.15,
+                occurrence_evidence_complete: true,
+                occurrences: Vec::new(),
+            }),
+        };
+        let serialized = serde_json::to_string(&summary).unwrap();
+        let last_legacy_field = serialized
+            .find("\"occurrence_evidence_complete\"")
+            .expect("existing evidence-completeness field is serialized");
+        let appended_field = serialized
+            .find("\"independent_occurrence_count\"")
+            .expect("independent count is serialized when present");
+        let appended_near_matches = serialized
+            .find("\"rhythm_near_matches\"")
+            .expect("rhythm-aware near matches are appended after legacy fields");
+        assert!(last_legacy_field < appended_field);
+        assert!(appended_field < appended_near_matches);
     }
 }
