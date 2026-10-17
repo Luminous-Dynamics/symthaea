@@ -1021,6 +1021,78 @@ mod tests {
             .expect("write csv");
             Self(path)
         }
+
+        fn write_provenance_manifest(&self) {
+            fs::write(self.0.join("source-manifest.json"), b"{\"source\":\"synthetic fixture\"}")
+                .expect("write source manifest");
+            fs::write(self.0.join("task-contract.json"), b"{\"task\":\"synthetic fixture task\"}")
+                .expect("write task contract");
+            fs::write(
+                self.0.join("evaluation-manifest.json"),
+                b"{\"evaluation\":\"synthetic fixture evaluation\"}",
+            )
+            .expect("write evaluation manifest");
+
+            let paths = [
+                ".hydra/config.yaml",
+                "source-manifest.json",
+                "task-contract.json",
+                "evaluation-manifest.json",
+                "summary/episodes.json",
+                "summary/episodes.csv",
+                "summary/summary.json",
+                "trajectories/episode_000.json",
+                "trajectories/episode_001.json",
+            ];
+            let mut artifacts = Vec::new();
+            let mut digests = BTreeMap::new();
+            for path in paths {
+                let (sha256, size_bytes) =
+                    hash_artifact(&self.0, path).expect("hash fixture artifact");
+                digests.insert(path.to_owned(), sha256.clone());
+                artifacts.push(json!({
+                    "path": path,
+                    "sha256": sha256,
+                    "size_bytes": size_bytes
+                }));
+            }
+
+            let manifest = json!({
+                "schema_version": PROVENANCE_SCHEMA_VERSION,
+                "run_id": "synthetic-run",
+                "benchmark_id": "synthetic-made",
+                "upstream_repository": "https://github.com/diffractivelabs/MADE",
+                "upstream_commit": "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
+                "policy_revision": "bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb",
+                "task_contract_sha256": digests["task-contract.json"],
+                "evaluation_manifest_sha256": digests["evaluation-manifest.json"],
+                "source_manifest_sha256": digests["source-manifest.json"],
+                "resolved_config_sha256": digests[".hydra/config.yaml"],
+                "data_sources": [{
+                    "source_id": "synthetic-data",
+                    "source_url": "https://example.org/synthetic",
+                    "revision": "fixture-v1",
+                    "license": "synthetic-only",
+                    "rights_status": "not_applicable"
+                }],
+                "oracle_accounting": {
+                    "setup_requests": 2,
+                    "proposal_requests": 4,
+                    "retry_requests": 1,
+                    "cache_hits": 1,
+                    "external_calls": 6,
+                    "failed_external_calls": 0,
+                    "total_cost": 1.5,
+                    "cost_unit": "synthetic-credit"
+                },
+                "artifacts": artifacts
+            });
+            fs::write(
+                self.0.join(PROVENANCE_MANIFEST_NAME),
+                serde_json::to_vec_pretty(&manifest).expect("serialize provenance manifest"),
+            )
+            .expect("write provenance manifest");
+        }
     }
 
     impl Drop for Fixture {
@@ -1086,6 +1158,52 @@ mod tests {
         let report = audit_run(&fixture.0);
         assert_eq!(report.status, "fail");
         assert!(report.findings.iter().any(|finding| finding.code == "no_episode_rows"));
+    }
+
+    #[test]
+    fn accepts_consistent_provenance_manifest_and_artifact_hashes() {
+        let fixture = Fixture::new();
+        fixture.write_provenance_manifest();
+
+        let report = audit_run(&fixture.0);
+        assert_eq!(report.status, "artifact_integrity_pass", "{:?}", report.findings);
+        assert_eq!(report.provenance_manifest_status, "manifest_consistent");
+        assert!(report
+            .checks_completed
+            .contains(&"provenance_manifest_artifact_hashes_and_accounting_reconcile".to_owned()));
+    }
+
+    #[test]
+    fn rejects_tampered_artifact_when_provenance_manifest_is_present() {
+        let fixture = Fixture::new();
+        fixture.write_provenance_manifest();
+        let config = fixture.0.join(".hydra/config.yaml");
+        fs::write(&config, "experiment:\\n  num_episodes: 999\\n").unwrap();
+
+        let report = audit_run(&fixture.0);
+        assert_eq!(report.status, "fail");
+        assert_eq!(report.provenance_manifest_status, "manifest_invalid");
+        assert!(report
+            .findings
+            .iter()
+            .any(|finding| finding.code == "provenance_artifact_hash_mismatch"));
+    }
+
+    #[test]
+    fn rejects_inconsistent_external_oracle_call_accounting() {
+        let fixture = Fixture::new();
+        fixture.write_provenance_manifest();
+        let path = fixture.0.join(PROVENANCE_MANIFEST_NAME);
+        let mut manifest: Value =
+            serde_json::from_str(&fs::read_to_string(&path).expect("read provenance")).unwrap();
+        manifest["oracle_accounting"]["external_calls"] = json!(99);
+        fs::write(&path, serde_json::to_vec_pretty(&manifest).unwrap()).unwrap();
+
+        let report = audit_run(&fixture.0);
+        assert_eq!(report.status, "fail");
+        assert!(report.findings.iter().any(|finding| {
+            finding.code == "oracle_accounting_external_call_mismatch"
+        }));
     }
 
     #[test]
