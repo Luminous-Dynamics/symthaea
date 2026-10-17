@@ -119,6 +119,8 @@ struct BenchmarkReceipt {
     selected_split: String,
     metadata_sha256: String,
     source_rows_selected: usize,
+    performer_count: usize,
+    performer_session_count: usize,
     generated_styles_requested: usize,
     generated_seeds_per_style: u64,
     human_reference: CorpusSummary,
@@ -274,6 +276,8 @@ fn run() -> Result<(), Box<dyn Error>> {
     let _cleanup_result = fs::remove_dir_all(&temp_dir);
     let (generated, generated_files) = generated_result?;
 
+    let performer_count = human_by_drummer.len();
+    let performer_session_count = human_by_drummer_session.len();
     let receipt = BenchmarkReceipt {
         schema: "melothaea-groove-timing-benchmark-v1",
         result_scope: "descriptive_profile_only_not_quality_qualified",
@@ -283,6 +287,8 @@ fn run() -> Result<(), Box<dyn Error>> {
         selected_split: args.split,
         metadata_sha256,
         source_rows_selected: source_files.len(),
+        performer_count,
+        performer_session_count,
         generated_styles_requested: args.generated_style_limit,
         generated_seeds_per_style: args.seeds_per_style,
         human_reference: human.summarize(),
