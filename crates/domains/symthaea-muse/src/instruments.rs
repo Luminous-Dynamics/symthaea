@@ -1383,18 +1383,17 @@ mod tests {
 
     #[test]
     fn new_additive_instrument_partials_are_well_formed() {
-        // 15 instruments now get dedicated additive-path tables: the
-        // original 9 (below) plus wave 2's 4 sustaining wind/voice additions
-        // (Tuba, Trombone, Duduk, ChoirOoh) and 2 KS/FM instruments given a
-        // dedicated fallback-backing table following the ElectricBass
-        // precedent (Harpsichord, Xylophone). The remaining KS/FM
-        // instruments (Mandolin, Banjo, Vibraphone, Celesta, MusicBox, and
-        // the rest of the original KS/FM roster) use KS/FM synthesis and —
+        // 19 instruments now get dedicated additive-path tables: the original
+        // 9, wave 2's 6 additions (Tuba, Trombone, Duduk, ChoirOoh, Harpsichord,
+        // Xylophone), and wave 3's four profile tables (Recorder, Ocarina,
+        // Harmonica, DanTranh). DanTranh is rendered by Karplus-Strong; its
+        // additive table is a fallback/profile description, not its primary
+        // synthesis path. The remaining KS/FM instruments use KS/FM synthesis and —
         // per this crate's own established pattern (see
         // Bell/Marimba/Guitar/Harp/Koto/Oud/Kalimba) — fall through to the
         // PIANO_FF additive-path fallback rather than getting a dedicated
         // table.
-        let tables: [(&str, &[f32; 16]); 15] = [
+        let tables: [(&str, &[f32; 16]); 19] = [
             ("VIOLA", &VIOLA),
             ("OBOE", &OBOE),
             ("BASSOON", &BASSOON),
@@ -1410,6 +1409,10 @@ mod tests {
             ("DUDUK", &DUDUK),
             ("CHOIR_OOH", &CHOIR_OOH),
             ("XYLOPHONE", &XYLOPHONE),
+            ("RECORDER", &RECORDER),
+            ("OCARINA", &OCARINA),
+            ("HARMONICA", &HARMONICA),
+            ("DAN_TRANH", &DAN_TRANH),
         ];
         for (name, table) in tables {
             assert_eq!(table.len(), 16, "{name} must have 16 partials");
@@ -1420,7 +1423,7 @@ mod tests {
             );
             assert!(
                 table.iter().all(|&x| x <= table[0] + 1e-6),
-                "{name} fundamental should be the strongest partial (no documented exception among these 15)"
+                "{name} fundamental should be the strongest partial (no documented exception among these 19)"
             );
         }
     }
