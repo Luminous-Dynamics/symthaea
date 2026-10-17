@@ -249,7 +249,7 @@ No dataset bytes, model weights, raw trajectories, or external solver outputs ar
 
 
 
-## 9. Distribution shift is a first-class test dimension
+## 8. Distribution shift is a first-class test dimension
 
 **Tracking:** [NANO-012 — worst-group trajectory reliability](https://github.com/Luminous-Dynamics/symthaea/issues/7762).
 
@@ -288,7 +288,7 @@ For each shift family and severity, report static energy/force/stress error dist
 
 The auditor/evaluator must reject: a single independence key shared between train and test; sample IDs duplicated across splits; missing or malformed source/shift digests; shift-severity labels shuffled after outcomes are viewed; and a policy that improves pooled metrics but materially degrades the predeclared worst group. Keep the official benchmark metrics intact; report shift metrics as separately named extensions.
 
-## 10. Prospective rescue-controller benchmark: maximize trustworthy simulation, not snapshot accuracy
+## 9. Prospective rescue-controller benchmark: maximize trustworthy simulation, not snapshot accuracy
 
 **Tracking:** [NANO-013 — prospective trajectory rescue and safe simulation time](https://github.com/Luminous-Dynamics/symthaea/issues/7777).
 
@@ -375,7 +375,7 @@ These are provisional go/no-go targets, not universal physical constants. The re
 
 This protocol qualifies a controller only after baseline reproduction, artifact/provenance audit, exact-head tests, and task-matched scientific validation. It does not qualify the current Symthaea molecular AIMD implementation for nanocrystal dynamics, and it authorizes no physical experiment.
 
-## 11. Decision record template
+## 10. Decision record template
 
 Each run review should end with a durable decision:
 
