@@ -525,6 +525,8 @@ fn main() {
     // not a perceptual classifier or a quality score.
     let mut within_seed_distances = vec![Vec::<f64>::new(); style_count];
     let mut within_layer_distances = vec![Vec::<f64>::new(); LAYERS.len()];
+    let mut within_layer_distances_by_style =
+        vec![vec![Vec::<f64>::new(); LAYERS.len()]; style_count];
     for style_index in 0..style_count {
         for intent_index in 0..INTENTS.len() {
             for seed_left in 0..SEEDS.len() {
@@ -539,8 +541,10 @@ fn main() {
                         layer_values.iter().zip(LAYERS.iter()).enumerate()
                     {
                         if *length > 0 {
-                            within_layer_distances[layer_index]
-                                .push(distance / (*length as f64).sqrt());
+                            let normalized = distance / (*length as f64).sqrt();
+                            within_layer_distances[layer_index].push(normalized);
+                            within_layer_distances_by_style[style_index][layer_index]
+                                .push(normalized);
                         }
                     }
                     within_seed_distances[style_index].push(layer_balanced_distance(
@@ -601,12 +605,23 @@ fn main() {
                 .enumerate()
                 .map(|(layer_index, (layer_name, _, layer_length))| {
                     let between = mean(&matched_layer_distances[layer_index]);
-                    let within_a = mean(&within_layer_distances[layer_index]);
-                    // Keep the two within-style baselines visible; their average
-                    // provides context without hiding style-specific variability.
-                    let margin_a = between - within_a;
+                    let within_a =
+                        mean(&within_layer_distances_by_style[left][layer_index]);
+                    let within_b =
+                        mean(&within_layer_distances_by_style[right][layer_index]);
+                    let within_pair_mean = (within_a + within_b) / 2.0;
                     let ratio_a = if within_a > 1e-9 {
                         json!(between / within_a)
+                    } else {
+                        Value::Null
+                    };
+                    let ratio_b = if within_b > 1e-9 {
+                        json!(between / within_b)
+                    } else {
+                        Value::Null
+                    };
+                    let pair_ratio = if within_pair_mean > 1e-9 {
+                        json!(between / within_pair_mean)
                     } else {
                         Value::Null
                     };
@@ -614,9 +629,14 @@ fn main() {
                         "layer": layer_name,
                         "dimensions": layer_length,
                         "mean_matched_between_style_rms": between,
-                        "mean_within_style_seed_rms_global_baseline": within_a,
-                        "between_minus_global_within_margin": margin_a,
-                        "between_to_global_within_ratio": ratio_a
+                        "mean_within_style_seed_rms_a": within_a,
+                        "mean_within_style_seed_rms_b": within_b,
+                        "between_minus_within_margin_a": between - within_a,
+                        "between_minus_within_margin_b": between - within_b,
+                        "between_minus_mean_within_pair_margin": between - within_pair_mean,
+                        "between_to_within_ratio_a": ratio_a,
+                        "between_to_within_ratio_b": ratio_b,
+                        "between_to_mean_within_pair_ratio": pair_ratio
                     })
                 })
                 .collect::<Vec<_>>();
