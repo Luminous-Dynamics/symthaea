@@ -654,6 +654,7 @@ fn verify_provenance_manifest(
         ("task-contract.json", manifest.task_contract_sha256.as_str()),
         ("evaluation-manifest.json", manifest.evaluation_manifest_sha256.as_str()),
         (".hydra/config.yaml", manifest.resolved_config_sha256.as_str()),
+        (manifest.oracle_call_ledger_path.as_str(), manifest.oracle_call_ledger_sha256.as_str()),
     ] {
         if let Some(artifact) = by_path.get(path) {
             if artifact.sha256 != expected_digest {
@@ -670,6 +671,250 @@ fn verify_provenance_manifest(
         report.checked("provenance_manifest_artifact_hashes_and_accounting_reconcile");
     } else {
         report.provenance_manifest_status = "manifest_invalid".to_owned();
+    }
+}
+
+fn verify_oracle_call_ledger(
+    run_dir: &Path,
+    manifest: &ProvenanceManifest,
+    artifacts: &BTreeMap<String, &ArtifactDeclaration>,
+    expected_proposal_requests: Option<usize>,
+    report: &mut AuditReport,
+) {
+    let findings_before = report.findings.len();
+    let Some(ledger_artifact) = artifacts.get(&manifest.oracle_call_ledger_path) else {
+        report.fail(
+            "oracle_call_ledger_missing",
+            format!(
+                "oracle call ledger {} is not included in the artifact manifest",
+                manifest.oracle_call_ledger_path
+            ),
+        );
+        return;
+    };
+    if ledger_artifact.sha256 != manifest.oracle_call_ledger_sha256 {
+        report.fail(
+            "oracle_call_ledger_digest_link_mismatch",
+            "oracle_call_ledger_sha256 does not match the listed ledger artifact digest",
+        );
+        return;
+    }
+
+    let (actual_digest, size_bytes) = match hash_artifact(run_dir, &manifest.oracle_call_ledger_path) {
+        Ok(result) => result,
+        Err(error) => {
+            report.fail("oracle_call_ledger_invalid_path", error);
+            return;
+        }
+    };
+    if size_bytes > MAX_ORACLE_CALL_LEDGER_BYTES {
+        report.fail(
+            "oracle_call_ledger_too_large",
+            format!(
+                "oracle call ledger exceeds the {MAX_ORACLE_CALL_LEDGER_BYTES}-byte limit"
+            ),
+        );
+        return;
+    }
+    if actual_digest != manifest.oracle_call_ledger_sha256 {
+        report.fail(
+            "oracle_call_ledger_hash_mismatch",
+            "oracle call ledger bytes do not match the declared SHA-256",
+        );
+        return;
+    }
+
+    let raw = match fs::read(run_dir.join(&manifest.oracle_call_ledger_path)) {
+        Ok(raw) => raw,
+        Err(error) => {
+            report.fail(
+                "oracle_call_ledger_unreadable",
+                format!("cannot read oracle call ledger: {error}"),
+            );
+            return;
+        }
+    };
+    let ledger_text = match std::str::from_utf8(&raw) {
+        Ok(text) => text,
+        Err(error) => {
+            report.fail(
+                "oracle_call_ledger_invalid_utf8",
+                format!("oracle call ledger must be UTF-8 JSONL: {error}"),
+            );
+            return;
+        }
+    };
+    let lines: Vec<&str> = ledger_text.lines().collect();
+    if lines.is_empty() {
+        report.fail("oracle_call_ledger_empty", "oracle call ledger contains no records");
+        return;
+    }
+    if lines.len() > MAX_ORACLE_CALL_RECORDS {
+        report.fail(
+            "oracle_call_ledger_record_limit_exceeded",
+            format!("oracle call ledger exceeds {MAX_ORACLE_CALL_RECORDS} records"),
+        );
+        return;
+    }
+
+    let mut setup_requests = 0usize;
+    let mut proposal_requests = 0usize;
+    let mut retry_requests = 0usize;
+    let mut cache_hits = 0usize;
+    let mut external_calls = 0usize;
+    let mut failed_external_calls = 0usize;
+    let mut total_cost = 0.0_f64;
+
+    for (index, line) in lines.iter().enumerate() {
+        if line.trim().is_empty() {
+            report.fail(
+                "oracle_call_ledger_blank_line",
+                format!("oracle call ledger line {} is blank", index + 1),
+            );
+            continue;
+        }
+        let call: OracleCallRecord = match serde_json::from_str(line) {
+            Ok(call) => call,
+            Err(error) => {
+                report.fail(
+                    "oracle_call_ledger_record_invalid",
+                    format!("line {} is not a valid strict call record: {error}", index + 1),
+                );
+                continue;
+            }
+        };
+        if call.sequence != index + 1 {
+            report.fail(
+                "oracle_call_ledger_sequence_mismatch",
+                format!(
+                    "line {} declares sequence {}; sequence numbers must be contiguous from 1",
+                    index + 1,
+                    call.sequence
+                ),
+            );
+        }
+        match call.stage.as_str() {
+            "setup" => setup_requests += 1,
+            "proposal" => {
+                proposal_requests += 1;
+                if !call
+                    .candidate_id
+                    .as_deref()
+                    .is_some_and(|candidate_id| !candidate_id.trim().is_empty())
+                {
+                    report.fail(
+                        "oracle_call_ledger_candidate_missing",
+                        format!("proposal record on line {} requires candidate_id", index + 1),
+                    );
+                }
+            }
+            "retry" => retry_requests += 1,
+            _ => report.fail(
+                "oracle_call_ledger_stage_invalid",
+                format!("line {} stage must be setup, proposal, or retry", index + 1),
+            ),
+        }
+        if !matches!(
+            call.status.as_str(),
+            "evaluated" | "invalid_candidate" | "oracle_failed" | "timeout"
+        ) {
+            report.fail(
+                "oracle_call_ledger_status_invalid",
+                format!("line {} has unsupported status {:?}", index + 1, call.status),
+            );
+        }
+        if call.cache_hit {
+            cache_hits += 1;
+        }
+        if call.external_invocation {
+            external_calls += 1;
+            if call.status != "evaluated" {
+                failed_external_calls += 1;
+            }
+        }
+        if call.external_invocation == call.cache_hit {
+            report.fail(
+                "oracle_call_ledger_invocation_cache_contradiction",
+                format!(
+                    "line {} must represent exactly one of cache_hit or external_invocation",
+                    index + 1
+                ),
+            );
+        }
+        if !call.cost.is_finite() || call.cost < 0.0 || call.cost > 1.0e12 {
+            report.fail(
+                "oracle_call_ledger_cost_invalid",
+                format!("line {} cost must be finite and between 0 and 1e12", index + 1),
+            );
+        } else {
+            total_cost += call.cost;
+        }
+        if !is_lower_hex(&call.receipt_sha256, 64) {
+            report.fail(
+                "oracle_call_ledger_receipt_digest_invalid",
+                format!("line {} receipt_sha256 is not a SHA-256 digest", index + 1),
+            );
+        }
+        match artifacts.get(&call.receipt_path) {
+            Some(artifact) if artifact.sha256 == call.receipt_sha256 => {}
+            Some(_) => report.fail(
+                "oracle_call_ledger_receipt_digest_mismatch",
+                format!("line {} receipt digest differs from the artifact manifest", index + 1),
+            ),
+            None => report.fail(
+                "oracle_call_ledger_receipt_missing",
+                format!(
+                    "line {} receipt {} is not included in the artifact manifest",
+                    index + 1,
+                    call.receipt_path
+                ),
+            ),
+        }
+    }
+
+    let accounting = &manifest.oracle_accounting;
+    for (counter, actual, expected) in [
+        ("setup_requests", setup_requests, accounting.setup_requests),
+        ("proposal_requests", proposal_requests, accounting.proposal_requests),
+        ("retry_requests", retry_requests, accounting.retry_requests),
+        ("cache_hits", cache_hits, accounting.cache_hits),
+        ("external_calls", external_calls, accounting.external_calls),
+        (
+            "failed_external_calls",
+            failed_external_calls,
+            accounting.failed_external_calls,
+        ),
+    ] {
+        if actual != expected {
+            report.fail(
+                "oracle_call_ledger_counter_mismatch",
+                format!("ledger {counter}={actual}, manifest declares {expected}"),
+            );
+        }
+    }
+    if !floats_equal(total_cost, accounting.total_cost) {
+        report.fail(
+            "oracle_call_ledger_cost_mismatch",
+            format!(
+                "ledger total cost is {total_cost}, manifest declares {}",
+                accounting.total_cost
+            ),
+        );
+    }
+    match expected_proposal_requests {
+        Some(expected) if proposal_requests == expected => {}
+        Some(expected) => report.fail(
+            "oracle_call_ledger_proposal_count_mismatch",
+            format!("ledger has {proposal_requests} proposal records but episode metrics sum to {expected}"),
+        ),
+        None => report.fail(
+            "oracle_call_ledger_proposal_count_unavailable",
+            "cannot reconcile proposal ledger records because episode query counts are unavailable",
+        ),
+    }
+
+    if report.findings.len() == findings_before {
+        report.checked("oracle_call_ledger_reconciles_manifest_and_receipts");
     }
 }
 
