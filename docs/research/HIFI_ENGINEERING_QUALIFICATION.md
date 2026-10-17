@@ -108,6 +108,13 @@ Never compress this scorecard to one undifferentiated leaderboard number.
 
 ## Verification status
 
+When a Rust toolchain is available, the focused commands are:
+
+\`\`\`bash
+cargo test --features "engineering-foundations school_learning" --lib benchmark_validation
+cargo test --features "engineering-foundations school_learning" --test engineering_benchmark_validation_oracle
+\`\`\`
+
 The focused source change, eight unit-test declarations, and a separately located 14-case integration oracle with hand-authored expected outcomes are on a dedicated public-repository branch. Rust execution is **not claimed** in this environment: neither `cargo` nor `rustc` is installed in the available shell, and queued CI jobs are not passes. No engineering capability, solver, physical result, reliability figure or safety certification is claimed by this document.
 
 ## References
