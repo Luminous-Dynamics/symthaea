@@ -331,7 +331,11 @@ mod tests {
 
     #[test]
     fn energy_saving_reports_savings_and_regressions_without_clamping() {
-        close(energy_saving_percent(100.0, 90.0).expect("positive baseline"), 10.0, 1e-12);
+        close(
+            energy_saving_percent(100.0, 90.0).expect("positive baseline"),
+            10.0,
+            1e-12,
+        );
         close(
             energy_saving_percent(100.0, 110.0).expect("treatment regression"),
             -10.0,
