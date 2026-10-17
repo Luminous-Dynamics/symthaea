@@ -373,46 +373,79 @@ impl CognitiveLoopService {
                             written_at: consumed_written_at,
                         });
 
-                    // The legacy default adapter forwards configured simulator dt.
-                    // Hardware bridges should override step_with_timing and enforce
-                    // their own qualified physical/device clock contract.
-                    match symthaea_core::embodiment::PlantStepTimingV1::configured_simulation(
-                        (cycle_num / interval) as u64,
-                        self.config.cfc_config.delta_t,
-                    ) {
-                        Ok(timing) => {
-                            match bridge.step_with_timing(&thought_hv, &timing, phi) {
-                                Ok(result) if result.success => {
-                                    let proprioceptive_hv = bridge.encode_perception();
-                                    let w = self.config.embodiment_blend_weight;
-                                    if w > 0.0 {
-                                        perception.encoding.encoding_result.hdv.lerp_in_place(
-                                            &proprioceptive_hv,
-                                            1.0 - w,
-                                            w,
-                                        );
-                                    }
-                                    self.sensorimotor.last_proprioceptive_hv =
-                                        Some(proprioceptive_hv);
-                                }
-                                Ok(_) => {}
-                                Err(error) => {
-                                    tracing::error!(
-                                        target: "symthaea::embodiment",
-                                        cycle = cycle_num,
-                                        error = ?error,
-                                        "bridge rejected plant timing; embodiment step not authorized"
-                                    );
-                                }
-                            }
+                    // The bridge must explicitly declare who owns plant time.
+                    // Undeclared authority and hardware profiles are never silently
+                    // handed a cognitive-loop configured simulation timestep.
+                    let plant_step_index = (cycle_num / interval) as u64;
+                    let timed_step: Result<
+                        (
+                            symthaea_core::embodiment::EmbodimentResult,
+                            symthaea_core::embodiment::PlantStepTimingV1,
+                        ),
+                        symthaea_core::embodiment::PlantStepTimingErrorV1,
+                    > = match bridge.plant_step_authority() {
+                        symthaea_core::embodiment::PlantStepAuthorityV1::Unspecified => {
+                            Err(symthaea_core::embodiment::PlantStepTimingErrorV1::TimingAuthorityUnspecified)
                         }
+                        symthaea_core::embodiment::PlantStepAuthorityV1::ConfiguredSimulation => {
+                            symthaea_core::embodiment::PlantStepTimingV1::configured_simulation(
+                                plant_step_index,
+                                self.config.cfc_config.delta_t,
+                            )
+                            .and_then(|timing| {
+                                bridge
+                                    .step_with_timing(&thought_hv, &timing, phi)
+                                    .map(|result| (result, timing))
+                            })
+                        }
+                        symthaea_core::embodiment::PlantStepAuthorityV1::BackendMeasuredClockRequired => {
+                            bridge
+                                .step_with_backend_timing(&thought_hv, plant_step_index, phi)
+                                .and_then(|outcome| {
+                                    outcome.timing.validate()?;
+                                    if outcome.timing.step_index != plant_step_index {
+                                        return Err(symthaea_core::embodiment::PlantStepTimingErrorV1::TimingStepIndexMismatch);
+                                    }
+                                    if outcome.timing.source
+                                        == symthaea_core::embodiment::PlantStepTimeSourceV1::ConfiguredSimulationStep
+                                    {
+                                        return Err(symthaea_core::embodiment::PlantStepTimingErrorV1::ConfiguredTimeReturnedForBackendMeasurement);
+                                    }
+                                    Ok((outcome.result, outcome.timing))
+                                })
+                        }
+                    };
+
+                    match timed_step {
+                        Ok((result, timing)) if result.success => {
+                            tracing::debug!(
+                                target: "symthaea::embodiment",
+                                cycle = cycle_num,
+                                step_index = timing.step_index,
+                                source = ?timing.source,
+                                dt_seconds = timing.dt_seconds,
+                                clock_domain = ?timing.clock_domain_id,
+                                clock_epoch = ?timing.clock_epoch_id,
+                                "embodiment step accepted with validated plant-time authority"
+                            );
+                            let proprioceptive_hv = bridge.encode_perception();
+                            let w = self.config.embodiment_blend_weight;
+                            if w > 0.0 {
+                                perception.encoding.encoding_result.hdv.lerp_in_place(
+                                    &proprioceptive_hv,
+                                    1.0 - w,
+                                    w,
+                                );
+                            }
+                            self.sensorimotor.last_proprioceptive_hv = Some(proprioceptive_hv);
+                        }
+                        Ok((_result, _timing)) => {}
                         Err(error) => {
-                            // Fail closed: do not call the legacy bridge with an invalid dt.
                             tracing::error!(
                                 target: "symthaea::embodiment",
                                 cycle = cycle_num,
                                 error = ?error,
-                                "refusing embodiment step with invalid plant timing"
+                                "refusing embodiment step without authorized and valid plant timing"
                             );
                         }
                     }
