@@ -44,7 +44,10 @@ impl ArtifactKind {
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
 pub enum RightsReview {
-    OpenRightsReviewed,
+    OpenRightsReviewed {
+        reviewer_ref: String,
+        evidence_sha256: String,
+    },
     Unknown,
     Incompatible,
 }
@@ -137,6 +140,7 @@ pub enum QualificationIssue {
     MissingLicenseIdentifier(ArtifactKind),
     UnknownArtifactRights(ArtifactKind),
     IncompatibleArtifactRights(ArtifactKind),
+    InvalidRightsReview(ArtifactKind),
     InvalidArtifactDigest(ArtifactKind),
     ArtifactRevisionMismatch {
         kind: ArtifactKind,
@@ -265,8 +269,16 @@ pub fn qualify_package(package: &DesignPackage) -> QualificationReport {
             });
             blocked = true;
         }
-        match artifact.rights_review {
-            RightsReview::OpenRightsReviewed => {}
+        match &artifact.rights_review {
+            RightsReview::OpenRightsReviewed {
+                reviewer_ref,
+                evidence_sha256,
+            } => {
+                if reviewer_ref.trim().is_empty() || !is_sha256(evidence_sha256) {
+                    issues.push(QualificationIssue::InvalidRightsReview(artifact.kind));
+                    blocked = true;
+                }
+            }
             RightsReview::Unknown => {
                 issues.push(QualificationIssue::UnknownArtifactRights(artifact.kind));
                 blocked = true;
@@ -441,7 +453,10 @@ mod tests {
             source_ref: format!("fixture://farm-design/rev-{revision}/{kind:?}"),
             sha256: "a".repeat(64),
             license_id: "CERN-OHL-S-2.0".into(),
-            rights_review: RightsReview::OpenRightsReviewed,
+            rights_review: RightsReview::OpenRightsReviewed {
+                reviewer_ref: "fixture://reviewer/licensing-review-001".into(),
+                evidence_sha256: "b".repeat(64),
+            },
             preferred_editable_source: kind == ArtifactKind::EditableSource,
         }
     }
@@ -538,6 +553,20 @@ mod tests {
         let mut incompatible = complete_package();
         incompatible.artifacts[0].rights_review = RightsReview::Incompatible;
         assert_eq!(qualify_package(&incompatible).readiness, PackageReadiness::Blocked);
+    }
+
+    #[test]
+    fn rights_review_requires_a_traceable_reviewer_and_evidence_digest() {
+        let mut package = complete_package();
+        package.artifacts[0].rights_review = RightsReview::OpenRightsReviewed {
+            reviewer_ref: String::new(),
+            evidence_sha256: "bad".into(),
+        };
+        let report = qualify_package(&package);
+        assert_eq!(report.readiness, PackageReadiness::Blocked);
+        assert!(report.issues.contains(
+            &QualificationIssue::InvalidRightsReview(ArtifactKind::EditableSource)
+        ));
     }
 
     #[test]
