@@ -490,11 +490,53 @@ fn anchor_on_module_boundary(
     configuration: &Configuration,
     anchor: &RoutingAnchor,
 ) -> Result<(), RoutingError> {
+    validate_anchor_shape(anchor)?;
+    let decks: Vec<_> = configuration.platform.deck_bounds.iter()
+        .filter(|deck| deck.deck_id == anchor.deck_id).collect();
+    if decks.len() != 1 {
+        return Err(RoutingError::new(
+            "ANCHOR_DECK_NOT_UNIQUE",
+            format!("anchor deck {:?} resolves to {} definitions", anchor.deck_id, decks.len()),
+        ));
+    }
+    let deck_bounds = &decks[0].bounds_mm;
+    if anchor.position_mm.z_mm < deck_bounds.z_min_mm
+        || anchor.position_mm.z_mm > deck_bounds.z_max_mm
+    {
+        return Err(RoutingError::new(
+            "ANCHOR_Z_OUTSIDE_DECK",
+            format!("anchor on deck {:?} declares Z={} mm outside the deck Z bounds", anchor.deck_id, anchor.position_mm.z_mm),
+        ));
+    }
     if anchor.kind != AnchorKind::ModulePort {
         return Ok(());
     }
     let instance_id = anchor.instance_id.as_deref().expect("shape checked");
+    let port_id = anchor.port_id.as_deref().expect("shape checked");
     let (deck_id, rect) = module_bounds(configuration, instance_id)?;
+    let placements: Vec<_> = configuration.placements.iter()
+        .filter(|placement| placement.instance_id == instance_id).collect();
+    if placements.len() != 1 {
+        return Err(RoutingError::new("ANCHOR_INSTANCE_NOT_UNIQUE", "module-port anchor must resolve to exactly one placed instance"));
+    }
+    let placement = placements[0];
+    let modules: Vec<_> = configuration.module_catalog.iter()
+        .filter(|module| module.module_id == placement.module_id && module.revision == placement.module_revision).collect();
+    if modules.len() != 1 {
+        return Err(RoutingError::new("ANCHOR_MODULE_NOT_UNIQUE", "module-port anchor must resolve to exactly one module revision"));
+    }
+    if !modules[0].ports.iter().any(|port| port.port_id == port_id) {
+        return Err(RoutingError::new("ANCHOR_PORT_NOT_UNIQUE", "module-port anchor references no declared port"));
+    }
+    let z_min = placement.position_mm.z_mm;
+    let z_max = z_min.checked_add(modules[0].envelope_mm.height_mm)
+        .ok_or_else(|| RoutingError::new("MODULE_ENVELOPE_Z_OVERFLOW", "module Z envelope overflows"))?;
+    if anchor.position_mm.z_mm < z_min || anchor.position_mm.z_mm > z_max {
+        return Err(RoutingError::new(
+            "ANCHOR_Z_OUTSIDE_MODULE_ENVELOPE",
+            format!("port anchor for instance {:?} lies outside the module's declared vertical envelope", instance_id),
+        ));
+    }
     let x = anchor.position_mm.x_mm;
     let y = anchor.position_mm.y_mm;
     let on_side = match anchor.side.expect("shape checked") {
@@ -1114,6 +1156,14 @@ pub fn verify_service_route_geometry(
     if result.route_id != request.route_id
         || result.connection_id != request.connection_id
         || grid_pitch_mm <= 0
+        || request.clearance_mm < 0
+        || request.clearance_mm > HARD_MAX_CLEARANCE_MM
+        || request.bend_penalty_mm < 0
+        || request.bend_penalty_mm > HARD_MAX_BEND_PENALTY_MM
+        || validate_anchor_shape(&request.start).is_err()
+        || validate_anchor_shape(&request.end).is_err()
+        || anchor_on_module_boundary(configuration, &request.start).is_err()
+        || anchor_on_module_boundary(configuration, &request.end).is_err()
     {
         return false;
     }
