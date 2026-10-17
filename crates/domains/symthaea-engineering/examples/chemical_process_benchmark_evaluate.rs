@@ -1113,6 +1113,9 @@ mod tests {
     use super::*;
 
     const HEAD: &str = "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa";
+    const FROZEN_CORPUS_JSON: &str = include_str!(
+        "../../../../docs/engineering/fixtures/CHEMICAL_PROCESS_QUALIFICATION_V1.json"
+    );
 
     #[test]
     fn sha256_digest_matches_published_test_vector() {
@@ -1563,6 +1566,39 @@ mod tests {
             output["cases"][0]["computed_numeric_checks"]["observed_conversion_valid"],
             false
         );
+    }
+
+    #[test]
+    fn all_twenty_semantic_oracles_match_the_frozen_fixture_dispositions() {
+        let corpus: Value = serde_json::from_str(FROZEN_CORPUS_JSON)
+            .expect("frozen synthetic corpus must parse for oracle coverage tests");
+        let tolerance = corpus["residual_profile"]["target_max"]
+            .as_f64()
+            .expect("frozen corpus must declare a numeric tolerance");
+        let cases = corpus["cases"].as_array().expect("frozen cases must be an array");
+        let mut checked = BTreeSet::new();
+
+        for case in cases {
+            let id = text(case, "id").expect("every frozen case must have an ID");
+            if matches!(
+                id,
+                "CHEM-PROC-001" | "CHEM-PROC-002" | "CHEM-PROC-004" | "CHEM-PROC-007"
+            ) {
+                continue;
+            }
+
+            let fixture = case.get("fixture").expect("case must have a fixture");
+            let oracle = derive_synthetic_disposition(id, fixture, tolerance)
+                .unwrap_or_else(|reason| panic!("{id} should have an independent oracle: {reason}"));
+            assert_eq!(
+                text(&oracle, "derived_disposition"),
+                text(case, "expected_disposition"),
+                "independent semantic oracle disagrees for {id}: {oracle}"
+            );
+            assert!(checked.insert(id.to_owned()), "semantic oracle case {id} was duplicated");
+        }
+
+        assert_eq!(checked.len(), 20, "every non-numeric fixture needs an independent semantic oracle");
     }
 
 }
