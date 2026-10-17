@@ -775,6 +775,12 @@
       "title": "CT-LNN: FPGA-Based Accelerator for Continuous-Time Liquid Neural Networks (IEEE TCSI, 2026)",
       "url": "https://doi.org/10.1109/TCSI.2026.3704401",
       "use": "External motivation for evaluating continuous-time state update and hardware/dataflow jointly; this is not a Symthaea performance baseline or a transferable numerical result."
+    },
+    {
+      "id": "S11",
+      "title": "Algorithm–hardware co-design of neuromorphic networks with dual memory pathways (Nature Machine Intelligence, 2026)",
+      "url": "https://www.nature.com/articles/s42256-026-01255-3",
+      "use": "External architectural motivation for compact slow-state plus fast/event-driven pathway co-design. The paper's reported throughput/energy figures are post-layout simulations for a different spiking architecture, not Symthaea measurements."
     }
   ],
   "benchmark_methodology": {
@@ -938,7 +944,50 @@
         "system_energy_at_declared_boundary",
         "snapshot_and_online_adaptation_continuity"
       ],
-      "promotion_rule": "Operator evidence is only a precondition. Resolution or hardware profiles advance only after trajectory fidelity, resource admissibility, task quality and measured cost are qualified on the same frozen source/config/workload. No default >64K promotion follows from representability alone."
+      "promotion_rule": "Operator evidence is only a precondition. Resolution or hardware profiles advance only after trajectory fidelity, resource admissibility, task quality and measured cost are qualified on the same frozen source/config/workload. No default >64K promotion follows from representability alone.",
+      "semantic_vs_dynamical_width": {
+        "status": "hypothesis for controlled experiment; not a production design decision",
+        "semantic_space_dimensions": [
+          16384,
+          32768,
+          65536,
+          131072,
+          262144
+        ],
+        "candidate_local_dynamical_dimensions": [
+          1024,
+          4096,
+          16384,
+          32768
+        ],
+        "canonical_owner": "https://github.com/Luminous-Dynamics/symthaea/issues/3348",
+        "control_arms": [
+          "full_width_dynamics",
+          "random_projection_at_matched_local_width",
+          "deterministic_orthogonal_or_nested_projection_where_applicable",
+          "manifold_projection_with_explicit_residual_novelty_path"
+        ],
+        "later_arm": "learned_task_specific_projection_only_after_nonlearned_controls",
+        "hard_rules": [
+          "High-dimensional semantic representation and local dynamical state dimension are separate declarations.",
+          "No full-width recurrent work may be hidden in a benchmark claiming compressed dynamics.",
+          "Residual/novelty path may not silently move the full source vector every step.",
+          "Static similarity preservation does not establish trajectory preservation.",
+          "Compression must preserve declared task quality and satisfy trajectory, tau/gate, stability, resource and measurement gates."
+        ],
+        "metrics": [
+          "task_quality_vs_local_state_width_frontier",
+          "reconstruction_error",
+          "temporal_prediction_or_control_quality",
+          "trajectory_tau_gate_error",
+          "bytes_moved",
+          "resident_and_peak_temporary_bytes",
+          "projection_and_lift_overhead",
+          "p50_p95_p99_latency",
+          "end_to_end_system_energy_where_measurable"
+        ],
+        "external_inspiration": "S11 describes a different spiking architecture; its post-layout-simulation results motivate hypotheses only and are not Symthaea benchmark data."
+      }
     }
   },
   "classification_labels": [
