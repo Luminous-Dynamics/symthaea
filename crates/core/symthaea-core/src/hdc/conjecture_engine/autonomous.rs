@@ -837,6 +837,7 @@ fn holdout_validation_profile_digest(
     dynamics_id: &str,
     candidate_digest: &str,
     discovery_config_digest: &str,
+    discovery_ic_manifest_digest: &str,
     holdout_manifest_digest: &str,
     discovery_seed: u64,
     holdout_seed: u64,
@@ -850,6 +851,7 @@ fn holdout_validation_profile_digest(
     holdout_hash_string(&mut hasher, dynamics_id);
     holdout_hash_string(&mut hasher, candidate_digest);
     holdout_hash_string(&mut hasher, discovery_config_digest);
+    holdout_hash_string(&mut hasher, discovery_ic_manifest_digest);
     holdout_hash_string(&mut hasher, holdout_manifest_digest);
     hasher.update(&discovery_seed.to_le_bytes());
     hasher.update(&holdout_seed.to_le_bytes());
@@ -878,6 +880,7 @@ fn compute_holdout_receipt_digest(result: &AutonomousHoldoutValidation) -> Strin
     holdout_hash_string(&mut hasher, &result.candidate_expression_digest);
     holdout_hash_string(&mut hasher, &result.discovery_config_snapshot);
     holdout_hash_string(&mut hasher, &result.discovery_config_digest);
+    holdout_hash_string(&mut hasher, &result.discovery_initial_conditions_digest);
     hasher.update(&(result.initial_state.len() as u64).to_le_bytes());
     for value in &result.initial_state {
         holdout_hash_f64(&mut hasher, *value);
