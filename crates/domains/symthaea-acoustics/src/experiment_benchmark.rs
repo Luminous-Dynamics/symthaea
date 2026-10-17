@@ -413,6 +413,19 @@ fn validate_plan(
     plan: &BudgetedExperimentPlan,
     option_map: &HashMap<&str, &ExperimentOption>,
 ) -> Result<(), SyntheticBenchmarkError> {
+    if options != plan.input_option_snapshot.as_slice() {
+        return Err(SyntheticBenchmarkError::PlanOptionPoolMismatch);
+    }
+    let ranking = rank_experiments(
+        options,
+        &plan.evaluation_profile_id,
+        &plan.cost_unit_id,
+        plan.policy,
+    )?;
+    let replayed_plan = select_under_budget(options, &ranking, plan.budget_units)?;
+    if replayed_plan != *plan {
+        return Err(SyntheticBenchmarkError::PlanReplayMismatch);
+    }
     if plan.selected_option_indices.len() != plan.selected_option_ids.len() {
         return Err(SyntheticBenchmarkError::PlanIndexIdMismatch);
     }
@@ -695,6 +708,26 @@ mod tests {
         assert_eq!(
             score_synthetic_plan(&changed, &case, &plan),
             Err(SyntheticBenchmarkError::PlanOptionPoolMismatch)
+        );
+    }
+
+
+    #[test]
+    fn scorer_rejects_plan_that_does_not_replay_under_declared_policy() {
+        let (options, case) = fixture();
+        let ranking = rank_experiments(
+            &options,
+            PROFILE,
+            COST,
+            ExperimentSelectionPolicy::CheapestFirst,
+        )
+        .unwrap();
+        let mut plan = select_under_budget(&options, &ranking, 9).unwrap();
+        plan.policy = ExperimentSelectionPolicy::FrontierRelevanceFirst;
+
+        assert_eq!(
+            score_synthetic_plan(&options, &case, &plan),
+            Err(SyntheticBenchmarkError::PlanReplayMismatch)
         );
     }
 
