@@ -165,8 +165,14 @@ pub struct IdealCapacitorMetrics {
     pub peak_stored_energy_j: f64,
     /// Active dielectric volume, in cubic metres.
     pub active_dielectric_volume_m3: f64,
-    /// Ideal linear-dielectric energy density, in J/m³.
+    /// Ideal linear-dielectric energy density at the applied field, in J/m³.
     pub ideal_energy_density_j_per_m3: f64,
+    /// Ideal linear-dielectric energy density evaluated at the reported breakdown field, in J/m³.
+    ///
+    /// This is a theoretical screening upper bound, not a rated or usable energy density.
+    /// It assumes field-independent permittivity, a homogeneous defect-free dielectric,
+    /// and no hysteresis, leakage, aging, thermal, or reliability penalties.
+    pub ideal_breakdown_limited_energy_density_j_per_m3: Option<f64>,
     /// Estimated sinusoidal dielectric-loss power at the record's test frequency, in watts.
     pub dielectric_loss_power_w: f64,
     /// Reported breakdown strength divided by calculated peak field, if both exist and field is nonzero.
@@ -215,6 +221,15 @@ pub fn calculate_ideal_capacitor_metrics(
         * geometry.dielectric_thickness_m
         * layers;
     let ideal_energy_density_j_per_m3 = peak_stored_energy_j / active_dielectric_volume_m3;
+    // This theoretical figure of merit makes the permittivity-versus-breakdown trade-off
+    // explicit; it must never be interpreted as an operating rating or safety clearance.
+    let ideal_breakdown_limited_energy_density_j_per_m3 = material
+        .breakdown_strength_v_per_m
+        .map(|breakdown| {
+            0.5 * VACUUM_PERMITTIVITY_F_PER_M
+                * material.relative_permittivity
+                * breakdown.powi(2)
+        });
     let dielectric_loss_power_w = 2.0
         * PI
         * material.test_frequency_hz
@@ -232,6 +247,7 @@ pub fn calculate_ideal_capacitor_metrics(
         peak_stored_energy_j,
         active_dielectric_volume_m3,
         ideal_energy_density_j_per_m3,
+        ideal_breakdown_limited_energy_density_j_per_m3,
         dielectric_loss_power_w,
         breakdown_field_ratio,
         property_temperature_k: material.test_temperature_k,
@@ -251,6 +267,9 @@ pub fn calculate_ideal_capacitor_metrics(
     .into_iter()
     .all(f64::is_finite);
     if !finite
+        || metrics
+            .ideal_breakdown_limited_energy_density_j_per_m3
+            .is_some_and(|value| !value.is_finite())
         || metrics
             .breakdown_field_ratio
             .is_some_and(|ratio| !ratio.is_finite())
@@ -376,6 +395,29 @@ mod tests {
         .unwrap();
         let expected = 0.5 * VACUUM_PERMITTIVITY_F_PER_M * 1_000.0 * 1.0e14;
         assert!((metrics.ideal_energy_density_j_per_m3 - expected).abs() <= expected * 1.0e-12);
+    }
+
+    #[test]
+    fn breakdown_limited_energy_density_is_only_an_ideal_upper_bound() {
+        let material = synthetic_record();
+        let metrics =
+            calculate_ideal_capacitor_metrics(&material, &geometry(), 10.0, 0.0).unwrap();
+        let breakdown = material.breakdown_strength_v_per_m.unwrap();
+        let expected = 0.5
+            * VACUUM_PERMITTIVITY_F_PER_M
+            * material.relative_permittivity
+            * breakdown.powi(2);
+        assert_eq!(
+            metrics.ideal_breakdown_limited_energy_density_j_per_m3,
+            Some(expected)
+        );
+
+        let mut no_breakdown = material;
+        no_breakdown.breakdown_strength_v_per_m = None;
+        no_breakdown.breakdown_reference = None;
+        let metrics =
+            calculate_ideal_capacitor_metrics(&no_breakdown, &geometry(), 10.0, 0.0).unwrap();
+        assert_eq!(metrics.ideal_breakdown_limited_energy_density_j_per_m3, None);
     }
 
     #[test]
