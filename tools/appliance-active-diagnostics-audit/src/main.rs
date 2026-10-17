@@ -19,10 +19,10 @@ const EXPECTED_TRACE_IDS: [&str; 21] = [
 type Errors = Vec<String>;
 
 #[derive(Debug, Clone, PartialEq, Eq)]
-pub(super) struct Decision {
-    pub(super) decision: String,
-    pub(super) next_measurement_id: Option<String>,
-    pub(super) reason_code: String,
+pub(crate) struct Decision {
+    pub(crate) decision: String,
+    pub(crate) next_measurement_id: Option<String>,
+    pub(crate) reason_code: String,
 }
 
 #[derive(Debug, PartialEq, Eq)]
@@ -37,11 +37,11 @@ struct AuditSummary {
     corpus_sha256: String,
 }
 
-pub(super) fn text_at<'a>(value: &'a Value, key: &str) -> Option<&'a str> {
+pub(crate) fn text_at<'a>(value: &'a Value, key: &str) -> Option<&'a str> {
     value.get(key).and_then(Value::as_str)
 }
 
-pub(super) fn number_at(value: &Value, key: &str) -> Option<f64> {
+pub(crate) fn number_at(value: &Value, key: &str) -> Option<f64> {
     value.get(key).and_then(Value::as_f64)
 }
 
@@ -83,7 +83,7 @@ fn invalid_decision(reason_code: &str) -> Decision {
     }
 }
 
-pub(super) fn validate_trace(trace: &Value) -> Result<(), String> {
+pub(crate) fn validate_trace(trace: &Value) -> Result<(), String> {
     let Some(hypotheses) = trace.get("hypotheses").and_then(Value::as_array) else {
         return Err("invalid_prior_distribution".to_owned());
     };
@@ -236,7 +236,7 @@ fn likelihood<'a>(measurement: &'a Value, hypothesis_id: &str, outcome_id: &str)
         .as_f64()
 }
 
-pub(super) fn information_gain(trace: &Value, measurement: &Value) -> f64 {
+pub(crate) fn information_gain(trace: &Value, measurement: &Value) -> f64 {
     let hypotheses = trace
         .get("hypotheses")
         .and_then(Value::as_array)
@@ -279,7 +279,7 @@ pub(super) fn information_gain(trace: &Value, measurement: &Value) -> f64 {
     (prior_entropy - expected_posterior_entropy).max(0.0)
 }
 
-pub(super) fn evaluate_trace(trace: &Value) -> Decision {
+pub(crate) fn evaluate_trace(trace: &Value) -> Decision {
     if let Err(reason_code) = validate_trace(trace) {
         return invalid_decision(&reason_code);
     }
@@ -483,7 +483,7 @@ fn audit_values(
     })
 }
 
-pub(super) fn audit_texts(schema_raw: &str, corpus_raw: &str) -> Result<AuditSummary, Errors> {
+pub(crate) fn audit_texts(schema_raw: &str, corpus_raw: &str) -> Result<AuditSummary, Errors> {
     let schema: Value = serde_json::from_str(schema_raw)
         .map_err(|error| vec![format!("schema JSON parse failed: {error}")])?;
     let corpus: Value = serde_json::from_str(corpus_raw)
