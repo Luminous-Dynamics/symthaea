@@ -12,6 +12,9 @@
 
 use serde::Serialize;
 use std::env;
+
+#[path = "blind_world_benchmark.rs"]
+mod blind_world_benchmark;
 use symthaea_sensebench::{
     EvaluationSplit, ScenarioKind, causal_benchmark::run_causal_selection_benchmark, evaluate,
     generate_scenario, z_score_baseline, ScenarioManifest, GENERATOR_VERSION,
@@ -50,6 +53,14 @@ struct RobustnessRunReport {
     generator_version: &'static str,
     code_revision: Option<String>,
     benchmark: symthaea_sensebench::robustness_benchmark::ModelMisspecificationBenchmarkReport,
+}
+
+#[derive(Serialize)]
+struct BlindWorldRunReport {
+    report_version: u16,
+    suite: &'static str,
+    code_revision: Option<String>,
+    benchmark: blind_world_benchmark::BlindWorldBenchmarkReport,
 }
 
 fn main() {
@@ -94,6 +105,7 @@ fn run() -> Result<(), String> {
                 );
                 println!("sensebench --suite causal --trials N --budget N --seed N");
                 println!("sensebench --suite robustness");
+                println!("sensebench --suite blind-worlds --trials 512 --budget 8 --seed 42");
                 println!("set SENSEBENCH_CODE_REVISION to the exact Git commit before running");
                 println!("--allow-unversioned is for exploratory runs only");
                 return Ok(());
@@ -145,8 +157,24 @@ fn run() -> Result<(), String> {
             .map_err(|error| format!("could not encode robustness report: {error}"))?);
         return Ok(());
     }
+    if suite == "blind-worlds" {
+        let benchmark = blind_world_benchmark::run_blind_world_benchmark(
+            trials, budget, seed, 0.95,
+        ).map_err(|error| error.to_string())?;
+        let report = BlindWorldRunReport {
+            report_version: 1,
+            suite: "blind_world_active_selection",
+            code_revision: revision,
+            benchmark,
+        };
+        println!("{}", serde_json::to_string_pretty(&report)
+            .map_err(|error| format!("could not encode blind-world report: {error}"))?);
+        return Ok(());
+    }
     if suite != "anomaly" {
-        return Err(format!("unknown suite: {suite}; expected anomaly, causal, or robustness"));
+        return Err(format!(
+            "unknown suite: {suite}; expected anomaly, causal, robustness, or blind-worlds"
+        ));
     }
 
     let scenarios: Vec<ScenarioKind> = if scenario_arg == "all" {
