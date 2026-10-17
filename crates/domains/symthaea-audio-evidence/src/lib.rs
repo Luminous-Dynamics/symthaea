@@ -63,8 +63,11 @@ pub fn validate_manifest(manifest: &Value) -> Result<(), String> {
             .is_some_and(|ch| ch.is_ascii_uppercase() || ch.is_ascii_digit())
     {
         return Err(
-            "manifest_id must be 3-128 ASCII uppercase/digit/._- characters and start with an uppercase letter or digit"
-                .to_owned(),
+            concat!(
+                "manifest_id must be 3-128 ASCII uppercase/digit/._- characters ",
+                "and start with an uppercase letter or digit"
+            )
+            .to_owned(),
         );
     }
 
