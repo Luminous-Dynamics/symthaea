@@ -1225,6 +1225,7 @@ fn simulate_trial(
         .ok_or(ScmGraphBenchmarkError::InvalidDagCatalogue)?;
     let mut measurements_used = 0usize;
     let mut interventions_used = 0usize;
+    let mut observed_states = Vec::with_capacity(measurement_budget);
     let mut measurements_to_threshold = None;
     let mut interventions_to_threshold = None;
 
@@ -1248,6 +1249,11 @@ fn simulate_trial(
         let true_distribution = hidden_candidate.likelihoods.get(truth_index)
             .ok_or(ScmGraphBenchmarkError::MissingCandidate)?;
         let observed_outcome = sample_outcome(true_distribution, &mut outcome_rng);
+        if policy == ScmGraphPolicy::PcObservationalBaseline {
+            observed_states.push(observed_outcome);
+            measurements_used += 1;
+            continue;
+        }
         let model_candidate = scenarios[0].candidates.iter()
             .find(|candidate| candidate.id == selected_id)
             .ok_or(ScmGraphBenchmarkError::MissingCandidate)?;
@@ -1263,8 +1269,26 @@ fn simulate_trial(
         }
     }
 
+    let pc_class_index = if policy == ScmGraphPolicy::PcObservationalBaseline {
+        let (_, class_index) = pc_observational_cpdag(&observed_states, classes);
+        // The PC baseline submits a CPDAG rather than claiming one fully oriented
+        // DAG. Represent its class as a uniform distribution over member DAGs so
+        // posterior-scored fields do not falsely retain the original uniform prior.
+        posterior.iter_mut().for_each(|hypothesis| hypothesis.probability = 0.0);
+        let members = &classes.members[class_index];
+        let member_probability = 1.0 / members.len() as f64;
+        for member in members {
+            posterior[*member].probability = member_probability;
+        }
+        Some(class_index)
+    } else {
+        None
+    };
+
     let map_index = if policy == ScmGraphPolicy::StructureBlindRandomGraph {
         selection_rng.index(graphs.len())
+    } else if let Some(class_index) = pc_class_index {
+        classes.members[class_index][0]
     } else {
         posterior_top_index(&posterior)
     };
@@ -1275,6 +1299,8 @@ fn simulate_trial(
         posterior_cpdag(&posterior, classes);
     let predicted_cpdag = if policy == ScmGraphPolicy::StructureBlindRandomGraph {
         classes.cpdag_marks[classes.class_for_graph[map_index]].clone()
+    } else if let Some(class_index) = pc_class_index {
+        classes.cpdag_marks[class_index].clone()
     } else {
         posterior_class_prediction
     };
@@ -1283,11 +1309,14 @@ fn simulate_trial(
         cpdag_metrics(&predicted_cpdag, &truth_cpdag);
     let posterior_true_markov_class = posterior_mass_on_class(&posterior, classes, truth_index);
     let max_probability = posterior[posterior_top_index(&posterior)].probability;
-    let claim_accepted = policy != ScmGraphPolicy::StructureBlindRandomGraph
-        && max_probability >= posterior_threshold;
+    let claim_accepted = !matches!(
+        policy,
+        ScmGraphPolicy::StructureBlindRandomGraph | ScmGraphPolicy::PcObservationalBaseline
+    ) && max_probability >= posterior_threshold;
     let false_graph_claim = claim_accepted && !exact_graph;
-    let cpdag_claim_accepted = policy != ScmGraphPolicy::StructureBlindRandomGraph
-        && posterior_top_class_mass >= posterior_threshold;
+    let cpdag_claim_accepted = policy == ScmGraphPolicy::PcObservationalBaseline
+        || (policy != ScmGraphPolicy::StructureBlindRandomGraph
+            && posterior_top_class_mass >= posterior_threshold);
     let false_cpdag_claim = cpdag_claim_accepted && !markov_class_correct;
     let graph_posterior_brier_score = posterior.iter().enumerate()
         .map(|(index, hypothesis)| {
