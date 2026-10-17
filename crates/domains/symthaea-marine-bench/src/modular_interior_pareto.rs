@@ -637,6 +637,26 @@ mod tests {
 
     const LIVE: &str = include_str!("../fixtures/modular-interiors/liveaboard-custom-layout-v1.json");
     const EXPEDITION: &str = include_str!("../fixtures/modular-interiors/expedition-research-layout-v1.json");
+    const PARETO_ORACLE: &str = include_str!("../fixtures/modular-interiors/pareto-oracle-v1.json");
+
+    #[derive(serde::Deserialize)]
+    struct ParetoOracleMatrix {
+        cases: Vec<ParetoOracleCase>,
+    }
+
+    #[derive(serde::Deserialize)]
+    struct ParetoOracleCase {
+        case_id: String,
+        candidates: Vec<ParetoOracleCandidate>,
+        expected_frontier_ids: Vec<String>,
+        expected_dominance: Vec<DominanceDecision>,
+    }
+
+    #[derive(serde::Deserialize)]
+    struct ParetoOracleCandidate {
+        candidate_id: String,
+        objectives: Vec<ObjectiveObservation>,
+    }
 
     fn live() -> Configuration { serde_json::from_str(LIVE).expect("live fixture parses") }
     fn expedition() -> Configuration { serde_json::from_str(EXPEDITION).expect("expedition fixture parses") }
@@ -720,6 +740,40 @@ mod tests {
             configuration: config,
             validation_receipt,
             objectives,
+        }
+    }
+
+    #[test]
+    fn frozen_hand_calculated_pareto_oracle_matches_frontiers() {
+        let oracle: ParetoOracleMatrix =
+            serde_json::from_str(PARETO_ORACLE).expect("frozen Pareto oracle parses");
+        for (case_index, case) in oracle.cases.into_iter().enumerate() {
+            let submissions: Vec<CandidateSubmission> = case.candidates.iter()
+                .enumerate()
+                .map(|(candidate_index, candidate)| {
+                    let suffix = format!("-T{case_index}{candidate_index}");
+                    let configuration = evidence_complete_test_config(live(), &suffix);
+                    submission(&candidate.candidate_id, configuration, candidate.objectives.clone())
+                })
+                .collect();
+            let report = rank_candidates(submissions.clone())
+                .unwrap_or_else(|error| panic!("{}: report failed: {error}", case.case_id));
+            assert_eq!(report.body.groups.len(), 1, "{}: expected one comparable group", case.case_id);
+            assert_eq!(
+                report.body.groups[0].frontier_candidate_ids,
+                case.expected_frontier_ids,
+                "{}: frontier mismatch", case.case_id
+            );
+            assert_eq!(
+                report.body.groups[0].dominance,
+                case.expected_dominance,
+                "{}: dominance relation mismatch", case.case_id
+            );
+            assert!(report.body.candidates.iter().all(|candidate|
+                candidate.eligibility == CandidateEligibility::Eligible),
+                "{}: oracle candidate failed evidence eligibility", case.case_id);
+            assert!(verify_pareto_report(&submissions, &report),
+                "{}: report integrity mismatch", case.case_id);
         }
     }
 
