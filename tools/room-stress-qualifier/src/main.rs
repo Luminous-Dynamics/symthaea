@@ -12,10 +12,11 @@ use sha2::{Digest, Sha256};
 use std::collections::{BTreeMap, BTreeSet};
 use std::env;
 use std::fs;
-use std::path::Path;
+use std::path::{Component, Path, PathBuf};
 
 const EXPECTED_SCHEMA_VERSION: &str = "room-imagination-stress-benchmark-v0.1";
 const EXPECTED_CASE_COUNT: usize = 30;
+const MAX_EVIDENCE_ARTIFACT_BYTES: u64 = 64 * 1024 * 1024;
 
 const EMBEDDED_BENCHMARK: &str = include_str!(
     "../../../docs/research/spatial-design/ROOM_IMAGINATION_STRESS_BENCHMARK_V0_1.json"
@@ -89,11 +90,15 @@ impl ValidationSummary {
     }
 }
 
-fn sha256_hex(input: &str) -> String {
-    Sha256::digest(input.as_bytes())
+fn sha256_bytes_hex(input: &[u8]) -> String {
+    Sha256::digest(input)
         .iter()
         .map(|byte| format!("{byte:02x}"))
         .collect()
+}
+
+fn sha256_hex(input: &str) -> String {
+    sha256_bytes_hex(input.as_bytes())
 }
 
 fn receipt_value(
@@ -139,14 +144,73 @@ fn validate_documents(
     validate_values(benchmark, schema)
 }
 
+fn verify_evidence_reference(reference: &Value, evidence_root: &Path) -> Result<(), String> {
+    let relative = reference
+        .get("artifact_path")
+        .and_then(Value::as_str)
+        .ok_or_else(|| "artifact_path must be a string".to_string())?;
+
+    if relative.trim().is_empty() || relative.contains('\\') {
+        return Err("artifact_path must be a non-empty portable relative path".into());
+    }
+
+    let relative_path = Path::new(relative);
+    if relative_path.is_absolute()
+        || relative_path
+            .components()
+            .any(|component| !matches!(component, Component::Normal(_)))
+    {
+        return Err("artifact_path must not contain absolute, current-directory, or parent components".into());
+    }
+
+    let claimed_hash = reference
+        .get("artifact_sha256")
+        .and_then(Value::as_str)
+        .ok_or_else(|| "artifact_sha256 must be a string".to_string())?;
+    let artifact_path = evidence_root.join(relative_path);
+    let canonical_artifact = fs::canonicalize(&artifact_path).map_err(|error| {
+        format!("evidence artifact {} is unavailable: {error}", relative_path.display())
+    })?;
+    if !canonical_artifact.starts_with(evidence_root) {
+        return Err("evidence artifact resolves outside the declared evidence root".into());
+    }
+
+    let metadata = fs::metadata(&canonical_artifact)
+        .map_err(|error| format!("cannot inspect evidence artifact: {error}"))?;
+    if !metadata.is_file() {
+        return Err("evidence artifact is not a regular file".into());
+    }
+    if metadata.len() > MAX_EVIDENCE_ARTIFACT_BYTES {
+        return Err(format!(
+            "evidence artifact exceeds the {MAX_EVIDENCE_ARTIFACT_BYTES}-byte limit"
+        ));
+    }
+
+    let bytes = fs::read(&canonical_artifact)
+        .map_err(|error| format!("cannot read evidence artifact: {error}"))?;
+    let actual_hash = sha256_bytes_hex(&bytes);
+    if actual_hash != claimed_hash {
+        return Err(format!(
+            "evidence artifact digest mismatch: declared {claimed_hash}, actual {actual_hash}"
+        ));
+    }
+    Ok(())
+}
+
 fn evaluate_run_report(
     benchmark_text: &str,
     benchmark_schema_text: &str,
     report_schema_text: &str,
     report_text: &str,
+    evidence_root: &Path,
 ) -> Result<EvaluationSummary, String> {
     // Validate the two contracts before scoring any candidate report.
     validate_documents(benchmark_text, benchmark_schema_text)?;
+    let evidence_root = fs::canonicalize(evidence_root)
+        .map_err(|error| format!("cannot resolve evidence root: {error}"))?;
+    if !evidence_root.is_dir() {
+        return Err("evidence root must be a directory".into());
+    }
     let benchmark = parse_json("benchmark", benchmark_text)?;
     let report = parse_json("run report", report_text)?;
     let report_schema = parse_json("run report schema", report_schema_text)?;
@@ -267,13 +331,13 @@ fn evaluate_run_report(
                 .ok_or_else(|| format!("{assertion_id} expected value is missing"))?;
 
             let actual = observations.get(observation_key);
-            let matching_refs = evidence_refs
+            let matching_refs: Vec<&Value> = evidence_refs
                 .iter()
                 .filter(|reference| {
                     reference.get("observation_key").and_then(Value::as_str)
                         == Some(observation_key)
                 })
-                .count();
+                .collect();
 
             let mut reasons = Vec::new();
             match actual {
@@ -288,12 +352,17 @@ fn evaluate_run_report(
                 .get("evidence_required")
                 .and_then(Value::as_bool)
                 .unwrap_or(false)
-                && matching_refs != 1
             {
-                reasons.push(format!(concat!(
-                    "expected exactly one evidence reference for {observation_key}, ",
-                    "found {matching_refs}"
-                )));
+                if matching_refs.len() != 1 {
+                    reasons.push(format!(
+                        "expected exactly one evidence reference for {observation_key}, found {}",
+                        matching_refs.len()
+                    ));
+                } else if let Err(error) =
+                    verify_evidence_reference(matching_refs[0], &evidence_root)
+                {
+                    reasons.push(error);
+                }
             }
 
             if reasons.is_empty() {
@@ -477,8 +546,10 @@ fn validate_values(benchmark: Value, schema: Value) -> Result<ValidationSummary,
 
 fn run(args: &[String]) -> Result<bool, String> {
     if args.first().map(String::as_str) == Some("--evaluate") {
-        if args.len() != 2 {
-            return Err("usage: room-stress-qualifier --evaluate RUN_REPORT.json".to_string());
+        if args.len() != 3 {
+            return Err(
+                "usage: room-stress-qualifier --evaluate RUN_REPORT.json EVIDENCE_ROOT".to_string(),
+            );
         }
         let report_path = &args[1];
         let report_text = fs::read_to_string(Path::new(report_path))
@@ -488,6 +559,7 @@ fn run(args: &[String]) -> Result<bool, String> {
             EMBEDDED_SCHEMA,
             EMBEDDED_RUN_REPORT_SCHEMA,
             &report_text,
+            Path::new(&args[2]),
         )?;
         summary.print();
         return Ok(summary.assertions_passed == summary.assertions_checked);
@@ -702,8 +774,9 @@ mod tests {
                 observations.insert(key.to_owned(), assertion["expected"].clone());
                 evidence_refs.push(serde_json::json!({
                     "observation_key": key,
-                    "artifact_sha256": "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
-                    "artifact_revision": "synthetic-golden-fixture-r1"
+                    "artifact_sha256": sha256_hex(benchmark_text),
+                    "artifact_revision": "synthetic-golden-fixture-r1",
+                    "artifact_path": "docs/research/spatial-design/ROOM_IMAGINATION_STRESS_BENCHMARK_V0_1.json"
                 }));
             }
             results.push(serde_json::json!({
@@ -723,6 +796,13 @@ mod tests {
         })
     }
 
+    fn repository_root() -> PathBuf {
+        Path::new(env!("CARGO_MANIFEST_DIR"))
+            .join("../..")
+            .canonicalize()
+            .expect("repository root exists")
+    }
+
     #[test]
     fn golden_run_report_passes_all_machine_checkable_assertions() {
         let report = golden_report_value(EMBEDDED_BENCHMARK);
@@ -732,6 +812,7 @@ mod tests {
             EMBEDDED_SCHEMA,
             EMBEDDED_RUN_REPORT_SCHEMA,
             &report_text,
+        &repository_root(),
         )
         .expect("golden result report must evaluate");
         assert_eq!(summary.cases_evaluated, EXPECTED_CASE_COUNT);
@@ -751,6 +832,7 @@ mod tests {
             EMBEDDED_SCHEMA,
             EMBEDDED_RUN_REPORT_SCHEMA,
             &report_text,
+        &repository_root(),
         )
         .unwrap();
         assert_eq!(summary.assertions_passed, 46);
@@ -770,6 +852,7 @@ mod tests {
             EMBEDDED_SCHEMA,
             EMBEDDED_RUN_REPORT_SCHEMA,
             &report_text,
+        &repository_root(),
         )
         .unwrap();
         assert!(summary.failures.iter().any(|failure| {
@@ -789,6 +872,7 @@ mod tests {
             EMBEDDED_SCHEMA,
             EMBEDDED_RUN_REPORT_SCHEMA,
             &report_text,
+        &repository_root(),
         )
         .unwrap_err();
         assert!(error.contains("benchmark digest mismatch"));
@@ -805,6 +889,7 @@ mod tests {
             EMBEDDED_SCHEMA,
             EMBEDDED_RUN_REPORT_SCHEMA,
             &report_text,
+        &repository_root(),
         )
         .unwrap_err();
         assert!(error.contains("duplicate run result"));
