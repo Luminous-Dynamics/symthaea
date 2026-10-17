@@ -40,19 +40,22 @@ Schemas: [provenance sidecar](schema/made-run-provenance.schema.json) and [audit
 - explicit data-source revisions, license declarations and rights-status declarations;
 - a local snapshot artifact and SHA-256 for each declared data source, tied to the artifact list;
 - core episode/summary artifacts by relative path, SHA-256 and byte count;
-- oracle setup/proposal/retry request counts, cache hits, external-call counts, failures and declared cost units.
+- an `oracle-call-ledger.jsonl` entry for each setup/proposal/retry request, with contiguous sequence numbers, candidate IDs for proposals, cost, cache/external status, and a hash-linked receipt artifact;
+- oracle request counts, cache hits, external-call counts, failures and total cost independently reconstructed from that ledger.
 
 Required artifact paths include `.hydra/config.yaml`, `source-manifest.json`, `task-contract.json`, `evaluation-manifest.json`, the three summary files, and all `trajectories/episode_NNN.json` files. All listed paths must be relative and resolve within the run directory. The manifest itself is a sidecar and must not list itself as an artifact.
 
-The accounting identities are:
+The accounting identities are reconstructed from the JSONL ledger and cross-checked against the manifest:
 ```
 requests_total = setup_requests + proposal_requests + retry_requests
-external_calls = requests_total - cache_hits
-failed_external_calls <= external_calls
-proposal_requests = sum(episode final/queries_used)
+external_calls = count(records where external_invocation = true)
+cache_hits = count(records where cache_hit = true)
+failed_external_calls = count(external calls whose status is not evaluated)
+proposal_requests = count(stage = proposal) = sum(episode final/queries_used)
+total_cost = sum(per-record cost)
 ```
 
-These identities detect internal contradictions; they do not prove the counters are truthful. Reconcile them with an immutable per-call ledger, logs or source-system receipts before making total-cost claims.
+Each record must identify a receipt artifact whose bytes are separately hash-verified. The ledger is still a declared run artifact; this verifier does not attest that an upstream oracle or service emitted the ledger or that the stated cost unit reflects an invoice or measured compute resource. Reconcile with source-system logs, signed receipts or billing/resource records before total-cost claims.
 
 ## Explicit claim ceiling
 
