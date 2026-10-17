@@ -1,0 +1,26 @@
+{
+  "schema_version": "1.0.0",
+  "claim_ceiling": "Synthetic finite-domain oracle only. It checks placement enumeration and geometry finding sensitivity; it does not qualify a vessel.",
+  "cases": [
+    {
+      "case_id": "TWO-MODULE-CLOSING-GAP-001",
+      "expected_candidate_count": 3,
+      "expected_search_complete": true,
+      "expected_candidate_sets": [
+        [
+          "CABIN-X600"
+        ],
+        [
+          "WETROOM-X2900"
+        ],
+        [
+          "CABIN-X600",
+          "WETROOM-X2900"
+        ]
+      ],
+      "expected_pair_interaction_findings": [
+        "MODULE_PHYSICAL_OVERLAP|CABIN-01 / WETROOM-01"
+      ]
+    }
+  ]
+}
