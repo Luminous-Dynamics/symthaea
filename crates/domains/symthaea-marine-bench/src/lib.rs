@@ -15,6 +15,7 @@ pub mod experiment_selection;
 pub mod catamaran_design;
 pub mod catamaran_design_space;
 pub mod modular_interior;
+pub mod modular_interior_impact;
 mod model;
 
 pub use assessor::{assess, AssessmentError, AssessmentReport, Finding, FindingStatus};

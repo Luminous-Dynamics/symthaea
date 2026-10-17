@@ -76,3 +76,32 @@ cargo run -p symthaea-marine-bench --example modular_interior_validator
 ```
 
 The example prints the complete receipt for both fixture configurations and exits non-zero if the bookkeeping checks reject either configuration. The expected fixture outcome is still `indeterminate`, since service/weight values are synthetic assumptions, physical routing is unknown, connector profiles are provisional, and safety gates are not assessed. A successful command would demonstrate only that the Rust validator ran on these manifests—not vessel feasibility or approval. These commands have not been executed in the current editing environment.
+
+
+## MARINE-MOD-003 — configuration-change impact
+
+The companion `modular_interior_impact` module compares exact typed configuration baselines and reports per-artifact changes plus the analysis domains requiring revalidation. A module swap, placement move, service/connection change, reserved-region edit or safety-evidence change cannot silently inherit all evidence from the prior layout.
+
+The analyzer computes canonical JSON digests that ignore ordering differences in arrays while keeping changes to actual item content visible. It binds the from/to configuration digests and report body into a SHA-256 receipt; this is a reproducibility/integrity mechanism, not a digital signature or evidence of source authenticity. Ambiguous duplicate IDs are explicitly marked, never collapsed silently. The dependency map is deliberately conservative and versioned; qualified reviewers must still determine regulatory applicability and the precise impact for each vessel.
+
+From the repository root, when the Rust toolchain is available:
+
+```sh
+cargo test -p symthaea-marine-bench modular_interior_impact
+cargo run -p symthaea-marine-bench --example modular_interior_impact
+```
+
+The benchmark plan should compare analyzer output with a frozen, manually authored change-impact oracle matrix. Proposed target: zero missed revalidation domains in that matrix, 100% deterministic reports, and zero automatic evidence carry-forward when the target configuration differs. These are targets, not achieved measurements. The example fixtures use synthetic mass, CG and service assumptions, so the change report is not a feasibility or safety assessment.
+
+
+### Frozen change-impact oracle
+
+`fixtures/modular-interiors/change-impact-oracle-v1.json` defines 10 synthetic comparison cases; `modular_interior_impact.rs` consumes it as a table-driven Rust test. The cases cover a no-op, ordering-only changes, moved placements, changed module mass, service/connection edits, reserved-region changes, platform envelope change, provenance/assumption/safety evidence changes, configuration identity/intent changes, and duplicate placement identity.
+
+The oracle asserts required change sections and revalidation domains rather than comparing a brittle full JSON blob. That lets the dependency map evolve with an explicit versioned review while still surfacing missing impact categories. The intended benchmark is zero missed required domains on this frozen oracle, 100% deterministic digests, and zero silent duplicate-ID collapse. At present these assertions are authored—not executed locally.
+
+Additional research:
+- Inselmann, Deutschmann & Krause (2025), *Enhancing end-of-life sustainability through modularity and interface design in product development*, studies a Module Interface Graph for separability, reuse and end-of-life outcomes: https://www.cambridge.org/core/journals/proceedings-of-the-design-society/article/enhancing-endoflife-sustainability-through-modularity-and-interface-design-in-product-development/15AB7374508B4B9CFD6978127BE03372
+- *Concepts of change propagation analysis in engineering design* (published online 2022; journal issue 2023) reviews the core concepts and approaches in engineering change-impact analysis: https://link.springer.com/article/10.1007/s00163-022-00395-y
+- Inselmann, Wehrend & Krause (2025), lifecycle-oriented interface standardization across product-family phases: https://doi.org/10.35199/dfx2025.24
+- IMO passenger-ship safety and fire protection are hard constraints for applicable vessels; change analysis must defer to the actual vessel's regulatory basis: https://www.imo.org/en/ourwork/safety/pages/passengerships.aspx and https://www.imo.org/en/ourwork/safety/pages/fireprotection-default.aspx
