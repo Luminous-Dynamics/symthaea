@@ -873,6 +873,38 @@ mod tests {
     }
 
     #[test]
+    fn generated_world_variants_preserve_declared_control_invariants() {
+        let worlds = hidden_worlds(2026);
+        for world in &worlds {
+            match world.regime {
+                BlindWorldRegime::NullNegativeControl => {
+                    for candidate in &world.candidates {
+                        let first = candidate.likelihoods[0][0];
+                        assert!(candidate.likelihoods.iter()
+                            .all(|row| (row[0] - first).abs() < 1.0e-12));
+                    }
+                }
+                BlindWorldRegime::InterventionArtifact => {
+                    let intervention = world.candidates.iter()
+                        .find(|candidate| candidate.id == "intervene_on_x").unwrap();
+                    let first = intervention.likelihoods[0][0];
+                    assert!(intervention.likelihoods.iter()
+                        .all(|row| (row[0] - first).abs() < 1.0e-12));
+                }
+                BlindWorldRegime::EffectReversal => {
+                    let intervention = world.candidates.iter()
+                        .find(|candidate| candidate.id == "intervene_on_x").unwrap();
+                    assert!(intervention.likelihoods[0][0] < intervention.likelihoods[1][0]);
+                    let confounder = world.candidates.iter()
+                        .find(|candidate| candidate.id == "measure_confounder").unwrap();
+                    assert!(confounder.likelihoods[0][0] > confounder.likelihoods[1][0]);
+                }
+                _ => {}
+            }
+        }
+    }
+
+    #[test]
     fn fixed_design_is_selected_from_development_regimes_only() {
         let priors = uniform_priors();
         let worlds = hidden_worlds(42);
