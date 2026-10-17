@@ -19,6 +19,8 @@ The reference device is a proposed guarded low-voltage DC fan supplied by an app
 
 The first slice is deliberately a **math/policy evaluator**, not a trained Symthaea model, physical sensor adapter, or appliance controller. It computes whether the input contract is coherent and demonstrates which measurement would be selected under declared toy priors/likelihoods/costs. The input assumptions remain visible and should be replaceable by future versioned, instrument-supported estimates.
 
+The low-voltage fan is not exempt from finished-product safety review. [IEC 60335-2-80:2024](https://webstore.iec.ch/en/publication/70375) covers household and similar electric fans, including DC-supplied and battery-operated examples. Applicable IEC 60335-1 requirements, national adoption, intended use, hazards and qualified test scope must be confirmed before any physical pilot or sale. Diagnostic policy fixtures cannot qualify the appliance.
+
 ## Decision policy v0.1
 
 1. Validate the contract first: unique hypothesis/measurement/outcome identities; prior probabilities sum to one; each measurement gives a normalized outcome distribution for every hypothesis; costs are finite and positive. Never silently normalize bad input.
