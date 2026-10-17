@@ -129,12 +129,26 @@ For shift-aware tasks, promotion additionally requires that no predeclared criti
 
 ## 7. Future Symthaea-specific arm
 
-Only after the simple baselines are executed:
-1. define a versioned HDC/active-inference policy implementation that uses permitted descriptor or metadata fields;
-2. freeze the representation/model/source hash and its training exposure;
-3. compare with the same pool, query budget and baseline selectors;
-4. ablate that one Symthaea component;
-5. use an independent checker to recompute outcomes from frozen requests/observations.
+**Research hypothesis (not a result):** combine inexpensive HDC representation-space retrieval with an uncertainty-calibrated, cost-aware acquisition rule so Symthaea spends expensive reference calls where they can change the scientific decision. For trajectory tasks, a temporal model may help forecast deteriorating stability, but it is a separate component and must be tested against an explicitly defined temporal baseline. Novelty and temporal-model confidence must never bypass physical feasibility constraints.
+
+The proposed two-stage policy is:
+1. **Cheap screening:** encode admitted structure/metadata descriptors into a versioned HDC representation; calculate redundancy, candidate coverage and similarity to known valid/failed domains. Treat distance as a novelty diagnostic—not physical validity or confidence.
+2. **Risk and value gate:** combine validated uncertainty or error-bound evidence with a task-specific estimate of expected value of information per all-in acquisition cost. If the candidate is clearly infeasible, reject it locally; if it is out-of-domain and low-information, abstain or ask for human review; prioritize candidates expected to change the decision or resolve a safety-critical uncertainty.
+3. **Reference feedback:** after each oracle result, update only the training/acquisition state permitted by the frozen sequential protocol. Never feed post-outcome labels into the policy during a static held-out comparison.
+4. **Independent audit:** emit exact selection receipts, local rejections, cache hits, external oracle calls, retries, wall/resource cost, and model/data revisions. A separate evaluator reconstructs utility and all-group outcomes from the frozen outcome ledger.
+
+Mandatory arms for this hypothesis:
+- random feasible candidate;
+- max-min diversity / farthest-first;
+- HDC novelty-only;
+- uncertainty-only (where the model supports qualified uncertainty);
+- cost-aware uncertainty or expected improvement;
+- HDC + calibrated uncertainty + value-of-information/cost;
+- passive/no-adaptation control, plus an oracle/selection negative control as applicable.
+
+Keep the candidate pool, initial information, allowed features, reference oracle, compute/time cap, and total-cost denominator identical. Do component ablations (remove HDC novelty, calibrated uncertainty, or cost normalization one at a time) so the result shows what actually caused the change. Freeze all model training exposure and preprocessing before opening grouped test systems.
+
+**Promotion targets:** target at least 20% fewer actual reference calls to reach a preregistered trajectory-reliability threshold; for error-triage experiments, target at least 90% severe-error recall while reviewing no more than 20% of windows. Both require no worsening of frozen hard-constraint violations, improvement across the predeclared worst-group guard, and adequate power across independent material/system groups. These are research targets; do not claim HDC, active inference, or a temporal model helps until this matched-budget ablation passes.
 
 Do not label the present max-min selector as “Symthaea intelligence”; it is a deterministic baseline kernel intended to make future contributions falsifiable.
 
