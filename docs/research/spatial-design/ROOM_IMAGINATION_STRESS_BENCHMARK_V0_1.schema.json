@@ -44,7 +44,8 @@
         "intervention",
         "required_behaviors",
         "blocking_failures",
-        "expected"
+        "expected",
+        "assertions"
       ]
     },
     "cases": {
@@ -70,7 +71,8 @@
         "intervention",
         "required_behaviors",
         "blocking_failures",
-        "expected"
+        "expected",
+        "assertions"
       ],
       "properties": {
         "id": {
@@ -136,6 +138,56 @@
         "expected": {
           "type": "string",
           "minLength": 10
+        },
+        "assertions": {
+          "type": "array",
+          "minItems": 1,
+          "items": {
+            "type": "object",
+            "additionalProperties": false,
+            "required": [
+              "assertion_id",
+              "observation_key",
+              "operator",
+              "expected",
+              "failure_code",
+              "severity",
+              "evidence_required"
+            ],
+            "properties": {
+              "assertion_id": {
+                "type": "string",
+                "pattern": "^ROOM-ASSERT-[0-9]{3}-[0-9]{2}$"
+              },
+              "observation_key": {
+                "type": "string",
+                "pattern": "^[a-z][a-z0-9_]*$"
+              },
+              "operator": {
+                "const": "equals"
+              },
+              "expected": {
+                "type": [
+                  "string",
+                  "integer",
+                  "boolean"
+                ]
+              },
+              "failure_code": {
+                "type": "string",
+                "pattern": "^[A-Z][A-Z0-9_]+$"
+              },
+              "severity": {
+                "enum": [
+                  "blocking",
+                  "quality"
+                ]
+              },
+              "evidence_required": {
+                "const": true
+              }
+            }
+          }
         }
       }
     }
