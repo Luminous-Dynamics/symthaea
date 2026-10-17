@@ -825,8 +825,48 @@ pub fn validate_work_record(
     }
 }
 
-/// Apply a controlled workflow transition. Software may flag/reject a task or
-/// request human review but it can never release the aircraft/task to service.
+/// Move an eligibility-reviewed card to ReadyToPerform only after the full
+/// readiness validator succeeds for this exact aircraft, source register,
+/// person, tool/part inventory and prerequisite set.
+pub fn prepare_task_for_execution(
+    card: &MaintenanceTaskCard,
+    context: &ExecutionContext,
+    reviewer: &ActorEvidence,
+) -> Result<TaskState, Vec<TaskCardError>> {
+    let mut errors = Vec::new();
+    if card.state != TaskState::EligibilityChecked {
+        errors.push(TaskCardError::WrongTaskState {
+            expected: TaskState::EligibilityChecked,
+            actual: card.state,
+        });
+    }
+    if reviewer.kind != ActorKind::HumanEligibilityReviewer
+        || reviewer.actor_id.trim().is_empty()
+        || reviewer.actor_id != context.performer.person_id
+        || reviewer.jurisdiction != card.authority.jurisdiction
+        || reviewer.certification_basis != card.authority.certification_basis
+    {
+        errors.push(TaskCardError::UnauthorizedTransition);
+    }
+
+    let mut ready_card = card.clone();
+    ready_card.state = TaskState::ReadyToPerform;
+    if let Err(readiness_errors) = validate_task_ready(&ready_card, context) {
+        errors.extend(readiness_errors);
+    }
+
+    if errors.is_empty() {
+        Ok(TaskState::ReadyToPerform)
+    } else {
+        Err(errors)
+    }
+}
+
+/// Apply a constrained workflow transition. This function cannot mark a
+/// task ReadyToPerform: use prepare_task_for_execution, which runs the complete
+/// readiness validation. It also cannot release a task; use
+/// release_task_to_service with a valid work record and current source register.
+
 pub fn transition_task(
     card: &MaintenanceTaskCard,
     transition: TaskTransition,
@@ -846,8 +886,6 @@ pub fn transition_task(
             if actor.kind == ActorKind::HumanSourceReviewer => TaskState::SourceVerified,
         (TaskState::SourceVerified, TaskTransition::MarkEligibilityChecked)
             if actor.kind == ActorKind::HumanEligibilityReviewer => TaskState::EligibilityChecked,
-        (TaskState::EligibilityChecked, TaskTransition::MarkReadyToPerform)
-            if actor.kind == ActorKind::HumanEligibilityReviewer => TaskState::ReadyToPerform,
         (TaskState::ReadyToPerform, TaskTransition::RecordWork)
             if actor.kind == ActorKind::HumanPerformer
                 && actor.role == Some(card.authority.required_role) => TaskState::WorkRecorded,
@@ -1192,6 +1230,24 @@ mod tests {
         let result = validate_task_ready(&card, &input).unwrap_err();
         assert!(result.contains(&TaskCardError::SerialNotApplicable));
         assert!(result.contains(&TaskCardError::ConfigurationMismatch));
+    }
+
+    #[test]
+    fn task_cannot_be_marked_ready_without_complete_prechecks() {
+        let mut card = card();
+        card.state = TaskState::EligibilityChecked;
+        let mut context = context(&card);
+        context.available_tools.clear();
+        let reviewer = ActorEvidence {
+            actor_id: context.performer.person_id.clone(),
+            kind: ActorKind::HumanEligibilityReviewer,
+            role: Some(MaintenanceRole::CertificatedMechanic),
+            jurisdiction: card.authority.jurisdiction.clone(),
+            certification_basis: card.authority.certification_basis.clone(),
+            credential_reference: Some(doc("review-credential", "rev-1", '4')),
+        };
+        let result = prepare_task_for_execution(&card, &context, &reviewer).unwrap_err();
+        assert!(result.contains(&TaskCardError::MissingTool { tool_id: "tool-fixture".into() }));
     }
 
     #[test]
