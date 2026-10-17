@@ -1246,6 +1246,24 @@ mod tests {
     }
 
     #[test]
+    fn rejects_manifest_artifact_path_traversal() {
+        let fixture = Fixture::new();
+        fixture.write_provenance_manifest();
+        let path = fixture.0.join(PROVENANCE_MANIFEST_NAME);
+        let mut manifest: Value =
+            serde_json::from_str(&fs::read_to_string(&path).expect("read provenance")).unwrap();
+        manifest["artifacts"][0]["path"] = json!("../outside.json");
+        fs::write(&path, serde_json::to_vec_pretty(&manifest).unwrap()).unwrap();
+
+        let report = audit_run(&fixture.0);
+        assert_eq!(report.status, "fail");
+        assert_eq!(report.provenance_manifest_status, "manifest_invalid");
+        assert!(report.findings.iter().any(|finding| {
+            finding.code == "provenance_artifact_invalid_path_or_unreadable"
+        }));
+    }
+
+    #[test]
     fn rejects_inconsistent_external_oracle_call_accounting() {
         let fixture = Fixture::new();
         fixture.write_provenance_manifest();
