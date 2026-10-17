@@ -1,0 +1,54 @@
+name: AGHRI Manifest Contract
+
+on:
+  push:
+    paths:
+      - "docs/research/AGHRI_HUMAN_ROBOT_INTERACTION_BENCHMARK_2026-10-17.md"
+      - "docs/research/aghri-run-manifest.v1.schema.json"
+      - "docs/research/aghri-run-manifest.template.json"
+      - ".github/workflows/aghri-manifest-contract.yml"
+  pull_request:
+    paths:
+      - "docs/research/AGHRI_HUMAN_ROBOT_INTERACTION_BENCHMARK_2026-10-17.md"
+      - "docs/research/aghri-run-manifest.v1.schema.json"
+      - "docs/research/aghri-run-manifest.template.json"
+      - ".github/workflows/aghri-manifest-contract.yml"
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  manifest-contract:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+      - name: Install pinned JSON Schema validator
+        run: python -m pip install --disable-pip-version-check jsonschema==4.23.0
+      - name: Validate JSON Schema and metadata-only template
+        run: |
+          python - <<'PY'
+          import json
+          from pathlib import Path
+          from jsonschema import Draft202012Validator
+
+          schema_path = Path("docs/research/aghri-run-manifest.v1.schema.json")
+          template_path = Path("docs/research/aghri-run-manifest.template.json")
+          schema = json.loads(schema_path.read_text(encoding="utf-8"))
+          template = json.loads(template_path.read_text(encoding="utf-8"))
+
+          Draft202012Validator.check_schema(schema)
+          Draft202012Validator(schema, format_checker=Draft202012Validator.FORMAT_CHECKER).validate(template)
+
+          assert template["schema_version"] == "aghri-run-manifest/v1"
+          assert template["acquisition"]["status"] == "not_acquired"
+          assert template["acquisition"]["source_files"] == []
+          assert template["acquisition"]["selected_sequence_ids"] == []
+          assert template["run"]["result_status"] == "template_unqualified"
+          assert template["claim_scope"]["physical_safety_qualification"] is False
+          assert template["claim_scope"]["field_validation"] is False
+          print("AGHRI manifest schema and metadata-only template are structurally valid; no dataset/result claim is made.")
+          PY

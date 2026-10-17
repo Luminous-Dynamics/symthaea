@@ -1,0 +1,62 @@
+{
+  "schema_version": "aghri-run-manifest/v1",
+  "dataset": {
+    "name": "AGHRI",
+    "doi": "10.24385/lincoln.32982638",
+    "license": "CC-BY-4.0",
+    "attribution": "AGHRI dataset, University of Lincoln; cite DOI 10.24385/lincoln.32982638. Confirm and apply the dataset's full CC BY 4.0 attribution requirements before publishing any derived artifacts.",
+    "reported_sequence_count": 65,
+    "reported_split_counts": {
+      "train": 52,
+      "validation": 7,
+      "test": 6
+    },
+    "reported_size_gb": 70,
+    "reported_duration_seconds": 1642.515,
+    "dataset_summary_sha256": null
+  },
+  "sources": {
+    "dataset_doi_url": "https://doi.org/10.24385/lincoln.32982638",
+    "benchmark_repository": {
+      "url": "https://github.com/LCAS/AGHRI-dataset-benchmark",
+      "license": "Apache-2.0",
+      "commit_sha": "565a289e0c9a742916da41bfc73c75126759d05b"
+    },
+    "dataset_tools_repository": {
+      "url": "https://github.com/LCAS/AGHRI-dataset-tools",
+      "license": "MIT",
+      "commit_sha": "ab70ecc3123e2089c662df5071c1380d8f9f8ecd"
+    }
+  },
+  "acquisition": {
+    "status": "not_acquired",
+    "acquired_at": null,
+    "source_archive_sha256": null,
+    "source_files": [],
+    "selected_sequence_ids": []
+  },
+  "run": {
+    "run_id": "aghri-metadata-template-not-a-run",
+    "task": "2d_detection",
+    "mode": "baseline_reproduction",
+    "evidence_stage": "metadata_only",
+    "official_split": "not_applicable",
+    "container_digest": null,
+    "model_id": null,
+    "model_sha256": null,
+    "config_sha256": null,
+    "evaluator_id": "not-run",
+    "evaluator_commit_sha": null,
+    "report_sha256": null,
+    "result_status": "template_unqualified",
+    "metrics": null
+  },
+  "claim_scope": {
+    "perception_claim": false,
+    "tracking_claim": false,
+    "runtime_monitoring_claim": false,
+    "physical_safety_qualification": false,
+    "field_validation": false,
+    "notes": "Metadata-only template. No dataset files have been acquired, no model has run, and no agronomic or safety outcome is established."
+  }
+}
