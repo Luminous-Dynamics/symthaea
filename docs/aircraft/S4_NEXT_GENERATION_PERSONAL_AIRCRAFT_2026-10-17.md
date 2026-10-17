@@ -3,6 +3,7 @@
 **Date:** 2026-10-17  
 **Status:** pre-design requirements hypothesis; no validated geometry, weight statement, performance estimate, or certification claim.  
 **Parent strategy:** [Owner-maintainable aircraft family](OWNER_MAINTAINABLE_AIRCRAFT_FAMILY_2026-10-17.md)  
+**Ownership economics:** [Rust lifecycle-cost model PR #7763](https://github.com/Luminous-Dynamics/symthaea/pull/7763) and [model contract](https://github.com/Luminous-Dynamics/symthaea/blob/research/aircraft-ownership-cost-model-2026-10-17/docs/engineering/AIRCRAFT_OWNERSHIP_COST_MODEL_2026-10-17.md)  
 **Tracking:** [AIRCRAFT-LINE-001 #7761](https://github.com/Luminous-Dynamics/symthaea/issues/7761)
 
 ## 1. Design intent
