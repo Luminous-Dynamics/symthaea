@@ -763,6 +763,88 @@
       "title": "NASA Technology Readiness Levels",
       "url": "https://www.nasa.gov/directorates/somd/space-communications-navigation-program/technology-readiness-levels/",
       "use": "Reminder to distinguish conceptual formulation, breadboard validation, prototype demonstration and operational evidence."
+    },
+    {
+      "id": "S9",
+      "title": "Hyperdimensional in-memory computing with analogue memristive crossbar arrays (Nature Communications, 2026)",
+      "url": "https://www.nature.com/articles/s41467-026-76067-5",
+      "use": "External research motivation for a separately versioned approximate/in-memory HDC track; published outcomes are not Symthaea measurements and must not populate synthetic fixtures as project evidence."
     }
-  ]
+  ],
+  "benchmark_methodology": {
+    "as_of": "2026-10-17",
+    "status": "design guidance derived from external references; not Symthaea result data",
+    "external_reference_ids": [
+      "S8",
+      "S9"
+    ],
+    "comparison_tracks": [
+      {
+        "id": "exact_digital",
+        "acceptance": "bit-identical output against the pinned canonical BinaryHV software oracle for every required fixture",
+        "permitted_claim": "exact semantic equivalence at the tested profile only",
+        "disallowed_inference": "no automatic inference of speed, lower energy, FPGA operation, or ASIC qualification"
+      },
+      {
+        "id": "approximate_or_in_memory",
+        "acceptance": "representation/version frozen; preregistered task-quality floor and robustness criteria; device variation, drift/noise, calibration age and repeatability measured",
+        "permitted_claim": "only task-level and hardware properties directly measured for this representation/profile",
+        "disallowed_inference": "must not inherit an exact-digital PASS; never silently mix with exact BinaryHV results"
+      }
+    ],
+    "dimension_sweep_bits": [
+      1024,
+      4096,
+      16384
+    ],
+    "preregistration": {
+      "freeze_before_measurement": [
+        "source_revision_and_toolchain",
+        "workload_id_and_input_corpus_hash",
+        "data_split_and_seed",
+        "preprocessing_and_postprocessing",
+        "exactness_or_approximation_profile",
+        "task_quality_floor",
+        "measurement_boundary",
+        "latency_and_thermal_hard_constraints",
+        "primary_objective_and_promotion_threshold"
+      ],
+      "current_project_hypothesis": "at least 2x end-to-end throughput OR at least 30% lower measured system energy, with equivalent output and every protected hard constraint preserved",
+      "threshold_note": "project-specific hypothesis only; not an MLPerf rule or universal scientific standard"
+    },
+    "measurement_boundaries": {
+      "report_separately": [
+        "core_only",
+        "end_to_end_deployed_path"
+      ],
+      "include_end_to_end_when_part_of_deployment": [
+        "encoding",
+        "preprocessing",
+        "host_device_transfer_or_DMA",
+        "setup_and_batching",
+        "memory_movement",
+        "output_conversion",
+        "ADC_DAC_and_peripheral_overhead",
+        "program_write_verify_cost",
+        "calibration_and_update_cost"
+      ],
+      "policy": "energy or latency values from different measurement boundaries are not directly comparable; only the preregistered end-to-end boundary may satisfy the system-advantage gate"
+    },
+    "dimensions_to_report_independently": [
+      "exact_output_or_task_quality",
+      "throughput",
+      "latency_p50_p95_p99",
+      "system_energy_at_declared_boundary",
+      "memory_and_data_movement",
+      "FPGA_or_device_resources",
+      "thermal_and_timing_constraints",
+      "device_variation_and_robustness",
+      "calibration_age_and_renewal",
+      "repairability_and_reproducibility",
+      "external_dependencies",
+      "capability_gain_and_protected_regressions",
+      "evidence_maturity_and_unresolved_items"
+    ],
+    "synthetic_fixture_policy": "All 13 RAT fixtures remain invented examples for contract testing. External published numbers are source context only and must never be treated as Symthaea measurements."
+  }
 }
