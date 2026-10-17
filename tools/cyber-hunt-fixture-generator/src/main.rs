@@ -303,7 +303,8 @@ fn generate_dataset(record_count: usize, seed: u64) -> Result<Dataset, String> {
     // Deliberately plausible benign alternatives: ordinary password typos, approved PowerShell
     // administration, and scheduled backup activity. They must not be scored as positives.
     let mut decoy_ids = Vec::with_capacity(BENIGN_DECOY_COUNT);
-    let decoy_base = BASE_TIME_MS.saturating_add(2_400_000);
+    // Put plausible benign activity inside the attack window so time clustering alone is insufficient.
+    let decoy_base = base.saturating_add(30_000);
     for offset in [0_i64, 8_000, 16_000] {
         let id = push_event(&mut events, &mut rng, &mut used_ids, decoy_base + offset, "host-007", "j.smith",
             "windows_security", "authentication", "failure",
@@ -614,6 +615,60 @@ mod tests {
             assert!(positive.contains(&relation.from_event_id));
             assert!(positive.contains(&relation.to_event_id));
         }
+    }
+
+    #[test]
+    fn benign_lookalikes_overlap_the_planted_attack_timeline() {
+        let dataset = generate_dataset(1_000, 2026).expect("dataset should generate");
+        let events: Vec<EventRecord> = std::str::from_utf8(&dataset.event_store)
+            .expect("JSONL should be UTF-8")
+            .lines()
+            .map(|line| serde_json::from_str(line).expect("event record should deserialize"))
+            .collect();
+        let positive_ids: BTreeSet<String> = dataset.truth.labels.iter()
+            .filter(|label| label.label == "positive")
+            .map(|label| label.event_id.clone())
+            .collect();
+        let attack_start = events.iter()
+            .filter(|event| positive_ids.contains(&event.event_id))
+            .map(|event| event.event_time_ms)
+            .min()
+            .expect("planted attack should contain events");
+
+        let benign_auth_failures: Vec<&EventRecord> = events.iter()
+            .filter(|event| event.host_id == "host-007"
+                && event.principal_id == "j.smith"
+                && event.event_type == "authentication"
+                && event.outcome == "failure")
+            .collect();
+        assert_eq!(benign_auth_failures.len(), 3);
+        assert!(benign_auth_failures.iter().all(|event| !positive_ids.contains(&event.event_id)));
+        let first_benign_auth = benign_auth_failures.iter()
+            .map(|event| event.event_time_ms)
+            .min()
+            .expect("benign authentication decoy should exist");
+        assert!(first_benign_auth >= attack_start);
+        assert!(first_benign_auth < attack_start + 50_000);
+
+        let benign_powershell = events.iter()
+            .find(|event| event.host_id == "host-012"
+                && event.principal_id == "it.admin"
+                && event.event_type == "process_start"
+                && event.details.get("command_summary").map(String::as_str) == Some("Get-Service"))
+            .expect("approved PowerShell decoy should exist");
+        assert!(!positive_ids.contains(&benign_powershell.event_id));
+        assert!(benign_powershell.event_time_ms > attack_start + 120_000);
+        assert!(benign_powershell.event_time_ms < attack_start + 145_000);
+
+        let benign_backup = events.iter()
+            .find(|event| event.host_id == "host-025"
+                && event.principal_id == "svc-backup"
+                && event.event_type == "file_write"
+                && event.details.get("job_id").map(String::as_str) == Some("BKP-2201"))
+            .expect("scheduled backup decoy should exist");
+        assert!(!positive_ids.contains(&benign_backup.event_id));
+        assert!(benign_backup.event_time_ms > attack_start + 190_000);
+        assert!(benign_backup.event_time_ms < attack_start + 240_000);
     }
 
     #[test]
