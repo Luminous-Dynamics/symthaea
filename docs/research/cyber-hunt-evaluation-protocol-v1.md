@@ -3,6 +3,7 @@
 **Status:** proposed evaluation contract; not an observed result or qualification.
 **Owner:** Symthaea cyber qualification, composed with [#7742](https://github.com/Luminous-Dynamics/symthaea/issues/7742), [#7770](https://github.com/Luminous-Dynamics/symthaea/issues/7770), and evaluator integration [#7776](https://github.com/Luminous-Dynamics/symthaea/issues/7776).
 **Fixture implementation:** draft [PR #7769](https://github.com/Luminous-Dynamics/symthaea/pull/7769).
+**Benchmark roadmap:** [Cyber Hunt Benchmark Roadmap v1](https://github.com/Luminous-Dynamics/symthaea/blob/cyber/unguided-hunt-fixture-generator-v1/docs/research/cyber-hunt-benchmark-roadmap-v1.md) adds a runner-independent research plan, staged corpus ladder, target trajectory, and evidence/causal/abstention/action-boundary metrics.
 
 ## 1. The paradigm shift
 
