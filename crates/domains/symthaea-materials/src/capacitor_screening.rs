@@ -9,7 +9,7 @@
 //! of manufactured performance.
 
 use crate::dielectric::{
-    CapacitorGeometry, DielectricEvidenceKind, DielectricPropertyRecord,
+    BreakdownTestKind, CapacitorGeometry, DielectricEvidenceKind, DielectricPropertyRecord,
     DielectricValidationError, IdealCapacitorMetrics, calculate_ideal_capacitor_metrics,
 };
 use serde::{Deserialize, Serialize};
@@ -45,9 +45,13 @@ pub struct CapacitorScreeningRequirements {
     pub max_dielectric_loss_power_w: f64,
     /// Optional minimum ideal energy density at the supplied applied voltage, in J/m³.
     pub min_ideal_energy_density_j_per_m3: Option<f64>,
+    /// Optional maximum absolute difference between breakdown-test temperature and the dielectric-property test temperature, in kelvin.
+    pub max_breakdown_temperature_deviation_k: f64,
     /// Optional minimum ratio of reported breakdown field to operating field.
     /// This is a screening threshold only, not a safe operating margin.
     pub min_breakdown_field_ratio: Option<f64>,
+    /// Allowed breakdown test protocol families. Breakdown-derived metrics are ineligible if the observed method is not listed.
+    pub accepted_breakdown_test_kinds: Vec<BreakdownTestKind>,
     /// Optional maximum allowed relative-permittivity uncertainty; missing uncertainty is not accepted when set.
     pub max_relative_permittivity_uncertainty: Option<f64>,
     /// Optional maximum allowed loss-tangent uncertainty; missing uncertainty is not accepted when set.
@@ -122,12 +126,24 @@ impl CapacitorScreeningRequirements {
                 "minimum ideal energy density must be finite and non-negative",
             ));
         }
+        if !self.max_breakdown_temperature_deviation_k.is_finite()
+            || self.max_breakdown_temperature_deviation_k < 0.0
+        {
+            return Err(CapacitorScreeningError::InvalidRequirements(
+                "maximum breakdown-temperature deviation must be finite and non-negative",
+            ));
+        }
         if self
             .min_breakdown_field_ratio
             .is_some_and(|value| !value.is_finite() || value < 0.0)
         {
             return Err(CapacitorScreeningError::InvalidRequirements(
                 "minimum breakdown field ratio must be finite and non-negative",
+            ));
+        }
+        if self.min_breakdown_field_ratio.is_some() && self.accepted_breakdown_test_kinds.is_empty() {
+            return Err(CapacitorScreeningError::InvalidRequirements(
+                "a breakdown ratio constraint requires an explicit allow-list of breakdown test protocols",
             ));
         }
         for uncertainty_limit in [
@@ -192,6 +208,10 @@ pub enum ScreeningLimitation {
     BreakdownUncertaintyAboveLimit,
     /// A breakdown ratio was required but no referenced breakdown evidence is available.
     MissingBreakdownEvidence,
+    /// Breakdown and dielectric-property characterization temperatures differ too much to combine.
+    BreakdownTemperatureMismatch,
+    /// Breakdown test protocol family was not included in the application's allow-list.
+    BreakdownTestKindNotAllowed,
     /// Breakdown evidence class was not included in the application's allow-list.
     BreakdownEvidenceClassNotAllowed,
 }
@@ -351,20 +371,39 @@ pub fn screen_capacitor_candidate(
         }
     }
 
-    if material.breakdown_strength_v_per_m.is_some()
-        && material
+    if let Some(breakdown_strength) = material.breakdown_strength_v_per_m {
+        if material
             .breakdown_evidence_kind
             .is_some_and(|kind| !requirements.accepted_evidence_kinds.contains(&kind))
-    {
-        // The report includes breakdown-derived metrics, so their evidence class
-        // must satisfy the allow-list even when no minimum-ratio constraint is requested.
-        limitations.push(ScreeningLimitation::BreakdownEvidenceClassNotAllowed);
-    }
-    if requirements.min_breakdown_field_ratio.is_some()
-        && (material.breakdown_strength_v_per_m.is_none()
-            || material.breakdown_reference.as_deref().is_none_or(|reference| reference.trim().is_empty())
-            || material.breakdown_evidence_kind.is_none())
-    {
+        {
+            // The report includes breakdown-derived metrics, so their evidence class
+            // must satisfy the allow-list even when no minimum-ratio constraint is requested.
+            limitations.push(ScreeningLimitation::BreakdownEvidenceClassNotAllowed);
+        }
+        if material
+            .breakdown_test_kind
+            .is_some_and(|kind| !requirements.accepted_breakdown_test_kinds.contains(&kind))
+        {
+            limitations.push(ScreeningLimitation::BreakdownTestKindNotAllowed);
+        }
+        if material
+            .breakdown_test_temperature_k
+            .is_some_and(|temperature| {
+                (temperature - material.test_temperature_k).abs()
+                    > requirements.max_breakdown_temperature_deviation_k
+            })
+        {
+            limitations.push(ScreeningLimitation::BreakdownTemperatureMismatch);
+        }
+        if requirements.min_breakdown_field_ratio.is_some()
+            && (material.breakdown_reference.as_deref().is_none_or(|reference| reference.trim().is_empty())
+                || material.breakdown_evidence_kind.is_none()
+                || material.breakdown_test_kind.is_none())
+        {
+            limitations.push(ScreeningLimitation::MissingBreakdownEvidence);
+        }
+        let _ = breakdown_strength;
+    } else if requirements.min_breakdown_field_ratio.is_some() {
         limitations.push(ScreeningLimitation::MissingBreakdownEvidence);
     }
 
@@ -470,7 +509,9 @@ mod tests {
             max_active_dielectric_volume_m3: 2.0e-9,
             max_dielectric_loss_power_w: 0.01,
             min_ideal_energy_density_j_per_m3: Some(1.0e6),
+            max_breakdown_temperature_deviation_k: 1.0,
             min_breakdown_field_ratio: Some(5.0),
+            accepted_breakdown_test_kinds: vec![BreakdownTestKind::DcRamp],
             max_relative_permittivity_uncertainty: Some(0.1),
             max_relative_loss_tangent_uncertainty: Some(0.1),
             max_relative_breakdown_strength_uncertainty: Some(0.1),
@@ -552,6 +593,27 @@ mod tests {
             req.validate(),
             Err(CapacitorScreeningError::InvalidRequirements(_))
         ));
+
+        let mut req = requirements();
+        req.accepted_breakdown_test_kinds.clear();
+        assert!(matches!(
+            req.validate(),
+            Err(CapacitorScreeningError::InvalidRequirements(_))
+        ));
+    }
+
+    #[test]
+    fn breakdown_evidence_must_match_temperature_and_protocol_contract() {
+        let mut sample = material();
+        sample.breakdown_test_temperature_k = Some(330.0);
+        sample.breakdown_test_kind = Some(BreakdownTestKind::AcSinusoidal);
+        let report =
+            screen_capacitor_candidate(&sample, &geometry(), &requirements(), 10.0, 1.0)
+                .unwrap();
+        assert_eq!(report.disposition, CapacitorScreeningDisposition::NotEvaluable);
+        assert!(report.limitations.contains(&ScreeningLimitation::BreakdownTemperatureMismatch));
+        assert!(report.limitations.contains(&ScreeningLimitation::BreakdownTestKindNotAllowed));
+        assert!(report.metrics.is_none());
     }
 
     #[test]
