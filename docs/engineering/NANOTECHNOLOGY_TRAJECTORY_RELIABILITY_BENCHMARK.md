@@ -127,6 +127,22 @@ Provisional screening target for a nominal 90% interval: 85–95% grouped-holdou
 
 HDC similarity, model disagreement, ensemble spread, or free-energy/active-inference quantities must not be relabelled as calibrated probability without direct calibration evidence. Cognitive free energy is not thermodynamic free energy.
 
+### C2. Uncertainty as error triage, not just an interval
+
+A calibrated interval is useful for a discovery campaign only if it helps locate dangerous or decision-changing errors under a fixed budget. Recent work on flexible uncertainty calibration for machine-learned interatomic potentials reports improved uncertainty–error correlation and detection of high-error configurations, including across several atomistic environments: Ho, Ortner & Wang (2026), https://www.nature.com/articles/s41524-026-02080-3. Treat that as a research motivation, not evidence that any Symthaea uncertainty signal is already calibrated.
+
+Pre-register the prediction and reference unit: atom/component, whole structure, trajectory window, or candidate-level decision. Do not compare atom-level scores to structure-level outcomes without a fixed aggregation rule. Evaluate at least:
+
+- **Error-ranking utility:** Spearman rank correlation between uncertainty and absolute reference error, plus precision/recall for predeclared worst-error tails (for example, the top 5% and 10% of held-out force-error windows).
+- **Budgeted detection:** recall of severe-error windows at fixed reference-acquisition rates (for example 5%, 10%, and 20% of candidate windows), compared with random, ensemble-disagreement, and uncalibrated uncertainty baselines.
+- **Reliability warning lead time:** time or saved integration steps between the first predeclared uncertainty alarm and the first reference-confirmed severe error or structural-integrity event. Report missed events and false alarms; a warning after failure is not an early warning.
+- **Conditional calibration:** interval coverage and width by material family, element/local environment, surface/passivation, temperature, and in-domain versus shifted groups. Keep calibration and evaluation groups disjoint.
+- **Decision impact:** actual reference calls consumed and the total calls required to meet the same trajectory-reliability and structural-fidelity gates, including failed calls, acquisition overhead, and the cost of false alarms/abstention.
+
+For a first screening experiment, a provisional target is at least 90% recall of the preregistered severe-error tail while acquiring references for no more than 20% of eligible windows, without violating the grouped 90%-interval coverage gate. This is a proposed go/no-go target—not a measured performance figure—and must be stress-tested at lower acquisition rates and under group shift. It must be compared with random sampling and at least one strong uncertainty baseline.
+
+Conformal-style marginal coverage assumptions can be weakened by distribution shift, temporal dependence, and chemical-family leakage. Consequently, report observed grouped coverage and calibration sample counts; never present nominal coverage as a guarantee for new nanocrystal chemistry without supporting assumptions and evidence. If the model uses ensemble spread, HDC similarity, novelty, or free-energy-inspired quantities, evaluate each as a separate candidate signal first. Those quantities are not calibrated probabilities by their names alone.
+
 ### D. Exploration fidelity
 
 If the use case includes relaxation, minima hopping or another structural search, static MAE and survival are still insufficient. On a frozen set of starts and an explicit call/time budget, report:
