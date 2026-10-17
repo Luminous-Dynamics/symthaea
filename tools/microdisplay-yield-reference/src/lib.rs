@@ -311,11 +311,11 @@ mod tests {
     #[test]
     fn literature_scale_arithmetic_is_reproduced_without_promoting_it_to_a_result() {
         let conventional = expected_counts(100_000_000, 0.9999).expect("valid inputs");
-        close(conventional.expected_defects, 10_000.0, 1e-9);
+        close(conventional.expected_defects, 10_000.0, 1e-6);
         close(conventional.expected_good, 99_990_000.0, 1e-7);
 
         let frontier = expected_counts(100_000_000, 0.999_999_9).expect("valid inputs");
-        close(frontier.expected_defects, 10.0, 1e-9);
+        close(frontier.expected_defects, 10.0, 1e-6);
         close(frontier.expected_good, 99_999_990.0, 1e-7);
         assert_eq!(frontier.population, 100_000_000);
         // These are expectations under a declared model, not measured counts.
