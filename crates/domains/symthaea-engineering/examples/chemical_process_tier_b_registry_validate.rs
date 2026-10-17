@@ -563,6 +563,59 @@ fn validate_registry(registry: &Value) -> Vec<String> {
     errors
 }
 
+fn dependency_audit_summaries(registry: &Value) -> Vec<Value> {
+    registry["candidates"]
+        .as_array()
+        .into_iter()
+        .flatten()
+        .filter_map(|candidate| {
+            let audit = candidate
+                .get("reference_outputs")?
+                .get("freeze_receipt")?
+                .get("shared_dependency_audit")?;
+            let case_id = text(candidate, "case_id").unwrap_or("<missing-case-id>");
+            let direct_a = digest_set(&audit["model_a_dependency_digests"]);
+            let direct_b = digest_set(&audit["model_b_dependency_digests"]);
+            let declared_shared = digest_set_with_empty(&audit["shared_dependency_digests"], true);
+            let independent_claimed = audit["independent_corroboration_claimed"].as_bool();
+            match computed_dependency_closures(audit) {
+                Ok((closure_a, closure_b)) => {
+                    let computed_shared = closure_a
+                        .intersection(&closure_b)
+                        .cloned()
+                        .collect::<BTreeSet<_>>();
+                    let declared_matches = declared_shared
+                        .as_ref()
+                        .is_some_and(|declared| declared == &computed_shared);
+                    let independence_consistent = independent_claimed.map(|claimed| {
+                        !claimed || computed_shared.is_empty()
+                    });
+                    Some(json!({
+                        "case_id": case_id,
+                        "lineage_state": "COMPUTED",
+                        "model_a_direct_dependencies": direct_a.unwrap_or_default().into_iter().collect::<Vec<_>>(),
+                        "model_b_direct_dependencies": direct_b.unwrap_or_default().into_iter().collect::<Vec<_>>(),
+                        "model_a_transitive_closure": closure_a.into_iter().collect::<Vec<_>>(),
+                        "model_b_transitive_closure": closure_b.into_iter().collect::<Vec<_>>(),
+                        "computed_shared_dependency_digests": computed_shared.into_iter().collect::<Vec<_>>(),
+                        "declared_shared_dependency_digests": declared_shared.map(|digests| digests.into_iter().collect::<Vec<_>>()),
+                        "declared_shared_set_matches": declared_matches,
+                        "independent_corroboration_claimed": independent_claimed,
+                        "independence_claim_consistent": independence_consistent
+                    }))
+                }
+                Err(reason) => Some(json!({
+                    "case_id": case_id,
+                    "lineage_state": "UNRESOLVED",
+                    "error": reason,
+                    "independent_corroboration_claimed": independent_claimed,
+                    "claim_ceiling": "No independence conclusion is supported by an invalid or incomplete lineage graph."
+                })),
+            }
+        })
+        .collect()
+}
+
 fn parse_registry_path() -> Result<String, String> {
     let mut path = None;
     let mut args = env::args().skip(1);
@@ -599,6 +652,7 @@ fn run() -> Result<bool, Box<dyn Error>> {
             "registry_bytes": bytes.len(),
             "schema_version": text(&registry, "schema_version"),
             "candidate_count": registry["candidates"].as_array().map_or(0, Vec::len),
+            "dependency_audits": dependency_audit_summaries(&registry),
             "passed": passed,
             "errors": errors,
             "claim_ceiling": "Registry structure only; no simulator execution or physical model validation."
@@ -811,6 +865,31 @@ mod tests {
             validate_registry(&value).iter().any(|error| error.contains("transitive source-data dependencies overlap")),
             "a shared transitive ancestor must block independent corroboration"
         );
+    }
+
+    #[test]
+    fn dependency_audit_report_exposes_computed_transitive_shared_sources() {
+        let mut value = frozen_receipt_registry();
+        let common = "sha256:ffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffff";
+        {
+            let audit = &mut value["candidates"][0]["reference_outputs"]["freeze_receipt"]["shared_dependency_audit"];
+            audit["lineage_nodes"][0]["derived_from"] = json!([common]);
+            audit["lineage_nodes"][1]["derived_from"] = json!([common]);
+            audit["lineage_nodes"].as_array_mut().unwrap().push(json!({
+                "artifact": "common-upstream-property-source",
+                "sha256": common,
+                "derived_from": []
+            }));
+            audit["shared_dependency_digests"] = json!([common]);
+            audit["independent_corroboration_claimed"] = json!(false);
+        }
+
+        let summaries = dependency_audit_summaries(&value);
+        assert_eq!(summaries.len(), 1);
+        assert_eq!(summaries[0]["lineage_state"].as_str(), Some("COMPUTED"));
+        assert_eq!(summaries[0]["declared_shared_set_matches"].as_bool(), Some(true));
+        assert_eq!(summaries[0]["computed_shared_dependency_digests"][0].as_str(), Some(common));
+        assert_eq!(summaries[0]["independence_claim_consistent"].as_bool(), Some(true));
     }
 
     #[test]
