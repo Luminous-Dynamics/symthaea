@@ -92,7 +92,7 @@ fn print_assessment(result: Assessment) {
         None => ("UNKNOWN".into(), "UNKNOWN".into(), "UNKNOWN".into(), "UNKNOWN".into()),
     };
     println!(
-        "{}\t{}\t{}\t{}\t{}\t{}",
+        "{}\t{}\t{:?}\t{}\t{}\t{}",
         result.candidate_id,
         status_name(result.status),
         result.blockers,
