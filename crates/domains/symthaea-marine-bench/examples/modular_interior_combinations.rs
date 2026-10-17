@@ -46,16 +46,16 @@ fn module_variant(
     let mut replacement = baseline.module_catalog.iter()
         .find(|module| module.module_id == module_id)
         .cloned()
-        .ok_or_else(|| format!("fixture has no module {module_id}"))?;
+        .ok_or_else(|| std::io::Error::new(std::io::ErrorKind::InvalidData, format!("fixture has no module {module_id}")))?;
     replacement.revision = replacement.revision.checked_add(1)
-        .ok_or_else(|| format!("revision overflow for {module_id}"))?;
+        .ok_or_else(|| std::io::Error::new(std::io::ErrorKind::InvalidData, format!("revision overflow for {module_id}")))?;
     replacement.name = format!("{} / combination-search example", replacement.name);
 
     if additional_ac_watts != 0.0 {
         let port = replacement.ports.iter_mut()
             .find(|port| port.port_id == "AC_IN")
-            .ok_or_else(|| format!("module {module_id} has no AC_IN port"))?;
-        let watts = port.rating.value.ok_or_else(|| format!("module {module_id} has no declared AC rating"))?;
+            .ok_or_else(|| std::io::Error::new(std::io::ErrorKind::InvalidData, format!("module {module_id} has no AC_IN port")))?;
+        let watts = port.rating.value.ok_or_else(|| std::io::Error::new(std::io::ErrorKind::InvalidData, format!("module {module_id} has no declared AC rating")))?;
         port.rating.value = Some(watts + additional_ac_watts);
     }
 
@@ -103,7 +103,7 @@ fn main() -> Result<(), Box<dyn Error>> {
     };
     println!("{}", serde_json::to_string_pretty(&summary)?);
     if !receipt_verifies_by_recomputation {
-        return Err("recomputed search receipt did not verify".into());
+        return Err(std::io::Error::new(std::io::ErrorKind::InvalidData, "recomputed search receipt did not verify").into());
     }
     Ok(())
 }
