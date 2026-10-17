@@ -67,6 +67,16 @@ Where relevant, add a fifth arm that uses independent jitter matched to the curv
 
 Use the Groove MIDI Dataset (GMD) as an initial data source for the drum-specific branch: it provides tempo-aligned expressive human drumming, performance/session identifiers and a supplied train/validation/test split. It is not a guitar/bass proxy. Use instrument-specific datasets for other roles only under their stated license and splits. Source: [official GMD dataset documentation](https://magenta.withgoogle.com/datasets/groove).
 
+The repository now has a read-only Rust profile adapter at `examples/groove_timing_benchmark.rs`. With the official MIDI-only archive extracted, run:
+
+```sh
+cargo run --release -p symthaea-muse --features theory --example groove_timing_benchmark -- \
+  --dataset-root /path/to/groove --split test --styles 24 --seeds 2 \
+  --output /path/to/new-groove-profile.json
+```
+
+The dataset root must contain `info.csv` and the MIDI files named by its `midi_filename` column. The official MIDI-only archive is about 3.11 MB; its SHA-256 is `651cbc524ffb891be1a3e46d89dc82a1cecb09a57c748c7b45b844c4841dcc1e9` (verify against the [official download page](https://magenta.withgoogle.com/datasets/groove)). The adapter reports human and generated distributions separately by drum role, hashes the metadata and every read MIDI file, records exclusions, and emits `quality_qualified: false`. It does not download the dataset, include source audio, align the different corpora as matched prompts, or prove superiority.
+
 For each role and tempo/style stratum, compare:
 - distributions of beat-relative timing residuals by subdivision and event role;
 - lag-1 and longer-range autocorrelation of residual timing;
