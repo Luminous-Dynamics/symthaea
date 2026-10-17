@@ -1181,6 +1181,29 @@ mod tests {
         let report = route_services(&baseline, &[no_path], limits()).unwrap();
         assert_eq!(report.body.routes[0].disposition, RouteDisposition::EndpointBlocked);
 
+        // Synthetic wall crossing the full deck height: a genuine no-path case
+        // distinct from an endpoint lying inside a reserved area.
+        let mut walled = baseline.clone();
+        walled.reserved_regions.push(crate::modular_interior::ReservedRegion {
+            region_id: "SYNTHETIC-FULL-WIDTH-BARRIER".to_owned(),
+            deck_id: "MAIN".to_owned(),
+            bounds_mm: crate::modular_interior::BoundsMm {
+                x_min_mm: 3500, x_max_mm: 3600,
+                y_min_mm: 0, y_max_mm: 5000,
+                z_min_mm: 0, z_max_mm: 2400,
+            },
+            purpose: "synthetic_no_path_control".to_owned(),
+            clearance_rule: "keep_clear".to_owned(),
+            evidence_status: "design_assumption".to_owned(),
+        });
+        let impossible = request_for(
+            "CLOSED-CORRIDOR-ROUTE", "CONN-CABIN-01-AC_IN",
+            module_anchor("CABIN-01", "AC_IN", 2800, 1800),
+            service_anchor("AC-BUS", 4700, 1800),
+        );
+        let report = route_services(&walled, &[impossible], limits()).unwrap();
+        assert_eq!(report.body.routes[0].disposition, RouteDisposition::NoPath);
+
         let direct = request_for(
             "BUDGET-ROUTE", "CONN-CABIN-01-AC_IN",
             module_anchor("CABIN-01", "AC_IN", 2800, 1800),
