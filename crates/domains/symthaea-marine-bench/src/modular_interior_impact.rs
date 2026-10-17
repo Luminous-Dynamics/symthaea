@@ -18,6 +18,14 @@ use std::collections::{BTreeMap, BTreeSet};
 pub const IMPACT_ANALYZER_VERSION: &str = "marine-interior-impact-v1";
 pub const EVIDENCE_POLICY: &str = "no_automatic_evidence_carry_forward";
 
+#[derive(Serialize)]
+struct ConfigurationMetadata<'a> {
+    schema_version: &'a str,
+    configuration_name: &'a str,
+    customization_intent: &'a str,
+    claim_ceiling: &'a str,
+}
+
 #[derive(Clone, Copy, Debug, Deserialize, Serialize, PartialEq, Eq, PartialOrd, Ord)]
 #[serde(rename_all = "snake_case")]
 pub enum ChangeKind {
@@ -322,18 +330,18 @@ pub fn analyze_configuration_change(
         });
         apply_section_impacts("configuration_identity", "configuration_id", &mut impacts);
     }
-    let before_metadata = (
-        &before.schema_version,
-        &before.configuration_name,
-        &before.customization_intent,
-        &before.claim_ceiling,
-    );
-    let after_metadata = (
-        &after.schema_version,
-        &after.configuration_name,
-        &after.customization_intent,
-        &after.claim_ceiling,
-    );
+    let before_metadata = ConfigurationMetadata {
+        schema_version: &before.schema_version,
+        configuration_name: &before.configuration_name,
+        customization_intent: &before.customization_intent,
+        claim_ceiling: &before.claim_ceiling,
+    };
+    let after_metadata = ConfigurationMetadata {
+        schema_version: &after.schema_version,
+        configuration_name: &after.configuration_name,
+        customization_intent: &after.customization_intent,
+        claim_ceiling: &after.claim_ceiling,
+    };
     if digest(&before_metadata)? != digest(&after_metadata)? {
         changes.push(ArtifactChange {
             section: "configuration_metadata".to_owned(),
@@ -470,12 +478,12 @@ mod tests {
     fn expedition() -> Configuration { serde_json::from_str(EXPEDITION).expect("expedition fixture parses") }
     const ORACLE: &str = include_str!("../fixtures/modular-interiors/change-impact-oracle-v1.json");
 
-    #[derive(Deserialize)]
+    #[derive(serde::Deserialize)]
     struct OracleMatrix {
         cases: Vec<OracleCase>,
     }
 
-    #[derive(Deserialize)]
+    #[derive(serde::Deserialize)]
     struct OracleCase {
         case_id: String,
         mutation: String,
