@@ -1094,14 +1094,38 @@ fn validate_date(field: &str, value: &str, errors: &mut Vec<TaskCardError>) {
 
 fn valid_iso_date(value: &str) -> bool {
     let bytes = value.as_bytes();
-    bytes.len() == 10
-        && bytes[4] == b'-'
-        && bytes[7] == b'-'
-        && bytes.iter().enumerate().all(|(index, byte)| {
+    if bytes.len() != 10
+        || bytes[4] != b'-'
+        || bytes[7] != b'-'
+        || !bytes.iter().enumerate().all(|(index, byte)| {
             matches!(index, 4 | 7) || byte.is_ascii_digit()
         })
-        && value[5..7].parse::<u8>().is_ok_and(|month| (1..=12).contains(&month))
-        && value[8..10].parse::<u8>().is_ok_and(|day| (1..=31).contains(&day))
+    {
+        return false;
+    }
+
+    let Ok(year) = value[0..4].parse::<u16>() else {
+        return false;
+    };
+    let Ok(month) = value[5..7].parse::<u8>() else {
+        return false;
+    };
+    let Ok(day) = value[8..10].parse::<u8>() else {
+        return false;
+    };
+    if year == 0 || !(1..=12).contains(&month) {
+        return false;
+    }
+
+    let leap_year = year % 4 == 0 && (year % 100 != 0 || year % 400 == 0);
+    let days_in_month = match month {
+        1 | 3 | 5 | 7 | 8 | 10 | 12 => 31,
+        4 | 6 | 9 | 11 => 30,
+        2 if leap_year => 29,
+        2 => 28,
+        _ => return false,
+    };
+    (1..=days_in_month).contains(&day)
 }
 
 #[cfg(test)]
@@ -1286,6 +1310,15 @@ mod tests {
             }],
             recorded_on: "2026-10-17".into(),
         }
+    }
+
+    #[test]
+    fn calendar_date_validator_rejects_impossible_dates() {
+        assert!(valid_iso_date("2024-02-29"));
+        assert!(!valid_iso_date("2026-02-29"));
+        assert!(!valid_iso_date("2026-04-31"));
+        assert!(!valid_iso_date("0000-01-01"));
+        assert!(!valid_iso_date("2026-13-01"));
     }
 
     #[test]
