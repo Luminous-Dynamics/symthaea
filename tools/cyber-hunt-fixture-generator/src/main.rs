@@ -606,7 +606,7 @@ fn generate_artifact_provenance_dataset(record_count: usize, seed: u64) -> Resul
         let (label, rationale) = if positives.contains(&event.event_id) {
             ("positive", "member of the synthetic artifact provenance mismatch causal sequence")
         } else if benign.contains(&event.event_id) {
-            ("negative", "benign matched-digest attestation, promotion, and deployment lookalike")
+            ("negative", "benign matched-digest source, build, artifact, attestation, promotion, and deployment lookalike")
         } else {
             ("negative", "synthetic background event outside the planted causal sequence")
         };
@@ -905,6 +905,29 @@ mod tests {
                 "benign chain must contain a lookalike {expected_type}"
             );
         }
+        let checkout = positive_events.iter().find(|event| event.event_type == "commit_checkout")
+            .expect("planted source checkout");
+        let build = positive_events.iter().find(|event| event.event_type == "build_job")
+            .expect("planted build");
+        let publish = positive_events.iter().find(|event| event.event_type == "artifact_publish")
+            .expect("planted artifact publish");
+        let attestation = positive_events.iter().find(|event| event.event_type == "provenance_attestation")
+            .expect("planted attestation");
+        let promotion = positive_events.iter().find(|event| event.event_type == "artifact_promotion")
+            .expect("planted promotion");
+        let deployment = positive_events.iter().find(|event| event.event_type == "deployment")
+            .expect("planted deployment");
+        assert_eq!(checkout.details.get("commit_id"), build.details.get("source_commit_id"));
+        assert_eq!(build.details.get("source_commit_id"), publish.details.get("source_commit_id"));
+        assert_ne!(
+            publish.details.get("artifact_digest"),
+            attestation.details.get("subject_digest"),
+            "a valid signature for a different digest must not be treated as provenance for the published artifact"
+        );
+        assert_eq!(publish.details.get("artifact_digest"), promotion.details.get("artifact_digest"));
+        assert_eq!(attestation.details.get("subject_digest"), promotion.details.get("attestation_subject_digest"));
+        assert_eq!(promotion.details.get("artifact_digest"), deployment.details.get("artifact_digest"));
+
         let replay = generate_artifact_provenance_dataset(1_000, 2026)
             .expect("identical seed should replay");
         assert_eq!(dataset.event_store, replay.event_store);
