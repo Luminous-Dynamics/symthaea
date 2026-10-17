@@ -639,7 +639,8 @@ mod tests {
             .filter(|event| event.host_id == "host-007"
                 && event.principal_id == "j.smith"
                 && event.event_type == "authentication"
-                && event.outcome == "failure")
+                && event.outcome == "failure"
+                && event.details.get("source_address").map(String::as_str) == Some("10.20.4.18"))
             .collect();
         assert_eq!(benign_auth_failures.len(), 3);
         assert!(benign_auth_failures.iter().all(|event| !positive_ids.contains(&event.event_id)));
