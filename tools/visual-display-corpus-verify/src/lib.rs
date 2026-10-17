@@ -17,9 +17,9 @@
 //! A valid corpus contract is not proof that a display, algorithm, measurement,
 //! or human study has passed any benchmark.
 
-use std::collections::{BTreeMap, BTreeSet};
-use sha2::{Digest, Sha256};
 use serde_json::Value;
+use sha2::{Digest, Sha256};
+use std::collections::{BTreeMap, BTreeSet};
 
 pub const EXPECTED_CORPUS_ID: &str = "VIS-DISP-CORPUS-001";
 pub const EXPECTED_SCHEMA_VERSION: &str = "0.1.0";
@@ -152,17 +152,13 @@ fn validate_semantics(manifest: &Value, schema: &Value) -> Vec<String> {
         "manifest",
         &mut errors,
     );
-    expect_string(
-        manifest,
-        "status",
-        UNQUALIFIED,
-        "manifest",
-        &mut errors,
-    );
+    expect_string(manifest, "status", UNQUALIFIED, "manifest", &mut errors);
 
     match manifest.get("created_date").and_then(Value::as_str) {
         Some(date) if is_valid_iso_date(date) => {}
-        Some(date) => errors.push(format!("manifest created_date is not a real YYYY-MM-DD date: {date}")),
+        Some(date) => errors.push(format!(
+            "manifest created_date is not a real YYYY-MM-DD date: {date}"
+        )),
         None => errors.push("manifest created_date must be a string".to_owned()),
     }
 
@@ -246,9 +242,7 @@ fn validate_semantics(manifest: &Value, schema: &Value) -> Vec<String> {
 
         if let Some(url) = source.get("url").and_then(Value::as_str) {
             if !url.starts_with("https://") {
-                errors.push(format!(
-                    "reference_sources[{index}].url must use HTTPS"
-                ));
+                errors.push(format!("reference_sources[{index}].url must use HTTPS"));
             }
         }
     }
@@ -291,7 +285,9 @@ fn validate_semantics(manifest: &Value, schema: &Value) -> Vec<String> {
         match id {
             Some(id) => {
                 if !is_case_id(id) {
-                    errors.push(format!("{path}.id has invalid VIS-DISP case ID shape: {id}"));
+                    errors.push(format!(
+                        "{path}.id has invalid VIS-DISP case ID shape: {id}"
+                    ));
                 }
                 if !case_ids.insert(id.to_owned()) {
                     errors.push(format!("duplicate case ID: {id}"));
@@ -303,9 +299,7 @@ fn validate_semantics(manifest: &Value, schema: &Value) -> Vec<String> {
         expect_string(case, "status", UNQUALIFIED, &path, &mut errors);
 
         let lane = case.get("lane").and_then(Value::as_str);
-        let evidence = case
-            .get("minimum_evidence_class")
-            .and_then(Value::as_str);
+        let evidence = case.get("minimum_evidence_class").and_then(Value::as_str);
 
         match (lane, evidence) {
             (Some(lane), Some(evidence)) => {
@@ -338,19 +332,16 @@ fn validate_semantics(manifest: &Value, schema: &Value) -> Vec<String> {
                 match reference.as_str() {
                     Some(reference) => {
                         if !source_ids.contains(reference) {
-                            errors.push(format!(
-                                "{path} references unknown source ID: {reference}"
-                            ));
+                            errors
+                                .push(format!("{path} references unknown source ID: {reference}"));
                         }
                         if !used_here.insert(reference.to_owned()) {
-                            errors.push(format!(
-                                "{path} repeats reference source ID: {reference}"
-                            ));
+                            errors.push(format!("{path} repeats reference source ID: {reference}"));
                         }
                     }
-                    None => errors.push(format!(
-                        "{path}.reference_ids entries must all be strings"
-                    )),
+                    None => {
+                        errors.push(format!("{path}.reference_ids entries must all be strings"))
+                    }
                 }
             }
         }
@@ -375,12 +366,11 @@ fn validate_semantics(manifest: &Value, schema: &Value) -> Vec<String> {
                 match value.as_str() {
                     Some(value) if !value.trim().is_empty() => {
                         if !unique.insert(value.to_owned()) {
-                            errors.push(format!("{path}.{field} contains duplicate value: {value}"));
+                            errors
+                                .push(format!("{path}.{field} contains duplicate value: {value}"));
                         }
                     }
-                    _ => errors.push(format!(
-                        "{path}.{field} entries must be non-empty strings"
-                    )),
+                    _ => errors.push(format!("{path}.{field} entries must be non-empty strings")),
                 }
             }
         }
@@ -389,18 +379,10 @@ fn validate_semantics(manifest: &Value, schema: &Value) -> Vec<String> {
     errors
 }
 
-fn expect_string(
-    value: &Value,
-    key: &str,
-    expected: &str,
-    path: &str,
-    errors: &mut Vec<String>,
-) {
+fn expect_string(value: &Value, key: &str, expected: &str, path: &str, errors: &mut Vec<String>) {
     match value.get(key).and_then(Value::as_str) {
         Some(actual) if actual == expected => {}
-        Some(actual) => errors.push(format!(
-            "{path}.{key} must remain {expected}, got {actual}"
-        )),
+        Some(actual) => errors.push(format!("{path}.{key} must remain {expected}, got {actual}")),
         None => errors.push(format!("{path}.{key} must be a string")),
     }
 }
@@ -423,9 +405,11 @@ fn is_valid_iso_date(value: &str) -> bool {
         return false;
     }
 
-    let (Ok(year), Ok(month), Ok(day)) =
-        (year.parse::<u32>(), month.parse::<u32>(), day.parse::<u32>())
-    else {
+    let (Ok(year), Ok(month), Ok(day)) = (
+        year.parse::<u32>(),
+        month.parse::<u32>(),
+        day.parse::<u32>(),
+    ) else {
         return false;
     };
 
@@ -450,9 +434,9 @@ fn is_case_id(value: &str) -> bool {
         return false;
     };
     !suffix.is_empty()
-        && suffix
-            .chars()
-            .all(|character| character.is_ascii_uppercase() || character.is_ascii_digit() || character == '-')
+        && suffix.chars().all(|character| {
+            character.is_ascii_uppercase() || character.is_ascii_digit() || character == '-'
+        })
         && !suffix.starts_with('-')
         && !suffix.ends_with('-')
 }
@@ -498,7 +482,10 @@ mod tests {
         assert_eq!(report.schema_version, EXPECTED_SCHEMA_VERSION);
         assert_eq!(report.claim_status, "CONTRACT_VALID_UNQUALIFIED");
         assert_eq!(report.case_count, EXPECTED_CASE_COUNT);
-        assert_eq!(report.lane_counts.values().sum::<usize>(), EXPECTED_CASE_COUNT);
+        assert_eq!(
+            report.lane_counts.values().sum::<usize>(),
+            EXPECTED_CASE_COUNT
+        );
         assert_eq!(report.manifest_sha256.len(), 64);
         assert_eq!(report.schema_sha256.len(), 64);
     }
@@ -519,7 +506,11 @@ mod tests {
         manifest["cases"][1]["id"] = first_id;
 
         let errors = revalidate(&manifest, &schema).expect_err("duplicate case ID must reject");
-        assert!(errors.iter().any(|error| error.contains("duplicate case ID")));
+        assert!(
+            errors
+                .iter()
+                .any(|error| error.contains("duplicate case ID"))
+        );
     }
 
     #[test]
@@ -534,11 +525,14 @@ mod tests {
     #[test]
     fn rejects_lane_evidence_class_mismatch() {
         let (mut manifest, schema) = values();
-        manifest["cases"][0]["minimum_evidence_class"] =
-            Value::String("BENCH_MEASURED".to_owned());
+        manifest["cases"][0]["minimum_evidence_class"] = Value::String("BENCH_MEASURED".to_owned());
 
         let errors = revalidate(&manifest, &schema).expect_err("lane mismatch must reject");
-        assert!(errors.iter().any(|error| error.contains("requires evidence class")));
+        assert!(
+            errors
+                .iter()
+                .any(|error| error.contains("requires evidence class"))
+        );
     }
 
     #[test]
@@ -547,7 +541,11 @@ mod tests {
         manifest["cases"][0]["reference_ids"][0] = Value::String("invented-source".to_owned());
 
         let errors = revalidate(&manifest, &schema).expect_err("unknown source must reject");
-        assert!(errors.iter().any(|error| error.contains("unknown source ID")));
+        assert!(
+            errors
+                .iter()
+                .any(|error| error.contains("unknown source ID"))
+        );
     }
 
     #[test]
@@ -556,15 +554,26 @@ mod tests {
         schema["properties"]["case_count"]["const"] = Value::from(31);
 
         let errors = revalidate(&manifest, &schema).expect_err("mutated schema count must reject");
-        assert!(errors.iter().any(|error| error.contains("schema properties.case_count.const")));
+        assert!(
+            errors
+                .iter()
+                .any(|error| error.contains("schema properties.case_count.const"))
+        );
     }
 
     #[test]
     fn rejects_missing_required_case_field() {
         let (mut manifest, schema) = values();
-        manifest["cases"][0].as_object_mut().expect("case is an object").remove("claim_limit");
+        manifest["cases"][0]
+            .as_object_mut()
+            .expect("case is an object")
+            .remove("claim_limit");
 
         let errors = revalidate(&manifest, &schema).expect_err("missing field must reject");
-        assert!(errors.iter().any(|error| error.contains("claim_limit") || error.contains("required")));
+        assert!(
+            errors
+                .iter()
+                .any(|error| error.contains("claim_limit") || error.contains("required"))
+        );
     }
 }
