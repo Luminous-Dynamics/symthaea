@@ -399,6 +399,7 @@ fn parse_results(bytes: &[u8]) -> Result<Vec<AuditResult>, String> {
 fn estimate(
     metric: Metric,
     groups: &BTreeMap<String, SufficientStats>,
+    stratified_groups: Option<&BTreeMap<String, BTreeMap<String, SufficientStats>>>,
     total: &SufficientStats,
     seed: u64,
     interpretation: &str,
@@ -410,17 +411,28 @@ fn estimate(
         valid_bootstrap_replicates: 0,
         interpretation: interpretation.to_owned(),
     };
-    if groups.len() < MIN_GROUPS_FOR_INTERVAL {
+    if groups.len() < MIN_GROUPS_FOR_INTERVAL || stratified_groups.is_none() {
         return report;
     }
 
-    let group_values = groups.values().copied().collect::<Vec<_>>();
+    // Resample independent parent clusters within each frozen stratum. Pooling clusters
+    // across strata would alter the declared allocation and can distort uncertainty.
+    let strata = stratified_groups
+        .expect("checked above")
+        .values()
+        .map(|stratum| stratum.values().copied().collect::<Vec<_>>())
+        .collect::<Vec<_>>();
+    if strata.iter().any(Vec::is_empty) {
+        return report;
+    }
     let mut rng = DeterministicRng(seed);
     let mut values = Vec::with_capacity(BOOTSTRAP_REPLICATES);
     for _ in 0..BOOTSTRAP_REPLICATES {
         let mut replicate = SufficientStats::default();
-        for _ in 0..group_values.len() {
-            replicate.add(group_values[rng.index(group_values.len())]);
+        for stratum_groups in &strata {
+            for _ in 0..stratum_groups.len() {
+                replicate.add(stratum_groups[rng.index(stratum_groups.len())]);
+            }
         }
         if let Some(value) = metric.value(&replicate) {
             if value.is_finite() {
@@ -589,6 +601,10 @@ pub fn score_run(run_dir: &Path) -> Result<String, String> {
     let result_digest_binding = manifest_digest.clone();
     let mut seen = BTreeSet::new();
     let mut groups = BTreeMap::<String, SufficientStats>::new();
+    let mut groups_by_stratum =
+        BTreeMap::<String, BTreeMap<String, SufficientStats>>::new();
+    let mut parent_stratum = BTreeMap::<String, String>::new();
+    let mut parent_spans_strata = false;
     let mut trajectories = BTreeSet::new();
     let mut evaluated = 0usize;
     let mut failed = 0usize;
@@ -671,6 +687,21 @@ pub fn score_run(run_dir: &Path) -> Result<String, String> {
         let row_stats = SufficientStats::from_row(row, intervention);
         total.add(row_stats);
         groups.entry(row.parent_group_id.clone()).or_default().add(row_stats);
+        match parent_stratum.get(&row.parent_group_id) {
+            Some(existing) if existing != &row.stratum_id => {
+                parent_spans_strata = true;
+            }
+            Some(_) => {}
+            None => {
+                parent_stratum.insert(row.parent_group_id.clone(), row.stratum_id.clone());
+            }
+        }
+        groups_by_stratum
+            .entry(row.stratum_id.clone())
+            .or_default()
+            .entry(row.parent_group_id.clone())
+            .or_default()
+            .add(row_stats);
     }
 
     if seen.len() != sample_by_id.len() {
@@ -705,7 +736,18 @@ pub fn score_run(run_dir: &Path) -> Result<String, String> {
         .filter_map(|group| group.severe_event_intervention_recall)
         .min_by(f64::total_cmp);
 
+    let bootstrap_groups = if parent_spans_strata {
+        None
+    } else {
+        Some(&groups_by_stratum)
+    };
+
     let mut warnings = Vec::new();
+    if parent_spans_strata {
+        warnings.push(
+            "One or more parent systems span multiple sampling strata; the simple stratified cluster bootstrap is not appropriate for this crossed design, so confidence intervals are withheld. Use a preregistered design-based or multiway-cluster variance method.".to_owned()
+        );
+    }
     if parent_groups_with_observed_integrity_breach > 0 {
         warnings.push(format!(
             "{} parent group(s) contain at least one observed physical-integrity breach; pooled averages must not mask these failures.",
@@ -765,6 +807,7 @@ pub fn score_run(run_dir: &Path) -> Result<String, String> {
         reference_outcome_coverage: estimate(
             Metric::ReferenceOutcomeCoverage,
             &groups,
+            bootstrap_groups,
             &total,
             0x8ad1_ee31_15ca_77a1,
             "Horvitz-Thompson weighted evaluated-outcome share of the eligible-window population.",
@@ -772,6 +815,7 @@ pub fn score_run(run_dir: &Path) -> Result<String, String> {
         policy_reference_query_fraction: estimate(
             Metric::QueryFraction,
             &groups,
+            bootstrap_groups,
             &total,
             0xa904_2d31_99c7_10ef,
             "Design-weighted fraction of eligible windows for which the policy requested a reference; independent of whether the evaluator reference later succeeded.",
@@ -779,6 +823,7 @@ pub fn score_run(run_dir: &Path) -> Result<String, String> {
         policy_intervention_fraction: estimate(
             Metric::InterventionFraction,
             &groups,
+            bootstrap_groups,
             &total,
             0xe3b1_7a62_5c49_08df,
             "Design-weighted fraction of eligible windows where policy action was not plain continue; includes conservative continuation, stop/abstain, and reference request.",
@@ -786,6 +831,7 @@ pub fn score_run(run_dir: &Path) -> Result<String, String> {
         severe_event_intervention_recall_on_evaluated_references: estimate(
             Metric::SevereEventInterventionRecall,
             &groups,
+            bootstrap_groups,
             &total,
             0x17d3_5a2c_91b4_06ef,
             "Design-weighted recall of any intervention (conservative_continue, abstain_stop, or request_reference) among successfully evaluated severe outcomes; conditional if any reference labels are missing.",
@@ -793,6 +839,7 @@ pub fn score_run(run_dir: &Path) -> Result<String, String> {
         severe_event_reference_query_recall_on_evaluated_references: estimate(
             Metric::SevereEventQueryRecall,
             &groups,
+            bootstrap_groups,
             &total,
             0x7ce4_1b90_2d65_a83f,
             "Design-weighted recall of explicit reference queries among successfully evaluated severe outcomes; conditional if any reference labels are missing.",
@@ -800,6 +847,7 @@ pub fn score_run(run_dir: &Path) -> Result<String, String> {
         false_intervention_rate_among_evaluated_nonsevere_windows: estimate(
             Metric::FalseInterventionRate,
             &groups,
+            bootstrap_groups,
             &total,
             0x36c8_21af_73d9_450b,
             "Design-weighted fraction of successfully evaluated non-severe windows receiving any intervention; conditional on observed reference labels.",
@@ -807,6 +855,7 @@ pub fn score_run(run_dir: &Path) -> Result<String, String> {
         false_reference_query_rate_among_evaluated_nonsevere_windows: estimate(
             Metric::FalseQueryRate,
             &groups,
+            bootstrap_groups,
             &total,
             0x11a8_2d74_c59e_630f,
             "Design-weighted fraction of successfully evaluated non-severe windows receiving an explicit reference query; conditional on observed reference labels.",
@@ -814,6 +863,7 @@ pub fn score_run(run_dir: &Path) -> Result<String, String> {
         known_label_intervention_false_alarm_burden_per_estimated_population_window: estimate(
             Metric::InterventionFalseAlarmBurden,
             &groups,
+            bootstrap_groups,
             &total,
             0xc0f1_25b8_794e_631d,
             "Known non-severe windows receiving any intervention divided by estimated eligible-window population. With missing labels this is a lower bound on total intervention false-alarm burden.",
@@ -821,6 +871,7 @@ pub fn score_run(run_dir: &Path) -> Result<String, String> {
         known_label_reference_query_false_alarm_burden_per_estimated_population_window: estimate(
             Metric::QueryFalseAlarmBurden,
             &groups,
+            bootstrap_groups,
             &total,
             0x62ef_a137_9d45_80bc,
             "Known non-severe windows receiving a reference query divided by estimated eligible-window population. With missing labels this is a lower bound on query false-alarm burden.",
@@ -828,12 +879,13 @@ pub fn score_run(run_dir: &Path) -> Result<String, String> {
         physical_integrity_failure_rate_on_evaluated_references: estimate(
             Metric::PhysicalIntegrityFailureRate,
             &groups,
+            bootstrap_groups,
             &total,
             0x5e20_4f7a_d193_86bc,
             "Design-weighted physical-integrity failure rate among outcomes with a known physical-integrity label; conditional if any labels are missing.",
         ),
         interval_method: format!(
-            "Approximate percentile bootstrap resampling independent parent_group_id clusters with replacement; {BOOTSTRAP_REPLICATES} deterministic replicates. A 95% interval is emitted only with at least {MIN_GROUPS_FOR_INTERVAL} parent groups and at least {:.0}% valid replicates. This is not an exact design-based finite-population variance estimator.",
+            "Approximate percentile bootstrap resampling parent_group_id clusters with replacement within each declared sampling stratum, preserving the number of sampled clusters per stratum; {BOOTSTRAP_REPLICATES} deterministic replicates. A 95% interval is emitted only with at least {MIN_GROUPS_FOR_INTERVAL} parent groups, no parent crossing strata, and at least {:.0}% valid replicates. This is not an exact design-based finite-population variance estimator.",
             REQUIRED_VALID_BOOTSTRAP_FRACTION * 100.0
         ),
         warnings,
@@ -972,6 +1024,7 @@ mod tests {
         let result = estimate(
             Metric::SevereEventQueryRecall,
             &groups,
+            None,
             &total,
             1234,
             "test",
