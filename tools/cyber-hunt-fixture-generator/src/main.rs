@@ -3,7 +3,7 @@ use sha2::{Digest, Sha256};
 use std::collections::{BTreeMap, BTreeSet};
 use std::env;
 use std::fs;
-use std::path::{Path, PathBuf};
+use std::path::PathBuf;
 use std::process;
 
 const GENERATOR_VERSION: &str = "cyber-hunt-fixture-generator/0.1.0";
@@ -77,6 +77,8 @@ struct DatasetManifest {
     event_store_utf8_bytes: usize,
     ordering: String,
     qualification_state: String,
+    generator_source_commit: String,
+    source_commit_pinned: bool,
     claim_ceiling: String,
 }
 
@@ -379,6 +381,8 @@ fn generate_dataset(record_count: usize, seed: u64) -> Result<Dataset, String> {
         event_store_utf8_bytes: event_store.len(),
         ordering: "ingest_time_ms_then_event_id; event_time_ms remains distinct".to_string(),
         qualification_state: "UNSCORED".to_string(),
+        generator_source_commit: "UNPINNED_LOCAL_SOURCE".to_string(),
+        source_commit_pinned: false,
         claim_ceiling: "Exact deterministic synthetic fixture identity only; not solver capability evidence.".to_string(),
     };
     Ok(Dataset { event_store, manifest, truth })
@@ -450,26 +454,11 @@ fn write_dataset(config: &Config) -> Result<(), String> {
     // exact source commit. Local mode remains explicitly unpinned and unqualified.
     let source_commit_is_pinned = config.source_commit.len() == 40
         && config.source_commit.bytes().all(|b| b.is_ascii_hexdigit());
-    let manifest_json = {
-        let value = serde_json::json!({
-            "schema_version": manifest.schema_version,
-            "generator_version": manifest.generator_version,
-            "generator_source_commit": config.source_commit,
-            "profile": manifest.profile,
-            "scenario_id": manifest.scenario_id,
-            "seed": manifest.seed,
-            "record_count": manifest.record_count,
-            "event_store_sha256": manifest.event_store_sha256,
-            "event_store_utf8_bytes": manifest.event_store_utf8_bytes,
-            "ordering": manifest.ordering,
-            "qualification_state": manifest.qualification_state,
-            "source_commit_pinned": source_commit_is_pinned,
-            "claim_ceiling": manifest.claim_ceiling
-        });
-        serde_json::to_vec_pretty(&value).map_err(|e| format!("cannot serialize manifest: {e}"))?
-    };
-    manifest = serde_json::from_slice(&manifest_json)
-        .map_err(|e| format!("cannot materialize manifest: {e}"))?;
+    manifest.generator_source_commit = config.source_commit.clone();
+    manifest.source_commit_pinned = source_commit_is_pinned;
+    let mut manifest_json = serde_json::to_vec_pretty(&manifest)
+        .map_err(|e| format!("cannot serialize manifest: {e}"))?;
+    manifest_json.push(b'\n');
     let mut truth = dataset.truth;
     truth.event_store_sha256 = digest(&dataset.event_store);
     let truth_json = serde_json::to_vec_pretty(&truth)
