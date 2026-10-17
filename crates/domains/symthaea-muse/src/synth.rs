@@ -748,6 +748,7 @@ fn render_arrangement_internal(
                 duration_secs: note.duration,
                 selected_render_path: rendered_path,
                 sample_attempt_status,
+                selected_sample: None,
             });
         }
     }
