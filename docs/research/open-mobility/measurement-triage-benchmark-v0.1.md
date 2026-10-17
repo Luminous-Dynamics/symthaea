@@ -47,7 +47,7 @@ Each action catalog entry must declare:
 
 For physical bench measurement, safety review and a relevant current calibration status must be explicitly satisfied. For human studies, consent/ethics and safety requirements must be explicitly satisfied. Unknown or blocked required gates exclude the action. Analysis/simulation may mark physical-only gates `not_applicable`; that designation is caller-declared, not independently authenticated.
 
-A stale protocol, unknown/duplicate candidate, duplicate action ID, duplicate metric target, malformed cost, or incomplete source pair matrix rejects triage instead of quietly producing a partial result.
+A stale protocol, unknown/duplicate candidate, duplicate action ID, duplicate metric target, malformed cost, incomplete source pair matrix, or source report with missing/duplicate/invalid metric intervals rejects triage instead of quietly producing a partial result.
 
 ## 5. Deterministic action frontier
 
@@ -55,10 +55,11 @@ For a given source comparison:
 
 1. Enumerate only pairwise comparisons whose dominance may change within the declared envelopes.
 2. Materialize the ordered cells from their not-separated dimensions.
-3. An action covers a cell only if it names both candidates in the pair and names that metric as a target.
-4. Keep blocked/unknown actions in the report with reasons but never include them in the eligible action frontier.
-5. Among eligible actions that cover at least one cell, action A dominates action B only if A's covered-cell set is a superset of B's and A's conservative upper cost bound is no greater, with strict improvement in coverage or cost.
-6. Return every non-dominated action, not one scalar winner. Actions that cover different cells stay available even when their coverage counts are equal.
+3. A declared not-separated dimension is a measurement target only when at least one candidate's echoed interval has width greater than the numerical comparison tolerance. Equal point-valued intervals contain no represented uncertainty to narrow and are not offered as measurement work.
+4. An action covers a cell only if it names both candidates in the pair and names that metric as a target.
+5. Keep blocked/unknown actions in the report with reasons but never include them in the eligible action frontier.
+6. Among eligible actions that cover at least one cell, action A dominates action B only if A's covered-cell set is a superset of B's and A's conservative upper cost bound is no greater, with strict improvement in coverage or cost.
+7. Return every non-dominated action, not one scalar winner. Actions that cover different cells stay available even when their coverage counts are equal.
 
 The receipt binds the canonical serialized source comparison using BLAKE3. A digest establishes content identity of the supplied structure, not sensor authenticity, valid calibration, consent, truth or authorization.
 
