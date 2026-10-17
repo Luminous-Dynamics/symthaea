@@ -491,20 +491,28 @@ fn validate_source_report(
             !pair.a_robustly_dominates_b && !pair.b_robustly_dominates_a;
         let expected_tradeoff = !pair.a_definitely_better_dimensions.is_empty()
             && !pair.b_definitely_better_dimensions.is_empty();
+        let expected_additional_evidence = expected_unresolved
+            && !expected_tradeoff
+            && (pair.a_may_dominate_b_within_bounds
+                || pair.b_may_dominate_a_within_bounds);
+        let mut not_separated = HashSet::with_capacity(pair.not_separated_dimensions.len());
+        let dimensions_are_unique = pair
+            .not_separated_dimensions
+            .iter()
+            .all(|metric| not_separated.insert(*metric));
+        let dimensions_are_disjoint = pair
+            .not_separated_dimensions
+            .iter()
+            .all(|metric| {
+                !pair.a_definitely_better_dimensions.contains(metric)
+                    && !pair.b_definitely_better_dimensions.contains(metric)
+            });
         if (pair.a_robustly_dominates_b && pair.b_robustly_dominates_a)
             || pair.unresolved != expected_unresolved
             || pair.definite_tradeoff != expected_tradeoff
-            || ((pair.a_robustly_dominates_b || pair.b_robustly_dominates_a)
-                && (pair.definite_tradeoff || pair.additional_evidence_may_change_dominance))
-            || (pair.definite_tradeoff
-                && (!pair.unresolved
-                    || pair.a_definitely_better_dimensions.is_empty()
-                    || pair.b_definitely_better_dimensions.is_empty()))
-            || (pair.additional_evidence_may_change_dominance
-                && (!pair.unresolved
-                    || pair.definite_tradeoff
-                    || !(pair.a_may_dominate_b_within_bounds
-                        || pair.b_may_dominate_a_within_bounds)))
+            || pair.additional_evidence_may_change_dominance != expected_additional_evidence
+            || !dimensions_are_unique
+            || !dimensions_are_disjoint
         {
             findings.push(
                 MeasurementTriageFindingV1::InconsistentPairClassification {
@@ -891,6 +899,47 @@ mod tests {
                 MeasurementTriageFindingV1::ProtocolMismatch { .. }
             ))
         );
+    }
+
+    #[test]
+    fn inconsistent_source_classification_fails_closed() {
+        let mut source = source_report();
+        source.pairwise_assessments[0].additional_evidence_may_change_dominance = false;
+        assert!(triage_measurement_actions(
+            &source,
+            &[],
+            MEASUREMENT_TRIAGE_SCHEMA_VERSION_V1,
+        )
+        .as_ref()
+        .err()
+        .unwrap()
+        .iter()
+        .any(|finding| {
+            matches!(
+                finding,
+                MeasurementTriageFindingV1::InconsistentPairClassification { .. }
+            )
+        }));
+
+        let mut source = source_report();
+        source.pairwise_assessments[0]
+            .not_separated_dimensions
+            .push(ArchitectureMetricV1::EnergyWhPerTask);
+        assert!(triage_measurement_actions(
+            &source,
+            &[],
+            MEASUREMENT_TRIAGE_SCHEMA_VERSION_V1,
+        )
+        .as_ref()
+        .err()
+        .unwrap()
+        .iter()
+        .any(|finding| {
+            matches!(
+                finding,
+                MeasurementTriageFindingV1::InconsistentPairClassification { .. }
+            )
+        }));
     }
 
     #[test]
