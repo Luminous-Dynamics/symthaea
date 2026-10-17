@@ -479,6 +479,23 @@ fn resolve_service<'a>(
     services.get(endpoint.service_id.as_deref()?).copied()
 }
 
+fn endpoint_shape_valid(endpoint: &Endpoint) -> bool {
+    match endpoint.kind.as_str() {
+        "module_port" => endpoint.instance_id.as_deref().is_some_and(|v| !v.trim().is_empty())
+            && endpoint.port_id.as_deref().is_some_and(|v| !v.trim().is_empty())
+            && endpoint.service_id.is_none(),
+        "platform_service" => endpoint.instance_id.is_none()
+            && endpoint.port_id.is_none()
+            && endpoint.service_id.as_deref().is_some_and(|v| !v.trim().is_empty()),
+        _ => false,
+    }
+}
+
+fn stable_id(value: &str) -> bool {
+    (3..=64).contains(&value.len())
+        && value.bytes().all(|b| b.is_ascii_alphanumeric() || matches!(b, b'.' | b'_' | b'-'))
+}
+
 fn compatible_port_direction(port: &str, service: &str) -> bool {
     match service {
         "source" => matches!(port, "in" | "bidirectional"),
@@ -635,6 +652,20 @@ pub fn validate_configuration(
         add_finding(&mut findings, "UNSUPPORTED_SCHEMA_VERSION", Severity::Error,
             &configuration.configuration_id, "schema version is not supported");
     }
+    if !stable_id(&configuration.configuration_id) || configuration.configuration_name.trim().is_empty()
+        || configuration.customization_intent.trim().is_empty() || configuration.claim_ceiling.trim().is_empty()
+    {
+        add_finding(&mut findings, "INVALID_CONFIGURATION_IDENTITY", Severity::Error,
+            &configuration.configuration_id, "configuration ID or required descriptive text is invalid");
+    }
+    if configuration.module_catalog.is_empty() || configuration.placements.is_empty()
+        || configuration.platform.deck_bounds.is_empty() || configuration.safety_gates.is_empty()
+        || configuration.provenance.is_empty() || configuration.assumptions.is_empty()
+    {
+        add_finding(&mut findings, "INCOMPLETE_CONFIGURATION_MANIFEST", Severity::Error,
+            &configuration.configuration_id,
+            "module catalog, placements, deck bounds, safety gates, assumptions and provenance must be populated");
+    }
     if configuration.coordinate_frame.unit != "mm"
         || configuration.coordinate_frame.x_axis != "forward"
         || configuration.coordinate_frame.y_axis != "starboard"
@@ -671,9 +702,21 @@ pub fn validate_configuration(
 
     for module in &configuration.module_catalog {
         let e = &module.envelope_mm;
+        if !stable_id(&module.module_id) || module.name.trim().is_empty() || module.function.trim().is_empty()
+            || module.provenance.is_empty() || module.ports.is_empty()
+        {
+            add_finding(&mut findings, "INCOMPLETE_MODULE_DEFINITION", Severity::Error,
+                &module.module_id, "module ID, name, function, ports and provenance must be populated");
+        }
         if module.revision == 0 || e.length_mm <= 0 || e.width_mm <= 0 || e.height_mm <= 0 {
             add_finding(&mut findings, "INVALID_MODULE_ENVELOPE", Severity::Error,
                 &module.module_id, "revision and all envelope dimensions must be positive");
+        }
+        if !matches!(module.mass_properties.status.as_str(),
+            "unknown" | "design_assumption" | "computed" | "measured" | "source_verified")
+        {
+            add_finding(&mut findings, "INVALID_MASS_STATUS", Severity::Error,
+                &module.module_id, "unsupported mass evidence status");
         }
         if module.mass_properties.status == "unknown"
             && (module.mass_properties.mass_kg.is_some()
@@ -806,6 +849,13 @@ pub fn validate_configuration(
     let mut port_use: HashMap<String, usize> = HashMap::new();
     let mut service_loads = Vec::new();
     for connection in &configuration.connections {
+        if !stable_id(&connection.connection_id) || !endpoint_shape_valid(&connection.endpoint_a)
+            || !endpoint_shape_valid(&connection.endpoint_b)
+        {
+            add_finding(&mut findings, "INVALID_CONNECTION_ENDPOINT_SHAPE", Severity::Error,
+                &connection.connection_id, "connection endpoints must match their declared module-port or platform-service shape");
+            continue;
+        }
         if connection.route_length_m.value.is_none() || connection.route_length_m.status == "unknown" {
             add_finding(&mut findings, "SERVICE_ROUTE_UNKNOWN", Severity::Indeterminate,
                 &connection.connection_id, "service route has not been laid out or measured");
@@ -867,6 +917,9 @@ pub fn validate_configuration(
             {
                 add_finding(&mut findings, "MODULE_LINK_INCOMPATIBLE", Severity::Error,
                     &connection.connection_id, "module-to-module interfaces differ by medium, profile or direction");
+            } else if pa.connector_profile.contains("PROVISIONAL") {
+                add_finding(&mut findings, "CONNECTOR_PROFILE_PROVISIONAL", Severity::Indeterminate,
+                    &connection.connection_id, "provisional profile is not evidence of a proven physical connector standard");
             }
         } else {
             add_finding(&mut findings, "UNSUPPORTED_CONNECTION_TOPOLOGY", Severity::Error,
@@ -899,6 +952,9 @@ pub fn validate_configuration(
             "pass" if gate.evidence_refs.is_empty() => add_finding(&mut findings,
                 "SAFETY_GATE_PASS_WITHOUT_EVIDENCE", Severity::Error, &gate.gate_id,
                 "safety gate cannot pass without evidence references"),
+            "not_applicable" if gate.evidence_refs.is_empty() =>
+                add_finding(&mut findings, "SAFETY_GATE_NA_WITHOUT_EVIDENCE", Severity::Indeterminate,
+                    &gate.gate_id, "not-applicable disposition lacks supporting evidence"),
             "pass" | "not_applicable" => {}
             _ => add_finding(&mut findings, "INVALID_SAFETY_GATE_DISPOSITION", Severity::Error,
                 &gate.gate_id, "unsupported safety-gate disposition"),
