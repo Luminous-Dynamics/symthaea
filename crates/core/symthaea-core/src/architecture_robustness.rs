@@ -12,7 +12,8 @@ use serde::{Deserialize, Serialize};
 use std::collections::HashSet;
 
 use crate::architecture_pareto::{
-    ArchitectureEvidenceLevelV1, ArchitectureMetricV1,
+    ArchitectureConditionFieldV1, ArchitectureEvidenceLevelV1, ArchitectureMetricV1,
+    ArchitectureOperatingConditionsV1,
 };
 
 /// Current schema version for interval-aware architecture comparisons.
@@ -88,8 +89,18 @@ pub struct ArchitectureRobustnessRequestV1 {
     pub schema_version: u16,
     /// Stable comparison identity.
     pub comparison_id: String,
+    /// Benchmark case shared by all candidates.
+    pub benchmark_case_id: String,
+    /// Task identity shared by all candidates.
+    pub task_id: String,
+    /// Wearer/device profile shared by all candidates.
+    pub wearer_profile_id: String,
+    /// Environment profile shared by all candidates.
+    pub environment_profile_id: String,
     /// Protocol revision shared by every candidate.
     pub task_protocol_version: String,
+    /// Operating conditions shared by every candidate.
+    pub operating_conditions: ArchitectureOperatingConditionsV1,
     /// Caller-declared evidence level. Evaluation never promotes it.
     pub evidence_level: ArchitectureEvidenceLevelV1,
     /// Must currently be `declared_conservative_envelope`.
@@ -106,6 +117,10 @@ pub enum ArchitectureRobustnessFindingV1 {
     UnsupportedSchemaVersion { received: u16 },
     /// Comparison identity or protocol revision is empty or surrounded by whitespace.
     InvalidIdentity { field: String },
+    /// An operating-condition value is not finite.
+    NonFiniteOperatingCondition { field: ArchitectureConditionFieldV1 },
+    /// A non-negative operating condition is below zero.
+    NegativeOperatingCondition { field: ArchitectureConditionFieldV1 },
     /// At least two candidates are required for comparison.
     InsufficientCandidates,
     /// Candidate identifier is empty or surrounded by whitespace.
@@ -217,8 +232,18 @@ pub struct ArchitectureRobustnessReportV1 {
     pub schema_version: u16,
     /// Comparison identity.
     pub comparison_id: String,
+    /// Benchmark case shared by all candidates.
+    pub benchmark_case_id: String,
+    /// Task identity shared by all candidates.
+    pub task_id: String,
+    /// Wearer/device profile shared by all candidates.
+    pub wearer_profile_id: String,
+    /// Environment profile shared by all candidates.
+    pub environment_profile_id: String,
     /// Shared task protocol revision.
     pub task_protocol_version: String,
+    /// Shared operating conditions echoed from the request.
+    pub operating_conditions: ArchitectureOperatingConditionsV1,
     /// Caller-declared interval interpretation.
     pub interval_semantics: MetricIntervalSemanticsV1,
     /// Evidence level copied from the request without promotion.
@@ -254,6 +279,10 @@ pub fn evaluate_architecture_robustness(
     }
     for (field, value) in [
         ("comparison_id", request.comparison_id.as_str()),
+        ("benchmark_case_id", request.benchmark_case_id.as_str()),
+        ("task_id", request.task_id.as_str()),
+        ("wearer_profile_id", request.wearer_profile_id.as_str()),
+        ("environment_profile_id", request.environment_profile_id.as_str()),
         ("task_protocol_version", request.task_protocol_version.as_str()),
     ] {
         if value.trim().is_empty() || value.trim() != value {
@@ -262,6 +291,32 @@ pub fn evaluate_architecture_robustness(
             });
         }
     }
+
+    let conditions = &request.operating_conditions;
+    for (field, value) in [
+        (ArchitectureConditionFieldV1::SpeedMps, conditions.speed_mps),
+        (ArchitectureConditionFieldV1::PayloadKg, conditions.payload_kg),
+        (ArchitectureConditionFieldV1::GradePercent, conditions.grade_percent),
+        (
+            ArchitectureConditionFieldV1::AmbientTemperatureC,
+            conditions.ambient_temperature_c,
+        ),
+    ] {
+        if !value.is_finite() {
+            findings.push(
+                ArchitectureRobustnessFindingV1::NonFiniteOperatingCondition { field },
+            );
+        } else if matches!(
+            field,
+            ArchitectureConditionFieldV1::SpeedMps | ArchitectureConditionFieldV1::PayloadKg
+        ) && value < 0.0
+        {
+            findings.push(
+                ArchitectureRobustnessFindingV1::NegativeOperatingCondition { field },
+            );
+        }
+    }
+
     if request.candidates.len() < 2 {
         findings.push(ArchitectureRobustnessFindingV1::InsufficientCandidates);
     }
@@ -431,7 +486,12 @@ pub fn evaluate_architecture_robustness(
     Ok(ArchitectureRobustnessReportV1 {
         schema_version: ARCHITECTURE_ROBUSTNESS_SCHEMA_VERSION_V1,
         comparison_id: request.comparison_id.clone(),
+        benchmark_case_id: request.benchmark_case_id.clone(),
+        task_id: request.task_id.clone(),
+        wearer_profile_id: request.wearer_profile_id.clone(),
+        environment_profile_id: request.environment_profile_id.clone(),
         task_protocol_version: request.task_protocol_version.clone(),
+        operating_conditions: request.operating_conditions.clone(),
         interval_semantics: request.interval_semantics,
         evidence_level: request.evidence_level,
         candidates,
@@ -849,7 +909,17 @@ mod tests {
         ArchitectureRobustnessRequestV1 {
             schema_version: ARCHITECTURE_ROBUSTNESS_SCHEMA_VERSION_V1,
             comparison_id: "robust-fixture-v1".to_owned(),
+            benchmark_case_id: "walk-case-profile-a".to_owned(),
+            task_id: "overground_walk".to_owned(),
+            wearer_profile_id: "profile-a".to_owned(),
+            environment_profile_id: "flat_lab".to_owned(),
             task_protocol_version: "walk-protocol-v1".to_owned(),
+            operating_conditions: ArchitectureOperatingConditionsV1 {
+                speed_mps: 0.8,
+                payload_kg: 0.0,
+                grade_percent: 0.0,
+                ambient_temperature_c: 22.0,
+            },
             evidence_level: ArchitectureEvidenceLevelV1::SyntheticReplay,
             interval_semantics: MetricIntervalSemanticsV1::DeclaredConservativeEnvelope,
             candidates,
