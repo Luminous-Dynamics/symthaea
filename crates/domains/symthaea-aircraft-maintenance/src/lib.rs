@@ -681,6 +681,12 @@ pub fn validate_work_record(
     record: &MaintenanceWorkRecord,
 ) -> Result<(), Vec<TaskCardError>> {
     let mut errors = Vec::new();
+    if !matches!(card.state, TaskState::WorkRecorded | TaskState::ReviewPending) {
+        errors.push(TaskCardError::WrongTaskState {
+            expected: TaskState::WorkRecorded,
+            actual: card.state,
+        });
+    }
     if record.task_id != card.task_id {
         errors.push(TaskCardError::RecordIdentityMismatch { field: "task_id".into() });
     }
@@ -847,11 +853,6 @@ pub fn transition_task(
                 && actor.role == Some(card.authority.required_role) => TaskState::WorkRecorded,
         (TaskState::WorkRecorded, TaskTransition::RequestReview)
             if matches!(actor.kind, ActorKind::SoftwareChecker | ActorKind::HumanPerformer) => TaskState::ReviewPending,
-        (TaskState::ReviewPending, TaskTransition::ReleaseToService)
-            if actor.kind == ActorKind::HumanReturnToServiceSigner
-                && actor.role == Some(card.authority.return_to_service_role)
-                && actor.credential_reference.as_ref().is_some_and(valid_document_shape)
-                && card.authority.review_is_verified() => TaskState::Released,
         (state, TaskTransition::Reject)
             if !matches!(state, TaskState::Released | TaskState::Superseded)
                 && matches!(actor.kind, ActorKind::SoftwareChecker | ActorKind::HumanSourceReviewer | ActorKind::HumanEligibilityReviewer | ActorKind::HumanInspector) => TaskState::Rejected,
@@ -860,13 +861,52 @@ pub fn transition_task(
                 && actor.kind == ActorKind::HumanSourceReviewer => TaskState::Superseded,
         _ => return Err(TaskCardError::UnauthorizedTransition),
     };
-    if next == TaskState::Released {
-        let credential = actor.credential_reference.as_ref().ok_or(TaskCardError::MissingReleaseCredential)?;
-        if !valid_document_shape(credential) {
-            return Err(TaskCardError::MissingReleaseCredential);
-        }
-    }
     Ok(next)
+}
+
+/// The only API that can produce Released. It requires an exact, valid work
+/// record, review-pending state, a matching aircraft configuration, a verified
+/// task authority review, and an explicitly typed human release signer with a
+/// traceable credential reference. The credential itself must still be
+/// authenticated by the responsible organization outside this crate.
+pub fn release_task_to_service(
+    card: &MaintenanceTaskCard,
+    aircraft: &AircraftIdentity,
+    record: &MaintenanceWorkRecord,
+    actor: &ActorEvidence,
+) -> Result<TaskState, Vec<TaskCardError>> {
+    if actor.kind == ActorKind::SoftwareChecker {
+        return Err(vec![TaskCardError::SoftwareCannotReleaseToService]);
+    }
+    let mut errors = Vec::new();
+    if card.state != TaskState::ReviewPending {
+        errors.push(TaskCardError::WrongTaskState {
+            expected: TaskState::ReviewPending,
+            actual: card.state,
+        });
+    }
+    if actor.kind != ActorKind::HumanReturnToServiceSigner
+        || actor.role != Some(card.authority.return_to_service_role)
+        || actor.actor_id.trim().is_empty()
+        || actor.jurisdiction != card.authority.jurisdiction
+        || actor.certification_basis != card.authority.certification_basis
+    {
+        errors.push(TaskCardError::UnauthorizedTransition);
+    }
+    if !actor.credential_reference.as_ref().is_some_and(valid_document_shape) {
+        errors.push(TaskCardError::MissingReleaseCredential);
+    }
+    if !card.authority.review_is_verified() {
+        errors.push(TaskCardError::AuthorityReviewUnresolved);
+    }
+    if let Err(record_errors) = validate_work_record(card, aircraft, record) {
+        errors.extend(record_errors);
+    }
+    if errors.is_empty() {
+        Ok(TaskState::Released)
+    } else {
+        Err(errors)
+    }
 }
 
 impl TaskAuthority {
@@ -1190,7 +1230,8 @@ mod tests {
 
     #[test]
     fn work_record_detects_out_of_range_values_and_missing_steps() {
-        let card = card();
+        let mut card = card();
+        card.state = TaskState::ReviewPending;
         let aircraft = context(&card).aircraft;
         let mut record = work_record(&card);
         record.measurements[0].value = 9.0;
@@ -1206,7 +1247,8 @@ mod tests {
 
     #[test]
     fn qualitative_check_requires_human_review() {
-        let card = card();
+        let mut card = card();
+        card.state = TaskState::ReviewPending;
         let aircraft = context(&card).aircraft;
         let mut record = work_record(&card);
         record.human_reviews.clear();
@@ -1242,6 +1284,67 @@ mod tests {
             transition_task(&card, TaskTransition::ReleaseToService, &actor),
             Err(TaskCardError::SoftwareCannotReleaseToService)
         );
+    }
+
+    #[test]
+    fn valid_work_record_still_requires_human_release_signer() {
+        let mut card = card();
+        card.state = TaskState::ReviewPending;
+        let context = context(&card);
+        let record = work_record(&card);
+        let signer = ActorEvidence {
+            actor_id: "authorized-signer-fixture".into(),
+            kind: ActorKind::HumanReturnToServiceSigner,
+            role: Some(card.authority.return_to_service_role),
+            jurisdiction: card.authority.jurisdiction.clone(),
+            certification_basis: card.authority.certification_basis.clone(),
+            credential_reference: Some(doc("credential-fixture", "rev-1", '3')),
+        };
+        assert_eq!(
+            release_task_to_service(&card, &context.aircraft, &record, &signer),
+            Ok(TaskState::Released)
+        );
+    }
+
+    #[test]
+    fn software_checker_cannot_release_even_with_a_valid_record() {
+        let mut card = card();
+        card.state = TaskState::ReviewPending;
+        let context = context(&card);
+        let record = work_record(&card);
+        let checker = ActorEvidence {
+            actor_id: "software-checker-fixture".into(),
+            kind: ActorKind::SoftwareChecker,
+            role: None,
+            jurisdiction: card.authority.jurisdiction.clone(),
+            certification_basis: card.authority.certification_basis.clone(),
+            credential_reference: None,
+        };
+        assert_eq!(
+            release_task_to_service(&card, &context.aircraft, &record, &checker),
+            Err(vec![TaskCardError::SoftwareCannotReleaseToService])
+        );
+    }
+
+    #[test]
+    fn invalid_work_record_cannot_be_released_to_service() {
+        let mut card = card();
+        card.state = TaskState::ReviewPending;
+        let context = context(&card);
+        let mut record = work_record(&card);
+        record.measurements[0].value = 99.0;
+        let signer = ActorEvidence {
+            actor_id: "authorized-signer-fixture".into(),
+            kind: ActorKind::HumanReturnToServiceSigner,
+            role: Some(card.authority.return_to_service_role),
+            jurisdiction: card.authority.jurisdiction.clone(),
+            certification_basis: card.authority.certification_basis.clone(),
+            credential_reference: Some(doc("credential-fixture", "rev-1", '3')),
+        };
+        let result = release_task_to_service(&card, &context.aircraft, &record, &signer).unwrap_err();
+        assert!(result.contains(&TaskCardError::MeasurementOutOfRange {
+            criterion_id: "numeric-fixture".into()
+        }));
     }
 
     #[test]
