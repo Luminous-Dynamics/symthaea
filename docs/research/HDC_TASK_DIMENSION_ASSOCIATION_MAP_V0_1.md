@@ -99,3 +99,21 @@ This first executable creates 32 unrelated pairs × 12 seeds = 384 negative comp
 ### Architecture implication: dimension and comparison count are joint controls
 
 Before escalating every representation to a much larger D, test a two-stage memory path: use a fast HDC similarity stage to shortlist (K \ll N) candidates, then apply a separately measured verifier or structured exact check. This trades index recall and shortlist size against end-to-end cost; it must report retrieval misses and false shortlist candidates, not just the second-stage verifier accuracy. For tasks that truly require all-pairs clustering, quantify the (N(N-1)/2) comparison growth explicitly. Segmented/hierarchical memory and stronger match requirements are alternative controls against simply increasing D.
+
+
+## Paired dimension experiments and progressive precision
+
+The capacity example now derives item identity independently of dimension. `ContinuousHV::random(D, seed)` is currently prefix-stable: generating the same seed at a larger D preserves all preceding coordinates. A runtime guard in `association_capacity_curves.rs` checks this for 1K, 4K and 16K. The comparison therefore becomes paired across widths, reducing the confound where different D values accidentally use unrelated codebooks. If the generator contract changes, the harness fails closed rather than silently losing that control.
+
+The next research direction is **progressive precision retrieval**: use nested 1K→2K→4K→8K→16K representations to shortlist candidates, refine only ambiguous/high-value candidates, and abstain if the calibrated margin remains insufficient. The relevant baseline is exhaustive retrieval at the highest reference width. A low-dimensional shortlist is useful only if it preserves the candidates needed by the final task.
+
+Proposed gates to freeze before evaluation:
+- exact common-prefix equality for the same item IDs/seeds across widths;
+- at least 99.9% held-out Recall@K of the exhaustive high-width reference candidates (with confidence interval);
+- task-relevant target recall no more than 0.1 percentage point below exhaustive reference, unless the task contract requires a stricter margin;
+- at least 2× fewer compared coordinates on average without breaching quality, p95/p99 latency, memory or cost constraints;
+- a coverage-versus-error curve for continue/refine/abstain, with thresholds selected on calibration data and evaluated on a separate held-out set.
+
+These are starting hypotheses, not universal standards or achieved results. If margin is not predictive of misses, or coarse routing discards true candidates, the adaptive approach fails. Index storage and update cost must include whatever data is retained for refinement; prefix sharing is not free by assumption.
+
+Recent practitioner results distinguish **within-record crosstalk** from **between-record false matches**. In their synthetic five-property MAP example, HDC Labs reports that dimension narrows similarity distributions while the number of comparisons changes the probability of seeing at least one false match; it explicitly treats very large capacity figures as theory-based estimates under independent/evenly spread properties, not universal measured limits ([Oct 15, 2026 article](https://hyperdimensionalcomputing.ai/blog/testing-the-limits-of-bundling-capacity-2/)). This motivates both (a) paired capacity curves and (b) a separate query-scale risk model, while requiring Symthaea-specific replication.
