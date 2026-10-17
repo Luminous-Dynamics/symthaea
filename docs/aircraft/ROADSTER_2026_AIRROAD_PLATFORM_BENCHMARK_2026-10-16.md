@@ -40,7 +40,7 @@ The Associated Press reports cold-gas thrusters and a multi-mode suction system,
 
 Sources:
 - Reuters, 2026-10-15: https://www.reuters.com/business/autos-transportation/tesla-set-unveil-next-generation-roadster-sports-ev-after-years-delay-2026-10-15/
-- Associated Press, 2026-10-16: https://apnews.com/article/tesla-musk-roadster-rocket-7d5f19665435b7408025bfb7a2f2f0b7
+- Associated Press, 2026-10-16: https://apnews.com/article/7d5f19665435b7408025bfb7a2f2f0b7
 - TechCrunch, 2026-10-15: https://techcrunch.com/2026/10/15/tesla-reveals-spacex-powered-roadster-that-flies-and-falls-with-style/
 - Tesla public Roadster page, checked 2026-10-17 (still shows legacy headline specification): https://www.tesla.com/roadster
 - The Verge, 2026-10-16 (configuration/road-use reporting): https://www.theverge.com/transportation/1012783/tesla-roadster-flying-stunt-production-reality-musk
