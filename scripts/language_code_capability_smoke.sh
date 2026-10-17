@@ -33,10 +33,18 @@ record "git_head" "$git_head"
 record "cargo_version" "$(cargo --version)"
 record "rustc_version" "$(rustc --version)"
 record "host" "$(rustc -vV | sed -n 's/^host: //p')"
-record "smoke_corpus_sha256" "$(sha256sum fixtures/language-code-capability/smoke-v1.json | cut -d ' ' -f 1)"
-record "smoke_schema_sha256" "$(sha256sum fixtures/language-code-capability/smoke-v1.schema.json | cut -d ' ' -f 1)"
-record "trajectory_corpus_sha256" "$(sha256sum fixtures/language-code-capability/trajectory-smoke-v1.json | cut -d ' ' -f 1)"
-record "trajectory_schema_sha256" "$(sha256sum fixtures/language-code-capability/trajectory-smoke-v1.schema.json | cut -d ' ' -f 1)"
+record "smoke_corpus_sha256" "$(
+    sha256sum fixtures/language-code-capability/smoke-v1.json | cut -d ' ' -f 1
+)"
+record "smoke_schema_sha256" "$(
+    sha256sum fixtures/language-code-capability/smoke-v1.schema.json | cut -d ' ' -f 1
+)"
+record "trajectory_corpus_sha256" "$(
+    sha256sum fixtures/language-code-capability/trajectory-smoke-v1.json | cut -d ' ' -f 1
+)"
+record "trajectory_schema_sha256" "$(
+    sha256sum fixtures/language-code-capability/trajectory-smoke-v1.schema.json | cut -d ' ' -f 1
+)"
 record "claim_ceiling" "synthetic auditor checks only; no model benchmark evaluated"
 
 run_logged() {
@@ -61,11 +69,17 @@ run_logged() {
 }
 
 run_logged "smoke_auditor_tests" cargo test --locked --example language_code_capability_smoke
-run_logged "trajectory_auditor_tests" cargo test --locked --example language_code_capability_trajectory_audit
-run_logged "receipt_verifier_tests" cargo test --locked --example language_code_capability_receipt_verify --features code_generation
+run_logged "trajectory_auditor_tests" \
+    cargo test --locked --example language_code_capability_trajectory_audit
+run_logged "receipt_verifier_tests" \
+    cargo test --locked --example language_code_capability_receipt_verify \
+    --features code_generation
 run_logged "smoke_auditor_run" cargo run --locked --example language_code_capability_smoke
-run_logged "trajectory_auditor_run" cargo run --locked --example language_code_capability_trajectory_audit
-run_logged "receipt_negative_controls" cargo run --locked --example language_code_capability_receipt_verify --features code_generation
+run_logged "trajectory_auditor_run" \
+    cargo run --locked --example language_code_capability_trajectory_audit
+run_logged "receipt_negative_controls" \
+    cargo run --locked --example language_code_capability_receipt_verify \
+    --features code_generation
 
 record "overall_status" "passed"
 echo "[language-code-capability] all local synthetic-auditor gates passed"
