@@ -19,7 +19,8 @@ use symthaea_music_theory::fingerprint::{
     STRUCT_DIMS, dist, exact_fingerprint, structural_fingerprint,
 };
 use symthaea_music_theory::rhythm::Duration;
-use symthaea_music_theory::score::Score;
+use symthaea_music_theory::pitch::Pitch;
+use symthaea_music_theory::score::{Score, VoiceRole};
 use symthaea_music_theory::{
     GrammarPlanEvidence, MUSIC_THEORY_ENGINE_VERSION, MusicalIntent, PitchClass, Style,
     compose_with_grammar_plan,
@@ -205,6 +206,90 @@ fn mean(values: &[f64]) -> f64 {
 /// exact onset/duration and the interval from its previous note, not absolute
 /// pitch. It checks whether changing tonic preserves the score's rhythmic and
 /// interval skeleton without pretending that absolute register is irrelevant.
+fn fatal_rule_detected(score: &Score, expected: ScoreValidationRule) -> bool {
+    validate_score(score, &ScoreValidationConfig::default())
+        .issues
+        .iter()
+        .any(|issue| {
+            issue.rule == expected && issue.severity == ValidationSeverity::Fatal
+        })
+}
+
+/// Seed known-invalid mutations to check the benchmark's validator oracle.
+/// These are synthetic tests of rule sensitivity, not music-quality tests.
+fn validator_mutation_audit() -> Value {
+    let baseline = realize(Style::Classical, &intent(0.0, 0.5, 0.5, 16, 42)).score;
+
+    let mut nonfinite_tempo = baseline.clone();
+    nonfinite_tempo.tempo_bpm = f32::NAN;
+    let metadata_detected =
+        fatal_rule_detected(&nonfinite_tempo, ScoreValidationRule::ScoreMetadata);
+
+    let mut zero_duration = baseline.clone();
+    zero_duration.notes[0].duration = Duration::zero();
+    let zero_duration_detected =
+        fatal_rule_detected(&zero_duration, ScoreValidationRule::NoteBounds);
+
+    let mut out_of_range_pitch = baseline.clone();
+    out_of_range_pitch.notes[0].pitch = Pitch::from_midi(0);
+    let pitch_bound_detected =
+        fatal_rule_detected(&out_of_range_pitch, ScoreValidationRule::NoteBounds);
+
+    let mut overlapping_melody = baseline.clone();
+    let mut melody_indices: Vec<usize> = overlapping_melody
+        .notes
+        .iter()
+        .enumerate()
+        .filter(|(_, note)| note.role == VoiceRole::Melody)
+        .map(|(index, _)| index)
+        .collect();
+    melody_indices.sort_by(|left, right| {
+        overlapping_melody.notes[*left]
+            .onset
+            .beats()
+            .total_cmp(&overlapping_melody.notes[*right].onset.beats())
+    });
+    let monophony_detected = if melody_indices.len() >= 2 {
+        let first_onset = overlapping_melody.notes[melody_indices[0]].onset;
+        overlapping_melody.notes[melody_indices[1]].onset = first_onset;
+        fatal_rule_detected(&overlapping_melody, ScoreValidationRule::VoiceMonophony)
+    } else {
+        false
+    };
+
+    let passed = metadata_detected
+        && zero_duration_detected
+        && pitch_bound_detected
+        && monophony_detected;
+    json!({
+        "passed": passed,
+        "scope": "validator self-test using synthetic fault injection; not a composition-quality test",
+        "cases": [
+            {
+                "mutation": "nonfinite_tempo",
+                "expected_fatal_rule": "ScoreMetadata",
+                "detected": metadata_detected
+            },
+            {
+                "mutation": "zero_note_duration",
+                "expected_fatal_rule": "NoteBounds",
+                "detected": zero_duration_detected
+            },
+            {
+                "mutation": "pitch_below_default_midi_floor",
+                "expected_fatal_rule": "NoteBounds",
+                "detected": pitch_bound_detected
+            },
+            {
+                "mutation": "overlapping_melody_events",
+                "expected_fatal_rule": "VoiceMonophony",
+                "detected": monophony_detected,
+                "eligible_melody_notes": melody_indices.len()
+            }
+        ]
+    })
+}
+
 fn transposition_shape_signature(score: &Score) -> Vec<(String, Duration, Duration, i32)> {
     let mut previous_pitch_by_role = HashMap::<String, i32>::new();
     score
@@ -524,6 +609,7 @@ fn main() {
         declared_live_no_effect_count + declared_inert_with_effect_count;
 
     let source_commit = std::env::var("GIT_COMMIT").ok();
+    let validator_self_test = validator_mutation_audit();
     let report = json!({
         "schema_version": 1,
         "engine_version": MUSIC_THEORY_ENGINE_VERSION,
@@ -572,7 +658,8 @@ fn main() {
                 && replay_failure_count == 0
                 && replay_structural_failure_count == 0
                 && universal_structural_defect_count == 0
-                && control_contract_violation_count == 0,
+                && control_contract_violation_count == 0
+                && validator_self_test["passed"].as_bool().unwrap_or(false),
         },
         "control_contract_audit": {
             "declared_live_no_effect_at_test_points": declared_live_no_effect_count,
@@ -581,6 +668,7 @@ fn main() {
             "passed_at_test_points": control_contract_violation_count == 0,
             "scope": "paired high/low probes across fixed seeds; no effect at tested points is not proof of global inactivity",
         },
+        "validator_mutation_audit": validator_self_test,
         "metamorphic_audit_summary": {
             "probe": "same seed and intent in C vs G",
             "style_count": style_count,
@@ -641,6 +729,15 @@ mod tests {
         let unique: HashSet<String> =
             Style::ALL.iter().map(|style| format!("{style:?}")).collect();
         assert_eq!(unique.len(), Style::ALL.len());
+    }
+
+    #[test]
+    fn validator_mutation_audit_detects_seeded_universal_faults() {
+        let report = validator_mutation_audit();
+        assert!(
+            report["passed"].as_bool().unwrap_or(false),
+            "validator failed to detect an intentionally seeded universal invariant defect: {report}"
+        );
     }
 
     #[test]
