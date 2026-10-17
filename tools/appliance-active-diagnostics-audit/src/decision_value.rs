@@ -238,7 +238,6 @@ fn expected_risk(
     let (action_id, risk) = candidates
         .first()
         .expect("the caller checks that one eligible action exists");
-    let _ = trace;
     ((*action_id).to_owned(), *risk)
 }
 
