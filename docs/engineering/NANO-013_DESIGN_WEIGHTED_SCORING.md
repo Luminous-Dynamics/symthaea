@@ -11,7 +11,7 @@ cargo run -p symthaea-nanotech-audit -- <run-directory>
 cargo run -p symthaea-nanotech-audit --bin nano-rescue-score -- <run-directory>
 ~~~
 
-The scorer itself reruns the structural verifier and refuses to produce a report unless it returns **artifact_integrity_pass**. Running the first command separately is useful for inspecting its full report. That status concerns artifact consistency only; it is not a scientific-performance pass.
+The scoring CLI independently reruns the NANO-013 contract audit and refuses to score if the bundle is absent or has findings. For a full MADE export, run the general auditor as well; its **artifact_integrity_pass** concerns artifact consistency only and is not a scientific-performance pass.
 
 The scorer reads **rescue-controller/audit-sampling-manifest.json** and **rescue-controller/blinded-audit-results.jsonl**. It independently rechecks the raw manifest digest, sample membership, sample/result cardinality, parent/trajectory/stratum identities, inclusion probabilities, reference status/label consistency, and policy-label blinding. It fails closed for malformed records, duplicate/missing sampled windows, mixed cost units, and digest mismatches.
 
