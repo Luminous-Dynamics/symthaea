@@ -477,7 +477,9 @@
             "enum": [
               "success_rate_at_budget",
               "normalized_success_auc",
-              "best_loss_reduction_at_budget"
+              "best_loss_reduction_at_budget",
+              "worst_group_success_rate_at_budget",
+              "worst_group_normalized_success_auc"
             ]
           },
           "estimated_delta": {
@@ -526,7 +528,8 @@
               "regression_beyond_margin",
               "inconclusive",
               "insufficient_independent_groups",
-              "insufficient_target_coverage"
+              "insufficient_target_coverage",
+              "insufficient_within_group_replication"
             ]
           },
           "covered_target_count": {
