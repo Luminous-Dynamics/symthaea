@@ -56,7 +56,7 @@ Schema versions:
 - Post-outcome ledger remains `nano-outcome-ledger-v1`: `schema/outcome-ledger.schema.json`
 - Metrics report is now `nano-benchmark-metrics-v2` with per-group and worst-group outputs: `schema/benchmark-metrics-report.schema.json`
 
-Use the same frozen `group_id` values as the shift manifest in the NANO-010 audit contract; the standalone metrics evaluator summarizes those groups but does not independently establish that split membership or physical shift labels are valid. The Rust artifact auditor in [PR #7717](https://github.com/Luminous-Dynamics/symthaea/pull/7717) checks shift-manifest hashes and rejects sample/independence keys that cross data splits.
+Use the same frozen `group_id` values as the shift manifest in the NANO-010 audit contract and populate optional `shift_manifest_sha256` in the outcome ledger. Metrics report v2 carries that digest forward so detached per-group/worst-group curves remain bound to the exact shift-manifest bytes. The standalone metrics evaluator summarizes those groups but does not independently establish that split membership or physical shift labels are valid. The Rust artifact auditor in [PR #7717](https://github.com/Luminous-Dynamics/symthaea/pull/7717) checks shift-manifest hashes and rejects sample/independence keys that cross data splits.
 
 Each observation's `cost` is the all-in cost for selecting and evaluating that attempt in the ledger's common unit. For end-to-end efficiency claims, include selector/runtime plus oracle costs; if only oracle cost is logged, label the metric accordingly rather than implying total pipeline cost.
 
