@@ -7,8 +7,8 @@
 use serde::Deserialize;
 use std::collections::HashSet;
 use symthaea_core::wearability::{
-    evaluate_wearability_request, WearabilityDispositionV1, WearabilityInputV1,
-    WearabilityStageV1,
+    evaluate_wearability_request, WearabilityDispositionV1, WearabilityFindingV1,
+    WearabilityInputV1, WearabilityStageV1,
 };
 
 #[derive(Debug, Deserialize)]
@@ -93,6 +93,66 @@ fn wearability_replay_is_deterministic() {
             assert_eq!(actual, expected, "scenario {} replay {}", scenario.id, replay);
         }
     }
+}
+
+#[test]
+fn known_scenarios_emit_specific_machine_readable_reasons() {
+    let cases = corpus();
+    let fixture_cases = [
+        ("WRB-002-missing-required-fastening", WearabilityFindingV1::RequiredFasteningIncomplete),
+        ("WRB-003-fit-evidence-stale-after-movement", WearabilityFindingV1::FitEvidenceStale),
+        ("WRB-006-user-requests-doff", WearabilityFindingV1::UserRequestedDoff),
+        ("WRB-013-task-outside-profile", WearabilityFindingV1::TaskOutsideProfile),
+        ("WRB-015-thermal-discomfort-reported", WearabilityFindingV1::ThermalDiscomfortReported),
+        ("WRB-016-duty-cycle-limit-reached", WearabilityFindingV1::DutyCycleLimitReached),
+        ("WRB-018-hygiene-context-incompatible", WearabilityFindingV1::HygieneWorkflowIncompatible),
+    ];
+
+    for (scenario_id, expected_finding) in fixture_cases {
+        let scenario = cases.scenarios.iter()
+            .find(|scenario| scenario.id == scenario_id)
+            .expect("expected reason-code fixture exists");
+        let decision = evaluate_wearability_request(
+            &scenario.profile,
+            scenario.stage,
+            &scenario.input,
+        );
+        assert!(
+            decision.findings.contains(&expected_finding),
+            "scenario {} missing finding {:?}; got {:?}",
+            scenario_id,
+            expected_finding,
+            decision.findings
+        );
+    }
+
+    let valid = cases.scenarios.iter()
+        .find(|scenario| scenario.id == "WRB-001-verified-self-don")
+        .expect("positive control exists");
+    let ready = evaluate_wearability_request(&valid.profile, valid.stage, &valid.input);
+    assert!(ready.findings.contains(&WearabilityFindingV1::FitCheckAdmittedForSimulation));
+}
+
+#[test]
+fn findings_keep_stable_priority_order_when_multiple_conditions_coexist() {
+    let input = WearabilityInputV1 {
+        schema_version: 99,
+        user_requested_doff: Some(true),
+        fit_evidence: Some(symthaea_core::wearability::FitEvidenceV1::Stale),
+        fastening_evidence: Some(symthaea_core::wearability::FasteningEvidenceV1::Incomplete),
+        ..Default::default()
+    };
+    let decision = evaluate_wearability_request("profile-a", WearabilityStageV1::Perform, &input);
+    assert_eq!(decision.disposition, WearabilityDispositionV1::DoffRequestPreemptsNewMotion);
+    assert_eq!(
+        decision.findings,
+        vec![
+            WearabilityFindingV1::UnsupportedSchemaVersion,
+            WearabilityFindingV1::UserRequestedDoff,
+            WearabilityFindingV1::RequiredFasteningIncomplete,
+            WearabilityFindingV1::FitEvidenceStale,
+        ]
+    );
 }
 
 #[test]
