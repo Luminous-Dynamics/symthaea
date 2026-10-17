@@ -249,11 +249,7 @@
       "type": "object",
       "additionalProperties": false,
       "required": [
-        "oracle_comparison",
-        "fixtures_attempted",
-        "fixtures_passed",
-        "mismatches",
-        "malformed_frames_accepted"
+        "oracle_comparison"
       ],
       "properties": {
         "oracle_comparison": {
@@ -484,7 +480,14 @@
               "malformed_frames_accepted": {
                 "const": 0
               }
-            }
+            },
+            "required": [
+              "oracle_comparison",
+              "fixtures_attempted",
+              "fixtures_passed",
+              "mismatches",
+              "malformed_frames_accepted"
+            ]
           },
           "artifacts": {
             "minItems": 1
