@@ -308,12 +308,12 @@ fn generate_dataset(record_count: usize, seed: u64) -> Result<Dataset, String> {
     for offset in [0_i64, 8_000, 16_000] {
         let id = push_event(&mut events, &mut rng, &mut used_ids, decoy_base + offset, "host-007", "j.smith",
             "windows_security", "authentication", "failure",
-            details(&[("source_address", "10.20.4.18"), ("status", "invalid_password"), ("logon_type", "interactive")]));
+            details(&[("source_address", "10.99.4.18"), ("status", "invalid_password"), ("logon_type", "interactive")]));
         decoy_ids.push(id);
     }
     decoy_ids.push(push_event(&mut events, &mut rng, &mut used_ids, decoy_base + 60_000, "host-007", "j.smith",
         "windows_security", "authentication", "success",
-        details(&[("source_address", "10.20.4.18"), ("logon_type", "interactive"), ("mfa", "satisfied"), ("device_posture", "compliant")])));
+        details(&[("source_address", "10.99.4.18"), ("logon_type", "interactive"), ("mfa", "satisfied"), ("device_posture", "compliant")])));
 
     decoy_ids.push(push_event(&mut events, &mut rng, &mut used_ids, decoy_base + 100_000, "host-012", "it.admin",
         "windows_sysmon", "process_start", "observed",
@@ -640,7 +640,7 @@ mod tests {
                 && event.principal_id == "j.smith"
                 && event.event_type == "authentication"
                 && event.outcome == "failure"
-                && event.details.get("source_address").map(String::as_str) == Some("10.20.4.18"))
+                && event.details.get("source_address").map(String::as_str) == Some("10.99.4.18"))
             .collect();
         assert_eq!(benign_auth_failures.len(), 3);
         assert!(benign_auth_failures.iter().all(|event| !positive_ids.contains(&event.event_id)));
