@@ -297,3 +297,136 @@ fn main() -> ExitCode {
         }
     }
 }
+
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    const HEAD: &str = "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa";
+
+    fn mini_corpus() -> Value {
+        json!({
+            "benchmark_id": "TEST-BENCH",
+            "corpus_version": "1.0.0",
+            "cases": [
+                {
+                    "id": "CASE-1",
+                    "expected_disposition": "ACCEPTED_WITHIN_SCOPE",
+                    "required_findings": ["balance_checked"],
+                    "prohibited_promotions": ["plant_qualified"]
+                },
+                {
+                    "id": "CASE-2",
+                    "expected_disposition": "BLOCKED",
+                    "required_findings": ["missing_utility_found"],
+                    "prohibited_promotions": ["production_capability_complete"]
+                }
+            ]
+        })
+    }
+
+    fn result_case(id: &str, disposition: &str, findings: &[&str], promotions: &[&str]) -> Value {
+        json!({
+            "id": id,
+            "observed_disposition": disposition,
+            "observed_findings": findings,
+            "observed_promotions": promotions
+        })
+    }
+
+    fn good_results() -> Value {
+        json!({
+            "benchmark_id": "TEST-BENCH",
+            "corpus_version": "1.0.0",
+            "evaluated_head": HEAD,
+            "cases": [
+                result_case("CASE-1", "ACCEPTED_WITHIN_SCOPE", &["balance_checked"], &[]),
+                result_case("CASE-2", "BLOCKED", &["missing_utility_found"], &[])
+            ]
+        })
+    }
+
+    #[test]
+    fn matching_dispositions_and_findings_pass_contract() {
+        let output = evaluate(&mini_corpus(), &good_results(), HEAD);
+        assert_eq!(output["passed"], true);
+        assert_eq!(output["passed_cases"], 2);
+        assert_eq!(output["failed_cases"], 0);
+    }
+
+    #[test]
+    fn disposition_mismatch_and_missing_findings_fail_closed() {
+        let mut results = good_results();
+        results["cases"][0]["observed_disposition"] = json!("BLOCKED");
+        results["cases"][0]["observed_findings"] = json!([]);
+        let output = evaluate(&mini_corpus(), &results, HEAD);
+        assert_eq!(output["passed"], false);
+        assert_eq!(output["cases"][0]["passed"], false);
+        assert!(!output["cases"][0]["errors"].as_array().unwrap().is_empty());
+    }
+
+    #[test]
+    fn prohibited_promotions_fail_even_when_disposition_matches() {
+        let mut results = good_results();
+        results["cases"][0]["observed_promotions"] = json!(["plant_qualified"]);
+        let output = evaluate(&mini_corpus(), &results, HEAD);
+        assert_eq!(output["passed"], false);
+        assert_eq!(
+            output["cases"][0]["prohibited_promotions_observed"],
+            json!(["plant_qualified"])
+        );
+    }
+
+    #[test]
+    fn report_head_must_match_independently_supplied_head() {
+        let mut results = good_results();
+        results["evaluated_head"] = json!("bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb");
+        let output = evaluate(&mini_corpus(), &results, HEAD);
+        assert_eq!(output["passed"], false);
+        assert!(
+            output["global_errors"]
+                .as_array()
+                .unwrap()
+                .iter()
+                .any(|error| error.as_str().unwrap().contains("expected-head"))
+        );
+    }
+
+    #[test]
+    fn duplicate_or_unknown_case_ids_fail_closed() {
+        let mut results = good_results();
+        results["cases"] = json!([
+            result_case("CASE-1", "ACCEPTED_WITHIN_SCOPE", &["balance_checked"], &[]),
+            result_case("CASE-1", "ACCEPTED_WITHIN_SCOPE", &["balance_checked"], &[]),
+            result_case("UNEXPECTED", "BLOCKED", &["some_finding"], &[])
+        ]);
+        let output = evaluate(&mini_corpus(), &results, HEAD);
+        assert_eq!(output["passed"], false);
+        assert!(
+            output["global_errors"]
+                .as_array()
+                .unwrap()
+                .iter()
+                .any(|error| error.as_str().unwrap().contains("duplicate result case id"))
+        );
+        assert!(
+            output["global_errors"]
+                .as_array()
+                .unwrap()
+                .iter()
+                .any(|error| error.as_str().unwrap().contains("unexpected result case id"))
+        );
+    }
+
+    #[test]
+    fn skipped_required_case_is_not_treated_as_pass() {
+        let mut results = good_results();
+        results["cases"] = json!([
+            result_case("CASE-1", "ACCEPTED_WITHIN_SCOPE", &["balance_checked"], &[])
+        ]);
+        let output = evaluate(&mini_corpus(), &results, HEAD);
+        assert_eq!(output["passed"], false);
+        assert_eq!(output["cases"][1]["passed"], false);
+    }
+}
