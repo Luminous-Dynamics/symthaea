@@ -37,7 +37,9 @@ pub fn validate_manifest(manifest: &Value) -> Result<(), String> {
         .ok_or_else(|| "embedded schema has no schema_version const".to_owned())?;
 
     let root = object_at(manifest, "manifest")?;
-    let allowed = schema.get("properties").and_then(Value::as_object)
+    let allowed = schema
+        .get("properties")
+        .and_then(Value::as_object)
         .ok_or_else(|| "embedded schema has no root properties object".to_owned())?;
     for key in root.keys() {
         if !allowed.contains_key(key) {
@@ -114,7 +116,9 @@ pub fn validate_manifest(manifest: &Value) -> Result<(), String> {
     let decision = object_at_pointer(manifest, "/decision")?;
     require_fields(decision, "/decision", &["disposition"])?;
     let disposition = string_at(manifest, "/decision/disposition")?;
-    let limitations = manifest.get("limitations").and_then(Value::as_array)
+    let limitations = manifest
+        .get("limitations")
+        .and_then(Value::as_array)
         .ok_or_else(|| "limitations must be an array".to_owned())?;
     if limitations.is_empty()
         || limitations
@@ -232,14 +236,18 @@ fn validate_started_run(manifest: &Value, captures: Option<&Vec<Value>>) -> Resu
         "/fixture",
         &["fixture_id", "fixture_type", "model_or_design", "revision"],
     )?;
-    let instruments = manifest.get("instrumentation").and_then(Value::as_array)
+    let instruments = manifest
+        .get("instrumentation")
+        .and_then(Value::as_array)
         .ok_or_else(|| "started run must provide instrumentation array".to_owned())?;
     if instruments.is_empty() {
         return Err("started run must identify at least one instrument".to_owned());
     }
     for (index, instrument) in instruments.iter().enumerate() {
         let label = format!("/instrumentation/{index}");
-        let object = instrument.as_object().ok_or_else(|| format!("{label} must be an object"))?;
+        let object = instrument
+            .as_object()
+            .ok_or_else(|| format!("{label} must be an object"))?;
         require_fields(
             object,
             &label,
@@ -262,7 +270,9 @@ fn validate_started_run(manifest: &Value, captures: Option<&Vec<Value>>) -> Resu
     }
     for (index, capture) in captures.iter().enumerate() {
         let label = format!("/captures/{index}");
-        let object = capture.as_object().ok_or_else(|| format!("{label} must be an object"))?;
+        let object = capture
+            .as_object()
+            .ok_or_else(|| format!("{label} must be an object"))?;
         require_fields(
             object,
             &label,
@@ -299,7 +309,9 @@ fn validate_analysis_and_results(
     }
     for (index, result) in results.iter().enumerate() {
         let label = format!("/results/{index}");
-        let object = result.as_object().ok_or_else(|| format!("{label} must be an object"))?;
+        let object = result
+            .as_object()
+            .ok_or_else(|| format!("{label} must be an object"))?;
         require_fields(
             object,
             &label,
@@ -349,7 +361,9 @@ fn validate_artifact_references(value: &Value, label: &str) -> Result<(), String
 }
 
 fn validate_artifact_object(value: &Value, label: &str) -> Result<(), String> {
-    let artifact = value.as_object().ok_or_else(|| format!("{label} must be an object"))?;
+    let artifact = value
+        .as_object()
+        .ok_or_else(|| format!("{label} must be an object"))?;
     require_fields(artifact, label, &["path", "sha256", "media_type"])?;
     let path = string_member(artifact, "path", label)?;
     validate_relative_path(path).map_err(|error| format!("{label}: {error}"))?;
@@ -445,7 +459,9 @@ fn validate_nonempty_member(
     key: &str,
     label: &str,
 ) -> Result<(), String> {
-    let value = object.get(key).and_then(Value::as_str)
+    let value = object
+        .get(key)
+        .and_then(Value::as_str)
         .ok_or_else(|| format!("{label}/{key} must be a string"))?;
     if value.trim().is_empty() {
         return Err(format!("{label}/{key} must be a non-empty string"));
@@ -454,7 +470,9 @@ fn validate_nonempty_member(
 }
 
 fn object_at<'a>(value: &'a Value, label: &str) -> Result<&'a Map<String, Value>, String> {
-    value.as_object().ok_or_else(|| format!("{label} must be an object"))
+    value
+        .as_object()
+        .ok_or_else(|| format!("{label} must be an object"))
 }
 
 fn object_at_pointer<'a>(
@@ -479,7 +497,10 @@ fn string_member<'a>(
     key: &str,
     label: &str,
 ) -> Result<&'a str, String> {
-    object.get(key).and_then(Value::as_str).ok_or_else(|| format!("{label}/{key} must be a string"))
+    object
+        .get(key)
+        .and_then(Value::as_str)
+        .ok_or_else(|| format!("{label}/{key} must be a string"))
 }
 
 fn require_fields(object: &Map<String, Value>, label: &str, fields: &[&str]) -> Result<(), String> {
