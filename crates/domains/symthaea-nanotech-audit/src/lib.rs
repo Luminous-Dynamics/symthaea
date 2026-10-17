@@ -1593,6 +1593,45 @@ mod tests {
     }
 
     #[test]
+    fn rejects_omitted_call_even_when_ledger_hashes_are_updated() {
+        let fixture = Fixture::new();
+        fixture.write_provenance_manifest();
+
+        let ledger_path = fixture.0.join("oracle-call-ledger.jsonl");
+        let mut lines = fs::read_to_string(&ledger_path)
+            .expect("read oracle ledger")
+            .lines()
+            .map(str::to_owned)
+            .collect::<Vec<_>>();
+        lines.pop().expect("at least one call record");
+        fs::write(&ledger_path, format!("{}\\n", lines.join("\\n")))
+            .expect("write shortened ledger");
+
+        let (ledger_sha256, ledger_size) =
+            hash_artifact(&fixture.0, "oracle-call-ledger.jsonl").expect("hash shortened ledger");
+        let manifest_path = fixture.0.join(PROVENANCE_MANIFEST_NAME);
+        let mut manifest: Value =
+            serde_json::from_str(&fs::read_to_string(&manifest_path).expect("read provenance"))
+                .unwrap();
+        manifest["oracle_call_ledger_sha256"] = json!(ledger_sha256);
+        for artifact in manifest["artifacts"].as_array_mut().unwrap() {
+            if artifact["path"] == "oracle-call-ledger.jsonl" {
+                artifact["sha256"] = json!(ledger_sha256);
+                artifact["size_bytes"] = json!(ledger_size);
+            }
+        }
+        fs::write(&manifest_path, serde_json::to_vec_pretty(&manifest).unwrap())
+            .expect("update provenance hashes");
+
+        let report = audit_run(&fixture.0);
+        assert_eq!(report.status, "fail");
+        assert_eq!(report.provenance_manifest_status, "manifest_invalid");
+        assert!(report.findings.iter().any(|finding| {
+            finding.code == "oracle_call_ledger_counter_mismatch"
+        }));
+    }
+
+    #[test]
     fn rejects_manifest_artifact_path_traversal() {
         let fixture = Fixture::new();
         fixture.write_provenance_manifest();
