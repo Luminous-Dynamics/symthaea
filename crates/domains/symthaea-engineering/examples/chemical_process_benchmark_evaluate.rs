@@ -100,6 +100,151 @@ fn strings(value: &Value, field: &str) -> Option<BTreeSet<String>> {
         .collect()
 }
 
+
+fn numeric_field(value: &Value, field: &str) -> Option<f64> {
+    value.get(field).and_then(Value::as_f64)
+}
+
+fn mixer_balance_oracle(fixture: &Value, tolerance: f64) -> Result<Value, String> {
+    if fixture.get("unit").and_then(Value::as_str) != Some("mixer")
+        || fixture.get("reaction").and_then(Value::as_bool) != Some(false)
+    {
+        return Err("mixer oracle requires a non-reactive mixer fixture".to_owned());
+    }
+
+    let mut components = BTreeMap::<String, (f64, f64, f64, String)>::new();
+    for (stream_group, is_inlet) in [("inlets", true), ("outlets", false)] {
+        let streams = fixture
+            .get(stream_group)
+            .and_then(Value::as_array)
+            .ok_or_else(|| format!("mixer fixture has no {stream_group} array"))?;
+
+        for stream in streams {
+            let component = text(stream, "component")
+                .filter(|value| !value.trim().is_empty())
+                .ok_or_else(|| format!("{stream_group} stream has no component identity"))?;
+            let flow = numeric_field(stream, "flow")
+                .ok_or_else(|| format!("{stream_group} stream for {component} has no numeric flow"))?;
+            let unit = text(stream, "unit")
+                .filter(|value| !value.trim().is_empty())
+                .ok_or_else(|| format!("{stream_group} stream for {component} has no unit"))?;
+
+            if !flow.is_finite() || flow < 0.0 {
+                return Err(format!("{stream_group} stream for {component} has invalid flow"));
+            }
+
+            let entry = components
+                .entry(component.to_owned())
+                .or_insert((0.0, 0.0, 0.0, unit.to_owned()));
+            if entry.3 != unit {
+                return Err(format!(
+                    "component {component} mixes incompatible unit labels without explicit conversion"
+                ));
+            }
+
+            if is_inlet {
+                entry.0 += flow;
+            } else {
+                entry.1 += flow;
+            }
+            entry.2 += flow.abs();
+        }
+    }
+
+    if components.is_empty() {
+        return Err("mixer fixture must contain at least one component".to_owned());
+    }
+
+    let mut all_closed = true;
+    let mut component_report = serde_json::Map::new();
+    for (component, (inlet, outlet, magnitude_sum, unit)) in components {
+        let residual = inlet - outlet;
+        let scale = 1.0_f64.max(magnitude_sum);
+        let normalized_residual = residual.abs() / scale;
+        let passed = normalized_residual <= tolerance;
+        all_closed &= passed;
+        component_report.insert(
+            component,
+            json!({
+                "unit": unit,
+                "inlet_total": inlet,
+                "outlet_total": outlet,
+                "raw_residual": residual,
+                "normalized_residual": normalized_residual,
+                "tolerance": tolerance,
+                "passed": passed
+            }),
+        );
+    }
+
+    Ok(json!({
+        "oracle": "nonreactive_mixer_component_balance_v1",
+        "derived_disposition": if all_closed { "ACCEPTED_WITHIN_SCOPE" } else { "BLOCKED" },
+        "components": component_report,
+        "passed": all_closed
+    }))
+}
+
+fn unit_conversion_oracle(
+    fixture: &Value,
+    observed_numeric_values: &Value,
+    tolerance: f64,
+) -> Result<Value, String> {
+    let from_value = numeric_field(fixture, "from_value")
+        .ok_or_else(|| "unit-conversion fixture is missing from_value".to_owned())?;
+    let to_value = numeric_field(fixture, "to_value")
+        .ok_or_else(|| "unit-conversion fixture is missing to_value".to_owned())?;
+    let factor = numeric_field(fixture, "conversion_factor")
+        .ok_or_else(|| "unit-conversion fixture is missing conversion_factor".to_owned())?;
+    let from_unit = text(fixture, "from_unit").unwrap_or_default();
+    let to_unit = text(fixture, "to_unit").unwrap_or_default();
+    let factor_ref = text(fixture, "conversion_factor_ref").unwrap_or_default();
+    let rule = text(fixture, "conversion_rule").unwrap_or_default();
+
+    if !from_value.is_finite()
+        || !to_value.is_finite()
+        || !factor.is_finite()
+        || factor <= 0.0
+        || from_unit.is_empty()
+        || to_unit.is_empty()
+        || from_unit == to_unit
+        || factor_ref.is_empty()
+        || rule != "to_value = from_value * conversion_factor"
+    {
+        return Err("unit-conversion fixture has invalid values, units, reference, or rule".to_owned());
+    }
+
+    let independently_converted = from_value * factor;
+    let reference_scale = 1.0_f64.max(independently_converted.abs()).max(to_value.abs());
+    let fixture_reference_residual =
+        (independently_converted - to_value).abs() / reference_scale;
+    let observed_value = numeric_field(observed_numeric_values, "converted_value")
+        .ok_or_else(|| "unit-conversion result is missing converted_value".to_owned())?;
+    if !observed_value.is_finite() {
+        return Err("unit-conversion result converted_value is non-finite".to_owned());
+    }
+    let observed_relative_error = (observed_value - independently_converted).abs()
+        / 1.0_f64.max(independently_converted.abs());
+    let fixture_reference_valid = fixture_reference_residual <= tolerance;
+    let observed_conversion_valid = observed_relative_error <= tolerance;
+    Ok(json!({
+        "oracle": "explicit_unit_conversion_v1",
+        "from_value": from_value,
+        "from_unit": from_unit,
+        "conversion_factor": factor,
+        "conversion_factor_ref": factor_ref,
+        "independently_converted_value": independently_converted,
+        "fixture_reference_value": to_value,
+        "fixture_reference_normalized_residual": fixture_reference_residual,
+        "observed_converted_value": observed_value,
+        "observed_relative_error": observed_relative_error,
+        "tolerance": tolerance,
+        "fixture_reference_valid": fixture_reference_valid,
+        "observed_conversion_valid": observed_conversion_valid,
+        "passed": fixture_reference_valid && observed_conversion_valid
+    }))
+}
+
 fn evaluate(corpus: &Value, results: &Value, expected_head: &str) -> Value {
     let mut global_errors = Vec::<String>::new();
 
@@ -392,6 +537,85 @@ fn evaluate(corpus: &Value, results: &Value, expected_head: &str) -> Value {
                 errors.push(
                     "analytic-reference result is missing numeric values or tolerance".to_owned(),
                 );
+            }
+        }
+
+        if matches!(id, "CHEM-PROC-001" | "CHEM-PROC-002") {
+            let tolerance = corpus
+                .get("residual_profile")
+                .and_then(|profile| numeric_field(profile, "target_max"))
+                .unwrap_or(f64::NAN);
+            match expected.get("fixture").ok_or_else(|| "fixture missing".to_owned())
+                .and_then(|fixture| mixer_balance_oracle(fixture, tolerance)) {
+                Ok(oracle) => {
+                    if text(&oracle, "derived_disposition") != Some(expected_disposition) {
+                        errors.push("independent mixer oracle disagrees with frozen expected disposition".to_owned());
+                    }
+                    let observed_residuals = actual
+                        .get("observed_numeric_values")
+                        .and_then(|value| value.get("component_balance_residuals"))
+                        .and_then(Value::as_object);
+                    match observed_residuals {
+                        Some(residuals) => {
+                            if let Some(components) = oracle.get("components").and_then(Value::as_object) {
+                                for (component, expected_balance) in components {
+                                    let expected_residual = numeric_field(expected_balance, "raw_residual")
+                                        .unwrap_or(f64::NAN);
+                                    let reported_residual = residuals.get(component).and_then(Value::as_f64);
+                                    match reported_residual {
+                                        Some(reported) if reported.is_finite()
+                                            && (reported - expected_residual).abs()
+                                                <= tolerance * 1.0_f64.max(expected_residual.abs()) => {}
+                                        _ => errors.push(format!(
+                                            "reported residual for component {component:?} is missing or disagrees with independent oracle"
+                                        )),
+                                    }
+                                }
+                                for component in residuals.keys() {
+                                    if !components.contains_key(component) {
+                                        errors.push(format!(
+                                            "unexpected reported balance component {component:?}"
+                                        ));
+                                    }
+                                }
+                            }
+                        }
+                        None => errors.push(
+                            "mixer case result is missing observed_numeric_values.component_balance_residuals"
+                                .to_owned()
+                        ),
+                    }
+                    if oracle.get("passed").and_then(Value::as_bool) != Some(true)
+                        && expected_disposition == "ACCEPTED_WITHIN_SCOPE"
+                    {
+                        errors.push("unclosed mixer balance cannot be accepted".to_owned());
+                    }
+                    computed_numeric_checks = oracle;
+                }
+                Err(reason) => errors.push(format!("independent mixer oracle failed: {reason}")),
+            }
+        }
+
+        if id == "CHEM-PROC-004" {
+            let tolerance = corpus
+                .get("residual_profile")
+                .and_then(|profile| numeric_field(profile, "target_max"))
+                .unwrap_or(f64::NAN);
+            let observed_numeric_values = actual
+                .get("observed_numeric_values")
+                .unwrap_or(&Value::Null);
+            match expected.get("fixture").ok_or_else(|| "fixture missing".to_owned())
+                .and_then(|fixture| unit_conversion_oracle(fixture, observed_numeric_values, tolerance)) {
+                Ok(oracle) => {
+                    if oracle.get("passed").and_then(Value::as_bool) != Some(true) {
+                        errors.push("independent unit-conversion oracle failed".to_owned());
+                    }
+                    if expected_disposition != "ACCEPTED_WITHIN_SCOPE" {
+                        errors.push("unit-conversion control must preserve its frozen expected disposition".to_owned());
+                    }
+                    computed_numeric_checks = oracle;
+                }
+                Err(reason) => errors.push(format!("independent unit-conversion oracle failed: {reason}")),
             }
         }
 
