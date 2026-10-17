@@ -5,6 +5,7 @@ mod crate_status;
 mod duplicate_scan;
 mod env_mobility;
 mod env_mobility_route;
+mod env_mobility_economics;
 mod manifest;
 mod rhn_sweep;
 
@@ -68,6 +69,8 @@ enum Commands {
     EnvMobilityQualify,
     /// Audit the synthetic microfactory routing fixture without scheduling or executing production work.
     EnvMobilityRouteAudit,
+    /// Evaluate the synthetic make-versus-buy economics corpus; this does not select real equipment.
+    EnvMobilityMakeBuy,
     GenerateManifest {
         #[arg(long, default_value = ".")]
         root: PathBuf,
@@ -127,6 +130,17 @@ fn main() -> anyhow::Result<()> {
         Commands::EnvMobilityRouteAudit => {
             let report = env_mobility_route::run()?;
             println!("{}", serde_json::to_string_pretty(&report)?);
+        }
+        Commands::EnvMobilityMakeBuy => {
+            let report = env_mobility_economics::run()?;
+            let failed = report.total_mismatch_count > 0;
+            println!("{}", serde_json::to_string_pretty(&report)?);
+            if failed {
+                anyhow::bail!(
+                    "microfactory make/buy fixture failed: {} total mismatches",
+                    report.total_mismatch_count
+                );
+            }
         }
         Commands::GenerateManifest { root } => {
             let files = vec!["Cargo.toml", "src/lib.rs", "symthaea-core/Cargo.toml"];
