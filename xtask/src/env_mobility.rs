@@ -1,4 +1,4 @@
-use anyhow::{bail, ensure, Context, Result};
+use anyhow::{ensure, Context, Result};
 use serde::Serialize;
 use serde_json::Value;
 use sha2::{Digest, Sha256};
@@ -109,7 +109,6 @@ struct CorpusSummary {
     corpus_id: String,
     schema_version: String,
     path: String,
-    git_blob_sha: String,
     raw_sha256: String,
     case_count: usize,
     unique_case_ids: bool,
@@ -552,9 +551,6 @@ fn load_and_qualify(
             corpus_id: string_at(&parsed, "corpus_id", &context)?.to_owned(),
             schema_version: expected_schema.to_owned(),
             path: relative_path.to_owned(),
-            // Git blob identity is obtained separately during source review; this report
-            // records the digest of the exact raw bytes consumed by this run.
-            git_blob_sha: String::new(),
             raw_sha256,
             case_count: cases.len(),
             unique_case_ids: ids.len() == cases.len(),
