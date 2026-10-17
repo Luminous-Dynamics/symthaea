@@ -1,0 +1,66 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://raw.githubusercontent.com/Luminous-Dynamics/symthaea/main/tools/cyber-hunt-fixture/schemas/query-response-v1.schema.json",
+  "title": "Synthetic cyber hunt query response v1",
+  "type": "object",
+  "additionalProperties": false,
+  "required": [
+    "receipt",
+    "records"
+  ],
+  "properties": {
+    "receipt": {
+      "$ref": "./query-receipt-v1.schema.json"
+    },
+    "records": {
+      "type": "array",
+      "items": {
+        "type": "object",
+        "additionalProperties": false,
+        "required": [
+          "record_id",
+          "fields"
+        ],
+        "properties": {
+          "record_id": {
+            "type": "string",
+            "pattern": "^evt-[0-9]{8}$"
+          },
+          "fields": {
+            "type": "object",
+            "minProperties": 1,
+            "maxProperties": 12,
+            "propertyNames": {
+              "enum": [
+                "record_id",
+                "source_event_id",
+                "delivery_id",
+                "event_time_ms",
+                "ingest_time_ms",
+                "host_id",
+                "principal_id",
+                "source_address",
+                "destination",
+                "bytes_sent",
+                "device_posture",
+                "source",
+                "event_type",
+                "result",
+                "summary",
+                "change_ticket",
+                "integrity_state"
+              ]
+            },
+            "additionalProperties": {
+              "type": [
+                "string",
+                "integer",
+                "null"
+              ]
+            }
+          }
+        }
+      }
+    }
+  }
+}

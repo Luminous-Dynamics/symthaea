@@ -1,0 +1,130 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://raw.githubusercontent.com/Luminous-Dynamics/symthaea/main/tools/cyber-hunt-fixture/schemas/oracle-v1.schema.json",
+  "title": "Synthetic cyber hunt evaluator oracle v1",
+  "type": "object",
+  "additionalProperties": false,
+  "required": [
+    "schema_version",
+    "generator_version",
+    "seed",
+    "record_count",
+    "labels",
+    "campaigns",
+    "non_claims"
+  ],
+  "properties": {
+    "schema_version": {
+      "const": "cyber-hunt-oracle-v1"
+    },
+    "generator_version": {
+      "const": "cyber-hunt-fixture-v1"
+    },
+    "seed": {
+      "type": "integer",
+      "minimum": 0
+    },
+    "record_count": {
+      "type": "integer",
+      "minimum": 500,
+      "maximum": 250000
+    },
+    "labels": {
+      "type": "array",
+      "items": {
+        "type": "object",
+        "additionalProperties": false,
+        "required": [
+          "record_id",
+          "security_label",
+          "data_quality",
+          "campaign_id",
+          "phase",
+          "rationale"
+        ],
+        "properties": {
+          "record_id": {
+            "type": "string",
+            "pattern": "^evt-[0-9]{8}$"
+          },
+          "security_label": {
+            "enum": [
+              "benign",
+              "malicious"
+            ]
+          },
+          "data_quality": {
+            "enum": [
+              "normal",
+              "duplicate_delivery",
+              "source_id_conflict"
+            ]
+          },
+          "campaign_id": {
+            "type": [
+              "string",
+              "null"
+            ]
+          },
+          "phase": {
+            "type": [
+              "string",
+              "null"
+            ]
+          },
+          "rationale": {
+            "type": "string",
+            "minLength": 1
+          }
+        }
+      }
+    },
+    "campaigns": {
+      "type": "array",
+      "minItems": 1,
+      "items": {
+        "type": "object",
+        "additionalProperties": false,
+        "required": [
+          "campaign_id",
+          "disposition",
+          "event_record_ids",
+          "claim_ceiling"
+        ],
+        "properties": {
+          "campaign_id": {
+            "type": "string",
+            "minLength": 1
+          },
+          "disposition": {
+            "enum": [
+              "malicious",
+              "benign_decoy"
+            ]
+          },
+          "event_record_ids": {
+            "type": "array",
+            "minItems": 1,
+            "uniqueItems": true,
+            "items": {
+              "type": "string",
+              "pattern": "^evt-[0-9]{8}$"
+            }
+          },
+          "claim_ceiling": {
+            "type": "string",
+            "minLength": 1
+          }
+        }
+      }
+    },
+    "non_claims": {
+      "type": "array",
+      "minItems": 1,
+      "items": {
+        "type": "string",
+        "minLength": 1
+      }
+    }
+  }
+}
