@@ -485,7 +485,12 @@ fn build_catalog(
 fn shared_service_terminal(
     a: &ServiceRouteRequest,
     b: &ServiceRouteRequest,
+    medium_a: &str,
+    medium_b: &str,
 ) -> BTreeSet<(i64, i64)> {
+    if medium_a != medium_b {
+        return BTreeSet::new();
+    }
     let mut allowed = BTreeSet::new();
     for aa in [&a.start, &a.end] {
         if aa.kind != AnchorKind::PlatformService { continue; }
@@ -515,7 +520,7 @@ fn paths_have_forbidden_shared_cells(
     {
         return false;
     }
-    let allowed = shared_service_terminal(request_a, request_b);
+    let allowed = shared_service_terminal(request_a, request_b, &a.medium, &b.medium);
     let cells_b: BTreeSet<_> = b.path.iter().map(|point| (point.x_mm, point.y_mm)).collect();
     a.path.iter().any(|point| {
         cells_b.contains(&(point.x_mm, point.y_mm))
@@ -589,7 +594,7 @@ fn enumerate_bundles(
             }
         }
         let Some(objective) = objective_for(&routes) else {
-            *rejected_conflicts = rejected_conflicts.saturating_add(1);
+            // Overflowed objective arithmetic is invalid, but is not mislabeled as a geometry conflict.
             return;
         };
         let candidate = BundleChoice {
@@ -619,7 +624,9 @@ fn select_bundle(
     limit: usize,
 ) -> (Option<BundleChoice>, usize, usize, bool) {
     if catalogs.iter().any(|catalog| catalog.alternatives.is_empty()) {
-        return (None, 0, 0, false);
+        // The Cartesian product of the emitted catalogs is empty. This says nothing about
+        // the broader path universe; per-route discovery status carries that caveat.
+        return (None, 0, 0, true);
     }
     let mut chosen = Vec::with_capacity(catalogs.len());
     let mut examined = 0usize;
@@ -659,6 +666,12 @@ pub fn optimize_route_bundle(
         return Err(RouteBundleError::new("INVALID_REQUEST_COST_OR_CLEARANCE", "clearance or bend penalty violates hard bounds"));
     }
     let normalized_requests = normalize_input_requests(requests)?;
+    if normalized_requests.len() > routing_limits.max_route_requests {
+        return Err(RouteBundleError::new(
+            "BUNDLE_EXCEEDS_ROUTING_REQUEST_LIMIT",
+            "route count exceeds the routing limit supplied for this bundle",
+        ));
+    }
     let input_manifest_sha256 = input_manifest_sha256(&normalized_requests)?;
     let configuration_sha256 = digest(configuration)?;
     let mut catalogs = Vec::with_capacity(normalized_requests.len());
