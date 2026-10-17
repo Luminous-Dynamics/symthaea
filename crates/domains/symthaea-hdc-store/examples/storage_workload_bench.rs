@@ -285,8 +285,8 @@ fn run() -> Result<(), Box<dyn Error>> {
         );
         let elapsed = start.elapsed();
         let approximate_id = outcome.neighbors.first().map(|entry| entry.0);
-        let recall_hit = u64::from(approximate_id == Some(*exact_id));
-        let success = u64::from(approximate_id.is_some());
+        let recall_hit = if approximate_id == Some(*exact_id) { 1_u64 } else { 0 };
+        let success = if approximate_id.is_some() { 1_u64 } else { 0 };
         if outcome.total_live != config.vectors {
             return Err(format!(
                 "approximate search reported {} live vectors for query {query_id}, expected {}",
