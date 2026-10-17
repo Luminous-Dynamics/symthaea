@@ -23,6 +23,9 @@ const EMBEDDED_BENCHMARK: &str = include_str!(
 const EMBEDDED_SCHEMA: &str = include_str!(
     "../../../docs/research/spatial-design/ROOM_IMAGINATION_STRESS_BENCHMARK_V0_1.schema.json"
 );
+const EMBEDDED_RUN_REPORT_SCHEMA: &str = include_str!(
+    "../../../docs/research/spatial-design/ROOM_IMAGINATION_STRESS_RUN_REPORT_V0_1.schema.json"
+);
 const EMBEDDED_CARGO_MANIFEST: &str = include_str!("../Cargo.toml");
 const EMBEDDED_VALIDATOR_SOURCE: &str = include_str!("main.rs");
 const CLAIM_CEILING: &str = concat!(
@@ -36,6 +39,34 @@ struct ValidationSummary {
     case_count: usize,
     family_count: usize,
     risk_counts: BTreeMap<String, usize>,
+}
+
+#[derive(Debug, PartialEq, Eq)]
+struct EvaluationSummary {
+    cases_evaluated: usize,
+    assertions_checked: usize,
+    assertions_passed: usize,
+    failures: Vec<String>,
+}
+
+impl EvaluationSummary {
+    fn print(&self) {
+        let status = if self.failures.is_empty() { "PASS" } else { "FAIL" };
+        println!("ROOM STRESS RESULT REPORT: {status}");
+        println!("cases evaluated: {}", self.cases_evaluated);
+        println!("assertions checked: {}", self.assertions_checked);
+        println!("assertions passed: {}", self.assertions_passed);
+        println!(
+            "assertions failed: {}",
+            self.assertions_checked.saturating_sub(self.assertions_passed)
+        );
+        for failure in &self.failures {
+            println!("FAIL: {failure}");
+        }
+        println!(
+            "Claim ceiling: evaluates reported observations against synthetic oracles; it does not prove the truth or authority of referenced artifacts."
+        );
+    }
 }
 
 impl ValidationSummary {
@@ -103,6 +134,175 @@ fn validate_documents(
     let benchmark = parse_json("benchmark", benchmark_text)?;
     let schema = parse_json("schema", schema_text)?;
     validate_values(benchmark, schema)
+}
+
+fn evaluate_run_report(
+    benchmark_text: &str,
+    benchmark_schema_text: &str,
+    report_schema_text: &str,
+    report_text: &str,
+) -> Result<EvaluationSummary, String> {
+    // Validate the two contracts before scoring any candidate report.
+    validate_documents(benchmark_text, benchmark_schema_text)?;
+    let benchmark = parse_json("benchmark", benchmark_text)?;
+    let report = parse_json("run report", report_text)?;
+    let report_schema = parse_json("run report schema", report_schema_text)?;
+
+    if !draft202012::meta::is_valid(&report_schema) {
+        return Err(
+            "run report schema is invalid under the JSON Schema Draft 2020-12 meta-schema".into(),
+        );
+    }
+    let report_validator = draft202012::new(&report_schema)
+        .map_err(|error| format!("could not compile run report schema: {error}"))?;
+    let report_errors: Vec<String> = report_validator
+        .iter_errors(&report)
+        .take(20)
+        .map(|error| format!("{} at {}", error, error.instance_path()))
+        .collect();
+    if !report_errors.is_empty() {
+        return Err(format!(
+            "run report failed JSON Schema validation (showing at most 20 errors):\\n{}",
+            report_errors.join("\\n")
+        ));
+    }
+
+    let supplied_hash = report
+        .get("benchmark_sha256")
+        .and_then(Value::as_str)
+        .ok_or_else(|| "run report benchmark_sha256 must be a string".to_string())?;
+    let actual_hash = sha256_hex(benchmark_text);
+    if supplied_hash != actual_hash {
+        return Err(format!(
+            "benchmark digest mismatch: report binds {supplied_hash}, exact benchmark bytes hash to {actual_hash}"
+        ));
+    }
+
+    let expected_cases = benchmark
+        .get("cases")
+        .and_then(Value::as_array)
+        .ok_or_else(|| "benchmark cases must be an array".to_string())?;
+    let report_cases = report
+        .get("results")
+        .and_then(Value::as_array)
+        .ok_or_else(|| "run report results must be an array".to_string())?;
+
+    let expected_ids: BTreeSet<String> = expected_cases
+        .iter()
+        .filter_map(|case| case.get("id").and_then(Value::as_str).map(str::to_owned))
+        .collect();
+    let mut report_by_id = BTreeMap::<String, &Value>::new();
+
+    for result in report_cases {
+        let case_id = result
+            .get("case_id")
+            .and_then(Value::as_str)
+            .ok_or_else(|| "each run result must have a case_id string".to_string())?;
+        if !expected_ids.contains(case_id) {
+            return Err(format!("run report contains unknown case_id {case_id}"));
+        }
+        if report_by_id.insert(case_id.to_owned(), result).is_some() {
+            return Err(format!("duplicate run result for case {case_id}"));
+        }
+    }
+
+    for case_id in &expected_ids {
+        if !report_by_id.contains_key(case_id) {
+            return Err(format!("run report is missing case result {case_id}"));
+        }
+    }
+
+    let mut summary = EvaluationSummary {
+        cases_evaluated: expected_cases.len(),
+        assertions_checked: 0,
+        assertions_passed: 0,
+        failures: Vec::new(),
+    };
+
+    for case in expected_cases {
+        let case_id = case
+            .get("id")
+            .and_then(Value::as_str)
+            .ok_or_else(|| "benchmark case id must be a string".to_string())?;
+        let result = report_by_id
+            .get(case_id)
+            .ok_or_else(|| format!("missing result for {case_id}"))?;
+        let assertions = case
+            .get("assertions")
+            .and_then(Value::as_array)
+            .ok_or_else(|| format!("{case_id}.assertions must be an array"))?;
+        let observations = result
+            .get("observations")
+            .and_then(Value::as_object)
+            .ok_or_else(|| format!("{case_id} observations must be an object"))?;
+        let evidence_refs = result
+            .get("evidence_refs")
+            .and_then(Value::as_array)
+            .ok_or_else(|| format!("{case_id} evidence_refs must be an array"))?;
+
+        for assertion in assertions {
+            summary.assertions_checked += 1;
+            let assertion_id = assertion
+                .get("assertion_id")
+                .and_then(Value::as_str)
+                .ok_or_else(|| format!("{case_id} assertion_id must be a string"))?;
+            let observation_key = assertion
+                .get("observation_key")
+                .and_then(Value::as_str)
+                .ok_or_else(|| format!("{assertion_id} observation_key must be a string"))?;
+            let failure_code = assertion
+                .get("failure_code")
+                .and_then(Value::as_str)
+                .ok_or_else(|| format!("{assertion_id} failure_code must be a string"))?;
+            let severity = assertion
+                .get("severity")
+                .and_then(Value::as_str)
+                .ok_or_else(|| format!("{assertion_id} severity must be a string"))?;
+            let expected = assertion
+                .get("expected")
+                .ok_or_else(|| format!("{assertion_id} expected value is missing"))?;
+
+            let actual = observations.get(observation_key);
+            let matching_refs = evidence_refs
+                .iter()
+                .filter(|reference| {
+                    reference.get("observation_key").and_then(Value::as_str)
+                        == Some(observation_key)
+                })
+                .count();
+
+            let mut reasons = Vec::new();
+            match actual {
+                Some(value) if value == expected => {}
+                Some(value) => reasons.push(format!(
+                    "observation {observation_key} expected {expected}, observed {value}"
+                )),
+                None => reasons.push(format!("observation {observation_key} is missing")),
+            }
+
+            if assertion
+                .get("evidence_required")
+                .and_then(Value::as_bool)
+                .unwrap_or(false)
+                && matching_refs != 1
+            {
+                reasons.push(format!(
+                    "expected exactly one evidence reference for {observation_key}, found {matching_refs}"
+                ));
+            }
+
+            if reasons.is_empty() {
+                summary.assertions_passed += 1;
+            } else {
+                summary.failures.push(format!(
+                    "{case_id} {assertion_id} [{severity}:{failure_code}]: {}",
+                    reasons.join("; ")
+                ));
+            }
+        }
+    }
+
+    Ok(summary)
 }
 
 fn validate_values(benchmark: Value, schema: Value) -> Result<ValidationSummary, String> {
@@ -232,7 +432,24 @@ fn validate_values(benchmark: Value, schema: Value) -> Result<ValidationSummary,
     })
 }
 
-fn run(args: &[String]) -> Result<(), String> {
+fn run(args: &[String]) -> Result<bool, String> {
+    if args.first().map(String::as_str) == Some("--evaluate") {
+        if args.len() != 2 {
+            return Err("usage: room-stress-qualifier --evaluate RUN_REPORT.json".to_string());
+        }
+        let report_path = &args[1];
+        let report_text = fs::read_to_string(Path::new(report_path))
+            .map_err(|error| format!("cannot read run report {report_path}: {error}"))?;
+        let summary = evaluate_run_report(
+            EMBEDDED_BENCHMARK,
+            EMBEDDED_SCHEMA,
+            EMBEDDED_RUN_REPORT_SCHEMA,
+            &report_text,
+        )?;
+        summary.print();
+        return Ok(summary.assertions_passed == summary.assertions_checked);
+    }
+
     let (json_mode, path_args) = match args.first().map(String::as_str) {
         Some("--json") => (true, &args[1..]),
         _ => (false, args),
@@ -271,15 +488,19 @@ fn run(args: &[String]) -> Result<(), String> {
     } else {
         summary.print();
     }
-    Ok(())
+    Ok(true)
 }
 
 fn main() {
     let args: Vec<String> = env::args().skip(1).collect();
-    if let Err(error) = run(&args) {
-        eprintln!("ROOM IMAGINATION STRESS MANIFEST: INVALID");
-        eprintln!("{error}");
-        std::process::exit(2);
+    match run(&args) {
+        Ok(true) => {}
+        Ok(false) => std::process::exit(1),
+        Err(error) => {
+            eprintln!("ROOM IMAGINATION STRESS VALIDATION: INVALID");
+            eprintln!("{error}");
+            std::process::exit(2);
+        }
     }
 }
 
@@ -425,6 +646,125 @@ mod tests {
             ),
             "the receipt must be deterministic for identical input bytes"
         );
+    }
+
+    fn golden_report_value(benchmark_text: &str) -> Value {
+        let benchmark: Value = serde_json::from_str(benchmark_text).unwrap();
+        let mut results = Vec::new();
+        for case in benchmark["cases"].as_array().unwrap() {
+            let mut observations = serde_json::Map::new();
+            let mut evidence_refs = Vec::new();
+            for assertion in case["assertions"].as_array().unwrap() {
+                let key = assertion["observation_key"].as_str().unwrap();
+                observations.insert(key.to_owned(), assertion["expected"].clone());
+                evidence_refs.push(serde_json::json!({
+                    "observation_key": key,
+                    "artifact_sha256": "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
+                    "artifact_revision": "synthetic-golden-fixture-r1"
+                }));
+            }
+            results.push(serde_json::json!({
+                "case_id": case["id"],
+                "observations": observations,
+                "evidence_refs": evidence_refs
+            }));
+        }
+        serde_json::json!({
+            "schema_version": "room-stress-run-report-v0.1",
+            "implementation": {
+                "name": "synthetic-golden-fixture",
+                "revision": "fixture-r1"
+            },
+            "benchmark_sha256": sha256_hex(benchmark_text),
+            "results": results
+        })
+    }
+
+    #[test]
+    fn golden_run_report_passes_all_machine_checkable_assertions() {
+        let report = golden_report_value(EMBEDDED_BENCHMARK);
+        let report_text = serde_json::to_string(&report).unwrap();
+        let summary = evaluate_run_report(
+            EMBEDDED_BENCHMARK,
+            EMBEDDED_SCHEMA,
+            EMBEDDED_RUN_REPORT_SCHEMA,
+            &report_text,
+        )
+        .expect("golden result report must evaluate");
+        assert_eq!(summary.cases_evaluated, EXPECTED_CASE_COUNT);
+        assert_eq!(summary.assertions_checked, 47);
+        assert_eq!(summary.assertions_passed, 47);
+        assert!(summary.failures.is_empty());
+    }
+
+    #[test]
+    fn wrong_observation_value_fails_with_stable_reason_code() {
+        let mut report = golden_report_value(EMBEDDED_BENCHMARK);
+        report["results"][0]["observations"]["hard_constraints_survive_edit_sequence"] =
+            Value::Bool(false);
+        let report_text = serde_json::to_string(&report).unwrap();
+        let summary = evaluate_run_report(
+            EMBEDDED_BENCHMARK,
+            EMBEDDED_SCHEMA,
+            EMBEDDED_RUN_REPORT_SCHEMA,
+            &report_text,
+        )
+        .unwrap();
+        assert_eq!(summary.assertions_passed, 46);
+        assert!(summary.failures[0].contains("HARD_CONSTRAINT_DROPPED"));
+    }
+
+    #[test]
+    fn missing_evidence_reference_fails_closed() {
+        let mut report = golden_report_value(EMBEDDED_BENCHMARK);
+        report["results"][0]["evidence_refs"]
+            .as_array_mut()
+            .unwrap()
+            .remove(0);
+        let report_text = serde_json::to_string(&report).unwrap();
+        let summary = evaluate_run_report(
+            EMBEDDED_BENCHMARK,
+            EMBEDDED_SCHEMA,
+            EMBEDDED_RUN_REPORT_SCHEMA,
+            &report_text,
+        )
+        .unwrap();
+        assert!(summary.failures.iter().any(|failure| {
+            failure.contains("expected exactly one evidence reference")
+        }));
+    }
+
+    #[test]
+    fn report_bound_to_different_benchmark_bytes_is_rejected() {
+        let mut report = golden_report_value(EMBEDDED_BENCHMARK);
+        report["benchmark_sha256"] = Value::String(
+            "bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb".into(),
+        );
+        let report_text = serde_json::to_string(&report).unwrap();
+        let error = evaluate_run_report(
+            EMBEDDED_BENCHMARK,
+            EMBEDDED_SCHEMA,
+            EMBEDDED_RUN_REPORT_SCHEMA,
+            &report_text,
+        )
+        .unwrap_err();
+        assert!(error.contains("benchmark digest mismatch"));
+    }
+
+    #[test]
+    fn duplicate_case_result_is_rejected() {
+        let mut report = golden_report_value(EMBEDDED_BENCHMARK);
+        let first_case_id = report["results"][0]["case_id"].clone();
+        report["results"][1]["case_id"] = first_case_id;
+        let report_text = serde_json::to_string(&report).unwrap();
+        let error = evaluate_run_report(
+            EMBEDDED_BENCHMARK,
+            EMBEDDED_SCHEMA,
+            EMBEDDED_RUN_REPORT_SCHEMA,
+            &report_text,
+        )
+        .unwrap_err();
+        assert!(error.contains("duplicate run result"));
     }
 
     #[test]
