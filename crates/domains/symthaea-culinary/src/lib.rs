@@ -54,6 +54,11 @@ pub use dynamics::{NewtonCooling, emulsion_relative_viscosity, krieger_dougherty
 pub use flavor_network::{DeltaNc, delta_nc, delta_nc_default};
 pub use ingredient::Ingredient;
 pub use nutrition::NutrientProfile;
+pub use pareto::{
+    CandidateAssessment, CulinaryCandidate, GateDisposition, GateEvidence, GateStatus,
+    ObjectiveDirection, ObjectiveMetric, ParetoError, ParetoReport, RankingDisposition,
+    evaluate_frontier,
+};
 pub use reaction::{arrhenius_rate, maillard_feasible, q10, reaction_extent};
 pub use spec::CulinarySpec;
 pub use thermal::ThermalTrajectory;
