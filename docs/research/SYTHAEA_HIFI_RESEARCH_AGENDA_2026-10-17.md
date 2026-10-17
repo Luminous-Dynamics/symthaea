@@ -165,6 +165,8 @@ Do not make a target such as “correlation ≥0.9” a universal gate without e
 
 **Question:** Does a preference distribution model outperform one fixed response target for predicting headphone-profile preference on new listeners and music excerpts?
 
+The detailed preregistration scaffold is [HP_PREF_001_PREREGISTRATION_2026-10-17.md](HP_PREF_001_PREREGISTRATION_2026-10-17.md), tracked by [Issue #7889](https://github.com/Luminous-Dynamics/symthaea/issues/7889). It freezes the split rules, endpoint/analysis plan, masking, level-match procedure, human-study safeguards and stop/deployment gates; it contains no participant data or claimed result.
+
 1. Freeze a small set of documented, safe EQ profiles. Include an unmodified baseline and profiles chosen to span a reasonable target space, not only profiles we expect to win.
 2. Use randomized, double-blind, level-matched comparisons. A short pilot identifies protocol problems and variance; don't use pilot observations in the final confirmatory analysis.
 3. Record listener IDs as pseudonyms, product/sample, fixture profile, excerpt ID, level matching procedure, condition, randomized order, preference response, confidence and exclusions. Keep sensitive demographic data out unless justified and consented.
