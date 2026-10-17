@@ -1769,6 +1769,12 @@ mod tests {
             assert!(declared_metrics.contains(&json!(metric_name)));
         }
         assert!(
+            report_schema["properties"]["comparisons"]["items"]["properties"]["disposition"]["enum"]
+                .as_array()
+                .unwrap()
+                .contains(&json!("insufficient_within_group_replication"))
+        );
+        assert!(
             ledger_schema["required"]
                 .as_array()
                 .unwrap()
