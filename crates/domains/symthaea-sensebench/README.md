@@ -15,6 +15,8 @@ SenseBench is a deterministic, hardware-free starter harness for the Symthaea Se
       cargo run -p symthaea-sensebench -- --suite robustness
     SENSEBENCH_CODE_REVISION="$(git rev-parse HEAD)" \
       cargo run -p symthaea-sensebench -- --suite blind-worlds --trials 512 --budget 8 --seed 42
+    SENSEBENCH_CODE_REVISION="$(git rev-parse HEAD)" \
+      cargo run -p symthaea-sensebench -- --suite scm-graph --trials 32 --budget 8 --seed 42
 
 The CLI requires `SENSEBENCH_CODE_REVISION` and emits a JSON report carrying the suite, generator version, exact revision string, full scenario manifest or causal-run configuration, seed, sample count/trials, and model-specific metrics. Run from a clean worktree so the Git commit identifies the exact code. `--allow-unversioned` permits exploratory output with a missing revision and must not be used for benchmark claims. Identical generator version, scenario, seed, sample count and interval produce identical observations. The report includes point metrics, average precision, event recall, missing sample count, contiguous false-alarm episodes per sensor-hour, and detection delay. Point-level false-positive sample counts remain available separately.
 
@@ -51,6 +53,21 @@ Run:
 This simulation compares nominal expected information gain, predictive variance, model-weighted gain, worst-case robust ranking, a fixed design selected from development regimes, uniform random selection, and passive-only observation. Outcomes are sampled from evaluator-only likelihood tables across six regime templates: two development regimes and four held-out regimes covering intervention artifacts, sensor degradation, effect reversal, and a null negative control. Four deterministic, seed-keyed likelihood variants per template produce 24 parameterized worlds (eight development, 16 held out). All policies share the same nominal Bayesian update rule and synthetic resource budget.
 
 Reports include Brier score, log loss, top-hypothesis accuracy, calibration error, cost to a confidence threshold, declared-model versus evaluator-world expected information gain, myopic per-selection regret against the hidden-world best affordable action, realized entropy reduction, and the rate of high-confidence causal claims on no-direct-cause trials. Negative realized entropy reduction is preserved. The version 0.2 report also computes prequential predictive log loss under the declared model ensemble and calibrates a per-policy adequacy cutoff at the 99th empirical percentile using independent-seed simulations from declared model scenarios. Trials above the cutoff are flagged for claim abstention; the JSON reports both null-world claim suppression and the fraction of trials retained after this gate. The root seed controls both world-parameter perturbations and outcome streams. The regret metric is a local one-step comparator, not a globally optimal multi-step policy oracle. The adequacy cutoff is only a synthetic, policy/budget-specific diagnostic: an alarm means the trajectory is surprising under the declared ensemble, while a lack of alarm does not prove the model is correct. It is not a formally calibrated test for real scientific data. This is an outcome-generating synthetic benchmark, not an independent graph-topology generator; test-world definitions are source-visible, so held-out regimes are not cryptographically sealed and results are not evidence of physical causal discovery. See [the full protocol](../../../docs/research/SENSEBENCH_BLIND_WORLD_PROTOCOL.md).
+
+## Generated structural causal graph benchmark
+
+Run a smaller exploratory configuration (the structural evaluator scores 25 candidate DAGs per action, so begin with 32 trials per world):
+
+    SENSEBENCH_CODE_REVISION="$(git rev-parse HEAD)" \
+      cargo run -p symthaea-sensebench -- --suite scm-graph --trials 32 --budget 8 --seed 42
+
+This is a separate evaluator from `blind-worlds`. It enumerates all 25 labeled DAGs on three observed variables, generates 28 parameterized SCM worlds from seven family templates (two development families and five held-out families), and compares nine policies: nominal expected information gain, predictive outcome entropy, model-weighted gain, worst-case robust selection, a fixed-design action, random intervention selection, passive observation, an optimistic known-mechanism oracle, and a structure-blind random graph guess.
+
+Each measurement observes the full three-variable binary state. An intervention fixes one variable to zero or one; the outcome distribution is enumerated exactly from a binary structural causal model, and observations are sampled from the hidden world's graph and mechanism parameters. The policies do not receive the hidden graph or those hidden parameters. A shared nominal posterior update is used across policies so the comparison primarily concerns acquisition choice; the known-mechanism oracle is an explicitly optimistic diagnostic, not a deployable policy.
+
+The report scores graph recovery—not just confidence—with skeleton F1, directed-edge F1, structural Hamming distance (one edit for an added/removed adjacency or reversed direction), exact graph recovery, posterior mass on the true graph, graph-posterior Brier score, claim coverage, false graph claims, and measurement/intervention cost to threshold. It retains per-world summaries and aggregates held-out performance with worlds as units.
+
+**Important limits:** three variables only; all three-variable DAGs are in the candidate catalogue; graph families/mechanisms remain synthetic and source-visible; only two development families are used; four jittered worlds per family are not a broad random sample of real causal systems. The oracle is given the hidden mechanism parameters. The aggregate intervals describe this fixed parameterized set and do not by themselves establish generalization to real-world graph families. This suite is an executable substrate for the next benchmark tranche, not evidence of scientific discovery. See [the protocol](../../../docs/research/SENSEBENCH_SCM_GRAPH_PROTOCOL.md).
 
 ## Domain-specific hypothesis fixture
 
