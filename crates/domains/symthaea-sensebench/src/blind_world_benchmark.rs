@@ -898,6 +898,8 @@ mod tests {
         for row in report.summaries {
             assert!((0.0..=2.0).contains(&row.mean_brier_score));
             assert!((0.0..=30.0).contains(&row.mean_log_loss));
+            assert!((0.0..=2.0).contains(&row.mean_hidden_world_expected_information_gain_bits_per_cost));
+            assert!((0.0..=2.0).contains(&row.mean_acquisition_regret_bits_per_selection));
             assert!((0.0..=1.0).contains(&row.top_hypothesis_accuracy));
             assert!((0.0..=1.0).contains(&row.mean_calibration_error_10_bins));
             assert!((0.0..=1.0).contains(&row.threshold_reached_fraction));
