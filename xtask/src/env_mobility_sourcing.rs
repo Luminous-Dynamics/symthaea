@@ -135,7 +135,8 @@ fn parse_price_state(item: &Value, context: &str) -> Result<(String, Option<f64>
             ensure!(!delivered_price_known, "{context}: unpriced dependency cannot claim delivery cost");
             ensure!(
                 string_field(item, "availability_statement", context)?.to_lowercase().contains("not sourced")
-                    || string_field(item, "availability_statement", context)?.to_lowercase().contains("not selected"),
+                    || string_field(item, "availability_statement", context)?.to_lowercase().contains("not selected")
+                    || string_field(item, "availability_statement", context)?.to_lowercase().contains("not quoted"),
                 "{context}: unknown dependency must explain why it is unpriced"
             );
         }
