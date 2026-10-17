@@ -30,7 +30,9 @@ use symthaea_music_theory::{
     },
 };
 
-const SEEDS: [u64; 4] = [0, 1, 7, 42];
+// Eight fixed seeds give each matched between-style pair 32 intent/config cells,
+// and 28 within-style seed pairs per intent. Keep this list frozen for comparable reports.
+const SEEDS: [u64; 8] = [0, 1, 7, 13, 29, 42, 73, 101];
 const INTENTS: [(f32, f32, f32, usize); 4] = [
     (0.0, 0.5, 0.5, 16),
     (0.8, 0.7, 0.7, 16),
@@ -110,6 +112,80 @@ fn realize(style: Style, intent: &MusicalIntent) -> symthaea_music_theory::Gramm
     let spec = style.spec();
     compose_with_grammar_plan(style.grammar_profile(), intent, &spec)
 }
+
+
+/// Event-level contract for the Minuet-and-Trio's central contrast:
+/// A and ReturnA keep the quarter-note Minuet gait; B must actually contain
+/// offbeat harmony attacks from the Trio's eighth-note arpeggiation.
+fn minuet_trio_texture_audit() -> Value {
+    let generated = realize(
+        Style::MinuetAndTrio,
+        &intent(0.2, 0.45, 0.4, 16, 42),
+    );
+    let Some(form) = generated.form.as_ref() else {
+        return json!({
+            "passed": false,
+            "failure": "missing_form",
+            "sections": [],
+            "is_qualification_gate": true
+        });
+    };
+
+    let score = &generated.score;
+    let meter = f64::from(score.meter);
+    let mut start_bar = 0_i64;
+    let mut metrics = Vec::<(String, usize, usize)>::new();
+    for section in &form.sections {
+        let section_bars = (section.period.antecedent.progression.len()
+            + section.period.consequent.progression.len()) as i64;
+        let start = start_bar as f64 * meter;
+        let end = (start_bar + section_bars) as f64 * meter;
+        let harmony_onsets: Vec<f64> = score
+            .notes
+            .iter()
+            .filter(|note| note.role == VoiceRole::Harmony)
+            .filter(|note| {
+                note.onset.beats() >= start - 1e-9
+                    && note.onset.beats() < end - 1e-9
+            })
+            .map(|note| note.onset.beats())
+            .collect();
+        let offbeat_count = harmony_onsets
+            .iter()
+            .filter(|onset| (**onset - onset.round()).abs() > 1e-6)
+            .count();
+        metrics.push((format!("{:?}", section.role), harmony_onsets.len(), offbeat_count));
+        start_bar += section_bars;
+    }
+
+    let expected = ["A", "B", "ReturnA"];
+    let roles_match = metrics.len() == expected.len()
+        && metrics.iter().zip(expected).all(|(row, name)| row.0 == name);
+    let passed = roles_match
+        && metrics[0].1 > 0
+        && metrics[0].2 == 0
+        && metrics[1].2 > 0
+        && metrics[2].1 > 0
+        && metrics[2].2 == 0;
+    json!({
+        "passed": passed,
+        "contract": "A and ReturnA use the Minuet's on-beat quarter-note harmony; B has actual offbeat eighth-note arpeggio attacks",
+        "is_qualification_gate": true,
+        "sections": metrics.iter().map(|(role, total, offbeat)| {
+            json!({
+                "role": role,
+                "harmony_event_count": total,
+                "offbeat_harmony_event_count": offbeat,
+                "offbeat_harmony_event_rate": if *total == 0 {
+                    Value::Null
+                } else {
+                    json!(*offbeat as f64 / *total as f64)
+                }
+            })
+        }).collect::<Vec<_>>()
+    })
+}
+
 
 fn plan_name(plan: &GrammarPlanEvidence) -> String {
     match plan {
@@ -943,6 +1019,7 @@ fn main() {
 
     let source_commit = std::env::var("GIT_COMMIT").ok();
     let validator_self_test = validator_mutation_audit();
+    let minuet_trio_contract = minuet_trio_texture_audit();
     let report = json!({
         "schema_version": 5,
         "engine_version": MUSIC_THEORY_ENGINE_VERSION,
@@ -983,7 +1060,9 @@ fn main() {
             "deterministic_replay_failures": replay_failure_count,
             "deterministic_replay_structural_failures": replay_structural_failure_count,
             "exact_cross_style_collision_pairs": exact_collision_pairs,
-            "all_mechanical_checks_passed": spec_invalid_count == 0
+            "named_style_contract_violations": if minuet_trio_contract["passed"].as_bool().unwrap_or(false) { 0 } else { 1 },
+            "all_mechanical_checks_passed": minuet_trio_contract["passed"].as_bool().unwrap_or(false)
+                && spec_invalid_count == 0
                 && empty_score_count == 0
                 && invalid_timeline_count == 0
                 && meter_mismatch_count == 0
@@ -1002,6 +1081,9 @@ fn main() {
             "scope": "paired high/low probes across fixed seeds; no effect at tested points is not proof of global inactivity",
         },
         "validator_mutation_audit": validator_self_test,
+        "named_style_contract_audit": {
+            "minuet_and_trio_texture": minuet_trio_contract
+        },
         "style_identifiability_audit": {
             "method": "compare matched between-style distances against same-style, same-intent distances across different seeds",
             "distance_metric": "layer-balanced RMS over the 11 named structural-fingerprint layers; each layer contributes equally regardless of dimensionality",
@@ -1076,7 +1158,7 @@ mod tests {
     #[test]
     fn benchmark_covers_all_unique_canonical_styles() {
         assert!(!Style::ALL.is_empty());
-        assert_eq!(SEEDS.len() * INTENTS.len(), 16);
+        assert_eq!(SEEDS.len() * INTENTS.len(), 32);
         let unique: HashSet<String> =
             Style::ALL.iter().map(|style| format!("{style:?}")).collect();
         assert_eq!(unique.len(), Style::ALL.len());
@@ -1123,6 +1205,31 @@ mod tests {
         assert_eq!(summary["finite_count"].as_u64(), Some(0));
         assert!(summary["median"].is_null());
         assert!(summary["mean"].is_null());
+    }
+
+    #[test]
+    fn fixed_seed_sweep_has_unique_seeds_and_32_matched_config_cells() {
+        let unique: HashSet<u64> = SEEDS.iter().copied().collect();
+        assert_eq!(unique.len(), SEEDS.len());
+        assert_eq!(SEEDS.len() * INTENTS.len(), 32);
+    }
+
+    #[test]
+    fn minuet_trio_texture_audit_detects_event_level_contrast() {
+        let report = minuet_trio_texture_audit();
+        assert!(
+            report["passed"].as_bool().unwrap_or(false),
+            "Minuet-and-Trio texture contract failed: {report}"
+        );
+        assert_eq!(report["sections"][0]["role"], "A");
+        assert_eq!(report["sections"][1]["role"], "B");
+        assert_eq!(report["sections"][2]["role"], "ReturnA");
+        assert_eq!(report["sections"][0]["offbeat_harmony_event_count"], 0);
+        assert!(
+            report["sections"][1]["offbeat_harmony_event_count"]
+                .as_u64().unwrap_or(0) > 0
+        );
+        assert_eq!(report["sections"][2]["offbeat_harmony_event_count"], 0);
     }
 
     #[test]
