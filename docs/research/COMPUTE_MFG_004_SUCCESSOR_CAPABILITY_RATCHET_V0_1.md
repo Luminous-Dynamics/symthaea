@@ -111,3 +111,22 @@ Every candidate measurement should bind:
 ## Qualification boundary
 
 The corpus is an E0 synthetic contract. It has not been evaluated by a Rust gate implementation, FPGA device, ASIC shuttle or packaged chip. No measured accelerator improvement is claimed by adding this file. Real successor promotion requires the exact canonical baseline, frozen RTL fixtures, verified hardware measurements and independent receipts.
+
+## Research calibration update — 2026-10-17
+
+Two external references sharpen this benchmark's measurement rules and establish a credible research fork beyond exact digital logic.
+
+- **MLPerf Tiny v1.4** is a useful benchmark-method reference: compare the same task/data/quality target, keep latency and task quality separate, and state the energy measurement boundary. Its 2026 results note that some entries measure only the inference engine while others include startup, peripherals, firmware and I/O; those values are not interchangeable. Sources: [MLPerf Tiny v1.4 results](https://mlcommons.org/2026/07/mlperf-tiny-v1-4-results/) and [MLPerf Inference: Tiny benchmark overview](https://mlcommons.org/benchmarks/inference-tiny/).
+
+- **Physical analogue HDC is a separate, promising track.** A Nature Communications paper published 28 July 2026 reports a memristive in-memory HDC system for 21-language classification; its reported simulation accuracy (98.87%) and hardware result (95.24%) differ, showing why hardware nonidealities and hardware-aware processing matter. That paper's dimensions, task, representation, device and measurement boundaries are not Symthaea results and must not be copied into this project's synthetic corpus as if measured here. Source: [Nature Communications (2026)](https://www.nature.com/articles/s41467-026-76067-5).
+
+### Benchmark-design consequences
+
+1. **Maintain two qualification tracks.** Exact digital HDC requires bit-identical BinaryHV outputs. Approximate / analogue / in-memory computing needs a separately versioned representation, preregistered task-quality floor and explicit robustness/noise/calibration criteria; it cannot inherit an exact-equivalence PASS.
+2. **Freeze task and data before tuning.** Bind the source revision, input corpus, data split, preprocessing/postprocessing, target quality and measurement protocol. Keep a closed comparison track with fixed semantics and a separate innovation track where representations may change only under explicit utility constraints.
+3. **Run a dimension/resource sweep.** Treat 1,024-, 4,096- and 16,384-bit profiles as different experiments. The 1,024-bit starting point is a useful comparator inspired by the external study, not a claim that its model is interchangeable with Symthaea. Measure any task-quality loss alongside memory, data movement, latency, energy and robustness.
+4. **Measure the whole deployed path.** Report core-only and end-to-end values separately. The end-to-end boundary should include encoding, host/device transfer or DMA, preprocessing, setup, batching, output conversion, memory movement, and—where relevant—ADC/DAC, peripheral overhead, write/verify, calibration and update costs. Only the preregistered end-to-end boundary can satisfy a system-advantage gate.
+5. **Expose device variation.** For analogue or approximate candidates, report per-device/run quality, drift/noise sensitivity, calibration age and repeatability. Use confidence intervals or distribution summaries where sample sizes support them; a good average must not hide unacceptable tails or failing devices.
+6. **Do not change gates after observing results.** The current 2× end-to-end throughput OR 30% lower measured system-energy target remains a Symthaea-specific experimental hypothesis, not an MLPerf rule or universal scientific standard. Freeze it and hard constraints before measurement, or report the outcome as exploratory / Pareto trade-off.
+
+These references improve methodology, not Symthaea performance claims. The synthetic fixtures remain synthetic, and external published measurements remain labelled as external evidence.
