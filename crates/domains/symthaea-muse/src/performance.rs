@@ -241,7 +241,6 @@ pub fn humanize_score_note_with_profile(
     Ok(())
 }
 
-
 /// A normalized position and timing offset control point for a phrase-level
 /// timing gesture. Positive offsets play late; negative offsets play early.
 #[derive(Debug, Clone, Copy, PartialEq)]
