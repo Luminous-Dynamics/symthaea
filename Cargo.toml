@@ -807,6 +807,10 @@ magi_loop = []                              # MAGI Loop world-grounded predictio
 reasoning_engine = ["magi_loop", "symthaea-causal-reasoning/counterfactual"]
 
 # ── Code Understanding & Generation ─────────────────────────────────
+# Minimal dependency feature for the standalone evidence-receipt verifier example.
+# Keep receipt-integrity checks independent of the much broader code-generation feature.
+receipt-verification = ["dep:sha2"]
+
 # Subsumes former code_understanding feature (tree-sitter parsers + code generation).
 code_generation = ["tree-sitter-rust", "tree-sitter-python", "rnix", "serde_yaml", "hcl-rs", "symthaea-core/synthesis-trait", "dep:sha2", "reasoning_engine"]
 geodesic_synthesis = ["dep:symthaea-geodesic"]  # GCS verification gate for CodingAgent (PDG topology + execution oracle)

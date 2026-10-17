@@ -1,0 +1,821 @@
+{
+  "schema_version": "1.0.0",
+  "benchmark_id": "symthaea-language-code-capability-smoke",
+  "dataset_version": "smoke-v1",
+  "split": "public_smoke",
+  "synthetic": true,
+  "created_date": "2026-10-17",
+  "intended_use": "Deterministic smoke fixture catalog for evaluation-harness development; not a measured benchmark result.",
+  "expected_case_count": 32,
+  "claim_ceiling": "The presence of fixtures is not evidence that Symthaea was evaluated or that any task passed.",
+  "cases": [
+    {
+      "id": "L-001",
+      "lane": "language",
+      "kind": "semantic_frame",
+      "prompt": "Mira archived the draft report and did not notify anyone.",
+      "expected": {
+        "decision": "answer",
+        "obligations": {
+          "actor": "Mira",
+          "action": "archive",
+          "object": "draft report",
+          "notification": "forbidden"
+        },
+        "uncertainty": "none"
+      },
+      "semantic_contract": "Extract actor/action/object and preserve the explicit negative constraint.",
+      "tags": [
+        "roles",
+        "negation"
+      ],
+      "claim_ceiling": "Fixture defines expected interpretation; it does not establish natural-language competence."
+    },
+    {
+      "id": "L-002",
+      "lane": "language",
+      "kind": "constraint_extraction",
+      "prompt": "Remove build artifacts only. Do not delete the source file, lockfile, or any file ending in .keep.",
+      "expected": {
+        "decision": "answer",
+        "obligations": {
+          "include": [
+            "build artifacts"
+          ],
+          "exclude": [
+            "source file",
+            "lockfile",
+            "*.keep"
+          ],
+          "scope": "only"
+        },
+        "uncertainty": "none"
+      },
+      "semantic_contract": "No excluded path may be treated as an allowed deletion target.",
+      "tags": [
+        "scope",
+        "exclusions"
+      ],
+      "claim_ceiling": "Fixture checks constraint preservation only."
+    },
+    {
+      "id": "L-003",
+      "lane": "language",
+      "kind": "ordered_plan",
+      "prompt": "Before committing, run cargo fmt --check and cargo test. If either fails, do not commit or push.",
+      "expected": {
+        "decision": "answer",
+        "obligations": {
+          "steps": [
+            [
+              "cargo fmt --check",
+              "cargo test"
+            ],
+            "commit"
+          ],
+          "failure_rule": "if either check fails, no commit and no push"
+        },
+        "uncertainty": "none"
+      },
+      "semantic_contract": "Both checks precede commit; either failure blocks commit and push.",
+      "tags": [
+        "ordering",
+        "conditionals"
+      ],
+      "claim_ceiling": "Fixture checks the structured plan, not the safety of arbitrary shell execution."
+    },
+    {
+      "id": "L-004",
+      "lane": "language",
+      "kind": "clarification",
+      "prompt": "Change the port in the configuration to 8081.",
+      "expected": {
+        "decision": "clarify",
+        "question": "Which configuration/environment should be changed?",
+        "obligations": {
+          "port": 8081,
+          "edit_authorized": false
+        },
+        "uncertainty": "target configuration is unspecified"
+      },
+      "semantic_contract": "Two plausible configuration targets are in context; do not choose one silently.",
+      "tags": [
+        "ambiguity",
+        "abstention"
+      ],
+      "claim_ceiling": "Fixture checks whether ambiguity is exposed, not human preference."
+    },
+    {
+      "id": "L-005",
+      "lane": "language",
+      "kind": "conflict_detection",
+      "prompt": "Return exactly two alternatives. Return only one alternative.",
+      "expected": {
+        "decision": "clarify",
+        "question": "Should I return one alternative or two?",
+        "obligations": {
+          "alternative_count": "conflicting"
+        },
+        "uncertainty": "requirements conflict"
+      },
+      "semantic_contract": "Detect direct contradiction; do not satisfy an arbitrary half.",
+      "tags": [
+        "contradiction",
+        "clarification"
+      ],
+      "claim_ceiling": "Fixture checks conflict detection for this case."
+    },
+    {
+      "id": "L-006",
+      "lane": "language",
+      "kind": "paraphrase_invariance",
+      "prompt": "Keep the public API unchanged, add a regression test for the defect, and do not add dependencies.",
+      "expected": {
+        "decision": "answer",
+        "obligations": {
+          "preserve": "public API",
+          "add": "regression test for defect",
+          "dependencies": "must not add"
+        },
+        "uncertainty": "none"
+      },
+      "semantic_contract": "Canonical obligation set for paraphrase group L-006/L-007.",
+      "pair_group": "api-regression-no-dependencies-v1",
+      "tags": [
+        "paraphrase",
+        "invariants"
+      ],
+      "claim_ceiling": "One equivalence pair is a smoke check, not a general paraphrase score."
+    },
+    {
+      "id": "L-007",
+      "lane": "language",
+      "kind": "paraphrase_invariance",
+      "prompt": "Without changing the public API or introducing dependencies, add a regression test that reproduces the bug.",
+      "expected": {
+        "decision": "answer",
+        "obligations": {
+          "preserve": "public API",
+          "add": "regression test for defect",
+          "dependencies": "must not add"
+        },
+        "uncertainty": "none"
+      },
+      "semantic_contract": "Canonical obligation set for paraphrase group L-006/L-007; should match L-006.",
+      "pair_group": "api-regression-no-dependencies-v1",
+      "tags": [
+        "paraphrase",
+        "invariants"
+      ],
+      "claim_ceiling": "One equivalence pair is a smoke check, not a general paraphrase score."
+    },
+    {
+      "id": "L-008",
+      "lane": "language",
+      "kind": "contrastive_meaning",
+      "prompt": "Delete the generated report, but preserve the source report.",
+      "expected": {
+        "decision": "answer",
+        "obligations": {
+          "delete": "generated report",
+          "preserve": "source report"
+        },
+        "uncertainty": "none"
+      },
+      "semantic_contract": "The delete and preserve target identities must remain distinct.",
+      "tags": [
+        "contrastive",
+        "object-identity"
+      ],
+      "claim_ceiling": "Fixture checks the declared object distinction only."
+    },
+    {
+      "id": "C-001",
+      "lane": "rust_synthesis",
+      "kind": "function_synthesis",
+      "prompt": "Implement clamp_i32(value, lower, upper) -> i32. Precondition: lower <= upper. Return value clamped to the inclusive [lower, upper] interval.",
+      "signature": "fn clamp_i32(value: i32, lower: i32, upper: i32) -> i32",
+      "test_source": "#[test] fn clamp_boundaries() { assert_eq!(clamp_i32(5, 0, 3), 3); assert_eq!(clamp_i32(-2, 0, 3), 0); assert_eq!(clamp_i32(2, 0, 3), 2); assert_eq!(clamp_i32(0, 0, 3), 0); }",
+      "expected": {
+        "preconditions": [
+          "lower <= upper"
+        ],
+        "properties": [
+          "inclusive lower and upper bounds",
+          "preserve in-range values"
+        ],
+        "tests": [
+          "upper clamp",
+          "lower clamp",
+          "in-range identity",
+          "boundary"
+        ]
+      },
+      "tags": [
+        "bounds",
+        "pure-function"
+      ],
+      "claim_ceiling": "Passing these tests does not prove all inputs without adequate test/property coverage."
+    },
+    {
+      "id": "C-002",
+      "lane": "rust_synthesis",
+      "kind": "function_synthesis",
+      "prompt": "Implement stable_unique(values: &[i32]) -> Vec<i32>. Keep only the first occurrence of each value, preserving original order.",
+      "signature": "fn stable_unique(values: &[i32]) -> Vec<i32>",
+      "test_source": "#[test] fn stable_unique_order() { assert_eq!(stable_unique(&[3, 1, 3, 2, 1]), vec![3, 1, 2]); assert_eq!(stable_unique(&[]), Vec::<i32>::new()); assert_eq!(stable_unique(&[4, 4]), vec![4]); }",
+      "expected": {
+        "preconditions": [],
+        "properties": [
+          "deduplicate by equality",
+          "preserve first-occurrence order"
+        ],
+        "tests": [
+          "mixed duplicate order",
+          "empty input",
+          "all-equal input"
+        ]
+      },
+      "tags": [
+        "collections",
+        "ordering"
+      ],
+      "claim_ceiling": "Fixture defines a compact behavior contract; it is not a performance benchmark."
+    },
+    {
+      "id": "C-003",
+      "lane": "rust_synthesis",
+      "kind": "function_synthesis",
+      "prompt": "Implement rotate_left<T>(items: &mut [T], amount: usize) -> (). Rotate in place by amount modulo length. Empty input is a no-op.",
+      "signature": "fn rotate_left<T>(items: &mut [T], amount: usize)",
+      "test_source": "#[test] fn rotates() { let mut a = [1, 2, 3, 4, 5]; rotate_left(&mut a, 2); assert_eq!(a, [3, 4, 5, 1, 2]); let mut b = [1, 2, 3]; rotate_left(&mut b, 7); assert_eq!(b, [2, 3, 1]); let mut c: [i32; 0] = []; rotate_left(&mut c, 9); assert_eq!(c, []); }",
+      "expected": {
+        "preconditions": [],
+        "properties": [
+          "in-place left rotation",
+          "amount normalized modulo length",
+          "empty slice is a no-op"
+        ],
+        "tests": [
+          "normal shift",
+          "shift larger than length",
+          "empty slice"
+        ]
+      },
+      "tags": [
+        "slices",
+        "edge-cases"
+      ],
+      "claim_ceiling": "Generic-compilation behavior requires running this test under the declared Rust toolchain."
+    },
+    {
+      "id": "C-004",
+      "lane": "rust_synthesis",
+      "kind": "function_synthesis",
+      "prompt": "Implement merge_sorted(left: &[i32], right: &[i32]) -> Vec<i32>. Inputs are ascending; return an ascending merge and preserve all duplicates.",
+      "signature": "fn merge_sorted(left: &[i32], right: &[i32]) -> Vec<i32>",
+      "test_source": "#[test] fn merge_preserves_duplicates() { assert_eq!(merge_sorted(&[1, 2, 2], &[2, 3]), vec![1, 2, 2, 2, 3]); assert_eq!(merge_sorted(&[], &[1, 2]), vec![1, 2]); assert_eq!(merge_sorted(&[0, 4], &[]), vec![0, 4]); }",
+      "expected": {
+        "preconditions": [
+          "inputs ascending"
+        ],
+        "properties": [
+          "output ascending",
+          "all input elements preserved with multiplicity"
+        ],
+        "tests": [
+          "equal elements across inputs",
+          "empty left",
+          "empty right"
+        ]
+      },
+      "tags": [
+        "merge",
+        "multiplicity"
+      ],
+      "claim_ceiling": "Input sortedness is a precondition, not checked by this function."
+    },
+    {
+      "id": "C-005",
+      "lane": "rust_synthesis",
+      "kind": "function_synthesis",
+      "prompt": "Implement parse_positive_u16(input: &str) -> Option<u16>. Accept only non-empty ASCII decimal digits, with value in 1..=65535. Reject whitespace, a sign, zero, non-ASCII digits and overflow.",
+      "signature": "fn parse_positive_u16(input: &str) -> Option<u16>",
+      "test_source": "#[test] fn parses_positive_u16() { assert_eq!(parse_positive_u16(\"1\"), Some(1)); assert_eq!(parse_positive_u16(\"65535\"), Some(65535)); assert_eq!(parse_positive_u16(\"0\"), None); assert_eq!(parse_positive_u16(\"+1\"), None); assert_eq!(parse_positive_u16(\" 1\"), None); assert_eq!(parse_positive_u16(\"65536\"), None); assert_eq!(parse_positive_u16(\"\"), None); }",
+      "expected": {
+        "preconditions": [],
+        "properties": [
+          "strict ASCII digits only",
+          "positive range",
+          "overflow rejected"
+        ],
+        "tests": [
+          "minimum valid",
+          "maximum valid",
+          "zero",
+          "sign",
+          "whitespace",
+          "overflow",
+          "empty"
+        ]
+      },
+      "tags": [
+        "parsing",
+        "validation"
+      ],
+      "claim_ceiling": "The test source is an initial oracle; additional boundary/property tests are required for promotion."
+    },
+    {
+      "id": "C-006",
+      "lane": "rust_synthesis",
+      "kind": "function_synthesis",
+      "prompt": "Implement first_duplicate(values: &[i32]) -> Option<i32>. Return the value whose second-or-later occurrence appears earliest in the input. Return None if every value is unique.",
+      "signature": "fn first_duplicate(values: &[i32]) -> Option<i32>",
+      "test_source": "#[test] fn first_duplicate_is_by_second_occurrence() { assert_eq!(first_duplicate(&[3, 2, 3, 2]), Some(3)); assert_eq!(first_duplicate(&[1, 2, 3]), None); assert_eq!(first_duplicate(&[]), None); }",
+      "expected": {
+        "preconditions": [],
+        "properties": [
+          "first repeat is defined by encounter order, not minimum/maximum duplicate"
+        ],
+        "tests": [
+          "competing duplicate values",
+          "unique values",
+          "empty input"
+        ]
+      },
+      "tags": [
+        "collections",
+        "semantic-precision"
+      ],
+      "claim_ceiling": "This small fixture is not a general data-structure evaluation."
+    },
+    {
+      "id": "C-007",
+      "lane": "rust_synthesis",
+      "kind": "function_synthesis",
+      "prompt": "Implement checked_sum_range(start: i64, end: i64) -> Option<i64>. Sum the inclusive ascending range using checked arithmetic. If start > end, return Some(0). If the sum overflows i64, return None.",
+      "signature": "fn checked_sum_range(start: i64, end: i64) -> Option<i64>",
+      "test_source": "#[test] fn checked_range_sum() { assert_eq!(checked_sum_range(1, 4), Some(10)); assert_eq!(checked_sum_range(4, 3), Some(0)); assert_eq!(checked_sum_range(i64::MAX - 1, i64::MAX), None); assert_eq!(checked_sum_range(0, 0), Some(0)); }",
+      "expected": {
+        "preconditions": [],
+        "properties": [
+          "inclusive sum",
+          "empty descending range yields zero",
+          "overflow returns None without panic"
+        ],
+        "tests": [
+          "normal range",
+          "descending range",
+          "overflow",
+          "single value"
+        ]
+      },
+      "tags": [
+        "arithmetic",
+        "overflow"
+      ],
+      "claim_ceiling": "Overflow safety must be observed in execution; source inspection alone is insufficient."
+    },
+    {
+      "id": "C-008",
+      "lane": "rust_synthesis",
+      "kind": "function_synthesis",
+      "prompt": "Implement count_ascii_digits(input: &str) -> usize. Count only ASCII characters '0' through '9'; Unicode numeric characters are not ASCII digits.",
+      "signature": "fn count_ascii_digits(input: &str) -> usize",
+      "test_source": "#[test] fn counts_only_ascii_digits() { assert_eq!(count_ascii_digits(\"a1b23\"), 3); assert_eq!(count_ascii_digits(\"١2\"), 1); assert_eq!(count_ascii_digits(\"none\"), 0); }",
+      "expected": {
+        "preconditions": [],
+        "properties": [
+          "count only ASCII decimal digits"
+        ],
+        "tests": [
+          "mixed text",
+          "Unicode numeric versus ASCII digit",
+          "no digits"
+        ]
+      },
+      "tags": [
+        "unicode",
+        "classification"
+      ],
+      "claim_ceiling": "Fixture checks ASCII classification only, not complete Unicode text handling."
+    },
+    {
+      "id": "R-001",
+      "lane": "repair",
+      "kind": "bug_repair",
+      "prompt": "Repair the implementation so it obeys the clamp_i32 contract. Keep the public signature unchanged.",
+      "signature": "fn clamp_i32(value: i32, lower: i32, upper: i32) -> i32",
+      "buggy_source": "fn clamp_i32(value: i32, lower: i32, upper: i32) -> i32 { let _ = lower; value.min(upper) }",
+      "repair_contract": "Clamp below the lower bound as well as above the upper bound; do not change the signature.",
+      "test_source": "#[test] fn repaired_clamp() { assert_eq!(clamp_i32(-2, 0, 3), 0); assert_eq!(clamp_i32(5, 0, 3), 3); assert_eq!(clamp_i32(2, 0, 3), 2); }",
+      "expected": {
+        "required_outcome": "all tests pass",
+        "protected_invariants": [
+          "signature preserved"
+        ],
+        "failure_modes": [
+          "upper-only clamp"
+        ]
+      },
+      "tags": [
+        "boundary-bug",
+        "minimal-repair"
+      ],
+      "claim_ceiling": "One repair fixture does not establish general repair skill."
+    },
+    {
+      "id": "R-002",
+      "lane": "repair",
+      "kind": "bug_repair",
+      "prompt": "Repair stable_unique: remove duplicates without sorting or changing the first-occurrence order.",
+      "signature": "fn stable_unique(values: &[i32]) -> Vec<i32>",
+      "buggy_source": "fn stable_unique(values: &[i32]) -> Vec<i32> { let mut out = values.to_vec(); out.sort(); out.dedup(); out }",
+      "repair_contract": "Retain first occurrences and original relative order; keep the signature.",
+      "test_source": "#[test] fn repaired_unique() { assert_eq!(stable_unique(&[3, 1, 3, 2, 1]), vec![3, 1, 2]); }",
+      "expected": {
+        "required_outcome": "all tests pass",
+        "protected_invariants": [
+          "signature preserved",
+          "input order semantics preserved"
+        ],
+        "failure_modes": [
+          "sort-based deduplication"
+        ]
+      },
+      "tags": [
+        "ordering-bug",
+        "minimal-repair"
+      ],
+      "claim_ceiling": "Passing the supplied case does not prove behavior over all sequences."
+    },
+    {
+      "id": "R-003",
+      "lane": "repair",
+      "kind": "bug_repair",
+      "prompt": "Repair rotate_left so every usize amount is accepted, including amounts larger than the slice length and empty slices.",
+      "signature": "fn rotate_left<T>(items: &mut [T], amount: usize)",
+      "buggy_source": "fn rotate_left<T>(items: &mut [T], amount: usize) { items.rotate_left(amount); }",
+      "repair_contract": "Normalize the rotation amount; empty input must not panic.",
+      "test_source": "#[test] fn repaired_rotate() { let mut a = [1, 2, 3]; rotate_left(&mut a, 7); assert_eq!(a, [2, 3, 1]); let mut b: [i32; 0] = []; rotate_left(&mut b, 10); assert_eq!(b, []); }",
+      "expected": {
+        "required_outcome": "all tests pass without panic",
+        "protected_invariants": [
+          "signature preserved",
+          "in-place mutation"
+        ],
+        "failure_modes": [
+          "amount greater than length",
+          "empty slice handling"
+        ]
+      },
+      "tags": [
+        "panic",
+        "edge-case"
+      ],
+      "claim_ceiling": "Runtime execution is required to establish no panic on the cases."
+    },
+    {
+      "id": "R-004",
+      "lane": "repair",
+      "kind": "bug_repair",
+      "prompt": "Repair merge_sorted so it preserves multiplicity when values from left and right are equal.",
+      "signature": "fn merge_sorted(left: &[i32], right: &[i32]) -> Vec<i32>",
+      "buggy_source": "fn merge_sorted(left: &[i32], right: &[i32]) -> Vec<i32> { let (mut i, mut j) = (0, 0); let mut out = Vec::new(); while i < left.len() && j < right.len() { if left[i] < right[j] { out.push(left[i]); i += 1; } else if left[i] > right[j] { out.push(right[j]); j += 1; } else { out.push(left[i]); i += 1; j += 1; } } out.extend_from_slice(&left[i..]); out.extend_from_slice(&right[j..]); out }",
+      "repair_contract": "Every element from both sorted inputs must appear in the output, including equal values.",
+      "test_source": "#[test] fn repaired_merge() { assert_eq!(merge_sorted(&[1, 2, 2], &[2, 3]), vec![1, 2, 2, 2, 3]); }",
+      "expected": {
+        "required_outcome": "all tests pass",
+        "protected_invariants": [
+          "ascending output",
+          "input multiplicity preserved"
+        ],
+        "failure_modes": [
+          "equal branch drops one item"
+        ]
+      },
+      "tags": [
+        "multiplicity",
+        "data-loss"
+      ],
+      "claim_ceiling": "This fixture detects one specific data-loss defect."
+    },
+    {
+      "id": "R-005",
+      "lane": "repair",
+      "kind": "bug_repair",
+      "prompt": "Repair parse_positive_u16 to reject surrounding whitespace and signs instead of silently normalizing the input.",
+      "signature": "fn parse_positive_u16(input: &str) -> Option<u16>",
+      "buggy_source": "fn parse_positive_u16(input: &str) -> Option<u16> { let value: u16 = input.trim().parse().ok()?; if value == 0 { None } else { Some(value) } }",
+      "repair_contract": "Accept only raw ASCII decimal digits representing 1 through 65535.",
+      "test_source": "#[test] fn repaired_parse() { assert_eq!(parse_positive_u16(\" 1\"), None); assert_eq!(parse_positive_u16(\"+1\"), None); assert_eq!(parse_positive_u16(\"1\"), Some(1)); }",
+      "expected": {
+        "required_outcome": "all tests pass",
+        "protected_invariants": [
+          "strict input grammar",
+          "positive value"
+        ],
+        "failure_modes": [
+          "trimming",
+          "sign acceptance"
+        ]
+      },
+      "tags": [
+        "parser",
+        "silent-normalization"
+      ],
+      "claim_ceiling": "Supplied tests are not a complete parser conformance suite."
+    },
+    {
+      "id": "R-006",
+      "lane": "repair",
+      "kind": "bug_repair",
+      "prompt": "Repair first_duplicate to return the duplicate whose repeated occurrence is encountered first, not the numerically smallest duplicate.",
+      "signature": "fn first_duplicate(values: &[i32]) -> Option<i32>",
+      "buggy_source": "fn first_duplicate(values: &[i32]) -> Option<i32> { let mut seen = std::collections::HashSet::new(); let mut duplicates = Vec::new(); for &v in values { if !seen.insert(v) { duplicates.push(v); } } duplicates.into_iter().min() }",
+      "repair_contract": "Return immediately on the first value whose insertion into the seen set fails.",
+      "test_source": "#[test] fn repaired_first_duplicate() { assert_eq!(first_duplicate(&[3, 2, 3, 2]), Some(3)); }",
+      "expected": {
+        "required_outcome": "all tests pass",
+        "protected_invariants": [
+          "encounter-order semantics"
+        ],
+        "failure_modes": [
+          "minimum duplicate substituted for first repeated value"
+        ]
+      },
+      "tags": [
+        "semantic-bug",
+        "ordering"
+      ],
+      "claim_ceiling": "Fixture tests the stated encounter-order definition only."
+    },
+    {
+      "id": "R-007",
+      "lane": "repair",
+      "kind": "bug_repair",
+      "prompt": "Repair checked_sum_range to report arithmetic overflow as None instead of panicking or wrapping.",
+      "signature": "fn checked_sum_range(start: i64, end: i64) -> Option<i64>",
+      "buggy_source": "fn checked_sum_range(start: i64, end: i64) -> Option<i64> { if start > end { return Some(0); } let mut sum = 0_i64; for value in start..=end { sum += value; } Some(sum) }",
+      "repair_contract": "Use checked arithmetic and return None when the inclusive sum overflows.",
+      "test_source": "#[test] fn repaired_checked_sum() { assert_eq!(checked_sum_range(i64::MAX - 1, i64::MAX), None); assert_eq!(checked_sum_range(1, 4), Some(10)); }",
+      "expected": {
+        "required_outcome": "overflow returns None without panic",
+        "protected_invariants": [
+          "correct sum on normal input",
+          "descending range returns Some(0)"
+        ],
+        "failure_modes": [
+          "unchecked addition"
+        ]
+      },
+      "tags": [
+        "overflow",
+        "panic"
+      ],
+      "claim_ceiling": "Source inspection is not a substitute for executing overflow controls under the actual build profile."
+    },
+    {
+      "id": "R-008",
+      "lane": "repair",
+      "kind": "bug_repair",
+      "prompt": "Repair count_ascii_digits so it counts ASCII decimal characters only, not every Unicode character classified as numeric.",
+      "signature": "fn count_ascii_digits(input: &str) -> usize",
+      "buggy_source": "fn count_ascii_digits(input: &str) -> usize { input.chars().filter(|ch| ch.is_numeric()).count() }",
+      "repair_contract": "Use ASCII-digit classification exactly.",
+      "test_source": "#[test] fn repaired_ascii_digits() { assert_eq!(count_ascii_digits(\"١2\"), 1); assert_eq!(count_ascii_digits(\"a123\"), 3); }",
+      "expected": {
+        "required_outcome": "all tests pass",
+        "protected_invariants": [
+          "ASCII-only definition"
+        ],
+        "failure_modes": [
+          "Unicode numeric classification used instead of ASCII digits"
+        ]
+      },
+      "tags": [
+        "unicode",
+        "specification-fidelity"
+      ],
+      "claim_ceiling": "This fixture does not establish complete Unicode processing quality."
+    },
+    {
+      "id": "V-001",
+      "lane": "verifier_integrity",
+      "kind": "receipt_negative_control",
+      "prompt": "Evaluate a run receipt whose required dataset digest is missing.",
+      "receipt_fixture": {
+        "run_id": "synthetic-v001",
+        "status": "passed",
+        "source_sha": "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
+        "dataset_sha256": null,
+        "toolchain": "rustc-pinned",
+        "compile_exit_code": 0,
+        "test_exit_code": 0,
+        "tests_executed": 4,
+        "artifact_bytes": "synthetic-artifact-v1"
+      },
+      "expected_outcome": "reject",
+      "expected_reason": "missing_required_dataset_digest",
+      "expected": {
+        "decision": "reject",
+        "reason": "missing_required_dataset_digest"
+      },
+      "tags": [
+        "missing-provenance",
+        "negative-control"
+      ],
+      "claim_ceiling": "Receipt validation only; no generated program is executed."
+    },
+    {
+      "id": "V-002",
+      "lane": "verifier_integrity",
+      "kind": "receipt_negative_control",
+      "prompt": "Evaluate a run receipt that marks an explicitly skipped test lane as passed.",
+      "receipt_fixture": {
+        "run_id": "synthetic-v002",
+        "status": "passed",
+        "test_lane_status": "skipped",
+        "compile_exit_code": 0,
+        "test_exit_code": null,
+        "tests_executed": 0,
+        "dataset_sha256": "bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb",
+        "artifact_bytes": "synthetic-artifact-v2"
+      },
+      "expected_outcome": "reject",
+      "expected_reason": "skipped_lane_cannot_claim_pass",
+      "expected": {
+        "decision": "reject",
+        "reason": "skipped_lane_cannot_claim_pass"
+      },
+      "tags": [
+        "skipped-lane",
+        "negative-control"
+      ],
+      "claim_ceiling": "A skipped measurement must never be reported as a passing test."
+    },
+    {
+      "id": "V-003",
+      "lane": "verifier_integrity",
+      "kind": "receipt_negative_control",
+      "prompt": "Evaluate a receipt whose supplied artifact bytes do not match its declared SHA-256.",
+      "receipt_fixture": {
+        "run_id": "synthetic-v003",
+        "status": "passed",
+        "dataset_sha256": "cccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccc",
+        "artifact_bytes": "actual-artifact-bytes",
+        "declared_artifact_sha256": "dddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddd",
+        "compile_exit_code": 0,
+        "test_exit_code": 0,
+        "tests_executed": 4
+      },
+      "expected_outcome": "reject",
+      "expected_reason": "artifact_digest_mismatch",
+      "expected": {
+        "decision": "reject",
+        "reason": "artifact_digest_mismatch"
+      },
+      "tags": [
+        "digest-mismatch",
+        "negative-control"
+      ],
+      "claim_ceiling": "A digest-shaped string alone is not artifact verification."
+    },
+    {
+      "id": "V-004",
+      "lane": "verifier_integrity",
+      "kind": "receipt_negative_control",
+      "prompt": "Evaluate a receipt bound to a stale source revision when the evaluation request pins a different exact head.",
+      "receipt_fixture": {
+        "run_id": "synthetic-v004",
+        "status": "passed",
+        "source_sha": "eeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeee",
+        "expected_source_sha": "ffffffffffffffffffffffffffffffffffffffff",
+        "dataset_sha256": "1111111111111111111111111111111111111111111111111111111111111111",
+        "compile_exit_code": 0,
+        "test_exit_code": 0,
+        "tests_executed": 4
+      },
+      "expected_outcome": "reject",
+      "expected_reason": "source_revision_mismatch",
+      "expected": {
+        "decision": "reject",
+        "reason": "source_revision_mismatch"
+      },
+      "tags": [
+        "stale-head",
+        "negative-control"
+      ],
+      "claim_ceiling": "Revision identity mismatch invalidates the comparison."
+    },
+    {
+      "id": "V-005",
+      "lane": "verifier_integrity",
+      "kind": "receipt_negative_control",
+      "prompt": "Evaluate a receipt reporting passed even though the test process returned exit code 1.",
+      "receipt_fixture": {
+        "run_id": "synthetic-v005",
+        "status": "passed",
+        "dataset_sha256": "2222222222222222222222222222222222222222222222222222222222222222",
+        "compile_exit_code": 0,
+        "test_exit_code": 1,
+        "tests_executed": 4
+      },
+      "expected_outcome": "reject",
+      "expected_reason": "test_exit_status_conflicts_with_pass",
+      "expected": {
+        "decision": "reject",
+        "reason": "test_exit_status_conflicts_with_pass"
+      },
+      "tags": [
+        "false-pass",
+        "negative-control"
+      ],
+      "claim_ceiling": "Independent exit-status consistency is required."
+    },
+    {
+      "id": "V-006",
+      "lane": "verifier_integrity",
+      "kind": "receipt_negative_control",
+      "prompt": "Evaluate a receipt that converts a test timeout into a passing result.",
+      "receipt_fixture": {
+        "run_id": "synthetic-v006",
+        "status": "passed",
+        "dataset_sha256": "3333333333333333333333333333333333333333333333333333333333333333",
+        "compile_exit_code": 0,
+        "test_exit_code": null,
+        "test_status": "timeout",
+        "tests_executed": 0,
+        "timeout_seconds": 5
+      },
+      "expected_outcome": "reject",
+      "expected_reason": "timeout_cannot_claim_pass",
+      "expected": {
+        "decision": "reject",
+        "reason": "timeout_cannot_claim_pass"
+      },
+      "tags": [
+        "timeout",
+        "negative-control"
+      ],
+      "claim_ceiling": "Timeout is not success and should remain distinguishable from failure."
+    },
+    {
+      "id": "V-007",
+      "lane": "verifier_integrity",
+      "kind": "receipt_negative_control",
+      "prompt": "Evaluate a functional-correctness claim with no tests executed and no declared compile-only policy.",
+      "receipt_fixture": {
+        "run_id": "synthetic-v007",
+        "status": "passed",
+        "claim": "functional_correctness",
+        "dataset_sha256": "4444444444444444444444444444444444444444444444444444444444444444",
+        "compile_exit_code": 0,
+        "test_exit_code": 0,
+        "tests_executed": 0,
+        "compile_only_policy": null
+      },
+      "expected_outcome": "reject",
+      "expected_reason": "functional_claim_without_tests",
+      "expected": {
+        "decision": "reject",
+        "reason": "functional_claim_without_tests"
+      },
+      "tags": [
+        "empty-tests",
+        "negative-control"
+      ],
+      "claim_ceiling": "Compilation alone does not substantiate a functional-correctness claim."
+    },
+    {
+      "id": "V-008",
+      "lane": "verifier_integrity",
+      "kind": "receipt_negative_control",
+      "prompt": "Evaluate a receipt whose stored result digest no longer matches its declared result payload.",
+      "receipt_fixture": {
+        "run_id": "synthetic-v008",
+        "status": "passed",
+        "dataset_sha256": "5555555555555555555555555555555555555555555555555555555555555555",
+        "compile_exit_code": 0,
+        "test_exit_code": 0,
+        "tests_executed": 4,
+        "result_payload": {
+          "status": "failed",
+          "tests_failed": 1
+        },
+        "declared_result_sha256": "6666666666666666666666666666666666666666666666666666666666666666"
+      },
+      "expected_outcome": "reject",
+      "expected_reason": "result_payload_digest_or_status_mismatch",
+      "expected": {
+        "decision": "reject",
+        "reason": "result_payload_digest_or_status_mismatch"
+      },
+      "tags": [
+        "tampering",
+        "negative-control"
+      ],
+      "claim_ceiling": "An outcome integrity check is not a digital signature or proof of evaluator correctness."
+    }
+  ]
+}
