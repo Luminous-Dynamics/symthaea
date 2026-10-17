@@ -9,12 +9,14 @@
 //! numerical-failure semantics. The crate contains mathematical primitives;
 //! agent cognition and simulation adapters belong in higher layers.
 
+pub mod creditism;
 pub mod error;
 pub mod finance;
 pub mod game;
 pub mod inequality;
 pub mod market;
 
+pub use creditism::{CreditismError, ExchangeSettlement, PersonalCreditLedger};
 pub use error::{EconomicsError, Result};
 pub use finance::{
     AmortizationPeriod, IrrAnalysis, IrrOptions, IrrStatus, amortization_schedule, annuity_payment,
