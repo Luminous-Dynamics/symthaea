@@ -889,6 +889,35 @@ mod tests {
     }
 
     #[test]
+    fn breakdown_observation_requires_protocol_and_rejects_frequency() {
+        let mut sample = ConditionedDielectricObservation {
+            material_id: "synthetic-breakdown-observation".to_string(),
+            property: DielectricObservationProperty::BreakdownStrength,
+            value: 1.0e8,
+            test_temperature_k: 298.15,
+            test_frequency_hz: None,
+            test_field_v_per_m: None,
+            breakdown_test_kind: Some(BreakdownTestKind::DcRamp),
+            evidence_kind: DielectricEvidenceKind::Experimental,
+            source_reference: "doi:example-breakdown-paper".to_string(),
+            dataset_version: None,
+            uncertainty: None,
+        };
+        assert!(sample.validate().is_ok());
+        sample.breakdown_test_kind = None;
+        assert_eq!(
+            sample.validate(),
+            Err(DielectricValidationError::MissingBreakdownTestKind)
+        );
+        sample.breakdown_test_kind = Some(BreakdownTestKind::DcRamp);
+        sample.test_frequency_hz = Some(1_000.0);
+        assert_eq!(
+            sample.validate(),
+            Err(DielectricValidationError::UnexpectedObservationFrequency)
+        );
+    }
+
+    #[test]
     fn conditioned_observation_rejects_missing_frequency_or_misplaced_breakdown_protocol() {
         let mut sample = ConditionedDielectricObservation {
             material_id: "synthetic-observation".to_string(),
