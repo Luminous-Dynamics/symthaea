@@ -126,7 +126,7 @@ Run in stages. Start with the software/integrity negatives, then qualify the pow
 
 This document defines how a future study should be run. It contains no measured power saving, physical display result, human-subject result, or claim that adaptive output is universally better. Claims must be supported by exact device/configuration identity, calibrated instruments, raw traces, preregistered tasks, uncertainty estimates, and independent review.
 
-## 11. Standards alignment and boundaries
+## 12. Standards alignment and boundaries
 
 Use existing standards as the measurement floor rather than inventing incompatible power tests:
 
