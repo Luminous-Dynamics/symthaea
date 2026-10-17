@@ -1,0 +1,85 @@
+# SenseBench Blind-World Protocol v0.1
+
+**Status:** implementation added to the `feat/symthaea-sense-observation-envelope` branch; Rust tests are authored but have not been executed in the current environment.
+
+## Question being tested
+
+Does active measurement selection improve identification and decision quality when the true outcome-generating process differs from the declared likelihood models, or does it merely optimize the assumptions used by its own scorer?
+
+The benchmark is an outcome-generating simulation, not a physical-science claim. Its source is intentionally inspectable, so "held out" means excluded from policy-model construction—not cryptographically sealed.
+
+## Design
+
+The `blind-worlds` CLI suite compares:
+
+- nominal expected information gain;
+- nominal predictive variance;
+- model-weighted expected information gain;
+- worst-case robust information-gain ranking;
+- a fixed design selected using development regimes only;
+- uniform random selection;
+- passive-only observation.
+
+All policies receive the same three-hypothesis prior, declared candidate-model set, nominal posterior-update rule, and synthetic resource budget. Candidate likelihoods are used by selectors; hidden-world likelihoods independently generate each observed binary outcome. Policies do not receive the hidden world ID, regime label, truth table, or true hypothesis index.
+
+Three hypotheses are represented: direct cause, shared-cause/confounder, and no direct causal effect. Six generator regimes cover two development conditions and four held-out conditions: intervention artifact, sensor degradation, effect reversal, and a null negative-control regime. Each candidate has a declared synthetic cost. The fixed-design comparator is selected by mean expected information gain per cost over the two development regimes; it does not inspect the held-out regimes to choose its action.
+
+Random streams are deterministic. The same world/trial seed is paired across policies, while action selection has a separate deterministic stream. Ground-truth hypotheses cycle across the three hypotheses so each regime's trial set remains approximately balanced. Each policy spends from the same total resource budget; it stops when it reaches the predeclared posterior threshold or no affordable candidate remains.
+
+## Reported outcomes
+
+Per world and policy, JSON reports:
+
+- multiclass Brier score and its trial-level 95% normal-approximation interval;
+- multiclass log loss and its trial-level 95% normal-approximation interval;
+- top-hypothesis accuracy with a Wilson interval;
+- threshold-reaching fraction with a Wilson interval;
+- mean experiments and synthetic cost spent;
+- experiments/cost to the threshold among trials that reach it;
+- 10-bin expected calibration error;
+- predicted expected information gain per cost versus realized entropy reduction per cost;
+- unsupported positive causal-claim rate when the true hypothesis is the no-direct-cause hypothesis, with a Wilson interval.
+
+An individual realized entropy reduction may be negative. It is not clamped to make a policy look better. The reported realized quantity measures entropy change under the benchmark's declared posterior update rule after outcomes sampled from the hidden-world distribution; it is not proof of true-world posterior calibration.
+
+## Reproduction
+
+Run from the repository's Nix devshell or other supported Rust environment:
+
+```sh
+SENSEBENCH_CODE_REVISION=$(git rev-parse HEAD) \
+  cargo run -p symthaea-sensebench -- --suite blind-worlds --trials 512 --budget 8 --seed 42
+
+SENSEBENCH_CODE_REVISION=$(git rev-parse HEAD) \
+  cargo test -p symthaea-sensebench
+```
+
+Use the exact commit SHA for every recorded report. Do not attribute a report to a parent commit or treat skipped workflow checks as successful validation.
+
+## Claims this protocol does not support
+
+- It does not prove causal discovery in real systems or validated physical measurement.
+- The likelihood tables are synthetic and source-visible.
+- Trial-level intervals quantify Monte Carlo uncertainty conditional on each declared fixture; they do not estimate generalization across all possible worlds.
+- A model-weighted or worst-case policy may fail to outperform a competent fixed design. Preserve such a result.
+- Deterministic seeds and report manifests improve replayability; they do not establish independent data custody or prevent source-level leakage.
+
+## Next qualification gates
+
+These are proposed acceptance gates, not measured capabilities:
+
+1. **Correctness controls:** exact known-answer ranking for a perfectly discriminating 1-bit action versus a 0-bit null action; malformed model/cost/outcome inputs fail closed.
+2. **Paired effectiveness:** at least 15% lower median synthetic resource cost to a predeclared identification threshold than both uniform random and development-selected fixed design on held-out regimes, with a paired 95% interval excluding zero improvement.
+3. **Calibration:** report Brier, log loss and calibration error together; no success claim based on threshold-reaching rate alone. Report overconfidence separately from identification accuracy.
+4. **Null discipline:** target zero positive causal claims above the declared confidence threshold on null controls. Any violation is a benchmark result to investigate, not a reason to weaken the test.
+5. **Robustness:** compare worst-case regret and performance on the correctly specified control; quantify any conservatism cost.
+6. **World-level inference:** add many independently parameterized graph/measurement families and uncertainty intervals that resample both worlds and trial seeds. The present per-regime intervals are not substitutes for world-level generalization estimates.
+7. **Stronger custody:** for a serious prospective benchmark, split generator/scorer into separate processes, publish a protocol commitment before scoring, hash the challenge corpus, and protect test labels/tables outside policy-accessible artifacts.
+8. **Real-stream bridge:** only after the synthetic suite is reproducible, replay an actual sensor stream with injected faults and compare to a trusted independent reference. Do not allow this suite to reconfigure or control physical hardware.
+
+## Research basis
+
+- NIST AI 800-3 distinguishes performance on a fixed benchmark from generalized performance and emphasizes explicit estimands and defensible uncertainty estimates: https://www.nist.gov/news-events/news/2026/02/new-report-expanding-ai-evaluation-toolbox-statistical-models
+- Robust Bayesian active learning research analyzes how model misspecification can amplify generalization error and motivates testing more than nominal information gain: https://proceedings.mlr.press/v300/tang26d.html
+- Bayesian adaptive experimental design can itself suffer active-learning bias under misspecification: https://arxiv.org/abs/2205.13698
+- The Numenta Anomaly Benchmark is a later complementary stream-detection adapter target; its streaming score does not establish sensor calibration or causal validity: https://github.com/numenta/NAB
