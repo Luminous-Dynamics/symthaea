@@ -69,6 +69,16 @@ fn run() -> Result<(), String> {
     );
     let repo_root = fs::canonicalize(&repo_root)
         .map_err(|error| format!("BLOCKED: cannot canonicalize repository root: {error}"))?;
+    let current_dir = fs::canonicalize(
+        env::current_dir().map_err(|error| format!("BLOCKED: cannot read current directory: {error}"))?
+    ).map_err(|error| format!("BLOCKED: cannot canonicalize current directory: {error}"))?;
+    if current_dir != repo_root {
+        return Err(format!(
+            "BLOCKED: run from the repository root '{}' (current directory is '{}')",
+            repo_root.display(),
+            current_dir.display()
+        ));
+    }
     let head_sha = git_text(&["rev-parse", "HEAD"], "read exact repository HEAD")?;
 
     let corpus_path = fs::canonicalize(&args[0])
