@@ -857,6 +857,26 @@ mod expansion_history_tests {
                 .line_of_sight_comoving_distance_mpc(1.0, 3),
             Err(ExpansionHistoryError::InvalidIntegrationIntervals)
         );
+
+        let mut negative_density = ExpansionHistory::flat_lcdm_approx();
+        negative_density.omega_m = -0.1;
+        negative_density.omega_de = 1.1;
+        assert_eq!(
+            negative_density.validate(),
+            Err(ExpansionHistoryError::NegativeDensityParameter)
+        );
+
+        let mut non_finite = ExpansionHistory::flat_lcdm_approx();
+        non_finite.h0_km_s_mpc = f64::NAN;
+        assert_eq!(
+            non_finite.validate(),
+            Err(ExpansionHistoryError::NonFiniteParameter)
+        );
+
+        assert_eq!(
+            ExpansionHistory::flat_lcdm_approx().e_squared(f64::MAX),
+            Err(ExpansionHistoryError::NonPhysicalExpansionRate)
+        );
     }
 
     #[test]
