@@ -108,3 +108,14 @@ Connect to [VIS-EXP-001 #7871](https://github.com/Luminous-Dynamics/symthaea/iss
 ## 10. Evidence boundary
 
 This document defines how a future study should be run. It contains no measured power saving, physical display result, human-subject result, or claim that adaptive output is universally better. Claims must be supported by exact device/configuration identity, calibrated instruments, raw traces, preregistered tasks, uncertainty estimates, and independent review.
+
+## 11. Standards alignment and boundaries
+
+Use existing standards as the measurement floor rather than inventing incompatible power tests:
+
+- [IEC 62087-7:2018](https://webstore.iec.ch/en/publication/27420) specifies power-consumption determination for mains-powered computer monitors. Follow the applicable method where a conformity or apples-to-apples monitor comparison is intended; this protocol adds task-conditioned outcomes and separate system/rendering measurements rather than replacing it.
+- [IEC 62087-2:2023](https://webstore.iec.ch/en/publication/65117) defines measurement signals/media for audiovisual power testing, including HDR/UHD and dynamic test signals. Keep standard stimulus runs separate from task-specific runs, and report both when the product category and method apply.
+- For glasses-free 3D/light-field extensions, track the active [IEEE P3079.4.1](https://standards.ieee.org/ieee/3079.4.1/12180/) measurement project covering resolution, viewing angle, viewpoint, crosstalk and depth. It is an active project, not a claim that a final standard has been adopted.
+
+Record the standard edition, test configuration, deviations and instrument uncertainty. Do not describe a task-conditioned research result as IEC/IEEE conformity or certification unless the full applicable process was followed.
+
