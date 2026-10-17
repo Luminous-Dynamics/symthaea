@@ -337,6 +337,7 @@ pub fn apply_phrase_timing_curve(
     }
 
     let mut previous_position = -1.0_f32;
+    let mut previous_input_start = -1.0_f32;
     let mut proposed_starts = Vec::with_capacity(notes.len());
     let mut previous_start = -1.0_f32;
     for (note, &position) in notes.iter().zip(phrase_positions) {
@@ -359,17 +360,25 @@ pub fn apply_phrase_timing_curve(
                 "phrase notes must have finite, valid frequency, timing, duration, and velocity",
             );
         }
+        if note.start_time < previous_input_start {
+            return Err("input note attacks must be nondecreasing");
+        }
 
         let offset_seconds = f64::from(curve.offset_ms_at(position)) / 1000.0;
-        let proposed = (f64::from(note.start_time) + offset_seconds) as f32;
-        if !proposed.is_finite() || proposed < 0.0 {
-            return Err("timing curve would create a negative or non-finite onset");
+        let proposed_f64 = f64::from(note.start_time) + offset_seconds;
+        if !proposed_f64.is_finite()
+            || proposed_f64 < 0.0
+            || proposed_f64 > f64::from(f32::MAX)
+        {
+            return Err("timing curve would create an unrepresentable onset");
         }
+        let proposed = proposed_f64 as f32;
         if proposed < previous_start {
             return Err("timing curve would reorder note attacks");
         }
         proposed_starts.push(proposed);
         previous_position = position;
+        previous_input_start = note.start_time;
         previous_start = proposed;
     }
 
@@ -456,6 +465,38 @@ mod tests {
         assert_eq!(notes[1].start_time, original[1].start_time);
         assert_eq!(notes[0].duration, original[0].duration);
         assert_eq!(notes[1].velocity, original[1].velocity);
+    }
+
+    #[test]
+    fn phrase_timing_curve_rejects_unsorted_input_and_float_overflow_atomically() {
+        let curve = test_timing_curve();
+        let mut unsorted = vec![
+            Note { frequency: 220.0, start_time: 1.0, duration: 0.2, velocity: 0.7 },
+            Note { frequency: 330.0, start_time: 0.5, duration: 0.2, velocity: 0.6 },
+        ];
+        let original = unsorted.clone();
+        assert!(apply_phrase_timing_curve(&mut unsorted, &[0.0, 1.0], &curve).is_err());
+        assert_eq!(unsorted[0].start_time, original[0].start_time);
+        assert_eq!(unsorted[1].start_time, original[1].start_time);
+
+        let mut oversized = vec![Note {
+            frequency: 220.0,
+            start_time: f32::MAX,
+            duration: 0.2,
+            velocity: 0.7,
+        }];
+        assert!(apply_phrase_timing_curve(
+            &mut oversized,
+            &[0.0],
+            &PhraseTimingCurveV1 {
+                points: vec![
+                    TimingCurvePointV1 { phrase_position: 0.0, offset_ms: 250.0 },
+                    TimingCurvePointV1 { phrase_position: 1.0, offset_ms: 0.0 },
+                ],
+                max_abs_offset_ms: 250.0,
+            }
+        ).is_err());
+        assert_eq!(oversized[0].start_time, f32::MAX);
     }
 
     #[test]
