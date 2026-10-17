@@ -138,6 +138,17 @@ pub fn validate_route(value: &Value, raw_sha256: String, context: &str) -> Resul
     ensure!(operations.len() == 10, "{context}: v1 expects ten operations");
     ensure!(mutations.len() == 10, "{context}: v1 expects ten mutation cases");
     ensure!(invariants.len() >= 5, "{context}: route invariants are missing");
+    let required_invariants = [
+        "No operation may schedule without every required worker skill and resource capability.",
+        "All predecessor edges must be respected; same worker/resource cannot be double-booked.",
+        "All mandatory operations execute exactly once or the route must reject.",
+        "No acceptance operation before reference measurement/check, exact manifest binding and required component/inspection checks.",
+        "Unknown, failed or missing calibration/check evidence prevents release-to-acceptance.",
+        "No adapter printed by this route may be represented as flight-critical, pressure-bearing or underwater-qualified.",
+    ];
+    for invariant in required_invariants {
+        ensure!(invariants.contains(invariant), "{context}: required invariant missing: {invariant}");
+    }
 
     let mut worker_ids = HashSet::new();
     let mut worker_skills = Vec::with_capacity(workers.len());
@@ -192,7 +203,14 @@ pub fn validate_route(value: &Value, raw_sha256: String, context: &str) -> Resul
         let capabilities = string_set(operation, "required_resource_capability_ids", &at)?;
         ensure!(!skills.is_empty(), "{at}: required worker skills cannot be empty");
         ensure!(!capabilities.is_empty(), "{at}: resource capabilities cannot be empty");
-        ensure!(!string_set(operation, "outputs", &at)?.is_empty(), "{at}: operation outputs required");
+        let outputs = string_set(operation, "outputs", &at)?;
+        ensure!(!outputs.is_empty(), "{at}: operation outputs required");
+        for output in outputs {
+            ensure!(
+                output_ids.insert(output.clone()),
+                "{at}: duplicate lifecycle output ID {output:?}"
+            );
+        }
 
         ensure!(workers.iter().zip(worker_skills.iter()).any(|(worker, available_skills)| {
             worker.get("available_minutes").and_then(Value::as_u64).unwrap_or(0) >= duration
@@ -307,8 +325,8 @@ pub fn validate_route(value: &Value, raw_sha256: String, context: &str) -> Resul
             && worker_ids.len() == workers.len()
             && resource_ids.len() == resources.len()
             && mutation_ids.len() == mutations.len(),
-        all_skills_have_a_qualified_worker_candidate: true,
-        all_capability_sets_have_a_resource_candidate: true,
+        all_required_skill_sets_have_worker_candidates: true,
+        all_required_capability_sets_have_resource_candidates: true,
         all_predecessors_resolve: true,
         dependency_graph_acyclic: true,
         all_mandatory_operations_present: true,
@@ -346,8 +364,8 @@ mod tests {
         assert_eq!(report.resource_count, 11);
         assert_eq!(report.mutation_case_count, 10);
         assert!(report.all_ids_unique);
-        assert!(report.all_skills_have_a_qualified_worker_candidate);
-        assert!(report.all_capability_sets_have_a_resource_candidate);
+        assert!(report.all_required_skill_sets_have_worker_candidates);
+        assert!(report.all_required_capability_sets_have_resource_candidates);
         assert!(report.all_predecessors_resolve);
         assert!(report.dependency_graph_acyclic);
         assert!(report.all_mandatory_operations_present);
