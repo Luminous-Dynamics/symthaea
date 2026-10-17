@@ -514,3 +514,375 @@ mod tests {
         assert!(sim < 0.9, "Different eras should differ");
     }
 }
+
+
+/// Parameters for the homogeneous expansion history of an FLRW cosmology.
+///
+/// Density parameters use their conventional present-day normalization:
+/// Ω_r + Ω_m + Ω_k + Ω_de = 1. The w0 parameter assumes constant dark-energy
+/// equation of state, p_de = w0 rho_de. This is a background-distance model,
+/// not a Boltzmann solver: it does not predict CMB power spectra or nonlinear
+/// structure.
+///
+/// The default below is intentionally a radiation-free flat ΛCDM approximation
+/// for comparison with the pre-existing simplified encoder, not a precision
+/// Planck likelihood configuration.
+#[derive(Debug, Clone, Copy, PartialEq)]
+pub struct ExpansionHistory {
+    /// Present-day Hubble constant [km s⁻¹ Mpc⁻¹].
+    pub h0_km_s_mpc: f64,
+    /// Present-day radiation density parameter Ω_r.
+    pub omega_r: f64,
+    /// Present-day nonrelativistic matter density parameter Ω_m.
+    pub omega_m: f64,
+    /// Curvature density parameter Ω_k; positive is open, negative is closed.
+    pub omega_k: f64,
+    /// Present-day dark-energy density parameter Ω_de.
+    pub omega_de: f64,
+    /// Constant dark-energy equation-of-state parameter w0.
+    pub w0: f64,
+}
+
+/// Input or numerical-domain errors for a background cosmology calculation.
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub enum ExpansionHistoryError {
+    NonFiniteParameter,
+    NonPositiveHubbleConstant,
+    NegativeDensityParameter,
+    ClosureViolation,
+    InvalidRedshift,
+    InvalidIntegrationIntervals,
+    NonPhysicalExpansionRate,
+    NumericalOverflow,
+}
+
+impl std::fmt::Display for ExpansionHistoryError {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        let message = match self {
+            Self::NonFiniteParameter => "cosmological parameters must be finite",
+            Self::NonPositiveHubbleConstant => "H0 must be positive",
+            Self::NegativeDensityParameter => "matter, radiation, and dark-energy densities must be non-negative",
+            Self::ClosureViolation => "density parameters must satisfy Ωr + Ωm + Ωk + Ωde = 1",
+            Self::InvalidRedshift => "redshift must be finite and >= 0",
+            Self::InvalidIntegrationIntervals => "Simpson integration requires an even interval count in 2..=1_000_000",
+            Self::NonPhysicalExpansionRate => "the model produced a non-positive or non-finite H(z)^2",
+            Self::NumericalOverflow => "the requested cosmology calculation overflowed",
+        };
+        f.write_str(message)
+    }
+}
+
+impl std::error::Error for ExpansionHistoryError {}
+
+impl ExpansionHistory {
+    /// A convenient flat ΛCDM background approximating the parameters already
+    /// used by CosmologyEncoder. Radiation is omitted deliberately; use an
+    /// explicitly configured ExpansionHistory for early-universe work.
+    pub const fn flat_lcdm_approx() -> Self {
+        Self {
+            h0_km_s_mpc: H0_KM_S_MPC,
+            omega_r: 0.0,
+            omega_m: 0.315,
+            omega_k: 0.0,
+            omega_de: 0.685,
+            w0: -1.0,
+        }
+    }
+
+    /// Validate finite inputs, non-negative physical density terms, and the
+    /// FLRW density-parameter closure relation to an absolute tolerance of 1e-6.
+    pub fn validate(&self) -> Result<(), ExpansionHistoryError> {
+        let values = [
+            self.h0_km_s_mpc,
+            self.omega_r,
+            self.omega_m,
+            self.omega_k,
+            self.omega_de,
+            self.w0,
+        ];
+        if values.iter().any(|value| !value.is_finite()) {
+            return Err(ExpansionHistoryError::NonFiniteParameter);
+        }
+        if self.h0_km_s_mpc <= 0.0 {
+            return Err(ExpansionHistoryError::NonPositiveHubbleConstant);
+        }
+        if self.omega_r < 0.0 || self.omega_m < 0.0 || self.omega_de < 0.0 {
+            return Err(ExpansionHistoryError::NegativeDensityParameter);
+        }
+        let closure = self.omega_r + self.omega_m + self.omega_k + self.omega_de;
+        if !closure.is_finite() {
+            return Err(ExpansionHistoryError::NumericalOverflow);
+        }
+        if (closure - 1.0).abs() > 1e-6 {
+            return Err(ExpansionHistoryError::ClosureViolation);
+        }
+        Ok(())
+    }
+
+    fn validate_redshift(z: f64) -> Result<(), ExpansionHistoryError> {
+        if z.is_finite() && z >= 0.0 {
+            Ok(())
+        } else {
+            Err(ExpansionHistoryError::InvalidRedshift)
+        }
+    }
+
+    /// Dimensionless expansion rate E(z)^2 = H(z)^2 / H0^2 for constant-w
+    /// dark energy in an FLRW background, including radiation and curvature.
+    fn e_squared_unchecked(&self, z: f64) -> f64 {
+        let one_plus_z = 1.0 + z;
+        let radiation = if self.omega_r == 0.0 {
+            0.0
+        } else {
+            self.omega_r * one_plus_z.powi(4)
+        };
+        let matter = if self.omega_m == 0.0 {
+            0.0
+        } else {
+            self.omega_m * one_plus_z.powi(3)
+        };
+        let curvature = if self.omega_k == 0.0 {
+            0.0
+        } else {
+            self.omega_k * one_plus_z.powi(2)
+        };
+        let dark_energy = if self.omega_de == 0.0 {
+            0.0
+        } else {
+            self.omega_de * one_plus_z.powf(3.0 * (1.0 + self.w0))
+        };
+        radiation + matter + curvature + dark_energy
+    }
+
+    /// Return E(z)^2 = H(z)^2 / H0^2.
+    pub fn e_squared(&self, z: f64) -> Result<f64, ExpansionHistoryError> {
+        self.validate()?;
+        Self::validate_redshift(z)?;
+        let value = self.e_squared_unchecked(z);
+        if value.is_finite() && value > 0.0 {
+            Ok(value)
+        } else {
+            Err(ExpansionHistoryError::NonPhysicalExpansionRate)
+        }
+    }
+
+    /// Hubble parameter H(z) [km s⁻¹ Mpc⁻¹].
+    pub fn hubble_km_s_mpc(&self, z: f64) -> Result<f64, ExpansionHistoryError> {
+        let value = self.h0_km_s_mpc * self.e_squared(z)?.sqrt();
+        if value.is_finite() && value > 0.0 {
+            Ok(value)
+        } else {
+            Err(ExpansionHistoryError::NumericalOverflow)
+        }
+    }
+
+    /// Line-of-sight comoving distance χ(z) [Mpc], computed by composite
+    /// Simpson integration of c/H(z). The interval count must be even.
+    ///
+    /// This is the radial comoving distance; curvature is accounted for only
+    /// when converting it to transverse distance in transverse_comoving_distance_mpc.
+    pub fn line_of_sight_comoving_distance_mpc(
+        &self,
+        z: f64,
+        intervals: usize,
+    ) -> Result<f64, ExpansionHistoryError> {
+        self.validate()?;
+        Self::validate_redshift(z)?;
+        if intervals < 2 || intervals > 1_000_000 || intervals % 2 != 0 {
+            return Err(ExpansionHistoryError::InvalidIntegrationIntervals);
+        }
+        if z == 0.0 {
+            return Ok(0.0);
+        }
+
+        const C_KM_S: f64 = 299_792.458;
+        let step = z / intervals as f64;
+        let integrand = |redshift: f64| -> Result<f64, ExpansionHistoryError> {
+            let e2 = self.e_squared_unchecked(redshift);
+            if !e2.is_finite() || e2 <= 0.0 {
+                return Err(ExpansionHistoryError::NonPhysicalExpansionRate);
+            }
+            let h = self.h0_km_s_mpc * e2.sqrt();
+            let value = C_KM_S / h;
+            if value.is_finite() {
+                Ok(value)
+            } else {
+                Err(ExpansionHistoryError::NumericalOverflow)
+            }
+        };
+
+        let mut sum = integrand(0.0)? + integrand(z)?;
+        for i in 1..intervals {
+            let weight = if i % 2 == 0 { 2.0 } else { 4.0 };
+            sum += weight * integrand(step * i as f64)?;
+        }
+        let distance = step * sum / 3.0;
+        if distance.is_finite() && distance >= 0.0 {
+            Ok(distance)
+        } else {
+            Err(ExpansionHistoryError::NumericalOverflow)
+        }
+    }
+
+    /// Transverse comoving distance D_M(z) [Mpc], applying the FLRW curvature
+    /// mapping to the line-of-sight distance.
+    pub fn transverse_comoving_distance_mpc(
+        &self,
+        z: f64,
+        intervals: usize,
+    ) -> Result<f64, ExpansionHistoryError> {
+        let radial = self.line_of_sight_comoving_distance_mpc(z, intervals)?;
+        if self.omega_k.abs() < 1e-12 {
+            return Ok(radial);
+        }
+        const C_KM_S: f64 = 299_792.458;
+        let hubble_distance = C_KM_S / self.h0_km_s_mpc;
+        let curvature_scale = self.omega_k.abs().sqrt();
+        let x = curvature_scale * radial / hubble_distance;
+        let distance = if self.omega_k > 0.0 {
+            // Ω_k > 0 is open: D_M = D_H sinh(sqrt(Ω_k) χ / D_H)/sqrt(Ω_k).
+            hubble_distance * x.sinh() / curvature_scale
+        } else {
+            // Ω_k < 0 is closed: D_M = D_H sin(sqrt(|Ω_k|) χ / D_H)/sqrt(|Ω_k|).
+            hubble_distance * x.sin() / curvature_scale
+        };
+        if distance.is_finite() && distance >= 0.0 {
+            Ok(distance)
+        } else {
+            Err(ExpansionHistoryError::NumericalOverflow)
+        }
+    }
+
+    /// Luminosity distance D_L(z) [Mpc] = (1 + z) D_M(z).
+    pub fn luminosity_distance_mpc(
+        &self,
+        z: f64,
+        intervals: usize,
+    ) -> Result<f64, ExpansionHistoryError> {
+        Self::validate_redshift(z)?;
+        let distance = (1.0 + z) * self.transverse_comoving_distance_mpc(z, intervals)?;
+        if distance.is_finite() {
+            Ok(distance)
+        } else {
+            Err(ExpansionHistoryError::NumericalOverflow)
+        }
+    }
+
+    /// Angular-diameter distance D_A(z) [Mpc] = D_M(z) / (1 + z).
+    pub fn angular_diameter_distance_mpc(
+        &self,
+        z: f64,
+        intervals: usize,
+    ) -> Result<f64, ExpansionHistoryError> {
+        Self::validate_redshift(z)?;
+        Ok(self.transverse_comoving_distance_mpc(z, intervals)? / (1.0 + z))
+    }
+}
+
+#[cfg(test)]
+mod expansion_history_tests {
+    use super::*;
+
+    const C_KM_S: f64 = 299_792.458;
+
+    fn einstein_de_sitter() -> ExpansionHistory {
+        ExpansionHistory {
+            h0_km_s_mpc: 70.0,
+            omega_r: 0.0,
+            omega_m: 1.0,
+            omega_k: 0.0,
+            omega_de: 0.0,
+            w0: -1.0,
+        }
+    }
+
+    #[test]
+    fn hubble_rate_matches_einstein_de_sitter_analytic_solution() {
+        // Ω_m = 1 gives E(z)^2 = (1 + z)^3.
+        let model = einstein_de_sitter();
+        let expected = 70.0 * 8.0_f64.sqrt();
+        let actual = model.hubble_km_s_mpc(1.0).unwrap();
+        assert!((actual - expected).abs() < 1e-12);
+    }
+
+    #[test]
+    fn comoving_distance_matches_einstein_de_sitter_analytic_solution() {
+        // χ(z) = 2c/H0 * (1 - 1/sqrt(1+z)) for a matter-only flat universe.
+        let model = einstein_de_sitter();
+        let z = 1.0;
+        let expected = 2.0 * C_KM_S / 70.0 * (1.0 - 1.0 / (1.0 + z).sqrt());
+        let actual = model.line_of_sight_comoving_distance_mpc(z, 4096).unwrap();
+        assert!(
+            (actual - expected).abs() / expected < 1e-10,
+            "expected {expected}, got {actual}"
+        );
+    }
+
+    #[test]
+    fn de_sitter_distance_is_exact_for_constant_hubble_rate() {
+        let model = ExpansionHistory {
+            h0_km_s_mpc: 70.0,
+            omega_r: 0.0,
+            omega_m: 0.0,
+            omega_k: 0.0,
+            omega_de: 1.0,
+            w0: -1.0,
+        };
+        let z = 2.0;
+        let expected = C_KM_S / 70.0 * z;
+        let actual = model.line_of_sight_comoving_distance_mpc(z, 128).unwrap();
+        assert!((actual - expected).abs() < 1e-10);
+    }
+
+    #[test]
+    fn distance_duality_relation_holds_by_construction() {
+        let model = ExpansionHistory::flat_lcdm_approx();
+        let z = 0.8;
+        let dl = model.luminosity_distance_mpc(z, 2048).unwrap();
+        let da = model.angular_diameter_distance_mpc(z, 2048).unwrap();
+        assert!((dl - (1.0 + z).powi(2) * da).abs() < 1e-9);
+    }
+
+    #[test]
+    fn invalid_closure_and_redshift_fail_closed() {
+        let mut bad = ExpansionHistory::flat_lcdm_approx();
+        bad.omega_de = 0.5;
+        assert_eq!(bad.validate(), Err(ExpansionHistoryError::ClosureViolation));
+        assert_eq!(
+            ExpansionHistory::flat_lcdm_approx().e_squared(-0.1),
+            Err(ExpansionHistoryError::InvalidRedshift)
+        );
+        assert_eq!(
+            ExpansionHistory::flat_lcdm_approx()
+                .line_of_sight_comoving_distance_mpc(1.0, 3),
+            Err(ExpansionHistoryError::InvalidIntegrationIntervals)
+        );
+    }
+
+    #[test]
+    fn curvature_changes_transverse_distance_in_expected_direction() {
+        let open = ExpansionHistory {
+            h0_km_s_mpc: 70.0,
+            omega_r: 0.0,
+            omega_m: 0.3,
+            omega_k: 0.1,
+            omega_de: 0.6,
+            w0: -1.0,
+        };
+        let closed = ExpansionHistory {
+            h0_km_s_mpc: 70.0,
+            omega_r: 0.0,
+            omega_m: 0.3,
+            omega_k: -0.1,
+            omega_de: 0.8,
+            w0: -1.0,
+        };
+        let z = 0.5;
+        let open_radial = open.line_of_sight_comoving_distance_mpc(z, 2048).unwrap();
+        let open_transverse = open.transverse_comoving_distance_mpc(z, 2048).unwrap();
+        let closed_radial = closed.line_of_sight_comoving_distance_mpc(z, 2048).unwrap();
+        let closed_transverse = closed.transverse_comoving_distance_mpc(z, 2048).unwrap();
+        assert!(open_transverse > open_radial);
+        assert!(closed_transverse < closed_radial);
+    }
+}
