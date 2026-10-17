@@ -97,6 +97,7 @@ struct ProbeReport {
     cases_near_silent: usize,
     cases_with_repeat_hash_mismatch: usize,
     cases_with_missing_receipts: usize,
+    cases_with_mismatched_receipts: usize,
     cases_with_render_path_mismatch: usize,
     evidence_boundary: &'static str,
     cases: Vec<ProbeCase>,
@@ -107,7 +108,6 @@ struct ProbeCase {
     instrument: String,
     gm_program_0_based: u8,
     declared_procedural_family: &'static str,
-    selected_render_path_evidence: &'static str,
     frequency_hz: f32,
     velocity: f32,
     frames: usize,
@@ -124,6 +124,8 @@ struct ProbeCase {
     sample_attempt_status: String,
     repeated_render_paths: Vec<String>,
     repeated_sample_attempt_statuses: Vec<String>,
+    receipt_matches_request: bool,
+    repeated_receipt_matches_request: Vec<bool>,
     render_path_repeats_match: bool,
     outcome: &'static str,
 }
@@ -185,6 +187,7 @@ fn run() -> Result<(), String> {
                 let mut hashes = Vec::with_capacity(options.repeats);
                 let mut selected_paths = Vec::with_capacity(options.repeats);
                 let mut sample_statuses = Vec::with_capacity(options.repeats);
+                let mut receipt_matches = Vec::with_capacity(options.repeats);
                 let mut first_metrics = None;
                 for _ in 0..options.repeats {
                     let rendered = render_arrangement_with_evidence(
@@ -195,6 +198,15 @@ fn run() -> Result<(), String> {
                         &config,
                     );
                     let receipt = rendered.note_receipts.first();
+                    let matches_request = receipt.is_some_and(|item| {
+                        item.voice_index == 0
+                            && item.note_index == 0
+                            && item.instrument == Some(*instrument)
+                            && item.frequency_hz == frequency_hz
+                            && item.velocity == velocity
+                            && item.duration_secs == duration_secs
+                    });
+                    receipt_matches.push(matches_request);
                     selected_paths.push(
                         receipt
                             .map(|item| item.selected_render_path)
@@ -217,9 +229,11 @@ fn run() -> Result<(), String> {
                 let metrics = first_metrics
                     .ok_or_else(|| "internal error: no render repetitions".to_string())?;
                 let repeat_hashes_match = hashes.windows(2).all(|pair| pair[0] == pair[1]);
+                let receipt_matches_request = receipt_matches.first().copied().unwrap_or(false);
                 let render_path_repeats_match =
                     selected_paths.windows(2).all(|pair| pair[0] == pair[1])
-                        && sample_statuses.windows(2).all(|pair| pair[0] == pair[1]);
+                        && sample_statuses.windows(2).all(|pair| pair[0] == pair[1])
+                        && receipt_matches.iter().all(|matches| *matches);
                 let selected_render_path = selected_paths
                     .first()
                     .cloned()
@@ -232,6 +246,8 @@ fn run() -> Result<(), String> {
                     "non_finite_output"
                 } else if selected_render_path == "missing_render_receipt" {
                     "missing_render_receipt"
+                } else if !receipt_matches_request {
+                    "render_receipt_mismatch"
                 } else if !render_path_repeats_match {
                     "render_path_mismatch"
                 } else if metrics.peak < 1.0e-5 {
@@ -245,9 +261,6 @@ fn run() -> Result<(), String> {
                     instrument: format!("{instrument:?}"),
                     gm_program_0_based: instrument.gm_program(),
                     declared_procedural_family: procedural_family(*instrument),
-                    // render_arrangement returns audio only. It does not expose
-                    // whether local samples or a procedural fallback won.
-                    selected_render_path_evidence: "not_exposed_by_legacy_render_api",
                     frequency_hz,
                     velocity,
                     frames: metrics.frames,
@@ -264,6 +277,8 @@ fn run() -> Result<(), String> {
                     sample_attempt_status,
                     repeated_render_paths: selected_paths,
                     repeated_sample_attempt_statuses: sample_statuses,
+                    receipt_matches_request,
+                    repeated_receipt_matches_request: receipt_matches,
                     render_path_repeats_match,
                     outcome,
                 });
@@ -297,6 +312,10 @@ fn run() -> Result<(), String> {
         cases_with_missing_receipts: cases
             .iter()
             .filter(|case| case.selected_render_path == "missing_render_receipt")
+            .count(),
+        cases_with_mismatched_receipts: cases
+            .iter()
+            .filter(|case| !case.receipt_matches_request)
             .count(),
         cases_with_render_path_mismatch: cases
             .iter()
