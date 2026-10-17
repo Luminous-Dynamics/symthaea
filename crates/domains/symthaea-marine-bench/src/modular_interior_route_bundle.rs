@@ -445,7 +445,7 @@ fn build_catalog(
             let modified = edge_ban_configuration(configuration, request, &edge, probe_index)?;
             probe_index = probe_index.saturating_add(1);
             let modified_digest = digest(&modified)?;
-            *total_deviation_probes = total_deviation_probes.saturating_add(1);
+            *total_deviation_probes = (*total_deviation_probes).saturating_add(1);
             let alternative_report = route_services(&modified, &[request.clone()], routing_limits.clone())?;
             let Some(candidate) = alternative_report.body.routes.into_iter().next() else {
                 return Err(RouteBundleError::new("ALTERNATIVE_RESULT_MISSING", "edge-ban probe emitted no route result"));
@@ -895,7 +895,13 @@ mod tests {
                     &catalogs[0].alternatives[a].route,
                     &catalogs[1].alternatives[b].route,
                 ];
-                if !paths_have_forbidden_shared_cells(routes[0], routes[1], &requests[0], &requests[1]) {
+                // The declared terminal IDs in this oracle are distinct, so any shared XY cell is forbidden.
+                let has_shared_cell = routes[0].path.iter().any(|left| {
+                    routes[1].path.iter().any(|right| {
+                        left.x_mm == right.x_mm && left.y_mm == right.y_mm
+                    })
+                });
+                if !has_shared_cell {
                     let cost = routes[0].search_cost_mm.unwrap() + routes[1].search_cost_mm.unwrap();
                     oracle_best = Some(oracle_best.map_or(cost, |old| old.min(cost)));
                 }
@@ -906,14 +912,16 @@ mod tests {
 
     #[test]
     fn shared_service_terminal_is_allowed_but_other_shared_cells_are_not() {
-        let mut a = dummy_route("A", "CA", &[(0, 0), (1, 0), (2, 0)], 3);
+        let a = dummy_route("A", "CA", &[(0, 0), (1, 0), (2, 0)], 3);
         let mut b = dummy_route("B", "CB", &[(4, 0), (3, 0), (2, 0)], 2);
         let request_a = dummy_request("A", "CA", service_anchor("AC-BUS", 2, 0));
         let request_b = dummy_request("B", "CB", service_anchor("AC-BUS", 2, 0));
         assert!(!paths_have_forbidden_shared_cells(&a, &b, &request_a, &request_b));
+        let mut different_medium = b.clone();
+        different_medium.medium = "incompatible-medium".to_owned();
+        assert!(paths_have_forbidden_shared_cells(&a, &different_medium, &request_a, &request_b));
         b.path.insert(1, GridPoint { x_mm: 1, y_mm: 0 });
         assert!(paths_have_forbidden_shared_cells(&a, &b, &request_a, &request_b));
-        a.path.clear();
     }
 
     #[test]
@@ -961,5 +969,6 @@ mod tests {
         let two = normalize_input_requests(&[b, a]).unwrap();
         assert_eq!(one.iter().map(|r| &r.route_id).collect::<Vec<_>>(),
                    two.iter().map(|r| &r.route_id).collect::<Vec<_>>());
+        assert_eq!(input_manifest_sha256(&one).unwrap(), input_manifest_sha256(&two).unwrap());
     }
 }
