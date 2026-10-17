@@ -3,7 +3,7 @@
 **Date:** 2026-10-17  
 **Status:** concept/product-line study; not an aircraft design, approved maintenance manual, certification plan accepted by an authority, or performance prediction.  
 **Tracking:** [AIRCRAFT-LINE-001 #7761](https://github.com/Luminous-Dynamics/symthaea/issues/7761)  
-**Related:** [aircraft-energy screening #7647](https://github.com/Luminous-Dynamics/symthaea/pull/7647), [Roadster/air-road benchmarks #7692](https://github.com/Luminous-Dynamics/symthaea/pull/7692), [S4 next-generation personal aircraft concept](S4_NEXT_GENERATION_PERSONAL_AIRCRAFT_2026-10-17.md), [candidate-specific mission model contract](CANDIDATE_SPECIFIC_MISSION_MODEL_CONTRACT_2026-10-17.md), [Skyhawk reference data card](REFERENCE_BASELINE_SKYHAWK_2026-10-17.md).
+**Related:** [aircraft-energy screening #7647](https://github.com/Luminous-Dynamics/symthaea/pull/7647), [Roadster/air-road benchmarks #7692](https://github.com/Luminous-Dynamics/symthaea/pull/7692), [S4 next-generation personal aircraft concept](S4_NEXT_GENERATION_PERSONAL_AIRCRAFT_2026-10-17.md), [maintenance task-card contract](MAINTENANCE_TASK_CARD_CONTRACT_2026-10-17.md), [candidate-specific mission model contract](CANDIDATE_SPECIFIC_MISSION_MODEL_CONTRACT_2026-10-17.md), [Skyhawk reference data card](REFERENCE_BASELINE_SKYHAWK_2026-10-17.md).
 
 ## 1. North star
 
