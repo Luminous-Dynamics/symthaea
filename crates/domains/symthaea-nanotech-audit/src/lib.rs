@@ -374,6 +374,7 @@ struct ShiftManifest {
 struct ShiftGroupDeclaration {
     group_id: String,
     shift_family: String,
+    shift_kind: String,
     severity: String,
     split: String,
     physical_rationale: String,
@@ -881,7 +882,8 @@ fn verify_optional_shift_manifest(
         "size_interface_passivation_substrate",
         "compounded",
     ];
-    let valid_severity = ["baseline", "mild", "moderate", "severe", "compounded"];
+    let valid_severity = ["baseline", "mild", "moderate", "severe"];
+    let valid_kinds = ["in_distribution", "single_factor", "compounded"];
     let valid_splits = ["train", "calibration", "validation", "test_lockbox"];
     let mut group_ids = BTreeSet::new();
     let mut independence_splits: BTreeMap<String, String> = BTreeMap::new();
@@ -891,6 +893,7 @@ fn verify_optional_shift_manifest(
         for (field, value) in [
             ("group_id", group.group_id.as_str()),
             ("shift_family", group.shift_family.as_str()),
+            ("shift_kind", group.shift_kind.as_str()),
             ("severity", group.severity.as_str()),
             ("split", group.split.as_str()),
             ("physical_rationale", group.physical_rationale.as_str()),
@@ -917,10 +920,26 @@ fn verify_optional_shift_manifest(
                 format!("shift_groups[{index}] has unsupported shift_family {:?}", group.shift_family),
             );
         }
+        if !valid_kinds.contains(&group.shift_kind.as_str()) {
+            report.fail(
+                "shift_manifest_kind_invalid",
+                format!("shift_groups[{index}] has unsupported shift_kind {:?}", group.shift_kind),
+            );
+        }
         if !valid_severity.contains(&group.severity.as_str()) {
             report.fail(
                 "shift_manifest_severity_invalid",
                 format!("shift_groups[{index}] has unsupported severity {:?}", group.severity),
+            );
+        }
+        if (group.shift_kind == "in_distribution") != (group.severity == "baseline")
+            || (group.shift_kind == "compounded") != (group.shift_family == "compounded")
+        {
+            report.fail(
+                "shift_manifest_kind_severity_mismatch",
+                format!(
+                    "shift_groups[{index}] must use baseline severity only for in_distribution data; shift_family=compounded and shift_kind=compounded must agree"
+                ),
             );
         }
         if !valid_splits.contains(&group.split.as_str()) {
@@ -1849,6 +1868,7 @@ mod tests {
                     {
                         "group_id": "train-composition",
                         "shift_family": "composition",
+                        "shift_kind": "in_distribution",
                         "severity": "baseline",
                         "split": "train",
                         "physical_rationale": "Synthetic baseline chemistry family for verifier tests.",
@@ -1861,6 +1881,7 @@ mod tests {
                     {
                         "group_id": "calibration-temperature",
                         "shift_family": "temperature_energy",
+                        "shift_kind": "single_factor",
                         "severity": "moderate",
                         "split": "calibration",
                         "physical_rationale": "Synthetic thermal regime for verifier tests.",
@@ -1873,6 +1894,7 @@ mod tests {
                     {
                         "group_id": "test-surface",
                         "shift_family": "surface_coordination",
+                        "shift_kind": "single_factor",
                         "severity": "severe",
                         "split": "test_lockbox",
                         "physical_rationale": "Synthetic surface family for verifier tests.",
