@@ -1279,7 +1279,6 @@ mod tests {
 
     #[test]
     fn test_einstein_numeric_residual_report_is_explicit() {
-        let b = bridge();
         let ricci = [1.0, 0.0, 0.0, 1.0];
         let metric = [1.0, 0.0, 0.0, 1.0];
         let report = Z3Bridge::check_einstein_residual_numeric(&ricci, &metric, 2, 1e-6).unwrap();
@@ -1293,7 +1292,6 @@ mod tests {
 
     #[test]
     fn test_einstein_numeric_residual_rejects_malformed_inputs() {
-        let b = bridge();
         assert_eq!(
             Z3Bridge::check_einstein_residual_numeric(&[1.0, 2.0], &[1.0, 0.0, 0.0, 1.0], 2, 0.01),
             Err(EinsteinResidualError::ComponentCountMismatch)
@@ -1318,7 +1316,6 @@ mod tests {
 
     #[test]
     fn test_einstein_numeric_residual_fails_outside_tolerance() {
-        let b = bridge();
         let ricci = [1.0, 0.2, 0.0, 1.0];
         let metric = [1.0, 0.0, 0.0, 1.0];
         let report = Z3Bridge::check_einstein_residual_numeric(&ricci, &metric, 2, 0.01).unwrap();
@@ -1484,7 +1481,6 @@ mod tests {
 
         // Step 3: Check concrete residuals. This is numeric candidate evidence,
         // not an SMT/formal proof of a symbolic or universal geometric identity.
-        let bridge = Z3Bridge::new();
         let report = Z3Bridge::check_einstein_residual_numeric(
                 &ricci_flat,
                 &metric_flat,
