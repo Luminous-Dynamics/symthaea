@@ -1,4 +1,4 @@
-# SenseBench SCM Graph Recovery Protocol v0.3
+# SenseBench SCM Graph Recovery Protocol v0.4
 
 **Status:** implementation committed to the public `feat/symthaea-sense-observation-envelope` branch; authored Rust tests have not been executed in the present environment.
 
@@ -34,7 +34,7 @@ This is deliberately a small, auditable graph-recovery substrate. It does not ye
 
 ## Policies
 
-All policies share the same initial uniform graph prior, nominal posterior-update rule, observation format, outcome generator, and measurement-count budget.
+The Bayesian acquisition policies share the same initial uniform graph prior, nominal posterior-update rule, observation format, outcome generator, and measurement-count budget. The PC baseline does not use the Bayesian graph posterior to estimate structure: it takes passive observations only, performs binary G-squared conditional-independence tests with asymptotic 5% cutoffs, and returns a projected valid CPDAG. Its finite-sample power and calibration are part of what the benchmark measures, not assumptions to take for granted.
 
 1. Nominal expected information gain.
 2. Predictive outcome entropy, a simple uncertainty-seeking baseline that does not directly score hypothesis discrimination.
@@ -45,8 +45,13 @@ All policies share the same initial uniform graph prior, nominal posterior-updat
 7. Passive observation only.
 8. Known-mechanism oracle: uses the hidden world's mechanism parameters while retaining the graph-hypothesis task. This is an optimistic upper-bound diagnostic and is not a deployable method.
 9. Structure-blind random graph submission, with no measurements. This supplies a graph-recovery floor separate from the random-action baseline.
+10. **Observational PC baseline:** passive-only measurements followed by unconditional and one-variable-conditioned G-squared independence tests; unshielded colliders are oriented from separating sets, then finite-sample edge marks are projected to the nearest valid CPDAG in the three-node catalogue. It submits a CPDAG claim, abstains from an exact full-DAG claim, and does not use the Bayesian likelihood model to recover structure.
 
 The current comparison deliberately keeps the posterior update on the same nominal likelihood model for the action-selection policies, to isolate acquisition differences. Consequently, model-weighted/robust selection is not also receiving a privileged model-averaged posterior update. A future factorial ablation should vary acquisition and inference separately.
+
+## Observational PC baseline details
+
+The reference PC comparator uses critical values 3.8415 for one degree of freedom and 5.9915 for two degrees of freedom (asymptotic 5% chi-square cutoffs for binary 2×2 and stratified 2×2 tests). It is transparent and limited to three observed variables. At the tiny budgets used by the exploratory default, asymptotic tests may have poor power or calibration; the benchmark must report graph recovery and CPDAG claim risk/coverage rather than presume the baseline is reliable. Projection onto the enumerated catalogue ensures the emitted CPDAG is valid, but does not retroactively validate an independence-test result. This is an observational PC baseline, not a full reproduction of every PC/PC-stable variant, and does not yet include PC plus greedy active orientation.
 
 ## Outcomes and metrics
 
