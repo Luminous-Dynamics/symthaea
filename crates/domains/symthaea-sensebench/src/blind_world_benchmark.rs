@@ -662,7 +662,7 @@ fn summarize_world_policy(
         .filter(|trial| trial.mean_prequential_predictive_nll > adequacy_threshold)
         .count();
     let accepted = count.saturating_sub(alarms);
-    let accepted_null_trials: Vec<&TrialResult> = null_truth_trials.iter()
+    let accepted_null_trials: Vec<&TrialResult> = null_truth_trials.iter().copied()
         .filter(|trial| trial.mean_prequential_predictive_nll <= adequacy_threshold)
         .collect();
     let accepted_false_claims = accepted_null_trials.iter()
