@@ -116,6 +116,8 @@ fn apply_section_impacts(
                 "accessibility_and_egress",
                 "ventilation_and_sanitation",
                 "maintainability",
+                "evidence_provenance_review",
+                "evidence_applicability",
             ] {
                 map_domain(impact, domain, &reason);
             }
@@ -538,7 +540,8 @@ mod tests {
     fn duplicate_identifiers_are_explicitly_ambiguous() {
         let before = live();
         let mut after = before.clone();
-        after.placements.push(after.placements[0].clone());
+        let duplicate = after.placements[0].clone();
+        after.placements.push(duplicate);
         let report = analyze_configuration_change(&before, &after).expect("diff serializes");
         assert_eq!(report.body.disposition, "revalidation_required_identity_ambiguous");
         assert!(report.body.changes.iter().any(|c| c.identity_ambiguous));
