@@ -1,0 +1,34 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "urn:luminous-dynamics:symthaea:nano-rescue-decision:v1",
+  "title": "NANO-013 online rescue-controller decision record",
+  "description": "One JSON object per line. Decisions bind only inputs available at the current step. This record is self-reported and does not prove source-system truth.",
+  "type": "object",
+  "additionalProperties": false,
+  "required": ["schema_version", "run_id", "trajectory_id", "parent_group_id", "window_id", "sequence", "decision_step", "max_observed_step", "action", "future_data_read", "heldout_label_read", "observed_state_sha256", "available_inputs_manifest_sha256", "policy_revision_sha256", "trigger_reason", "risk_score", "reference_request_id", "policy_cost", "policy_cost_unit"],
+  "properties": {
+    "schema_version": {"const": "nano-rescue-decision-v1"},
+    "run_id": {"type": "string", "minLength": 1, "maxLength": 256},
+    "trajectory_id": {"type": "string", "minLength": 1, "maxLength": 256},
+    "parent_group_id": {"type": "string", "minLength": 1, "maxLength": 256},
+    "window_id": {"type": "string", "minLength": 1, "maxLength": 256},
+    "sequence": {"type": "integer", "minimum": 1},
+    "decision_step": {"type": "integer", "minimum": 0},
+    "max_observed_step": {"type": "integer", "minimum": 0, "description": "Runtime verifier rejects values greater than decision_step."},
+    "action": {"enum": ["continue", "conservative_continue", "abstain_stop", "request_reference"]},
+    "future_data_read": {"const": false},
+    "heldout_label_read": {"const": false},
+    "observed_state_sha256": {"type": "string", "pattern": "^[a-f0-9]{64}$"},
+    "available_inputs_manifest_sha256": {"type": "string", "pattern": "^[a-f0-9]{64}$"},
+    "policy_revision_sha256": {"type": "string", "pattern": "^[a-f0-9]{64}$"},
+    "trigger_reason": {"enum": ["nominal", "uncertainty", "shift_alarm", "budget_guard", "reference_result", "integrity_guard", "operator_override"]},
+    "risk_score": {"type": ["number", "null"], "minimum": 0, "maximum": 1},
+    "reference_request_id": {"type": ["string", "null"], "minLength": 1, "maxLength": 256},
+    "policy_cost": {"type": "number", "minimum": 0, "maximum": 1000000000000},
+    "policy_cost_unit": {"type": "string", "minLength": 1, "maxLength": 64}
+  },
+  "allOf": [
+    {"if": {"properties": {"action": {"const": "request_reference"}}, "required": ["action"]}, "then": {"properties": {"reference_request_id": {"type": "string", "minLength": 1}}}},
+    {"if": {"properties": {"action": {"enum": ["continue", "conservative_continue", "abstain_stop"]}}, "required": ["action"]}, "then": {"properties": {"reference_request_id": {"type": "null"}}}}
+  ]
+}

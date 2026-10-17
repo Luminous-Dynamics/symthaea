@@ -1,0 +1,15 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "urn:luminous-dynamics:symthaea:nano-rescue-frame-record:v1",
+  "title": "NANO-013 frozen eligible-window frame row",
+  "description": "One JSON object per line. The frame is frozen before policy outcomes are inspected.",
+  "type": "object",
+  "additionalProperties": false,
+  "required": ["window_id", "trajectory_id", "parent_group_id", "stratum_id"],
+  "properties": {
+    "window_id": {"type": "string", "minLength": 1, "maxLength": 256},
+    "trajectory_id": {"type": "string", "minLength": 1, "maxLength": 256},
+    "parent_group_id": {"type": "string", "minLength": 1, "maxLength": 256},
+    "stratum_id": {"type": "string", "minLength": 1, "maxLength": 256}
+  }
+}

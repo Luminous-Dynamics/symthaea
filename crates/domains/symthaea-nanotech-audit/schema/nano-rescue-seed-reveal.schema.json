@@ -1,0 +1,14 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "urn:luminous-dynamics:symthaea:nano-rescue-seed-reveal:v1",
+  "title": "NANO-013 post-run sampling seed reveal",
+  "description": "The seed is revealed after policy completion so the independent sample can be reproduced. The seed digest must match the precommitted seed commitment.",
+  "type": "object",
+  "additionalProperties": false,
+  "required": ["schema_version", "run_id", "seed"],
+  "properties": {
+    "schema_version": {"const": "nano-rescue-seed-reveal-v1"},
+    "run_id": {"type": "string", "minLength": 1, "maxLength": 256},
+    "seed": {"type": "string", "minLength": 1, "maxLength": 512}
+  }
+}
