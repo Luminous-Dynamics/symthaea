@@ -12,11 +12,15 @@ The accompanying research contract identifies the official DESI DR2 BAO ΛCDM + 
 
 The CLI accepts a named column followed by one or more ASCII chain files whose recognized comment header starts with “# weight minuslogpost”. It combines files only when their full column header and ordering match exactly, then emits one JSON summary. It rejects malformed rows, duplicate columns, non-finite values, negative sample weights, absent parameters, incompatible chain headers and zero-total-weight chains.
 
-Example command:
+Verify one downloaded artifact before parsing, using its expected digest from the official SHA-256 manifest:
+
+    cargo run -p symthaea-cosmology-bench --bin symthaea-cosmology-chain-audit -- --verify-sha256 chain.1.txt EXPECTED_SHA256_FROM_MANIFEST
+
+Audit and combine the four compatible DESI chain files for a selected parameter:
 
     cargo run -p symthaea-cosmology-bench --bin symthaea-cosmology-chain-audit -- H0 chain.1.txt chain.2.txt chain.3.txt chain.4.txt
 
-Output reports per-file row count, total and positive-weight sample count, weighted mean/population variance, weighted empirical q16/q50/q84, and weight-only effective sample size.
+Output reports input paths, row count, total and positive-weight sample count, weighted mean/population variance, weighted empirical q16/q50/q84, and weight-only effective sample size.
 
 ## Scientific boundaries
 
