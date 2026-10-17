@@ -818,13 +818,7 @@ mod tests {
 
     #[test]
     fn every_builtin_style_spec_validates() {
-        for style in [
-            Style::Classical,
-            Style::Waltz,
-            Style::Folk,
-            Style::Cinematic,
-            Style::Playful,
-        ] {
+        for style in Style::ALL {
             let spec = style.spec();
             assert_eq!(
                 spec.validate(),
