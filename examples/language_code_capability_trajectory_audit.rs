@@ -62,6 +62,28 @@ fn evaluate_case(case: &Value) -> Result<(String, String), String> {
         previous_step = step;
     }
 
+    let task_contract = case
+        .get("task_contract")
+        .ok_or_else(|| format!("{id}: missing task_contract"))?;
+    if task_contract
+        .get("requires_source_inspection")
+        .and_then(Value::as_bool)
+        == Some(true)
+    {
+        if let Some((patch_index, _)) = latest_patch(events) {
+            let requirements_index = first_event_index(events, "read_requirements");
+            let source_index = first_event_index(events, "read_source");
+            if requirements_index.is_none_or(|index| index >= patch_index)
+                || source_index.is_none_or(|index| index >= patch_index)
+            {
+                return Ok((
+                    "reject".to_owned(),
+                    "patch_before_inspection".to_owned(),
+                ));
+            }
+        }
+    }
+
     if events.iter().any(|event| {
         string_field(event, "event") == Some("scope_change")
             && event.get("authorized").and_then(Value::as_bool) == Some(false)
@@ -191,10 +213,17 @@ fn evaluate_case(case: &Value) -> Result<(String, String), String> {
         ));
     }
 
-    if first_event_index(events, "claim_complete").is_none() {
+    let Some(claim_index) = first_event_index(events, "claim_complete") else {
         return Ok((
             "reject".to_owned(),
             "completion_claim_missing".to_owned(),
+        ));
+    };
+    let final_diff_index = verified_diff.map(|(index, _)| index).unwrap_or(0);
+    if claim_index <= final_diff_index {
+        return Ok((
+            "reject".to_owned(),
+            "completion_claim_precedes_verification".to_owned(),
         ));
     }
 
@@ -359,6 +388,46 @@ mod tests {
             Ok((
                 "reject".to_owned(),
                 "final_diff_not_reviewed".to_owned()
+            ))
+        );
+    }
+
+    #[test]
+    fn patch_before_inspection_is_rejected() {
+        let mut case = fixture()["cases"][0].clone();
+        case["events"] = json!([
+            {"step": 1, "event": "patch", "patch_id": "p1", "files": ["src/lib.rs"]},
+            {"step": 2, "event": "read_requirements"},
+            {"step": 3, "event": "read_source", "artifact": "src/lib.rs"}
+        ]);
+        case["events"].as_array_mut().unwrap().push(json!({
+            "step": 4, "event": "test", "patch_id": "p1", "result": "pass"
+        }));
+        case["events"].as_array_mut().unwrap().push(json!({
+            "step": 5, "event": "verify_diff", "patch_id": "p1",
+            "reviewed_files": ["src/lib.rs"]
+        }));
+        case["events"].as_array_mut().unwrap().push(json!({
+            "step": 6, "event": "claim_complete"
+        }));
+        assert_eq!(
+            evaluate_case(&case),
+            Ok(("reject".to_owned(), "patch_before_inspection".to_owned()))
+        );
+    }
+
+    #[test]
+    fn completion_claim_before_verification_is_rejected() {
+        let mut case = fixture()["cases"][0].clone();
+        let events = case["events"].as_array_mut().unwrap();
+        events.swap(4, 5);
+        events[4]["step"] = json!(5);
+        events[5]["step"] = json!(6);
+        assert_eq!(
+            evaluate_case(&case),
+            Ok((
+                "reject".to_owned(),
+                "completion_claim_precedes_verification".to_owned()
             ))
         );
     }
