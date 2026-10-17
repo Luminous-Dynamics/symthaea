@@ -107,6 +107,34 @@ Every report must publish the numerator, denominator, aggregation method, exclus
 | Serviceability | Diagnostic success, time to isolate fault, module-replacement duration, tools and skill assumptions, and return-to-service result |
 | Evidence completeness | Expected traces, outcomes, source revisions, timing records, and measurements present / expected; missing evidence is not imputed as a pass |
 
+### 5.1 Agency-budget sweep for discrete shared autonomy
+
+For discrete high-level intent/action selection, add a controller-side agency-loss proxy to the outcome record. Let `p_user(t)` be the user-intent model's distribution over the declared candidate actions and `a_exec(t)` the action selected by the arbitration layer:
+
+```text
+ALI(t, a_exec) = max(0, max_a p_user(t, a) - p_user(t, a_exec))
+```
+
+This measures how far the selected action departs from the user's most-supported candidate according to the model. It is **not** a direct measure of felt agency, informed consent, or clinical benefit; do not relabel it as one. Its reliability depends on the quality/calibration of the user-intent distribution, so publish calibration and per-class diagnostics alongside it. If the system has no defensible discrete probability distribution, do not manufacture one: preregister a task-specific alignment measure and pair it with direct user-reported agency in any properly reviewed user study.
+
+Keep this measurement at the **high-level arbitration layer** (candidate goal, grasp, command, or task primitive). It is not a force/torque budget, a motor-control safety envelope, or permission to actuate. The local safety controller and the user's stop/cancel path remain independent and higher priority.
+
+For every replayable decision, log:
+- the versioned candidate-action set and user/autonomy distributions (or a digest plus a safely accessible immutable trace);
+- the chosen high-level action, computed ALI, declared agency budget `tau`, and whether the action was accepted inside the budget or fell back to user-only selection;
+- confirmation, override, cancellation, mistaken-start, and recovery events, with the denominator/exposure definition;
+- exact scenario/episode, model and configuration revisions, random seed where applicable, and data/calibration provenance.
+
+Compare the following on identical replay seeds: **UserOnly** (user-intent argmax), **AutoOnly** (offline diagnostic baseline, not a device command), **confidence blending**, **binary agency gate**, and a **set-based agency envelope** that maximizes autonomy preference only among actions meeting the user-defined constraint. Sweep `tau` over a preregistered grid (initial candidate: `0, 0.025, 0.05, 0.10, 0.15, 0.20`) rather than declaring one universal threshold. For every budget, report task success/accuracy and time alongside mean, p95, and maximum ALI; override and confirmation burden; false starts; cancellation outcomes; calibration error; and per-user/session/class slices. Plot the task-utility-versus-ALI frontier and retain nondominated alternatives; do not reduce it to one scalar score.
+
+**Proposed software/replay gates, not clinical standards:**
+1. In synthetic discrete-action tests, every constrained choice either satisfies `ALI <= tau` or uses the specified user-only fallback. This is checked per decision, not just on an average.
+2. Explicit stop/cancel inputs preempt the autonomy proposal in 100% of seeded replay cases; record each case, with zero misses permitted in this software gate.
+3. Positive controls must show that some autonomy proposals inside the declared envelope are accepted. An always-user-only system may satisfy the bound but does not demonstrate an improvement frontier.
+4. Report results per participant/session and by action class whenever available, alongside pooled estimates and a prespecified uncertainty method. Missing labels, failed episodes, and exclusions remain visible; do not impute missing evidence as success.
+
+A 2026 offline prosthetic-grasp study introduced the ALI as a model-side proxy and compared a performance–agency frontier using the MeganePro/NinaPro DB10 dataset. It supports testing this *kind* of constraint, not importing its effect sizes or thresholds into exosuit control. Its sample covered five able-bodied participants and four transradial amputees, so external validity is limited. See [Zhang et al., published online 8 September 2026](https://journals.sagepub.com/doi/10.1177/10711813261485183). A 2026 study on user-preference-based exoskeleton assistance also reports that perceived agency should be evaluated explicitly: [Schäfer et al., npj Biomedical Innovations](https://www.nature.com/articles/s44385-026-00085-7).
+
 Do not collapse all metrics into a single leaderboard number. Safety, user agency, task utility, and serviceability remain separate dimensions.
 
 ## 6. HDC/LTC research matrix
