@@ -71,7 +71,7 @@ An `artifact_integrity_pass` is **not** a scientific benchmark pass. The verifie
 
 ### Optional distribution-shift manifest
 
-A run can bind an optional `shift_manifest_path` and `shift_manifest_sha256` in the provenance sidecar. When present, both fields are required. The manifest freezes shift family, severity, split (`train`, `calibration`, `validation`, or `test_lockbox`), physical rationale, severity definition, source snapshot hash, independence keys, and sample IDs.
+A run can bind an optional `shift_manifest_path` and `shift_manifest_sha256` in the provenance sidecar. When present, both fields are required. The manifest freezes shift family, shift kind (`in_distribution`, `single_factor`, or `compounded`), severity (`baseline`, `mild`, `moderate`, or `severe`), split (`train`, `calibration`, `validation`, or `test_lockbox`), physical rationale, severity definition, source snapshot hash, independence keys, and sample IDs.
 
 The auditor checks the shift-manifest digest against the artifact list and validates:
 - recognized shift families and severity/split labels;
