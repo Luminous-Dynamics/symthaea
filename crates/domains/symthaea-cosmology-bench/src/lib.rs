@@ -546,6 +546,30 @@ mod tests {
     }
 
     #[test]
+    fn official_desi_manifest_entries_resolve_by_exact_relative_path() {
+        let manifest = concat!(
+            "fde589a17a4ca0fd58371b61290ada939dd672484cb3d523adacb8565a340ced  cobaya/base/desi-bao-all/chain.1.txt\n",
+            "b6ce2202c5fd11049a0de5c277b017e91aa9fbc9c25d6fdce1d166e7f0ef72b7  cobaya/base/desi-bao-all/chain.2.txt\n",
+            "7c869b6928ef91134674551165d8a6528af7e4f210f54e2632d5bf8c0bdebb89  cobaya/base/desi-bao-all/chain.margestats\n"
+        );
+        assert_eq!(
+            expected_sha256_from_manifest(
+                manifest,
+                "cobaya/base/desi-bao-all/chain.1.txt"
+            ).unwrap(),
+            "fde589a17a4ca0fd58371b61290ada939dd672484cb3d523adacb8565a340ced"
+        );
+        assert_eq!(
+            expected_sha256_from_manifest(
+                manifest,
+                "cobaya/base/desi-bao-all/chain.margestats"
+            ).unwrap(),
+            "7c869b6928ef91134674551165d8a6528af7e4f210f54e2632d5bf8c0bdebb89"
+        );
+    }
+
+    #[test]
+    fn manifest_file_verification_uses_the_named_entry() {    #[test]
     fn manifest_file_verification_uses_the_named_entry() {
         let directory = std::env::temp_dir().join(format!(
             "symthaea-cosmology-manifest-{}",
