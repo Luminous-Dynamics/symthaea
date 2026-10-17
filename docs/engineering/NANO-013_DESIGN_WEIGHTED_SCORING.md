@@ -7,8 +7,13 @@ This scorer turns the independent, evaluator-sealed probability sample into expl
 From the repository root:
 
 ~~~sh
-cargo run -p symthaea-nanotech-audit -- <run-directory>
 cargo run -p symthaea-nanotech-audit --bin nano-rescue-score -- <run-directory>
+~~~
+
+For a full MADE export, also run the general artifact auditor:
+
+~~~sh
+cargo run -p symthaea-nanotech-audit -- <run-directory>
 ~~~
 
 The scoring CLI independently reruns the NANO-013 contract audit and refuses to score if the bundle is absent or has findings. For a full MADE export, run the general auditor as well; its **artifact_integrity_pass** concerns artifact consistency only and is not a scientific-performance pass.
