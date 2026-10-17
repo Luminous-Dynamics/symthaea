@@ -177,6 +177,12 @@ Compare the proposed Symthaea-guided search against random feasible search, a sp
 A useful external benchmark across five experimental materials-science domains found that Bayesian optimization with random-forest surrogates was comparable to GP with automatic relevance detection, and both outperformed a GP baseline without ARD on those datasets. That result is not specific to dielectrics, but it demonstrates why Symthaea must compete against tuned conventional baselines rather than a deliberately weak strawman:
 https://www.nature.com/articles/s41524-021-00656-9
 
+Add **feasibility-aware BO** as a baseline because candidate synthesis, processing and measurement can fail for reasons not captured in a property regressor. The 2025 Anubis work benchmarks learned-feasibility acquisition strategies on material-stability and synthesis-accessibility tasks; this is general methodological prior art, not a capacitor-specific result:
+https://doi.org/10.1039/d5dd00018a
+
+Where reproductions and task access permit, include an **LLM-based optimizer** as another challenger rather than assuming that Symthaea’s reasoning architecture automatically wins. A 2026 *Nature Machine Intelligence* study evaluates an uncertainty-calibrated LLM optimizer over 23 tasks spanning four chemistry domains; those results are not capacitor validation but make a relevant optimizer class worth testing:
+https://doi.org/10.1038/s42256-026-01283-z
+
 - Pre-register at least 10 random seeds when evaluation is affordable.
 - Report feasible-candidate yield, time/cost per useful candidate, best feasible objective, Pareto hypervolume, uncertainty calibration, and number of expensive calculations avoided.
 - Stretch goal: at least 10% improvement in normalized Pareto hypervolume or at least 20% fewer expensive evaluations to reach the same reference frontier, without regression in hard constraints. Require confidence intervals and a held-out search space.
