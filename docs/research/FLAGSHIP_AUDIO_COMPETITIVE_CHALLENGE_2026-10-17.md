@@ -34,6 +34,14 @@ The manufacturer lists a 3-way system with a 28 mm tweeter, 5-inch midrange and 
 
 These figures are a useful reference for the scale of the challenge, not a substitute for independently measured results under one agreed protocol. Arendal’s 118 dB peak / 112 dB RMS specification must not be equated directly with an AES75 result unless signal, bandwidth, distance, environment and pass criteria are comparable.
 
+### Independent measurement reconnaissance (not a substitute for our common protocol)
+
+- **ABYSS AB-1266 Phi TC:** [Hi-Fi News' lab report](https://www.hifinews.com/content/abyss-ab-1266-phi-tc-headphones-lab-report) reports ten reseated artificial-ear measurements, 98.4 dB SPL at 1 V / 1 kHz, impedance extrema of about 42.0–42.1 Ω over its stated band, and distortion below 0.1% at 100 Hz and 0.1% at 1 kHz for its 90 dB SPL test. Its interpretation also notes reticent/curtailed treble with a perceived-response depression around 5 kHz. The report's mass is 646 g including cable and 1/4-inch connector, so it is not directly interchangeable with the manufacturer's 640 g figure without matching weigh-in conditions.
+- **Fit is a first-order variable:** [Kuulokenurkka's AB1266 Phi TC review](https://kuulokenurkka.com/en/review-abyss-ab1266-phi-tc/) reports IEC 711-type measurements and describes bass response changing materially with the ear-pad/head gap. This is one reviewer/fixture's observation, not a population study; it is enough to require a fit/seal sensitivity experiment rather than assume repeatability.
+- **Arendal measurement gap:** [Spinorama's public measurement catalogue](https://www.spinorama.org/) surfaced an entry for the Arendal Sound **1610 Tower 8**, an adjacent model, but this research pass did not establish an apples-to-apples independent standardized measurement package for the exact **1528 Tower 8**. The 1610 may be a useful additional comparative design point; it must not be substituted as evidence for the 1528. The exact 1528 should be bought or borrowed and measured under the same declared protocol, or the missing comparison must remain explicit.
+
+Use these reports to formulate test hypotheses, not to declare either product good or bad from isolated values. Their fixtures, response compensation, samples, test signals and reporting formats differ, so values cannot be pooled as if they were one laboratory experiment.
+
 ### Required competitor selection
 
 Before confirmatory measurements, freeze a shortlist that includes:
@@ -201,6 +209,9 @@ The next highest-value EAC experiment is a fixture/repeatability campaign and ba
 - [ABYSS AB1266 TC — manufacturer specifications](https://abyss-headphones.com/en-gb/products/abyss-ab-1266-phi-headphone).
 - [Arendal Sound 1528 Tower 8 — official technical specifications](https://arendalsound.com/product/1528-tower-8/tech/).
 - [Arendal Sound 1528 product handbook (PDF)](https://arendalsound.com/wp-content/uploads/2025/02/2025_02_Product_Handbook_Arendal_1528_Speakers_8_v2.5_WEB.pdf).
+- [Hi-Fi News AB-1266 Phi TC lab report](https://www.hifinews.com/content/abyss-ab-1266-phi-tc-headphones-lab-report).
+- [Kuulokenurkka AB1266 Phi TC measurement review](https://kuulokenurkka.com/en/review-abyss-ab1266-phi-tc/).
+- [Spinorama open loudspeaker measurement catalogue](https://www.spinorama.org/).
 - [IEC 60268-7:2025 — headphones and earphones](https://webstore.iec.ch/en/publication/86573).
 - [ANSI/CTA-2034-B — residential loudspeaker measurement scope](https://www.cta.tech/standards/ansicta-2034-b/).
 - [AES75-2023 — maximum linear sound level using Music-Noise](https://aes.org/standards/AES75/).
