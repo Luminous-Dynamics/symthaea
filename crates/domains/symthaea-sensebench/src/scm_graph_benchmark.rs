@@ -24,7 +24,7 @@ const WORLD_VARIANTS_PER_FAMILY: usize = 4;
 const MECHANISM_REGIME_COUNT: usize = 4;
 const MAX_TRIALS_PER_WORLD: usize = 10_000;
 const MAX_MEASUREMENT_BUDGET: usize = 64;
-const GENERATOR_VERSION: &str = "sensebench-scm-graphs-0.5.0";
+const GENERATOR_VERSION: &str = "sensebench-scm-graphs-0.6.0";
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, Deserialize)]
 #[serde(rename_all = "snake_case")]
@@ -114,10 +114,11 @@ pub enum ScmGraphPolicy {
     KnownMechanicsOracle,
     StructureBlindRandomGraph,
     PcObservationalBaseline,
+    PcExactConditionalBaseline,
 }
 
 impl ScmGraphPolicy {
-    fn all() -> [Self; 10] {
+    fn all() -> [Self; 11] {
         [
             Self::NominalExpectedInformationGain,
             Self::PredictiveOutcomeEntropy,
@@ -129,6 +130,7 @@ impl ScmGraphPolicy {
             Self::KnownMechanicsOracle,
             Self::StructureBlindRandomGraph,
             Self::PcObservationalBaseline,
+            Self::PcExactConditionalBaseline,
         ]
     }
 }
@@ -327,6 +329,7 @@ pub struct ScmGraphBenchmarkReport {
     pub factorized_shift_aggregates: Vec<ScmGraphFactorizedShiftAggregate>,
     pub paired_policy_deltas: Vec<ScmGraphPairedPolicyDelta>,
     pub observational_pc_baseline: ScmGraphPolicy,
+    pub exact_observational_pc_baseline: ScmGraphPolicy,
     pub interpretation_boundary: String,
 }
 
@@ -547,15 +550,41 @@ const PC_G2_CRITICAL_DF2_95: f64 = 5.991_464_547_107_979;
 /// conditioning on the third binary variable. This transparent three-node PC
 /// baseline uses asymptotic 5% thresholds; at low sample counts these tests are
 /// approximate and must be judged on the held-out benchmark, not presumed reliable.
-fn g_squared_ci_statistic(
+fn g_squared_for_table(table: &[[f64; 2]; 2]) -> f64 {
+    let n = table.iter().flatten().sum::<f64>();
+    if n == 0.0 {
+        return 0.0;
+    }
+    let rows = [
+        table[0][0] + table[0][1],
+        table[1][0] + table[1][1],
+    ];
+    let columns = [
+        table[0][0] + table[1][0],
+        table[0][1] + table[1][1],
+    ];
+    let mut g_squared = 0.0;
+    for x_value in 0..2 {
+        for y_value in 0..2 {
+            let observed = table[x_value][y_value];
+            if observed == 0.0 {
+                continue;
+            }
+            let expected = rows[x_value] * columns[y_value] / n;
+            if expected > 0.0 {
+                g_squared += 2.0 * observed * (observed / expected).ln();
+            }
+        }
+    }
+    g_squared.max(0.0)
+}
+
+fn contingency_tables(
     observations: &[usize],
     x: usize,
     y: usize,
     conditioning: Option<usize>,
-) -> f64 {
-    if observations.is_empty() {
-        return 0.0;
-    }
+) -> Vec<[[f64; 2]; 2]> {
     let strata = if conditioning.is_some() { 2 } else { 1 };
     let mut counts = vec![[[0.0_f64; 2]; 2]; strata];
     for state in observations {
@@ -564,40 +593,136 @@ fn g_squared_ci_statistic(
         let stratum = conditioning.map_or(0, |node| (state >> node) & 1);
         counts[stratum][x_value][y_value] += 1.0;
     }
+    counts
+}
 
-    let mut g_squared = 0.0;
-    for table in &counts {
-        let n = table.iter().flatten().sum::<f64>();
-        if n == 0.0 {
-            continue;
-        }
-        let rows = [
-            table[0][0] + table[0][1],
-            table[1][0] + table[1][1],
+/// Asymptotic G-squared statistic for binary variables X and Y, optionally
+/// conditioned on the third binary variable.
+fn g_squared_ci_statistic(
+    observations: &[usize],
+    x: usize,
+    y: usize,
+    conditioning: Option<usize>,
+) -> f64 {
+    contingency_tables(observations, x, y, conditioning).iter()
+        .map(g_squared_for_table)
+        .sum::<f64>()
+        .max(0.0)
+}
+
+fn log_binomial_coefficient(n: usize, k: usize) -> f64 {
+    if k > n {
+        return f64::NEG_INFINITY;
+    }
+    let k = k.min(n - k);
+    (1..=k).map(|i| ((n - k + i) as f64).ln() - (i as f64).ln()).sum()
+}
+
+/// Enumerate the exact conditional null distribution of G-squared for one 2x2
+/// table, conditioning on both margins. The cell count follows a hypergeometric
+/// distribution under independence.
+fn exact_g_squared_stratum_distribution(table: &[[f64; 2]; 2]) -> Vec<(f64, f64)> {
+    let n = table.iter().flatten().map(|count| *count as usize).sum::<usize>();
+    let row_one = (table[1][0] + table[1][1]) as usize;
+    let column_one = (table[0][1] + table[1][1]) as usize;
+    let low = row_one.saturating_add(column_one).saturating_sub(n);
+    let high = row_one.min(column_one);
+    if low > high {
+        return Vec::new();
+    }
+
+    let denominator = log_binomial_coefficient(n, row_one);
+    (low..=high).map(|both_one| {
+        let row_zero = n - row_one;
+        let column_zero_in_row_one = row_one - both_one;
+        let column_one_in_row_zero = column_one - both_one;
+        let table_zero_zero = row_zero - column_one_in_row_zero;
+        let expected_table = [
+            [table_zero_zero as f64, column_one_in_row_zero as f64],
+            [column_zero_in_row_one as f64, both_one as f64],
         ];
-        let columns = [
-            table[0][0] + table[1][0],
-            table[0][1] + table[1][1],
-        ];
-        for x_value in 0..2 {
-            for y_value in 0..2 {
-                let observed = table[x_value][y_value];
-                if observed == 0.0 {
-                    continue;
-                }
-                let expected = rows[x_value] * columns[y_value] / n;
-                if expected > 0.0 {
-                    g_squared += 2.0 * observed * (observed / expected).ln();
-                }
+        let log_probability = log_binomial_coefficient(column_one, both_one)
+            + log_binomial_coefficient(n - column_one, row_one - both_one)
+            - denominator;
+        (g_squared_for_table(&expected_table), log_probability.exp())
+    }).collect()
+}
+
+/// Exact conditional G-squared p-value for unconditional or one-variable-
+/// conditioned independence between binary variables. The test conditions on
+/// each stratum's observed margins and enumerates the finite null distribution.
+fn exact_conditional_g_squared_p_value(
+    observations: &[usize],
+    x: usize,
+    y: usize,
+    conditioning: Option<usize>,
+) -> f64 {
+    if observations.is_empty() {
+        return 1.0;
+    }
+    let tables = contingency_tables(observations, x, y, conditioning);
+    let observed = tables.iter().map(g_squared_for_table).sum::<f64>();
+    let mut null_distribution = vec![(0.0_f64, 1.0_f64)];
+    for table in &tables {
+        let stratum_distribution = exact_g_squared_stratum_distribution(table);
+        let mut expanded = Vec::with_capacity(
+            null_distribution.len().saturating_mul(stratum_distribution.len()),
+        );
+        for (prior_statistic, prior_probability) in &null_distribution {
+            for (stratum_statistic, stratum_probability) in &stratum_distribution {
+                expanded.push((
+                    prior_statistic + stratum_statistic,
+                    prior_probability * stratum_probability,
+                ));
             }
         }
+        null_distribution = expanded;
     }
-    g_squared.max(0.0)
+    null_distribution.iter()
+        .filter(|(statistic, _)| *statistic + 1.0e-12 >= observed)
+        .map(|(_, probability)| *probability)
+        .sum::<f64>()
+        .clamp(0.0, 1.0)
+}
+
+fn pc_ci_test_independent(
+    observations: &[usize],
+    x: usize,
+    y: usize,
+    conditioning: Option<usize>,
+    exact_conditional: bool,
+) -> bool {
+    if exact_conditional {
+        exact_conditional_g_squared_p_value(observations, x, y, conditioning) >= 0.05
+    } else {
+        let statistic = g_squared_ci_statistic(observations, x, y, conditioning);
+        let critical = if conditioning.is_some() {
+            PC_G2_CRITICAL_DF2_95
+        } else {
+            PC_G2_CRITICAL_DF1_95
+        };
+        statistic <= critical
+    }
 }
 
 fn pc_observational_cpdag(
     observations: &[usize],
     classes: &MarkovClassCatalog,
+) -> (Vec<EdgeMark>, usize, usize) {
+    pc_observational_cpdag_with_ci_test(observations, classes, false)
+}
+
+fn pc_exact_conditional_cpdag(
+    observations: &[usize],
+    classes: &MarkovClassCatalog,
+) -> (Vec<EdgeMark>, usize, usize) {
+    pc_observational_cpdag_with_ci_test(observations, classes, true)
+}
+
+fn pc_observational_cpdag_with_ci_test(
+    observations: &[usize],
+    classes: &MarkovClassCatalog,
+    exact_conditional: bool,
 ) -> (Vec<EdgeMark>, usize, usize) {
     if observations.is_empty() {
         let marks = vec![EdgeMark::Undirected; UNORDERED_PAIRS.len()];
@@ -613,8 +738,7 @@ fn pc_observational_cpdag(
 
     // PC level 0: remove unconditionally independent pairs.
     for (first, second) in UNORDERED_PAIRS {
-        let statistic = g_squared_ci_statistic(observations, first, second, None);
-        if statistic <= PC_G2_CRITICAL_DF1_95 {
+        if pc_ci_test_independent(observations, first, second, None, exact_conditional) {
             adjacent_matrix[first][second] = false;
             adjacent_matrix[second][first] = false;
             separating_sets[first][second] = None;
@@ -634,8 +758,7 @@ fn pc_observational_cpdag(
             .find(|node| *node != first && *node != second)
             .expect("three-node graph has one third variable");
         if adjacency_at_level[first][third] || adjacency_at_level[second][third] {
-            let statistic = g_squared_ci_statistic(observations, first, second, Some(third));
-            if statistic <= PC_G2_CRITICAL_DF2_95 {
+            if pc_ci_test_independent(observations, first, second, Some(third), exact_conditional) {
                 adjacent_matrix[first][second] = false;
                 adjacent_matrix[second][first] = false;
                 separating_sets[first][second] = Some(third);
@@ -1126,7 +1249,9 @@ fn choose_action(
         ScmGraphPolicy::UniformRandomAction => {
             Some(nominal.candidates[rng.index(nominal.candidates.len())].id.clone())
         }
-        ScmGraphPolicy::PassiveOnly | ScmGraphPolicy::PcObservationalBaseline => {
+        ScmGraphPolicy::PassiveOnly
+        | ScmGraphPolicy::PcObservationalBaseline
+        | ScmGraphPolicy::PcExactConditionalBaseline => {
             Some("observe".into())
         }
         ScmGraphPolicy::KnownMechanicsOracle => rank_experiments(posterior, oracle_candidates)?
@@ -1261,7 +1386,7 @@ fn simulate_trial(
         let true_distribution = hidden_candidate.likelihoods.get(truth_index)
             .ok_or(ScmGraphBenchmarkError::MissingCandidate)?;
         let observed_outcome = sample_outcome(true_distribution, &mut outcome_rng);
-        if policy == ScmGraphPolicy::PcObservationalBaseline {
+        if matches!(policy, ScmGraphPolicy::PcObservationalBaseline | ScmGraphPolicy::PcExactConditionalBaseline) {
             observed_states.push(observed_outcome);
             measurements_used += 1;
             continue;
@@ -1282,9 +1407,12 @@ fn simulate_trial(
     }
 
     let (pc_class_index, pc_projection_mark_changes) =
-        if policy == ScmGraphPolicy::PcObservationalBaseline {
-            let (_, class_index, projection_mark_changes) =
-                pc_observational_cpdag(&observed_states, classes);
+        if matches!(policy, ScmGraphPolicy::PcObservationalBaseline | ScmGraphPolicy::PcExactConditionalBaseline) {
+            let (_, class_index, projection_mark_changes) = if policy == ScmGraphPolicy::PcExactConditionalBaseline {
+                pc_exact_conditional_cpdag(&observed_states, classes)
+            } else {
+                pc_observational_cpdag(&observed_states, classes)
+            };
             // The PC baseline submits a CPDAG rather than claiming one fully oriented
             // DAG. Represent its class as a uniform distribution over member DAGs so
             // posterior-scored fields do not falsely retain the original uniform prior.
@@ -1325,10 +1453,12 @@ fn simulate_trial(
     let max_probability = posterior[posterior_top_index(&posterior)].probability;
     let claim_accepted = !matches!(
         policy,
-        ScmGraphPolicy::StructureBlindRandomGraph | ScmGraphPolicy::PcObservationalBaseline
+        ScmGraphPolicy::StructureBlindRandomGraph
+            | ScmGraphPolicy::PcObservationalBaseline
+            | ScmGraphPolicy::PcExactConditionalBaseline
     ) && max_probability >= posterior_threshold;
     let false_graph_claim = claim_accepted && !exact_graph;
-    let cpdag_claim_accepted = policy == ScmGraphPolicy::PcObservationalBaseline
+    let cpdag_claim_accepted = matches!(policy, ScmGraphPolicy::PcObservationalBaseline | ScmGraphPolicy::PcExactConditionalBaseline)
         || (policy != ScmGraphPolicy::StructureBlindRandomGraph
             && posterior_top_class_mass >= posterior_threshold);
     let false_cpdag_claim = cpdag_claim_accepted && !markov_class_correct;
@@ -1623,6 +1753,7 @@ fn aggregate_paired_policy_deltas(
         ScmGraphPolicy::DevelopmentFixedDesign,
         ScmGraphPolicy::UniformRandomAction,
         ScmGraphPolicy::PcObservationalBaseline,
+        ScmGraphPolicy::PcExactConditionalBaseline,
     ];
     let mut output = Vec::new();
     for policy in policies.iter().copied() {
@@ -1823,6 +1954,7 @@ pub fn run_scm_graph_benchmark(
         factorized_shift_aggregates: aggregate_factorized_shifts(&summaries, &policies),
         paired_policy_deltas: aggregate_paired_policy_deltas(&summaries, &policies),
         observational_pc_baseline: ScmGraphPolicy::PcObservationalBaseline,
+        exact_observational_pc_baseline: ScmGraphPolicy::PcExactConditionalBaseline,
         worlds: summaries,
         interpretation_boundary: concat!(
             "Synthetic software benchmark only. The candidate set enumerates all labeled DAGs ",
@@ -2022,6 +2154,51 @@ mod tests {
     }
 
     #[test]
+    fn exact_conditional_g2_is_conservative_on_balanced_null_and_detects_large_dependence() {
+        let independent: Vec<usize> = (0..OUTCOME_COUNT)
+            .flat_map(|state| std::iter::repeat_n(state, 20))
+            .collect();
+        assert!(
+            exact_conditional_g_squared_p_value(&independent, 0, 1, None) > 0.99,
+            "balanced independent variables should have a null p-value near one"
+        );
+
+        let mut dependent = Vec::new();
+        for x in 0..=1_usize {
+            for y in 0..=1_usize {
+                let copies = if x == y { 100 } else { 5 };
+                let state = x | (y << 1);
+                dependent.extend(std::iter::repeat_n(state, copies));
+            }
+        }
+        let p_value = exact_conditional_g_squared_p_value(&dependent, 0, 1, None);
+        assert!((0.0..=1.0).contains(&p_value));
+        assert!(p_value < 0.05, "large binary dependence should be rejected");
+    }
+
+    #[test]
+    fn exact_conditional_pc_recovers_known_unshielded_collider() {
+        let catalogue = all_dags();
+        let classes = build_markov_class_catalog(&catalogue);
+        let mut collider_observations = Vec::new();
+        for x in 0..=1_usize {
+            for y in 0..=1_usize {
+                let z_ones = if x == 0 && y == 0 { 20 } else { 80 };
+                let z_zeros = 100 - z_ones;
+                let state_zero = x | (y << 2);
+                let state_one = state_zero | (1 << 1);
+                collider_observations.extend(std::iter::repeat_n(state_zero, z_zeros));
+                collider_observations.extend(std::iter::repeat_n(state_one, z_ones));
+            }
+        }
+        let (marks, class_index, changed_marks) =
+            pc_exact_conditional_cpdag(&collider_observations, &classes);
+        assert_eq!(marks, vec![EdgeMark::Forward, EdgeMark::Absent, EdgeMark::Reverse]);
+        assert_eq!(marks, classes.cpdag_marks[class_index]);
+        assert_eq!(changed_marks, 0);
+    }
+
+    #[test]
     fn cpdag_metrics_do_not_penalize_unidentifiable_chain_directions() {
         let catalogue = all_dags();
         let chain_forward = CausalDag {
@@ -2197,9 +2374,10 @@ mod tests {
         assert_eq!(a, b);
         assert_eq!(serde_json::to_vec(&a).unwrap(), serde_json::to_vec(&b).unwrap());
         assert_eq!(a.schema_version, 4);
-        assert_eq!(a.generator_version, "sensebench-scm-graphs-0.5.0");
-        assert_eq!(ScmGraphPolicy::all().len(), 10);
+        assert_eq!(a.generator_version, "sensebench-scm-graphs-0.6.0");
+        assert_eq!(ScmGraphPolicy::all().len(), 11);
         assert_eq!(a.observational_pc_baseline, ScmGraphPolicy::PcObservationalBaseline);
+        assert_eq!(a.exact_observational_pc_baseline, ScmGraphPolicy::PcExactConditionalBaseline);
         assert_eq!(a.world_count, 112);
         assert_eq!(a.development_world_count, 16);
         assert_eq!(a.held_out_world_count, 96);
@@ -2246,8 +2424,7 @@ mod tests {
         let report = run_scm_graph_benchmark(3, 1, 5050, 0.90).unwrap();
         assert_eq!(
             report.paired_policy_deltas.len(),
-            (ScmGraphPolicy::all().len() - 1)
-                * 4
+            (ScmGraphPolicy::all().len() * 5 - 5)
                 * ScmGraphShiftSplit::all().len()
         );
         for delta in &report.paired_policy_deltas {
@@ -2279,7 +2456,7 @@ mod tests {
     fn held_out_claim_metrics_are_bounded_and_null_false_claims_are_visible() {
         let report = run_scm_graph_benchmark(6, 2, 0x5EED, 0.90).unwrap();
         for row in report.worlds.iter()
-            .filter(|row| row.policy == ScmGraphPolicy::PcObservationalBaseline)
+            .filter(|row| matches!(row.policy, ScmGraphPolicy::PcObservationalBaseline | ScmGraphPolicy::PcExactConditionalBaseline))
         {
             assert_eq!(row.mean_measurements_used, 2.0);
             assert_eq!(row.mean_interventions_used, 0.0);
