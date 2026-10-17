@@ -799,15 +799,19 @@ mod tests {
     }
 
     #[test]
-    fn objective_declaration_order_does_not_change_dominance() {
+    fn objective_declaration_order_does_not_change_dominance_or_report() {
         let baseline = candidate("baseline", Some(8.0), Some(8.0), Some(2.0));
-        let mut reordered = candidate("reordered", Some(9.0), Some(7.0), Some(3.0));
-        reordered.objectives.reverse();
+        let canonical = candidate("reordered", Some(9.0), Some(7.0), Some(3.0));
+        let mut reversed = canonical.clone();
+        reversed.objectives.reverse();
 
-        let report = evaluate_frontier(&[baseline, reordered]).unwrap();
-        assert_eq!(report.frontier_ids, vec!["baseline"]);
+        let canonical_report = evaluate_frontier(&[baseline.clone(), canonical]).unwrap();
+        let reversed_report = evaluate_frontier(&[baseline, reversed]).unwrap();
+
+        assert_eq!(canonical_report, reversed_report);
+        assert_eq!(canonical_report.frontier_ids, vec!["baseline"]);
         assert_eq!(
-            report
+            canonical_report
                 .candidates
                 .iter()
                 .find(|item| item.id == "reordered")
