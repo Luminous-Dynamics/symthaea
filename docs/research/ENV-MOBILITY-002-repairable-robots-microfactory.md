@@ -5,6 +5,14 @@
 **Related Symthaea owners:** [robotics domain ownership #7650](https://github.com/Luminous-Dynamics/symthaea/issues/7650), [robot platform specialization #6033](https://github.com/Luminous-Dynamics/symthaea/issues/6033), [transport engineering #6244](https://github.com/Luminous-Dynamics/symthaea/issues/6244), [physical validation ladder #6254](https://github.com/Luminous-Dynamics/symthaea/issues/6254), [persistent platforms #7343](https://github.com/Luminous-Dynamics/symthaea/issues/7343).  
 **Related Mycelix owners:** [AeroCommons #3638](https://github.com/Luminous-Dynamics/mycelix/issues/3638), [Mobility Commons #3708](https://github.com/Luminous-Dynamics/mycelix/issues/3708), manufacturing lifecycle and provenance owners to be mapped before implementation.
 
+**Existing canonical work to compose (do not duplicate):**
+- [AIRCAR-001 repairable modular flying vehicle #7675](https://github.com/Luminous-Dynamics/symthaea/issues/7675) owns the broader repairability/lifecycle baseline for a flying-vehicle system. Reuse its repair, spares, diagnosis and lifecycle-cost disciplines; its passenger-mobility KPIs are not directly transferable to survey robots.
+- [AIRCRAFT-FACTORY-TRAINING-001 #7652](https://github.com/Luminous-Dynamics/symthaea/issues/7652) owns factory/process/workforce co-design and the provider-neutral training contract. This proposal specializes those principles for a lower-capital environmental-survey microfactory; it is not a second factory or training ontology.
+- [FACTORY-OPS-001 #7677 / draft implementation PR #7678](https://github.com/Luminous-Dynamics/symthaea/pull/7678) owns the deterministic capability-constrained line scheduler. Reuse its scheduler and independent verifier for a survey-robot assembly case after confirming its API and exact-head evidence; do not create another scheduling engine.
+- [ROB-MFG-001 #5775](https://github.com/Luminous-Dynamics/symthaea/issues/5775) owns robotics repair/replacement-part closure; [MFG-VALUE-001 #7608](https://github.com/Luminous-Dynamics/symthaea/issues/7608) owns independent manufacturing-value benchmarking; [BUILT-ROB-PILOT-001 #6040](https://github.com/Luminous-Dynamics/symthaea/issues/6040) owns the benign workcell digital-thread demonstrator.
+- ENV-MOBILITY-002 contributes the cross-link: test those canonical capabilities against a small environmental-survey fleet, whose output metric is cost per **valid observation** and whose mode-specific physics and qualification remain separate.
+
+
 ## 1. Design thesis: optimize lifetime service, not minimum purchase price
 
 Build robots that are easy to understand, fabricate, inspect, repair, update, and recycle. Minimize *unnecessary* moving mechanisms, proprietary components, custom parts, connector diversity, destructive assembly and inaccessible service points. Do not minimize a count mechanically if doing so makes recovery, stability, reliability or safe stopping worse.
