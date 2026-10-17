@@ -349,6 +349,22 @@ fn close_probability(left: f64, right: f64) -> bool {
     left.is_finite() && right.is_finite() && (left - right).abs() <= 1.0e-12
 }
 
+/// Returns true when a parent cluster is already assigned to a different stratum.
+/// It never overwrites the original assignment after a conflict.
+fn parent_cluster_crosses_strata(
+    parent_strata: &mut BTreeMap<String, String>,
+    parent_group_id: &str,
+    stratum_id: &str,
+) -> bool {
+    match parent_strata.get(parent_group_id) {
+        Some(existing) => existing != stratum_id,
+        None => {
+            parent_strata.insert(parent_group_id.to_owned(), stratum_id.to_owned());
+            false
+        }
+    }
+}
+
 fn parse_decisions(bytes: &[u8]) -> Result<Vec<DecisionRecord>, String> {
     let text = std::str::from_utf8(bytes).map_err(|error| format!("decision ledger is not UTF-8: {error}"))?;
     let mut rows = Vec::new();
@@ -687,15 +703,11 @@ pub fn score_run(run_dir: &Path) -> Result<String, String> {
         let row_stats = SufficientStats::from_row(row, intervention);
         total.add(row_stats);
         groups.entry(row.parent_group_id.clone()).or_default().add(row_stats);
-        match parent_stratum.get(&row.parent_group_id) {
-            Some(existing) if existing != &row.stratum_id => {
-                parent_spans_strata = true;
-            }
-            Some(_) => {}
-            None => {
-                parent_stratum.insert(row.parent_group_id.clone(), row.stratum_id.clone());
-            }
-        }
+        parent_spans_strata |= parent_cluster_crosses_strata(
+            &mut parent_stratum,
+            &row.parent_group_id,
+            &row.stratum_id,
+        );
         groups_by_stratum
             .entry(row.stratum_id.clone())
             .or_default()
@@ -1016,6 +1028,28 @@ mod tests {
     }
 
 
+
+    #[test]
+    fn detects_parent_cluster_assigned_to_multiple_strata() {
+        let mut parent_strata = BTreeMap::new();
+        assert!(!parent_cluster_crosses_strata(
+            &mut parent_strata,
+            "parent-A",
+            "surface"
+        ));
+        assert!(!parent_cluster_crosses_strata(
+            &mut parent_strata,
+            "parent-A",
+            "surface"
+        ));
+        assert!(parent_cluster_crosses_strata(
+            &mut parent_strata,
+            "parent-A",
+            "interface"
+        ));
+        assert_eq!(parent_strata.get("parent-A").map(String::as_str), Some("surface"));
+    }
+
     #[test]
     fn cluster_bootstrap_preserves_sample_allocation_within_each_stratum() {
         let mut groups = BTreeMap::<String, SufficientStats>::new();
@@ -1072,7 +1106,7 @@ mod tests {
     }
 
     #[test]
-    fn intervals_are_withheld_when_parent_clusters_cross_strata() {
+    fn intervals_are_withheld_without_a_stratified_cluster_design() {
         let mut groups = BTreeMap::<String, SufficientStats>::new();
         let mut stats = BTreeMap::<String, SufficientStats>::new();
         for index in 0..MIN_GROUPS_FOR_INTERVAL {
