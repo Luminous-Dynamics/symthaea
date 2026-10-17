@@ -64,7 +64,9 @@ pub struct MissionEnvironment {
     pub air_density_kg_m3: f64,
     pub ambient_temperature_k: f64,
     pub ambient_pressure_pa: f64,
-    /// Wind vector in a declared local frame, metres per second.
+    /// Explicit coordinate frame in which the wind vector is expressed.
+    pub wind_reference_frame: String,
+    /// Wind vector in that local frame, metres per second.
     pub wind_vector_mps: [f64; 3],
 }
 
@@ -91,6 +93,8 @@ pub struct CandidateMissionModelRun {
     pub energy_system_artifact: ModelArtifactRef,
     pub mass_properties_artifact: ModelArtifactRef,
     pub environment_artifact: ModelArtifactRef,
+    pub route_artifact: ModelArtifactRef,
+    pub mission_family_artifact: ModelArtifactRef,
     pub input_configuration_sha256: String,
     pub input_energy_system_envelope_sha256: String,
 }
@@ -196,6 +200,8 @@ pub fn validate_candidate_mission_manifest(
         ("model_run.energy_system_artifact", &manifest.model_run.energy_system_artifact),
         ("model_run.mass_properties_artifact", &manifest.model_run.mass_properties_artifact),
         ("model_run.environment_artifact", &manifest.model_run.environment_artifact),
+        ("model_run.route_artifact", &manifest.model_run.route_artifact),
+        ("model_run.mission_family_artifact", &manifest.model_run.mission_family_artifact),
     ] {
         validate_artifact(field, artifact, &mut findings);
     }
@@ -377,6 +383,11 @@ fn validate_environment(
         environment.ambient_pressure_pa,
         findings,
     );
+    validate_nonempty(
+        "environment.wind_reference_frame",
+        &environment.wind_reference_frame,
+        findings,
+    );
     for (index, component) in environment.wind_vector_mps.iter().enumerate() {
         if !component.is_finite() {
             findings.push(MissionModelContractFinding::InvalidValue {
@@ -494,6 +505,7 @@ mod tests {
                 air_density_kg_m3: 1.225,
                 ambient_temperature_k: 288.15,
                 ambient_pressure_pa: 101_325.0,
+                wind_reference_frame: "local-north-east-down-v1".into(),
                 wind_vector_mps: [0.0, 0.0, 0.0],
             },
             model_run: CandidateMissionModelRun {
@@ -506,7 +518,9 @@ mod tests {
                 propulsion_artifact: artifact('d', "propulsion"),
                 energy_system_artifact: artifact('e', "energy"),
                 mass_properties_artifact: artifact('f', "mass"),
-                environment_artifact: artifact('a', "environment"),
+                environment_artifact: artifact('7', "environment"),
+                route_artifact: artifact('8', "route"),
+                mission_family_artifact: artifact('9', "mission-family"),
                 input_configuration_sha256: config_digest,
                 input_energy_system_envelope_sha256: energy_digest,
             },
