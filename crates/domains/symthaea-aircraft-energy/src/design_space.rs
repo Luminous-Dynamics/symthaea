@@ -9,7 +9,7 @@
 //! a vehicle-level model must recompute mission loads for each candidate before
 //! any mass-sensitive comparison is interpreted as a fair aircraft trade.
 
-use std::collections::HashMap;
+use std::collections::{BTreeMap, HashMap};
 
 use super::{
     BatteryPackSpec, Disposition, EnergySystemEnvelope, Finding, MissionProfile,
@@ -59,6 +59,13 @@ pub struct BatteryDesignRow {
     pub on_pareto_front: bool,
 }
 
+/// One frontier for a single common reserve fraction.
+#[derive(Debug, Clone, PartialEq)]
+pub struct ReservePolicyFrontier {
+    pub reserve_fraction: f64,
+    pub candidate_ids: Vec<String>,
+}
+
 /// Result of a bounded sweep. A frontier is valid only for this explicit,
 /// frozen mission and this arithmetic model. It is not proof of aircraft
 /// feasibility. The current model does not propagate changes in system mass
@@ -67,7 +74,9 @@ pub struct BatteryDesignRow {
 pub struct BatteryDesignSweepReport {
     pub mission_id: String,
     pub rows: Vec<BatteryDesignRow>,
-    pub pareto_front_ids: Vec<String>,
+    /// A separate frontier per reserve policy; candidates with different
+    /// reserve fractions are not ranked against one another.
+    pub pareto_frontiers: Vec<ReservePolicyFrontier>,
     pub feasible_count: usize,
     pub infeasible_count: usize,
     /// Includes invalid configurations and other missing/invalid evidence.
@@ -124,7 +133,7 @@ pub fn sweep_battery_design_space(
     }
 
     let mut rows = Vec::with_capacity(requested);
-    let mut candidates = Vec::with_capacity(requested);
+    let mut candidates_by_reserve: BTreeMap<u64, Vec<SystemCandidate>> = BTreeMap::new();
 
     for linear_index in 0..requested {
         let mut remainder = linear_index;
@@ -147,10 +156,41 @@ pub fn sweep_battery_design_space(
         match spec.to_envelope() {
             Ok(envelope) => {
                 let screening = evaluate_mission(mission, &envelope);
-                candidates.push(SystemCandidate {
-                    id: candidate_id.clone(),
-                    system: envelope.clone(),
-                });
+                if let Some(reserve) = envelope.reserve_fraction {
+                    candidates_by_reserve
+                        .entry(reserve.to_bits())
+                        .or_default()
+                        .push(SystemCandidate {
+                            id: candidate_id.clone(),
+                            system: envelope.clone(),
+                        });
+                } else {
+                    // BatteryPackSpec::to_envelope currently always supplies
+                    // reserve. Keep this fail-closed if that contract changes.
+                    let finding = Finding::MissingInput {
+                        field: "system.reserve_fraction".into(),
+                    };
+                    rows.push(BatteryDesignRow {
+                        candidate_id,
+                        spec,
+                        configuration_valid: false,
+                        configuration_findings: vec![finding.clone()],
+                        envelope: None,
+                        screening: ScreeningResult {
+                            disposition: Disposition::Indeterminate,
+                            required_mission_energy_wh: None,
+                            available_energy_after_reserve_wh: None,
+                            energy_margin_wh: None,
+                            minimum_continuous_power_margin_w: None,
+                            peak_power_margin_w: None,
+                            peak_duration_margin_s: None,
+                            installed_mass_kg: None,
+                            findings: vec![finding],
+                        },
+                        on_pareto_front: false,
+                    });
+                    continue;
+                }
                 rows.push(BatteryDesignRow {
                     candidate_id,
                     spec,
@@ -186,7 +226,8 @@ pub fn sweep_battery_design_space(
         }
     }
 
-    if !candidates.is_empty() {
+    let mut pareto_frontiers = Vec::with_capacity(candidates_by_reserve.len());
+    for (reserve_bits, candidates) in candidates_by_reserve {
         let comparison = compare_systems_on_mission(mission, &candidates)
             .map_err(|cause| DesignSpaceError::CandidateComparisonRejected { cause })?;
         let ranked: HashMap<String, _> = comparison
@@ -200,7 +241,12 @@ pub fn sweep_battery_design_space(
                 row.on_pareto_front = ranked_row.on_pareto_front;
             }
         }
+        pareto_frontiers.push(ReservePolicyFrontier {
+            reserve_fraction: f64::from_bits(reserve_bits),
+            candidate_ids: comparison.pareto_front_ids,
+        });
     }
+    pareto_frontiers.sort_by(|a, b| a.reserve_fraction.total_cmp(&b.reserve_fraction));
 
     rows.sort_by(|left, right| left.candidate_id.cmp(&right.candidate_id));
     let feasible_count = rows
@@ -223,16 +269,10 @@ pub fn sweep_battery_design_space(
                 && row.screening.disposition == Disposition::Indeterminate
         })
         .count();
-    let pareto_front_ids = rows
-        .iter()
-        .filter(|row| row.on_pareto_front)
-        .map(|row| row.candidate_id.clone())
-        .collect();
-
     Ok(BatteryDesignSweepReport {
         mission_id: mission.id.clone(),
         rows,
-        pareto_front_ids,
+        pareto_frontiers,
         feasible_count,
         infeasible_count,
         indeterminate_count,
@@ -290,7 +330,9 @@ mod tests {
         assert_eq!(report.rows.len(), 64);
         assert_eq!(report.invalid_configuration_count, 0);
         assert_eq!(report.feasible_count, 64);
-        assert!(!report.pareto_front_ids.is_empty());
+        assert_eq!(report.pareto_frontiers.len(), 2);
+        assert!(report.pareto_frontiers.iter().all(|frontier| !frontier.candidate_ids.is_empty()));
+        assert!(report.pareto_frontiers[0].reserve_fraction < report.pareto_frontiers[1].reserve_fraction);
         assert!(report.rows.iter().all(|row| {
             row.configuration_valid
                 && row.envelope.is_some()
@@ -329,7 +371,7 @@ mod tests {
         assert_eq!(report.rows.len(), 1);
         assert_eq!(report.invalid_configuration_count, 1);
         assert_eq!(report.indeterminate_count, 1);
-        assert!(report.pareto_front_ids.is_empty());
+        assert!(report.pareto_frontiers.is_empty());
         assert!(!report.rows[0].configuration_valid);
         assert!(!report.rows[0].on_pareto_front);
         assert!(!report.rows[0].configuration_findings.is_empty());
