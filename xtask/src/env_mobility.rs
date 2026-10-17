@@ -122,6 +122,8 @@ struct CorpusSummary {
 #[derive(Debug, Serialize)]
 pub struct QualificationReport {
     report_schema: &'static str,
+    verifier_version: &'static str,
+    verifier_source_revision: Option<&'static str>,
     claim_ceiling: &'static str,
     feasibility: CorpusSummary,
     repairability: CorpusSummary,
@@ -791,6 +793,8 @@ pub fn run() -> Result<QualificationReport> {
 
     Ok(QualificationReport {
         report_schema: "env-mobility-qualifier-report-v1",
+        verifier_version: env!("CARGO_PKG_VERSION"),
+        verifier_source_revision: option_env!("GITHUB_SHA"),
         claim_ceiling: concat!(
             "Synthetic fixture conformance only; no real-world feasibility, repair qualification, ",
             "manufacturing yield, regulatory status or safety is established."
@@ -832,6 +836,11 @@ mod tests {
             report.cases.iter().filter(|c| !c.matches).collect::<Vec<_>>()
         );
         assert_eq!(report.protected_gate_false_accepts, 0);
+
+        let first = serde_json::to_string(&report).expect("serialize first report");
+        let second = serde_json::to_string(&run().expect("repeat qualification"))
+            .expect("serialize second report");
+        assert_eq!(first, second, "same corpus bytes must produce deterministic output");
     }
 
     #[test]
