@@ -186,7 +186,7 @@ For active-learning experiments, fit the surrogate/model only on revealed traini
 A separate `src/metrics.rs` module and `nano-policy-metrics` binary now evaluate a frozen JSON outcome ledger after all selector/oracle actions are complete. The ledger includes task/source/evaluation manifest digests, policy revision and run/selection-receipt digests, paired target IDs, caller-declared independent groups, chronological candidate attempts, evaluated loss/status and per-call cost.
 
 The evaluator rejects:
-- mismatched target or group sets across policy arms;
+- malformed optional shift-manifest digests and mismatched target or group sets across policy arms;
 - non-contiguous query ranks or query count beyond the common budget;
 - missing/non-finite/negative loss on an evaluated attempt, or a loss attached to a failed attempt;
 - non-finite/negative cost, invalid digests, duplicate arm/target IDs, and unknown fields;
@@ -201,6 +201,6 @@ Unit tests use synthetic ledger fixtures to test budget success, full-curve AUC,
 ## 10. Current status
 
 - The selector kernel, structural receipt verifier, outcome-ledger metrics module/CLI, request/response/receipt/outcome/report schemas, selector/outcome fixtures, README/benchmark contracts and focused workflow are committed on the draft PR branch.
-- The outcome evaluator now has 17 authored unit tests, including a grouped fixture in which the pooled result alone would hide a worst-group regression. The report contract is now `nano-benchmark-metrics-v2`; the outcome-ledger input remains v1. An independent JavaScript arithmetic check over the checked-in synthetic ledger matches the test expectations for baseline success rate/AUC, failure accounting, candidate repetitions, all-in cost and paired success-rate delta. The JSON fixture and report schema were fetched back and parsed as JSON.
+- The outcome evaluator now has 19 authored unit tests, including grouped fixtures in which pooled averages hide worst-group regressions and tests for optional shift-manifest digest propagation/validation. The report contract is now `nano-benchmark-metrics-v2`; the outcome-ledger input remains v1. An independent JavaScript arithmetic check over the checked-in synthetic ledger matches the test expectations for baseline success rate/AUC, failure accounting, candidate repetitions, all-in cost and paired success-rate delta. The JSON fixture and report schema were fetched back and parsed as JSON.
 - The independent arithmetic and JSON parsing are source/fixture checks, **not** Rust compilation or test execution. No `cargo`, `rustc` or `rustfmt` is installed in the current environment, so formatting and tests remain unverified locally.
 - The exact-head Rust workflow status must be read separately; queued/skipped is not a pass. No scientific data were scored and no selector improvement is claimed.
