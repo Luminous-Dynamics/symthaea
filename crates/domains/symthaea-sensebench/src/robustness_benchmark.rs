@@ -24,6 +24,9 @@ const FIXED_DESIGN_ID: &str = "coarse_spatial_comparator";
 pub enum RobustnessPolicy {
     /// Optimistically optimize information gain under the first declared model only.
     NominalExpectedGain,
+    /// Maximize variance in predicted outcome probability across hypotheses under
+    /// the first declared model, divided by cost. This simple baseline can be brittle.
+    NominalPredictiveVariance,
     /// Optimize weighted expected gain across declared model scenarios.
     WeightedExpectedGain,
     /// Maximize worst-case gain across the declared model-scenario set.
@@ -158,6 +161,7 @@ pub fn run_model_misspecification_benchmark(
 
     let policies = [
         RobustnessPolicy::NominalExpectedGain,
+        RobustnessPolicy::NominalPredictiveVariance,
         RobustnessPolicy::WeightedExpectedGain,
         RobustnessPolicy::WorstCaseRobust,
         RobustnessPolicy::FixedDesign,
@@ -265,6 +269,19 @@ fn choose_policy(
                 .map(|score| Some(score.candidate_id.clone()))
                 .ok_or(ModelMisspecificationBenchmarkError::EmptyCandidateLibrary)
         }
+        RobustnessPolicy::NominalPredictiveVariance => {
+            let candidates = &model_scenarios.first()
+                .ok_or(ModelMisspecificationBenchmarkError::EmptyCandidateLibrary)?
+                .candidates;
+            let candidate = candidates.iter()
+                .max_by(|left, right| {
+                    (predictive_variance(left, priors) / left.cost)
+                        .total_cmp(&(predictive_variance(right, priors) / right.cost))
+                        .then_with(|| right.id.cmp(&left.id))
+                })
+                .ok_or(ModelMisspecificationBenchmarkError::EmptyCandidateLibrary)?;
+            Ok(Some(candidate.id.clone()))
+        }
         RobustnessPolicy::WeightedExpectedGain => {
             let scores = rank_experiments_robust(priors, model_scenarios)?;
             scores.into_iter()
@@ -293,6 +310,22 @@ fn choose_policy(
         }
         RobustnessPolicy::UniformRandomExpectation => Ok(None),
     }
+}
+
+/// Variance across hypothesis-conditional probabilities of outcome 0.
+/// This is a simple acquisition baseline, not expected information gain.
+fn predictive_variance(
+    candidate: &ExperimentCandidate,
+    priors: &[HypothesisPrior],
+) -> f64 {
+    let mean = priors.iter()
+        .zip(&candidate.likelihoods)
+        .map(|(prior, row)| prior.probability * row[0])
+        .sum::<f64>();
+    priors.iter()
+        .zip(&candidate.likelihoods)
+        .map(|(prior, row)| prior.probability * (row[0] - mean).powi(2))
+        .sum::<f64>()
 }
 
 /// Build a symmetric binary-outcome likelihood table.
@@ -373,6 +406,20 @@ mod tests {
     }
 
     #[test]
+    fn nominal_predictive_variance_can_also_be_brittle_under_model_shift() {
+        let report = run_model_misspecification_benchmark().unwrap();
+        assert_eq!(
+            row(&report, "world_a", RobustnessPolicy::NominalPredictiveVariance)
+                .selected_candidate_id.as_deref(),
+            Some("targeted_brittle_measurement")
+        );
+        assert!(
+            row(&report, "world_b", RobustnessPolicy::NominalPredictiveVariance)
+                .regret_bits_per_cost > 0.0
+        );
+    }
+
+    #[test]
     fn fixed_design_is_not_outscored_by_robust_policy_on_this_small_fixture() {
         // Keep this negative/control result explicit: a strong fixed measurement
         // can match the robust selector, so this test does not claim general active
@@ -391,7 +438,7 @@ mod tests {
         let second = run_model_misspecification_benchmark().unwrap();
         assert_eq!(first, second);
         assert_eq!(first.held_out_world_ids, vec!["held_out_world_c"]);
-        assert_eq!(first.per_world.len(), 15);
+        assert_eq!(first.per_world.len(), 18);
     }
 
     #[test]

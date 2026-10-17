@@ -174,7 +174,7 @@ SENSEBENCH_CODE_REVISION="$(git rev-parse HEAD)" \
   cargo run -p symthaea-sensebench -- --suite robustness
 ```
 
-The suite compares nominal single-model expected gain, model-weighted expected gain, worst-case robust ranking, a predeclared fixed comparator, and the exact expected gain for uniform-random selection. It scores decisions against two declared toy worlds and one likelihood world held out from selector inputs. Reports include the chosen candidate, evaluator-oracle candidate, realized synthetic information gain per declared cost, per-world regret, and mean/maximum regret.
+The suite compares nominal single-model expected gain, nominal predictive variance, model-weighted expected gain, worst-case robust ranking, a predeclared fixed comparator, and the exact expected gain for uniform-random selection. It scores decisions against two declared toy worlds and one likelihood world held out from selector inputs. Reports include the chosen candidate, evaluator-oracle candidate, realized synthetic information gain per declared cost, per-world regret, and mean/maximum regret.
 
 The hand-authored fixture is parameterized to exercise the proposed SE-13 gate mechanics: formula-level reference arithmetic gives nominal maximum regret of about 0.2781 bits/cost and worst-case robust maximum regret of about 0.0101 bits/cost, a 96.36% reduction; information-gain loss on the correctly specified model-A control is about 3.51%. These are not Rust-executed results or empirical performance. They are expected values computed from deliberately constructed likelihood tables to test evaluator wiring and acceptance checks.
 
