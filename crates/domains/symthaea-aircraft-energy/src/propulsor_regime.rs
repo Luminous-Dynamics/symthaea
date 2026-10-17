@@ -93,6 +93,8 @@ pub enum PropulsorOperatingRegime {
     StaticPoweredThrust,
     /// Near-static axial flow with negative thrust while power is supplied.
     StaticPoweredNegativeThrust,
+    /// Near-static flow, power supplied, and thrust within deadband.
+    StaticPoweredLowThrust,
     /// Near-static flow and net shaft power extraction.
     StaticPowerExtraction,
     /// Near-static flow and nonzero rotation but shaft power near zero.
@@ -226,7 +228,7 @@ pub fn classify_propulsor_regime(
                 ThrustState::NegativeThrust,
             ) => PropulsorOperatingRegime::StaticPoweredNegativeThrust,
             (AxialFlowState::NearStatic, ShaftPowerState::PowerIntoShaft, ThrustState::NearZero) => {
-                PropulsorOperatingRegime::ForwardPoweredLowThrust
+                PropulsorOperatingRegime::StaticPoweredLowThrust
             }
             (
                 AxialFlowState::NearStatic,
@@ -306,6 +308,12 @@ mod tests {
     fn classifies_static_powered_thrust_without_static_efficiency_claim() {
         let result = classify_propulsor_regime(point(0.0, 4_000.0, 120.0, 2_500.0), deadbands()).unwrap();
         assert_eq!(result.regime, PropulsorOperatingRegime::StaticPoweredThrust);
+    }
+
+    #[test]
+    fn static_powered_low_thrust_has_its_own_regime() {
+        let result = classify_propulsor_regime(point(0.0, 2_000.0, 0.05, 100.0), deadbands()).unwrap();
+        assert_eq!(result.regime, PropulsorOperatingRegime::StaticPoweredLowThrust);
     }
 
     #[test]
