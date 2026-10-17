@@ -48,6 +48,8 @@ label alone. These declarations still are not authenticated evidence.
 
 ### Required integrity rules
 
+- Every candidate preserves its declared architecture family and tether status alongside the 15 objective intervals.
+- Remote-actuation/tethered family must declare a tether; an untethered candidate must have a structural-zero tether-interference interval.
 - All 15 objective intervals appear exactly once per candidate.
 - Every bound is finite; lower bound does not exceed upper bound.
 - Non-negative metrics cannot have negative bounds; normalized task-success, movement-restriction and comfort bounds stay in [0, 1].
@@ -75,7 +77,7 @@ These are engineering targets for the **software and evidence pipeline**, not cl
 | Determinism | Identical request and schema produce byte-identical JSON across 100 replay iterations | Non-determinism breaks reproducible receipts |
 | Claim ceiling | 0 paths that turn synthetic intervals into physical, clinical, regulatory or safety claims | Any claim promotion is a release blocker |
 
-The current draft authors focused unit tests plus a fixture-replay test. The 10,000-case sweep, exhaustive dimension mutation, and interval-monotonicity property test are **future gates**, not tests claimed to have run or already passed.
+The draft now authors 11 unit tests, including context-binding and tether-integrity negative controls, plus fixture replay and one-dimension interval-widening checks. The 10,000-case sweep and exhaustive dimension mutation remain **future gates**, not tests claimed to have run or already passed.
 
 ## 4. Physical-data readiness targets
 
