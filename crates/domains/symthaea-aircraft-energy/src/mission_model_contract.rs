@@ -115,6 +115,8 @@ pub struct CandidateMissionModelRun {
     pub energy_system_artifact: ModelArtifactRef,
     pub mass_properties_artifact: ModelArtifactRef,
     pub environment_artifact: ModelArtifactRef,
+    /// Content-addressed phase list including nominal power and uncertainty bounds.
+    pub phase_demand_artifact: ModelArtifactRef,
     pub route_artifact: ModelArtifactRef,
     pub mission_family_artifact: ModelArtifactRef,
     pub input_configuration_sha256: String,
@@ -123,6 +125,7 @@ pub struct CandidateMissionModelRun {
     pub input_mission_family_sha256: String,
     pub input_mass_properties_sha256: String,
     pub input_environment_sha256: String,
+    pub output_phase_demand_sha256: String,
 }
 
 /// Complete provenance-bearing output from a candidate-specific mission model.
@@ -141,6 +144,7 @@ pub struct CandidateMissionManifest {
     pub mission_family_sha256: String,
     pub mass_properties_sha256: String,
     pub environment_sha256: String,
+    pub phase_demand_sha256: String,
     pub route_distance_m: f64,
     pub reserve_fraction: f64,
     pub mass_properties: CandidateMassProperties,
@@ -214,6 +218,16 @@ pub fn validate_candidate_mission_manifest(
     validate_digest(
         "environment_sha256",
         &manifest.environment_sha256,
+        &mut findings,
+    );
+    validate_digest(
+        "phase_demand_sha256",
+        &manifest.phase_demand_sha256,
+        &mut findings,
+    );
+    validate_digest(
+        "model_run.output_phase_demand_sha256",
+        &manifest.model_run.output_phase_demand_sha256,
         &mut findings,
     );
     validate_digest(
@@ -307,6 +321,7 @@ pub fn validate_candidate_mission_manifest(
         ("model_run.energy_system_artifact", &manifest.model_run.energy_system_artifact),
         ("model_run.mass_properties_artifact", &manifest.model_run.mass_properties_artifact),
         ("model_run.environment_artifact", &manifest.model_run.environment_artifact),
+        ("model_run.phase_demand_artifact", &manifest.model_run.phase_demand_artifact),
         ("model_run.route_artifact", &manifest.model_run.route_artifact),
         ("model_run.mission_family_artifact", &manifest.model_run.mission_family_artifact),
     ] {
@@ -355,6 +370,21 @@ pub fn validate_candidate_mission_manifest(
         &manifest.model_run.environment_artifact.sha256,
         &mut findings,
     );
+    validate_digest_binding(
+        "phase_demand_sha256",
+        &manifest.phase_demand_sha256,
+        "model_run.phase_demand_artifact.sha256",
+        &manifest.model_run.phase_demand_artifact.sha256,
+        &mut findings,
+    );
+    validate_digest_binding(
+        "phase_demand_sha256",
+        &manifest.phase_demand_sha256,
+        "model_run.output_phase_demand_sha256",
+        &manifest.model_run.output_phase_demand_sha256,
+        &mut findings,
+    );
+
 
     validate_positive("route_distance_m", manifest.route_distance_m, &mut findings);
     validate_fraction("reserve_fraction", manifest.reserve_fraction, &mut findings);
@@ -714,6 +744,7 @@ mod tests {
             mission_family_sha256: "9".repeat(64),
             mass_properties_sha256: "f".repeat(64),
             environment_sha256: "7".repeat(64),
+            phase_demand_sha256: "6".repeat(64),
             route_distance_m: 100_000.0,
             reserve_fraction: 0.1,
             mass_properties: CandidateMassProperties {
@@ -745,6 +776,7 @@ mod tests {
                 energy_system_artifact: artifact('2', "energy"),
                 mass_properties_artifact: artifact('f', "mass"),
                 environment_artifact: artifact('7', "environment"),
+                phase_demand_artifact: artifact('6', "phase-demand"),
                 route_artifact: artifact('8', "route"),
                 mission_family_artifact: artifact('9', "mission-family"),
                 input_configuration_sha256: config_digest,
@@ -753,6 +785,7 @@ mod tests {
                 input_mission_family_sha256: "9".repeat(64),
                 input_mass_properties_sha256: "f".repeat(64),
                 input_environment_sha256: "7".repeat(64),
+                output_phase_demand_sha256: "6".repeat(64),
             },
             phases: vec![
                 MissionPhaseDemand {
@@ -871,6 +904,21 @@ mod tests {
                 finding,
                 MissionModelContractFinding::DigestMismatch { .. }
             )).count() >= 2
+        ));
+    }
+
+    #[test]
+    fn phase_demand_digest_must_match_output_artifact_and_record() {
+        let mut input = manifest();
+        input.model_run.output_phase_demand_sha256 = "0".repeat(64);
+        let result = validate_candidate_mission_manifest(&input, &energy_system());
+        assert!(matches!(
+            result,
+            Err(findings) if findings.iter().any(|finding| matches!(
+                finding,
+                MissionModelContractFinding::DigestMismatch { field }
+                    if field.contains("phase_demand_sha256")
+            ))
         ));
     }
 
