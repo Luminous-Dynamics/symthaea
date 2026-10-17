@@ -14,7 +14,7 @@
 //! - [`inventory`]: economic order quantity (EOQ) + total cost.
 //! - [`queue`]: M/M/1 queue metrics (ρ, L, Lq, W, Wq).
 //! - [`graph`]: Dijkstra single-source shortest paths.
- //! - `aircraft_ownership`: annual ownership-cost decomposition with dispatch and completed-passenger-kilometre metrics.
+//! - [`aircraft_ownership`]: annual ownership-cost decomposition with dispatch and completed-passenger-kilometre metrics.
 //!
 //! ## Example
 //!
