@@ -139,7 +139,6 @@ fn load_unverified_chains(paths: &[String]) -> Result<(Vec<ChainTable>, Vec<Inpu
 
 fn load_manifest_verified_chains(
     manifest_text: &str,
-    manifest_sha256: &str,
     mappings: &[String],
 ) -> Result<(Vec<ChainTable>, Vec<InputArtifactAudit>), String> {
     let mut tables = Vec::with_capacity(mappings.len());
@@ -187,10 +186,6 @@ fn load_manifest_verified_chains(
         });
     }
 
-    // Mention the manifest digest in the report so it can be retained with the
-    // result. This does not independently authenticate the manifest itself; the
-    // caller must acquire it from the official publisher over a trusted channel.
-    let _ = manifest_sha256;
     Ok((tables, artifacts))
 }
 
@@ -253,7 +248,7 @@ fn run() -> Result<bool, String> {
     }
 
     if args.get(1).map(String::as_str) == Some("--audit-manifest") {
-        if args.len() < 6 {
+        if args.len() < 5 {
             return Err(format!(
                 "usage: {} --audit-manifest SHA256SUMS COLUMN RELATIVE_PATH=LOCAL_FILE [RELATIVE_PATH=LOCAL_FILE ...]",
                 args.first().map(String::as_str).unwrap_or("symthaea-cosmology-chain-audit")
@@ -267,7 +262,7 @@ fn run() -> Result<bool, String> {
             .map_err(|error| format!("checksum manifest is not UTF-8: {error}"))?;
         let manifest_sha256 = sha256_bytes(&manifest_bytes);
         let mappings = &args[4..];
-        let (tables, artifacts) = load_manifest_verified_chains(manifest_text, &manifest_sha256, mappings)?;
+        let (tables, artifacts) = load_manifest_verified_chains(manifest_text, mappings)?;
         summarize_loaded_chains(
             requested_column,
             tables,
@@ -329,6 +324,43 @@ mod tests {
             json_input_artifacts(&artifacts),
             "[{\"path\": \"chain.1.txt\", \"manifest_relative_path\": \"cobaya/base/desi-bao-all/chain.1.txt\", \"expected_sha256\": \"ba7816bf8f01cfea414140de5dae2223b00361a396177a9cb410ff61f20015ad\", \"sha256\": \"ba7816bf8f01cfea414140de5dae2223b00361a396177a9cb410ff61f20015ad\", \"size_bytes\": 3, \"checksum_verified\": true}]"
         );
+    }
+
+    #[test]
+    fn manifest_audit_parses_only_checksum_matching_bytes() {
+        use std::time::{SystemTime, UNIX_EPOCH};
+
+        let unique = SystemTime::now()
+            .duration_since(UNIX_EPOCH)
+            .unwrap()
+            .as_nanos();
+        let dir = std::env::temp_dir().join(format!(
+            "symthaea-desicheck-{}-{unique}",
+            std::process::id()
+        ));
+        std::fs::create_dir_all(&dir).unwrap();
+        let file_path = dir.join("chain.1.txt");
+        let bytes = b"# weight minuslogpost H0\n1 -10 67\n1 -11 69\n";
+        std::fs::write(&file_path, bytes).unwrap();
+
+        let relative_path = "cobaya/base/desi-bao-all/chain.1.txt";
+        let digest = sha256_bytes(bytes);
+        let manifest = format!("{digest}  {relative_path}\n");
+        let mapping = format!("{relative_path}={}", file_path.display());
+        let (tables, artifacts) =
+            load_manifest_verified_chains(&manifest, &[mapping.clone()]).unwrap();
+        assert_eq!(tables.len(), 1);
+        assert_eq!(tables[0].rows.len(), 2);
+        assert_eq!(artifacts.len(), 1);
+        assert!(artifacts[0].checksum_verified);
+        assert_eq!(artifacts[0].expected_sha256.as_deref(), Some(digest.as_str()));
+        assert_eq!(artifacts[0].sha256, digest);
+
+        // Mutation after the manifest was frozen must stop the audit before
+        // any summary can be returned.
+        std::fs::write(&file_path, b"# weight minuslogpost H0\n1 -10 67\n1 -11 70\n").unwrap();
+        assert!(load_manifest_verified_chains(&manifest, &[mapping]).is_err());
+        std::fs::remove_dir_all(dir).unwrap();
     }
 
     #[test]
