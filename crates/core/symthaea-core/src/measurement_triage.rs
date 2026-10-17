@@ -554,6 +554,18 @@ mod tests {
         ArchitectureFamilyV1, ArchitectureOperatingConditionsV1,
     };
 
+    const TRIAGE_ACTIONS_FIXTURE_JSON: &str = include_str!(
+        "../../../../docs/research/open-mobility/fixtures/measurement-triage-actions-v1.json"
+    );
+
+    #[derive(Deserialize)]
+    struct TriageFixtureV1 {
+        schema_version: u16,
+        actions: Vec<MeasurementActionV1>,
+        expected_frontier: Vec<String>,
+        expected_blocked: Vec<String>,
+    }
+
     fn gates(kind: MeasurementActionKindV1) -> MeasurementActionGatesV1 {
         MeasurementActionGatesV1 {
             protocol_frozen: MeasurementGateStatusV1::Satisfied,
@@ -868,6 +880,37 @@ mod tests {
             MEASUREMENT_TRIAGE_SCHEMA_VERSION_V1,
         )
         .is_err());
+    }
+
+    #[test]
+    fn versioned_action_catalog_matches_decision_sensitive_frontier() {
+        let fixture: TriageFixtureV1 =
+            serde_json::from_str(TRIAGE_ACTIONS_FIXTURE_JSON)
+                .expect("measurement action fixture parses");
+        let report = triage_measurement_actions(
+            &source_report(),
+            &fixture.actions,
+            fixture.schema_version,
+        )
+        .expect("versioned action catalog and source report are valid");
+
+        let frontier: Vec<String> = report
+            .actions
+            .iter()
+            .filter(|assessment| assessment.on_proposal_frontier)
+            .map(|assessment| assessment.action_id.clone())
+            .collect();
+        assert_eq!(frontier, fixture.expected_frontier);
+
+        let blocked: Vec<String> = report
+            .actions
+            .iter()
+            .filter(|assessment| !assessment.eligible_for_triage)
+            .map(|assessment| assessment.action_id.clone())
+            .collect();
+        assert_eq!(blocked, fixture.expected_blocked);
+        assert_eq!(report.measurement_sensitive_pair_count, 1);
+        assert_eq!(report.decision_sensitive_cell_count, 2);
     }
 
     #[test]
