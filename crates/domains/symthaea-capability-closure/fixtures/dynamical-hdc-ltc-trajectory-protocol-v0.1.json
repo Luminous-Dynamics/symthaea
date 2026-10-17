@@ -5,7 +5,13 @@
   "scope": {
     "active_implementation": "symthaea-core::hdc::hdc_ltc_unified",
     "representation": "continuous_f32",
-    "semantic_dimensions": [16384, 32768, 65536, 131072, 262144],
+    "semantic_dimensions": [
+      16384,
+      32768,
+      65536,
+      131072,
+      262144
+    ],
     "tier_status": {
       "16384": "baseline",
       "32768": "baseline",
@@ -13,7 +19,12 @@
       "131072": "exploratory",
       "262144": "exploratory"
     },
-    "candidate_local_dynamical_dimensions": [1024, 4096, 16384, 32768],
+    "candidate_local_dynamical_dimensions": [
+      1024,
+      4096,
+      16384,
+      32768
+    ],
     "canonical_owners": [
       "https://github.com/Luminous-Dynamics/symthaea/issues/6560",
       "https://github.com/Luminous-Dynamics/symthaea/issues/6561",
@@ -51,12 +62,36 @@
     "representative_edge_state_update"
   ],
   "evidence_ladder": [
-    { "level": "E0", "name": "protocol_and_schema_only", "permits": "no empirical performance claim" },
-    { "level": "E1", "name": "operator_correctness_and_cost", "permits": "operator-level claim only" },
-    { "level": "E2", "name": "trajectory_fidelity", "permits": "numerical-dynamics claim within declared workload" },
-    { "level": "E3", "name": "held_out_task_quality", "permits": "task claim within the frozen evaluation set" },
-    { "level": "E4", "name": "end_to_end_measured_system_cost", "permits": "measured performance/energy claim on declared platform" },
-    { "level": "E5", "name": "independent_hardware_or_external_replication", "permits": "only the specific externally supported hardware/replication claim" }
+    {
+      "level": "E0",
+      "name": "protocol_and_schema_only",
+      "permits": "no empirical performance claim"
+    },
+    {
+      "level": "E1",
+      "name": "operator_correctness_and_cost",
+      "permits": "operator-level claim only"
+    },
+    {
+      "level": "E2",
+      "name": "trajectory_fidelity",
+      "permits": "numerical-dynamics claim within declared workload"
+    },
+    {
+      "level": "E3",
+      "name": "held_out_task_quality",
+      "permits": "task claim within the frozen evaluation set"
+    },
+    {
+      "level": "E4",
+      "name": "end_to_end_measured_system_cost",
+      "permits": "measured performance/energy claim on declared platform"
+    },
+    {
+      "level": "E5",
+      "name": "independent_hardware_or_external_replication",
+      "permits": "only the specific externally supported hardware/replication claim"
+    }
   ],
   "candidate_gates_to_freeze_before_candidate_results": {
     "numerical_integrator": {
@@ -73,7 +108,7 @@
     },
     "compressed_dynamics": {
       "applies_when": "Semantic width is distinct from local dynamical width and full-width dynamics is the control.",
-      "held_out_classification_absolute_accuracy_drop_percentage_points_max": 1.0,
+      "held_out_classification_absolute_accuracy_drop_percentage_points_max": 1,
       "held_out_control_return_relative_drop_max": 0.02,
       "reconstructed_trajectory_nrmse_vs_full_width_max": 0.01,
       "hidden_full_width_recurrent_work_allowed": false,
@@ -86,8 +121,8 @@
     "end_to_end_system_win": {
       "requires_task_quality_gate": true,
       "requires_numerical_or_trajectory_gate_for_the_claimed_profile": true,
-      "throughput_speedup_minimum_alternative_gate": 2.0,
-      "measured_system_energy_reduction_fraction_minimum_alternative_gate": 0.30,
+      "throughput_speedup_minimum_alternative_gate": 2,
+      "measured_system_energy_reduction_fraction_minimum_alternative_gate": 0.3,
       "p95_latency_regression_fraction_max": 0.05,
       "p99_latency_regression_fraction_max": 0.05,
       "measurement_boundary": [
@@ -108,7 +143,11 @@
     "warmup_invocations_minimum": 10,
     "timed_invocations_per_measurement_block_minimum": 1000,
     "independent_measurement_blocks_per_configuration_minimum": 30,
-    "report_latency_percentiles": ["p50", "p95", "p99"],
+    "report_latency_percentiles": [
+      "p50",
+      "p95",
+      "p99"
+    ],
     "report_confidence_intervals": "95% bootstrap interval over independent measurement blocks; document the resampling unit.",
     "report_fields": [
       "source_commit_and_dirty_state",
@@ -147,5 +186,10 @@
       "url": "https://www.nature.com/articles/s41467-026-76067-5",
       "use": "Motivates a separate approximate/analogue evidence track; it is a different architecture and benchmark."
     }
-  ]
+  ],
+  "task_dimension_association_map": {
+    "document": "docs/research/HDC_TASK_DIMENSION_ASSOCIATION_MAP_V0_1.md",
+    "machine_readable_matrix": "crates/domains/symthaea-capability-closure/fixtures/hdc-task-dimension-association-matrix-v0.1.json",
+    "status": "literature_grounded_hypotheses_not_measurements"
+  }
 }
