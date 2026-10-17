@@ -94,7 +94,7 @@ pub struct OutcomeLedger {
     /// SHA-256 of the source, data-rights and artifact-provenance manifest.
     pub source_manifest_sha256: String,
     /// Optional SHA-256 of the independently verified distribution-shift manifest.
-    #[serde(default)]
+    #[serde(default, skip_serializing_if = "Option::is_none")]
     pub shift_manifest_sha256: Option<String>,
     /// Task loss name; lower is better.
     pub loss_name: String,
