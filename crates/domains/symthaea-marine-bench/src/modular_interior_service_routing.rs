@@ -79,7 +79,7 @@ pub enum AnchorEvidenceClass {
     SourceVerified,
 }
 
-#[derive(Clone, Debug, Deserialize, Serialize, PartialEq, Eq)]
+#[derive(Clone, Debug, Deserialize, Serialize)]
 #[serde(deny_unknown_fields)]
 pub struct RoutingAnchor {
     pub kind: AnchorKind,
@@ -92,7 +92,7 @@ pub struct RoutingAnchor {
     pub evidence_refs: Vec<String>,
 }
 
-#[derive(Clone, Debug, Deserialize, Serialize, PartialEq, Eq)]
+#[derive(Clone, Debug, Deserialize, Serialize)]
 #[serde(deny_unknown_fields)]
 pub struct ServiceRouteRequest {
     pub route_id: String,
@@ -375,9 +375,13 @@ fn normalize_requests(
                 }
                 AnchorKind::PlatformService => {
                     let service_id = anchor.service_id.as_deref().expect("shape checked");
-                    let count = configuration.platform_services.iter().filter(|service| service.service_id == service_id).count();
-                    if count != 1 {
-                        return Err(RoutingError::new("ANCHOR_SERVICE_NOT_UNIQUE", format!("service anchor {:?} resolves to {count} platform services", service_id)));
+                    let services: Vec<_> = configuration.platform_services.iter()
+                        .filter(|service| service.service_id == service_id).collect();
+                    if services.len() != 1 {
+                        return Err(RoutingError::new("ANCHOR_SERVICE_NOT_UNIQUE", format!("service anchor {:?} resolves to {} platform services", service_id, services.len())));
+                    }
+                    if services[0].medium != connection.medium {
+                        return Err(RoutingError::new("ANCHOR_MEDIUM_MISMATCH", format!("service anchor {:?} medium differs from connection {:?}", service_id, connection.connection_id)));
                     }
                 }
             }
@@ -932,10 +936,10 @@ mod tests {
         }
     }
 
-    fn request(route_id: &str, start: RoutingAnchor, end: RoutingAnchor) -> ServiceRouteRequest {
+    fn request_for(route_id: &str, connection_id: &str, start: RoutingAnchor, end: RoutingAnchor) -> ServiceRouteRequest {
         ServiceRouteRequest {
             route_id: route_id.to_owned(),
-            connection_id: "CONN-CABIN-01-AC_IN".to_owned(),
+            connection_id: connection_id.to_owned(),
             start, end,
             clearance_mm: 100,
             bend_penalty_mm: 100,
@@ -954,8 +958,8 @@ mod tests {
     #[test]
     fn detour_around_wetroom_is_deterministic_and_receipt_verifies() {
         let baseline = live();
-        let route = request(
-            "AC-TRUNK-01",
+        let route = request_for(
+            "AC-TRUNK-01", "CONN-CABIN-01-AC_IN",
             module_anchor("CABIN-01", "AC_IN", 2800, 1800),
             service_anchor("AC-BUS", 4700, 1800),
         );
@@ -974,8 +978,8 @@ mod tests {
     #[test]
     fn no_path_and_expansion_cap_are_explicit() {
         let baseline = live();
-        let no_path = request(
-            "NO-PATH-ROUTE",
+        let no_path = request_for(
+            "NO-PATH-ROUTE", "CONN-CABIN-01-AC_IN",
             module_anchor("CABIN-01", "AC_IN", 2800, 1800),
             service_anchor("AC-BUS", 13000, 1800),
         );
@@ -983,8 +987,8 @@ mod tests {
         let report = route_services(&baseline, &[no_path], limits()).unwrap();
         assert_eq!(report.body.routes[0].disposition, RouteDisposition::EndpointBlocked);
 
-        let direct = request(
-            "BUDGET-ROUTE",
+        let direct = request_for(
+            "BUDGET-ROUTE", "CONN-CABIN-01-AC_IN",
             module_anchor("CABIN-01", "AC_IN", 2800, 1800),
             service_anchor("AC-BUS", 4700, 1800),
         );
@@ -997,8 +1001,8 @@ mod tests {
     #[test]
     fn route_inputs_bind_to_existing_connection_endpoints() {
         let baseline = live();
-        let route = request(
-            "BAD-ANCHOR-01",
+        let route = request_for(
+            "BAD-ANCHOR-01", "CONN-CABIN-01-AC_IN",
             module_anchor("CABIN-01", "AC_IN", 2700, 1800),
             service_anchor("AC-BUS", 4700, 1800),
         );
@@ -1009,8 +1013,8 @@ mod tests {
     #[test]
     fn duplicate_routes_for_connection_are_rejected() {
         let baseline = live();
-        let first = request(
-            "AC-TRUNK-01",
+        let first = request_for(
+            "AC-TRUNK-01", "CONN-CABIN-01-AC_IN",
             module_anchor("CABIN-01", "AC_IN", 2800, 1800),
             service_anchor("AC-BUS", 4700, 1800),
         );
