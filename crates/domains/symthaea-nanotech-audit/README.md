@@ -34,7 +34,7 @@ Without a sidecar, the auditor reports `provenance_manifest_status: "not_provide
 
 ## Provenance sidecar
 
-Schemas: [provenance sidecar](schema/made-run-provenance.schema.json), [per-call oracle ledger record](schema/oracle-call-ledger-record.schema.json), and [audit report](schema/audit-report.schema.json). The report schema is the machine-readable output contract. The sidecar binds an exported run to:
+Schemas: [provenance sidecar](schema/made-run-provenance.schema.json), [per-call oracle ledger record](schema/oracle-call-ledger-record.schema.json), [distribution-shift manifest](schema/nano-shift-manifest.schema.json), and [audit report](schema/audit-report.schema.json). The report schema is the machine-readable output contract. The sidecar binds an exported run to:
 - the exact upstream benchmark and policy revisions;
 - task, evaluation, source manifests and resolved configuration hashes;
 - explicit data-source revisions, license declarations and rights-status declarations;
@@ -68,5 +68,18 @@ An `artifact_integrity_pass` is **not** a scientific benchmark pass. The verifie
 - oracle-call truth, cache behavior, setup cost, compute cost or carbon accounting from external evidence;
 - scientific validity of a predicted property, trajectory reliability, or causal discovery;
 - experimental confirmation or independent replication.
+
+### Optional distribution-shift manifest
+
+A run can bind an optional `shift_manifest_path` and `shift_manifest_sha256` in the provenance sidecar. When present, both fields are required. The manifest freezes shift family, severity, split (`train`, `calibration`, `validation`, or `test_lockbox`), physical rationale, severity definition, source snapshot hash, independence keys, and sample IDs.
+
+The auditor checks the shift-manifest digest against the artifact list and validates:
+- recognized shift families and severity/split labels;
+- task-contract and benchmark identity against the provenance sidecar;
+- source snapshot digests against already hashed artifacts;
+- unique group IDs and non-empty sample/independence identifiers;
+- no independence key or sample ID crossing between different data splits.
+
+This is a leakage guard, not proof that the shift labels are physically justified or that the split represents real deployment. Those decisions require preregistration and domain review. The strict split contract is intended for NANO-012.
 
 A manifest hash is a check on bytes and linkage, not external attestation. The auditor is an integrity component for NANO-010, not the full scientific benchmark gate.
