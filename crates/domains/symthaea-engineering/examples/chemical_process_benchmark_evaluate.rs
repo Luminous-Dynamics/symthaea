@@ -89,7 +89,11 @@ fn strings(value: &Value, field: &str) -> Option<BTreeSet<String>> {
         .get(field)?
         .as_array()?
         .iter()
-        .map(|item| item.as_str().map(ToOwned::to_owned))
+        .map(|item| {
+            item.as_str()
+                .filter(|text| !text.trim().is_empty())
+                .map(ToOwned::to_owned)
+        })
         .collect()
 }
 
@@ -644,6 +648,26 @@ mod tests {
                 "observed_numeric_values": { "solution": solution }
             }]
         })
+    }
+
+    
+    #[test]
+    fn malformed_corpus_contract_fails_closed() {
+        let mut invalid_corpus = mini_corpus();
+        invalid_corpus["cases"][0]
+            .as_object_mut()
+            .unwrap()
+            .remove("prohibited_promotions");
+
+        let output = evaluate(&invalid_corpus, &good_results(), HEAD);
+        assert_eq!(output["passed"], false);
+        assert!(
+            output["global_errors"]
+                .as_array()
+                .unwrap()
+                .iter()
+                .any(|error| error.as_str().unwrap().contains("prohibited_promotions"))
+        );
     }
 
     #[test]
