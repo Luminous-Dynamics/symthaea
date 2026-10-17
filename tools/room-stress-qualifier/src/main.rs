@@ -112,7 +112,10 @@ impl EvaluationSummary {
             "assertions_passed": self.assertions_passed,
             "assertions_failed": self.assertions_checked.saturating_sub(self.assertions_passed),
             "failures": self.failures.iter().map(EvaluationFailure::to_value).collect::<Vec<_>>(),
-            "claim_ceiling": "Reports are checked against synthetic oracles; evidence path/digest checks do not qualify artifact semantics."
+            "claim_ceiling": concat!(
+                "Reports are checked against synthetic oracles; evidence path/digest checks ",
+                "do not qualify artifact semantics."
+            )
         })
     }
 }
@@ -285,8 +288,8 @@ fn evaluate_run_report(
         .collect();
     if !report_errors.is_empty() {
         return Err(format!(
-            "run report failed JSON Schema validation (showing at most 20 errors):\\n{}",
-            report_errors.join("\\n")
+            "run report failed JSON Schema validation (showing at most 20 errors):\n{}",
+            report_errors.join("\n")
         ));
     }
 
@@ -607,7 +610,10 @@ fn run(args: &[String]) -> Result<bool, String> {
     if args.first().map(String::as_str) == Some("--evaluate-json") {
         if args.len() != 3 {
             return Err(
-                "usage: room-stress-qualifier --evaluate-json RUN_REPORT.json EVIDENCE_ROOT".to_string(),
+                concat!(
+                    "usage: room-stress-qualifier --evaluate-json ",
+                    "RUN_REPORT.json EVIDENCE_ROOT"
+                ).to_string(),
             );
         }
         let report_path = &args[1];
@@ -973,7 +979,9 @@ mod tests {
         )
         .unwrap();
         assert!(summary.failures.iter().any(|failure| {
-            failure.reasons.iter().any(|reason| reason.contains("expected exactly one evidence reference"))
+            failure.reasons.iter().any(|reason| {
+                reason.contains("expected exactly one evidence reference")
+            })
         }));
     }
 
@@ -1010,7 +1018,9 @@ mod tests {
         )
         .unwrap();
         assert!(summary.failures.iter().any(|failure| {
-            failure.reasons.iter().any(|reason| reason.contains("evidence artifact digest mismatch"))
+            failure.reasons.iter().any(|reason| {
+                reason.contains("evidence artifact digest mismatch")
+            })
         }));
     }
 
@@ -1029,7 +1039,9 @@ mod tests {
         )
         .unwrap();
         assert!(summary.failures.iter().any(|failure| {
-            failure.reasons.iter().any(|reason| reason.contains("artifact_path cannot contain absolute paths or dot segments"))
+            failure.reasons.iter().any(|reason| {
+                reason.contains("artifact_path cannot contain absolute paths or dot segments")
+            })
         }));
     }
 
@@ -1048,7 +1060,9 @@ mod tests {
         )
         .unwrap();
         assert!(summary.failures.iter().any(|failure| {
-            failure.reasons.iter().any(|reason| reason.contains("evidence artifact") && reason.contains("is unavailable"))
+            failure.reasons.iter().any(|reason| {
+                reason.contains("evidence artifact") && reason.contains("is unavailable")
+            })
         }));
     }
 
