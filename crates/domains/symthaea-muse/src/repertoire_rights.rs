@@ -241,8 +241,20 @@ fn required_layers(request: &RepertoireUseRequestV1) -> Vec<RightsLayerV1> {
         A::JoinLiveJam => vec![L::PerformerConsent],
         A::AnalyzeSourceAudio => vec![L::SoundRecording],
         A::TranscribeComposition => vec![L::SoundRecording, L::Composition],
-        A::CreateArrangement => vec![L::SoundRecording, L::Composition, L::Arrangement],
-        A::PrivateRehearsal => vec![L::Composition],
+        A::CreateArrangement => {
+            let mut required = vec![L::Composition, L::Arrangement];
+            if request.source.is_audio_asset() {
+                required.insert(0, L::SoundRecording);
+            }
+            required
+        }
+        A::PrivateRehearsal => {
+            let mut required = vec![L::Composition];
+            if request.source.is_audio_asset() {
+                required.insert(0, L::SoundRecording);
+            }
+            required
+        }
         A::PerformCoverPublicly => vec![L::Composition, L::PublicPerformance],
         A::RecordCover => vec![L::Composition, L::CoverRecording],
         A::PublishCoverAudio => vec![
