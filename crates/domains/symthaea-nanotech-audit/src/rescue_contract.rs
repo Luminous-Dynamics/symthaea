@@ -89,7 +89,7 @@ struct SamplingManifest {
     sampling_frame_path: String,
     sampling_frame_sha256: String,
     preregistration_receipt_path: String,
-    preregistration_receipt_sha256: String,
+    manifest_visibility: String,
     seed_reveal_path: String,
     seed_commitment_sha256: String,
     frame_population_size: usize,
@@ -124,6 +124,7 @@ struct SampledWindow {
 struct PreregistrationReceipt {
     schema_version: String,
     run_id: String,
+    audit_sampling_manifest_sha256: String,
     policy_revision_sha256: String,
     sampling_frame_sha256: String,
     seed_commitment_sha256: String,
@@ -218,10 +219,12 @@ pub(crate) fn audit_optional_rescue_contract(run_dir: &Path) -> RescueContractAu
     }
     if !is_sha256(&manifest.policy_revision_sha256)
         || !is_sha256(&manifest.sampling_frame_sha256)
-        || !is_sha256(&manifest.preregistration_receipt_sha256)
         || !is_sha256(&manifest.seed_commitment_sha256)
     {
         audit.fail("rescue_manifest_bad_digest", "policy/frame/receipt/seed digests must be lowercase SHA-256");
+    }
+    if manifest.manifest_visibility != "evaluator_sealed_until_policy_run_complete" {
+        audit.fail("rescue_manifest_not_sealed", "sample IDs must remain evaluator-sealed until the policy run completes");
     }
     if !manifest.frozen_before_policy_run || !manifest.policy_blind {
         audit.fail(
@@ -293,9 +296,6 @@ pub(crate) fn audit_optional_rescue_contract(run_dir: &Path) -> RescueContractAu
             return audit;
         }
     };
-    if sha256_hex(&receipt_bytes) != manifest.preregistration_receipt_sha256 {
-        audit.fail("rescue_receipt_digest_mismatch", "pre-registration receipt digest does not match");
-    }
     let receipt: PreregistrationReceipt = match serde_json::from_slice(&receipt_bytes) {
         Ok(value) => value,
         Err(error) => {
@@ -305,6 +305,7 @@ pub(crate) fn audit_optional_rescue_contract(run_dir: &Path) -> RescueContractAu
     };
     if receipt.schema_version != "nano-rescue-preregistration-v1"
         || receipt.run_id != manifest.run_id
+        || receipt.audit_sampling_manifest_sha256 != manifest_digest
         || receipt.policy_revision_sha256 != manifest.policy_revision_sha256
         || receipt.sampling_frame_sha256 != manifest.sampling_frame_sha256
         || receipt.seed_commitment_sha256 != manifest.seed_commitment_sha256
