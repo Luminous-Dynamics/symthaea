@@ -247,27 +247,42 @@
     },
     {
       "operation_id": "OP-03-harness-prep",
-      "title": "Prepare harness and verify polarity/continuity",
-      "duration_minutes_estimate": 25,
+      "title": "Prepare approved harness and crimp labeled connectors",
+      "duration_minutes_estimate": 20,
       "predecessor_ids": [
         "OP-01-incoming-inspection"
       ],
       "required_worker_skill_ids": [
-        "harness_fabrication",
-        "continuity_polarity_test"
+        "harness_fabrication"
       ],
       "required_resource_capability_ids": [
-        "harness_fabrication",
-        "continuity_polarity_test"
+        "harness_fabrication"
       ],
       "outputs": [
         "harness_identity",
+        "harness_assembly_record"
+      ]
+    },
+    {
+      "operation_id": "OP-04-harness-continuity-check",
+      "title": "Independently check harness pinout, polarity and continuity",
+      "duration_minutes_estimate": 5,
+      "predecessor_ids": [
+        "OP-03-harness-prep"
+      ],
+      "required_worker_skill_ids": [
+        "continuity_polarity_test"
+      ],
+      "required_resource_capability_ids": [
+        "continuity_polarity_test"
+      ],
+      "outputs": [
         "pinout_and_polarity_record",
         "continuity_record"
       ]
     },
     {
-      "operation_id": "OP-04-adapter-dimensional-check",
+      "operation_id": "OP-05-adapter-dimensional-check",
       "title": "Measure adapter geometry and service access",
       "duration_minutes_estimate": 15,
       "predecessor_ids": [
@@ -285,13 +300,13 @@
       ]
     },
     {
-      "operation_id": "OP-05-module-assembly",
+      "operation_id": "OP-06-module-assembly",
       "title": "Assemble sensor/logger, harness and adapter",
       "duration_minutes_estimate": 20,
       "predecessor_ids": [
         "OP-01-incoming-inspection",
-        "OP-03-harness-prep",
-        "OP-04-adapter-dimensional-check"
+        "OP-04-harness-continuity-check",
+        "OP-05-adapter-dimensional-check"
       ],
       "required_worker_skill_ids": [
         "mechanical_assembly",
@@ -309,11 +324,11 @@
       ]
     },
     {
-      "operation_id": "OP-06-electrical-functional-check",
+      "operation_id": "OP-07-electrical-functional-check",
       "title": "Run current-limited electrical and data-readout checks",
       "duration_minutes_estimate": 10,
       "predecessor_ids": [
-        "OP-05-module-assembly"
+        "OP-06-module-assembly"
       ],
       "required_worker_skill_ids": [
         "current_limited_electrical_test",
@@ -330,11 +345,11 @@
       ]
     },
     {
-      "operation_id": "OP-07-reference-measurement-check",
+      "operation_id": "OP-08-reference-measurement-check",
       "title": "Compare indicated values with the declared reference system",
       "duration_minutes_estimate": 40,
       "predecessor_ids": [
-        "OP-06-electrical-functional-check"
+        "OP-07-electrical-functional-check"
       ],
       "required_worker_skill_ids": [
         "reference_instrument_use",
@@ -354,11 +369,11 @@
       ]
     },
     {
-      "operation_id": "OP-08-bind-build-manifest",
+      "operation_id": "OP-09-bind-build-manifest",
       "title": "Bind exact article, firmware/configuration and evidence references",
       "duration_minutes_estimate": 10,
       "predecessor_ids": [
-        "OP-07-reference-measurement-check"
+        "OP-08-reference-measurement-check"
       ],
       "required_worker_skill_ids": [
         "artifact_manifest_binding"
@@ -373,11 +388,11 @@
       ]
     },
     {
-      "operation_id": "OP-09-independent-acceptance",
+      "operation_id": "OP-10-independent-acceptance",
       "title": "Independent review of all mandatory evidence and deviations",
       "duration_minutes_estimate": 15,
       "predecessor_ids": [
-        "OP-08-bind-build-manifest"
+        "OP-09-bind-build-manifest"
       ],
       "required_worker_skill_ids": [
         "independent_acceptance_review",
@@ -399,12 +414,13 @@
     "OP-01-incoming-inspection",
     "OP-02-adapter-fabrication",
     "OP-03-harness-prep",
-    "OP-04-adapter-dimensional-check",
-    "OP-05-module-assembly",
-    "OP-06-electrical-functional-check",
-    "OP-07-reference-measurement-check",
-    "OP-08-bind-build-manifest",
-    "OP-09-independent-acceptance"
+    "OP-04-harness-continuity-check",
+    "OP-05-adapter-dimensional-check",
+    "OP-06-module-assembly",
+    "OP-07-electrical-functional-check",
+    "OP-08-reference-measurement-check",
+    "OP-09-bind-build-manifest",
+    "OP-10-independent-acceptance"
   ],
   "route_invariants": [
     "No operation may schedule without every required worker skill and resource capability.",
