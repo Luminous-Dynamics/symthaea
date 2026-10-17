@@ -10,19 +10,21 @@ The accompanying research contract identifies the official DESI DR2 BAO ΛCDM + 
 - https://data.desi.lbl.gov/public/papers/y3/bao-cosmo-params/dr2_vac_dr2_bao-cosmo-params_v1.0.sha256sum
 - https://data.desi.lbl.gov/public/papers/y3/bao-cosmo-params/cobaya/base/desi-bao-all/
 
-The CLI accepts a named column followed by one or more ASCII chain files whose recognized comment header starts with “# weight minuslogpost”. It combines files only when their full column header and ordering match exactly, then emits one JSON summary. It rejects malformed rows, duplicate columns, non-finite values, negative sample weights, absent parameters, incompatible chain headers and zero-total-weight chains.
+The official audit mode requires the checksum manifest and explicit relative-path/local-file mappings. Each file is hashed and compared against the exact manifest entry before the very same in-memory bytes are parsed. If one digest mismatches, no weighted summary is emitted. All chain headers must match exactly before samples are combined. The separately named `--summary-unverified` mode exists for synthetic/local exploration only and labels every input as not checksum-verified.
 
-Verify one downloaded artifact directly against the official SHA-256 manifest, without manually copying the digest:
+Verify one downloaded artifact separately, when needed for intake triage:
 
     cargo run -p symthaea-cosmology-bench --bin symthaea-cosmology-chain-audit -- --verify-manifest data/bao-cosmo-params/dr2_vac_dr2_bao-cosmo-params_v1.0.sha256sum cobaya/base/desi-bao-all/chain.1.txt data/bao-cosmo-params/cobaya/base/desi-bao-all/chain.1.txt
 
-Repeat for chain.2.txt, chain.3.txt, chain.4.txt, chain.input.yaml, chain.updated.yaml, chain.checkpoint, chain.margestats, and chain.covmat as required. Use the relative path exactly as it appears in the official manifest; a missing or duplicate entry fails closed.
+**Official checksum-gated audit:** one command verifies all chain inputs before parsing or summarizing any of them. The relative paths are taken verbatim from the publisher's manifest:
 
-Audit and combine the four compatible DESI chain files for a selected parameter only after checksum verification:
+    cargo run -p symthaea-cosmology-bench --bin symthaea-cosmology-chain-audit -- --audit-manifest data/bao-cosmo-params/dr2_vac_dr2_bao-cosmo-params_v1.0.sha256sum H0 cobaya/base/desi-bao-all/chain.1.txt=data/bao-cosmo-params/cobaya/base/desi-bao-all/chain.1.txt cobaya/base/desi-bao-all/chain.2.txt=data/bao-cosmo-params/cobaya/base/desi-bao-all/chain.2.txt cobaya/base/desi-bao-all/chain.3.txt=data/bao-cosmo-params/cobaya/base/desi-bao-all/chain.3.txt cobaya/base/desi-bao-all/chain.4.txt=data/bao-cosmo-params/cobaya/base/desi-bao-all/chain.4.txt
 
-    cargo run -p symthaea-cosmology-bench --bin symthaea-cosmology-chain-audit -- H0 data/bao-cosmo-params/cobaya/base/desi-bao-all/chain.1.txt data/bao-cosmo-params/cobaya/base/desi-bao-all/chain.2.txt data/bao-cosmo-params/cobaya/base/desi-bao-all/chain.3.txt data/bao-cosmo-params/cobaya/base/desi-bao-all/chain.4.txt
+For the small local fixture or other unverified input, use the explicitly labeled mode:
 
-The JSON summary includes each exact parsed input's SHA-256 and byte size, plus row count, total and positive-weight sample count, weighted mean/population variance, weighted empirical q16/q50/q84, and weight-only effective sample size. The hashes are computed from the same in-memory bytes passed to the parser.
+    cargo run -p symthaea-cosmology-bench --bin symthaea-cosmology-chain-audit -- --summary-unverified H0 ./synthetic-chain.txt
+
+The JSON summary records the checksum-manifest path and SHA-256, each local path and exact publisher-relative path, expected and actual SHA-256, byte size, and a per-input `checksum_verified` boolean. The hash is computed from the same in-memory bytes passed to the parser. A manifest supplied by a caller is itself recorded and hashed but not independently authenticated by this tool; obtain it from the official publisher over a trusted channel.
 
 ## Scientific boundaries
 
