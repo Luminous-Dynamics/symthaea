@@ -44,11 +44,43 @@ struct ValidationSummary {
 }
 
 #[derive(Debug, PartialEq, Eq)]
+struct EvaluationFailure {
+    case_id: String,
+    assertion_id: String,
+    severity: String,
+    failure_code: String,
+    reasons: Vec<String>,
+}
+
+impl EvaluationFailure {
+    fn display_line(&self) -> String {
+        format!(
+            "{} {} [{}:{}]: {}",
+            self.case_id,
+            self.assertion_id,
+            self.severity,
+            self.failure_code,
+            self.reasons.join("; ")
+        )
+    }
+
+    fn to_value(&self) -> Value {
+        serde_json::json!({
+            "case_id": self.case_id,
+            "assertion_id": self.assertion_id,
+            "severity": self.severity,
+            "failure_code": self.failure_code,
+            "reasons": self.reasons
+        })
+    }
+}
+
+#[derive(Debug, PartialEq, Eq)]
 struct EvaluationSummary {
     cases_evaluated: usize,
     assertions_checked: usize,
     assertions_passed: usize,
-    failures: Vec<String>,
+    failures: Vec<EvaluationFailure>,
 }
 
 impl EvaluationSummary {
@@ -63,12 +95,25 @@ impl EvaluationSummary {
             self.assertions_checked.saturating_sub(self.assertions_passed)
         );
         for failure in &self.failures {
-            println!("FAIL: {failure}");
+            println!("FAIL: {}", failure.display_line());
         }
         println!(concat!(
             "Claim ceiling: reported observations are compared with synthetic oracles; ",
             "artifact paths and hashes are checked but artifact semantics are not qualified."
         ));
+    }
+
+    fn to_value(&self) -> Value {
+        serde_json::json!({
+            "result_version": "room-stress-evaluation-result-v0.1",
+            "status": if self.failures.is_empty() { "pass" } else { "fail" },
+            "cases_evaluated": self.cases_evaluated,
+            "assertions_checked": self.assertions_checked,
+            "assertions_passed": self.assertions_passed,
+            "assertions_failed": self.assertions_checked.saturating_sub(self.assertions_passed),
+            "failures": self.failures.iter().map(EvaluationFailure::to_value).collect::<Vec<_>>(),
+            "claim_ceiling": "Reports are checked against synthetic oracles; evidence path/digest checks do not qualify artifact semantics."
+        })
     }
 }
 
@@ -379,10 +424,13 @@ fn evaluate_run_report(
             if reasons.is_empty() {
                 summary.assertions_passed += 1;
             } else {
-                summary.failures.push(format!(
-                    "{case_id} {assertion_id} [{severity}:{failure_code}]: {}",
-                    reasons.join("; ")
-                ));
+                summary.failures.push(EvaluationFailure {
+                    case_id: case_id.to_owned(),
+                    assertion_id: assertion_id.to_owned(),
+                    severity: severity.to_owned(),
+                    failure_code: failure_code.to_owned(),
+                    reasons,
+                });
             }
         }
     }
@@ -556,6 +604,29 @@ fn validate_values(benchmark: Value, schema: Value) -> Result<ValidationSummary,
 }
 
 fn run(args: &[String]) -> Result<bool, String> {
+    if args.first().map(String::as_str) == Some("--evaluate-json") {
+        if args.len() != 3 {
+            return Err(
+                "usage: room-stress-qualifier --evaluate-json RUN_REPORT.json EVIDENCE_ROOT".to_string(),
+            );
+        }
+        let report_path = &args[1];
+        let report_text = fs::read_to_string(Path::new(report_path))
+            .map_err(|error| format!("cannot read run report {report_path}: {error}"))?;
+        let summary = evaluate_run_report(
+            EMBEDDED_BENCHMARK,
+            EMBEDDED_SCHEMA,
+            EMBEDDED_RUN_REPORT_SCHEMA,
+            &report_text,
+            Path::new(&args[2]),
+        )?;
+        let passes = summary.failures.is_empty();
+        let rendered = serde_json::to_string_pretty(&summary.to_value())
+            .map_err(|error| format!("could not serialize evaluation result: {error}"))?;
+        println!("{rendered}");
+        return Ok(passes);
+    }
+
     if args.first().map(String::as_str) == Some("--evaluate") {
         if args.len() != 3 {
             return Err(
@@ -847,6 +918,27 @@ mod tests {
     }
 
     #[test]
+    fn evaluation_summary_json_is_structured_and_stable() {
+        let summary = EvaluationSummary {
+            cases_evaluated: 1,
+            assertions_checked: 1,
+            assertions_passed: 0,
+            failures: vec![EvaluationFailure {
+                case_id: "ROOM-STRESS-001".into(),
+                assertion_id: "ROOM-ASSERT-001-01".into(),
+                severity: "blocking".into(),
+                failure_code: "HARD_CONSTRAINT_DROPPED".into(),
+                reasons: vec!["fixture failure".into()],
+            }],
+        };
+        let value = summary.to_value();
+        assert_eq!(value["status"], "fail");
+        assert_eq!(value["assertions_failed"], 1);
+        assert_eq!(value["failures"][0]["failure_code"], "HARD_CONSTRAINT_DROPPED");
+        assert_eq!(value["failures"][0]["case_id"], "ROOM-STRESS-001");
+    }
+
+    #[test]
     fn wrong_observation_value_fails_with_stable_reason_code() {
         let mut report = golden_report_value(EMBEDDED_BENCHMARK);
         report["results"][0]["observations"]["hard_constraints_survive_edit_sequence"] =
@@ -861,7 +953,7 @@ mod tests {
         )
         .unwrap();
         assert_eq!(summary.assertions_passed, 46);
-        assert!(summary.failures[0].contains("HARD_CONSTRAINT_DROPPED"));
+        assert_eq!(summary.failures[0].failure_code, "HARD_CONSTRAINT_DROPPED");
     }
 
     #[test]
@@ -881,7 +973,7 @@ mod tests {
         )
         .unwrap();
         assert!(summary.failures.iter().any(|failure| {
-            failure.contains("expected exactly one evidence reference")
+            failure.reasons.iter().any(|reason| reason.contains("expected exactly one evidence reference"))
         }));
     }
 
@@ -918,7 +1010,7 @@ mod tests {
         )
         .unwrap();
         assert!(summary.failures.iter().any(|failure| {
-            failure.contains("evidence artifact digest mismatch")
+            failure.reasons.iter().any(|reason| reason.contains("evidence artifact digest mismatch"))
         }));
     }
 
@@ -937,7 +1029,7 @@ mod tests {
         )
         .unwrap();
         assert!(summary.failures.iter().any(|failure| {
-            failure.contains("artifact_path cannot contain absolute paths or dot segments")
+            failure.reasons.iter().any(|reason| reason.contains("artifact_path cannot contain absolute paths or dot segments"))
         }));
     }
 
@@ -956,8 +1048,7 @@ mod tests {
         )
         .unwrap();
         assert!(summary.failures.iter().any(|failure| {
-            failure.contains("evidence artifact")
-                && failure.contains("is unavailable")
+            failure.reasons.iter().any(|reason| reason.contains("evidence artifact") && reason.contains("is unavailable"))
         }));
     }
 
