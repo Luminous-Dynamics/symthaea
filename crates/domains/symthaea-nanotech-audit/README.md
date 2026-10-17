@@ -50,12 +50,14 @@ The accounting identities are reconstructed from the JSONL ledger and cross-chec
 requests_total = setup_requests + proposal_requests + retry_requests
 external_calls = count(records where external_invocation = true)
 cache_hits = count(records where cache_hit = true)
+local_rejections = count(proposal records with status = invalid_candidate)
+requests_total = external_calls + cache_hits + local_rejections
 failed_external_calls = count(external calls whose status is not evaluated)
 proposal_requests = count(stage = proposal) = sum(episode final/queries_used)
 total_cost = sum(per-record cost)
 ```
 
-Each record must identify a receipt artifact whose bytes are separately hash-verified. The ledger is still a declared run artifact; this verifier does not attest that an upstream oracle or service emitted the ledger or that the stated cost unit reflects an invoice or measured compute resource. Reconcile with source-system logs, signed receipts or billing/resource records before total-cost claims.
+A locally rejected candidate is still a proposal attempt and has selector/validation cost, but must have neither an external invocation nor a cache hit. An evaluated request must be either a cache hit or an external invocation; an oracle failure or timeout must record an external invocation. Each record must identify a receipt artifact whose bytes are separately hash-verified. The ledger is still a declared run artifact; this verifier does not attest that an upstream oracle or service emitted the ledger or that the stated cost unit reflects an invoice or measured compute resource. Reconcile with source-system logs, signed receipts or billing/resource records before total-cost claims.
 
 ## Explicit claim ceiling
 
