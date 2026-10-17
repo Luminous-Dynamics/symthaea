@@ -755,6 +755,152 @@ mod tests {
         }
     }
 
+    fn hard_uncertainty(relative_uncertainty: f64) -> PropertyUncertainty {
+        PropertyUncertainty {
+            relative_uncertainty,
+            semantics: PropertyUncertaintySemantics::HardRelativeBound,
+            method_reference: "synthetic hard-bound fixture".to_string(),
+        }
+    }
+
+    fn conditioned_observation(
+        property: DielectricObservationProperty,
+        value: f64,
+        test_temperature_k: f64,
+        test_frequency_hz: Option<f64>,
+        test_field_v_per_m: Option<f64>,
+        breakdown_test_kind: Option<BreakdownTestKind>,
+        evidence_kind: DielectricEvidenceKind,
+        source_reference: &str,
+        dataset_version: Option<&str>,
+        uncertainty: Option<PropertyUncertainty>,
+    ) -> ConditionedDielectricObservation {
+        ConditionedDielectricObservation {
+            material_id: "pairing-fixture-material".to_string(),
+            property,
+            value,
+            test_temperature_k,
+            test_frequency_hz,
+            test_field_v_per_m,
+            breakdown_test_kind,
+            evidence_kind,
+            source_reference: source_reference.to_string(),
+            dataset_version: dataset_version.map(str::to_string),
+            uncertainty,
+        }
+    }
+
+    #[test]
+    fn pairing_preserves_breakdown_provenance_and_requires_matching_epsilon_loss_metadata() {
+        let permittivity = conditioned_observation(
+            DielectricObservationProperty::RelativePermittivity,
+            180.0,
+            298.15,
+            Some(1_000.0),
+            Some(1.0e6),
+            None,
+            DielectricEvidenceKind::Experimental,
+            "doi:paired-dielectric-paper",
+            Some("table-2"),
+            Some(hard_uncertainty(0.03)),
+        );
+        let loss = conditioned_observation(
+            DielectricObservationProperty::LossTangent,
+            0.0008,
+            298.15,
+            Some(1_000.0),
+            Some(1.0e6),
+            None,
+            DielectricEvidenceKind::Experimental,
+            "doi:paired-dielectric-paper",
+            Some("table-2"),
+            Some(hard_uncertainty(0.05)),
+        );
+        let breakdown = conditioned_observation(
+            DielectricObservationProperty::BreakdownStrength,
+            1.2e8,
+            325.0,
+            None,
+            None,
+            Some(BreakdownTestKind::DcRamp),
+            DielectricEvidenceKind::ManufacturerDatasheet,
+            "datasheet:breakdown-test",
+            Some("revision-3"),
+            Some(hard_uncertainty(0.10)),
+        );
+        let paired = pair_conditioned_dielectric_observations(
+            &permittivity,
+            &loss,
+            Some(&breakdown),
+        )
+        .unwrap();
+        assert_eq!(paired.relative_permittivity, 180.0);
+        assert_eq!(paired.loss_tangent, 0.0008);
+        assert_eq!(paired.source_reference, "doi:paired-dielectric-paper");
+        assert_eq!(
+            paired.breakdown_reference.as_deref(),
+            Some("datasheet:breakdown-test")
+        );
+        assert_eq!(
+            paired.breakdown_evidence_kind,
+            Some(DielectricEvidenceKind::ManufacturerDatasheet)
+        );
+        assert_eq!(paired.breakdown_test_temperature_k, Some(325.0));
+
+        let different_source = conditioned_observation(
+            DielectricObservationProperty::LossTangent,
+            0.0008,
+            298.15,
+            Some(1_000.0),
+            Some(1.0e6),
+            None,
+            DielectricEvidenceKind::Experimental,
+            "doi:different-paper",
+            Some("table-2"),
+            Some(hard_uncertainty(0.05)),
+        );
+        assert_eq!(
+            pair_conditioned_dielectric_observations(
+                &permittivity,
+                &different_source,
+                None
+            ),
+            Err(DielectricValidationError::IncompatibleObservations)
+        );
+    }
+
+    #[test]
+    fn pairing_rejects_frequency_mismatch_instead_of_blending_conditions() {
+        let permittivity = conditioned_observation(
+            DielectricObservationProperty::RelativePermittivity,
+            180.0,
+            298.15,
+            Some(1_000.0),
+            Some(1.0e6),
+            None,
+            DielectricEvidenceKind::Experimental,
+            "doi:paired-dielectric-paper",
+            Some("table-2"),
+            None,
+        );
+        let loss = conditioned_observation(
+            DielectricObservationProperty::LossTangent,
+            0.0008,
+            298.15,
+            Some(10_000.0),
+            Some(1.0e6),
+            None,
+            DielectricEvidenceKind::Experimental,
+            "doi:paired-dielectric-paper",
+            Some("table-2"),
+            None,
+        );
+        assert_eq!(
+            pair_conditioned_dielectric_observations(&permittivity, &loss, None),
+            Err(DielectricValidationError::IncompatibleObservations)
+        );
+    }
+
     #[test]
     fn parallel_plate_multilayer_capacitance_matches_equation() {
         let metrics = calculate_ideal_capacitor_metrics(
