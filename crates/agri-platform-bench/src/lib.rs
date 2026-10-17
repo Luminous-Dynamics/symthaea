@@ -260,10 +260,12 @@ fn nonempty(value: &Option<String>) -> bool {
 }
 
 fn evidence_record_is_well_formed(record: &EvidenceRecord) -> bool {
-    if let Some(digest) = record.artifact_sha256.as_deref() {
-        if !valid_sha256(digest) {
-            return false;
-        }
+    if record
+        .artifact_sha256
+        .as_deref()
+        .is_some_and(|digest| !valid_sha256(digest))
+    {
+        return false;
     }
 
     match record.state {
@@ -339,7 +341,7 @@ fn ceil_div(value: u64, divisor: u64) -> Option<u64> {
         return None;
     }
     let quotient = value / divisor;
-    if value % divisor == 0 {
+    if value.is_multiple_of(divisor) {
         Some(quotient)
     } else {
         quotient.checked_add(1)
