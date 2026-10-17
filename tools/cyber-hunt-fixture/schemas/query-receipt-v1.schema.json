@@ -11,8 +11,6 @@
     "request_sha256",
     "solver_manifest_sha256",
     "event_store_sha256",
-    "source_commit",
-    "source_commit_pinned",
     "rows_examined",
     "rows_matched",
     "rows_returned",
@@ -46,13 +44,6 @@
     "event_store_sha256": {
       "type": "string",
       "pattern": "^[0-9a-f]{64}$"
-    },
-    "source_commit": {
-      "type": "string",
-      "minLength": 1
-    },
-    "source_commit_pinned": {
-      "type": "boolean"
     },
     "rows_examined": {
       "type": "integer",
