@@ -344,6 +344,10 @@ pub struct MelodicDna {
 /// breathe" switches.
 #[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
 pub struct TextureSpec {
+    /// Section-specific accompaniment changes layered over the spec's default pattern.
+    /// Empty by default for compatibility with existing saved specifications.
+    #[serde(default)]
+    pub section_accompaniment_overrides: Vec<(crate::form::SectionRole, Accompaniment)>,
     /// Strip the departure (B) section to melody+bass for its first half.
     pub thin_departure: bool,
     /// Add the voice-led, collision-avoided second line in return sections.
@@ -662,6 +666,16 @@ impl CompositionSpec {
         if self.accompaniment_pool.is_empty() {
             errors.push("accompaniment_pool is empty".into());
         }
+        let mut overridden_section_roles = Vec::new();
+        for (role, _) in &self.texture.section_accompaniment_overrides {
+            if overridden_section_roles.contains(role) {
+                errors.push(format!(
+                    "section_accompaniment_overrides repeats section role {role:?}"
+                ));
+            } else {
+                overridden_section_roles.push(*role);
+            }
+        }
         if self.form_pool.is_empty() {
             errors.push("form_pool is empty".into());
         }
@@ -835,6 +849,20 @@ mod tests {
     }
 
     #[test]
+    fn section_accompaniment_overrides_reject_duplicate_roles() {
+        let mut spec = Style::MinuetAndTrio.spec();
+        spec.texture.section_accompaniment_overrides.push((
+            crate::form::SectionRole::B,
+            Accompaniment::Block,
+        ));
+        let errors = spec.validate().unwrap_err();
+        assert!(
+            errors.iter().any(|error| error.contains("section_accompaniment_overrides repeats section role B")),
+            "duplicate section override must be rejected, got: {errors:?}"
+        );
+    }
+
+    #[test]
     fn specs_round_trip_through_json() {
         let spec = Style::Playful.spec();
         let json = serde_json::to_string_pretty(&spec).unwrap();
@@ -851,9 +879,11 @@ mod tests {
         let obj = v.as_object_mut().unwrap();
         obj.remove("mode");
         obj.remove("counter_instrument");
+        obj.get_mut("texture").unwrap().as_object_mut().unwrap().remove("section_accompaniment_overrides");
         let spec: CompositionSpec = serde_json::from_value(v).unwrap();
         assert_eq!(spec.mode, None);
         assert_eq!(spec.counter_instrument, None);
+        assert!(spec.texture.section_accompaniment_overrides.is_empty());
         assert!(spec.validate().is_ok());
     }
 
