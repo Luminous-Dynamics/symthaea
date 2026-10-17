@@ -13,8 +13,6 @@
 use serde::Serialize;
 use std::env;
 
-#[path = "blind_world_benchmark.rs"]
-mod blind_world_benchmark;
 use symthaea_sensebench::{
     EvaluationSplit, ScenarioKind, causal_benchmark::run_causal_selection_benchmark, evaluate,
     generate_scenario, z_score_baseline, ScenarioManifest, GENERATOR_VERSION,
@@ -60,7 +58,7 @@ struct BlindWorldRunReport {
     report_version: u16,
     suite: &'static str,
     code_revision: Option<String>,
-    benchmark: blind_world_benchmark::BlindWorldBenchmarkReport,
+    benchmark: symthaea_sensebench::blind_world_benchmark::BlindWorldBenchmarkReport,
 }
 
 fn main() {
@@ -158,7 +156,7 @@ fn run() -> Result<(), String> {
         return Ok(());
     }
     if suite == "blind-worlds" {
-        let benchmark = blind_world_benchmark::run_blind_world_benchmark(
+        let benchmark = symthaea_sensebench::blind_world_benchmark::run_blind_world_benchmark(
             trials, budget, seed, 0.95,
         ).map_err(|error| error.to_string())?;
         let report = BlindWorldRunReport {
