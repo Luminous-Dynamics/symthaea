@@ -12,7 +12,7 @@ use serde::{Deserialize, Serialize};
 use sha2::{Digest, Sha256};
 use std::collections::{BTreeMap, BTreeSet};
 use std::fs;
-use std::path::{Path, PathBuf};
+use std::path::Path;
 
 const BOOTSTRAP_REPLICATES: usize = 2_000;
 const MIN_GROUPS_FOR_INTERVAL: usize = 10;
