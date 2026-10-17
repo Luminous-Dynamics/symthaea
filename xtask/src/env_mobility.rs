@@ -212,7 +212,9 @@ fn validate_reason_codes(value: &Value, context: &str) -> Result<Vec<String>> {
         .map(|(index, item)| {
             item.as_str()
                 .map(str::to_owned)
-                .with_context(|| format!("{context}: reason code at index {index} must be a string"))
+                .with_context(|| {
+                    format!("{context}: reason code at index {index} must be a string")
+                })
         })
         .collect::<Result<_>>()?;
     let mut seen = HashSet::with_capacity(reasons.len());
@@ -789,7 +791,10 @@ pub fn run() -> Result<QualificationReport> {
 
     Ok(QualificationReport {
         report_schema: "env-mobility-qualifier-report-v1",
-        claim_ceiling: "Synthetic fixture conformance only; no real-world feasibility, repair qualification, manufacturing yield, regulatory status or safety is established.",
+        claim_ceiling: concat!(
+            "Synthetic fixture conformance only; no real-world feasibility, repair qualification, ",
+            "manufacturing yield, regulatory status or safety is established."
+        ),
         feasibility,
         repairability,
         total_cases: cases.len(),
