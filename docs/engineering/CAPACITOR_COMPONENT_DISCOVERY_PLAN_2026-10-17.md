@@ -1,7 +1,7 @@
 # Capacitor and Electronic-Component Discovery Plan
 
 **Status date:** 2026-10-17  
-**Status:** Research and implementation plan; initial equation/provenance primitives staged in a draft PR  
+**Status:** Research and implementation plan; first equation/provenance and fail-closed screening primitives staged in a draft PR  
 **Scope:** Public Symthaea repository; no private monorepo dependencies
 
 ## Executive direction
@@ -115,15 +115,17 @@ Lock test splits, seed sets, evaluation budgets, baseline implementations, and m
 
 ## Initial software increment
 
-The first narrow increment adds `crates/domains/symthaea-materials/src/dielectric.rs` and exports it from `symthaea-materials`. It includes:
+The first narrow increment adds `crates/domains/symthaea-materials/src/dielectric.rs` plus `capacitor_screening.rs`, exported from `symthaea-materials`. It includes:
 
-- An explicit evidence class and required provenance reference.
-- Permittivity/loss test temperature and frequency; optional field and breakdown evidence.
+- Explicit evidence classes and source references; uncertainty is attached to each property with a reference describing how that uncertainty was obtained.
+- Permittivity/loss test temperature, frequency and optional characterization field; separate evidence metadata for breakdown strength.
 - Multilayer parallel-plate geometry with input validation.
-- First-order capacitance, peak stored-energy, active-volume, ideal linear energy-density, sinusoidal dielectric-loss, and optional raw breakdown-field-ratio calculations.
-- Tests for the equations, validation failures, and provenance retention.
+- First-order capacitance, peak stored energy, active volume, ideal linear energy density, sinusoidal dielectric-loss, ideal breakdown-limited energy-density figure of merit, and optional breakdown-field ratio.
+- Application-conditioned screening constraints and distinct outcomes for constraint violation versus missing/out-of-domain evidence.
+- Fail-closed checks for characterization temperature, frequency and field; evidence-class allow-lists; per-property uncertainty limits; and breakdown evidence when a breakdown ratio is required.
+- Deterministic tests for equations, condition mismatch, invalid inputs, missing evidence, uncertainty gates and hard-constraint failures.
 
-It intentionally does **not** include new material constants, a trained model, temperature/frequency extrapolation, a breakdown safety gate, manufacturing guarantees, or a validated capacitor design. Its sample record is synthetic test data, clearly labelled as such.
+It intentionally does **not** include new real-material constants, a trained property predictor, temperature/frequency extrapolation, a component qualification/safety gate, manufacturing guarantees, or a validated capacitor design. Sample records are synthetic test fixtures explicitly labelled as such. Compilation/test execution remains an outstanding verification gate.
 
 The general physical-device integration should continue to reuse the broader engineering architecture in PR #5672 rather than add a parallel engineering framework.
 
@@ -136,8 +138,9 @@ All thresholds below are **proposed acceptance targets**, not current results. P
 **Purpose:** Make physical arithmetic and evidence boundaries testable.
 
 - Compare capacitor calculations against independently implemented analytic reference equations and dimensional checks.
-- Exercise zero, negative, NaN, infinity, missing provenance, missing breakdown protocol, and overflow paths.
+- Exercise zero, negative, NaN, infinity, missing provenance, missing breakdown protocol/evidence class, missing property-specific uncertainty, out-of-domain temperature/frequency/field, and overflow paths.
 - Require invalid inputs to fail closed; no invalid/non-finite derived metric may be emitted.
+- Distinguish `PassesIdealizedScreen`, `FailsDeclaredConstraints`, and `NotEvaluable`; a candidate outside the characterization domain must never be ranked as if its properties were known.
 - Target: relative error no greater than 1e-12 on finite well-conditioned analytic fixtures; all negative controls rejected.
 - Test fixtures must be synthetic and must never be counted as empirical material evidence.
 
