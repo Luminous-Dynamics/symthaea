@@ -193,7 +193,12 @@ fn validate_values(benchmark: Value, schema: Value) -> Result<ValidationSummary,
             .ok_or_else(|| format!("{case_label}.risk must be a string"))?;
         *risk_counts.entry(risk.to_owned()).or_default() += 1;
 
-        for field in ["known_facts", "unknowns", "required_behaviors", "blocking_failures"] {
+        for field in [
+            "known_facts",
+            "unknowns",
+            "required_behaviors",
+            "blocking_failures",
+        ] {
             let values = case
                 .get(field)
                 .and_then(Value::as_array)
@@ -201,9 +206,10 @@ fn validate_values(benchmark: Value, schema: Value) -> Result<ValidationSummary,
             if values.is_empty() {
                 return Err(format!("{case_label}.{field} must not be empty"));
             }
-            if values.iter().any(|value| {
-                value.as_str().map(str::trim).is_none_or(str::is_empty)
-            }) {
+            if values
+                .iter()
+                .any(|value| value.as_str().map(str::trim).is_none_or(str::is_empty))
+            {
                 return Err(format!(
                     "{case_label}.{field} must contain only non-empty strings"
                 ));
@@ -240,8 +246,7 @@ fn run(args: &[String]) -> Result<(), String> {
         [benchmark, schema] => (benchmark.as_str(), schema.as_str()),
         _ => {
             return Err(
-                "usage: room-stress-qualifier [--json] [BENCHMARK.json SCHEMA.json]".to_string(),
-            );
+                "usage: room-stress-qualifier [--json] [BENCHMARK.json SCHEMA.json]".to_string());
         }
     };
 
@@ -284,8 +289,7 @@ mod tests {
     fn fixture_values() -> (Value, Value) {
         let benchmark: Value =
             serde_json::from_str(EMBEDDED_BENCHMARK).expect("benchmark fixture parses");
-        let schema: Value =
-            serde_json::from_str(EMBEDDED_SCHEMA).expect("schema fixture parses");
+        let schema: Value = serde_json::from_str(EMBEDDED_SCHEMA).expect("schema fixture parses");
         (benchmark, schema)
     }
 
@@ -295,7 +299,10 @@ mod tests {
             .expect("committed manifest should validate");
         assert_eq!(summary.case_count, EXPECTED_CASE_COUNT);
         assert_eq!(summary.family_count, EXPECTED_CASE_COUNT);
-        assert_eq!(summary.risk_counts.values().sum::<usize>(), EXPECTED_CASE_COUNT);
+        assert_eq!(
+            summary.risk_counts.values().sum::<usize>(),
+            EXPECTED_CASE_COUNT
+        );
     }
 
     #[test]
@@ -316,7 +323,10 @@ mod tests {
     #[test]
     fn missing_required_field_is_rejected() {
         let (mut benchmark, schema) = fixture_values();
-        benchmark["cases"][0].as_object_mut().unwrap().remove("blocking_failures");
+        benchmark["cases"][0]
+            .as_object_mut()
+            .unwrap()
+            .remove("blocking_failures");
         let error = validate_values(benchmark, schema).unwrap_err();
         assert!(error.contains("blocking_failures"));
     }
@@ -383,9 +393,20 @@ mod tests {
             EMBEDDED_VALIDATOR_SOURCE,
         );
         assert_eq!(receipt["status"], "valid_manifest");
-        assert_eq!(receipt["inputs"]["benchmark_sha256"].as_str().unwrap().len(), 64);
-        assert_eq!(receipt["inputs"]["schema_sha256"].as_str().unwrap().len(), 64);
-        assert!(receipt["claim_ceiling"].as_str().unwrap().contains("does not qualify geometry"));
+        assert_eq!(
+            receipt["inputs"]["benchmark_sha256"].as_str().unwrap().len(),
+            64
+        );
+        assert_eq!(
+            receipt["inputs"]["schema_sha256"].as_str().unwrap().len(),
+            64
+        );
+        assert!(
+            receipt["claim_ceiling"]
+                .as_str()
+                .unwrap()
+                .contains("does not qualify geometry")
+        );
         assert_eq!(
             receipt,
             receipt_value(
