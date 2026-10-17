@@ -127,6 +127,34 @@ All thresholds in this section are **proposal targets**. Freeze the operating co
 - Do not progress to free flight if structural, battery, actuator, lost-link or control-failure modes lack a documented response.
 - Do not describe the system as “silent,” biologically equivalent, conscious, or safe in all conditions without explicit supporting evidence.
 
+## OWL-002: move from a single bearing to a spatial hypothesis map
+
+**New research direction:** score a set of possible source positions and preserve multiple plausible hypotheses. Do not force every observation into one “best direction” when reverberation, geometry or symmetric placements leave multiple explanations.
+
+Relevant current benchmarks and literature:
+
+- The [LOCATA corpus](https://www.locata.lms.tf.fau.de/datasets/) provides microphone-array audio and ground-truth source / sensor trajectories in realistic reverberation and ambient noise, with several array geometries including a robot-head configuration. It is a useful real-data validation source after synthetic known-answer tests.
+- [DCASE 2026 Task 3](https://dcase.community/challenge2026/task-semantic-acoustic-imaging-for-sound-event-localization-and-detection-from-spatial-audio-and-audiovisual-scenes) shifts evaluation toward dense semantic acoustic-energy maps from low-channel multichannel recordings, not only sparse direction vectors. Its STAIRS26 materials include 32-channel recordings and high-definition acoustic-map labels.
+- A 2026 paper explores confidence-aware adaptation under microphone faults for sound source localization: https://doi.org/10.1109/access.2026.3684240 . Treat this as a future robustness benchmark lead; it is not evidence that our own confidence outputs are calibrated.
+
+### Implemented slice
+
+The `symthaea-owl` crate now includes `spatial_likelihood`, which scores candidate 3-D points against already-estimated pairwise TDOAs using known microphone positions and caller-supplied timing uncertainty. It uses max-subtracted exponential normalization and rejects physically impossible delays, invalid indices, coincident microphone pairs and non-finite input.
+
+These are **relative likelihood weights**, not calibrated posterior probabilities. The first version assumes independent Gaussian timing errors and equal prior weight for each candidate; pairwise TDOAs sharing microphones are generally correlated, and an irregularly sampled candidate set is not a uniform spatial prior. It neither extracts TDOA from waveforms nor solves all global localization ambiguities.
+
+### Proposed evaluation gates
+
+1. **Synthetic exactness:** on non-degenerate noise-free test scenes, the true sampled source point must attain the maximum likelihood score. All normalized weights must sum to one within numeric tolerance.
+2. **Ambiguity preservation:** symmetric arrays / source configurations must retain equal or comparably ranked mirrored hypotheses rather than fabricate uniqueness. Physical violations and invalid measurements must fail closed.
+3. **Uncertainty robustness:** perturb TDOA by controlled Gaussian noise, channel time offsets and missing channels. Evaluate top-K ground-truth coverage, angular/position error and whether ambiguity survives—not just top-1 accuracy.
+4. **Real recordings:** run a locked split of LOCATA (dynamic sensor/source cases) and, where appropriate, the DCASE 2026 Task 3/STAIRS26 protocol. Preserve licenses, use only permitted data access, and do not tune on held-out evaluation labels.
+5. **Calibrated confidence:** before presenting weights as confidence, evaluate negative log-likelihood, Brier score / reliability and expected calibration error on held-out truth. Until then, call them normalized likelihood weights.
+
+### Paradigm beyond localization
+
+A future controller can use the spatial map to choose a head movement with the largest expected reduction in ambiguity, subject to latency, energy and safe joint limits. The active-sensing claim must be measured against a fixed-head baseline using the same sources, sensor package, compute budget and trial order randomization. This follows a perception-action loop; it does not presume that motion always helps.
+
 ## Related work
 
 - OWL-001 issue: https://github.com/Luminous-Dynamics/symthaea/issues/7912

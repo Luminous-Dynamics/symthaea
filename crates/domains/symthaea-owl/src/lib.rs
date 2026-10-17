@@ -20,6 +20,8 @@
 //! provide elevation; reverberation, calibration error and finite range need
 //! separate treatment.
 
+pub mod spatial_likelihood;
+
 use core::fmt;
 
 /// Errors returned by the bounded far-field two-microphone geometry model.
