@@ -281,6 +281,8 @@ pub struct IdealCapacitorMetrics {
     pub property_temperature_k: f64,
     /// Frequency at which the input dielectric properties apply, in hertz.
     pub property_frequency_hz: f64,
+    /// Frequency used in the sinusoidal loss equation, in hertz. It equals the characterization frequency for the basic calculator and the requested operating frequency for application screening.
+    pub loss_evaluation_frequency_hz: f64,
     /// Temperature associated with the reported breakdown field, if available.
     pub breakdown_test_temperature_k: Option<f64>,
     /// Protocol family used to measure the reported breakdown field, if available.
@@ -314,6 +316,29 @@ pub fn calculate_ideal_capacitor_metrics(
     peak_voltage_v: f64,
     ac_rms_voltage_v: f64,
 ) -> Result<IdealCapacitorMetrics, DielectricValidationError> {
+    calculate_ideal_capacitor_metrics_at_frequency(
+        material,
+        geometry,
+        peak_voltage_v,
+        ac_rms_voltage_v,
+        material.test_frequency_hz,
+    )
+}
+
+/// Calculate ideal metrics using an explicitly supplied operating frequency for AC loss.
+///
+/// This function does not change or extrapolate the material properties. The
+/// caller must establish that the recorded loss tangent is applicable at the
+/// evaluation frequency. `screen_capacitor_candidate` checks the declared
+/// frequency tolerance before using this function. Direct callers are
+/// responsible for their own applicability check.
+pub fn calculate_ideal_capacitor_metrics_at_frequency(
+    material: &DielectricPropertyRecord,
+    geometry: &CapacitorGeometry,
+    peak_voltage_v: f64,
+    ac_rms_voltage_v: f64,
+    loss_evaluation_frequency_hz: f64,
+) -> Result<IdealCapacitorMetrics, DielectricValidationError> {
     material.validate()?;
     geometry.validate()?;
     if !peak_voltage_v.is_finite() || peak_voltage_v < 0.0 {
@@ -322,7 +347,10 @@ pub fn calculate_ideal_capacitor_metrics(
     if !ac_rms_voltage_v.is_finite() || ac_rms_voltage_v < 0.0 {
         return Err(DielectricValidationError::InvalidAcRmsVoltage);
     }
-    if ac_rms_voltage_v > 0.0 && material.test_frequency_hz == 0.0 {
+    if !loss_evaluation_frequency_hz.is_finite() || loss_evaluation_frequency_hz < 0.0 {
+        return Err(DielectricValidationError::InvalidEvaluationFrequency);
+    }
+    if ac_rms_voltage_v > 0.0 && loss_evaluation_frequency_hz == 0.0 {
         return Err(DielectricValidationError::AcLossRequiresPositiveCharacterizationFrequency);
     }
 
@@ -349,7 +377,7 @@ pub fn calculate_ideal_capacitor_metrics(
         });
     let dielectric_loss_power_w = 2.0
         * PI
-        * material.test_frequency_hz
+        * loss_evaluation_frequency_hz
         * capacitance_f
         * ac_rms_voltage_v.powi(2)
         * material.loss_tangent;
@@ -369,6 +397,7 @@ pub fn calculate_ideal_capacitor_metrics(
         breakdown_field_ratio,
         property_temperature_k: material.test_temperature_k,
         property_frequency_hz: material.test_frequency_hz,
+        loss_evaluation_frequency_hz,
         breakdown_test_temperature_k: material.breakdown_test_temperature_k,
         breakdown_test_kind: material.breakdown_test_kind,
         breakdown_evidence_kind: material.breakdown_evidence_kind,
@@ -446,6 +475,8 @@ pub enum DielectricValidationError {
     ZeroActiveLayers,
     /// Peak voltage must be finite and non-negative.
     InvalidPeakVoltage,
+    /// Frequency used by the loss equation must be finite and non-negative.
+    InvalidEvaluationFrequency,
     /// AC RMS voltage must be finite and non-negative.
     InvalidAcRmsVoltage,
     /// A nonzero AC RMS voltage requires dielectric-loss data at a positive characterization frequency.
@@ -477,6 +508,7 @@ impl fmt::Display for DielectricValidationError {
             Self::InvalidDielectricThickness => "dielectric thickness must be finite and positive",
             Self::ZeroActiveLayers => "active dielectric layer count must be nonzero",
             Self::InvalidPeakVoltage => "peak voltage must be finite and non-negative",
+            Self::InvalidEvaluationFrequency => "loss evaluation frequency must be finite and non-negative",
             Self::InvalidAcRmsVoltage => "AC RMS voltage must be finite and non-negative",
             Self::AcLossRequiresPositiveCharacterizationFrequency => "AC dielectric loss requires a positive characterization frequency",
             Self::NonFiniteCalculatedMetric => "calculated metric is non-finite; check input magnitudes",
@@ -608,6 +640,7 @@ mod tests {
         assert_eq!(metrics.source_reference, material.source_reference);
         assert_eq!(metrics.property_temperature_k, material.test_temperature_k);
         assert_eq!(metrics.property_frequency_hz, material.test_frequency_hz);
+        assert_eq!(metrics.loss_evaluation_frequency_hz, material.test_frequency_hz);
         assert_eq!(metrics.breakdown_field_ratio, Some(10.0));
     }
 
