@@ -47,6 +47,9 @@ cargo run --locked -p symthaea-silicon --example hdc_bind_rtl_simulator_diff -- 
 
 The tool writes a JSON receipt to stdout containing the repository head, oracle and contract pins, Git blob IDs for the RTL/oracle/corpus/generated bench, simulator version, commands, exit codes, warnings, tested fixture IDs, raw output, and the retained evidence directory. It fails closed if a required tool is missing, the source is dirty/untracked, a pin is wrong, a fixture is missing/malformed, the simulator fails, or compiler warnings require review. Other corpus operations are reported as unsupported; they are not run through an XOR module.
 
+
+The differential runner additionally regenerates the corpus from the clean, tracked Rust example and requires byte-for-byte equality with the supplied file. It compares the current canonical oracle and benchmark-contract file blobs to those stored in their pinned commits; merely carrying matching commit-ID strings is not sufficient. Receipt fields include the generator source blob and the regenerated corpus hash.
+
 ## Semantic/evidence boundary
 
 - The canonical Rust `BinaryHV` remains the source of HDC semantics.
