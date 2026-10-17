@@ -1,7 +1,7 @@
 # Capacitor and Electronic-Component Discovery Plan
 
 **Status date:** 2026-10-17  
-**Status:** Research and implementation plan; first equation/provenance and fail-closed screening primitives staged in a draft PR  
+**Status:** Research and implementation plan; equation/provenance, nominal screening and hard-bound robust screening primitives staged in a draft PR  
 **Scope:** Public Symthaea repository; no private monorepo dependencies
 
 ## Executive direction
@@ -116,17 +116,19 @@ Lock test splits, seed sets, evaluation budgets, baseline implementations, and m
 
 ## Initial software increment
 
-The first narrow increment adds `crates/domains/symthaea-materials/src/dielectric.rs` plus `capacitor_screening.rs`, exported from `symthaea-materials`. It includes:
+The initial increment adds `dielectric.rs`, `capacitor_screening.rs`, and `robust_capacitor.rs`, exported from `symthaea-materials`. It includes:
 
-- Explicit evidence classes and source references; uncertainty is attached to each property with a reference describing how that uncertainty was obtained.
+- Explicit evidence classes and source references; uncertainty is attached to each property with a reference describing how that uncertainty was obtained, and semantics distinguishing a hard bound, statistical estimate, or confidence interval.
 - Permittivity/loss test temperature, frequency and optional characterization field; separate evidence metadata for breakdown strength.
 - Multilayer parallel-plate geometry with input validation.
 - First-order capacitance, peak stored energy, active volume, ideal linear energy density, sinusoidal dielectric-loss, ideal breakdown-limited energy-density figure of merit, and optional breakdown-field ratio.
 - Application-conditioned screening constraints and distinct outcomes for constraint violation versus missing/out-of-domain evidence.
 - Fail-closed checks for characterization temperature, frequency and field; evidence-class allow-lists; per-property uncertainty limits; and breakdown evidence when a breakdown ratio is required.
-- Deterministic tests for equations, condition mismatch, invalid inputs, missing evidence, uncertainty gates and hard-constraint failures.
+- An additional hard-bound path that calculates lower/upper ideal metric intervals and evaluates constraints against the conservative endpoints. Statistical uncertainty and confidence intervals are explicitly refused as deterministic hard bounds.
+- Reproducible reports retain the exact inputs to each nominal and robust decision.
+- Deterministic tests for equations, condition mismatch, invalid inputs, missing evidence, uncertainty semantics, nominal-vs-robust disagreement and hard-constraint failures.
 
-It intentionally does **not** include new real-material constants, a trained property predictor, temperature/frequency extrapolation, a component qualification/safety gate, manufacturing guarantees, or a validated capacitor design. Sample records are synthetic test fixtures explicitly labelled as such. Compilation/test execution remains an outstanding verification gate.
+It intentionally does **not** include new real-material constants, a trained property predictor, temperature/frequency extrapolation, probability-of-failure calculations, correlated uncertainty propagation, geometry/process variation, a component qualification/safety gate, manufacturing guarantees, or a validated capacitor design. Sample records are synthetic test fixtures explicitly labelled as such. Compilation/test execution remains an outstanding verification gate.
 
 The general physical-device integration should continue to reuse the broader engineering architecture in PR #5672 rather than add a parallel engineering framework.
 
@@ -142,7 +144,9 @@ All thresholds below are **proposed acceptance targets**, not current results. P
 - Exercise zero, negative, NaN, infinity, missing provenance, missing breakdown protocol/evidence class, missing property-specific uncertainty, out-of-domain temperature/frequency/field, and overflow paths.
 - Require invalid inputs to fail closed; no invalid/non-finite derived metric may be emitted.
 - Distinguish `PassesNominalIdealizedScreen`, `FailsDeclaredConstraints`, and `NotEvaluable`; a candidate outside the characterization domain must never be ranked as if its properties were known.
-- A nominal pass must not be described as uncertainty-robust: the current version gates on property-specific uncertainty magnitudes but does not propagate them into worst-case metrics or constraint-violation probabilities.
+- The nominal screen gates on property-specific uncertainty magnitudes but does not propagate them.
+- The separate robust screen propagates uncertainty only when it is explicitly declared as a hard relative bound; statistical estimates/confidence intervals are not accepted as deterministic ranges. Its "pass" means only the chosen ideal equations satisfy constraints throughout those declared property bounds. It is not a physical reliability or manufacturing-yield guarantee.
+- The robust interval path currently assumes exact geometry and operating inputs, independent property bounds, linear field-independent permittivity, and the stated sinusoidal loss model. Geometry/process uncertainty, model discrepancy and uncertainty correlations are not included.
 - Target: relative error no greater than 1e-12 on finite well-conditioned analytic fixtures; all negative controls rejected.
 - Test fixtures must be synthetic and must never be counted as empirical material evidence.
 
@@ -180,10 +184,11 @@ https://www.nature.com/articles/s41524-021-00656-9
 
 ### B4 — Robustness and reliability
 
-- Perturb manufacturing dimensions, material parameters, ESR/ESL, temperature, ripple waveform, and aging assumptions.
-- Report worst-case/quantile behavior and constraint violation probability, not just nominal optimum.
+- First verify interval algebra with synthetic hard-bound fixtures: nominal metrics lie inside each calculated interval; upper-loss and lower-breakdown cases are exercised; statistically described uncertainty is rejected from deterministic interval claims.
+- Next perturb geometry, manufacturing dimensions, material parameters, ESR/ESL, temperature, ripple waveform, and aging assumptions using separately supported models/data.
+- Report deterministic hard-bound feasibility separately from statistical constraint-violation probability. Only estimate probabilities when distributions/correlations are justified and calibration can be assessed.
 - No lifetime claim from a generic CfC state similarity. Lifetime prediction needs appropriate labelled degradation data, model calibration, and independent validation.
-- Proposed gate: all declared hard constraints hold over the specified test envelope, or candidate is marked infeasible/uncertain rather than averaged into a high score.
+- Proposed gate: every required conservative endpoint satisfies the declared constraints, or the candidate is marked as failing/not evaluable. Nominal score must not hide a conservative-bound violation.
 
 ### B5 — Physical prototype / external validation
 
