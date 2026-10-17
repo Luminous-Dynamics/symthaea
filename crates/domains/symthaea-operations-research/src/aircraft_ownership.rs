@@ -467,6 +467,14 @@ fn validate_scenario(scenario: &AircraftOwnershipScenario) -> Vec<OwnershipCostE
             "successful flight hours and completed passenger-kilometres require at least one completed mission",
         ));
     }
+    if scenario.utilization.completed_missions > 0
+        && scenario.utilization.successful_flight_hours == 0.0
+    {
+        errors.push(invalid(
+            "utilization.successful_flight_hours",
+            "completed flight missions require positive successful flight hours",
+        ));
+    }
 
     let fixed = &scenario.fixed_annual_cash_costs;
     for (field, value) in [
@@ -675,6 +683,13 @@ mod tests {
         let mut input = scenario("inconsistent-service", 100.0);
         input.utilization.completed_missions = 0;
         input.utilization.completed_passenger_kilometres = 900.0;
+        assert!(calculate_ownership_cost(&input).is_err());
+    }
+
+    #[test]
+    fn completed_mission_cannot_have_zero_successful_flight_hours() {
+        let mut input = scenario("impossible-success", 100.0);
+        input.utilization.successful_flight_hours = 0.0;
         assert!(calculate_ownership_cost(&input).is_err());
     }
 
