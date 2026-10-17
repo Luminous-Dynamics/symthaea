@@ -224,6 +224,24 @@
       "Zero false matches in a small Monte Carlo sample does not establish an extreme-tail guarantee.",
       "Do not generalize the bipolar-f32 result to native uniform-f32 ContinuousHV or LTC/CfC dynamics.",
       "Do not change the existing binding algebra implementation as part of this characterization example."
+    ],
+    "sample_limit": {
+      "negative_pairs_per_dimension_representation": 384,
+      "zero_event_one_sided_95_percent_upper_bound_under_iid_fixed_threshold": "1 - 0.05^(1/n), approximately 3/n; for n=384 approximately 0.78%",
+      "implication": "Smoke-level distribution characterization only; threshold calibration and final held-out false-positive evaluation need separate samples. This sample cannot support extreme-tail guarantees."
+    },
+    "next_architecture_controls": [
+      "Two-stage retrieval: HDC shortlist K candidates from N, then separately measure a verifier; include shortlist misses and false candidates in end-to-end metrics.",
+      "Segmented/hierarchical memory to lower candidate comparisons rather than increasing D by default.",
+      "For all-pairs tasks, count N*(N-1)/2 comparisons in risk calculations."
+    ],
+    "two_stage_metrics": [
+      "shortlist_recall_at_k",
+      "false_shortlist_candidates_per_query",
+      "verifier_acceptance_precision",
+      "end_to_end_query_latency",
+      "end_to_end_bytes_moved",
+      "end_to_end_energy_where_measurable"
     ]
   }
 }
