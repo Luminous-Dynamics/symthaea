@@ -191,7 +191,10 @@ pub fn score_spatial_candidates(
         }
         // Allow a tiny floating-point margin, not a material physical violation.
         let tolerance = maximum_delay * 1.0e-12;
-        if measurement.delay_seconds.abs() > maximum_delay + tolerance {
+        let measured_magnitude = measurement.delay_seconds.abs();
+        if measured_magnitude > maximum_delay
+            && measured_magnitude - maximum_delay > tolerance
+        {
             return Err(SpatialLikelihoodError::PhysicallyImpossibleDelay);
         }
     }
