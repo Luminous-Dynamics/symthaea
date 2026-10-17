@@ -62,7 +62,13 @@ pub struct BlindWorldPolicySummary {
     pub log_loss_ci95: [f64; 2],
     pub top_hypothesis_accuracy: f64,
     pub top_hypothesis_accuracy_wilson_ci95: [f64; 2],
+    /// Expected gain predicted by the declared model for the chosen actions.
     pub mean_expected_information_gain_bits_per_cost: f64,
+    /// Evaluator-world expected gain for chosen actions, based on hidden likelihoods.
+    pub mean_hidden_world_expected_information_gain_bits_per_cost: f64,
+    /// Per-selected-action regret versus the best currently affordable candidate
+    /// under the evaluator-world likelihood table.
+    pub mean_acquisition_regret_bits_per_selection: f64,
     /// Can be negative: a surprising outcome can increase posterior entropy.
     pub mean_realized_entropy_reduction_bits_per_cost: f64,
     pub mean_calibration_error_10_bins: f64,
@@ -233,6 +239,8 @@ struct TrialResult {
     steps_to_threshold: Option<usize>,
     cost_to_threshold: Option<f64>,
     expected_gain_bits_per_cost: f64,
+    hidden_world_gain_bits_per_cost: f64,
+    acquisition_regret_bits_per_selection: f64,
     realized_entropy_reduction_bits_per_cost: f64,
     unsupported_causal_claim: bool,
     null_truth: bool,
@@ -256,6 +264,8 @@ fn simulate_trial(
     let mut cost_spent = 0.0;
     let mut experiments_used = 0usize;
     let mut expected_gain_sum = 0.0;
+    let mut hidden_world_gain_sum = 0.0;
+    let mut acquisition_regret_sum = 0.0;
     let mut realized_gain_sum = 0.0;
     let mut gain_cost_sum = 0.0;
     let mut steps_to_threshold = None;
@@ -293,7 +303,11 @@ fn simulate_trial(
         let model_candidate = affordable_models[0].candidates.iter()
             .find(|candidate| candidate.id == selected_id)
             .ok_or(BlindWorldBenchmarkError::MissingCandidate)?;
-        let hidden_candidate = hidden_candidates.iter()
+        let affordable_hidden_candidates: Vec<ExperimentCandidate> = hidden_candidates.iter()
+            .filter(|candidate| candidate.cost <= remaining + 1.0e-9)
+            .cloned()
+            .collect();
+        let hidden_candidate = affordable_hidden_candidates.iter()
             .find(|candidate| candidate.id == selected_id)
             .ok_or(BlindWorldBenchmarkError::MissingCandidate)?;
 
@@ -302,6 +316,21 @@ fn simulate_trial(
             std::slice::from_ref(model_candidate),
         )?.into_iter().next()
             .ok_or(BlindWorldBenchmarkError::EmptyCandidateLibrary)?;
+        let selected_hidden_score = rank_experiments(
+            &posterior,
+            std::slice::from_ref(hidden_candidate),
+        )?.into_iter().next()
+            .ok_or(BlindWorldBenchmarkError::EmptyCandidateLibrary)?;
+        let hidden_oracle = rank_experiments(
+            &posterior,
+            &affordable_hidden_candidates,
+        )?.into_iter().next()
+            .ok_or(BlindWorldBenchmarkError::EmptyCandidateLibrary)?;
+        acquisition_regret_sum += (
+            hidden_oracle.information_gain_per_cost
+                - selected_hidden_score.information_gain_per_cost
+        ).max(0.0);
+        hidden_world_gain_sum += selected_hidden_score.information_gain_per_cost;
         let likelihood_row = &hidden_candidate.likelihoods[true_hypothesis_index];
         let outcome_index = if outcome_rng.unit_f64() < likelihood_row[0] { 0 } else { 1 };
         // Every strategy updates with the same declared nominal model. This keeps
@@ -350,6 +379,16 @@ fn simulate_trial(
         cost_to_threshold,
         expected_gain_bits_per_cost: if gain_cost_sum > 0.0 {
             expected_gain_sum / gain_cost_sum
+        } else {
+            0.0
+        },
+        hidden_world_gain_bits_per_cost: if experiments_used > 0 {
+            hidden_world_gain_sum / experiments_used as f64
+        } else {
+            0.0
+        },
+        acquisition_regret_bits_per_selection: if experiments_used > 0 {
+            acquisition_regret_sum / experiments_used as f64
         } else {
             0.0
         },
@@ -493,6 +532,10 @@ fn summarize_world_policy(
         top_hypothesis_accuracy_wilson_ci95: wilson_ci95(correct, count),
         mean_expected_information_gain_bits_per_cost: mean(&trials.iter()
             .map(|trial| trial.expected_gain_bits_per_cost).collect::<Vec<_>>()),
+        mean_hidden_world_expected_information_gain_bits_per_cost: mean(&trials.iter()
+            .map(|trial| trial.hidden_world_gain_bits_per_cost).collect::<Vec<_>>()),
+        mean_acquisition_regret_bits_per_selection: mean(&trials.iter()
+            .map(|trial| trial.acquisition_regret_bits_per_selection).collect::<Vec<_>>()),
         mean_realized_entropy_reduction_bits_per_cost: mean(&trials.iter()
             .map(|trial| trial.realized_entropy_reduction_bits_per_cost).collect::<Vec<_>>()),
         mean_calibration_error_10_bins: ece,
