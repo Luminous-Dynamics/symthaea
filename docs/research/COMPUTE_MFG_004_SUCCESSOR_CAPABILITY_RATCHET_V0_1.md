@@ -131,3 +131,12 @@ Two external references sharpen this benchmark's measurement rules and establish
 6. **Do not change gates after observing results.** The current 2× end-to-end throughput OR 30% lower measured system-energy target remains a Symthaea-specific experimental hypothesis, not an MLPerf rule or universal scientific standard. Freeze it and hard constraints before measurement, or report the outcome as exploratory / Pareto trade-off.
 
 These references improve methodology, not Symthaea performance claims. The synthetic fixtures remain synthetic, and external published measurements remain labelled as external evidence.
+
+
+## First useful kernel: exact streaming Hamming distance
+
+The first experimentally useful HDC kernel should be more than XOR bind in isolation. Hamming distance combines XOR, popcount and cross-lane accumulation to produce an exact integer used by similarity search/retrieval. Prototype source is tracked by [NEURO-SILICON-001B-E #7731](https://github.com/Luminous-Dynamics/symthaea/issues/7731), with the Rust-oracle differential gate in [#7733](https://github.com/Luminous-Dynamics/symthaea/issues/7733). The current streaming prototype remains uncompiled/unqualified until an exact-head simulator receipt exists.
+
+For the same 16,384-bit input pair, compare declared lane profiles of 64, 128, 256, 512 and 16,384 bits (256, 128, 64, 32 and 1 transfers per vector, respectively). These counts are arithmetic consequences of widths, not measured performance. Freeze the exact input/output corpus and require integer distance equality in every profile. Then measure separately: vector comparisons/s, cycles/vector, p50/p95/p99 latency, sustained backpressured throughput, state/resource/timing reports, host transfers, system energy/comparison, and retrieval/task quality. Simulation cycles and synthesis estimates cannot satisfy the physical system-energy gate.
+
+This kernel also provides a useful falsification test: a wider lane may reduce transfer count but enlarge combinational logic or routing, while a narrow lane may improve implementation feasibility but lose throughput to per-beat and host/protocol overhead. No lane width should be selected as best before pinned synthesis and then physical-board measurement.
