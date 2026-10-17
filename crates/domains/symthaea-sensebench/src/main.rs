@@ -125,7 +125,7 @@ fn run() -> Result<(), String> {
         }
     }
 
-    // The graph suite has 112 SCM worlds × nine policies. Default it to a
+    // The graph suite has 112 SCM worlds × ten policies. Default it to a
     // reproducible exploratory run size while preserving other suites' defaults.
     if suite == "scm-graph" && !trials_explicit {
         trials = 32;
