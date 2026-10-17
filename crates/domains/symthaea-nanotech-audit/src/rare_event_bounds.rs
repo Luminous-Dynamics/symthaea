@@ -50,7 +50,7 @@ pub enum RareEventAssessment {
         assumptions: Vec<String>,
         claim_ceiling: String,
     },
-    NotBoundUnderDeclaredAssumptions {
+    NotEstimable {
         unit_label: String,
         observed_units: u64,
         observed_events: u64,
@@ -62,7 +62,7 @@ pub enum RareEventAssessment {
 
 /// Assess a one-sided exact Clopper-Pearson upper confidence bound.
 ///
-/// An Ok(NotBoundUnderDeclaredAssumptions { .. }) is a valid result when design assumptions are not satisfied.
+/// An Ok(NotEstimable { .. }) is a valid result when design assumptions are not satisfied.
 /// An Err is reserved for malformed counts or numerical inputs. A bound is not emitted merely
 /// because a caller supplied counts: all design flags must be true and independently justified.
 pub fn assess_rare_event_risk(
@@ -117,7 +117,7 @@ pub fn assess_rare_event_risk(
     }
 
     if !reasons.is_empty() {
-        return Ok(RareEventAssessment::NotBoundUnderDeclaredAssumptions {
+        return Ok(RareEventAssessment::NotEstimable {
             unit_label: evidence.unit_label.clone(),
             observed_units: evidence.observed_units,
             observed_events: evidence.observed_events,
@@ -252,7 +252,7 @@ mod tests {
                 upper_confidence_bound,
                 ..
             } => upper_confidence_bound,
-            other => panic!("expected estimable bound, got {other:?}"),
+            other => panic!("expected conditional bound, got {other:?}"),
         }
     }
 
@@ -300,7 +300,7 @@ mod tests {
         input.all_outcomes_observed = false;
         let report = assess_rare_event_risk(&input).unwrap();
         match report {
-            RareEventAssessment::NotBoundUnderDeclaredAssumptions { reasons, .. } => {
+            RareEventAssessment::NotEstimable { reasons, .. } => {
                 assert!(reasons.iter().any(|reason| reason.contains("missing")));
             }
             other => panic!("expected not-estimable, got {other:?}"),
@@ -312,12 +312,12 @@ mod tests {
         let mut clustered = evidence(0, 299);
         clustered.independent_units_justified = false;
         let report = assess_rare_event_risk(&clustered).unwrap();
-        assert!(matches!(report, RareEventAssessment::NotBoundUnderDeclaredAssumptions { .. }));
+        assert!(matches!(report, RareEventAssessment::NotEstimable { .. }));
 
         let mut unequal = evidence(0, 299);
         unequal.equal_probability_sampling = false;
         let report = assess_rare_event_risk(&unequal).unwrap();
-        assert!(matches!(report, RareEventAssessment::NotBoundUnderDeclaredAssumptions { .. }));
+        assert!(matches!(report, RareEventAssessment::NotEstimable { .. }));
     }
 
     #[test]
