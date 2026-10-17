@@ -379,7 +379,7 @@ mod tests {
     use super::*;
 
     #[test]
-    fn benchmark_covers_the_canonical_registry_without_aliasing_the_legacy_pilot() {
+    fn benchmark_covers_all_unique_canonical_styles() {
         assert!(!Style::ALL.is_empty());
         assert_eq!(SEEDS.len() * INTENTS.len(), 16);
         let unique: HashSet<String> =
