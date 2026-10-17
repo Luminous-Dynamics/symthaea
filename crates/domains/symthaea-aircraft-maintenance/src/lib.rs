@@ -1524,7 +1524,7 @@ mod tests {
             credential_reference: None,
         };
         assert_eq!(
-            transition_task(&card, TaskTransition::ReleaseToService, &actor),
+            transition_task(&mut card, TaskTransition::ReleaseToService, &actor),
             Err(TaskCardError::SoftwareCannotReleaseToService)
         );
     }
@@ -1547,6 +1547,7 @@ mod tests {
             release_task_to_service(&mut card, &context.aircraft, &record, &context.current_documents, &signer),
             Ok(TaskState::Released)
         );
+        assert_eq!(card.state(), TaskState::Released);
     }
 
     #[test]
@@ -1615,7 +1616,7 @@ mod tests {
             certification_basis: card.authority.certification_basis.clone(),
             credential_reference: Some(doc("credential-fixture", "rev-1", '3')),
         };
-        let result = release_task_to_service(&card, &context.aircraft, &record, &context.current_documents, &signer).unwrap_err();
+        let result = release_task_to_service(&mut card, &context.aircraft, &record, &context.current_documents, &signer).unwrap_err();
         assert!(result.contains(&TaskCardError::MeasurementOutOfRange {
             criterion_id: "numeric-fixture".into()
         }));
