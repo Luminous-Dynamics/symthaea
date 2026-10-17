@@ -43,6 +43,7 @@ pub enum DesignSpaceError {
     EmptyAxis(&'static str),
     CardinalityOverflow,
     CandidateLimitExceeded { requested: usize, limit: usize },
+    EmptySourceRevision,
     Serialization(String),
 }
 
@@ -59,6 +60,7 @@ impl fmt::Display for DesignSpaceError {
                 f,
                 "design-space contains {requested} candidates, exceeding configured limit {limit}"
             ),
+            Self::EmptySourceRevision => write!(f, "source revision must not be empty"),
             Self::Serialization(error) => {
                 write!(f, "could not serialize design-space manifest: {error}")
             }
@@ -96,11 +98,24 @@ pub struct CatamaranDesignCandidate {
 #[derive(Clone, Debug, PartialEq, Serialize)]
 pub struct DesignSpaceReceipt {
     pub design_space_version: String,
+    pub generator_source_revision: String,
     pub spec: DesignSpaceSpec,
     pub candidate_count: usize,
     pub candidate_manifest_sha256: String,
     pub candidates: Vec<CatamaranDesignCandidate>,
     pub limitations: Vec<String>,
+    pub receipt_sha256: String,
+}
+
+#[derive(Serialize)]
+struct DesignSpaceReceiptBody {
+    design_space_version: String,
+    generator_source_revision: String,
+    spec: DesignSpaceSpec,
+    candidate_count: usize,
+    candidate_manifest_sha256: String,
+    candidates: Vec<CatamaranDesignCandidate>,
+    limitations: Vec<String>,
 }
 
 fn validate_positive_axis(
@@ -159,6 +174,18 @@ fn checked_cardinality(spec: &DesignSpaceSpec) -> Result<usize, DesignSpaceError
 pub fn generate_design_space(
     spec: &DesignSpaceSpec,
 ) -> Result<DesignSpaceReceipt, DesignSpaceError> {
+    generate_design_space_with_revision(spec, "unavailable")
+}
+
+/// Generates a grid and binds the caller-supplied source revision into its receipt.
+/// Use the literal `unavailable` rather than guessing when the exact revision is unknown.
+pub fn generate_design_space_with_revision(
+    spec: &DesignSpaceSpec,
+    source_revision: &str,
+) -> Result<DesignSpaceReceipt, DesignSpaceError> {
+    if source_revision.trim().is_empty() {
+        return Err(DesignSpaceError::EmptySourceRevision);
+    }
     if !spec.length_waterline_m.is_finite() {
         return Err(DesignSpaceError::NonFinite("length_waterline_m"));
     }
@@ -251,19 +278,54 @@ pub fn generate_design_space(
         .map_err(|error| DesignSpaceError::Serialization(error.to_string()))
         .map(|bytes| format!("{:x}", Sha256::digest(bytes)))?;
 
-    Ok(DesignSpaceReceipt {
+    let limitations = vec![
+        "Generated values are a deterministic parameter grid, not predicted performance.".to_owned(),
+        "Dimensionless ratios are caller-supplied search inputs, not recommended or optimal values.".to_owned(),
+        "No resistance, seakeeping, slamming, stability, structural strength, energy, or safety result is calculated.".to_owned(),
+        "Hydrodynamic validation and operating-envelope assessment require compatible reference/test evidence.".to_owned(),
+    ];
+    let body = DesignSpaceReceiptBody {
         design_space_version: DESIGN_SPACE_VERSION.to_owned(),
+        generator_source_revision: source_revision.to_owned(),
         spec: spec.clone(),
         candidate_count: candidates.len(),
-        candidate_manifest_sha256,
-        candidates,
-        limitations: vec![
-            "Generated values are a deterministic parameter grid, not predicted performance.".to_owned(),
-            "Dimensionless ratios are caller-supplied search inputs, not recommended or optimal values.".to_owned(),
-            "No resistance, seakeeping, slamming, stability, structural strength, energy, or safety result is calculated.".to_owned(),
-            "Hydrodynamic validation and operating-envelope assessment require compatible reference/test evidence.".to_owned(),
-        ],
+        candidate_manifest_sha256: candidate_manifest_sha256.clone(),
+        candidates: candidates.clone(),
+        limitations: limitations.clone(),
+    };
+    let receipt_sha256 = serde_json::to_vec(&body)
+        .map_err(|error| DesignSpaceError::Serialization(error.to_string()))
+        .map(|bytes| format!("{:x}", Sha256::digest(bytes)))?;
+
+    Ok(DesignSpaceReceipt {
+        design_space_version: body.design_space_version,
+        generator_source_revision: body.generator_source_revision,
+        spec: body.spec,
+        candidate_count: body.candidate_count,
+        candidate_manifest_sha256: body.candidate_manifest_sha256,
+        candidates: body.candidates,
+        limitations: body.limitations,
+        receipt_sha256,
     })
+}
+
+/// Verifies receipt integrity only. It does not validate source authenticity or physical claims.
+pub fn verify_design_space_receipt(
+    receipt: &DesignSpaceReceipt,
+) -> Result<bool, DesignSpaceError> {
+    let body = DesignSpaceReceiptBody {
+        design_space_version: receipt.design_space_version.clone(),
+        generator_source_revision: receipt.generator_source_revision.clone(),
+        spec: receipt.spec.clone(),
+        candidate_count: receipt.candidate_count,
+        candidate_manifest_sha256: receipt.candidate_manifest_sha256.clone(),
+        candidates: receipt.candidates.clone(),
+        limitations: receipt.limitations.clone(),
+    };
+    let digest = serde_json::to_vec(&body)
+        .map_err(|error| DesignSpaceError::Serialization(error.to_string()))
+        .map(|bytes| format!("{:x}", Sha256::digest(bytes)))?;
+    Ok(digest == receipt.receipt_sha256)
 }
 
 #[cfg(test)]
@@ -298,6 +360,8 @@ mod tests {
         let second = generate_design_space(&spec()).expect("second grid");
         assert_eq!(first.candidate_manifest_sha256, second.candidate_manifest_sha256);
         assert_eq!(first.candidates, second.candidates);
+        assert_eq!(first.spec, spec());
+        assert!(verify_design_space_receipt(&first).expect("receipt verifies"));
     }
 
     #[test]
@@ -360,6 +424,23 @@ mod tests {
         );
         invalid.froude_numbers = vec![0.0];
         assert!(generate_design_space(&invalid).is_ok());
+    }
+
+    #[test]
+    fn receipt_mutation_is_detected_and_revision_is_bound() {
+        let original = generate_design_space_with_revision(&spec(), "abcdef012345")
+            .expect("receipt with pinned revision");
+        assert_eq!(original.generator_source_revision, "abcdef012345");
+        assert!(verify_design_space_receipt(&original).expect("valid receipt"));
+
+        let mut mutated = original.clone();
+        mutated.candidates[0].speed_m_s += 0.01;
+        assert!(!verify_design_space_receipt(&mutated).expect("mutated receipt serializes"));
+
+        assert_eq!(
+            generate_design_space_with_revision(&spec(), " ").unwrap_err(),
+            DesignSpaceError::EmptySourceRevision
+        );
     }
 
     #[test]
