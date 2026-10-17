@@ -21,6 +21,7 @@ pub mod scenario_sweep;
 pub mod propulsor_reference;
 pub mod propulsor_map;
 pub mod propulsor_coefficients;
+pub mod propulsor_regime;
 
 const SECONDS_PER_HOUR: f64 = 3_600.0;
 
