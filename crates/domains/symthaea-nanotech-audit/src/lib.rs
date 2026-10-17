@@ -373,8 +373,9 @@ struct ShiftManifest {
 #[serde(deny_unknown_fields)]
 struct ShiftGroupDeclaration {
     group_id: String,
-    shift_family: String,
-    /// Statistical/physical mechanism axes can differ even within one physical family.
+    /// Physical perturbation families present in this group; separate from mechanism axes.
+    shift_families: Vec<String>,
+    /// Statistical/physical mechanism axes can differ independently of physical families.
     shift_axes: Vec<String>,
     shift_kind: String,
     severity: String,
@@ -882,7 +883,6 @@ fn verify_optional_shift_manifest(
         "temperature_energy",
         "strain_pressure_phase",
         "size_interface_passivation_substrate",
-        "compounded",
     ];
     let valid_severity = ["baseline", "mild", "moderate", "severe"];
     let valid_kinds = ["in_distribution", "single_factor", "compounded"];
@@ -902,7 +902,6 @@ fn verify_optional_shift_manifest(
     for (index, group) in shift.shift_groups.iter().enumerate() {
         for (field, value) in [
             ("group_id", group.group_id.as_str()),
-            ("shift_family", group.shift_family.as_str()),
             ("shift_kind", group.shift_kind.as_str()),
             ("severity", group.severity.as_str()),
             ("split", group.split.as_str()),
@@ -924,11 +923,20 @@ fn verify_optional_shift_manifest(
                 format!("group_id {:?} appears more than once", group.group_id),
             );
         }
-        if !valid_families.contains(&group.shift_family.as_str()) {
-            report.fail(
-                "shift_manifest_family_invalid",
-                format!("shift_groups[{index}] has unsupported shift_family {:?}", group.shift_family),
-            );
+        let mut physical_families_seen = BTreeSet::new();
+        for family in &group.shift_families {
+            if !valid_families.contains(&family.as_str()) {
+                report.fail(
+                    "shift_manifest_family_invalid",
+                    format!("shift_groups[{index}] has unsupported physical shift family {family:?}"),
+                );
+            }
+            if !physical_families_seen.insert(family) {
+                report.fail(
+                    "shift_manifest_family_duplicate",
+                    format!("shift_groups[{index}] repeats physical shift family {family:?}"),
+                );
+            }
         }
         if !valid_kinds.contains(&group.shift_kind.as_str()) {
             report.fail(
@@ -942,13 +950,11 @@ fn verify_optional_shift_manifest(
                 format!("shift_groups[{index}] has unsupported severity {:?}", group.severity),
             );
         }
-        if (group.shift_kind == "in_distribution") != (group.severity == "baseline")
-            || (group.shift_kind == "compounded") != (group.shift_family == "compounded")
-        {
+        if (group.shift_kind == "in_distribution") != (group.severity == "baseline") {
             report.fail(
                 "shift_manifest_kind_severity_mismatch",
                 format!(
-                    "shift_groups[{index}] must use baseline severity only for in_distribution data; shift_family=compounded and shift_kind=compounded must agree"
+                    "shift_groups[{index}] must use baseline severity only for in_distribution data"
                 ),
             );
         }
@@ -1906,7 +1912,7 @@ mod tests {
                 "shift_groups": [
                     {
                         "group_id": "train-composition",
-                        "shift_family": "composition",
+                        "shift_families": [],
                         "shift_axes": [],
                         "shift_kind": "in_distribution",
                         "severity": "baseline",
@@ -1920,7 +1926,7 @@ mod tests {
                     },
                     {
                         "group_id": "calibration-temperature",
-                        "shift_family": "temperature_energy",
+                        "shift_families": ["temperature_energy"],
                         "shift_axes": ["physical_regime"],
                         "shift_kind": "single_factor",
                         "severity": "moderate",
@@ -1934,7 +1940,7 @@ mod tests {
                     },
                     {
                         "group_id": "test-surface",
-                        "shift_family": "surface_coordination",
+                        "shift_families": ["surface_coordination"],
                         "shift_axes": ["graph_topology"],
                         "shift_kind": "single_factor",
                         "severity": "severe",
@@ -2077,7 +2083,8 @@ mod tests {
         let shift_path = fixture.0.join("shift-manifest.json");
         let mut shift: Value =
             serde_json::from_str(&fs::read_to_string(&shift_path).expect("read shift")).unwrap();
-        shift["shift_groups"][1]["shift_family"] = json!("compounded");
+        shift["shift_groups"][1]["shift_families"] =
+            json!(["temperature_energy", "composition"]);
         shift["shift_groups"][1]["shift_kind"] = json!("compounded");
         shift["shift_groups"][1]["shift_axes"] =
             json!(["physical_regime", "label_distribution"]);
