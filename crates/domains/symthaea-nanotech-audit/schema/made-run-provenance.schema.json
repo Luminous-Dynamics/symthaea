@@ -134,7 +134,8 @@
         "external_calls",
         "failed_external_calls",
         "total_cost",
-        "cost_unit"
+        "cost_unit",
+        "local_rejections"
       ],
       "properties": {
         "setup_requests": {
@@ -176,6 +177,12 @@
           "type": "string",
           "minLength": 1,
           "maxLength": 128
+        },
+        "local_rejections": {
+          "type": "integer",
+          "minimum": 0,
+          "maximum": 1000000000,
+          "description": "Proposal candidates rejected locally before any external oracle invocation or cache lookup."
         }
       }
     },
