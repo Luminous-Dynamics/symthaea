@@ -2162,6 +2162,10 @@ mod tests {
             exact_conditional_g_squared_p_value(&independent, 0, 1, None) > 0.99,
             "balanced independent variables should have a null p-value near one"
         );
+        assert!(
+            exact_conditional_g_squared_p_value(&independent, 0, 1, Some(2)) > 0.99,
+            "balanced strata should retain conditional independence"
+        );
 
         let mut dependent = Vec::new();
         for x in 0..=1_usize {
@@ -2191,6 +2195,12 @@ mod tests {
                 collider_observations.extend(std::iter::repeat_n(state_one, z_ones));
             }
         }
+        assert!(
+            exact_conditional_g_squared_p_value(
+                &collider_observations, 0, 2, Some(1),
+            ) < 0.05,
+            "conditioning on the collider should induce dependence between its parents"
+        );
         let (marks, class_index, changed_marks) =
             pc_exact_conditional_cpdag(&collider_observations, &classes);
         assert_eq!(marks, vec![EdgeMark::Forward, EdgeMark::Absent, EdgeMark::Reverse]);
@@ -2378,6 +2388,14 @@ mod tests {
         assert_eq!(ScmGraphPolicy::all().len(), 11);
         assert_eq!(a.observational_pc_baseline, ScmGraphPolicy::PcObservationalBaseline);
         assert_eq!(a.exact_observational_pc_baseline, ScmGraphPolicy::PcExactConditionalBaseline);
+        for row in &a.worlds {
+            let is_pc = matches!(
+                row.policy,
+                ScmGraphPolicy::PcObservationalBaseline | ScmGraphPolicy::PcExactConditionalBaseline
+            );
+            assert_eq!(row.pc_raw_to_projected_mark_changes_mean.is_some(), is_pc);
+            assert_eq!(row.pc_projection_changed_trial_rate.is_some(), is_pc);
+        }
         assert_eq!(a.world_count, 112);
         assert_eq!(a.development_world_count, 16);
         assert_eq!(a.held_out_world_count, 96);
@@ -2462,6 +2480,8 @@ mod tests {
             assert_eq!(row.mean_interventions_used, 0.0);
             assert_eq!(row.graph_claim_coverage, 0.0);
             assert_eq!(row.cpdag_claim_coverage, 1.0);
+            assert!(row.pc_raw_to_projected_mark_changes_mean.is_some());
+            assert!(row.pc_projection_changed_trial_rate.is_some());
         }
         for row in &report.worlds {
             assert!((0.0..=1.0).contains(&row.mean_skeleton_f1));
