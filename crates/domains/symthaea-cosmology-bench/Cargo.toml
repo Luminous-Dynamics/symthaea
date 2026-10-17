@@ -11,7 +11,7 @@ description = "Dependency-light audit tools for released cosmological posterior 
 path = "src/lib.rs"
 
 [dependencies]
-sha2.workspace = true
+sha2 = "0.10"
 
 [[bin]]
 name = "symthaea-cosmology-chain-audit"
