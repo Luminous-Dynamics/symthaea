@@ -278,6 +278,9 @@ impl CognitiveLoopService {
     pub fn cycle_with_hv(&mut self, hdv: &symthaea_core::hdc::ContinuousHV) -> super::CycleResult {
         let cycle_start = Instant::now();
         self.stats.total_cycles += 1;
+        // This input path does not submit a plant step; prevent timing evidence
+        // from a preceding text-driven cycle from leaking into its snapshot.
+        self.sensorimotor.plant_step_timing_this_cycle = None;
 
         // 1. Compress HDC -> CfC input dimension via random projection
         let compressed_state = self

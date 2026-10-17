@@ -38,6 +38,7 @@ impl CognitiveLoopService {
     pub fn cycle(&mut self, input: &str) -> CycleResult {
         let cycle_start = Instant::now();
         self.stats.total_cycles += 1;
+        self.sensorimotor.plant_step_timing_this_cycle = None;
         self.substrate_manager.tick_energy(&self.config);
         // Feed substrate energy data to ThermodynamicManager
         self.thermodynamic_mgr.set_energy(
@@ -311,9 +312,9 @@ impl CognitiveLoopService {
             if cycle_num % interval == 0 {
                 if let Some(mut bridge) = self.sensorimotor.embodiment_bridge.take() {
                     let phi = self.carryover.history.consciousness_level;
-                    // Scale motor dt by substrate speed factor (Putnam 1967: substrate independence).
-                    // Photonic substrates step physics faster; biological substrates slower.
-                    let dt = self.config.cfc_config.delta_t * self.substrate_manager.tau_factor;
+                    // Plant/model time belongs to the simulator or physical backend.
+                    // Cognitive tau may modulate internal dynamics; it must not silently
+                    // change the number of plant-time seconds advanced by this step.
                     // Forward ethics verdict to embodiment bridge (from previous cycle).
                     // Platforms that override apply_moral_gate() will constrain motor output.
                     let verdict_u8 = match self.last_ethics_verdict {
@@ -373,18 +374,77 @@ impl CognitiveLoopService {
                             written_at: consumed_written_at,
                         });
 
-                    let result = bridge.step(&thought_hv, dt, phi);
-                    if result.success {
-                        let proprioceptive_hv = bridge.encode_perception();
-                        let w = self.config.embodiment_blend_weight;
-                        if w > 0.0 {
-                            perception.encoding.encoding_result.hdv.lerp_in_place(
-                                &proprioceptive_hv,
-                                1.0 - w,
-                                w,
+                    // The bridge must explicitly declare who owns plant time.
+                    // Undeclared authority and hardware profiles are never silently
+                    // handed a cognitive-loop configured simulation timestep.
+                    let plant_step_index = (cycle_num / interval) as u64;
+                    let timed_step: Result<
+                        (
+                            symthaea_core::embodiment::EmbodimentResult,
+                            symthaea_core::embodiment::PlantStepTimingV1,
+                        ),
+                        symthaea_core::embodiment::PlantStepTimingErrorV1,
+                    > = match bridge.plant_step_authority() {
+                        symthaea_core::embodiment::PlantStepAuthorityV1::Unspecified => {
+                            Err(symthaea_core::embodiment::PlantStepTimingErrorV1::TimingAuthorityUnspecified)
+                        }
+                        symthaea_core::embodiment::PlantStepAuthorityV1::ConfiguredSimulation => {
+                            symthaea_core::embodiment::PlantStepTimingV1::configured_simulation(
+                                plant_step_index,
+                                self.config.cfc_config.delta_t,
+                            )
+                            .and_then(|timing| {
+                                bridge
+                                    .step_with_timing(&thought_hv, &timing, phi)
+                                    .map(|result| (result, timing))
+                            })
+                        }
+                        symthaea_core::embodiment::PlantStepAuthorityV1::BackendMeasuredClockRequired => {
+                            bridge
+                                .step_with_backend_timing(&thought_hv, plant_step_index, phi)
+                                .and_then(|outcome| {
+                                    outcome.validate_for_step(plant_step_index)?;
+                                    Ok((outcome.result, outcome.timing))
+                                })
+                        }
+                    };
+
+                    if let Ok((_result, timing)) = &timed_step {
+                        self.sensorimotor.plant_step_timing_this_cycle = Some(timing.clone());
+                    }
+
+                    match timed_step {
+                        Ok((result, timing)) if result.success => {
+                            tracing::debug!(
+                                target: "symthaea::embodiment",
+                                cycle = cycle_num,
+                                step_index = timing.step_index,
+                                source = ?timing.source,
+                                dt_seconds = timing.dt_seconds,
+                                clock_domain = ?timing.clock_domain_id,
+                                clock_epoch = ?timing.clock_epoch_id,
+                                "embodiment step accepted with validated plant-time authority"
+                            );
+                            let proprioceptive_hv = bridge.encode_perception();
+                            let w = self.config.embodiment_blend_weight;
+                            if w > 0.0 {
+                                perception.encoding.encoding_result.hdv.lerp_in_place(
+                                    &proprioceptive_hv,
+                                    1.0 - w,
+                                    w,
+                                );
+                            }
+                            self.sensorimotor.last_proprioceptive_hv = Some(proprioceptive_hv);
+                        }
+                        Ok((_result, _timing)) => {}
+                        Err(error) => {
+                            tracing::error!(
+                                target: "symthaea::embodiment",
+                                cycle = cycle_num,
+                                error = ?error,
+                                "refusing embodiment step without authorized and valid plant timing"
                             );
                         }
-                        self.sensorimotor.last_proprioceptive_hv = Some(proprioceptive_hv);
                     }
                     self.sensorimotor.embodiment_telemetry = bridge.telemetry();
                     self.sensorimotor.embodiment_bridge = Some(bridge);
