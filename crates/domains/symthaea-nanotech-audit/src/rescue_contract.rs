@@ -758,6 +758,35 @@ mod tests {
     }
 
     #[test]
+    fn sample_manifest_must_remain_evaluator_sealed() {
+        let (parent, run_dir) = copy_fixture_to_temp();
+        let path = run_dir.join("audit-sampling-manifest.json");
+        let raw = fs::read_to_string(&path).expect("read copied sampling manifest");
+        let changed = raw.replace(
+            "\\"manifest_visibility\\": \\"evaluator_sealed_until_policy_run_complete\\"",
+            "\\"manifest_visibility\\": \\"public_before_run\\"",
+        );
+        assert_ne!(raw, changed);
+        fs::write(&path, changed).expect("write exposed-sample manifest");
+        let audit = audit_optional_rescue_contract(&parent);
+        assert!(audit.findings.iter().any(|f| f.code == "rescue_manifest_not_sealed"));
+        fs::remove_dir_all(parent).expect("remove temporary fixture");
+    }
+
+    #[test]
+    fn audit_labels_revealed_to_policy_fail_closed() {
+        let (parent, run_dir) = copy_fixture_to_temp();
+        let path = run_dir.join("blinded-audit-results.jsonl");
+        let raw = fs::read_to_string(&path).expect("read copied blinded outcomes");
+        let changed = raw.replacen("\\"labels_revealed_to_policy\\":false", "\\"labels_revealed_to_policy\\":true", 1);
+        assert_ne!(raw, changed);
+        fs::write(&path, changed).expect("write revealed-label audit result");
+        let audit = audit_optional_rescue_contract(&parent);
+        assert!(audit.findings.iter().any(|f| f.code == "rescue_audit_labels_revealed"));
+        fs::remove_dir_all(parent).expect("remove temporary fixture");
+    }
+
+    #[test]
     fn unsafe_relative_paths_are_rejected_before_reading() {
         let result = read_regular_file(Path::new("/tmp"), Path::new("../outside.json"));
         assert!(result.unwrap_err().contains("unsafe relative path"));
