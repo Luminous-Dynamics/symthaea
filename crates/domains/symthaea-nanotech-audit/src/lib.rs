@@ -296,6 +296,8 @@ struct ProvenanceManifest {
     evaluation_manifest_sha256: String,
     source_manifest_sha256: String,
     resolved_config_sha256: String,
+    oracle_call_ledger_path: String,
+    oracle_call_ledger_sha256: String,
     data_sources: Vec<DataSourceDeclaration>,
     oracle_accounting: OracleAccountingDeclaration,
     artifacts: Vec<ArtifactDeclaration>,
@@ -333,6 +335,23 @@ struct ArtifactDeclaration {
     sha256: String,
     size_bytes: u64,
 }
+
+#[derive(Debug, Deserialize)]
+#[serde(deny_unknown_fields)]
+struct OracleCallRecord {
+    sequence: usize,
+    stage: String,
+    status: String,
+    candidate_id: Option<String>,
+    receipt_path: String,
+    receipt_sha256: String,
+    cost: f64,
+    cache_hit: bool,
+    external_invocation: bool,
+}
+
+const MAX_ORACLE_CALL_LEDGER_BYTES: u64 = 64 * 1024 * 1024;
+const MAX_ORACLE_CALL_RECORDS: usize = 500_000;
 
 fn sum_proposal_requests(rows: &[Value]) -> Option<usize> {
     rows.iter().try_fold(0usize, |total, row| {
@@ -439,6 +458,7 @@ fn verify_provenance_manifest(
         ("evaluation_manifest_sha256", manifest.evaluation_manifest_sha256.as_str()),
         ("source_manifest_sha256", manifest.source_manifest_sha256.as_str()),
         ("resolved_config_sha256", manifest.resolved_config_sha256.as_str()),
+        ("oracle_call_ledger_sha256", manifest.oracle_call_ledger_sha256.as_str()),
     ] {
         if !is_lower_hex(value, 64) {
             report.fail(
@@ -624,6 +644,7 @@ fn verify_provenance_manifest(
     }
 
     let mut required_paths = vec![
+        manifest.oracle_call_ledger_path.clone(),
         ".hydra/config.yaml".to_owned(),
         "source-manifest.json".to_owned(),
         "task-contract.json".to_owned(),
@@ -674,6 +695,8 @@ fn verify_provenance_manifest(
             }
         }
     }
+
+    verify_oracle_call_ledger(run_dir, &manifest, &by_path, expected_proposal_requests, report);
 
     if report.findings.len() == findings_before {
         report.provenance_manifest_status = "manifest_consistent".to_owned();
