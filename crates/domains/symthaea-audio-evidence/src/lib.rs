@@ -381,7 +381,11 @@ fn collect_artifacts<'a>(value: &'a Value, output: &mut Vec<&'a Map<String, Valu
                 collect_artifacts(child, output);
             }
         }
-        Value::Array(items) => for child in items { collect_artifacts(child, output); },
+        Value::Array(items) => {
+            for child in items {
+                collect_artifacts(child, output);
+            }
+        }
         _ => {}
     }
 }
@@ -430,7 +434,9 @@ fn validate_required_object(value: &Value, pointer: &str, fields: &[&str]) -> Re
 
 fn validate_nonempty_string(value: &Value, pointer: &str) -> Result<(), String> {
     let text = string_at(value, pointer)?;
-    if text.trim().is_empty() { return Err(format!("{pointer} must be a non-empty string")); }
+    if text.trim().is_empty() {
+        return Err(format!("{pointer} must be a non-empty string"));
+    }
     Ok(())
 }
 
@@ -441,7 +447,9 @@ fn validate_nonempty_member(
 ) -> Result<(), String> {
     let value = object.get(key).and_then(Value::as_str)
         .ok_or_else(|| format!("{label}/{key} must be a string"))?;
-    if value.trim().is_empty() { return Err(format!("{label}/{key} must be a non-empty string")); }
+    if value.trim().is_empty() {
+        return Err(format!("{label}/{key} must be a non-empty string"));
+    }
     Ok(())
 }
 
