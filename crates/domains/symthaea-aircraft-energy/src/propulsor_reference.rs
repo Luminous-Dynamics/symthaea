@@ -93,6 +93,125 @@ pub fn ideal_static_actuator_disk(
     })
 }
 
+/// Inputs for ideal axial-flight actuator-disk momentum theory.
+///
+/// Unlike the static-only reference function, this model includes positive
+/// forward speed. It remains an ideal actuator-disk approximation, not a
+/// blade-element, CFD, measured propeller, or electrical-chain model.
+#[derive(Debug, Clone, Copy, PartialEq)]
+pub struct AxialActuatorDiskInput {
+    pub thrust_n: f64,
+    pub air_density_kg_m3: f64,
+    pub disk_area_m2: f64,
+    /// Free-stream speed along the propulsor axis, m/s. Reverse flow is out
+    /// of scope for this simple positive-thrust propeller model.
+    pub forward_speed_m_s: f64,
+}
+
+/// Ideal axial-flow quantities. At zero forward speed the ideal propulsive
+/// efficiency is undefined and is represented by None, not by zero percent.
+#[derive(Debug, Clone, Copy, PartialEq)]
+pub struct AxialActuatorDiskEstimate {
+    pub induced_velocity_m_s: f64,
+    /// Ideal power transferred to the airflow at the disk; not shaft or
+    /// electrical input power.
+    pub ideal_air_power_w: f64,
+    /// Thrust multiplied by forward speed; zero in static conditions.
+    pub useful_thrust_power_w: f64,
+    /// Useful thrust power / ideal air power for forward flight only.
+    pub ideal_propulsive_efficiency: Option<f64>,
+    pub disk_loading_n_m2: f64,
+}
+
+/// Calculate an ideal axial-flow actuator-disk reference for positive thrust.
+///
+/// The ideal momentum relation is T = 2 rho A vi (V + vi), so the induced
+/// velocity is (sqrt(V^2 + 2T/(rho A)) - V)/2. A rationalized expression is
+/// used for the high-speed branch to avoid catastrophic subtraction. This
+/// remains an ideal lower-bound calculation and is invalid for crossflow,
+/// strongly nonuniform inflow, reverse flow, or as a real propeller map.
+pub fn ideal_axial_actuator_disk(
+    input: AxialActuatorDiskInput,
+) -> Result<AxialActuatorDiskEstimate, StaticActuatorDiskError> {
+    for (field, value) in [
+        ("thrust_n", input.thrust_n),
+        ("air_density_kg_m3", input.air_density_kg_m3),
+        ("disk_area_m2", input.disk_area_m2),
+    ] {
+        if !value.is_finite() {
+            return Err(StaticActuatorDiskError::NonFiniteInput { field });
+        }
+        if value <= 0.0 {
+            return Err(StaticActuatorDiskError::NonPositiveInput { field });
+        }
+    }
+    if !input.forward_speed_m_s.is_finite() {
+        return Err(StaticActuatorDiskError::NonFiniteInput {
+            field: "forward_speed_m_s",
+        });
+    }
+    if input.forward_speed_m_s < 0.0 {
+        return Err(StaticActuatorDiskError::NonPositiveInput {
+            field: "forward_speed_m_s",
+        });
+    }
+
+    let thrust_per_density_area =
+        input.thrust_n / input.air_density_kg_m3 / input.disk_area_m2;
+    if !thrust_per_density_area.is_finite()
+        || thrust_per_density_area <= 0.0
+        || thrust_per_density_area > f64::MAX / 2.0
+    {
+        return Err(StaticActuatorDiskError::DerivedValueOutOfRange);
+    }
+    let velocity_scale = (2.0 * thrust_per_density_area).sqrt();
+    if !velocity_scale.is_finite() || velocity_scale <= 0.0 {
+        return Err(StaticActuatorDiskError::DerivedValueOutOfRange);
+    }
+
+    let speed = input.forward_speed_m_s;
+    let root = speed.hypot(velocity_scale);
+    // vi = 0.5 * velocity_scale^2 / (root + speed). Scale the
+    // high-speed ratio so root + speed cannot overflow and subtraction
+    // of nearly equal velocities is avoided.
+    let induced_velocity_m_s = if speed > velocity_scale {
+        0.5 * velocity_scale * (velocity_scale / speed) / (root / speed + 1.0)
+    } else {
+        0.5 * velocity_scale * (velocity_scale / (root + speed))
+    };
+    let disk_flow_speed = speed + induced_velocity_m_s;
+    let ideal_air_power_w = input.thrust_n * disk_flow_speed;
+    let useful_thrust_power_w = input.thrust_n * speed;
+    let disk_loading_n_m2 = input.thrust_n / input.disk_area_m2;
+    let ideal_propulsive_efficiency = if speed > 0.0 {
+        Some(speed / disk_flow_speed)
+    } else {
+        None
+    };
+
+    if !induced_velocity_m_s.is_finite()
+        || induced_velocity_m_s <= 0.0
+        || !disk_flow_speed.is_finite()
+        || !ideal_air_power_w.is_finite()
+        || ideal_air_power_w <= 0.0
+        || !useful_thrust_power_w.is_finite()
+        || useful_thrust_power_w < 0.0
+        || !disk_loading_n_m2.is_finite()
+        || disk_loading_n_m2 <= 0.0
+        || ideal_propulsive_efficiency.is_some_and(|eta| !eta.is_finite() || eta <= 0.0 || eta >= 1.0)
+    {
+        return Err(StaticActuatorDiskError::DerivedValueOutOfRange);
+    }
+
+    Ok(AxialActuatorDiskEstimate {
+        induced_velocity_m_s,
+        ideal_air_power_w,
+        useful_thrust_power_w,
+        ideal_propulsive_efficiency,
+        disk_loading_n_m2,
+    })
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;
@@ -193,4 +312,89 @@ mod tests {
             Err(StaticActuatorDiskError::DerivedValueOutOfRange)
         );
     }
+    #[test]
+    fn axial_zero_speed_matches_static_bound_and_has_no_static_efficiency() {
+        let input = StaticActuatorDiskInput {
+            thrust_n: 1_000.0,
+            air_density_kg_m3: 1.225,
+            disk_area_m2: 1.0,
+        };
+        let static_result = ideal_static_actuator_disk(input).unwrap();
+        let axial_result = ideal_axial_actuator_disk(AxialActuatorDiskInput {
+            thrust_n: input.thrust_n,
+            air_density_kg_m3: input.air_density_kg_m3,
+            disk_area_m2: input.disk_area_m2,
+            forward_speed_m_s: 0.0,
+        })
+        .unwrap();
+
+        assert!((axial_result.induced_velocity_m_s - static_result.induced_velocity_m_s).abs() < 1e-12);
+        assert!((axial_result.ideal_air_power_w - static_result.ideal_induced_power_w).abs() < 1e-8);
+        assert_eq!(axial_result.useful_thrust_power_w, 0.0);
+        assert_eq!(axial_result.ideal_propulsive_efficiency, None);
+    }
+
+    #[test]
+    fn forward_flight_reports_separate_useful_power_and_efficiency() {
+        let result = ideal_axial_actuator_disk(AxialActuatorDiskInput {
+            thrust_n: 1_000.0,
+            air_density_kg_m3: 1.225,
+            disk_area_m2: 1.0,
+            forward_speed_m_s: 50.0,
+        })
+        .unwrap();
+
+        assert!(result.ideal_air_power_w > result.useful_thrust_power_w);
+        assert_eq!(result.useful_thrust_power_w, 50_000.0);
+        let eta = result.ideal_propulsive_efficiency.unwrap();
+        assert!(eta > 0.0 && eta < 1.0);
+        assert!((eta - result.useful_thrust_power_w / result.ideal_air_power_w).abs() < 1e-12);
+    }
+
+    #[test]
+    fn ideal_propulsive_efficiency_increases_with_forward_speed_at_fixed_thrust() {
+        let slow = ideal_axial_actuator_disk(AxialActuatorDiskInput {
+            thrust_n: 1_000.0,
+            air_density_kg_m3: 1.225,
+            disk_area_m2: 1.0,
+            forward_speed_m_s: 10.0,
+        })
+        .unwrap();
+        let fast = ideal_axial_actuator_disk(AxialActuatorDiskInput {
+            thrust_n: 1_000.0,
+            air_density_kg_m3: 1.225,
+            disk_area_m2: 1.0,
+            forward_speed_m_s: 50.0,
+        })
+        .unwrap();
+
+        assert!(fast.ideal_propulsive_efficiency.unwrap() > slow.ideal_propulsive_efficiency.unwrap());
+    }
+
+    #[test]
+    fn negative_or_non_finite_forward_speed_fails_closed() {
+        assert_eq!(
+            ideal_axial_actuator_disk(AxialActuatorDiskInput {
+                thrust_n: 1_000.0,
+                air_density_kg_m3: 1.225,
+                disk_area_m2: 1.0,
+                forward_speed_m_s: -1.0,
+            }),
+            Err(StaticActuatorDiskError::NonPositiveInput {
+                field: "forward_speed_m_s"
+            })
+        );
+        assert_eq!(
+            ideal_axial_actuator_disk(AxialActuatorDiskInput {
+                thrust_n: 1_000.0,
+                air_density_kg_m3: 1.225,
+                disk_area_m2: 1.0,
+                forward_speed_m_s: f64::INFINITY,
+            }),
+            Err(StaticActuatorDiskError::NonFiniteInput {
+                field: "forward_speed_m_s"
+            })
+        );
+    }
+
 }
