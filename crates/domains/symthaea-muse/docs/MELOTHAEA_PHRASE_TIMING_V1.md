@@ -40,7 +40,7 @@ This is a research hypothesis, not an assertion that correlated curves are inher
 2. Simultaneous chord tones with the same phrase position remain simultaneous.
 3. A curve that would reorder consecutive attacks is rejected, with the entire input unchanged.
 4. Malformed anchors and curves that would push an onset below zero are rejected atomically.
-5. Follow-on work should add generated property tests over thousands of valid/invalid curves and assert invariants: finite output, bound-respecting offsets, no reordering, and no mutation on failure.
+5. A deterministic property-style panel now exercises 128 generated curves across 17 event positions, asserting bounded displacements, unchanged pitch/duration/velocity, and ordered attacks. Follow-on work should scale this to thousands of valid/invalid curves and explicitly mutate every contract field.
 
 The authored Rust tests on this branch have not yet been compiled or executed in this environment.
 
@@ -100,7 +100,7 @@ Recent work reinforces the need for task- and listener-grounded evaluation: the 
 
 ## Related correction: performance calibration parser
 
-This branch also hardens `examples/performance_calibration.rs`. Previously, the evaluation parser keyed open notes by pitch alone, shared that map across tracks, and replaced an earlier same-pitch note-on silently. It could pair events from different channels/tracks or corrupt durations in repeated-note cases. The new track-local parser keys by channel and pitch and rejects ambiguous re-triggers, orphan note-offs, unmatched note-ons, zero-duration events, invalid PPQ and tick overflow. Regression tests use synthetic MIDI events; they are authored but not executed here.
+This branch also hardens `examples/performance_calibration.rs`. Previously, the evaluation parser keyed open notes by pitch alone, shared that map across tracks, and replaced an earlier same-pitch note-on silently. It could pair events from different channels/tracks or corrupt durations in repeated-note cases. The new track-local parser keys by channel and pitch and rejects ambiguous re-triggers, orphan note-offs, unmatched note-ons, zero-duration events, PPQ outside the positive MIDI metrical range or with a fractional value, and tick overflow. Regression tests use synthetic MIDI events; they are authored but not executed here.
 
 This keeps a future baseline comparison from being invalidated by the measurement harness itself.
 
