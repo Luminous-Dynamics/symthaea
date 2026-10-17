@@ -120,8 +120,29 @@ fn run() -> Result<(), Box<dyn Error>> {
         })
         .collect();
 
-    let tempdir = tempfile::tempdir()?;
-    let store_path = tempdir.path().join("workload.hdc");
+    let tempdir = if config.store_path.is_none() {
+        Some(tempfile::tempdir()?)
+    } else {
+        None
+    };
+    let store_path = config.store_path.clone().unwrap_or_else(|| {
+        tempdir
+            .as_ref()
+            .expect("temporary directory exists for the default store path")
+            .path()
+            .join("workload.hdc")
+    });
+    if store_path.exists() {
+        return Err(format!(
+            "store path already exists (the benchmark never overwrites data): {}",
+            store_path.display()
+        ).into());
+    }
+    if let Some(parent) = store_path.parent() {
+        if parent != std::path::Path::new("") && !parent.exists() {
+            return Err(format!("store parent directory does not exist: {}", parent.display()).into());
+        }
+    }
 
     let create_start = Instant::now();
     let mut store = HdcStore::create(
@@ -414,6 +435,10 @@ fn run() -> Result<(), Box<dyn Error>> {
 
     println!("HDC store synthetic workload benchmark (no hardware/energy claim)");
     println!("vectors={}, queries={}, batch_size={}, seed={}", config.vectors, config.queries, config.batch_size, config.seed);
+    println!("host_os={}, host_arch={}", env::consts::OS, env::consts::ARCH);
+    println!("source_sha={}", option_env!("SYMTHAEA_SOURCE_SHA").unwrap_or("not-injected"));
+    println!("rustc_version={}", option_env!("RUSTC_VERSION").unwrap_or("not-injected"));
+    println!("store_path={}", store_path.display());
     println!("corpus_fingerprint_fnv1a64_noncryptographic={corpus_fingerprint:016x}");
     println!("logical_vector_payload_bytes={corpus_bytes}");
     println!("store_file_bytes_including_preallocation_and_metadata={store_file_bytes}");
@@ -455,9 +480,14 @@ fn parse_args() -> Result<Config, Box<dyn Error>> {
                     args.next().ok_or("--csv requires a path")?,
                 ))
             }
+            "--store" => {
+                config.store_path = Some(PathBuf::from(
+                    args.next().ok_or("--store requires a path")?,
+                ))
+            }
             "--help" | "-h" => {
                 println!(
-                    "Usage: storage_workload_bench [--vectors N] [--queries N] [--batch-size N] [--seed N] [--csv PATH]\nDefaults: vectors=1024, queries=32, batch-size=128, seed=7"
+                    "Usage: storage_workload_bench [--vectors N] [--queries N] [--batch-size N] [--seed N] [--csv PATH] [--store PATH]\nDefaults: vectors=1024, queries=32, batch-size=128, seed=7"
                 );
                 std::process::exit(0);
             }
