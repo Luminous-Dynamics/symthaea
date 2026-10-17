@@ -114,6 +114,82 @@ fn compute_forces(mol: &Molecule, fd_step: f64) -> Vec<[f64; 3]> {
     forces
 }
 
+/// Checked central-difference forces; perturbations and energies are validated
+/// before they can reach subsequent integration work.
+fn compute_forces_checked(
+    mol: &Molecule,
+    fd_step: f64,
+    step: usize,
+) -> Result<Vec<[f64; 3]>, MdRunError> {
+    let n_atoms = mol.n_atoms();
+    let mut forces = vec![[0.0; 3]; n_atoms];
+    let scf_config = RhfConfig::default();
+
+    for atom_idx in 0..n_atoms {
+        for coord in 0..3 {
+            let mut mol_plus = mol.clone();
+            mol_plus.atoms[atom_idx].position[coord] += fd_step;
+            for (idx, atom) in mol_plus.atoms.iter().enumerate() {
+                for (axis, value) in atom.position.iter().enumerate() {
+                    if !value.is_finite() {
+                        return Err(MdRunError::NonFinitePosition {
+                            step,
+                            atom_index: idx,
+                            axis,
+                        });
+                    }
+                }
+            }
+            let basis_p = Sto3g::build(&mol_plus);
+            let e_plus = restricted_hartree_fock(&mol_plus, &basis_p, &scf_config).total_energy;
+            if !e_plus.is_finite() {
+                return Err(MdRunError::NonFiniteForceEnergy {
+                    step,
+                    atom_index: atom_idx,
+                    axis: coord,
+                    direction: 1,
+                });
+            }
+
+            let mut mol_minus = mol.clone();
+            mol_minus.atoms[atom_idx].position[coord] -= fd_step;
+            for (idx, atom) in mol_minus.atoms.iter().enumerate() {
+                for (axis, value) in atom.position.iter().enumerate() {
+                    if !value.is_finite() {
+                        return Err(MdRunError::NonFinitePosition {
+                            step,
+                            atom_index: idx,
+                            axis,
+                        });
+                    }
+                }
+            }
+            let basis_m = Sto3g::build(&mol_minus);
+            let e_minus = restricted_hartree_fock(&mol_minus, &basis_m, &scf_config).total_energy;
+            if !e_minus.is_finite() {
+                return Err(MdRunError::NonFiniteForceEnergy {
+                    step,
+                    atom_index: atom_idx,
+                    axis: coord,
+                    direction: -1,
+                });
+            }
+
+            let force = -(e_plus - e_minus) / (2.0 * fd_step);
+            if !force.is_finite() {
+                return Err(MdRunError::NonFiniteForce {
+                    step,
+                    atom_index: atom_idx,
+                    axis: coord,
+                });
+            }
+            forces[atom_idx][coord] = force;
+        }
+    }
+
+    Ok(forces)
+}
+
 /// Fixed default seed retained for backwards-reproducible run_md calls.
 const DEFAULT_MD_SEED: u64 = 42;
 
@@ -299,6 +375,12 @@ pub enum MdRunError {
     InvalidInput(MdInputError),
     NonFinitePosition { step: usize, atom_index: usize, axis: usize },
     NonFiniteForce { step: usize, atom_index: usize, axis: usize },
+    NonFiniteForceEnergy {
+        step: usize,
+        atom_index: usize,
+        axis: usize,
+        direction: i8,
+    },
     NonFiniteVelocity { step: usize, atom_index: usize, axis: usize },
     NonFinitePotentialEnergy { step: usize },
     NonFiniteKineticEnergy { step: usize },
@@ -314,6 +396,10 @@ impl std::fmt::Display for MdRunError {
             ),
             Self::NonFiniteForce { step, atom_index, axis } => write!(
                 f, "non-finite force at step {step}, atom {atom_index}, axis {axis}"
+            ),
+            Self::NonFiniteForceEnergy { step, atom_index, axis, direction } => write!(
+                f,
+                "non-finite perturbed energy at step {step}, atom {atom_index}, axis {axis}, direction {direction}"
             ),
             Self::NonFiniteVelocity { step, atom_index, axis } => write!(
                 f, "non-finite velocity at step {step}, atom {atom_index}, axis {axis}"
@@ -516,7 +602,7 @@ fn run_md_validated_with_seed(
     // Initial forces are checked before the trajectory proceeds to energy and
     // integration; non-finite force estimates can otherwise poison positions.
     let mut mol = molecule.clone();
-    let mut forces = compute_forces(&mol, config.fd_step);
+    let mut forces = compute_forces_checked(&mol, config.fd_step, 0)?;
     validate_finite_forces(0, &forces)?;
     let basis = Sto3g::build(&mol);
     let mut energy = restricted_hartree_fock(&mol, &basis, &RhfConfig::default()).total_energy;
@@ -556,7 +642,7 @@ fn run_md_validated_with_seed(
         }
 
         // New forces; check them before the follow-on energy evaluation.
-        let forces_new = compute_forces(&mol, config.fd_step);
+        let forces_new = compute_forces_checked(&mol, config.fd_step, step + 1)?;
         validate_finite_forces(step + 1, &forces_new)?;
         let basis = Sto3g::build(&mol);
         energy = restricted_hartree_fock(&mol, &basis, &RhfConfig::default()).total_energy;
@@ -719,6 +805,21 @@ mod tests {
         assert!(mean.abs() < 0.03, "sample mean was {mean}");
         assert!((variance - 1.0).abs() < 0.05, "sample variance was {variance}");
     }
+    #[test]
+    fn checked_force_evaluation_rejects_overflowed_perturbation() {
+        let mut molecule = Molecule::h2();
+        molecule.atoms[0].position[0] = 1.0e308;
+        let result = compute_forces_checked(&molecule, 1.0e308, 7);
+        assert_eq!(
+            result,
+            Err(MdRunError::NonFinitePosition {
+                step: 7,
+                atom_index: 0,
+                axis: 0,
+            })
+        );
+    }
+
     #[test]
     fn runtime_guards_reject_non_finite_vector_states() {
         assert_eq!(
