@@ -107,7 +107,7 @@ fn validate_receipt_shape(
             errors.push(format!("{id}: stdout/stderr receipt is missing valid {field}"));
         }
     }
-    if streams["raw_output_sha256"] != *raw_output_hash {
+    if text(streams, "raw_output_sha256") != raw_output_hash.as_str() {
         errors.push(format!("{id}: receipt raw-output digest disagrees with execution.raw_output_hash"));
     }
 
@@ -189,11 +189,11 @@ fn validate_frozen_receipt(candidate: &Value, errors: &mut Vec<String>, id: &str
             }
             validate_receipt_shape(receipt, &execution["raw_output_hash"], errors, id);
         }
-        if candidate["freeze_blockers"]
+        if !candidate["freeze_blockers"]
             .as_array()
-            .is_some_and(|blockers| !blockers.is_empty())
+            .is_some_and(|blockers| blockers.is_empty())
         {
-            errors.push(format!("{id}: a frozen candidate must not retain freeze_blockers"));
+            errors.push(format!("{id}: a frozen candidate must have an explicit empty freeze_blockers array"));
         }
     } else {
         if freeze_state == "FROZEN" {
@@ -202,8 +202,8 @@ fn validate_frozen_receipt(candidate: &Value, errors: &mut Vec<String>, id: &str
         if text(outputs, "state") == Some("FROZEN") {
             errors.push(format!("{id}: reference_outputs.state=FROZEN requires exact outputs to be frozen"));
         }
-        if has_content(&outputs["output_digest"]) {
-            errors.push(format!("{id}: non-frozen outputs may not declare an output_digest"));
+        if !outputs["output_digest"].is_null() {
+            errors.push(format!("{id}: non-frozen outputs require output_digest=null"));
         }
         if status == "PASS" {
             errors.push(format!("{id}: PASS cannot be claimed while exact outputs are unfrozen"));
@@ -221,11 +221,11 @@ fn validate_frozen_receipt(candidate: &Value, errors: &mut Vec<String>, id: &str
             if executed {
                 errors.push(format!("{id}: NOT_RUN conflicts with simulator_executed=true"));
             }
-            if has_content(&execution["raw_output_hash"]) {
-                errors.push(format!("{id}: NOT_RUN may not claim raw output bytes"));
+            if !execution["raw_output_hash"].is_null() {
+                errors.push(format!("{id}: NOT_RUN requires raw_output_hash=null"));
             }
-            if has_content(&execution["simulator_version"]) {
-                errors.push(format!("{id}: NOT_RUN may not claim an executed simulator version"));
+            if !execution["simulator_version"].is_null() {
+                errors.push(format!("{id}: NOT_RUN requires simulator_version=null"));
             }
             if frozen {
                 errors.push(format!("{id}: NOT_RUN may not freeze simulator outputs"));
@@ -237,6 +237,12 @@ fn validate_frozen_receipt(candidate: &Value, errors: &mut Vec<String>, id: &str
             }
             if executed {
                 errors.push(format!("{id}: {status} conflicts with simulator_executed=true"));
+            }
+            if !execution["raw_output_hash"].is_null()
+                || !execution["simulator_version"].is_null()
+                || !outputs["output_digest"].is_null()
+            {
+                errors.push(format!("{id}: {status} may not claim simulator/output artifacts"));
             }
         }
         "PASS" | "FAIL" => {
@@ -259,6 +265,12 @@ fn validate_frozen_receipt(candidate: &Value, errors: &mut Vec<String>, id: &str
             }
             if executed && !nonempty_text(execution, "simulator_version") {
                 errors.push(format!("{id}: an executed unresolved/out-of-domain run requires simulator_version"));
+            }
+            if !executed
+                && (!execution["raw_output_hash"].is_null()
+                    || !execution["simulator_version"].is_null())
+            {
+                errors.push(format!("{id}: an unexecuted unresolved/out-of-domain case may not claim run artifacts"));
             }
         }
         _ => errors.push(format!("{id}: unknown execution status {status:?}")),
