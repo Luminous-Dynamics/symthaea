@@ -16,5 +16,9 @@ path = "src/lib.rs"
 name = "agri-platform-bench"
 path = "src/main.rs"
 
+[[bin]]
+name = "verify-manifest"
+path = "src/bin/verify_manifest.rs"
+
 [profile.release]
 overflow-checks = true
