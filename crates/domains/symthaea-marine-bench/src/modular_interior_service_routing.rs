@@ -1850,7 +1850,7 @@ mod tests {
                 }) {
                     continue;
                 }
-                let turns = u64::from(direction != 0 && direction != next_direction);
+                let turns = if direction != 0 && direction != next_direction { 1u64 } else { 0u64 };
                 let step_cost = pitch.checked_add(bend.checked_mul(turns)?)?;
                 let next_cost = cost.checked_add(step_cost)?;
                 let next_state = next_cell.checked_mul(3)?.checked_add(usize::from(next_direction))?;
@@ -1867,9 +1867,8 @@ mod tests {
             if raw == u64::MAX {
                 return None;
             }
-            let terminal_turn = u64::from(
-                terminal_direction != 0 && direction != 0 && direction != terminal_direction
-            );
+            let terminal_turn = if terminal_direction != 0 && direction != 0
+                && direction != terminal_direction { 1u64 } else { 0u64 };
             raw.checked_add(bend.checked_mul(terminal_turn)?)
         }).min()
     }
