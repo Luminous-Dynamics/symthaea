@@ -1,4 +1,4 @@
-# SenseBench SCM Graph Recovery Protocol v0.4
+# SenseBench SCM Graph Recovery Protocol v0.5
 
 **Status:** implementation committed to the public `feat/symthaea-sense-observation-envelope` branch; authored Rust tests have not been executed in the present environment.
 
@@ -17,7 +17,7 @@ SENSEBENCH_CODE_REVISION="$(git rev-parse HEAD)" \
   cargo run -p symthaea-sensebench -- --suite scm-graph --trials 32 --budget 8 --seed 42
 ```
 
-The workspace CLI emits versioned JSON and requires an exact caller-provided `SENSEBENCH_CODE_REVISION`. Use a clean worktree and record that SHA with the configuration. Do not interpret a queued or skipped workflow as a passing build/test.
+The workspace CLI emits versioned JSON (SCM report schema v5) and requires an exact caller-provided `SENSEBENCH_CODE_REVISION`. Use a clean worktree and record that SHA with the configuration. Do not interpret a queued or skipped workflow as a passing build/test.
 
 ## Graph catalogue and worlds
 
@@ -51,7 +51,7 @@ The current comparison deliberately keeps the posterior update on the same nomin
 
 ## Observational PC baseline details
 
-The reference PC comparator uses critical values 3.8415 for one degree of freedom and 5.9915 for two degrees of freedom (asymptotic 5% chi-square cutoffs for binary 2×2 and stratified 2×2 tests). It is transparent and limited to three observed variables. At the tiny budgets used by the exploratory default, asymptotic tests may have poor power or calibration; the benchmark must report graph recovery and CPDAG claim risk/coverage rather than presume the baseline is reliable. Projection onto the enumerated catalogue ensures the emitted CPDAG is valid, but does not retroactively validate an independence-test result. This is an observational PC baseline, not a full reproduction of every PC/PC-stable variant, and does not yet include PC plus greedy active orientation.
+The reference PC comparator uses critical values 3.8415 for one degree of freedom and 5.9915 for two degrees of freedom (asymptotic 5% chi-square cutoffs for binary 2×2 and stratified 2×2 tests). It is transparent and limited to three observed variables. At the tiny budgets used by the exploratory default, asymptotic tests may have poor power or calibration; the benchmark must report graph recovery and CPDAG claim risk/coverage rather than presume the baseline is reliable. Schema v5 additionally reports how many raw edge marks the valid-catalogue projection changes, averaged per world and as the fraction of trials with at least one change. This exposes a previously hidden repair step: projection makes the submitted CPDAG valid, but does not retroactively validate an independence-test or collider decision. It does not yet expose full per-test p-values or constitute finite-sample calibration. This is an observational PC baseline, not a full reproduction of every PC/PC-stable variant, and does not yet include PC plus greedy active orientation.
 
 ## Outcomes and metrics
 
