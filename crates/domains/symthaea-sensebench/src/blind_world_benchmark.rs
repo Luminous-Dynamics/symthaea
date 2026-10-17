@@ -237,8 +237,8 @@ pub fn run_blind_world_benchmark(
     }
 
     Ok(BlindWorldBenchmarkReport {
-        schema_version: 1,
-        generator_version: "sensebench-blind-worlds-0.1.0".into(),
+        schema_version: 2,
+        generator_version: "sensebench-blind-worlds-0.2.0".into(),
         seed,
         trials_per_world,
         resource_budget_units,
@@ -1049,6 +1049,8 @@ mod tests {
     #[test]
     fn suite_contains_development_and_held_out_world_regimes() {
         let report = run_blind_world_benchmark(6, 6, 42, 0.95).unwrap();
+        assert_eq!(report.schema_version, 2);
+        assert_eq!(report.generator_version, "sensebench-blind-worlds-0.2.0");
         assert_eq!(report.world_count, 24);
         assert_eq!(report.held_out_world_count, 16);
         assert_eq!(report.world_variants_per_regime, WORLD_VARIANTS_PER_REGIME);
