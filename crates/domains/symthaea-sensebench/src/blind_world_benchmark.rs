@@ -401,7 +401,7 @@ fn choose_candidate(
             .find(|candidate| candidate.id == fixed_candidate_id)
             .map(|candidate| candidate.id.clone()),
         BlindWorldPolicy::UniformRandom => {
-            let index = (selection_rng.next_u64() % nominal.candidates.len() as u64) as usize;
+            let index = selection_rng.index(nominal.candidates.len());
             nominal.candidates.get(index).map(|candidate| candidate.id.clone())
         }
         BlindWorldPolicy::PassiveOnly => nominal.candidates.iter()
@@ -800,6 +800,19 @@ impl BenchmarkRng {
         z = (z ^ (z >> 30)).wrapping_mul(0xBF58_476D_1CE4_E5B9);
         z = (z ^ (z >> 27)).wrapping_mul(0x94D0_49BB_1331_11EB);
         z ^ (z >> 31)
+    }
+
+    /// Sample without modulo bias for a bound that is strictly positive.
+    fn index(&mut self, upper_bound: usize) -> usize {
+        assert!(upper_bound > 0, "index bound must be positive");
+        let bound = upper_bound as u64;
+        let zone = (u64::MAX / bound) * bound;
+        loop {
+            let value = self.next_u64();
+            if value < zone {
+                return (value % bound) as usize;
+            }
+        }
     }
 
     fn unit_f64(&mut self) -> f64 {
