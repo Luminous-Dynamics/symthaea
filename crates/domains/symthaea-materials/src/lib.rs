@@ -12,20 +12,43 @@
 #![warn(missing_docs)]
 
 pub mod aging;
+pub mod capacitor_screening;
 pub mod compound_stability;
 pub mod database;
+pub mod dielectric;
 pub mod encoder;
 pub mod haptic_prober;
 pub mod mining;
 pub mod properties;
+pub mod robust_capacitor;
 pub mod strategic;
 
 pub use aging::{AGING_HORIZON_LABELS, AGING_HORIZONS, AgingPrediction, MaterialAgingModel};
+pub use capacitor_screening::{
+    CapacitorConstraintViolation, CapacitorScreeningDisposition, CapacitorScreeningError,
+    CapacitorScreeningReport, CapacitorScreeningRequirements, ScreeningLimitation,
+    screen_capacitor_candidate,
+};
 pub use database::{MaterialDatabase, MaterialSearchResult};
+pub use dielectric::{
+    CapacitorGeometry, DielectricEvidenceKind, DielectricPropertyRecord, DielectricValidationError,
+    BreakdownTestKind, ConditionedDielectricObservation, DielectricObservationProperty,
+    IdealCapacitorMetrics, PropertyUncertainty, PropertyUncertaintySemantics,
+    VACUUM_PERMITTIVITY_F_PER_M,
+    calculate_ideal_capacitor_metrics, calculate_ideal_capacitor_metrics_at_frequency,
+    pair_conditioned_dielectric_observations,
+};
 pub use encoder::MaterialHdcEncoder;
 pub use mining::{
     MINING_HORIZON_LABELS, MINING_HORIZONS, MiningFepAction, MiningFepAgent, MiningHdcEncoder,
     MiningPredictor, MiningReading,
+};
+pub use robust_capacitor::{
+    BoundedCapacitorMetrics, RobustCapacitorConstraintViolation,
+    RobustCapacitorScreeningDisposition, RobustCapacitorScreeningReport,
+    RobustMetricError, RobustMetricLimitation, RobustScreeningError,
+    RobustScreeningLimitation, ScalarBounds, calculate_bounded_capacitor_metrics,
+    calculate_bounded_capacitor_metrics_at_frequency, screen_capacitor_candidate_robust,
 };
 pub use properties::{MaterialCategory, MaterialProperty};
 pub use strategic::{
