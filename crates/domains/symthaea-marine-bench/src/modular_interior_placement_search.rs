@@ -687,6 +687,32 @@ mod tests {
             .any(|finding| finding.code == "INVALID_PLACEMENT_GEOMETRY"));
     }
 
+
+    #[test]
+    fn out_of_bounds_and_reserved_clearance_mutations_stay_rejected() {
+        let baseline = live();
+        let out_of_bounds = vec![PlacementDomain {
+            instance_id: "CABIN-01".to_owned(),
+            choices: vec![choice("CABIN-OUT-OF-BOUNDS", 13_000, 1100, 0)],
+        }];
+        let out_report = search_placements(&baseline, &out_of_bounds, limits()).unwrap();
+        assert_eq!(out_report.body.candidates[0].disposition,
+            PlacementCandidateDisposition::RejectedByValidator);
+        assert!(out_report.body.candidates[0].validation_receipt.body.findings.iter()
+            .any(|finding| finding.code == "PLACEMENT_OUT_OF_BOUNDS"));
+
+        let reserved_region = vec![PlacementDomain {
+            instance_id: "CABIN-01".to_owned(),
+            choices: vec![choice("CABIN-IN-SERVICE-ZONE", 11_000, 1100, 0)],
+        }];
+        let reserved_report = search_placements(&baseline, &reserved_region, limits()).unwrap();
+        assert!(reserved_report.body.candidates[0].validation_receipt.body.findings.iter()
+            .any(|finding| finding.code == "RESERVED_REGION_CONFLICT"
+                && finding.subject.contains("REGION-SERVICE-ACCESS-01")));
+        assert_eq!(reserved_report.body.candidates[0].disposition,
+            PlacementCandidateDisposition::RejectedByValidator);
+    }
+
     #[test]
     fn frozen_placement_oracle_matches_candidate_sets_and_interaction() {
         let oracle: PlacementOracle = serde_json::from_str(ORACLE).expect("placement oracle parses");
