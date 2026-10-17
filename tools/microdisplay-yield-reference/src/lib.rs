@@ -36,14 +36,19 @@ pub enum YieldError {
 impl fmt::Display for YieldError {
     fn fmt(&self, formatter: &mut fmt::Formatter<'_>) -> fmt::Result {
         match self {
-            Self::ZeroDenominator => formatter.write_str("population/trial denominator must be positive"),
+            Self::ZeroDenominator => {
+                formatter.write_str("population/trial denominator must be positive")
+            }
             Self::NonFiniteInput => formatter.write_str("numeric input must be finite"),
             Self::ProbabilityOutOfRange => formatter.write_str("probability must be in [0, 1]"),
-            Self::SuccessesExceedTrials => formatter.write_str("observed successes cannot exceed trials"),
-            Self::InvalidZScore => formatter.write_str("z-score must be finite and strictly positive"),
-            Self::IndependenceNotEstablished => formatter.write_str(
-                "stage-product yield requires an explicit independent-stage assumption",
-            ),
+            Self::SuccessesExceedTrials => {
+                formatter.write_str("observed successes cannot exceed trials")
+            }
+            Self::InvalidZScore => {
+                formatter.write_str("z-score must be finite and strictly positive")
+            }
+            Self::IndependenceNotEstablished => formatter
+                .write_str("stage-product yield requires an explicit independent-stage assumption"),
         }
     }
 }
@@ -157,9 +162,7 @@ pub fn wilson_interval(
     let z2 = z_score * z_score;
     let denominator = 1.0 + z2 / n;
     let center = (p + z2 / (2.0 * n)) / denominator;
-    let half_width = z_score
-        * ((p * (1.0 - p) / n + z2 / (4.0 * n * n)).sqrt())
-        / denominator;
+    let half_width = z_score * ((p * (1.0 - p) / n + z2 / (4.0 * n * n)).sqrt()) / denominator;
 
     Ok(ProbabilityInterval {
         lower: (center - half_width).clamp(0.0, 1.0),
@@ -216,19 +219,14 @@ pub fn repair_adjusted_yield(
     validate_probability(retest_success_probability)?;
 
     Ok(first_pass_yield
-        + (1.0 - first_pass_yield)
-            * repair_success_probability
-            * retest_success_probability)
+        + (1.0 - first_pass_yield) * repair_success_probability * retest_success_probability)
 }
 
 /// Computes the fraction of values that meet an explicit minimum quality floor.
 ///
 /// The caller supplies measured/predicted values and floors; this helper does
 /// not infer or qualify the metrics themselves.
-pub fn fraction_meeting_floor(
-    values: &[f64],
-    minimum: f64,
-) -> Result<f64, YieldError> {
+pub fn fraction_meeting_floor(values: &[f64], minimum: f64) -> Result<f64, YieldError> {
     if values.is_empty() {
         return Err(YieldError::ZeroDenominator);
     }
@@ -282,11 +280,23 @@ mod tests {
             schema_errors.is_empty(),
             "microdisplay corpus does not satisfy its schema: {schema_errors:#?}"
         );
-        assert_eq!(corpus["corpus_id"].as_str(), Some("MICRODISP-YIELD-CORPUS-001"));
+        assert_eq!(
+            corpus["corpus_id"].as_str(),
+            Some("MICRODISP-YIELD-CORPUS-001")
+        );
         assert_eq!(corpus["status"].as_str(), Some("UNQUALIFIED"));
-        assert_eq!(schema["$schema"].as_str(), Some("https://json-schema.org/draft/2020-12/schema"));
-        assert_eq!(schema["properties"]["corpus_id"]["const"].as_str(), Some("MICRODISP-YIELD-CORPUS-001"));
-        assert_eq!(schema["properties"]["case_count"]["const"].as_u64(), Some(20));
+        assert_eq!(
+            schema["$schema"].as_str(),
+            Some("https://json-schema.org/draft/2020-12/schema")
+        );
+        assert_eq!(
+            schema["properties"]["corpus_id"]["const"].as_str(),
+            Some("MICRODISP-YIELD-CORPUS-001")
+        );
+        assert_eq!(
+            schema["properties"]["case_count"]["const"].as_u64(),
+            Some(20)
+        );
         assert_eq!(schema["properties"]["cases"]["minItems"].as_u64(), Some(20));
         assert_eq!(schema["properties"]["cases"]["maxItems"].as_u64(), Some(20));
         assert_eq!(schema["properties"]["cases"]["items"]["properties"]["id"]["pattern"].as_str(), Some("^MICLED-[A-Z0-9-]+$"));
@@ -301,14 +311,24 @@ mod tests {
             .as_array()
             .expect("reference sources must be an array")
             .iter()
-            .map(|source| source["id"].as_str().expect("source ID must be a string").to_owned())
+            .map(|source| {
+                source["id"]
+                    .as_str()
+                    .expect("source ID must be a string")
+                    .to_owned()
+            })
             .collect();
-        let schema_sources: std::collections::BTreeSet<String> = schema["properties"]["cases"]["items"]["properties"]["reference_ids"]["items"]["enum"]
-            .as_array()
-            .expect("schema must enumerate reference IDs")
-            .iter()
-            .map(|id| id.as_str().expect("schema reference ID must be a string").to_owned())
-            .collect();
+        let schema_sources: std::collections::BTreeSet<String> =
+            schema["properties"]["cases"]["items"]["properties"]["reference_ids"]["items"]["enum"]
+                .as_array()
+                .expect("schema must enumerate reference IDs")
+                .iter()
+                .map(|id| {
+                    id.as_str()
+                        .expect("schema reference ID must be a string")
+                        .to_owned()
+                })
+                .collect();
         assert_eq!(known_sources, schema_sources);
 
         let mut ids = std::collections::BTreeSet::new();
@@ -324,7 +344,8 @@ mod tests {
             assert!(!references.is_empty());
             for reference in references {
                 assert!(
-                    known_sources.contains(reference.as_str().expect("reference ID must be a string")),
+                    known_sources
+                        .contains(reference.as_str().expect("reference ID must be a string")),
                     "unresolved reference in case {id}"
                 );
             }
@@ -345,7 +366,9 @@ mod tests {
                 .expect("corpus arithmetic inputs must be valid");
             assert!(output.expected_defects.is_finite());
             assert!(output.expected_good.is_finite());
-            assert!((output.expected_good + output.expected_defects - population as f64).abs() < 1e-6);
+            assert!(
+                (output.expected_good + output.expected_defects - population as f64).abs() < 1e-6
+            );
         }
     }
 
@@ -365,11 +388,15 @@ mod tests {
     #[test]
     fn exact_zero_and_perfect_probabilities_have_canonical_expected_counts() {
         assert_eq!(
-            expected_counts(100, 1.0).expect("valid probability").expected_defects,
+            expected_counts(100, 1.0)
+                .expect("valid probability")
+                .expected_defects,
             0.0
         );
         assert_eq!(
-            expected_counts(100, 0.0).expect("valid probability").expected_good,
+            expected_counts(100, 0.0)
+                .expect("valid probability")
+                .expected_good,
             0.0
         );
     }
@@ -391,15 +418,25 @@ mod tests {
     #[test]
     fn observed_yield_requires_valid_counts() {
         assert_eq!(
-            observed_yield(ObservedCounts { successes: 0, trials: 0 }),
+            observed_yield(ObservedCounts {
+                successes: 0,
+                trials: 0
+            }),
             Err(YieldError::ZeroDenominator)
         );
         assert_eq!(
-            observed_yield(ObservedCounts { successes: 11, trials: 10 }),
+            observed_yield(ObservedCounts {
+                successes: 11,
+                trials: 10
+            }),
             Err(YieldError::SuccessesExceedTrials)
         );
         close(
-            observed_yield(ObservedCounts { successes: 997, trials: 1000 }).expect("valid counts"),
+            observed_yield(ObservedCounts {
+                successes: 997,
+                trials: 1000,
+            })
+            .expect("valid counts"),
             0.997,
             1e-15,
         );
@@ -407,16 +444,25 @@ mod tests {
 
     #[test]
     fn wilson_interval_stays_bounded_and_contains_observed_proportion() {
-        let counts = ObservedCounts { successes: 997, trials: 1000 };
+        let counts = ObservedCounts {
+            successes: 997,
+            trials: 1000,
+        };
         let interval = wilson_interval(counts, Z_95).expect("valid counts and z-score");
         assert!((0.0..=1.0).contains(&interval.lower));
         assert!((0.0..=1.0).contains(&interval.upper));
         assert!(interval.lower <= 0.997 && 0.997 <= interval.upper);
         assert!(interval.lower < interval.upper);
         close(
-            wilson_interval(ObservedCounts { successes: 10, trials: 10 }, Z_95)
-                .expect("valid")
-                .upper,
+            wilson_interval(
+                ObservedCounts {
+                    successes: 10,
+                    trials: 10,
+                },
+                Z_95,
+            )
+            .expect("valid")
+            .upper,
             1.0,
             1e-15,
         );
@@ -425,19 +471,43 @@ mod tests {
     #[test]
     fn wilson_interval_rejects_invalid_inputs() {
         assert_eq!(
-            wilson_interval(ObservedCounts { successes: 0, trials: 0 }, Z_95),
+            wilson_interval(
+                ObservedCounts {
+                    successes: 0,
+                    trials: 0
+                },
+                Z_95
+            ),
             Err(YieldError::ZeroDenominator)
         );
         assert_eq!(
-            wilson_interval(ObservedCounts { successes: 2, trials: 1 }, Z_95),
+            wilson_interval(
+                ObservedCounts {
+                    successes: 2,
+                    trials: 1
+                },
+                Z_95
+            ),
             Err(YieldError::SuccessesExceedTrials)
         );
         assert_eq!(
-            wilson_interval(ObservedCounts { successes: 1, trials: 1 }, 0.0),
+            wilson_interval(
+                ObservedCounts {
+                    successes: 1,
+                    trials: 1
+                },
+                0.0
+            ),
             Err(YieldError::InvalidZScore)
         );
         assert_eq!(
-            wilson_interval(ObservedCounts { successes: 1, trials: 1 }, f64::NAN),
+            wilson_interval(
+                ObservedCounts {
+                    successes: 1,
+                    trials: 1
+                },
+                f64::NAN
+            ),
             Err(YieldError::NonFiniteInput)
         );
     }
