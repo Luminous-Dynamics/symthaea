@@ -6,6 +6,7 @@ mod duplicate_scan;
 mod env_mobility;
 mod env_mobility_route;
 mod env_mobility_economics;
+mod env_mobility_sourcing;
 mod manifest;
 mod rhn_sweep;
 
@@ -71,6 +72,8 @@ enum Commands {
     EnvMobilityRouteAudit,
     /// Evaluate the synthetic make-versus-buy economics corpus; this does not select real equipment.
     EnvMobilityMakeBuy,
+    /// Audit the dated SPM-0 sourcing register without treating catalog prices as quotes.
+    EnvMobilitySourcingAudit,
     GenerateManifest {
         #[arg(long, default_value = ".")]
         root: PathBuf,
@@ -141,6 +144,10 @@ fn main() -> anyhow::Result<()> {
                     report.total_mismatch_count
                 );
             }
+        }
+        Commands::EnvMobilitySourcingAudit => {
+            let report = env_mobility_sourcing::run()?;
+            println!("{}", serde_json::to_string_pretty(&report)?);
         }
         Commands::GenerateManifest { root } => {
             let files = vec!["Cargo.toml", "src/lib.rs", "symthaea-core/Cargo.toml"];
