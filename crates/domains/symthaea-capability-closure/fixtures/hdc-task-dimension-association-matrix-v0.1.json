@@ -584,7 +584,7 @@
   },
   "progressive_precision_routing": {
     "tracking_issue": "https://github.com/Luminous-Dynamics/symthaea/issues/7778",
-    "status": "protocol_and_issue_open_harness_not_implemented",
+    "status": "executable_scaffold_added_not_executed",
     "width_schedule": [
       1024,
       2048,
@@ -633,6 +633,40 @@
       "Support explicit abstain/refine decisions for ambiguous margins.",
       "Count stored refinement data and index update cost; prefix sharing is not free.",
       "All threshold targets are proposals and not measured results."
+    ],
+    "example": "crates/core/symthaea-core/examples/progressive_retrieval_reference.rs",
+    "command": "cargo run --release --example progressive_retrieval_reference -p symthaea-core -- /tmp/progressive-retrieval.csv 12345",
+    "initial_corpus": {
+      "records": 512,
+      "queries": 64,
+      "properties_per_record": 8,
+      "values_per_property": 32,
+      "observed_query_property_counts": [
+        1,
+        2,
+        4,
+        6
+      ],
+      "max_reference_dimension": 16384,
+      "corpus_seed_is_cli_parameter": true,
+      "full_width_reference_stays_resident": true,
+      "storage_note": "The experiment compares coordinate-evaluation work, not persistent index-memory savings. Full 16K records remain resident for both modes."
+    },
+    "implemented_metrics": [
+      "reference_top1_preserved_in_low_width_shortlist",
+      "reference_topk_overlap_fraction",
+      "exact_matching_records_in_shortlist",
+      "exact_match_shortlist_recall",
+      "false_shortlist_candidates_under_exact_observed_property_match",
+      "reference_top1_margin",
+      "coordinate_evaluations_staged_vs_exhaustive",
+      "full_index_vector_bytes"
+    ],
+    "remaining_work": [
+      "Run with multiple independent corpus seeds and calculate uncertainty intervals.",
+      "Add held-out correlated/near-duplicate and query-corruption controls.",
+      "Separate threshold calibration and final evaluation for an adaptive continue/refine/abstain policy.",
+      "Verify Rust formatting, compilation and runtime output on an equipped host."
     ]
   }
 }
