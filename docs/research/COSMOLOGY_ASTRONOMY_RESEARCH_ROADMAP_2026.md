@@ -26,7 +26,7 @@ The output should be a **reproducible scientific claim**, not a free-floating an
 
 ## Immediate code increment
 
-The companion implementation adds a validated FLRW background expansion model with constant dark-energy equation of state, radiation, matter, curvature, Simpson-integrated line-of-sight comoving distance, curvature-adjusted transverse distance, luminosity distance, and angular-diameter distance.
+The companion implementation adds a validated FLRW background expansion model with constant dark-energy equation of state, radiation, matter, curvature, Simpson-integrated line-of-sight comoving distance, curvature-adjusted transverse distance, luminosity distance, angular-diameter distance, and cosmological lookback time. Tests cover analytic Einstein–de Sitter and de Sitter limits, distance reciprocity, curvature direction, invalid inputs, and non-finite expansion rates.
 
 It deliberately does **not** claim to provide a CMB Boltzmann solver, perturbation evolution, nonlinear structure formation, survey likelihoods, parameter inference, or precision Planck constraints. The default helper is an explicitly radiation-free flat-ΛCDM approximation for continuity with existing code, not a precision parameter release.
 
@@ -40,6 +40,7 @@ Fixtures must cover:
 - de Sitter: Ωde=1, w=-1. Test constant H(z) and χ(z)=cz/H0.
 - Open and closed FLRW models. Test the sign of the transverse-distance correction against radial distance.
 - Distance reciprocity: DL=(1+z)^2 DA for a transparent metric theory on the same background.
+- Lookback time in Einstein–de Sitter and de Sitter limits; H0-to-Gyr conversion must be explicit and tested.
 - Invalid/non-finite inputs, closure failures, pathological expansion rates, and invalid integration interval counts must fail closed.
 
 **Acceptance:** analytic expansion-rate identities at tight floating-point tolerance; integrated distance relative error ≤ 1e-9 against analytic cases at the committed integration resolution; no NaN/Infinity silently emitted; every failure path has a deterministic test. Tighten the tolerance only when it is justified by a reference comparison and CI platform behavior.
