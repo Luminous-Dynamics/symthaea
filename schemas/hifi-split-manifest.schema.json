@@ -1,0 +1,133 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://luminousdynamics.io/schemas/hifi-split-manifest.schema.json",
+  "title": "Open Hi-Fi Group-Split Manifest",
+  "description": "Interchange schema for declared group-disjoint evaluation partitions. Cross-row uniqueness and leakage checks are implemented by hifi-benchmark-check; a complete JSON Schema validator should be used for this schema as well.",
+  "type": "object",
+  "additionalProperties": false,
+  "required": [
+    "schema_version",
+    "benchmark_id",
+    "evaluation_regime",
+    "partition_algorithm",
+    "source_revision",
+    "observations",
+    "holdout_rules"
+  ],
+  "properties": {
+    "schema_version": {
+      "const": "hifi-split-manifest-v1"
+    },
+    "benchmark_id": {
+      "type": "string",
+      "minLength": 1
+    },
+    "evaluation_regime": {
+      "type": "string",
+      "enum": [
+        "unseen_listener",
+        "personalization",
+        "unseen_product_revision",
+        "fixture_transfer",
+        "session_transfer"
+      ]
+    },
+    "partition_algorithm": {
+      "type": "string",
+      "minLength": 1
+    },
+    "source_revision": {
+      "type": "string",
+      "minLength": 1
+    },
+    "observations": {
+      "type": "array",
+      "minItems": 2,
+      "items": {
+        "type": "object",
+        "additionalProperties": false,
+        "required": [
+          "sample_id",
+          "role",
+          "listener_id",
+          "excerpt_id",
+          "product_revision_id",
+          "measurement_session_id",
+          "fixture_id"
+        ],
+        "properties": {
+          "sample_id": {
+            "type": "string",
+            "minLength": 1
+          },
+          "role": {
+            "type": "string",
+            "enum": [
+              "train",
+              "validation",
+              "calibration",
+              "test"
+            ]
+          },
+          "listener_id": {
+            "type": "string",
+            "minLength": 1
+          },
+          "excerpt_id": {
+            "type": "string",
+            "minLength": 1
+          },
+          "product_revision_id": {
+            "type": "string",
+            "minLength": 1
+          },
+          "measurement_session_id": {
+            "type": "string",
+            "minLength": 1
+          },
+          "fixture_id": {
+            "type": "string",
+            "minLength": 1
+          }
+        }
+      }
+    },
+    "holdout_rules": {
+      "type": "array",
+      "minItems": 1,
+      "items": {
+        "type": "object",
+        "additionalProperties": false,
+        "required": [
+          "dimension",
+          "disjoint_from_roles"
+        ],
+        "properties": {
+          "dimension": {
+            "type": "string",
+            "enum": [
+              "listener_id",
+              "excerpt_id",
+              "product_revision_id",
+              "measurement_session_id",
+              "fixture_id"
+            ]
+          },
+          "disjoint_from_roles": {
+            "type": "array",
+            "minItems": 1,
+            "uniqueItems": true,
+            "items": {
+              "type": "string",
+              "enum": [
+                "train",
+                "validation",
+                "calibration"
+              ]
+            }
+          }
+        }
+      }
+    }
+  }
+}

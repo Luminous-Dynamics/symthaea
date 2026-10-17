@@ -1,0 +1,882 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "title": "Open Audio Evidence Manifest",
+  "description": "Evidence index for one audio-device measurement run. A syntactically valid manifest is not product or standards certification.",
+  "type": "object",
+  "additionalProperties": false,
+  "required": [
+    "schema_version",
+    "manifest_id",
+    "data_status",
+    "created_at",
+    "product",
+    "build",
+    "protocol",
+    "decision",
+    "limitations"
+  ],
+  "properties": {
+    "schema_version": {
+      "const": "1.0.0"
+    },
+    "manifest_id": {
+      "type": "string",
+      "minLength": 3,
+      "maxLength": 128,
+      "pattern": "^[A-Z0-9][A-Z0-9._-]+$"
+    },
+    "data_status": {
+      "enum": [
+        "planned",
+        "captured",
+        "analyzed",
+        "validated",
+        "invalid",
+        "excluded"
+      ]
+    },
+    "created_at": {
+      "type": "string",
+      "format": "date-time"
+    },
+    "started_at": {
+      "type": "string",
+      "format": "date-time"
+    },
+    "completed_at": {
+      "type": "string",
+      "format": "date-time"
+    },
+    "operator_id": {
+      "type": "string",
+      "minLength": 1,
+      "maxLength": 128,
+      "description": "Use a stable pseudonymous ID, not personal data."
+    },
+    "product": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "kind",
+        "brand",
+        "model",
+        "hardware_revision"
+      ],
+      "properties": {
+        "kind": {
+          "enum": [
+            "headphone",
+            "earphone",
+            "loudspeaker_system",
+            "loudspeaker_driver",
+            "subwoofer",
+            "amplifier",
+            "dac",
+            "preamp",
+            "measurement_fixture",
+            "other"
+          ]
+        },
+        "brand": {
+          "type": "string",
+          "minLength": 1,
+          "maxLength": 128
+        },
+        "model": {
+          "type": "string",
+          "minLength": 1,
+          "maxLength": 256
+        },
+        "hardware_revision": {
+          "type": "string",
+          "minLength": 1,
+          "maxLength": 128
+        },
+        "serial_or_sample_id": {
+          "type": "string",
+          "minLength": 1,
+          "maxLength": 128
+        },
+        "condition": {
+          "enum": [
+            "new",
+            "used",
+            "prototype",
+            "repaired",
+            "unknown",
+            "not_yet_built"
+          ]
+        },
+        "accessories": {
+          "type": "array",
+          "items": {
+            "type": "string",
+            "maxLength": 256
+          },
+          "uniqueItems": true
+        },
+        "pad_or_earpiece": {
+          "type": "object",
+          "additionalProperties": false,
+          "properties": {
+            "type": {
+              "type": "string",
+              "maxLength": 128
+            },
+            "age_hours": {
+              "type": "number",
+              "minimum": 0
+            },
+            "condition": {
+              "type": "string",
+              "maxLength": 256
+            },
+            "lot_or_revision": {
+              "type": "string",
+              "maxLength": 128
+            }
+          }
+        }
+      }
+    },
+    "build": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "build_id",
+        "source_revision"
+      ],
+      "properties": {
+        "build_id": {
+          "type": "string",
+          "minLength": 1,
+          "maxLength": 128
+        },
+        "source_revision": {
+          "type": "string",
+          "minLength": 1,
+          "maxLength": 256
+        },
+        "cad_revision": {
+          "type": "string",
+          "maxLength": 256
+        },
+        "bom_revision": {
+          "type": "string",
+          "maxLength": 256
+        },
+        "pcb_revision": {
+          "type": "string",
+          "maxLength": 256
+        },
+        "firmware_revision": {
+          "type": "string",
+          "maxLength": 256
+        },
+        "approved_substitutions": {
+          "type": "array",
+          "items": {
+            "type": "string",
+            "maxLength": 512
+          }
+        },
+        "design_artifacts": {
+          "type": "array",
+          "items": {
+            "$ref": "#/$defs/artifact"
+          }
+        }
+      }
+    },
+    "protocol": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "protocol_id",
+        "version",
+        "measurement_type"
+      ],
+      "properties": {
+        "protocol_id": {
+          "type": "string",
+          "minLength": 1,
+          "maxLength": 128
+        },
+        "version": {
+          "type": "string",
+          "minLength": 1,
+          "maxLength": 64
+        },
+        "measurement_type": {
+          "enum": [
+            "headphone_response",
+            "headphone_fit_sensitivity",
+            "headphone_channel_tracking",
+            "headphone_impedance",
+            "headphone_distortion",
+            "speaker_on_axis_response",
+            "speaker_angular_response",
+            "speaker_directivity",
+            "speaker_distortion",
+            "speaker_compression",
+            "speaker_maximum_linear_output",
+            "amplifier_loopback",
+            "amplifier_load_sweep",
+            "dac_loopback",
+            "room_response",
+            "listening_preference",
+            "mechanical_repair",
+            "other"
+          ]
+        },
+        "procedure_uri": {
+          "type": "string",
+          "format": "uri"
+        },
+        "source_revision": {
+          "type": "string",
+          "maxLength": 256
+        },
+        "declared_standards": {
+          "type": "array",
+          "items": {
+            "type": "string",
+            "maxLength": 256
+          },
+          "description": "References only; listing a standard does not assert compliance."
+        },
+        "profile_hash_sha256": {
+          "$ref": "#/$defs/sha256"
+        },
+        "settings": {
+          "type": "object",
+          "description": "Protocol-specific settings; version protocol when semantics change."
+        }
+      }
+    },
+    "fixture": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "fixture_id",
+        "fixture_type",
+        "model_or_design",
+        "revision"
+      ],
+      "properties": {
+        "fixture_id": {
+          "type": "string",
+          "minLength": 1,
+          "maxLength": 128
+        },
+        "fixture_type": {
+          "enum": [
+            "ear_simulator",
+            "head_and_torso_simulator",
+            "headphone_coupler",
+            "microphone_and_stand",
+            "speaker_turntable",
+            "anechoic_room",
+            "ground_plane",
+            "room",
+            "electrical_load",
+            "loopback",
+            "other"
+          ]
+        },
+        "model_or_design": {
+          "type": "string",
+          "minLength": 1,
+          "maxLength": 256
+        },
+        "revision": {
+          "type": "string",
+          "minLength": 1,
+          "maxLength": 128
+        },
+        "coupler_standard_or_geometry": {
+          "type": "string",
+          "maxLength": 512
+        },
+        "application_force_newtons": {
+          "type": "number",
+          "minimum": 0
+        },
+        "clamp_setting": {
+          "type": "string",
+          "maxLength": 256
+        },
+        "position_grid": {
+          "type": "string",
+          "maxLength": 512
+        },
+        "limitations": {
+          "type": "array",
+          "items": {
+            "type": "string",
+            "maxLength": 1024
+          }
+        },
+        "calibration_artifacts": {
+          "type": "array",
+          "items": {
+            "$ref": "#/$defs/artifact"
+          }
+        }
+      }
+    },
+    "instrumentation": {
+      "type": "array",
+      "default": [],
+      "items": {
+        "type": "object",
+        "additionalProperties": false,
+        "required": [
+          "instrument_id",
+          "kind",
+          "manufacturer",
+          "model",
+          "calibration_state"
+        ],
+        "properties": {
+          "instrument_id": {
+            "type": "string",
+            "minLength": 1,
+            "maxLength": 128
+          },
+          "kind": {
+            "enum": [
+              "measurement_microphone",
+              "audio_interface",
+              "analyzer",
+              "sound_level_meter",
+              "amplifier",
+              "voltmeter",
+              "ammeter",
+              "impedance_analyzer",
+              "temperature_sensor",
+              "force_gauge",
+              "turntable_encoder",
+              "other"
+            ]
+          },
+          "manufacturer": {
+            "type": "string",
+            "minLength": 1,
+            "maxLength": 128
+          },
+          "model": {
+            "type": "string",
+            "minLength": 1,
+            "maxLength": 256
+          },
+          "serial_or_asset_id": {
+            "type": "string",
+            "maxLength": 128
+          },
+          "firmware_or_software": {
+            "type": "string",
+            "maxLength": 256
+          },
+          "calibration_state": {
+            "enum": [
+              "in_date_verified",
+              "out_of_date",
+              "uncalibrated",
+              "unknown",
+              "not_applicable"
+            ]
+          },
+          "calibration_due_at": {
+            "type": "string",
+            "format": "date-time"
+          },
+          "calibration_artifacts": {
+            "type": "array",
+            "items": {
+              "$ref": "#/$defs/artifact"
+            }
+          }
+        }
+      }
+    },
+    "environment": {
+      "type": "object",
+      "additionalProperties": false,
+      "properties": {
+        "temperature_c": {
+          "type": "number",
+          "minimum": -40,
+          "maximum": 100
+        },
+        "relative_humidity_percent": {
+          "type": "number",
+          "minimum": 0,
+          "maximum": 100
+        },
+        "background_noise_db_spl": {
+          "type": "number",
+          "minimum": 0,
+          "maximum": 200
+        },
+        "room_or_site_id": {
+          "type": "string",
+          "maxLength": 128
+        },
+        "room_description": {
+          "type": "string",
+          "maxLength": 1024
+        },
+        "mains_or_supply_conditions": {
+          "type": "string",
+          "maxLength": 512
+        }
+      }
+    },
+    "captures": {
+      "type": "array",
+      "default": [],
+      "items": {
+        "type": "object",
+        "additionalProperties": false,
+        "required": [
+          "capture_id",
+          "capture_role",
+          "artifact",
+          "channel_or_angle"
+        ],
+        "properties": {
+          "capture_id": {
+            "type": "string",
+            "minLength": 1,
+            "maxLength": 128
+          },
+          "capture_role": {
+            "enum": [
+              "raw",
+              "reference_control",
+              "calibration_check",
+              "processed",
+              "plot",
+              "report",
+              "photo",
+              "other"
+            ]
+          },
+          "artifact": {
+            "$ref": "#/$defs/artifact"
+          },
+          "channel_or_angle": {
+            "type": "string",
+            "minLength": 1,
+            "maxLength": 128
+          },
+          "placement_or_reseat_id": {
+            "type": "string",
+            "maxLength": 128
+          },
+          "fit_condition": {
+            "type": "string",
+            "maxLength": 512
+          },
+          "repeat_index": {
+            "type": "integer",
+            "minimum": 1
+          },
+          "captured_at": {
+            "type": "string",
+            "format": "date-time"
+          },
+          "notes": {
+            "type": "string",
+            "maxLength": 2048
+          }
+        }
+      }
+    },
+    "analysis": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "tool_id",
+        "tool_version",
+        "source_revision"
+      ],
+      "properties": {
+        "tool_id": {
+          "type": "string",
+          "minLength": 1,
+          "maxLength": 128
+        },
+        "tool_version": {
+          "type": "string",
+          "minLength": 1,
+          "maxLength": 128
+        },
+        "source_revision": {
+          "type": "string",
+          "minLength": 1,
+          "maxLength": 256
+        },
+        "configuration_hash_sha256": {
+          "$ref": "#/$defs/sha256"
+        },
+        "analysis_artifacts": {
+          "type": "array",
+          "items": {
+            "$ref": "#/$defs/artifact"
+          }
+        }
+      }
+    },
+    "results": {
+      "type": "array",
+      "default": [],
+      "items": {
+        "type": "object",
+        "additionalProperties": false,
+        "required": [
+          "metric_id",
+          "value",
+          "unit",
+          "statistic",
+          "frequency_or_condition"
+        ],
+        "properties": {
+          "metric_id": {
+            "type": "string",
+            "minLength": 1,
+            "maxLength": 128
+          },
+          "value": {
+            "type": "number"
+          },
+          "unit": {
+            "type": "string",
+            "minLength": 1,
+            "maxLength": 64
+          },
+          "statistic": {
+            "enum": [
+              "single",
+              "mean",
+              "median",
+              "p10",
+              "p90",
+              "minimum",
+              "maximum",
+              "rms",
+              "range",
+              "other"
+            ]
+          },
+          "frequency_or_condition": {
+            "type": "string",
+            "minLength": 1,
+            "maxLength": 256
+          },
+          "sample_count": {
+            "type": "integer",
+            "minimum": 1
+          },
+          "method": {
+            "type": "string",
+            "maxLength": 1024
+          },
+          "uncertainty_value": {
+            "type": "number",
+            "minimum": 0
+          },
+          "uncertainty_unit": {
+            "type": "string",
+            "maxLength": 64
+          },
+          "notes": {
+            "type": "string",
+            "maxLength": 2048
+          }
+        }
+      }
+    },
+    "decision": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "disposition"
+      ],
+      "properties": {
+        "disposition": {
+          "enum": [
+            "not_evaluated",
+            "pass",
+            "fail",
+            "inconclusive",
+            "excluded"
+          ]
+        },
+        "gate_id": {
+          "type": "string",
+          "maxLength": 128
+        },
+        "gate_revision": {
+          "type": "string",
+          "maxLength": 128
+        },
+        "rule": {
+          "type": "string",
+          "maxLength": 2048
+        },
+        "threshold_value": {
+          "type": "number"
+        },
+        "threshold_unit": {
+          "type": "string",
+          "maxLength": 64
+        },
+        "explanation": {
+          "type": "string",
+          "maxLength": 4096
+        }
+      }
+    },
+    "deviations": {
+      "type": "array",
+      "default": [],
+      "items": {
+        "type": "string",
+        "maxLength": 2048
+      }
+    },
+    "limitations": {
+      "type": "array",
+      "minItems": 1,
+      "items": {
+        "type": "string",
+        "minLength": 1,
+        "maxLength": 2048
+      }
+    },
+    "provenance": {
+      "type": "object",
+      "additionalProperties": false,
+      "properties": {
+        "manifest_authority": {
+          "type": "string",
+          "maxLength": 256
+        },
+        "data_license": {
+          "type": "string",
+          "maxLength": 256
+        },
+        "third_party_data": {
+          "type": "array",
+          "items": {
+            "type": "object",
+            "additionalProperties": false,
+            "required": [
+              "source_uri",
+              "license_or_permission",
+              "use"
+            ],
+            "properties": {
+              "source_uri": {
+                "type": "string",
+                "format": "uri"
+              },
+              "license_or_permission": {
+                "type": "string",
+                "maxLength": 512
+              },
+              "use": {
+                "type": "string",
+                "maxLength": 1024
+              }
+            }
+          }
+        }
+      }
+    }
+  },
+  "$defs": {
+    "sha256": {
+      "type": "string",
+      "pattern": "^[a-fA-F0-9]{64}$"
+    },
+    "artifact": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "path",
+        "sha256",
+        "media_type"
+      ],
+      "properties": {
+        "path": {
+          "type": "string",
+          "minLength": 1,
+          "maxLength": 1024,
+          "pattern": "^(?!/)(?!.*(?:^|/)\\.\\.(?:/|$))[A-Za-z0-9._/-]+$",
+          "description": "Relative path only; no absolute paths or parent traversal."
+        },
+        "sha256": {
+          "type": "string",
+          "pattern": "^[a-fA-F0-9]{64}$"
+        },
+        "media_type": {
+          "type": "string",
+          "minLength": 1,
+          "maxLength": 128
+        },
+        "size_bytes": {
+          "type": "integer",
+          "minimum": 0
+        },
+        "description": {
+          "type": "string",
+          "maxLength": 1024
+        }
+      }
+    }
+  },
+  "allOf": [
+    {
+      "if": {
+        "properties": {
+          "data_status": {
+            "const": "planned"
+          }
+        },
+        "required": [
+          "data_status"
+        ]
+      },
+      "then": {
+        "properties": {
+          "captures": {
+            "maxItems": 0
+          },
+          "results": {
+            "maxItems": 0
+          },
+          "decision": {
+            "properties": {
+              "disposition": {
+                "const": "not_evaluated"
+              }
+            }
+          }
+        }
+      },
+      "else": {
+        "required": [
+          "started_at",
+          "fixture",
+          "instrumentation",
+          "environment",
+          "captures"
+        ],
+        "properties": {
+          "instrumentation": {
+            "minItems": 1
+          },
+          "captures": {
+            "minItems": 1,
+            "contains": {
+              "properties": {
+                "capture_role": {
+                  "const": "raw"
+                }
+              },
+              "required": [
+                "capture_role"
+              ]
+            },
+            "minContains": 1
+          }
+        }
+      }
+    },
+    {
+      "if": {
+        "properties": {
+          "data_status": {
+            "enum": [
+              "analyzed",
+              "validated"
+            ]
+          }
+        },
+        "required": [
+          "data_status"
+        ]
+      },
+      "then": {
+        "required": [
+          "analysis",
+          "results"
+        ],
+        "properties": {
+          "results": {
+            "minItems": 1
+          }
+        }
+      }
+    },
+    {
+      "if": {
+        "properties": {
+          "data_status": {
+            "const": "validated"
+          }
+        },
+        "required": [
+          "data_status"
+        ]
+      },
+      "then": {
+        "required": [
+          "decision"
+        ],
+        "properties": {
+          "decision": {
+            "properties": {
+              "disposition": {
+                "enum": [
+                  "pass",
+                  "fail",
+                  "inconclusive"
+                ]
+              }
+            }
+          }
+        }
+      }
+    },
+    {
+      "if": {
+        "properties": {
+          "data_status": {
+            "enum": [
+              "captured",
+              "analyzed"
+            ]
+          }
+        },
+        "required": [
+          "data_status"
+        ]
+      },
+      "then": {
+        "properties": {
+          "decision": {
+            "properties": {
+              "disposition": {
+                "const": "not_evaluated"
+              }
+            }
+          }
+        }
+      }
+    }
+  ]
+}

@@ -1,0 +1,86 @@
+{
+  "schema_version": "hifi-split-manifest-v1",
+  "benchmark_id": "HP-PREF-001",
+  "evaluation_regime": "personalization",
+  "partition_algorithm": "predeclared_group_holdout_v1",
+  "source_revision": "synthetic-fixture-v1",
+  "observations": [
+    {
+      "sample_id": "sample-train-001",
+      "role": "train",
+      "listener_id": "listener-population-01",
+      "excerpt_id": "excerpt-train-1",
+      "product_revision_id": "headphone-h1-rev1",
+      "measurement_session_id": "session-train-01",
+      "fixture_id": "fixture-a"
+    },
+    {
+      "sample_id": "sample-train-002",
+      "role": "train",
+      "listener_id": "listener-population-02",
+      "excerpt_id": "excerpt-train-2",
+      "product_revision_id": "headphone-h1-rev1",
+      "measurement_session_id": "session-train-02",
+      "fixture_id": "fixture-a"
+    },
+    {
+      "sample_id": "sample-validation-001",
+      "role": "validation",
+      "listener_id": "listener-validation-01",
+      "excerpt_id": "excerpt-validation-1",
+      "product_revision_id": "headphone-h1-rev1",
+      "measurement_session_id": "session-validation-01",
+      "fixture_id": "fixture-a"
+    },
+    {
+      "sample_id": "sample-calibration-001",
+      "role": "calibration",
+      "listener_id": "listener-personalized-01",
+      "excerpt_id": "excerpt-calibration-1",
+      "product_revision_id": "headphone-h1-rev1",
+      "measurement_session_id": "session-calibration-01",
+      "fixture_id": "fixture-a"
+    },
+    {
+      "sample_id": "sample-calibration-002",
+      "role": "calibration",
+      "listener_id": "listener-personalized-01",
+      "excerpt_id": "excerpt-calibration-2",
+      "product_revision_id": "headphone-h1-rev1",
+      "measurement_session_id": "session-calibration-02",
+      "fixture_id": "fixture-a"
+    },
+    {
+      "sample_id": "sample-test-001",
+      "role": "test",
+      "listener_id": "listener-personalized-01",
+      "excerpt_id": "excerpt-test-1",
+      "product_revision_id": "headphone-h1-rev1",
+      "measurement_session_id": "session-test-01",
+      "fixture_id": "fixture-a"
+    },
+    {
+      "sample_id": "sample-test-002",
+      "role": "test",
+      "listener_id": "listener-personalized-01",
+      "excerpt_id": "excerpt-test-2",
+      "product_revision_id": "headphone-h1-rev1",
+      "measurement_session_id": "session-test-02",
+      "fixture_id": "fixture-a"
+    }
+  ],
+  "holdout_rules": [
+    {
+      "dimension": "listener_id",
+      "disjoint_from_roles": ["train", "validation"]
+    },
+    {
+      "dimension": "excerpt_id",
+      "disjoint_from_roles": ["train", "validation", "calibration"]
+    },
+    {
+      "dimension": "measurement_session_id",
+      "disjoint_from_roles": ["train", "validation", "calibration"]
+    }
+  ]
+}
