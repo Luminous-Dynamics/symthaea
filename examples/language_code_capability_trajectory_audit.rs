@@ -215,6 +215,10 @@ fn evaluate_case(case: &Value) -> Result<(String, String), String> {
 fn audit_corpus() -> Result<Value, String> {
     let corpus: Value = serde_json::from_str(CORPUS)
         .map_err(|error| format!("invalid embedded trajectory corpus: {error}"))?;
+    validate_corpus(&corpus)
+}
+
+fn validate_corpus(corpus: &Value) -> Result<Value, String> {
     if corpus.get("synthetic").and_then(Value::as_bool) != Some(true) {
         return Err("trajectory corpus must be labelled synthetic=true".to_owned());
     }
@@ -321,13 +325,19 @@ mod tests {
     #[test]
     fn earlier_pass_does_not_verify_later_patch() {
         let mut case = fixture()["cases"][2].clone();
-        case["events"][6] = json!({
-            "step": 7,
-            "event": "test",
-            "patch_id": "p2",
-            "result": "pass",
-            "command": "cargo test"
-        });
+        let events = case["events"].as_array_mut().unwrap();
+        events.insert(
+            5,
+            json!({
+                "step": 6,
+                "event": "test",
+                "patch_id": "p2",
+                "result": "pass",
+                "command": "cargo test"
+            }),
+        );
+        events[6]["step"] = json!(7);
+        events[7]["step"] = json!(8);
         assert_eq!(
             evaluate_case(&case),
             Ok((
@@ -394,12 +404,10 @@ mod tests {
     fn duplicate_ids_are_rejected_by_catalog_audit() {
         let mut corpus = fixture();
         corpus["cases"][1]["id"] = corpus["cases"][0]["id"].clone();
-        let ids: Vec<&str> = corpus["cases"]
-            .as_array()
-            .unwrap()
-            .iter()
-            .map(|case| string_field(case, "id").unwrap())
-            .collect();
-        assert!(ids.iter().collect::<BTreeSet<_>>().len() < ids.len());
+        assert!(
+            validate_corpus(&corpus)
+                .expect_err("duplicate IDs must fail")
+                .contains("duplicate trajectory case ID")
+        );
     }
 }
