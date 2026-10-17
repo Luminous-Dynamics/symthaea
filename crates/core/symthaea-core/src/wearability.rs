@@ -10,6 +10,7 @@
 //! measured and traced by a separate validated system.
 
 use serde::{Deserialize, Serialize};
+use std::collections::HashSet;
 
 /// Current schema version for wearability input requests.
 pub const WEARABILITY_SCHEMA_VERSION: u16 = 1;
@@ -695,41 +696,41 @@ fn validate_wearability_provenance(
 
     let mut present_fields = Vec::new();
     macro_rules! present {
-        ($field:ident) => {
+        ($field:ident, $variant:ident) => {
             if input.$field.is_some() {
-                present_fields.push(Field::$field);
+                present_fields.push(Field::$variant);
             }
         };
     }
-    present!(fastening_evidence);
-    present!(profile_match);
-    present!(fit_evidence);
-    present!(sensor_consistency);
-    present!(pressure_sensor);
-    present!(shear_sensor);
-    present!(user_comfort_report);
-    present!(task_compatibility);
-    present!(movement_clearance);
-    present!(thermal_comfort);
-    present!(duty_cycle);
-    present!(hygiene_compatibility);
-    present!(workflow_support_requirement);
-    present!(caregiver_available);
-    present!(user_requested_doff);
-    present!(active_motion_request);
-    present!(prior_session_mode);
-    present!(current_session_mode);
-    present!(configuration_lineage);
-    present!(task_energy_estimate);
-    present!(predicted_reserve_after_task);
-    present!(estimate_confidence);
-    present!(module_changed);
-    present!(calibration_lineage_after_service);
-    present!(diagnostic_result);
-    present!(workflow_timeout);
-    present!(critical_step_completed);
-    present!(interface_migration_sensor);
-    present!(measured_migration_value);
+    present!(fastening_evidence, FasteningEvidence);
+    present!(profile_match, ProfileMatch);
+    present!(fit_evidence, FitEvidence);
+    present!(sensor_consistency, SensorConsistency);
+    present!(pressure_sensor, PressureSensor);
+    present!(shear_sensor, ShearSensor);
+    present!(user_comfort_report, UserComfortReport);
+    present!(task_compatibility, TaskCompatibility);
+    present!(movement_clearance, MovementClearance);
+    present!(thermal_comfort, ThermalComfort);
+    present!(duty_cycle, DutyCycle);
+    present!(hygiene_compatibility, HygieneCompatibility);
+    present!(workflow_support_requirement, WorkflowSupportRequirement);
+    present!(caregiver_available, CaregiverAvailable);
+    present!(user_requested_doff, UserRequestedDoff);
+    present!(active_motion_request, ActiveMotionRequest);
+    present!(prior_session_mode, PriorSessionMode);
+    present!(current_session_mode, CurrentSessionMode);
+    present!(configuration_lineage, ConfigurationLineage);
+    present!(task_energy_estimate, TaskEnergyEstimate);
+    present!(predicted_reserve_after_task, PredictedReserveAfterTask);
+    present!(estimate_confidence, EstimateConfidence);
+    present!(module_changed, ModuleChanged);
+    present!(calibration_lineage_after_service, CalibrationLineageAfterService);
+    present!(diagnostic_result, DiagnosticResult);
+    present!(workflow_timeout, WorkflowTimeout);
+    present!(critical_step_completed, CriticalStepCompleted);
+    present!(interface_migration_sensor, InterfaceMigrationSensor);
+    present!(measured_migration_value, MeasuredMigrationValue);
 
     let mut findings = Vec::new();
     for field in present_fields.iter().copied() {
