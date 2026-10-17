@@ -18,7 +18,7 @@ use std::collections::HashSet;
 /// annual_capital_charge must be calculated and documented by the caller.
 /// Do not also include the same acquisition/depreciation/finance charge in
 /// another field.
-#[derive(Debug, Clone, Copy, PartialEq, Default)]
+#[derive(Debug, Clone, Copy, PartialEq)]
 pub struct AnnualFixedCosts {
     pub annual_capital_charge: f64,
     pub annual_insurance: f64,
@@ -56,11 +56,14 @@ impl AnnualFixedCosts {
 /// maintenance labor/parts, and explicit per-hour engine/propeller/battery
 /// reserves. Do not put calendar inspection costs here if they are already in
 /// AnnualFixedCosts.
-#[derive(Debug, Clone, Copy, PartialEq, Default)]
+#[derive(Debug, Clone, Copy, PartialEq)]
 pub struct HourlyOperatingCosts {
     pub fuel_or_energy: f64,
     pub oil_and_consumables: f64,
-    pub maintenance_labor: f64,
+    /// Owner maintenance time monetized using an explicit opportunity-cost rate.
+    pub owner_maintenance_labor: f64,
+    /// Licensed/authorized maintenance labor costs.
+    pub professional_maintenance_labor: f64,
     pub maintenance_parts: f64,
     pub engine_overhaul_reserve: f64,
     pub propeller_reserve: f64,
@@ -72,7 +75,8 @@ impl HourlyOperatingCosts {
     fn total(&self) -> f64 {
         self.fuel_or_energy
             + self.oil_and_consumables
-            + self.maintenance_labor
+            + self.owner_maintenance_labor
+            + self.professional_maintenance_labor
             + self.maintenance_parts
             + self.engine_overhaul_reserve
             + self.propeller_reserve
@@ -84,7 +88,8 @@ impl HourlyOperatingCosts {
         [
             ("fuel_or_energy", self.fuel_or_energy),
             ("oil_and_consumables", self.oil_and_consumables),
-            ("maintenance_labor", self.maintenance_labor),
+            ("owner_maintenance_labor", self.owner_maintenance_labor),
+            ("professional_maintenance_labor", self.professional_maintenance_labor),
             ("maintenance_parts", self.maintenance_parts),
             ("engine_overhaul_reserve", self.engine_overhaul_reserve),
             ("propeller_reserve", self.propeller_reserve),
@@ -97,7 +102,7 @@ impl HourlyOperatingCosts {
 /// Costs incurred per scheduled dispatch attempt, including attempts that are
 /// cancelled before a completed mission. A completed-mission cost can represent
 /// landing/handling fees or other cost incurred only for completed sorties.
-#[derive(Debug, Clone, Copy, PartialEq, Default)]
+#[derive(Debug, Clone, Copy, PartialEq)]
 pub struct PerMissionCosts {
     pub preparation_per_attempt: f64,
     pub failed_dispatch_per_attempt: f64,
@@ -119,6 +124,14 @@ pub struct AircraftOwnershipScenario {
     /// SHA-256 digest of the canonical mission definition and common operating
     /// assumptions; syntax/equality only are checked by this module.
     pub mission_family_sha256: String,
+    /// Shared inclusion/exclusion rules for a fair cost comparison.
+    pub cost_boundary_id: String,
+    /// Content digest for this candidate's complete normalized cost assumptions.
+    pub cost_assumptions_sha256: String,
+    /// Source locator for the candidate cost input package/invoice set.
+    pub cost_assumptions_reference: String,
+    /// Date associated with the comparable cost dataset (ISO 8601 date).
+    pub cost_data_as_of: String,
     /// ISO 4217-style three-letter code; this crate performs no currency conversion.
     pub currency_code: String,
     pub annual_planned_attempts: u32,
@@ -142,6 +155,10 @@ pub enum OwnershipCostError {
     DuplicateAircraftId { aircraft_id: String },
     EmptyMissionFamilyId,
     InvalidMissionFamilyDigest,
+    EmptyCostBoundaryId,
+    InvalidCostAssumptionsDigest,
+    MissingCostAssumptionsReference,
+    InvalidCostDataDate,
     InvalidCurrencyCode,
     ZeroPlannedAttempts,
     ZeroPassengerCount,
@@ -154,6 +171,8 @@ pub enum OwnershipCostError {
     ZeroDenominator { metric: &'static str },
     MissionFamilyMismatch { aircraft_id: String },
     MissionDigestMismatch { aircraft_id: String },
+    CostBoundaryMismatch { aircraft_id: String },
+    CostDataDateMismatch { aircraft_id: String },
     CurrencyMismatch { aircraft_id: String },
     PlannedAttemptsMismatch { aircraft_id: String },
     PassengerCountMismatch { aircraft_id: String },
@@ -162,7 +181,7 @@ pub enum OwnershipCostError {
 }
 
 /// Cost decomposition in the scenario's declared currency units.
-#[derive(Debug, Clone, Copy, PartialEq, Default)]
+#[derive(Debug, Clone, Copy, PartialEq)]
 pub struct AnnualCostBreakdown {
     pub annual_capital_charge: f64,
     pub annual_insurance: f64,
@@ -176,7 +195,8 @@ pub struct AnnualCostBreakdown {
     pub completed_mission_costs: f64,
     pub fuel_or_energy_costs: f64,
     pub oil_and_consumables_costs: f64,
-    pub maintenance_labor_costs: f64,
+    pub owner_maintenance_labor_costs: f64,
+    pub professional_maintenance_labor_costs: f64,
     pub maintenance_parts_costs: f64,
     pub engine_overhaul_reserve_costs: f64,
     pub propeller_reserve_costs: f64,
@@ -261,7 +281,9 @@ pub fn evaluate_ownership_scenario(
     let hourly_inputs = scenario.hourly_costs;
     let fuel_or_energy_costs = flown_hours * hourly_inputs.fuel_or_energy;
     let oil_and_consumables_costs = flown_hours * hourly_inputs.oil_and_consumables;
-    let maintenance_labor_costs = flown_hours * hourly_inputs.maintenance_labor;
+    let owner_maintenance_labor_costs = flown_hours * hourly_inputs.owner_maintenance_labor;
+    let professional_maintenance_labor_costs =
+        flown_hours * hourly_inputs.professional_maintenance_labor;
     let maintenance_parts_costs = flown_hours * hourly_inputs.maintenance_parts;
     let engine_overhaul_reserve_costs = flown_hours * hourly_inputs.engine_overhaul_reserve;
     let propeller_reserve_costs = flown_hours * hourly_inputs.propeller_reserve;
@@ -269,7 +291,8 @@ pub fn evaluate_ownership_scenario(
     let other_hourly_costs = flown_hours * hourly_inputs.other_hourly;
     let hourly = fuel_or_energy_costs
         + oil_and_consumables_costs
-        + maintenance_labor_costs
+        + owner_maintenance_labor_costs
+        + professional_maintenance_labor_costs
         + maintenance_parts_costs
         + engine_overhaul_reserve_costs
         + propeller_reserve_costs
@@ -290,7 +313,8 @@ pub fn evaluate_ownership_scenario(
         ("completed_mission_costs", completed_cost),
         ("fuel_or_energy_costs", fuel_or_energy_costs),
         ("oil_and_consumables_costs", oil_and_consumables_costs),
-        ("maintenance_labor_costs", maintenance_labor_costs),
+        ("owner_maintenance_labor_costs", owner_maintenance_labor_costs),
+        ("professional_maintenance_labor_costs", professional_maintenance_labor_costs),
         ("maintenance_parts_costs", maintenance_parts_costs),
         ("engine_overhaul_reserve_costs", engine_overhaul_reserve_costs),
         ("propeller_reserve_costs", propeller_reserve_costs),
@@ -342,7 +366,8 @@ pub fn evaluate_ownership_scenario(
             completed_mission_costs: completed_cost,
             fuel_or_energy_costs,
             oil_and_consumables_costs,
-            maintenance_labor_costs,
+            owner_maintenance_labor_costs,
+            professional_maintenance_labor_costs,
             maintenance_parts_costs,
             engine_overhaul_reserve_costs,
             propeller_reserve_costs,
@@ -389,6 +414,16 @@ pub fn compare_ownership_scenarios(
             &reference.mission_family_sha256,
         ) {
             return Err(OwnershipCostError::MissionDigestMismatch {
+                aircraft_id: scenario.aircraft_id.clone(),
+            });
+        }
+        if scenario.cost_boundary_id != reference.cost_boundary_id {
+            return Err(OwnershipCostError::CostBoundaryMismatch {
+                aircraft_id: scenario.aircraft_id.clone(),
+            });
+        }
+        if scenario.cost_data_as_of != reference.cost_data_as_of {
+            return Err(OwnershipCostError::CostDataDateMismatch {
                 aircraft_id: scenario.aircraft_id.clone(),
             });
         }
@@ -447,6 +482,26 @@ fn validate_scenario(scenario: &AircraftOwnershipScenario) -> Result<(), Ownersh
     }
     if !is_sha256_digest(&scenario.mission_family_sha256) {
         return Err(OwnershipCostError::InvalidMissionFamilyDigest);
+    }
+    if scenario.cost_boundary_id.trim().is_empty()
+        || scenario.cost_boundary_id.trim() != scenario.cost_boundary_id.as_str()
+    {
+        return Err(OwnershipCostError::EmptyCostBoundaryId);
+    }
+    if !is_sha256_digest(&scenario.cost_assumptions_sha256) {
+        return Err(OwnershipCostError::InvalidCostAssumptionsDigest);
+    }
+    if scenario.cost_assumptions_reference.trim().is_empty() {
+        return Err(OwnershipCostError::MissingCostAssumptionsReference);
+    }
+    if scenario.cost_data_as_of.len() != 10
+        || scenario.cost_data_as_of.chars().nth(4) != Some('-')
+        || scenario.cost_data_as_of.chars().nth(7) != Some('-')
+        || !scenario.cost_data_as_of.chars().enumerate().all(|(i, ch)| {
+            if i == 4 || i == 7 { ch == '-' } else { ch.is_ascii_digit() }
+        })
+    {
+        return Err(OwnershipCostError::InvalidCostDataDate);
     }
     if scenario.currency_code.len() != 3
         || !scenario.currency_code.bytes().all(|b| b.is_ascii_uppercase())
@@ -542,6 +597,10 @@ mod tests {
             aircraft_id: aircraft_id.into(),
             mission_family_id: "s4-personal-150nm-v1".into(),
             mission_family_sha256: "a".repeat(64),
+            cost_boundary_id: "owner-aircraft-full-cost-v1".into(),
+            cost_assumptions_sha256: "c".repeat(64),
+            cost_assumptions_reference: "synthetic-test-fixture-v1".into(),
+            cost_data_as_of: "2026-10-17".into(),
             currency_code: "USD".into(),
             annual_planned_attempts: attempts,
             annual_scheduling_budget_hours: 500.0,
@@ -560,7 +619,8 @@ mod tests {
             hourly_costs: HourlyOperatingCosts {
                 fuel_or_energy: 60.0,
                 oil_and_consumables: 5.0,
-                maintenance_labor: 25.0,
+                owner_maintenance_labor: 10.0,
+                professional_maintenance_labor: 15.0,
                 maintenance_parts: 20.0,
                 engine_overhaul_reserve: 30.0,
                 propeller_reserve: 5.0,
@@ -664,6 +724,45 @@ mod tests {
             Err(OwnershipCostError::MissionDigestMismatch {
                 aircraft_id: "beta".into()
             })
+        );
+    }
+
+    #[test]
+    fn cost_boundary_and_data_date_must_match_for_comparison() {
+        let baseline = scenario("alpha", 20);
+        let mut different_boundary = scenario("beta", 20);
+        different_boundary.cost_boundary_id = "fuel-only-v1".into();
+        assert_eq!(
+            compare_ownership_scenarios(&[baseline.clone(), different_boundary]),
+            Err(OwnershipCostError::CostBoundaryMismatch {
+                aircraft_id: "beta".into()
+            })
+        );
+
+        let mut different_date = scenario("gamma", 20);
+        different_date.cost_data_as_of = "2026-09-17".into();
+        assert_eq!(
+            compare_ownership_scenarios(&[baseline, different_date]),
+            Err(OwnershipCostError::CostDataDateMismatch {
+                aircraft_id: "gamma".into()
+            })
+        );
+    }
+
+    #[test]
+    fn cost_inputs_require_a_traceable_digest_and_reference() {
+        let mut missing = scenario("alpha", 20);
+        missing.cost_assumptions_sha256 = "unknown".into();
+        assert_eq!(
+            evaluate_ownership_scenario(&missing),
+            Err(OwnershipCostError::InvalidCostAssumptionsDigest)
+        );
+
+        let mut missing_reference = scenario("beta", 20);
+        missing_reference.cost_assumptions_reference = " ".into();
+        assert_eq!(
+            evaluate_ownership_scenario(&missing_reference),
+            Err(OwnershipCostError::MissingCostAssumptionsReference)
         );
     }
 
