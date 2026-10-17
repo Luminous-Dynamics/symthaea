@@ -1,0 +1,30 @@
+name: Appliance Active Diagnostics Adapter
+
+on:
+  push:
+    branches: ["feat/appliance-active-diagnostics-adapter-v0-1"]
+    paths:
+      - "crates/domains/symthaea-manufacturing-active-learning-bench/**"
+      - ".github/workflows/appliance-active-diagnostics-adapter.yml"
+
+permissions:
+  contents: read
+
+concurrency:
+  group: appliance-active-diagnostics-adapter-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  adapter:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - name: Install pinned Rust toolchain
+        uses: dtolnay/rust-toolchain@stable
+        with:
+          toolchain: 1.96.0
+          components: rustfmt, clippy
+      - name: Format shared kernel and appliance adapter
+        run: cargo fmt --manifest-path crates/domains/symthaea-manufacturing-active-learning-bench/Cargo.toml -- --check
+      - name: Test shared kernel and appliance integration
+        run: cargo test --manifest-path crates/domains/symthaea-manufacturing-active-learning-bench/Cargo.toml --all-targets
