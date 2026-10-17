@@ -164,7 +164,7 @@ cargo run --locked -p symthaea-silicon --example hdc_retrieval_host_benchmark --
 cargo run --locked -p symthaea-silicon --example hdc_retrieval_host_benchmark -- --validate-receipt target/neuro-silicon-003/receipt.json
 ```
 
-The default run writes `input_manifest.json`, `expected_results.json`, `raw_observations.json`, and `receipt.json` under `target/neuro-silicon-003/`. Override hardware and clock/power identity using `SYTHAEA_BENCH_HARDWARE` and `SYTHAEA_BENCH_CLOCK_POWER_PROFILE`; unspecified identity stays explicitly unknown/not captured.
+The default run writes `input_manifest.json`, `expected_results.json`, `raw_observations.json`, and `receipt.json` under `target/neuro-silicon-003/`. Override hardware and clock/power identity using `SYMTHAEA_BENCH_HARDWARE` and `SYMTHAEA_BENCH_CLOCK_POWER_PROFILE`; unspecified identity stays explicitly unknown/not captured.
 
 A correct run intentionally reports `incomplete`: it measures host-resident retrieval against synthetic known targets, not production encoding, external transfers, GPU/FPGA execution, or energy. A result mismatch reports `fail`. The built-in preflight verifies SHA-256 and key claim/status invariants; it is not a substitute for an independent JSON Schema validator or for independently reproducing benchmark measurements. A successful preflight proves receipt consistency only.
 
