@@ -439,6 +439,10 @@ fn run() -> Result<(), Box<dyn Error>> {
     println!("source_sha={}", option_env!("SYMTHAEA_SOURCE_SHA").unwrap_or("not-injected"));
     println!("rustc_version={}", option_env!("RUSTC_VERSION").unwrap_or("not-injected"));
     println!("store_path={}", store_path.display());
+    println!("host_os={}, host_arch={}", env::consts::OS, env::consts::ARCH);
+    println!("source_sha={}", option_env!("SYMTHAEA_SOURCE_SHA").unwrap_or("not-injected"));
+    println!("rustc_version={}", option_env!("RUSTC_VERSION").unwrap_or("not-injected"));
+    println!("store_path={}", store_path.display());
     println!("corpus_fingerprint_fnv1a64_noncryptographic={corpus_fingerprint:016x}");
     println!("logical_vector_payload_bytes={corpus_bytes}");
     println!("store_file_bytes_including_preallocation_and_metadata={store_file_bytes}");
@@ -458,7 +462,33 @@ fn run() -> Result<(), Box<dyn Error>> {
     let csv = render_csv(&samples);
     if let Some(path) = config.csv_path {
         fs::write(&path, csv.as_bytes())?;
+        let meta_path = path.with_extension("meta.txt");
+        let metadata = format!(
+            "benchmark=storage_workload_bench\nsource_sha={}\nrustc_version={}\nhost_os={}\nhost_arch={}\nstore_path={}\nvectors={}\nqueries={}\nbatch_size={}\nseed={}\ncorpus_fingerprint_fnv1a64_noncryptographic={:016x}\nlogical_vector_payload_bytes={}\nstore_file_bytes_including_preallocation_and_metadata={}\ncontent_checksum={:?}\ngeneration={}\nlive_count={}\ntombstones={}\napprox_top1_recall={}/{}\nexact_fallbacks={}/{}\nphysical_media_bytes=not_measured\nenergy=not_measured\nos_page_cache_coldness=not_controlled\n",
+            option_env!("SYMTHAEA_SOURCE_SHA").unwrap_or("not-injected"),
+            option_env!("RUSTC_VERSION").unwrap_or("not-injected"),
+            env::consts::OS,
+            env::consts::ARCH,
+            store_path.display(),
+            config.vectors,
+            config.queries,
+            config.batch_size,
+            config.seed,
+            corpus_fingerprint,
+            corpus_bytes,
+            store_file_bytes,
+            content_checksum,
+            generation,
+            live_count,
+            tombstone_count,
+            approx_hits,
+            approx_total,
+            approx_fallbacks,
+            approximate_samples.len(),
+        );
+        fs::write(&meta_path, metadata)?;
         eprintln!("raw_samples_csv={}", path.display());
+        eprintln!("run_metadata={}", meta_path.display());
     }
     println!("RAW_SAMPLE_CSV_BEGIN");
     print!("{csv}");
@@ -478,6 +508,11 @@ fn parse_args() -> Result<Config, Box<dyn Error>> {
             "--csv" => {
                 config.csv_path = Some(PathBuf::from(
                     args.next().ok_or("--csv requires a path")?,
+                ))
+            }
+            "--store" => {
+                config.store_path = Some(PathBuf::from(
+                    args.next().ok_or("--store requires a path")?,
                 ))
             }
             "--store" => {
