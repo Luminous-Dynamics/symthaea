@@ -48,11 +48,14 @@ fn parse_args() -> Result<Args, String> {
         }
     }
 
-    let expected_head = expected_head\n        .ok_or_else(|| format!("--expected-head is required\\n{USAGE}"))?;
+    let expected_head = expected_head
+        .ok_or_else(|| format!("--expected-head is required\n{USAGE}"))?;
     let is_hex_sha = matches!(expected_head.len(), 40 | 64)
         && expected_head.chars().all(|character| character.is_ascii_hexdigit());
     if !is_hex_sha {
-        return Err(format!(\n            "expected head must be a 40- or 64-character hexadecimal commit ID\\n{USAGE}"\n        ));
+        return Err(format!(
+            "expected head must be a 40- or 64-character hexadecimal commit ID\n{USAGE}"
+        ));
     }
 
     Ok(Args {
@@ -99,7 +102,9 @@ fn evaluate(corpus: &Value, results: &Value, expected_head: &str) -> Value {
 
     let reported_head = text(results, "evaluated_head").unwrap_or_default();
     if reported_head != expected_head {
-        global_errors.push(\n            "results evaluated_head does not match externally supplied --expected-head".to_owned(),\n        );
+        global_errors.push(
+            "results evaluated_head does not match externally supplied --expected-head".to_owned(),
+        );
     }
 
     let expected_cases = match corpus.get("cases").and_then(Value::as_array) {
@@ -164,7 +169,9 @@ fn evaluate(corpus: &Value, results: &Value, expected_head: &str) -> Value {
         let mut errors = Vec::<String>::new();
 
         if !ALLOWED_DISPOSITIONS.contains(&expected_disposition) {
-            errors.push(format!(\n                "corpus contains unknown expected disposition {expected_disposition:?}"\n            ));
+            errors.push(format!(
+                "corpus contains unknown expected disposition {expected_disposition:?}"
+            ));
         }
 
         let actual = observed_by_id.get(id).filter(|matches| matches.len() == 1);
@@ -241,7 +248,9 @@ fn evaluate(corpus: &Value, results: &Value, expected_head: &str) -> Value {
                 .and_then(Value::as_f64);
 
             if equation != Some("x = fresh + recycle_fraction*x") {
-                errors.push(\n                    "analytic-reference fixture has no supported oracle equation".to_owned(),\n                );
+                errors.push(
+                    "analytic-reference fixture has no supported oracle equation".to_owned(),
+                );
             } else if let (Some(fresh), Some(recycle_fraction), Some(analytic_solution),
                 Some(observed_solution), Some(tolerance)) =
                 (fresh, recycle_fraction, analytic_solution, observed_solution, tolerance)
@@ -251,11 +260,16 @@ fn evaluate(corpus: &Value, results: &Value, expected_head: &str) -> Value {
                     .all(|number| number.is_finite())
                     || tolerance <= 0.0
                 {
-                    errors.push(\n                        "analytic-reference numeric values must be finite and tolerance positive"\n                            .to_owned(),\n                    );
+                    errors.push(
+                        "analytic-reference numeric values must be finite and tolerance positive"
+                            .to_owned(),
+                    );
                 } else {
                     let rhs = fresh + recycle_fraction * observed_solution;
                     let residual_scale = 1.0_f64.max(
-                        observed_solution.abs() + fresh.abs() + (recycle_fraction * observed_solution).abs()
+                        observed_solution.abs()
+                            + fresh.abs()
+                            + (recycle_fraction * observed_solution).abs(),
                     );
                     let normalized_residual = (observed_solution - rhs).abs() / residual_scale;
                     let solution_relative_error = (observed_solution - analytic_solution).abs()
@@ -263,10 +277,15 @@ fn evaluate(corpus: &Value, results: &Value, expected_head: &str) -> Value {
                     let numeric_passed = normalized_residual <= tolerance
                         && solution_relative_error <= tolerance;
                     if normalized_residual > tolerance {
-                        errors.push(\n                            "independently calculated recycle-equation residual exceeds frozen tolerance"\n                                .to_owned(),\n                        );
+                        errors.push(
+                            "independently calculated recycle-equation residual exceeds frozen tolerance"
+                                .to_owned(),
+                        );
                     }
                     if solution_relative_error > tolerance {
-                        errors.push(\n                            "observed solution differs from the frozen analytic solution".to_owned(),\n                        );
+                        errors.push(
+                            "observed solution differs from the frozen analytic solution".to_owned(),
+                        );
                     }
                     computed_numeric_checks = json!({
                         "oracle": "linear_recycle_v1",
@@ -279,7 +298,9 @@ fn evaluate(corpus: &Value, results: &Value, expected_head: &str) -> Value {
                     });
                 }
             } else {
-                errors.push(\n                    "analytic-reference result is missing numeric values or tolerance".to_owned(),\n                );
+                errors.push(
+                    "analytic-reference result is missing numeric values or tolerance".to_owned(),
+                );
             }
         }
 
@@ -336,13 +357,19 @@ fn report(
         "failed_cases": failed_count,
         "global_errors": global_errors,
         "passed": passed,
-        "claim_ceiling": concat!(\n            "This result checks only agreement with the frozen synthetic benchmark contract. ",\n            "It does not establish chemistry, process-model accuracy, product grade, safety, ",\n            "economics, plant qualification, or physical operating authority."\n        ),
+        "claim_ceiling": concat!(
+            "This result checks only agreement with the frozen synthetic benchmark contract. ",
+            "It does not establish chemistry, process-model accuracy, product grade, safety, ",
+            "economics, plant qualification, or physical operating authority."
+        ),
         "cases": cases
     })
 }
 
 fn run() -> Result<bool, Box<dyn Error>> {
-    let args = parse_args().map_err(|message| {\n        std::io::Error::new(std::io::ErrorKind::InvalidInput, message)\n    })?;
+    let args = parse_args().map_err(|message| {
+        std::io::Error::new(std::io::ErrorKind::InvalidInput, message)
+    })?;
     let corpus = read_json(&args.corpus_path)?;
     let results = read_json(&args.results_path)?;
     let report = evaluate(&corpus, &results, &args.expected_head);
@@ -390,7 +417,12 @@ mod tests {
         })
     }
 
-    fn result_case(\n        id: &str,\n        disposition: &str,\n        findings: &[&str],\n        promotions: &[&str],\n    ) -> Value {
+    fn result_case(
+        id: &str,
+        disposition: &str,
+        findings: &[&str],
+        promotions: &[&str],
+    ) -> Value {
         json!({
             "id": id,
             "observed_disposition": disposition,
@@ -505,7 +537,10 @@ mod tests {
                 "id": "RECYCLE-1",
                 "class": "analytic-reference",
                 "expected_disposition": "ACCEPTED_WITHIN_SCOPE",
-                "required_findings": [\n                    "solution_matches_analytic_reference",\n                    "residual_within_frozen_tolerance"\n                ],
+                "required_findings": [
+                    "solution_matches_analytic_reference",
+                    "residual_within_frozen_tolerance"
+                ],
                 "prohibited_promotions": [],
                 "fixture": {
                     "equation": "x = fresh + recycle_fraction*x",
@@ -525,7 +560,10 @@ mod tests {
             "cases": [{
                 "id": "RECYCLE-1",
                 "observed_disposition": "ACCEPTED_WITHIN_SCOPE",
-                "observed_findings": [\n                    "solution_matches_analytic_reference",\n                    "residual_within_frozen_tolerance"\n                ],
+                "observed_findings": [
+                    "solution_matches_analytic_reference",
+                    "residual_within_frozen_tolerance"
+                ],
                 "observed_promotions": [],
                 "observed_numeric_values": { "solution": solution }
             }]
@@ -536,7 +574,10 @@ mod tests {
     fn analytical_recycle_oracle_recomputes_residual() {
         let output = evaluate(&analytic_corpus(), &analytic_results(1.25), HEAD);
         assert_eq!(output["passed"], true);
-        assert_eq!(\n            output["cases"][0]["computed_numeric_checks"]["normalized_equation_residual"],\n            0.0\n        );
+        assert_eq!(
+            output["cases"][0]["computed_numeric_checks"]["normalized_equation_residual"],
+            0.0
+        );
         assert_eq!(output["cases"][0]["computed_numeric_checks"]["passed"], true);
     }
 
