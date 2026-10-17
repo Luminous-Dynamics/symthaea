@@ -10,7 +10,7 @@ From the repository root:
 cargo run -p symthaea-nanotech-audit --bin nano-qoi-acquisition
 ~~~
 
-Optional arguments are reference budget, number of random baseline trials, and random seed. Defaults are 8, 256, and 0x51a7 (the seed is entered as a decimal integer). The CLI emits a JSON report with all acquisition arms and posterior uncertainty by budget.
+Optional arguments are reference budget, number of random baseline trials, and random seed. Defaults are 8, 256, and 0x51a7 (decimal 20903). The JSON report records the seed and trial count so the random baseline is reproducible. Each arm also reports the number of reference calls needed to reach the preregistered synthetic QoI posterior-variance tolerance of 0.03, or null when the budget did not reach it.
 
 ## Known-model scenario
 
