@@ -37,10 +37,12 @@ Per world and policy, JSON reports:
 - mean experiments and synthetic cost spent;
 - experiments/cost to the threshold among trials that reach it;
 - 10-bin expected calibration error;
-- predicted expected information gain per cost versus realized entropy reduction per cost;
+- declared-model expected information gain versus evaluator-world expected information gain per selected action;
+- per-selection acquisition regret versus the highest expected-information-gain-per-cost candidate available under the evaluator-world likelihoods;
+- realized posterior entropy reduction per cost (can be negative);
 - unsupported positive causal-claim rate when the true hypothesis is the no-direct-cause hypothesis, with a Wilson interval.
 
-An individual realized entropy reduction may be negative. It is not clamped to make a policy look better. The reported realized quantity measures entropy change under the benchmark's declared posterior update rule after outcomes sampled from the hidden-world distribution; it is not proof of true-world posterior calibration.
+An individual realized entropy reduction may be negative. It is not clamped to make a policy look better. Acquisition regret is a local, myopic per-selection comparison against the best currently affordable candidate under the hidden world; it does not compare globally optimal multi-step experiment plans. The reported realized quantity measures entropy change under the benchmark's declared posterior update rule after outcomes sampled from the hidden-world distribution; it is not proof of true-world posterior calibration.
 
 ## Reproduction
 
