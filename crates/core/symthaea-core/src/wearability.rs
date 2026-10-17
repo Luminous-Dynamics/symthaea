@@ -205,7 +205,7 @@ pub enum DiagnosticResultV1 {
 /// All fields are optional because different lifecycle stages require different
 /// evidence. Missing evidence is distinct from a measured zero and is never
 /// silently converted into a pass.
-#[derive(Debug, Clone, PartialEq, Serialize, Deserialize, Default)]
+#[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
 #[serde(default, deny_unknown_fields)]
 pub struct WearabilityInputV1 {
     /// Input schema version; defaults to version 1 for fixture compatibility.
@@ -259,6 +259,39 @@ pub struct WearabilityInputV1 {
     pub interface_migration_sensor: Option<SignalEvidenceV1>,
     /// Measured migration value, in caller-defined units; no universal threshold is implied.
     pub measured_migration_value: Option<f32>,
+}
+
+/// Creates an empty input with the current schema version.
+impl Default for WearabilityInputV1 {
+    fn default() -> Self {
+        Self {
+            schema_version: WEARABILITY_SCHEMA_VERSION,
+            fastening_evidence: None,
+            profile_match: None,
+            fit_evidence: None,
+            sensor_consistency: None,
+            pressure_sensor: None,
+            shear_sensor: None,
+            user_comfort_report: None,
+            workflow_support_requirement: None,
+            caregiver_available: None,
+            user_requested_doff: None,
+            active_motion_request: None,
+            prior_session_mode: None,
+            current_session_mode: None,
+            configuration_lineage: None,
+            task_energy_estimate: None,
+            predicted_reserve_after_task: None,
+            estimate_confidence: None,
+            module_changed: None,
+            calibration_lineage_after_service: None,
+            diagnostic_result: None,
+            workflow_timeout: None,
+            critical_step_completed: None,
+            interface_migration_sensor: None,
+            measured_migration_value: None,
+        }
+    }
 }
 
 /// Report-only disposition of a lifecycle evidence check.
