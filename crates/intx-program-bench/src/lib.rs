@@ -107,6 +107,10 @@ pub fn validate_against_oracle(
     cases: &[Case],
     outcomes: &[ExpectedOutcome],
 ) -> Result<(), String> {
+    // Never let callers bypass the scenario schema/identity and dispatch invariants
+    // by invoking only the oracle comparison.
+    validate_cases(cases)?;
+
     if cases.len() != outcomes.len() || outcomes.len() != 50 {
         return Err(format!(
             "case/oracle cardinality mismatch: {} cases, {} outcomes",
