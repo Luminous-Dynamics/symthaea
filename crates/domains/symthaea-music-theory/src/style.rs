@@ -3364,38 +3364,16 @@ mod tests {
         // Every new style's preset must validate, compose a full piece in
         // its own meter/tempo band, and differ audibly from Classical.
         let classical = compose_with_spec(&MusicalIntent::default(), &Style::Classical.spec());
-        for style in [
-            Style::Nocturne,
-            Style::March,
-            Style::Lullaby,
-            Style::ModalFolk,
-            Style::Fugue,
-            Style::Passacaglia,
-            Style::Tango,
-            Style::Celtic,
-            Style::Blues,
-            Style::Impressionism,
-            Style::SacredChoral,
-            Style::Minimalism,
-            Style::JazzBallad,
-            Style::BaroqueSuite,
-            Style::ProgFolk,
-            Style::Ambient,
-            Style::Sonata,
-            Style::RenaissancePolyphony,
-            Style::AfroCuban,
-            Style::Flamenco,
-            Style::BossaNova,
-            Style::Opera,
-            Style::IrishTraditional,
-            Style::HindustaniInspired,
-            Style::Rondo,
-            Style::ThemeAndVariations,
-            Style::Erosion,
-            Style::Lineage,
-            Style::Sarabande,
-            Style::MinuetAndTrio,
-        ] {
+        for style in Style::ALL.into_iter().filter(|style| {
+            !matches!(
+                style,
+                Style::Classical
+                    | Style::Waltz
+                    | Style::Folk
+                    | Style::Cinematic
+                    | Style::Playful
+            )
+        }) {
             let spec = style.spec();
             spec.validate()
                 .unwrap_or_else(|e| panic!("{style:?} preset invalid: {e:?}"));
