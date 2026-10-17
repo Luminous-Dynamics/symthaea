@@ -677,8 +677,6 @@ fn grid_for_route(
     let end_points = anchor_approach_points(&request.end, request.clearance_mm, limits.grid_pitch_mm)?;
     let start_approach: Vec<usize> = start_points.iter().map(cell_for_point).collect::<Result<_, _>>()?;
     let end_approach: Vec<usize> = end_points.iter().map(cell_for_point).collect::<Result<_, _>>()?;
-    let start_anchor_cell = cell_for_point(&GridPoint { x_mm: request.start.position_mm.x_mm, y_mm: request.start.position_mm.y_mm })?;
-    let end_anchor_cell = cell_for_point(&GridPoint { x_mm: request.end.position_mm.x_mm, y_mm: request.end.position_mm.y_mm })?;
     let start_escape = *start_approach.last().expect("approach contains anchor");
     let end_escape = *end_approach.last().expect("approach contains anchor");
 
@@ -690,9 +688,8 @@ fn grid_for_route(
                 && contains(&obstacle.rect, point.x_mm, point.y_mm, request.clearance_mm)
         }))
     };
-    let mut endpoint_blocked = point_is_blocked(&request.start, &start_points[0])?
-        || point_is_blocked(&request.end, &end_points[0])?;
-    for point in start_points.iter().chain(end_points.iter()) {
+    let mut endpoint_blocked = false;
+    for point in &start_points {
         // The port's own module is the only obstacle permitted inside its outward
         // approach clearance. A different module or reserved area blocks the approach.
         if point_is_blocked(&request.start, point)? {
@@ -733,6 +730,44 @@ fn grid_for_route(
         x_min_mm: bounds.x_min_mm, y_min_mm: bounds.y_min_mm,
         pitch_mm: limits.grid_pitch_mm, width, height, blocked,
     }, start_escape, end_escape, start_approach, end_approach, obstacles, endpoint_blocked))
+}
+
+fn path_metrics(
+    grid: &Grid,
+    cells: &[usize],
+    bend_penalty_mm: i64,
+) -> (Option<u64>, Option<usize>, Option<u64>) {
+    if cells.is_empty() {
+        return (None, None, None);
+    }
+    let steps = cells.len().saturating_sub(1);
+    let length = u64::try_from(steps).ok()
+        .and_then(|count| count.checked_mul(u64::try_from(grid.pitch_mm).ok()?));
+    let mut prior_axis = None;
+    let mut bends = 0usize;
+    for pair in cells.windows(2) {
+        let ax = pair[0] % grid.width;
+        let ay = pair[0] / grid.width;
+        let bx = pair[1] % grid.width;
+        let by = pair[1] / grid.width;
+        let axis = if ay == by && ax.abs_diff(bx) == 1 {
+            Some(1u8)
+        } else if ax == bx && ay.abs_diff(by) == 1 {
+            Some(2u8)
+        } else {
+            return (None, None, None);
+        };
+        if let (Some(previous), Some(current)) = (prior_axis, axis) {
+            if previous != current { bends = bends.saturating_add(1); }
+        }
+        prior_axis = axis;
+    }
+    let score = length.and_then(|distance| {
+        let bend_total = u64::try_from(bends).ok()?
+            .checked_mul(u64::try_from(bend_penalty_mm).ok()?)?;
+        distance.checked_add(bend_total)
+    });
+    (length, Some(bends), score)
 }
 
 fn cell_to_point(grid: &Grid, cell: usize) -> Result<GridPoint, RoutingError> {
@@ -865,21 +900,28 @@ pub fn route_services(
     let mut route_cells = BTreeMap::<String, BTreeSet<(String, usize)>>::new();
 
     for request in &requests {
-        let (grid, start, goal, _obstacles) = grid_for_route(configuration, request, &limits)?;
-        let path_outcome = if point_blocked_by_foreign_obstacle(
-            &_obstacles, &request.start, request.clearance_mm,
-        ).unwrap_or(true) || point_blocked_by_foreign_obstacle(
-            &_obstacles, &request.end, request.clearance_mm,
-        ).unwrap_or(true) {
+        let (grid, start_escape, end_escape, start_approach, end_approach, _obstacles, endpoint_blocked) =
+            grid_for_route(configuration, request, &limits)?;
+        let mut path_outcome = if endpoint_blocked {
             PathOutcome { disposition: RouteDisposition::EndpointBlocked, cells: Vec::new(), length_mm: None, bend_count: None, search_cost_mm: None, expanded_states: 0 }
         } else {
-            search_grid(&grid, start, goal, request, limits.max_expanded_states)
+            search_grid(&grid, start_escape, end_escape, request, limits.max_expanded_states)
         };
-        let mut path = Vec::with_capacity(path_outcome.cells.len());
-        for cell in &path_outcome.cells {
+        let mut complete_cells = Vec::new();
+        if path_outcome.disposition == RouteDisposition::Routed {
+            complete_cells.extend(start_approach.iter().copied());
+            complete_cells.extend(path_outcome.cells.iter().skip(1).copied());
+            complete_cells.extend(end_approach.iter().rev().skip(1).copied());
+            let (length, bends, cost) = path_metrics(&grid, &complete_cells, request.bend_penalty_mm);
+            path_outcome.length_mm = length;
+            path_outcome.bend_count = bends;
+            path_outcome.search_cost_mm = cost;
+        }
+        let mut path = Vec::with_capacity(complete_cells.len());
+        for cell in &complete_cells {
             path.push(cell_to_point(&grid, *cell)?);
         }
-        let cell_keys: BTreeSet<(String, usize)> = path_outcome.cells.iter()
+        let cell_keys: BTreeSet<(String, usize)> = complete_cells.iter()
             .map(|cell| (request.start.deck_id.clone(), *cell)).collect();
         route_cells.insert(request.route_id.clone(), cell_keys);
         results.push(ServiceRouteResult {
