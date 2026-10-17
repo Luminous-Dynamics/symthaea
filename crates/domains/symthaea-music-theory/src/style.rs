@@ -591,8 +591,8 @@ impl Style {
         self.spec().progression(bars, seed)
     }
 
-    /// This style as a [`CompositionSpec`] — the built-in styles are nothing
-    /// more than five preset values of the open, user-editable spec type.
+    /// This style as a [`CompositionSpec`] — built-in styles are preset values
+    /// of the open, user-editable spec type.
     /// Transcription fidelity is tested (`spec_motifs_match_the_style_banks
     /// _they_transcribe` and the compose-identity test in `composer.rs`).
     pub fn spec(self) -> crate::spec::CompositionSpec {
