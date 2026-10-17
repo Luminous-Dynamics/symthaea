@@ -21,6 +21,10 @@ use symthaea_music_theory::fingerprint::{
 use symthaea_music_theory::{
     GrammarPlanEvidence, MUSIC_THEORY_ENGINE_VERSION, MusicalIntent, PitchClass, Style,
     compose_with_grammar_plan,
+    score_validation::{
+        ScoreValidationConfig, ScoreValidationRule, ValidationSeverity,
+        is_universal_invariant, validate_score,
+    },
 };
 
 const SEEDS: [u64; 4] = [0, 1, 7, 42];
@@ -52,6 +56,9 @@ struct StyleCounters {
     tempo_out_of_band: usize,
     deterministic_replay_failures: usize,
     deterministic_replay_structural_failures: usize,
+    universal_structural_defects: usize,
+    style_dependent_fatal_findings: usize,
+    validation_warnings: usize,
     form_available_samples: usize,
     plan_kinds: HashSet<String>,
     seed_hashes: HashSet<u64>,
@@ -69,6 +76,9 @@ impl StyleCounters {
             tempo_out_of_band: 0,
             deterministic_replay_failures: 0,
             deterministic_replay_structural_failures: 0,
+            universal_structural_defects: 0,
+            style_dependent_fatal_findings: 0,
+            validation_warnings: 0,
             form_available_samples: 0,
             plan_kinds: HashSet::new(),
             seed_hashes: HashSet::new(),
@@ -220,6 +230,23 @@ fn main() {
                 if first.score.notes.is_empty() {
                     stats.empty_scores += 1;
                 }
+                let validation =
+                    validate_score(&first.score, &ScoreValidationConfig::default());
+                for issue in &validation.issues {
+                    match issue.severity {
+                        ValidationSeverity::Fatal if is_universal_invariant(issue.rule) => {
+                            stats.universal_structural_defects += 1;
+                        }
+                        ValidationSeverity::Fatal => {
+                            // Keep style-dependent tonal/voice-leading findings visible
+                            // without treating one idiom's rules as universal law.
+                            stats.style_dependent_fatal_findings += 1;
+                        }
+                        ValidationSeverity::Warning => {
+                            stats.validation_warnings += 1;
+                        }
+                    }
+                }
                 let total_beats = first.score.total_beats.beats();
                 if !total_beats.is_finite()
                     || total_beats <= 0.0
@@ -349,6 +376,9 @@ fn main() {
             "deterministic_replay_failures": stats.deterministic_replay_failures,
             "deterministic_replay_structural_failures":
                 stats.deterministic_replay_structural_failures,
+            "universal_structural_defects": stats.universal_structural_defects,
+            "style_dependent_fatal_findings": stats.style_dependent_fatal_findings,
+            "validation_warnings": stats.validation_warnings,
             "distinct_seed_fingerprints": stats.seed_hashes.len(),
             "seed_diversity_test_seeds": SEEDS.len(),
             "mean_nearest_cross_style_structural_distance":
@@ -372,6 +402,18 @@ fn main() {
     let replay_structural_failure_count: usize = counters
         .iter()
         .map(|row| row.deterministic_replay_structural_failures)
+        .sum();
+    let universal_structural_defect_count: usize = counters
+        .iter()
+        .map(|row| row.universal_structural_defects)
+        .sum();
+    let style_dependent_fatal_finding_count: usize = counters
+        .iter()
+        .map(|row| row.style_dependent_fatal_findings)
+        .sum();
+    let validation_warning_count: usize = counters
+        .iter()
+        .map(|row| row.validation_warnings)
         .sum();
     let control_contract_violation_count =
         declared_live_no_effect_count + declared_inert_with_effect_count;
@@ -405,6 +447,10 @@ fn main() {
             "route": "compose_with_grammar_plan(style.grammar_profile(), intent, style.spec())",
         },
         "mechanical_audit": {
+            "score_validation_version": symthaea_music_theory::score_validation::THEORY_VALIDATION_VERSION,
+            "universal_structural_defects": universal_structural_defect_count,
+            "style_dependent_fatal_findings": style_dependent_fatal_finding_count,
+            "validation_warnings": validation_warning_count,
             "spec_invalid_styles": spec_invalid_count,
             "empty_scores": empty_score_count,
             "invalid_timeline_scores": invalid_timeline_count,
@@ -420,6 +466,7 @@ fn main() {
                 && tempo_out_of_band_count == 0
                 && replay_failure_count == 0
                 && replay_structural_failure_count == 0
+                && universal_structural_defect_count == 0
                 && control_contract_violation_count == 0,
         },
         "control_contract_audit": {
@@ -473,6 +520,16 @@ mod tests {
         let unique: HashSet<String> =
             Style::ALL.iter().map(|style| format!("{style:?}")).collect();
         assert_eq!(unique.len(), Style::ALL.len());
+    }
+
+    #[test]
+    fn benchmark_gates_only_style_independent_score_invariants() {
+        assert!(is_universal_invariant(ScoreValidationRule::ScoreMetadata));
+        assert!(is_universal_invariant(ScoreValidationRule::NoteBounds));
+        assert!(is_universal_invariant(ScoreValidationRule::VoiceMonophony));
+        assert!(!is_universal_invariant(ScoreValidationRule::FinalTonicArrival));
+        assert!(!is_universal_invariant(ScoreValidationRule::StrongBeatConsonance));
+        assert!(!is_universal_invariant(ScoreValidationRule::MelodicLeap));
     }
 
     #[test]
