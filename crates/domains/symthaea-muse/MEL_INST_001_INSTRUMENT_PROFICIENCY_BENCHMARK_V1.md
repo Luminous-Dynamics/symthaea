@@ -127,8 +127,10 @@ Report listener counts, uncertainty, per-class confusion, source/baseline and fa
 - First increment now exists as `src/bin/muse_instrument_probe.rs` and is auto-discovered by Cargo as `muse_instrument_probe`.
 - It probes all 46 registered instrument variants on a common 3-pitch × 3-velocity grid (220/440/880 Hz; velocities 0.2/0.5/0.9), with two exact rerenders by default.
 - Per-case JSON reports peak, RMS, DC mean, non-finite count, near-silence classification, clipped sample count, SHA-256 of the actual rendered float samples, and whether repeated hashes match.
+- The new `render_arrangement_with_evidence` API attaches the selected per-note renderer path and sample-selection outcome. The probe also checks that these receipts remain stable across repeated renders.
+- Receipt paths distinguish named/default sample rendering, Karplus–Strong, FM, ordinary additive synthesis, and the legacy mood-derived path when no instrument identity is assigned. Sample fallback status differentiates a missing library from an unavailable bank or pitch/velocity selection.
 - The common pitch grid is a **signal-health smoke grid, not a valid range claim for every instrument**. Use a future source-derived capability-range manifest to choose each instrument's real test register.
-- The current legacy `render_arrangement` API does not expose the selected per-note source/render path, so the report explicitly says `not_exposed_by_legacy_render_api`. A non-silent result cannot count as source-selection or acoustic-fidelity evidence.
+- A selected sample path means the renderer picked and rendered a compatible sample; it does not prove pitch fidelity, full source-bank coverage, authentic technique, or perceptual quality.
 - The tool makes no network calls and performs no heavyweight asset download by default.
 
 Example commands:
@@ -146,7 +148,7 @@ cargo run -p symthaea-muse --bin muse_instrument_probe -- --instrument harmonica
 
 Use `cargo test -p symthaea-muse --bin muse_instrument_probe` for the CLI's roster, bounds and signal-metric unit tests. These tests and commands are authored/documented but are not marked as executed by this change.
 
-The next increment should add explicit per-note render-path receipts; only after that should the probe count source-backed notes separately from procedural fallback notes. Pitch-tracking and instrument-specific range/gesture checks belong on top of that honest path record, not in a pooled “instrument score.”
+The next increment should add source-relative sample identity (where available) and instrument-specific range/pitch/gesture tests to the receipt. Keep a per-note evidence record linking requested instrument, selected renderer, selected source sample when known, signal checks, and exact renderer/asset digests. Do not collapse these fields into a pooled “instrument score.”
 
 ### P3 — First-class gesture events
 - Add versioned typed events for a small subset of distinctive gestures and prove target sensitivity plus non-target invariance.
