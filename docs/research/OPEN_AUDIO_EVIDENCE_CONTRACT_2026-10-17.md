@@ -30,6 +30,19 @@ The lifecycle is `planned`, `captured`, `analyzed`, `validated`, `invalid`, or `
 
 Schema v1 is an evidence index, not a universal interchange format for every waveform and response array. Keep native raw data in durable versioned files and reference it with path, SHA-256, media type and size. Derived CSV/JSON/plots are separate artifacts and never replace raw captures.
 
+### Executable integrity checker
+
+The Rust package `symthaea-audio-evidence` provides the offline CLI `audio-evidence-check`. It checks project-specific lifecycle and required-field invariants, validates artifact path syntax, rejects incomplete artifact references, verifies the exact SHA-256 and optional byte length of referenced bundle files, and rejects file symlinks that resolve outside the bundle root.
+
+Example from the repository root:
+
+~~~sh
+cargo run -p symthaea-audio-evidence --bin audio-evidence-check -- schemas/examples/h1-fit-repeatability-plan.json
+cargo test -p symthaea-audio-evidence
+~~~
+
+The checker deliberately does **not** claim to implement all JSON Schema Draft 2020-12 keywords. It verifies selected high-risk project invariants and file integrity; a standards-compliant JSON Schema validator remains a separate gate. A successful check does not prove calibration, physical validity or standards conformity.
+
 ## Headphone protocol: separate best fit from robustness
 
 Use IEC 60268-7:2025 as the current standard reference and obtain the licensed text before claiming compliance. State the ear simulator/coupler model and its limits. Recent public work from Warren Labs is a useful example of why seating rules, capture counts, calibration, pad state and repeatability belong next to a curve: [method and repeatability protocol](https://warrenlabs.com/method/).
