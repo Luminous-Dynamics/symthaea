@@ -226,8 +226,8 @@ mod tests {
     #[test]
     fn rejects_duplicate_sample_ids() {
         let mut manifest = fixture();
-        manifest["observations"][1]["sample_id"] =
-            manifest["observations"][0]["sample_id"].clone();
+        let duplicate = manifest["observations"][0]["sample_id"].clone();
+        manifest["observations"][1]["sample_id"] = duplicate;
         let error = validate_split_manifest(&manifest).expect_err("duplicate IDs must fail");
         assert!(error.contains("globally unique"));
     }
