@@ -210,7 +210,10 @@ fn usable_evidence_sources(configuration: &Configuration) -> BTreeSet<String> {
     records.into_iter().filter_map(|(source_id, entries)| {
         let first = *entries.first()?;
         if source_id.trim().is_empty()
-            || first.source_type == "authored_synthetic"
+            || !matches!(
+                first.source_type.as_str(),
+                "external_reference" | "vendor_specification" | "measured_test"
+            )
             || first.title.trim().is_empty()
             || first.uri.trim().is_empty()
             || first.scope.trim().is_empty()
