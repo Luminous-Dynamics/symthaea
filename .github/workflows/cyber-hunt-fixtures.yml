@@ -67,6 +67,44 @@ jobs:
           cp "$root/solver/events.jsonl" cyber-hunt-events-smoke.jsonl
           cp "$root/solver/manifest.json" cyber-hunt-manifest-smoke.json
 
+      - name: Generate and verify artifact-provenance family with benign lookalikes
+        env:
+          SOURCE_COMMIT: ${{ github.event.pull_request.head.sha || github.sha }}
+        run: |
+          set -euo pipefail
+          root="$RUNNER_TEMP/cyber-hunt-artifact"
+          mkdir -p "$root/solver" "$root/evaluator"
+          cargo run -q --manifest-path tools/cyber-hunt-fixture-generator/Cargo.toml -- \
+            --family artifact-provenance --records 1000 --seed 20261018 \
+            --events-out "$root/solver/events.jsonl" \
+            --manifest-out "$root/solver/manifest.json" \
+            --truth-out "$root/evaluator/truth.json" \
+            --source-commit "$SOURCE_COMMIT"
+          test "$(wc -l < "$root/solver/events.jsonl")" -eq 1000
+          actual_sha="$(sha256sum "$root/solver/events.jsonl" | cut -d' ' -f1)"
+          jq -e --arg sha "$actual_sha" --arg commit "$SOURCE_COMMIT" '
+            .record_count == 1000 and
+            .event_store_sha256 == $sha and
+            .generator_source_commit == $commit and
+            .source_commit_pinned == true and
+            .scenario_id == "synthetic-artifact-lifecycle-v1" and
+            .generator_version == "cyber-hunt-fixture-generator/0.2.0"
+          ' "$root/solver/manifest.json"
+          jq -e --arg sha "$actual_sha" '
+            .event_count == 1000 and .event_store_sha256 == $sha and
+            .scenario_id == "synthetic-artifact-lifecycle-v1" and
+            (.labels | length) == 1000 and
+            ([.labels[] | select(.label == "positive")] | length) == 6 and
+            ([.labels[] | select(.label == "negative")] | length) == 994 and
+            (.expected_relations | length) == 5
+          ' "$root/evaluator/truth.json"
+          if grep -Eq '"(label|ground_truth|malicious)"[[:space:]]*:' "$root/solver/events.jsonl"; then
+            echo "ground-truth label field leaked into solver event stream"
+            exit 1
+          fi
+          cp "$root/solver/events.jsonl" cyber-hunt-events-artifact-provenance-smoke.jsonl
+          cp "$root/solver/manifest.json" cyber-hunt-manifest-artifact-provenance-smoke.json
+
       - name: Generate a 75,000-record scale smoke fixture
         env:
           SOURCE_COMMIT: ${{ github.event.pull_request.head.sha || github.sha }}
@@ -97,6 +135,8 @@ jobs:
           path: |
             cyber-hunt-events-smoke.jsonl
             cyber-hunt-manifest-smoke.json
+            cyber-hunt-events-artifact-provenance-smoke.jsonl
+            cyber-hunt-manifest-artifact-provenance-smoke.json
             cyber-hunt-fixture-evidence.txt
           if-no-files-found: error
           retention-days: 14
