@@ -426,7 +426,7 @@ fn generate_artifact_provenance_dataset(record_count: usize, seed: u64) -> Resul
     const POSITIVE_COUNT: usize = 6;
     const BENIGN_LOOKALIKE_COUNT: usize = 6;
     const PLANTED_COUNT: usize = POSITIVE_COUNT + BENIGN_LOOKALIKE_COUNT;
-    const SCENARIO: &str = "synthetic-artifact-provenance-mismatch-v1";
+    const SCENARIO: &str = "synthetic-artifact-lifecycle-v1";
 
     if !(MIN_RECORDS..=MAX_RECORDS).contains(&record_count) {
         return Err(format!(
@@ -880,7 +880,7 @@ mod tests {
         let positive_events: Vec<&EventRecord> = events.iter()
             .filter(|event| positive_ids.contains(&event.event_id))
             .collect();
-        assert_eq!(dataset.manifest.scenario_id, "synthetic-artifact-provenance-mismatch-v1");
+        assert_eq!(dataset.manifest.scenario_id, "synthetic-artifact-lifecycle-v1");
         assert_eq!(dataset.truth.expected_relations.len(), 5);
         assert_eq!(positive_events.len(), 6);
         assert_eq!(
