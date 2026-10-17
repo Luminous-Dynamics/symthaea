@@ -68,7 +68,7 @@ Compare HDC retrieval/representation, temporal cognition, conventional retrieval
 | C2. Repair | Diagnose deliberately introduced compile and test failures | Repair success; attempts/time; changed-file scope; regression count |
 | C3. Repository work | Interpret an issue, locate the relevant code, make a bounded patch and preserve existing tests | Exact commit/diff, failing-to-passing tests, passing-to-failing regressions, reviewer rubric |
 | V1. Verification integrity | Whether the system's pass/fail claims match independent re-execution | False-pass rate, rejected tampered receipts, mutation-control results |
-| P1. Engineering trajectory quality | Whether a claimed result follows evidence order: inspection before edits, final patch tested, final diff reviewed, scope authorized, retries evidence-driven, ambiguity safely surfaced | Unsupported-success rate, blind-retry rate, process ordering, justified scope ratio, trajectory-quality tier |
+| P1. Engineering trajectory quality | Whether a claimed result follows evidence order: inspection before edits, final patch tested, final diff reviewed, scope authorized, retries evidence-driven, ambiguity safely surfaced, and selected plan bound to executed action | Unsupported-success rate, blind-retry rate, selected-plan/action identity mismatch rate, process ordering, justified scope ratio, trajectory-quality tier |
 | E1. Efficiency | Quality versus runtime and resource use | Wall time, attempts, peak memory when available, CPU/GPU/backend and energy only when actually measured |
 | X1. Generalization | Performance on temporally fresh, compositional, and held-out cases | Split-specific scores and uncertainty; no mixing train/dev/test |
 
@@ -179,6 +179,7 @@ Pre-register one primary metric per experiment, all protected metrics, the minim
 - **Unsupported-success rate:** fraction of completion claims made without a passing test for the final patch and a review of every changed file.
 - **Blind-retry rate:** repeated identical actions without new diagnostic evidence, a configuration change, or a predeclared reason to retry.
 - **Final-state verification:** fraction of patches whose exact final patch identity is linked to successful test output and complete diff review.
+- **Plan/action identity consistency:** fraction of executed actions whose plan ID and canonical action fingerprint match the most recent selected plan. A mismatch is a hard process failure even if the final tests pass.
 - **Scope discipline:** fraction of changed files/behaviors justified by the task contract; unauthorized expansion is a hard failure, not something averaged into a score.
 - **Recovery efficiency:** fraction of failed attempts followed by a diagnosis grounded in new evidence and a repair that changes the subsequent outcome.
 - **Safe abstention:** correct detection of ambiguous/conflicting requirements without unauthorized mutation; report separately from task completion.
@@ -195,7 +196,7 @@ Use a separate evaluator for final pass/fail wherever feasible. A generator shou
 | Language improvement | Aim for at least +5 percentage points on the pre-registered primary held-out semantic metric, with a paired 95% confidence interval excluding zero | A research target, not an industry standard; expand the sample when uncertainty is too wide |
 | Coding improvement | Aim for at least +5 percentage points in held-out functional pass@1 **or** at least 20% lower median repair attempts, with no protected correctness regression | Select only one primary outcome before the experiment |
 | Regression guard | No statistically supported increase in protected-test failures; any safety/false-pass regression blocks regardless of aggregate score | Hard failures cannot be averaged away |
-| Trajectory discipline | 100% of synthetic policy controls receive their expected classifications; 0 unsupported-success claims on promotion candidates; no unauthorized scope expansion | Synthetic controls qualify the auditor only; live agent trajectories must be assessed separately |
+| Trajectory discipline | 100% of synthetic policy controls receive their expected classifications; 0 unsupported-success claims on promotion candidates; 100% rejection of plan/action identity mismatch controls; no unauthorized scope expansion | Synthetic controls qualify the auditor only; live agent trajectories must be assessed separately |
 | Calibration | Where confidence exists, initial target ECE ≤ 0.10 on a sufficiently large, predeclared sample, while reporting coverage and the calibration method | ECE alone is not sufficient and can be unstable on small datasets |
 | Replication | Direction of the primary effect repeats across three runs where the path is stochastic, using the same frozen protocol | Repeated runs do not compensate for contaminated or weak tests |
 
