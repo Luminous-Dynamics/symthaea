@@ -92,3 +92,16 @@ cargo run -p symthaea-marine-bench --example modular_interior_impact
 ```
 
 The benchmark plan should compare analyzer output with a frozen, manually authored change-impact oracle matrix. Proposed target: zero missed revalidation domains in that matrix, 100% deterministic reports, and zero automatic evidence carry-forward when the target configuration differs. These are targets, not achieved measurements. The example fixtures use synthetic mass, CG and service assumptions, so the change report is not a feasibility or safety assessment.
+
+
+### Frozen change-impact oracle
+
+`fixtures/modular-interiors/change-impact-oracle-v1.json` defines 10 synthetic comparison cases; `modular_interior_impact.rs` consumes it as a table-driven Rust test. The cases cover a no-op, ordering-only changes, moved placements, changed module mass, service/connection edits, reserved-region changes, platform envelope change, provenance/assumption/safety evidence changes, configuration identity/intent changes, and duplicate placement identity.
+
+The oracle asserts required change sections and revalidation domains rather than comparing a brittle full JSON blob. That lets the dependency map evolve with an explicit versioned review while still surfacing missing impact categories. The intended benchmark is zero missed required domains on this frozen oracle, 100% deterministic digests, and zero silent duplicate-ID collapse. At present these assertions are authored—not executed locally.
+
+Additional research:
+- Inselmann, Deutschmann & Krause (2025), *Enhancing end-of-life sustainability through modularity and interface design in product development*, studies a Module Interface Graph for separability, reuse and end-of-life outcomes: https://www.cambridge.org/core/journals/proceedings-of-the-design-society/article/enhancing-endoflife-sustainability-through-modularity-and-interface-design-in-product-development/15AB7374508B4B9CFD6978127BE03372
+- *Concepts of change propagation analysis in engineering design* (published online 2022; journal issue 2023) reviews the core concepts and approaches in engineering change-impact analysis: https://link.springer.com/article/10.1007/s00163-022-00395-y
+- Inselmann, Wehrend & Krause (2025), lifecycle-oriented interface standardization across product-family phases: https://doi.org/10.35199/dfx2025.24
+- IMO passenger-ship safety and fire protection are hard constraints for applicable vessels; change analysis must defer to the actual vessel's regulatory basis: https://www.imo.org/en/ourwork/safety/pages/passengerships.aspx and https://www.imo.org/en/ourwork/safety/pages/fireprotection-default.aspx
