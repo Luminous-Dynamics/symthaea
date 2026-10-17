@@ -130,14 +130,16 @@ These targets are proposed research gates, not established standards. Freeze the
 
 The cognition layer may infer intent, summarize evidence and propose adjustments. It must not directly authorize physical force, resolve safety conflicts in its own favor, or authenticate its own measurements.
 
-Suggested report-only concepts for the next software increment:
+**Current reference implementation:** draft [PR #7865](https://github.com/Luminous-Dynamics/symthaea/pull/7865) adds a report-only Rust evaluator with typed lifecycle stages and evidence states, deterministic dispositions, and 15 unit tests plus three public-API integration tests against 18 versioned scenarios. Its additional task gates reject an explicitly unsupported task, restricted space, or incompatible hygiene workflow, and request review when thermal discomfort is reported, duty-cycle limits are reached, or compatibility is unknown. Tests have not been executed; the count describes authored tests, not test results.
 
-- `WearerWorkflowStageV1`: Prepare, Transfer, Don, FitCheck, Start, Perform, Degraded, Recover, Doff, Maintain, Store.
-- `FitEvidenceStatusV1`: VerifiedByDeclaredProcedure, Incomplete, Stale, Conflicted, Unavailable, Invalid.
-- `WearabilityEventV1`: typed event with stage, profile/session identity, source/timestamp, evidence status, reason code and receipt reference.
-- `ServiceabilityReceiptV1`: simulated task/part, tools, elapsed time, calibration-lineage before/after, test result and evidence level.
-- A benchmark manifest that separates scenario event, caller assertion, sensor measurement, independent observation and operator annotation.
-- Deterministic replay corpus with positive controls for successful self-don/doff, fit-confirmation and recovery, as well as negative controls for skipped steps, stale configuration, fit drift, energy estimation errors and failed fallback.
+The evaluator is deliberately a report, not physical control authority. It cannot determine tissue-safe pressure, prove a physical latch, validate battery range, or execute emergency doffing. Its declared inputs remain caller assertions unless separate validated measurement evidence is attached.
+
+**Further implementation work:**
+
+- Extend lifecycle receipts with source/timestamp, session identity, per-finding reason codes and calibration provenance.
+- Add a benchmark manifest that distinguishes caller assertion, sensor measurement, independent observation and operator annotation.
+- Expand deterministic replay cases for task transitions, real-world confined-space restrictions, cleaning/hygiene compatibility, repeated don/doff cycles and comfort over duration.
+- Reuse existing embodiment/mobility contracts where possible rather than adding a second physical command API.
 
 Reuse existing embodiment and mobility contracts where possible. Do not add a second physical command API. Keep new types report-only until ownership and integration points are reviewed.
 

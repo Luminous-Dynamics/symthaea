@@ -66,7 +66,8 @@
       "input": {
         "pressure_sensor": "conflicted",
         "shear_sensor": "unavailable",
-        "user_comfort_report": "not_collected"
+        "user_comfort_report": "not_collected",
+        "fit_evidence": "current"
       },
       "expected_disposition": "interface_state_unknown",
       "required_receipts": [
@@ -202,13 +203,120 @@
       "stage": "perform",
       "input": {
         "interface_migration_sensor": "unavailable",
-        "measured_migration_value": null
+        "measured_migration_value": null,
+        "fit_evidence": "current"
       },
       "expected_disposition": "migration_metric_missing",
       "required_receipts": [
         "sensor_status",
         "missingness_reason",
         "metric_not_imputed"
+      ],
+      "positive_control": false
+    },
+    {
+      "id": "WRB-013-task-outside-profile",
+      "profile": "personal_mobility",
+      "stage": "perform",
+      "input": {
+        "fit_evidence": "current",
+        "task_compatibility": "unsupported",
+        "movement_clearance": "compatible"
+      },
+      "expected_disposition": "task_not_admitted_for_profile",
+      "required_receipts": [
+        "task_profile_id",
+        "out_of_scope_reason",
+        "no_action_claim"
+      ],
+      "positive_control": false
+    },
+    {
+      "id": "WRB-014-restricted-space",
+      "profile": "personal_mobility",
+      "stage": "perform",
+      "input": {
+        "fit_evidence": "current",
+        "task_compatibility": "supported",
+        "movement_clearance": "restricted"
+      },
+      "expected_disposition": "task_not_admitted_for_profile",
+      "required_receipts": [
+        "environment_profile",
+        "clearance_reason",
+        "alternate_path_or_profile"
+      ],
+      "positive_control": false
+    },
+    {
+      "id": "WRB-015-thermal-discomfort-reported",
+      "profile": "personal_mobility",
+      "stage": "perform",
+      "input": {
+        "fit_evidence": "current",
+        "task_compatibility": "supported",
+        "movement_clearance": "compatible",
+        "thermal_comfort": "discomfort_reported",
+        "duty_cycle": "within_profile_limit"
+      },
+      "expected_disposition": "task_review_or_alternate_profile_required",
+      "required_receipts": [
+        "wearer_report",
+        "task_context",
+        "review_or_alternate_profile_option"
+      ],
+      "positive_control": false
+    },
+    {
+      "id": "WRB-016-duty-cycle-limit-reached",
+      "profile": "personal_mobility",
+      "stage": "perform",
+      "input": {
+        "fit_evidence": "current",
+        "task_compatibility": "supported",
+        "movement_clearance": "compatible",
+        "duty_cycle": "limit_reached"
+      },
+      "expected_disposition": "task_review_or_alternate_profile_required",
+      "required_receipts": [
+        "profile_duty_limit",
+        "observed_session_duration",
+        "review_or_rest_option"
+      ],
+      "positive_control": false
+    },
+    {
+      "id": "WRB-017-unknown-task-compatibility",
+      "profile": "personal_mobility",
+      "stage": "perform",
+      "input": {
+        "fit_evidence": "current",
+        "task_compatibility": "unknown",
+        "movement_clearance": "compatible"
+      },
+      "expected_disposition": "task_review_or_alternate_profile_required",
+      "required_receipts": [
+        "compatibility_evidence_status",
+        "unknown_reason",
+        "no_unsupported_claim"
+      ],
+      "positive_control": false
+    },
+    {
+      "id": "WRB-018-hygiene-context-incompatible",
+      "profile": "healthcare_task_support",
+      "stage": "perform",
+      "input": {
+        "fit_evidence": "current",
+        "task_compatibility": "supported",
+        "movement_clearance": "compatible",
+        "hygiene_compatibility": "incompatible"
+      },
+      "expected_disposition": "task_not_admitted_for_profile",
+      "required_receipts": [
+        "hygiene_profile",
+        "compatibility_reason",
+        "alternate_workflow"
       ],
       "positive_control": false
     }
