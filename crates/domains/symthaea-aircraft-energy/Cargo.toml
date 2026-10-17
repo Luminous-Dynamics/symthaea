@@ -4,7 +4,7 @@ version = "0.1.0"
 edition = "2024"
 rust-version = "1.94"
 license = "AGPL-3.0-or-later"
-description = "Deterministic, evidence-bounded aircraft mission energy and power screening"
+description = "Evidence-bounded aircraft mission energy screening and mass-coupled battery sizing orchestration"
 repository = "https://github.com/Luminous-Dynamics/symthaea"
 
 [lib]
