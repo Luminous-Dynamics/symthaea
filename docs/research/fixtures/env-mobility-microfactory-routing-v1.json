@@ -1,0 +1,469 @@
+{
+  "routing_id": "env-mobility-microfactory-routing-v1",
+  "schema_version": "env-mobility-routing-case-v1",
+  "status": "synthetic_planning_fixture",
+  "article_id": "SPM-0",
+  "article_description": "Dry-side, low-voltage environmental sensor/logger module with removable harness and non-structural mounting adapter.",
+  "source_class": "illustrative routing assumptions; no physical measurements or supplier quotes",
+  "claim_ceiling": "Planning fixture only. Not a scheduler API conformance claim, production route, manufacturing instruction, calibrated instrument, flight article, underwater hardware or release authorization.",
+  "duration_unit": "minutes",
+  "estimated_durations_are_observed": false,
+  "route_api_mapping": {
+    "canonical_owner": "Luminous-Dynamics/symthaea#7677",
+    "implementation_pr": "https://github.com/Luminous-Dynamics/symthaea/pull/7678",
+    "mapping_status": "pending API review against exact source head",
+    "do_not_create_second_scheduler": true
+  },
+  "workers": [
+    {
+      "worker_id": "design_author_01",
+      "skill_ids": [
+        "design_release",
+        "cad_bom_revision"
+      ],
+      "available_minutes": 480
+    },
+    {
+      "worker_id": "incoming_inspector_01",
+      "skill_ids": [
+        "incoming_inspection",
+        "part_identity"
+      ],
+      "available_minutes": 480
+    },
+    {
+      "worker_id": "fabrication_technician_01",
+      "skill_ids": [
+        "noncritical_additive_fabrication",
+        "dimensional_inspection"
+      ],
+      "available_minutes": 480
+    },
+    {
+      "worker_id": "electronics_technician_01",
+      "skill_ids": [
+        "harness_fabrication",
+        "continuity_polarity_test",
+        "electronic_assembly"
+      ],
+      "available_minutes": 480
+    },
+    {
+      "worker_id": "assembly_technician_01",
+      "skill_ids": [
+        "mechanical_assembly",
+        "electronic_assembly",
+        "work_instruction_compliance"
+      ],
+      "available_minutes": 480
+    },
+    {
+      "worker_id": "bench_technician_01",
+      "skill_ids": [
+        "current_limited_electrical_test",
+        "instrument_readout_check"
+      ],
+      "available_minutes": 480
+    },
+    {
+      "worker_id": "metrology_operator_01",
+      "skill_ids": [
+        "reference_instrument_use",
+        "calibration_check",
+        "uncertainty_recording"
+      ],
+      "available_minutes": 480
+    },
+    {
+      "worker_id": "qualified_inspector_01",
+      "skill_ids": [
+        "independent_acceptance_review",
+        "nonconformance_disposition"
+      ],
+      "available_minutes": 480
+    }
+  ],
+  "resources": [
+    {
+      "resource_id": "cad_bom_workstation",
+      "capability_ids": [
+        "design_release",
+        "cad_bom_revision"
+      ],
+      "available_minutes": 480,
+      "max_concurrent_operations": 1
+    },
+    {
+      "resource_id": "incoming_inspection_kit",
+      "capability_ids": [
+        "part_identity",
+        "incoming_inspection"
+      ],
+      "available_minutes": 480,
+      "max_concurrent_operations": 1
+    },
+    {
+      "resource_id": "desktop_fdm_printer",
+      "capability_ids": [
+        "noncritical_additive_fabrication"
+      ],
+      "available_minutes": 480,
+      "max_concurrent_operations": 1,
+      "restriction": "Fixtures and non-structural adapters only; not a pressure boundary or flight-critical structure."
+    },
+    {
+      "resource_id": "caliper_set",
+      "capability_ids": [
+        "dimensional_inspection"
+      ],
+      "available_minutes": 480,
+      "max_concurrent_operations": 1
+    },
+    {
+      "resource_id": "connector_specific_crimper",
+      "capability_ids": [
+        "harness_fabrication"
+      ],
+      "available_minutes": 480,
+      "max_concurrent_operations": 1,
+      "restriction": "Must match the exact selected terminal and wire system."
+    },
+    {
+      "resource_id": "continuity_polarity_fixture",
+      "capability_ids": [
+        "continuity_polarity_test"
+      ],
+      "available_minutes": 480,
+      "max_concurrent_operations": 1
+    },
+    {
+      "resource_id": "esd_assembly_bench",
+      "capability_ids": [
+        "electronic_assembly",
+        "mechanical_assembly"
+      ],
+      "available_minutes": 480,
+      "max_concurrent_operations": 1
+    },
+    {
+      "resource_id": "current_limited_bench",
+      "capability_ids": [
+        "current_limited_electrical_test",
+        "instrument_readout_check"
+      ],
+      "available_minutes": 480,
+      "max_concurrent_operations": 1
+    },
+    {
+      "resource_id": "reference_instrument_station",
+      "capability_ids": [
+        "reference_instrument_use",
+        "calibration_check",
+        "uncertainty_recording"
+      ],
+      "available_minutes": 480,
+      "max_concurrent_operations": 1,
+      "restriction": "Exact reference instrument identities, calibration status and uncertainty must be supplied before a physical measurement claim."
+    },
+    {
+      "resource_id": "build_record_workstation",
+      "capability_ids": [
+        "artifact_manifest_binding"
+      ],
+      "available_minutes": 480,
+      "max_concurrent_operations": 1
+    },
+    {
+      "resource_id": "acceptance_review_station",
+      "capability_ids": [
+        "independent_acceptance_review",
+        "nonconformance_disposition"
+      ],
+      "available_minutes": 480,
+      "max_concurrent_operations": 1
+    }
+  ],
+  "operations": [
+    {
+      "operation_id": "OP-00-release-design",
+      "title": "Release requirement, CAD, BOM, wiring and test profile",
+      "duration_minutes_estimate": 20,
+      "predecessor_ids": [],
+      "required_worker_skill_ids": [
+        "design_release",
+        "cad_bom_revision"
+      ],
+      "required_resource_capability_ids": [
+        "design_release",
+        "cad_bom_revision"
+      ],
+      "outputs": [
+        "released_requirement_ref",
+        "cad_and_drawing_revision",
+        "bom_and_substitution_rules",
+        "wiring_profile",
+        "test_and_calibration_plan"
+      ]
+    },
+    {
+      "operation_id": "OP-01-incoming-inspection",
+      "title": "Inspect and identify purchased parts",
+      "duration_minutes_estimate": 15,
+      "predecessor_ids": [
+        "OP-00-release-design"
+      ],
+      "required_worker_skill_ids": [
+        "incoming_inspection",
+        "part_identity"
+      ],
+      "required_resource_capability_ids": [
+        "part_identity",
+        "incoming_inspection"
+      ],
+      "outputs": [
+        "incoming_inspection_record",
+        "exact_part_and_lot_refs",
+        "approved_substitution_disposition"
+      ]
+    },
+    {
+      "operation_id": "OP-02-adapter-fabrication",
+      "title": "Fabricate non-structural adapter / print assembly gauge",
+      "duration_minutes_estimate": 45,
+      "predecessor_ids": [
+        "OP-00-release-design"
+      ],
+      "required_worker_skill_ids": [
+        "noncritical_additive_fabrication"
+      ],
+      "required_resource_capability_ids": [
+        "noncritical_additive_fabrication"
+      ],
+      "outputs": [
+        "fabrication_execution_ref",
+        "as_fabricated_adapter_identity"
+      ]
+    },
+    {
+      "operation_id": "OP-03-harness-prep",
+      "title": "Prepare harness and verify polarity/continuity",
+      "duration_minutes_estimate": 25,
+      "predecessor_ids": [
+        "OP-01-incoming-inspection"
+      ],
+      "required_worker_skill_ids": [
+        "harness_fabrication",
+        "continuity_polarity_test"
+      ],
+      "required_resource_capability_ids": [
+        "harness_fabrication",
+        "continuity_polarity_test"
+      ],
+      "outputs": [
+        "harness_identity",
+        "pinout_and_polarity_record",
+        "continuity_record"
+      ]
+    },
+    {
+      "operation_id": "OP-04-adapter-dimensional-check",
+      "title": "Measure adapter geometry and service access",
+      "duration_minutes_estimate": 15,
+      "predecessor_ids": [
+        "OP-02-adapter-fabrication"
+      ],
+      "required_worker_skill_ids": [
+        "dimensional_inspection"
+      ],
+      "required_resource_capability_ids": [
+        "dimensional_inspection"
+      ],
+      "outputs": [
+        "dimensional_measurement_record",
+        "fit_and_access_disposition"
+      ]
+    },
+    {
+      "operation_id": "OP-05-module-assembly",
+      "title": "Assemble sensor/logger, harness and adapter",
+      "duration_minutes_estimate": 20,
+      "predecessor_ids": [
+        "OP-01-incoming-inspection",
+        "OP-03-harness-prep",
+        "OP-04-adapter-dimensional-check"
+      ],
+      "required_worker_skill_ids": [
+        "mechanical_assembly",
+        "electronic_assembly",
+        "work_instruction_compliance"
+      ],
+      "required_resource_capability_ids": [
+        "mechanical_assembly",
+        "electronic_assembly"
+      ],
+      "outputs": [
+        "as_assembled_serial",
+        "as_assembled_component_manifest",
+        "assembly_checklist"
+      ]
+    },
+    {
+      "operation_id": "OP-06-electrical-functional-check",
+      "title": "Run current-limited electrical and data-readout checks",
+      "duration_minutes_estimate": 10,
+      "predecessor_ids": [
+        "OP-05-module-assembly"
+      ],
+      "required_worker_skill_ids": [
+        "current_limited_electrical_test",
+        "instrument_readout_check"
+      ],
+      "required_resource_capability_ids": [
+        "current_limited_electrical_test",
+        "instrument_readout_check"
+      ],
+      "outputs": [
+        "voltage_current_observation",
+        "functional_readout_record",
+        "fault_and_rework_record"
+      ]
+    },
+    {
+      "operation_id": "OP-07-reference-measurement-check",
+      "title": "Compare indicated values with the declared reference system",
+      "duration_minutes_estimate": 40,
+      "predecessor_ids": [
+        "OP-06-electrical-functional-check"
+      ],
+      "required_worker_skill_ids": [
+        "reference_instrument_use",
+        "calibration_check",
+        "uncertainty_recording"
+      ],
+      "required_resource_capability_ids": [
+        "reference_instrument_use",
+        "calibration_check",
+        "uncertainty_recording"
+      ],
+      "outputs": [
+        "reference_instrument_identity",
+        "raw_comparison_observations",
+        "residual_and_uncertainty_record",
+        "calibration_or_check_disposition"
+      ]
+    },
+    {
+      "operation_id": "OP-08-bind-build-manifest",
+      "title": "Bind exact article, firmware/configuration and evidence references",
+      "duration_minutes_estimate": 10,
+      "predecessor_ids": [
+        "OP-07-reference-measurement-check"
+      ],
+      "required_worker_skill_ids": [
+        "part_identity"
+      ],
+      "required_resource_capability_ids": [
+        "artifact_manifest_binding"
+      ],
+      "outputs": [
+        "article_manifest",
+        "source_and_configuration_digests",
+        "test_evidence_refs"
+      ]
+    },
+    {
+      "operation_id": "OP-09-independent-acceptance",
+      "title": "Independent review of all mandatory evidence and deviations",
+      "duration_minutes_estimate": 15,
+      "predecessor_ids": [
+        "OP-08-bind-build-manifest"
+      ],
+      "required_worker_skill_ids": [
+        "independent_acceptance_review",
+        "nonconformance_disposition"
+      ],
+      "required_resource_capability_ids": [
+        "independent_acceptance_review",
+        "nonconformance_disposition"
+      ],
+      "outputs": [
+        "acceptance_or_reject_disposition",
+        "open_nonconformance_refs",
+        "required_rework_and_retest"
+      ]
+    }
+  ],
+  "mandatory_operation_ids": [
+    "OP-00-release-design",
+    "OP-01-incoming-inspection",
+    "OP-02-adapter-fabrication",
+    "OP-03-harness-prep",
+    "OP-04-adapter-dimensional-check",
+    "OP-05-module-assembly",
+    "OP-06-electrical-functional-check",
+    "OP-07-reference-measurement-check",
+    "OP-08-bind-build-manifest",
+    "OP-09-independent-acceptance"
+  ],
+  "route_invariants": [
+    "No operation may schedule without every required worker skill and resource capability.",
+    "All predecessor edges must be respected; same worker/resource cannot be double-booked.",
+    "All mandatory operations execute exactly once or the route must reject.",
+    "No acceptance operation before reference measurement/check, exact manifest binding and required component/inspection checks.",
+    "Unknown, failed or missing calibration/check evidence prevents release-to-acceptance.",
+    "No adapter printed by this route may be represented as flight-critical, pressure-bearing or underwater-qualified.",
+    "Estimated operation durations are replaced by observed distributions after a five-unit baseline; don't report them as measured cycle time."
+  ],
+  "mutation_cases": [
+    {
+      "case_id": "SPM0-MUT-01",
+      "mutation": "Remove qualified independent inspector",
+      "expected": "route infeasible"
+    },
+    {
+      "case_id": "SPM0-MUT-02",
+      "mutation": "Remove caliper capability from dimensional check",
+      "expected": "route infeasible"
+    },
+    {
+      "case_id": "SPM0-MUT-03",
+      "mutation": "Remove harness continuity test",
+      "expected": "route invalid before scheduling"
+    },
+    {
+      "case_id": "SPM0-MUT-04",
+      "mutation": "Remove reference measurement/check operation",
+      "expected": "route invalid before scheduling"
+    },
+    {
+      "case_id": "SPM0-MUT-05",
+      "mutation": "Create a dependency cycle",
+      "expected": "route infeasible"
+    },
+    {
+      "case_id": "SPM0-MUT-06",
+      "mutation": "Make the only required reference instrument unavailable",
+      "expected": "route infeasible or wait-state explicitly represented"
+    },
+    {
+      "case_id": "SPM0-MUT-07",
+      "mutation": "Component substitution absent from approved BOM",
+      "expected": "quarantine / no acceptance"
+    },
+    {
+      "case_id": "SPM0-MUT-08",
+      "mutation": "Source data/configuration changed after measurement",
+      "expected": "manifest mismatch and required recheck"
+    },
+    {
+      "case_id": "SPM0-MUT-09",
+      "mutation": "Route attempts to classify an adapter as pressure-bearing",
+      "expected": "reject unsupported scope"
+    },
+    {
+      "case_id": "SPM0-MUT-10",
+      "mutation": "Calibration/check is missing or failed but acceptance still reported",
+      "expected": "blocking false-accept failure"
+    }
+  ]
+}
