@@ -2,7 +2,7 @@
 
 **Status:** research protocol draft  
 **Tracking issue:** [MOBILITY-ASSIST-010 / #7904](https://github.com/Luminous-Dynamics/symthaea/issues/7904)  
-**Implementation:** draft PR to be linked after opening  
+**Implementation:** draft [PR #7907](https://github.com/Luminous-Dynamics/symthaea/pull/7907)  
 **Interval comparator:** [MOBILITY-ASSIST-009 / PR #7892](https://github.com/Luminous-Dynamics/symthaea/pull/7892)  
 **Action catalog:** [measurement-triage-actions-v1.json](./fixtures/measurement-triage-actions-v1.json)
 
