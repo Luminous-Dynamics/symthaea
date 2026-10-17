@@ -1,0 +1,448 @@
+// Copyright (C) 2026 Luminous Dynamics
+// SPDX-License-Identifier: AGPL-3.0-or-later
+//! Dependency-free integrity checks for the proposed INTX-PROGRAM-001 fixture corpus.
+//!
+//! This validates fixture shape and stated safety invariants only. It does not execute
+//! Symthaea's action runtime, prove connector correctness, or qualify physical equipment.
+
+use std::collections::{BTreeMap, BTreeSet};
+
+pub const CORPUS: &str = include_str!("../fixtures/cases.tsv");
+pub const EXPECTED_OUTCOMES: &str = include_str!("../fixtures/expected.tsv");
+
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub struct Case {
+    pub id: String,
+    pub dimension: String,
+    pub scenario: String,
+    pub expected_state: String,
+    pub dispatch: String,
+    pub reconcile: String,
+}
+
+pub fn parse_cases(input: &str) -> Result<Vec<Case>, String> {
+    let mut lines = input.lines();
+    let header = lines.next().ok_or_else(|| "missing header".to_string())?;
+    if header != "id|dimension|scenario|expected_state|dispatch|reconcile" {
+        return Err("unexpected corpus header".to_string());
+    }
+
+    let mut cases = Vec::new();
+    for (offset, line) in lines.enumerate() {
+        if line.trim().is_empty() || line.starts_with('#') {
+            continue;
+        }
+        let fields: Vec<&str> = line.split('|').collect();
+        if fields.len() != 6 {
+            return Err(format!("line {}: expected 6 pipe-delimited fields", offset + 2));
+        }
+        if fields.iter().any(|field| field.trim().is_empty()) {
+            return Err(format!("line {}: empty field", offset + 2));
+        }
+        if fields.iter().any(|field| field.contains(',') || field.contains('\t')) {
+            return Err(format!(
+                "line {}: fields must use stable identifiers, not embedded delimiters",
+                offset + 2
+            ));
+        }
+        cases.push(Case {
+            id: fields[0].to_string(),
+            dimension: fields[1].to_string(),
+            scenario: fields[2].to_string(),
+            expected_state: fields[3].to_string(),
+            dispatch: fields[4].to_string(),
+            reconcile: fields[5].to_string(),
+        });
+    }
+    Ok(cases)
+}
+
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub struct ExpectedOutcome {
+    pub id: String,
+    pub expected_state: String,
+    pub dispatch: String,
+    pub reconcile: String,
+}
+
+/// Parse the frozen golden-outcome table, stored separately from scenario inputs.
+pub fn parse_expected_outcomes(input: &str) -> Result<Vec<ExpectedOutcome>, String> {
+    let mut lines = input.lines();
+    let header = lines.next().ok_or_else(|| "missing oracle header".to_string())?;
+    if header != "id|expected_state|dispatch|reconcile" {
+        return Err("unexpected oracle header".to_string());
+    }
+
+    let mut outcomes = Vec::new();
+    for (offset, line) in lines.enumerate() {
+        if line.trim().is_empty() || line.starts_with('#') {
+            continue;
+        }
+        let fields: Vec<&str> = line.split('|').collect();
+        if fields.len() != 4 || fields.iter().any(|field| field.trim().is_empty()) {
+            return Err(format!("oracle line {}: expected 4 non-empty fields", offset + 2));
+        }
+        outcomes.push(ExpectedOutcome {
+            id: fields[0].to_string(),
+            expected_state: fields[1].to_string(),
+            dispatch: fields[2].to_string(),
+            reconcile: fields[3].to_string(),
+        });
+    }
+    if outcomes.len() != 50 {
+        return Err(format!("expected 50 oracle outcomes, got {}", outcomes.len()));
+    }
+    let mut ids = BTreeSet::new();
+    for outcome in &outcomes {
+        if !ids.insert(&outcome.id) {
+            return Err(format!("duplicate oracle ID: {}", outcome.id));
+        }
+    }
+    Ok(outcomes)
+}
+
+/// Compare scenario metadata with a separately frozen expected-outcome oracle.
+/// The oracle is a test expectation, never production authorization.
+pub fn validate_against_oracle(
+    cases: &[Case],
+    outcomes: &[ExpectedOutcome],
+) -> Result<(), String> {
+    // Never let callers bypass the scenario schema/identity and dispatch invariants
+    // by invoking only the oracle comparison.
+    validate_cases(cases)?;
+
+    if cases.len() != outcomes.len() || outcomes.len() != 50 {
+        return Err(format!(
+            "case/oracle cardinality mismatch: {} cases, {} outcomes",
+            cases.len(),
+            outcomes.len()
+        ));
+    }
+
+    let expected: BTreeMap<String, &ExpectedOutcome> = outcomes
+        .iter()
+        .map(|outcome| (outcome.id.clone(), outcome))
+        .collect();
+    if expected.len() != outcomes.len() {
+        return Err("duplicate outcome identifiers".to_string());
+    }
+
+    for case in cases {
+        let outcome = expected
+            .get(case.id.as_str())
+            .ok_or_else(|| format!("no frozen oracle outcome for {}", case.id))?;
+        if case.expected_state != outcome.expected_state
+            || case.dispatch != outcome.dispatch
+            || case.reconcile != outcome.reconcile
+        {
+            return Err(format!(
+                "scenario/oracle mismatch for {}: scenario=({},{},{}), oracle=({},{},{})",
+                case.id,
+                case.expected_state,
+                case.dispatch,
+                case.reconcile,
+                outcome.expected_state,
+                outcome.dispatch,
+                outcome.reconcile
+            ));
+        }
+    }
+    Ok(())
+}
+
+pub fn validate_cases(cases: &[Case]) -> Result<(), String> {
+    if cases.len() != 50 {
+        return Err(format!("expected 50 cases, got {}", cases.len()));
+    }
+
+    let expected_ids: BTreeSet<String> = (0..5)
+        .flat_map(|group| (1..=10).map(move |number| format!("C{group}-{number:02}")))
+        .collect();
+    let actual_ids: BTreeSet<String> = cases.iter().map(|case| case.id.clone()).collect();
+    if actual_ids != expected_ids {
+        return Err("case IDs do not match the frozen C0-01 through C4-10 corpus".to_string());
+    }
+
+    let mut ids = BTreeSet::new();
+    let mut dimensions = BTreeMap::<&str, usize>::new();
+    let valid_dimensions = ["identity", "artifact", "authority", "transport", "lifecycle"];
+    let valid_states = [
+        "denied",
+        "observation_admitted",
+        "release_blocked",
+        "artifact_exported",
+        "offline_validation_passed",
+        "preflight_admitted",
+        "not_dispatched",
+        "outcome_unknown",
+        "remote_rejected",
+        "deduplicated",
+        "discrepancy",
+        "synthetic_effect_verified",
+        "requalification_required",
+    ];
+
+    for case in cases {
+        if !ids.insert(&case.id) {
+            return Err(format!("duplicate case id: {}", case.id));
+        }
+        if !valid_dimensions.contains(&case.dimension.as_str()) {
+            return Err(format!("unknown dimension: {}", case.dimension));
+        }
+        if !valid_states.contains(&case.expected_state.as_str()) {
+            return Err(format!("unknown expected state: {}", case.expected_state));
+        }
+        if !["none", "occurred", "may_have_occurred"].contains(&case.dispatch.as_str()) {
+            return Err(format!("unknown dispatch class for {}", case.id));
+        }
+        if !["yes", "no"].contains(&case.reconcile.as_str()) {
+            return Err(format!("invalid reconcile value for {}", case.id));
+        }
+
+        let expected_prefix = match case.dimension.as_str() {
+            "identity" => "C0-",
+            "artifact" => "C1-",
+            "authority" => "C2-",
+            "transport" => "C3-",
+            "lifecycle" => "C4-",
+            _ => return Err(format!("unknown dimension: {}", case.dimension)),
+        };
+        if !case.id.starts_with(expected_prefix) {
+            return Err(format!("case id and dimension disagree: {}", case.id));
+        }
+
+        *dimensions.entry(case.dimension.as_str()).or_default() += 1;
+
+        if ["denied", "release_blocked", "requalification_required", "not_dispatched"]
+            .contains(&case.expected_state.as_str())
+            && (case.dispatch != "none" || case.reconcile != "no")
+        {
+            return Err(format!(
+                "blocked case could dispatch or expects unsupported reconciliation: {}",
+                case.id
+            ));
+        }
+        if case.expected_state == "outcome_unknown"
+            && (case.dispatch != "may_have_occurred" || case.reconcile != "yes")
+        {
+            return Err(format!("ambiguous outcome must require reconciliation: {}", case.id));
+        }
+        if ["discrepancy", "synthetic_effect_verified"].contains(&case.expected_state.as_str())
+            && (case.dispatch != "occurred" || case.reconcile != "yes")
+        {
+            return Err(format!("post-dispatch state must reconcile: {}", case.id));
+        }
+        if ["remote_rejected", "deduplicated"].contains(&case.expected_state.as_str())
+            && (case.dispatch != "occurred" || case.reconcile != "no")
+        {
+            return Err(format!(
+                "definitive transport result has inconsistent dispatch/reconciliation: {}",
+                case.id
+            ));
+        }
+        if [
+            "observation_admitted",
+            "artifact_exported",
+            "offline_validation_passed",
+            "preflight_admitted",
+        ]
+        .contains(&case.expected_state.as_str())
+            && case.dispatch != "none"
+        {
+            return Err(format!("non-effect stage cannot dispatch: {}", case.id));
+        }
+    }
+
+    for dimension in valid_dimensions {
+        let count = dimensions.get(dimension).copied().unwrap_or_default();
+        if count != 10 {
+            return Err(format!("dimension {dimension} should contain 10 cases, got {count}"));
+        }
+    }
+
+    Ok(())
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    #[test]
+    fn frozen_corpus_has_fifty_unique_cases_across_five_dimensions() {
+        let cases = parse_cases(CORPUS).expect("fixture corpus parses");
+        validate_cases(&cases).expect("fixture corpus satisfies shape and safety invariants");
+        assert_eq!(cases.first().map(|case| case.id.as_str()), Some("C0-01"));
+        assert_eq!(cases.last().map(|case| case.id.as_str()), Some("C4-10"));
+    }
+
+    #[test]
+    fn every_scenario_matches_the_separately_frozen_outcome_oracle() {
+        let cases = parse_cases(CORPUS).expect("scenario corpus parses");
+        let outcomes =
+            parse_expected_outcomes(EXPECTED_OUTCOMES).expect("outcome oracle parses");
+        validate_cases(&cases).expect("scenario invariant checks pass");
+        validate_against_oracle(&cases, &outcomes)
+            .expect("scenarios match the separately frozen expected outcomes");
+    }
+
+    #[test]
+    fn semantic_mutation_is_detected_even_when_local_rules_still_hold() {
+        let mut cases = parse_cases(CORPUS).expect("scenario corpus parses");
+        let outcomes =
+            parse_expected_outcomes(EXPECTED_OUTCOMES).expect("outcome oracle parses");
+        let case = cases
+            .iter_mut()
+            .find(|case| case.id == "C2-05")
+            .expect("safety-invariant fixture exists");
+        case.expected_state = "observation_admitted".to_string();
+        assert!(validate_cases(&cases).is_ok());
+        assert!(validate_against_oracle(&cases, &outcomes).is_err());
+    }
+
+    #[test]
+    fn every_expected_case_id_is_part_of_the_frozen_corpus() {
+        let mut cases = parse_cases(CORPUS).expect("fixture corpus parses");
+        let case = cases
+            .iter_mut()
+            .find(|case| case.id == "C1-09")
+            .expect("export fixture exists");
+        case.id = "C1-90".to_string();
+        assert!(validate_cases(&cases).is_err());
+    }
+
+    #[test]
+    fn ambiguous_outcomes_cannot_be_misclassified_as_failures() {
+        let mut cases = parse_cases(CORPUS).expect("fixture corpus parses");
+        let case = cases
+            .iter_mut()
+            .find(|case| case.id == "C3-02")
+            .expect("ambiguous timeout fixture exists");
+        case.expected_state = "remote_rejected".to_string();
+        assert!(validate_cases(&cases).is_err());
+    }
+
+    #[test]
+    fn blocked_states_cannot_request_dispatch() {
+        let mut cases = parse_cases(CORPUS).expect("fixture corpus parses");
+        let case = cases
+            .iter_mut()
+            .find(|case| case.id == "C2-05")
+            .expect("safety-invariant fixture exists");
+        case.dispatch = "occurred".to_string();
+        assert!(validate_cases(&cases).is_err());
+    }
+
+    #[test]
+    fn changed_case_identity_cannot_be_silently_accepted() {
+        let mut cases = parse_cases(CORPUS).expect("fixture corpus parses");
+        let case = cases
+            .iter_mut()
+            .find(|case| case.id == "C1-01")
+            .expect("artifact fixture exists");
+        case.id = "C9-99".to_string();
+        assert!(validate_cases(&cases).is_err());
+    }
+
+    #[test]
+    fn malformed_expected_outcome_rows_fail_closed() {
+        assert!(parse_expected_outcomes(
+            "id|expected_state|dispatch|reconcile\nC0-01|denied"
+        )
+        .is_err());
+    }
+
+    #[test]
+    fn duplicate_expected_outcome_ids_fail_closed() {
+        let mutated = EXPECTED_OUTCOMES.replacen(
+            "C0-02|denied|none|no",
+            "C0-01|denied|none|no",
+            1,
+        );
+        assert!(parse_expected_outcomes(&mutated).is_err());
+    }
+
+    #[test]
+    fn every_denied_or_blocked_case_rejects_dispatch_mutation() {
+        let original = parse_cases(CORPUS).expect("scenario corpus parses");
+        let blocked_states = [
+            "denied",
+            "release_blocked",
+            "requalification_required",
+            "not_dispatched",
+        ];
+
+        for case in original
+            .iter()
+            .filter(|case| blocked_states.contains(&case.expected_state.as_str()))
+        {
+            let mut mutated = original.clone();
+            let changed = mutated
+                .iter_mut()
+                .find(|candidate| candidate.id == case.id)
+                .expect("same stable case id exists");
+            changed.dispatch = "occurred".to_string();
+            assert!(
+                validate_cases(&mutated).is_err(),
+                "blocked case {} must reject dispatch",
+                case.id
+            );
+        }
+    }
+
+    #[test]
+    fn every_ambiguous_outcome_rejects_missing_reconciliation() {
+        let original = parse_cases(CORPUS).expect("scenario corpus parses");
+        let ambiguous: Vec<String> = original
+            .iter()
+            .filter(|case| case.expected_state == "outcome_unknown")
+            .map(|case| case.id.clone())
+            .collect();
+        assert!(!ambiguous.is_empty(), "corpus must exercise ambiguous outcomes");
+
+        for id in ambiguous {
+            let mut mutated = original.clone();
+            let changed = mutated
+                .iter_mut()
+                .find(|candidate| candidate.id == id)
+                .expect("same stable case id exists");
+            changed.reconcile = "no".to_string();
+            assert!(
+                validate_cases(&mutated).is_err(),
+                "ambiguous case {id} must require reconciliation"
+            );
+        }
+    }
+
+    #[test]
+    fn every_case_outcome_is_bound_to_the_frozen_oracle() {
+        let original = parse_cases(CORPUS).expect("scenario corpus parses");
+        let outcomes =
+            parse_expected_outcomes(EXPECTED_OUTCOMES).expect("outcome oracle parses");
+
+        for case in &original {
+            let mut mutated = original.clone();
+            let changed = mutated
+                .iter_mut()
+                .find(|candidate| candidate.id == case.id)
+                .expect("same stable case id exists");
+            changed.expected_state = if case.expected_state == "denied" {
+                "observation_admitted".to_string()
+            } else {
+                "denied".to_string()
+            };
+            assert!(
+                validate_against_oracle(&mutated, &outcomes).is_err(),
+                "outcome mutation for {} must fail",
+                case.id
+            );
+        }
+    }
+
+    #[test]
+    fn malformed_fixture_rows_fail_closed() {
+        assert!(parse_cases(
+            "id|dimension|scenario|expected_state|dispatch|reconcile\nC0-01|identity"
+        )
+        .is_err());
+    }
+}

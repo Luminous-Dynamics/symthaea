@@ -1,0 +1,11 @@
+[package]
+name = "intx-program-bench-corpus"
+version = "0.1.0"
+edition = "2024"
+license = "AGPL-3.0-or-later"
+description = "Dependency-free integrity checks for synthetic INTX equipment programming qualification fixtures"
+
+[lib]
+path = "src/lib.rs"
+
+[workspace]
