@@ -42,7 +42,7 @@ impl ArtifactKind {
     ];
 }
 
-#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+#[derive(Debug, Clone, PartialEq, Eq)]
 pub enum RightsReview {
     OpenRightsReviewed {
         reviewer_ref: String,
