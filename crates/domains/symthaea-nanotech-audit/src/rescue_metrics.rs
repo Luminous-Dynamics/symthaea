@@ -285,6 +285,33 @@ fn close_probability(left: f64, right: f64) -> bool {
     left.is_finite() && right.is_finite() && (left - right).abs() <= 1.0e-12
 }
 
+fn parse_decisions(bytes: &[u8]) -> Result<Vec<DecisionRecord>, String> {
+    let text = std::str::from_utf8(bytes).map_err(|error| format!("decision ledger is not UTF-8: {error}"))?;
+    let mut rows = Vec::new();
+    for (index, line) in text.lines().enumerate() {
+        if line.trim().is_empty() {
+            return Err(format!("blank decision JSONL record at line {}", index + 1));
+        }
+        if rows.len() >= MAX_RESULTS_ROWS {
+            return Err(format!("decision rows exceed the {MAX_RESULTS_ROWS}-row limit"));
+        }
+        let row: DecisionRecord = serde_json::from_str(line)
+            .map_err(|error| format!("invalid decision record at line {}: {error}", index + 1))?;
+        rows.push(row);
+    }
+    if rows.is_empty() {
+        return Err("policy decision ledger contains no records".to_owned());
+    }
+    Ok(rows)
+}
+
+fn is_sha256(value: &str) -> bool {
+    value.len() == 64
+        && value
+            .bytes()
+            .all(|byte| byte.is_ascii_digit() || (b'a'..=b'f').contains(&byte))
+}
+
 fn parse_results(bytes: &[u8]) -> Result<Vec<AuditResult>, String> {
     let text = std::str::from_utf8(bytes).map_err(|error| format!("results are not UTF-8: {error}"))?;
     let mut rows = Vec::new();
@@ -704,9 +731,9 @@ mod tests {
         let severe_high_weight = row("a", "parent-a", 0.1, "evaluated", Some(true), true);
         let severe_low_weight = row("b", "parent-b", 0.5, "evaluated", Some(true), false);
         let mut stats = SufficientStats::default();
-        stats.add(SufficientStats::from_row(&severe_high_weight));
-        stats.add(SufficientStats::from_row(&severe_low_weight));
-        let recall = Metric::SevereEventRecall.value(&stats).unwrap();
+        stats.add(SufficientStats::from_row(&severe_high_weight, true));
+        stats.add(SufficientStats::from_row(&severe_low_weight, false));
+        let recall = Metric::SevereEventQueryRecall.value(&stats).unwrap();
         assert!((recall - (10.0 / 12.0)).abs() < 1.0e-12);
     }
 
@@ -715,21 +742,42 @@ mod tests {
         let evaluated = row("a", "parent-a", 0.5, "evaluated", Some(true), true);
         let missing = row("b", "parent-b", 0.5, "reference_failed", None, false);
         let mut stats = SufficientStats::default();
-        stats.add(SufficientStats::from_row(&evaluated));
-        stats.add(SufficientStats::from_row(&missing));
+        stats.add(SufficientStats::from_row(&evaluated, true));
+        stats.add(SufficientStats::from_row(&missing, false));
         assert!((Metric::ReferenceOutcomeCoverage.value(&stats).unwrap() - 0.5).abs() < 1.0e-12);
-        assert_eq!(Metric::SevereEventRecall.value(&stats), Some(1.0));
-        assert_eq!(Metric::FalseAlarmRate.value(&stats), None);
+        assert_eq!(Metric::SevereEventQueryRecall.value(&stats), Some(1.0));
+        assert_eq!(Metric::FalseQueryRate.value(&stats), None);
+    }
+
+
+    #[test]
+    fn conservative_action_counts_as_intervention_without_counting_as_reference_query() {
+        let severe = row("s", "parent-s", 0.25, "evaluated", Some(true), false);
+        let stats = SufficientStats::from_row(&severe, true);
+        assert_eq!(Metric::SevereEventInterventionRecall.value(&stats), Some(1.0));
+        assert_eq!(Metric::SevereEventQueryRecall.value(&stats), Some(0.0));
+        assert_eq!(Metric::InterventionFraction.value(&stats), Some(1.0));
+        assert_eq!(Metric::QueryFraction.value(&stats), Some(0.0));
+    }
+
+    #[test]
+    fn false_alarm_distinguishes_intervention_cost_from_reference_query_cost() {
+        let nonsevere = row("n", "parent-n", 0.5, "evaluated", Some(false), false);
+        let stats = SufficientStats::from_row(&nonsevere, true);
+        assert_eq!(Metric::FalseInterventionRate.value(&stats), Some(1.0));
+        assert_eq!(Metric::FalseQueryRate.value(&stats), Some(0.0));
+        assert_eq!(Metric::InterventionFalseAlarmBurden.value(&stats), Some(1.0));
+        assert_eq!(Metric::QueryFalseAlarmBurden.value(&stats), Some(0.0));
     }
 
     #[test]
     fn intervals_are_withheld_for_too_few_independent_groups() {
         let row = row("a", "parent-a", 0.5, "evaluated", Some(true), true);
         let mut groups = BTreeMap::new();
-        groups.insert("parent-a".to_owned(), SufficientStats::from_row(&row));
+        groups.insert("parent-a".to_owned(), SufficientStats::from_row(&row, true));
         let total = *groups.values().next().unwrap();
         let result = estimate(
-            Metric::SevereEventRecall,
+            Metric::SevereEventQueryRecall,
             &groups,
             &total,
             1234,
