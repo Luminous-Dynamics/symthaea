@@ -1415,17 +1415,17 @@ mod tests {
             .expect("write evaluation manifest");
 
             let calls = [
-                ("setup", None, 0.1_f64, false, true),
-                ("setup", None, 0.2_f64, true, false),
-                ("proposal", Some("candidate-0"), 0.2_f64, false, true),
-                ("proposal", Some("candidate-1"), 0.2_f64, false, true),
-                ("proposal", Some("candidate-2"), 0.2_f64, false, true),
-                ("proposal", Some("candidate-3"), 0.2_f64, false, false),
-                ("retry", None, 0.4_f64, false, true),
+                ("setup", None, "evaluated", 0.1_f64, false, true),
+                ("setup", None, "evaluated", 0.2_f64, true, false),
+                ("proposal", Some("candidate-0"), "evaluated", 0.2_f64, false, true),
+                ("proposal", Some("candidate-1"), "evaluated", 0.2_f64, false, true),
+                ("proposal", Some("candidate-2"), "evaluated", 0.2_f64, false, true),
+                ("proposal", Some("candidate-3"), "invalid_candidate", 0.2_f64, false, false),
+                ("retry", None, "evaluated", 0.4_f64, false, true),
             ];
             let mut ledger_lines = Vec::new();
             let mut receipt_paths = Vec::new();
-            for (index, (stage, candidate_id, cost, cache_hit, external_invocation)) in
+            for (index, (stage, candidate_id, status, cost, cache_hit, external_invocation)) in
                 calls.into_iter().enumerate()
             {
                 let receipt_path = format!("receipts/receipt_{index:03}.json");
@@ -1442,7 +1442,7 @@ mod tests {
                 let record = json!({
                     "sequence": index + 1,
                     "stage": stage,
-                    "status": "evaluated",
+                    "status": status,
                     "candidate_id": candidate_id,
                     "receipt_path": receipt_path,
                     "receipt_sha256": receipt_sha256,
