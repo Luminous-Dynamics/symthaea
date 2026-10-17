@@ -30,7 +30,7 @@ Every record binds:
 
 Unknown source time must remain unknown. Host receive time must never be copied into the source-time field to make age appear computable. Host monotonic values may be compared only within the same host clock epoch. Device-session epoch is a separate lineage boundary and is advanced when ADB capture failure and later recovery indicate disconnection/reconnection, or on an explicit bridge reset.
 
-This receipt is instrumentation/evidence, not an actuator permission, safety certificate, application-level completion acknowledgement, or a claim that the environment is fresh. The general cognitive-loop dispatcher still needs a dedicated event-driven scheduling integration; this first tranche exposes the distinct bridge contract while leaving the existing fail-closed plant-time path intact.
+This receipt is instrumentation/evidence, not an actuator permission, safety certificate, application-level completion acknowledgement, or a claim that the environment is fresh. The cognitive loop now routes the `EventDrivenExternal` authority through `step_event_driven` and serializes the accepted receipt into a separate `CycleMetadata.external_action_timing` field; plant-timing evidence remains separate. A source-less ADB capture is represented as a newly received observation artifact without a claim about its device-side capture timestamp or UI-settled state.
 
 ## Frozen qualification corpus
 
@@ -74,4 +74,4 @@ No universal p99 milliseconds target is asserted for phone UI operations: transp
 - This contract does not infer device-side capture time from ADB transport timing.
 - A successful ADB command does not establish that the intended application state was reached.
 - Device epoch transitions based on observed ADB capture failure/recovery are best-effort session evidence, not a certified device clock epoch.
-- Next tranche: wire step_event_driven into a dedicated cognitive-loop dispatcher and serialized CycleMetadata field, add injectable ADB tests, and test stale/duplicate observation admission before allowing event-driven adapters into normal orchestration.
+- Next tranche: inject the ADB/clock providers so the event corpus can be replayed without a live device; add explicit reconnect, delayed/failed dispatch, and postcondition tests; define how source-less capture receipts are distinguished from duplicate transport artifacts; and add a versioned command-trace/corpus hash to the receipt.
