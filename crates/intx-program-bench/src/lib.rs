@@ -344,6 +344,83 @@ mod tests {
     }
 
     #[test]
+    fn every_denied_or_blocked_case_rejects_dispatch_mutation() {
+        let original = parse_cases(CORPUS).expect("scenario corpus parses");
+        let blocked_states = [
+            "denied",
+            "release_blocked",
+            "requalification_required",
+            "not_dispatched",
+        ];
+
+        for case in original
+            .iter()
+            .filter(|case| blocked_states.contains(&case.expected_state.as_str()))
+        {
+            let mut mutated = original.clone();
+            let changed = mutated
+                .iter_mut()
+                .find(|candidate| candidate.id == case.id)
+                .expect("same stable case id exists");
+            changed.dispatch = "occurred".to_string();
+            assert!(
+                validate_cases(&mutated).is_err(),
+                "blocked case {} must reject dispatch",
+                case.id
+            );
+        }
+    }
+
+    #[test]
+    fn every_ambiguous_outcome_rejects_missing_reconciliation() {
+        let original = parse_cases(CORPUS).expect("scenario corpus parses");
+        let ambiguous: Vec<String> = original
+            .iter()
+            .filter(|case| case.expected_state == "outcome_unknown")
+            .map(|case| case.id.clone())
+            .collect();
+        assert!(!ambiguous.is_empty(), "corpus must exercise ambiguous outcomes");
+
+        for id in ambiguous {
+            let mut mutated = original.clone();
+            let changed = mutated
+                .iter_mut()
+                .find(|candidate| candidate.id == id)
+                .expect("same stable case id exists");
+            changed.reconcile = "no".to_string();
+            assert!(
+                validate_cases(&mutated).is_err(),
+                "ambiguous case {id} must require reconciliation"
+            );
+        }
+    }
+
+    #[test]
+    fn every_case_outcome_is_bound_to_the_frozen_oracle() {
+        let original = parse_cases(CORPUS).expect("scenario corpus parses");
+        let outcomes =
+            parse_expected_outcomes(EXPECTED_OUTCOMES).expect("outcome oracle parses");
+
+        for case in &original {
+            let mut mutated = original.clone();
+            let changed = mutated
+                .iter_mut()
+                .find(|candidate| candidate.id == case.id)
+                .expect("same stable case id exists");
+            changed.expected_state = if case.expected_state == "denied" {
+                "observation_admitted".to_string()
+            } else {
+                "denied".to_string()
+            };
+            assert!(
+                validate_against_oracle(&mutated, &outcomes).is_err(),
+                "outcome mutation for {} must fail",
+                case.id
+            );
+        }
+    }
+
+    #[test]
     fn malformed_fixture_rows_fail_closed() {
         assert!(parse_cases(
             "id|dimension|scenario|expected_state|dispatch|reconcile\nC0-01|identity"
