@@ -3,7 +3,7 @@ name = "symthaea-audio-evidence"
 version = "0.1.0"
 edition = "2024"
 license = "AGPL-3.0-or-later"
-description = "Fail-closed structural and artifact-integrity checks for open audio measurement manifests"
+description = "Fail-closed open-audio evidence and hi-fi benchmark split-integrity checks"
 
 [[bin]]
 name = "audio-evidence-check"
