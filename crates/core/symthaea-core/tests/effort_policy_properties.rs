@@ -57,6 +57,7 @@ fn exhaustive_control_cross_product_preserves_effort_policy_invariants() {
     ];
     let bools = [false, true];
     let resistance_values = [0.0_f32, 0.2_f32];
+    let seed = valid_mobility_seed();
     let mut evaluated = 0_usize;
 
     for mode in modes {
@@ -68,7 +69,7 @@ fn exhaustive_control_cross_product_preserves_effort_policy_invariants() {
                             for more_assistance in bools {
                                 for increase in bools {
                                     for resistance in resistance_values {
-                                        let mut request = valid_mobility_seed();
+                                        let mut request = seed.clone();
                                         request.mode = mode;
                                         request.effort_evidence = evidence;
                                         request.explicit_training_opt_in = opt_in;
