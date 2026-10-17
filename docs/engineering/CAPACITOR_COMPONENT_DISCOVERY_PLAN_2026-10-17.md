@@ -10,6 +10,20 @@ Symthaea should become an evidence-carrying component-discovery and co-design sy
 
 The first vertical is **capacitor dielectric + package + circuit co-design**. It has clear physical equations, widely used passive-component families, meaningful multi-objective trade-offs, and a manageable initial simulation scope. The same interfaces can later support inductors, transformers, sensors, protection components, semiconductor devices, and PCB-level power integrity.
 
+## Existing Symthaea work to compose, not duplicate
+
+This capacitor specialization should consume the repository's current materials/engineering contracts rather than establish competing frameworks:
+
+- [MAT-009 #4340](https://github.com/Luminous-Dynamics/symthaea/issues/4340): reuse the shared materials-discovery campaign and Pareto-objective contract.
+- [MAT-GEN #5258](https://github.com/Luminous-Dynamics/symthaea/issues/5258): align held-out generalization, domain-shift, and split-integrity evaluation.
+- [MAT-PSPP #6224](https://github.com/Luminous-Dynamics/symthaea/issues/6224): use the process → structure → property → performance lineage for composition, microstructure, processing, and device context.
+- [MAT-ENG #6185](https://github.com/Luminous-Dynamics/symthaea/issues/6185): connect engineering demand, candidate materials discovery, and qualification evidence.
+- [ENG-SPICE-001 #5633](https://github.com/Luminous-Dynamics/symthaea/issues/5633): existing task for real ngspice output parsing, convergence semantics, and exact solver/netlist/output provenance.
+- [ENG-SEMI-000 #5671](https://github.com/Luminous-Dynamics/symthaea/issues/5671): preserve the distinction between material properties, device physics/TCAD, compact models, circuit simulations, and measured devices.
+- [ENG-DEVICE-000 #5670](https://github.com/Luminous-Dynamics/symthaea/issues/5670) and [architecture PR #5672](https://github.com/Luminous-Dynamics/symthaea/pull/5672): reuse common physical-device packaging, power, thermal, measurement, and safety architecture.
+
+The present increment is intentionally limited to capacitor-specific dielectric-property provenance, transparent first-order equations, and an evaluation plan. Future active-learning orchestration, generic Pareto ranking, simulator execution/evidence closure, and physical qualification should land in their existing owner layers.
+
 ## Why this is timely
 
 1. **High-κ ceramic MLCCs.** The 2026 paper *Temperature-stable high-κ oxides for miniaturized capacitors* reports a hierarchical ML-guided strategy: identify promising structural families, then optimize local atomic features to balance high permittivity, low loss, and near-zero temperature dependence. This is a useful reference workflow—not evidence that Symthaea has reproduced it.  
