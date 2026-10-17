@@ -3,7 +3,7 @@
 
 use std::error::Error;
 
-use symthaea_marine_bench::{assess, MarineFreightCase};
+use symthaea_marine_bench::{MarineFreightCase, assess};
 
 fn main() -> Result<(), Box<dyn Error>> {
     let input = include_str!("../fixtures/marine_freight_reference_case_v2.synthetic.json");

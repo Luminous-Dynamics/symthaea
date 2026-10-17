@@ -13,7 +13,7 @@
 mod assessor;
 mod model;
 
-pub use assessor::{assess, AssessmentError, AssessmentReport, Finding, FindingStatus};
+pub use assessor::{AssessmentError, AssessmentReport, Finding, FindingStatus, assess};
 pub use model::{
     BatterySystem, DecisionUse, DutyCycle, EvidenceClass, EvidenceValue, MarineFreightCase,
     ProvenanceRecord, RouteEnvelope, SystemBoundary, TerminalInterface, VesselGeometry,

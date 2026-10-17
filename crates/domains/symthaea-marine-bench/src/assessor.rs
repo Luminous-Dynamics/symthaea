@@ -6,10 +6,10 @@ use std::fmt;
 
 use serde::{Deserialize, Serialize};
 
+use crate::CLAIM_CEILING;
 use crate::model::{
     DecisionUse, EvidenceClass, EvidenceValue, MarineFreightCase, ProvenanceRecord,
 };
-use crate::CLAIM_CEILING;
 
 #[derive(Clone, Copy, Debug, Deserialize, Serialize, PartialEq, Eq)]
 #[serde(rename_all = "snake_case")]
@@ -74,7 +74,10 @@ impl fmt::Display for AssessmentError {
             }
             Self::DuplicateProvenanceId(id) => write!(f, "duplicate provenance ID: {id}"),
             Self::ClaimCeilingMismatch => {
-                write!(f, "case claim ceiling does not match this evaluator's frozen ceiling")
+                write!(
+                    f,
+                    "case claim ceiling does not match this evaluator's frozen ceiling"
+                )
             }
             Self::UnsupportedEvidenceClass(class) => {
                 write!(
@@ -94,7 +97,9 @@ impl std::error::Error for AssessmentError {}
 /// in an indeterminate finding rather than being replaced by zero.
 pub fn assess(case: &MarineFreightCase) -> Result<AssessmentReport, AssessmentError> {
     if case.schema_version != "2.0.0" {
-        return Err(AssessmentError::UnsupportedSchema(case.schema_version.clone()));
+        return Err(AssessmentError::UnsupportedSchema(
+            case.schema_version.clone(),
+        ));
     }
     if case.case_id.trim().is_empty() {
         return Err(AssessmentError::EmptyCaseId);
@@ -103,7 +108,10 @@ pub fn assess(case: &MarineFreightCase) -> Result<AssessmentReport, AssessmentEr
         return Err(AssessmentError::ClaimCeilingMismatch);
     }
     if case.evidence_class != EvidenceClass::SyntheticIllustration {
-        return Err(AssessmentError::UnsupportedEvidenceClass(format!("{:?}", case.evidence_class)));
+        return Err(AssessmentError::UnsupportedEvidenceClass(format!(
+            "{:?}",
+            case.evidence_class
+        )));
     }
     if case.decision_use != DecisionUse::NotForDecision {
         return Err(AssessmentError::UnsupportedDecisionUse);
@@ -193,7 +201,10 @@ pub fn assess(case: &MarineFreightCase) -> Result<AssessmentReport, AssessmentEr
     ));
     findings.push(compare_le(
         "service_turnaround_window",
-        match (resolve(&case.duty_cycle.round_trip_duration_h, "h", &sources), charge_duration) {
+        match (
+            resolve(&case.duty_cycle.round_trip_duration_h, "h", &sources),
+            charge_duration,
+        ) {
             (Ok(mission_h), Ok(charge_h)) => mission_h.add(charge_h, "mission plus recharge time"),
             (Err(reason), _) => Err(reason),
             (_, Err(reason)) => Err(reason),
@@ -249,7 +260,9 @@ fn validate_provenance<'a>(
             return Err(AssessmentError::EmptyProvenanceId);
         }
         if record.description.trim().is_empty() {
-            return Err(AssessmentError::EmptyProvenanceDescription(record.id.clone()));
+            return Err(AssessmentError::EmptyProvenanceDescription(
+                record.id.clone(),
+            ));
         }
         if sources.insert(record.id.as_str(), record).is_some() {
             return Err(AssessmentError::DuplicateProvenanceId(record.id.clone()));
@@ -292,7 +305,6 @@ impl Interval {
             label,
         )
     }
-
 }
 
 fn checked_interval(nominal: f64, lower: f64, upper: f64, label: &str) -> Result<Interval, String> {
@@ -304,7 +316,11 @@ fn checked_interval(nominal: f64, lower: f64, upper: f64, label: &str) -> Result
             "{label} produced an invalid interval (require 0 <= lower <= nominal <= upper)"
         ));
     }
-    Ok(Interval { nominal, lower, upper })
+    Ok(Interval {
+        nominal,
+        lower,
+        upper,
+    })
 }
 
 fn resolve(
@@ -356,7 +372,11 @@ fn sum_values(
     inputs: &[(&EvidenceValue, &str)],
     sources: &BTreeMap<&str, &ProvenanceRecord>,
 ) -> Result<Interval, String> {
-    let mut total = Interval { nominal: 0.0, lower: 0.0, upper: 0.0 };
+    let mut total = Interval {
+        nominal: 0.0,
+        lower: 0.0,
+        upper: 0.0,
+    };
     for (input, unit) in inputs {
         total = total.add(resolve(input, unit, sources)?, "sum of declared inputs")?;
     }
@@ -452,7 +472,11 @@ fn charge_duration_h(
     let rate = effective_power.multiply_nonnegative(efficiency, "delivered charge rate")?;
     if rate.upper == 0.0 {
         return if demand.upper == 0.0 {
-            Ok(Interval { nominal: 0.0, lower: 0.0, upper: 0.0 })
+            Ok(Interval {
+                nominal: 0.0,
+                lower: 0.0,
+                upper: 0.0,
+            })
         } else {
             Err("no positive charge rate is available".to_owned())
         };
@@ -488,20 +512,19 @@ fn compare_le(
                 FindingStatus::Indeterminate
             };
             let reason = match status {
-                FindingStatus::WithinDeclaredBound =>
-                    concat!(
-                        "entire observed interval is within the entire declared bound interval; ",
-                        "this is not physical qualification",
-                    )
-                    .to_owned(),
-                FindingStatus::ViolatesDeclaredBound =>
-                    "even the lowest observed value exceeds the highest declared bound".to_owned(),
-                FindingStatus::Indeterminate =>
-                    concat!(
-                        "input intervals overlap or cross; available bounds do not establish ",
-                        "feasibility or violation",
-                    )
-                    .to_owned(),
+                FindingStatus::WithinDeclaredBound => concat!(
+                    "entire observed interval is within the entire declared bound interval; ",
+                    "this is not physical qualification",
+                )
+                .to_owned(),
+                FindingStatus::ViolatesDeclaredBound => {
+                    "even the lowest observed value exceeds the highest declared bound".to_owned()
+                }
+                FindingStatus::Indeterminate => concat!(
+                    "input intervals overlap or cross; available bounds do not establish ",
+                    "feasibility or violation",
+                )
+                .to_owned(),
             };
             Finding {
                 metric: metric.to_owned(),
@@ -556,16 +579,25 @@ mod tests {
     }
 
     fn finding<'a>(report: &'a AssessmentReport, metric: &str) -> &'a Finding {
-        report.findings.iter().find(|f| f.metric == metric).expect("finding exists")
+        report
+            .findings
+            .iter()
+            .find(|f| f.metric == metric)
+            .expect("finding exists")
     }
 
     fn set_number(input: &mut EvidenceValue, value: f64) {
         match input {
-            EvidenceValue::Known { value: slot, lower_bound, upper_bound, .. } => {
+            EvidenceValue::Known {
+                value: slot,
+                lower_bound,
+                upper_bound,
+                ..
+            } => {
                 *slot = value;
                 *lower_bound = value;
                 *upper_bound = value;
-            },
+            }
             EvidenceValue::Unknown { .. } => panic!("test expected a known input"),
         }
     }
@@ -576,7 +608,12 @@ mod tests {
         let report = assess(&case).expect("valid synthetic case");
         assert_eq!(report.case_id, "marine-freight-synthetic-screen-v2");
         assert_eq!(report.findings.len(), 10);
-        assert!(report.findings.iter().all(|f| f.status == FindingStatus::WithinDeclaredBound));
+        assert!(
+            report
+                .findings
+                .iter()
+                .all(|f| f.status == FindingStatus::WithinDeclaredBound)
+        );
 
         let energy = finding(&report, "battery_energy_per_duty_cycle");
         assert_eq!(energy.observed, Some(3235.0));
@@ -769,7 +806,12 @@ mod tests {
 
     fn set_range(input: &mut EvidenceValue, nominal: f64, lower: f64, upper: f64) {
         match input {
-            EvidenceValue::Known { value, lower_bound, upper_bound, .. } => {
+            EvidenceValue::Known {
+                value,
+                lower_bound,
+                upper_bound,
+                ..
+            } => {
                 *value = nominal;
                 *lower_bound = lower;
                 *upper_bound = upper;
@@ -781,7 +823,12 @@ mod tests {
     #[test]
     fn overlapping_energy_intervals_are_indeterminate_not_nominal_pass() {
         let mut case = case();
-        set_range(&mut case.duty_cycle.loaded_leg_propulsion_kwh, 1850.0, 1700.0, 2500.0);
+        set_range(
+            &mut case.duty_cycle.loaded_leg_propulsion_kwh,
+            1850.0,
+            1700.0,
+            2500.0,
+        );
         let report = assess(&case).expect("synthetic bounded case");
         let energy = finding(&report, "battery_energy_per_duty_cycle");
         assert_eq!(energy.status, FindingStatus::Indeterminate);
@@ -798,7 +845,12 @@ mod tests {
     #[test]
     fn fully_separated_input_ranges_prove_robust_violation() {
         let mut case = case();
-        set_range(&mut case.duty_cycle.loaded_leg_propulsion_kwh, 2500.0, 2400.0, 2600.0);
+        set_range(
+            &mut case.duty_cycle.loaded_leg_propulsion_kwh,
+            2500.0,
+            2400.0,
+            2600.0,
+        );
         let report = assess(&case).expect("synthetic bounded case");
         let energy = finding(&report, "battery_energy_per_duty_cycle");
         assert_eq!(energy.status, FindingStatus::ViolatesDeclaredBound);
@@ -813,17 +865,28 @@ mod tests {
         let mut case = case();
         set_range(&mut case.vessel.length_overall_m, 80.0, 82.0, 81.0);
         let report = assess(&case).expect("range error is a finding, not a panic");
-        assert_eq!(finding(&report, "route_length_envelope").status, FindingStatus::Indeterminate);
+        assert_eq!(
+            finding(&report, "route_length_envelope").status,
+            FindingStatus::Indeterminate
+        );
     }
 
     #[test]
     fn uncertainty_ranges_are_propagated_through_under_keel_clearance() {
         let mut case = case();
         set_range(&mut case.vessel.design_draft_m, 2.2, 2.1, 2.4);
-        set_range(&mut case.route.minimum_under_keel_clearance_m, 0.5, 0.4, 0.7);
+        set_range(
+            &mut case.route.minimum_under_keel_clearance_m,
+            0.5,
+            0.4,
+            0.7,
+        );
         set_range(&mut case.route.available_water_depth_m, 3.2, 3.0, 3.25);
         let report = assess(&case).expect("synthetic bounded case");
-        assert_eq!(finding(&report, "under_keel_clearance").status, FindingStatus::Indeterminate);
+        assert_eq!(
+            finding(&report, "under_keel_clearance").status,
+            FindingStatus::Indeterminate
+        );
     }
     #[test]
     fn interval_comparator_matches_frozen_oracle_for_ten_thousand_cases() {
