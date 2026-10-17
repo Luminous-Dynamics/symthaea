@@ -601,6 +601,32 @@ fn is_admitting(corpus: &str, disposition: &str) -> bool {
     }
 }
 
+
+fn expected_platform_for_mission(family: &str) -> Option<&'static str> {
+    match family {
+        "watershed_lake" => Some("usv"),
+        "coast_estuary" => Some("auv"),
+        "agriculture_catchment" => Some("multirotor"),
+        "disaster_assessment" => Some("fixed_wing"),
+        "biodiversity_habitat" => Some("multirotor"),
+        "remote_infrastructure" => Some("rov"),
+        _ => None,
+    }
+}
+
+fn expected_criticality_for_component(family: &str) -> Option<&'static str> {
+    match family {
+        "airframe_arm" => Some("routine_replaceable"),
+        "propulsion_module" => Some("safety_relevant"),
+        "wiring_harness" => Some("electrical_interface"),
+        "sensor_payload" => Some("measurement_critical"),
+        "surface_vessel_module" => Some("environment_exposed"),
+        "underwater_pressure_interface" => Some("pressure_boundary"),
+        "battery_module" => Some("energy_storage_safety_relevant"),
+        _ => None,
+    }
+}
+
 fn load_and_qualify(
     root: &Path,
     relative_path: &str,
@@ -693,6 +719,7 @@ fn load_and_qualify(
     let mut results = Vec::with_capacity(cases.len());
     let mut expected_counts = BTreeMap::new();
     let mut derived_counts = BTreeMap::new();
+    let mut family_counts = BTreeMap::new();
 
     for (index, case) in cases.iter().enumerate() {
         let case_context = format!("{relative_path} case[{index}]");
@@ -707,16 +734,21 @@ fn load_and_qualify(
         let scenario = string_at(case, "scenario", &case_context)?;
         ensure!(!scenario.trim().is_empty(), "{case_context}: scenario must not be empty");
         if corpus_kind == "feasibility" {
-            for key in ["mission_family", "platform_family"] {
-                let value = string_at(case, key, &case_context)?;
-                ensure!(
-                    !value.trim().is_empty(),
-                    "{case_context}: field {key:?} must not be empty"
-                );
-            }
+            let mission_family = string_at(case, "mission_family", &case_context)?;
+            let platform_family = string_at(case, "platform_family", &case_context)?;
+            ensure!(
+                expected_platform_for_mission(mission_family) == Some(platform_family),
+                "{case_context}: mission/platform family pair is not supported"
+            );
+            add_count(&mut family_counts, mission_family);
         } else {
-            let value = string_at(case, "component_family", &case_context)?;
-            ensure!(!value.trim().is_empty(), "{case_context}: component_family must not be empty");
+            let component_family = string_at(case, "component_family", &case_context)?;
+            let criticality = string_at(case, "criticality_profile", &case_context)?;
+            ensure!(
+                expected_criticality_for_component(component_family) == Some(criticality),
+                "{case_context}: component/criticality pair is not supported"
+            );
+            add_count(&mut family_counts, component_family);
         }
         let facts = case.get("facts").context("case facts missing")?;
 
@@ -750,6 +782,37 @@ fn load_and_qualify(
             matches,
             protected_gate_false_accept,
         });
+    }
+
+    let expected_families: &[(&str, usize)] = if corpus_kind == "feasibility" {
+        &[
+            ("watershed_lake", 8),
+            ("coast_estuary", 8),
+            ("agriculture_catchment", 8),
+            ("disaster_assessment", 8),
+            ("biodiversity_habitat", 8),
+            ("remote_infrastructure", 8),
+        ]
+    } else {
+        &[
+            ("airframe_arm", 4),
+            ("propulsion_module", 4),
+            ("wiring_harness", 4),
+            ("sensor_payload", 4),
+            ("surface_vessel_module", 4),
+            ("underwater_pressure_interface", 4),
+            ("battery_module", 4),
+        ]
+    };
+    ensure!(
+        family_counts.len() == expected_families.len(),
+        "{context}: observed unexpected family cardinality"
+    );
+    for (family, expected_count) in expected_families {
+        ensure!(
+            family_counts.get(*family) == Some(expected_count),
+            "{context}: family {family:?} must have exactly {expected_count} cases"
+        );
     }
 
     let mismatch_count = results.iter().filter(|item| !item.matches).count();
@@ -841,6 +904,18 @@ mod tests {
         let second = serde_json::to_string(&run().expect("repeat qualification"))
             .expect("serialize second report");
         assert_eq!(first, second, "same corpus bytes must produce deterministic output");
+    }
+
+    #[test]
+    fn family_mappings_reject_cross_domain_relabeling() {
+        assert_eq!(expected_platform_for_mission("coast_estuary"), Some("auv"));
+        assert_eq!(expected_platform_for_mission("coast_estuary"), Some("auv"));
+        assert_eq!(expected_platform_for_mission("invented_family"), None);
+        assert_eq!(
+            expected_criticality_for_component("underwater_pressure_interface"),
+            Some("pressure_boundary")
+        );
+        assert_eq!(expected_criticality_for_component("invented_component"), None);
     }
 
     #[test]
