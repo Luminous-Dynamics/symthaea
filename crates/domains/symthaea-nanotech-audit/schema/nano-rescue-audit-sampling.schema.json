@@ -5,7 +5,7 @@
   "description": "The manifest declares a probability sample independent from controller-triggered requests. The Rust verifier reconstructs counts and inclusion probabilities. Local declarations do not independently attest when the manifest was frozen.",
   "type": "object",
   "additionalProperties": false,
-  "required": ["schema_version", "run_id", "evaluation_id", "policy_revision_sha256", "sampling_frame_path", "sampling_frame_sha256", "preregistration_receipt_path", "preregistration_receipt_sha256", "seed_reveal_path", "seed_commitment_sha256", "frame_population_size", "sampling_method", "frozen_before_policy_run", "policy_blind", "strata", "sampled_windows"],
+  "required": ["schema_version", "run_id", "evaluation_id", "policy_revision_sha256", "sampling_frame_path", "sampling_frame_sha256", "preregistration_receipt_path", "manifest_visibility", "seed_reveal_path", "seed_commitment_sha256", "frame_population_size", "sampling_method", "frozen_before_policy_run", "policy_blind", "strata", "sampled_windows"],
   "properties": {
     "schema_version": {"const": "nano-rescue-audit-sampling-v1"},
     "run_id": {"type": "string", "minLength": 1, "maxLength": 256},
@@ -14,7 +14,7 @@
     "sampling_frame_path": {"type": "string", "minLength": 1, "maxLength": 1024},
     "sampling_frame_sha256": {"type": "string", "pattern": "^[a-f0-9]{64}$"},
     "preregistration_receipt_path": {"type": "string", "minLength": 1, "maxLength": 1024},
-    "preregistration_receipt_sha256": {"type": "string", "pattern": "^[a-f0-9]{64}$"},
+    "manifest_visibility": {"const": "evaluator_sealed_until_policy_run_complete"},
     "seed_reveal_path": {"type": "string", "minLength": 1, "maxLength": 1024},
     "seed_commitment_sha256": {"type": "string", "pattern": "^[a-f0-9]{64}$"},
     "frame_population_size": {"type": "integer", "minimum": 1},
