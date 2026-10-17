@@ -26,6 +26,7 @@ pub const HARD_MAX_BUNDLE_ROUTES: usize = 8;
 pub const HARD_MAX_CANDIDATES_PER_ROUTE: usize = 64;
 pub const HARD_MAX_DEVIATION_PROBES_PER_ROUTE: usize = 4_096;
 pub const HARD_MAX_TOTAL_DEVIATION_PROBES: usize = 4_096;
+pub const HARD_MAX_TOTAL_EXPANDED_STATES: usize = 25_000_000;
 pub const HARD_MAX_BUNDLE_COMBINATIONS: usize = 1_000_000;
 
 #[derive(Clone, Debug, Deserialize, Serialize, PartialEq, Eq)]
@@ -37,6 +38,8 @@ pub struct RouteBundleLimits {
     pub max_deviation_probes_per_route: usize,
     /// Aggregate edge-ban probes across the entire bundle, fairly divided by request count.
     pub max_total_deviation_probes: usize,
+    /// Aggregate number of A* expansion states allowed across every base and deviation search.
+    pub max_total_expanded_states: usize,
     /// Maximum complete candidate combinations evaluated by bundle selection.
     pub max_bundle_combinations: usize,
 }
@@ -47,6 +50,7 @@ impl Default for RouteBundleLimits {
             max_candidates_per_route: 8,
             max_deviation_probes_per_route: 256,
             max_total_deviation_probes: 128,
+            max_total_expanded_states: 2_000_000,
             max_bundle_combinations: 10_000,
         }
     }
@@ -90,6 +94,10 @@ pub struct GridEdge {
 pub struct AlternativeProbe {
     pub banned_edge: Option<GridEdge>,
     pub probe_configuration_sha256: Option<String>,
+    /// Effective per-call bound; None means no route search was launched.
+    pub max_expanded_states_used: Option<usize>,
+    /// States actually expanded by the route search, when one was run.
+    pub expanded_states: Option<usize>,
     pub route_disposition: Option<String>,
     /// Examples: base_candidate, new_candidate, duplicate_path, no_path_under_ban,
     /// search_budget_exceeded, geometry_audit_failed, or base_route_unavailable.
@@ -153,6 +161,7 @@ pub struct RouteBundleReportBody {
     pub catalogs: Vec<RouteCandidateCatalog>,
     pub selection: Option<RouteBundleSelection>,
     pub total_deviation_probes: usize,
+    pub total_expanded_states: usize,
     pub bundle_combinations_examined: usize,
     pub bundles_rejected_for_shared_route_cells: usize,
     /// Completeness applies only to Cartesian combinations of the emitted catalogs.
@@ -209,6 +218,14 @@ fn validate_limits(limits: &RouteBundleLimits) -> Result<(), RouteBundleError> {
         return Err(RouteBundleError::new(
             "INVALID_TOTAL_DEVIATION_PROBE_LIMIT",
             format!("max_total_deviation_probes must be in 1..={HARD_MAX_TOTAL_DEVIATION_PROBES}"),
+        ));
+    }
+    if limits.max_total_expanded_states == 0
+        || limits.max_total_expanded_states > HARD_MAX_TOTAL_EXPANDED_STATES
+    {
+        return Err(RouteBundleError::new(
+            "INVALID_TOTAL_EXPANDED_STATE_LIMIT",
+            format!("max_total_expanded_states must be in 1..={HARD_MAX_TOTAL_EXPANDED_STATES}"),
         ));
     }
     if limits.max_bundle_combinations == 0
