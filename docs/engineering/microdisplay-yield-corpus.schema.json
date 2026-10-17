@@ -107,7 +107,7 @@
         "properties": {
           "id": {
             "type": "string",
-            "pattern": "^MICRODISP-[A-Z0-9-]+$"
+            "pattern": "^MICLED-[A-Z0-9-]+$"
           },
           "title": {
             "type": "string",
