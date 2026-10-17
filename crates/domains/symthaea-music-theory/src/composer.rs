@@ -613,14 +613,10 @@ fn compose_with_spec_and_form_and_grammar_impl(
         tx.cadential_harmonic_rhythm,
         spec.development != crate::spec::DevelopmentDna::Classic,
     );
-    // Minuet-and-Trio is not only an ABA key plan: the contrasting Trio
-    // also changes accompaniment texture. Keep the Minuet's beat-one-weighted
-    // quarter-note gait for A and the da-capo return; after the B section's
-    // opening thinning, articulate its harmony as eighth-note arpeggios.
-    let section_pattern_override = (spec.name == "MinuetAndTrio").then_some((
-        SectionRole::B,
-        crate::accompaniment::Accompaniment::Arpeggio,
-    ));
+    // Section-level texture changes are declarative CompositionSpec data.
+    // For Minuet-and-Trio this preserves quarter-note A/ReturnA and gives B
+    // eighth-note arpeggiated harmony after the opening thinning.
+    let section_pattern_overrides = &spec.texture.section_accompaniment_overrides;
     realize_harmony_with_section_pattern(
         &mut score,
         &form,
@@ -631,7 +627,7 @@ fn compose_with_spec_and_form_and_grammar_impl(
         tx.thin_departure,
         tx.cadential_harmonic_rhythm,
         tx.seventh_chords,
-        section_pattern_override,
+        section_pattern_overrides,
     );
     if tx.hook_cell {
         apply_hidden_bass_quote(
@@ -4277,7 +4273,7 @@ pub(crate) fn realize_harmony(
         thin_departure,
         cadential_split,
         seventh_chords,
-        None,
+        &[],
     );
 }
 
@@ -4291,10 +4287,10 @@ fn realize_harmony_with_section_pattern(
     thin_departure: bool,
     cadential_split: bool,
     seventh_chords: bool,
-    section_pattern_override: Option<(
+    section_pattern_overrides: &[(
         crate::form::SectionRole,
         crate::accompaniment::Accompaniment,
-    )>,
+    )],
 ) {
     let mut measure: i64 = 0;
     for section in &form.sections {
@@ -4313,9 +4309,10 @@ fn realize_harmony_with_section_pattern(
         } else {
             (&degrees[..], measure)
         };
-        let section_pattern = section_pattern_override
-            .filter(|(role, _)| *role == section.role)
-            .map(|(_, pattern)| pattern)
+        let section_pattern = section_pattern_overrides
+            .iter()
+            .find(|(role, _)| *role == section.role)
+            .map(|(_, section_pattern)| *section_pattern)
             .unwrap_or(pattern);
         realize_harmony_measures(
             score,
