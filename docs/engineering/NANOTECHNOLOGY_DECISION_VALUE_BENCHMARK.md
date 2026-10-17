@@ -163,7 +163,28 @@ Never generalize a result beyond the supported element, chemistry, size, surface
 
 Current Symthaea molecular AIMD uses molecular, non-periodic RHF/STO-3G with finite-difference forces and is not an eligible periodic nanocrystal reference. A new benchmark must not use it as experimental truth or imply it is a qualified nanocrystal simulator. NANO-008 separately covers trajectory reliability.
 
-## 13. Interoperability with MADE (ICML 2026)
+## 13. Keep three scientific benchmark lanes separate
+
+A paradigm shift is to share a *decision/receipt/audit architecture* without collapsing distinct physical questions into one composite "nanotechnology score". A discovery policy can succeed on one lane and fail on another; pooling incomparable targets, units or failure modes hides this.
+
+| Lane | Scientific question | Core outcomes | Admission gate |
+|---|---|---|---|
+| A. Convex-hull discovery | Can a policy find new reference-stable compounds under a fixed oracle budget? | Official discovery curves, qualified stable-hit rate, paired regret, setup-inclusive cost | Reproduce a pinned MADE task; identify each phase-diagram/source revision, the exact oracle and effective-ground-truth filters |
+| B. Historical measured-property optimization | Can a policy choose candidates with better *measured* performance? | Hit rate at K, simple regret, target-coverage calibration, cost to first hit, failure/repeat accounting | Local snapshot/hash, units, measured-feature availability/cost, sample/replicate grouping, source rights and attribution |
+| C. Atomistic trajectory reliability | Does a potential preserve credible nanostructure dynamics and explore plausible structures? | Trajectory survival, structural fidelity, severe-error recall, warning lead time, calls to reliability threshold | Exact starting geometries, reference trajectory/config, model/data rights, group splits, material-specific failure rules |
+
+Use one policy/evidence interface across lanes where possible, but keep distinct task contracts, units, thresholds, denominators, and reports. Report lane-specific results side-by-side; do not average them into a single score. A cross-lane transfer claim requires a fourth, explicitly preregistered experiment in which the transfer mechanism and held-out target domain are defined in advance.
+
+### Current candidate tasks and rights status
+
+- **MADE convex-hull campaign:** the official repository says its run harness can use ORB/MACE/analytic oracles, and some data/agents rely on Materials Project, checkpoints, and API services. The README's MIT code license does not automatically settle upstream dataset, model-weight, or API terms. Freeze one task, oracle, cached/source artifacts, data rights, start state, setup invocations, and actual external-call ledger before using it for a fair cost comparison.
+- **NIST/REMI Fe-Co-Ni historical measurements:** issue [NANO-007 (#7644)](https://github.com/Luminous-Dynamics/symthaea/issues/7644) records that the pinned source tree lacks an explicit dataset license. Do not bundle the source data or derived redistribution artifacts until the rights question is resolved. This is measured-property benchmarking if admitted, not a nanocrystal simulation benchmark.
+- **MOCLIP measured nanophotonics:** the public [release repository](https://github.com/RodionovSA/MOCLIP_release) provides a 10k subset of measured geometry–spectrum pairs and has an MIT code license. The repository README/license alone does not establish separate rights for the dataset or pretrained weights; issue [NANO-004 (#7531)](https://github.com/Luminous-Dynamics/symthaea/issues/7531) remains blocked pending exact dataset/model terms. Its measured spectra could provide a useful historical inverse-design lane if the rights gate is cleared; they do not validate atomic-scale nanocrystal dynamics.
+- **CdSe nanocrystal reliability:** the 2026 preprint is a useful candidate, but its exact input/reference artifacts and terms must be independently admitted before reproduction. The current Symthaea molecular RHF/STO-3G implementation is not an eligible periodic/nanocrystal reference solver.
+
+At the time this version was authored, **no one task above is declared rights-cleared and experimentally qualified by this protocol**. Treat that as a concrete admission blocker, not permission to silently choose whichever public files happen to be downloadable. The immediate deliverable is a source/rights decision record plus a reproducible baseline package; no real scientific improvement can be claimed until one lane clears admission.
+
+## 14. Interoperability with MADE (ICML 2026)
 
 Before inventing a new closed-loop benchmark stack, evaluate [MADE: Benchmark Environments for Closed-Loop Materials Discovery](https://proceedings.mlr.press/v306/malik26a.html) and its [official implementation](https://github.com/diffractivelabs/MADE). MADE models discovery as an iterative campaign under a constrained oracle budget, using convex-hull stability tasks and interchangeable generators, filters, scorers, planners and oracles. Its release lists AF, EF, AUDC and mSUN as discovery metrics and provides per-episode trajectories, summaries, configs and logs. The ICML 2026 paper reports that adaptive planning becomes more important as the search space grows.
 
@@ -189,7 +210,7 @@ A preliminary read of the upstream release identifies specific items that the in
 
 These points are an audit checklist derived from source inspection, not a claim that MADE is invalid. Preserve the official results and names when reproducing the paper, and publish any corrected or extended metric as a separately named metric.
 
-## 14. Research references
+## 15. Research references
 
 - Usman et al. (2026), *Benchmarking Machine-Learning Interatomic Potentials for Dynamical Stability in Inorganic Semiconductor Nanocrystals: A CdSe Case Study*, preprint: https://arxiv.org/abs/2609.15299
 - Xu et al. (2026), *Benchmarking universal machine learning interatomic potentials for supported nanoparticles: decoupling energy accuracy from structural exploration*, npj Computational Materials 12, 189: https://www.nature.com/articles/s41524-026-02043-8
