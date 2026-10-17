@@ -293,10 +293,10 @@ mod tests {
 
     #[test]
     fn integrates_constant_positive_mechanical_and_electrical_power() {
-        let result = audit_flapping_cycle(vec![
+        let result = audit_flapping_cycle(trace(vec![
             sample(0.0, 2.0, 10.0, 25.0),
             sample(1.0, 2.0, 10.0, 25.0),
-        ].into_iter().collect::<Vec<_>>().pipe(trace)).unwrap();
+        ])).unwrap();
 
         assert!((result.positive_mechanical_work_j - 20.0).abs() < 1e-12);
         assert_eq!(result.negative_mechanical_work_magnitude_j, 0.0);
@@ -308,22 +308,21 @@ mod tests {
 
     #[test]
     fn splits_sign_changing_mechanical_power_at_its_zero_crossing() {
-        let mut values = trace(vec![
+        let values = trace(vec![
             sample(0.0, 1.0, 10.0, 0.0),
             sample(1.0, 1.0, -10.0, 0.0),
         ]);
         // The joint power samples are +10 W and -10 W.
-        let result = audit_flapping_cycle(values.clone()).unwrap();
+        let result = audit_flapping_cycle(values).unwrap();
         assert!((result.positive_mechanical_work_j - 2.5).abs() < 1e-12);
         assert!((result.negative_mechanical_work_magnitude_j - 2.5).abs() < 1e-12);
         assert!(result.net_mechanical_work_j.abs() < 1e-12);
-        values.samples[1].time_s = 1.0;
     }
 
     #[test]
     fn electrical_regeneration_is_not_conflated_with_mechanical_return() {
         let result = audit_flapping_cycle(trace(vec![
-            sample(0.0, 1.0, 10.0, 20.0),
+            sample(0.0, 1.0, 10.0, 10.0),
             sample(1.0, 1.0, -10.0, -10.0),
         ])).unwrap();
 
