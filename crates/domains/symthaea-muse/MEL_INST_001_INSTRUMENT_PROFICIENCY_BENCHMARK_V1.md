@@ -124,9 +124,29 @@ Report listener counts, uncertainty, per-class confusion, source/baseline and fa
 - Treat missing roots as unavailable evidence, not empty-but-supported coverage.
 
 ### P2 — Per-instrument render receipts and probe grid
-- Extend the inventory or add a focused renderer-probe executable to emit pitch/velocity/duration cells and finite signal metrics.
-- Include renderer/source digests, precise missing-cell reasons and deterministic output receipts.
-- Avoid heavyweight asset downloads by default.
+- First increment now exists as `src/bin/muse_instrument_probe.rs` and is auto-discovered by Cargo as `muse_instrument_probe`.
+- It probes all 46 registered instrument variants on a common 3-pitch × 3-velocity grid (220/440/880 Hz; velocities 0.2/0.5/0.9), with two exact rerenders by default.
+- Per-case JSON reports peak, RMS, DC mean, non-finite count, near-silence classification, clipped sample count, SHA-256 of the actual rendered float samples, and whether repeated hashes match.
+- The common pitch grid is a **signal-health smoke grid, not a valid range claim for every instrument**. Use a future source-derived capability-range manifest to choose each instrument's real test register.
+- The current legacy `render_arrangement` API does not expose the selected per-note source/render path, so the report explicitly says `not_exposed_by_legacy_render_api`. A non-silent result cannot count as source-selection or acoustic-fidelity evidence.
+- The tool makes no network calls and performs no heavyweight asset download by default.
+
+Example commands:
+
+```sh
+# Fast probe of one instrument (nine pitch/velocity cases, two render repetitions each).
+cargo run -p symthaea-muse --bin muse_instrument_probe -- --instrument recorder
+
+# Full registered-variant grid; redirect the machine-readable report.
+cargo run -p symthaea-muse --bin muse_instrument_probe -- --instrument all > mel-instrument-probe.json
+
+# Keep runtime lower while inspecting signal health.
+cargo run -p symthaea-muse --bin muse_instrument_probe -- --instrument harmonica --repeats 1
+```
+
+Use `cargo test -p symthaea-muse --bin muse_instrument_probe` for the CLI's roster, bounds and signal-metric unit tests. These tests and commands are authored/documented but are not marked as executed by this change.
+
+The next increment should add explicit per-note render-path receipts; only after that should the probe count source-backed notes separately from procedural fallback notes. Pitch-tracking and instrument-specific range/gesture checks belong on top of that honest path record, not in a pooled “instrument score.”
 
 ### P3 — First-class gesture events
 - Add versioned typed events for a small subset of distinctive gestures and prove target sensitivity plus non-target invariance.
@@ -144,5 +164,11 @@ Prioritize the next instrument based on a weighted combination of listener deman
 ## 6. Evidence boundary for this increment
 
 This plan is designed to let source work and local evaluation proceed without waiting for unrelated style PRs, while preserving honest qualification. The four procedural profiles and regression code can be inspected statically; compile, formatting, unit-test, local-asset decode, instrument-grid render, and blind-listening outcomes require execution. A queued or skipped runner never passes a gate.
+
+## 7. Research anchors for evaluation design
+
+- [MIREX 2026 Music Evaluation via CMI-RewardBench](https://www.music-ir.org/mirex/wiki/2026%3AMusic_Evaluation_via_CMI-RewardBench) uses pairwise comparisons and evaluates automatic metrics against human preference; the lesson for Melothaea is to publish signal measurements and human ratings as separate evidence channels.
+- [MIREX 2026 Symbolic Music Generation](https://www.music-ir.org/mirex/wiki/2026%3ASymbolic_Music_Generation) evaluates blind listener judgements along separate dimensions such as prompt coherence, creativity, structuredness, and musicality. These can guide later music-level studies, but they do not replace isolated instrument tests.
+- [ITU-R BS.1770-5](https://www.itu.int/rec/R-REC-BS.1770-5-202311-I) is the in-force recommendation for programme loudness and true-peak measurement. The initial probe only measures raw sample peak/RMS/DC and therefore must not label these as LUFS or true-peak compliance.
 
 **Definition of progress:** fewer unsupported musical requests, more reliably playable pitches/gestures, less undocumented fallback, and stronger audible distinction—not simply a larger instrument count. Style diversity expansion should resume after the instrument inventory, render grid, and first instrument-specific listening pack identify concrete gaps.
