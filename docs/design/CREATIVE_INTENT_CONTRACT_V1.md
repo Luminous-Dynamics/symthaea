@@ -1,0 +1,82 @@
+# Creative Intent Contracts v1
+
+Status: additive engineering prototype; no claim that the contract is connected to production selection or feedback.
+
+## Why this tranche exists
+
+The creative-quality audit in CREATIVE_METRIC_VALIDITY_AUDIT_2026-07-31.md records a concrete failure: the current melodic-coherence proxy prefers a one-pitch drone over a more varied generated composition, while the current form proxy can reward a concentration of notes followed by silence. These are not repaired by adding more arbitrary weights.
+
+The underlying problem is category error. A repeated-pitch drone may be exactly right for an ambient brief and a failure for a melody brief. A single scalar with no declared intent cannot tell those cases apart.
+
+## Paradigm shift: intent contract first, measured features second, taste evaluation separately
+
+The first vertical slice adds CreativeIntentContractV1 in symthaea-muse. A caller explicitly declares mechanical constraints; the evaluator reports observations and contract violations. It does not infer that the candidate is beautiful, emotionally successful, original, culturally grounded, or fun.
+
+The contract initially measures:
+- valid note count;
+- distinct rounded MIDI pitches;
+- pitch range in semitones;
+- onset coverage across equal-duration windows;
+- share of notes occupying the dominant pitch.
+
+Malformed contracts, durations, and notes fail closed. Invalid notes are reported by index and cannot be silently discarded to make a candidate pass. The module deliberately leaves the legacy CreativeQualityScore and live reward loop unchanged until the new seam has been calibrated and integrated in a separately reviewed change.
+
+## How this generalizes to games and cross-modal creative work
+
+A future shared project contract should declare, by modality:
+- intention and audience;
+- immutable requirements and editable degrees of freedom;
+- machine-verifiable constraints;
+- observed feature vector, with no universal aesthetic scalar;
+- provenance, seed, build and generator identity;
+- human review questions and failure cases.
+
+For a game, hard constraints might cover launchability, reachability of an ending, controller/input coverage, save/replay integrity, and content restrictions. Separate feature descriptors could capture navigation density, risk/reward profile, mechanics, pacing, visual palette, and sound dynamics. A candidate can be mechanically admissible but artistically weak; those outcomes must not be collapsed into one label.
+
+For music, candidate search should retain a set of outputs along different useful axes instead of repeatedly selecting the current scalar maximum. An ambient drone, a lyrical melody, a percussion-led groove, and an experimental piece should be judged against their respective briefs. The system should preserve surprising but admissible candidates rather than allowing the current taste model to erase all alternatives.
+
+## Benchmark programme
+
+All numbers below are proposed gates, not achieved results.
+
+### Gate A — contract correctness
+- 100% of seeded invalid-contract and invalid-note cases are rejected.
+- 100% of seeded task-constraint violations are detected by the independent test oracle.
+- Identical input and contract produce identical reports.
+- No malformed candidate is accepted because its invalid fields were dropped before scoring.
+
+### Gate B — generator usefulness
+Compare, on matched briefs and held-out seeds:
+1. current generator without candidate filtering;
+2. random candidates filtered only by the contract;
+3. generator plus contract;
+4. a quality-diversity search that maintains alternatives across declared feature dimensions.
+
+Report acceptance rate, runtime, memory, contract-specific feature coverage, pairwise novelty, and every rejection reason. Do not compare best-of-N selection with one-shot generation without reporting candidate budget and both results.
+
+### Gate C — human evaluation
+- Blind, randomized pairwise ratings on held-out briefs and evaluators.
+- Target: more than 60% preference over the strongest matched baseline, with the 95% confidence interval's lower bound above 50%, replicated on a separate set of briefs before any superiority claim.
+- Independently rate intent adherence, coherence, novelty, diversity, playability/listenability, and overall preference. Preserve disagreements; do not merge all dimensions into one score.
+- Report within-system and across-system diversity. A system can make each individual user's output more pleasing while narrowing collective diversity.
+
+### Gate D — cross-modal integration
+For a playable prototype, require:
+- all critical interaction paths pass deterministic smoke tests;
+- sound, visuals, mechanics, and narration remain bound to one versioned project intent;
+- at least 90% of blinded reviewers can identify the declared high-level intent from the assembled experience;
+- revision improves a preregistered human-rated dimension without worsening hard validity or collapsing diversity;
+- every claim is tied to the exact source/build and evaluation corpus.
+
+The 90% intent-recognition target is an engineering aspiration, not a literature standard. Calibrate the task and reviewer protocol before confirmatory trials.
+
+## Research basis
+
+- Khalifa et al., The Procedural Content Generation Benchmark: An Open-source Testbed for Generative Challenges in Games (FDG 2025). It explicitly separates quality, diversity and controllability over 12 game-content problems: https://arxiv.org/abs/2503.21474
+- Ding et al., Quality Diversity through Human Feedback (ICML 2024). It explores inferring diversity dimensions from human similarity judgments instead of relying only on hand-authored descriptors: https://proceedings.mlr.press/v235/ding24h.html
+- Bradley et al., Quality-Diversity through AI Feedback (ICLR 2024). It studies combining AI-based critique with diversity-driven search for qualitative generation tasks: https://proceedings.iclr.cc/paper_files/paper/2024/hash/5b9bef4eae0f574cedbf9f4bf29d8ae7-Abstract-Conference.html
+- Doshi & Hauser, Generative AI enhances individual creativity but reduces the collective diversity of novel content (Science Advances, 2024): https://doi.org/10.1126/sciadv.adn5290
+
+## Non-claims and follow-up
+
+This prototype is not a creativity test, aesthetic critic, consciousness measurement, music-theory validator, player-experience test, or proof that an output is good. It is a fail-closed mechanical contract boundary. Before production integration, separately audit and repair the known legacy score defects, add human-calibrated criteria, and run the benchmark matrix above against declared baselines.
