@@ -801,12 +801,22 @@ fn neighbor_cells(grid: &Grid, cell: usize) -> [(Option<usize>, u8); 4] {
     ]
 }
 
+fn anchor_axis(anchor: &RoutingAnchor) -> u8 {
+    match anchor.side {
+        Some(AnchorSide::East | AnchorSide::West) => 1,
+        Some(AnchorSide::North | AnchorSide::South) => 2,
+        None => 0,
+    }
+}
+
 fn search_grid(
     grid: &Grid,
     start: usize,
     goal: usize,
     request: &ServiceRouteRequest,
     max_expanded: usize,
+    initial_direction: u8,
+    terminal_direction: u8,
 ) -> PathOutcome {
     if grid.blocked[start] || grid.blocked[goal] {
         return PathOutcome { disposition: RouteDisposition::EndpointBlocked, cells: Vec::new(), length_mm: None, bend_count: None, search_cost_mm: None, expanded_states: 0 };
@@ -814,26 +824,42 @@ fn search_grid(
     if start == goal {
         return PathOutcome { disposition: RouteDisposition::Routed, cells: vec![start], length_mm: Some(0), bend_count: Some(0), search_cost_mm: Some(0), expanded_states: 0 };
     }
-    // direction 0 = none, 1 = horizontal, 2 = vertical
+    // direction 0 = none, 1 = horizontal, 2 = vertical. The source approach
+    // direction seeds A*; the sink approach bend is included in terminal cost.
     let state_count = grid.blocked.len().saturating_mul(3);
     let mut distances = vec![i64::MAX; state_count];
     let mut bends = vec![usize::MAX; state_count];
     let mut parents = vec![usize::MAX; state_count];
-    let start_state = start * 3;
+    let start_state = start * 3 + usize::from(initial_direction);
     distances[start_state] = 0;
     bends[start_state] = 0;
     let mut heap: BinaryHeap<Reverse<(i64, i64, usize)>> = BinaryHeap::new();
     heap.push(Reverse((manhattan_mm(grid, start, goal), 0, start_state)));
     let mut expanded = 0usize;
-    let mut finish = None;
+    let mut finish: Option<usize> = None;
+    let mut finish_cost = i64::MAX;
 
-    while let Some(Reverse((_f, cost, state))) = heap.pop() {
+    while let Some(Reverse((f, cost, state))) = heap.peek().copied() {
+        // Manhattan distance is admissible because bend penalties are non-negative.
+        if finish.is_some() && f > finish_cost { break; }
+        let _ = heap.pop();
         if cost != distances[state] { continue; }
         let cell = state / 3;
         let direction = (state % 3) as u8;
         if cell == goal {
-            finish = Some(state);
-            break;
+            let terminal_bend = terminal_direction != 0
+                && direction != 0
+                && direction != terminal_direction;
+            let terminal_cost = cost.saturating_add(
+                if terminal_bend { request.bend_penalty_mm } else { 0 }
+            );
+            if terminal_cost < finish_cost
+                || (terminal_cost == finish_cost && finish.is_none_or(|prior| state < prior))
+            {
+                finish = Some(state);
+                finish_cost = terminal_cost;
+            }
+            continue;
         }
         if expanded >= max_expanded {
             return PathOutcome { disposition: RouteDisposition::SearchBudgetExceeded, cells: Vec::new(), length_mm: None, bend_count: None, search_cost_mm: None, expanded_states: expanded };
@@ -862,8 +888,10 @@ fn search_grid(
     let Some(mut state) = finish else {
         return PathOutcome { disposition: RouteDisposition::NoPath, cells: Vec::new(), length_mm: None, bend_count: None, search_cost_mm: None, expanded_states: expanded };
     };
-    let final_cost = distances[state];
-    let final_bends = bends[state];
+    let terminal_bend = terminal_direction != 0
+        && state % 3 != 0
+        && (state % 3) as u8 != terminal_direction;
+    let final_bends = bends[state].saturating_add(usize::from(terminal_bend));
     let mut cells = Vec::new();
     loop {
         cells.push(state / 3);
@@ -876,7 +904,7 @@ fn search_grid(
     cells.reverse();
     let length = u64::try_from(cells.len().saturating_sub(1))
         .ok().and_then(|steps| steps.checked_mul(u64::try_from(grid.pitch_mm).ok()?));
-    let cost = u64::try_from(final_cost).ok();
+    let cost = u64::try_from(finish_cost).ok();
     PathOutcome {
         disposition: RouteDisposition::Routed,
         cells,
@@ -905,7 +933,7 @@ pub fn route_services(
         let mut path_outcome = if endpoint_blocked {
             PathOutcome { disposition: RouteDisposition::EndpointBlocked, cells: Vec::new(), length_mm: None, bend_count: None, search_cost_mm: None, expanded_states: 0 }
         } else {
-            search_grid(&grid, start_escape, end_escape, request, limits.max_expanded_states)
+            search_grid(&grid, start_escape, end_escape, request, limits.max_expanded_states, anchor_axis(&request.start), anchor_axis(&request.end))
         };
         let mut complete_cells = Vec::new();
         if path_outcome.disposition == RouteDisposition::Routed {
