@@ -15,6 +15,7 @@
 
 use std::collections::HashSet;
 
+pub mod design_space;
 pub mod scenario_sweep;
 
 const SECONDS_PER_HOUR: f64 = 3_600.0;
