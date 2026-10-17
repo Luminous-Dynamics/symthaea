@@ -648,6 +648,31 @@ mod tests {
     }
 
     #[test]
+    fn arrangement_from_symbolic_work_does_not_require_master_recording() {
+        let req = request(
+            RepertoireActionV1::CreateArrangement,
+            RepertoireSourceV1::UserAuthoredSymbolicWork,
+            RepertoireProcessingModeV1::LicensedService,
+        );
+        let grants = [
+            grant(
+                RightsLayerV1::Composition,
+                RightsEvidenceStatusV1::VerifiedGrant,
+                RepertoireActionV1::CreateArrangement,
+            ),
+            grant(
+                RightsLayerV1::Arrangement,
+                RightsEvidenceStatusV1::VerifiedGrant,
+                RepertoireActionV1::CreateArrangement,
+            ),
+        ];
+        assert_eq!(
+            evaluate_repertoire_use_v1(&req, &grants),
+            RepertoireGateOutcomeV1::AllowedByRecordedGrant
+        );
+    }
+
+    #[test]
     fn public_performance_is_separate_from_cover_recording_rights() {
         let req = request(
             RepertoireActionV1::PerformCoverPublicly,
