@@ -434,7 +434,7 @@ mod tests {
     fn unsafe_artifact_paths_are_rejected() {
         let mut manifest = started_manifest(b"test bytes");
         manifest["captures"][0]["artifact"]["path"] = json!("../escape.wav");
-        assert!(validate_manifest(&manifest).expect_err("parent traversal must fail").contains("repository-relative"));
+        assert!(validate_manifest(&manifest).expect_err("parent traversal must fail").contains("unsafe path component"));
     }
 
     #[test]
