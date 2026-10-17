@@ -1314,6 +1314,7 @@ mod tests {
     fn dag_catalogue_contains_all_twenty_five_three_node_dags() {
         let graphs = all_dags();
         assert_eq!(graphs.len(), 25);
+        assert_eq!(build_markov_class_catalog(&graphs).members.len(), 14);
         assert!(graphs.iter().all(|graph| is_acyclic(graph.edge_mask)));
         assert_eq!(
             graphs.iter().map(|graph| graph.edge_mask).collect::<std::collections::BTreeSet<_>>().len(),
@@ -1474,7 +1475,7 @@ mod tests {
         assert_eq!(a.world_count, 28);
         assert_eq!(a.held_out_world_count, 20);
         assert_eq!(a.candidate_dag_count, 25);
-        assert_eq!(a.markov_equivalence_class_count, build_markov_class_catalog(&all_dags()).members.len());
+        assert_eq!(a.markov_equivalence_class_count, 14);
         assert_eq!(a.worlds.len(), 28 * ScmGraphPolicy::all().len());
         assert_eq!(a.held_out_policy_aggregates.len(), ScmGraphPolicy::all().len());
     }
@@ -1493,6 +1494,8 @@ mod tests {
             assert!((0.0..=3.0).contains(&row.mean_structural_hamming_distance));
             assert!((0.0..=1.0).contains(&row.graph_claim_coverage));
             assert!((0.0..=1.0).contains(&row.false_graph_claim_rate_all_trials));
+            assert!((0.0..=1.0).contains(&row.cpdag_claim_coverage));
+            assert!((0.0..=1.0).contains(&row.false_cpdag_claim_rate_all_trials));
             if row.family == ScmGraphFamily::NullGraphNegativeControl {
                 assert!(row.mean_structural_hamming_distance >= 0.0);
             }
@@ -1504,6 +1507,8 @@ mod tests {
             assert!((0.0..=1.0).contains(&aggregate.mean_held_out_compelled_direction_f1));
             assert!((0.0..=3.0).contains(&aggregate.mean_held_out_cpdag_mark_distance));
             assert!((0.0..=1.0).contains(&aggregate.held_out_markov_equivalence_class_recovery_rate));
+            assert!((0.0..=1.0).contains(&aggregate.mean_held_out_cpdag_claim_coverage));
+            assert!((0.0..=1.0).contains(&aggregate.mean_held_out_false_cpdag_claim_rate_all_trials));
             assert!((0.0..=3.0).contains(&aggregate.mean_held_out_shd));
             assert!((0.0..=1.0).contains(&aggregate.mean_held_out_claim_coverage));
         }
