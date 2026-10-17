@@ -403,7 +403,8 @@ mod tests {
     #[test]
     fn duplicate_case_ids_are_rejected() {
         let mut value = registry();
-        value["candidates"][1]["case_id"] = value["candidates"][0]["case_id"].clone();
+        let duplicate_id = value["candidates"][0]["case_id"].clone();
+        value["candidates"][1]["case_id"] = duplicate_id;
         assert!(validate_registry(&value).iter().any(|error| error.contains("duplicate candidate case_id")));
     }
 
