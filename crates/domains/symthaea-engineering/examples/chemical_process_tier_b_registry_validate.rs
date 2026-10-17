@@ -79,6 +79,74 @@ fn source_has_url(source: &Value) -> bool {
     })
 }
 
+fn validate_receipt_shape(
+    receipt: &Value,
+    raw_output_hash: &Value,
+    errors: &mut Vec<String>,
+    id: &str,
+) {
+    let artifacts = receipt["native_input_files_and_transitive_data_hashes"]
+        .as_array();
+    match artifacts {
+        Some(artifacts) if !artifacts.is_empty() => {
+            for (index, artifact) in artifacts.iter().enumerate() {
+                if !nonempty_text(artifact, "artifact") {
+                    errors.push(format!("{id}: input artifact {index} needs an artifact identifier"));
+                }
+                if !is_sha256(&artifact["sha256"]) {
+                    errors.push(format!("{id}: input artifact {index} needs a SHA-256 digest"));
+                }
+            }
+        }
+        _ => errors.push(format!("{id}: input artifacts must be a nonempty digest-bearing array")),
+    }
+
+    let streams = &receipt["stdout_stderr_and_raw_output_hashes"];
+    for field in ["stdout_sha256", "stderr_sha256", "raw_output_sha256"] {
+        if !is_sha256(&streams[field]) {
+            errors.push(format!("{id}: stdout/stderr receipt is missing valid {field}"));
+        }
+    }
+    if streams["raw_output_sha256"] != *raw_output_hash {
+        errors.push(format!("{id}: receipt raw-output digest disagrees with execution.raw_output_hash"));
+    }
+
+    let checker = &receipt["independent_checker_version_and_result"];
+    if !nonempty_text(checker, "checker_version") || text(checker, "result") != Some("PASS") {
+        errors.push(format!("{id}: freeze receipt requires a versioned independent checker with result=PASS"));
+    }
+
+    let dependency_audit = &receipt["shared_dependency_audit"];
+    if dependency_audit["complete"].as_bool() != Some(true)
+        || dependency_audit["independence_assessed"].as_bool() != Some(true)
+        || !dependency_audit["dependency_digests"].is_array()
+        || !dependency_audit["shared_dependency_digests"].is_array()
+    {
+        errors.push(format!("{id}: shared-dependency audit must be complete, assessed, and enumerate both dependency sets"));
+    }
+
+    let tolerance = &receipt["preregistered_case_specific_tolerance_and_rationale"];
+    let metrics = tolerance["metrics"].as_array();
+    if tolerance["frozen_before_candidate_evaluation"].as_bool() != Some(true)
+        || !nonempty_text(tolerance, "rationale")
+        || !metrics.is_some_and(|items| {
+            !items.is_empty()
+                && items.iter().all(|item| {
+                    nonempty_text(item, "metric") && nonempty_text(item, "acceptance_rule")
+                })
+        })
+    {
+        errors.push(format!("{id}: tolerances must be case-specific, justified, and frozen before candidate evaluation"));
+    }
+
+    if !nonempty_text(&receipt["claim_ceiling"], "text") {
+        // Accept a nonempty string claim ceiling as the most portable JSON form.
+        if !receipt["claim_ceiling"].as_str().is_some_and(|value| !value.trim().is_empty()) {
+            errors.push(format!("{id}: claim_ceiling must be an explicit nonempty string"));
+        }
+    }
+}
+
 fn validate_frozen_receipt(candidate: &Value, errors: &mut Vec<String>, id: &str) {
     let execution = &candidate["execution"];
     let outputs = &candidate["reference_outputs"];
@@ -119,6 +187,7 @@ fn validate_frozen_receipt(candidate: &Value, errors: &mut Vec<String>, id: &str
                     errors.push(format!("{id}: freeze_receipt is missing {field}"));
                 }
             }
+            validate_receipt_shape(receipt, &execution["raw_output_hash"], errors, id);
         }
         if candidate["freeze_blockers"]
             .as_array()
@@ -133,7 +202,7 @@ fn validate_frozen_receipt(candidate: &Value, errors: &mut Vec<String>, id: &str
         if text(outputs, "state") == Some("FROZEN") {
             errors.push(format!("{id}: reference_outputs.state=FROZEN requires exact outputs to be frozen"));
         }
-        if outputs["output_digest"].as_str().is_some_and(|digest| !digest.is_empty()) {
+        if has_content(&outputs["output_digest"]) {
             errors.push(format!("{id}: non-frozen outputs may not declare an output_digest"));
         }
         if status == "PASS" {
