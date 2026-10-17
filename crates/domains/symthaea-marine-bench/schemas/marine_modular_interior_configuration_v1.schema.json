@@ -1,0 +1,1171 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "urn:luminous-dynamics:symthaea:marine-modular-interior-configuration:v1",
+  "title": "Symthaea Marine Modular Interior Configuration v1",
+  "description": "Evidence-carrying modular interior layout. Schema validation does not validate geometry, service routing, naval stability, structural adequacy, accessibility, or regulatory compliance.",
+  "type": "object",
+  "additionalProperties": false,
+  "required": [
+    "schema_version",
+    "configuration_id",
+    "configuration_name",
+    "customization_intent",
+    "platform",
+    "coordinate_frame",
+    "module_catalog",
+    "placements",
+    "platform_services",
+    "connections",
+    "reserved_regions",
+    "safety_gates",
+    "assumptions",
+    "provenance",
+    "claim_ceiling"
+  ],
+  "properties": {
+    "schema_version": {
+      "const": "1.0.0"
+    },
+    "configuration_id": {
+      "type": "string",
+      "pattern": "^[A-Z0-9][A-Z0-9._-]{2,63}$"
+    },
+    "configuration_name": {
+      "type": "string",
+      "minLength": 1
+    },
+    "customization_intent": {
+      "type": "string",
+      "minLength": 1
+    },
+    "platform": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "vessel_concept_ref",
+        "vessel_revision",
+        "archetype",
+        "interior_bounds_mm",
+        "deck_bounds"
+      ],
+      "properties": {
+        "vessel_concept_ref": {
+          "type": "string",
+          "minLength": 1
+        },
+        "vessel_revision": {
+          "type": "string",
+          "minLength": 1
+        },
+        "archetype": {
+          "enum": [
+            "sailing_catamaran",
+            "motor_yacht",
+            "expedition_yacht",
+            "coastal_cruise",
+            "ocean_cruise",
+            "other"
+          ]
+        },
+        "interior_bounds_mm": {
+          "type": "object",
+          "additionalProperties": false,
+          "required": [
+            "length_mm",
+            "width_mm",
+            "height_mm"
+          ],
+          "properties": {
+            "length_mm": {
+              "type": "integer",
+              "minimum": 1
+            },
+            "width_mm": {
+              "type": "integer",
+              "minimum": 1
+            },
+            "height_mm": {
+              "type": "integer",
+              "minimum": 1
+            }
+          }
+        },
+        "deck_bounds": {
+          "type": "array",
+          "minItems": 1,
+          "items": {
+            "$ref": "#/$defs/deck_bounds"
+          }
+        }
+      }
+    },
+    "coordinate_frame": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "unit",
+        "origin",
+        "x_axis",
+        "y_axis",
+        "z_axis"
+      ],
+      "properties": {
+        "unit": {
+          "const": "mm"
+        },
+        "origin": {
+          "enum": [
+            "port_aft_floor",
+            "declared_custom_origin"
+          ]
+        },
+        "x_axis": {
+          "const": "forward"
+        },
+        "y_axis": {
+          "const": "starboard"
+        },
+        "z_axis": {
+          "const": "up"
+        }
+      }
+    },
+    "module_catalog": {
+      "type": "array",
+      "minItems": 1,
+      "items": {
+        "$ref": "#/$defs/module_definition"
+      }
+    },
+    "placements": {
+      "type": "array",
+      "minItems": 1,
+      "items": {
+        "$ref": "#/$defs/placement"
+      }
+    },
+    "platform_services": {
+      "type": "array",
+      "minItems": 1,
+      "items": {
+        "$ref": "#/$defs/platform_service"
+      }
+    },
+    "connections": {
+      "type": "array",
+      "items": {
+        "$ref": "#/$defs/connection"
+      }
+    },
+    "reserved_regions": {
+      "type": "array",
+      "items": {
+        "$ref": "#/$defs/reserved_region"
+      }
+    },
+    "safety_gates": {
+      "type": "array",
+      "minItems": 1,
+      "items": {
+        "$ref": "#/$defs/safety_gate"
+      }
+    },
+    "assumptions": {
+      "type": "array",
+      "minItems": 1,
+      "items": {
+        "$ref": "#/$defs/assumption"
+      }
+    },
+    "provenance": {
+      "type": "array",
+      "minItems": 1,
+      "items": {
+        "$ref": "#/$defs/provenance"
+      }
+    },
+    "claim_ceiling": {
+      "type": "string",
+      "minLength": 1
+    }
+  },
+  "$defs": {
+    "provenance": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "source_id",
+        "title",
+        "uri",
+        "scope",
+        "source_type"
+      ],
+      "properties": {
+        "source_id": {
+          "type": "string",
+          "minLength": 1
+        },
+        "title": {
+          "type": "string",
+          "minLength": 1
+        },
+        "uri": {
+          "type": "string",
+          "format": "uri"
+        },
+        "scope": {
+          "type": "string",
+          "minLength": 1
+        },
+        "source_type": {
+          "enum": [
+            "authored_synthetic",
+            "external_reference",
+            "vendor_specification",
+            "measured_test"
+          ]
+        }
+      }
+    },
+    "bounds_mm": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "x_min_mm",
+        "x_max_mm",
+        "y_min_mm",
+        "y_max_mm",
+        "z_min_mm",
+        "z_max_mm"
+      ],
+      "properties": {
+        "x_min_mm": {
+          "type": "integer"
+        },
+        "x_max_mm": {
+          "type": "integer"
+        },
+        "y_min_mm": {
+          "type": "integer"
+        },
+        "y_max_mm": {
+          "type": "integer"
+        },
+        "z_min_mm": {
+          "type": "integer"
+        },
+        "z_max_mm": {
+          "type": "integer"
+        }
+      }
+    },
+    "capacity": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "value",
+        "unit",
+        "status",
+        "source_ref",
+        "rationale"
+      ],
+      "properties": {
+        "value": {
+          "type": [
+            "number",
+            "null"
+          ]
+        },
+        "unit": {
+          "enum": [
+            "W",
+            "V",
+            "A",
+            "kW",
+            "L/min",
+            "m3/h",
+            "Pa",
+            "N",
+            "N.m",
+            "Mbit/s",
+            "kg/m2",
+            "kg",
+            "mm",
+            "count"
+          ]
+        },
+        "status": {
+          "enum": [
+            "unknown",
+            "design_assumption",
+            "computed",
+            "measured",
+            "source_verified"
+          ]
+        },
+        "source_ref": {
+          "type": [
+            "string",
+            "null"
+          ],
+          "minLength": 1
+        },
+        "rationale": {
+          "type": "string",
+          "minLength": 1
+        }
+      },
+      "allOf": [
+        {
+          "if": {
+            "properties": {
+              "status": {
+                "const": "unknown"
+              }
+            },
+            "required": [
+              "status"
+            ]
+          },
+          "then": {
+            "properties": {
+              "value": {
+                "type": "null"
+              }
+            }
+          }
+        }
+      ]
+    },
+    "deck_bounds": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "deck_id",
+        "bounds_mm",
+        "max_area_load_kg_m2",
+        "max_point_load_kg",
+        "source_ref"
+      ],
+      "properties": {
+        "deck_id": {
+          "type": "string",
+          "pattern": "^[A-Z0-9][A-Z0-9._-]{1,31}$"
+        },
+        "bounds_mm": {
+          "$ref": "#/$defs/bounds_mm"
+        },
+        "max_area_load_kg_m2": {
+          "$ref": "#/$defs/capacity"
+        },
+        "max_point_load_kg": {
+          "$ref": "#/$defs/capacity"
+        },
+        "source_ref": {
+          "type": [
+            "string",
+            "null"
+          ],
+          "minLength": 1
+        }
+      }
+    },
+    "mass_properties": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "status",
+        "mass_kg",
+        "local_cg_mm",
+        "source_ref",
+        "rationale"
+      ],
+      "properties": {
+        "status": {
+          "enum": [
+            "unknown",
+            "design_assumption",
+            "computed",
+            "measured",
+            "source_verified"
+          ]
+        },
+        "mass_kg": {
+          "type": [
+            "number",
+            "null"
+          ],
+          "minimum": 0
+        },
+        "local_cg_mm": {
+          "type": "object",
+          "additionalProperties": false,
+          "required": [
+            "x_mm",
+            "y_mm",
+            "z_mm"
+          ],
+          "properties": {
+            "x_mm": {
+              "type": [
+                "number",
+                "null"
+              ]
+            },
+            "y_mm": {
+              "type": [
+                "number",
+                "null"
+              ]
+            },
+            "z_mm": {
+              "type": [
+                "number",
+                "null"
+              ]
+            }
+          }
+        },
+        "source_ref": {
+          "type": [
+            "string",
+            "null"
+          ],
+          "minLength": 1
+        },
+        "rationale": {
+          "type": "string",
+          "minLength": 1
+        }
+      },
+      "allOf": [
+        {
+          "if": {
+            "properties": {
+              "status": {
+                "const": "unknown"
+              }
+            },
+            "required": [
+              "status"
+            ]
+          },
+          "then": {
+            "properties": {
+              "mass_kg": {
+                "type": "null"
+              },
+              "local_cg_mm": {
+                "properties": {
+                  "x_mm": {
+                    "type": "null"
+                  },
+                  "y_mm": {
+                    "type": "null"
+                  },
+                  "z_mm": {
+                    "type": "null"
+                  }
+                }
+              }
+            }
+          }
+        }
+      ]
+    },
+    "port": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "port_id",
+        "medium",
+        "direction",
+        "rating",
+        "connector_profile",
+        "criticality"
+      ],
+      "properties": {
+        "port_id": {
+          "type": "string",
+          "pattern": "^[A-Z0-9][A-Z0-9._-]{1,31}$"
+        },
+        "medium": {
+          "enum": [
+            "electrical_power",
+            "fresh_water",
+            "greywater",
+            "blackwater",
+            "hvac_supply",
+            "hvac_return",
+            "exhaust_air",
+            "data_network",
+            "structural_mount",
+            "fire_detection",
+            "sprinkler",
+            "drain",
+            "waste",
+            "marine_cooling"
+          ]
+        },
+        "direction": {
+          "enum": [
+            "in",
+            "out",
+            "bidirectional"
+          ]
+        },
+        "rating": {
+          "$ref": "#/$defs/capacity"
+        },
+        "connector_profile": {
+          "type": "string",
+          "minLength": 1
+        },
+        "criticality": {
+          "enum": [
+            "noncritical",
+            "important",
+            "safety_critical"
+          ]
+        }
+      }
+    },
+    "module_definition": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "module_id",
+        "revision",
+        "name",
+        "function",
+        "envelope_mm",
+        "mass_properties",
+        "ports",
+        "service_clearance_mm",
+        "minimum_accessibility",
+        "fire_material_status",
+        "mounting_status",
+        "electrical_status",
+        "sanitary_status",
+        "provenance"
+      ],
+      "properties": {
+        "module_id": {
+          "type": "string",
+          "pattern": "^[A-Z0-9][A-Z0-9._-]{2,63}$"
+        },
+        "revision": {
+          "type": "integer",
+          "minimum": 1
+        },
+        "name": {
+          "type": "string",
+          "minLength": 1
+        },
+        "function": {
+          "enum": [
+            "sleeping",
+            "bathroom",
+            "galley",
+            "lounge",
+            "convertible_workspace",
+            "medical",
+            "laboratory",
+            "workshop",
+            "storage",
+            "crew",
+            "utility",
+            "circulation",
+            "accessibility",
+            "laundry",
+            "dining",
+            "recreation",
+            "control",
+            "other"
+          ]
+        },
+        "envelope_mm": {
+          "type": "object",
+          "additionalProperties": false,
+          "required": [
+            "length_mm",
+            "width_mm",
+            "height_mm"
+          ],
+          "properties": {
+            "length_mm": {
+              "type": "integer",
+              "minimum": 1
+            },
+            "width_mm": {
+              "type": "integer",
+              "minimum": 1
+            },
+            "height_mm": {
+              "type": "integer",
+              "minimum": 1
+            }
+          }
+        },
+        "mass_properties": {
+          "$ref": "#/$defs/mass_properties"
+        },
+        "ports": {
+          "type": "array",
+          "minItems": 1,
+          "items": {
+            "$ref": "#/$defs/port"
+          }
+        },
+        "service_clearance_mm": {
+          "type": "object",
+          "additionalProperties": false,
+          "required": [
+            "forward",
+            "aft",
+            "port",
+            "starboard",
+            "above"
+          ],
+          "properties": {
+            "forward": {
+              "type": "integer",
+              "minimum": 0
+            },
+            "aft": {
+              "type": "integer",
+              "minimum": 0
+            },
+            "port": {
+              "type": "integer",
+              "minimum": 0
+            },
+            "starboard": {
+              "type": "integer",
+              "minimum": 0
+            },
+            "above": {
+              "type": "integer",
+              "minimum": 0
+            }
+          }
+        },
+        "minimum_accessibility": {
+          "enum": [
+            "none",
+            "step_free_path",
+            "wheelchair_turning_space",
+            "assisted_transfer",
+            "crew_service_access"
+          ]
+        },
+        "fire_material_status": {
+          "enum": [
+            "unknown",
+            "design_assumption",
+            "evidence_available",
+            "authority_reviewed",
+            "not_applicable"
+          ]
+        },
+        "mounting_status": {
+          "enum": [
+            "unknown",
+            "design_assumption",
+            "evidence_available",
+            "authority_reviewed",
+            "not_applicable"
+          ]
+        },
+        "electrical_status": {
+          "enum": [
+            "unknown",
+            "design_assumption",
+            "evidence_available",
+            "authority_reviewed",
+            "not_applicable"
+          ]
+        },
+        "sanitary_status": {
+          "enum": [
+            "unknown",
+            "design_assumption",
+            "evidence_available",
+            "authority_reviewed",
+            "not_applicable"
+          ]
+        },
+        "provenance": {
+          "type": "array",
+          "minItems": 1,
+          "items": {
+            "$ref": "#/$defs/provenance"
+          }
+        }
+      }
+    },
+    "placement": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "instance_id",
+        "module_id",
+        "module_revision",
+        "deck_id",
+        "position_mm",
+        "rotation_z_deg",
+        "status"
+      ],
+      "properties": {
+        "instance_id": {
+          "type": "string",
+          "pattern": "^[A-Z0-9][A-Z0-9._-]{2,63}$"
+        },
+        "module_id": {
+          "type": "string",
+          "pattern": "^[A-Z0-9][A-Z0-9._-]{2,63}$"
+        },
+        "module_revision": {
+          "type": "integer",
+          "minimum": 1
+        },
+        "deck_id": {
+          "type": "string",
+          "pattern": "^[A-Z0-9][A-Z0-9._-]{1,31}$"
+        },
+        "position_mm": {
+          "type": "object",
+          "additionalProperties": false,
+          "required": [
+            "x_mm",
+            "y_mm",
+            "z_mm"
+          ],
+          "properties": {
+            "x_mm": {
+              "type": "integer"
+            },
+            "y_mm": {
+              "type": "integer"
+            },
+            "z_mm": {
+              "type": "integer"
+            }
+          }
+        },
+        "rotation_z_deg": {
+          "enum": [
+            0,
+            90,
+            180,
+            270
+          ]
+        },
+        "status": {
+          "enum": [
+            "proposed",
+            "layout_checked",
+            "engineering_reviewed",
+            "approved_for_build",
+            "installed"
+          ]
+        }
+      }
+    },
+    "platform_service": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "service_id",
+        "medium",
+        "direction",
+        "capacity",
+        "connector_profile"
+      ],
+      "properties": {
+        "service_id": {
+          "type": "string",
+          "pattern": "^[A-Z0-9][A-Z0-9._-]{1,31}$"
+        },
+        "medium": {
+          "enum": [
+            "electrical_power",
+            "fresh_water",
+            "greywater",
+            "blackwater",
+            "hvac_supply",
+            "hvac_return",
+            "exhaust_air",
+            "data_network",
+            "structural_mount",
+            "fire_detection",
+            "sprinkler",
+            "drain",
+            "waste",
+            "marine_cooling"
+          ]
+        },
+        "direction": {
+          "enum": [
+            "source",
+            "sink",
+            "bidirectional"
+          ]
+        },
+        "capacity": {
+          "$ref": "#/$defs/capacity"
+        },
+        "connector_profile": {
+          "type": "string",
+          "minLength": 1
+        }
+      }
+    },
+    "endpoint": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "kind",
+        "instance_id",
+        "port_id",
+        "service_id"
+      ],
+      "properties": {
+        "kind": {
+          "enum": [
+            "module_port",
+            "platform_service"
+          ]
+        },
+        "instance_id": {
+          "type": [
+            "string",
+            "null"
+          ],
+          "minLength": 1
+        },
+        "port_id": {
+          "type": [
+            "string",
+            "null"
+          ],
+          "minLength": 1
+        },
+        "service_id": {
+          "type": [
+            "string",
+            "null"
+          ],
+          "minLength": 1
+        }
+      },
+      "allOf": [
+        {
+          "if": {
+            "properties": {
+              "kind": {
+                "const": "module_port"
+              }
+            },
+            "required": [
+              "kind"
+            ]
+          },
+          "then": {
+            "properties": {
+              "instance_id": {
+                "type": "string",
+                "minLength": 1
+              },
+              "port_id": {
+                "type": "string",
+                "minLength": 1
+              },
+              "service_id": {
+                "type": "null"
+              }
+            }
+          }
+        },
+        {
+          "if": {
+            "properties": {
+              "kind": {
+                "const": "platform_service"
+              }
+            },
+            "required": [
+              "kind"
+            ]
+          },
+          "then": {
+            "properties": {
+              "instance_id": {
+                "type": "null"
+              },
+              "port_id": {
+                "type": "null"
+              },
+              "service_id": {
+                "type": "string",
+                "minLength": 1
+              }
+            }
+          }
+        }
+      ]
+    },
+    "connection": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "connection_id",
+        "medium",
+        "endpoint_a",
+        "endpoint_b",
+        "route_length_m",
+        "compatibility_status",
+        "evidence_refs"
+      ],
+      "properties": {
+        "connection_id": {
+          "type": "string",
+          "pattern": "^[A-Z0-9][A-Z0-9._-]{2,63}$"
+        },
+        "medium": {
+          "enum": [
+            "electrical_power",
+            "fresh_water",
+            "greywater",
+            "blackwater",
+            "hvac_supply",
+            "hvac_return",
+            "exhaust_air",
+            "data_network",
+            "structural_mount",
+            "fire_detection",
+            "sprinkler",
+            "drain",
+            "waste",
+            "marine_cooling"
+          ]
+        },
+        "endpoint_a": {
+          "$ref": "#/$defs/endpoint"
+        },
+        "endpoint_b": {
+          "$ref": "#/$defs/endpoint"
+        },
+        "route_length_m": {
+          "type": "object",
+          "additionalProperties": false,
+          "required": [
+            "value",
+            "status",
+            "source_ref",
+            "rationale"
+          ],
+          "properties": {
+            "value": {
+              "type": [
+                "number",
+                "null"
+              ],
+              "minimum": 0
+            },
+            "status": {
+              "enum": [
+                "unknown",
+                "design_assumption",
+                "computed",
+                "measured",
+                "source_verified"
+              ]
+            },
+            "source_ref": {
+              "type": [
+                "string",
+                "null"
+              ],
+              "minLength": 1
+            },
+            "rationale": {
+              "type": "string",
+              "minLength": 1
+            }
+          }
+        },
+        "compatibility_status": {
+          "enum": [
+            "declared_unverified",
+            "verified_compatible",
+            "verified_incompatible",
+            "indeterminate"
+          ]
+        },
+        "evidence_refs": {
+          "type": "array",
+          "items": {
+            "type": "string",
+            "minLength": 1
+          }
+        }
+      }
+    },
+    "reserved_region": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "region_id",
+        "deck_id",
+        "bounds_mm",
+        "purpose",
+        "clearance_rule",
+        "evidence_status"
+      ],
+      "properties": {
+        "region_id": {
+          "type": "string",
+          "pattern": "^[A-Z0-9][A-Z0-9._-]{2,63}$"
+        },
+        "deck_id": {
+          "type": "string",
+          "pattern": "^[A-Z0-9][A-Z0-9._-]{1,31}$"
+        },
+        "bounds_mm": {
+          "$ref": "#/$defs/bounds_mm"
+        },
+        "purpose": {
+          "enum": [
+            "egress_route",
+            "accessible_route",
+            "service_access",
+            "equipment_access",
+            "fire_boundary",
+            "watertight_boundary",
+            "structural_keepout",
+            "no_install_zone"
+          ]
+        },
+        "clearance_rule": {
+          "enum": [
+            "keep_clear",
+            "access_required",
+            "boundary_must_not_be_penetrated",
+            "requires_review"
+          ]
+        },
+        "evidence_status": {
+          "enum": [
+            "unknown",
+            "design_assumption",
+            "checked",
+            "authority_reviewed"
+          ]
+        }
+      }
+    },
+    "safety_gate": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "gate_id",
+        "category",
+        "disposition",
+        "evidence_refs",
+        "notes"
+      ],
+      "properties": {
+        "gate_id": {
+          "type": "string",
+          "pattern": "^[A-Z0-9][A-Z0-9._-]{2,63}$"
+        },
+        "category": {
+          "enum": [
+            "fire_safety",
+            "means_of_escape",
+            "accessibility",
+            "structural_attachments",
+            "stability_and_cg",
+            "electrical_protection",
+            "potable_water",
+            "wastewater",
+            "ventilation",
+            "emergency_equipment_access",
+            "maintainability",
+            "acoustics",
+            "noise",
+            "hazardous_materials"
+          ]
+        },
+        "disposition": {
+          "enum": [
+            "not_assessed",
+            "pass",
+            "fail",
+            "indeterminate",
+            "not_applicable"
+          ]
+        },
+        "evidence_refs": {
+          "type": "array",
+          "items": {
+            "type": "string",
+            "minLength": 1
+          }
+        },
+        "notes": {
+          "type": "string",
+          "minLength": 1
+        }
+      }
+    },
+    "assumption": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "assumption_id",
+        "category",
+        "statement",
+        "status",
+        "falsification_method"
+      ],
+      "properties": {
+        "assumption_id": {
+          "type": "string",
+          "pattern": "^[A-Z0-9][A-Z0-9._-]{2,63}$"
+        },
+        "category": {
+          "enum": [
+            "geometry",
+            "mass",
+            "services",
+            "accessibility",
+            "safety",
+            "mission",
+            "manufacturing",
+            "maintenance",
+            "cost",
+            "environmental"
+          ]
+        },
+        "statement": {
+          "type": "string",
+          "minLength": 1
+        },
+        "status": {
+          "enum": [
+            "untested",
+            "supported_by_source",
+            "measured",
+            "rejected"
+          ]
+        },
+        "falsification_method": {
+          "type": "string",
+          "minLength": 1
+        }
+      }
+    }
+  }
+}
