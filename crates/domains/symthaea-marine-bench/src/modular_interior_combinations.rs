@@ -491,6 +491,22 @@ mod tests {
     use crate::modular_interior_variants::ModuleVariant;
 
     const LIVE: &str = include_str!("../fixtures/modular-interiors/liveaboard-custom-layout-v1.json");
+    const ORACLE: &str = include_str!("../fixtures/modular-interiors/combination-search-oracle-v1.json");
+
+    #[derive(serde::Deserialize)]
+    struct SearchOracle {
+        cases: Vec<SearchOracleCase>,
+    }
+
+    #[derive(serde::Deserialize)]
+    struct SearchOracleCase {
+        case_id: String,
+        input_variant_ids: Vec<String>,
+        expected_candidate_count: usize,
+        expected_search_complete: bool,
+        expected_candidate_sets: Vec<Vec<String>>,
+        expected_pair_interaction_findings: Vec<String>,
+    }
 
     fn live() -> Configuration {
         serde_json::from_str(LIVE).expect("live fixture parses")
@@ -600,6 +616,51 @@ mod tests {
         assert!(!verify_combination_search_report(&baseline, &[a.clone()], &limits, &report));
         let invalid_limits = SearchLimits { max_input_variants: 129, max_candidates: 1, max_changed_modules: 1 };
         assert!(search_combinations(&baseline, &[a], invalid_limits).is_err());
+    }
+
+
+    #[test]
+    fn frozen_combination_oracle_matches_enumeration_and_interactions() {
+        let oracle: SearchOracle = serde_json::from_str(ORACLE).expect("oracle fixture parses");
+        for case in oracle.cases {
+            let baseline = live();
+            let variants = match case.case_id.as_str() {
+                "CARDINALITY-FIRST-TWO-TARGETS-001" => vec![
+                    variant(&baseline, "SLEEP-POD", "SLEEP-V2", 0.0),
+                    variant(&baseline, "MODULE-STORAGE", "STORAGE-V2", 0.0),
+                ],
+                "COMBINED-AC-SERVICE-OVERLOAD-002" => vec![
+                    variant(&baseline, "COMPACT-GALLEY", "GALLEY-HIGH-LOAD", 2_000.0),
+                    variant(&baseline, "FLEX-WORKSPACE", "WORKSPACE-HIGH-LOAD", 2_000.0),
+                ],
+                other => panic!("unknown frozen oracle case: {other}"),
+            };
+            let ids: Vec<String> = variants.iter().map(|item| item.variant_id.clone()).collect();
+            assert_eq!(ids.into_iter().collect::<BTreeSet<_>>(),
+                case.input_variant_ids.into_iter().collect::<BTreeSet<_>>());
+            let report = search_combinations(&baseline, &variants, default_limits()).unwrap();
+            assert_eq!(report.body.candidates.len(), case.expected_candidate_count, "{}", case.case_id);
+            assert_eq!(report.body.search_complete, case.expected_search_complete, "{}", case.case_id);
+
+            let mut observed_sets: Vec<Vec<String>> = report.body.candidates.iter()
+                .map(|candidate| {
+                    let mut ids = candidate.selected_variant_ids.clone();
+                    ids.sort();
+                    ids
+                }).collect();
+            let mut expected_sets = case.expected_candidate_sets.clone();
+            observed_sets.sort();
+            expected_sets.sort();
+            assert_eq!(observed_sets, expected_sets, "{}", case.case_id);
+
+            let observed_interactions: Vec<String> = report.body.candidates.iter()
+                .find(|candidate| candidate.selected_variant_ids.len() == 2)
+                .expect("oracle has a two-variant combination")
+                .interaction_findings.iter()
+                .map(|finding| format!("{}|{}", finding.code, finding.subject))
+                .collect();
+            assert_eq!(observed_interactions, case.expected_pair_interaction_findings, "{}", case.case_id);
+        }
     }
 
     #[test]
