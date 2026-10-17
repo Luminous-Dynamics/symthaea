@@ -380,7 +380,7 @@ mod tests {
         assert_eq!(map.interpolate(&query(0.0, 1_000.0)).unwrap().thrust_n, 100.0);
         assert_eq!(map.interpolate(&query(10.0, 2_000.0)).unwrap().thrust_n, 160.0);
         assert_eq!(map.interpolate(&query(5.0, 1_000.0)).unwrap().thrust_n, 90.0);
-        assert_eq!(map.interpolate(&query(10.0, 1_500.0)).unwrap().thrust_n, 130.0);
+        assert_eq!(map.interpolate(&query(10.0, 1_500.0)).unwrap().thrust_n, 120.0);
     }
 
     #[test]
