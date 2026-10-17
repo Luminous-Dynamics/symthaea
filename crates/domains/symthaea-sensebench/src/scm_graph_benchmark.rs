@@ -273,6 +273,32 @@ pub struct ScmGraphFactorizedShiftAggregate {
 }
 
 #[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
+pub struct ScmGraphPairedPolicyDelta {
+    pub policy: ScmGraphPolicy,
+    pub comparator: ScmGraphPolicy,
+    pub split: ScmGraphShiftSplit,
+    pub paired_world_rows: usize,
+    pub paired_topology_instances: usize,
+    /// Policy minus comparator; positive values mean better directed-edge F1.
+    pub delta_directed_edge_f1: f64,
+    pub delta_directed_edge_f1_topology_instance_ci95: [f64; 2],
+    /// Policy minus comparator; positive values mean better CPDAG skeleton F1.
+    pub delta_cpdag_skeleton_f1: f64,
+    pub delta_cpdag_skeleton_f1_topology_instance_ci95: [f64; 2],
+    /// Policy minus comparator; negative values mean fewer graph edits.
+    pub delta_structural_hamming_distance: f64,
+    pub delta_shd_topology_instance_ci95: [f64; 2],
+    /// Policy minus comparator; negative values mean fewer measurements/interventions.
+    pub delta_measurements_used: f64,
+    pub delta_measurements_topology_instance_ci95: [f64; 2],
+    pub delta_interventions_used: f64,
+    pub delta_interventions_topology_instance_ci95: [f64; 2],
+    /// Policy minus comparator; negative values mean fewer false graph claims.
+    pub delta_false_graph_claim_rate: f64,
+    pub delta_false_graph_claim_rate_topology_instance_ci95: [f64; 2],
+}
+
+#[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
 pub struct ScmGraphBenchmarkReport {
     pub schema_version: u16,
     pub generator_version: String,
@@ -293,6 +319,7 @@ pub struct ScmGraphBenchmarkReport {
     pub worlds: Vec<ScmGraphPolicySummary>,
     pub held_out_policy_aggregates: Vec<ScmGraphPolicyAggregate>,
     pub factorized_shift_aggregates: Vec<ScmGraphFactorizedShiftAggregate>,
+    pub paired_policy_deltas: Vec<ScmGraphPairedPolicyDelta>,
     pub interpretation_boundary: String,
 }
 
@@ -1337,6 +1364,103 @@ fn aggregate_factorized_shifts(
     aggregates
 }
 
+fn paired_topology_delta_means(
+    summaries: &[ScmGraphPolicySummary],
+    policy: ScmGraphPolicy,
+    comparator: ScmGraphPolicy,
+    split: ScmGraphShiftSplit,
+    metric: fn(&ScmGraphPolicySummary) -> f64,
+) -> (usize, Vec<f64>) {
+    let target_rows: Vec<&ScmGraphPolicySummary> = summaries.iter()
+        .filter(|row| row.policy == policy && split.includes(row))
+        .collect();
+    let mut topology_keys: Vec<(ScmGraphFamily, usize)> = Vec::new();
+    for row in &target_rows {
+        let key = (row.family, row.graph_variant_index);
+        if !topology_keys.contains(&key) {
+            topology_keys.push(key);
+        }
+    }
+
+    let per_topology_deltas = topology_keys.iter().filter_map(|(family, variant)| {
+        let paired_rows: Vec<f64> = target_rows.iter()
+            .filter(|target| target.family == *family && target.graph_variant_index == *variant)
+            .filter_map(|target| {
+                let baseline = summaries.iter().find(|row| {
+                    row.world_id == target.world_id && row.policy == comparator
+                })?;
+                Some(metric(target) - metric(baseline))
+            })
+            .collect();
+        (!paired_rows.is_empty()).then(|| mean(&paired_rows))
+    }).collect();
+    (target_rows.len(), per_topology_deltas)
+}
+
+fn aggregate_paired_policy_deltas(
+    summaries: &[ScmGraphPolicySummary],
+    policies: &[ScmGraphPolicy],
+) -> Vec<ScmGraphPairedPolicyDelta> {
+    let comparators = [
+        ScmGraphPolicy::NominalExpectedInformationGain,
+        ScmGraphPolicy::DevelopmentFixedDesign,
+        ScmGraphPolicy::UniformRandomAction,
+    ];
+    let mut output = Vec::new();
+    for policy in policies.iter().copied() {
+        for comparator in comparators {
+            if policy == comparator {
+                continue;
+            }
+            for split in ScmGraphShiftSplit::all() {
+                let (paired_world_rows, directed) = paired_topology_delta_means(
+                    summaries, policy, comparator, split, |row| row.mean_directed_edge_f1,
+                );
+                let (_, cpdag_skeleton) = paired_topology_delta_means(
+                    summaries, policy, comparator, split, |row| row.mean_cpdag_skeleton_f1,
+                );
+                let (_, shd) = paired_topology_delta_means(
+                    summaries, policy, comparator, split,
+                    |row| row.mean_structural_hamming_distance,
+                );
+                let (_, measurements) = paired_topology_delta_means(
+                    summaries, policy, comparator, split, |row| row.mean_measurements_used,
+                );
+                let (_, interventions) = paired_topology_delta_means(
+                    summaries, policy, comparator, split, |row| row.mean_interventions_used,
+                );
+                let (_, false_claims) = paired_topology_delta_means(
+                    summaries, policy, comparator, split,
+                    |row| row.false_graph_claim_rate_all_trials,
+                );
+                output.push(ScmGraphPairedPolicyDelta {
+                    policy,
+                    comparator,
+                    split,
+                    paired_world_rows,
+                    paired_topology_instances: directed.len(),
+                    delta_directed_edge_f1: mean(&directed),
+                    delta_directed_edge_f1_topology_instance_ci95: mean_ci95(&directed, -1.0, 1.0),
+                    delta_cpdag_skeleton_f1: mean(&cpdag_skeleton),
+                    delta_cpdag_skeleton_f1_topology_instance_ci95: mean_ci95(&cpdag_skeleton, -1.0, 1.0),
+                    delta_structural_hamming_distance: mean(&shd),
+                    delta_shd_topology_instance_ci95: mean_ci95(
+                        &shd, -(NODE_COUNT * (NODE_COUNT - 1) / 2) as f64,
+                        (NODE_COUNT * (NODE_COUNT - 1) / 2) as f64,
+                    ),
+                    delta_measurements_used: mean(&measurements),
+                    delta_measurements_topology_instance_ci95: mean_ci95(&measurements, -64.0, 64.0),
+                    delta_interventions_used: mean(&interventions),
+                    delta_interventions_topology_instance_ci95: mean_ci95(&interventions, -64.0, 64.0),
+                    delta_false_graph_claim_rate: mean(&false_claims),
+                    delta_false_graph_claim_rate_topology_instance_ci95: mean_ci95(&false_claims, -1.0, 1.0),
+                });
+            }
+        }
+    }
+    output
+}
+
 fn aggregate_held_out(
     summaries: &[ScmGraphPolicySummary],
     policies: &[ScmGraphPolicy],
@@ -1479,6 +1603,7 @@ pub fn run_scm_graph_benchmark(
         fixed_design_action_id: fixed_action_id,
         held_out_policy_aggregates: aggregate_held_out(&summaries, &policies),
         factorized_shift_aggregates: aggregate_factorized_shifts(&summaries, &policies),
+        paired_policy_deltas: aggregate_paired_policy_deltas(&summaries, &policies),
         worlds: summaries,
         interpretation_boundary: concat!(
             "Synthetic software benchmark only. The candidate set enumerates all labeled DAGs ",
@@ -1818,6 +1943,40 @@ mod tests {
                 assert!((0.0..=1.0).contains(&split.mean_directed_edge_f1));
                 assert!((0.0..=3.0).contains(&split.mean_structural_hamming_distance));
             }
+        }
+    }
+
+    #[test]
+    fn paired_deltas_use_the_same_worlds_and_topology_clustered_intervals() {
+        let report = run_scm_graph_benchmark(3, 1, 5050, 0.90).unwrap();
+        assert_eq!(
+            report.paired_policy_deltas.len(),
+            (ScmGraphPolicy::all().len() - 1)
+                * 3
+                * ScmGraphShiftSplit::all().len()
+        );
+        for delta in &report.paired_policy_deltas {
+            assert_ne!(delta.policy, delta.comparator);
+            let expected_rows = match delta.split {
+                ScmGraphShiftSplit::AnyHeldOut => 96,
+                ScmGraphShiftSplit::TopologyShiftOnly => 40,
+                ScmGraphShiftSplit::MechanismShiftOnly => 16,
+                ScmGraphShiftSplit::JointShift => 40,
+            };
+            let expected_topologies = match delta.split {
+                ScmGraphShiftSplit::AnyHeldOut => 28,
+                ScmGraphShiftSplit::TopologyShiftOnly => 20,
+                ScmGraphShiftSplit::MechanismShiftOnly => 8,
+                ScmGraphShiftSplit::JointShift => 20,
+            };
+            assert_eq!(delta.paired_world_rows, expected_rows);
+            assert_eq!(delta.paired_topology_instances, expected_topologies);
+            assert!((-1.0..=1.0).contains(&delta.delta_directed_edge_f1));
+            assert!((-1.0..=1.0).contains(&delta.delta_cpdag_skeleton_f1));
+            assert!((-3.0..=3.0).contains(&delta.delta_structural_hamming_distance));
+            assert!((-64.0..=64.0).contains(&delta.delta_measurements_used));
+            assert!((-64.0..=64.0).contains(&delta.delta_interventions_used));
+            assert!((-1.0..=1.0).contains(&delta.delta_false_graph_claim_rate));
         }
     }
 
