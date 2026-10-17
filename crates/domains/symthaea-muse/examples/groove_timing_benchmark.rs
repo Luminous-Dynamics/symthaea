@@ -599,10 +599,14 @@ fn resolve_dataset_file(root: &Path, relative: &str) -> Result<PathBuf, String> 
 }
 
 fn parse_drum_hits(bytes: &[u8], bpm: f64) -> Result<Vec<DrumHit>, String> {
+    let smf = Smf::parse(bytes).map_err(|error| format!("invalid MIDI: {error}"))?;
+    extract_drum_hits(&smf, bpm)
+}
+
+fn extract_drum_hits(smf: &Smf<'_>, bpm: f64) -> Result<Vec<DrumHit>, String> {
     if !bpm.is_finite() || bpm <= 0.0 {
         return Err("BPM must be finite and positive".to_owned());
     }
-    let smf = Smf::parse(bytes).map_err(|error| format!("invalid MIDI: {error}"))?;
     let ppq = match smf.header.timing {
         Timing::Metrical(value) => f64::from(value.as_int()),
         _ => return Err("SMPTE-based MIDI timing is unsupported".to_owned()),
@@ -923,6 +927,44 @@ mod tests {
         assert_eq!(drum_role(45), "tom");
         assert_eq!(drum_role(49), "cymbal");
         assert_eq!(drum_role(88), "other");
+    }
+
+    #[test]
+    fn drum_parser_selects_positive_note_ons_on_percussion_channel_only() {
+        use midly::{
+            Format, Header, TrackEvent,
+            num::{u4, u7, u15, u28},
+        };
+
+        let event = |delta, channel, key, velocity| TrackEvent {
+            delta: u28::new(delta),
+            kind: TrackEventKind::Midi {
+                channel: u4::new(channel),
+                message: MidiMessage::NoteOn {
+                    key: u7::new(key),
+                    vel: u7::new(velocity),
+                },
+            },
+        };
+        let smf = Smf {
+            header: Header {
+                format: Format::SingleTrack,
+                timing: Timing::Metrical(u15::new(480)),
+            },
+            tracks: vec![vec![
+                event(0, 9, 36, 100),
+                event(120, 0, 38, 90),
+                event(120, 9, 42, 0),
+                event(0, 9, 42, 80),
+            ]],
+        };
+        let hits = extract_drum_hits(&smf, 120.0).unwrap();
+        assert_eq!(hits.len(), 2);
+        assert_eq!(hits[0].pitch, 36);
+        assert_eq!(hits[0].onset_beats, 0.0);
+        assert_eq!(hits[1].pitch, 42);
+        assert_eq!(hits[1].onset_beats, 0.5);
+        assert_eq!(hits[1].velocity, 80);
     }
 
     #[test]
