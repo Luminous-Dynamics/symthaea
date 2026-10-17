@@ -1,0 +1,4 @@
+{"window_id":"w-001","trajectory_id":"traj-001","parent_group_id":"parent-A","stratum_id":"family-A"}
+{"window_id":"w-002","trajectory_id":"traj-001","parent_group_id":"parent-A","stratum_id":"family-A"}
+{"window_id":"w-003","trajectory_id":"traj-002","parent_group_id":"parent-B","stratum_id":"family-B"}
+{"window_id":"w-004","trajectory_id":"traj-002","parent_group_id":"parent-B","stratum_id":"family-B"}
