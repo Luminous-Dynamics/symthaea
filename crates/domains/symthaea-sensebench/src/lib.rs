@@ -12,6 +12,7 @@ use serde::{Deserialize, Serialize};
 pub mod experiment_design;
 pub mod causal_benchmark;
 pub mod geophysics;
+pub mod robustness_benchmark;
 
 pub const GENERATOR_VERSION: &str = "sensebench-0.1.0";
 pub const MANIFEST_SCHEMA_VERSION: u16 = 1;
