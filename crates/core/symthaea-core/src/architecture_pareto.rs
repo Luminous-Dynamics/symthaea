@@ -312,9 +312,10 @@ pub struct ArchitectureParetoReportV1 {
 /// Evaluate a comparison set and return the non-dominated Pareto frontier.
 ///
 /// No weighted score is constructed. The request fixes one task/profile/environment
-/// and protocol context so candidates are comparable. Dominance uses every declared
-/// metric, including wearer and off-board mass, segment mass, energy, setup, restriction,
-/// comfort, tether interference and repair complexity. A missing metric fails strict
+/// and protocol context so candidates are comparable. Dominance uses the declared
+/// objective dimensions: task success, wearer/off-board/segment mass, energy, setup,
+/// restriction, comfort, tether interference and repair time. Component count is echoed
+/// as a descriptive attribute, not assumed to be monotonic. A missing metric fails strict
 /// deserialization rather than being filled with zero. Supplied values are not authenticated.
 pub fn evaluate_architecture_pareto(
     request: &ArchitectureComparisonRequestV1,
