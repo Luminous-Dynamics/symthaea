@@ -496,8 +496,8 @@ pub fn validate_task_card_static(
                 document_id: check.source_document_id.clone(),
             });
         }
-        if let AcceptanceRule::NumericRange { minimum, maximum } = check.rule {
-            match (minimum, maximum) {
+        if let AcceptanceRule::NumericRange { minimum, maximum } = &check.rule {
+            match (*minimum, *maximum) {
                 (None, None) => errors.push(TaskCardError::EmptyField {
                     field: format!("acceptance_checks[{}].numeric_range", check.criterion_id),
                 }),
@@ -780,7 +780,7 @@ pub fn validate_work_record(
     }
 
     for check in &card.acceptance_checks {
-        match check.rule {
+        match &check.rule {
             AcceptanceRule::NumericRange { minimum, maximum } => {
                 let Some(measurement) = record.measurements.iter().find(|m| m.criterion_id == check.criterion_id) else {
                     errors.push(TaskCardError::MissingMeasurement { criterion_id: check.criterion_id.clone() });
@@ -790,8 +790,8 @@ pub fn validate_work_record(
                     errors.push(TaskCardError::InvalidMeasurement { criterion_id: check.criterion_id.clone() });
                     continue;
                 }
-                if minimum.is_some_and(|min| measurement.value < min)
-                    || maximum.is_some_and(|max| measurement.value > max)
+                if (*minimum).is_some_and(|min| measurement.value < min)
+                    || (*maximum).is_some_and(|max| measurement.value > max)
                 {
                     errors.push(TaskCardError::MeasurementOutOfRange {
                         criterion_id: check.criterion_id.clone(),
@@ -871,7 +871,7 @@ pub fn transition_task(
 
 impl TaskAuthority {
     fn review_is_verified(&self) -> bool {
-        matches!(self.review, AuthorityReview::Verified { .. })
+        matches!(&self.review, AuthorityReview::Verified { .. })
     }
 }
 
