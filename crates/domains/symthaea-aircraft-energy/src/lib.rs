@@ -20,6 +20,7 @@ pub mod mission_model_contract;
 pub mod scenario_sweep;
 pub mod propulsor_reference;
 pub mod propulsor_map;
+pub mod propulsor_channel_audit;
 
 const SECONDS_PER_HOUR: f64 = 3_600.0;
 
