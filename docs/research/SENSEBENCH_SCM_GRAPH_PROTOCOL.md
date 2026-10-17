@@ -71,7 +71,7 @@ For each world/policy pair, the JSON report includes:
 - Mean measurements/interventions used and counts to threshold when the threshold is reached.
 - Per-world metrics, trial-level intervals, and held-out policy summaries. World-level summaries weight generated worlds equally instead of pooling trials as if every observation were an independent world.
 - Factorized shift report: 96 any-held-out world rows (28 topology instances), 40 topology-only-shift rows (20 topologies), 16 mechanism-only-shift rows (8 topologies), and 40 joint-shift rows (20 topologies).
-- Paired policy effects against nominal EIG, development-fixed design, uniform random action, and the observational PC baseline. Deltas are computed on matching graph × mechanism world summaries first, averaged across paired mechanism regimes within each topology instance, then summarized across topology instances.
+- Paired policy effects against nominal EIG, development-fixed design, uniform random action, asymptotic PC, and exact-conditional PC. Deltas are computed on matching graph × mechanism world summaries first, averaged across paired mechanism regimes within each topology instance, then summarized across topology instances.
 - Aggregate intervals first average held-out mechanism regimes within each exact graph topology, then quantify variability across topology instances. Four regime rows sharing one exact graph are not treated as four independent topologies. The post-run result includes each evaluator world ID, truth graph ID and truth edge count for replay/audit; these are evaluator outputs and are not inputs to the measurement policy.
 
 The structure-blind random graph policy reports graph metrics but makes no confidence-qualified claim. Keep its no-measurement behavior separate from the random intervention policy.
@@ -98,11 +98,11 @@ These are authored tests, not executed results. The benchmark has not been compi
 1. **Exactness:** all DAG catalogue, distribution normalization, intervention, and structural-metric known-answer tests pass.
 2. **Budget fairness:** all actionable policies use the same observation format and measurement budget; report actual costs if non-unit costs are introduced later.
 3. **Held-out graph recovery:** compare directed F1, skeleton F1 and SHD against the fixed-design, random-action, passive-only, observational PC, and structure-blind graph baselines. Do not claim superiority unless paired differences and uncertainty support it.
-4. **Paired policy effects:** use matching worlds and trial seeds to compare each adaptive policy with nominal EIG, the development-fixed design, uniform random action, and observational PC. Report paired deltas and topology-clustered uncertainty separately for topology-only, mechanism-only, joint, and all-held-out shifts. A claimed win requires a preregistered confidence interval supporting improvement over the fixed design on a primary metric, with no unacceptable regression in graph-claim risk or coverage.
-5. **Graph confidence:** report graph-claim coverage beside false-claim risk. Reject the trivial policy that wins by abstaining on every trial.
-6. **Negative controls:** on the empty-graph family, report spurious-edge frequency and false accepted graph claims explicitly.
-7. **Factorial generator audit:** seven graph-family templates each generate four graph variants, and each exact graph is evaluated under four mechanism regimes using independent random streams. Confirm that each topology appears under every regime and that the split is 16 development / 96 held out. This reduces the direct graph-family-to-coefficient shortcut, but the seven graph templates remain hand-authored.
-8. **World/family inference:** use many independently generated graph families and parameter draws from preregistered distributions. Analyse topology-family and mechanism-regime generalization separately; do not treat 112 graph × mechanism worlds or 28 topology instances nested in seven hand-authored families as a random sample of the universe of SCMs.
+5. **Paired policy effects:** use matching worlds and trial seeds to compare each adaptive policy with nominal EIG, the development-fixed design, uniform random action, asymptotic PC, and exact-conditional PC. Report paired deltas and topology-clustered uncertainty separately for topology-only, mechanism-only, joint, and all-held-out shifts. A claimed win requires a preregistered confidence interval supporting improvement over the fixed design on a primary metric, with no unacceptable regression in graph-claim risk or coverage.
+6. **Graph confidence:** report graph-claim coverage beside false-claim risk. Reject the trivial policy that wins by abstaining on every trial.
+7. **Negative controls:** on the empty-graph family, report spurious-edge frequency and false accepted graph claims explicitly.
+8. **Factorial generator audit:** seven graph-family templates each generate four graph variants, and each exact graph is evaluated under four mechanism regimes using independent random streams. Confirm that each topology appears under every regime and that the split is 16 development / 96 held out. This reduces the direct graph-family-to-coefficient shortcut, but the seven graph templates remain hand-authored.
+9. **World/family inference:** use many independently generated graph families and parameter draws from preregistered distributions. Analyse topology-family and mechanism-regime generalization separately; do not treat 112 graph × mechanism worlds or 28 topology instances nested in seven hand-authored families as a random sample of the universe of SCMs.
 
 ## Candidate quantitative targets for the next benchmark tranche (not results)
 
@@ -116,6 +116,13 @@ These are proposed engineering targets to preregister before looking at held-out
 - **Reproducibility gate:** every claimed win must be reproducible from the exact commit, generator/schema version, configuration, split, seed manifest and report JSON; include the strongest simple baseline and all negative controls in the same release artifact.
 
 If the current small benchmark cannot support these intervals or targets, report the result as inconclusive and expand the generator or evaluation budget. Do not relax the gates after inspecting held-out outcomes.
+
+## Conditional-independence calibration gates
+
+- Compare the asymptotic and exact-conditional PC policies on identical worlds, budgets and trial seeds. Report type-I error and power by sample budget, marginal prevalence, and presence/absence of conditioning strata.
+- Check p-value behavior on known-null and known-dependent fixtures; exact tests must return values in [0, 1] and agree with an independent reference enumeration on tiny tables.
+- Report both graph-level effects (skeleton F1, CPDAG class recovery, false-edge/collider rates) and the raw-to-projected mark-change rate. Projection repairs graph validity; it does not validate the CI tests.
+- Preserve negative findings: exact conditional tests may be conservative and need not win on graph-recovery metrics. Do not tune thresholds after looking at held-out worlds.
 9. **Observational equivalence:** the current suite now has a three-variable CPDAG-class scorer and separate compelled-direction metrics. Expand and cross-check it against a trusted CPDAG implementation before larger-graph use; then score interventional direction recovery separately.
 10. **Richer SCMs:** add continuous linear-Gaussian and nonlinear/additive-noise families, measurement noise, sampling constraints, intervention artifacts, latent confounding, and selection/censoring mechanisms.
 11. **Independent custody:** move the evaluation truth and score implementation to a separate process/corpus, bind test corpus hashes to the protocol, and keep policy-visible fixtures separated from the qualification set.
