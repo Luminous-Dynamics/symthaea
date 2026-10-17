@@ -916,6 +916,37 @@ mod expansion_history_tests {
     }
 
     #[test]
+    fn radiation_dominated_distance_and_lookback_match_analytic_solutions() {
+        let model = ExpansionHistory {
+            h0_km_s_mpc: 70.0,
+            omega_r: 1.0,
+            omega_m: 0.0,
+            omega_k: 0.0,
+            omega_de: 0.0,
+            w0: -1.0,
+        };
+        let z: f64 = 3.0;
+        let e2_expected = (1.0 + z).powi(4);
+        assert!((model.e_squared(z).unwrap() - e2_expected).abs() < 1e-12);
+
+        let distance_expected = C_KM_S / 70.0 * z / (1.0 + z);
+        let distance = model.line_of_sight_comoving_distance_mpc(z, 4096).unwrap();
+        assert!(
+            (distance - distance_expected).abs() / distance_expected < 1e-9,
+            "expected {distance_expected}, got {distance}"
+        );
+
+        let hubble_time_gyr = 977.792_221_680_789_2 / 70.0;
+        let lookback_expected =
+            0.5 * hubble_time_gyr * (1.0 - (1.0 + z).powi(-2));
+        let lookback = model.lookback_time_gyr(z, 4096).unwrap();
+        assert!(
+            (lookback - lookback_expected).abs() / lookback_expected < 1e-9,
+            "expected {lookback_expected}, got {lookback}"
+        );
+    }
+
+    #[test]
     fn distance_duality_relation_holds_by_construction() {
         let model = ExpansionHistory::flat_lcdm_approx();
         let z = 0.8;
