@@ -33,8 +33,17 @@ jobs:
         run: cargo fmt --manifest-path tools/room-stress-qualifier/Cargo.toml -- --check
       - name: Run negative-control tests
         run: cargo test --manifest-path tools/room-stress-qualifier/Cargo.toml
-      - name: Validate checked-in benchmark
+      - name: Validate checked-in benchmark and emit receipt
         run: |
-          cargo run --manifest-path tools/room-stress-qualifier/Cargo.toml -- \
+          cargo run --manifest-path tools/room-stress-qualifier/Cargo.toml -- --json \
             docs/research/spatial-design/ROOM_IMAGINATION_STRESS_BENCHMARK_V0_1.json \
-            docs/research/spatial-design/ROOM_IMAGINATION_STRESS_BENCHMARK_V0_1.schema.json
+            docs/research/spatial-design/ROOM_IMAGINATION_STRESS_BENCHMARK_V0_1.schema.json \
+            > room-stress-qualification-receipt.json
+          cat room-stress-qualification-receipt.json
+      - name: Upload manifest validation receipt
+        uses: actions/upload-artifact@v4
+        with:
+          name: room-stress-manifest-receipt-${{ github.sha }}
+          path: room-stress-qualification-receipt.json
+          if-no-files-found: error
+          retention-days: 30
