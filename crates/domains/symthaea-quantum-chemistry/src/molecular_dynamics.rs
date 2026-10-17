@@ -95,6 +95,29 @@ fn compute_forces(mol: &Molecule, fd_step: f64) -> Vec<[f64; 3]> {
         .unwrap_or_else(|error| panic!("finite-difference force evaluation failed: {error}"))
 }
 
+/// Reject finite-difference shifts that overflow or round back to the original value.
+fn validate_perturbed_coordinate(
+    original: f64,
+    perturbed: f64,
+    step: usize,
+    atom_index: usize,
+    axis: usize,
+    direction: i8,
+) -> Result<(), MdRunError> {
+    if !perturbed.is_finite() {
+        return Err(MdRunError::NonFinitePosition { step, atom_index, axis });
+    }
+    if perturbed == original {
+        return Err(MdRunError::UnrepresentablePerturbation {
+            step,
+            atom_index,
+            axis,
+            direction,
+        });
+    }
+    Ok(())
+}
+
 /// Checked central-difference forces; perturbations and energies are validated
 /// before they can reach subsequent integration work.
 fn compute_forces_checked(
@@ -109,7 +132,16 @@ fn compute_forces_checked(
     for atom_idx in 0..n_atoms {
         for coord in 0..3 {
             let mut mol_plus = mol.clone();
+            let original = mol.atoms[atom_idx].position[coord];
             mol_plus.atoms[atom_idx].position[coord] += fd_step;
+            validate_perturbed_coordinate(
+                original,
+                mol_plus.atoms[atom_idx].position[coord],
+                step,
+                atom_idx,
+                coord,
+                1,
+            )?;
             for (idx, atom) in mol_plus.atoms.iter().enumerate() {
                 for (axis, value) in atom.position.iter().enumerate() {
                     if !value.is_finite() {
@@ -134,6 +166,14 @@ fn compute_forces_checked(
 
             let mut mol_minus = mol.clone();
             mol_minus.atoms[atom_idx].position[coord] -= fd_step;
+            validate_perturbed_coordinate(
+                original,
+                mol_minus.atoms[atom_idx].position[coord],
+                step,
+                atom_idx,
+                coord,
+                -1,
+            )?;
             for (idx, atom) in mol_minus.atoms.iter().enumerate() {
                 for (axis, value) in atom.position.iter().enumerate() {
                     if !value.is_finite() {
@@ -355,6 +395,12 @@ impl std::error::Error for MdInputError {}
 pub enum MdRunError {
     InvalidInput(MdInputError),
     NonFinitePosition { step: usize, atom_index: usize, axis: usize },
+    UnrepresentablePerturbation {
+        step: usize,
+        atom_index: usize,
+        axis: usize,
+        direction: i8,
+    },
     NonFiniteForce { step: usize, atom_index: usize, axis: usize },
     NonFiniteForceEnergy {
         step: usize,
@@ -374,6 +420,9 @@ impl std::fmt::Display for MdRunError {
             Self::InvalidInput(error) => write!(f, "invalid AIMD input: {error}"),
             Self::NonFinitePosition { step, atom_index, axis } => write!(
                 f, "non-finite position at step {step}, atom {atom_index}, axis {axis}"
+            ),
+            Self::UnrepresentablePerturbation { step, atom_index, axis, direction } => write!(
+                f, "finite-difference perturbation rounded away at step {step}, atom {atom_index}, axis {axis}, direction {direction}"
             ),
             Self::NonFiniteForce { step, atom_index, axis } => write!(
                 f, "non-finite force at step {step}, atom {atom_index}, axis {axis}"
@@ -786,6 +835,22 @@ mod tests {
         assert!(mean.abs() < 0.03, "sample mean was {mean}");
         assert!((variance - 1.0).abs() < 0.05, "sample variance was {variance}");
     }
+    #[test]
+    fn checked_force_rejects_perturbation_rounded_away_before_solver() {
+        let mut molecule = Molecule::h2();
+        molecule.atoms[0].position[0] = 1.0e300;
+        let result = compute_forces_checked(&molecule, 0.005, 7);
+        assert_eq!(
+            result,
+            Err(MdRunError::UnrepresentablePerturbation {
+                step: 7,
+                atom_index: 0,
+                axis: 0,
+                direction: 1,
+            })
+        );
+    }
+
     #[test]
     fn checked_force_evaluation_rejects_overflowed_perturbation() {
         let mut molecule = Molecule::h2();
