@@ -765,24 +765,28 @@ mod tests {
     }
 
     #[test]
-    fn widening_any_single_metric_envelope_cannot_create_a_robust_winner() {
+    fn widening_any_single_metric_envelope_cannot_preserve_false_certainty() {
         for metric in REQUIRED_METRICS {
             let mut a = candidate("candidate-a", Profile::Balanced);
-            let b = candidate("candidate-b", Profile::Balanced);
-            let interval = &mut a.metrics.iter_mut().find(|entry| entry.metric == metric).unwrap().interval;
+            let b = candidate("candidate-b", Profile::Overbuilt);
+            let baseline = evaluate_architecture_robustness(&request(vec![a.clone(), b.clone()]))
+                .expect("baseline envelopes are valid");
+            assert!(baseline.pairwise_assessments[0].a_robustly_dominates_b);
 
+            let b_interval = b.metrics.iter().find(|entry| entry.metric == metric).unwrap().interval;
+            let a_interval = &mut a.metrics.iter_mut().find(|entry| entry.metric == metric).unwrap().interval;
             if is_higher_better(metric) {
-                interval.lower = (interval.lower - 0.05).max(0.0);
+                a_interval.lower = (b_interval.upper - 0.1).max(0.0);
             } else {
-                interval.upper += 0.5;
+                a_interval.upper = b_interval.lower + 0.1;
             }
 
             let report = evaluate_architecture_robustness(&request(vec![a, b]))
                 .expect("one-sided envelope widening preserves fixture integrity");
             let pair = &report.pairwise_assessments[0];
             assert!(
-                !pair.a_robustly_dominates_b && !pair.b_robustly_dominates_a,
-                "widening {metric:?} must not manufacture a robust dominance result"
+                !pair.a_robustly_dominates_b,
+                "widening {metric:?} across the rival bound must erase robust dominance"
             );
         }
     }
