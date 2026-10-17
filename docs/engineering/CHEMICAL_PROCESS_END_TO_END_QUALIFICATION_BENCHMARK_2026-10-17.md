@@ -191,6 +191,30 @@ Measure:
 
 These are proposed research gates; none is presently claimed as measured or passed.
 
+## Risk-adaptive credibility: spend verification effort where it changes decisions
+
+A flat validation checklist is not enough for a process portfolio that includes models of very different consequence. Use a risk-informed credibility profile based on at least (a) the model's influence on a decision, (b) the consequence of a wrong decision, (c) extrapolation distance from validation evidence, and (d) reversibility/detectability of a failure. This follows the direction of NIST's 2026 work on harmonizing computational-model uncertainty with measurement practice and NIST's manufacturing digital-twin guidance; it is a design principle, not a declaration of standards compliance.
+
+For each model-to-claim edge, freeze a **credibility budget** before evaluating candidates:
+- intended context of use and the exact claim it supports;
+- failure modes and consequence class;
+- verification depth, validation evidence and independent comparison required;
+- treatment of measurement, parameter, numerical and model-form uncertainty;
+- allowable extrapolation and out-of-domain detection;
+- decision sensitivity and value of additional information;
+- expiry, data-currentness and requalification triggers.
+
+Use distributions, not only point estimates, where uncertainty materially affects the engineering decision. Preserve correlation and common-mode uncertainty when multiple models share a property package, dataset, fitted correlation or assumptions. Independent software does not imply independent evidence. When shared uncertainty can reorder the Pareto frontier, the system should say so and prioritize evidence that can resolve the decision—not average disagreeing answers or call the apparent winner robust.
+
+**Benchmark additions:**
+1. Keep all 24 synthetic Tier-A fixture dispositions exact and fail-closed.
+2. Add paired decision cases with identical nominal predictions but different uncertainty and consequence profiles; require the higher-consequence case to request stronger evidence rather than inherit the lower-risk approval.
+3. Add common-mode test cases where two independent-looking engines share a stale property source; the evaluator must not count agreement as independent corroboration.
+4. Add value-of-information tests with a synthetic known decision boundary; confirm the selected next observation reduces expected decision loss under the frozen loss model, not merely model variance.
+5. Report calibration and coverage with sample size and confidence intervals; do not claim calibration on synthetic cases alone.
+
+A proposed metric is **decision-weighted regret** against the oracle decision for known synthetic problems, reported alongside feasibility and uncertainty calibration. Do not multiply away hard safety constraints with a risk score: hard gates remain non-compensatory. The model-risk profile changes the amount and independence of evidence required, not the laws of conservation or the right to bypass plant approval.
+
 ## Cross-cutting verification requirements
 
 Every benchmark run should create an immutable manifest/receipt containing:
@@ -238,3 +262,5 @@ This benchmark specification establishes a proposed test program and target crit
 4. CO-LaN, [The CAPE-OPEN Standard](https://www.colan.org/).
 5. OSHA, [Process Safety Management, 29 CFR 1910.119](https://www.osha.gov/laws-regs/regulations/standardnumber/1910/1910.119).
 6. AIChE, [Principles of Inherently Safer Design (2026)](https://publications.aiche.org/cep/2026/february/principles-inherently-safer-design).
+7. NIST, [On Methods of Uncertainty Quantification in Computational Modeling and Simulation: Harmonizing Modeling and Metrology Practices](https://doi.org/10.6028/NIST.AMS.100-85) (2026).
+8. NIST, [Digital Twins Workshops Summary Report (NISTIR 8620)](https://doi.org/10.6028/NIST.IR.8620) (2026).
