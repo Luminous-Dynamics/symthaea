@@ -21,8 +21,8 @@ pub struct RouteAudit {
     pub resource_count: usize,
     pub mutation_case_count: usize,
     pub all_ids_unique: bool,
-    pub all_skills_have_a_qualified_worker_candidate: bool,
-    pub all_capability_sets_have_a_resource_candidate: bool,
+    pub all_required_skill_sets_have_worker_candidates: bool,
+    pub all_required_capability_sets_have_resource_candidates: bool,
     pub all_predecessors_resolve: bool,
     pub dependency_graph_acyclic: bool,
     pub all_mandatory_operations_present: bool,
@@ -36,9 +36,9 @@ fn object<'a>(value: &'a Value, context: &str) -> Result<&'a serde_json::Map<Str
 fn exact_keys(value: &Value, required: &[&str], optional: &[&str], context: &str) -> Result<()> {
     let map = object(value, context)?;
     let keys: HashSet<&str> = map.keys().map(String::as_str).collect();
-    let required: HashSet<&str> = required.iter().copied().collect();
-    let allowed: HashSet<&str> = required.iter().chain(optional.iter()).copied().collect();
-    ensure!(required.is_subset(&keys) && keys.is_subset(&allowed),
+    let required_keys: HashSet<&str> = required.iter().copied().collect();
+    let allowed_keys: HashSet<&str> = required.iter().chain(optional.iter()).copied().collect();
+    ensure!(required_keys.is_subset(&keys) && keys.is_subset(&allowed_keys),
         "{context}: required/allowed keys differ from schema");
     Ok(())
 }
@@ -117,6 +117,11 @@ pub fn validate_route(value: &Value, raw_sha256: String, context: &str) -> Resul
     ], &[], "route_api_mapping")?;
     ensure!(string_field(mapping, "canonical_owner", context)? == "Luminous-Dynamics/symthaea#7677",
         "{context}: mapping must point to the existing scheduler owner");
+    ensure!(
+        string_field(mapping, "implementation_pr", context)?
+            == "https://github.com/Luminous-Dynamics/symthaea/pull/7678",
+        "{context}: scheduler implementation link must remain exact"
+    );
     ensure!(string_field(mapping, "mapping_status", context)? == "pending API review against exact source head",
         "{context}: fixture cannot claim scheduler API conformance before review");
     ensure!(mapping.get("do_not_create_second_scheduler").and_then(Value::as_bool) == Some(true),
@@ -141,7 +146,8 @@ pub fn validate_route(value: &Value, raw_sha256: String, context: &str) -> Resul
         exact_keys(worker, &["worker_id", "skill_ids", "available_minutes"], &[], &at)?;
         let id = string_field(worker, "worker_id", &at)?;
         ensure!(worker_ids.insert(id.to_owned()), "{at}: duplicate worker ID {id:?}");
-        positive_minutes(worker, "available_minutes", &at)?;
+        let availability = positive_minutes(worker, "available_minutes", &at)?;
+        ensure!(availability <= 480, "{at}: availability exceeds the declared 480-minute shift");
         worker_skills.push(string_set(worker, "skill_ids", &at)?);
     }
 
@@ -154,7 +160,8 @@ pub fn validate_route(value: &Value, raw_sha256: String, context: &str) -> Resul
             &["restriction"], &at)?;
         let id = string_field(resource, "resource_id", &at)?;
         ensure!(resource_ids.insert(id.to_owned()), "{at}: duplicate resource ID {id:?}");
-        positive_minutes(resource, "available_minutes", &at)?;
+        let availability = positive_minutes(resource, "available_minutes", &at)?;
+        ensure!(availability <= 480, "{at}: availability exceeds the declared 480-minute shift");
         positive_minutes(resource, "max_concurrent_operations", &at)?;
         if let Some(restriction) = resource.get("restriction") {
             ensure!(restriction.as_str().is_some_and(|s| !s.trim().is_empty()),
@@ -164,6 +171,7 @@ pub fn validate_route(value: &Value, raw_sha256: String, context: &str) -> Resul
     }
 
     let mut operation_ids = HashSet::new();
+    let mut output_ids = HashSet::new();
     let mut operation_map: BTreeMap<String, &Value> = BTreeMap::new();
     let mut children: BTreeMap<String, Vec<String>> = BTreeMap::new();
     let mut indegree: BTreeMap<String, usize> = BTreeMap::new();
