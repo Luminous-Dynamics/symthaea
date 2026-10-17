@@ -214,6 +214,18 @@ fn quantile_sorted(values: &[f64], quantile: f64) -> Option<f64> {
     Some(values[lower] + (values[upper] - values[lower]) * fraction)
 }
 
+/// Calculate a quantile for an arbitrary sample while excluding, but not
+/// silently losing visibility of, non-finite values in the emitted summary.
+fn sample_quantile(values: &[f64], quantile: f64) -> Option<f64> {
+    let mut finite = values
+        .iter()
+        .copied()
+        .filter(|value| value.is_finite())
+        .collect::<Vec<_>>();
+    finite.sort_by(f64::total_cmp);
+    quantile_sorted(&finite, quantile)
+}
+
 /// A distribution summary keeps central tendency and tails visible together.
 /// Non-finite values are excluded from statistics but explicitly counted.
 fn distribution_summary(values: &[f64]) -> Value {
@@ -614,6 +626,7 @@ fn main() {
     let mut between_style_by_style = vec![Vec::<f64>::new(); style_count];
     let mut style_pair_rows = Vec::new();
     let mut style_pairs_above_seed_variation = 0usize;
+    let mut style_pairs_with_positive_tail_margin = 0usize;
     for left in 0..style_count {
         for right in (left + 1)..style_count {
             let mut matched_distances = Vec::with_capacity(config_count);
@@ -643,6 +656,16 @@ fn main() {
             let left_within = mean(&within_seed_distances[left]);
             let right_within = mean(&within_seed_distances[right]);
             let mean_within_pair = (left_within + right_within) / 2.0;
+            let between_p10 = sample_quantile(&matched_distances, 0.10);
+            let left_within_p90 = sample_quantile(&within_seed_distances[left], 0.90);
+            let right_within_p90 = sample_quantile(&within_seed_distances[right], 0.90);
+            let robust_tail_margin = match (between_p10, left_within_p90, right_within_p90) {
+                (Some(between), Some(within_a), Some(within_b)) => {
+                    Some(between - within_a.max(within_b))
+                }
+                _ => None,
+            };
+            let positive_tail_margin = robust_tail_margin.is_some_and(|margin| margin > 0.0);
             let margin = mean_between - mean_within_pair;
             let ratio = if mean_within_pair > 1e-9 {
                 json!(mean_between / mean_within_pair)
@@ -652,6 +675,9 @@ fn main() {
             let above_seed_variation = mean_between > mean_within_pair;
             if above_seed_variation {
                 style_pairs_above_seed_variation += 1;
+            }
+            if positive_tail_margin {
+                style_pairs_with_positive_tail_margin += 1;
             }
             let per_layer_diagnostics = LAYERS
                 .iter()
@@ -663,6 +689,18 @@ fn main() {
                     let within_b =
                         mean(&within_layer_distances_by_style[right][layer_index]);
                     let within_pair_mean = (within_a + within_b) / 2.0;
+                    let between_p10 =
+                        sample_quantile(&matched_layer_distances[layer_index], 0.10);
+                    let within_a_p90 =
+                        sample_quantile(&within_layer_distances_by_style[left][layer_index], 0.90);
+                    let within_b_p90 =
+                        sample_quantile(&within_layer_distances_by_style[right][layer_index], 0.90);
+                    let robust_tail_margin = match (between_p10, within_a_p90, within_b_p90) {
+                        (Some(between), Some(within_a), Some(within_b)) => {
+                            Some(between - within_a.max(within_b))
+                        }
+                        _ => None,
+                    };
                     let ratio_a = if within_a > 1e-9 {
                         json!(between / within_a)
                     } else {
@@ -695,7 +733,15 @@ fn main() {
                         "between_minus_mean_within_pair_margin": between - within_pair_mean,
                         "between_to_within_ratio_a": ratio_a,
                         "between_to_within_ratio_b": ratio_b,
-                        "between_to_mean_within_pair_ratio": pair_ratio
+                        "between_to_mean_within_pair_ratio": pair_ratio,
+                        "observed_tail_separation": {
+                            "between_style_p10": between_p10,
+                            "within_style_seed_p90_a": within_a_p90,
+                            "within_style_seed_p90_b": within_b_p90,
+                            "margin": robust_tail_margin,
+                            "positive_margin": robust_tail_margin.is_some_and(|margin| margin > 0.0),
+                            "is_qualification_gate": false
+                        }
                     })
                 })
                 .collect::<Vec<_>>();
@@ -713,6 +759,15 @@ fn main() {
                 "between_minus_within_margin": margin,
                 "between_to_within_ratio": ratio,
                 "between_exceeds_mean_seed_variation": above_seed_variation,
+                "observed_tail_separation": {
+                    "between_style_p10": between_p10,
+                    "within_style_seed_p90_a": left_within_p90,
+                    "within_style_seed_p90_b": right_within_p90,
+                    "margin": robust_tail_margin,
+                    "positive_margin": positive_tail_margin,
+                    "is_qualification_gate": false,
+                    "interpretation": "positive margin means the observed lower tail of between-style distance exceeds both observed within-style upper tails; this small fixed sample is not a confidence interval"
+                },
                 "per_layer_diagnostics": per_layer_diagnostics,
                 "matched_config_count": config_count
             }));
@@ -958,6 +1013,7 @@ fn main() {
             "between_style_distance_distribution": distribution_summary(&between_style_distances),
             "global_between_to_within_distance_ratio": global_style_separation_ratio,
             "style_pairs_above_both_seed_variation_baselines": style_pairs_above_seed_variation,
+            "style_pairs_with_positive_observed_tail_margin": style_pairs_with_positive_tail_margin,
             "style_pair_count": style_pair_rows.len(),
             "per_layer_separation": per_layer_separation,
             "per_style_pair": style_pair_rows,
@@ -1034,6 +1090,18 @@ mod tests {
         assert_eq!(quantile_sorted(&sorted, 0.9), Some(27.0));
         assert_eq!(quantile_sorted(&sorted, 1.0), Some(30.0));
         assert_eq!(quantile_sorted(&[], 0.5), None);
+    }
+
+    #[test]
+    fn sampled_quantiles_detect_robust_tail_margin_without_claiming_confidence() {
+        let between = [4.0, 5.0, 6.0, 7.0, 8.0, 9.0];
+        let within_a = [0.0, 1.0, 1.0, 2.0];
+        let within_b = [0.0, 1.0, 2.0, 3.0];
+        let between_p10 = sample_quantile(&between, 0.10).unwrap();
+        let within_a_p90 = sample_quantile(&within_a, 0.90).unwrap();
+        let within_b_p90 = sample_quantile(&within_b, 0.90).unwrap();
+        assert!(between_p10 - within_a_p90.max(within_b_p90) > 0.0);
+        assert_eq!(sample_quantile(&[f64::NAN, f64::INFINITY], 0.5), None);
     }
 
     #[test]
