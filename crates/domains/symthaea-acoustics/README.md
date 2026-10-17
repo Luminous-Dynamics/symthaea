@@ -13,7 +13,7 @@ Pure std, zero dependencies, no symthaea-core link.
 - response_curve — validated response curves, log-frequency interpolation, band summaries and target deviation.
 - pareto — deterministic unweighted Pareto-front extraction for point estimates.
 - robust_pareto — conservative Pareto-front extraction from objective intervals under one declared profile.
-- experiment_selection — deterministic baselines for ranking already-eligible design × fidelity experiments.
+- experiment_selection — deterministic baselines and budgeted plans for already-eligible design × fidelity experiments.
 
 ## Multi-objective acoustic design
 
@@ -31,14 +31,20 @@ correlations or joint uncertainty.
 
 The experiment-selection module compares four explicit baselines: cheapest first,
 frontier relevance first, estimated uncertainty reduction per cost, and a seeded
-pseudo-random order. Ranking scores are caller-supplied heuristics frozen by an
-evaluation profile; they are not probabilistic guarantees or claims that a
-measurement will resolve a question. Persist the profile, cost unit, policy,
-option IDs, budget and actual evaluation receipts for a benchmark replay.
-Only pre-screened, eligible options enter the ranking. This module does not
-authorize hardware actuation or bypass safety, calibration, or evidence controls.
+pseudo-random order. Ranking inputs are caller-supplied heuristics frozen by an
+evaluation profile; they are not probabilities and do not promise a measurement
+will resolve a question. Each option must identify its evaluation profile and
+common cost unit; mismatches fail closed.
 
-These utilities analyze derived inputs. They do not ingest raw measurements,
+The ranker returns a full option-order and profile metadata. Budget planning
+consumes that ranking only when the entire option snapshot is unchanged; this
+prevents stale indices being reused after costs, fidelity or relevance estimates
+change. The budget planner skips options that do not fit the remaining budget
+so a cheaper later option can still be selected. It returns selected and skipped
+IDs, estimated spend, remaining budget, profile, unit and policy as a replayable
+planning receipt. This receipt is not authorization to execute physical tests.
+
+These utilities analyze derived inputs; they do not ingest raw measurements,
 establish microphone calibration, establish simulation validity, implement
 CTA-2034/AES75/IEC compliance, guarantee safety, or predict human preference.
 Raw observation and calibration provenance remains owned by FIELD. Objective
