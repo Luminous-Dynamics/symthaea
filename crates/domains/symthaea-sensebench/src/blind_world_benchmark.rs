@@ -62,7 +62,7 @@ pub struct BlindWorldPolicySummary {
     pub mean_log_loss: f64,
     pub log_loss_ci95: [f64; 2],
     /// Mean prequential negative log likelihood assigned to observed outcomes
-    /// by the declared model at each observation, before updating the posterior.
+    /// by the declared likelihood-model ensemble, before updating the posterior.
     pub mean_prequential_predictive_log_loss: f64,
     pub prequential_predictive_log_loss_ci95: [f64; 2],
     /// Rate of trials whose prequential predictive loss exceeds the cutoff
@@ -440,7 +440,13 @@ fn simulate_trial(
         // the experiment-choice comparison interpretable; the robust policies are
         // not silently granted a separate posterior-inference advantage.
         let update = update_posterior(&posterior, model_candidate, outcome_index)?;
-        predictive_nll_sum += -update.outcome_probability.max(1.0e-12).ln();
+        let ensemble_outcome_probability = ensemble_predictive_outcome_probability(
+            &posterior,
+            &affordable_models,
+            &selected_id,
+            outcome_index,
+        )?;
+        predictive_nll_sum += -ensemble_outcome_probability.max(1.0e-12).ln();
         posterior = update.posterior;
 
         experiments_used += 1;
@@ -509,6 +515,36 @@ fn simulate_trial(
         unsupported_causal_claim,
         null_truth: true_hypothesis_index == 2,
     })
+}
+
+fn ensemble_predictive_outcome_probability(
+    posterior: &[HypothesisPrior],
+    model_scenarios: &[ModelLikelihoodScenario],
+    candidate_id: &str,
+    outcome_index: usize,
+) -> Result<f64, BlindWorldBenchmarkError> {
+    let total_weight = model_scenarios.iter().map(|scenario| scenario.weight).sum::<f64>();
+    if !total_weight.is_finite() || total_weight <= 0.0 {
+        return Err(BlindWorldBenchmarkError::EmptyCandidateLibrary);
+    }
+    let mut mixture_probability = 0.0;
+    for scenario in model_scenarios {
+        let candidate = scenario.candidates.iter()
+            .find(|candidate| candidate.id == candidate_id)
+            .ok_or(BlindWorldBenchmarkError::MissingCandidate)?;
+        let outcome_count = candidate.likelihoods.first()
+            .map(Vec::len)
+            .ok_or(BlindWorldBenchmarkError::EmptyCandidateLibrary)?;
+        if outcome_index >= outcome_count {
+            return Err(BlindWorldBenchmarkError::MissingCandidate);
+        }
+        let scenario_probability = posterior.iter()
+            .zip(&candidate.likelihoods)
+            .map(|(hypothesis, row)| hypothesis.probability * row[outcome_index])
+            .sum::<f64>();
+        mixture_probability += (scenario.weight / total_weight) * scenario_probability;
+    }
+    Ok(mixture_probability.clamp(0.0, 1.0))
 }
 
 fn choose_candidate(
