@@ -372,7 +372,11 @@ fn equivalent_annual_capital_cost(capital: &CapitalEconomics) -> f64 {
 }
 
 fn positive_denominator_rate(numerator: f64, denominator: f64) -> Option<f64> {
-    (denominator > 0.0).then_some(numerator / denominator)
+    if denominator > 0.0 {
+        Some(numerator / denominator)
+    } else {
+        None
+    }
 }
 
 fn validate_scenario(scenario: &AircraftOwnershipScenario) -> Vec<OwnershipCostError> {
@@ -450,6 +454,15 @@ fn validate_scenario(scenario: &AircraftOwnershipScenario) -> Vec<OwnershipCostE
         errors.push(invalid(
             "utilization.completed_missions",
             "must not exceed attempted missions",
+        ));
+    }
+    if scenario.utilization.completed_missions == 0
+        && (scenario.utilization.successful_flight_hours > 0.0
+            || scenario.utilization.completed_passenger_kilometres > 0.0)
+    {
+        errors.push(invalid(
+            "utilization.completed_missions",
+            "successful flight hours and completed passenger-kilometres require at least one completed mission",
         ));
     }
 
@@ -647,9 +660,19 @@ mod tests {
         let mut input = scenario("no-completions", 100.0);
         input.utilization.completed_missions = 0;
         input.utilization.attempted_missions = 0;
+        input.utilization.successful_flight_hours = 0.0;
+        input.utilization.completed_passenger_kilometres = 0.0;
         let result = calculate_ownership_cost(&input).unwrap();
         assert_eq!(result.cost_per_completed_mission, None);
         assert_eq!(result.mission_completion_fraction, None);
+    }
+
+    #[test]
+    fn delivered_service_cannot_be_reported_without_completed_missions() {
+        let mut input = scenario("inconsistent-service", 100.0);
+        input.utilization.completed_missions = 0;
+        input.utilization.completed_passenger_kilometres = 900.0;
+        assert!(calculate_ownership_cost(&input).is_err());
     }
 
     #[test]
