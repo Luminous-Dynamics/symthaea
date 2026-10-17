@@ -1167,6 +1167,55 @@ mod tests {
         assert!(lag1_autocorrelation(&[-1.0, 0.0, 1.0, 2.0]).is_some());
     }
 
+    fn test_corpus_with_kick_profile(
+        hit_count: usize,
+        median_residual_beats: f64,
+        p95_residual_beats: f64,
+        mean_velocity: f64,
+    ) -> CorpusSummary {
+        let role = RoleSummary {
+            files_with_hits: 1,
+            hit_count,
+            mean_signed_sixteenth_residual_ms: Some(0.0),
+            median_absolute_sixteenth_residual_ms: Some(median_residual_beats * 100.0),
+            p95_absolute_sixteenth_residual_ms: Some(p95_residual_beats * 100.0),
+            median_absolute_sixteenth_grid_residual_beats: Some(median_residual_beats),
+            p95_absolute_sixteenth_grid_residual_beats: Some(p95_residual_beats),
+            median_absolute_triplet_residual_ms: Some(1.0),
+            mean_velocity_0_to_127: Some(mean_velocity),
+            velocity_standard_deviation: Some(10.0),
+            mean_file_lag1_residual_correlation: Some(0.1),
+        };
+        CorpusSummary {
+            files_examined: 1,
+            files_with_drum_hits: 1,
+            files_without_drum_hits: 0,
+            files_excluded: 0,
+            total_drum_hits: hit_count,
+            roles: BTreeMap::from([("kick".to_owned(), role)]),
+        }
+    }
+
+    #[test]
+    fn performer_macro_weights_drummer_summaries_equally_not_by_hit_count() {
+        let by_drummer = BTreeMap::from([
+            (
+                "drummer-a".to_owned(),
+                test_corpus_with_kick_profile(10_000, 0.01, 0.12, 10.0),
+            ),
+            (
+                "drummer-b".to_owned(),
+                test_corpus_with_kick_profile(10, 0.09, 0.22, 100.0),
+            ),
+        ]);
+        let summary = performer_macro_summary(&by_drummer);
+        let kick = &summary["kick"];
+        assert_eq!(kick.performers_with_role, 2);
+        assert!((kick.mean_performer_median_abs_sixteenth_grid_residual_beats.unwrap() - 0.05).abs() < 1e-12);
+        assert!((kick.median_performer_median_abs_sixteenth_grid_residual_beats.unwrap() - 0.09).abs() < 1e-12);
+        assert!((kick.mean_performer_velocity_mean_0_to_127.unwrap() - 55.0).abs() < 1e-12);
+    }
+
     #[test]
     fn csv_parser_rejects_unclosed_quoted_field() {
         assert!(parse_csv_record(r#"a,"unfinished"#).is_none());
