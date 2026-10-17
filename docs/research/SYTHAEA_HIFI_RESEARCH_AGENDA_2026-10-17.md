@@ -148,7 +148,7 @@ All numeric targets below are **proposed project gates**, not published-standard
 |---|---|
 | Measurement integrity | 100% of used samples have the required identity/protocol metadata; raw-artifact hashes match; failed controls cannot enter the accepted set silently |
 | Predictor generalization | Evaluate on product-grouped held-out data; report Spearman/Kendall ranking, MAE/calibration where relevant, uncertainty intervals and error by product class; no acceptance based on random capture-level splits |
-| Baseline value | Symthaea predictor must beat the declared simple baseline by a pre-registered meaningful margin on untouched data, or remain an exploratory model |
+| Baseline value | Initial research ambition: ≥10% relative reduction in held-out pairwise log loss vs the strongest transparent baseline, with a listener-clustered uncertainty interval supporting improvement and no material calibration degradation; freeze the final practical threshold after pilot/power simulation but before confirmation |
 | Preference model calibration | Report reliability/calibration plots and Brier/log loss for probabilistic choices; never report only rank correlation |
 | Personalization uplift | A target/profile adapted from limited user feedback must improve held-out choices for unseen excerpts/products compared with the best static baseline; include users for whom it does not help |
 | Fixture transfer | Report per-band transfer error and confidence intervals on held-out devices; never label the transfer universal if results remain device/fixture dependent |
