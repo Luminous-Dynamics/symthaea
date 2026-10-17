@@ -1144,13 +1144,13 @@ mod tests {
     }
 
     #[test]
-    fn frozen_oracle_covers_route_length_and_conflicts() {
+    fn frozen_oracle_covers_route_length_and_shared_cell_conflicts() {
         let oracle: RoutingOracle = serde_json::from_str(ORACLE).expect("route oracle parses");
         for case in oracle.cases {
             match case.case_id.as_str() {
                 "WETROOM-DETOUR-001" => {
-                    let report = route_services(&live(), &[request(
-                        "AC-TRUNK-01",
+                    let report = route_services(&live(), &[request_for(
+                        "AC-TRUNK-01", "CONN-CABIN-01-AC_IN",
                         module_anchor("CABIN-01", "AC_IN", 2800, 1800),
                         service_anchor("AC-BUS", 4700, 1800),
                     )], limits()).unwrap();
@@ -1161,15 +1161,25 @@ mod tests {
                 }
                 "SHARED-CELL-CONFLICT-002" => {
                     let baseline = live();
-                    let a = request("ROUTE-ALPHA", module_anchor("CABIN-01", "AC_IN", 2800, 1800), service_anchor("AC-BUS", 4700, 1800));
-                    let b = request("ROUTE-BETA", module_anchor("CABIN-01", "AC_IN", 2800, 1800), service_anchor("AC-BUS", 4700, 1800));
-                    // Requests must map one-to-one to schema connections; duplicate connection
-                    // routes are intentionally forbidden, so this case is checked as a guard.
-                    assert_eq!(route_services(&baseline, &[a, b], limits()).unwrap_err().code,
-                        "DUPLICATE_CONNECTION_ROUTE");
+                    let cabin_route = request_for(
+                        "ROUTE-CABIN", "CONN-CABIN-01-AC_IN",
+                        module_anchor("CABIN-01", "AC_IN", 2800, 1800),
+                        service_anchor("AC-BUS", 4700, 1800),
+                    );
+                    let wetroom_route = request_for(
+                        "ROUTE-WETROOM", "CONN-WETROOM-01-AC_IN",
+                        module_anchor("WETROOM-01", "AC_IN", 4600, 1800),
+                        service_anchor("AC-BUS", 4700, 1800),
+                    );
+                    let report = route_services(&baseline, &[cabin_route, wetroom_route], limits()).unwrap();
+                    assert_eq!(report.body.routes.len(), 2);
+                    for route in &report.body.routes {
+                        assert_eq!(route.disposition, RouteDisposition::Routed);
+                        assert_eq!(route.conflicts_with_route_ids.len(), case.expected_conflict_count);
+                        assert!(route.path_length_mm.unwrap_or(0) >= case.expected_min_length_mm.unwrap_or(0));
+                    }
                 }
                 other => panic!("unknown routing oracle case: {other}"),
             }
         }
-    }
-}
+    }}
