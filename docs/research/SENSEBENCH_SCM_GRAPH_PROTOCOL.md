@@ -38,7 +38,7 @@ All policies share the same initial uniform graph prior, nominal posterior-updat
 2. Predictive outcome entropy, a simple uncertainty-seeking baseline that does not directly score hypothesis discrimination.
 3. Model-weighted expected information gain across the declared scenarios.
 4. Worst-case robust information-gain selection.
-5. Development-fixed action selected before held-out scoring.
+5. Development-fixed action chosen by mean one-step expected information gain across development-family mechanism parameters only; it does not use the development worlds' truth graph IDs and never inspects held-out worlds.
 6. Uniform random measurement/intervention selection.
 7. Passive observation only.
 8. Known-mechanism oracle: uses the hidden world's mechanism parameters while retaining the graph-hypothesis task. This is an optimistic upper-bound diagnostic and is not a deployable method.
@@ -61,7 +61,7 @@ For each world/policy pair, the JSON report includes:
 - Graph-claim coverage at the configured posterior threshold.
 - False graph claim rate among accepted claims and across all trials.
 - Mean measurements/interventions used and counts to threshold when the threshold is reached.
-- Per-world metrics, trial-level intervals, and held-out policy summaries. World-level summaries weight generated worlds equally instead of pooling trials as if every observation were an independent world.
+- Per-world metrics, trial-level intervals, and held-out policy summaries. World-level summaries weight generated worlds equally instead of pooling trials as if every observation were an independent world. The post-run result includes each evaluator world ID, truth graph ID and truth edge count for replay/audit; these are evaluator outputs and are not inputs to the measurement policy.
 
 The structure-blind random graph policy reports graph metrics but makes no confidence-qualified claim. Keep its no-measurement behavior separate from the random intervention policy.
 
