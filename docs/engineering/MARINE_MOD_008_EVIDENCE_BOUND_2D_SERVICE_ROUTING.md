@@ -37,10 +37,10 @@ Additional tests cover connection-ID binding, port-side and Z-elevation validati
 | Benchmark | Target / acceptance gate |
 |---|---|
 | Shortest-path correctness | 100% agreement with independent Dijkstra on exhaustive tiny grids across the full test matrix of obstacle layouts and bend penalties |
-| Path validity | 100% of emitted adjacent points are exactly one grid step apart; all non-terminal cells avoid clearance-inflated obstacles and reserved regions |
+| Path validity | 100% of emitted adjacent points are exactly one grid step apart; route segments avoid clearance-inflated obstacles and reserved regions except explicitly validated terminal escape corridors |
 | Endpoint contract | 100% detection of stale IDs, wrong service/port medium, off-side anchors, grid misalignment and missing evidence references |
 | Clearance and no-path | 100% sensitivity on frozen blocked-endpoint, closed-corridor, obstacle and budget negative controls |
-| Multi-route interactions | 100% detection of exact shared-cell overlaps in the frozen oracle; later expand to minimum separation, swept volumes, route class and approved junction rules |
+| Multi-route interactions | 100% detection of shared path segments and 100% non-reporting of the frozen common-terminal-only overlap; later expand to minimum separation, swept volumes, route class and approved junction rules |
 | Determinism | 100% byte-identical report digests for 100 permutations of equivalent request inputs |
 | Scaling | Measure grid node tiers of 100, 1,000, 10,000, 100,000 and 250,000; record expanded states, route length proxy, bends, p50/p95 runtime and peak memory |
 | Generalization | Evaluate at least three reviewed layout/route cases with source-verified anchors before making any engineering capability claim |
