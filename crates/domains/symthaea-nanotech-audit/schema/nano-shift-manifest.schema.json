@@ -46,7 +46,8 @@
           "source_artifact_sha256",
           "independence_keys",
           "sample_ids",
-          "shift_kind"
+          "shift_kind",
+          "shift_axes"
         ],
         "properties": {
           "group_id": {
@@ -126,6 +127,22 @@
               "single_factor",
               "compounded"
             ]
+          },
+          "shift_axes": {
+            "type": "array",
+            "uniqueItems": true,
+            "maxItems": 6,
+            "description": "Mechanism axes, distinct from the material/system family. An in-distribution group has none; single_factor has exactly one; compounded has at least two.",
+            "items": {
+              "enum": [
+                "feature_support",
+                "label_distribution",
+                "graph_topology",
+                "physical_regime",
+                "chemical_environment",
+                "measurement_process"
+              ]
+            }
           }
         },
         "allOf": [
@@ -222,6 +239,69 @@
                     "moderate",
                     "severe"
                   ]
+                }
+              }
+            }
+          },
+          {
+            "if": {
+              "properties": {
+                "shift_kind": {
+                  "const": "in_distribution"
+                }
+              },
+              "required": [
+                "shift_kind"
+              ]
+            },
+            "then": {
+              "properties": {
+                "shift_axes": {
+                  "maxItems": 0
+                }
+              }
+            }
+          },
+          {
+            "if": {
+              "properties": {
+                "shift_kind": {
+                  "const": "single_factor"
+                }
+              },
+              "required": [
+                "shift_kind"
+              ]
+            },
+            "then": {
+              "properties": {
+                "shift_axes": {
+                  "minItems": 1,
+                  "maxItems": 1,
+                  "items": {
+                    "not": {
+                      "const": "in_distribution"
+                    }
+                  }
+                }
+              }
+            }
+          },
+          {
+            "if": {
+              "properties": {
+                "shift_kind": {
+                  "const": "compounded"
+                }
+              },
+              "required": [
+                "shift_kind"
+              ]
+            },
+            "then": {
+              "properties": {
+                "shift_axes": {
+                  "minItems": 2
                 }
               }
             }
