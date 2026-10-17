@@ -113,6 +113,7 @@ struct BenchmarkReceipt {
     result_scope: &'static str,
     quality_qualified: bool,
     dataset: &'static str,
+    generated_method: &'static str,
     selected_split: String,
     metadata_sha256: String,
     source_rows_selected: usize,
@@ -253,6 +254,7 @@ fn run() -> Result<(), Box<dyn Error>> {
         result_scope: "descriptive_profile_only_not_quality_qualified",
         quality_qualified: false,
         dataset: "Groove MIDI Dataset; metadata and MIDI only; local user-supplied copy",
+        generated_method: "compose_styled + export_performance_midi; existing production realization path; new phrase curve is not applied",
         selected_split: args.split,
         metadata_sha256,
         source_rows_selected: source_files.len(),
@@ -412,6 +414,14 @@ fn locate_dataset_root(requested: &Path) -> Result<PathBuf, Box<dyn Error>> {
     }
     let nested = root.join("groove");
     if nested.join("info.csv").is_file() {
+        let metadata = fs::symlink_metadata(&nested)?;
+        if metadata.file_type().is_symlink() || !metadata.file_type().is_dir() {
+            return Err(io::Error::new(
+                io::ErrorKind::InvalidInput,
+                "nested groove directory must be a regular non-symlink directory",
+            )
+            .into());
+        }
         return Ok(nested.canonicalize()?);
     }
     Err(io::Error::new(
@@ -640,6 +650,12 @@ fn extract_drum_hits(smf: &Smf<'_>, bpm: f64) -> Result<Vec<DrumHit>, String> {
             }
         }
     }
+    hits.sort_by(|left, right| {
+        left.onset_beats
+            .total_cmp(&right.onset_beats)
+            .then_with(|| left.pitch.cmp(&right.pitch))
+            .then_with(|| left.velocity.cmp(&right.velocity))
+    });
     Ok(hits)
 }
 
@@ -734,7 +750,7 @@ fn drum_role(pitch: u8) -> &'static str {
         35 | 36 => "kick",
         37 | 38 | 40 => "snare",
         22 | 26 | 42 | 44 | 46 => "hi_hat",
-        41 | 43 | 45 | 47 | 48 | 50 => "tom",
+        41 | 43 | 45 | 47 | 48 | 50 | 58 => "tom",
         49 | 51 | 52 | 53 | 55 | 57 | 59 => "cymbal",
         _ => "other",
     }
