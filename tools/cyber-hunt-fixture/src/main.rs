@@ -1093,7 +1093,8 @@ fn print_help() {
          --source-commit   Source revision included as provenance metadata (default UNPINNED_LOCAL_SOURCE)\n\
          Query mode: cyber-hunt-fixture query --store-dir SOLVER_ONLY_DIR --requests-jsonl REQUESTS.jsonl\n\
          Evaluate mode: cyber-hunt-fixture evaluate --dataset-root DATASET_ROOT --predictions PREDICTIONS.json\n\n\
-         Outputs: solver/events.jsonl + solver/manifest.json; evaluator/oracle.json; root manifest.json pins all three artifacts.\n\         Stdout is a read-back receipt; local source metadata is not a trusted build attestation.\n\
+         Outputs: solver/events.jsonl + solver/manifest.json; evaluator/oracle.json; root manifest.json pins all three artifacts.\n\
+         Stdout is a read-back receipt; local source metadata is not a trusted build attestation.\n\
          Every output is synthetic and UNSCORED. The public oracle is not held-out evaluation data."
     );
 }
