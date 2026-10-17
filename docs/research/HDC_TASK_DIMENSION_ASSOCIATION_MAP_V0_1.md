@@ -90,3 +90,12 @@ For a declared decision threshold, let (p) be the false-match probability of one
 Thresholds must be chosen using positive/negative calibration data separate from the final evaluation data. Report the number of held-out negative comparisons, observed false matches and a confidence interval / upper bound. **Zero observed false matches in a small sample does not demonstrate an extreme tail rate** such as (10^{-9}). If a deployment requires such guarantees, use an appropriate exact or justified statistical model, conservative multiplicity accounting, and calibration on the real/representative distribution; keep model assumptions and measurements distinct.
 
 Recent HDC Labs practitioner work experimentally illustrates this single-query-versus-all-pairs distinction on synthetic records ([Oct 15, 2026](https://hyperdimensionalcomputing.ai/blog/testing-the-limits-of-bundling-capacity-2/)). We use it as an external hypothesis to replicate, not as Symthaea result evidence.
+
+
+### Why 384 negative samples are only a smoke-level control
+
+This first executable creates 32 unrelated pairs × 12 seeds = 384 negative comparisons per representation/dimension. Even if all 384 scores stay below a fixed threshold, that does **not** justify a rare-event claim. Under an IID Bernoulli model, zero events in (n) trials gives a one-sided 95% upper confidence limit (p \le 1-0.05^{1/n}\), approximately (3/n); at (n=384), that is about 0.78%. If the threshold was selected using those same scores, this calculation is not a valid independent test bound. Threshold selection and final evaluation must use separate data.
+
+### Architecture implication: dimension and comparison count are joint controls
+
+Before escalating every representation to a much larger D, test a two-stage memory path: use a fast HDC similarity stage to shortlist (K \ll N) candidates, then apply a separately measured verifier or structured exact check. This trades index recall and shortlist size against end-to-end cost; it must report retrieval misses and false shortlist candidates, not just the second-stage verifier accuracy. For tasks that truly require all-pairs clustering, quantify the (N(N-1)/2) comparison growth explicitly. Segmented/hierarchical memory and stronger match requirements are alternative controls against simply increasing D.
