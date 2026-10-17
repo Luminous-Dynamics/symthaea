@@ -79,7 +79,7 @@ Report these dimensions separately with denominators, confidence intervals, and 
 1. **Detection:** event-level precision, recall, F1, false-positive count per 10,000 benign events, and analyst review burden.
 2. **Coverage:** recall by represented tactic/domain and causal-chain stage. Mark domains with no tested cases as `NOT_REPRESENTED`, never as zero or full coverage.
 3. **Attribution:** exact event ID and timestamp precision; evidence-supported hypotheses; precision/recall of expected causal relations.
-4. **Discrimination:** false positives for plausible benign administration, successful user recovery after password errors, scheduled backups, and other explicitly modeled alternatives.
+4. **Discrimination:** false positives for plausible benign administration, successful user recovery after password errors, scheduled backups, and other explicitly modeled alternatives. On the benign-only control, report both (a) false confirmed-incident assertions / benign-only episodes and (b) incorrectly flagged events per 10,000 benign events; separately report bounded hypotheses or justified requests for more evidence.
 5. **Uncertainty:** quality of probability estimates where available; abstention coverage/risk curve; whether missing, stale, or untrusted evidence incorrectly strengthens a claim.
 6. **Search efficiency:** query count, rows/bytes examined, latency distribution, query errors, budget exhaustion, and cost when measured.
 7. **Metamorphic robustness:** relevant-intervention accuracy and irrelevant-mutation invariance per mutation family, composed with #7770.
@@ -99,7 +99,7 @@ All baselines must use identical solver-visible data, query APIs, context, and q
 - **Keyword-only baseline:** diagnostic lower bound for how much a visible keyword cue alone explains.
 - **Always-negative baseline:** must fail recall/coverage gates.
 - **Always-positive baseline:** must fail precision / false-positive-burden gates.
-- **Benign-only control:** must not yield an unsubstantiated confirmed attack; investigate calibrated abstention separately.
+- **Benign-only control:** report per-episode false-confirmed-incident rate and event-level false positives/10,000; the frozen public smoke control should produce zero unsubstantiated confirmed-attack claims as a conformance floor only. It is public and can be memorized, so it is not a generalization or deployment threshold. Score useful completion on answerable mixed cases separately so blanket abstention does not pass.
 - **Positive control:** confirms that planted true events and the evaluator are scoreable, not that the solver detects them.
 
 A solver improvement claim requires held-out deltas against relevant baselines under a predeclared budget and reporting policy. Do not compare runs with different context, event count, tool access, or query budget and attribute the full difference to reasoning ability.
