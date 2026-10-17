@@ -1,0 +1,1614 @@
+{
+  "schema_version": "1.0.0",
+  "configuration_id": "LD-EXPEDITION-MOD-V1",
+  "configuration_name": "Expedition research configuration",
+  "customization_intent": "Reconfigure the same abstract platform for two sleeping cabins plus a medical nook, workspace, galley, wet room and storage.",
+  "platform": {
+    "vessel_concept_ref": "LD-MARINE-PLATFORM-12000",
+    "vessel_revision": "concept-v1",
+    "archetype": "expedition_yacht",
+    "interior_bounds_mm": {
+      "length_mm": 14000,
+      "width_mm": 5000,
+      "height_mm": 2400
+    },
+    "deck_bounds": [
+      {
+        "deck_id": "MAIN",
+        "bounds_mm": {
+          "x_min_mm": 0,
+          "x_max_mm": 14000,
+          "y_min_mm": 0,
+          "y_max_mm": 5000,
+          "z_min_mm": 0,
+          "z_max_mm": 2400
+        },
+        "max_area_load_kg_m2": {
+          "value": null,
+          "unit": "kg/m2",
+          "status": "unknown",
+          "source_ref": null,
+          "rationale": "Platform limit has not been established."
+        },
+        "max_point_load_kg": {
+          "value": null,
+          "unit": "kg",
+          "status": "unknown",
+          "source_ref": null,
+          "rationale": "Platform limit has not been established."
+        },
+        "source_ref": null
+      }
+    ]
+  },
+  "coordinate_frame": {
+    "unit": "mm",
+    "origin": "port_aft_floor",
+    "x_axis": "forward",
+    "y_axis": "starboard",
+    "z_axis": "up"
+  },
+  "module_catalog": [
+    {
+      "module_id": "SLEEP-POD",
+      "revision": 1,
+      "name": "Compact sleeping cabin",
+      "function": "sleeping",
+      "envelope_mm": {
+        "length_mm": 2400,
+        "width_mm": 1800,
+        "height_mm": 2000
+      },
+      "mass_properties": {
+        "status": "design_assumption",
+        "mass_kg": 310,
+        "local_cg_mm": {
+          "x_mm": 1200,
+          "y_mm": 900,
+          "z_mm": 1000
+        },
+        "source_ref": "SYNTHETIC-MOD-001",
+        "rationale": "Invented placeholder solely for configuration-workflow prototyping; not a vendor or engineering value."
+      },
+      "ports": [
+        {
+          "port_id": "AC_IN",
+          "medium": "electrical_power",
+          "direction": "in",
+          "rating": {
+            "value": 300,
+            "unit": "W",
+            "status": "design_assumption",
+            "source_ref": "SYNTHETIC-MOD-001",
+            "rationale": "Synthetic placeholder for schema and workflow development."
+          },
+          "connector_profile": "LD-INTERFACE-V1-PROVISIONAL",
+          "criticality": "important"
+        },
+        {
+          "port_id": "HVAC_IN",
+          "medium": "hvac_supply",
+          "direction": "in",
+          "rating": {
+            "value": 50,
+            "unit": "m3/h",
+            "status": "design_assumption",
+            "source_ref": "SYNTHETIC-MOD-001",
+            "rationale": "Synthetic placeholder for schema and workflow development."
+          },
+          "connector_profile": "LD-INTERFACE-V1-PROVISIONAL",
+          "criticality": "noncritical"
+        },
+        {
+          "port_id": "STRUCTURE_MOUNT",
+          "medium": "structural_mount",
+          "direction": "in",
+          "rating": {
+            "value": 5000,
+            "unit": "N",
+            "status": "design_assumption",
+            "source_ref": "SYNTHETIC-MOD-001",
+            "rationale": "Synthetic placeholder for schema and workflow development."
+          },
+          "connector_profile": "LD-INTERFACE-V1-PROVISIONAL",
+          "criticality": "safety_critical"
+        }
+      ],
+      "service_clearance_mm": {
+        "forward": 100,
+        "aft": 150,
+        "port": 100,
+        "starboard": 100,
+        "above": 100
+      },
+      "minimum_accessibility": "step_free_path",
+      "fire_material_status": "unknown",
+      "mounting_status": "design_assumption",
+      "electrical_status": "design_assumption",
+      "sanitary_status": "unknown",
+      "provenance": [
+        {
+          "source_id": "SYNTHETIC-MOD-001",
+          "title": "Authored synthetic example data",
+          "uri": "urn:luminous-dynamics:symthaea:synthetic:marine-mod-001",
+          "scope": "Illustration only; no real vessel, vendor or test evidence.",
+          "source_type": "authored_synthetic"
+        }
+      ]
+    },
+    {
+      "module_id": "WET-ROOM",
+      "revision": 1,
+      "name": "Wet room / bathroom",
+      "function": "bathroom",
+      "envelope_mm": {
+        "length_mm": 1500,
+        "width_mm": 1700,
+        "height_mm": 2000
+      },
+      "mass_properties": {
+        "status": "design_assumption",
+        "mass_kg": 260,
+        "local_cg_mm": {
+          "x_mm": 750,
+          "y_mm": 850,
+          "z_mm": 1000
+        },
+        "source_ref": "SYNTHETIC-MOD-001",
+        "rationale": "Invented placeholder solely for configuration-workflow prototyping; not a vendor or engineering value."
+      },
+      "ports": [
+        {
+          "port_id": "AC_IN",
+          "medium": "electrical_power",
+          "direction": "in",
+          "rating": {
+            "value": 600,
+            "unit": "W",
+            "status": "design_assumption",
+            "source_ref": "SYNTHETIC-MOD-001",
+            "rationale": "Synthetic placeholder for schema and workflow development."
+          },
+          "connector_profile": "LD-INTERFACE-V1-PROVISIONAL",
+          "criticality": "important"
+        },
+        {
+          "port_id": "WATER_IN",
+          "medium": "fresh_water",
+          "direction": "in",
+          "rating": {
+            "value": 8,
+            "unit": "L/min",
+            "status": "design_assumption",
+            "source_ref": "SYNTHETIC-MOD-001",
+            "rationale": "Synthetic placeholder for schema and workflow development."
+          },
+          "connector_profile": "LD-INTERFACE-V1-PROVISIONAL",
+          "criticality": "noncritical"
+        },
+        {
+          "port_id": "GREY_OUT",
+          "medium": "greywater",
+          "direction": "out",
+          "rating": {
+            "value": 8,
+            "unit": "L/min",
+            "status": "design_assumption",
+            "source_ref": "SYNTHETIC-MOD-001",
+            "rationale": "Synthetic placeholder for schema and workflow development."
+          },
+          "connector_profile": "LD-INTERFACE-V1-PROVISIONAL",
+          "criticality": "noncritical"
+        },
+        {
+          "port_id": "BLACK_OUT",
+          "medium": "blackwater",
+          "direction": "out",
+          "rating": {
+            "value": 8,
+            "unit": "L/min",
+            "status": "design_assumption",
+            "source_ref": "SYNTHETIC-MOD-001",
+            "rationale": "Synthetic placeholder for schema and workflow development."
+          },
+          "connector_profile": "LD-INTERFACE-V1-PROVISIONAL",
+          "criticality": "important"
+        },
+        {
+          "port_id": "EXHAUST_OUT",
+          "medium": "exhaust_air",
+          "direction": "out",
+          "rating": {
+            "value": 80,
+            "unit": "m3/h",
+            "status": "design_assumption",
+            "source_ref": "SYNTHETIC-MOD-001",
+            "rationale": "Synthetic placeholder for schema and workflow development."
+          },
+          "connector_profile": "LD-INTERFACE-V1-PROVISIONAL",
+          "criticality": "noncritical"
+        },
+        {
+          "port_id": "STRUCTURE_MOUNT",
+          "medium": "structural_mount",
+          "direction": "in",
+          "rating": {
+            "value": 8000,
+            "unit": "N",
+            "status": "design_assumption",
+            "source_ref": "SYNTHETIC-MOD-001",
+            "rationale": "Synthetic placeholder for schema and workflow development."
+          },
+          "connector_profile": "LD-INTERFACE-V1-PROVISIONAL",
+          "criticality": "safety_critical"
+        }
+      ],
+      "service_clearance_mm": {
+        "forward": 100,
+        "aft": 150,
+        "port": 100,
+        "starboard": 100,
+        "above": 100
+      },
+      "minimum_accessibility": "step_free_path",
+      "fire_material_status": "unknown",
+      "mounting_status": "design_assumption",
+      "electrical_status": "design_assumption",
+      "sanitary_status": "unknown",
+      "provenance": [
+        {
+          "source_id": "SYNTHETIC-MOD-001",
+          "title": "Authored synthetic example data",
+          "uri": "urn:luminous-dynamics:symthaea:synthetic:marine-mod-001",
+          "scope": "Illustration only; no real vessel, vendor or test evidence.",
+          "source_type": "authored_synthetic"
+        }
+      ]
+    },
+    {
+      "module_id": "COMPACT-GALLEY",
+      "revision": 1,
+      "name": "Compact galley",
+      "function": "galley",
+      "envelope_mm": {
+        "length_mm": 2200,
+        "width_mm": 1800,
+        "height_mm": 2000
+      },
+      "mass_properties": {
+        "status": "design_assumption",
+        "mass_kg": 340,
+        "local_cg_mm": {
+          "x_mm": 1100,
+          "y_mm": 900,
+          "z_mm": 1000
+        },
+        "source_ref": "SYNTHETIC-MOD-001",
+        "rationale": "Invented placeholder solely for configuration-workflow prototyping; not a vendor or engineering value."
+      },
+      "ports": [
+        {
+          "port_id": "AC_IN",
+          "medium": "electrical_power",
+          "direction": "in",
+          "rating": {
+            "value": 2500,
+            "unit": "W",
+            "status": "design_assumption",
+            "source_ref": "SYNTHETIC-MOD-001",
+            "rationale": "Synthetic placeholder for schema and workflow development."
+          },
+          "connector_profile": "LD-INTERFACE-V1-PROVISIONAL",
+          "criticality": "important"
+        },
+        {
+          "port_id": "WATER_IN",
+          "medium": "fresh_water",
+          "direction": "in",
+          "rating": {
+            "value": 5,
+            "unit": "L/min",
+            "status": "design_assumption",
+            "source_ref": "SYNTHETIC-MOD-001",
+            "rationale": "Synthetic placeholder for schema and workflow development."
+          },
+          "connector_profile": "LD-INTERFACE-V1-PROVISIONAL",
+          "criticality": "noncritical"
+        },
+        {
+          "port_id": "GREY_OUT",
+          "medium": "greywater",
+          "direction": "out",
+          "rating": {
+            "value": 5,
+            "unit": "L/min",
+            "status": "design_assumption",
+            "source_ref": "SYNTHETIC-MOD-001",
+            "rationale": "Synthetic placeholder for schema and workflow development."
+          },
+          "connector_profile": "LD-INTERFACE-V1-PROVISIONAL",
+          "criticality": "noncritical"
+        },
+        {
+          "port_id": "EXHAUST_OUT",
+          "medium": "exhaust_air",
+          "direction": "out",
+          "rating": {
+            "value": 120,
+            "unit": "m3/h",
+            "status": "design_assumption",
+            "source_ref": "SYNTHETIC-MOD-001",
+            "rationale": "Synthetic placeholder for schema and workflow development."
+          },
+          "connector_profile": "LD-INTERFACE-V1-PROVISIONAL",
+          "criticality": "noncritical"
+        },
+        {
+          "port_id": "STRUCTURE_MOUNT",
+          "medium": "structural_mount",
+          "direction": "in",
+          "rating": {
+            "value": 10000,
+            "unit": "N",
+            "status": "design_assumption",
+            "source_ref": "SYNTHETIC-MOD-001",
+            "rationale": "Synthetic placeholder for schema and workflow development."
+          },
+          "connector_profile": "LD-INTERFACE-V1-PROVISIONAL",
+          "criticality": "safety_critical"
+        }
+      ],
+      "service_clearance_mm": {
+        "forward": 100,
+        "aft": 150,
+        "port": 100,
+        "starboard": 100,
+        "above": 100
+      },
+      "minimum_accessibility": "none",
+      "fire_material_status": "unknown",
+      "mounting_status": "design_assumption",
+      "electrical_status": "design_assumption",
+      "sanitary_status": "unknown",
+      "provenance": [
+        {
+          "source_id": "SYNTHETIC-MOD-001",
+          "title": "Authored synthetic example data",
+          "uri": "urn:luminous-dynamics:symthaea:synthetic:marine-mod-001",
+          "scope": "Illustration only; no real vessel, vendor or test evidence.",
+          "source_type": "authored_synthetic"
+        }
+      ]
+    },
+    {
+      "module_id": "FLEX-WORKSPACE",
+      "revision": 1,
+      "name": "Convertible lounge / workspace",
+      "function": "convertible_workspace",
+      "envelope_mm": {
+        "length_mm": 2100,
+        "width_mm": 1800,
+        "height_mm": 2000
+      },
+      "mass_properties": {
+        "status": "design_assumption",
+        "mass_kg": 180,
+        "local_cg_mm": {
+          "x_mm": 1050,
+          "y_mm": 900,
+          "z_mm": 1000
+        },
+        "source_ref": "SYNTHETIC-MOD-001",
+        "rationale": "Invented placeholder solely for configuration-workflow prototyping; not a vendor or engineering value."
+      },
+      "ports": [
+        {
+          "port_id": "AC_IN",
+          "medium": "electrical_power",
+          "direction": "in",
+          "rating": {
+            "value": 1200,
+            "unit": "W",
+            "status": "design_assumption",
+            "source_ref": "SYNTHETIC-MOD-001",
+            "rationale": "Synthetic placeholder for schema and workflow development."
+          },
+          "connector_profile": "LD-INTERFACE-V1-PROVISIONAL",
+          "criticality": "important"
+        },
+        {
+          "port_id": "DATA_IN",
+          "medium": "data_network",
+          "direction": "in",
+          "rating": {
+            "value": 1000,
+            "unit": "Mbit/s",
+            "status": "design_assumption",
+            "source_ref": "SYNTHETIC-MOD-001",
+            "rationale": "Synthetic placeholder for schema and workflow development."
+          },
+          "connector_profile": "LD-INTERFACE-V1-PROVISIONAL",
+          "criticality": "noncritical"
+        },
+        {
+          "port_id": "HVAC_IN",
+          "medium": "hvac_supply",
+          "direction": "in",
+          "rating": {
+            "value": 40,
+            "unit": "m3/h",
+            "status": "design_assumption",
+            "source_ref": "SYNTHETIC-MOD-001",
+            "rationale": "Synthetic placeholder for schema and workflow development."
+          },
+          "connector_profile": "LD-INTERFACE-V1-PROVISIONAL",
+          "criticality": "noncritical"
+        },
+        {
+          "port_id": "STRUCTURE_MOUNT",
+          "medium": "structural_mount",
+          "direction": "in",
+          "rating": {
+            "value": 4000,
+            "unit": "N",
+            "status": "design_assumption",
+            "source_ref": "SYNTHETIC-MOD-001",
+            "rationale": "Synthetic placeholder for schema and workflow development."
+          },
+          "connector_profile": "LD-INTERFACE-V1-PROVISIONAL",
+          "criticality": "safety_critical"
+        }
+      ],
+      "service_clearance_mm": {
+        "forward": 100,
+        "aft": 150,
+        "port": 100,
+        "starboard": 100,
+        "above": 100
+      },
+      "minimum_accessibility": "wheelchair_turning_space",
+      "fire_material_status": "unknown",
+      "mounting_status": "design_assumption",
+      "electrical_status": "design_assumption",
+      "sanitary_status": "unknown",
+      "provenance": [
+        {
+          "source_id": "SYNTHETIC-MOD-001",
+          "title": "Authored synthetic example data",
+          "uri": "urn:luminous-dynamics:symthaea:synthetic:marine-mod-001",
+          "scope": "Illustration only; no real vessel, vendor or test evidence.",
+          "source_type": "authored_synthetic"
+        }
+      ]
+    },
+    {
+      "module_id": "MODULE-STORAGE",
+      "revision": 1,
+      "name": "Modular storage",
+      "function": "storage",
+      "envelope_mm": {
+        "length_mm": 1400,
+        "width_mm": 1700,
+        "height_mm": 2000
+      },
+      "mass_properties": {
+        "status": "design_assumption",
+        "mass_kg": 120,
+        "local_cg_mm": {
+          "x_mm": 700,
+          "y_mm": 850,
+          "z_mm": 1000
+        },
+        "source_ref": "SYNTHETIC-MOD-001",
+        "rationale": "Invented placeholder solely for configuration-workflow prototyping; not a vendor or engineering value."
+      },
+      "ports": [
+        {
+          "port_id": "STRUCTURE_MOUNT",
+          "medium": "structural_mount",
+          "direction": "in",
+          "rating": {
+            "value": 5000,
+            "unit": "N",
+            "status": "design_assumption",
+            "source_ref": "SYNTHETIC-MOD-001",
+            "rationale": "Synthetic placeholder for schema and workflow development."
+          },
+          "connector_profile": "LD-INTERFACE-V1-PROVISIONAL",
+          "criticality": "safety_critical"
+        }
+      ],
+      "service_clearance_mm": {
+        "forward": 100,
+        "aft": 150,
+        "port": 100,
+        "starboard": 100,
+        "above": 100
+      },
+      "minimum_accessibility": "none",
+      "fire_material_status": "unknown",
+      "mounting_status": "design_assumption",
+      "electrical_status": "design_assumption",
+      "sanitary_status": "unknown",
+      "provenance": [
+        {
+          "source_id": "SYNTHETIC-MOD-001",
+          "title": "Authored synthetic example data",
+          "uri": "urn:luminous-dynamics:symthaea:synthetic:marine-mod-001",
+          "scope": "Illustration only; no real vessel, vendor or test evidence.",
+          "source_type": "authored_synthetic"
+        }
+      ]
+    },
+    {
+      "module_id": "MEDICAL-NOOK",
+      "revision": 1,
+      "name": "Medical / treatment nook",
+      "function": "medical",
+      "envelope_mm": {
+        "length_mm": 1700,
+        "width_mm": 1500,
+        "height_mm": 2000
+      },
+      "mass_properties": {
+        "status": "design_assumption",
+        "mass_kg": 200,
+        "local_cg_mm": {
+          "x_mm": 850,
+          "y_mm": 750,
+          "z_mm": 1000
+        },
+        "source_ref": "SYNTHETIC-MOD-001",
+        "rationale": "Invented placeholder solely for configuration-workflow prototyping; not a vendor or engineering value."
+      },
+      "ports": [
+        {
+          "port_id": "AC_IN",
+          "medium": "electrical_power",
+          "direction": "in",
+          "rating": {
+            "value": 1500,
+            "unit": "W",
+            "status": "design_assumption",
+            "source_ref": "SYNTHETIC-MOD-001",
+            "rationale": "Synthetic placeholder for schema and workflow development."
+          },
+          "connector_profile": "LD-INTERFACE-V1-PROVISIONAL",
+          "criticality": "important"
+        },
+        {
+          "port_id": "DATA_IN",
+          "medium": "data_network",
+          "direction": "in",
+          "rating": {
+            "value": 100,
+            "unit": "Mbit/s",
+            "status": "design_assumption",
+            "source_ref": "SYNTHETIC-MOD-001",
+            "rationale": "Synthetic placeholder for schema and workflow development."
+          },
+          "connector_profile": "LD-INTERFACE-V1-PROVISIONAL",
+          "criticality": "noncritical"
+        },
+        {
+          "port_id": "HVAC_IN",
+          "medium": "hvac_supply",
+          "direction": "in",
+          "rating": {
+            "value": 60,
+            "unit": "m3/h",
+            "status": "design_assumption",
+            "source_ref": "SYNTHETIC-MOD-001",
+            "rationale": "Synthetic placeholder for schema and workflow development."
+          },
+          "connector_profile": "LD-INTERFACE-V1-PROVISIONAL",
+          "criticality": "noncritical"
+        },
+        {
+          "port_id": "STRUCTURE_MOUNT",
+          "medium": "structural_mount",
+          "direction": "in",
+          "rating": {
+            "value": 6000,
+            "unit": "N",
+            "status": "design_assumption",
+            "source_ref": "SYNTHETIC-MOD-001",
+            "rationale": "Synthetic placeholder for schema and workflow development."
+          },
+          "connector_profile": "LD-INTERFACE-V1-PROVISIONAL",
+          "criticality": "safety_critical"
+        }
+      ],
+      "service_clearance_mm": {
+        "forward": 100,
+        "aft": 150,
+        "port": 100,
+        "starboard": 100,
+        "above": 100
+      },
+      "minimum_accessibility": "assisted_transfer",
+      "fire_material_status": "unknown",
+      "mounting_status": "design_assumption",
+      "electrical_status": "design_assumption",
+      "sanitary_status": "unknown",
+      "provenance": [
+        {
+          "source_id": "SYNTHETIC-MOD-001",
+          "title": "Authored synthetic example data",
+          "uri": "urn:luminous-dynamics:symthaea:synthetic:marine-mod-001",
+          "scope": "Illustration only; no real vessel, vendor or test evidence.",
+          "source_type": "authored_synthetic"
+        }
+      ]
+    }
+  ],
+  "placements": [
+    {
+      "instance_id": "CABIN-01",
+      "module_id": "SLEEP-POD",
+      "module_revision": 1,
+      "deck_id": "MAIN",
+      "position_mm": {
+        "x_mm": 400,
+        "y_mm": 1000,
+        "z_mm": 0
+      },
+      "rotation_z_deg": 0,
+      "status": "proposed"
+    },
+    {
+      "instance_id": "CABIN-02",
+      "module_id": "SLEEP-POD",
+      "module_revision": 1,
+      "deck_id": "MAIN",
+      "position_mm": {
+        "x_mm": 3100,
+        "y_mm": 1000,
+        "z_mm": 0
+      },
+      "rotation_z_deg": 0,
+      "status": "proposed"
+    },
+    {
+      "instance_id": "WETROOM-01",
+      "module_id": "WET-ROOM",
+      "module_revision": 1,
+      "deck_id": "MAIN",
+      "position_mm": {
+        "x_mm": 5800,
+        "y_mm": 1000,
+        "z_mm": 0
+      },
+      "rotation_z_deg": 0,
+      "status": "proposed"
+    },
+    {
+      "instance_id": "GALLEY-01",
+      "module_id": "COMPACT-GALLEY",
+      "module_revision": 1,
+      "deck_id": "MAIN",
+      "position_mm": {
+        "x_mm": 7600,
+        "y_mm": 1000,
+        "z_mm": 0
+      },
+      "rotation_z_deg": 0,
+      "status": "proposed"
+    },
+    {
+      "instance_id": "MEDICAL-01",
+      "module_id": "MEDICAL-NOOK",
+      "module_revision": 1,
+      "deck_id": "MAIN",
+      "position_mm": {
+        "x_mm": 400,
+        "y_mm": 3000,
+        "z_mm": 0
+      },
+      "rotation_z_deg": 0,
+      "status": "proposed"
+    },
+    {
+      "instance_id": "FLEX-01",
+      "module_id": "FLEX-WORKSPACE",
+      "module_revision": 1,
+      "deck_id": "MAIN",
+      "position_mm": {
+        "x_mm": 2400,
+        "y_mm": 3000,
+        "z_mm": 0
+      },
+      "rotation_z_deg": 0,
+      "status": "proposed"
+    },
+    {
+      "instance_id": "STORAGE-01",
+      "module_id": "MODULE-STORAGE",
+      "module_revision": 1,
+      "deck_id": "MAIN",
+      "position_mm": {
+        "x_mm": 4800,
+        "y_mm": 3000,
+        "z_mm": 0
+      },
+      "rotation_z_deg": 0,
+      "status": "proposed"
+    }
+  ],
+  "platform_services": [
+    {
+      "service_id": "AC-BUS",
+      "medium": "electrical_power",
+      "direction": "source",
+      "capacity": {
+        "value": 8000,
+        "unit": "W",
+        "status": "design_assumption",
+        "source_ref": "SYNTHETIC-MOD-001",
+        "rationale": "Synthetic placeholder for workflow development; requires vessel-specific engineering evidence."
+      },
+      "connector_profile": "LD-INTERFACE-V1-PROVISIONAL"
+    },
+    {
+      "service_id": "FRESH-WATER",
+      "medium": "fresh_water",
+      "direction": "source",
+      "capacity": {
+        "value": 30,
+        "unit": "L/min",
+        "status": "design_assumption",
+        "source_ref": "SYNTHETIC-MOD-001",
+        "rationale": "Synthetic placeholder for workflow development; requires vessel-specific engineering evidence."
+      },
+      "connector_profile": "LD-INTERFACE-V1-PROVISIONAL"
+    },
+    {
+      "service_id": "GREY-WATER",
+      "medium": "greywater",
+      "direction": "sink",
+      "capacity": {
+        "value": 30,
+        "unit": "L/min",
+        "status": "design_assumption",
+        "source_ref": "SYNTHETIC-MOD-001",
+        "rationale": "Synthetic placeholder for workflow development; requires vessel-specific engineering evidence."
+      },
+      "connector_profile": "LD-INTERFACE-V1-PROVISIONAL"
+    },
+    {
+      "service_id": "BLACK-WATER",
+      "medium": "blackwater",
+      "direction": "sink",
+      "capacity": {
+        "value": 12,
+        "unit": "L/min",
+        "status": "design_assumption",
+        "source_ref": "SYNTHETIC-MOD-001",
+        "rationale": "Synthetic placeholder for workflow development; requires vessel-specific engineering evidence."
+      },
+      "connector_profile": "LD-INTERFACE-V1-PROVISIONAL"
+    },
+    {
+      "service_id": "EXHAUST",
+      "medium": "exhaust_air",
+      "direction": "sink",
+      "capacity": {
+        "value": 300,
+        "unit": "m3/h",
+        "status": "design_assumption",
+        "source_ref": "SYNTHETIC-MOD-001",
+        "rationale": "Synthetic placeholder for workflow development; requires vessel-specific engineering evidence."
+      },
+      "connector_profile": "LD-INTERFACE-V1-PROVISIONAL"
+    },
+    {
+      "service_id": "HVAC-SUPPLY",
+      "medium": "hvac_supply",
+      "direction": "source",
+      "capacity": {
+        "value": 450,
+        "unit": "m3/h",
+        "status": "design_assumption",
+        "source_ref": "SYNTHETIC-MOD-001",
+        "rationale": "Synthetic placeholder for workflow development; requires vessel-specific engineering evidence."
+      },
+      "connector_profile": "LD-INTERFACE-V1-PROVISIONAL"
+    },
+    {
+      "service_id": "DATA-NET",
+      "medium": "data_network",
+      "direction": "source",
+      "capacity": {
+        "value": 2000,
+        "unit": "Mbit/s",
+        "status": "design_assumption",
+        "source_ref": "SYNTHETIC-MOD-001",
+        "rationale": "Synthetic placeholder for workflow development; requires vessel-specific engineering evidence."
+      },
+      "connector_profile": "LD-INTERFACE-V1-PROVISIONAL"
+    },
+    {
+      "service_id": "STRUCTURE-RAIL",
+      "medium": "structural_mount",
+      "direction": "source",
+      "capacity": {
+        "value": 50000,
+        "unit": "N",
+        "status": "design_assumption",
+        "source_ref": "SYNTHETIC-MOD-001",
+        "rationale": "Synthetic placeholder for workflow development; requires vessel-specific engineering evidence."
+      },
+      "connector_profile": "LD-INTERFACE-V1-PROVISIONAL"
+    }
+  ],
+  "connections": [
+    {
+      "connection_id": "CONN-CABIN-01-AC_IN",
+      "medium": "electrical_power",
+      "endpoint_a": {
+        "kind": "module_port",
+        "instance_id": "CABIN-01",
+        "port_id": "AC_IN",
+        "service_id": null
+      },
+      "endpoint_b": {
+        "kind": "platform_service",
+        "instance_id": null,
+        "port_id": null,
+        "service_id": "AC-BUS"
+      },
+      "route_length_m": {
+        "value": null,
+        "status": "unknown",
+        "source_ref": null,
+        "rationale": "Routing and physical length are not yet designed."
+      },
+      "compatibility_status": "declared_unverified",
+      "evidence_refs": []
+    },
+    {
+      "connection_id": "CONN-CABIN-01-HVAC_IN",
+      "medium": "hvac_supply",
+      "endpoint_a": {
+        "kind": "module_port",
+        "instance_id": "CABIN-01",
+        "port_id": "HVAC_IN",
+        "service_id": null
+      },
+      "endpoint_b": {
+        "kind": "platform_service",
+        "instance_id": null,
+        "port_id": null,
+        "service_id": "HVAC-SUPPLY"
+      },
+      "route_length_m": {
+        "value": null,
+        "status": "unknown",
+        "source_ref": null,
+        "rationale": "Routing and physical length are not yet designed."
+      },
+      "compatibility_status": "declared_unverified",
+      "evidence_refs": []
+    },
+    {
+      "connection_id": "CONN-CABIN-01-STRUCTURE_MOUNT",
+      "medium": "structural_mount",
+      "endpoint_a": {
+        "kind": "module_port",
+        "instance_id": "CABIN-01",
+        "port_id": "STRUCTURE_MOUNT",
+        "service_id": null
+      },
+      "endpoint_b": {
+        "kind": "platform_service",
+        "instance_id": null,
+        "port_id": null,
+        "service_id": "STRUCTURE-RAIL"
+      },
+      "route_length_m": {
+        "value": null,
+        "status": "unknown",
+        "source_ref": null,
+        "rationale": "Routing and physical length are not yet designed."
+      },
+      "compatibility_status": "declared_unverified",
+      "evidence_refs": []
+    },
+    {
+      "connection_id": "CONN-CABIN-02-AC_IN",
+      "medium": "electrical_power",
+      "endpoint_a": {
+        "kind": "module_port",
+        "instance_id": "CABIN-02",
+        "port_id": "AC_IN",
+        "service_id": null
+      },
+      "endpoint_b": {
+        "kind": "platform_service",
+        "instance_id": null,
+        "port_id": null,
+        "service_id": "AC-BUS"
+      },
+      "route_length_m": {
+        "value": null,
+        "status": "unknown",
+        "source_ref": null,
+        "rationale": "Routing and physical length are not yet designed."
+      },
+      "compatibility_status": "declared_unverified",
+      "evidence_refs": []
+    },
+    {
+      "connection_id": "CONN-CABIN-02-HVAC_IN",
+      "medium": "hvac_supply",
+      "endpoint_a": {
+        "kind": "module_port",
+        "instance_id": "CABIN-02",
+        "port_id": "HVAC_IN",
+        "service_id": null
+      },
+      "endpoint_b": {
+        "kind": "platform_service",
+        "instance_id": null,
+        "port_id": null,
+        "service_id": "HVAC-SUPPLY"
+      },
+      "route_length_m": {
+        "value": null,
+        "status": "unknown",
+        "source_ref": null,
+        "rationale": "Routing and physical length are not yet designed."
+      },
+      "compatibility_status": "declared_unverified",
+      "evidence_refs": []
+    },
+    {
+      "connection_id": "CONN-CABIN-02-STRUCTURE_MOUNT",
+      "medium": "structural_mount",
+      "endpoint_a": {
+        "kind": "module_port",
+        "instance_id": "CABIN-02",
+        "port_id": "STRUCTURE_MOUNT",
+        "service_id": null
+      },
+      "endpoint_b": {
+        "kind": "platform_service",
+        "instance_id": null,
+        "port_id": null,
+        "service_id": "STRUCTURE-RAIL"
+      },
+      "route_length_m": {
+        "value": null,
+        "status": "unknown",
+        "source_ref": null,
+        "rationale": "Routing and physical length are not yet designed."
+      },
+      "compatibility_status": "declared_unverified",
+      "evidence_refs": []
+    },
+    {
+      "connection_id": "CONN-WETROOM-01-AC_IN",
+      "medium": "electrical_power",
+      "endpoint_a": {
+        "kind": "module_port",
+        "instance_id": "WETROOM-01",
+        "port_id": "AC_IN",
+        "service_id": null
+      },
+      "endpoint_b": {
+        "kind": "platform_service",
+        "instance_id": null,
+        "port_id": null,
+        "service_id": "AC-BUS"
+      },
+      "route_length_m": {
+        "value": null,
+        "status": "unknown",
+        "source_ref": null,
+        "rationale": "Routing and physical length are not yet designed."
+      },
+      "compatibility_status": "declared_unverified",
+      "evidence_refs": []
+    },
+    {
+      "connection_id": "CONN-WETROOM-01-WATER_IN",
+      "medium": "fresh_water",
+      "endpoint_a": {
+        "kind": "module_port",
+        "instance_id": "WETROOM-01",
+        "port_id": "WATER_IN",
+        "service_id": null
+      },
+      "endpoint_b": {
+        "kind": "platform_service",
+        "instance_id": null,
+        "port_id": null,
+        "service_id": "FRESH-WATER"
+      },
+      "route_length_m": {
+        "value": null,
+        "status": "unknown",
+        "source_ref": null,
+        "rationale": "Routing and physical length are not yet designed."
+      },
+      "compatibility_status": "declared_unverified",
+      "evidence_refs": []
+    },
+    {
+      "connection_id": "CONN-WETROOM-01-GREY_OUT",
+      "medium": "greywater",
+      "endpoint_a": {
+        "kind": "module_port",
+        "instance_id": "WETROOM-01",
+        "port_id": "GREY_OUT",
+        "service_id": null
+      },
+      "endpoint_b": {
+        "kind": "platform_service",
+        "instance_id": null,
+        "port_id": null,
+        "service_id": "GREY-WATER"
+      },
+      "route_length_m": {
+        "value": null,
+        "status": "unknown",
+        "source_ref": null,
+        "rationale": "Routing and physical length are not yet designed."
+      },
+      "compatibility_status": "declared_unverified",
+      "evidence_refs": []
+    },
+    {
+      "connection_id": "CONN-WETROOM-01-BLACK_OUT",
+      "medium": "blackwater",
+      "endpoint_a": {
+        "kind": "module_port",
+        "instance_id": "WETROOM-01",
+        "port_id": "BLACK_OUT",
+        "service_id": null
+      },
+      "endpoint_b": {
+        "kind": "platform_service",
+        "instance_id": null,
+        "port_id": null,
+        "service_id": "BLACK-WATER"
+      },
+      "route_length_m": {
+        "value": null,
+        "status": "unknown",
+        "source_ref": null,
+        "rationale": "Routing and physical length are not yet designed."
+      },
+      "compatibility_status": "declared_unverified",
+      "evidence_refs": []
+    },
+    {
+      "connection_id": "CONN-WETROOM-01-EXHAUST_OUT",
+      "medium": "exhaust_air",
+      "endpoint_a": {
+        "kind": "module_port",
+        "instance_id": "WETROOM-01",
+        "port_id": "EXHAUST_OUT",
+        "service_id": null
+      },
+      "endpoint_b": {
+        "kind": "platform_service",
+        "instance_id": null,
+        "port_id": null,
+        "service_id": "EXHAUST"
+      },
+      "route_length_m": {
+        "value": null,
+        "status": "unknown",
+        "source_ref": null,
+        "rationale": "Routing and physical length are not yet designed."
+      },
+      "compatibility_status": "declared_unverified",
+      "evidence_refs": []
+    },
+    {
+      "connection_id": "CONN-WETROOM-01-STRUCTURE_MOUNT",
+      "medium": "structural_mount",
+      "endpoint_a": {
+        "kind": "module_port",
+        "instance_id": "WETROOM-01",
+        "port_id": "STRUCTURE_MOUNT",
+        "service_id": null
+      },
+      "endpoint_b": {
+        "kind": "platform_service",
+        "instance_id": null,
+        "port_id": null,
+        "service_id": "STRUCTURE-RAIL"
+      },
+      "route_length_m": {
+        "value": null,
+        "status": "unknown",
+        "source_ref": null,
+        "rationale": "Routing and physical length are not yet designed."
+      },
+      "compatibility_status": "declared_unverified",
+      "evidence_refs": []
+    },
+    {
+      "connection_id": "CONN-GALLEY-01-AC_IN",
+      "medium": "electrical_power",
+      "endpoint_a": {
+        "kind": "module_port",
+        "instance_id": "GALLEY-01",
+        "port_id": "AC_IN",
+        "service_id": null
+      },
+      "endpoint_b": {
+        "kind": "platform_service",
+        "instance_id": null,
+        "port_id": null,
+        "service_id": "AC-BUS"
+      },
+      "route_length_m": {
+        "value": null,
+        "status": "unknown",
+        "source_ref": null,
+        "rationale": "Routing and physical length are not yet designed."
+      },
+      "compatibility_status": "declared_unverified",
+      "evidence_refs": []
+    },
+    {
+      "connection_id": "CONN-GALLEY-01-WATER_IN",
+      "medium": "fresh_water",
+      "endpoint_a": {
+        "kind": "module_port",
+        "instance_id": "GALLEY-01",
+        "port_id": "WATER_IN",
+        "service_id": null
+      },
+      "endpoint_b": {
+        "kind": "platform_service",
+        "instance_id": null,
+        "port_id": null,
+        "service_id": "FRESH-WATER"
+      },
+      "route_length_m": {
+        "value": null,
+        "status": "unknown",
+        "source_ref": null,
+        "rationale": "Routing and physical length are not yet designed."
+      },
+      "compatibility_status": "declared_unverified",
+      "evidence_refs": []
+    },
+    {
+      "connection_id": "CONN-GALLEY-01-GREY_OUT",
+      "medium": "greywater",
+      "endpoint_a": {
+        "kind": "module_port",
+        "instance_id": "GALLEY-01",
+        "port_id": "GREY_OUT",
+        "service_id": null
+      },
+      "endpoint_b": {
+        "kind": "platform_service",
+        "instance_id": null,
+        "port_id": null,
+        "service_id": "GREY-WATER"
+      },
+      "route_length_m": {
+        "value": null,
+        "status": "unknown",
+        "source_ref": null,
+        "rationale": "Routing and physical length are not yet designed."
+      },
+      "compatibility_status": "declared_unverified",
+      "evidence_refs": []
+    },
+    {
+      "connection_id": "CONN-GALLEY-01-EXHAUST_OUT",
+      "medium": "exhaust_air",
+      "endpoint_a": {
+        "kind": "module_port",
+        "instance_id": "GALLEY-01",
+        "port_id": "EXHAUST_OUT",
+        "service_id": null
+      },
+      "endpoint_b": {
+        "kind": "platform_service",
+        "instance_id": null,
+        "port_id": null,
+        "service_id": "EXHAUST"
+      },
+      "route_length_m": {
+        "value": null,
+        "status": "unknown",
+        "source_ref": null,
+        "rationale": "Routing and physical length are not yet designed."
+      },
+      "compatibility_status": "declared_unverified",
+      "evidence_refs": []
+    },
+    {
+      "connection_id": "CONN-GALLEY-01-STRUCTURE_MOUNT",
+      "medium": "structural_mount",
+      "endpoint_a": {
+        "kind": "module_port",
+        "instance_id": "GALLEY-01",
+        "port_id": "STRUCTURE_MOUNT",
+        "service_id": null
+      },
+      "endpoint_b": {
+        "kind": "platform_service",
+        "instance_id": null,
+        "port_id": null,
+        "service_id": "STRUCTURE-RAIL"
+      },
+      "route_length_m": {
+        "value": null,
+        "status": "unknown",
+        "source_ref": null,
+        "rationale": "Routing and physical length are not yet designed."
+      },
+      "compatibility_status": "declared_unverified",
+      "evidence_refs": []
+    },
+    {
+      "connection_id": "CONN-MEDICAL-01-AC_IN",
+      "medium": "electrical_power",
+      "endpoint_a": {
+        "kind": "module_port",
+        "instance_id": "MEDICAL-01",
+        "port_id": "AC_IN",
+        "service_id": null
+      },
+      "endpoint_b": {
+        "kind": "platform_service",
+        "instance_id": null,
+        "port_id": null,
+        "service_id": "AC-BUS"
+      },
+      "route_length_m": {
+        "value": null,
+        "status": "unknown",
+        "source_ref": null,
+        "rationale": "Routing and physical length are not yet designed."
+      },
+      "compatibility_status": "declared_unverified",
+      "evidence_refs": []
+    },
+    {
+      "connection_id": "CONN-MEDICAL-01-DATA_IN",
+      "medium": "data_network",
+      "endpoint_a": {
+        "kind": "module_port",
+        "instance_id": "MEDICAL-01",
+        "port_id": "DATA_IN",
+        "service_id": null
+      },
+      "endpoint_b": {
+        "kind": "platform_service",
+        "instance_id": null,
+        "port_id": null,
+        "service_id": "DATA-NET"
+      },
+      "route_length_m": {
+        "value": null,
+        "status": "unknown",
+        "source_ref": null,
+        "rationale": "Routing and physical length are not yet designed."
+      },
+      "compatibility_status": "declared_unverified",
+      "evidence_refs": []
+    },
+    {
+      "connection_id": "CONN-MEDICAL-01-HVAC_IN",
+      "medium": "hvac_supply",
+      "endpoint_a": {
+        "kind": "module_port",
+        "instance_id": "MEDICAL-01",
+        "port_id": "HVAC_IN",
+        "service_id": null
+      },
+      "endpoint_b": {
+        "kind": "platform_service",
+        "instance_id": null,
+        "port_id": null,
+        "service_id": "HVAC-SUPPLY"
+      },
+      "route_length_m": {
+        "value": null,
+        "status": "unknown",
+        "source_ref": null,
+        "rationale": "Routing and physical length are not yet designed."
+      },
+      "compatibility_status": "declared_unverified",
+      "evidence_refs": []
+    },
+    {
+      "connection_id": "CONN-MEDICAL-01-STRUCTURE_MOUNT",
+      "medium": "structural_mount",
+      "endpoint_a": {
+        "kind": "module_port",
+        "instance_id": "MEDICAL-01",
+        "port_id": "STRUCTURE_MOUNT",
+        "service_id": null
+      },
+      "endpoint_b": {
+        "kind": "platform_service",
+        "instance_id": null,
+        "port_id": null,
+        "service_id": "STRUCTURE-RAIL"
+      },
+      "route_length_m": {
+        "value": null,
+        "status": "unknown",
+        "source_ref": null,
+        "rationale": "Routing and physical length are not yet designed."
+      },
+      "compatibility_status": "declared_unverified",
+      "evidence_refs": []
+    },
+    {
+      "connection_id": "CONN-FLEX-01-AC_IN",
+      "medium": "electrical_power",
+      "endpoint_a": {
+        "kind": "module_port",
+        "instance_id": "FLEX-01",
+        "port_id": "AC_IN",
+        "service_id": null
+      },
+      "endpoint_b": {
+        "kind": "platform_service",
+        "instance_id": null,
+        "port_id": null,
+        "service_id": "AC-BUS"
+      },
+      "route_length_m": {
+        "value": null,
+        "status": "unknown",
+        "source_ref": null,
+        "rationale": "Routing and physical length are not yet designed."
+      },
+      "compatibility_status": "declared_unverified",
+      "evidence_refs": []
+    },
+    {
+      "connection_id": "CONN-FLEX-01-DATA_IN",
+      "medium": "data_network",
+      "endpoint_a": {
+        "kind": "module_port",
+        "instance_id": "FLEX-01",
+        "port_id": "DATA_IN",
+        "service_id": null
+      },
+      "endpoint_b": {
+        "kind": "platform_service",
+        "instance_id": null,
+        "port_id": null,
+        "service_id": "DATA-NET"
+      },
+      "route_length_m": {
+        "value": null,
+        "status": "unknown",
+        "source_ref": null,
+        "rationale": "Routing and physical length are not yet designed."
+      },
+      "compatibility_status": "declared_unverified",
+      "evidence_refs": []
+    },
+    {
+      "connection_id": "CONN-FLEX-01-HVAC_IN",
+      "medium": "hvac_supply",
+      "endpoint_a": {
+        "kind": "module_port",
+        "instance_id": "FLEX-01",
+        "port_id": "HVAC_IN",
+        "service_id": null
+      },
+      "endpoint_b": {
+        "kind": "platform_service",
+        "instance_id": null,
+        "port_id": null,
+        "service_id": "HVAC-SUPPLY"
+      },
+      "route_length_m": {
+        "value": null,
+        "status": "unknown",
+        "source_ref": null,
+        "rationale": "Routing and physical length are not yet designed."
+      },
+      "compatibility_status": "declared_unverified",
+      "evidence_refs": []
+    },
+    {
+      "connection_id": "CONN-FLEX-01-STRUCTURE_MOUNT",
+      "medium": "structural_mount",
+      "endpoint_a": {
+        "kind": "module_port",
+        "instance_id": "FLEX-01",
+        "port_id": "STRUCTURE_MOUNT",
+        "service_id": null
+      },
+      "endpoint_b": {
+        "kind": "platform_service",
+        "instance_id": null,
+        "port_id": null,
+        "service_id": "STRUCTURE-RAIL"
+      },
+      "route_length_m": {
+        "value": null,
+        "status": "unknown",
+        "source_ref": null,
+        "rationale": "Routing and physical length are not yet designed."
+      },
+      "compatibility_status": "declared_unverified",
+      "evidence_refs": []
+    },
+    {
+      "connection_id": "CONN-STORAGE-01-STRUCTURE_MOUNT",
+      "medium": "structural_mount",
+      "endpoint_a": {
+        "kind": "module_port",
+        "instance_id": "STORAGE-01",
+        "port_id": "STRUCTURE_MOUNT",
+        "service_id": null
+      },
+      "endpoint_b": {
+        "kind": "platform_service",
+        "instance_id": null,
+        "port_id": null,
+        "service_id": "STRUCTURE-RAIL"
+      },
+      "route_length_m": {
+        "value": null,
+        "status": "unknown",
+        "source_ref": null,
+        "rationale": "Routing and physical length are not yet designed."
+      },
+      "compatibility_status": "declared_unverified",
+      "evidence_refs": []
+    }
+  ],
+  "reserved_regions": [
+    {
+      "region_id": "REGION-EGRESS-01",
+      "deck_id": "MAIN",
+      "bounds_mm": {
+        "x_min_mm": 0,
+        "x_max_mm": 14000,
+        "y_min_mm": 0,
+        "y_max_mm": 800,
+        "z_min_mm": 0,
+        "z_max_mm": 2400
+      },
+      "purpose": "egress_route",
+      "clearance_rule": "keep_clear",
+      "evidence_status": "design_assumption"
+    },
+    {
+      "region_id": "REGION-SERVICE-ACCESS-01",
+      "deck_id": "MAIN",
+      "bounds_mm": {
+        "x_min_mm": 12000,
+        "x_max_mm": 14000,
+        "y_min_mm": 0,
+        "y_max_mm": 5000,
+        "z_min_mm": 0,
+        "z_max_mm": 2400
+      },
+      "purpose": "service_access",
+      "clearance_rule": "access_required",
+      "evidence_status": "design_assumption"
+    }
+  ],
+  "safety_gates": [
+    {
+      "gate_id": "GATE-FIRE",
+      "category": "fire_safety",
+      "disposition": "not_assessed",
+      "evidence_refs": [],
+      "notes": "No vessel-specific verification has been performed; do not infer compliance."
+    },
+    {
+      "gate_id": "GATE-EGRESS",
+      "category": "means_of_escape",
+      "disposition": "not_assessed",
+      "evidence_refs": [],
+      "notes": "No vessel-specific verification has been performed; do not infer compliance."
+    },
+    {
+      "gate_id": "GATE-ACCESS",
+      "category": "accessibility",
+      "disposition": "not_assessed",
+      "evidence_refs": [],
+      "notes": "No vessel-specific verification has been performed; do not infer compliance."
+    },
+    {
+      "gate_id": "GATE-STRUCTURE",
+      "category": "structural_attachments",
+      "disposition": "not_assessed",
+      "evidence_refs": [],
+      "notes": "No vessel-specific verification has been performed; do not infer compliance."
+    },
+    {
+      "gate_id": "GATE-STABILITY",
+      "category": "stability_and_cg",
+      "disposition": "not_assessed",
+      "evidence_refs": [],
+      "notes": "No vessel-specific verification has been performed; do not infer compliance."
+    },
+    {
+      "gate_id": "GATE-ELECTRICAL",
+      "category": "electrical_protection",
+      "disposition": "not_assessed",
+      "evidence_refs": [],
+      "notes": "No vessel-specific verification has been performed; do not infer compliance."
+    },
+    {
+      "gate_id": "GATE-POTABLE",
+      "category": "potable_water",
+      "disposition": "not_assessed",
+      "evidence_refs": [],
+      "notes": "No vessel-specific verification has been performed; do not infer compliance."
+    },
+    {
+      "gate_id": "GATE-WASTEWATER",
+      "category": "wastewater",
+      "disposition": "not_assessed",
+      "evidence_refs": [],
+      "notes": "No vessel-specific verification has been performed; do not infer compliance."
+    },
+    {
+      "gate_id": "GATE-VENTILATION",
+      "category": "ventilation",
+      "disposition": "not_assessed",
+      "evidence_refs": [],
+      "notes": "No vessel-specific verification has been performed; do not infer compliance."
+    },
+    {
+      "gate_id": "GATE-EQUIPMENT-ACCESS",
+      "category": "emergency_equipment_access",
+      "disposition": "not_assessed",
+      "evidence_refs": [],
+      "notes": "No vessel-specific verification has been performed; do not infer compliance."
+    },
+    {
+      "gate_id": "GATE-MAINTAINABILITY",
+      "category": "maintainability",
+      "disposition": "not_assessed",
+      "evidence_refs": [],
+      "notes": "No vessel-specific verification has been performed; do not infer compliance."
+    }
+  ],
+  "assumptions": [
+    {
+      "assumption_id": "ASSUMED-SYNTHETIC-GEOMETRY",
+      "category": "geometry",
+      "statement": "The deck and module envelopes are synthetic, axis-aligned rectangles used only to exercise a future configuration checker.",
+      "status": "untested",
+      "falsification_method": "Replace all values with a vessel-specific CAD/engineering model and compare geometric intersections."
+    },
+    {
+      "assumption_id": "ASSUMED-INTERFACE-PROFILES",
+      "category": "services",
+      "statement": "LD-MOD-PORT-V1-PROVISIONAL is a placeholder profile and is not an industry-standard connector.",
+      "status": "untested",
+      "falsification_method": "Define a versioned interface specification and verify each connection against supplier/platform ratings."
+    },
+    {
+      "assumption_id": "ASSUMED-MASS-VALUES",
+      "category": "mass",
+      "statement": "Module masses and local centres of gravity are invented design assumptions, not vendor or measured data.",
+      "status": "untested",
+      "falsification_method": "Obtain supplier mass properties or weigh production modules and verify the installed configuration."
+    }
+  ],
+  "provenance": [
+    {
+      "source_id": "SYNTHETIC-MOD-001",
+      "title": "Authored synthetic modular-interior example",
+      "uri": "urn:luminous-dynamics:symthaea:synthetic:marine-mod-001",
+      "scope": "All numerical module, mass and service values in this fixture are invented placeholders.",
+      "source_type": "authored_synthetic"
+    }
+  ],
+  "claim_ceiling": "Synthetic layout and interface manifest only. It does not demonstrate actual fit, weight closure, centre of gravity, stability, structural adequacy, fire compliance, safe egress, accessibility, habitability, power/water capacity, or approval for construction."
+}
