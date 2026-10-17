@@ -88,8 +88,43 @@ pub struct MdResult {
     pub total_steps: usize,
 }
 
-/// Compute forces on all atoms via central finite differences.
+/// Compatibility helper for callers that expect finite-difference forces directly.
+/// The checked AIMD runner calls compute_forces_checked and returns typed failures.
 fn compute_forces(mol: &Molecule, fd_step: f64) -> Vec<[f64; 3]> {
+    compute_forces_checked(mol, fd_step, 0)
+        .unwrap_or_else(|error| panic!("finite-difference force evaluation failed: {error}"))
+}
+
+/// Reject finite-difference shifts that overflow or round back to the original value.
+fn validate_perturbed_coordinate(
+    original: f64,
+    perturbed: f64,
+    step: usize,
+    atom_index: usize,
+    axis: usize,
+    direction: i8,
+) -> Result<(), MdRunError> {
+    if !perturbed.is_finite() {
+        return Err(MdRunError::NonFinitePosition { step, atom_index, axis });
+    }
+    if perturbed == original {
+        return Err(MdRunError::UnrepresentablePerturbation {
+            step,
+            atom_index,
+            axis,
+            direction,
+        });
+    }
+    Ok(())
+}
+
+/// Checked central-difference forces; perturbations and energies are validated
+/// before they can reach subsequent integration work.
+fn compute_forces_checked(
+    mol: &Molecule,
+    fd_step: f64,
+    step: usize,
+) -> Result<Vec<[f64; 3]>, MdRunError> {
     let n_atoms = mol.n_atoms();
     let mut forces = vec![[0.0; 3]; n_atoms];
     let scf_config = RhfConfig::default();
@@ -97,21 +132,83 @@ fn compute_forces(mol: &Molecule, fd_step: f64) -> Vec<[f64; 3]> {
     for atom_idx in 0..n_atoms {
         for coord in 0..3 {
             let mut mol_plus = mol.clone();
+            let original = mol.atoms[atom_idx].position[coord];
             mol_plus.atoms[atom_idx].position[coord] += fd_step;
+            validate_perturbed_coordinate(
+                original,
+                mol_plus.atoms[atom_idx].position[coord],
+                step,
+                atom_idx,
+                coord,
+                1,
+            )?;
+            for (idx, atom) in mol_plus.atoms.iter().enumerate() {
+                for (axis, value) in atom.position.iter().enumerate() {
+                    if !value.is_finite() {
+                        return Err(MdRunError::NonFinitePosition {
+                            step,
+                            atom_index: idx,
+                            axis,
+                        });
+                    }
+                }
+            }
             let basis_p = Sto3g::build(&mol_plus);
             let e_plus = restricted_hartree_fock(&mol_plus, &basis_p, &scf_config).total_energy;
+            if !e_plus.is_finite() {
+                return Err(MdRunError::NonFiniteForceEnergy {
+                    step,
+                    atom_index: atom_idx,
+                    axis: coord,
+                    direction: 1,
+                });
+            }
 
             let mut mol_minus = mol.clone();
             mol_minus.atoms[atom_idx].position[coord] -= fd_step;
+            validate_perturbed_coordinate(
+                original,
+                mol_minus.atoms[atom_idx].position[coord],
+                step,
+                atom_idx,
+                coord,
+                -1,
+            )?;
+            for (idx, atom) in mol_minus.atoms.iter().enumerate() {
+                for (axis, value) in atom.position.iter().enumerate() {
+                    if !value.is_finite() {
+                        return Err(MdRunError::NonFinitePosition {
+                            step,
+                            atom_index: idx,
+                            axis,
+                        });
+                    }
+                }
+            }
             let basis_m = Sto3g::build(&mol_minus);
             let e_minus = restricted_hartree_fock(&mol_minus, &basis_m, &scf_config).total_energy;
+            if !e_minus.is_finite() {
+                return Err(MdRunError::NonFiniteForceEnergy {
+                    step,
+                    atom_index: atom_idx,
+                    axis: coord,
+                    direction: -1,
+                });
+            }
 
-            // Force = -dE/dx
-            forces[atom_idx][coord] = -(e_plus - e_minus) / (2.0 * fd_step);
+            let force = -(e_plus - e_minus) / (2.0 * fd_step);
+            if !force.is_finite() {
+                return Err(MdRunError::NonFiniteForce {
+                    step,
+                    atom_index: atom_idx,
+                    axis: coord,
+                });
+            }
+            forces[atom_idx][coord] = force;
         }
     }
 
-    forces
+    Ok(forces)
 }
 
 /// Fixed default seed retained for backwards-reproducible run_md calls.
@@ -241,6 +338,7 @@ pub enum MdInputError {
     NegativeTemperature,
     NonFiniteFiniteDifferenceStep,
     NonPositiveFiniteDifferenceStep,
+    NonFiniteFiniteDifferenceDenominator,
     StepCountOverflow,
     NonFiniteTrajectoryDuration,
 }
@@ -281,6 +379,9 @@ impl std::fmt::Display for MdInputError {
             Self::NonPositiveFiniteDifferenceStep => {
                 write!(f, "finite-difference step must be greater than zero")
             }
+            Self::NonFiniteFiniteDifferenceDenominator => {
+                write!(f, "twice the finite-difference step must be finite for the central-difference denominator")
+            }
             Self::StepCountOverflow => {
                 write!(f, "step count plus initial frame overflows usize")
             }
@@ -292,6 +393,65 @@ impl std::fmt::Display for MdInputError {
 }
 
 impl std::error::Error for MdInputError {}
+
+/// Numerical/runtime failures detected by the checked molecular AIMD integrator.
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub enum MdRunError {
+    InvalidInput(MdInputError),
+    NonFinitePosition { step: usize, atom_index: usize, axis: usize },
+    UnrepresentablePerturbation {
+        step: usize,
+        atom_index: usize,
+        axis: usize,
+        direction: i8,
+    },
+    NonFiniteForce { step: usize, atom_index: usize, axis: usize },
+    NonFiniteForceEnergy {
+        step: usize,
+        atom_index: usize,
+        axis: usize,
+        direction: i8,
+    },
+    NonFiniteVelocity { step: usize, atom_index: usize, axis: usize },
+    NonFinitePotentialEnergy { step: usize },
+    NonFiniteKineticEnergy { step: usize },
+    NonFiniteTemperature { step: usize },
+}
+
+impl std::fmt::Display for MdRunError {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        match self {
+            Self::InvalidInput(error) => write!(f, "invalid AIMD input: {error}"),
+            Self::NonFinitePosition { step, atom_index, axis } => write!(
+                f, "non-finite position at step {step}, atom {atom_index}, axis {axis}"
+            ),
+            Self::UnrepresentablePerturbation { step, atom_index, axis, direction } => write!(
+                f, "finite-difference perturbation rounded away at step {step}, atom {atom_index}, axis {axis}, direction {direction}"
+            ),
+            Self::NonFiniteForce { step, atom_index, axis } => write!(
+                f, "non-finite force at step {step}, atom {atom_index}, axis {axis}"
+            ),
+            Self::NonFiniteForceEnergy { step, atom_index, axis, direction } => write!(
+                f,
+                "non-finite perturbed energy at step {step}, atom {atom_index}, axis {axis}, direction {direction}"
+            ),
+            Self::NonFiniteVelocity { step, atom_index, axis } => write!(
+                f, "non-finite velocity at step {step}, atom {atom_index}, axis {axis}"
+            ),
+            Self::NonFinitePotentialEnergy { step } => {
+                write!(f, "non-finite potential energy at step {step}")
+            }
+            Self::NonFiniteKineticEnergy { step } => {
+                write!(f, "non-finite kinetic energy at step {step}")
+            }
+            Self::NonFiniteTemperature { step } => {
+                write!(f, "non-finite temperature at step {step}")
+            }
+        }
+    }
+}
+
+impl std::error::Error for MdRunError {}
 
 /// Validate molecular AIMD inputs before basis construction or SCF evaluation.
 ///
@@ -330,6 +490,11 @@ pub fn validate_md_inputs(molecule: &Molecule, config: &MdConfig) -> Result<(), 
     }
     if config.fd_step <= 0.0 {
         return Err(MdInputError::NonPositiveFiniteDifferenceStep);
+    }
+    // The central-difference formula divides by 2 * fd_step; reject overflow
+    // before any basis construction or SCF evaluation.
+    if !(2.0 * config.fd_step).is_finite() {
+        return Err(MdInputError::NonFiniteFiniteDifferenceDenominator);
     }
 
     for (atom_index, atom) in molecule.atoms.iter().enumerate() {
@@ -371,18 +536,20 @@ pub fn validate_md_inputs(molecule: &Molecule, config: &MdConfig) -> Result<(), 
 pub fn run_md_checked(
     molecule: &Molecule,
     config: &MdConfig,
-) -> Result<MdResult, MdInputError> {
+) -> Result<MdResult, MdRunError> {
     run_md_checked_with_seed(molecule, config, DEFAULT_MD_SEED)
 }
 
 /// Checked molecular AIMD entry point with a reproducible, explicit seed.
+///
+/// Input errors and non-finite numerical states are returned as typed errors.
 pub fn run_md_checked_with_seed(
     molecule: &Molecule,
     config: &MdConfig,
     seed: u64,
-) -> Result<MdResult, MdInputError> {
-    validate_md_inputs(molecule, config)?;
-    Ok(run_md_validated_with_seed(molecule, config, seed))
+) -> Result<MdResult, MdRunError> {
+    validate_md_inputs(molecule, config).map_err(MdRunError::InvalidInput)?;
+    run_md_validated_with_seed(molecule, config, seed)
 }
 
 
@@ -401,10 +568,65 @@ pub fn run_md(molecule: &Molecule, config: &MdConfig) -> MdResult {
 /// qualify the underlying electronic-structure model or trajectory physics.
 pub fn run_md_with_seed(molecule: &Molecule, config: &MdConfig, seed: u64) -> MdResult {
     run_md_checked_with_seed(molecule, config, seed)
-        .unwrap_or_else(|error| panic!("invalid AIMD inputs: {error}"))
+        .unwrap_or_else(|error| panic!("AIMD run failed: {error}"))
 }
 
-fn run_md_validated_with_seed(molecule: &Molecule, config: &MdConfig, seed: u64) -> MdResult {
+fn validate_finite_positions(step: usize, values: &[[f64; 3]]) -> Result<(), MdRunError> {
+    for (atom_index, vector) in values.iter().enumerate() {
+        for (axis, value) in vector.iter().enumerate() {
+            if !value.is_finite() {
+                return Err(MdRunError::NonFinitePosition { step, atom_index, axis });
+            }
+        }
+    }
+    Ok(())
+}
+
+fn validate_finite_forces(step: usize, values: &[[f64; 3]]) -> Result<(), MdRunError> {
+    for (atom_index, vector) in values.iter().enumerate() {
+        for (axis, value) in vector.iter().enumerate() {
+            if !value.is_finite() {
+                return Err(MdRunError::NonFiniteForce { step, atom_index, axis });
+            }
+        }
+    }
+    Ok(())
+}
+
+fn validate_finite_velocities(step: usize, values: &[[f64; 3]]) -> Result<(), MdRunError> {
+    for (atom_index, vector) in values.iter().enumerate() {
+        for (axis, value) in vector.iter().enumerate() {
+            if !value.is_finite() {
+                return Err(MdRunError::NonFiniteVelocity { step, atom_index, axis });
+            }
+        }
+    }
+    Ok(())
+}
+
+fn validate_finite_observables(
+    step: usize,
+    potential_energy: f64,
+    kinetic_energy: f64,
+    temperature: f64,
+) -> Result<(), MdRunError> {
+    if !potential_energy.is_finite() {
+        return Err(MdRunError::NonFinitePotentialEnergy { step });
+    }
+    if !kinetic_energy.is_finite() {
+        return Err(MdRunError::NonFiniteKineticEnergy { step });
+    }
+    if !temperature.is_finite() {
+        return Err(MdRunError::NonFiniteTemperature { step });
+    }
+    Ok(())
+}
+
+fn run_md_validated_with_seed(
+    molecule: &Molecule,
+    config: &MdConfig,
+    seed: u64,
+) -> Result<MdResult, MdRunError> {
     let n_atoms = molecule.n_atoms();
     let masses: Vec<f64> = molecule
         .atoms
@@ -414,15 +636,22 @@ fn run_md_validated_with_seed(molecule: &Molecule, config: &MdConfig, seed: u64)
 
     let mut positions: Vec<[f64; 3]> = molecule.atoms.iter().map(|a| a.position).collect();
     let mut velocities = initialize_velocities(&masses, config.temperature, seed);
+    validate_finite_velocities(0, &velocities)?;
 
-    // Initial forces
+    // Initial forces are checked before the trajectory proceeds to energy and
+    // integration; non-finite force estimates can otherwise poison positions.
     let mut mol = molecule.clone();
-    let mut forces = compute_forces(&mol, config.fd_step);
+    let mut forces = compute_forces_checked(&mol, config.fd_step, 0)?;
+    validate_finite_forces(0, &forces)?;
     let basis = Sto3g::build(&mol);
     let mut energy = restricted_hartree_fock(&mol, &basis, &RhfConfig::default()).total_energy;
+    if !energy.is_finite() {
+        return Err(MdRunError::NonFinitePotentialEnergy { step: 0 });
+    }
 
     let mut frames = Vec::with_capacity(config.n_steps + 1);
     let (ke, temp) = kinetic_energy_and_temperature(&velocities, &masses);
+    validate_finite_observables(0, energy, ke, temp)?;
     frames.push(MdFrame {
         positions: positions.clone(),
         velocities: velocities.clone(),
@@ -444,15 +673,21 @@ fn run_md_validated_with_seed(molecule: &Molecule, config: &MdConfig, seed: u64)
             }
         }
 
-        // Update molecule for force evaluation
+        // Reject non-finite coordinates before basis construction or SCF.
+        validate_finite_positions(step + 1, &positions)?;
+        // Update molecule for force evaluation only after that check.
         for i in 0..n_atoms {
             mol.atoms[i].position = positions[i];
         }
 
-        // New forces
-        let forces_new = compute_forces(&mol, config.fd_step);
+        // New forces; check them before the follow-on energy evaluation.
+        let forces_new = compute_forces_checked(&mol, config.fd_step, step + 1)?;
+        validate_finite_forces(step + 1, &forces_new)?;
         let basis = Sto3g::build(&mol);
         energy = restricted_hartree_fock(&mol, &basis, &RhfConfig::default()).total_energy;
+        if !energy.is_finite() {
+            return Err(MdRunError::NonFinitePotentialEnergy { step: step + 1 });
+        }
 
         // Update velocities: v(t+dt) = v(t) + 0.5*(a(t) + a(t+dt))*dt
         for i in 0..n_atoms {
@@ -463,9 +698,11 @@ fn run_md_validated_with_seed(molecule: &Molecule, config: &MdConfig, seed: u64)
             }
         }
 
+        validate_finite_velocities(step + 1, &velocities)?;
         forces = forces_new;
 
         let (ke, temp) = kinetic_energy_and_temperature(&velocities, &masses);
+        validate_finite_observables(step + 1, energy, ke, temp)?;
         frames.push(MdFrame {
             positions: positions.clone(),
             velocities: velocities.clone(),
@@ -476,10 +713,10 @@ fn run_md_validated_with_seed(molecule: &Molecule, config: &MdConfig, seed: u64)
         });
     }
 
-    MdResult {
+    Ok(MdResult {
         frames,
         total_steps: config.n_steps,
-    }
+    })
 }
 
 #[cfg(test)]
@@ -608,6 +845,70 @@ mod tests {
         assert!((variance - 1.0).abs() < 0.05, "sample variance was {variance}");
     }
     #[test]
+    fn checked_force_rejects_perturbation_rounded_away_before_solver() {
+        let mut molecule = Molecule::h2();
+        molecule.atoms[0].position[0] = 1.0e300;
+        let result = compute_forces_checked(&molecule, 0.005, 7);
+        assert_eq!(
+            result,
+            Err(MdRunError::UnrepresentablePerturbation {
+                step: 7,
+                atom_index: 0,
+                axis: 0,
+                direction: 1,
+            })
+        );
+    }
+
+    #[test]
+    fn checked_force_evaluation_rejects_overflowed_perturbation() {
+        let mut molecule = Molecule::h2();
+        molecule.atoms[0].position[0] = 1.0e308;
+        let result = compute_forces_checked(&molecule, 1.0e308, 7);
+        assert_eq!(
+            result,
+            Err(MdRunError::NonFinitePosition {
+                step: 7,
+                atom_index: 0,
+                axis: 0,
+            })
+        );
+    }
+
+    #[test]
+    fn runtime_guards_reject_non_finite_vector_states() {
+        assert_eq!(
+            validate_finite_positions(3, &[[f64::NAN, 0.0, 0.0]]),
+            Err(MdRunError::NonFinitePosition { step: 3, atom_index: 0, axis: 0 })
+        );
+        assert_eq!(
+            validate_finite_forces(4, &[[0.0, f64::INFINITY, 0.0]]),
+            Err(MdRunError::NonFiniteForce { step: 4, atom_index: 0, axis: 1 })
+        );
+        assert_eq!(
+            validate_finite_velocities(5, &[[0.0, 0.0, f64::NEG_INFINITY]]),
+            Err(MdRunError::NonFiniteVelocity { step: 5, atom_index: 0, axis: 2 })
+        );
+    }
+
+    #[test]
+    fn runtime_guards_reject_non_finite_observables() {
+        assert_eq!(
+            validate_finite_observables(2, f64::NAN, 0.0, 300.0),
+            Err(MdRunError::NonFinitePotentialEnergy { step: 2 })
+        );
+        assert_eq!(
+            validate_finite_observables(2, -1.0, f64::INFINITY, 300.0),
+            Err(MdRunError::NonFiniteKineticEnergy { step: 2 })
+        );
+        assert_eq!(
+            validate_finite_observables(2, -1.0, 0.1, f64::NAN),
+            Err(MdRunError::NonFiniteTemperature { step: 2 })
+        );
+        assert!(validate_finite_observables(0, -1.0, 0.1, 300.0).is_ok());
+    }
+
+    #[test]
     fn validate_default_h2_inputs() {
         let molecule = Molecule::h2();
         assert_eq!(validate_md_inputs(&molecule, &MdConfig::default()), Ok(()));
@@ -627,7 +928,7 @@ mod tests {
         let molecule = Molecule::new(vec![]);
         assert!(matches!(
             run_md_checked(&molecule, &MdConfig::default()),
-            Err(MdInputError::EmptyMolecule)
+            Err(MdRunError::InvalidInput(MdInputError::EmptyMolecule))
         ));
     }
 
@@ -655,6 +956,11 @@ mod tests {
         assert_eq!(
             validate_md_inputs(&molecule, &config),
             Err(MdInputError::NonFiniteFiniteDifferenceStep)
+        );
+        config.fd_step = 1.0e308;
+        assert_eq!(
+            validate_md_inputs(&molecule, &config),
+            Err(MdInputError::NonFiniteFiniteDifferenceDenominator)
         );
     }
 
