@@ -122,6 +122,7 @@ pub enum RouteDisposition {
     NoPath,
     EndpointBlocked,
     SearchBudgetExceeded,
+    InvalidGeneratedPath,
 }
 
 #[derive(Clone, Debug, Deserialize, Serialize, PartialEq, Eq)]
@@ -981,9 +982,18 @@ pub fn route_services(
             complete_cells.extend(path_outcome.cells.iter().skip(1).copied());
             complete_cells.extend(end_approach.iter().rev().skip(1).copied());
             let (length, bends, cost) = path_metrics(&grid, &complete_cells, request.bend_penalty_mm);
-            path_outcome.length_mm = length;
-            path_outcome.bend_count = bends;
-            path_outcome.search_cost_mm = cost;
+            if let (Some(length), Some(bends), Some(cost)) = (length, bends, cost) {
+                path_outcome.length_mm = Some(length);
+                path_outcome.bend_count = Some(bends);
+                path_outcome.search_cost_mm = Some(cost);
+            } else {
+                // Never emit a "routed" disposition without a valid orthogonal cell path.
+                path_outcome.disposition = RouteDisposition::InvalidGeneratedPath;
+                path_outcome.length_mm = None;
+                path_outcome.bend_count = None;
+                path_outcome.search_cost_mm = None;
+                complete_cells.clear();
+            }
         }
         let mut path = Vec::with_capacity(complete_cells.len());
         for cell in &complete_cells {
