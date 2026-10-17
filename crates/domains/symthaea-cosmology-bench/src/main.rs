@@ -29,25 +29,37 @@ fn json_string(value: &str) -> String {
     output
 }
 
+fn json_string_array(values: &[String]) -> String {
+    let items = values.iter().map(|value| json_string(value)).collect::<Vec<_>>();
+    format!("[{}]", items.join(", "))
+}
+
 fn run() -> Result<(), String> {
     let args = env::args().collect::<Vec<_>>();
-    if args.len() != 3 {
+    if args.len() < 3 {
         return Err(format!(
-            "usage: {} CHAIN_TXT COLUMN_NAME",
+            "usage: {} COLUMN_NAME CHAIN_TXT [CHAIN_TXT ...]",
             args.first().map(String::as_str).unwrap_or("symthaea-cosmology-chain-audit")
         ));
     }
 
-    let path = &args[1];
-    let requested_column = &args[2];
-    let file = File::open(path).map_err(|error| format!("cannot open {path}: {error}"))?;
-    let chain = ChainTable::parse(BufReader::new(file)).map_err(|error| error.to_string())?;
+    let requested_column = &args[1];
+    let paths = &args[2..];
+    let mut tables = Vec::with_capacity(paths.len());
+    for path in paths {
+        let file = File::open(path).map_err(|error| format!("cannot open {path}: {error}"))?;
+        let table = ChainTable::parse(BufReader::new(file))
+            .map_err(|error| format!("{path}: {error}"))?;
+        tables.push(table);
+    }
+    let chain = ChainTable::combine(tables).map_err(|error| error.to_string())?;
     let summary = chain.summarize(requested_column).map_err(|error| error.to_string())?;
 
     println!("{{");
     println!("  \"protocol\": {},", json_string(CHAIN_AUDIT_PROTOCOL));
     println!("  \"version\": {},", CHAIN_AUDIT_VERSION);
-    println!("  \"input_path\": {},", json_string(path));
+    println!("  \"input_paths\": {},", json_string_array(paths));
+    println!("  \"input_chain_count\": {},", paths.len());
     println!("  \"selected_column\": {},", json_string(&summary.name));
     println!("  \"sample_rows\": {},", summary.sample_rows);
     println!("  \"positive_weight_rows\": {},", summary.positive_weight_rows);
