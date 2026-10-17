@@ -1,0 +1,115 @@
+{
+  "schema_version": "1.0.0",
+  "claim_ceiling": "Frozen synthetic 2D grid cases for algorithmic conformance only; not physical route evidence.",
+  "cases": [
+    {
+      "case_id": "OPEN-3X3-ZERO-BEND-COST",
+      "width": 3,
+      "height": 3,
+      "pitch_mm": 10,
+      "start": 0,
+      "goal": 8,
+      "initial_direction": 0,
+      "terminal_direction": 0,
+      "bend_penalty_mm": 0,
+      "clearance_mm": 0,
+      "blocked_cells": [],
+      "obstacles": [],
+      "expected_disposition": "routed",
+      "expected_cost_mm": 40
+    },
+    {
+      "case_id": "OPEN-3X3-POSITIVE-BEND-COST",
+      "width": 3,
+      "height": 3,
+      "pitch_mm": 10,
+      "start": 0,
+      "goal": 8,
+      "initial_direction": 0,
+      "terminal_direction": 0,
+      "bend_penalty_mm": 7,
+      "clearance_mm": 0,
+      "blocked_cells": [],
+      "obstacles": [],
+      "expected_disposition": "routed",
+      "expected_cost_mm": 47
+    },
+    {
+      "case_id": "DIRECTIONAL-ESCAPE-COSTS",
+      "width": 3,
+      "height": 3,
+      "pitch_mm": 10,
+      "start": 0,
+      "goal": 8,
+      "initial_direction": 1,
+      "terminal_direction": 2,
+      "bend_penalty_mm": 7,
+      "clearance_mm": 0,
+      "blocked_cells": [],
+      "obstacles": [],
+      "expected_disposition": "routed",
+      "expected_cost_mm": 47
+    },
+    {
+      "case_id": "CENTER-CELL-DETOUR",
+      "width": 3,
+      "height": 3,
+      "pitch_mm": 10,
+      "start": 1,
+      "goal": 7,
+      "initial_direction": 0,
+      "terminal_direction": 0,
+      "bend_penalty_mm": 7,
+      "clearance_mm": 0,
+      "blocked_cells": [
+        4
+      ],
+      "obstacles": [],
+      "expected_disposition": "routed",
+      "expected_cost_mm": 54
+    },
+    {
+      "case_id": "FULL-COLUMN-BARRIER",
+      "width": 3,
+      "height": 3,
+      "pitch_mm": 10,
+      "start": 0,
+      "goal": 2,
+      "initial_direction": 0,
+      "terminal_direction": 0,
+      "bend_penalty_mm": 7,
+      "clearance_mm": 0,
+      "blocked_cells": [
+        1,
+        4,
+        7
+      ],
+      "obstacles": [],
+      "expected_disposition": "no_path",
+      "expected_cost_mm": null
+    },
+    {
+      "case_id": "SUBGRID-WALL-BETWEEN-NODES",
+      "width": 3,
+      "height": 3,
+      "pitch_mm": 10,
+      "start": 0,
+      "goal": 2,
+      "initial_direction": 0,
+      "terminal_direction": 0,
+      "bend_penalty_mm": 7,
+      "clearance_mm": 0,
+      "blocked_cells": [],
+      "obstacles": [
+        {
+          "x_min_mm": 4,
+          "x_max_mm": 6,
+          "y_min_mm": -1,
+          "y_max_mm": 21
+        }
+      ],
+      "expected_disposition": "no_path",
+      "expected_cost_mm": null
+    }
+  ]
+}

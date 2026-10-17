@@ -1382,6 +1382,39 @@ mod tests {
 
     const LIVE: &str = include_str!("../fixtures/modular-interiors/liveaboard-custom-layout-v1.json");
     const ORACLE: &str = include_str!("../fixtures/modular-interiors/service-routing-oracle-v1.json");
+    const ASTAR_DIJKSTRA_ORACLE: &str = include_str!("../fixtures/modular-interiors/astar-dijkstra-oracle-v1.json");
+
+    #[derive(Deserialize)]
+    struct TinyDijkstraFixture {
+        cases: Vec<TinyDijkstraCase>,
+    }
+
+    #[derive(Deserialize)]
+    struct TinyDijkstraCase {
+        case_id: String,
+        width: usize,
+        height: usize,
+        pitch_mm: i64,
+        start: usize,
+        goal: usize,
+        initial_direction: u8,
+        terminal_direction: u8,
+        bend_penalty_mm: i64,
+        clearance_mm: i64,
+        blocked_cells: Vec<usize>,
+        obstacles: Vec<TinyDijkstraObstacle>,
+        expected_disposition: String,
+        expected_cost_mm: Option<u64>,
+    }
+
+    #[derive(Deserialize)]
+    struct TinyDijkstraObstacle {
+        x_min_mm: i64,
+        x_max_mm: i64,
+        y_min_mm: i64,
+        y_max_mm: i64,
+    }
+
 
     #[derive(Deserialize)]
     struct RoutingOracle {
@@ -1751,4 +1784,431 @@ mod tests {
             }
         }
     }
+    // Independent reference implementation used only by tests. Deliberately does not
+    // call production A* neighbor, segment-intersection, cell-coordinate or metric helpers.
+    fn reference_dijkstra_cost(
+        grid: &Grid,
+        start: usize,
+        goal: usize,
+        bend_penalty_mm: i64,
+        initial_direction: u8,
+        terminal_direction: u8,
+        clearance_mm: i64,
+        obstacles: &[Obstacle],
+    ) -> Option<u64> {
+        if grid.width == 0 || grid.height == 0
+            || grid.blocked.len() != grid.width.checked_mul(grid.height)?
+            || start >= grid.blocked.len() || goal >= grid.blocked.len()
+            || initial_direction > 2 || terminal_direction > 2
+            || grid.blocked[start] || grid.blocked[goal]
+            || grid.pitch_mm <= 0 || bend_penalty_mm < 0 || clearance_mm < 0
+        {
+            return None;
+        }
+        if start == goal {
+            return Some(0);
+        }
+        let count = grid.blocked.len().checked_mul(3)?;
+        let mut distance = vec![u64::MAX; count];
+        let start_state = start.checked_mul(3)?.checked_add(usize::from(initial_direction))?;
+        distance[start_state] = 0;
+        let mut queue = std::collections::BinaryHeap::new();
+        queue.push(std::cmp::Reverse((0u64, start_state)));
+        let pitch = u64::try_from(grid.pitch_mm).ok()?;
+        let bend = u64::try_from(bend_penalty_mm).ok()?;
+
+        while let Some(std::cmp::Reverse((cost, state))) = queue.pop() {
+            if cost != distance[state] {
+                continue;
+            }
+            let cell = state / 3;
+            let direction = (state % 3) as u8;
+            // A route terminates at the goal. Do not allow a cheaper-than-terminal
+            // cost by walking through the destination and returning in another direction.
+            if cell == goal {
+                continue;
+            }
+            let x = cell % grid.width;
+            let y = cell / grid.width;
+            let candidates = [
+                (if x > 0 { Some(cell - 1) } else { None }, 1u8),
+                (if x + 1 < grid.width { Some(cell + 1) } else { None }, 1u8),
+                (if y > 0 { Some(cell - grid.width) } else { None }, 2u8),
+                (if y + 1 < grid.height { Some(cell + grid.width) } else { None }, 2u8),
+            ];
+            for (next, next_direction) in candidates {
+                let Some(next_cell) = next else { continue; };
+                if grid.blocked[next_cell] {
+                    continue;
+                }
+                let a = reference_grid_point(grid, cell)?;
+                let b = reference_grid_point(grid, next_cell)?;
+                if obstacles.iter().any(|obstacle| {
+                    reference_segment_intersects_rect(
+                        &obstacle.rect, &a, &b, clearance_mm
+                    )
+                }) {
+                    continue;
+                }
+                let turns = if direction != 0 && direction != next_direction { 1u64 } else { 0u64 };
+                let step_cost = pitch.checked_add(bend.checked_mul(turns)?)?;
+                let next_cost = cost.checked_add(step_cost)?;
+                let next_state = next_cell.checked_mul(3)?.checked_add(usize::from(next_direction))?;
+                if next_cost < distance[next_state] {
+                    distance[next_state] = next_cost;
+                    queue.push(std::cmp::Reverse((next_cost, next_state)));
+                }
+            }
+        }
+
+        let goal_state = goal.checked_mul(3)?;
+        (0..=2u8).filter_map(|direction| {
+            let raw = *distance.get(goal_state.checked_add(usize::from(direction))?)?;
+            if raw == u64::MAX {
+                return None;
+            }
+            let terminal_turn = if terminal_direction != 0 && direction != 0
+                && direction != terminal_direction { 1u64 } else { 0u64 };
+            raw.checked_add(bend.checked_mul(terminal_turn)?)
+        }).min()
+    }
+
+    fn reference_grid_point(grid: &Grid, cell: usize) -> Option<GridPoint> {
+        if grid.width == 0 || cell >= grid.width.checked_mul(grid.height)? {
+            return None;
+        }
+        let x = i128::from(grid.x_min_mm)
+            + i128::from(cell % grid.width).checked_mul(i128::from(grid.pitch_mm))?;
+        let y = i128::from(grid.y_min_mm)
+            + i128::from(cell / grid.width).checked_mul(i128::from(grid.pitch_mm))?;
+        Some(GridPoint {
+            x_mm: i64::try_from(x).ok()?,
+            y_mm: i64::try_from(y).ok()?,
+        })
+    }
+
+    fn reference_segment_intersects_rect(
+        rect: &Rect,
+        first: &GridPoint,
+        second: &GridPoint,
+        clearance_mm: i64,
+    ) -> bool {
+        let left = i128::from(rect.x_min) - i128::from(clearance_mm);
+        let right = i128::from(rect.x_max) + i128::from(clearance_mm);
+        let bottom = i128::from(rect.y_min) - i128::from(clearance_mm);
+        let top = i128::from(rect.y_max) + i128::from(clearance_mm);
+        let x1 = i128::from(first.x_mm);
+        let y1 = i128::from(first.y_mm);
+        let x2 = i128::from(second.x_mm);
+        let y2 = i128::from(second.y_mm);
+
+        if y1 == y2 {
+            y1 >= bottom && y1 < top && x1.max(x2) > left && x1.min(x2) < right
+        } else if x1 == x2 {
+            x1 >= left && x1 < right && y1.max(y2) > bottom && y1.min(y2) < top
+        } else {
+            true
+        }
+    }
+
+    fn reference_path_is_valid(
+        grid: &Grid,
+        cells: &[usize],
+        start: usize,
+        goal: usize,
+        clearance_mm: i64,
+        obstacles: &[Obstacle],
+    ) -> bool {
+        if cells.is_empty() || cells.first() != Some(&start) || cells.last() != Some(&goal) {
+            return false;
+        }
+        for cell in cells {
+            if *cell >= grid.blocked.len() || grid.blocked[*cell] {
+                return false;
+            }
+        }
+        for pair in cells.windows(2) {
+            let Some(a) = reference_grid_point(grid, pair[0]) else { return false; };
+            let Some(b) = reference_grid_point(grid, pair[1]) else { return false; };
+            let dx = (i128::from(a.x_mm) - i128::from(b.x_mm)).abs();
+            let dy = (i128::from(a.y_mm) - i128::from(b.y_mm)).abs();
+            if !((dx == i128::from(grid.pitch_mm) && dy == 0)
+                || (dy == i128::from(grid.pitch_mm) && dx == 0))
+            {
+                return false;
+            }
+            if obstacles.iter().any(|obstacle| {
+                reference_segment_intersects_rect(&obstacle.rect, &a, &b, clearance_mm)
+            }) {
+                return false;
+            }
+        }
+        true
+    }
+
+    fn reference_path_cost_from_cells(
+        grid: &Grid,
+        cells: &[usize],
+        initial_direction: u8,
+        terminal_direction: u8,
+        bend_penalty_mm: i64,
+    ) -> Option<u64> {
+        if cells.len() <= 1 {
+            return Some(0);
+        }
+        let mut prior = initial_direction;
+        let mut bends = 0u64;
+        for pair in cells.windows(2) {
+            let first_x = pair[0] % grid.width;
+            let first_y = pair[0] / grid.width;
+            let second_x = pair[1] % grid.width;
+            let second_y = pair[1] / grid.width;
+            let direction = if first_y == second_y && first_x.abs_diff(second_x) == 1 {
+                1
+            } else if first_x == second_x && first_y.abs_diff(second_y) == 1 {
+                2
+            } else {
+                return None;
+            };
+            if prior != 0 && prior != direction {
+                bends = bends.checked_add(1)?;
+            }
+            prior = direction;
+        }
+        if terminal_direction != 0 && prior != 0 && prior != terminal_direction {
+            bends = bends.checked_add(1)?;
+        }
+        let steps = u64::try_from(cells.len().checked_sub(1)?).ok()?;
+        steps.checked_mul(u64::try_from(grid.pitch_mm).ok()?)?
+            .checked_add(bends.checked_mul(u64::try_from(bend_penalty_mm).ok()?)?)
+    }
+
+    fn grid_and_obstacles_for_case(case: &TinyDijkstraCase) -> (Grid, Vec<Obstacle>) {
+        let mut blocked = vec![false; case.width * case.height];
+        for cell in &case.blocked_cells {
+            assert!(*cell < blocked.len(), "fixture cell index is in range: {}", case.case_id);
+            blocked[*cell] = true;
+        }
+        let grid = Grid {
+            x_min_mm: 0,
+            y_min_mm: 0,
+            pitch_mm: case.pitch_mm,
+            width: case.width,
+            height: case.height,
+            blocked,
+        };
+        let obstacles = case.obstacles.iter().enumerate().map(|(index, item)| Obstacle {
+            owner: format!("oracle-obstacle-{index}"),
+            rect: Rect {
+                x_min: item.x_min_mm,
+                x_max: item.x_max_mm,
+                y_min: item.y_min_mm,
+                y_max: item.y_max_mm,
+            },
+        }).collect();
+        (grid, obstacles)
+    }
+
+    #[test]
+    fn frozen_tiny_grid_cases_match_independent_dijkstra() {
+        let fixture: TinyDijkstraFixture =
+            serde_json::from_str(ASTAR_DIJKSTRA_ORACLE).expect("Dijkstra fixture parses");
+        assert!(!fixture.cases.is_empty());
+        for case in fixture.cases {
+            let (grid, obstacles) = grid_and_obstacles_for_case(&case);
+            let route = request_for(
+                &format!("DIJKSTRA-{}", case.case_id),
+                "CONN-CABIN-01-AC_IN",
+                module_anchor("CABIN-01", "AC_IN", 0, 0),
+                service_anchor("AC-BUS", 0, 0),
+            );
+            let mut request = route;
+            request.clearance_mm = case.clearance_mm;
+            request.bend_penalty_mm = case.bend_penalty_mm;
+            let oracle = reference_dijkstra_cost(
+                &grid, case.start, case.goal, case.bend_penalty_mm,
+                case.initial_direction, case.terminal_direction,
+                case.clearance_mm, &obstacles,
+            );
+            let actual = search_grid(
+                &grid, case.start, case.goal, &request, 100_000,
+                case.initial_direction, case.terminal_direction, &obstacles,
+            );
+            let expected_routed = case.expected_disposition == "routed";
+            assert_eq!(oracle, case.expected_cost_mm, "frozen oracle mismatch: {}", case.case_id);
+            assert_eq!(actual.disposition == RouteDisposition::Routed, expected_routed,
+                "disposition mismatch: {}", case.case_id);
+            assert_eq!(actual.search_cost_mm, oracle, "A* vs Dijkstra cost: {}", case.case_id);
+            if expected_routed {
+                assert!(reference_path_is_valid(
+                    &grid, &actual.cells, case.start, case.goal, case.clearance_mm, &obstacles
+                ), "independent geometry audit failed: {}", case.case_id);
+                assert_eq!(
+                    reference_path_cost_from_cells(
+                        &grid, &actual.cells, case.initial_direction, case.terminal_direction,
+                        case.bend_penalty_mm,
+                    ),
+                    actual.search_cost_mm,
+                    "reported cost does not equal emitted path cost: {}", case.case_id
+                );
+                assert_eq!(actual.search_cost_mm, case.expected_cost_mm);
+            } else {
+                assert_eq!(actual.disposition, RouteDisposition::NoPath, "{}", case.case_id);
+                assert!(actual.cells.is_empty(), "unreachable case must not emit a path: {}", case.case_id);
+            }
+        }
+    }
+
+    #[test]
+    fn dijkstra_matches_astar_for_all_endpoint_pairs_on_open_three_by_three_grid() {
+        let grid = Grid {
+            x_min_mm: -10,
+            y_min_mm: 20,
+            pitch_mm: 10,
+            width: 3,
+            height: 3,
+            blocked: vec![false; 9],
+        };
+        for start in 0..9 {
+            for goal in 0..9 {
+                if start == goal { continue; }
+                for initial_direction in 0..=2u8 {
+                    for terminal_direction in 0..=2u8 {
+                        for bend_penalty_mm in [0, 1, 7, 19] {
+                            let mut request = request_for(
+                                "OPEN-GRID-DIFFERENTIAL",
+                                "CONN-CABIN-01-AC_IN",
+                                module_anchor("CABIN-01", "AC_IN", -10, 20),
+                                service_anchor("AC-BUS", 10, 40),
+                            );
+                            request.clearance_mm = 0;
+                            request.bend_penalty_mm = bend_penalty_mm;
+                            let a_star = search_grid(
+                                &grid, start, goal, &request, 10_000,
+                                initial_direction, terminal_direction, &[],
+                            );
+                            let dijkstra = reference_dijkstra_cost(
+                                &grid, start, goal, bend_penalty_mm,
+                                initial_direction, terminal_direction, 0, &[],
+                            );
+                            assert_eq!(a_star.disposition, RouteDisposition::Routed);
+                            assert_eq!(a_star.search_cost_mm, dijkstra,
+                                "start={start} goal={goal} initial={initial_direction} terminal={terminal_direction} bend={bend_penalty_mm}");
+                            assert!(reference_path_is_valid(&grid, &a_star.cells, start, goal, 0, &[]));
+                            assert_eq!(
+                                reference_path_cost_from_cells(
+                                    &grid, &a_star.cells, initial_direction, terminal_direction,
+                                    bend_penalty_mm,
+                                ),
+                                a_star.search_cost_mm
+                            );
+                        }
+                    }
+                }
+            }
+        }
+    }
+
+    #[test]
+    fn dijkstra_matches_astar_on_pinned_seeded_obstacle_maps() {
+        let mut seed = 0x5eed_d1a5_2026_u64;
+        let mut next = || {
+            seed = seed.wrapping_mul(6_364_136_223_846_793_005)
+                .wrapping_add(1_442_695_040_888_963_407);
+            seed >> 32
+        };
+        for case_index in 0..160usize {
+            let mut blocked = vec![false; 25];
+            for cell in 1..24 {
+                blocked[cell] = next() % 7 == 0;
+            }
+            blocked[0] = false;
+            blocked[24] = false;
+            let mut obstacles = Vec::new();
+            if case_index % 3 == 0 {
+                let x_min = 10 + (next() % 2) as i64 * 5;
+                let y_min = 10 + (next() % 2) as i64 * 5;
+                obstacles.push(Obstacle {
+                    owner: format!("seeded-{case_index}"),
+                    rect: Rect {
+                        x_min,
+                        x_max: x_min + 5 + (next() % 2) as i64 * 5,
+                        y_min,
+                        y_max: y_min + 10 + (next() % 2) as i64 * 5,
+                    },
+                });
+            }
+            let grid = Grid {
+                x_min_mm: 0,
+                y_min_mm: 0,
+                pitch_mm: 10,
+                width: 5,
+                height: 5,
+                blocked,
+            };
+            let initial_direction = (next() % 3) as u8;
+            let terminal_direction = (next() % 3) as u8;
+            let bend_penalty_mm = [0, 3, 11][(next() % 3) as usize];
+            let clearance_mm = (next() % 2) as i64;
+            let mut request = request_for(
+                &format!("SEEDED-{case_index:03}"),
+                "CONN-CABIN-01-AC_IN",
+                module_anchor("CABIN-01", "AC_IN", 0, 0),
+                service_anchor("AC-BUS", 40, 40),
+            );
+            request.clearance_mm = clearance_mm;
+            request.bend_penalty_mm = bend_penalty_mm;
+
+            let a_star = search_grid(
+                &grid, 0, 24, &request, 20_000,
+                initial_direction, terminal_direction, &obstacles,
+            );
+            let oracle = reference_dijkstra_cost(
+                &grid, 0, 24, bend_penalty_mm,
+                initial_direction, terminal_direction, clearance_mm, &obstacles,
+            );
+            assert_eq!(a_star.search_cost_mm, oracle,
+                "seeded map {case_index}, seed family 0x5eed_d1a5_2026");
+            if oracle.is_some() {
+                assert_eq!(a_star.disposition, RouteDisposition::Routed);
+                assert!(reference_path_is_valid(&grid, &a_star.cells, 0, 24, clearance_mm, &obstacles),
+                    "invalid path from A* on seeded map {case_index}");
+                assert_eq!(
+                    reference_path_cost_from_cells(
+                        &grid, &a_star.cells, initial_direction, terminal_direction,
+                        bend_penalty_mm,
+                    ),
+                    a_star.search_cost_mm
+                );
+            } else {
+                assert_eq!(a_star.disposition, RouteDisposition::NoPath);
+                assert!(a_star.cells.is_empty());
+            }
+        }
+    }
+
+    #[test]
+    fn independent_oracle_is_sensitive_to_removed_thin_wall() {
+        let fixture: TinyDijkstraFixture =
+            serde_json::from_str(ASTAR_DIJKSTRA_ORACLE).expect("Dijkstra fixture parses");
+        let case = fixture.cases.iter()
+            .find(|case| case.case_id == "SUBGRID-WALL-BETWEEN-NODES")
+            .expect("thin-wall negative control is frozen");
+        let (grid, obstacles) = grid_and_obstacles_for_case(case);
+        assert_eq!(
+            reference_dijkstra_cost(
+                &grid, case.start, case.goal, case.bend_penalty_mm,
+                case.initial_direction, case.terminal_direction, case.clearance_mm, &obstacles,
+            ),
+            None
+        );
+        assert_eq!(
+            reference_dijkstra_cost(
+                &grid, case.start, case.goal, case.bend_penalty_mm,
+                case.initial_direction, case.terminal_direction, case.clearance_mm, &[],
+            ),
+            Some(20)
+        );
+    }
+
 }
