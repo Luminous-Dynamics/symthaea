@@ -12,8 +12,10 @@ use serde::{Deserialize, Serialize};
 use std::collections::HashSet;
 
 use crate::architecture_robustness::{
-    ArchitectureRobustnessReportV1, MetricIntervalV1, RobustCandidateAssessmentV1,
-    ARCHITECTURE_ROBUSTNESS_SCHEMA_VERSION_V1, ROBUST_COMPARISON_EPSILON_V1,
+    evaluate_architecture_robustness, ArchitectureRobustnessReportV1,
+    ArchitectureRobustnessRequestV1, MetricIntervalV1, RobustArchitectureCandidateV1,
+    RobustCandidateAssessmentV1, ARCHITECTURE_ROBUSTNESS_SCHEMA_VERSION_V1,
+    ROBUST_COMPARISON_EPSILON_V1,
 };
 use crate::architecture_pareto::{
     ArchitectureEvidenceLevelV1, ArchitectureMetricV1,
@@ -221,6 +223,10 @@ pub enum MeasurementTriageFindingV1 {
     },
     /// The source report cannot be serialized canonically for digesting.
     SourceReportSerializationFailed,
+    /// Recomputed pairwise/candidate results do not match the source report.
+    SourceReportReevaluationMismatch,
+    /// The reconstructed interval comparison fails its own validation.
+    SourceReportReevaluationFailed,
     /// An action's protocol revision differs from its source report.
     ProtocolMismatch { action_id: String },
     /// Action references an unknown or duplicate candidate ID.
@@ -495,6 +501,7 @@ fn validate_source_report(
     source: &ArchitectureRobustnessReportV1,
     findings: &mut Vec<MeasurementTriageFindingV1>,
 ) {
+    let initial_finding_count = findings.len();
     if source.schema_version != ARCHITECTURE_ROBUSTNESS_SCHEMA_VERSION_V1 {
         findings.push(
             MeasurementTriageFindingV1::UnsupportedSourceSchemaVersion {
@@ -619,6 +626,59 @@ fn validate_source_report(
                     candidate_b_id: pair.candidate_b_id.clone(),
                 },
             );
+        }
+    }
+
+    if findings.len() != initial_finding_count {
+        return;
+    }
+
+    let request = ArchitectureRobustnessRequestV1 {
+        schema_version: source.schema_version,
+        comparison_id: source.comparison_id.clone(),
+        benchmark_case_id: source.benchmark_case_id.clone(),
+        task_id: source.task_id.clone(),
+        wearer_profile_id: source.wearer_profile_id.clone(),
+        environment_profile_id: source.environment_profile_id.clone(),
+        task_protocol_version: source.task_protocol_version.clone(),
+        operating_conditions: source.operating_conditions.clone(),
+        evidence_level: source.evidence_level,
+        interval_semantics: source.interval_semantics,
+        candidates: source
+            .candidates
+            .iter()
+            .map(|candidate| RobustArchitectureCandidateV1 {
+                candidate_id: candidate.candidate_id.clone(),
+                family: candidate.family,
+                tethered: candidate.tethered,
+                metrics: candidate.metrics.clone(),
+            })
+            .collect(),
+    };
+
+    match evaluate_architecture_robustness(&request) {
+        Err(_) => findings.push(MeasurementTriageFindingV1::SourceReportReevaluationFailed),
+        Ok(recomputed) => {
+            let candidate_receipts_match = recomputed
+                .candidates
+                .iter()
+                .zip(source.candidates.iter())
+                .all(|(expected, received)| {
+                    expected.candidate_id == received.candidate_id
+                        && expected.family == received.family
+                        && expected.tethered == received.tethered
+                        && expected.on_robust_frontier == received.on_robust_frontier
+                        && expected.robustly_dominated_by == received.robustly_dominated_by
+                        && expected.unresolved_against == received.unresolved_against
+                        && expected.metrics == received.metrics
+                });
+            if recomputed.pairwise_assessments != source.pairwise_assessments
+                || !candidate_receipts_match
+            {
+                findings.push(
+                    MeasurementTriageFindingV1::SourceReportReevaluationMismatch,
+                );
+            }
         }
     }
 }
