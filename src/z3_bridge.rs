@@ -367,7 +367,6 @@ impl Z3Bridge {
     /// The method does not invoke Z3 because the supplied residuals are already
     /// concrete numeric constants.
     pub fn check_einstein_residual_numeric(
-        &self,
         ricci_components: &[f64],
         metric_components: &[f64],
         dim: usize,
@@ -450,7 +449,7 @@ impl Z3Bridge {
         dim: usize,
         tolerance: f64,
     ) -> VerificationResult {
-        match self.check_einstein_residual_numeric(
+        match Self::check_einstein_residual_numeric(
             ricci_components,
             metric_components,
             dim,
@@ -1283,7 +1282,7 @@ mod tests {
         let b = bridge();
         let ricci = [1.0, 0.0, 0.0, 1.0];
         let metric = [1.0, 0.0, 0.0, 1.0];
-        let report = b.check_einstein_residual_numeric(&ricci, &metric, 2, 1e-6).unwrap();
+        let report = Z3Bridge::check_einstein_residual_numeric(&ricci, &metric, 2, 1e-6).unwrap();
         assert_eq!(report.dimension, 2);
         assert_eq!(report.estimated_k_from_diagonal_ratios, 1.0);
         assert_eq!(report.diagonal_ratios_used, 2);
@@ -1296,23 +1295,23 @@ mod tests {
     fn test_einstein_numeric_residual_rejects_malformed_inputs() {
         let b = bridge();
         assert_eq!(
-            b.check_einstein_residual_numeric(&[1.0, 2.0], &[1.0, 0.0, 0.0, 1.0], 2, 0.01),
+            Z3Bridge::check_einstein_residual_numeric(&[1.0, 2.0], &[1.0, 0.0, 0.0, 1.0], 2, 0.01),
             Err(EinsteinResidualError::ComponentCountMismatch)
         );
         assert_eq!(
-            b.check_einstein_residual_numeric(&[f64::NAN, 0.0, 0.0, 1.0], &[1.0, 0.0, 0.0, 1.0], 2, 0.01),
+            Z3Bridge::check_einstein_residual_numeric(&[f64::NAN, 0.0, 0.0, 1.0], &[1.0, 0.0, 0.0, 1.0], 2, 0.01),
             Err(EinsteinResidualError::NonFiniteInput)
         );
         assert_eq!(
-            b.check_einstein_residual_numeric(&[0.0], &[1.0], 1, -1.0),
+            Z3Bridge::check_einstein_residual_numeric(&[0.0], &[1.0], 1, -1.0),
             Err(EinsteinResidualError::InvalidTolerance)
         );
         assert_eq!(
-            b.check_einstein_residual_numeric(&[0.0], &[0.0], 1, 1e-6),
+            Z3Bridge::check_einstein_residual_numeric(&[0.0], &[0.0], 1, 1e-6),
             Err(EinsteinResidualError::NoUsableDiagonalMetricComponents)
         );
         assert_eq!(
-            b.check_einstein_residual_numeric(&[], &[], 0, 1e-6),
+            Z3Bridge::check_einstein_residual_numeric(&[], &[], 0, 1e-6),
             Err(EinsteinResidualError::ZeroDimension)
         );
     }
@@ -1322,7 +1321,7 @@ mod tests {
         let b = bridge();
         let ricci = [1.0, 0.2, 0.0, 1.0];
         let metric = [1.0, 0.0, 0.0, 1.0];
-        let report = b.check_einstein_residual_numeric(&ricci, &metric, 2, 0.01).unwrap();
+        let report = Z3Bridge::check_einstein_residual_numeric(&ricci, &metric, 2, 0.01).unwrap();
         assert!(!report.within_tolerance);
         assert!((report.max_abs_residual - 0.2).abs() < 1e-12);
     }
@@ -1486,8 +1485,7 @@ mod tests {
         // Step 3: Check concrete residuals. This is numeric candidate evidence,
         // not an SMT/formal proof of a symbolic or universal geometric identity.
         let bridge = Z3Bridge::new();
-        let report = bridge
-            .check_einstein_residual_numeric(
+        let report = Z3Bridge::check_einstein_residual_numeric(
                 &ricci_flat,
                 &metric_flat,
                 metric.dim,
