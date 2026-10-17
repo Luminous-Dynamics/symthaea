@@ -1,0 +1,46 @@
+{
+  "schema_version": "nano-rescue-audit-sampling-v1",
+  "run_id": "nano-013-synthetic-run-001",
+  "evaluation_id": "nano-013-synthetic-eval-001",
+  "policy_revision_sha256": "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
+  "sampling_frame_path": "rescue-controller/eligible-window-frame.jsonl",
+  "sampling_frame_sha256": "3e4fe27162b44df7141d2f00e7b3bcd22974c85e096c44c3c8c052d8ebedc891",
+  "preregistration_receipt_path": "rescue-controller/preregistration-receipt.json",
+  "preregistration_receipt_sha256": "734a831c03e481b1d737c8a670460801d714ae5c458817a0fe759972e8b8ba2a",
+  "seed_reveal_path": "rescue-controller/sampling-seed-reveal.json",
+  "seed_commitment_sha256": "8a9e69d54a8383458a6dd411df717779ed9a8e78de981b2781e3a3fb8e3c455d",
+  "frame_population_size": 4,
+  "sampling_method": "stratified_random_without_replacement",
+  "frozen_before_policy_run": true,
+  "policy_blind": true,
+  "strata": [
+    {
+      "stratum_id": "family-A",
+      "eligible_count": 2,
+      "sampled_count": 1,
+      "inclusion_probability": 0.5
+    },
+    {
+      "stratum_id": "family-B",
+      "eligible_count": 2,
+      "sampled_count": 1,
+      "inclusion_probability": 0.5
+    }
+  ],
+  "sampled_windows": [
+    {
+      "window_id": "w-001",
+      "parent_group_id": "parent-A",
+      "trajectory_id": "traj-001",
+      "stratum_id": "family-A",
+      "inclusion_probability": 0.5
+    },
+    {
+      "window_id": "w-003",
+      "parent_group_id": "parent-B",
+      "trajectory_id": "traj-002",
+      "stratum_id": "family-B",
+      "inclusion_probability": 0.5
+    }
+  ]
+}
