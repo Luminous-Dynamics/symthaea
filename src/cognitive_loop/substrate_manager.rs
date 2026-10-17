@@ -1544,7 +1544,7 @@ mod tests {
         assert!(!window_overflow.consciousness_viable);
         assert_eq!(window_overflow.energy_rate_window_joules, 0.0);
         assert_eq!(window_overflow.energy_rate_window_started_at, None);
-        assert_eq!(window_overflow.total_energy_spent, 1.0e308);
+        assert_eq!(window_overflow.total_energy_spent, 0.0, "overflowing window sample must not be accounted");
     }
 
     #[test]
