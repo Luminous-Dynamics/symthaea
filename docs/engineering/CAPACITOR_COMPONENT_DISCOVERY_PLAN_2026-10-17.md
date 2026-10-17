@@ -140,7 +140,8 @@ All thresholds below are **proposed acceptance targets**, not current results. P
 - Compare capacitor calculations against independently implemented analytic reference equations and dimensional checks.
 - Exercise zero, negative, NaN, infinity, missing provenance, missing breakdown protocol/evidence class, missing property-specific uncertainty, out-of-domain temperature/frequency/field, and overflow paths.
 - Require invalid inputs to fail closed; no invalid/non-finite derived metric may be emitted.
-- Distinguish `PassesIdealizedScreen`, `FailsDeclaredConstraints`, and `NotEvaluable`; a candidate outside the characterization domain must never be ranked as if its properties were known.
+- Distinguish `PassesNominalIdealizedScreen`, `FailsDeclaredConstraints`, and `NotEvaluable`; a candidate outside the characterization domain must never be ranked as if its properties were known.
+- A nominal pass must not be described as uncertainty-robust: the current version gates on property-specific uncertainty magnitudes but does not propagate them into worst-case metrics or constraint-violation probabilities.
 - Target: relative error no greater than 1e-12 on finite well-conditioned analytic fixtures; all negative controls rejected.
 - Test fixtures must be synthetic and must never be counted as empirical material evidence.
 
