@@ -2,7 +2,7 @@
   "schema_version": "1.0.0",
   "benchmark_id": "CULINARY-VALIDATOR-CORPUS",
   "benchmark_version": "1.0.0",
-  "expected_case_count": 26,
+  "expected_case_count": 29,
   "cases": [
     {
       "id": "EMULSION-VALID-INTERIOR-001",
@@ -237,6 +237,33 @@
       "input": { "stage": "SoftBall", "trajectory_points": [[0.0, 100.0], [2.0, 108.0]] },
       "rationale": "A numerically valid trajectory below the requested stage is a modeled process violation, not invalid numeric input.",
       "reference": "McGee (2004), On Food and Cooking; project parameter in thresholds.rs"
+    },
+    {
+      "id": "PASTEURIZATION-ISOTHERMAL-VALID-001",
+      "family": "pasteurization",
+      "expected_status": "pass",
+      "expected_violation": null,
+      "input": { "pathogen": "SalmonellaPoultry", "required_log_reduction": null, "trajectory_points": [[0.0, 60.0], [3.96, 60.0]] },
+      "rationale": "A constant-temperature model hold at its reference temperature should deliver 3.96 / 0.396 = 10 log reductions, exceeding the configured 7-log model target.",
+      "reference": "Murphy et al. (2004) D/z model parameters as encoded in thresholds.rs; this is a model positive control, not a cooking protocol"
+    },
+    {
+      "id": "PASTEURIZATION-INSUFFICIENT-VALID-001",
+      "family": "pasteurization",
+      "expected_status": "reject",
+      "expected_violation": "InsufficientPasteurization",
+      "input": { "pathogen": "SalmonellaPoultry", "required_log_reduction": 7.0, "trajectory_points": [[0.0, 55.0], [0.1, 55.0]] },
+      "rationale": "A finite, internally valid trajectory that delivers less than the requested model target must yield a distinct insufficient-lethality violation.",
+      "reference": "Murphy et al. (2004) D/z model parameters as encoded in thresholds.rs; model behavior only"
+    },
+    {
+      "id": "PASTEURIZATION-ZERO-TARGET-001",
+      "family": "pasteurization",
+      "expected_status": "reject",
+      "expected_violation": "InvalidNumericInput",
+      "input": { "pathogen": "SalmonellaPoultry", "required_log_reduction": 0.0, "trajectory_points": [[0.0, 60.0], [5.0, 60.0]] },
+      "rationale": "A finite but non-positive user-specified lethality target is invalid and must not bypass target validation.",
+      "reference": "Project input-integrity invariant in validate.rs"
     }
   ]
 }
