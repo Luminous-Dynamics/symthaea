@@ -8,11 +8,13 @@
 //! not verify source/data provenance, oracle call costs, scientific validity,
 //! or experimental confirmation.
 
-use serde::Serialize;
+use serde::{Deserialize, Serialize};
 use serde_json::Value;
+use sha2::{Digest, Sha256};
 use std::collections::{BTreeMap, BTreeSet};
-use std::fs;
-use std::path::{Path, PathBuf};
+use std::fs::{self, File};
+use std::io::Read;
+use std::path::{Component, Path, PathBuf};
 
 const ABS_TOLERANCE: f64 = 1.0e-10;
 const REL_TOLERANCE: f64 = 1.0e-9;
@@ -31,6 +33,8 @@ pub struct AuditReport {
     pub episode_rows: usize,
     pub findings: Vec<AuditFinding>,
     pub checks_completed: Vec<String>,
+    /// "not_provided", "manifest_consistent", or "manifest_invalid".
+    pub provenance_manifest_status: String,
     pub scope_ceiling: Vec<String>,
 }
 
@@ -43,6 +47,7 @@ impl AuditReport {
             episode_rows: 0,
             findings: Vec::new(),
             checks_completed: Vec::new(),
+            provenance_manifest_status: "not_provided".to_owned(),
             scope_ceiling: vec![
                 "An artifact-integrity pass is not a scientific-performance pass.".to_owned(),
                 "Source commit, data rights and dataset identity/hash are not verified.".to_owned(),
@@ -262,6 +267,9 @@ pub fn audit_run(run_dir: &Path) -> AuditReport {
         audit_csv(&csv_path, rows, &mut report);
         audit_aggregate(rows, aggregate_value.as_ref(), &mut report);
     }
+
+    let proposal_requests = episode_rows.as_ref().and_then(sum_proposal_requests);
+    verify_provenance_manifest(run_dir, proposal_requests, &mut report);
 
     report.status = if report.findings.is_empty() {
         "artifact_integrity_pass".to_owned()
