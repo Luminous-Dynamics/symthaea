@@ -160,6 +160,12 @@ fn validate_semantics(manifest: &Value, schema: &Value) -> Vec<String> {
         &mut errors,
     );
 
+    match manifest.get("created_date").and_then(Value::as_str) {
+        Some(date) if is_valid_iso_date(date) => {}
+        Some(date) => errors.push(format!("manifest created_date is not a real YYYY-MM-DD date: {date}")),
+        None => errors.push("manifest created_date must be a string".to_owned()),
+    }
+
     let declared_count = manifest.get("case_count").and_then(Value::as_u64);
     if declared_count != Some(EXPECTED_CASE_COUNT as u64) {
         errors.push(format!(
@@ -399,6 +405,46 @@ fn expect_string(
     }
 }
 
+fn is_valid_iso_date(value: &str) -> bool {
+    let mut parts = value.split('-');
+    let (Some(year), Some(month), Some(day), None) =
+        (parts.next(), parts.next(), parts.next(), parts.next())
+    else {
+        return false;
+    };
+
+    if year.len() != 4
+        || month.len() != 2
+        || day.len() != 2
+        || !year.bytes().all(|byte| byte.is_ascii_digit())
+        || !month.bytes().all(|byte| byte.is_ascii_digit())
+        || !day.bytes().all(|byte| byte.is_ascii_digit())
+    {
+        return false;
+    }
+
+    let (Ok(year), Ok(month), Ok(day)) =
+        (year.parse::<u32>(), month.parse::<u32>(), day.parse::<u32>())
+    else {
+        return false;
+    };
+
+    if !(1..=12).contains(&month) {
+        return false;
+    }
+
+    let leap_year = year % 4 == 0 && (year % 100 != 0 || year % 400 == 0);
+    let days_in_month = match month {
+        1 | 3 | 5 | 7 | 8 | 10 | 12 => 31,
+        4 | 6 | 9 | 11 => 30,
+        2 if leap_year => 29,
+        2 => 28,
+        _ => return false,
+    };
+
+    (1..=days_in_month).contains(&day)
+}
+
 fn is_case_id(value: &str) -> bool {
     let Some(suffix) = value.strip_prefix("VIS-DISP-") else {
         return false;
@@ -455,6 +501,15 @@ mod tests {
         assert_eq!(report.lane_counts.values().sum::<usize>(), EXPECTED_CASE_COUNT);
         assert_eq!(report.manifest_sha256.len(), 64);
         assert_eq!(report.schema_sha256.len(), 64);
+    }
+
+    #[test]
+    fn rejects_invalid_calendar_date() {
+        let (mut manifest, schema) = values();
+        manifest["created_date"] = Value::String("2026-02-30".to_owned());
+
+        let errors = revalidate(&manifest, &schema).expect_err("impossible date must reject");
+        assert!(errors.iter().any(|error| error.contains("created_date")));
     }
 
     #[test]
