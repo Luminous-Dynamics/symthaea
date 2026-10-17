@@ -9,27 +9,9 @@ use std::process::ExitCode;
 
 const SCHEMA_ID: &str = "urn:luminous-dynamics:appliance-active-diagnostics:0.1.0";
 const EXPECTED_TRACE_IDS: [&str; 21] = [
-    "ADT-001",
-    "ADT-002",
-    "ADT-003",
-    "ADT-004",
-    "ADT-005",
-    "ADT-006",
-    "ADT-007",
-    "ADT-008",
-    "ADT-009",
-    "ADT-010",
-    "ADT-011",
-    "ADT-012",
-    "ADT-013",
-    "ADT-014",
-    "ADT-015",
-    "ADT-016",
-    "ADT-017",
-    "ADT-018",
-    "ADT-019",
-    "ADT-020",
-    "ADT-021",
+    "ADT-001", "ADT-002", "ADT-003", "ADT-004", "ADT-005", "ADT-006", "ADT-007", "ADT-008",
+    "ADT-009", "ADT-010", "ADT-011", "ADT-012", "ADT-013", "ADT-014", "ADT-015", "ADT-016",
+    "ADT-017", "ADT-018", "ADT-019", "ADT-020", "ADT-021",
 ];
 
 type Errors = Vec<String>;
@@ -179,7 +161,9 @@ fn validate_trace(trace: &Value) -> Result<(), String> {
             let Some(hypothesis_id) = text_at(row, "hypothesis_id") else {
                 return Err("invalid_likelihood_model".to_owned());
             };
-            if !hypothesis_ids.contains(hypothesis_id) || !row_ids.insert(hypothesis_id.to_owned()) {
+            if !hypothesis_ids.contains(hypothesis_id)
+                || !row_ids.insert(hypothesis_id.to_owned())
+            {
                 return Err("invalid_likelihood_model".to_owned());
             }
 
@@ -208,7 +192,10 @@ fn validate_trace(trace: &Value) -> Result<(), String> {
                 }
                 row_sum += probability;
             }
-            if probability_ids != outcome_ids || !row_sum.is_finite() || (row_sum - 1.0).abs() > 1e-9 {
+            if probability_ids != outcome_ids
+                || !row_sum.is_finite()
+                || (row_sum - 1.0).abs() > 1e-9
+            {
                 return Err("invalid_likelihood_model".to_owned());
             }
         }
