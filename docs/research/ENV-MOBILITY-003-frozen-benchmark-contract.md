@@ -66,18 +66,18 @@ No weighted total score should allow a strong average to offset a hard failure. 
 
 ## 5. Required follow-on mutations
 
-The v1 feasibility corpus already covers permission, calibration, operating envelopes, energy, recovery, coordinate reference, configuration mismatch, data-rights and claim-laundering cases. The independent test harness should additionally generate mutations for:
+The v1 corpora and test-only Rust harness already exercise permission, calibration, operating envelopes, energy, recovery, coordinate reference, configuration mismatch, data rights, claim laundering, shared-power common-mode failure, hidden recovery attempts, stale source data, and a failed repair reintroduced without acceptance.
 
-- common-mode dependency failures involving power, clocks, radios or calibration systems that are not yet represented by a corpus case;
-- repeated docking/recovery failures with a different combination of environmental or mission constraints;
-- unknown/stale battery configuration or unrecorded replacement;
-- a communications partition with no offline policy or safe local fallback;
-- a failed repair followed by an unchanged “passed” acceptance record;
-- a fixed-sensor/manual baseline made artificially infeasible by changing assumptions only for the baseline;
-- stale mission data presented as current;
-- calibration marked current solely because a vendor/status field says so, without the required evidence reference.
+Follow-on mutations should deepen the coverage with distinct or combined failure modes rather than merely duplicate the current cases:
 
-The v1 corpus and test-only Rust harness now include shared-power redundancy falsely claimed as independent, hidden failed recovery attempts, stale source data, and a failed repair reintroduced without acceptance. Continue adding mutations for the remaining cases below. All labels and reactions must remain reviewable by a human independent of the production selector.
+- shared-clock, radio, and calibration dependencies that make nominally redundant subsystems fail together;
+- repeated docking/recovery failures under different current, visibility, and energy conditions;
+- unknown or stale battery configuration after a replacement;
+- unfair-baseline mutations that make fixed sensors or manual observation artificially infeasible;
+- calibration marked current solely by a vendor/status field without the required evidence reference;
+- combinations of communication partition, uncertain reserve, and recovery degradation.
+
+All labels and reactions must remain reviewable by a human independent of the production selector.
 
 ## 6. Benchmark report format
 
