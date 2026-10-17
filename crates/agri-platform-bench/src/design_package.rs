@@ -382,7 +382,7 @@ pub fn qualify_package(package: &DesignPackage) -> QualificationReport {
     // Missing prices do not by themselves make the source package unbuildable;
     // they do prevent a complete-cost claim. Arithmetic overflow invalidates
     // the total and blocks the report.
-    if matches!(cost_evidence, CostEvidenceStatus::ArithmeticOverflow) {
+    if cost_evidence == CostEvidenceStatus::ArithmeticOverflow {
         blocked = true;
     }
 
