@@ -55,7 +55,7 @@ fn string_array<'a>(value: &'a Value, key: &str) -> Vec<&'a str> {
 }
 
 #[test]
-fn frozen_v1_corpus_is_well_formed_and_versioned() {
+fn frozen_v1_1_corpus_is_well_formed_and_versioned() {
     let root = corpus();
     let required_root_fields = [
         "schema_version",
@@ -82,7 +82,7 @@ fn frozen_v1_corpus_is_well_formed_and_versioned() {
 
     assert_eq!(string_field(&root, "schema_version"), "1.0.0");
     assert_eq!(string_field(&root, "benchmark_id"), "LUMINOUS-CHEM-PROC-QUAL");
-    assert_eq!(string_field(&root, "corpus_version"), "1.0.0");
+    assert_eq!(string_field(&root, "corpus_version"), "1.1.0");
 
     let allowed = string_array(&root, "allowed_dispositions")
         .into_iter()
@@ -127,7 +127,7 @@ fn case_ids_are_unique_and_each_case_has_a_frozen_disposition() {
         .get("cases")
         .and_then(Value::as_array)
         .expect("cases must be an array");
-    assert_eq!(cases.len(), 24, "corpus v1 count changes require deliberate versioning");
+    assert_eq!(cases.len(), 26, "corpus count changes require deliberate versioning and a version bump");
 
     let allowed_dispositions = ALLOWED_DISPOSITIONS.iter().copied().collect::<BTreeSet<_>>();
     let allowed_classes = ALLOWED_CLASSES.iter().copied().collect::<BTreeSet<_>>();
@@ -288,6 +288,16 @@ fn negative_controls_cover_critical_no_silent_promotion_rules() {
         string_field(by_id["CHEM-PROC-005"], "expected_disposition"),
         "UNRESOLVED",
         "unknown output material must not silently close a balance"
+    );
+    assert_eq!(
+        string_field(by_id["CHEM-PROC-025"], "expected_disposition"),
+        "UNRESOLVED",
+        "shared evidence dependencies must not count as independent corroboration"
+    );
+    assert_eq!(
+        string_field(by_id["CHEM-PROC-026"], "expected_disposition"),
+        "ACCEPTED_WITHIN_SCOPE",
+        "disjoint, complete synthetic dependencies should pass only the independence-contract check"
     );
     assert_eq!(
         string_field(by_id["CHEM-PROC-013"], "expected_disposition"),
