@@ -1034,7 +1034,13 @@ mod tests {
     fn widening_any_single_metric_envelope_cannot_preserve_false_certainty() {
         for metric in REQUIRED_METRICS {
             let mut a = candidate("candidate-a", Profile::Balanced);
-            let b = candidate("candidate-b", Profile::Overbuilt);
+            let mut b = candidate("candidate-b", Profile::Overbuilt);
+            if metric == ArchitectureMetricV1::TetherInterferenceEventsPerTask {
+                a.family = ArchitectureFamilyV1::RemoteActuationTethered;
+                a.tethered = true;
+                b.family = ArchitectureFamilyV1::RemoteActuationTethered;
+                b.tethered = true;
+            }
             let baseline = evaluate_architecture_robustness(&request(vec![a.clone(), b.clone()]))
                 .expect("baseline envelopes are valid");
             assert!(baseline.pairwise_assessments[0].a_robustly_dominates_b);
@@ -1065,6 +1071,45 @@ mod tests {
                 "widening {metric:?} across the rival bound must erase robust dominance"
             );
         }
+    }
+
+    #[test]
+    fn invalid_tether_declarations_fail_closed() {
+        let mut untethered_with_interference = candidate("untethered", Profile::Balanced);
+        untethered_with_interference
+            .metrics
+            .iter_mut()
+            .find(|entry| {
+                entry.metric == ArchitectureMetricV1::TetherInterferenceEventsPerTask
+            })
+            .expect("tether metric exists")
+            .interval = MetricIntervalV1 {
+            lower: 0.0,
+            upper: 0.01,
+        };
+        let result = evaluate_architecture_robustness(&request(vec![
+            untethered_with_interference,
+            candidate("other", Profile::Overbuilt),
+        ]));
+        assert!(result.as_ref().err().unwrap().iter().any(|finding| {
+            matches!(
+                finding,
+                ArchitectureRobustnessFindingV1::TetherMetricInconsistent { .. }
+            )
+        }));
+
+        let mut remote_without_tether = candidate("remote", Profile::Balanced);
+        remote_without_tether.family = ArchitectureFamilyV1::RemoteActuationTethered;
+        let result = evaluate_architecture_robustness(&request(vec![
+            remote_without_tether,
+            candidate("other", Profile::Overbuilt),
+        ]));
+        assert!(result.as_ref().err().unwrap().iter().any(|finding| {
+            matches!(
+                finding,
+                ArchitectureRobustnessFindingV1::RemoteActuationRequiresTether { .. }
+            )
+        }));
     }
 
     #[test]
