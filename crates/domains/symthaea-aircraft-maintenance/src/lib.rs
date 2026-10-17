@@ -378,7 +378,6 @@ pub struct ActorEvidence {
 pub enum TaskTransition {
     MarkSourceVerified,
     MarkEligibilityChecked,
-    MarkReadyToPerform,
     RecordWork,
     RequestReview,
     ReleaseToService,
@@ -932,11 +931,22 @@ pub fn prepare_task_for_execution(
     }
     if reviewer.kind != ActorKind::HumanEligibilityReviewer
         || reviewer.actor_id.trim().is_empty()
-        || reviewer.actor_id != context.performer.person_id
+        || reviewer.role.is_none()
+        || !reviewer.credential_reference.as_ref().is_some_and(valid_document_shape)
         || reviewer.jurisdiction != card.authority.jurisdiction
         || reviewer.certification_basis != card.authority.certification_basis
     {
         errors.push(TaskCardError::UnauthorizedTransition);
+    }
+
+    if let Some(credential) = reviewer.credential_reference.as_ref() {
+        if valid_document_shape(credential)
+            && !document_is_current(credential, &context.current_documents)
+        {
+            errors.push(TaskCardError::StaleOrMissingSource {
+                document_id: credential.document_id.clone(),
+            });
+        }
     }
 
     let mut ready_card = card.clone();
@@ -1312,6 +1322,7 @@ mod tests {
         if let AuthorityReview::Verified { permission_source, .. } = &card.authority.review {
             docs.push(CurrentDocument { reference: permission_source.clone() });
         }
+        docs.push(CurrentDocument { reference: doc("review-credential", "rev-1", '4') });
         let tool = ToolAvailability {
             tool_id: "tool-fixture".into(),
             calibration_valid_until: Some("2027-10-17".into()),
