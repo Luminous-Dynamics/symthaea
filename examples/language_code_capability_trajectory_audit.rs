@@ -62,6 +62,31 @@ fn evaluate_case(case: &Value) -> Result<(String, String), String> {
         previous_step = step;
     }
 
+    // A selected plan must be the plan whose action actually runs. Comparing
+    // only the stored profile or final test status can hide a default-action
+    // fallback that silently executes a different plan.
+    for (action_index, action) in events.iter().enumerate().filter(|(_, event)| {
+        string_field(event, "event") == Some("action_executed")
+    }) {
+        let selected = events[..action_index]
+            .iter()
+            .rev()
+            .find(|event| string_field(event, "event") == Some("plan_selected"));
+        let identity_matches = selected.is_some_and(|selected| {
+            string_field(selected, "plan_id") == string_field(action, "plan_id")
+                && string_field(selected, "action_fingerprint")
+                    == string_field(action, "action_fingerprint")
+                && string_field(selected, "plan_id").is_some()
+                && string_field(selected, "action_fingerprint").is_some()
+        });
+        if !identity_matches {
+            return Ok((
+                "reject".to_owned(),
+                "selected_plan_execution_mismatch".to_owned(),
+            ));
+        }
+    }
+
     let task_contract = case
         .get("task_contract")
         .ok_or_else(|| format!("{id}: missing task_contract"))?;
@@ -254,17 +279,17 @@ fn validate_corpus(corpus: &Value) -> Result<Value, String> {
     if corpus
         .get("expected_case_count")
         .and_then(Value::as_u64)
-        != Some(8)
+        != Some(9)
     {
-        return Err("expected_case_count must be 8 for trajectory-smoke-v1".to_owned());
+        return Err("expected_case_count must be 9 for trajectory-smoke-v1".to_owned());
     }
 
     let cases = corpus
         .get("cases")
         .and_then(Value::as_array)
         .ok_or_else(|| "trajectory corpus is missing cases".to_owned())?;
-    if cases.len() != 8 {
-        return Err(format!("expected 8 trajectory cases, found {}", cases.len()));
+    if cases.len() != 9 {
+        return Err(format!("expected 9 trajectory cases, found {}", cases.len()));
     }
 
     let mut ids = BTreeSet::new();
@@ -317,7 +342,7 @@ fn validate_corpus(corpus: &Value) -> Result<Value, String> {
         "policy_negative_controls": rejected,
         "outcomes": outcomes,
         "claim_ceiling": concat!(
-            "The policy auditor matched eight authored synthetic traces; ",
+            "The policy auditor matched nine authored synthetic traces; ",
             "this is not a score for a model or live coding agent."
         )
     }))
@@ -350,10 +375,10 @@ mod tests {
     #[test]
     fn frozen_trajectory_expectations_match_policy() {
         let report = audit_corpus().expect("all authored expectations should match");
-        assert_eq!(report["cases_examined"], 8);
+        assert_eq!(report["cases_examined"], 9);
         assert_eq!(report["policy_positive_verified"], 2);
         assert_eq!(report["policy_positive_abstentions"], 1);
-        assert_eq!(report["policy_negative_controls"], 5);
+        assert_eq!(report["policy_negative_controls"], 6);
         assert_eq!(report["benchmark_evaluated"], false);
     }
 
@@ -426,14 +451,38 @@ mod tests {
     fn completion_claim_before_verification_is_rejected() {
         let mut case = fixture()["cases"][0].clone();
         let events = case["events"].as_array_mut().unwrap();
-        events.swap(4, 5);
-        events[4]["step"] = json!(5);
-        events[5]["step"] = json!(6);
+        events.swap(6, 7);
+        events[6]["step"] = json!(7);
+        events[7]["step"] = json!(8);
         assert_eq!(
             evaluate_case(&case),
             Ok((
                 "reject".to_owned(),
                 "completion_claim_precedes_verification".to_owned()
+            ))
+        );
+    }
+
+    #[test]
+    fn selected_plan_that_matches_executed_action_is_accepted() {
+        let case = fixture()["cases"][0].clone();
+        assert_eq!(
+            evaluate_case(&case),
+            Ok((
+                "accept_verified".to_owned(),
+                "final_patch_tested_and_diff_reviewed".to_owned()
+            ))
+        );
+    }
+
+    #[test]
+    fn selected_plan_mismatch_is_rejected_even_if_later_tests_pass() {
+        let case = fixture()["cases"][8].clone();
+        assert_eq!(
+            evaluate_case(&case),
+            Ok((
+                "reject".to_owned(),
+                "selected_plan_execution_mismatch".to_owned()
             ))
         );
     }
@@ -465,7 +514,13 @@ mod tests {
     #[test]
     fn skipped_final_test_does_not_support_success() {
         let mut case = fixture()["cases"][0].clone();
-        case["events"][3]["result"] = json!("skipped");
+        let test_index = case["events"]
+            .as_array()
+            .unwrap()
+            .iter()
+            .position(|event| string_field(event, "event") == Some("test"))
+            .unwrap();
+        case["events"][test_index]["result"] = json!("skipped");
         assert_eq!(
             evaluate_case(&case),
             Ok((
