@@ -3,7 +3,7 @@
 **Status:** proposed evaluation contract; not an observed result or qualification.
 **Owner:** Symthaea cyber qualification, composed with [#7742](https://github.com/Luminous-Dynamics/symthaea/issues/7742), [#7770](https://github.com/Luminous-Dynamics/symthaea/issues/7770), and evaluator integration [#7776](https://github.com/Luminous-Dynamics/symthaea/issues/7776).
 **Fixture implementation:** draft [PR #7769](https://github.com/Luminous-Dynamics/symthaea/pull/7769).
-**Benchmark roadmap:** [Cyber Hunt Benchmark Roadmap v1](https://github.com/Luminous-Dynamics/symthaea/blob/b702d90f5d94c080cfc801296822c45c0163e138/docs/research/cyber-hunt-benchmark-roadmap-v1.md) adds a runner-independent research plan, staged corpus ladder, target trajectory, executable tool/evaluator contract audits, and evidence/causal/abstention/action-boundary metrics.
+**Benchmark roadmap:** [Cyber Hunt Benchmark Roadmap v1](https://github.com/Luminous-Dynamics/symthaea/blob/87d29703ef804c534d18eda89ccf446781201e65/docs/research/cyber-hunt-benchmark-roadmap-v1.md) adds a runner-independent research plan, staged corpus ladder, target trajectory, executable tool/evaluator contract audits, and evidence/causal/abstention/action-boundary metrics.
 
 ## 1. The paradigm shift
 
@@ -44,7 +44,7 @@ A lower tier does not imply a higher one. Queued, cancelled, skipped, timed-out,
 | S3 | upper-bound resource stress | up to generator limit of 250k records | scaling/cost profile, not improved security reasoning |
 | S4 | held-out capability evaluation | target at least 30 independently reviewed incident templates, multiple causal patterns and environments | generalization only to covered domains |
 
-The generator's current planted identity-to-egress storyline is a smoke fixture. Changing seeds or row identifiers does not make independent incidents. Expand the corpus with distinct causal structures, benign workflows, source models, and domain coverage before any broad capability claim. Long term, target 100+ independently sourced or authored and reviewed procedures, but never inflate counts by treating rows or near-identical transforms as independent scenarios.
+The generator now exposes two public smoke families: identity-to-egress and artifact lifecycle/provenance. The artifact family includes a full benign build-to-deployment chain with the same event types as the planted chain, and a digest mismatch between the published artifact and a validly signed attestation subject. This closes a simple event-type-only shortcut, but it is still synthetic smoke data, not a reviewed campaign suite. Changing seeds or row identifiers does not make independent incidents. Expand to at least four distinct causal families, review the ground-truth rubric independently, and create held-out campaign/environment splits before any broad capability claim. Long term, target 100+ independently sourced or authored and reviewed procedures, but never inflate counts by treating rows or near-identical transforms as independent scenarios.
 
 The 2026 *Cyber Defense Benchmark* is a useful scale comparator: it describes unguided queries over 75k–135k Windows-event records and reports 3.8% average malicious-event recall for its best tested model in that benchmark setup. It proposes a 50% recall floor on each tactic as an unsupervised-SOC bar; no tested model met it across all tactics. These results are motivation, not a transferable result or universal ranking: https://arxiv.org/abs/2604.19533.
 
