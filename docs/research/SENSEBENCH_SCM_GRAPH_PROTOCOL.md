@@ -53,6 +53,9 @@ For each world/policy pair, the JSON report includes:
 - **Skeleton F1:** adjacency recovery ignoring edge direction.
 - **Directed-edge F1:** exact arrow recovery; a reversed arrow counts as a directed false positive and false negative.
 - **Structural Hamming distance (SHD):** one edit per unordered variable pair whose state differs, including one edit for a reversal.
+- **CPDAG skeleton F1, compelled-direction F1 and edge-mark distance:** score the highest-posterior-mass Markov equivalence class, not an independently thresholded collection of arrows.
+- **Markov equivalence-class recovery and posterior class mass:** distinguish learning the observationally identifiable class from selecting one exact DAG inside it.
+- **Separate full-DAG and CPDAG claim coverage / false-claim rates:** a confident class-level claim can be appropriate while a single direction remains unresolved.
 - Exact graph recovery rate and its Wilson interval.
 - Posterior mass on the true graph and multiclass graph-posterior Brier score.
 - Graph-claim coverage at the configured posterior threshold.
@@ -61,6 +64,10 @@ For each world/policy pair, the JSON report includes:
 - Per-world metrics, trial-level intervals, and held-out policy summaries. World-level summaries weight generated worlds equally instead of pooling trials as if every observation were an independent world.
 
 The structure-blind random graph policy reports graph metrics but makes no confidence-qualified claim. Keep its no-measurement behavior separate from the random intervention policy.
+
+Markov-equivalence classes are precomputed for the 25 DAGs; the known-answer catalogue contains 11 classes. Two DAGs are treated as equivalent when they have the same skeleton and the same unshielded colliders, the standard criterion for the causal-sufficiency/faithfulness setting represented by this synthetic benchmark. The predicted CPDAG is the class with greatest summed posterior mass. This keeps the emitted partially directed graph within the catalogue of valid equivalence-class CPDAGs instead of independently thresholding edge directions into a potentially invalid PDAG.
+
+The graph-posterior Brier score scores the posterior over DAGs, not the CPDAG class distribution.
 
 ## Negative and known-answer controls
 
@@ -83,7 +90,7 @@ These are authored tests, not executed results. The benchmark has not been compi
 4. **Graph confidence:** report graph-claim coverage beside false-claim risk. Reject the trivial policy that wins by abstaining on every trial.
 5. **Negative controls:** on the empty-graph family, report spurious-edge frequency and false accepted graph claims explicitly.
 6. **World/family inference:** current summaries have four parameter variants per hand-designed family. These are not a sample of all possible causal systems. The next version should generate many graph families/mechanisms from preregistered design distributions and use family-level analysis, rather than treating within-family variants as independent evidence of generalization.
-7. **Observational equivalence:** add CPDAG-aware scoring so the learner is not penalized for leaving directions unresolved when observational data cannot identify direction. Then score interventional direction recovery separately.
+7. **Observational equivalence:** the current suite now has a three-variable CPDAG-class scorer and separate compelled-direction metrics. Expand and cross-check it against a trusted CPDAG implementation before larger-graph use; then score interventional direction recovery separately.
 8. **Richer SCMs:** add continuous linear-Gaussian and nonlinear/additive-noise families, measurement noise, sampling constraints, intervention artifacts, latent confounding, and selection/censoring mechanisms.
 9. **Independent custody:** move the evaluation truth and score implementation to a separate process/corpus, bind test corpus hashes to the protocol, and keep policy-visible fixtures separated from the qualification set.
 10. **Physical bridge:** only after software correctness and reproducibility, use replayed sensor streams with injected faults and an independently calibrated reference. Synthetic success alone does not support physical scientific claims.
