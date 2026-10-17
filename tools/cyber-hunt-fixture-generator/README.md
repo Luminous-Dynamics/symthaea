@@ -31,7 +31,7 @@ cargo run --manifest-path tools/cyber-hunt-fixture-generator/Cargo.toml -- \
   --source-commit "$(git rev-parse HEAD)"
 ```
 
-`--family identity-to-egress` is the default for backward compatibility. The additional options are `artifact-provenance`, `cloud-data-movement`, and `cross-domain-trust-chain`. Family changes select a distinct causal graph; new seeds within a family are still not independent campaigns.
+`--family identity-to-egress` is the default for backward compatibility. The additional family options are `artifact-provenance`, `cloud-data-movement`, and `cross-domain-trust-chain`. Use `benign-only-control` for an all-negative hard-negative episode; it emits no positive labels and no attack relations. A family selector changes the causal graph, but new seeds within a family are still not independent campaigns.
 
 Cloud-family example:
 
@@ -52,6 +52,17 @@ cargo run --manifest-path tools/cyber-hunt-fixture-generator/Cargo.toml -- \\
   --events-out /tmp/cyber-hunt-cross-domain/solver/events.jsonl \\
   --manifest-out /tmp/cyber-hunt-cross-domain/solver/manifest.json \\
   --truth-out /tmp/cyber-hunt-cross-domain/evaluator/truth.json \\
+  --source-commit "$(git rev-parse HEAD)"
+\`\`\`
+
+All-negative false-positive control:
+
+\`\`\`sh
+cargo run --manifest-path tools/cyber-hunt-fixture-generator/Cargo.toml -- \\
+  --family benign-only-control --records 1000 --seed 20261021 \\
+  --events-out /tmp/cyber-hunt-benign/solver/events.jsonl \\
+  --manifest-out /tmp/cyber-hunt-benign/solver/manifest.json \\
+  --truth-out /tmp/cyber-hunt-benign/evaluator/truth.json \\
   --source-commit "$(git rev-parse HEAD)"
 \`\`\`
 
