@@ -7,10 +7,14 @@ deterministic validator benchmark. The runner lives at
 ## Run
 
 From a clean checkout of the Symthaea repository, set `EXPECTED_HEAD` to the
-**independently known full commit SHA being evaluated** (for CI, use the event's
-trusted commit SHA; for local review, use the SHA supplied by the PR/revision
-being audited). Do not derive the expected SHA from the checkout being tested,
-because that makes the identity comparison tautological.
+**independently known full commit SHA being evaluated**. In GitHub Actions, use
+the event-provided `github.sha` only when the job checks out that exact SHA. A
+`pull_request` job commonly checks out the generated merge commit, not the PR
+head; to qualify the PR head instead, explicitly check out
+`github.event.pull_request.head.sha` and pass that same event-provided SHA.
+For local review, use the full SHA supplied by the PR/revision being audited.
+Do not derive the expected SHA from the checkout being tested, because that
+makes the identity comparison tautological.
 
 ```bash
 EXPECTED_HEAD="replace-with-full-commit-sha-under-review"
