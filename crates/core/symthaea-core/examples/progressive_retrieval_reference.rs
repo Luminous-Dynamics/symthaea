@@ -215,7 +215,11 @@ fn main() {
             })
             .map(|(record_id, _)| record_id)
             .collect::<Vec<_>>();
-        let exact_match_count = relevant_ids.len().max(1);
+        assert!(
+            relevant_ids.contains(&target_id),
+            "the source record must satisfy its own partial query"
+        );
+        let exact_match_count = relevant_ids.len();
 
         for &dim in COARSE_DIMS {
             let coarse_ranked = rank_records(&records, &query, dim);
