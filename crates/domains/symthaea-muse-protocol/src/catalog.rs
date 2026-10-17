@@ -834,8 +834,20 @@ pub const CATALOG: [CanonicalStyle; 152] = [
     style!(15, "Toccata", BaroqueEarlyDance),
     style!(16, "French Overture", BaroqueEarlyDance),
     style!(17, "Sonata", DevelopmentalLargeForms, "Sonata", Developing),
-    style!(18, "Rondo", DevelopmentalLargeForms),
-    style!(19, "Theme and Variations", DevelopmentalLargeForms),
+    style!(
+        18,
+        "Rondo",
+        DevelopmentalLargeForms,
+        "Rondo",
+        Developing
+    ),
+    style!(
+        19,
+        "Theme and Variations",
+        DevelopmentalLargeForms,
+        "ThemeAndVariations",
+        Developing
+    ),
     style!(20, "Scherzo", DevelopmentalLargeForms),
     style!(21, "Symphonic Poem", DevelopmentalLargeForms),
     style!(22, "Concerto Movement", DevelopmentalLargeForms),
@@ -877,8 +889,20 @@ pub const CATALOG: [CanonicalStyle; 152] = [
     style!(36, "Folia Variations", GroundOstinatoTransformation),
     style!(37, "Romanesca", GroundOstinatoTransformation),
     style!(38, "Ostinato Variations", GroundOstinatoTransformation),
-    style!(39, "Erosion", GroundOstinatoTransformation),
-    style!(40, "Lineage", GroundOstinatoTransformation),
+    style!(
+        39,
+        "Erosion",
+        GroundOstinatoTransformation,
+        "Erosion",
+        Developing
+    ),
+    style!(
+        40,
+        "Lineage",
+        GroundOstinatoTransformation,
+        "Lineage",
+        Developing
+    ),
     style!(41, "Folk", SongNarrative, "Folk", Developing),
     style!(42, "Modal Folk", SongNarrative, "ModalFolk", Developing),
     style!(43, "Folk Ballad", SongNarrative),
@@ -1162,12 +1186,12 @@ mod tests {
     #[test]
     fn all_current_composer_styles_are_mapped_once() {
         let implemented: Vec<_> = implemented_catalog().collect();
-        assert_eq!(implemented.len(), 29);
+        assert_eq!(implemented.len(), 33);
         let names: HashSet<_> = implemented
             .iter()
             .filter_map(|entry| entry.composer_style)
             .collect();
-        assert_eq!(names.len(), 29);
+        assert_eq!(names.len(), 33);
         assert!(
             implemented
                 .iter()
