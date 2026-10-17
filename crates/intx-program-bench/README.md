@@ -8,6 +8,7 @@ It is deliberately a standalone, dependency-free Rust package so it does not alt
 
 ```sh
 sha256sum --check crates/intx-program-bench/fixtures/cases.tsv.sha256
+sha256sum --check crates/intx-program-bench/fixtures/expected.tsv.sha256
 cargo test --manifest-path crates/intx-program-bench/Cargo.toml --locked
 cargo fmt --manifest-path crates/intx-program-bench/Cargo.toml -- --check
 cargo clippy --manifest-path crates/intx-program-bench/Cargo.toml --locked -- -D warnings
@@ -17,7 +18,7 @@ Run from the Symthaea repository root. These checks require only the repository-
 
 ## Corpus shape
 
-`fixtures/cases.tsv` has 50 stable synthetic scenarios: 10 each for identity, artifact integrity, authority, transport/reconciliation, and lifecycle/audit. Each row records a stable ID, expected state, dispatch expectation, and whether reconciliation is required.
+`fixtures/cases.tsv` has 50 stable synthetic scenarios: 10 each for identity, artifact integrity, authority, transport/reconciliation, and lifecycle/audit. `fixtures/expected.tsv` separately freezes the expected state, dispatch class, and reconciliation requirement for every case ID; Rust tests compare the scenario table to this oracle so a semantically wrong expected state cannot pass merely because it satisfies local cross-field rules. Both files have pinned SHA-256 checksums. This is a separate frozen test oracle, not a formal proof and not production authorization.
 
 Dispatch classes:
 - `none`: no remote effect attempt is permitted or expected.
