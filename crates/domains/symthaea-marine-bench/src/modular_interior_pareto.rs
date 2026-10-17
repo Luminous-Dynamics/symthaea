@@ -82,6 +82,7 @@ pub enum ParetoStatus {
 pub struct CandidateAssessment {
     pub candidate_id: String,
     pub configuration_sha256: String,
+    pub objectives_sha256: String,
     pub eligibility: CandidateEligibility,
     pub pareto_status: ParetoStatus,
     pub objective_group_sha256: Option<String>,
@@ -126,6 +127,7 @@ struct InputFingerprint {
     candidate_id: String,
     configuration_sha256: String,
     validation_receipt_sha256: String,
+    objectives_sha256: String,
     objectives: Vec<ObjectiveObservation>,
 }
 
@@ -172,46 +174,57 @@ fn input_fingerprints(
 ) -> Result<Vec<InputFingerprint>, serde_json::Error> {
     let mut fingerprints = Vec::with_capacity(submissions.len());
     for submission in submissions {
+        let objectives = normalized_objectives(&submission.objectives);
         fingerprints.push(InputFingerprint {
             candidate_id: submission.candidate_id.clone(),
             configuration_sha256: digest(&submission.configuration)?,
             validation_receipt_sha256: submission.validation_receipt.receipt_sha256.clone(),
-            objectives: normalized_objectives(&submission.objectives),
+            objectives_sha256: digest(&objectives)?,
+            objectives,
         });
     }
     fingerprints.sort_by(|a, b| {
         a.candidate_id.cmp(&b.candidate_id)
             .then(a.configuration_sha256.cmp(&b.configuration_sha256))
             .then(a.validation_receipt_sha256.cmp(&b.validation_receipt_sha256))
+            .then(a.objectives_sha256.cmp(&b.objectives_sha256))
     });
     Ok(fingerprints)
 }
 
 fn usable_evidence_sources(configuration: &Configuration) -> BTreeSet<String> {
-    let mut sources = BTreeSet::new();
-    let mut add = |source: &crate::modular_interior::Provenance| {
-        if source.source_type != "authored_synthetic"
-            && !source.source_id.trim().is_empty()
-            && !source.title.trim().is_empty()
-            && !source.uri.trim().is_empty()
-            && !source.scope.trim().is_empty()
-        {
-            sources.insert(source.source_id.clone());
-        }
-    };
+    let mut records: BTreeMap<&str, Vec<&crate::modular_interior::Provenance>> = BTreeMap::new();
     for source in &configuration.provenance {
-        add(source);
+        records.entry(source.source_id.as_str()).or_default().push(source);
     }
     for placement in &configuration.placements {
         if let Some(module) = configuration.module_catalog.iter()
             .find(|module| module.module_id == placement.module_id)
         {
             for source in &module.provenance {
-                add(source);
+                records.entry(source.source_id.as_str()).or_default().push(source);
             }
         }
     }
-    sources
+
+    records.into_iter().filter_map(|(source_id, entries)| {
+        let first = *entries.first()?;
+        if source_id.trim().is_empty()
+            || first.source_type == "authored_synthetic"
+            || first.title.trim().is_empty()
+            || first.uri.trim().is_empty()
+            || first.scope.trim().is_empty()
+        {
+            return None;
+        }
+        let consistent = entries.iter().all(|source| {
+            source.title == first.title
+                && source.uri == first.uri
+                && source.scope == first.scope
+                && source.source_type == first.source_type
+        });
+        consistent.then(|| source_id.to_owned())
+    }).collect()
 }
 
 fn configuration_evidence_blockers(configuration: &Configuration) -> (bool, Vec<String>) {
@@ -520,6 +533,7 @@ pub fn rank_candidates(
         assessments.push(CandidateAssessment {
             candidate_id: submission.candidate_id.clone(),
             configuration_sha256: configuration_sha256.clone(),
+            objectives_sha256: digest(&normalized)?,
             eligibility,
             pareto_status: ParetoStatus::NotRanked,
             objective_group_sha256: group_sha256.clone(),
@@ -579,7 +593,8 @@ pub fn rank_candidates(
     }
 
     assessments.sort_by(|a, b| a.candidate_id.cmp(&b.candidate_id)
-        .then(a.configuration_sha256.cmp(&b.configuration_sha256)));
+        .then(a.configuration_sha256.cmp(&b.configuration_sha256))
+        .then(a.objectives_sha256.cmp(&b.objectives_sha256)));
     groups.sort_by(|a, b| a.objective_group_sha256.cmp(&b.objective_group_sha256));
 
     let body = ParetoReportBody {
