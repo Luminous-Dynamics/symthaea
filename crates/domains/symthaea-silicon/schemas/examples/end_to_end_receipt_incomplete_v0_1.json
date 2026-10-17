@@ -39,11 +39,13 @@
     "commands": []
   },
   "correctness": {
-    "oracle_comparison": "not_run"
+    "oracle_comparison": "not_run",
+    "malformed_frames_accepted": null
   },
   "metrics": [],
   "artifacts": [],
   "limitations": [
-    "Planning example only; no input manifest, oracle run, performance measurement, energy measurement, simulator run, synthesis run, or hardware observation is represented."
+    "Planning example only; no input manifest, oracle run, performance measurement, energy measurement, simulator run, synthesis run, or hardware observation is represented.",
+    "No protocol frames were exercised; malformed-frame acceptance is not measured and is represented as null."
   ]
 }
