@@ -22,7 +22,8 @@
       "enum": [
         "synthetic-identity-to-egress-v1",
         "synthetic-artifact-lifecycle-v1",
-        "synthetic-cloud-data-movement-v1"
+        "synthetic-cloud-data-movement-v1",
+        "synthetic-cross-domain-trust-chain-v1"
       ]
     },
     "profile": {
