@@ -17,6 +17,10 @@ const BASE_TIME_MS: i64 = 1_800_000_000_000;
 const ATTACK_EVENT_COUNT: usize = 9;
 const BENIGN_DECOY_COUNT: usize = 6;
 const PLANTED_EVENT_COUNT: usize = ATTACK_EVENT_COUNT + BENIGN_DECOY_COUNT;
+const SYNTHETIC_PRINCIPALS: [&str; 12] = [
+    "a.chen", "j.smith", "m.patel", "it.admin", "svc-report", "svc-backup",
+    "svc-build", "d.owens", "s.lee", "svc-inventory", "helpdesk.1", "r.garcia",
+];
 
 #[derive(Debug, Clone, Serialize, Deserialize, PartialEq, Eq)]
 #[serde(deny_unknown_fields)]
@@ -190,11 +194,7 @@ fn background_event(
     let event_time_ms = BASE_TIME_MS.saturating_add(time_offset);
     let host_number = 1 + rng.below(48);
     let host_id = format!("host-{host_number:03}");
-    let principals = [
-        "a.chen", "j.smith", "m.patel", "it.admin", "svc-report", "svc-backup",
-        "svc-build", "d.owens", "s.lee", "svc-inventory", "helpdesk.1", "r.garcia",
-    ];
-    let principal = principals[rng.below(principals.len() as u64) as usize];
+    let principal = SYNTHETIC_PRINCIPALS[rng.below(SYNTHETIC_PRINCIPALS.len() as u64) as usize];
     match rng.below(7) {
         0 => {
             let address = format!("10.20.{}.{}", 1 + rng.below(20), 1 + rng.below(250));
@@ -263,11 +263,11 @@ fn generate_dataset(record_count: usize, seed: u64) -> Result<Dataset, String> {
         background_event(index, &mut events, &mut rng, &mut used_ids);
     }
 
-    // Seed-dependent shift and case-local identities make trivial fixed-value matching less useful.
-    // These identifiers are synthetic and do not refer to real hosts or principals.
+    // Vary the incident time and choose identities from the same naming pools as background activity.
+    // Do not add a special prefix or scenario marker that lets the solver spot planted records.
     let base = BASE_TIME_MS.saturating_add(600_000 + rng.below(7_200_000) as i64);
-    let host = format!("host-case-{:04x}", rng.next_u64() as u16);
-    let principal = format!("svc-case-{:04x}", rng.next_u64() as u16);
+    let host = format!("host-{:03}", 1 + rng.below(48));
+    let principal = SYNTHETIC_PRINCIPALS[rng.below(SYNTHETIC_PRINCIPALS.len() as u64) as usize].to_string();
     let session_id = format!("sid-{:016x}", rng.next_u64());
     let source_ip = format!("192.0.2.{}", 10 + rng.below(240)); // RFC 5737 documentation range.
     let external_ip = format!("198.51.100.{}", 10 + rng.below(240)); // RFC 5737 documentation range.
@@ -588,10 +588,7 @@ mod tests {
     }
 
     #[test]
-    fn planted_identity_and_timeline_vary_by_seed_while_the_chain_stays_coherent() {
-        let a = generate_dataset(1_000, 2026).expect("first dataset should generate");
-        let b = generate_dataset(1_000, 2027).expect("second dataset should generate");
-
+    fn planted_identity_and_timeline_vary_by_seed_without_special_marker_leaks() {
         let positive_signature = |dataset: &Dataset| {
             let events: Vec<EventRecord> = std::str::from_utf8(&dataset.event_store)
                 .expect("JSONL should be UTF-8")
@@ -617,23 +614,42 @@ mod tests {
             (hosts, principals, source_ips, destination_ips, start, positives.len())
         };
 
-        let (hosts_a, principals_a, source_ips_a, destination_ips_a, start_a, count_a) = positive_signature(&a);
-        let (hosts_b, principals_b, source_ips_b, destination_ips_b, start_b, count_b) = positive_signature(&b);
-        assert_eq!(count_a, ATTACK_EVENT_COUNT);
-        assert_eq!(count_b, ATTACK_EVENT_COUNT);
-        assert_eq!(hosts_a.len(), 1, "all planted attack events share one case-local host");
-        assert_eq!(hosts_b.len(), 1, "all planted attack events share one case-local host");
-        assert_eq!(principals_a.len(), 1, "all planted attack events share one case-local principal");
-        assert_eq!(principals_b.len(), 1, "all planted attack events share one case-local principal");
-        assert_ne!(hosts_a, hosts_b, "the planted host identity should be seed-dependent");
-        assert_ne!(principals_a, principals_b, "the planted principal should be seed-dependent");
-        assert_eq!(source_ips_a.len(), 1, "authentication evidence shares one synthetic source IP");
-        assert_eq!(source_ips_b.len(), 1, "authentication evidence shares one synthetic source IP");
-        assert_eq!(destination_ips_a.len(), 1, "egress evidence shares one synthetic destination IP");
-        assert_eq!(destination_ips_b.len(), 1, "egress evidence shares one synthetic destination IP");
-        assert_ne!(source_ips_a, source_ips_b, "the planted source IP should be seed-dependent");
-        assert_ne!(destination_ips_a, destination_ips_b, "the planted destination IP should be seed-dependent");
-        assert_ne!(start_a, start_b, "the planted campaign time should be seed-dependent");
+        let signatures: Vec<_> = (2026_u64..2042_u64)
+            .map(|seed| {
+                let dataset = generate_dataset(1_000, seed).expect("seeded dataset should generate");
+                positive_signature(&dataset)
+            })
+            .collect();
+
+        for signature in &signatures {
+            assert_eq!(signature.5, ATTACK_EVENT_COUNT);
+            assert_eq!(signature.0.len(), 1, "all planted events must share one ordinary host ID");
+            assert_eq!(signature.1.len(), 1, "all planted events must share one ordinary principal ID");
+            assert_eq!(signature.2.len(), 1, "authentication events must share one source IP");
+            assert_eq!(signature.3.len(), 1, "egress events must share one destination IP");
+            assert!(signature.0.iter().all(|host| host.starts_with("host-") && !host.starts_with("host-case-")));
+            assert!(signature.1.iter().all(|principal| !principal.starts_with("svc-case-")));
+        }
+
+        let unique_hosts: BTreeSet<String> = signatures.iter()
+            .map(|signature| signature.0.iter().next().expect("host").clone())
+            .collect();
+        let unique_principals: BTreeSet<String> = signatures.iter()
+            .map(|signature| signature.1.iter().next().expect("principal").clone())
+            .collect();
+        let unique_source_ips: BTreeSet<String> = signatures.iter()
+            .map(|signature| signature.2.iter().next().expect("source IP").clone())
+            .collect();
+        let unique_destination_ips: BTreeSet<String> = signatures.iter()
+            .map(|signature| signature.3.iter().next().expect("destination IP").clone())
+            .collect();
+        let unique_starts: BTreeSet<i64> = signatures.iter().map(|signature| signature.4).collect();
+
+        assert!(unique_hosts.len() > 1, "host identity should vary across seeds");
+        assert!(unique_principals.len() > 1, "principal identity should vary across seeds");
+        assert!(unique_source_ips.len() > 1, "source IP should vary across seeds");
+        assert!(unique_destination_ips.len() > 1, "destination IP should vary across seeds");
+        assert!(unique_starts.len() > 1, "campaign time should vary across seeds");
     }
 
     #[test]
