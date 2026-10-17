@@ -281,6 +281,7 @@ pub fn audit_run(run_dir: &Path) -> AuditReport {
 
 const PROVENANCE_MANIFEST_NAME: &str = "provenance-manifest.json";
 const PROVENANCE_SCHEMA_VERSION: &str = "made-run-provenance-v1";
+const MAX_PROVENANCE_MANIFEST_BYTES: u64 = 32 * 1024 * 1024;
 
 #[derive(Debug, Deserialize)]
 #[serde(deny_unknown_fields)]
@@ -369,6 +370,14 @@ fn verify_provenance_manifest(
         report.fail(
             "provenance_manifest_not_regular_file",
             "provenance-manifest.json must be a regular file, not a symlink",
+        );
+        return;
+    }
+    if manifest_metadata.len() > MAX_PROVENANCE_MANIFEST_BYTES {
+        report.provenance_manifest_status = "manifest_invalid".to_owned();
+        report.fail(
+            "provenance_manifest_too_large",
+            format!("provenance manifest exceeds {MAX_PROVENANCE_MANIFEST_BYTES} bytes"),
         );
         return;
     }
@@ -744,6 +753,14 @@ fn verify_oracle_call_ledger(
             return;
         }
     };
+    let line_count = ledger_text.lines().count();
+    if line_count > MAX_ORACLE_CALL_RECORDS {
+        report.fail(
+            "oracle_call_ledger_record_limit_exceeded",
+            format!("oracle call ledger exceeds {MAX_ORACLE_CALL_RECORDS} records"),
+        );
+        return;
+    }
     let lines: Vec<&str> = ledger_text.lines().collect();
     if lines.is_empty() {
         report.fail("oracle_call_ledger_empty", "oracle call ledger contains no records");
