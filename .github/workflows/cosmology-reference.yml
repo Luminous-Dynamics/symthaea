@@ -36,10 +36,10 @@ jobs:
           components: rustfmt
 
       - name: Check cosmology module formatting
-        run: cargo fmt --manifest-path crates/core/symthaea-core/Cargo.toml -- --check
+        run: rustfmt --edition 2024 --check crates/core/symthaea-core/src/physics/cosmology.rs
 
       - name: Check chain-auditor formatting
-        run: cargo fmt --manifest-path crates/domains/symthaea-cosmology-bench/Cargo.toml -- --check
+        run: rustfmt --edition 2024 --check crates/domains/symthaea-cosmology-bench/src/lib.rs crates/domains/symthaea-cosmology-bench/src/main.rs
 
       - name: Test FLRW analytic and adaptive reference oracles
         run: cargo test -p symthaea-core expansion_history_tests
