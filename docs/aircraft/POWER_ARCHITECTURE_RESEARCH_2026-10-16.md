@@ -237,6 +237,18 @@ Use scoped disclosure for commercially sensitive component and supplier data and
 11. FAA, [Propulsion Systems](https://www.faa.gov/aircraft/air_cert/step/disciplines/propulsion_systems) — electric/hybrid propulsion and lifecycle safety/certification discipline.
 12. Mycelix, [AeroCommons engineering and manufacturing commons](https://github.com/Luminous-Dynamics/mycelix/issues/3638) and [physical-evidence reproducibility challenge](https://github.com/Luminous-Dynamics/mycelix/issues/3643) — provenance boundary for as-built configurations and test evidence.
 
+## Deterministic design-space comparison status (2026-10-17)
+
+The aircraft-energy research branch now includes three distinct functions:
+
+1. **Frozen-mission envelope screening**: check energy after reserve, continuous and peak power, peak duration, installed-system mass, and explicit missing/invalid inputs.
+2. **Same-profile candidate Pareto comparison**: compare candidate energy-system envelopes on one supplied mission profile without collapsing mass/margin trade-offs into a weighted score.
+3. **Bounded battery sensitivity grid and candidate-specific mission comparison**: enumerate pack specific energy, installed-system/pack mass ratio, temperature capacity fraction, end-of-life state of health, reserve fraction, and power derating, with a hard maximum of 50,000 generated combinations. Invalid configurations stay in the report and never enter the frontier. A separate API accepts each candidate's own mission profile under a shared caller-declared use-case family; that makes it possible for a future validated vehicle model to recalculate demand when candidate mass or configuration changes.
+
+**Important limitation:** the fixed-profile sensitivity grid does not recompute aircraft lift, drag, climb, transition, or required bus power after changing system mass. The candidate-specific API only consumes upstream mission profiles; it does not generate or validate them. A common family identifier is bookkeeping, not proof that route, payload, weather, reserves, acoustic limits, charging losses, or certification assumptions are equivalent. Do not interpret these screening outputs as an aircraft-level optimum, energy estimate, performance guarantee, safety case, or design validation.
+
+Next gates are an independently reviewed, candidate-specific reduced-order mission model with explicit mass/payload/aerodynamic coupling; a frozen dataset and units/provenance manifest; sensitivity and adverse-case tests; and comparison against a conventional road vehicle plus conventional aircraft baseline. Until such a model exists, treat the sweep as an engineering bookkeeping and early rejection tool only.
+
 ## Claims this document does not make
 
 This document does not claim that Symthaea has designed a superior aircraft, that any proposed propulsion architecture is feasible for a selected mission, that onboard SMR/fission or fusion propulsion is near-term, or that any aircraft is safe, certifiable, economical, or ready to build. Those claims require qualified models, independent evaluation, physical evidence, and relevant external approvals.
