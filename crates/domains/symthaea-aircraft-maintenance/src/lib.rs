@@ -1076,6 +1076,7 @@ pub fn prepare_task_for_execution(
 pub fn transition_task(
     card: &mut MaintenanceTaskCard,
     transition: TaskTransition,
+    current_documents: &[CurrentDocument],
     actor: &ActorEvidence,
 ) -> Result<TaskState, TaskCardError> {
     if actor.actor_id.trim().is_empty()
@@ -1087,6 +1088,71 @@ pub fn transition_task(
     if actor.kind == ActorKind::SoftwareChecker && transition == TaskTransition::ReleaseToService {
         return Err(TaskCardError::SoftwareCannotReleaseToService);
     }
+
+    if matches!(
+        transition,
+        TaskTransition::MarkSourceVerified | TaskTransition::MarkEligibilityChecked
+    ) {
+        if actor.role.is_none()
+            || !actor.credential_reference.as_ref().is_some_and(valid_document_shape)
+        {
+            return Err(TaskCardError::UnauthorizedTransition);
+        }
+        let credential = actor.credential_reference.as_ref().expect("credential checked above");
+        if !document_is_current(credential, current_documents) {
+            return Err(TaskCardError::StaleOrMissingSource {
+                document_id: credential.document_id.clone(),
+            });
+        }
+        validate_task_card_static(card).map_err(|_| TaskCardError::UnauthorizedTransition)?;
+    }
+
+    if transition == TaskTransition::MarkSourceVerified {
+        for source in std::iter::once(&card.controlling_manual)
+            .chain(card.supporting_sources.iter())
+            .chain(card.parts.iter().map(|part| &part.source))
+        {
+            if !document_is_current(source, current_documents) {
+                return Err(TaskCardError::StaleOrMissingSource {
+                    document_id: source.document_id.clone(),
+                });
+            }
+        }
+    }
+
+    if transition == TaskTransition::MarkEligibilityChecked {
+        match &card.authority.review {
+            AuthorityReview::Unresolved => return Err(TaskCardError::AuthorityReviewUnresolved),
+            AuthorityReview::Verified {
+                jurisdiction,
+                certification_basis,
+                permission_source,
+                reviewer_id,
+                reviewed_on,
+                scope_statement,
+            } => {
+                if jurisdiction != &card.authority.jurisdiction
+                    || certification_basis != &card.authority.certification_basis
+                    || reviewer_id.trim().is_empty()
+                    || scope_statement.trim().is_empty()
+                    || !valid_iso_date(reviewed_on)
+                {
+                    return Err(TaskCardError::AuthorityReviewMismatch);
+                }
+                validate_document(
+                    "authority.review.permission_source",
+                    permission_source,
+                    &mut Vec::new(),
+                );
+                if !document_is_current(permission_source, current_documents) {
+                    return Err(TaskCardError::StaleOrMissingSource {
+                        document_id: permission_source.document_id.clone(),
+                    });
+                }
+            }
+        }
+    }
+
     let next = match (card.state, transition) {
         (TaskState::Draft, TaskTransition::MarkSourceVerified)
             if actor.kind == ActorKind::HumanSourceReviewer => TaskState::SourceVerified,
@@ -1548,6 +1614,57 @@ mod tests {
     }
 
     #[test]
+    fn source_verification_requires_current_sources_and_reviewer_credential() {
+        let mut card = card();
+        card.state = TaskState::Draft;
+        let context = context(&card);
+        let reviewer = ActorEvidence {
+            actor_id: "source-reviewer-fixture".into(),
+            kind: ActorKind::HumanSourceReviewer,
+            role: Some(MaintenanceRole::CertificatedMechanic),
+            jurisdiction: card.authority.jurisdiction.clone(),
+            certification_basis: card.authority.certification_basis.clone(),
+            credential_reference: Some(doc("review-credential", "rev-1", '4')),
+        };
+        assert_eq!(
+            transition_task(
+                &mut card,
+                TaskTransition::MarkSourceVerified,
+                &context.current_documents,
+                &reviewer,
+            ),
+            Ok(TaskState::SourceVerified)
+        );
+        assert_eq!(card.state(), TaskState::SourceVerified);
+    }
+
+    #[test]
+    fn eligibility_review_cannot_advance_with_unresolved_permission_basis() {
+        let mut card = card();
+        card.state = TaskState::SourceVerified;
+        card.authority.review = AuthorityReview::Unresolved;
+        let context = context(&card);
+        let reviewer = ActorEvidence {
+            actor_id: "eligibility-reviewer-fixture".into(),
+            kind: ActorKind::HumanEligibilityReviewer,
+            role: Some(MaintenanceRole::CertificatedMechanic),
+            jurisdiction: card.authority.jurisdiction.clone(),
+            certification_basis: card.authority.certification_basis.clone(),
+            credential_reference: Some(doc("review-credential", "rev-1", '4')),
+        };
+        assert_eq!(
+            transition_task(
+                &mut card,
+                TaskTransition::MarkEligibilityChecked,
+                &context.current_documents,
+                &reviewer,
+            ),
+            Err(TaskCardError::AuthorityReviewUnresolved)
+        );
+        assert_eq!(card.state(), TaskState::SourceVerified);
+    }
+
+    #[test]
     fn task_cannot_be_marked_ready_without_complete_prechecks() {
         let mut card = card();
         card.state = TaskState::EligibilityChecked;
@@ -1603,6 +1720,7 @@ mod tests {
     #[test]
     fn software_checker_cannot_release_a_task() {
         let mut card = card();
+        let current_documents = context(&card).current_documents;
         let actor = ActorEvidence {
             actor_id: "checker-fixture".into(),
             kind: ActorKind::SoftwareChecker,
@@ -1612,7 +1730,7 @@ mod tests {
             credential_reference: None,
         };
         assert_eq!(
-            transition_task(&mut card, TaskTransition::ReleaseToService, &actor),
+            transition_task(&mut card, TaskTransition::ReleaseToService, &current_documents, &actor),
             Err(TaskCardError::SoftwareCannotReleaseToService)
         );
     }
@@ -1694,6 +1812,7 @@ mod tests {
     fn software_cannot_skip_directly_from_work_recorded_to_released() {
         let mut card = card();
         card.state = TaskState::WorkRecorded;
+        let current_documents = context(&card).current_documents;
         let actor = ActorEvidence {
             actor_id: "checker-fixture".into(),
             kind: ActorKind::SoftwareChecker,
