@@ -105,3 +105,34 @@ Additional research:
 - *Concepts of change propagation analysis in engineering design* (published online 2022; journal issue 2023) reviews the core concepts and approaches in engineering change-impact analysis: https://link.springer.com/article/10.1007/s00163-022-00395-y
 - Inselmann, Wehrend & Krause (2025), lifecycle-oriented interface standardization across product-family phases: https://doi.org/10.35199/dfx2025.24
 - IMO passenger-ship safety and fire protection are hard constraints for applicable vessels; change analysis must defer to the actual vessel's regulatory basis: https://www.imo.org/en/ourwork/safety/pages/passengerships.aspx and https://www.imo.org/en/ourwork/safety/pages/fireprotection-default.aspx
+
+  
+## MARINE-MOD-004 — evidence-gated Pareto ranking
+
+The companion `modular_interior_pareto` module implements strict separation between constraint checking and design preference. It accepts candidate configurations only with a validation receipt that verifies against the exact typed configuration. A rejected candidate never ranks; an indeterminate candidate stays review-required and cannot enter the frontier. The objective layer likewise excludes unknown, assumption-only, non-finite or evidence-less values. Objective groups require exact matches for metric ID, unit, direction and comparison basis; there are no implicit unit conversions.
+
+The implementation uses Pareto dominance rather than a weighted scalar score. One design cannot compensate for a violation of a hard gate by being lighter, cheaper or more comfortable. The report identifies eligible candidates, frontier candidates, dominated candidates and the named dominator, then binds a digest over the normalized input manifest and report. This is only as strong as the upstream validation and evidence classification; it is not a vessel approval.
+
+The example intentionally feeds assumption-only mass values from the synthetic fixtures. Expected behavior: zero candidates in the evidence-backed frontier until actual configuration checks and objective evidence meet the declared threshold. That is a fail-closed demonstration, not a failed optimization.
+
+Run when Rust is available:
+  
+```sh
+cargo test -p symthaea-marine-bench modular_interior_pareto
+cargo run -p symthaea-marine-bench --example modular_interior_pareto
+```
+
+### Benchmark plan (targets, not results)
+
+- 100% agreement with hand-calculated Pareto cases covering minimize/maximize objectives, ties, dominance and trade-offs.
+- 100% exclusion of candidates with invalid configuration receipts, hard errors, indeterminate safety/engineering findings, unknown objectives, assumption-only objectives or missing evidence references.
+- Zero cross-comparisons across differing units, directions or comparison bases.
+- 100% repeatable report digests after candidate input reordering.
+- Zero safety false negatives; every candidate with unresolved hard evidence remains outside the frontier.
+- Report frontier size and review-required fraction together; a zero frontier can be the correct result when no candidate has sufficient evidence.
+
+### Research
+
+Configure-to-order modular ship-platform optimization is established prior art: it models multiple mission configurations and lifecycle costs rather than selecting one hull/layout in isolation (https://www.sciencedirect.com/science/article/abs/pii/S0029801818309065). The 2024/2025 review of ship arrangement optimization describes cabin, compartment and equipment-placement variables and constraints (https://academic.oup.com/jcde/article/12/1/100/7922870). Digital ship-design surveys cover parametric optimization, simulation-driven design and product-lifecycle workflows (https://doi.org/10.59490/imdc.2024.784). Our differentiator is evidence-gated comparison with explicit incompleteness and independently verified configuration receipts, not Pareto optimization itself.
+
+Safety basis remains vessel- and mission-specific: IMO explains that passenger ships must meet applicable SOLAS/Load Lines requirements and highlights escape and fire protection as key design concerns (https://www.imo.org/en/ourwork/safety/pages/passengerships.aspx; https://www.imo.org/en/ourwork/safety/pages/fireprotection-default.aspx).
