@@ -107,7 +107,11 @@ Proposed gate: target at least 20% lower held-out model residual than the calibr
 
 Tracked in [VIS-CIL-001 #7833](https://github.com/Luminous-Dynamics/symthaea/issues/7833). A relevant 2026 Optica conference contribution reports camera-in-the-loop calibration of a phase-only SLM and experimental speckle reduction; reproduce its protocol and equipment constraints before claiming comparability: https://opg.optica.org/abstract.cfm?uri=DH-2026-Tu1A.3.
 
-## Benchmark contract
+## Decision-aware visual experiment selection
+
+The next measurement should be selected for its **expected impact on the engineering decision per declared cost**, not uncertainty reduction in isolation. A high-variance optical property can be decision-irrelevant, while a modest uncertainty near a hard luminance/MTF/eye-box threshold can change feasibility. Compose with [SE-OPT-BENCH-001 #7803](https://github.com/Luminous-Dynamics/symthaea/issues/7803) and its existing selector baselines rather than introducing a new planner. Visual challenge cases are tracked in [VIS-EXP-001 #7871](https://github.com/Luminous-Dynamics/symthaea/issues/7871).
+
+Benchmark seeded random, space-filling, uncertainty sampling, declared information-gain/hypervolume, fixed multi-fidelity allocation, decision-aware selection, robust worst-case regret and an abstention/no-information control. Keep expected value of sample information separate from distribution-free interval/robust claims. Every result records cost/time, attempted/failed/abstained calls, calibration needs, evidence class, hidden-oracle controls, false-feasible rate and decision regret. A physical experiment cannot be replaced by an analytic or synthetic result merely because its cost is lower.
 
 ### Frozen first corpus
 
