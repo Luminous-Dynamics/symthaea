@@ -84,6 +84,12 @@ struct AuditResult {
 
 #[derive(Debug, Clone, Copy, Default, Serialize)]
 struct SufficientStats {
+    sampled_windows: usize,
+    evaluated_reference_windows: usize,
+    reference_failed_windows: usize,
+    reference_unavailable_windows: usize,
+    known_integrity_windows: usize,
+    integrity_breach_windows: usize,
     weight_total: f64,
     weight_query: f64,
     weight_intervention: f64,
@@ -101,6 +107,12 @@ struct SufficientStats {
 
 impl SufficientStats {
     fn add(&mut self, other: Self) {
+        self.sampled_windows += other.sampled_windows;
+        self.evaluated_reference_windows += other.evaluated_reference_windows;
+        self.reference_failed_windows += other.reference_failed_windows;
+        self.reference_unavailable_windows += other.reference_unavailable_windows;
+        self.known_integrity_windows += other.known_integrity_windows;
+        self.integrity_breach_windows += other.integrity_breach_windows;
         self.weight_total += other.weight_total;
         self.weight_query += other.weight_query;
         self.weight_intervention += other.weight_intervention;
@@ -125,6 +137,12 @@ impl SufficientStats {
         let integrity_failure = row.physical_integrity_pass == Some(false);
 
         Self {
+            sampled_windows: 1,
+            evaluated_reference_windows: usize::from(evaluated),
+            reference_failed_windows: usize::from(row.reference_status == "reference_failed"),
+            reference_unavailable_windows: usize::from(row.reference_status == "reference_unavailable"),
+            known_integrity_windows: usize::from(integrity_known),
+            integrity_breach_windows: usize::from(integrity_failure),
             weight_total: weight,
             weight_query: if row.policy_triggered_reference { weight } else { 0.0 },
             weight_intervention: if intervention { weight } else { 0.0 },
@@ -211,6 +229,45 @@ struct MetricEstimate {
 }
 
 #[derive(Debug, Serialize)]
+struct ParentGroupReport {
+    parent_group_id: String,
+    sampled_windows: usize,
+    evaluated_reference_windows: usize,
+    reference_failed_windows: usize,
+    reference_unavailable_windows: usize,
+    known_integrity_windows: usize,
+    observed_integrity_breach_windows: usize,
+    policy_reference_query_fraction: Option<f64>,
+    policy_intervention_fraction: Option<f64>,
+    severe_event_intervention_recall: Option<f64>,
+    severe_event_reference_query_recall: Option<f64>,
+    false_intervention_rate: Option<f64>,
+    false_reference_query_rate: Option<f64>,
+    physical_integrity_failure_rate: Option<f64>,
+}
+
+impl ParentGroupReport {
+    fn from_stats(parent_group_id: &str, stats: &SufficientStats) -> Self {
+        Self {
+            parent_group_id: parent_group_id.to_owned(),
+            sampled_windows: stats.sampled_windows,
+            evaluated_reference_windows: stats.evaluated_reference_windows,
+            reference_failed_windows: stats.reference_failed_windows,
+            reference_unavailable_windows: stats.reference_unavailable_windows,
+            known_integrity_windows: stats.known_integrity_windows,
+            observed_integrity_breach_windows: stats.integrity_breach_windows,
+            policy_reference_query_fraction: Metric::QueryFraction.value(stats),
+            policy_intervention_fraction: Metric::InterventionFraction.value(stats),
+            severe_event_intervention_recall: Metric::SevereEventInterventionRecall.value(stats),
+            severe_event_reference_query_recall: Metric::SevereEventQueryRecall.value(stats),
+            false_intervention_rate: Metric::FalseInterventionRate.value(stats),
+            false_reference_query_rate: Metric::FalseQueryRate.value(stats),
+            physical_integrity_failure_rate: Metric::PhysicalIntegrityFailureRate.value(stats),
+        }
+    }
+}
+
+#[derive(Debug, Serialize)]
 struct ScoreReport {
     schema_version: &'static str,
     run_id: String,
@@ -221,6 +278,13 @@ struct ScoreReport {
     reference_unavailable_windows: usize,
     independent_parent_groups: usize,
     independent_trajectories: usize,
+    parent_groups_with_observed_integrity_breach: usize,
+    parent_groups_with_known_integrity_outcomes: usize,
+    parent_groups_without_evaluated_reference_outcome: usize,
+    worst_parent_group_physical_integrity_failure_rate: Option<f64>,
+    worst_parent_group_false_intervention_rate: Option<f64>,
+    lowest_parent_group_severe_event_intervention_recall: Option<f64>,
+    parent_groups: Vec<ParentGroupReport>,
     policy_decision_count: usize,
     policy_reference_query_count: usize,
     policy_intervention_count: usize,
@@ -612,7 +676,48 @@ pub fn score_run(run_dir: &Path) -> Result<String, String> {
     if seen.len() != sample_by_id.len() {
         return Err("one or more preregistered sample windows have no outcome record".to_owned());
     }
+    let parent_groups = groups
+        .iter()
+        .map(|(parent, stats)| ParentGroupReport::from_stats(parent, stats))
+        .collect::<Vec<_>>();
+    let parent_groups_with_observed_integrity_breach = groups
+        .values()
+        .filter(|stats| stats.integrity_breach_windows > 0)
+        .count();
+    let parent_groups_with_known_integrity_outcomes = groups
+        .values()
+        .filter(|stats| stats.known_integrity_windows > 0)
+        .count();
+    let parent_groups_without_evaluated_reference_outcome = groups
+        .values()
+        .filter(|stats| stats.evaluated_reference_windows == 0)
+        .count();
+    let worst_parent_group_physical_integrity_failure_rate = parent_groups
+        .iter()
+        .filter_map(|group| group.physical_integrity_failure_rate)
+        .max_by(f64::total_cmp);
+    let worst_parent_group_false_intervention_rate = parent_groups
+        .iter()
+        .filter_map(|group| group.false_intervention_rate)
+        .max_by(f64::total_cmp);
+    let lowest_parent_group_severe_event_intervention_recall = parent_groups
+        .iter()
+        .filter_map(|group| group.severe_event_intervention_recall)
+        .min_by(f64::total_cmp);
+
     let mut warnings = Vec::new();
+    if parent_groups_with_observed_integrity_breach > 0 {
+        warnings.push(format!(
+            "{} parent group(s) contain at least one observed physical-integrity breach; pooled averages must not mask these failures.",
+            parent_groups_with_observed_integrity_breach
+        ));
+    }
+    if parent_groups_without_evaluated_reference_outcome > 0 {
+        warnings.push(format!(
+            "{} parent group(s) have no successfully evaluated reference outcome; these groups cannot be classified as physically safe.",
+            parent_groups_without_evaluated_reference_outcome
+        ));
+    }
     if groups.len() < MIN_GROUPS_FOR_INTERVAL {
         warnings.push(format!(
             "Only {} independent parent groups are represented; cluster-bootstrap intervals are withheld until at least {} groups are available.",
@@ -641,6 +746,13 @@ pub fn score_run(run_dir: &Path) -> Result<String, String> {
         reference_unavailable_windows: unavailable,
         independent_parent_groups: groups.len(),
         independent_trajectories: trajectories.len(),
+        parent_groups_with_observed_integrity_breach,
+        parent_groups_with_known_integrity_outcomes,
+        parent_groups_without_evaluated_reference_outcome,
+        worst_parent_group_physical_integrity_failure_rate,
+        worst_parent_group_false_intervention_rate,
+        lowest_parent_group_severe_event_intervention_recall,
+        parent_groups,
         policy_decision_count: decisions.len(),
         policy_reference_query_count,
         policy_intervention_count,
