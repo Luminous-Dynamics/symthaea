@@ -3,7 +3,7 @@
 
 use std::env;
 use std::fs;
-use std::path::PathBuf;
+use std::path::{Path, PathBuf};
 use visual_display_corpus_verify::validate_corpus_str;
 
 const DEFAULT_MANIFEST: &str = "docs/engineering/visual-display-workload-corpus-v0.1.json";
@@ -53,7 +53,7 @@ fn main() {
     }
 }
 
-fn read_file(path: &PathBuf) -> String {
+fn read_file(path: &Path) -> String {
     match fs::read_to_string(path) {
         Ok(content) => content,
         Err(error) => fail(&format!("cannot read {}: {error}", path.display())),
