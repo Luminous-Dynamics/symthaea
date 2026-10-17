@@ -18,7 +18,9 @@
     "resolved_config_sha256",
     "data_sources",
     "oracle_accounting",
-    "artifacts"
+    "artifacts",
+    "oracle_call_ledger_path",
+    "oracle_call_ledger_sha256"
   ],
   "properties": {
     "schema_version": {
@@ -206,6 +208,16 @@
           }
         }
       }
+    },
+    "oracle_call_ledger_path": {
+      "type": "string",
+      "minLength": 1,
+      "maxLength": 1024,
+      "description": "Relative path to strict JSONL per-request ledger, included in artifacts."
+    },
+    "oracle_call_ledger_sha256": {
+      "type": "string",
+      "pattern": "^[a-f0-9]{64}$"
     }
   }
 }
