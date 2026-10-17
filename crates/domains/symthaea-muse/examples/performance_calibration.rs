@@ -64,33 +64,165 @@ fn parse(path: &Path) -> Option<Vec<Ev>> {
         midly::Timing::Metrical(t) => t.as_int() as f64,
         _ => return None,
     };
-    let mut open: BTreeMap<u8, (u32, u8)> = BTreeMap::new();
+    if !ppq.is_finite() || !(1.0..=32_767.0).contains(&ppq) || ppq.fract() != 0.0 {
+        return None;
+    }
     let mut out = Vec::new();
-    for track in smf.tracks {
-        let mut tick: u32 = 0;
-        for ev in track {
-            tick += ev.delta.as_int();
-            let midly::TrackEventKind::Midi { message, .. } = ev.kind else {
-                continue;
-            };
-            match message {
-                midly::MidiMessage::NoteOn { key, vel } if vel.as_int() > 0 => {
-                    open.insert(key.as_int(), (tick, vel.as_int()));
-                }
-                midly::MidiMessage::NoteOff { key, .. }
-                | midly::MidiMessage::NoteOn { key, .. } => {
-                    if let Some((start, vel)) = open.remove(&key.as_int()) {
-                        let dur = tick.saturating_sub(start) as f64 / ppq;
-                        if dur > 1e-4 {
-                            out.push((start as f64 / ppq, dur, key.as_int(), vel));
-                        }
-                    }
-                }
-                _ => {}
-            }
-        }
+    for track in &smf.tracks {
+        out.extend(parse_track(track, ppq)?);
     }
     (!out.is_empty()).then_some(out)
+}
+
+/// Parse one MIDI track with channel-and-pitch-specific note pairing.
+///
+/// The calibration must not overwrite an earlier same-pitch note-on, pair
+/// different channels, or silently discard unmatched events: any such file is
+/// excluded as ambiguous rather than allowed to distort performance statistics.
+fn parse_track(track: &[midly::TrackEvent<'_>], ppq: f64) -> Option<Vec<Ev>> {
+    if !ppq.is_finite() || !(1.0..=32_767.0).contains(&ppq) || ppq.fract() != 0.0 {
+        return None;
+    }
+    let mut open: BTreeMap<(u8, u8), (u32, u8)> = BTreeMap::new();
+    let mut out = Vec::new();
+    let mut tick = 0_u32;
+
+    for event in track {
+        tick = tick.checked_add(event.delta.as_int())?;
+        let midly::TrackEventKind::Midi { channel, message } = &event.kind else {
+            continue;
+        };
+        let channel = channel.as_int();
+        match message {
+            midly::MidiMessage::NoteOn { key, vel } if vel.as_int() > 0 => {
+                let identity = (channel, key.as_int());
+                if open.contains_key(&identity) {
+                    return None;
+                }
+                open.insert(identity, (tick, vel.as_int()));
+            }
+            midly::MidiMessage::NoteOff { key, .. }
+            | midly::MidiMessage::NoteOn { key, .. } => {
+                let identity = (channel, key.as_int());
+                let (start, velocity) = open.remove(&identity)?;
+                let duration_ticks = tick.checked_sub(start)?;
+                let duration_beats = f64::from(duration_ticks) / ppq;
+                if duration_beats <= 1.0e-4 {
+                    return None;
+                }
+                out.push((
+                    f64::from(start) / ppq,
+                    duration_beats,
+                    key.as_int(),
+                    velocity,
+                ));
+            }
+            _ => {}
+        }
+    }
+
+    if !open.is_empty() {
+        return None;
+    }
+    Some(out)
+}
+
+#[cfg(test)]
+mod midi_pairing_tests {
+    use super::*;
+    use midly::{
+        MidiMessage, TrackEvent, TrackEventKind,
+        num::{u4, u7, u28},
+    };
+
+    fn event(delta: u32, channel: u8, message: MidiMessage) -> TrackEvent<'static> {
+        TrackEvent {
+            delta: u28::new(delta),
+            kind: TrackEventKind::Midi {
+                channel: u4::new(channel),
+                message,
+            },
+        }
+    }
+
+    fn note_on(key: u8, velocity: u8) -> MidiMessage {
+        MidiMessage::NoteOn {
+            key: u7::new(key),
+            vel: u7::new(velocity),
+        }
+    }
+
+    fn note_off(key: u8) -> MidiMessage {
+        MidiMessage::NoteOff {
+            key: u7::new(key),
+            vel: u7::new(0),
+        }
+    }
+
+    #[test]
+    fn pairs_same_pitch_independently_on_different_channels() {
+        let track = vec![
+            event(0, 0, note_on(60, 100)),
+            event(0, 1, note_on(60, 80)),
+            event(480, 0, note_off(60)),
+            event(0, 1, note_off(60)),
+        ];
+        let parsed = parse_track(&track, 480.0).unwrap();
+        assert_eq!(parsed.len(), 2);
+        assert_eq!(parsed[0].0, 0.0);
+        assert_eq!(parsed[1].0, 0.0);
+        assert_eq!(parsed[0].1, 1.0);
+        assert_eq!(parsed[1].1, 1.0);
+        assert_eq!(parsed[0].3, 100);
+        assert_eq!(parsed[1].3, 80);
+    }
+
+    #[test]
+    fn rejects_retriggered_same_channel_pitch_before_note_off() {
+        let track = vec![
+            event(0, 0, note_on(60, 100)),
+            event(120, 0, note_on(60, 90)),
+            event(120, 0, note_off(60)),
+            event(120, 0, note_off(60)),
+        ];
+        assert!(parse_track(&track, 480.0).is_none());
+    }
+
+    #[test]
+    fn rejects_orphan_note_off_and_unmatched_note_on() {
+        let orphan = vec![event(0, 0, note_off(60))];
+        assert!(parse_track(&orphan, 480.0).is_none());
+
+        let unmatched = vec![event(0, 0, note_on(60, 100))];
+        assert!(parse_track(&unmatched, 480.0).is_none());
+    }
+
+    #[test]
+    fn rejects_invalid_pulses_per_quarter() {
+        let track = vec![
+            event(0, 0, note_on(60, 100)),
+            event(480, 0, note_off(60)),
+        ];
+        assert!(parse_track(&track, 0.0).is_none());
+        assert!(parse_track(&track, 480.5).is_none());
+        assert!(parse_track(&track, 32_768.0).is_none());
+    }
+
+    #[test]
+    fn rejects_tick_overflow_instead_of_wrapping() {
+        let track: Vec<_> = (0..17)
+            .map(|_| {
+                event(
+                    0x0fff_ffff,
+                    0,
+                    MidiMessage::ProgramChange {
+                        program: u7::new(0),
+                    },
+                )
+            })
+            .collect();
+        assert!(parse_track(&track, 480.0).is_none());
+    }
 }
 
 fn std_dev(xs: &[f64]) -> f64 {
