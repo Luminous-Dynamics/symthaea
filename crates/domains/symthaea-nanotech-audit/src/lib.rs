@@ -1604,7 +1604,7 @@ mod tests {
             .map(str::to_owned)
             .collect::<Vec<_>>();
         lines.pop().expect("at least one call record");
-        fs::write(&ledger_path, format!("{}\\n", lines.join("\\n")))
+        fs::write(&ledger_path, format!("{}\n", lines.join("\n")))
             .expect("write shortened ledger");
 
         let (ledger_sha256, ledger_size) =
