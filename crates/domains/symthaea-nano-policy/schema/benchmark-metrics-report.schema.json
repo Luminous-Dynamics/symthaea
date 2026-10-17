@@ -406,7 +406,7 @@
                 "mean_cost_per_target_query": {
                   "type": "number",
                   "minimum": 0,
-                  "maximum": 1000000000000
+                  "maximum": 1000000000000000
                 },
                 "success_curve": {
                   "type": "array",
