@@ -361,13 +361,8 @@ mod tests {
     }
 
     #[test]
-    fn checks_cardinality_overflow_before_allocation() {
+    fn zero_candidate_cap_fails_closed_before_allocation() {
         let mut invalid = spec();
-        invalid.hull_spacing_over_lwl = vec![0.3; usize::MAX];
-        // This test would allocate before checked cardinality if the implementation regressed;
-        // instead construct two huge virtual axis lengths cannot be represented by Vec.
-        // The practical overflow path is exercised by a zero cap on an otherwise valid grid.
-        invalid = spec();
         invalid.max_candidates = 0;
         assert_eq!(
             generate_design_space(&invalid).unwrap_err(),
