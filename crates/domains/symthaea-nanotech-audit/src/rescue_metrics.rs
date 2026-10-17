@@ -138,11 +138,11 @@ impl SufficientStats {
 
         Self {
             sampled_windows: 1,
-            evaluated_reference_windows: usize::from(evaluated),
-            reference_failed_windows: usize::from(row.reference_status == "reference_failed"),
-            reference_unavailable_windows: usize::from(row.reference_status == "reference_unavailable"),
-            known_integrity_windows: usize::from(integrity_known),
-            integrity_breach_windows: usize::from(integrity_failure),
+            evaluated_reference_windows: if evaluated { 1 } else { 0 },
+            reference_failed_windows: if row.reference_status == "reference_failed" { 1 } else { 0 },
+            reference_unavailable_windows: if row.reference_status == "reference_unavailable" { 1 } else { 0 },
+            known_integrity_windows: if integrity_known { 1 } else { 0 },
+            integrity_breach_windows: if integrity_failure { 1 } else { 0 },
             weight_total: weight,
             weight_query: if row.policy_triggered_reference { weight } else { 0.0 },
             weight_intervention: if intervention { weight } else { 0.0 },
@@ -914,6 +914,25 @@ mod tests {
         assert_eq!(Metric::FalseQueryRate.value(&stats), Some(0.0));
         assert_eq!(Metric::InterventionFalseAlarmBurden.value(&stats), Some(1.0));
         assert_eq!(Metric::QueryFalseAlarmBurden.value(&stats), Some(0.0));
+    }
+
+
+    #[test]
+    fn parent_group_report_preserves_localized_breach_hidden_by_pooling() {
+        let severe = row("bad", "parent-bad", 0.5, "evaluated", Some(true), false);
+        let safe = row("safe", "parent-safe", 0.5, "evaluated", Some(false), false);
+        let severe_stats = SufficientStats::from_row(&severe, true);
+        let safe_stats = SufficientStats::from_row(&safe, false);
+        let mut pooled = severe_stats;
+        pooled.add(safe_stats);
+
+        assert_eq!(Metric::PhysicalIntegrityFailureRate.value(&pooled), Some(0.5));
+        let worst_group = ParentGroupReport::from_stats("parent-bad", &severe_stats);
+        let safe_group = ParentGroupReport::from_stats("parent-safe", &safe_stats);
+        assert_eq!(worst_group.observed_integrity_breach_windows, 1);
+        assert_eq!(worst_group.physical_integrity_failure_rate, Some(1.0));
+        assert_eq!(safe_group.physical_integrity_failure_rate, Some(0.0));
+        assert_eq!(worst_group.severe_event_intervention_recall, Some(1.0));
     }
 
     #[test]
