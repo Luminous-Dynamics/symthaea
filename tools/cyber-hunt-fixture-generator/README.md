@@ -2,6 +2,8 @@
 
 A standalone, deterministic Rust generator for a **public synthetic smoke corpus** supporting Symthaea issue [#7742](https://github.com/Luminous-Dynamics/symthaea/issues/7742), the unguided large-log threat-hunting tier.
 
+Generator version 0.2.0 supports two structurally different synthetic families: the default `identity-to-egress` story and the selectable `artifact-provenance` lifecycle. The latter links source revision, CI build, artifact digest, signed attestation, promotion, and deployment. Its benign comparison is a complete matched-digest chain using the same event types, so event-type presence alone cannot separate the planted incident. A valid signature over a different subject digest is not treated as provenance for the observed artifact. This is a test fixture, not a full software-supply-chain simulator or a blind benchmark.
+
 ## Run
 
 Keep the evaluator oracle outside the solver-visible filesystem:
@@ -17,6 +19,19 @@ cargo run --manifest-path tools/cyber-hunt-fixture-generator/Cargo.toml -- \
 ```
 
 Record count is bounded to 64–250,000. The same seed and count produce identical event bytes. Different seeds vary the planted host/principal choices (drawn from the same naming pools as ordinary background activity) and source/destination documentation IPs. They shift the whole environment clock so ordinary background records overlap the planted incident's timeline; no special ID prefix marks planted events. These seeded variations are still one public scenario template, not independent held-out incidents. The dataset has no network connectivity or live-target actions; all identities, hosts, addresses, destinations and events are synthetic. IPv4 addresses come from reserved documentation ranges or synthetic private ranges. Example domains use `.invalid`.
+
+An alternative family can be generated with:
+
+```sh
+cargo run --manifest-path tools/cyber-hunt-fixture-generator/Cargo.toml -- \
+  --family artifact-provenance --records 1000 --seed 20261018 \
+  --events-out /tmp/cyber-hunt-artifact/solver/events.jsonl \
+  --manifest-out /tmp/cyber-hunt-artifact/solver/manifest.json \
+  --truth-out /tmp/cyber-hunt-artifact/evaluator/truth.json \
+  --source-commit "$(git rev-parse HEAD)"
+```
+
+`--family identity-to-egress` is the default for backward compatibility. Family changes select a distinct causal graph; new seeds within a family are still not independent campaigns.
 
 ## Output separation
 
