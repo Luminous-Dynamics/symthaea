@@ -414,7 +414,11 @@ impl SubstrateManager {
 
         let speed_adjusted_energy = self.energy_per_cycle * self.tau_factor as f64;
         let next_total_energy = self.total_energy_spent + speed_adjusted_energy;
-        if !speed_adjusted_energy.is_finite()
+        if !self.energy_per_cycle.is_finite()
+            || self.energy_per_cycle < 0.0
+            || !self.tau_factor.is_finite()
+            || self.tau_factor <= 0.0
+            || !speed_adjusted_energy.is_finite()
             || speed_adjusted_energy < 0.0
             || !next_total_energy.is_finite()
         {
@@ -1488,6 +1492,8 @@ mod tests {
             (-1.0, 1.0_f32),
             (1.0, f32::NAN),
             (1.0, f32::INFINITY),
+            (-1.0, -1.0),
+            (1.0, 0.0),
         ] {
             let mut config = default_config();
             config.enable_energy_budget = true;
