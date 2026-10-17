@@ -18106,10 +18106,6 @@ name = "symthaea-acoustics"
 version = "0.1.0"
 
 [[package]]
-name = "symthaea-owl"
-version = "0.1.0"
-
-[[package]]
 name = "symthaea-aesthetic"
 version = "0.1.0"
 dependencies = [
@@ -19535,6 +19531,10 @@ version = "0.1.0"
 
 [[package]]
 name = "symthaea-organic-chemistry"
+version = "0.1.0"
+
+[[package]]
+name = "symthaea-owl"
 version = "0.1.0"
 
 [[package]]
