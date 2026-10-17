@@ -172,9 +172,10 @@ impl CapacitorScreeningRequirements {
 /// Final disposition of an idealized candidate screen.
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, Deserialize)]
 pub enum CapacitorScreeningDisposition {
-    /// No declared idealized constraint was violated and the supplied evidence is in-domain.
-    /// This does not constitute product qualification or a safety pass.
-    PassesIdealizedScreen,
+    /// Nominal idealized metrics meet the declared constraints and configured evidence gates.
+    /// Input uncertainties are thresholded but are not propagated into conservative bounds;
+    /// this is not a robust-feasibility guarantee, product qualification, or safety pass.
+    PassesNominalIdealizedScreen,
     /// One or more supplied idealized constraints were violated.
     FailsDeclaredConstraints,
     /// A required evidence class, characterization condition, or uncertainty is absent/inapplicable.
@@ -285,6 +286,10 @@ impl From<DielectricValidationError> for CapacitorScreeningError {
 }
 
 /// Screen a candidate using application constraints and condition-matched properties.
+///
+/// The disposition is nominal rather than risk-bounded: uncertainty gates enforce
+/// evidence-quality thresholds but do not transform uncertainty into worst-case
+/// predictions or probabilities of constraint violation.
 ///
 /// The function refuses to compute a pass/fail disposition when characterization
 /// does not cover the specified temperature, frequency, or operating field.
@@ -478,7 +483,7 @@ pub fn screen_capacitor_candidate(
     }
 
     let disposition = if violations.is_empty() {
-        CapacitorScreeningDisposition::PassesIdealizedScreen
+        CapacitorScreeningDisposition::PassesNominalIdealizedScreen
     } else {
         CapacitorScreeningDisposition::FailsDeclaredConstraints
     };
@@ -570,7 +575,7 @@ mod tests {
                 .unwrap();
         assert_eq!(
             report.disposition,
-            CapacitorScreeningDisposition::PassesIdealizedScreen
+            CapacitorScreeningDisposition::PassesNominalIdealizedScreen
         );
         assert!(report.violations.is_empty());
         assert!(report.limitations.is_empty());
