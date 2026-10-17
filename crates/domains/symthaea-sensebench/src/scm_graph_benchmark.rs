@@ -618,16 +618,18 @@ fn pc_observational_cpdag(
         }
     }
 
-    // PC level 1: test the only possible third-node conditioning set while it
-    // belongs to at least one endpoint's current adjacency set.
+    // PC level 1: take one immutable adjacency snapshot for the entire level.
+    // Removing an edge for one pair must not change the conditioning-set search
+    // for another pair at the same level (which would make results order-dependent).
+    let adjacency_at_level = adjacent_matrix;
     for (first, second) in UNORDERED_PAIRS {
-        if !adjacent_matrix[first][second] {
+        if !adjacency_at_level[first][second] {
             continue;
         }
         let third = (0..NODE_COUNT)
             .find(|node| *node != first && *node != second)
             .expect("three-node graph has one third variable");
-        if adjacent_matrix[first][third] || adjacent_matrix[second][third] {
+        if adjacency_at_level[first][third] || adjacency_at_level[second][third] {
             let statistic = g_squared_ci_statistic(observations, first, second, Some(third));
             if statistic <= PC_G2_CRITICAL_DF2_95 {
                 adjacent_matrix[first][second] = false;
@@ -1598,6 +1600,7 @@ fn aggregate_paired_policy_deltas(
         ScmGraphPolicy::NominalExpectedInformationGain,
         ScmGraphPolicy::DevelopmentFixedDesign,
         ScmGraphPolicy::UniformRandomAction,
+        ScmGraphPolicy::PcObservationalBaseline,
     ];
     let mut output = Vec::new();
     for policy in policies.iter().copied() {
@@ -2202,7 +2205,7 @@ mod tests {
         assert_eq!(
             report.paired_policy_deltas.len(),
             (ScmGraphPolicy::all().len() - 1)
-                * 3
+                * 4
                 * ScmGraphShiftSplit::all().len()
         );
         for delta in &report.paired_policy_deltas {
