@@ -11,7 +11,7 @@
 
 use serde::{Deserialize, Serialize};
 
-use symthaea_sensebench::experiment_design::{
+use crate::experiment_design::{
     ExperimentCandidate, ExperimentDesignError, HypothesisPrior, ModelLikelihoodScenario,
     rank_experiments, rank_experiments_robust, update_posterior,
 };
