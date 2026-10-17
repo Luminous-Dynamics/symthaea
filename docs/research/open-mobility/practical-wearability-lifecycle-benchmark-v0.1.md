@@ -16,6 +16,7 @@ Recent evidence motivates that shift:
 - A 2026 home-use study involving seven people with paraplegia after extended use identified caregiver availability as a dominant factor in potential abandonment: https://www.nature.com/articles/s41394-026-00739-z
 - A 2026 review of human–robot interface mechanics highlights pressure/shear, interface migration and joint-axis misalignment as concerns for comfort and tissue injury: https://www.frontiersin.org/journals/bioengineering-and-biotechnology/articles/10.3389/fbioe.2026.1733173/full
 - A home/community study of the Myosuit identified donning difficulty as a barrier to independence and frequent use: https://pmc.ncbi.nlm.nih.gov/articles/PMC9714034/
+- A randomized clinical trial involving 161 veterans with paralysis found low use and no significant patient-reported mental/physical health differences for wheelchair plus exoskeleton versus wheelchair alone over four months; the authors noted that safe modifications reducing companion requirements may improve personal use: https://jamanetwork.com/journals/jamanetworkopen/fullarticle/2823146
 
 These findings motivate what to measure. Small or population-specific studies do not establish universal thresholds.
 
