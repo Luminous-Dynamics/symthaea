@@ -14,7 +14,8 @@
     "intervention",
     "required_behaviors",
     "blocking_failures",
-    "expected"
+    "expected",
+    "assertions"
   ],
   "cases": [
     {
