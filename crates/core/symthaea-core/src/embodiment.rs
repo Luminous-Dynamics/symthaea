@@ -439,6 +439,9 @@ pub enum PlantStepAuthorityV1 {
     Unspecified,
     ConfiguredSimulation,
     BackendMeasuredClockRequired,
+    /// An asynchronous external environment whose action/observation timing is
+    /// reported separately from physical/model plant time.
+    EventDrivenExternal,
 }
 
 /// Timing evidence for one requested plant transition.
@@ -806,6 +809,33 @@ impl ExternalActionEmbodimentStepV1 {
             return Err(ExternalActionTimingErrorV1::StepIndexMismatch);
         }
         Ok(())
+    }
+}
+
+/// Validated timing evidence for one bridge execution. Plant time and external
+/// action/observation time are intentionally distinct variants.
+#[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
+pub enum EmbodimentStepTimingEvidenceV1 {
+    Plant(PlantStepTimingV1),
+    External(ExternalActionTimingV1),
+}
+
+/// The timing contract that failed when a bridge step was refused.
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, Deserialize)]
+pub enum EmbodimentStepDispatchErrorV1 {
+    Plant(PlantStepTimingErrorV1),
+    External(ExternalActionTimingErrorV1),
+}
+
+impl From<PlantStepTimingErrorV1> for EmbodimentStepDispatchErrorV1 {
+    fn from(value: PlantStepTimingErrorV1) -> Self {
+        Self::Plant(value)
+    }
+}
+
+impl From<ExternalActionTimingErrorV1> for EmbodimentStepDispatchErrorV1 {
+    fn from(value: ExternalActionTimingErrorV1) -> Self {
+        Self::External(value)
     }
 }
 
