@@ -468,8 +468,100 @@ mod tests {
 
     fn live() -> Configuration { serde_json::from_str(LIVE).expect("live fixture parses") }
     fn expedition() -> Configuration { serde_json::from_str(EXPEDITION).expect("expedition fixture parses") }
+    const ORACLE: &str = include_str!("../fixtures/modular-interiors/change-impact-oracle-v1.json");
+
+    #[derive(Deserialize)]
+    struct OracleMatrix {
+        cases: Vec<OracleCase>,
+    }
+
+    #[derive(Deserialize)]
+    struct OracleCase {
+        case_id: String,
+        mutation: String,
+        expected_disposition: String,
+        expected_sections: Vec<String>,
+        required_domains: Vec<String>,
+    }
+
+    fn mutate(base: &Configuration, mutation: &str) -> Configuration {
+        let mut after = base.clone();
+        match mutation {
+            "no_change" => {}
+            "reorder_collections" => {
+                after.module_catalog.reverse();
+                after.placements.reverse();
+                after.platform_services.reverse();
+                after.connections.reverse();
+            }
+            "move_cabin" => {
+                after.placements.iter_mut().find(|p| p.instance_id == "CABIN-01")
+                    .expect("cabin exists").position_mm.x_mm += 150;
+            }
+            "change_module_mass" => {
+                let module = after.module_catalog.iter_mut().find(|m| m.module_id == "SLEEP-POD")
+                    .expect("sleep pod exists");
+                module.mass_properties.mass_kg = Some(module.mass_properties.mass_kg.unwrap_or(0.0) + 1.0);
+            }
+            "change_service_and_connection" => {
+                after.connections.pop();
+                after.platform_services.iter_mut().find(|s| s.service_id == "AC-BUS")
+                    .expect("AC bus exists").capacity.value = Some(7_000.0);
+            }
+            "change_egress_region" => {
+                after.reserved_regions.iter_mut().find(|r| r.region_id == "REGION-EGRESS-01")
+                    .expect("egress region exists").bounds_mm.y_max_mm += 100;
+            }
+            "change_platform_envelope" => after.platform.interior_bounds_mm.length_mm += 500,
+            "change_assumption_provenance_and_safety" => {
+                after.assumptions[0].statement.push_str(" revised");
+                after.provenance[0].scope.push_str(" changed");
+                after.safety_gates.iter_mut().find(|g| g.category == "fire_safety")
+                    .expect("fire gate exists").notes.push_str(" revised");
+            }
+            "change_identity_and_intent" => {
+                after.configuration_id = "LD-LIVEABOARD-REV2".to_owned();
+                after.customization_intent.push_str(" Step-free access requested.");
+            }
+            "duplicate_placement_identity" => {
+                let duplicate = after.placements[0].clone();
+                after.placements.push(duplicate);
+            }
+            unknown => panic!("unknown oracle mutation {unknown}"),
+        }
+        after
+    }
+
     fn domains(report: &ImpactReport) -> Vec<&str> {
         report.body.revalidation_required.iter().map(|item| item.domain.as_str()).collect()
+    }
+
+    #[test]
+    fn frozen_change_impact_oracle_has_no_missed_required_domains() {
+        let matrix: OracleMatrix = serde_json::from_str(ORACLE).expect("oracle matrix parses");
+        let baseline = live();
+        for case in matrix.cases {
+            let target = mutate(&baseline, &case.mutation);
+            let report = analyze_configuration_change(&baseline, &target)
+                .unwrap_or_else(|error| panic!("{}: analysis failed: {error}", case.case_id));
+            assert_eq!(
+                report.body.disposition, case.expected_disposition,
+                "{}: unexpected disposition", case.case_id
+            );
+            let actual_sections: Vec<&str> = report.body.changes.iter()
+                .map(|change| change.section.as_str()).collect();
+            for section in &case.expected_sections {
+                assert!(actual_sections.contains(&section.as_str()),
+                    "{}: missing changed section {}", case.case_id, section);
+            }
+            let actual_domains = domains(&report);
+            for domain in &case.required_domains {
+                assert!(actual_domains.contains(&domain.as_str()),
+                    "{}: missed revalidation domain {}", case.case_id, domain);
+            }
+            assert!(verify_impact_report(&baseline, &target, &report),
+                "{}: receipt did not verify", case.case_id);
+        }
     }
 
     #[test]
