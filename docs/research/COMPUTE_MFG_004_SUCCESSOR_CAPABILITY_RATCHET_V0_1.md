@@ -180,3 +180,17 @@ These are one-vector representation sizes, not full neuron/network working sets,
 Compare dense float32 evolution, SIMD/cache-tiled state update, dependency-valid streamed chunks, and manifold/low-rank alternatives with an explicit residual/novelty path. Event-driven skipping is permitted only when a qualified activity/dependency map proves skipped state cannot affect the required output. Keep approximate or analogue representations versioned separately from exact ContinuousHV execution. Do not assume that the static XOR/Hamming RTL path accelerates liquid dynamics.
 
 The acceptance unit is the **trajectory at fixed task quality and explicit resource/latency constraints**, not a single static similarity result. An operator-matrix PASS is a prerequisite, not trajectory qualification or measured performance advantage.
+### Stronger paradigm hypothesis: decouple semantic dimension from dynamical state dimension
+
+Do not assume every 128K+ semantic hypervector must be numerically evolved in full at every time step. The architecture question is whether Symthaea can retain a high-dimensional semantic address space while evolving a smaller, task-qualified dynamical state, then lift the result through a projection with a residual/novelty path. This is a research hypothesis owned in part by [NEUROARCH-011 / manifold-compressed liquid dynamics #3348](https://github.com/Luminous-Dynamics/symthaea/issues/3348), not an assumption that low-dimensional state is automatically equivalent.
+
+Benchmark two independent dimensions:
+
+- **Semantic dimension:** 16K / 32K / 64K / 128K / 256K ContinuousHV profile, where required by the task.
+- **Local dynamical dimension:** candidate 1K / 4K / 16K / 32K manifold states, selected and evaluated independently of semantic width.
+
+Required controls are full-width dynamics; random projection at a matched local dimension; a deterministic orthogonal/nested projection where applicable; and the proposed manifold projection with an explicit residual/novelty path. A learned task-specific projection comes later, after the non-learned controls. The residual cannot silently carry the entire high-dimensional vector every step in a run claiming compressed dynamics.
+
+Report the task-quality vs local-state-width Pareto frontier, reconstruction error, temporal prediction/control quality, trajectory/tau/gate error, byte traffic, resident and peak temporary memory, projection/lift overhead, and p50/p95/p99 latency. Include cases where compressed dynamics loses so the gate can reject it. High-dimensional semantics may still be needed for binding/retrieval even when local temporal evolution can use fewer coordinates.
+
+External motivation—not a transferable result: a June 2026 Nature Machine Intelligence study on a dual-memory-pathway spiking architecture reports co-design of a compact slow state with a fast event-driven pathway and over 4× throughput / over 5× energy-efficiency improvements in post-layout simulation. It is a different spiking architecture, and those hardware figures are simulation-derived; it supports testing fast/slow separation and locality, not a claim about Symthaea or a reason to force LTC/CfC into spiking semantics ([paper](https://www.nature.com/articles/s42256-026-01255-3)).
