@@ -758,8 +758,7 @@ mod tests {
     use super::*;
     use serde::Deserialize;
     use crate::architecture_robustness::{
-        ArchitectureRobustnessReportV1, MetricIntervalEntryV1,
-        MetricIntervalSemanticsV1, RobustCandidateAssessmentV1, RobustPairwiseAssessmentV1,
+        ArchitectureRobustnessReportV1, MetricIntervalEntryV1, MetricIntervalSemanticsV1,
     };
     use crate::architecture_pareto::{
         ArchitectureFamilyV1, ArchitectureOperatingConditionsV1,
@@ -1086,6 +1085,27 @@ mod tests {
                 MeasurementTriageFindingV1::ProtocolMismatch { .. }
             ))
         );
+    }
+
+    #[test]
+    fn altered_pairwise_receipt_is_rejected_after_recomputation() {
+        let mut source = source_report(false);
+        source.pairwise_assessments[0].additional_evidence_may_change_dominance = false;
+        assert!(triage_measurement_actions(
+            &source,
+            &[],
+            MEASUREMENT_TRIAGE_SCHEMA_VERSION_V1,
+        )
+        .as_ref()
+        .err()
+        .unwrap()
+        .iter()
+        .any(|finding| {
+            matches!(
+                finding,
+                MeasurementTriageFindingV1::SourceReportReevaluationMismatch
+            )
+        }));
     }
 
     #[test]
