@@ -122,8 +122,13 @@ fn corpus_preserves_positive_controls_and_blocked_workflows() {
         ))
         .count();
 
+    let reviewed_service = cases.scenarios.iter()
+        .filter(|scenario| scenario.expected_disposition == WearabilityDispositionV1::EligibleForReviewedReturnToService)
+        .count();
+
     assert!(positive >= 3, "successful fit, removal and service controls must remain");
-    assert!(ready >= 2, "corpus needs successful workflows");
+    assert!(ready >= 1, "corpus needs a successful fit/start control");
+    assert!(reviewed_service >= 1, "corpus needs a successful service control");
     assert!(doff >= 1, "corpus must cover user-requested doff priority");
     assert!(blocked >= 7, "corpus needs diverse negative controls");
 }
