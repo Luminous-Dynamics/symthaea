@@ -511,10 +511,18 @@
                     "throughput",
                     "energy_per_query"
                   ]
+                },
+                "kind": {
+                  "const": "measured"
+                },
+                "sample_count": {
+                  "minimum": 30
                 }
               },
               "required": [
-                "metric_id"
+                "metric_id",
+                "kind",
+                "sample_count"
               ]
             },
             "minContains": 1
