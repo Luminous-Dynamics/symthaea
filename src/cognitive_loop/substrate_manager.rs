@@ -413,6 +413,17 @@ impl SubstrateManager {
         }
 
         let speed_adjusted_energy = self.energy_per_cycle * self.tau_factor as f64;
+        if !speed_adjusted_energy.is_finite() || speed_adjusted_energy < 0.0 {
+            // A non-finite or negative modeled-energy sample cannot safely feed
+            // a rate budget: in particular, NaN comparisons otherwise evaluate false.
+            self.consciousness_viable = false;
+            self.last_energy_spent = 0.0;
+            self.energy_rate_window_joules = 0.0;
+            self.energy_rate_window_started_at = None;
+            self.estimated_energy_rate_watts = 0.0;
+            self.energy_rate_window_seconds = 0.0;
+            return;
+        }
         self.last_energy_spent = speed_adjusted_energy;
 
         // The first call starts a fresh window. Do not include idle time between
@@ -1412,6 +1423,40 @@ mod tests {
             assert_eq!(open_window_mgr.energy_rate_window_joules, 0.0);
             assert_eq!(open_window_mgr.energy_rate_window_started_at, None);
             assert_eq!(open_window_mgr.total_energy_spent, 0.0);
+        }
+    }
+
+    #[test]
+    fn test_invalid_modeled_energy_fails_closed_before_accounting() {
+        for (energy_per_cycle, tau_factor) in [
+            (f64::NAN, 1.0_f32),
+            (f64::INFINITY, 1.0_f32),
+            (-1.0, 1.0_f32),
+            (1.0, f32::NAN),
+            (1.0, f32::INFINITY),
+        ] {
+            let mut config = default_config();
+            config.enable_energy_budget = true;
+            config.energy_budget_joules_per_sec = Some(1e9);
+
+            let mut mgr = SubstrateManager::new(&config);
+            mgr.energy_per_cycle = energy_per_cycle;
+            mgr.tau_factor = tau_factor;
+            let now = std::time::Instant::now();
+            mgr.energy_rate_window_started_at = Some(now);
+            mgr.energy_rate_window_joules = 0.25;
+
+            mgr.tick_energy_at(&config, now + std::time::Duration::from_millis(500));
+
+            assert!(
+                !mgr.consciousness_viable,
+                "invalid energy model ({energy_per_cycle:?} J/cycle, tau={tau_factor:?}) must fail closed"
+            );
+            assert_eq!(mgr.total_energy_spent, 0.0);
+            assert_eq!(mgr.last_energy_spent, 0.0);
+            assert_eq!(mgr.energy_rate_window_joules, 0.0);
+            assert_eq!(mgr.energy_rate_window_started_at, None);
+            assert_eq!(mgr.estimated_energy_rate_watts, 0.0);
         }
     }
 
