@@ -79,9 +79,9 @@ fn source_has_url(source: &Value) -> bool {
     })
 }
 
-fn digest_set(value: &Value) -> Option<BTreeSet<String>> {
+fn digest_set_with_empty(value: &Value, allow_empty: bool) -> Option<BTreeSet<String>> {
     let values = value.as_array()?;
-    if values.is_empty() {
+    if !allow_empty && values.is_empty() {
         return None;
     }
     let mut digests = BTreeSet::new();
@@ -91,6 +91,10 @@ fn digest_set(value: &Value) -> Option<BTreeSet<String>> {
         }
     }
     Some(digests)
+}
+
+fn digest_set(value: &Value) -> Option<BTreeSet<String>> {
+    digest_set_with_empty(value, false)
 }
 
 fn visit_lineage_node(
@@ -238,7 +242,7 @@ fn validate_receipt_shape(
     }
 
     let dependency_audit = &receipt["shared_dependency_audit"];
-    let declared_shared = digest_set(&dependency_audit["shared_dependency_digests"]);
+    let declared_shared = digest_set_with_empty(&dependency_audit["shared_dependency_digests"], true);
     let closures = computed_dependency_closures(dependency_audit);
     let computed_shared = closures
         .as_ref()
