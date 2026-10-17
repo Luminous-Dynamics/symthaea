@@ -187,9 +187,157 @@ fn input_fingerprints(
     Ok(fingerprints)
 }
 
-fn objective_blockers(objectives: &[ObjectiveObservation]) -> Vec<String> {
+fn usable_evidence_sources(configuration: &Configuration) -> BTreeSet<String> {
+    let mut sources = BTreeSet::new();
+    let mut add = |source: &crate::modular_interior::Provenance| {
+        if source.source_type != "authored_synthetic"
+            && !source.source_id.trim().is_empty()
+            && !source.title.trim().is_empty()
+            && !source.uri.trim().is_empty()
+            && !source.scope.trim().is_empty()
+        {
+            sources.insert(source.source_id.clone());
+        }
+    };
+    for source in &configuration.provenance {
+        add(source);
+    }
+    for placement in &configuration.placements {
+        if let Some(module) = configuration.module_catalog.iter()
+            .find(|module| module.module_id == placement.module_id)
+        {
+            for source in &module.provenance {
+                add(source);
+            }
+        }
+    }
+    sources
+}
+
+fn configuration_evidence_blockers(configuration: &Configuration) -> (bool, Vec<String>) {
+    let sources = usable_evidence_sources(configuration);
+    let mut blockers = BTreeSet::new();
+    let mut hard_reject = false;
+    let has_source = |reference: &str| !reference.trim().is_empty() && sources.contains(reference);
+
+    for assumption in &configuration.assumptions {
+        match assumption.status.as_str() {
+            "rejected" => {
+                hard_reject = true;
+                blockers.insert(format!("assumption {} is rejected", assumption.assumption_id));
+            }
+            "untested" => {
+                blockers.insert(format!("assumption {} remains untested", assumption.assumption_id));
+            }
+            "supported_by_source" | "measured" => {}
+            other => {
+                blockers.insert(format!("assumption {} has unsupported status {other}", assumption.assumption_id));
+            }
+        }
+    }
+
+    for placement in &configuration.placements {
+        let Some(module) = configuration.module_catalog.iter()
+            .find(|module| module.module_id == placement.module_id) else {
+            hard_reject = true;
+            blockers.insert(format!("placement {} has no module definition", placement.instance_id));
+            continue;
+        };
+        let mass = &module.mass_properties;
+        if !matches!(mass.status.as_str(), "measured" | "source_verified") {
+            blockers.insert(format!("placed module {} mass is not measured/source-verified", module.module_id));
+        }
+        if !mass.source_ref.as_deref().is_some_and(has_source) {
+            blockers.insert(format!("placed module {} mass provenance does not resolve to non-synthetic evidence", module.module_id));
+        }
+        for (label, status) in [
+            ("fire/material", module.fire_material_status.as_str()),
+            ("mounting", module.mounting_status.as_str()),
+            ("electrical", module.electrical_status.as_str()),
+            ("sanitary", module.sanitary_status.as_str()),
+        ] {
+            if !matches!(status, "evidence_available" | "authority_reviewed" | "not_applicable") {
+                blockers.insert(format!("placed module {} {label} evidence is not available/reviewed", module.module_id));
+            }
+        }
+        if !module.provenance.iter().any(|source| {
+            source.source_type != "authored_synthetic" && has_source(&source.source_id)
+        }) {
+            blockers.insert(format!("placed module {} has no usable provenance", module.module_id));
+        }
+        for port in &module.ports {
+            if !matches!(port.rating.status.as_str(), "measured" | "source_verified") {
+                blockers.insert(format!("port {}.{} rating is not measured/source-verified", module.module_id, port.port_id));
+            }
+            if !port.rating.source_ref.as_deref().is_some_and(has_source) {
+                blockers.insert(format!("port {}.{} rating provenance does not resolve to non-synthetic evidence", module.module_id, port.port_id));
+            }
+        }
+    }
+
+    for service in &configuration.platform_services {
+        if !matches!(service.capacity.status.as_str(), "measured" | "source_verified") {
+            blockers.insert(format!("platform service {} capacity is not measured/source-verified", service.service_id));
+        }
+        if !service.capacity.source_ref.as_deref().is_some_and(has_source) {
+            blockers.insert(format!("platform service {} capacity provenance does not resolve to non-synthetic evidence", service.service_id));
+        }
+    }
+
+    for deck in &configuration.platform.deck_bounds {
+        for (label, value) in [
+            ("area load", &deck.max_area_load_kg_m2),
+            ("point load", &deck.max_point_load_kg),
+        ] {
+            if !matches!(value.status.as_str(), "measured" | "source_verified") {
+                blockers.insert(format!("deck {} {label} limit is not measured/source-verified", deck.deck_id));
+            }
+            if !value.source_ref.as_deref().is_some_and(has_source) {
+                blockers.insert(format!("deck {} {label} provenance does not resolve to non-synthetic evidence", deck.deck_id));
+            }
+        }
+    }
+
+    for connection in &configuration.connections {
+        if !matches!(connection.compatibility_status.as_str(), "verified_compatible") {
+            blockers.insert(format!("connection {} is not verified compatible", connection.connection_id));
+        }
+        if connection.evidence_refs.is_empty()
+            || connection.evidence_refs.iter().any(|reference| !has_source(reference))
+        {
+            blockers.insert(format!("connection {} evidence references do not resolve to non-synthetic sources", connection.connection_id));
+        }
+        if !matches!(connection.route_length_m.status.as_str(), "computed" | "measured" | "source_verified")
+            || !connection.route_length_m.source_ref.as_deref().is_some_and(has_source)
+        {
+            blockers.insert(format!("connection {} route evidence is incomplete", connection.connection_id));
+        }
+    }
+
+    for gate in &configuration.safety_gates {
+        match gate.disposition.as_str() {
+            "fail" => {
+                hard_reject = true;
+                blockers.insert(format!("safety gate {} failed", gate.gate_id));
+            }
+            "pass" | "not_applicable" if !gate.evidence_refs.is_empty()
+                && gate.evidence_refs.iter().all(|reference| has_source(reference)) => {}
+            _ => {
+                blockers.insert(format!("safety gate {} lacks closed, evidence-backed disposition", gate.gate_id));
+            }
+        }
+    }
+
+    (hard_reject, blockers.into_iter().collect())
+}
+
+fn objective_blockers(
+    objectives: &[ObjectiveObservation],
+    configuration: &Configuration,
+) -> Vec<String> {
     let mut blockers = BTreeSet::new();
     let mut ids = BTreeSet::new();
+    let sources = usable_evidence_sources(configuration);
     if objectives.is_empty() {
         blockers.insert("no objectives were supplied".to_owned());
     }
@@ -216,9 +364,11 @@ fn objective_blockers(objectives: &[ObjectiveObservation]) -> Vec<String> {
             _ => {}
         }
         if objective.evidence_refs.is_empty()
-            || objective.evidence_refs.iter().any(|reference| reference.trim().is_empty())
+            || objective.evidence_refs.iter().any(|reference| {
+                reference.trim().is_empty() || !sources.contains(reference)
+            })
         {
-            blockers.insert(format!("objective {} has no usable evidence reference", objective.metric_id));
+            blockers.insert(format!("objective {} evidence does not resolve to non-synthetic configuration provenance", objective.metric_id));
         }
         if !matches!(
             objective.evidence_status,
@@ -242,20 +392,14 @@ fn dominates(
     if left.len() != right.len() {
         return false;
     }
-    let left_by_id: BTreeMap<&str, &ObjectiveObservation> =
-        left.iter().map(|objective| (objective.metric_id.as_str(), objective)).collect();
-    let right_by_id: BTreeMap<&str, &ObjectiveObservation> =
-        right.iter().map(|objective| (objective.metric_id.as_str(), objective)).collect();
-    if left_by_id.len() != left.len() || right_by_id.len() != right.len()
-        || left_by_id.keys().ne(right_by_id.keys())
-    {
-        return false;
-    }
-
+    let mut left = left.to_vec();
+    let mut right = right.to_vec();
+    left.sort_by(|a, b| a.metric_id.cmp(&b.metric_id));
+    right.sort_by(|a, b| a.metric_id.cmp(&b.metric_id));
     let mut strictly_better = false;
-    for (metric_id, left_value) in &left_by_id {
-        let right_value = right_by_id[metric_id];
-        if left_value.unit != right_value.unit
+    for (left_value, right_value) in left.iter().zip(right.iter()) {
+        if left_value.metric_id != right_value.metric_id
+            || left_value.unit != right_value.unit
             || left_value.direction != right_value.direction
             || left_value.comparison_basis != right_value.comparison_basis
         {
@@ -342,11 +486,16 @@ pub fn rank_candidates(
                 }
             }
         }
-        for blocker in objective_blockers(&normalized) {
+        let (configuration_has_hard_failure, configuration_blockers) =
+            configuration_evidence_blockers(&submission.configuration);
+        for blocker in configuration_blockers {
+            blockers.insert(blocker);
+        }
+        for blocker in objective_blockers(&normalized, &submission.configuration) {
             blockers.insert(blocker);
         }
 
-        let eligibility = if blockers.iter().any(|blocker| {
+        let eligibility = if configuration_has_hard_failure || blockers.iter().any(|blocker| {
             blocker.contains("failed one or more hard validation checks")
                 || blocker.contains("invalid or does not bind")
                 || blocker.contains("candidate ID is duplicated")
@@ -472,14 +621,30 @@ mod tests {
         // In-memory test sentinels exercise the eligibility path only. They do not alter
         // production fixtures and are not measurements or vessel evidence.
         configuration.configuration_id.push_str(suffix);
+        let source = crate::modular_interior::Provenance {
+            source_id: "TEST-HARNESS-ONLY".to_owned(),
+            title: "Test harness sentinel, not real engineering evidence".to_owned(),
+            uri: "urn:symthaea:test-harness-only".to_owned(),
+            scope: "Unit-test mechanics only; never production measurement or approval".to_owned(),
+            source_type: "measured_test".to_owned(),
+        };
+        configuration.provenance = vec![source.clone()];
         for module in &mut configuration.module_catalog {
             module.mass_properties.status = "source_verified".to_owned();
             module.mass_properties.source_ref = Some("TEST-HARNESS-ONLY".to_owned());
+            module.provenance = vec![source.clone()];
+            module.fire_material_status = "authority_reviewed".to_owned();
+            module.mounting_status = "authority_reviewed".to_owned();
+            module.electrical_status = "authority_reviewed".to_owned();
+            module.sanitary_status = "authority_reviewed".to_owned();
             for port in &mut module.ports {
                 port.rating.status = "source_verified".to_owned();
                 port.rating.source_ref = Some("TEST-HARNESS-ONLY".to_owned());
                 port.connector_profile = "TEST-HARNESS-INTERFACE".to_owned();
             }
+        }
+        for assumption in &mut configuration.assumptions {
+            assumption.status = "measured".to_owned();
         }
         for service in &mut configuration.platform_services {
             service.capacity.status = "source_verified".to_owned();
@@ -489,8 +654,14 @@ mod tests {
         for deck in &mut configuration.platform.deck_bounds {
             deck.max_area_load_kg_m2.value = Some(500.0);
             deck.max_area_load_kg_m2.status = "source_verified".to_owned();
+            deck.max_area_load_kg_m2.source_ref = Some("TEST-HARNESS-ONLY".to_owned());
             deck.max_point_load_kg.value = Some(5000.0);
             deck.max_point_load_kg.status = "source_verified".to_owned();
+            deck.max_point_load_kg.source_ref = Some("TEST-HARNESS-ONLY".to_owned());
+            deck.source_ref = Some("TEST-HARNESS-ONLY".to_owned());
+        }
+        for service in &mut configuration.platform_services {
+            service.capacity.source_ref = Some("TEST-HARNESS-ONLY".to_owned());
         }
         for connection in &mut configuration.connections {
             connection.compatibility_status = "verified_compatible".to_owned();
