@@ -18,6 +18,7 @@ use std::collections::HashSet;
 pub mod design_space;
 pub mod mission_model_contract;
 pub mod scenario_sweep;
+pub mod propulsor_reference;
 
 const SECONDS_PER_HOUR: f64 = 3_600.0;
 
