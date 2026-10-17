@@ -347,8 +347,27 @@ fn verify_provenance_manifest(
     report: &mut AuditReport,
 ) {
     let manifest_path = run_dir.join(PROVENANCE_MANIFEST_NAME);
-    if !manifest_path.exists() {
-        report.provenance_manifest_status = "not_provided".to_owned();
+    let manifest_metadata = match fs::symlink_metadata(&manifest_path) {
+        Ok(metadata) => metadata,
+        Err(error) if error.kind() == std::io::ErrorKind::NotFound => {
+            report.provenance_manifest_status = "not_provided".to_owned();
+            return;
+        }
+        Err(error) => {
+            report.provenance_manifest_status = "manifest_invalid".to_owned();
+            report.fail(
+                "provenance_manifest_unreadable",
+                format!("{}: {error}", manifest_path.display()),
+            );
+            return;
+        }
+    };
+    if manifest_metadata.file_type().is_symlink() || !manifest_metadata.is_file() {
+        report.provenance_manifest_status = "manifest_invalid".to_owned();
+        report.fail(
+            "provenance_manifest_not_regular_file",
+            "provenance-manifest.json must be a regular file, not a symlink",
+        );
         return;
     }
 
@@ -530,6 +549,13 @@ fn verify_provenance_manifest(
 
     let mut by_path: BTreeMap<String, &ArtifactDeclaration> = BTreeMap::new();
     for artifact in &manifest.artifacts {
+        if artifact.path == PROVENANCE_MANIFEST_NAME {
+            report.fail(
+                "provenance_manifest_self_reference",
+                "provenance-manifest.json must not list itself as a hashed artifact",
+            );
+            continue;
+        }
         if artifact.path.trim().is_empty() {
             report.fail("provenance_artifact_path_empty", "artifact paths must not be empty");
             continue;
@@ -633,6 +659,7 @@ fn is_lower_hex(value: &str, expected_len: usize) -> bool {
 fn hash_artifact(run_dir: &Path, relative_path: &str) -> Result<(String, u64), String> {
     let relative = Path::new(relative_path);
     if relative.as_os_str().is_empty()
+        || relative_path.contains('\\\\')
         || relative
             .components()
             .any(|component| !matches!(component, Component::Normal(_)))
