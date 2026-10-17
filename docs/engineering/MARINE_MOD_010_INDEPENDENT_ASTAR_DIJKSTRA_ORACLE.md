@@ -18,7 +18,7 @@ Frozen fixture cases cover:
 - A fully blocked column (no path).
 - A thin barrier between grid nodes that must still block crossing segments (no path).
 
-The Rust test definitions also cover every distinct endpoint pair on an open 3×3 grid across all 3×3 combinations of source/terminal directions and four bend penalties (2,304 cases), plus 160 deterministic seeded 5×5 obstacle maps. Each produced A* path is independently checked for endpoint identity, grid-step length, blocked cells, and segment crossings. A negative control removes the thin wall and checks that reachability returns.
+The Rust test definitions also cover every distinct endpoint pair on an open 3×3 grid across all 3×3 combinations of source/terminal directions and four bend penalties (2,592 cases), plus 160 deterministic seeded 5×5 obstacle maps. Each produced A* path is independently checked for endpoint identity, grid-step length, blocked cells, and segment crossings. A negative control removes the thin wall and checks that reachability returns.
 
 The frozen values have also been checked with a separate JavaScript Dijkstra/A* model. That is a supporting model-level calculation, not evidence that the Rust test suite compiles or passes.
 
