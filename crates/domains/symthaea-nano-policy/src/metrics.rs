@@ -466,6 +466,7 @@ pub fn evaluate_json_ledger(
         limitations: vec![
             "Success and loss semantics are only as valid as the frozen task contract; this evaluator does not validate the physics.".to_string(),
             "Group independence is asserted by the external evaluation manifest and cannot be proven from IDs alone.".to_string(),
+            "An optional shift-manifest digest is carried through as a declaration; a separate artifact auditor must verify the manifest bytes and split membership.".to_string(),
             "The evaluator uses provided post-outcome observations; it does not run a selector, oracle, simulator, or experiment.".to_string(),
             "The evaluator checks observation artifact digest shape but does not dereference artifacts or recompute each loss from raw spectra/predictions; a separate scientific checker must validate those links.".to_string(),
             "A report does not establish transfer to another material family, physical regime, laboratory, or application.".to_string(),
