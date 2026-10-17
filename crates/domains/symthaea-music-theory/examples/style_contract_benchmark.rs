@@ -298,9 +298,15 @@ fn main() {
         .map(|row| row.deterministic_replay_failures)
         .sum();
 
+    let source_commit = std::env::var("GIT_COMMIT").ok();
     let report = json!({
         "schema_version": 1,
         "engine_version": MUSIC_THEORY_ENGINE_VERSION,
+        "provenance": {
+            "git_commit": source_commit,
+            "git_commit_source": "GIT_COMMIT environment variable; null means the caller did not provide it",
+            "corpus": "none; deterministic synthetic intents only",
+        },
         "registry": {
             "style_count": style_count,
             "styles": Style::ALL.iter().map(|style| format!("{style:?}")).collect::<Vec<_>>(),
