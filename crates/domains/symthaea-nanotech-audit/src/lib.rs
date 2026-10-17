@@ -958,6 +958,14 @@ fn verify_optional_shift_manifest(
                 ),
             );
         }
+        if group.shift_kind == "in_distribution" && !group.shift_families.is_empty() {
+            report.fail(
+                "shift_manifest_baseline_family_mismatch",
+                format!(
+                    "shift_groups[{index}] cannot declare changed physical families for in_distribution data"
+                ),
+            );
+        }
         let mut axes_seen = BTreeSet::new();
         for axis in &group.shift_axes {
             if !valid_axes.contains(&axis.as_str()) {
