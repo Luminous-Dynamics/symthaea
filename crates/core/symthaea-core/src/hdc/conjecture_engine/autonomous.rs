@@ -693,6 +693,35 @@ fn generate_holdout_initial_conditions(
     conditions
 }
 
+fn discovery_config_digest(config: &RegressorConfig) -> String {
+    let mut hasher = blake3::Hasher::new();
+    hasher.update(b"SymthaeaRegressorConfigV1\\0");
+    hasher.update(&(config.population_size as u64).to_le_bytes());
+    hasher.update(&(config.generations as u64).to_le_bytes());
+    hasher.update(&(config.max_depth as u64).to_le_bytes());
+    hasher.update(&(config.max_complexity as u64).to_le_bytes());
+    holdout_hash_f64(&mut hasher, config.lambda);
+    hasher.update(&(config.tournament_size as u64).to_le_bytes());
+    holdout_hash_f64(&mut hasher, config.mutation_rate);
+    hasher.update(&config.seed.to_le_bytes());
+    hasher.update(&[
+        u8::from(config.disable_macro_seeds),
+        u8::from(config.exclude_trig),
+    ]);
+    hasher.update(&(config.diverse_trajectory_count as u64).to_le_bytes());
+    holdout_hash_f64(&mut hasher, config.prior_composition_rate);
+    holdout_hash_f64(&mut hasher, config.prior_fragment_bonus);
+    holdout_hash_f64(&mut hasher, config.orthogonality_penalty);
+    holdout_hash_f64(&mut hasher, config.orthogonality_threshold);
+    hasher.update(&(config.known_invariants.len() as u64).to_le_bytes());
+    for invariant in &config.known_invariants {
+        let canonical = format!("{invariant}");
+        holdout_hash_string(&mut hasher, &canonical);
+    }
+    hasher.update(&[u8::from(config.use_lie_fitness)]);
+    hasher.finalize().to_hex().to_string()
+}
+
 fn holdout_initial_conditions_digest(
     initial_state: &[f64],
     var_names: &[&str],
@@ -798,8 +827,7 @@ pub fn validate_invariant_holdout(
     let discovery_seed = discovery_config.seed;
     let candidate_expression = format!("{candidate}");
     let candidate_expression_digest = blake3::hash(candidate_expression.as_bytes()).to_hex().to_string();
-    let config_serialization = format!("RegressorConfigV1:{discovery_config:?}");
-    let discovery_config_digest = blake3::hash(config_serialization.as_bytes()).to_hex().to_string();
+    let discovery_config_digest = discovery_config_digest(discovery_config);
 
     let bounded_request = requested <= MAX_HOLDOUT_TRAJECTORIES;
     let conditions = if bounded_request {
@@ -902,7 +930,11 @@ pub fn validate_invariant_holdout(
     }
     result.trajectories_checked = variances.len();
     if variances.len() != requested || variances.is_empty() {
-        result.max_lie_derivative_variance = variances.iter().copied().fold(0.0, f64::max);
+        result.max_lie_derivative_variance = if variances.is_empty() {
+            f64::MAX
+        } else {
+            variances.iter().copied().fold(0.0, f64::max)
+        };
         result.failure = Some(AutonomousHoldoutFailure::IncompleteHoldout);
         return finalize_holdout_validation(result);
     }
