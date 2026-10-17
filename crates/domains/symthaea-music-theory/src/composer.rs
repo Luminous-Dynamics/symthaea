@@ -5259,13 +5259,14 @@ mod tests {
         );
 
         let meter = score.meter as f64;
+        let intro_beats = spec.texture.intro_bars as f64 * meter;
         let mut start_bar = 0_i64;
         let mut section_metrics = Vec::new();
         for section in &form.sections {
             let section_bars = (section.period.antecedent.progression.len()
                 + section.period.consequent.progression.len()) as i64;
-            let start = start_bar as f64 * meter;
-            let end = (start_bar + section_bars) as f64 * meter;
+            let start = intro_beats + start_bar as f64 * meter;
+            let end = intro_beats + (start_bar + section_bars) as f64 * meter;
             let harmony: Vec<f64> = score
                 .notes
                 .iter()
