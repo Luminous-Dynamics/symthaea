@@ -1,5 +1,4 @@
 {
-  "$schema": "../schemas/marine_modular_interior_configuration_v1.schema.json",
   "schema_version": "1.0.0",
   "configuration_id": "LD-EXPEDITION-MOD-V1",
   "configuration_name": "Expedition research configuration",
