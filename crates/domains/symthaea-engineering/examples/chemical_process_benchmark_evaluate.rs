@@ -220,6 +220,69 @@ fn evaluate(corpus: &Value, results: &Value, expected_head: &str) -> Value {
             errors.push("prohibited evidence promotion detected".to_owned());
         }
 
+        let mut computed_numeric_checks = Value::Null;
+        if text(expected, "class") == Some("analytic-reference") {
+            let fixture = expected.get("fixture");
+            let equation = fixture.and_then(|value| text(value, "equation"));
+            let fresh = fixture.and_then(|value| value.get("fresh")).and_then(Value::as_f64);
+            let recycle_fraction = fixture
+                .and_then(|value| value.get("recycle_fraction"))
+                .and_then(Value::as_f64);
+            let analytic_solution = fixture
+                .and_then(|value| value.get("analytic_solution"))
+                .and_then(Value::as_f64);
+            let observed_solution = actual
+                .get("observed_numeric_values")
+                .and_then(|value| value.get("solution"))
+                .and_then(Value::as_f64);
+            let tolerance = corpus
+                .get("residual_profile")
+                .and_then(|value| value.get("target_max"))
+                .and_then(Value::as_f64);
+
+            if equation != Some("x = fresh + recycle_fraction*x") {
+                errors.push("analytic-reference fixture has no supported oracle equation".to_owned());
+            } else if let (Some(fresh), Some(recycle_fraction), Some(analytic_solution),
+                Some(observed_solution), Some(tolerance)) =
+                (fresh, recycle_fraction, analytic_solution, observed_solution, tolerance)
+            {
+                if ![fresh, recycle_fraction, analytic_solution, observed_solution, tolerance]
+                    .iter()
+                    .all(|number| number.is_finite())
+                    || tolerance <= 0.0
+                {
+                    errors.push("analytic-reference numeric values must be finite and tolerance positive".to_owned());
+                } else {
+                    let rhs = fresh + recycle_fraction * observed_solution;
+                    let residual_scale = 1.0_f64.max(
+                        observed_solution.abs() + fresh.abs() + (recycle_fraction * observed_solution).abs()
+                    );
+                    let normalized_residual = (observed_solution - rhs).abs() / residual_scale;
+                    let solution_relative_error = (observed_solution - analytic_solution).abs()
+                        / 1.0_f64.max(analytic_solution.abs());
+                    let numeric_passed = normalized_residual <= tolerance
+                        && solution_relative_error <= tolerance;
+                    if normalized_residual > tolerance {
+                        errors.push("independently calculated recycle-equation residual exceeds frozen tolerance".to_owned());
+                    }
+                    if solution_relative_error > tolerance {
+                        errors.push("observed solution differs from the frozen analytic solution".to_owned());
+                    }
+                    computed_numeric_checks = json!({
+                        "oracle": "linear_recycle_v1",
+                        "observed_solution": observed_solution,
+                        "analytic_solution": analytic_solution,
+                        "normalized_equation_residual": normalized_residual,
+                        "solution_relative_error": solution_relative_error,
+                        "tolerance": tolerance,
+                        "passed": numeric_passed
+                    });
+                }
+            } else {
+                errors.push("analytic-reference result is missing numeric values or tolerance".to_owned());
+            }
+        }
+
         let passed = errors.is_empty();
         case_reports.push(json!({
             "id": id,
@@ -227,6 +290,7 @@ fn evaluate(corpus: &Value, results: &Value, expected_head: &str) -> Value {
             "observed_disposition": observed_disposition,
             "missing_required_findings": missing_findings,
             "prohibited_promotions_observed": violations,
+            "computed_numeric_checks": computed_numeric_checks,
             "passed": passed,
             "errors": errors
         }));
@@ -430,3 +494,55 @@ mod tests {
         assert_eq!(output["cases"][1]["passed"], false);
     }
 }
+
+
+    fn analytic_corpus() -> Value {
+        json!({
+            "benchmark_id": "ANALYTIC-TEST",
+            "corpus_version": "1.0.0",
+            "residual_profile": { "target_max": 1e-8 },
+            "cases": [{
+                "id": "RECYCLE-1",
+                "class": "analytic-reference",
+                "expected_disposition": "ACCEPTED_WITHIN_SCOPE",
+                "required_findings": ["solution_matches_analytic_reference", "residual_within_frozen_tolerance"],
+                "prohibited_promotions": [],
+                "fixture": {
+                    "equation": "x = fresh + recycle_fraction*x",
+                    "fresh": 1.0,
+                    "recycle_fraction": 0.2,
+                    "analytic_solution": 1.25
+                }
+            }]
+        })
+    }
+
+    fn analytic_results(solution: f64) -> Value {
+        json!({
+            "benchmark_id": "ANALYTIC-TEST",
+            "corpus_version": "1.0.0",
+            "evaluated_head": HEAD,
+            "cases": [{
+                "id": "RECYCLE-1",
+                "observed_disposition": "ACCEPTED_WITHIN_SCOPE",
+                "observed_findings": ["solution_matches_analytic_reference", "residual_within_frozen_tolerance"],
+                "observed_promotions": [],
+                "observed_numeric_values": { "solution": solution }
+            }]
+        })
+    }
+
+    #[test]
+    fn analytical_recycle_oracle_recomputes_residual() {
+        let output = evaluate(&analytic_corpus(), &analytic_results(1.25), HEAD);
+        assert_eq!(output["passed"], true);
+        assert_eq!(output["cases"][0]["computed_numeric_checks"]["normalized_equation_residual"], 0.0);
+        assert_eq!(output["cases"][0]["computed_numeric_checks"]["passed"], true);
+    }
+
+    #[test]
+    fn analytical_recycle_oracle_rejects_a_plausible_but_wrong_solution() {
+        let output = evaluate(&analytic_corpus(), &analytic_results(2.0), HEAD);
+        assert_eq!(output["passed"], false);
+        assert_eq!(output["cases"][0]["computed_numeric_checks"]["passed"], false);
+    }
