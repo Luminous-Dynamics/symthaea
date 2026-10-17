@@ -75,6 +75,7 @@ A run can bind an optional `shift_manifest_path` and `shift_manifest_sha256` in 
 
 The auditor checks the shift-manifest digest against the artifact list and validates:
 - recognized physical shift families, mechanism axes, and severity/split labels;
+- baseline consistency: in-distribution groups must declare zero changed physical perturbation families;
 - axis cardinality consistency: no axes for in-distribution groups, one for single-factor shifts, and at least two for compounded shifts;
 - task-contract and benchmark identity against the provenance sidecar;
 - source snapshot digests against already hashed artifacts;
