@@ -6,7 +6,7 @@
   "sampling_frame_path": "rescue-controller/eligible-window-frame.jsonl",
   "sampling_frame_sha256": "3e4fe27162b44df7141d2f00e7b3bcd22974c85e096c44c3c8c052d8ebedc891",
   "preregistration_receipt_path": "rescue-controller/preregistration-receipt.json",
-  "preregistration_receipt_sha256": "734a831c03e481b1d737c8a670460801d714ae5c458817a0fe759972e8b8ba2a",
+  "manifest_visibility": "evaluator_sealed_until_policy_run_complete",
   "seed_reveal_path": "rescue-controller/sampling-seed-reveal.json",
   "seed_commitment_sha256": "8a9e69d54a8383458a6dd411df717779ed9a8e78de981b2781e3a3fb8e3c455d",
   "frame_population_size": 4,
