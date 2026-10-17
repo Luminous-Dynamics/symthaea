@@ -16,9 +16,8 @@ use crate::capacitor_screening::{
 };
 use crate::dielectric::{
     CapacitorGeometry, DielectricEvidenceKind, DielectricPropertyRecord,
-    DielectricValidationError, IdealCapacitorMetrics, PropertyUncertainty,
-    PropertyUncertaintySemantics, VACUUM_PERMITTIVITY_F_PER_M,
-    calculate_ideal_capacitor_metrics,
+    DielectricValidationError, PropertyUncertainty, PropertyUncertaintySemantics,
+    VACUUM_PERMITTIVITY_F_PER_M,
 };
 use serde::{Deserialize, Serialize};
 use std::error::Error;
@@ -491,7 +490,8 @@ mod tests {
     use super::*;
     use crate::capacitor_screening::ScreeningLimitation;
     use crate::dielectric::{
-        BreakdownTestKind, DielectricEvidenceKind, PropertyUncertaintySemantics,
+        calculate_ideal_capacitor_metrics, BreakdownTestKind, DielectricEvidenceKind,
+        PropertyUncertaintySemantics,
     };
 
     fn hard_uncertainty(relative_uncertainty: f64) -> PropertyUncertainty {
