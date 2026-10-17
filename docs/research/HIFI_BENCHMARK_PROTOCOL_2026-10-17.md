@@ -31,7 +31,7 @@ Do not combine these regimes into one leaderboard; each measures a different gen
 
 Each benchmark manifest must name its intended regime and declare group-level disjointness rules. Never assume that random row splitting is valid. In repeated-measures audio data, correlated rows may differ in filename while representing the same person, excerpt, product revision, reseat, fixture or session.
 
-The new **hifi-benchmark-check** tool is a fail-closed **split-contract guard**, not a model evaluator. It checks identity fields, unique sample IDs, allowed roles and explicit test-versus-fit-role disjointness rules. It deliberately allows calibration/test listener overlap only when the declared rule does not prohibit it. It cannot prove that a dataset is honest, that the study was randomized, or that the model is good.
+The new **hifi-benchmark-check** tool is a fail-closed **split-contract guard**, not a model evaluator. It checks identity fields, unique sample IDs, allowed roles and explicit test-versus-fit-role disjointness rules. It deliberately allows calibration/test listener overlap only when the declared rule does not prohibit it. It cannot prove that a dataset is honest, that the study was randomized, or that the model is good. The interchange contract is [hifi-split-manifest.schema.json](../../schemas/hifi-split-manifest.schema.json); use a full Draft 2020-12 validator for that schema and the custom Rust check for cross-row rules. The manifest must declare an evaluation regime, and the checker refuses regimes that omit their mandatory holdout dimensions.
 
 ## Baselines that should always be reported
 
