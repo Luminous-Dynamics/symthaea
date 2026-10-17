@@ -51,6 +51,7 @@ struct StyleCounters {
     meter_mismatches: usize,
     tempo_out_of_band: usize,
     deterministic_replay_failures: usize,
+    deterministic_replay_structural_failures: usize,
     form_available_samples: usize,
     plan_kinds: HashSet<String>,
     seed_hashes: HashSet<u64>,
@@ -67,6 +68,7 @@ impl StyleCounters {
             meter_mismatches: 0,
             tempo_out_of_band: 0,
             deterministic_replay_failures: 0,
+            deterministic_replay_structural_failures: 0,
             form_available_samples: 0,
             plan_kinds: HashSet::new(),
             seed_hashes: HashSet::new(),
@@ -129,17 +131,27 @@ fn sensitivity_rows(style: Style) -> Vec<Value> {
         .iter()
         .map(|axis| {
             let mut observed_seed_count = 0usize;
+            let mut exact_effect_seed_count = 0usize;
+            let mut structural_effect_seed_count = 0usize;
             let mut max_distance = 0.0_f64;
             let mut mean_distance = 0.0_f64;
             for seed in AXIS_SEEDS {
                 let low = realize(style, &axis_intent(axis, false, seed));
                 let high = realize(style, &axis_intent(axis, true, seed));
-                let low_fp =
-                    structural_fingerprint(&low.score, low.form.as_ref());
-                let high_fp =
-                    structural_fingerprint(&high.score, high.form.as_ref());
+                let low_hash = exact_fingerprint(&low.score);
+                let high_hash = exact_fingerprint(&high.score);
+                let low_fp = structural_fingerprint(&low.score, low.form.as_ref());
+                let high_fp = structural_fingerprint(&high.score, high.form.as_ref());
                 let distance = dist(&low_fp, &high_fp);
-                if distance > 1e-9 {
+                let exact_effect = low_hash != high_hash;
+                let structural_effect = distance > 1e-9;
+                if exact_effect {
+                    exact_effect_seed_count += 1;
+                }
+                if structural_effect {
+                    structural_effect_seed_count += 1;
+                }
+                if exact_effect || structural_effect {
                     observed_seed_count += 1;
                 }
                 max_distance = max_distance.max(distance);
@@ -158,6 +170,8 @@ fn sensitivity_rows(style: Style) -> Vec<Value> {
                 "axis": axis,
                 "declared_live": declared_live,
                 "observed_seed_count": observed_seed_count,
+                "observed_exact_effect_seed_count": exact_effect_seed_count,
+                "observed_structural_effect_seed_count": structural_effect_seed_count,
                 "tested_seed_count": AXIS_SEEDS.len(),
                 "max_structural_distance": max_distance,
                 "mean_structural_distance": mean_distance,
@@ -195,6 +209,8 @@ fn main() {
                     structural_fingerprint(&first.score, first.form.as_ref());
                 let replay = realize(style, &request);
                 let replay_hash = exact_fingerprint(&replay.score);
+                let replay_structural =
+                    structural_fingerprint(&replay.score, replay.form.as_ref());
 
                 stats.samples += 1;
                 stats.plan_kinds.insert(plan_name(&first.plan));
@@ -222,6 +238,9 @@ fn main() {
                 }
                 if first_hash != replay_hash {
                     stats.deterministic_replay_failures += 1;
+                }
+                if first_structural != replay_structural {
+                    stats.deterministic_replay_structural_failures += 1;
                 }
                 if intent_index == 0 {
                     stats.seed_hashes.insert(first_hash);
@@ -289,6 +308,8 @@ fn main() {
     }
 
     let mut style_rows = Vec::with_capacity(style_count);
+    let mut declared_live_no_effect_count = 0usize;
+    let mut declared_inert_with_effect_count = 0usize;
     for (index, style) in Style::ALL.iter().copied().enumerate() {
         let stats = &counters[index];
         let mut plan_kinds = stats.plan_kinds.iter().cloned().collect::<Vec<_>>();
@@ -300,6 +321,18 @@ fn main() {
             .iter()
             .map(|pattern| format!("{pattern:?}"))
             .collect::<Vec<_>>();
+        let sensitivities = sensitivity_rows(style);
+        for row in &sensitivities {
+            match row["status"].as_str() {
+                Some("declared_live_no_effect_at_test_points") => {
+                    declared_live_no_effect_count += 1;
+                }
+                Some("declared_inert_but_effect_observed") => {
+                    declared_inert_with_effect_count += 1;
+                }
+                _ => {}
+            }
+        }
         style_rows.push(json!({
             "style": stats.style_name,
             "grammar_family": format!("{:?}", style.grammar_family()),
@@ -314,11 +347,13 @@ fn main() {
             "meter_mismatches": stats.meter_mismatches,
             "tempo_out_of_band": stats.tempo_out_of_band,
             "deterministic_replay_failures": stats.deterministic_replay_failures,
+            "deterministic_replay_structural_failures":
+                stats.deterministic_replay_structural_failures,
             "distinct_seed_fingerprints": stats.seed_hashes.len(),
             "seed_diversity_test_seeds": SEEDS.len(),
             "mean_nearest_cross_style_structural_distance":
                 mean(&nearest_distances[index]),
-            "intent_sensitivity": sensitivity_rows(style),
+            "intent_sensitivity": sensitivities,
         }));
     }
 
@@ -334,6 +369,12 @@ fn main() {
         .iter()
         .map(|row| row.deterministic_replay_failures)
         .sum();
+    let replay_structural_failure_count: usize = counters
+        .iter()
+        .map(|row| row.deterministic_replay_structural_failures)
+        .sum();
+    let control_contract_violation_count =
+        declared_live_no_effect_count + declared_inert_with_effect_count;
 
     let source_commit = std::env::var("GIT_COMMIT").ok();
     let report = json!({
@@ -370,13 +411,23 @@ fn main() {
             "meter_mismatches": meter_mismatch_count,
             "tempo_out_of_band": tempo_out_of_band_count,
             "deterministic_replay_failures": replay_failure_count,
+            "deterministic_replay_structural_failures": replay_structural_failure_count,
             "exact_cross_style_collision_pairs": exact_collision_pairs,
             "all_mechanical_checks_passed": spec_invalid_count == 0
                 && empty_score_count == 0
                 && invalid_timeline_count == 0
                 && meter_mismatch_count == 0
                 && tempo_out_of_band_count == 0
-                && replay_failure_count == 0,
+                && replay_failure_count == 0
+                && replay_structural_failure_count == 0
+                && control_contract_violation_count == 0,
+        },
+        "control_contract_audit": {
+            "declared_live_no_effect_at_test_points": declared_live_no_effect_count,
+            "declared_inert_but_effect_observed": declared_inert_with_effect_count,
+            "violation_count": control_contract_violation_count,
+            "passed_at_test_points": control_contract_violation_count == 0,
+            "scope": "paired high/low probes across fixed seeds; no effect at tested points is not proof of global inactivity",
         },
         "per_style": style_rows,
         "exact_cross_style_collisions": exact_pair_rows,
