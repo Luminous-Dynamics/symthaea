@@ -6,7 +6,7 @@ use std::fs;
 use std::path::{Path, PathBuf};
 use std::process;
 
-const GENERATOR_VERSION: &str = "cyber-hunt-fixture-generator/0.1.0";
+const GENERATOR_VERSION: &str = "cyber-hunt-fixture-generator/0.2.0";
 const EVENT_SCHEMA: &str = "cyber-hunt-event-v1";
 const MANIFEST_SCHEMA: &str = "cyber-hunt-manifest-v1";
 const TRUTH_SCHEMA: &str = "cyber-hunt-truth-v1";
@@ -397,10 +397,269 @@ fn generate_dataset(record_count: usize, seed: u64) -> Result<Dataset, String> {
     Ok(Dataset { event_store, manifest, truth })
 }
 
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+enum CampaignFamily {
+    IdentityToEgress,
+    ArtifactProvenance,
+}
+
+impl CampaignFamily {
+    fn parse(value: &str) -> Result<Self, String> {
+        match value {
+            "identity-to-egress" => Ok(Self::IdentityToEgress),
+            "artifact-provenance" => Ok(Self::ArtifactProvenance),
+            _ => Err(format!(
+                "unsupported --family {value}; expected identity-to-egress or artifact-provenance"
+            )),
+        }
+    }
+
+    fn as_str(self) -> &'static str {
+        match self {
+            Self::IdentityToEgress => "identity-to-egress",
+            Self::ArtifactProvenance => "artifact-provenance",
+        }
+    }
+}
+
+fn generate_artifact_provenance_dataset(record_count: usize, seed: u64) -> Result<Dataset, String> {
+    const POSITIVE_COUNT: usize = 6;
+    const BENIGN_LOOKALIKE_COUNT: usize = 3;
+    const PLANTED_COUNT: usize = POSITIVE_COUNT + BENIGN_LOOKALIKE_COUNT;
+    const SCENARIO: &str = "synthetic-artifact-provenance-mismatch-v1";
+
+    if !(MIN_RECORDS..=MAX_RECORDS).contains(&record_count) {
+        return Err(format!(
+            "record count must be between {MIN_RECORDS} and {MAX_RECORDS}"
+        ));
+    }
+
+    let mut rng = Rng::new(seed);
+    let mut events = Vec::with_capacity(record_count);
+    let mut used_ids = BTreeSet::new();
+    let campaign_anchor_ms = BASE_TIME_MS.saturating_add(rng.below(7_200_000) as i64);
+
+    for index in 0..(record_count - PLANTED_COUNT) {
+        background_event(index, campaign_anchor_ms, &mut events, &mut rng, &mut used_ids);
+    }
+
+    // A separate causal family: source revision, build, artifact bytes, signed
+    // attestation, promotion, and observed deployment. The signature is valid but
+    // binds a different digest from the artifact that is promoted.
+    let base = campaign_anchor_ms.saturating_add(600_000);
+    let build_host = format!("host-{:03}", 1 + rng.below(48));
+    let build_principal = "svc-build";
+    let source_commit = format!("commit-{:012x}", rng.next_u64() & 0x0000_ffff_ffff_ffff);
+    let build_id = format!("build-{:08x}", rng.next_u64() as u32);
+    let artifact_digest = format!("sha256:{:064x}", rng.next_u64());
+    let mismatched_subject_digest = format!("sha256:{:064x}", rng.next_u64());
+    let benign_digest = format!("sha256:{:064x}", rng.next_u64());
+    let benign_commit = format!("commit-{:012x}", rng.next_u64() & 0x0000_ffff_ffff_ffff);
+    let benign_build = format!("build-{:08x}", rng.next_u64() as u32);
+
+    let mut positive_ids = Vec::with_capacity(POSITIVE_COUNT);
+    positive_ids.push(push_event(
+        &mut events, &mut rng, &mut used_ids, base, &build_host, build_principal,
+        "source_control", "commit_checkout", "completed",
+        details(&[
+            ("repository", "service/catalog"),
+            ("commit_id", &source_commit),
+            ("branch", "release"),
+            ("review_state", "pending"),
+        ]),
+    ));
+    positive_ids.push(push_event(
+        &mut events, &mut rng, &mut used_ids, base + 30_000, &build_host, build_principal,
+        "ci_audit", "build_job", "completed",
+        details(&[
+            ("build_id", &build_id),
+            ("source_commit_id", &source_commit),
+            ("workflow_revision", "build-workflow-17"),
+            ("workflow_trust", "unverified_revision"),
+        ]),
+    ));
+    positive_ids.push(push_event(
+        &mut events, &mut rng, &mut used_ids, base + 60_000, &build_host, build_principal,
+        "artifact_registry", "artifact_publish", "published",
+        details(&[
+            ("build_id", &build_id),
+            ("artifact_digest", &artifact_digest),
+            ("source_commit_id", &source_commit),
+            ("package", "service-catalog"),
+        ]),
+    ));
+    positive_ids.push(push_event(
+        &mut events, &mut rng, &mut used_ids, base + 90_000, &build_host, "builder-prod",
+        "attestation_verifier", "provenance_attestation", "signature_valid",
+        details(&[
+            ("subject_digest", &mismatched_subject_digest),
+            ("source_commit_id", &source_commit),
+            ("build_id", &build_id),
+            ("predicate_type", "build-provenance"),
+            ("signer", "builder-prod"),
+        ]),
+    ));
+    positive_ids.push(push_event(
+        &mut events, &mut rng, &mut used_ids, base + 120_000, &build_host, "release-controller",
+        "release_audit", "artifact_promotion", "promoted",
+        details(&[
+            ("artifact_digest", &artifact_digest),
+            ("attestation_subject_digest", &mismatched_subject_digest),
+            ("policy_decision", "override"),
+            ("change_ticket", "CHG-2317"),
+        ]),
+    ));
+    positive_ids.push(push_event(
+        &mut events, &mut rng, &mut used_ids, base + 150_000, &build_host, "deploy-controller",
+        "deployment_audit", "deployment", "succeeded",
+        details(&[
+            ("artifact_digest", &artifact_digest),
+            ("environment", "production"),
+            ("release_channel", "stable"),
+            ("change_ticket", "CHG-2317"),
+        ]),
+    ));
+
+    // Benign lookalike: a valid signature whose subject digest matches the promoted
+    // and deployed artifact. It overlaps the suspicious chain in event types and time.
+    let benign_ids = vec![
+        push_event(
+            &mut events, &mut rng, &mut used_ids, base + 40_000, "host-018", "builder-prod",
+            "attestation_verifier", "provenance_attestation", "signature_valid",
+            details(&[
+                ("subject_digest", &benign_digest),
+                ("source_commit_id", &benign_commit),
+                ("build_id", &benign_build),
+                ("predicate_type", "build-provenance"),
+                ("signer", "builder-prod"),
+            ]),
+        ),
+        push_event(
+            &mut events, &mut rng, &mut used_ids, base + 125_000, "host-018", "release-controller",
+            "release_audit", "artifact_promotion", "promoted",
+            details(&[
+                ("artifact_digest", &benign_digest),
+                ("attestation_subject_digest", &benign_digest),
+                ("policy_decision", "pass"),
+                ("change_ticket", "CHG-1042"),
+            ]),
+        ),
+        push_event(
+            &mut events, &mut rng, &mut used_ids, base + 155_000, "host-018", "deploy-controller",
+            "deployment_audit", "deployment", "succeeded",
+            details(&[
+                ("artifact_digest", &benign_digest),
+                ("environment", "staging"),
+                ("release_channel", "stable"),
+                ("change_ticket", "CHG-1042"),
+            ]),
+        ),
+    ];
+
+    if events.len() != record_count
+        || positive_ids.len() != POSITIVE_COUNT
+        || benign_ids.len() != BENIGN_LOOKALIKE_COUNT
+    {
+        return Err("internal artifact-provenance fixture construction count mismatch".to_string());
+    }
+
+    events.sort_by(|a, b| (a.ingest_time_ms, &a.event_id).cmp(&(b.ingest_time_ms, &b.event_id)));
+    let event_store = encode_jsonl(&events)?;
+    let event_store_sha256 = digest(&event_store);
+
+    let positives: BTreeSet<String> = positive_ids.iter().cloned().collect();
+    let benign: BTreeSet<String> = benign_ids.iter().cloned().collect();
+    let mut labels = Vec::with_capacity(events.len());
+    for event in &events {
+        let (label, rationale) = if positives.contains(&event.event_id) {
+            ("positive", "member of the synthetic artifact provenance mismatch causal sequence")
+        } else if benign.contains(&event.event_id) {
+            ("negative", "benign matched-digest attestation, promotion, and deployment lookalike")
+        } else {
+            ("negative", "synthetic background event outside the planted causal sequence")
+        };
+        labels.push(EventLabel {
+            event_id: event.event_id.clone(),
+            label: label.to_string(),
+            rationale: rationale.to_string(),
+        });
+    }
+
+    let expected_relations = vec![
+        ExpectedRelation {
+            from_event_id: positive_ids[0].clone(),
+            to_event_id: positive_ids[1].clone(),
+            relation: "source_revision_consumed_by_build".to_string(),
+        },
+        ExpectedRelation {
+            from_event_id: positive_ids[1].clone(),
+            to_event_id: positive_ids[2].clone(),
+            relation: "build_produced_artifact_digest".to_string(),
+        },
+        ExpectedRelation {
+            from_event_id: positive_ids[2].clone(),
+            to_event_id: positive_ids[3].clone(),
+            relation: "attestation_subject_digest_mismatch".to_string(),
+        },
+        ExpectedRelation {
+            from_event_id: positive_ids[3].clone(),
+            to_event_id: positive_ids[4].clone(),
+            relation: "promotion_followed_mismatched_attestation".to_string(),
+        },
+        ExpectedRelation {
+            from_event_id: positive_ids[4].clone(),
+            to_event_id: positive_ids[5].clone(),
+            relation: "promoted_artifact_observed_in_deployment".to_string(),
+        },
+    ];
+
+    let truth = GroundTruth {
+        schema_version: TRUTH_SCHEMA.to_string(),
+        scenario_id: SCENARIO.to_string(),
+        profile: "public-synthetic-smoke-v1".to_string(),
+        seed,
+        event_count: record_count,
+        event_store_sha256: event_store_sha256.clone(),
+        labels,
+        expected_relations,
+        claim_ceiling: "Synthetic build-to-artifact provenance consistency and causal correlation only; not real supply-chain assurance or real-world security.".to_string(),
+    };
+
+    let manifest = DatasetManifest {
+        schema_version: MANIFEST_SCHEMA.to_string(),
+        generator_version: GENERATOR_VERSION.to_string(),
+        profile: "public-synthetic-smoke-v1".to_string(),
+        scenario_id: SCENARIO.to_string(),
+        seed,
+        record_count,
+        event_store_sha256,
+        event_store_utf8_bytes: event_store.len(),
+        ordering: "ingest_time_ms_then_event_id; event_time_ms remains distinct".to_string(),
+        qualification_state: "UNSCORED".to_string(),
+        generator_source_commit: "UNPINNED_LOCAL_SOURCE".to_string(),
+        source_commit_pinned: false,
+        claim_ceiling: "Exact deterministic synthetic artifact-provenance smoke fixture only; not solver capability evidence.".to_string(),
+    };
+
+    Ok(Dataset { event_store, manifest, truth })
+}
+
+fn generate_dataset_for_family(
+    record_count: usize,
+    seed: u64,
+    family: CampaignFamily,
+) -> Result<Dataset, String> {
+    match family {
+        CampaignFamily::IdentityToEgress => generate_dataset(record_count, seed),
+        CampaignFamily::ArtifactProvenance => generate_artifact_provenance_dataset(record_count, seed),
+    }
+}
+
 #[derive(Debug)]
 struct Config {
     records: usize,
     seed: u64,
+    family: CampaignFamily,
     events_out: PathBuf,
     manifest_out: PathBuf,
     truth_out: PathBuf,
@@ -411,6 +670,7 @@ fn parse_args() -> Result<Option<Config>, String> {
     let mut args = env::args().skip(1);
     let mut records = 1_000usize;
     let mut seed = 20_261_017u64;
+    let mut family = CampaignFamily::IdentityToEgress;
     let mut events_out = None;
     let mut manifest_out = None;
     let mut truth_out = None;
@@ -429,6 +689,9 @@ fn parse_args() -> Result<Option<Config>, String> {
             "--seed" => {
                 seed = value(&mut args, "--seed")?.parse()
                     .map_err(|_| "--seed must be an unsigned integer".to_string())?;
+            }
+            "--family" => {
+                family = CampaignFamily::parse(&value(&mut args, "--family")?)?;
             }
             "--events-out" => events_out = Some(PathBuf::from(value(&mut args, "--events-out")?)),
             "--manifest-out" => manifest_out = Some(PathBuf::from(value(&mut args, "--manifest-out")?)),
@@ -453,7 +716,7 @@ fn parse_args() -> Result<Option<Config>, String> {
         return Err("--source-commit must be a 40-character hexadecimal commit SHA".to_string());
     }
 
-    Ok(Some(Config { records, seed, events_out, manifest_out, truth_out, source_commit }))
+    Ok(Some(Config { records, seed, family, events_out, manifest_out, truth_out, source_commit }))
 }
 
 fn canonical_output_path(path: &Path) -> Result<PathBuf, String> {
@@ -474,7 +737,7 @@ fn path_is_ancestor_or_equal(parent: &Path, child: &Path) -> bool {
 }
 
 fn write_dataset(config: &Config) -> Result<(), String> {
-    let dataset = generate_dataset(config.records, config.seed)?;
+    let dataset = generate_dataset_for_family(config.records, config.seed, config.family)?;
     let mut manifest = dataset.manifest;
     // Source revision is recorded as provenance metadata; the caller must supply a clean,
     // exact source commit. Local mode remains explicitly unpinned and unqualified.
@@ -532,6 +795,7 @@ fn write_dataset(config: &Config) -> Result<(), String> {
     println!("generator_version={GENERATOR_VERSION}");
     println!("records={}", config.records);
     println!("seed={}", config.seed);
+    println!("family={}", config.family.as_str());
     println!("event_store_sha256={}", digest(&dataset.event_store));
     println!("event_store_bytes={}", dataset.event_store.len());
     println!("manifest={}", config.manifest_out.display());
@@ -546,7 +810,7 @@ fn main() {
     match parse_args() {
         Ok(None) => {
             println!(
-                "Usage: cyber-hunt-fixture-generator --events-out PATH --manifest-out PATH --truth-out PATH [--records N] [--seed N] [--source-commit 40_HEX_SHA]\n\
+                "Usage: cyber-hunt-fixture-generator --events-out PATH --manifest-out PATH --truth-out PATH [--family identity-to-egress|artifact-provenance] [--records N] [--seed N] [--source-commit 40_HEX_SHA]\n\
                  Generates deterministic synthetic defensive telemetry only. Keep --truth-out outside the solver-visible filesystem."
             );
         }
@@ -567,6 +831,79 @@ fn main() {
 #[cfg(test)]
 mod tests {
     use super::*;
+
+    #[test]
+    fn artifact_provenance_family_has_a_distinct_causal_graph_and_benign_matched_chain() {
+        let dataset = generate_artifact_provenance_dataset(1_000, 2026)
+            .expect("artifact-provenance dataset should generate");
+        let events: Vec<EventRecord> = std::str::from_utf8(&dataset.event_store)
+            .expect("JSONL should be UTF-8")
+            .lines()
+            .map(|line| serde_json::from_str(line).expect("event should deserialize"))
+            .collect();
+        let positive_ids: BTreeSet<String> = dataset.truth.labels.iter()
+            .filter(|label| label.label == "positive")
+            .map(|label| label.event_id.clone())
+            .collect();
+        let positive_events: Vec<&EventRecord> = events.iter()
+            .filter(|event| positive_ids.contains(&event.event_id))
+            .collect();
+        assert_eq!(dataset.manifest.scenario_id, "synthetic-artifact-provenance-mismatch-v1");
+        assert_eq!(dataset.truth.expected_relations.len(), 5);
+        assert_eq!(positive_events.len(), 6);
+        assert_eq!(
+            dataset.truth.labels.iter().filter(|label| label.label == "negative").count(),
+            994
+        );
+        for expected_type in [
+            "commit_checkout",
+            "build_job",
+            "artifact_publish",
+            "provenance_attestation",
+            "artifact_promotion",
+            "deployment",
+        ] {
+            assert!(positive_events.iter().any(|event| event.event_type == expected_type));
+        }
+
+        let benign_deployments: Vec<&EventRecord> = events.iter()
+            .filter(|event| event.event_type == "deployment"
+                && event.details.get("environment").map(String::as_str) == Some("staging")
+                && !positive_ids.contains(&event.event_id))
+            .collect();
+        assert_eq!(benign_deployments.len(), 1);
+        let benign_deployment = benign_deployments[0];
+        let artifact_digest = benign_deployment.details.get("artifact_digest").expect("benign digest");
+        let benign_promotion = events.iter()
+            .find(|event| event.event_type == "artifact_promotion"
+                && event.details.get("artifact_digest") == Some(artifact_digest))
+            .expect("benign matching promotion should exist");
+        let benign_attestation = events.iter()
+            .find(|event| event.event_type == "provenance_attestation"
+                && event.details.get("subject_digest") == Some(artifact_digest))
+            .expect("benign matching attestation should exist");
+        assert!(!positive_ids.contains(&benign_attestation.event_id));
+        assert!(!positive_ids.contains(&benign_promotion.event_id));
+    }
+
+    #[test]
+    fn campaign_family_selection_keeps_existing_family_as_default() {
+        assert_eq!(
+            CampaignFamily::parse("identity-to-egress").expect("identity family should parse"),
+            CampaignFamily::IdentityToEgress
+        );
+        assert_eq!(
+            CampaignFamily::parse("artifact-provenance").expect("artifact family should parse"),
+            CampaignFamily::ArtifactProvenance
+        );
+        assert!(CampaignFamily::parse("invented-family").is_err());
+        let default = generate_dataset_for_family(128, 2026, CampaignFamily::IdentityToEgress)
+            .expect("identity family should generate");
+        let compatibility = generate_dataset(128, 2026)
+            .expect("default generator should remain compatible");
+        assert_eq!(default.event_store, compatibility.event_store);
+        assert_eq!(default.truth, compatibility.truth);
+    }
 
     #[test]
     fn sha256_known_answer() {
