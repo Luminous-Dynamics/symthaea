@@ -64,7 +64,10 @@ impl EvaluationSummary {
             println!("FAIL: {failure}");
         }
         println!(
-            "Claim ceiling: evaluates reported observations against synthetic oracles; it does not prove the truth or authority of referenced artifacts."
+            concat!(
+                "Claim ceiling: reported observations are compared with synthetic oracles; ",
+                "referenced artifacts are not independently qualified."
+            )
         );
     }
 }
@@ -173,9 +176,10 @@ fn evaluate_run_report(
         .ok_or_else(|| "run report benchmark_sha256 must be a string".to_string())?;
     let actual_hash = sha256_hex(benchmark_text);
     if supplied_hash != actual_hash {
-        return Err(format!(
-            "benchmark digest mismatch: report binds {supplied_hash}, exact benchmark bytes hash to {actual_hash}"
-        ));
+        return Err(format!(concat!(
+            "benchmark digest mismatch: report binds {supplied_hash}, ",
+            "exact benchmark bytes hash to {actual_hash}"
+        )));
     }
 
     let expected_cases = benchmark
@@ -286,9 +290,10 @@ fn evaluate_run_report(
                 .unwrap_or(false)
                 && matching_refs != 1
             {
-                reasons.push(format!(
-                    "expected exactly one evidence reference for {observation_key}, found {matching_refs}"
-                ));
+                reasons.push(format!(concat!(
+                    "expected exactly one evidence reference for {observation_key}, ",
+                    "found {matching_refs}"
+                )));
             }
 
             if reasons.is_empty() {
