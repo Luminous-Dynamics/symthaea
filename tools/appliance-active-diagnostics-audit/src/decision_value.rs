@@ -217,7 +217,6 @@ fn parse_measurement_costs(
 }
 
 fn expected_risk(
-    trace: &Value,
     actions: &[Action],
     probabilities: &BTreeMap<String, f64>,
 ) -> (String, f64) {
@@ -287,7 +286,7 @@ fn posterior_expected_risk(
                 .ok_or_else(|| "invalid_likelihood_model".to_owned())?;
             probability_of_outcome += prior * likelihood;
         }
-        if probability_of_outcome <= 1e-15 {
+        if probability_of_outcome <= 0.0 {
             continue;
         }
 
@@ -319,7 +318,7 @@ fn posterior_expected_risk(
                 prior * likelihood / probability_of_outcome,
             );
         }
-        let (_, outcome_risk) = expected_risk(trace, actions, &posterior);
+        let (_, outcome_risk) = expected_risk(actions, &posterior);
         total += probability_of_outcome * outcome_risk;
     }
 
@@ -388,7 +387,7 @@ fn evaluate_case(trace: &Value, case: &Value) -> Result<DecisionValueResult, Str
             ))
         })
         .collect::<Result<_, String>>()?;
-    let (prior_action, prior_risk) = expected_risk(trace, &eligible_actions, &priors);
+    let (prior_action, prior_risk) = expected_risk(&eligible_actions, &priors);
     let available_tests: Vec<&Value> = trace["candidate_measurements"]
         .as_array()
         .ok_or_else(|| "invalid_likelihood_model".to_owned())?
@@ -774,7 +773,11 @@ mod tests {
             result.entropy_baseline_measurement_id.as_deref(),
             Some("rpm_check")
         );
-        let _ = schema;
+        assert!((result.prior_risk_units.unwrap() - 2.25).abs() < 1e-8);
+        assert!((result.best_candidate_posterior_risk_units.unwrap() - 1.5).abs() < 1e-8);
+        assert!((result.best_candidate_evsi_units.unwrap() - 0.75).abs() < 1e-8);
+        assert!((result.best_candidate_cost_units.unwrap() - 0.5).abs() < 1e-8);
+        assert!((result.best_candidate_net_value_units.unwrap() - 0.25).abs() < 1e-8);
     }
 
     #[test]
