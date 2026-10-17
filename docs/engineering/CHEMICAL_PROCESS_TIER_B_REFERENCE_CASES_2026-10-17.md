@@ -127,6 +127,20 @@ Before admission to the frozen corpus, select one public example with:
 
 Do not compare Cantera reactor dynamics against a DWSIM steady-state unit operation as if they modeled the same equations. If no independent reference value exists, classify the case as an adapter/trajectory-reproducibility test, not a model-accuracy test. A solver returning success is not evidence of physical validation.
 
+## Machine-readable candidate registry
+
+The candidate set is also recorded in [`CHEMICAL_PROCESS_TIER_B_CANDIDATES_V1.json`](fixtures/CHEMICAL_PROCESS_TIER_B_CANDIDATES_V1.json). The registry stores case IDs, source URLs, input conditions, analytical invariants, tutorial-only hints, freeze blockers, claim ceilings and hard-gated acceptance targets.
+
+Registry invariants:
+- All five candidates explicitly report `NOT_RUN`; the file does not imply DWSIM or Cantera was executed.
+- Only the water mixer’s exact total mass-flow sum is frozen as an analytical invariant (150 kg/s); state variables remain unfrozen.
+- Approximate heater/cooler duties and broad flash-drum ranges are tagged as non-gold hints.
+- The Cantera case stays design-only until a specific example and independent comparator are selected.
+- A paired common-mode challenge makes dependency independence testable rather than a self-declared Boolean.
+- Missing outputs, skipped runs, and reference unavailability cannot count as PASS.
+
+This registry has been read back from the branch and structurally checked for parseability, unique IDs, source references, valid result statuses, explicit freeze blockers and non-frozen simulator outputs. Those are registry-integrity checks—not scientific validation or a simulator run.
+
 ## Freeze protocol for all Tier-B cases
 
 The owner implementing each case must archive these items before setting gold outputs:
