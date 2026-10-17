@@ -3310,6 +3310,45 @@ mod tests {
     }
 
     #[test]
+    fn rondo_and_theme_variations_realize_their_named_return_forms() {
+        use crate::composer::{MusicalIntent, compose_with_spec_and_form};
+        use crate::form::SectionRole;
+
+        let intent = MusicalIntent::default();
+        let (rondo_score, rondo) =
+            compose_with_spec_and_form(&intent, &Style::Rondo.spec());
+        let rondo = rondo.expect("Rondo must expose its five-section form");
+        assert_eq!(rondo_score.meter, Style::Rondo.meter());
+        assert_eq!(
+            rondo.sections.iter().map(|section| section.role).collect::<Vec<_>>(),
+            vec![
+                SectionRole::A,
+                SectionRole::B,
+                SectionRole::ReturnA,
+                SectionRole::C,
+                SectionRole::ReturnA,
+            ]
+        );
+        assert_eq!(rondo.sections[0].period, rondo.sections[2].period);
+        assert_eq!(rondo.sections[0].period, rondo.sections[4].period);
+
+        let (variation_score, variations) =
+            compose_with_spec_and_form(&intent, &Style::ThemeAndVariations.spec());
+        let variations = variations.expect("Theme and Variations must expose its form");
+        assert_eq!(variation_score.meter, Style::ThemeAndVariations.meter());
+        assert_eq!(
+            variations.sections.iter().map(|section| section.role).collect::<Vec<_>>(),
+            vec![
+                SectionRole::A,
+                SectionRole::B,
+                SectionRole::C,
+                SectionRole::ReturnA,
+            ]
+        );
+        assert_eq!(variations.sections[0].period, variations.sections[3].period);
+    }
+
+    #[test]
     fn sarabande_preset_uses_its_distinctive_three_beat_gait() {
         use crate::accompaniment::Accompaniment;
         use crate::spec::FormKind;
