@@ -170,6 +170,7 @@ fn mixer_balance_oracle(fixture: &Value, tolerance: f64) -> Result<Value, String
                 "inlet_total": inlet,
                 "outlet_total": outlet,
                 "raw_residual": residual,
+                "normalization_scale": scale,
                 "normalized_residual": normalized_residual,
                 "tolerance": tolerance,
                 "passed": passed
@@ -561,11 +562,15 @@ fn evaluate(corpus: &Value, results: &Value, expected_head: &str) -> Value {
                                 for (component, expected_balance) in components {
                                     let expected_residual = numeric_field(expected_balance, "raw_residual")
                                         .unwrap_or(f64::NAN);
+                                    let normalization_scale = numeric_field(expected_balance, "normalization_scale")
+                                        .unwrap_or(f64::NAN);
                                     let reported_residual = residuals.get(component).and_then(Value::as_f64);
                                     match reported_residual {
                                         Some(reported) if reported.is_finite()
+                                            && normalization_scale.is_finite()
+                                            && normalization_scale > 0.0
                                             && (reported - expected_residual).abs()
-                                                <= tolerance * 1.0_f64.max(expected_residual.abs()) => {}
+                                                / normalization_scale <= tolerance => {}
                                         _ => errors.push(format!(
                                             "reported residual for component {component:?} is missing or disagrees with independent oracle"
                                         )),
