@@ -2,7 +2,7 @@
   "$schema": "https://json-schema.org/draft/2020-12/schema",
   "$id": "https://github.com/Luminous-Dynamics/symthaea/blob/main/crates/domains/symthaea-silicon/schemas/end_to_end_receipt_v0_1.schema.json",
   "title": "Symthaea NEURO-SILICON-003 end-to-end benchmark receipt",
-  "description": "Evidence receipt for end-to-end HDC workload measurements. Missing measurements are omitted, not encoded as zero. A structurally valid receipt does not itself prove hardware correctness.",
+  "description": "Evidence receipt for end-to-end exact digital HDC workload measurements. Lower-level RTL/EDA qualification and future approximate/analogue profiles use separate contracts. Missing measurements are omitted, not encoded as zero.",
   "type": "object",
   "additionalProperties": false,
   "required": [
@@ -33,10 +33,7 @@
     "claim_ceiling": {
       "enum": [
         "software_only",
-        "rtl_simulation",
-        "synthesis_estimate",
-        "fpga_observed",
-        "analogue_device_observed"
+        "hardware_observed"
       ]
     },
     "source": {
@@ -145,10 +142,7 @@
             "cpu_scalar",
             "cpu_simd",
             "gpu",
-            "rtl_simulator",
-            "synthesis",
             "fpga_board",
-            "analogue_device",
             "unknown"
           ]
         },
@@ -491,6 +485,39 @@
           },
           "artifacts": {
             "minItems": 1
+          },
+          "profile": {
+            "properties": {
+              "backend": {
+                "enum": [
+                  "cpu_scalar",
+                  "cpu_simd",
+                  "gpu",
+                  "fpga_board"
+                ]
+              }
+            },
+            "required": [
+              "backend"
+            ]
+          },
+          "metrics": {
+            "contains": {
+              "type": "object",
+              "properties": {
+                "metric_id": {
+                  "enum": [
+                    "latency_p95",
+                    "throughput",
+                    "energy_per_query"
+                  ]
+                }
+              },
+              "required": [
+                "metric_id"
+              ]
+            },
+            "minContains": 1
           }
         }
       }
@@ -510,6 +537,64 @@
         "properties": {
           "limitations": {
             "minItems": 1
+          }
+        }
+      }
+    },
+    {
+      "if": {
+        "properties": {
+          "claim_ceiling": {
+            "const": "software_only"
+          }
+        },
+        "required": [
+          "claim_ceiling"
+        ]
+      },
+      "then": {
+        "properties": {
+          "profile": {
+            "properties": {
+              "backend": {
+                "enum": [
+                  "cpu_scalar",
+                  "cpu_simd"
+                ]
+              }
+            },
+            "required": [
+              "backend"
+            ]
+          }
+        }
+      }
+    },
+    {
+      "if": {
+        "properties": {
+          "claim_ceiling": {
+            "const": "hardware_observed"
+          }
+        },
+        "required": [
+          "claim_ceiling"
+        ]
+      },
+      "then": {
+        "properties": {
+          "profile": {
+            "properties": {
+              "backend": {
+                "enum": [
+                  "gpu",
+                  "fpga_board"
+                ]
+              }
+            },
+            "required": [
+              "backend"
+            ]
           }
         }
       }
