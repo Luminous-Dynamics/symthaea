@@ -320,6 +320,28 @@ mod tests {
         assert!(matches!(report, RareEventAssessment::NotEstimable { .. }));
     }
 
+
+    #[test]
+    fn serialized_status_distinguishes_conditional_bound_from_not_estimable() {
+        let estimable = assess_rare_event_risk(&evidence(0, 10)).unwrap();
+        let json = serde_json::to_value(estimable).unwrap();
+        assert_eq!(json["status"], "bound_under_declared_assumptions");
+
+        let mut evidence = evidence(0, 10);
+        evidence.common_exposure_horizon = false;
+        let not_estimable = assess_rare_event_risk(&evidence).unwrap();
+        let json = serde_json::to_value(not_estimable).unwrap();
+        assert_eq!(json["status"], "not_estimable");
+        assert!(json.get("upper_confidence_bound").is_none());
+    }
+
+    #[test]
+    fn numerically_degenerate_confidence_levels_fail_closed() {
+        let mut evidence = evidence(0, 10);
+        evidence.confidence_level = f64::MIN_POSITIVE;
+        assert!(assess_rare_event_risk(&evidence).is_err());
+    }
+
     #[test]
     fn malformed_counts_and_confidence_fail_closed() {
         assert!(assess_rare_event_risk(&evidence(2, 1)).is_err());
