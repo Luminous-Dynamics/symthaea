@@ -33,6 +33,15 @@ pub struct EnergyInterval {
     pub upper_joules: f64,
 }
 
+/// Conservative interval for a relative energy saving, in percentage points.
+#[derive(Clone, Copy, Debug, PartialEq)]
+pub struct SavingIntervalPercent {
+    /// Lowest possible percentage saving, potentially negative.
+    pub lower_percent: f64,
+    /// Highest possible percentage saving, potentially negative or positive.
+    pub upper_percent: f64,
+}
+
 /// Invalid trace, denominator, or comparison inputs.
 #[derive(Clone, Copy, Debug, PartialEq, Eq)]
 pub enum EnergyError {
@@ -219,14 +228,12 @@ pub fn energy_saving_percent(
 pub fn conservative_energy_saving_interval_percent(
     baseline: EnergyInterval,
     treatment: EnergyInterval,
-) -> Result<EnergyInterval, EnergyError> {
+) -> Result<SavingIntervalPercent, EnergyError> {
     for interval in [baseline, treatment] {
         if !interval.lower_joules.is_finite() || !interval.upper_joules.is_finite() {
             return Err(EnergyError::InvalidEnergyInterval);
         }
-        if interval.lower_joules < 0.0
-            || interval.upper_joules < interval.lower_joules
-        {
+        if interval.lower_joules < 0.0 || interval.upper_joules < interval.lower_joules {
             return Err(EnergyError::InvalidEnergyInterval);
         }
     }
@@ -241,9 +248,9 @@ pub fn conservative_energy_saving_interval_percent(
         return Err(EnergyError::NonFiniteResult);
     }
 
-    Ok(EnergyInterval {
-        lower_joules: lower,
-        upper_joules: upper,
+    Ok(SavingIntervalPercent {
+        lower_percent: lower,
+        upper_percent: upper,
     })
 }
 
@@ -430,10 +437,10 @@ mod tests {
         let interval = conservative_energy_saving_interval_percent(baseline, treatment)
             .expect("valid energy intervals");
 
-        close(interval.lower_joules, 100.0 * (1.0 - 92.0 / 98.0), 1e-12);
-        close(interval.upper_joules, 100.0 * (1.0 - 88.0 / 102.0), 1e-12);
-        assert!(interval.lower_joules < 10.0);
-        assert!(interval.upper_joules > 10.0);
+        close(interval.lower_percent, 100.0 * (1.0 - 92.0 / 98.0), 1e-12);
+        close(interval.upper_percent, 100.0 * (1.0 - 88.0 / 102.0), 1e-12);
+        assert!(interval.lower_percent < 10.0);
+        assert!(interval.upper_percent > 10.0);
     }
 
     #[test]
@@ -496,8 +503,8 @@ mod tests {
         };
         let interval = conservative_energy_saving_interval_percent(baseline, treatment)
             .expect("valid energy intervals");
-        assert!(interval.lower_joules < 0.0);
-        assert!(interval.upper_joules < 0.0);
+        assert!(interval.lower_percent < 0.0);
+        assert!(interval.upper_percent < 0.0);
     }
 
     #[test]
