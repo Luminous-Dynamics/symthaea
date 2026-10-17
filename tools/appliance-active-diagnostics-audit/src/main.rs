@@ -681,9 +681,21 @@ mod tests {
                 .expect("measurement array")
             {
                 let gain = information_gain(trace, measurement);
-                assert!(gain.is_finite(), "non-finite information gain in {}", text_at(trace, "trace_id").unwrap_or("?"));
-                assert!(gain >= -1e-12, "negative information gain in {}", text_at(trace, "trace_id").unwrap_or("?"));
-                assert!(gain <= prior_entropy + 1e-12, "information gain exceeds prior entropy in {}", text_at(trace, "trace_id").unwrap_or("?"));
+                assert!(
+                    gain.is_finite(),
+                    "non-finite information gain in {}",
+                    text_at(trace, "trace_id").unwrap_or("?")
+                );
+                assert!(
+                    gain >= -1e-12,
+                    "negative information gain in {}",
+                    text_at(trace, "trace_id").unwrap_or("?")
+                );
+                assert!(
+                    gain <= prior_entropy + 1e-12,
+                    "information gain exceeds prior entropy in {}",
+                    text_at(trace, "trace_id").unwrap_or("?")
+                );
             }
         }
     }
