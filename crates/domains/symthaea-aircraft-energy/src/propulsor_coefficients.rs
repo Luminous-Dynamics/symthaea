@@ -317,6 +317,14 @@ mod tests {
     }
 
     #[test]
+    fn efficiency_above_one_is_preserved_for_diagnostics_not_clamped() {
+        let mut input = known_point();
+        input.shaft_power_w = 500.0;
+        let result = calculate_propeller_coefficients(input).unwrap();
+        assert!((result.propulsive_efficiency.unwrap() - 2.0).abs() < 1e-14);
+    }
+
+    #[test]
     fn identical_pinned_point_is_deterministic() {
         let input = known_point();
         assert_eq!(
