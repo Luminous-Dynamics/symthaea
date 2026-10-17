@@ -1450,6 +1450,62 @@ mod tests {
     use crate::{MuseConfig, MusicalState, Note, OutputFormat};
 
     #[test]
+    fn wave_three_instruments_render_finite_non_silent_audio() {
+        for (instrument, frequency) in [
+            (Instrument::Recorder, 440.0),
+            (Instrument::Ocarina, 523.25),
+            (Instrument::Harmonica, 392.0),
+            (Instrument::DanTranh, 329.63),
+        ] {
+            let arrangement = Arrangement {
+                voices: vec![Voice {
+                    role: VoiceRole::Lead,
+                    notes: vec![Note {
+                        frequency,
+                        start_time: 0.0,
+                        duration: 0.18,
+                        velocity: 0.75,
+                    }],
+                    pitch_range: (frequency * 0.8, frequency * 1.2),
+                    volume: 1.0,
+                    pan: 0.0,
+                    instrument: Some(instrument),
+                }],
+            };
+            let audio = render_arrangement(
+                &arrangement,
+                22_050,
+                11_025,
+                &MusicalState::default(),
+                &MuseConfig {
+                    output_format: OutputFormat::StereoF32,
+                    ..MuseConfig::default()
+                },
+            );
+            let samples: Vec<f32> = match audio {
+                crate::AudioData::I16(values) => {
+                    values.into_iter().map(|v| v as f32 / i16::MAX as f32).collect()
+                }
+                crate::AudioData::F32(values) => values,
+                crate::AudioData::StereoF32(frames) => frames
+                    .into_iter()
+                    .flat_map(|frame| [frame[0], frame[1]])
+                    .collect(),
+            };
+            assert!(!samples.is_empty(), "{instrument:?}: empty render");
+            assert!(
+                samples.iter().all(|sample| sample.is_finite()),
+                "{instrument:?}: non-finite sample"
+            );
+            let peak = samples.iter().map(|sample| sample.abs()).fold(0.0f32, f32::max);
+            assert!(
+                peak > 1.0e-5,
+                "{instrument:?}: render appears silent (peak={peak})"
+            );
+        }
+    }
+
+    #[test]
     fn styled_render_receipts_explain_unknown_style_and_invalid_voice() {
         let arrangement = Arrangement {
             voices: vec![Voice {

@@ -1,0 +1,148 @@
+# MEL-INST-001: Instrument Vocabulary and Proficiency Benchmark v1
+
+**Status:** Proposed acceptance contract for staged implementation. Targets below are goals, not measured outcomes.  
+**Priority:** Instrument capability before further style-catalog expansion.  
+**Implementation wave:** Recorder, Ocarina, Harmonica, and đàn tranh procedural profiles, plus explicit source identity and renderer-state boundaries.  
+**Repository:** Public `Luminous-Dynamics/symthaea` / `symthaea-muse`.
+
+## 1. Why vocabulary is not proficiency
+
+A selectable instrument name does not prove that Melothaea can perform it. Instrument capability has several independent dimensions:
+
+1. **Identity:** which instrument or source-native model is requested, with alias and provenance.
+2. **Procedural model:** which synthesis parameters and excitation model are available.
+3. **Source assets:** whether a named sample bank or external preset is declared and actually present.
+4. **Playable coverage:** which pitches/registers, dynamics, articulations and tuning contexts are represented.
+5. **Performance vocabulary:** which instrument-specific gestures the event model can express.
+6. **Realization evidence:** whether a requested event rendered, produced valid signal, and stayed inside resource/output bounds.
+7. **Perceptual evidence:** whether musicians/listeners can recognize a useful timbre or gesture in blind, level-matched evaluation.
+
+These dimensions must not collapse into one `supported=true` flag. A source-tree directory is not a local asset; a decoded WAV is not a correctly mapped pitch; non-silent output is not an authentic timbre; a GM program number is an interoperability fallback, not source identity.
+
+## 2. Wave 3: four useful vocabulary additions
+
+The first increment adds four instrument variants to the existing vocabulary of 42, bringing the enum/inventory target to 46. It also gives the VCSL Baroque Alto Recorder mapping to **Recorder**, not **Ney**. That distinction matters: an available recorder recording cannot be presented as a faithful ney recording.
+
+| Instrument | First-wave representation | Explicitly not yet claimed |
+|---|---|---|
+| Recorder | Derived procedural spectrum/envelope/attack plus a declared VCSL Baroque Alto Recorder source path | Local sample availability, full register coverage, accurate tonguing/ornaments or human-validated timbre |
+| Ocarina | Derived procedural profile and GM Ocarina compatibility program | Dedicated sample-bank/pitch coverage, breath-to-pitch calibration, articulation fidelity |
+| Harmonica | Derived free-reed procedural profile and GM Harmonica compatibility program | Blow/draw reed-pair semantics, bends/overblows, hand-cup/wah, chord blocks or source-backed realism |
+| Đàn tranh (Dan Tranh) | Derived plucked profile, Karplus–Strong route and source-native identity in the related catalogue | String-specific bends/tuning, tremolo, instrument-specific plucking positions, mapped/decoded local bank |
+
+These are vocabulary and model footholds, not a claim that each instrument is already proficiently performed. The three non-recorder instruments remain without asserted source sample mappings until the exact assets and naming/pitch conventions have been inspected. For all four new procedural tables, values are labelled as derived estimates and must not be cited as direct measurements.
+
+## 3. Instrument capability contract
+
+The follow-on capability record should be versioned and additive. It should distinguish fields equivalent to:
+
+- stable `instrument_id`, canonical label, aliases and source-native names;
+- family and pitched/unpitched event semantics;
+- approximate or source-evidenced usable pitch range, including its evidence source;
+- primary renderer type and optional sample/preset source;
+- available articulations and expressive controls, each with evidence status;
+- dynamic-layer/velocity behavior and polyphony limits;
+- fallback policy, loss declarations, and source-license/provenance receipt;
+- calibration status, benchmark version, renderer revision, and asset digest.
+
+Do not add a single “proficiency level” inferred from enum membership. Capability records should allow unknown or not-yet-tested fields. Keep this sidecar compatible with the existing versioned instrument-inventory work in [issue #7416](https://github.com/Luminous-Dynamics/symthaea/issues/7416) rather than creating a competing identity registry.
+
+## 4. Benchmark suite
+
+### A. Registry and routing integrity
+
+- Enumerate every supported variant from one explicit roster.
+- Require successful name resolution, valid bounded synthesis parameters, renderer-family assignment, and either a truthful sample mapping or an explicit unmapped status.
+- Ensure GM fallback IDs are unique for the instrument pairs Melothaea can place in the same ensemble, and visibly label approximate mappings.
+- Unknown instruments and unsupported articulations must fail closed or produce a visible reason-coded fallback.
+
+**Initial target:** 100% of declared instruments have a deterministic identity, renderer route/status, and explicit unsupported/fallback behavior.
+
+### B. Acoustic-model robustness
+
+For each procedural instrument, render a deterministic pitch × velocity × duration grid inside the declared operating range. Start with five pitches spanning low, middle and high register; three velocities (soft/medium/loud); and short/medium/sustained note durations where applicable. Use fixed seeds and a named sample rate.
+
+Measure:
+- finite output and no NaN/Inf;
+- peak/RMS and near-silence status;
+- clipping/headroom and DC offset;
+- pitch tracking error and unwanted octave errors;
+- onset delay, decay/sustain/release behavior;
+- spectral centroid, rolloff, spectral flux and harmonic/noise profile;
+- rerender determinism under pinned settings.
+
+**Initial target:** 100% finite/profile-contract cases; ≥95% successful note coverage across each *declared* range; every uncovered cell reported rather than omitted from the denominator. Targets should be revised only with a versioned rationale and measured baseline.
+
+### C. Instrument-specific gesture coverage
+
+Evaluate these as explicit event-level capabilities, not genre presets:
+
+- **Recorder:** tongued versus slurred attacks, breath phrasing, register transitions and ornament primitives.
+- **Ocarina:** breath-pressure dynamics, phrase-boundary breath, stable pitch and deliberate pitch transitions.
+- **Harmonica:** blow/draw selection, bend envelope, overblow/overdraw events, chord/double-stop behavior and hand-cup modulation.
+- **Đàn tranh:** pluck position/strength, repeated-note variation, tremolo, controlled string bends and tuning/scale profiles.
+
+The first code increment does **not** implement all these techniques. Start with identity and basic render probes, then add a typed gesture model only where event semantics and an appropriate renderer can represent the behavior. Do not fake a bend by changing instrument identity or relabel a stationary spectrum as a fully idiomatic performance.
+
+**Initial target:** every marketed gesture has a positive control that audibly/structurally changes the intended feature and a negative control that proves the test can fail. Untested gestures remain labelled unavailable.
+
+### D. Source-backed sample and mapping qualification
+
+For each sample bank:
+
+1. pin the upstream source revision, license/provenance, relative asset paths and manifest/content digests;
+2. confirm the asset root is actually present locally;
+3. decode all indexed WAVs and report corrupt, silent, duplicate or rejected files;
+4. verify pitch tokens and ranges against known note/pitch references, not filenames alone;
+5. measure coverage by pitch, dynamic layer, round-robin and articulation;
+6. run round-trip and render probes against the selected notes and velocities;
+7. record exact sample/renderer decisions in each note/part receipt.
+
+VCSL states its assets are CC0; VSCO-2-CE also documents CC0 use and asks users for courtesy attribution. Pin and preserve the applicable source terms and revision rather than assuming all sample sources share a license. References: [VCSL](https://github.com/sgossner/VCSL), [VSCO-2-CE](https://github.com/sgossner/VSCO-2-CE).
+
+**Initial target:** 100% of selected parts have truthful provenance/render-path receipts; zero silent source substitution; represented import/export assignments and timed changes round-trip exactly on supported paths.
+
+### E. Blind timbre/gesture evaluation
+
+Create equal-loudness, level-matched, randomized A/B packs. Compare the candidate instrument model against a named baseline and, only when properly licensed, suitable reference recordings. Split tests by instrument, register, velocity and gesture. Include both instrument-identification trials and naturalness/preference ratings; the two answer different questions.
+
+Report listener counts, uncertainty, per-class confusion, source/baseline and failed trials. Do not promote a sample-decode or signal-health pass into an audio-quality claim. Where tradition-specific playing practices are involved, involve appropriately knowledgeable practitioners and separate that review from technical pass criteria.
+
+**Proposed stretch goal:** for a named task and instrument family, >60% pairwise preference against the strongest matched baseline with a 95% confidence-interval lower bound above 50%, then replicate on held-out prompts/listeners. Do not use a pooled score to hide weak instruments.
+
+## 5. Next implementation sequence
+
+### P0 — This wave: vocabulary and no-fabrication boundary
+- Add four explicit identities and derived procedural profiles.
+- Keep source paths distinct from renderer/sample claims.
+- Route the actual VCSL recorder bank to Recorder instead of treating it as Ney.
+- Add roster and parameter-integrity regressions.
+
+### P1 — Inventory on the target machine
+- Run the existing instrument-capability inventory when local VCSL/VSCO-2-CE assets and a soundfont are available.
+- Pin the asset manifest and identify uncovered instruments, pitch ranges, dynamics and articulations.
+- Treat missing roots as unavailable evidence, not empty-but-supported coverage.
+
+### P2 — Per-instrument render receipts and probe grid
+- Extend the inventory or add a focused renderer-probe executable to emit pitch/velocity/duration cells and finite signal metrics.
+- Include renderer/source digests, precise missing-cell reasons and deterministic output receipts.
+- Avoid heavyweight asset downloads by default.
+
+### P3 — First-class gesture events
+- Add versioned typed events for a small subset of distinctive gestures and prove target sensitivity plus non-target invariance.
+- Start with the highest-value cases where the selected sample assets or renderer can actually realize them.
+- Unsupported gestures remain explicit, instead of being approximated invisibly.
+
+### P4 — Blind audition and musician review
+- Produce reproducible instrument-specific listening packs from pinned outputs.
+- Collect independent ratings and report confidence intervals and confusion matrices.
+- Only then label instruments as perceptually reviewed.
+
+### P5 — Broaden the vocabulary by measured capability gaps
+Prioritize the next instrument based on a weighted combination of listener demand, source availability, ensemble utility, missing expressive capability and engineering cost. Candidate source families already identified for later evaluation include recorder variants, ocarina, harmonicas, Dan Tranh, percussion drum-hit/roll lanes, and additional culturally distinct plucked/wind families. Source catalogue entries alone do not count as playable instruments.
+
+## 6. Evidence boundary for this increment
+
+This plan is designed to let source work and local evaluation proceed without waiting for unrelated style PRs, while preserving honest qualification. The four procedural profiles and regression code can be inspected statically; compile, formatting, unit-test, local-asset decode, instrument-grid render, and blind-listening outcomes require execution. A queued or skipped runner never passes a gate.
+
+**Definition of progress:** fewer unsupported musical requests, more reliably playable pitches/gestures, less undocumented fallback, and stronger audible distinction—not simply a larger instrument count. Style diversity expansion should resume after the instrument inventory, render grid, and first instrument-specific listening pack identify concrete gaps.

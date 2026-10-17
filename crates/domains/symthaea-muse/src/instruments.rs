@@ -287,6 +287,36 @@ pub const XYLOPHONE: [f32; 16] = [
     0.000, 0.000, 0.000,
 ];
 
+// ─── Wave 3: Additional instrument voices ───────────────────────────────────
+
+// These four profiles are deliberately marked as derived procedural estimates,
+// not measured spectra or claims of full idiomatic performance. Their next
+// qualification step is a held-out render comparison against licensed sources.
+pub const RECORDER: [f32; 16] = [
+    1.000, 0.340, 0.180, 0.080, 0.040, 0.020, 0.010, 0.006, 0.003, 0.002, 0.001, 0.001,
+    0.000, 0.000, 0.000, 0.000,
+];
+
+/// Vessel-flute approximation; not a measured ocarina spectrum.
+pub const OCARINA: [f32; 16] = [
+    1.000, 0.280, 0.100, 0.035, 0.015, 0.008, 0.004, 0.002, 0.001, 0.001, 0.000, 0.000,
+    0.000, 0.000, 0.000, 0.000,
+];
+
+/// Free-reed approximation; throat/hand wah, bends, and overblows are not
+/// represented by this stationary partial profile.
+pub const HARMONICA: [f32; 16] = [
+    1.000, 0.550, 0.420, 0.300, 0.240, 0.170, 0.140, 0.100, 0.075, 0.055, 0.040, 0.030,
+    0.020, 0.015, 0.010, 0.007,
+];
+
+/// Plucked metal-string zither fallback profile; string-press pitch bends and
+/// tremolo require explicit performance events and are not implied here.
+pub const DAN_TRANH: [f32; 16] = [
+    1.000, 0.460, 0.360, 0.260, 0.190, 0.145, 0.110, 0.085, 0.065, 0.050, 0.038, 0.028,
+    0.021, 0.016, 0.012, 0.009,
+];
+
 // ─── Instrument Enum ────────────────────────────────────────────────────────
 
 /// Available instrument timbres.
@@ -313,6 +343,10 @@ pub enum Instrument {
     Koto,
     Oud,
     Ney,
+    Recorder,
+    Ocarina,
+    Harmonica,
+    DanTranh,
     UprightBass,
     Viola,
     Oboe,
@@ -345,6 +379,10 @@ impl Instrument {
             Self::Violin => &VIOLIN,
             Self::Cello | Self::UprightBass => &CELLO,
             Self::Flute | Self::Ney => &FLUTE,
+            Self::Recorder => &RECORDER,
+            Self::Ocarina => &OCARINA,
+            Self::Harmonica => &HARMONICA,
+            Self::DanTranh => &DAN_TRANH,
             Self::Organ => &ORGAN,
             Self::Clarinet => &CLARINET,
             Self::Trumpet => &TRUMPET,
@@ -422,6 +460,9 @@ impl Instrument {
                 | Self::Trumpet
                 | Self::Saxophone
                 | Self::Ney
+                | Self::Recorder
+                | Self::Ocarina
+                | Self::Harmonica
                 | Self::Pad
                 | Self::SawLead
                 | Self::Viola
@@ -451,9 +492,15 @@ impl Instrument {
             // like an edge-blown flute's chiff than a crisp reed start, so it
             // joins Flute/Ney/ChoirAah/ChoirOoh here rather than the
             // clarinet/oboe/sax reed group below.
-            Self::Flute | Self::Ney | Self::ChoirAah | Self::ChoirOoh | Self::Duduk => {
-                (0.12, 0.04) // breath chiff
-            }
+            Self::Flute
+            | Self::Ney
+            | Self::Recorder
+            | Self::Ocarina
+            | Self::ChoirAah
+            | Self::ChoirOoh
+            | Self::Duduk => (0.12, 0.04), // breath chiff
+            Self::Harmonica => (0.08, 0.02), // free-reed onset, procedural estimate
+            Self::DanTranh => (0.08, 0.006), // zither pluck, additive fallback only
             Self::Clarinet
             | Self::Saxophone
             | Self::Trumpet
@@ -552,6 +599,10 @@ impl Instrument {
             "koto" => Self::Koto,
             "oud" => Self::Oud,
             "ney" => Self::Ney,
+            "recorder" => Self::Recorder,
+            "ocarina" => Self::Ocarina,
+            "harmonica" => Self::Harmonica,
+            "dan_tranh" => Self::DanTranh,
             "upright_bass" => Self::UprightBass,
             "viola" => Self::Viola,
             "oboe" => Self::Oboe,
@@ -594,6 +645,9 @@ impl Instrument {
             Self::Piano | Self::PianoPP => 0, // Acoustic Grand Piano
             Self::ElectricPiano => 4,         // Electric Piano 1
             Self::Marimba => 12,
+            // The Dan Tranh has no dedicated GM program; 15 (Dulcimer) is
+            // an explicit compatibility approximation, not an identity claim.
+            Self::DanTranh => 15,
             Self::Bell => 14, // Tubular Bells
             Self::Organ => 19,
             Self::AcousticGuitar => 24, // Nylon Guitar
@@ -606,7 +660,9 @@ impl Instrument {
             Self::Saxophone => 66, // Tenor Sax
             Self::Clarinet => 71,
             Self::Flute => 73,
+            Self::Recorder => 74, // Recorder
             Self::Ney => 75, // Pan Flute
+            Self::Ocarina => 79, // Ocarina
             Self::SawLead => 81,
             Self::Pad => 88,
             Self::Sitar => 104,
@@ -617,6 +673,7 @@ impl Instrument {
             Self::Bassoon => 70,
             Self::FrenchHorn => 60,
             Self::Accordion => 21,
+            Self::Harmonica => 22, // Harmonica
             // GM has no dedicated mandolin program. Mapped honestly to the
             // nearest UNUSED plucked-string family (Shamisen) rather than
             // reusing AcousticGuitar (24), Oud (25), or Banjo (105) — a folk
@@ -660,6 +717,7 @@ impl Instrument {
                 | Self::Banjo
                 | Self::ElectricBass
                 | Self::Harpsichord
+                | Self::DanTranh
         )
     }
 
@@ -700,6 +758,9 @@ impl Instrument {
             // decays a bit faster than the nylon-strung guitar/harp (no
             // continued excitation once the jack releases the string).
             Self::Harpsichord => (0.995, 0.65, 0.004),
+            // Derived starter values for a plucked metal-string zither;
+            // qualify against source recordings before making a fidelity claim.
+            Self::DanTranh => (0.995, 0.58, 0.006),
             _ => (0.996, 0.42, 0.000),
         }
     }
@@ -756,6 +817,9 @@ impl Instrument {
             | Self::Trumpet
             | Self::Saxophone
             | Self::Ney
+            | Self::Recorder
+            | Self::Ocarina
+            | Self::Harmonica
             | Self::Oboe
             | Self::Bassoon
             | Self::FrenchHorn
@@ -785,7 +849,8 @@ impl Instrument {
             | Self::Timpani
             | Self::MusicBox
             | Self::Harpsichord
-            | Self::Xylophone => (0.002, 0.3, 0.2, 0.5),
+            | Self::Xylophone
+            | Self::DanTranh => (0.002, 0.3, 0.2, 0.5),
         }
     }
 }
@@ -1318,18 +1383,17 @@ mod tests {
 
     #[test]
     fn new_additive_instrument_partials_are_well_formed() {
-        // 15 instruments now get dedicated additive-path tables: the
-        // original 9 (below) plus wave 2's 4 sustaining wind/voice additions
-        // (Tuba, Trombone, Duduk, ChoirOoh) and 2 KS/FM instruments given a
-        // dedicated fallback-backing table following the ElectricBass
-        // precedent (Harpsichord, Xylophone). The remaining KS/FM
-        // instruments (Mandolin, Banjo, Vibraphone, Celesta, MusicBox, and
-        // the rest of the original KS/FM roster) use KS/FM synthesis and —
+        // 19 instruments now get dedicated additive-path tables: the original
+        // 9, wave 2's 6 additions (Tuba, Trombone, Duduk, ChoirOoh, Harpsichord,
+        // Xylophone), and wave 3's four profile tables (Recorder, Ocarina,
+        // Harmonica, DanTranh). DanTranh is rendered by Karplus-Strong; its
+        // additive table is a fallback/profile description, not its primary
+        // synthesis path. The remaining KS/FM instruments use KS/FM synthesis and —
         // per this crate's own established pattern (see
         // Bell/Marimba/Guitar/Harp/Koto/Oud/Kalimba) — fall through to the
         // PIANO_FF additive-path fallback rather than getting a dedicated
         // table.
-        let tables: [(&str, &[f32; 16]); 15] = [
+        let tables: [(&str, &[f32; 16]); 19] = [
             ("VIOLA", &VIOLA),
             ("OBOE", &OBOE),
             ("BASSOON", &BASSOON),
@@ -1345,6 +1409,10 @@ mod tests {
             ("DUDUK", &DUDUK),
             ("CHOIR_OOH", &CHOIR_OOH),
             ("XYLOPHONE", &XYLOPHONE),
+            ("RECORDER", &RECORDER),
+            ("OCARINA", &OCARINA),
+            ("HARMONICA", &HARMONICA),
+            ("DAN_TRANH", &DAN_TRANH),
         ];
         for (name, table) in tables {
             assert_eq!(table.len(), 16, "{name} must have 16 partials");
@@ -1355,7 +1423,7 @@ mod tests {
             );
             assert!(
                 table.iter().all(|&x| x <= table[0] + 1e-6),
-                "{name} fundamental should be the strongest partial (no documented exception among these 15)"
+                "{name} fundamental should be the strongest partial (no documented exception among these 19)"
             );
         }
     }
@@ -1643,5 +1711,88 @@ mod tests {
             violin_sustain > piano_sustain,
             "violin ({violin_sustain}) should sustain higher than piano ({piano_sustain})"
         );
+    }
+}
+
+    #[test]
+    fn wave_three_names_resolve_and_have_distinct_gm_programs() {
+        assert_eq!(Instrument::from_name("recorder"), Some(Instrument::Recorder));
+        assert_eq!(Instrument::from_name("ocarina"), Some(Instrument::Ocarina));
+        assert_eq!(Instrument::from_name("harmonica"), Some(Instrument::Harmonica));
+        assert_eq!(Instrument::from_name("dan_tranh"), Some(Instrument::DanTranh));
+
+        assert_eq!(Instrument::Recorder.gm_program(), 74);
+        assert_eq!(Instrument::Harmonica.gm_program(), 22);
+        assert_eq!(Instrument::Ocarina.gm_program(), 79);
+        // GM Dulcimer is only a compatibility fallback for Dan Tranh.
+        assert_eq!(Instrument::DanTranh.gm_program(), 15);
+
+        assert!(Instrument::Recorder.sustains());
+        assert!(Instrument::Ocarina.sustains());
+        assert!(Instrument::Harmonica.sustains());
+        assert!(Instrument::DanTranh.uses_karplus_strong());
+    }
+
+    #[test]
+    fn every_instrument_has_finite_bounded_core_synthesis_parameters() {
+        const ALL: [Instrument; 46] = [
+            Instrument::Piano, Instrument::PianoPP, Instrument::Violin, Instrument::Cello,
+            Instrument::Flute, Instrument::Organ, Instrument::ElectricPiano, Instrument::Bell,
+            Instrument::AcousticGuitar, Instrument::Harp, Instrument::Pad, Instrument::Clarinet,
+            Instrument::Trumpet, Instrument::Saxophone, Instrument::Marimba, Instrument::Sitar,
+            Instrument::Kalimba, Instrument::SawLead, Instrument::Koto, Instrument::Oud,
+            Instrument::Ney, Instrument::Recorder, Instrument::Ocarina, Instrument::Harmonica,
+            Instrument::DanTranh, Instrument::UprightBass, Instrument::Viola, Instrument::Oboe,
+            Instrument::FrenchHorn, Instrument::Bassoon, Instrument::Accordion, Instrument::Mandolin,
+            Instrument::Banjo, Instrument::Vibraphone, Instrument::Celesta, Instrument::ChoirAah,
+            Instrument::StringEnsemble, Instrument::ElectricBass, Instrument::Timpani,
+            Instrument::MusicBox, Instrument::Harpsichord, Instrument::Tuba, Instrument::Trombone,
+            Instrument::Duduk, Instrument::ChoirOoh, Instrument::Xylophone,
+        ];
+
+        for instrument in ALL {
+            let partials = instrument.partials();
+            assert!(partials[0].is_finite() && partials[0] > 0.0, "{instrument:?}");
+            assert!(partials.iter().all(|v| v.is_finite() && *v >= 0.0), "{instrument:?}");
+
+            for velocity in [0.0, 0.5, 1.0] {
+                let profile = instrument.partials_at_velocity(velocity);
+                assert!(
+                    profile.iter().all(|v| v.is_finite() && *v >= 0.0),
+                    "bad velocity spectrum: {instrument:?}, velocity={velocity}"
+                );
+            }
+
+            let (attack, decay, sustain, release) = instrument.default_adsr();
+            assert!(
+                attack.is_finite() && decay.is_finite() && release.is_finite()
+                    && attack > 0.0 && decay > 0.0 && release > 0.0,
+                "bad envelope: {instrument:?}"
+            );
+            assert!(
+                sustain.is_finite() && (0.0..=1.0).contains(&sustain),
+                "bad sustain: {instrument:?}"
+            );
+
+            assert!(
+                !(instrument.uses_karplus_strong() && instrument.uses_fm()),
+                "instrument routed to conflicting primary synths: {instrument:?}"
+            );
+        }
+
+        for left in ALL {
+            for right in ALL {
+                if left == right || matches!((left, right),
+                    (Instrument::Piano, Instrument::PianoPP) |
+                    (Instrument::PianoPP, Instrument::Piano)
+                ) {
+                    continue;
+                }
+                assert_ne!(
+                    left.gm_program(), right.gm_program(),
+                    "unexpected General MIDI program collision: {left:?} and {right:?}"
+                );
+            }
+        }
     }
 }
