@@ -2,16 +2,18 @@
   "$schema": "https://json-schema.org/draft/2020-12/schema",
   "$id": "urn:luminous-dynamics:symthaea:catamaran-design-space-receipt:v1",
   "title": "Symthaea catamaran design-space receipt v1",
-  "description": "Deterministic geometry candidate grid. Consumers must verify candidate_count equals candidates length and recompute candidate_manifest_sha256 over the canonical serialized ordered candidates. This receipt is not a hydrodynamic or safety prediction.",
+  "description": "Deterministic geometry candidate grid. Consumers must verify receipt_sha256, candidate_count equals candidates length, and candidate_manifest_sha256 over canonical serialized ordered candidates. Receipt integrity does not establish source authenticity or physical performance.",
   "type": "object",
   "additionalProperties": false,
   "required": [
     "design_space_version",
+    "generator_source_revision",
     "spec",
     "candidate_count",
     "candidate_manifest_sha256",
     "candidates",
-    "limitations"
+    "limitations",
+    "receipt_sha256"
   ],
   "properties": {
     "design_space_version": {
@@ -41,6 +43,13 @@
         "type": "string",
         "minLength": 1
       }
+    },
+    "generator_source_revision": {
+      "type": "string",
+      "minLength": 1
+    },
+    "receipt_sha256": {
+      "$ref": "#/$defs/sha256"
     }
   },
   "$defs": {
