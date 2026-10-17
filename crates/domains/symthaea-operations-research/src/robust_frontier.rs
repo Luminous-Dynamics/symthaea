@@ -504,7 +504,7 @@ fn coverage_for_objective(
     let mean_interval_width = if widths.is_empty() {
         None
     } else {
-        Some(widths.iter().sum::<f64>() / widths.len() as f64)
+        Some(widths.iter().map(|width| *width / widths.len() as f64).sum::<f64>())
     };
     let maximum_interval_width = widths.iter().copied().reduce(f64::max);
     ObjectiveCoverage {
@@ -650,7 +650,7 @@ pub fn analyze_robust_frontier(
         });
     }
 
-    let mut objective_coverage: Vec<ObjectiveCoverage> = objectives
+    let objective_coverage: Vec<ObjectiveCoverage> = objectives
         .iter()
         .map(|objective| coverage_for_objective(objective, &canonical_candidates))
         .collect();
@@ -680,10 +680,6 @@ pub fn analyze_robust_frontier(
         possible_only_dominance_pair_count: possible_only_dominance_pairs.len(),
         midpoint_frontier_disagreement_count: midpoint_frontier_disagreements.len(),
     };
-
-    // Retain deterministic order; this binding also ensures future edits don't
-    // accidentally replace a missing-interval row with an imputed value.
-    objective_coverage.shrink_to_fit();
 
     Ok(RobustFrontierReport {
         study_id: study_id.to_owned(),
