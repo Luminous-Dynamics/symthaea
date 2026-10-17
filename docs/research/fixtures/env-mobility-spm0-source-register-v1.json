@@ -1,0 +1,260 @@
+{
+  "registry_id": "env-mobility-spm0-source-register-v1",
+  "schema_version": "env-mobility-source-register-v1",
+  "status": "catalog_snapshot_not_procurement_qualified",
+  "observed_on": "2026-10-17",
+  "region": "South Africa; seller-listed stock locations are recorded per line",
+  "currency": "ZAR",
+  "price_basis": "Prices transcribed from public product listings; VAT treatment and stock statement recorded per source page. No checkout or written quote was obtained.",
+  "claim_ceiling": "Catalog evidence only. Not a frozen BOM, supplier quote, reserved inventory, delivered Gauteng cost, sensor qualification, calibration evidence, manufacturing capability, or procurement recommendation.",
+  "items": [
+    {
+      "item_id": "SPM0-SENSOR-ENV3-BME280",
+      "role": "optional_temperature_humidity_pressure_sensor",
+      "vendor": "Make Electronics",
+      "vendor_sku": "0ME1655",
+      "description": "BME280 3-in-1 Sensor Module Type 1; six-way straight SIL header supplied",
+      "product_url": "https://make.net.za/product/bme280-3-in-1-sensor-module-type1/",
+      "displayed_unit_price": 159,
+      "currency": "ZAR",
+      "vat_included": true,
+      "availability_statement": "14 in stock; Durban stock shown on the listing",
+      "price_evidence_class": "public_catalog_listing",
+      "form_factor": "assembled_sensor_breakout",
+      "measurands": [
+        "temperature",
+        "relative_humidity",
+        "barometric_pressure"
+      ],
+      "stated_interface": [
+        "I2C",
+        "SPI"
+      ],
+      "substitution_profile": "only eligible for a requirement that includes all selected measurands and accepts its verified measurement uncertainty",
+      "confirmed_quote": false,
+      "delivered_to_gauteng_price_known": false,
+      "qualification_status": "not_independently_qualified",
+      "calibration_status": "not_calibrated_by_this_registry",
+      "notes": "Seller page advertises datasheet-derived nominal ranges/tolerances; no SPM-0 performance has been measured."
+    },
+    {
+      "item_id": "SPM0-MCU-ESP32C3-SUPERMINI",
+      "role": "low_voltage_controller_development_board",
+      "vendor": "Make Electronics",
+      "vendor_sku": "3ME3079",
+      "description": "ESP32-C3 SuperMini 4 MB - Soldered",
+      "product_url": "https://make.net.za/product/3me3079/",
+      "displayed_unit_price": 89,
+      "currency": "ZAR",
+      "vat_included": true,
+      "availability_statement": "16 in stock; Durban stock shown on the listing",
+      "price_evidence_class": "public_catalog_listing",
+      "form_factor": "development_board",
+      "measurands": [],
+      "interfaces": [
+        "USB-C",
+        "I2C",
+        "SPI",
+        "UART",
+        "GPIO"
+      ],
+      "substitution_profile": "verify exact board revision, mounting, USB boot/debug, power rails and interfaces before freezing a hardware revision",
+      "confirmed_quote": false,
+      "delivered_to_gauteng_price_known": false,
+      "qualification_status": "prototype_candidate_only",
+      "calibration_status": "not_applicable_to_controller",
+      "notes": "Listing is a development board, not a bespoke production PCB or a qualified flight/marine controller."
+    },
+    {
+      "item_id": "SPM0-MCU-ESP32C3-CH340-ALT",
+      "role": "alternative_low_voltage_controller_development_board",
+      "vendor": "Make Electronics",
+      "vendor_sku": "3ME3029",
+      "description": "ESP32-C3 Dev Board - CH340",
+      "product_url": "https://make.net.za/product/esp32-c3-dev-board-ch340/",
+      "displayed_unit_price": 115,
+      "currency": "ZAR",
+      "vat_included": true,
+      "availability_statement": "10 in stock; Durban stock shown on the listing",
+      "price_evidence_class": "public_catalog_listing",
+      "form_factor": "development_board",
+      "measurands": [],
+      "interfaces": [
+        "Micro-USB",
+        "I2C",
+        "SPI",
+        "UART",
+        "GPIO"
+      ],
+      "substitution_profile": "alternative only after mounting, connector, power, board-size and service-time comparison",
+      "confirmed_quote": false,
+      "delivered_to_gauteng_price_known": false,
+      "qualification_status": "prototype_candidate_only",
+      "calibration_status": "not_applicable_to_controller",
+      "notes": "Listed at R26 above the SuperMini; that price difference alone does not determine repairability or total service cost."
+    },
+    {
+      "item_id": "SPM0-SENSOR-PRESSURE-TEMP-BMP280",
+      "role": "lower_measurand_pressure_temperature_variant",
+      "vendor": "Communica",
+      "vendor_sku": "HKD BAROMTRC SENSR-BMP280-3.3",
+      "description": "GY-BMP280-3.3 atmospheric pressure sensor module",
+      "product_url": "https://www.communica.co.za/products/hkd-baromtrc-sensr-bmp280-3-3",
+      "displayed_unit_price": 13,
+      "currency": "ZAR",
+      "vat_included": true,
+      "availability_statement": "Listing says in stock and ready for dispatch; states 2-5 working-day South Africa delivery",
+      "price_evidence_class": "public_catalog_listing",
+      "form_factor": "assembled_sensor_module",
+      "measurands": [
+        "temperature",
+        "barometric_pressure"
+      ],
+      "interfaces": [
+        "I2C"
+      ],
+      "substitution_profile": "not equivalent to BME280 when relative humidity is required; identity and performance must be checked on the delivered board",
+      "confirmed_quote": false,
+      "delivered_to_gauteng_price_known": false,
+      "qualification_status": "low_cost_candidate_unverified",
+      "calibration_status": "not_calibrated_by_this_registry",
+      "notes": "Catalog price is strikingly lower than the BME280 breakout and must not be used as evidence of comparable accuracy, origin, authenticity, or quality."
+    },
+    {
+      "item_id": "SPM0-BENCH-USB-C-25CM",
+      "role": "shared_programming_and_bench_power_cable",
+      "vendor": "Make Electronics",
+      "vendor_sku": "4ME2515",
+      "description": "USB Type-A male to USB Type-C male cable, 25 cm",
+      "product_url": "https://make.net.za/product/4me2515/",
+      "displayed_unit_price": 11.2,
+      "currency": "ZAR",
+      "vat_included": true,
+      "availability_statement": "42 in stock; Durban stock shown on the listing",
+      "price_evidence_class": "public_catalog_listing",
+      "form_factor": "shared_bench_accessory",
+      "measurands": [],
+      "interfaces": [
+        "USB-A",
+        "USB-C"
+      ],
+      "substitution_profile": "shared bench/tooling cost unless each deployed unit is explicitly required to include its own cable",
+      "confirmed_quote": false,
+      "delivered_to_gauteng_price_known": false,
+      "qualification_status": "bench_accessory_candidate",
+      "calibration_status": "not_applicable",
+      "notes": "Not counted as one cable per article in either minimum electronics subtotal."
+    },
+    {
+      "item_id": "SPM0-HARNESS-KEYED-4WIRE",
+      "role": "replaceable_keyed_four_wire_sensor_harness",
+      "vendor": null,
+      "vendor_sku": null,
+      "description": "Keyed, replaceable 3.3 V / GND / SDA / SCL harness with a connector system selected for mechanical access and service cycles",
+      "product_url": null,
+      "displayed_unit_price": null,
+      "currency": "ZAR",
+      "vat_included": null,
+      "availability_statement": "Not sourced; supplier/part selection and quote required",
+      "price_evidence_class": "unknown_unpriced_dependency",
+      "form_factor": "field_replaceable_harness",
+      "measurands": [],
+      "interfaces": [
+        "3V3",
+        "GND",
+        "SDA",
+        "SCL"
+      ],
+      "substitution_profile": "not frozen until exact housing, contacts, wire gauge, crimp tooling, pinout and post-repair test are declared",
+      "confirmed_quote": false,
+      "delivered_to_gauteng_price_known": false,
+      "qualification_status": "not_selected",
+      "calibration_status": "not_applicable",
+      "notes": "Do not substitute loose friction-fit jumper leads for a declared field-service connector without reviewing strain relief, retention, pinout protection and repair tests."
+    },
+    {
+      "item_id": "SPM0-ENCLOSURE-MOUNT",
+      "role": "dry_side_enclosure_and_nonstructural_mounting_adapter",
+      "vendor": null,
+      "vendor_sku": null,
+      "description": "Accessible dry-side enclosure and non-structural mounting adapter",
+      "product_url": null,
+      "displayed_unit_price": null,
+      "currency": "ZAR",
+      "vat_included": null,
+      "availability_statement": "Not quoted; material, mounting envelope and environmental protection profile are not yet frozen",
+      "price_evidence_class": "unknown_unpriced_dependency",
+      "form_factor": "nonstructural_mechanical_parts",
+      "measurands": [],
+      "interfaces": [
+        "mechanical_mounting_datum",
+        "service_access"
+      ],
+      "substitution_profile": "must be designed against a released drawing and checked for connector access, retention, thermal effects and non-destructive repair",
+      "confirmed_quote": false,
+      "delivered_to_gauteng_price_known": false,
+      "qualification_status": "not_selected",
+      "calibration_status": "not_applicable",
+      "notes": "No water ingress, submersion, pressure-boundary or flight-critical claim is implied."
+    },
+    {
+      "item_id": "SPM0-REFERENCE-CALIBRATION",
+      "role": "reference_measurement_or_calibration_service",
+      "vendor": null,
+      "vendor_sku": null,
+      "description": "Reference instrument or external calibration/check route matching the selected measurands, range, uncertainty and intended claims",
+      "product_url": null,
+      "displayed_unit_price": null,
+      "currency": "ZAR",
+      "vat_included": null,
+      "availability_statement": "Not selected; exact scope, instrument, points, uncertainty and service suitability require supplier/lab confirmation",
+      "price_evidence_class": "unknown_unpriced_dependency",
+      "form_factor": "measurement_service",
+      "measurands": [
+        "to_be_frozen_with_requirements"
+      ],
+      "interfaces": [],
+      "substitution_profile": "not interchangeable by price alone; must provide the required traceability/uncertainty and explicit scope",
+      "confirmed_quote": false,
+      "delivered_to_gauteng_price_known": false,
+      "qualification_status": "not_selected",
+      "calibration_status": "not_applicable",
+      "notes": "A calibration listing, if later found, does not prove the selected BME/BMP module is accepted within that laboratory's scope or that it will pass."
+    }
+  ],
+  "derived_arithmetic_only": [
+    {
+      "option_id": "SPM0-PRESSURE-TEMPERATURE-BENCH-PAIR",
+      "items": [
+        "SPM0-MCU-ESP32C3-SUPERMINI",
+        "SPM0-SENSOR-PRESSURE-TEMP-BMP280"
+      ],
+      "displayed_electronics_subtotal": 102,
+      "currency": "ZAR",
+      "vat_included": true,
+      "status": "catalog arithmetic only",
+      "caveat": "Not eligible if relative humidity is a required measurand; excludes every unpriced dependency and delivery."
+    },
+    {
+      "option_id": "SPM0-TEMP-HUMIDITY-PRESSURE-BENCH-PAIR",
+      "items": [
+        "SPM0-MCU-ESP32C3-SUPERMINI",
+        "SPM0-SENSOR-ENV3-BME280"
+      ],
+      "displayed_electronics_subtotal": 248,
+      "currency": "ZAR",
+      "vat_included": true,
+      "status": "catalog arithmetic only",
+      "caveat": "Excludes every unpriced dependency and delivery; not a calibrated or qualified instrument BOM."
+    }
+  ],
+  "next_evidence_gates": [
+    "Freeze required measurands and accuracy/uncertainty before choosing one sensor profile.",
+    "Request dated delivered quotes for exact parts and one Gauteng-served alternative source.",
+    "Inspect delivered module identity/revision and confirm interfaces against datasheets.",
+    "Select and quote a keyed harness/connector/tooling system; preserve one-resource-per-operation constraints in the routing.",
+    "Freeze enclosure/mount drawing and quote either supplier fabrication or local non-structural manufacture.",
+    "Declare reference instrument/lab and check method, including uncertainty and acceptance criteria.",
+    "Replace catalog snapshots with quote evidence, and replace planning times with observed five-unit baseline records."
+  ]
+}

@@ -3,6 +3,10 @@ use std::path::PathBuf;
 
 mod crate_status;
 mod duplicate_scan;
+mod env_mobility;
+mod env_mobility_route;
+mod env_mobility_economics;
+mod env_mobility_sourcing;
 mod manifest;
 mod rhn_sweep;
 
@@ -62,6 +66,14 @@ enum Commands {
         #[arg(long)]
         out: PathBuf,
     },
+    /// Independently qualify the frozen synthetic survey-feasibility and repairability corpora.
+    EnvMobilityQualify,
+    /// Audit the synthetic microfactory routing fixture without scheduling or executing production work.
+    EnvMobilityRouteAudit,
+    /// Evaluate the synthetic make-versus-buy economics corpus; this does not select real equipment.
+    EnvMobilityMakeBuy,
+    /// Audit the dated SPM-0 sourcing register without treating catalog prices as quotes.
+    EnvMobilitySourcingAudit,
     GenerateManifest {
         #[arg(long, default_value = ".")]
         root: PathBuf,
@@ -105,6 +117,37 @@ fn main() -> anyhow::Result<()> {
         }
         Commands::RhnFinalize { input, out } => {
             rhn_sweep::run_finalize(input, out)?;
+        }
+        Commands::EnvMobilityQualify => {
+            let report = env_mobility::run()?;
+            let failed = report.total_mismatches > 0 || report.protected_gate_false_accepts > 0;
+            println!("{}", serde_json::to_string_pretty(&report)?);
+            if failed {
+                anyhow::bail!(
+                    "environmental mobility qualification failed: {} mismatches, {} protected-gate false accepts",
+                    report.total_mismatches,
+                    report.protected_gate_false_accepts
+                );
+            }
+        }
+        Commands::EnvMobilityRouteAudit => {
+            let report = env_mobility_route::run()?;
+            println!("{}", serde_json::to_string_pretty(&report)?);
+        }
+        Commands::EnvMobilityMakeBuy => {
+            let report = env_mobility_economics::run()?;
+            let failed = report.total_mismatch_count > 0;
+            println!("{}", serde_json::to_string_pretty(&report)?);
+            if failed {
+                anyhow::bail!(
+                    "microfactory make/buy fixture failed: {} total mismatches",
+                    report.total_mismatch_count
+                );
+            }
+        }
+        Commands::EnvMobilitySourcingAudit => {
+            let report = env_mobility_sourcing::run()?;
+            println!("{}", serde_json::to_string_pretty(&report)?);
         }
         Commands::GenerateManifest { root } => {
             let files = vec!["Cargo.toml", "src/lib.rs", "symthaea-core/Cargo.toml"];
