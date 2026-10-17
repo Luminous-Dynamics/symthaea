@@ -19260,6 +19260,15 @@ dependencies = [
 ]
 
 [[package]]
+name = "symthaea-nano-policy"
+version = "0.1.0"
+dependencies = [
+ "serde",
+ "serde_json",
+ "sha2 0.10.9",
+]
+
+[[package]]
 name = "symthaea-memetics"
 version = "0.1.0"
 dependencies = [
