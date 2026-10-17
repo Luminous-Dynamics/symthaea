@@ -2,8 +2,10 @@
 // SPDX-License-Identifier: AGPL-3.0-or-later
 // Commercial licensing: see COMMERCIAL_LICENSE.md at repository root
 
+use std::collections::HashSet;
 use std::env;
 use std::fs;
+use std::path::PathBuf;
 use std::process::ExitCode;
 
 use symthaea_cosmology_bench::{
@@ -117,7 +119,13 @@ fn summarize_loaded_chains(
 fn load_unverified_chains(paths: &[String]) -> Result<(Vec<ChainTable>, Vec<InputArtifactAudit>), String> {
     let mut tables = Vec::with_capacity(paths.len());
     let mut artifacts = Vec::with_capacity(paths.len());
+    let mut seen_local_paths = HashSet::<PathBuf>::new();
     for path in paths {
+        let canonical_path = fs::canonicalize(path)
+            .map_err(|error| format!("cannot resolve local artifact {path}: {error}"))?;
+        if !seen_local_paths.insert(canonical_path) {
+            return Err(format!("duplicate local chain input: {path}"));
+        }
         let bytes = fs::read(path).map_err(|error| format!("cannot read {path}: {error}"))?;
         let digest = sha256_bytes(&bytes);
         let size_bytes = u64::try_from(bytes.len())
@@ -143,6 +151,8 @@ fn load_manifest_verified_chains(
 ) -> Result<(Vec<ChainTable>, Vec<InputArtifactAudit>), String> {
     let mut tables = Vec::with_capacity(mappings.len());
     let mut artifacts = Vec::with_capacity(mappings.len());
+    let mut seen_relative_paths = HashSet::<String>::new();
+    let mut seen_local_paths = HashSet::<PathBuf>::new();
 
     for mapping in mappings {
         let (relative_path, local_path) = mapping.split_once('=').ok_or_else(|| {
@@ -154,6 +164,14 @@ fn load_manifest_verified_chains(
             return Err(format!(
                 "invalid input mapping {mapping:?}; both sides of '=' are required"
             ));
+        }
+        if !seen_relative_paths.insert(relative_path.to_string()) {
+            return Err(format!("duplicate checksum-manifest input path: {relative_path}"));
+        }
+        let canonical_path = fs::canonicalize(local_path)
+            .map_err(|error| format!("cannot resolve local artifact {local_path}: {error}"))?;
+        if !seen_local_paths.insert(canonical_path) {
+            return Err(format!("duplicate local chain input: {local_path}"));
         }
 
         let expected = expected_sha256_from_manifest(manifest_text, relative_path)
@@ -360,6 +378,29 @@ mod tests {
         // any summary can be returned.
         std::fs::write(&file_path, b"# weight minuslogpost H0\n1 -10 67\n1 -11 70\n").unwrap();
         assert!(load_manifest_verified_chains(&manifest, &[mapping]).is_err());
+        std::fs::remove_dir_all(dir).unwrap();
+    }
+
+    #[test]
+    fn duplicate_local_chain_inputs_are_rejected() {
+        use std::time::{SystemTime, UNIX_EPOCH};
+
+        let unique = SystemTime::now().duration_since(UNIX_EPOCH).unwrap().as_nanos();
+        let dir = std::env::temp_dir().join(format!("symthaea-duplicate-chain-{unique}"));
+        std::fs::create_dir_all(&dir).unwrap();
+        let file = dir.join("chain.txt");
+        let bytes = b"# weight minuslogpost H0\n1 -10 67\n";
+        std::fs::write(&file, bytes).unwrap();
+        let path = file.to_string_lossy().into_owned();
+
+        assert!(load_unverified_chains(&[path.clone(), path.clone()]).is_err());
+
+        let relative_path = "cobaya/base/desi-bao-all/chain.1.txt";
+        let digest = sha256_bytes(bytes);
+        let manifest = format!("{digest}  {relative_path}\n");
+        let mapping = format!("{relative_path}={path}");
+        assert!(load_manifest_verified_chains(&manifest, &[mapping.clone(), mapping]).is_err());
+
         std::fs::remove_dir_all(dir).unwrap();
     }
 
