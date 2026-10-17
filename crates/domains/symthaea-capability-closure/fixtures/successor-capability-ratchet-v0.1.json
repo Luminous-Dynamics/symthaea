@@ -845,7 +845,33 @@
       "capability_gain_and_protected_regressions",
       "evidence_maturity_and_unresolved_items"
     ],
-    "synthetic_fixture_policy": "All 13 RAT fixtures remain invented examples for contract testing. External published numbers are source context only and must never be treated as Symthaea measurements."
+    "synthetic_fixture_policy": "All 13 RAT fixtures remain invented examples for contract testing. External published numbers are source context only and must never be treated as Symthaea measurements.",
+    "first_kernel": {
+      "id": "exact_streaming_hamming_distance",
+      "motivation": "Hamming distance composes XOR, per-lane population count and accumulation into a retrieval/similarity primitive; XOR alone is too trivial to represent a useful system advantage.",
+      "vector_dimension_bits": 16384,
+      "lane_profile_transfers_per_vector": {
+        "64": 256,
+        "128": 128,
+        "256": 64,
+        "512": 32,
+        "16384": 1
+      },
+      "correctness_gate": "Exact integer distance equality against the pinned canonical Rust BinaryHV::hamming_distance output for every required fixture.",
+      "measurements_to_keep_separate": [
+        "simulated_cycles_per_vector",
+        "synthesized_resources_and_timing_estimates",
+        "physical_FPGA_vector_comparisons_per_second",
+        "p50_p95_p99_latency",
+        "sustained_throughput_under_backpressure",
+        "end_to_end_system_energy_per_comparison",
+        "host_transfer_and_protocol_overhead",
+        "retrieval_or_task_quality",
+        "thermal_and_reliability_constraints"
+      ],
+      "decision_rule": "Do not select a best lane width until pinned synthesis and then physical-board measurements; width alone does not prove the best throughput/resource/energy tradeoff.",
+      "evidence_status": "prototype only; no compile, simulator, synthesis or physical measurement PASS claimed"
+    }
   },
   "classification_labels": [
     "reproduction_gain_only",
