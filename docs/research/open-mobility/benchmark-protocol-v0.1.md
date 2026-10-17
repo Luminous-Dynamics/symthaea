@@ -162,6 +162,8 @@ These are **proposed research gates**, not published standards and not measured 
 6. **Task utility hypothesis:** explore >=20% reduction in median task completion time versus the strongest simple baseline, while task errors, unwanted actions, and external assistance do not increase. Treat this as an exploratory gate; human-benefit claims require appropriately designed participant studies.
 7. **Reproducibility:** every evidence report binds source commit, build/toolchain, model/configuration, scenario corpus digest, seeds, backend/version, timing semantics, denominators, and exclusions.
 8. **Model comparison:** publish the accuracy/utility–latency–memory–energy Pareto curves. No representation size or model family is declared best based on one metric.
+9. **Agency-envelope compliance:** 100% of constrained discrete-action decisions must either select within the declared agency envelope or produce the explicit user-only fallback. Any violation is individually recorded; mean ALI cannot hide a per-decision violation.
+10. **Agency–utility frontier:** publish the preregistered agency-budget sweep against task utility, ALI distribution, override/confirmation burden, false initiations, and cancellation outcomes. Do not declare a universal ALI target or choose a winner from pooled accuracy alone.
 
 Target changes require a versioned rationale and must never weaken the hard negative controls to improve a headline score.
 
@@ -177,6 +179,8 @@ The following fields are required before a run may produce a benchmark claim. Th
 - environment_id, backend version, clock domain, requested and observed timing semantics
 - declared profile/input modality; pseudonymous local subject/session key only if human data is later approved
 - action-stage counts (requested, admitted/projected, applied, independently measured where available)
+- per-decision autonomy arbitration record: candidate-action set/version, user/autonomy distribution digest or immutable replay-trace reference, selected high-level action, ALI definition/version and value, agency budget, envelope membership, and fallback/override reason
+- explicit stop/cancel event identifiers, observed local safe-state transition, clock/timebase, latency, and missed/deferred/duplicate event outcomes
 - metric values with units, numerator, denominator, aggregation and uncertainty/interval method
 - accepted, rejected, missing, invalid, and conflicted observation counts
 - evidence level (Synthetic, Simulation, Bench, HIL, HumanStudy) set by the harness/program and never automatically promoted
