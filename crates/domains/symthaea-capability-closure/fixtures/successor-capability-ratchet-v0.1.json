@@ -769,6 +769,12 @@
       "title": "Hyperdimensional in-memory computing with analogue memristive crossbar arrays (Nature Communications, 2026)",
       "url": "https://www.nature.com/articles/s41467-026-76067-5",
       "use": "External research motivation for a separately versioned approximate/in-memory HDC track; published outcomes are not Symthaea measurements and must not populate synthetic fixtures as project evidence."
+    },
+    {
+      "id": "S10",
+      "title": "CT-LNN: FPGA-Based Accelerator for Continuous-Time Liquid Neural Networks (IEEE TCSI, 2026)",
+      "url": "https://doi.org/10.1109/TCSI.2026.3704401",
+      "use": "External motivation for evaluating continuous-time state update and hardware/dataflow jointly; this is not a Symthaea performance baseline or a transferable numerical result."
     }
   ],
   "benchmark_methodology": {
@@ -871,6 +877,68 @@
       ],
       "decision_rule": "Do not select a best lane width until pinned synthesis and then physical-board measurements; width alone does not prove the best throughput/resource/energy tradeoff.",
       "evidence_status": "prototype only; no compile, simulator, synthesis or physical measurement PASS claimed"
+    },
+    "dynamical_hdc_ltc": {
+      "tracking_issue": "https://github.com/Luminous-Dynamics/symthaea/issues/7749",
+      "active_implementation": "symthaea-core::hdc::hdc_ltc_unified",
+      "representation": "continuous_f32",
+      "resolution_dimensions": [
+        16384,
+        32768,
+        65536,
+        131072,
+        262144
+      ],
+      "tier_status": {
+        "16384": "baseline",
+        "32768": "baseline",
+        "65536": "baseline",
+        "131072": "exploratory",
+        "262144": "exploratory"
+      },
+      "bytes_per_f32_vector": {
+        "16384": 65536,
+        "32768": 131072,
+        "65536": 262144,
+        "131072": 524288,
+        "262144": 1048576
+      },
+      "cost_note": "Per-vector representation sizes only. Actual working set is configuration-dependent (state, weights, gates, tau modulation, layers/neurons and temporaries) and must use checked arithmetic; these values are not cache traffic or measured energy.",
+      "canonical_owners": {
+        "resolution_transition": "https://github.com/Luminous-Dynamics/symthaea/issues/6560",
+        "trajectory_matrix": "https://github.com/Luminous-Dynamics/symthaea/issues/6561",
+        "operator_evidence": "https://github.com/Luminous-Dynamics/symthaea/pull/6596",
+        "trajectory_dependency_gate": "https://github.com/Luminous-Dynamics/symthaea/pull/6630",
+        "resource_gate": "https://github.com/Luminous-Dynamics/symthaea/issues/6631",
+        "timestep_budget": "https://github.com/Luminous-Dynamics/symthaea/issues/7374",
+        "manifold_compression": "https://github.com/Luminous-Dynamics/symthaea/issues/3348"
+      },
+      "required_arms": [
+        "active_scalar_or_simd_continuous_hdc_ltc",
+        "fused_closed_form_evolution",
+        "bounded_iterative_evolution_against_fine_step_rk4_reference",
+        "dense_f32_state_update",
+        "simd_cache_tiled_state_update",
+        "streamed_chunked_update_only_if_dependencies_allow",
+        "manifold_compression_with_residual_novelty_path",
+        "approximate_or_analogue_profile_as_separately_versioned"
+      ],
+      "required_metrics": [
+        "per_step_state_error",
+        "mean_and_terminal_trajectory_divergence",
+        "effective_tau_gate_equilibrium_distortion",
+        "fixed_and_irregular_dt_behavior",
+        "long_horizon_boundedness_and_recovery",
+        "task_quality_on_held_out_sequences",
+        "p50_p95_p99_latency",
+        "updates_per_second",
+        "resident_and_peak_temporary_bytes",
+        "allocations_and_bytes_moved",
+        "cache_or_bandwidth_counters_when_available",
+        "system_energy_at_declared_boundary",
+        "snapshot_and_online_adaptation_continuity"
+      ],
+      "promotion_rule": "Operator evidence is only a precondition. Resolution or hardware profiles advance only after trajectory fidelity, resource admissibility, task quality and measured cost are qualified on the same frozen source/config/workload. No default >64K promotion follows from representability alone."
     }
   },
   "classification_labels": [
