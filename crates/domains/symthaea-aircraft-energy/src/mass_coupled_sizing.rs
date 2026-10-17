@@ -14,6 +14,8 @@
 //! or airworthiness tool. A returned convergence result means only that the
 //! caller-supplied model and these equations reached arithmetic closure.
 
+use std::collections::BTreeSet;
+
 use super::{
     DutyClass, EnergySystemEnvelope,
     mission_model_contract::{MissionPhaseDemand, PowerUncertaintyBounds},
