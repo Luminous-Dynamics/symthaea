@@ -24,7 +24,7 @@ const WORLD_VARIANTS_PER_FAMILY: usize = 4;
 const MECHANISM_REGIME_COUNT: usize = 4;
 const MAX_TRIALS_PER_WORLD: usize = 10_000;
 const MAX_MEASUREMENT_BUDGET: usize = 64;
-const GENERATOR_VERSION: &str = "sensebench-scm-graphs-0.3.0";
+const GENERATOR_VERSION: &str = "sensebench-scm-graphs-0.4.0";
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, Deserialize)]
 #[serde(rename_all = "snake_case")]
@@ -322,6 +322,7 @@ pub struct ScmGraphBenchmarkReport {
     pub held_out_policy_aggregates: Vec<ScmGraphPolicyAggregate>,
     pub factorized_shift_aggregates: Vec<ScmGraphFactorizedShiftAggregate>,
     pub paired_policy_deltas: Vec<ScmGraphPairedPolicyDelta>,
+    pub observational_pc_baseline: ScmGraphPolicy,
     pub interpretation_boundary: String,
 }
 
@@ -1776,7 +1777,7 @@ pub fn run_scm_graph_benchmark(
     }
 
     Ok(ScmGraphBenchmarkReport {
-        schema_version: 3,
+        schema_version: 4,
         generator_version: GENERATOR_VERSION.into(),
         seed,
         trials_per_world,
@@ -1796,6 +1797,7 @@ pub fn run_scm_graph_benchmark(
         held_out_policy_aggregates: aggregate_held_out(&summaries, &policies),
         factorized_shift_aggregates: aggregate_factorized_shifts(&summaries, &policies),
         paired_policy_deltas: aggregate_paired_policy_deltas(&summaries, &policies),
+        observational_pc_baseline: ScmGraphPolicy::PcObservationalBaseline,
         worlds: summaries,
         interpretation_boundary: concat!(
             "Synthetic software benchmark only. The candidate set enumerates all labeled DAGs ",
@@ -2149,8 +2151,10 @@ mod tests {
         let b = run_scm_graph_benchmark(3, 2, 123, 0.95).unwrap();
         assert_eq!(a, b);
         assert_eq!(serde_json::to_vec(&a).unwrap(), serde_json::to_vec(&b).unwrap());
-        assert_eq!(a.schema_version, 3);
-        assert_eq!(a.generator_version, "sensebench-scm-graphs-0.3.0");
+        assert_eq!(a.schema_version, 4);
+        assert_eq!(a.generator_version, "sensebench-scm-graphs-0.4.0");
+        assert_eq!(ScmGraphPolicy::all().len(), 10);
+        assert_eq!(a.observational_pc_baseline, ScmGraphPolicy::PcObservationalBaseline);
         assert_eq!(a.world_count, 112);
         assert_eq!(a.development_world_count, 16);
         assert_eq!(a.held_out_world_count, 96);
