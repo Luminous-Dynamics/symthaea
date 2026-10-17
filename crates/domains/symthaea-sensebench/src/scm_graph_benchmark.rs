@@ -196,8 +196,8 @@ pub struct ScmGraphPolicyAggregate {
     pub held_out_worlds: usize,
     /// Distinct graph topologies represented among the held-out worlds.
     pub held_out_topology_instances: usize,
-    /// Confidence intervals resample topology instances, averaging their held-out
-    /// mechanism regimes first so paired worlds are not treated as independent.
+    /// Confidence intervals resample topology instances after averaging paired
+    /// held-out mechanism regimes; they are conditional on the seven fixed family templates.
     pub mean_held_out_skeleton_f1: f64,
     pub held_out_skeleton_f1_topology_instance_ci95: [f64; 2],
     pub mean_held_out_directed_edge_f1: f64,
