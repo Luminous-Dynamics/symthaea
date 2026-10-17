@@ -12,6 +12,7 @@ use serde::Serialize;
 
 const DIM: usize = 3;
 const DEFAULT_NOISE_VARIANCE: f64 = 0.1;
+const TARGET_QOI_VARIANCE_TOLERANCE: f64 = 0.03;
 
 type Vector = [f64; DIM];
 type Matrix = [[f64; DIM]; DIM];
@@ -34,6 +35,7 @@ pub struct AcquisitionStep {
 #[derive(Debug, Clone, Serialize)]
 pub struct AcquisitionArm {
     pub arm: String,
+    pub calls_to_target_variance_tolerance: Option<usize>,
     pub steps: Vec<AcquisitionStep>,
 }
 
@@ -45,6 +47,7 @@ pub struct QoiAcquisitionReport {
     pub target_qoi_parameter_direction: Vector,
     pub prior_covariance: Matrix,
     pub observation_noise_variance: f64,
+    pub target_qoi_variance_tolerance: f64,
     pub candidate_count: usize,
     pub reference_call_budget: usize,
     pub random_baseline_trials: usize,
@@ -218,8 +221,13 @@ fn greedy_arm(
         });
     }
 
+    let calls_to_target_variance_tolerance = steps
+        .iter()
+        .find(|step| step.target_qoi_posterior_variance <= TARGET_QOI_VARIANCE_TOLERANCE)
+        .map(|step| step.budget_used);
     AcquisitionArm {
         arm: arm_name.to_owned(),
+        calls_to_target_variance_tolerance,
         steps,
     }
 }
@@ -261,8 +269,13 @@ fn random_arm_mean(
         })
         .collect();
 
+    let calls_to_target_variance_tolerance = steps
+        .iter()
+        .find(|step| step.target_qoi_posterior_variance <= TARGET_QOI_VARIANCE_TOLERANCE)
+        .map(|step| step.budget_used);
     AcquisitionArm {
         arm: "uniform_random_average".to_owned(),
+        calls_to_target_variance_tolerance,
         steps,
     }
 }
@@ -327,6 +340,7 @@ pub fn run_qoi_acquisition_benchmark(
         target_qoi_parameter_direction: qoi_direction,
         prior_covariance: identity(),
         observation_noise_variance: noise_variance,
+        target_qoi_variance_tolerance: TARGET_QOI_VARIANCE_TOLERANCE,
         candidate_count: candidates.len(),
         reference_call_budget: budget,
         random_baseline_trials: random_trials,
@@ -357,6 +371,16 @@ mod tests {
         assert!(generic[0].selected_candidate_id.starts_with("nuisance-focused-"));
     }
 
+
+
+    #[test]
+    fn target_qoi_tolerance_reports_reference_call_efficiency() {
+        let report = run_qoi_acquisition_benchmark(8, 256, 0x51a7).unwrap();
+        assert_eq!(report.target_qoi_variance_tolerance, 0.03);
+        assert_eq!(report.arms[0].calls_to_target_variance_tolerance, Some(4));
+        assert_eq!(report.arms[1].calls_to_target_variance_tolerance, Some(7));
+        assert_eq!(report.arms[2].calls_to_target_variance_tolerance, Some(8));
+    }
 
     #[test]
     fn deterministic_curve_matches_independent_numeric_reference_values() {
