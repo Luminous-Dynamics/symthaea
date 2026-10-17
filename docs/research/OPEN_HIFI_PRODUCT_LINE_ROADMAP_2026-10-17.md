@@ -90,7 +90,7 @@ Highest-priority questions are:
 
 Established approaches (e.g. ITU-R BS.1116 / BS.1534 listening assessment, published loudspeaker preference models, and fixture-specific headphone targets) are baselines to evaluate and replicate, not universal oracles. Future models must use product/listener/excerpt-grouped held-out data, uncertainty calibration, independent replication and null-result reporting.
 
-The agenda establishes a first preference experiment plan (HP-PREF-001) and benchmark gates. It is research design, not a claim that Luminous hardware has been measured or that a Symthaea preference model is validated.
+The agenda establishes the first preference experiment (HP-PREF-001); its preregistration scaffold is [HP_PREF_001_PREREGISTRATION_2026-10-17.md](HP_PREF_001_PREREGISTRATION_2026-10-17.md), tracked by [#7889](https://github.com/Luminous-Dynamics/symthaea/issues/7889). It freezes holdout rules, outcome metrics, masking, safety and deployment gates, without claiming existing listener data or a validated predictor.
 
 ### Open instruments and practical engineering kits
 
