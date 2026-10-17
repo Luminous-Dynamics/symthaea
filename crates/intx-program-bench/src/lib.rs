@@ -346,7 +346,7 @@ mod tests {
     #[test]
     fn malformed_expected_outcome_rows_fail_closed() {
         assert!(parse_expected_outcomes(
-            "id|expected_state|dispatch|reconcile\\nC0-01|denied"
+            "id|expected_state|dispatch|reconcile\nC0-01|denied"
         )
         .is_err());
     }
