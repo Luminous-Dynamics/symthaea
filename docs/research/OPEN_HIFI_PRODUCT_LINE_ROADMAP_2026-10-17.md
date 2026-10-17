@@ -76,6 +76,22 @@ The names below are working engineering IDs, not verified trademarks.
 | M5 | Room measurement/correction workflow | Multiple listening positions; uncorrected and corrected data retained |
 | Service kit | Repair parts and manuals | BOM by revision, fastener list, diagnostics, sourcing and repair-time logs |
 
+### Perceptual, robust and experiment-driven research
+
+The product family will be optimized against a layered research programme, not a single target-curve score. See [HIFI-RESEARCH-001 #7888](https://github.com/Luminous-Dynamics/symthaea/issues/7888) and [SYTHAEA_HIFI_RESEARCH_AGENDA_2026-10-17.md](SYTHAEA_HIFI_RESEARCH_AGENDA_2026-10-17.md).
+
+Highest-priority questions are:
+- Does a perceptual predictor generalize to held-out products, listeners, listening excerpts and measurement sessions better than a simple transparent baseline?
+- Do listener-conditional target/profile models improve held-out choices, rather than impose one purportedly universal curve?
+- How much of measured improvement survives fixture/coupler transfer, headphone reseating, driver tolerances, speaker angles and multiple room positions?
+- At which levels and on which stimuli are transducer nonlinearities detectable or preferred, separately from raw distortion magnitude?
+- Does cost-aware active experiment selection reduce total physical measurement cost to reach a preregistered decision, counting repeats and deferred validation?
+- Which physical or directivity defects are irreducible by room EQ, and does a proposed filter retain headroom across a declared listening region?
+
+Established approaches (e.g. ITU-R BS.1116 / BS.1534 listening assessment, published loudspeaker preference models, and fixture-specific headphone targets) are baselines to evaluate and replicate, not universal oracles. Future models must use product/listener/excerpt-grouped held-out data, uncertainty calibration, independent replication and null-result reporting.
+
+The agenda establishes a first preference experiment plan (HP-PREF-001) and benchmark gates. It is research design, not a claim that Luminous hardware has been measured or that a Symthaea preference model is validated.
+
 ### Open instruments and practical engineering kits
 
 The measurement layer is a product family, not just documentation. See [OPEN-AUDIO-INSTRUMENTS-001 #7874](https://github.com/Luminous-Dynamics/symthaea/issues/7874) and the [instrument and kit plan](OPEN_AUDIO_INSTRUMENTS_AND_KITS_2026-10-17.md).
