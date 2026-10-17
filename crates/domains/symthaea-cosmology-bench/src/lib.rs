@@ -46,6 +46,7 @@ pub enum ChainAuditError {
     InvalidHeader(String),
     DuplicateColumn(String),
     MissingSamples,
+    MismatchedChainHeaders,
     WrongColumnCount {
         line: usize,
         expected: usize,
@@ -76,6 +77,7 @@ impl fmt::Display for ChainAuditError {
             Self::InvalidHeader(message) => write!(f, "invalid chain header: {message}"),
             Self::DuplicateColumn(name) => write!(f, "duplicate chain column: {name}"),
             Self::MissingSamples => f.write_str("chain contains no sample rows"),
+            Self::MismatchedChainHeaders => f.write_str("cannot combine chain files with different column headers"),
             Self::WrongColumnCount { line, expected, actual } => {
                 write!(f, "line {line}: expected {expected} columns, found {actual}")
             }
@@ -96,6 +98,32 @@ impl fmt::Display for ChainAuditError {
 impl std::error::Error for ChainAuditError {}
 
 impl ChainTable {
+    /// Combine chain tables only when their full column order matches exactly.
+    /// This prevents parameter columns from silently shifting between files.
+    pub fn combine(mut tables: Vec<Self>) -> Result<Self, ChainAuditError> {
+        if tables.is_empty() {
+            return Err(ChainAuditError::MissingSamples);
+        }
+        let mut combined = tables.remove(0);
+        for table in tables {
+            if table.columns != combined.columns {
+                return Err(ChainAuditError::MismatchedChainHeaders);
+            }
+            combined.rows.extend(table.rows);
+        }
+        if combined.rows.is_empty() {
+            return Err(ChainAuditError::MissingSamples);
+        }
+        let total_weight = combined.rows.iter().map(|row| row[0]).sum::<f64>();
+        if !total_weight.is_finite() {
+            return Err(ChainAuditError::NumericalOverflow);
+        }
+        if total_weight <= 0.0 {
+            return Err(ChainAuditError::ZeroTotalWeight);
+        }
+        Ok(combined)
+    }
+
     /// Parse a Cobaya sample file. The first recognized header must list weight
     /// and minuslogpost in the first two columns. Malformed rows are rejected,
     /// never silently skipped or shifted into a wrong parameter column.
@@ -321,6 +349,27 @@ mod tests {
         assert_eq!(summary.q50, 68.0);
         assert_eq!(summary.q84, 69.0);
         assert!((summary.weight_effective_sample_size - (16.0 / 6.0)).abs() < 1e-12);
+    }
+
+    #[test]
+    fn combine_requires_identical_headers_and_preserves_weighted_samples() {
+        let first = ChainTable::parse(Cursor::new(FIXTURE)).unwrap();
+        let second = ChainTable::parse(Cursor::new(
+            "# weight minuslogpost H0 omega_m\n1 -9 70 0.33\n",
+        )).unwrap();
+        let combined = ChainTable::combine(vec![first.clone(), second]).unwrap();
+        assert_eq!(combined.rows.len(), 4);
+        let summary = combined.summarize("H0").unwrap();
+        assert!((summary.total_weight - 5.0).abs() < 1e-12);
+        assert!((summary.weighted_mean - 68.6).abs() < 1e-12);
+
+        let wrong_header = ChainTable::parse(Cursor::new(
+            "# weight minuslogpost omega_m H0\n1 -9 0.33 70\n",
+        )).unwrap();
+        assert_eq!(
+            ChainTable::combine(vec![first, wrong_header]),
+            Err(ChainAuditError::MismatchedChainHeaders)
+        );
     }
 
     #[test]
