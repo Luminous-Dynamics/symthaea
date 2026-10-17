@@ -56,6 +56,7 @@ pub struct BatteryDesignRow {
     pub configuration_findings: Vec<Finding>,
     pub envelope: Option<EnergySystemEnvelope>,
     pub screening: ScreeningResult,
+    /// Non-dominated only among valid candidates with the same reserve fraction.
     pub on_pareto_front: bool,
 }
 
