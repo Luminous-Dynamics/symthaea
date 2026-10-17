@@ -673,8 +673,12 @@ pub struct ExternalActionTimingV1 {
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub observation_id: Option<String>,
     /// Only populated when the observation source itself supplies a timestamp.
+    /// Source-side time is omitted when the adapter cannot provide it honestly.
+    #[serde(default, skip_serializing_if = "Option::is_none")]
     pub observation_source_timestamp_ns: Option<u64>,
+    #[serde(default, skip_serializing_if = "Option::is_none")]
     pub observation_source_clock_domain_id: Option<String>,
+    #[serde(default, skip_serializing_if = "Option::is_none")]
     pub observation_source_clock_epoch_id: Option<String>,
     /// Host-monotonic bounds of the bridge's action-dispatch call.
     pub action_dispatch_started_ns: Option<u64>,
@@ -701,6 +705,7 @@ pub enum ExternalActionTimingErrorV1 {
     PartialActionDispatch,
     ReversedActionDispatchInterval,
     PartialSourceTimestampProvenance,
+    SourceTimeWithoutObservation,
     EmptySourceClockIdentity,
     StepIndexMismatch,
 }
@@ -781,6 +786,11 @@ impl ExternalActionTimingV1 {
             self.observation_source_clock_domain_id.as_deref(),
             self.observation_source_clock_epoch_id.as_deref(),
         ) {
+            (Some(_), Some(_), Some(_))
+                if self.observation_received_monotonic_ns.is_none() || self.observation_id.is_none() =>
+            {
+                return Err(ExternalActionTimingErrorV1::SourceTimeWithoutObservation);
+            }
             (None, None, None) => {}
             (Some(_), Some(domain), Some(epoch)) if !domain.trim().is_empty() && !epoch.trim().is_empty() => {}
             (Some(_), Some(_), Some(_)) => {
