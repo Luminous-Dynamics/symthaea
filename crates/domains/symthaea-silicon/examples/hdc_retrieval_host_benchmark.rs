@@ -264,7 +264,7 @@ fn run() -> Result<(), String> {
             "vector_dimension_bits": DIMENSION_BITS,
             "store_vector_count": config.store_size,
             "query_batch_size": config.batch_size,
-            "query_count": measured_queries,
+            "query_count": config.batch_size,
             "operations": ["hamming_distance", "retrieve"],
             "tie_break_policy": "lowest stable vector-store index wins equal Hamming distance",
             "task_quality_metric": "synthetic target top-1 accuracy",
