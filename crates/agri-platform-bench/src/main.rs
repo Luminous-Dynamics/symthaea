@@ -3,7 +3,7 @@
 //! Prints a synthetic screening example. It performs no network or hardware I/O.
 
 use agri_platform_bench::{
-    assess, Assessment, AssessmentStatus, EvidenceDomain, EvidenceRecord, PlatformClass,
+    assess, Assessment, AssessmentStatus, EvidenceRecord, PlatformClass,
     PlatformProfile, ScenarioProfile, ServiceUnit, TaskKind, CONTRACT_VERSION,
 };
 
@@ -95,7 +95,7 @@ fn print_assessment(result: Assessment) {
         "{}\t{}\t{}\t{}\t{}\t{}",
         result.candidate_id,
         status_name(result.status),
-        format!("{:?}", result.blockers),
+        result.blockers,
         cost,
         supervision,
         maintenance
