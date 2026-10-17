@@ -117,3 +117,18 @@ Proposed gates to freeze before evaluation:
 These are starting hypotheses, not universal standards or achieved results. If margin is not predictive of misses, or coarse routing discards true candidates, the adaptive approach fails. Index storage and update cost must include whatever data is retained for refinement; prefix sharing is not free by assumption.
 
 Recent practitioner results distinguish **within-record crosstalk** from **between-record false matches**. In their synthetic five-property MAP example, HDC Labs reports that dimension narrows similarity distributions while the number of comparisons changes the probability of seeing at least one false match; it explicitly treats very large capacity figures as theory-based estimates under independent/evenly spread properties, not universal measured limits ([Oct 15, 2026 article](https://hyperdimensionalcomputing.ai/blog/testing-the-limits-of-bundling-capacity-2/)). This motivates both (a) paired capacity curves and (b) a separate query-scale risk model, while requiring Symthaea-specific replication.
+
+
+## Executable scaffold for progressive-width candidate preservation
+
+Added `crates/core/symthaea-core/examples/progressive_retrieval_reference.rs` to compare coarse prefix-width search against exhaustive 16,384-D retrieval:
+
+```sh
+cargo run --release --example progressive_retrieval_reference -p symthaea-core -- /tmp/progressive-retrieval.csv 12345
+```
+
+It uses a deterministic synthetic corpus of 512 eight-property records, 64 partial queries (1/2/4/6 observed properties), and sweeps coarse widths 1K/2K/4K/8K plus shortlist sizes 1/4/8/16/32. The full-width highest-score ranking is retained as a candidate-preservation reference. Each row reports whether its top candidate survived, overlap with reference top-K, exact observed-property matches, reference margin, coordinate-evaluation counts and the raw full-width vector-storage estimate. The corpus seed is a CLI argument so independent corpus realizations can be compared.
+
+This is a first scaffold, **not an executed benchmark and not an adaptive confidence-threshold implementation**. The full-width vectors remain resident, so it measures coordinate-evaluation savings only; it does not claim persistent memory savings. Still needed: multi-seed aggregation and confidence intervals, correlated/nearly-duplicate distractors, query corruption, separate calibration/test corpora, and exact-head Rust formatting/compile/run receipts. A low-width shortlist is useful only if the right candidates survive.
+
+The paired-width invariant is protected by a runtime guard: for a shared item seed, 1K coordinates must exactly equal the first 1K of the 4K vector, and 4K must exactly equal the first 4K of the 16K vector. The capacity harness uses the same dimension-independent seed derivation so its dimension curves are paired.
