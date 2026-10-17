@@ -1,0 +1,76 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "title": "Symthaea synthetic cyber hunt manifest v1",
+  "type": "object",
+  "additionalProperties": false,
+  "required": [
+    "schema_version",
+    "generator_version",
+    "generator_source_commit",
+    "source_commit_pinned",
+    "profile",
+    "scenario_id",
+    "seed",
+    "record_count",
+    "event_store_sha256",
+    "event_store_utf8_bytes",
+    "ordering",
+    "qualification_state",
+    "claim_ceiling"
+  ],
+  "properties": {
+    "schema_version": {
+      "const": "cyber-hunt-manifest-v1"
+    },
+    "generator_version": {
+      "const": "cyber-hunt-fixture-generator/0.1.0"
+    },
+    "generator_source_commit": {
+      "anyOf": [
+        {
+          "const": "UNPINNED_LOCAL_SOURCE"
+        },
+        {
+          "type": "string",
+          "pattern": "^[0-9a-fA-F]{40}$"
+        }
+      ]
+    },
+    "source_commit_pinned": {
+      "type": "boolean"
+    },
+    "profile": {
+      "const": "public-synthetic-smoke-v1"
+    },
+    "scenario_id": {
+      "const": "synthetic-identity-to-egress-v1"
+    },
+    "seed": {
+      "type": "integer",
+      "minimum": 0
+    },
+    "record_count": {
+      "type": "integer",
+      "minimum": 64,
+      "maximum": 250000
+    },
+    "event_store_sha256": {
+      "type": "string",
+      "pattern": "^[0-9a-f]{64}$"
+    },
+    "event_store_utf8_bytes": {
+      "type": "integer",
+      "minimum": 1
+    },
+    "ordering": {
+      "const": "ingest_time_ms_then_event_id; event_time_ms remains distinct"
+    },
+    "qualification_state": {
+      "const": "UNSCORED"
+    },
+    "claim_ceiling": {
+      "type": "string",
+      "minLength": 20
+    }
+  }
+}
