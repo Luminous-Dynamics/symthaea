@@ -12,7 +12,7 @@ use sha2::{Digest, Sha256};
 use std::collections::{BTreeMap, BTreeSet};
 use std::env;
 use std::fs;
-use std::path::{Component, Path, PathBuf};
+use std::path::{Component, Path};
 
 const EXPECTED_SCHEMA_VERSION: &str = "room-imagination-stress-benchmark-v0.1";
 const EXPECTED_CASE_COUNT: usize = 30;
@@ -105,6 +105,7 @@ fn receipt_value(
     summary: &ValidationSummary,
     benchmark_text: &str,
     schema_text: &str,
+    run_report_schema_text: &str,
     cargo_manifest_text: &str,
     validator_source_text: &str,
 ) -> Value {
@@ -119,7 +120,8 @@ fn receipt_value(
         },
         "inputs": {
             "benchmark_sha256": sha256_hex(benchmark_text),
-            "schema_sha256": sha256_hex(schema_text)
+            "schema_sha256": sha256_hex(schema_text),
+            "run_report_schema_sha256": sha256_hex(run_report_schema_text)
         },
         "summary": {
             "schema_version": EXPECTED_SCHEMA_VERSION,
@@ -594,6 +596,7 @@ fn run(args: &[String]) -> Result<bool, String> {
             &summary,
             &benchmark_text,
             &schema_text,
+            EMBEDDED_RUN_REPORT_SCHEMA,
             EMBEDDED_CARGO_MANIFEST,
             EMBEDDED_VALIDATOR_SOURCE,
         );
@@ -726,6 +729,7 @@ mod tests {
             &summary,
             EMBEDDED_BENCHMARK,
             EMBEDDED_SCHEMA,
+            EMBEDDED_RUN_REPORT_SCHEMA,
             EMBEDDED_CARGO_MANIFEST,
             EMBEDDED_VALIDATOR_SOURCE,
         );
@@ -744,6 +748,13 @@ mod tests {
                 .len(),
             64
         );
+        assert_eq!(
+            receipt["inputs"]["run_report_schema_sha256"]
+                .as_str()
+                .unwrap()
+                .len(),
+            64
+        );
         assert!(
             receipt["claim_ceiling"]
                 .as_str()
@@ -756,6 +767,7 @@ mod tests {
                 &summary,
                 EMBEDDED_BENCHMARK,
                 EMBEDDED_SCHEMA,
+                EMBEDDED_RUN_REPORT_SCHEMA,
                 EMBEDDED_CARGO_MANIFEST,
                 EMBEDDED_VALIDATOR_SOURCE,
             ),
@@ -765,6 +777,10 @@ mod tests {
 
     fn golden_report_value(benchmark_text: &str) -> Value {
         let benchmark: Value = serde_json::from_str(benchmark_text).unwrap();
+        let benchmark_evidence_path = concat!(
+            "docs/research/spatial-design/",
+            "ROOM_IMAGINATION_STRESS_BENCHMARK_V0_1.json"
+        );
         let mut results = Vec::new();
         for case in benchmark["cases"].as_array().unwrap() {
             let mut observations = serde_json::Map::new();
@@ -776,7 +792,7 @@ mod tests {
                     "observation_key": key,
                     "artifact_sha256": sha256_hex(benchmark_text),
                     "artifact_revision": "synthetic-golden-fixture-r1",
-                    "artifact_path": "docs/research/spatial-design/ROOM_IMAGINATION_STRESS_BENCHMARK_V0_1.json"
+                    "artifact_path": benchmark_evidence_path
                 }));
             }
             results.push(serde_json::json!({
@@ -796,7 +812,7 @@ mod tests {
         })
     }
 
-    fn repository_root() -> PathBuf {
+    fn repository_root() -> std::path::PathBuf {
         Path::new(env!("CARGO_MANIFEST_DIR"))
             .join("../..")
             .canonicalize()
@@ -876,6 +892,44 @@ mod tests {
         )
         .unwrap_err();
         assert!(error.contains("benchmark digest mismatch"));
+    }
+
+    #[test]
+    fn evidence_artifact_hash_mismatch_fails_closed() {
+        let mut report = golden_report_value(EMBEDDED_BENCHMARK);
+        report["results"][0]["evidence_refs"][0]["artifact_sha256"] =
+            Value::String("bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb".into());
+        let report_text = serde_json::to_string(&report).unwrap();
+        let summary = evaluate_run_report(
+            EMBEDDED_BENCHMARK,
+            EMBEDDED_SCHEMA,
+            EMBEDDED_RUN_REPORT_SCHEMA,
+            &report_text,
+            &repository_root(),
+        )
+        .unwrap();
+        assert!(summary.failures.iter().any(|failure| {
+            failure.contains("evidence artifact digest mismatch")
+        }));
+    }
+
+    #[test]
+    fn evidence_path_traversal_is_rejected() {
+        let mut report = golden_report_value(EMBEDDED_BENCHMARK);
+        report["results"][0]["evidence_refs"][0]["artifact_path"] =
+            Value::String("../Cargo.toml".into());
+        let report_text = serde_json::to_string(&report).unwrap();
+        let summary = evaluate_run_report(
+            EMBEDDED_BENCHMARK,
+            EMBEDDED_SCHEMA,
+            EMBEDDED_RUN_REPORT_SCHEMA,
+            &report_text,
+            &repository_root(),
+        )
+        .unwrap();
+        assert!(summary.failures.iter().any(|failure| {
+            failure.contains("must not contain absolute, current-directory, or parent components")
+        }));
     }
 
     #[test]
