@@ -162,17 +162,6 @@ fn validate_receipt(
             return Err("passed_receipt_without_tests_or_compile_only_policy".to_owned());
         }
 
-        let embedded_artifact = receipt.get("artifact_bytes").and_then(Value::as_str);
-        let artifact_bytes = artifact_bytes_override
-            .or_else(|| embedded_artifact.map(str::as_bytes))
-            .ok_or_else(|| "missing_artifact_bytes".to_owned())?;
-        let declared = receipt
-            .get("declared_artifact_sha256")
-            .and_then(Value::as_str)
-            .ok_or_else(|| "missing_artifact_digest".to_owned())?;
-        if !is_lower_hex(declared, 64) || sha256_hex(artifact_bytes) != declared {
-            return Err("artifact_digest_mismatch".to_owned());
-        }
         let payload = receipt
             .get("result_payload")
             .ok_or_else(|| "missing_result_payload".to_owned())?;
@@ -188,6 +177,23 @@ fn validate_receipt(
         {
             return Err("result_payload_digest_or_status_mismatch".to_owned());
         }
+    }
+
+    // Every receipt status must bind the actual artifact bytes. A failed or
+    // indeterminate run may be valid evidence of failure, but it cannot omit
+    // artifact identity and still be promoted as an internally valid receipt.
+    let embedded_artifact = receipt.get("artifact_bytes").and_then(Value::as_str);
+    let artifact_bytes = artifact_bytes_override
+        .or_else(|| embedded_artifact.map(str::as_bytes))
+        .ok_or_else(|| "missing_artifact_bytes".to_owned())?;
+    let declared_artifact = receipt
+        .get("declared_artifact_sha256")
+        .and_then(Value::as_str)
+        .ok_or_else(|| "missing_artifact_digest".to_owned())?;
+    if !is_lower_hex(declared_artifact, 64)
+        || sha256_hex(artifact_bytes) != declared_artifact
+    {
+        return Err("artifact_digest_mismatch".to_owned());
     }
 
     Ok(())
@@ -504,6 +510,36 @@ mod tests {
         let different_bytes = b"not the artifact embedded in the test receipt";
         assert_eq!(
             validate_receipt(&receipt, Some(&"a".repeat(40)), Some(different_bytes)),
+            Err("artifact_digest_mismatch".to_owned())
+        );
+    }
+
+    #[test]
+    fn failed_receipt_still_requires_artifact_identity() {
+        let mut receipt = valid_receipt();
+        receipt["status"] = json!("failed");
+        receipt["result_payload"]["status"] = json!("failed");
+        let payload_bytes =
+            serde_json::to_vec(&receipt["result_payload"]).expect("serialize payload");
+        receipt["declared_result_sha256"] = json!(sha256_hex(&payload_bytes));
+        receipt.as_object_mut().unwrap().remove("declared_artifact_sha256");
+        assert_eq!(
+            validate_receipt(&receipt, None, None),
+            Err("missing_artifact_digest".to_owned())
+        );
+    }
+
+    #[test]
+    fn failed_receipt_must_hash_the_referenced_artifact_bytes() {
+        let mut receipt = valid_receipt();
+        receipt["status"] = json!("failed");
+        receipt["result_payload"]["status"] = json!("failed");
+        let payload_bytes =
+            serde_json::to_vec(&receipt["result_payload"]).expect("serialize payload");
+        receipt["declared_result_sha256"] = json!(sha256_hex(&payload_bytes));
+        receipt["artifact_bytes"] = json!("changed after failure");
+        assert_eq!(
+            validate_receipt(&receipt, None, None),
             Err("artifact_digest_mismatch".to_owned())
         );
     }
