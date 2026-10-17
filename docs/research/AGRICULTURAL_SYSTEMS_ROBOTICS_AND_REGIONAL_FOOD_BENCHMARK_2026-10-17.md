@@ -266,6 +266,36 @@ A 2026 open-access autonomous field-robot cost study used empirical data from 61
 
 For platform selection, record whole-task/season economics including plot size, access points, route distance, headland turns, setup, charging, transport between plots, supervision, failed missions, recovery, repairs and local parts lead times. Model low/base/high utilization and disruption cases. Compare robots against existing implements, fixed sensors, shared equipment and no-robot baselines.
 
+### Mechanization as a service: Southern African evidence and caveats
+
+A 2026 field-and-business study in Masvingo, Zimbabwe evaluated a service-provider model using a 12 kW two-wheel tractor, trailer, no-till planter and thresher. The equipment was field-assessed, and one selected high-performing provider's business was monitored over 42 months. That provider served 136 farmers and two farmer groups across 23 villages; women were reported as 50% of clients. Compared with conventional ox-drawn practices, the no-till planter reduced crop-establishment labour by 58–65% and total crop-production labour by 14–24%, with no statistically significant maize-yield difference reported in that comparison. These are results from a specific study, not promised outcomes for a new platform or another region.
+
+The most important adoption insight is that the economic unit is **access to an appropriately timed service**, not ownership of a robot. The paper's monitored provider earned most revenue from transport, while demand for no-till planting was negligible. Spare-parts supply was fragmented; only a small share of parts was supplied with the machinery, and sourcing delay increased downtime. Its return-on-investment figures describe the selected case and differ with subsidy assumptions; they must not be treated as a representative Southern African ROI estimate.
+
+Source: Matin et al. (2026), *Economic analysis of a Service Provider model for scaling smallholder farm mechanization in Southern Africa: a case study from Zimbabwe*. https://doi.org/10.1080/23311932.2026.2715245
+
+#### Required service-model comparison
+
+For each farm task, evaluate at least: (1) current manual practice, (2) improved hand tool or existing implement, (3) shared/cooperative asset, (4) independent local service provider or contractor, and (5) owned/leased robot if it is genuinely suitable. Report the winning alternative even when it is not a robot.
+
+Measure:
+- cost per **successfully completed and accepted** service unit, not nominal hectares/hour;
+- seasonal demand, waiting time, travel between clients, cancellation/no-show rate, utilization, seasonal idle time and revenue by service type;
+- service quality and adverse outcomes, including crop damage, missed rows/tasks, resource usage and rework;
+- uptime, repair hours, time waiting for parts, local mechanic availability, parts lead time and full maintenance cost;
+- affordability and payment mode, including carefully bounded cash/in-kind options where locally appropriate;
+- access across farm sizes, geography, gender and farmer groups, without assuming one selected provider or enthusiastic customer is representative.
+
+#### Cross-project division of responsibility
+
+- **Sol Atlas:** farmer-verified site, distance, access, field geometry and place-specific evidence.
+- **Symthaea:** source-grounded task/platform screening and explicit reasons to abstain or recommend no automation.
+- **Symtropy:** deterministic cost and bounded-sensitivity comparison across ownership, leasing and service-provision scenarios; do not invent probability distributions or assume subsidy continuation.
+- **Mycelix:** consented cooperative assets, service offers, commitments, delivery/fulfillment receipts, disputes and data-sharing permissions.
+- **Open hardware pipeline:** editable source, rights and revision evidence, BOM with local alternatives, repair instructions, service tooling and measured parts availability.
+
+Start with one repeatable, low-risk service and a farm-selected baseline; record actual demand and delivery outcomes through a full relevant season before scaling hardware or claiming improved income. A service-provider business model can lower the ownership barrier, but does not automatically create demand, local parts supply, affordability, safety or profitability.
+
 ## 11. Explicit nonclaims
 
 This document does not establish crop/yield benefits, disease diagnosis, food safety, nutrient adequacy, regulatory compliance, safe machinery operation, commercial viability, positive ROI, improved farmer bargaining power, land-equivalent superiority, or any other real-world outcome. These require task- and site-specific evidence and independent validation.
