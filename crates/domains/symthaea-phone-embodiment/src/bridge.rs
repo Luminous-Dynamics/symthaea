@@ -951,6 +951,10 @@ impl symthaea_core::embodiment::EmbodimentBridge for PhoneBridge {
         self.step_embodiment(thought_hv, dt, phi)
     }
 
+    fn plant_step_authority(&self) -> symthaea_core::embodiment::PlantStepAuthorityV1 {
+        symthaea_core::embodiment::PlantStepAuthorityV1::EventDrivenExternal
+    }
+
     fn step_event_driven(
         &mut self,
         thought_hv: &symthaea_core::hdc::ContinuousHV,
