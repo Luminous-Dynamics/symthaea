@@ -101,12 +101,24 @@ pub enum EinsteinResidualError {
 impl std::fmt::Display for EinsteinResidualError {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
         match self {
-            Self::ZeroDimension => write!(f, "dimension must be positive and its square representable"),
-            Self::ComponentCountMismatch => write!(f, "Ricci and metric arrays must each contain dim*dim components"),
+            Self::ZeroDimension => write!(
+                f,
+                "dimension must be positive and its square representable"
+            ),
+            Self::ComponentCountMismatch => write!(
+                f,
+                "Ricci and metric arrays must each contain dim*dim components"
+            ),
             Self::InvalidTolerance => write!(f, "tolerance must be finite and nonnegative"),
             Self::NonFiniteInput => write!(f, "Ricci and metric components must all be finite"),
-            Self::NoUsableDiagonalMetricComponents => write!(f, "no nonzero diagonal metric components are available to estimate k"),
-            Self::NonFiniteArithmetic => write!(f, "numeric ratio or residual was not representable as a finite value"),
+            Self::NoUsableDiagonalMetricComponents => write!(
+                f,
+                "no nonzero diagonal metric components are available to estimate k"
+            ),
+            Self::NonFiniteArithmetic => write!(
+                f,
+                "numeric ratio or residual was not representable as a finite value"
+            ),
         }
     }
 }
@@ -384,7 +396,11 @@ impl Z3Bridge {
         if !tolerance.is_finite() || tolerance < 0.0 {
             return Err(EinsteinResidualError::InvalidTolerance);
         }
-        if ricci_components.iter().chain(metric_components).any(|v| !v.is_finite()) {
+        if ricci_components
+            .iter()
+            .chain(metric_components)
+            .any(|value| !value.is_finite())
+        {
             return Err(EinsteinResidualError::NonFiniteInput);
         }
 
@@ -422,7 +438,10 @@ impl Z3Bridge {
             }
             component_residuals.push(residual);
         }
-        let max_abs_residual = component_residuals.iter().copied().fold(0.0_f64, f64::max);
+        let max_abs_residual = component_residuals
+            .iter()
+            .copied()
+            .fold(0.0_f64, f64::max);
 
         Ok(EinsteinResidualReport {
             dimension: dim,
@@ -441,6 +460,7 @@ impl Z3Bridge {
     /// formal or universal Einstein condition. New callers should prefer
     /// check_einstein_residual_numeric so the measured residual and tolerance
     /// remain explicit in the result type.
+    #[allow(clippy::unused_self)] // Receiver retained for compatibility; this path is solver-independent.
     #[deprecated(note = "numeric residual check only; use check_einstein_residual_numeric; this is not a formal proof")]
     pub fn verify_einstein_condition(
         &self,
@@ -1293,11 +1313,21 @@ mod tests {
     #[test]
     fn test_einstein_numeric_residual_rejects_malformed_inputs() {
         assert_eq!(
-            Z3Bridge::check_einstein_residual_numeric(&[1.0, 2.0], &[1.0, 0.0, 0.0, 1.0], 2, 0.01),
+            Z3Bridge::check_einstein_residual_numeric(
+                &[1.0, 2.0],
+                &[1.0, 0.0, 0.0, 1.0],
+                2,
+                0.01,
+            ),
             Err(EinsteinResidualError::ComponentCountMismatch)
         );
         assert_eq!(
-            Z3Bridge::check_einstein_residual_numeric(&[f64::NAN, 0.0, 0.0, 1.0], &[1.0, 0.0, 0.0, 1.0], 2, 0.01),
+            Z3Bridge::check_einstein_residual_numeric(
+                &[f64::NAN, 0.0, 0.0, 1.0],
+                &[1.0, 0.0, 0.0, 1.0],
+                2,
+                0.01,
+            ),
             Err(EinsteinResidualError::NonFiniteInput)
         );
         assert_eq!(
@@ -1481,12 +1511,12 @@ mod tests {
         // Step 3: Check concrete residuals. This is numeric candidate evidence,
         // not an SMT/formal proof of a symbolic or universal geometric identity.
         let report = Z3Bridge::check_einstein_residual_numeric(
-                &ricci_flat,
-                &metric_flat,
-                metric.dim,
-                0.1, // relaxed tolerance for search candidate
-            )
-            .expect("finite candidate should produce a numeric residual report");
+            &ricci_flat,
+            &metric_flat,
+            metric.dim,
+            0.1, // relaxed tolerance for search candidate
+        )
+        .expect("finite candidate should produce a numeric residual report");
 
         assert!(
             report.within_tolerance,
