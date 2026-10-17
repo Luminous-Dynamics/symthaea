@@ -11,8 +11,15 @@ const FIXTURE_REF: &str = "inline-fixture:synthetic-agri-platform-bench-fixture-
 const FIXTURE_SHA256: &str =
     "db5822bd2544c966f3d8d5348e55551aef8e4d4f48cc562edf6a0deada73c3bf";
 
-fn evidence() -> Vec<EvidenceRecord> {
-    EvidenceDomain::ALL
+fn scenario_evidence() -> Vec<EvidenceRecord> {
+    agri_platform_bench::SCENARIO_EVIDENCE_DOMAINS
+        .into_iter()
+        .map(|domain| EvidenceRecord::verified(domain, FIXTURE_REF, FIXTURE_SHA256))
+        .collect()
+}
+
+fn platform_evidence() -> Vec<EvidenceRecord> {
+    agri_platform_bench::PLATFORM_EVIDENCE_DOMAINS
         .into_iter()
         .map(|domain| EvidenceRecord::verified(domain, FIXTURE_REF, FIXTURE_SHA256))
         .collect()
@@ -34,7 +41,7 @@ fn demo_scenario() -> ScenarioProfile {
         annual_operating_hours: 100,
         require_local_repair: true,
         max_repair_lead_days: 14,
-        evidence: evidence(),
+        evidence: scenario_evidence(),
     }
 }
 
@@ -61,6 +68,7 @@ fn candidate(id: &str, class: PlatformClass) -> PlatformProfile {
         repair_lead_days: 7,
         bounded_safety_case_verified: true,
         human_override_available: true,
+        evidence: platform_evidence(),
     }
 }
 
