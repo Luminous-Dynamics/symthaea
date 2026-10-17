@@ -1,0 +1,83 @@
+{
+  "request": {
+    "schema_version": 1,
+    "comparison_id": "OPEN-MOBILITY-ROBUST-PARETO-001",
+    "task_protocol_version": "walk-protocol-v1",
+    "evidence_level": "synthetic_replay",
+    "interval_semantics": "declared_conservative_envelope",
+    "candidates": [
+      {
+        "candidate_id": "balanced-assist",
+        "metrics": [
+          {"metric":"task_success_rate","interval":{"lower":0.90,"upper":0.95}},
+          {"metric":"wearer_borne_mass_kg","interval":{"lower":4.5,"upper":5.0}},
+          {"metric":"total_system_mass_kg","interval":{"lower":5.2,"upper":5.7}},
+          {"metric":"offboard_mass_kg","interval":{"lower":0.3,"upper":0.5}},
+          {"metric":"torso_mass_kg","interval":{"lower":0.5,"upper":0.7}},
+          {"metric":"pelvis_mass_kg","interval":{"lower":0.8,"upper":1.0}},
+          {"metric":"proximal_limb_mass_kg","interval":{"lower":1.1,"upper":1.3}},
+          {"metric":"distal_limb_mass_kg","interval":{"lower":1.0,"upper":1.2}},
+          {"metric":"other_worn_mass_kg","interval":{"lower":0.4,"upper":0.5}},
+          {"metric":"energy_wh_per_task","interval":{"lower":1.0,"upper":1.2}},
+          {"metric":"setup_time_seconds","interval":{"lower":40.0,"upper":45.0}},
+          {"metric":"movement_restriction_index","interval":{"lower":0.10,"upper":0.20}},
+          {"metric":"comfort_score","interval":{"lower":0.82,"upper":0.88}},
+          {"metric":"tether_interference_events_per_task","interval":{"lower":0.0,"upper":0.1}},
+          {"metric":"repair_time_minutes","interval":{"lower":20.0,"upper":25.0}}
+        ]
+      },
+      {
+        "candidate_id": "overbuilt",
+        "metrics": [
+          {"metric":"task_success_rate","interval":{"lower":0.65,"upper":0.75}},
+          {"metric":"wearer_borne_mass_kg","interval":{"lower":7.7,"upper":8.2}},
+          {"metric":"total_system_mass_kg","interval":{"lower":8.8,"upper":9.3}},
+          {"metric":"offboard_mass_kg","interval":{"lower":0.5,"upper":0.7}},
+          {"metric":"torso_mass_kg","interval":{"lower":0.9,"upper":1.1}},
+          {"metric":"pelvis_mass_kg","interval":{"lower":1.4,"upper":1.6}},
+          {"metric":"proximal_limb_mass_kg","interval":{"lower":2.0,"upper":2.2}},
+          {"metric":"distal_limb_mass_kg","interval":{"lower":2.0,"upper":2.3}},
+          {"metric":"other_worn_mass_kg","interval":{"lower":0.6,"upper":0.8}},
+          {"metric":"energy_wh_per_task","interval":{"lower":2.0,"upper":2.2}},
+          {"metric":"setup_time_seconds","interval":{"lower":70.0,"upper":80.0}},
+          {"metric":"movement_restriction_index","interval":{"lower":0.45,"upper":0.55}},
+          {"metric":"comfort_score","interval":{"lower":0.50,"upper":0.60}},
+          {"metric":"tether_interference_events_per_task","interval":{"lower":0.2,"upper":0.3}},
+          {"metric":"repair_time_minutes","interval":{"lower":40.0,"upper":50.0}}
+        ]
+      },
+      {
+        "candidate_id": "mass-first",
+        "metrics": [
+          {"metric":"task_success_rate","interval":{"lower":0.55,"upper":0.62}},
+          {"metric":"wearer_borne_mass_kg","interval":{"lower":2.0,"upper":2.4}},
+          {"metric":"total_system_mass_kg","interval":{"lower":2.3,"upper":2.8}},
+          {"metric":"offboard_mass_kg","interval":{"lower":0.1,"upper":0.2}},
+          {"metric":"torso_mass_kg","interval":{"lower":0.2,"upper":0.3}},
+          {"metric":"pelvis_mass_kg","interval":{"lower":0.3,"upper":0.5}},
+          {"metric":"proximal_limb_mass_kg","interval":{"lower":0.5,"upper":0.7}},
+          {"metric":"distal_limb_mass_kg","interval":{"lower":0.5,"upper":0.7}},
+          {"metric":"other_worn_mass_kg","interval":{"lower":0.3,"upper":0.4}},
+          {"metric":"energy_wh_per_task","interval":{"lower":0.4,"upper":0.6}},
+          {"metric":"setup_time_seconds","interval":{"lower":20.0,"upper":30.0}},
+          {"metric":"movement_restriction_index","interval":{"lower":0.05,"upper":0.10}},
+          {"metric":"comfort_score","interval":{"lower":0.55,"upper":0.65}},
+          {"metric":"tether_interference_events_per_task","interval":{"lower":0.05,"upper":0.1}},
+          {"metric":"repair_time_minutes","interval":{"lower":10.0,"upper":15.0}}
+        ]
+      }
+    ]
+  },
+  "expected_robust_frontier": [
+    "balanced-assist",
+    "mass-first"
+  ],
+  "expected_dominance": [
+    {"dominator":"balanced-assist","dominated":"overbuilt"}
+  ],
+  "expected_unresolved_pairs": [
+    ["balanced-assist","mass-first"],
+    ["overbuilt","mass-first"]
+  ],
+  "claim_ceiling": "All values are invented synthetic intervals used to exercise the software. They are not physical measurements, confidence intervals, clinical evidence, safety limits, or design targets."
+}
