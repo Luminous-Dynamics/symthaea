@@ -3,8 +3,8 @@
 
 //! # symthaea-operations-research
 //!
-//! Operations research for Symthaea: inventory optimization, queueing, and
-//! shortest paths. A practical decision-science layer the workspace lacked.
+//! Operations research for Symthaea: inventory optimization, queueing,
+//! shortest paths, and explicit aircraft ownership-cost scenario analysis.
 //!
 //! Pure `std`, zero dependencies, no `symthaea-core` link. Closed-form results
 //! and an exact Dijkstra, checked against known values.
@@ -14,6 +14,7 @@
 //! - [`inventory`]: economic order quantity (EOQ) + total cost.
 //! - [`queue`]: M/M/1 queue metrics (ρ, L, Lq, W, Wq).
 //! - [`graph`]: Dijkstra single-source shortest paths.
+//! - [`aircraft_ownership`]: fixed/variable/capital/owner-labor aircraft cost scenarios.
 //!
 //! ## Example
 //!
@@ -23,6 +24,7 @@
 //! assert!((MM1 { arrival_rate: 2.0, service_rate: 3.0 }.avg_in_system() - 2.0).abs() < 1e-12);
 //! ```
 
+pub mod aircraft_ownership;
 pub mod graph;
 pub mod inventory;
 pub mod queue;
