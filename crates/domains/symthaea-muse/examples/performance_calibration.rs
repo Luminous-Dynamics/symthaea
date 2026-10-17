@@ -64,6 +64,9 @@ fn parse(path: &Path) -> Option<Vec<Ev>> {
         midly::Timing::Metrical(t) => t.as_int() as f64,
         _ => return None,
     };
+    if !ppq.is_finite() || ppq <= 0.0 {
+        return None;
+    }
     let mut out = Vec::new();
     for track in &smf.tracks {
         out.extend(parse_track(track, ppq)?);
@@ -193,12 +196,17 @@ mod midi_pairing_tests {
 
     #[test]
     fn rejects_tick_overflow_instead_of_wrapping() {
-        let track = vec![
-            event(0x0fff_ffff, 0, note_on(60, 100)),
-            event(0x0fff_ffff, 0, note_off(60)),
-            event(0x0fff_ffff, 0, note_on(62, 100)),
-            event(0x0fff_ffff, 0, note_off(62)),
-        ];
+        let track: Vec<_> = (0..17)
+            .map(|_| {
+                event(
+                    0x0fff_ffff,
+                    0,
+                    MidiMessage::ProgramChange {
+                        program: u7::new(0),
+                    },
+                )
+            })
+            .collect();
         assert!(parse_track(&track, 480.0).is_none());
     }
 }
