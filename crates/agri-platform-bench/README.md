@@ -41,7 +41,7 @@ Run this contract with the existing dependency-free benchmark:
 cargo test --manifest-path crates/agri-platform-bench/Cargo.toml --all-targets
 ```
 
-The test fixtures are synthetic. Passing them establishes contract behavior only, not completeness or safety of any real farm design.
+The test fixtures are synthetic. The integration-level golden-outcome suite uses an explicit artifact inventory and separate hand-authored expected outcomes, but it still calls the production function for its observed result; it is not yet a separate executable verifier. Passing these fixtures establishes contract behavior only, not completeness or safety of any real farm design.
 
 ## Important limitations
 
