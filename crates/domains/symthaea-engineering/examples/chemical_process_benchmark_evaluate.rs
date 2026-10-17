@@ -392,7 +392,11 @@ fn derive_synthetic_disposition(
             let unresolved = reference_a != reference_b && !evidence_present;
             Ok(json!({
                 "oracle": "thermodynamic_reference_state_compatibility_v1",
-                "derived_disposition": if unresolved { "UNRESOLVED" } else { "ACCEPTED_WITHIN_SCOPE" },
+                "derived_disposition": if unresolved {
+                    "UNRESOLVED"
+                } else {
+                    "ACCEPTED_WITHIN_SCOPE"
+                },
                 "reference_states_match": reference_a == reference_b,
                 "reconciliation_evidence_present": evidence_present
             }))
@@ -497,7 +501,11 @@ fn derive_synthetic_disposition(
             let unresolved = overlap && rank_changes;
             Ok(json!({
                 "oracle": "uncertainty_sensitive_ranking_v1",
-                "derived_disposition": if unresolved { "UNRESOLVED" } else { "ACCEPTED_WITHIN_SCOPE" },
+                "derived_disposition": if unresolved {
+                    "UNRESOLVED"
+                } else {
+                    "ACCEPTED_WITHIN_SCOPE"
+                },
                 "point_scores": { "A": score_a, "B": score_b },
                 "uncertainty_overlap": overlap,
                 "sensitivity_changes_order": rank_changes
@@ -526,7 +534,11 @@ fn derive_synthetic_disposition(
             let missing = required.difference(&available).cloned().collect::<Vec<_>>();
             Ok(json!({
                 "oracle": "lifecycle_dependency_closure_v1",
-                "derived_disposition": if missing.is_empty() { "ACCEPTED_WITHIN_SCOPE" } else { "BLOCKED" },
+                "derived_disposition": if missing.is_empty() {
+                    "ACCEPTED_WITHIN_SCOPE"
+                } else {
+                    "BLOCKED"
+                },
                 "missing_dependencies": missing
             }))
         }
