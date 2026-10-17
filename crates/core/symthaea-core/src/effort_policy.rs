@@ -289,7 +289,9 @@ pub fn evaluate_effort_request(request: &EffortRequestV1) -> EffortDecisionV1 {
     {
         findings.push(EffortFindingV1::StopConflictsWithResistance);
     }
-    if request.user_requested_recovery
+    let recovery_requested =
+        request.user_requested_recovery || request.mode == EffortModeV1::RecoveryHighSupport;
+    if recovery_requested
         && (request.requested_resistance > 0.0 || request.resistance_increase_requested)
     {
         findings.push(EffortFindingV1::RecoveryConflictsWithResistance);
@@ -303,7 +305,7 @@ pub fn evaluate_effort_request(request: &EffortRequestV1) -> EffortDecisionV1 {
     if request.user_requested_stop {
         findings.push(EffortFindingV1::UserRequestedStop);
     }
-    if request.user_requested_recovery {
+    if recovery_requested {
         findings.push(EffortFindingV1::UserRequestedRecovery);
     }
     if request.user_requested_more_assistance {
@@ -312,7 +314,7 @@ pub fn evaluate_effort_request(request: &EffortRequestV1) -> EffortDecisionV1 {
 
     let status = if request.user_requested_stop {
         EffortDecisionStatusV1::StopRequired
-    } else if request.user_requested_recovery {
+    } else if recovery_requested {
         EffortDecisionStatusV1::RecoveryRequired
     } else if request.user_requested_more_assistance {
         EffortDecisionStatusV1::SupportRequired
@@ -441,6 +443,24 @@ mod tests {
         assert!(has_finding(
             &decision,
             EffortFindingV1::RecoveryConflictsWithResistance
+        ));
+    }
+
+    #[test]
+    fn recovery_mode_has_recovery_disposition_without_extra_flag() {
+        let mut request = valid_training_request();
+        request.mode = EffortModeV1::RecoveryHighSupport;
+        request.requested_resistance = 0.0;
+        request.resistance_increase_requested = false;
+        let decision = evaluate_effort_request(&request);
+        assert_eq!(decision.status, EffortDecisionStatusV1::RecoveryRequired);
+        assert!(has_finding(
+            &decision,
+            EffortFindingV1::UserRequestedRecovery
+        ));
+        assert!(!has_finding(
+            &decision,
+            EffortFindingV1::ResistanceRequiresTrainingMode
         ));
     }
 
