@@ -577,11 +577,11 @@ pub fn validate_task_card_static(
             &mut errors,
         );
         let step_source_matches = if card.controlling_manual.document_id == step.source_document_id {
-            card.controlling_manual.source_section == step.source_section
+            card.controlling_manual.source_sections.iter().any(|section| section == &step.source_section)
         } else {
             card.supporting_sources.iter().any(|source| {
                 source.document_id == step.source_document_id
-                    && source.source_section == step.source_section
+                    && source.source_sections.iter().any(|section| section == &step.source_section)
             })
         };
         if !step_source_matches {
@@ -613,11 +613,11 @@ pub fn validate_task_card_static(
             });
         }
         let criterion_source_matches = if card.controlling_manual.document_id == check.source_document_id {
-            card.controlling_manual.source_section == check.source_section
+            card.controlling_manual.source_sections.iter().any(|section| section == &check.source_section)
         } else {
             card.supporting_sources.iter().any(|source| {
                 source.document_id == check.source_document_id
-                    && source.source_section == check.source_section
+                    && source.source_sections.iter().any(|section| section == &check.source_section)
             })
         };
         if !criterion_source_matches {
