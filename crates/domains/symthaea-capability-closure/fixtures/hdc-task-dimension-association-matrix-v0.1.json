@@ -580,6 +580,13 @@
         16384
       ],
       "reason": "Paired common prefixes isolate effect of adding coordinates from a change in codebook samples."
+    },
+    "score_comparability": {
+      "binary_bundle_retrieval_metric": "BinaryHV::cosine_similarity [-1,1]",
+      "binary_negative_pair_metric": "BinaryHV::cosine_similarity [-1,1]",
+      "continuous_bipolar_retrieval_metric": "ContinuousHV::similarity cosine [-1,1]",
+      "purpose": "Place raw target/distractor scores and margins on a comparable bipolar similarity scale.",
+      "caveat": "Comparable score scale does not imply identical representation algebra or noise distributions."
     }
   },
   "progressive_precision_routing": {
