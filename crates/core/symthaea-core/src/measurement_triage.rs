@@ -351,7 +351,11 @@ pub fn triage_measurement_actions(
             blockers.push(MeasurementActionBlockerV1 {
                 gate: "decision_relevance".to_owned(),
                 status: MeasurementGateStatusV1::NotApplicable,
-                reason: "Action covers no metric-pair cell whose dominance may change within the source intervals; it cannot enter this decision-sensitive frontier.".to_owned(),
+                reason: concat!(
+                    "Action covers no metric-pair cell whose dominance may change within ",
+                    "the source intervals; it cannot enter this decision-sensitive frontier."
+                )
+                .to_owned(),
             });
         }
 
@@ -397,13 +401,30 @@ pub fn triage_measurement_actions(
         actions: assessments,
         assumptions: vec![
             "Action coverage is caller-declared and is not independently verified.".to_owned(),
-            "Covered metric-pair cells are deterministic diagnostics, not expected information gain.".to_owned(),
-            "A measurement can narrow bounds without resolving dominance; no resolution is guaranteed.".to_owned(),
+            concat!(
+                "Covered metric-pair cells are deterministic diagnostics, not expected ",
+                "information gain."
+            )
+            .to_owned(),
+            concat!(
+                "A measurement can narrow bounds without resolving dominance; ",
+                "no resolution is guaranteed."
+            )
+            .to_owned(),
             "Definite trade-offs are not sent to a dominance-resolution queue.".to_owned(),
             "Gate statuses are caller-declared and are not authenticated.".to_owned(),
-            "No physical or human-participant action is executed or authorized by this report.".to_owned(),
+            concat!(
+                "No physical or human-participant action is executed or authorized ",
+                "by this report."
+            )
+            .to_owned(),
         ],
-        claim_ceiling: "Triage of caller-declared measurement proposals against supplied interval comparison evidence only; no experiment outcome, clinical benefit, safety or execution authority.".to_owned(),
+        claim_ceiling: concat!(
+            "Triage of caller-declared measurement proposals against supplied interval ",
+            "comparison evidence only; no experiment outcome, clinical benefit, safety ",
+            "or execution authority."
+        )
+        .to_owned(),
     })
 }
 
@@ -552,8 +573,8 @@ fn evaluate_action_gates(action: &MeasurementActionV1) -> Vec<MeasurementActionB
 }
 
 fn action_dominates(a: &MeasurementActionAssessmentV1, b: &MeasurementActionAssessmentV1) -> bool {
-    let cost_no_worse =
-        a.cost_minutes.upper_minutes <= b.cost_minutes.upper_minutes + MEASUREMENT_TRIAGE_EPSILON_V1;
+    let cost_no_worse = a.cost_minutes.upper_minutes
+        <= b.cost_minutes.upper_minutes + MEASUREMENT_TRIAGE_EPSILON_V1;
     if !cost_no_worse {
         return false;
     }
@@ -568,6 +589,7 @@ fn action_dominates(a: &MeasurementActionAssessmentV1, b: &MeasurementActionAsse
 #[cfg(test)]
 mod tests {
     use super::*;
+    use serde::Deserialize;
     use crate::architecture_robustness::{
         ArchitectureRobustnessReportV1, MetricIntervalEntryV1, RobustCandidateAssessmentV1,
         RobustPairwiseAssessmentV1,
@@ -690,9 +712,14 @@ mod tests {
                 grade_percent: 0.0,
                 ambient_temperature_c: 22.0,
             },
-            interval_semantics: crate::architecture_robustness::MetricIntervalSemanticsV1::DeclaredConservativeEnvelope,
+            interval_semantics:
+                crate::architecture_robustness::MetricIntervalSemanticsV1::DeclaredConservativeEnvelope,
             evidence_level: ArchitectureEvidenceLevelV1::SyntheticReplay,
-            candidates: vec![candidate("candidate-a"), candidate("candidate-b"), candidate("candidate-c")],
+            candidates: vec![
+                candidate("candidate-a"),
+                candidate("candidate-b"),
+                candidate("candidate-c"),
+            ],
             pairwise_assessments: vec![ambiguous, tradeoff, third_pair],
             assumptions: Vec::new(),
             claim_ceiling: "Synthetic triage fixture only".to_owned(),
