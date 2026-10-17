@@ -12,8 +12,8 @@ use serde::{Deserialize, Serialize};
 use std::collections::HashSet;
 
 use crate::architecture_pareto::{
-    ArchitectureConditionFieldV1, ArchitectureEvidenceLevelV1, ArchitectureMetricV1,
-    ArchitectureOperatingConditionsV1,
+    ArchitectureConditionFieldV1, ArchitectureEvidenceLevelV1, ArchitectureFamilyV1,
+    ArchitectureMetricV1, ArchitectureOperatingConditionsV1,
 };
 
 /// Current schema version for interval-aware architecture comparisons.
@@ -77,6 +77,10 @@ pub struct MetricIntervalEntryV1 {
 pub struct RobustArchitectureCandidateV1 {
     /// Stable unique identifier within this comparison.
     pub candidate_id: String,
+    /// Architecture family descriptor carried by the point-estimate comparator.
+    pub family: ArchitectureFamilyV1,
+    /// Whether the declared architecture uses a physical tether for the task.
+    pub tethered: bool,
     /// Metric entries. Every objective must appear exactly once; order is normalized in output.
     pub metrics: Vec<MetricIntervalEntryV1>,
 }
@@ -127,6 +131,10 @@ pub enum ArchitectureRobustnessFindingV1 {
     InvalidCandidateId { candidate_id: String },
     /// Candidate identifiers must be unique.
     DuplicateCandidateId { candidate_id: String },
+    /// Remote-actuation architecture must declare a physical tether.
+    RemoteActuationRequiresTether { candidate_id: String },
+    /// An untethered architecture cannot report positive tether-interference bounds.
+    TetherMetricInconsistent { candidate_id: String },
     /// A required objective was omitted.
     MissingMetric {
         candidate_id: String,
@@ -213,6 +221,10 @@ pub struct RobustPairwiseAssessmentV1 {
 pub struct RobustCandidateAssessmentV1 {
     /// Candidate identifier from the request.
     pub candidate_id: String,
+    /// Architecture family descriptor.
+    pub family: ArchitectureFamilyV1,
+    /// Whether the architecture declares a physical tether.
+    pub tethered: bool,
     /// True if no candidate robustly dominates this candidate.
     /// Unresolved candidates remain on this conservative frontier.
     pub on_robust_frontier: bool,
@@ -335,6 +347,15 @@ pub fn evaluate_architecture_robustness(
                 candidate_id: candidate.candidate_id.clone(),
             });
         }
+        if candidate.family == ArchitectureFamilyV1::RemoteActuationTethered
+            && !candidate.tethered
+        {
+            findings.push(
+                ArchitectureRobustnessFindingV1::RemoteActuationRequiresTether {
+                    candidate_id: candidate.candidate_id.clone(),
+                },
+            );
+        }
 
         let mut seen_metrics = HashSet::with_capacity(candidate.metrics.len());
         for entry in &candidate.metrics {
@@ -385,6 +406,16 @@ pub fn evaluate_architecture_robustness(
                 });
             }
         }
+        if !candidate.tethered
+            && candidate.metrics.iter().any(|entry| {
+                entry.metric == ArchitectureMetricV1::TetherInterferenceEventsPerTask
+                    && entry.interval.upper > 0.0
+            })
+        {
+            findings.push(ArchitectureRobustnessFindingV1::TetherMetricInconsistent {
+                candidate_id: candidate.candidate_id.clone(),
+            });
+        }
     }
 
     // Cross-metric envelope checks run only if their needed intervals are structurally complete
@@ -424,6 +455,8 @@ pub fn evaluate_architecture_robustness(
                 .collect();
             RobustArchitectureCandidateV1 {
                 candidate_id: candidate.candidate_id.clone(),
+                family: candidate.family,
+                tethered: candidate.tethered,
                 metrics,
             }
         })
@@ -476,6 +509,8 @@ pub fn evaluate_architecture_robustness(
         .enumerate()
         .map(|(index, candidate)| RobustCandidateAssessmentV1 {
             candidate_id: candidate.candidate_id,
+            family: candidate.family,
+            tethered: candidate.tethered,
             on_robust_frontier: robustly_dominated_by[index].is_empty(),
             robustly_dominated_by: robustly_dominated_by[index].clone(),
             unresolved_against: unresolved_against[index].clone(),
@@ -865,17 +900,14 @@ mod tests {
                 lower: 20.0,
                 upper: 30.0,
             },
-            (M::TetherInterferenceEventsPerTask, Profile::Balanced) => MetricIntervalV1 {
-                lower: 0.0,
-                upper: 0.1,
-            },
-            (M::TetherInterferenceEventsPerTask, Profile::Overbuilt) => MetricIntervalV1 {
-                lower: 0.2,
-                upper: 0.3,
-            },
-            (M::TetherInterferenceEventsPerTask, Profile::MassFirst) => MetricIntervalV1 {
-                lower: 0.05,
-                upper: 0.1,
+            (M::TetherInterferenceEventsPerTask, Profile::Balanced) => {
+                MetricIntervalV1 { lower: 0.0, upper: 0.0 }
+            }
+            (M::TetherInterferenceEventsPerTask, Profile::Overbuilt) => {
+                MetricIntervalV1 { lower: 0.0, upper: 0.0 }
+            }
+            (M::TetherInterferenceEventsPerTask, Profile::MassFirst) => {
+                MetricIntervalV1 { lower: 0.0, upper: 0.0 }
             },
             (M::RepairTimeMinutes, Profile::Balanced) => MetricIntervalV1 {
                 lower: 20.0,
@@ -895,6 +927,12 @@ mod tests {
     fn candidate(candidate_id: &str, profile: Profile) -> RobustArchitectureCandidateV1 {
         RobustArchitectureCandidateV1 {
             candidate_id: candidate_id.to_owned(),
+            family: match profile {
+                Profile::Balanced => ArchitectureFamilyV1::HybridPoweredPassive,
+                Profile::Overbuilt => ArchitectureFamilyV1::PoweredRigid,
+                Profile::MassFirst => ArchitectureFamilyV1::Passive,
+            },
+            tethered: false,
             metrics: REQUIRED_METRICS
                 .into_iter()
                 .map(|metric| MetricIntervalEntryV1 {
