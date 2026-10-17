@@ -70,6 +70,9 @@ pub mod core;
 /// Shared embodiment types: MotorSafetyLevel, EmbodimentBridge trait, telemetry.
 #[allow(missing_docs)]
 pub mod embodiment;
+/// Report-only system-level Pareto evaluation for wearable-robot architectures.
+#[allow(missing_docs)]
+pub mod architecture_pareto;
 /// Report-only lifecycle and wearability evidence evaluator for exosuit research.
 #[allow(missing_docs)]
 pub mod wearability;
