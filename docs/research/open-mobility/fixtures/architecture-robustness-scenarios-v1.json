@@ -104,7 +104,7 @@
             "metric": "tether_interference_events_per_task",
             "interval": {
               "lower": 0,
-              "upper": 0.1
+              "upper": 0
             }
           },
           {
@@ -114,7 +114,9 @@
               "upper": 25
             }
           }
-        ]
+        ],
+        "family": "hybrid_powered_passive",
+        "tethered": false
       },
       {
         "candidate_id": "overbuilt",
@@ -213,8 +215,8 @@
           {
             "metric": "tether_interference_events_per_task",
             "interval": {
-              "lower": 0.2,
-              "upper": 0.3
+              "lower": 0,
+              "upper": 0
             }
           },
           {
@@ -224,7 +226,9 @@
               "upper": 50
             }
           }
-        ]
+        ],
+        "family": "powered_rigid",
+        "tethered": false
       },
       {
         "candidate_id": "mass-first",
@@ -323,8 +327,8 @@
           {
             "metric": "tether_interference_events_per_task",
             "interval": {
-              "lower": 0.05,
-              "upper": 0.1
+              "lower": 0,
+              "upper": 0
             }
           },
           {
@@ -334,7 +338,9 @@
               "upper": 15
             }
           }
-        ]
+        ],
+        "family": "passive",
+        "tethered": false
       }
     ],
     "benchmark_case_id": "ARCH-001-flat-walk-task-profile-a",
