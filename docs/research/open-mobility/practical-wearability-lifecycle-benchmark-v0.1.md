@@ -87,6 +87,8 @@ A successful software state transition is not proof that a physical latch, stop,
 
 Use deterministic synthetic and replay traces first. Human-participant protocols require appropriate ethical review, accessible consent, domain expertise and regulatory review as applicable. Physical tests require a platform-specific safety plan.
 
+The starter [scenario corpus v1](./fixtures/wearability-lifecycle-scenarios-v1.json) contains 12 named positive and negative replay cases for verified fit, incomplete fastening, dynamic fit drift, missing/conflicted interface evidence, caregiver unavailability, doff requests, restart-boundary configuration, task-energy reserve, calibration invalidation after service, timeouts and missing measurements. The fixture states expected software/report dispositions, not physical actions. Add cases only with stable identifiers and preserve positive controls.
+
 ## 5. Metric dictionary
 
 Keep dimensions separate. Every report must publish definitions, units, numerator/denominator, aggregation, exclusions and uncertainty method.
