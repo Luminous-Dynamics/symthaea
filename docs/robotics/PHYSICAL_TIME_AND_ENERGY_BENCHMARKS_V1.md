@@ -31,6 +31,7 @@ ROS 2 control's clock model is a useful boundary reference: hardware-oriented re
 | PT-9 | Replay and evidence | Pin repo SHA, backend/profile, config, seed, initial state, command trace hash, timing source, workload identifier, build/features, and corpus version. Preserve negative controls. | Deterministic simulation replay yields identical plant-time evidence and, where the backend claims determinism, identical transition/capture hashes. Missing provenance is an incomplete result, not a pass. |
 | PT-10 | Fault and disturbance response | Inject bounded sensor dropout/staleness, clock reset or epoch change, missed command deadline, actuator rejection, and plant disturbance in simulation with pinned seeds and negative controls. Record detect-to-safe-action latency, time to recover, intervention count, and safety-envelope violations. | Every out-of-policy timing record is rejected; no stale command is reported as fresh. Response deadlines are profile-owned and explicit. Zero unsafe actions is required on the declared test corpus, but does not constitute a proof of safety or a hard-realtime guarantee. |
 | PT-11 | Adaptation agility | Start from a declared baseline task and environment, then request a task/tool/obstacle change without changing the plant-time authority. Measure time-to-reconfigure, task success, recovery time, human interventions, constraint violations, and repeatability across randomized but pinned scenarios. | Report distributions and baselines rather than one aggregate score. Faster re-tasking must not relax timing provenance, safety constraints, or evidence requirements. |
+| PT-12 | Invalid energy-model inputs | Inject NaN, positive/negative infinity, and negative modeled joules per cycle; inject non-finite/negative tau factors that make the computed sample invalid. Exercise first-cycle and open-window states. | The first affected tick fails closed, records no invalid joule/watt sample, clears the partial window, and leaves a bounded, interpretable telemetry state. NaN must never bypass a comparison because IEEE comparisons with NaN are false. |
 
 ## Reporting rules
 
@@ -40,7 +41,7 @@ Every published result must distinguish the following metrics; do not combine th
 - controller update cadence and deadline/jitter distribution;
 - requested and actually applied plant dt, cumulative simulation/model time, and wall-time execution ratio;
 - sensor sample age, receive age, command age, and transport latency;
-- modeled joules/cycle, total modeled joules, model-estimated average watts, and measured electrical energy/power (if instrumented);
+- modeled joules/cycle, total modeled joules, model-estimated average watts, and measured electrical energy/power (if instrumented), plus invalid-model-input rejection counts;
 - success/task quality, safety-envelope violations, time-to-safe-action after faults, recovery time, and task reconfiguration/agility.
 
 Report p50, p95, p99, p99.9, maximum, sample count, duration, missed deadlines, and relevant uncertainty. Pin the workload and distinguish warm-up from scored runs. Never infer hard real-time guarantees from a finite test alone.
