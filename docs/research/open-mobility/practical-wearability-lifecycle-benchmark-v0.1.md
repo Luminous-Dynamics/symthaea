@@ -132,12 +132,14 @@ The cognition layer may infer intent, summarize evidence and propose adjustments
 
 **Current reference implementation:** draft [PR #7865](https://github.com/Luminous-Dynamics/symthaea/pull/7865) adds a report-only Rust evaluator with typed lifecycle stages and evidence states, deterministic dispositions, and 15 unit tests plus three public-API integration tests against 18 versioned scenarios. Its additional task gates reject an explicitly unsupported task, restricted space, or incompatible hygiene workflow, and request review when thermal discomfort is reported, duty-cycle limits are reached, or compatibility is unknown. Tests have not been executed; the count describes authored tests, not test results.
 
+**Auditability follow-on:** draft [PR #7879](https://github.com/Luminous-Dynamics/symthaea/pull/7879) adds ordered reason codes and a separately versioned decision receipt with declared evidence provenance. This separates the decision result from input completeness: synthetic fixture values are explicitly `caller_assertion`, not sensor readings. Missing evidence, duplicate records, and sensor records without timestamp/timebase/calibration metadata remain visible. See tracking issue [#7867](https://github.com/Luminous-Dynamics/symthaea/issues/7867). The extended branch contains 21 authored unit tests and eight integration tests, all unexecuted in this environment; these counts are not passes.
+
 The evaluator is deliberately a report, not physical control authority. It cannot determine tissue-safe pressure, prove a physical latch, validate battery range, or execute emergency doffing. Its declared inputs remain caller assertions unless separate validated measurement evidence is attached.
 
 **Further implementation work:**
 
-- Extend lifecycle receipts with source/timestamp, session identity, per-finding reason codes and calibration provenance.
-- Add a benchmark manifest that distinguishes caller assertion, sensor measurement, independent observation and operator annotation.
+- Bind each evidence record to immutable source revision, scenario/corpus digest, profile revision and an authenticated measurement-system identity where available; this report-only module cannot authenticate its caller.
+- Add independent receipt-completeness verification and adversarial fixtures for conflicting observations, duplicated IDs, clock discontinuity and stale calibration.
 - Expand deterministic replay cases for task transitions, real-world confined-space restrictions, cleaning/hygiene compatibility, repeated don/doff cycles and comfort over duration.
 - Reuse existing embodiment/mobility contracts where possible rather than adding a second physical command API.
 
