@@ -5,14 +5,14 @@
 
 ## Baseline and honest completion measure
 
-The catalog has 152 stable public IDs across 19 constellations. On this branch, 34 entries have a callable composer route, up from 29. The remaining 118 entries have no callable route.
+The catalog has 152 stable public IDs across 19 constellations. On this branch, 35 entries have a callable composer route, up from 29. The remaining 117 entries have no callable route.
 
 A callable route is not the same as a finished or authentic style. Existing catalog statuses remain Developing or ExpertReviewRequired; no style is Foundation merely because it generates a score. Some existing entries route to a close related preset (for example, Chicago Blues to the general Blues engine or Motet to SacredChoral), so style-specific identity and blind listening still need to be established.
 
 | Constellation | Callable routes | No route yet |
 |---|---:|---:|
 | Classical Lyric & Character | 7/8 | 1 |
-| Baroque and Early Dance Forms | 2/8 | 6 |
+| Baroque and Early Dance Forms | 3/8 | 5 |
 | Developmental and Large Forms | 3/8 | 5 |
 | Contrapuntal and Polyphonic | 3/8 | 5 |
 | Ground, Ostinato and Transformation | 3/8 | 5 |
@@ -30,21 +30,22 @@ A callable route is not the same as a finished or authentic style. Existing cata
 | Club and Beat Music | 0/8 | 8 |
 | Pop and Rock | 0/8 | 8 |
 | Dramatic, Screen and Stage | 2/8 | 6 |
-| **Total** | **34/152** | **118/152** |
+| **Total** | **35/152** | **117/152** |
 
 ## Newly callable styles
 
-This tranche adds four composer presets using existing, named structural engines and one Baroque preset with an explicit rhythmic identity instead of making a new genre name only a tempo label:
+This tranche adds four structural presets using existing named engines, plus two Baroque presets with distinct rhythmic identities/form control instead of mapping those catalog names to a generic genre label:
 
 - **Rondo** — fixes the form pool to A–B–A–C–A, using the current Rondo realizer.
 - **Theme and Variations** — fixes the form pool to the duration-preserving variation realizer.
 - **Erosion** — fixes the ground-form pool to the existing progressive ground-loss realizer.
 - **Lineage** — fixes the ground-form pool to the existing parent-to-descendant ground transformation realizer.
 - **Sarabande** — uses an explicit 3/4 accompaniment cell with the primary accent on beat two, separated from the existing Waltz/OomPah pattern. Its formal model and stylistic details remain Developing pending review.
+- **Minuet and Trio** — uses a 3/4 minuet-specific first-beat accent cell and a fixed ternary A–B–A form for the da-capo return. The trio's instrumentation/form contrast remains Developing pending expert review.
 
-Rondo, Theme and Variations, Erosion, Lineage, and Sarabande each have a named catalogue mapping and a defined tempo band. The four structural presets have exact-form regression tests. The Sarabande accompaniment has tests for its beat positions and accent hierarchy. Erosion and Lineage derive their starting instrumentation/motif/harmonic constraints from the Passacaglia preset and still need their own authored melodic DNA; they are structurally callable, not fully differentiated timbral or melodic identities.
+All six styles have a named catalogue mapping and a defined tempo band. Rondo, Theme and Variations, Erosion, Lineage, and Minuet and Trio have fixed-form regression checks. Sarabande and Minuet each have rhythmic-cell tests for beat positions and accent hierarchy. Erosion and Lineage derive their starting instrumentation/motif/harmonic constraints from the Passacaglia preset and still need their own authored melodic DNA; they are structurally callable, not fully differentiated timbral or melodic identities.
 
-The Style::ALL registry and the catalog's executable-route tests now cover the expanded 34. The known inert progression-field audit and intent-axis audit also include the ground-form additions. A style whose dedicated form owns its own harmonic/length logic must not be made to look complete by changing a progression field that the engine does not consume.
+The Style::ALL registry and the catalog's executable-route tests now cover the expanded 35. The known inert progression-field audit and intent-axis audit also include the ground-form additions. A style whose dedicated form owns its own harmonic/length logic must not be made to look complete by changing a progression field that the engine does not consume.
 
 ## Cultural and tradition-specific safety
 
@@ -76,7 +77,7 @@ A style should only be promoted through these layers:
 
 ## Recommended remaining sequence
 
-**Next: Classical and Baroque forms.** Build Minuet and Trio, Gavotte, Gigue, Allemande, Toccata, French Overture, Rondo-adjacent developmental forms and Elegy; expand the Sarabande's current rhythm-focused preset into a reviewed form/performance model from actual formal/rhythmic differences, not aliases. Reuse existing form machinery when its invariants really match; add a new engine only when the structure cannot be represented faithfully.
+**Next: Classical and Baroque forms.** Expand the Minuet and Trio's actual A-versus-Trio contrast, then build Gavotte, Gigue, Allemande, Toccata, French Overture, Rondo-adjacent developmental forms and Elegy; expand the Sarabande's current rhythm-focused preset into a reviewed form/performance model from actual formal/rhythmic differences, not aliases. Reuse existing form machinery when its invariants really match; add a new engine only when the structure cannot be represented faithfully.
 
 **Then: song, blues and jazz.** Build verse/chorus, through-composed, sea shanty, art song/Lied, Delta/Country/Chicago blues variants, Gospel call-response, Soul/R&B/Neo-Soul, swing, bebop, cool/hard/modal/free jazz and jazz waltz. Require distinct groove/harmonic/phrase identity tests before making these callable under specific labels.
 
@@ -86,10 +87,10 @@ A style should only be promoted through these layers:
 
 **Then: process/electronic/club/pop/screen.** Complete phase music, additive process, spectral/aleatoric, dark ambient, drone, Berlin School, IDM/glitch/vaporwave/electroacoustic, house/deep house/techno/trance/DnB/UK garage/breakbeat/hip-hop, pop/indie/dream/synthpop/rock/prog/post-rock/folk-rock, musical theatre, noir/epic/horror/sci-fi and adaptive game-score states. Include arrangement, production and long-form tests as relevant; notes and tempo alone cannot finish these styles.
 
-These batches are a prioritization, not permission to skip any of the 118 remaining unmapped catalog IDs.
+These batches are a prioritization, not permission to skip any of the 117 remaining unmapped catalog IDs.
 
 ## Verification status
 
-This branch is the first style-completion tranche, not the final 152-style delivery. Five style routes and catalog coverage tests are authored. Rust formatting, compilation, unit tests and listening checks must pass on the exact final commit before this tranche is qualified. A queued, skipped, stale or missing CI result is not a pass.
+This branch is the first style-completion tranche, not the final 152-style delivery. Six style routes and catalog coverage tests are authored. Rust formatting, compilation, unit tests and listening checks must pass on the exact final commit before this tranche is qualified. A queued, skipped, stale or missing CI result is not a pass.
 
 No audio samples or third-party recordings are added to this branch. Listening and benchmark corpora must use original works, verified public-domain recordings, or explicitly licensed/authorized sources.
