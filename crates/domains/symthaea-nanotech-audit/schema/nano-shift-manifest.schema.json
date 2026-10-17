@@ -164,6 +164,25 @@
             },
             "then": {
               "properties": {
+                "shift_families": {
+                  "maxItems": 0
+                }
+              }
+            }
+          },
+          {
+            "if": {
+              "properties": {
+                "shift_kind": {
+                  "const": "in_distribution"
+                }
+              },
+              "required": [
+                "shift_kind"
+              ]
+            },
+            "then": {
+              "properties": {
                 "severity": {
                   "const": "baseline"
                 }
