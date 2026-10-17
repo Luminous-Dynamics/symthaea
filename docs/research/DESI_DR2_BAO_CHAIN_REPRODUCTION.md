@@ -106,16 +106,20 @@ This gate is an inference reproduction, not necessarily independent reanalysis o
 
 ## Planned implementation boundary
 
-Symthaea should first provide the cosmological background equations and validated analytic reference tests. An initial dependency-light chain reader/auditor now exists in crates/domains/symthaea-cosmology-bench. It includes streaming SHA-256 verification against an exact relative-path entry in a downloaded SHA-256SUMS-style manifest, a JSON CLI mode, multi-chain parsing with strict identical-header checks, and synthetic parser/summary negative controls. Example checksum command:
+Symthaea should first provide the cosmological background equations and validated analytic reference tests. The dependency-light chain reader/auditor in `crates/domains/symthaea-cosmology-bench` now has a fail-closed chain-summary mode: the official path requires the exact SHA-256 manifest plus `RELATIVE_PATH=LOCAL_FILE` mappings for each chain. Every local artifact is hashed and checked against its official relative-path entry before its same in-memory bytes are parsed. The separate `--summary-unverified` mode is clearly labeled for synthetic/local exploration only.
+
+Example official checksum-gated audit command:
 
 ```sh
 cargo run -p symthaea-cosmology-bench --bin symthaea-cosmology-chain-audit -- \
-  --verify-manifest data/bao-cosmo-params/dr2_vac_dr2_bao-cosmo-params_v1.0.sha256sum \
-  cobaya/base/desi-bao-all/chain.1.txt \
-  data/bao-cosmo-params/cobaya/base/desi-bao-all/chain.1.txt
+  --audit-manifest data/bao-cosmo-params/dr2_vac_dr2_bao-cosmo-params_v1.0.sha256sum H0 \
+  cobaya/base/desi-bao-all/chain.1.txt=data/bao-cosmo-params/cobaya/base/desi-bao-all/chain.1.txt \
+  cobaya/base/desi-bao-all/chain.2.txt=data/bao-cosmo-params/cobaya/base/desi-bao-all/chain.2.txt \
+  cobaya/base/desi-bao-all/chain.3.txt=data/bao-cosmo-params/cobaya/base/desi-bao-all/chain.3.txt \
+  cobaya/base/desi-bao-all/chain.4.txt=data/bao-cosmo-params/cobaya/base/desi-bao-all/chain.4.txt
 ```
 
-The tool and tests remain uncompiled in this environment, and it has not processed the real DESI files here. Before D0/D1 can pass, run it against downloaded artifacts and compare its summary conventions with official metadata. It must not claim to implement a Boltzmann solver or a full cosmological likelihood.
+The tool and tests remain uncompiled in this environment, and it has not processed the real DESI files here. Before D0/D1 can pass, run it against downloaded artifacts and compare its summary conventions with official metadata. A checksum-manifest file is recorded and hashed by the tool but is not independently authenticated by it; acquire it from the official DESI publisher and preserve its provenance. This tool does not implement a Boltzmann solver or a full cosmological likelihood.
 
 Mycelix-DeSci should store the exact input hashes, output summary, settings, benchmark status, comparison tolerance, and independent reproduction attestation. Symtropy is not required for this chain-audit milestone; its role begins with validated dynamical simulations, not posterior-file parsing.
 
