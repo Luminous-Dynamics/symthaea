@@ -11,6 +11,7 @@
 //!   --repetitions N     (measurement batches; default 30)
 //!   --warmup N           (warm-up batches; default 5)
 //!   --out DIR            (default target/neuro-silicon-003)
+//!   --validate-receipt PATH/receipt.json
 //!
 //! This is deliberately a software-only retrieval micro-workload. It uses the
 //! canonical BinaryHV::random and BinaryHV::hamming_distance APIs. Store/query
@@ -21,7 +22,7 @@ use serde_json::{Value, json};
 use sha2::{Digest, Sha256};
 use std::env;
 use std::fs;
-use std::path::{Path, PathBuf};
+use std::path::{Component, Path, PathBuf};
 use std::process::Command;
 use std::time::Instant;
 use symthaea_core::hdc::binary_hv::BinaryHV;
@@ -67,6 +68,24 @@ fn main() {
 
 fn run() -> Result<(), String> {
     let args: Vec<String> = env::args().skip(1).collect();
+    if args.first().map(String::as_str) == Some("--validate-receipt") {
+        if args.len() != 2 {
+            return Err("usage: hdc_retrieval_host_benchmark --validate-receipt PATH/receipt.json".to_owned());
+        }
+        let receipt_path = PathBuf::from(&args[1]);
+        let bytes = fs::read(&receipt_path)
+            .map_err(|error| format!("cannot read receipt {}: {error}", receipt_path.display()))?;
+        let receipt: Value = serde_json::from_slice(&bytes)
+            .map_err(|error| format!("receipt is not valid JSON: {error}"))?;
+        let base_dir = receipt_path.parent().filter(|path| !path.as_os_str().is_empty()).unwrap_or(Path::new("."));
+        validate_receipt(&receipt, base_dir)?;
+        println!(
+            "receipt preflight valid: status={} source_commit={}",
+            receipt["status"].as_str().unwrap_or("unknown"),
+            receipt["source"]["commit_sha"].as_str().unwrap_or("unknown")
+        );
+        return Ok(());
+    }
     let config = parse_args(&args)?;
     let repo_root = PathBuf::from(git_text(None, &["rev-parse", "--show-toplevel"])?);
     let repo_root = fs::canonicalize(&repo_root)
@@ -281,6 +300,7 @@ fn run() -> Result<(), String> {
         "artifacts": [manifest_artifact, expected_artifact, raw_artifact],
         "limitations": limitations
     });
+    validate_receipt(&receipt, &output_dir)?;
     let receipt_bytes = json_bytes(&receipt)?;
     fs::write(output_dir.join("receipt.json"), &receipt_bytes)
         .map_err(|error| format!("cannot write receipt.json: {error}"))?;
@@ -290,6 +310,131 @@ fn run() -> Result<(), String> {
         "output={} status={} batches={} queries={} mismatches={}",
         output_dir.display(), status, config.repetitions, measured_queries, mismatches
     );
+    Ok(())
+}
+
+/// Check the receipt's high-impact invariants and all referenced artifact hashes.
+/// This is a semantic preflight, not a replacement for validating against the
+/// versioned JSON Schema or independently reproducing the measurements.
+fn validate_receipt(receipt: &Value, base_dir: &Path) -> Result<(), String> {
+    let status = receipt.get("status").and_then(Value::as_str)
+        .ok_or_else(|| "receipt is missing string status".to_owned())?;
+    if !["pass", "fail", "incomplete", "not_comparable"].contains(&status) {
+        return Err(format!("receipt has unsupported status {status:?}"));
+    }
+    if receipt.get("schema_version").and_then(Value::as_str) != Some("0.1") {
+        return Err("receipt schema_version must be 0.1".to_owned());
+    }
+
+    let source = receipt.get("source").ok_or_else(|| "receipt is missing source".to_owned())?;
+    for key in ["commit_sha", "tree_sha"] {
+        let sha = source.get(key).and_then(Value::as_str)
+            .ok_or_else(|| format!("receipt source is missing {key}"))?;
+        if sha.len() != 40 || !sha.bytes().all(|byte| byte.is_ascii_hexdigit()) {
+            return Err(format!("receipt source {key} is not a 40-character hexadecimal identifier"));
+        }
+    }
+
+    let mut artifact_hashes = std::collections::BTreeMap::<String, String>::new();
+    let artifacts = receipt.get("artifacts").and_then(Value::as_array)
+        .ok_or_else(|| "receipt artifacts must be an array".to_owned())?;
+    if artifacts.is_empty() && status == "pass" {
+        return Err("pass receipt must reference at least one evidence artifact".to_owned());
+    }
+    for artifact in artifacts {
+        let path_text = artifact.get("path").and_then(Value::as_str)
+            .ok_or_else(|| "artifact is missing path".to_owned())?;
+        let relative = Path::new(path_text);
+        if relative.is_absolute() || relative.components().any(|component| {
+            matches!(component, Component::ParentDir | Component::RootDir | Component::Prefix(_))
+        }) {
+            return Err(format!("artifact path must be relative and cannot escape receipt directory: {path_text}"));
+        }
+        let bytes = fs::read(base_dir.join(relative))
+            .map_err(|error| format!("cannot read artifact {path_text}: {error}"))?;
+        let expected_sha = artifact.get("sha256").and_then(Value::as_str)
+            .ok_or_else(|| format!("artifact {path_text} is missing sha256"))?;
+        if sha256(&bytes) != expected_sha {
+            return Err(format!("artifact hash mismatch: {path_text}"));
+        }
+        let expected_size = artifact.get("size_bytes").and_then(Value::as_u64)
+            .ok_or_else(|| format!("artifact {path_text} is missing integer size_bytes"))?;
+        if expected_size != bytes.len() as u64 {
+            return Err(format!("artifact size mismatch: {path_text}"));
+        }
+        if artifact_hashes.insert(path_text.to_owned(), expected_sha.to_owned()).is_some() {
+            return Err(format!("duplicate artifact path: {path_text}"));
+        }
+    }
+
+    let workload = receipt.get("workload").ok_or_else(|| "receipt is missing workload".to_owned())?;
+    for (field, artifact_path) in [
+        ("input_manifest_sha256", "input_manifest.json"),
+        ("expected_results_sha256", "expected_results.json"),
+    ] {
+        if status == "pass" || workload.get(field).is_some() {
+            let declared = workload.get(field).and_then(Value::as_str)
+                .ok_or_else(|| format!("workload is missing {field}"))?;
+            let artifact = artifact_hashes.get(artifact_path)
+                .ok_or_else(|| format!("required artifact {artifact_path} is not referenced"))?;
+            if declared != artifact {
+                return Err(format!("{field} does not match artifact {artifact_path}"));
+            }
+        }
+    }
+
+    let execution = receipt.get("execution").ok_or_else(|| "receipt is missing execution".to_owned())?;
+    let boundary_complete = execution.get("boundary_complete").and_then(Value::as_bool)
+        .ok_or_else(|| "execution.boundary_complete must be boolean".to_owned())?;
+    let measured_batches = execution.get("measured_batches").and_then(Value::as_u64)
+        .ok_or_else(|| "execution.measured_batches must be an integer".to_owned())?;
+    let correctness = receipt.get("correctness").ok_or_else(|| "receipt is missing correctness".to_owned())?;
+    let mismatch_count = correctness.get("mismatches").and_then(Value::as_u64)
+        .ok_or_else(|| "correctness.mismatches must be an integer".to_owned())?;
+    let attempted = correctness.get("fixtures_attempted").and_then(Value::as_u64)
+        .ok_or_else(|| "correctness.fixtures_attempted must be an integer".to_owned())?;
+    let passed = correctness.get("fixtures_passed").and_then(Value::as_u64)
+        .ok_or_else(|| "correctness.fixtures_passed must be an integer".to_owned())?;
+    if passed.saturating_add(mismatch_count) != attempted {
+        return Err("fixtures_passed + mismatches must equal fixtures_attempted".to_owned());
+    }
+    if !boundary_complete && status == "pass" {
+        return Err("a workload with an incomplete measurement boundary cannot pass".to_owned());
+    }
+    if mismatch_count > 0 && status != "fail" {
+        return Err("a receipt with correctness mismatches must have status=fail".to_owned());
+    }
+    if status == "pass" {
+        if measured_batches < 30 {
+            return Err("pass receipt requires at least 30 measured batches".to_owned());
+        }
+        if correctness.get("oracle_comparison").and_then(Value::as_str) != Some("exact_match") {
+            return Err("pass receipt requires exact_match oracle comparison".to_owned());
+        }
+        if correctness.get("malformed_frames_accepted").and_then(Value::as_u64) != Some(0) {
+            return Err("pass receipt requires an explicit zero malformed-frame acceptance count".to_owned());
+        }
+        let metrics = receipt.get("metrics").and_then(Value::as_array)
+            .ok_or_else(|| "receipt metrics must be an array".to_owned())?;
+        let has_measured_tail = metrics.iter().any(|metric| {
+            matches!(
+                metric.get("metric_id").and_then(Value::as_str),
+                Some("latency_p95" | "throughput" | "energy_per_query")
+            ) && metric.get("kind").and_then(Value::as_str) == Some("measured")
+                && metric.get("sample_count").and_then(Value::as_u64).unwrap_or(0) >= 30
+        });
+        if !has_measured_tail {
+            return Err("pass receipt requires at least one measured p95/throughput/energy metric with 30 or more samples".to_owned());
+        }
+        if artifacts.len() == 0 {
+            return Err("pass receipt requires evidence artifacts".to_owned());
+        }
+    }
+    if matches!(status, "incomplete" | "not_comparable")
+        && receipt.get("limitations").and_then(Value::as_array).map_or(true, Vec::is_empty)
+    {
+        return Err(format!("status={status} requires at least one explicit limitation"));
+    }
     Ok(())
 }
 
