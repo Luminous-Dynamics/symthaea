@@ -265,8 +265,10 @@ pub fn calculate_ownership_cost(
         annual_successful_flight_hours: successful_hours,
         attempted_missions: scenario.utilization.attempted_missions,
         completed_missions: scenario.utilization.completed_missions,
-        mission_completion_fraction: (attempted_missions > 0.0)
-            .then_some(successful_missions / attempted_missions),
+        mission_completion_fraction: positive_denominator_rate(
+            successful_missions,
+            attempted_missions,
+        ),
         completed_passenger_kilometres: passenger_km,
         cost_per_flown_hour: positive_denominator_rate(full_economic_annual, flown_hours),
         cost_per_successful_flight_hour: positive_denominator_rate(
@@ -665,6 +667,7 @@ mod tests {
         let result = calculate_ownership_cost(&input).unwrap();
         assert_eq!(result.cost_per_completed_mission, None);
         assert_eq!(result.mission_completion_fraction, None);
+        assert_eq!(result.cost_per_completed_passenger_kilometre, None);
     }
 
     #[test]
