@@ -1,20 +1,21 @@
 // Copyright (C) 2024-2026 Tristan Stoltz / Luminous Dynamics
 // SPDX-License-Identifier: AGPL-3.0-or-later
-//! Performance expression: humanize notes with Phi-dependent timing,
-//! FEP-driven dynamics, rubato, and legato.
+//! Performance expression primitives: legacy Phi-linked humanization and an
+//! explicit, versioned profile API for parameters that can be calibrated from
+//! instrument-specific performer evidence.
 //!
-//! Research basis:
-//! - Human pianists deviate ±7ms (4%) in controlled performance (Weber's Law)
-//! - SD scales linearly with IOI duration above 300ms
-//! - Beat 1 timing is more precise (humans anchor to downbeats)
-//! - Velocity curves follow phrase arcs (crescendo/diminuendo)
+//! The legacy Phi-to-jitter relation and the default profile values are
+//! heuristics, not validated measures of musicianship or universal estimates
+//! of human motor variability. In particular, Phi must not be interpreted as
+//! instrumental skill. Product-level performance claims require role-specific
+//! held-out measurements and listener evaluation.
 
 use crate::Note;
 
-/// Phi-dependent Gaussian timing jitter standard deviation (milliseconds).
+/// Legacy heuristic mapping from Phi to Gaussian timing jitter SD (ms).
 ///
-/// High Phi (integrated consciousness) → tight timing (~8ms SD)
-/// Low Phi (fragmented) → erratic timing (~22ms SD)
+/// Retained for compatibility with existing callers; this is not a validated
+/// relationship between Phi, consciousness, expressive timing, or performance skill.
 fn timing_sd_ms(phi: f32) -> f32 {
     7.0 + (1.0 - phi.clamp(0.0, 1.0)) * 15.0
 }
@@ -34,9 +35,12 @@ pub fn humanize(note: &mut Note, beat_position: f32, phrase_position: f32, seed:
     humanize_with_consciousness(note, beat_position, phrase_position, seed, 0.5, 0.5);
 }
 
-/// Full humanization with consciousness parameters.
+/// Legacy humanization heuristic with consciousness-related inputs.
 ///
-/// - Phi-dependent Gaussian timing jitter (±7ms at high Phi, ±22ms at low Phi)
+/// These input-to-performance mappings are engineering choices, not evidence that
+/// Phi or arousal measure musicianship or predict the best expressive timing.
+///
+/// - Phi-dependent Gaussian timing jitter (approximately 7–22ms SD)
 /// - Beat accent: beat 1 tighter + louder, beat 3 softer
 /// - Phrase dynamics: crescendo to 60%, then diminuendo
 /// - Arousal-dependent dynamic range compression
@@ -98,9 +102,9 @@ pub fn humanize_with_consciousness(
 /// (`symthaea-music-theory`'s composer), so applying the full phrase-dynamics
 /// curve here would double-apply structural dynamics. What a score CANNOT
 /// represent — and what this adds — is human motor variance:
-/// - Φ-scaled Gaussian onset jitter (downbeats anchored tighter, matching
-///   measured pianist behavior), meter-aware via `beats_per_bar` instead of
-///   the 4/4 hardcoded in the older path (a Waltz has 3 beats to a bar);
+/// - legacy Φ-scaled Gaussian onset jitter (downbeat weighting is a heuristic,
+///   not a calibrated cross-instrument performance rule), meter-aware via
+///   `beats_per_bar` instead of the 4/4 hardcoded in the older path;
 /// - ±8% Gaussian velocity noise (small enough not to fight the score's
 ///   structural dynamics);
 /// - optional legato overlap for sustained melodic/bass lines (block chords
