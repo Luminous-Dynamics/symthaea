@@ -83,7 +83,9 @@ fn decision_schema_validator(schema: &Value) -> Result<jsonschema::Validator, St
         return Err(format!("decision schema $id must be {DECISION_SCHEMA_ID}"));
     }
     if !jsonschema::draft202012::meta::is_valid(schema) {
-        return Err("decision schema does not validate against the Draft 2020-12 meta-schema".to_owned());
+        return Err(
+            "decision schema does not validate against the Draft 2020-12 meta-schema".to_owned(),
+        );
     }
     jsonschema::draft202012::options()
         .should_validate_formats(true)
@@ -214,7 +216,11 @@ fn parse_measurement_costs(
     Ok(cost_map)
 }
 
-fn expected_risk(trace: &Value, actions: &[Action], probabilities: &BTreeMap<String, f64>) -> (String, f64) {
+fn expected_risk(
+    trace: &Value,
+    actions: &[Action],
+    probabilities: &BTreeMap<String, f64>,
+) -> (String, f64) {
     let mut candidates = Vec::new();
     for action in actions.iter().filter(|action| action.eligible) {
         let risk = probabilities
@@ -559,6 +565,14 @@ fn audit_values(
     decision_corpus_raw: &str,
 ) -> Result<Value, Errors> {
     let _ = base_schema;
+    let actual_base_sha = format!("{:x}", Sha256::digest(base_corpus_raw.as_bytes()));
+    if text_at(decision_corpus, "base_corpus_sha256") != Some(actual_base_sha.as_str()) {
+        return Err(vec![format!(
+            "base corpus SHA-256 mismatch: fixture declares {:?}, actual is {actual_base_sha}",
+            text_at(decision_corpus, "base_corpus_sha256")
+        )]);
+    }
+
     let decision_validator =
         decision_schema_validator(decision_schema).map_err(|error| vec![error])?;
     let schema_errors: Vec<String> = decision_validator
@@ -567,14 +581,6 @@ fn audit_values(
         .collect();
     if !schema_errors.is_empty() {
         return Err(schema_errors);
-    }
-
-    let actual_base_sha = format!("{:x}", Sha256::digest(base_corpus_raw.as_bytes()));
-    if text_at(decision_corpus, "base_corpus_sha256") != Some(actual_base_sha.as_str()) {
-        return Err(vec![format!(
-            "base corpus SHA-256 mismatch: fixture declares {:?}, actual is {actual_base_sha}",
-            text_at(decision_corpus, "base_corpus_sha256")
-        )]);
     }
     let traces = base_corpus
         .get("traces")
@@ -693,8 +699,12 @@ pub(super) fn audit_decision_texts(
     decision_schema_raw: &str,
     decision_corpus_raw: &str,
 ) -> Result<Value, Errors> {
-    crate::audit_texts(base_schema_raw, base_corpus_raw)
-        .map_err(|errors| errors.into_iter().map(|error| format!("base corpus: {error}")).collect::<Vec<_>>())?;
+    crate::audit_texts(base_schema_raw, base_corpus_raw).map_err(|errors| {
+        errors
+            .into_iter()
+            .map(|error| format!("base corpus: {error}"))
+            .collect::<Vec<_>>()
+    })?;
     let base_schema: Value = serde_json::from_str(base_schema_raw)
         .map_err(|error| vec![format!("base schema JSON parse failed: {error}")])?;
     let base_corpus: Value = serde_json::from_str(base_corpus_raw)
@@ -718,14 +728,18 @@ pub(super) fn audit_decision_texts(
 mod tests {
     use super::*;
 
-    const BASE_SCHEMA: &str =
-        include_str!("../../../schemas/diagnostics/appliance_active_diagnostic_corpus_v0_1.schema.json");
-    const BASE_CORPUS: &str =
-        include_str!("../../../fixtures/diagnostics/appliance_active_diagnostic_corpus_v0_1.json");
-    const DECISION_SCHEMA: &str =
-        include_str!("../../../schemas/diagnostics/appliance_decision_value_corpus_v0_1.schema.json");
-    const DECISION_CORPUS: &str =
-        include_str!("../../../fixtures/diagnostics/appliance_decision_value_corpus_v0_1.json");
+    const BASE_SCHEMA: &str = include_str!(
+        "../../../schemas/diagnostics/appliance_active_diagnostic_corpus_v0_1.schema.json"
+    );
+    const BASE_CORPUS: &str = include_str!(
+        "../../../fixtures/diagnostics/appliance_active_diagnostic_corpus_v0_1.json"
+    );
+    const DECISION_SCHEMA: &str = include_str!(
+        "../../../schemas/diagnostics/appliance_decision_value_corpus_v0_1.schema.json"
+    );
+    const DECISION_CORPUS: &str = include_str!(
+        "../../../fixtures/diagnostics/appliance_decision_value_corpus_v0_1.json"
+    );
 
     #[test]
     fn canonical_decision_corpus_matches_expected_actions_and_losses() {
@@ -747,7 +761,6 @@ mod tests {
 
     #[test]
     fn decision_value_can_choose_a_different_test_than_entropy() {
-        let schema: Value = serde_json::from_str(DECISION_SCHEMA).expect("decision schema");
         let corpus: Value = serde_json::from_str(DECISION_CORPUS).expect("decision corpus");
         let cases = corpus["cases"].as_array().expect("cases");
         let case = case_by_id(cases, "DVAL-001").expect("DVAL-001");
