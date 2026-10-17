@@ -17,6 +17,7 @@
 //! assert!((wavelength(440.0, c) - 0.78).abs() < 0.01); // A4 ≈ 0.78 m
 //! ```
 
+pub mod experiment_benchmark;
 pub mod experiment_selection;
 pub mod pareto;
 pub mod response_curve;
