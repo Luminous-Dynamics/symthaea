@@ -243,6 +243,8 @@ pub enum ArchitectureValidationFindingV1 {
         segment_sum_kg: f64,
         declared_wearer_mass_kg: f64,
     },
+    /// Aggregating individually finite mass values overflowed.
+    MassAggregationOverflow { candidate_id: String },
     /// Total-system mass understates wearer mass plus off-board mass.
     TotalMassInconsistent {
         candidate_id: String,
@@ -459,31 +461,44 @@ fn validate_candidate_metrics(
         }
     }
 
-    let segment_sum = m.mass_distribution.torso_kg
-        + m.mass_distribution.pelvis_kg
-        + m.mass_distribution.proximal_limb_kg
-        + m.mass_distribution.distal_limb_kg
-        + m.mass_distribution.other_worn_kg;
-    if segment_sum.is_finite()
-        && m.wearer_borne_mass_kg.is_finite()
-        && (segment_sum - m.wearer_borne_mass_kg).abs() > MASS_BALANCE_TOLERANCE_KG_V1
-    {
-        findings.push(ArchitectureValidationFindingV1::MassDistributionMismatch {
-            candidate_id: id.clone(),
-            segment_sum_kg: segment_sum,
-            declared_wearer_mass_kg: m.wearer_borne_mass_kg,
-        });
-    }
-    let minimum_total = m.wearer_borne_mass_kg + m.offboard_mass_kg;
-    if minimum_total.is_finite()
-        && m.total_system_mass_kg.is_finite()
-        && m.total_system_mass_kg + MASS_BALANCE_TOLERANCE_KG_V1 < minimum_total
-    {
-        findings.push(ArchitectureValidationFindingV1::TotalMassInconsistent {
-            candidate_id: id.clone(),
-            declared_total_kg: m.total_system_mass_kg,
-            minimum_consistent_total_kg: minimum_total,
-        });
+    let mass_components = [
+        m.wearer_borne_mass_kg,
+        m.offboard_mass_kg,
+        m.total_system_mass_kg,
+        m.mass_distribution.torso_kg,
+        m.mass_distribution.pelvis_kg,
+        m.mass_distribution.proximal_limb_kg,
+        m.mass_distribution.distal_limb_kg,
+        m.mass_distribution.other_worn_kg,
+    ];
+    let mass_components_finite = mass_components.iter().all(|value| value.is_finite());
+    if mass_components_finite {
+        let segment_sum = m.mass_distribution.torso_kg
+            + m.mass_distribution.pelvis_kg
+            + m.mass_distribution.proximal_limb_kg
+            + m.mass_distribution.distal_limb_kg
+            + m.mass_distribution.other_worn_kg;
+        let minimum_total = m.wearer_borne_mass_kg + m.offboard_mass_kg;
+        if !segment_sum.is_finite() || !minimum_total.is_finite() {
+            findings.push(ArchitectureValidationFindingV1::MassAggregationOverflow {
+                candidate_id: id.clone(),
+            });
+        } else {
+            if (segment_sum - m.wearer_borne_mass_kg).abs() > MASS_BALANCE_TOLERANCE_KG_V1 {
+                findings.push(ArchitectureValidationFindingV1::MassDistributionMismatch {
+                    candidate_id: id.clone(),
+                    segment_sum_kg: segment_sum,
+                    declared_wearer_mass_kg: m.wearer_borne_mass_kg,
+                });
+            }
+            if m.total_system_mass_kg + MASS_BALANCE_TOLERANCE_KG_V1 < minimum_total {
+                findings.push(ArchitectureValidationFindingV1::TotalMassInconsistent {
+                    candidate_id: id.clone(),
+                    declared_total_kg: m.total_system_mass_kg,
+                    minimum_consistent_total_kg: minimum_total,
+                });
+            }
+        }
     }
     if !candidate.tethered && m.tether_interference_events_per_task > PARETO_EPSILON_V1 {
         findings.push(ArchitectureValidationFindingV1::TetherMetricInconsistent {
@@ -675,6 +690,50 @@ mod tests {
             result,
             Err(ref findings) if findings.iter().any(|finding| matches!(finding, ArchitectureValidationFindingV1::DuplicateCandidateId { .. }))
                 && findings.iter().any(|finding| matches!(finding, ArchitectureValidationFindingV1::NonFiniteMetric { metric: ArchitectureMetricV1::EnergyWhPerTask, .. }))
+        ));
+    }
+
+    #[test]
+    fn mass_aggregation_overflow_fails_closed() {
+        let mut huge = candidate("huge", 0.9, 3.0, 0.5, 0.8);
+        huge.metrics.wearer_borne_mass_kg = f64::MAX * 0.6;
+        huge.metrics.offboard_mass_kg = f64::MAX * 0.6;
+        huge.metrics.total_system_mass_kg = f64::MAX;
+        huge.metrics.mass_distribution = WearerMassDistributionV1 {
+            torso_kg: f64::MAX * 0.6,
+            pelvis_kg: 0.0,
+            proximal_limb_kg: 0.0,
+            distal_limb_kg: 0.0,
+            other_worn_kg: 0.0,
+        };
+        let result = evaluate_architecture_pareto(&request(vec![
+            huge,
+            candidate("reference", 0.8, 3.0, 0.7, 0.7),
+        ]));
+        assert!(matches!(
+            result,
+            Err(ref findings) if findings.iter().any(|finding| matches!(
+                finding,
+                ArchitectureValidationFindingV1::MassAggregationOverflow { .. }
+            ))
+        ));
+    }
+
+    #[test]
+    fn remote_actuation_must_declare_a_tether() {
+        let mut remote = candidate("remote", 0.9, 3.0, 0.5, 0.8);
+        remote.family = ArchitectureFamilyV1::RemoteActuationTethered;
+        remote.tethered = false;
+        let result = evaluate_architecture_pareto(&request(vec![
+            remote,
+            candidate("local", 0.8, 3.0, 0.7, 0.7),
+        ]));
+        assert!(matches!(
+            result,
+            Err(ref findings) if findings.iter().any(|finding| matches!(
+                finding,
+                ArchitectureValidationFindingV1::RemoteActuationRequiresTether { .. }
+            ))
         ));
     }
 
