@@ -102,7 +102,7 @@ pub struct MeasurementActionV1 {
 }
 
 /// One actionable metric/pair cell. Coverage does not imply that the comparison will resolve.
-#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
+#[derive(Debug, Clone, PartialEq, Eq, Hash, Serialize, Deserialize)]
 #[serde(deny_unknown_fields)]
 pub struct DecisionSensitiveCellV1 {
     /// Earlier candidate in the source report's pair order.
@@ -446,7 +446,13 @@ fn validate_source_report(
             });
         }
 
+        let expected_unresolved =
+            !pair.a_robustly_dominates_b && !pair.b_robustly_dominates_a;
+        let expected_tradeoff = !pair.a_definitely_better_dimensions.is_empty()
+            && !pair.b_definitely_better_dimensions.is_empty();
         if (pair.a_robustly_dominates_b && pair.b_robustly_dominates_a)
+            || pair.unresolved != expected_unresolved
+            || pair.definite_tradeoff != expected_tradeoff
             || ((pair.a_robustly_dominates_b || pair.b_robustly_dominates_a)
                 && (pair.definite_tradeoff || pair.additional_evidence_may_change_dominance))
             || (pair.definite_tradeoff
@@ -541,8 +547,8 @@ fn action_dominates(a: &MeasurementActionAssessmentV1, b: &MeasurementActionAsse
 mod tests {
     use super::*;
     use crate::architecture_robustness::{
-        ArchitectureRobustnessReportV1, MetricIntervalEntryV1, MetricIntervalV1,
-        RobustCandidateAssessmentV1, RobustPairwiseAssessmentV1,
+        ArchitectureRobustnessReportV1, MetricIntervalEntryV1, RobustCandidateAssessmentV1,
+        RobustPairwiseAssessmentV1,
     };
     use crate::architecture_pareto::{
         ArchitectureFamilyV1, ArchitectureOperatingConditionsV1,
@@ -808,16 +814,21 @@ mod tests {
             MeasurementActionKindV1::BenchMeasurement,
         );
         candidate_action.task_protocol_version = "walk-v0".to_owned();
-        assert!(triage_measurement_actions(
-            &source_report(),
-            &[candidate_action],
-            MEASUREMENT_TRIAGE_SCHEMA_VERSION_V1,
-        )
-        .as_ref()
-        .err()
-        .unwrap()
-        .iter()
-        .any(|finding| matches!(finding, MeasurementTriageFindingV1::ProtocolMismatch { .. })));
+        assert!(
+            triage_measurement_actions(
+                &source_report(),
+                &[candidate_action],
+                MEASUREMENT_TRIAGE_SCHEMA_VERSION_V1,
+            )
+            .as_ref()
+            .err()
+            .unwrap()
+            .iter()
+            .any(|finding| matches!(
+                finding,
+                MeasurementTriageFindingV1::ProtocolMismatch { .. }
+            ))
+        );
     }
 
     #[test]
