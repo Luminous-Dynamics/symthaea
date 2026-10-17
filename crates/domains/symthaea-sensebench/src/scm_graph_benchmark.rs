@@ -1496,6 +1496,10 @@ mod tests {
             assert!((0.0..=1.0).contains(&row.false_graph_claim_rate_all_trials));
             assert!((0.0..=1.0).contains(&row.cpdag_claim_coverage));
             assert!((0.0..=1.0).contains(&row.false_cpdag_claim_rate_all_trials));
+            assert!(
+                row.cpdag_claim_coverage + 1.0e-12 >= row.graph_claim_coverage,
+                "a qualified full-DAG claim also qualifies its Markov-equivalence class"
+            );
             if row.family == ScmGraphFamily::NullGraphNegativeControl {
                 assert!(row.mean_structural_hamming_distance >= 0.0);
             }
