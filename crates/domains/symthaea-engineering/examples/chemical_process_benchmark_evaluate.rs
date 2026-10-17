@@ -632,6 +632,69 @@ fn derive_synthetic_disposition(
                 "equipment_qualified": equipment_qualified
             }))
         }
+        "CHEM-PROC-025" | "CHEM-PROC-026" => {
+            let proposition_id = text(fixture, "proposition_id").unwrap_or_default();
+            let manifests_complete = fixture
+                .get("dependency_manifests_complete")
+                .and_then(Value::as_bool)
+                == Some(true);
+            let solver_a = fixture.get("solver_a");
+            let solver_b = fixture.get("solver_b");
+            let solver_a_id = solver_a
+                .and_then(|solver| text(solver, "solver_id"))
+                .unwrap_or_default();
+            let solver_b_id = solver_b
+                .and_then(|solver| text(solver, "solver_id"))
+                .unwrap_or_default();
+            let solver_a_implementation = solver_a
+                .and_then(|solver| text(solver, "implementation_digest"))
+                .unwrap_or_default();
+            let solver_b_implementation = solver_b
+                .and_then(|solver| text(solver, "implementation_digest"))
+                .unwrap_or_default();
+            let dependencies_a = solver_a
+                .and_then(|solver| strings(solver, "evidence_dependency_digests"))
+                .unwrap_or_default();
+            let dependencies_b = solver_b
+                .and_then(|solver| strings(solver, "evidence_dependency_digests"))
+                .unwrap_or_default();
+            let shared_dependencies = dependencies_a
+                .intersection(&dependencies_b)
+                .cloned()
+                .collect::<Vec<_>>();
+            let inputs_complete = !proposition_id.trim().is_empty()
+                && manifests_complete
+                && !solver_a_id.trim().is_empty()
+                && !solver_b_id.trim().is_empty()
+                && !solver_a_implementation.trim().is_empty()
+                && !solver_b_implementation.trim().is_empty()
+                && !dependencies_a.is_empty()
+                && !dependencies_b.is_empty();
+            let implementations_distinct = solver_a_id != solver_b_id
+                && solver_a_implementation != solver_b_implementation;
+            let independent_within_declared_scope = inputs_complete
+                && implementations_distinct
+                && shared_dependencies.is_empty();
+            let derived_disposition = if independent_within_declared_scope {
+                "ACCEPTED_WITHIN_SCOPE"
+            } else {
+                "UNRESOLVED"
+            };
+            Ok(json!({
+                "oracle": "evidence_dependency_independence_v1",
+                "derived_disposition": derived_disposition,
+                "proposition_id": proposition_id,
+                "dependency_manifests_complete": manifests_complete,
+                "solver_a_id": solver_a_id,
+                "solver_b_id": solver_b_id,
+                "solver_implementations_distinct": implementations_distinct,
+                "solver_a_dependency_count": dependencies_a.len(),
+                "solver_b_dependency_count": dependencies_b.len(),
+                "shared_evidence_dependency_digests": shared_dependencies,
+                "input_provenance_complete": inputs_complete,
+                "independent_corroboration_within_declared_scope": independent_within_declared_scope
+            }))
+        }
         _ => Err(format!("no semantic disposition oracle registered for {id}")),
     }
 }
@@ -1045,6 +1108,7 @@ fn evaluate(corpus: &Value, results: &Value, expected_head: &str) -> Value {
             "CHEM-PROC-013", "CHEM-PROC-014", "CHEM-PROC-015", "CHEM-PROC-016",
             "CHEM-PROC-017", "CHEM-PROC-018", "CHEM-PROC-019", "CHEM-PROC-020",
             "CHEM-PROC-021", "CHEM-PROC-022", "CHEM-PROC-023", "CHEM-PROC-024",
+            "CHEM-PROC-025", "CHEM-PROC-026",
         ];
         if semantic_oracle_ids.contains(&id) {
             let tolerance = corpus
@@ -1625,7 +1689,58 @@ mod tests {
     }
 
     #[test]
-    fn all_twenty_semantic_oracles_match_the_frozen_fixture_dispositions() {
+    fn common_mode_dependency_oracle_fails_closed_on_shared_or_incomplete_provenance() {
+        let corpus: Value = serde_json::from_str(FROZEN_CORPUS_JSON)
+            .expect("frozen synthetic corpus must parse");
+        let cases = corpus["cases"].as_array().expect("cases must be an array");
+        let shared_case = cases
+            .iter()
+            .find(|case| text(case, "id") == Some("CHEM-PROC-025"))
+            .expect("common-mode negative control must exist");
+        let shared_oracle = derive_synthetic_disposition(
+            "CHEM-PROC-025",
+            &shared_case["fixture"],
+            1.0e-8,
+        )
+        .expect("shared-dependency oracle must calculate a disposition");
+        assert_eq!(text(&shared_oracle, "derived_disposition"), Some("UNRESOLVED"));
+        assert!(
+            shared_oracle["shared_evidence_dependency_digests"]
+                .as_array()
+                .is_some_and(|values| !values.is_empty()),
+            "shared property data must be visible in the independent checker report"
+        );
+
+        let independent_case = cases
+            .iter()
+            .find(|case| text(case, "id") == Some("CHEM-PROC-026"))
+            .expect("independence positive control must exist");
+        let mut fixture = independent_case["fixture"].clone();
+        let independent_oracle = derive_synthetic_disposition(
+            "CHEM-PROC-026",
+            &fixture,
+            1.0e-8,
+        )
+        .expect("disjoint-dependency oracle must calculate a disposition");
+        assert_eq!(
+            text(&independent_oracle, "derived_disposition"),
+            Some("ACCEPTED_WITHIN_SCOPE")
+        );
+
+        let shared_digest = fixture["solver_a"]["evidence_dependency_digests"][0].clone();
+        fixture["solver_b"]["evidence_dependency_digests"][0] = shared_digest;
+        let mutated_oracle = derive_synthetic_disposition("CHEM-PROC-026", &fixture, 1.0e-8)
+            .expect("mutated common-mode fixture must remain evaluable");
+        assert_eq!(text(&mutated_oracle, "derived_disposition"), Some("UNRESOLVED"));
+
+        fixture["dependency_manifests_complete"] = json!(false);
+        let incomplete_oracle = derive_synthetic_disposition("CHEM-PROC-026", &fixture, 1.0e-8)
+            .expect("missing provenance must become unresolved, not a checker crash");
+        assert_eq!(text(&incomplete_oracle, "derived_disposition"), Some("UNRESOLVED"));
+    }
+
+    #[test]
+    fn all_twenty_two_semantic_oracles_match_the_frozen_fixture_dispositions() {
         let corpus: Value = serde_json::from_str(FROZEN_CORPUS_JSON)
             .expect("frozen synthetic corpus must parse for oracle coverage tests");
         let tolerance = corpus["residual_profile"]["target_max"]
@@ -1658,7 +1773,7 @@ mod tests {
 
         assert_eq!(
             checked.len(),
-            20,
+            22,
             "every non-numeric fixture needs an independent semantic oracle"
         );
     }
