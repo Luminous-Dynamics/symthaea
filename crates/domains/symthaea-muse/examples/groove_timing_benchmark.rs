@@ -91,6 +91,8 @@ struct RoleSummary {
     mean_signed_sixteenth_residual_ms: Option<f64>,
     median_absolute_sixteenth_residual_ms: Option<f64>,
     p95_absolute_sixteenth_residual_ms: Option<f64>,
+    median_absolute_sixteenth_grid_residual_beats: Option<f64>,
+    p95_absolute_sixteenth_grid_residual_beats: Option<f64>,
     median_absolute_triplet_residual_ms: Option<f64>,
     mean_velocity_0_to_127: Option<f64>,
     velocity_standard_deviation: Option<f64>,
@@ -120,6 +122,8 @@ struct BenchmarkReceipt {
     generated_styles_requested: usize,
     generated_seeds_per_style: u64,
     human_reference: CorpusSummary,
+    human_by_drummer: BTreeMap<String, CorpusSummary>,
+    human_by_drummer_session: BTreeMap<String, CorpusSummary>,
     melothaea_generated: CorpusSummary,
     source_files: Vec<SourceFileReceipt>,
     generated_files: Vec<GeneratedFileReceipt>,
@@ -130,6 +134,7 @@ struct BenchmarkReceipt {
 #[derive(Debug, Default)]
 struct RoleAccumulator {
     signed_sixteenth_residual_ms: Vec<f64>,
+    signed_sixteenth_grid_residual_beats: Vec<f64>,
     absolute_triplet_residual_ms: Vec<f64>,
     velocities: Vec<f64>,
     file_lag1_correlations: Vec<f64>,
@@ -178,6 +183,8 @@ fn run() -> Result<(), Box<dyn Error>> {
     }
 
     let mut human = CorpusAccumulator::default();
+    let mut human_by_drummer: BTreeMap<String, CorpusAccumulator> = BTreeMap::new();
+    let mut human_by_drummer_session: BTreeMap<String, CorpusAccumulator> = BTreeMap::new();
     let mut source_files = Vec::with_capacity(rows.len());
     let mut exclusions = Vec::new();
 
@@ -185,8 +192,12 @@ fn run() -> Result<(), Box<dyn Error>> {
         let resolved = match resolve_dataset_file(&dataset_root, &row.midi_filename) {
             Ok(path) => path,
             Err(reason) => {
-                human.files_examined += 1;
-                human.files_excluded += 1;
+                record_excluded_grouped(
+                    &mut human,
+                    &mut human_by_drummer,
+                    &mut human_by_drummer_session,
+                    &row,
+                );
                 exclusions.push(format!("{}: {reason}", row.midi_filename));
                 source_files.push(source_receipt(&row, None, 0, "excluded", Some(reason)));
                 continue;
@@ -196,8 +207,12 @@ fn run() -> Result<(), Box<dyn Error>> {
         let bytes = match fs::read(&resolved) {
             Ok(bytes) => bytes,
             Err(error) => {
-                human.files_examined += 1;
-                human.files_excluded += 1;
+                record_excluded_grouped(
+                    &mut human,
+                    &mut human_by_drummer,
+                    &mut human_by_drummer_session,
+                    &row,
+                );
                 let reason = format!("cannot read MIDI: {error}");
                 exclusions.push(format!("{}: {reason}", row.midi_filename));
                 source_files.push(source_receipt(&row, None, 0, "excluded", Some(reason)));
@@ -207,7 +222,13 @@ fn run() -> Result<(), Box<dyn Error>> {
         let digest = sha256_hex(&bytes);
         match parse_drum_hits(&bytes, row.bpm) {
             Ok(hits) => {
-                human.record_file(&hits, row.bpm);
+                record_observed_grouped(
+                    &mut human,
+                    &mut human_by_drummer,
+                    &mut human_by_drummer_session,
+                    &row,
+                    &hits,
+                );
                 let hit_count = hits.len();
                 let status = if hits.is_empty() { "no_drum_hits" } else { "measured" };
                 source_files.push(source_receipt(
@@ -219,8 +240,12 @@ fn run() -> Result<(), Box<dyn Error>> {
                 ));
             }
             Err(reason) => {
-                human.files_examined += 1;
-                human.files_excluded += 1;
+                record_excluded_grouped(
+                    &mut human,
+                    &mut human_by_drummer,
+                    &mut human_by_drummer_session,
+                    &row,
+                );
                 exclusions.push(format!("{}: {reason}", row.midi_filename));
                 source_files.push(source_receipt(
                     &row,
@@ -261,6 +286,14 @@ fn run() -> Result<(), Box<dyn Error>> {
         generated_styles_requested: args.generated_style_limit,
         generated_seeds_per_style: args.seeds_per_style,
         human_reference: human.summarize(),
+        human_by_drummer: human_by_drummer
+            .into_iter()
+            .map(|(drummer, corpus)| (drummer, corpus.summarize()))
+            .collect(),
+        human_by_drummer_session: human_by_drummer_session
+            .into_iter()
+            .map(|(session, corpus)| (session, corpus.summarize()))
+            .collect(),
         melothaea_generated: generated.summarize(),
         source_files,
         generated_files,
@@ -660,6 +693,11 @@ fn extract_drum_hits(smf: &Smf<'_>, bpm: f64) -> Result<Vec<DrumHit>, String> {
 }
 
 impl CorpusAccumulator {
+    fn record_excluded_file(&mut self) {
+        self.files_examined += 1;
+        self.files_excluded += 1;
+    }
+
     fn record_file(&mut self, hits: &[DrumHit], bpm: f64) {
         self.files_examined += 1;
         if hits.is_empty() {
@@ -682,6 +720,9 @@ impl CorpusAccumulator {
             accumulator
                 .signed_sixteenth_residual_ms
                 .push(signed_residual_beats * milliseconds_per_beat);
+            accumulator
+                .signed_sixteenth_grid_residual_beats
+                .push(signed_residual_beats);
             accumulator
                 .absolute_triplet_residual_ms
                 .push(absolute_triplet_residual_ms);
@@ -722,6 +763,14 @@ impl CorpusAccumulator {
                             &accumulator.signed_sixteenth_residual_ms,
                             0.95,
                         ),
+                        median_absolute_sixteenth_grid_residual_beats: quantile_abs(
+                            &accumulator.signed_sixteenth_grid_residual_beats,
+                            0.50,
+                        ),
+                        p95_absolute_sixteenth_grid_residual_beats: quantile_abs(
+                            &accumulator.signed_sixteenth_grid_residual_beats,
+                            0.95,
+                        ),
                         median_absolute_triplet_residual_ms: median(
                             &accumulator.absolute_triplet_residual_ms,
                         ),
@@ -743,6 +792,45 @@ impl CorpusAccumulator {
             roles,
         }
     }
+}
+
+fn drummer_session_key(row: &DatasetRow) -> String {
+    format!("drummer={};session={}", row.drummer, row.session)
+}
+
+fn record_excluded_grouped(
+    all: &mut CorpusAccumulator,
+    by_drummer: &mut BTreeMap<String, CorpusAccumulator>,
+    by_drummer_session: &mut BTreeMap<String, CorpusAccumulator>,
+    row: &DatasetRow,
+) {
+    all.record_excluded_file();
+    by_drummer
+        .entry(row.drummer.clone())
+        .or_default()
+        .record_excluded_file();
+    by_drummer_session
+        .entry(drummer_session_key(row))
+        .or_default()
+        .record_excluded_file();
+}
+
+fn record_observed_grouped(
+    all: &mut CorpusAccumulator,
+    by_drummer: &mut BTreeMap<String, CorpusAccumulator>,
+    by_drummer_session: &mut BTreeMap<String, CorpusAccumulator>,
+    row: &DatasetRow,
+    hits: &[DrumHit],
+) {
+    all.record_file(hits, row.bpm);
+    by_drummer
+        .entry(row.drummer.clone())
+        .or_default()
+        .record_file(hits, row.bpm);
+    by_drummer_session
+        .entry(drummer_session_key(row))
+        .or_default()
+        .record_file(hits, row.bpm);
 }
 
 fn drum_role(pitch: u8) -> &'static str {
