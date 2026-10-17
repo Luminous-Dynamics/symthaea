@@ -603,6 +603,25 @@ mod tests {
     }
 
     #[test]
+    fn application_loss_uses_requested_operating_frequency() {
+        let mut sample = material();
+        sample.test_frequency_hz = 995.0;
+        let req = requirements();
+        let report =
+            screen_capacitor_candidate(&sample, &geometry(), &req, 10.0, 1.0).unwrap();
+        let metrics = report.metrics.unwrap();
+        let expected = 2.0
+            * std::f64::consts::PI
+            * req.operating_frequency_hz
+            * metrics.capacitance_f
+            * 1.0_f64.powi(2)
+            * sample.loss_tangent;
+        assert_eq!(metrics.property_frequency_hz, 995.0);
+        assert_eq!(metrics.loss_evaluation_frequency_hz, 1_000.0);
+        assert!((metrics.dielectric_loss_power_w - expected).abs() <= expected * 1.0e-12);
+    }
+
+    #[test]
     fn hard_constraint_violations_are_separate_from_missing_evidence() {
         let mut req = requirements();
         req.max_dielectric_loss_power_w = 0.0;
