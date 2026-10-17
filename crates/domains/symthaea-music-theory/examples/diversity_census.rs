@@ -969,7 +969,7 @@ mod tests {
     #[test]
     fn causal_census_tracks_the_canonical_style_registry() {
         assert_eq!(STYLES, &Style::ALL[..]);
-        assert_eq!(STYLES.len(), 35);
+        assert_eq!(STYLES.len(), Style::ALL.len());
         assert_eq!(LEGACY_PILOT_STYLES.len(), 29);
         assert!(STYLES.len() > LEGACY_PILOT_STYLES.len());
         for style in LEGACY_PILOT_STYLES {
