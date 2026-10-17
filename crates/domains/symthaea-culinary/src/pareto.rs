@@ -272,15 +272,11 @@ pub fn evaluate_frontier(
         }
     }
 
-    let by_id: BTreeMap<&str, &CulinaryCandidate> = candidates
-        .iter()
-        .map(|candidate| (candidate.id.as_str(), candidate))
-        .collect();
-    let ids_sorted: Vec<&str> = by_id.keys().copied().collect();
+    let mut sorted_candidates: Vec<&CulinaryCandidate> = candidates.iter().collect();
+    sorted_candidates.sort_by(|left, right| left.id.cmp(&right.id));
     let mut assessments: BTreeMap<String, CandidateAssessment> = BTreeMap::new();
 
-    for id in &ids_sorted {
-        let candidate = by_id[id];
+    for candidate in &sorted_candidates {
         let gate_disposition = gate_disposition(candidate);
         let ranking_disposition = if gate_disposition != GateDisposition::Feasible {
             RankingDisposition::NotRanked
@@ -303,40 +299,38 @@ pub fn evaluate_frontier(
         );
     }
 
-    for (left_index, left_id) in ids_sorted.iter().enumerate() {
-        let left = by_id[left_id];
-        if assessments[*left_id].ranking_disposition != RankingDisposition::Ranked {
+    for (left_index, left) in sorted_candidates.iter().enumerate() {
+        if assessments[&left.id].ranking_disposition != RankingDisposition::Ranked {
             continue;
         }
 
-        for right_id in ids_sorted.iter().skip(left_index + 1) {
-            let right = by_id[right_id];
-            if assessments[*right_id].ranking_disposition != RankingDisposition::Ranked {
+        for right in sorted_candidates.iter().skip(left_index + 1) {
+            if assessments[&right.id].ranking_disposition != RankingDisposition::Ranked {
                 continue;
             }
 
             if dominates(left, right) {
                 assessments
-                    .get_mut(*left_id)
+                    .get_mut(&left.id)
                     .expect("assessment created for every unique ID")
                     .dominates
-                    .push((*right_id).to_owned());
+                    .push(right.id.clone());
                 assessments
-                    .get_mut(*right_id)
+                    .get_mut(&right.id)
                     .expect("assessment created for every unique ID")
                     .dominated_by
-                    .push((*left_id).to_owned());
+                    .push(left.id.clone());
             } else if dominates(right, left) {
                 assessments
-                    .get_mut(*right_id)
+                    .get_mut(&right.id)
                     .expect("assessment created for every unique ID")
                     .dominates
-                    .push((*left_id).to_owned());
+                    .push(left.id.clone());
                 assessments
-                    .get_mut(*left_id)
+                    .get_mut(&left.id)
                     .expect("assessment created for every unique ID")
                     .dominated_by
-                    .push((*right_id).to_owned());
+                    .push(right.id.clone());
             }
         }
     }
