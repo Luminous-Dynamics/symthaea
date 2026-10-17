@@ -13,7 +13,7 @@ being audited). Do not derive the expected SHA from the checkout being tested,
 because that makes the identity comparison tautological.
 
 ```bash
-EXPECTED_HEAD=<full-commit-sha-under-review>
+EXPECTED_HEAD="replace-with-full-commit-sha-under-review"
 cargo run -p symthaea-culinary --example culinary_validation_receipt -- \
   --expected-head "$EXPECTED_HEAD" \
   --output target/culinary-validation-receipt.json
