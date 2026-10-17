@@ -17,9 +17,10 @@ use super::{
     evaluate_mission,
 };
 
-/// Hard limit to prevent accidental combinatorial explosions and unbounded
-/// memory usage. A larger study should be partitioned into reviewed batches.
-pub const MAX_BATTERY_DESIGN_POINTS: usize = 50_000;
+/// Hard limit for the current pairwise Pareto implementation, whose comparison
+/// cost is quadratic in the number of candidates. A larger study must use
+/// reviewed batches and a separately verified frontier-merging procedure.
+pub const MAX_BATTERY_DESIGN_POINTS: usize = 2_000;
 
 /// Independent axes for an explicit battery-system sensitivity sweep.
 ///
@@ -115,6 +116,13 @@ pub fn sweep_battery_design_space(
     for (name, axis) in &mut axes {
         if axis.is_empty() {
             return Err(DesignSpaceError::EmptyAxis { name: *name });
+        }
+        // Negative zero and positive zero represent the same physical fraction;
+        // canonicalize before bitwise deduplication to avoid duplicate designs.
+        for value in axis.iter_mut() {
+            if *value == 0.0 {
+                *value = 0.0;
+            }
         }
         axis.sort_by(f64::total_cmp);
         axis.dedup_by(|left, right| left.to_bits() == right.to_bits());
@@ -376,6 +384,16 @@ mod tests {
         assert!(!report.rows[0].configuration_valid);
         assert!(!report.rows[0].on_pareto_front);
         assert!(!report.rows[0].configuration_findings.is_empty());
+    }
+
+    #[test]
+    fn signed_zero_is_canonicalized_before_axis_deduplication() {
+        let mut design_space = space();
+        design_space.reserve_fractions = vec![-0.0, 0.0];
+        let report = sweep_battery_design_space(&mission(), &template(), &design_space).unwrap();
+        assert_eq!(report.rows.len(), 32);
+        assert_eq!(report.pareto_frontiers.len(), 1);
+        assert_eq!(report.pareto_frontiers[0].reserve_fraction, 0.0);
     }
 
     #[test]
