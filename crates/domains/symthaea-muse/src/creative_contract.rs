@@ -14,6 +14,8 @@
 use crate::Note;
 use std::collections::BTreeMap;
 
+const MAX_WINDOW_COUNT: usize = 4096;
+
 /// Hard, task-specific requirements for one musical output family.
 ///
 /// Thresholds are supplied by the caller instead of treating one musical style as
@@ -21,8 +23,6 @@ use std::collections::BTreeMap;
 /// brief can allow one dominant pitch. The window ratio measures onset coverage,
 /// not sustained-note coverage.
 #[derive(Debug, Clone, PartialEq)]
-const MAX_WINDOW_COUNT: usize = 4096;
-
 pub struct CreativeIntentContractV1 {
     pub min_note_count: usize,
     pub min_distinct_pitches: usize,
