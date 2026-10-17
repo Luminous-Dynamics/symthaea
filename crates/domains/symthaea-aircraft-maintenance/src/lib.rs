@@ -965,8 +965,17 @@ pub fn release_task_to_service(
     {
         errors.push(TaskCardError::UnauthorizedTransition);
     }
-    if !actor.credential_reference.as_ref().is_some_and(valid_document_shape) {
-        errors.push(TaskCardError::MissingReleaseCredential);
+    match actor.credential_reference.as_ref() {
+        None => errors.push(TaskCardError::MissingReleaseCredential),
+        Some(credential) if !valid_document_shape(credential) => {
+            errors.push(TaskCardError::MissingReleaseCredential);
+        }
+        Some(credential) if !document_is_current(credential, current_documents) => {
+            errors.push(TaskCardError::StaleOrMissingSource {
+                document_id: credential.document_id.clone(),
+            });
+        }
+        Some(_) => {}
     }
     match &card.authority.review {
         AuthorityReview::Unresolved => errors.push(TaskCardError::AuthorityReviewUnresolved),
@@ -1004,10 +1013,14 @@ pub fn release_task_to_service(
             });
         }
     }
-    if let AuthorityReview::Verified { permission_source, .. } = &card.authority.review {
-        if !document_is_current(permission_source, current_documents) {
+    for review in &record.human_reviews {
+        if !valid_document_shape(&review.authority_reference) {
+            errors.push(TaskCardError::InvalidMeasurement {
+                criterion_id: review.criterion_id.clone(),
+            });
+        } else if !document_is_current(&review.authority_reference, current_documents) {
             errors.push(TaskCardError::StaleOrMissingSource {
-                document_id: permission_source.document_id.clone(),
+                document_id: review.authority_reference.document_id.clone(),
             });
         }
     }
@@ -1218,6 +1231,8 @@ mod tests {
             calibration_record: Some(doc("calibration-tool-fixture", "rev-1", 'e')),
         };
         docs.push(CurrentDocument { reference: tool.calibration_record.clone().unwrap() });
+        docs.push(CurrentDocument { reference: doc("review-authority", "rev-1", '2') });
+        docs.push(CurrentDocument { reference: doc("credential-fixture", "rev-1", '3') });
         let part = card.parts[0].clone();
         ExecutionContext {
             aircraft,
