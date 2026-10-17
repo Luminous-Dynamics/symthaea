@@ -1,0 +1,102 @@
+name: Cyber Hunt Fixture Generator
+
+on:
+  pull_request:
+    paths:
+      - "tools/cyber-hunt-fixture-generator/**"
+      - "docs/research/cyber-hunt-*-v1.schema.json"
+      - ".github/workflows/cyber-hunt-fixtures.yml"
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+concurrency:
+  group: ${{ github.workflow }}-${{ github.event.pull_request.number || github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  verify:
+    runs-on: ubuntu-latest
+    timeout-minutes: 20
+    steps:
+      - name: Checkout exact tested revision
+        uses: actions/checkout@11bd71901bbe5b1630ceea73d27597364c9af683
+        with:
+          ref: ${{ github.event.pull_request.head.sha || github.sha }}
+
+      - name: Install stable Rust
+        uses: actions-rust-lang/setup-rust-toolchain@166cdcfd11aee3cb47222f9ddb555ce30ddb9659
+        with:
+          toolchain: stable
+
+      - name: Run deterministic generator tests
+        run: cargo test --manifest-path tools/cyber-hunt-fixture-generator/Cargo.toml
+
+      - name: Generate and verify 1,000-record smoke fixture
+        env:
+          SOURCE_COMMIT: ${{ github.event.pull_request.head.sha || github.sha }}
+        run: |
+          set -euo pipefail
+          root="$RUNNER_TEMP/cyber-hunt"
+          mkdir -p "$root/solver" "$root/evaluator"
+          cargo run --manifest-path tools/cyber-hunt-fixture-generator/Cargo.toml -- \
+            --records 1000 --seed 20261017 \
+            --events-out "$root/solver/events.jsonl" \
+            --manifest-out "$root/solver/manifest.json" \
+            --truth-out "$root/evaluator/truth.json" \
+            --source-commit "$SOURCE_COMMIT"
+          test "$(wc -l < "$root/solver/events.jsonl")" -eq 1000
+          actual_sha="$(sha256sum "$root/solver/events.jsonl" | cut -d' ' -f1)"
+          actual_bytes="$(wc -c < "$root/solver/events.jsonl" | tr -d ' ')"
+          jq -e --arg sha "$actual_sha" --argjson bytes "$actual_bytes" --arg commit "$SOURCE_COMMIT" '
+            .record_count == 1000 and
+            .event_store_sha256 == $sha and
+            .event_store_utf8_bytes == $bytes and
+            .generator_source_commit == $commit and
+            .source_commit_pinned == true and
+            .qualification_state == "UNSCORED"
+          ' "$root/solver/manifest.json"
+          jq -e --arg sha "$actual_sha" '.event_count == 1000 and .event_store_sha256 == $sha and (.labels | length) == 1000' "$root/evaluator/truth.json"
+          if grep -Eq '"(label|ground_truth|malicious)"[[:space:]]*:' "$root/solver/events.jsonl"; then
+            echo "ground-truth label field leaked into solver event stream"
+            exit 1
+          fi
+          printf 'source_commit=%s\nrecord_count=1000\nevent_store_sha256=%s\nevent_store_bytes=%s\nqualification_state=UNSCORED\n' \
+            "$SOURCE_COMMIT" "$actual_sha" "$actual_bytes" > cyber-hunt-fixture-evidence.txt
+          cp "$root/solver/events.jsonl" cyber-hunt-events-smoke.jsonl
+          cp "$root/solver/manifest.json" cyber-hunt-manifest-smoke.json
+
+      - name: Generate a 75,000-record scale smoke fixture
+        env:
+          SOURCE_COMMIT: ${{ github.event.pull_request.head.sha || github.sha }}
+        run: |
+          set -euo pipefail
+          root="$RUNNER_TEMP/cyber-hunt-scale"
+          mkdir -p "$root/solver" "$root/evaluator"
+          cargo run -q --manifest-path tools/cyber-hunt-fixture-generator/Cargo.toml -- \
+            --records 75000 --seed 20261017 \
+            --events-out "$root/solver/events.jsonl" \
+            --manifest-out "$root/solver/manifest.json" \
+            --truth-out "$root/evaluator/truth.json" \
+            --source-commit "$SOURCE_COMMIT"
+          test "$(wc -l < "$root/solver/events.jsonl")" -eq 75000
+          actual_sha="$(sha256sum "$root/solver/events.jsonl" | cut -d' ' -f1)"
+          jq -e --arg sha "$actual_sha" --arg commit "$SOURCE_COMMIT" '
+            .record_count == 75000 and .event_store_sha256 == $sha and
+            .generator_source_commit == $commit and .source_commit_pinned == true
+          ' "$root/solver/manifest.json"
+          jq -e --arg sha "$actual_sha" '.event_count == 75000 and .event_store_sha256 == $sha and (.labels | length) == 75000' "$root/evaluator/truth.json"
+          printf 'source_commit=%s\nrecord_count=75000\nevent_store_sha256=%s\nqualification_state=UNSCORED\n' \
+            "$SOURCE_COMMIT" "$actual_sha" >> cyber-hunt-fixture-evidence.txt
+
+      - name: Upload solver-visible fixture and structural evidence only
+        uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02
+        with:
+          name: cyber-hunt-fixture-smoke-${{ github.sha }}
+          path: |
+            cyber-hunt-events-smoke.jsonl
+            cyber-hunt-manifest-smoke.json
+            cyber-hunt-fixture-evidence.txt
+          if-no-files-found: error
+          retention-days: 14
