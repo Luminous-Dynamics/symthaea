@@ -15,7 +15,7 @@
   ],
   "rule_order": [
     "Quarantine known failed component qualification; unapproved substitutions; failed post-repair/calibration checks; unresolved recurring faults; unknown history for safety-relevant or pressure-boundary parts; and unqualified battery or pressure-boundary fabrication.",
-    "If a routine field-replaceable part requires destructive access, return redesign_for_serviceability unless a higher-priority quarantine condition exists.",
+    "If a declared field-replaceable component requires destructive access, return redesign_for_serviceability unless a higher-priority quarantine condition exists. Serviceability target and safety criticality are separate fields.",
     "Return not_locally_reproducible when local_fabrication is requested but preferred editable source files are unavailable; this is a manufacturing-closure result, not a blanket judgement that a commercially supplied qualified part is unsafe.",
     "Hold for retest when required configuration records are stale or required post-repair checks are incomplete; hold for evidence when substitution/compatibility status is unknown.",
     "Return release_to_acceptance only when all declared gates are satisfied. This is not a product release or qualification."
@@ -38,7 +38,8 @@
         "post_repair_check": "complete",
         "calibration": "current",
         "configuration_record": "updated_exact",
-        "fault_history": "resolved"
+        "fault_history": "resolved",
+        "serviceability_target": "field_replaceable"
       },
       "expected_disposition": "release_to_acceptance",
       "expected_reason_codes": [
@@ -61,7 +62,8 @@
         "post_repair_check": "complete",
         "calibration": "current",
         "configuration_record": "stale",
-        "fault_history": "resolved"
+        "fault_history": "resolved",
+        "serviceability_target": "field_replaceable"
       },
       "expected_disposition": "hold_for_retest",
       "expected_reason_codes": [
@@ -84,7 +86,8 @@
         "post_repair_check": "complete",
         "calibration": "current",
         "configuration_record": "updated_exact",
-        "fault_history": "resolved"
+        "fault_history": "resolved",
+        "serviceability_target": "field_replaceable"
       },
       "expected_disposition": "quarantine",
       "expected_reason_codes": [
@@ -107,7 +110,8 @@
         "post_repair_check": "complete",
         "calibration": "current",
         "configuration_record": "updated_exact",
-        "fault_history": "resolved"
+        "fault_history": "resolved",
+        "serviceability_target": "field_replaceable"
       },
       "expected_disposition": "redesign_for_serviceability",
       "expected_reason_codes": [
@@ -130,7 +134,8 @@
         "post_repair_check": "complete",
         "calibration": "current",
         "configuration_record": "updated_exact",
-        "fault_history": "resolved"
+        "fault_history": "resolved",
+        "serviceability_target": "field_replaceable"
       },
       "expected_disposition": "release_to_acceptance",
       "expected_reason_codes": [
@@ -153,7 +158,8 @@
         "post_repair_check": "missing",
         "calibration": "current",
         "configuration_record": "updated_exact",
-        "fault_history": "resolved"
+        "fault_history": "resolved",
+        "serviceability_target": "field_replaceable"
       },
       "expected_disposition": "hold_for_retest",
       "expected_reason_codes": [
@@ -176,7 +182,8 @@
         "post_repair_check": "complete",
         "calibration": "current",
         "configuration_record": "updated_exact",
-        "fault_history": "resolved"
+        "fault_history": "resolved",
+        "serviceability_target": "field_replaceable"
       },
       "expected_disposition": "quarantine",
       "expected_reason_codes": [
@@ -199,7 +206,8 @@
         "post_repair_check": "complete",
         "calibration": "current",
         "configuration_record": "updated_exact",
-        "fault_history": "resolved"
+        "fault_history": "resolved",
+        "serviceability_target": "field_replaceable"
       },
       "expected_disposition": "quarantine",
       "expected_reason_codes": [
@@ -222,7 +230,8 @@
         "post_repair_check": "complete",
         "calibration": "current",
         "configuration_record": "updated_exact",
-        "fault_history": "resolved"
+        "fault_history": "resolved",
+        "serviceability_target": "field_replaceable"
       },
       "expected_disposition": "release_to_acceptance",
       "expected_reason_codes": [
@@ -245,7 +254,8 @@
         "post_repair_check": "missing",
         "calibration": "current",
         "configuration_record": "updated_exact",
-        "fault_history": "resolved"
+        "fault_history": "resolved",
+        "serviceability_target": "field_replaceable"
       },
       "expected_disposition": "hold_for_retest",
       "expected_reason_codes": [
@@ -268,7 +278,8 @@
         "post_repair_check": "complete",
         "calibration": "current",
         "configuration_record": "updated_exact",
-        "fault_history": "resolved"
+        "fault_history": "resolved",
+        "serviceability_target": "field_replaceable"
       },
       "expected_disposition": "quarantine",
       "expected_reason_codes": [
@@ -291,7 +302,8 @@
         "post_repair_check": "complete",
         "calibration": "current",
         "configuration_record": "updated_exact",
-        "fault_history": "resolved"
+        "fault_history": "resolved",
+        "serviceability_target": "field_replaceable"
       },
       "expected_disposition": "not_locally_reproducible",
       "expected_reason_codes": [
@@ -314,7 +326,8 @@
         "post_repair_check": "complete",
         "calibration": "current",
         "configuration_record": "updated_exact",
-        "fault_history": "resolved"
+        "fault_history": "resolved",
+        "serviceability_target": "field_replaceable"
       },
       "expected_disposition": "release_to_acceptance",
       "expected_reason_codes": [
@@ -337,7 +350,8 @@
         "post_repair_check": "complete",
         "calibration": "current",
         "configuration_record": "stale",
-        "fault_history": "resolved"
+        "fault_history": "resolved",
+        "serviceability_target": "field_replaceable"
       },
       "expected_disposition": "hold_for_retest",
       "expected_reason_codes": [
@@ -360,7 +374,8 @@
         "post_repair_check": "complete",
         "calibration": "failed",
         "configuration_record": "updated_exact",
-        "fault_history": "resolved"
+        "fault_history": "resolved",
+        "serviceability_target": "field_replaceable"
       },
       "expected_disposition": "quarantine",
       "expected_reason_codes": [
@@ -383,7 +398,8 @@
         "post_repair_check": "complete",
         "calibration": "current",
         "configuration_record": "updated_exact",
-        "fault_history": "resolved"
+        "fault_history": "resolved",
+        "serviceability_target": "field_replaceable"
       },
       "expected_disposition": "redesign_for_serviceability",
       "expected_reason_codes": [
@@ -406,7 +422,8 @@
         "post_repair_check": "complete",
         "calibration": "current",
         "configuration_record": "updated_exact",
-        "fault_history": "resolved"
+        "fault_history": "resolved",
+        "serviceability_target": "field_replaceable"
       },
       "expected_disposition": "release_to_acceptance",
       "expected_reason_codes": [
@@ -429,7 +446,8 @@
         "post_repair_check": "missing",
         "calibration": "current",
         "configuration_record": "updated_exact",
-        "fault_history": "resolved"
+        "fault_history": "resolved",
+        "serviceability_target": "field_replaceable"
       },
       "expected_disposition": "hold_for_retest",
       "expected_reason_codes": [
@@ -452,7 +470,8 @@
         "post_repair_check": "complete",
         "calibration": "current",
         "configuration_record": "updated_exact",
-        "fault_history": "recurring_unresolved"
+        "fault_history": "recurring_unresolved",
+        "serviceability_target": "field_replaceable"
       },
       "expected_disposition": "quarantine",
       "expected_reason_codes": [
@@ -475,7 +494,8 @@
         "post_repair_check": "complete",
         "calibration": "current",
         "configuration_record": "updated_exact",
-        "fault_history": "resolved"
+        "fault_history": "resolved",
+        "serviceability_target": "field_replaceable"
       },
       "expected_disposition": "hold_for_evidence",
       "expected_reason_codes": [
@@ -498,7 +518,8 @@
         "post_repair_check": "complete",
         "calibration": "current",
         "configuration_record": "updated_exact",
-        "fault_history": "resolved"
+        "fault_history": "resolved",
+        "serviceability_target": "specialist_service_only"
       },
       "expected_disposition": "release_to_acceptance",
       "expected_reason_codes": [
@@ -521,7 +542,8 @@
         "post_repair_check": "missing",
         "calibration": "current",
         "configuration_record": "updated_exact",
-        "fault_history": "resolved"
+        "fault_history": "resolved",
+        "serviceability_target": "specialist_service_only"
       },
       "expected_disposition": "hold_for_retest",
       "expected_reason_codes": [
@@ -544,7 +566,8 @@
         "post_repair_check": "complete",
         "calibration": "current",
         "configuration_record": "updated_exact",
-        "fault_history": "resolved"
+        "fault_history": "resolved",
+        "serviceability_target": "specialist_service_only"
       },
       "expected_disposition": "quarantine",
       "expected_reason_codes": [
@@ -567,7 +590,8 @@
         "post_repair_check": "complete",
         "calibration": "current",
         "configuration_record": "updated_exact",
-        "fault_history": "resolved"
+        "fault_history": "resolved",
+        "serviceability_target": "specialist_service_only"
       },
       "expected_disposition": "quarantine",
       "expected_reason_codes": [
@@ -590,7 +614,8 @@
         "post_repair_check": "complete",
         "calibration": "current",
         "configuration_record": "updated_exact",
-        "fault_history": "resolved"
+        "fault_history": "resolved",
+        "serviceability_target": "qualified_module_swap_only"
       },
       "expected_disposition": "release_to_acceptance",
       "expected_reason_codes": [
@@ -613,7 +638,8 @@
         "post_repair_check": "complete",
         "calibration": "current",
         "configuration_record": "stale",
-        "fault_history": "resolved"
+        "fault_history": "resolved",
+        "serviceability_target": "qualified_module_swap_only"
       },
       "expected_disposition": "hold_for_retest",
       "expected_reason_codes": [
@@ -636,7 +662,8 @@
         "post_repair_check": "complete",
         "calibration": "current",
         "configuration_record": "updated_exact",
-        "fault_history": "resolved"
+        "fault_history": "resolved",
+        "serviceability_target": "qualified_module_swap_only"
       },
       "expected_disposition": "quarantine",
       "expected_reason_codes": [
@@ -659,7 +686,8 @@
         "post_repair_check": "complete",
         "calibration": "current",
         "configuration_record": "updated_exact",
-        "fault_history": "resolved"
+        "fault_history": "resolved",
+        "serviceability_target": "qualified_module_swap_only"
       },
       "expected_disposition": "quarantine",
       "expected_reason_codes": [
