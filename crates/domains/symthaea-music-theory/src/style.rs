@@ -3337,6 +3337,33 @@ mod tests {
         assert!(spec.validate().is_ok());
     }
 
+
+    #[test]
+    fn minuet_and_trio_realizes_a_trio_and_an_exact_dacapo_return() {
+        use crate::composer::{MusicalIntent, compose_with_spec_and_form};
+        use crate::form::SectionRole;
+
+        let spec = Style::MinuetAndTrio.spec();
+        let (score, form) = compose_with_spec_and_form(&MusicalIntent::default(), &spec);
+        let form = form.expect("Minuet and Trio must expose its ternary form");
+        assert_eq!(score.meter, 3);
+        assert_eq!(form.sections.len(), 3);
+        assert_eq!(
+            form.sections.iter().map(|section| section.role).collect::<Vec<_>>(),
+            vec![SectionRole::A, SectionRole::B, SectionRole::ReturnA]
+        );
+        assert_ne!(
+            form.sections[0].key,
+            form.sections[1].key,
+            "the Trio must depart from the home key"
+        );
+        assert_eq!(form.sections[0].key, form.sections[2].key);
+        assert_eq!(
+            form.sections[0].period, form.sections[2].period,
+            "the da-capo return must restore the opening period exactly"
+        );
+    }
+
     #[test]
     fn classical_is_the_default() {
         assert_eq!(Style::default(), Style::Classical);
