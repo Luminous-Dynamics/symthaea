@@ -123,6 +123,12 @@ pub struct ScmGraphPolicySummary {
     pub cpdag_mark_distance_ci95: [f64; 2],
     pub markov_equivalence_class_recovery_rate: f64,
     pub markov_equivalence_class_recovery_wilson_ci95: [f64; 2],
+    /// Claim coverage using posterior mass summed over a Markov equivalence class.
+    pub cpdag_claim_coverage: f64,
+    pub cpdag_claim_coverage_wilson_ci95: [f64; 2],
+    pub false_cpdag_claim_rate_among_accepted: Option<f64>,
+    pub false_cpdag_claim_rate_among_accepted_wilson_ci95: Option<[f64; 2]>,
+    pub false_cpdag_claim_rate_all_trials: f64,
     pub mean_posterior_mass_on_true_markov_class: f64,
     pub posterior_mass_on_true_markov_class_ci95: [f64; 2],
     /// One unit for a missing/extra adjacency or a reversed edge.
@@ -163,6 +169,8 @@ pub struct ScmGraphPolicyAggregate {
     pub mean_held_out_cpdag_mark_distance: f64,
     pub held_out_cpdag_mark_distance_world_ci95: [f64; 2],
     pub held_out_markov_equivalence_class_recovery_rate: f64,
+    pub mean_held_out_cpdag_claim_coverage: f64,
+    pub mean_held_out_false_cpdag_claim_rate_all_trials: f64,
     pub mean_held_out_shd: f64,
     pub held_out_shd_world_ci95: [f64; 2],
     pub worst_world_directed_edge_f1: f64,
@@ -419,6 +427,8 @@ struct TrialResult {
     compelled_direction_f1: f64,
     cpdag_mark_distance: f64,
     markov_equivalence_class_correct: bool,
+    cpdag_claim_accepted: bool,
+    false_cpdag_claim: bool,
     posterior_true_graph: f64,
     posterior_true_markov_class: f64,
     graph_posterior_brier: f64,
@@ -910,7 +920,7 @@ fn simulate_trial(
     let predicted = graphs[map_index];
     let truth = graphs[truth_index];
     let (skeleton_f1, directed_edge_f1, shd, exact_graph) = structure_metrics(predicted, truth);
-    let posterior_class_prediction = posterior_cpdag(&posterior, graphs).0;
+    let (posterior_class_prediction, posterior_top_class_mass) = posterior_cpdag(&posterior, graphs);
     let predicted_cpdag = if policy == ScmGraphPolicy::StructureBlindRandomGraph {
         cpdag_marks(predicted, graphs)
     } else {
@@ -924,6 +934,9 @@ fn simulate_trial(
     let claim_accepted = policy != ScmGraphPolicy::StructureBlindRandomGraph
         && max_probability >= posterior_threshold;
     let false_graph_claim = claim_accepted && !exact_graph;
+    let cpdag_claim_accepted = policy != ScmGraphPolicy::StructureBlindRandomGraph
+        && posterior_top_class_mass >= posterior_threshold;
+    let false_cpdag_claim = cpdag_claim_accepted && !markov_class_correct;
     let graph_posterior_brier_score = posterior.iter().enumerate()
         .map(|(index, hypothesis)| {
             let target = if index == truth_index { 1.0 } else { 0.0 };
@@ -940,6 +953,8 @@ fn simulate_trial(
         compelled_direction_f1,
         cpdag_mark_distance,
         markov_equivalence_class_correct: markov_class_correct,
+        cpdag_claim_accepted,
+        false_cpdag_claim,
         posterior_true_graph: posterior[truth_index].probability,
         posterior_true_markov_class,
         graph_posterior_brier_score,
@@ -1002,6 +1017,10 @@ fn summarize_world(
     let cpdag_distance: Vec<f64> = trials.iter().map(|trial| trial.cpdag_mark_distance).collect();
     let cpdag_correct = trials.iter()
         .filter(|trial| trial.markov_equivalence_class_correct).count();
+    let cpdag_claims = trials.iter().filter(|trial| trial.cpdag_claim_accepted).count();
+    let false_cpdag_claims = trials.iter().filter(|trial| trial.false_cpdag_claim).count();
+    let accepted_false_cpdag_claims = trials.iter()
+        .filter(|trial| trial.cpdag_claim_accepted && trial.false_cpdag_claim).count();
     let true_mass: Vec<f64> = trials.iter().map(|trial| trial.posterior_true_graph).collect();
     let true_class_mass: Vec<f64> = trials.iter()
         .map(|trial| trial.posterior_true_markov_class).collect();
@@ -1041,6 +1060,13 @@ fn summarize_world(
         cpdag_mark_distance_ci95: mean_ci95(&cpdag_distance, 0.0, (NODE_COUNT * (NODE_COUNT - 1) / 2) as f64),
         markov_equivalence_class_recovery_rate: cpdag_correct as f64 / count as f64,
         markov_equivalence_class_recovery_wilson_ci95: wilson_ci95(cpdag_correct, count),
+        cpdag_claim_coverage: cpdag_claims as f64 / count as f64,
+        cpdag_claim_coverage_wilson_ci95: wilson_ci95(cpdag_claims, count),
+        false_cpdag_claim_rate_among_accepted: (cpdag_claims > 0)
+            .then_some(accepted_false_cpdag_claims as f64 / cpdag_claims as f64),
+        false_cpdag_claim_rate_among_accepted_wilson_ci95: (cpdag_claims > 0)
+            .then_some(wilson_ci95(accepted_false_cpdag_claims, cpdag_claims)),
+        false_cpdag_claim_rate_all_trials: false_cpdag_claims as f64 / count as f64,
         mean_posterior_mass_on_true_markov_class: mean(&true_class_mass),
         posterior_mass_on_true_markov_class_ci95: mean_ci95(&true_class_mass, 0.0, 1.0),
         mean_structural_hamming_distance: mean(&shd),
@@ -1082,6 +1108,10 @@ fn aggregate_held_out(
         let cpdag_distance: Vec<f64> = rows.iter().map(|row| row.mean_cpdag_mark_distance).collect();
         let cpdag_accuracy: Vec<f64> = rows.iter()
             .map(|row| row.markov_equivalence_class_recovery_rate).collect();
+        let cpdag_coverage: Vec<f64> = rows.iter()
+            .map(|row| row.cpdag_claim_coverage).collect();
+        let cpdag_false_claims: Vec<f64> = rows.iter()
+            .map(|row| row.false_cpdag_claim_rate_all_trials).collect();
         let shd: Vec<f64> = rows.iter().map(|row| row.mean_structural_hamming_distance).collect();
         let exact: Vec<f64> = rows.iter().map(|row| row.exact_graph_recovery_rate).collect();
         let coverage: Vec<f64> = rows.iter().map(|row| row.graph_claim_coverage).collect();
@@ -1101,6 +1131,8 @@ fn aggregate_held_out(
             mean_held_out_cpdag_mark_distance: mean(&cpdag_distance),
             held_out_cpdag_mark_distance_world_ci95: mean_ci95(&cpdag_distance, 0.0, (NODE_COUNT * (NODE_COUNT - 1) / 2) as f64),
             held_out_markov_equivalence_class_recovery_rate: mean(&cpdag_accuracy),
+            mean_held_out_cpdag_claim_coverage: mean(&cpdag_coverage),
+            mean_held_out_false_cpdag_claim_rate_all_trials: mean(&cpdag_false_claims),
             mean_held_out_shd: mean(&shd),
             held_out_shd_world_ci95: mean_ci95(&shd, 0.0, (NODE_COUNT * (NODE_COUNT - 1) / 2) as f64),
             worst_world_directed_edge_f1: directed.iter().copied().fold(1.0, f64::min),
