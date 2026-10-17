@@ -88,7 +88,7 @@ A “style” should stop being a preset name attached to a shared generator. Tr
 
 ### New executable benchmark
 
-A Rust example, **examples/style_contract_benchmark.rs**, is now added to audit the real public composition path, **compose_with_grammar_plan(style.grammar_profile(), intent, style.spec())**. It reports the selected grammar-plan families alongside the declared form/accompaniment pools, spec validity, empty/invalid timelines, meter and tempo-band violations, deterministic replay failures, seed-level exact-fingerprint diversity, matched-intent exact collisions between styles, nearest cross-style structural neighbors, and the gap between declared and observed sensitivity for valence/arousal/energy/bars.
+A Rust example, **examples/style_contract_benchmark.rs**, audits the real public composition path, **compose_with_grammar_plan(style.grammar_profile(), intent, style.spec())**. It reports the selected grammar-plan families alongside declared form/accompaniment pools, spec validity, empty/invalid timelines, meter and tempo-band violations, score-level and structural replay failures, seed-level exact-fingerprint diversity, matched-intent exact collisions between styles, nearest cross-style structural neighbors, and declared-vs-observed sensitivity for valence/arousal/energy/bars. Paired sensitivity probes now count an effect when either the exact symbolic score fingerprint changes or the structural fingerprint changes; the report keeps those counts separate.
 
 Run it with source provenance captured:
 
@@ -98,7 +98,7 @@ Or write a machine-readable report:
 
     GIT_COMMIT="$(git rev-parse HEAD)" cargo run --release -p symthaea-music-theory --example style_contract_benchmark -- /tmp/style-contract.json
 
-The JSON marks the source commit as null when GIT_COMMIT is not supplied; preserve the JSON beside the exact source revision and CI evidence.
+The JSON marks the source commit as null when GIT_COMMIT is not supplied; preserve the JSON beside the exact source revision and CI evidence. Structural replay is checked independently of the score hash so a stable note stream cannot hide a nondeterministic generated form. The top-level **control_contract_audit** counts both declared-live controls with no observed effect at the sampled points and declared-inert controls that do show an effect; either discrepancy prevents **all_mechanical_checks_passed** from being true. This is a bounded counterfactual screen, not proof that a control is globally active or inactive.
 
 The diversity census now uses **Style::ALL** for its current causal-diversity pass so new presets enter by default. Its historical 29-style pilot remains fixed for reproducibility. The new contract benchmark runs through the actual grammar dispatcher, including dedicated grammar families; that distinction matters because the older diversity census uses the shared composition-and-form path and is a different measurement layer.
 
