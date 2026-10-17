@@ -139,11 +139,11 @@ fn validate_receipt_shape(
         errors.push(format!("{id}: tolerances must be case-specific, justified, and frozen before candidate evaluation"));
     }
 
-    if !nonempty_text(&receipt["claim_ceiling"], "text") {
-        // Accept a nonempty string claim ceiling as the most portable JSON form.
-        if !receipt["claim_ceiling"].as_str().is_some_and(|value| !value.trim().is_empty()) {
-            errors.push(format!("{id}: claim_ceiling must be an explicit nonempty string"));
-        }
+    if !receipt["claim_ceiling"]
+        .as_str()
+        .is_some_and(|value| !value.trim().is_empty())
+    {
+        errors.push(format!("{id}: claim_ceiling must be an explicit nonempty string"));
     }
 }
 
@@ -547,17 +547,39 @@ mod tests {
         candidate["reference_outputs"]["freeze_receipt"] = json!({
             "primary_source_url_and_revision": "https://dwsim.org/tutorials/en/beginner/02-mixer-basics.html @ pinned revision",
             "retrieved_at": "2026-10-17",
-            "native_input_files_and_transitive_data_hashes": ["sha256:cccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccc"],
+            "native_input_files_and_transitive_data_hashes": [{
+                "artifact": "mixer-project.dwxmz",
+                "sha256": "sha256:cccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccc"
+            }],
             "component_identity_and_order": "water",
             "units_and_composition_basis": "SI; mass flow in kg/s",
             "phase_and_reference_state_conventions": "captured and documented",
             "property_package_or_mechanism_and_parameter_provenance": "pinned IAPWS-IF97 property data source",
             "solver_build_and_runtime_versions": "exact DWSIM build recorded",
             "numerical_methods_tolerances_and_convergence_status": "converged; case-specific tolerance preregistered",
-            "stdout_stderr_and_raw_output_hashes": "stdout/stderr archived; raw output SHA-256 above",
-            "independent_checker_version_and_result": "synthetic checker v1; result recorded",
-            "shared_dependency_audit": "data dependency graph archived",
-            "preregistered_case_specific_tolerance_and_rationale": "defined before candidate evaluation",
+            "stdout_stderr_and_raw_output_hashes": {
+                "stdout_sha256": "sha256:dddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddd",
+                "stderr_sha256": "sha256:eeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeee",
+                "raw_output_sha256": "sha256:aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa"
+            },
+            "independent_checker_version_and_result": {
+                "checker_version": "synthetic-checker-v1",
+                "result": "PASS"
+            },
+            "shared_dependency_audit": {
+                "complete": true,
+                "independence_assessed": true,
+                "dependency_digests": ["sha256:cccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccc"],
+                "shared_dependency_digests": []
+            },
+            "preregistered_case_specific_tolerance_and_rationale": {
+                "frozen_before_candidate_evaluation": true,
+                "rationale": "mass conservation is analytically exact under the declared bookkeeping assumptions",
+                "metrics": [{
+                    "metric": "total_mass_flow",
+                    "acceptance_rule": "exact arithmetic invariant of 150 kg/s"
+                }]
+            },
             "claim_ceiling": "only matched-context water-mixer reference reproducibility"
         });
         assert!(
