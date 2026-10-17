@@ -98,7 +98,7 @@ The first code slice is now proposed as a module inside the existing standalone,
 - It checks required release-artifact presence, exact revision binding, digest shape, traceable rights-review declaration, BOM structure and source availability for a declared fabrication context.
 - It separates design-package completeness from cost evidence. Missing price quotes cannot become zero; mixed currencies do not yield a single total; checked arithmetic overflow blocks the computed cost claim.
 - It emits only `CompleteForIndependentBuildReview`, `Incomplete`, or `Blocked`. The report never marks a package safety-certified or authorizes equipment use.
-- Its tests are synthetic unit tests, **not** an independent verifier and not proof that external hashes, license terms, CAD geometry, safety, or the design itself are valid. The exact-head benchmark workflow is currently queued; no pass is inferred from that state.
+- The stacked PR now includes synthetic unit tests and a separate integration-level golden-outcome file with an explicit artifact inventory. That test calls the production function to compare observed output with hand-authored expectations; it is **not yet** a separate verifier executable, and it does not prove external hashes, license terms, CAD geometry, safety, or design validity. The exact-head benchmark workflow is currently queued; no pass is inferred from that state.
 
 This is a deliberately small step toward a real evidence pipeline. Before using it to qualify a real design, add a separately implemented verifier over a frozen fixture corpus, bind actual artifact bytes/manifests, and review the contract against a named part/tool/build scenario.
 
