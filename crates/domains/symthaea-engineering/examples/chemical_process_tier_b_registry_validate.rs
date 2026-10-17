@@ -117,12 +117,58 @@ fn validate_receipt_shape(
     }
 
     let dependency_audit = &receipt["shared_dependency_audit"];
+    let parse_digest_set = |field: &str| -> Option<BTreeSet<String>> {
+        let values = dependency_audit.get(field)?.as_array()?;
+        if values.is_empty() {
+            return None;
+        }
+        let mut digests = BTreeSet::new();
+        for value in values {
+            if !is_sha256(value) {
+                return None;
+            }
+            let digest = value.as_str()?.to_owned();
+            if !digests.insert(digest) {
+                return None;
+            }
+        }
+        Some(digests)
+    };
+    let model_a = parse_digest_set("model_a_dependency_digests");
+    let model_b = parse_digest_set("model_b_dependency_digests");
+    let declared_shared = dependency_audit
+        .get("shared_dependency_digests")
+        .and_then(Value::as_array)
+        .and_then(|values| {
+            let mut digests = BTreeSet::new();
+            for value in values {
+                if !is_sha256(value) || !digests.insert(value.as_str()?.to_owned()) {
+                    return None;
+                }
+            }
+            Some(digests)
+        });
+    let computed_shared = model_a
+        .as_ref()
+        .zip(model_b.as_ref())
+        .map(|(a, b)| a.intersection(b).cloned().collect::<BTreeSet<_>>());
     if dependency_audit["complete"].as_bool() != Some(true)
         || dependency_audit["independence_assessed"].as_bool() != Some(true)
-        || !dependency_audit["dependency_digests"].is_array()
-        || !dependency_audit["shared_dependency_digests"].is_array()
+        || model_a.is_none()
+        || model_b.is_none()
+        || declared_shared.is_none()
     {
-        errors.push(format!("{id}: shared-dependency audit must be complete, assessed, and enumerate both dependency sets"));
+        errors.push(format!("{id}: dependency audit must contain two nonempty, unique, SHA-256 dependency sets and a valid shared set"));
+    } else if declared_shared != computed_shared {
+        errors.push(format!("{id}: declared shared_dependency_digests do not equal the computed intersection of model dependency sets"));
+    }
+    let independent_claimed = dependency_audit["independent_corroboration_claimed"].as_bool();
+    if independent_claimed.is_none() {
+        errors.push(format!("{id}: dependency audit must explicitly declare independent_corroboration_claimed"));
+    } else if independent_claimed == Some(true)
+        && computed_shared.as_ref().is_some_and(|shared| !shared.is_empty())
+    {
+        errors.push(format!("{id}: independent corroboration cannot be claimed when source-data dependencies overlap"));
     }
 
     let tolerance = &receipt["preregistered_case_specific_tolerance_and_rationale"];
