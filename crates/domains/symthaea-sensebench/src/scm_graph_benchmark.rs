@@ -190,6 +190,7 @@ pub struct ScmGraphBenchmarkReport {
     pub posterior_threshold: f64,
     pub observed_node_count: usize,
     pub candidate_dag_count: usize,
+    pub markov_equivalence_class_count: usize,
     pub world_variants_per_family: usize,
     pub world_count: usize,
     pub held_out_world_count: usize,
@@ -298,40 +299,71 @@ fn cpdag_marks(graph: CausalDag, catalogue: &[CausalDag]) -> Vec<EdgeMark> {
     }).collect()
 }
 
-/// Choose the Markov equivalence class with the greatest summed posterior mass.
-/// This keeps the emitted partial graph aligned to a valid CPDAG class rather than
-/// independently thresholding pairwise arrow probabilities into a possibly cyclic
-/// or otherwise invalid partially directed graph.
+#[derive(Debug, Clone)]
+struct MarkovClassCatalog {
+    class_for_graph: Vec<usize>,
+    members: Vec<Vec<usize>>,
+    cpdag_marks: Vec<Vec<EdgeMark>>,
+}
+
+fn build_markov_class_catalog(catalogue: &[CausalDag]) -> MarkovClassCatalog {
+    let mut class_for_graph = vec![usize::MAX; catalogue.len()];
+    let mut members: Vec<Vec<usize>> = Vec::new();
+    let mut marks: Vec<Vec<EdgeMark>> = Vec::new();
+    for (candidate_index, candidate) in catalogue.iter().enumerate() {
+        if class_for_graph[candidate_index] != usize::MAX {
+            continue;
+        }
+        let class_index = members.len();
+        let class_members: Vec<usize> = catalogue.iter().enumerate()
+            .filter(|(_, other)| markov_equivalent(*candidate, **other))
+            .map(|(index, _)| index)
+            .collect();
+        for member in &class_members {
+            class_for_graph[*member] = class_index;
+        }
+        members.push(class_members);
+        marks.push(cpdag_marks(*candidate, catalogue));
+    }
+    MarkovClassCatalog {
+        class_for_graph,
+        members,
+        cpdag_marks: marks,
+    }
+}
+
+/// Select the Markov equivalence class with the greatest summed posterior mass.
+/// Its CPDAG comes from the precomputed valid class catalogue, avoiding pairwise
+/// threshold combinations that can create invalid partially directed graphs.
 fn posterior_cpdag(
     posterior: &[HypothesisPrior],
-    catalogue: &[CausalDag],
-) -> (Vec<EdgeMark>, f64) {
-    let mut best_graph_index = 0usize;
+    classes: &MarkovClassCatalog,
+) -> (Vec<EdgeMark>, f64, usize) {
+    let mut best_class_index = 0usize;
     let mut best_mass = -1.0_f64;
-    for (candidate_index, candidate) in catalogue.iter().enumerate() {
-        let class_mass = catalogue.iter().enumerate()
-            .filter(|(_, other)| markov_equivalent(*candidate, **other))
-            .map(|(index, _)| posterior[index].probability)
+    for (class_index, members) in classes.members.iter().enumerate() {
+        let class_mass = members.iter()
+            .map(|member| posterior[*member].probability)
             .sum::<f64>();
         if class_mass > best_mass {
             best_mass = class_mass;
-            best_graph_index = candidate_index;
+            best_class_index = class_index;
         }
     }
     (
-        cpdag_marks(catalogue[best_graph_index], catalogue),
+        classes.cpdag_marks[best_class_index].clone(),
         best_mass.max(0.0),
+        best_class_index,
     )
 }
 
 fn posterior_mass_on_class(
     posterior: &[HypothesisPrior],
-    catalogue: &[CausalDag],
-    target: CausalDag,
+    classes: &MarkovClassCatalog,
+    target_graph_index: usize,
 ) -> f64 {
-    catalogue.iter().enumerate()
-        .filter(|(_, candidate)| markov_equivalent(target, **candidate))
-        .map(|(index, _)| posterior[index].probability)
+    classes.members[classes.class_for_graph[target_graph_index]].iter()
+        .map(|member| posterior[*member].probability)
         .sum()
 }
 
@@ -857,6 +889,7 @@ fn f1_from_counts(tp: usize, fp: usize, fn_: usize) -> f64 {
 fn simulate_trial(
     policy: ScmGraphPolicy,
     graphs: &[CausalDag],
+    classes: &MarkovClassCatalog,
     actions: &[ScmAction],
     priors: &[HypothesisPrior],
     scenarios: &[ModelLikelihoodScenario],
@@ -920,16 +953,17 @@ fn simulate_trial(
     let predicted = graphs[map_index];
     let truth = graphs[truth_index];
     let (skeleton_f1, directed_edge_f1, shd, exact_graph) = structure_metrics(predicted, truth);
-    let (posterior_class_prediction, posterior_top_class_mass) = posterior_cpdag(&posterior, graphs);
+    let (posterior_class_prediction, posterior_top_class_mass, _) =
+        posterior_cpdag(&posterior, classes);
     let predicted_cpdag = if policy == ScmGraphPolicy::StructureBlindRandomGraph {
-        cpdag_marks(predicted, graphs)
+        classes.cpdag_marks[classes.class_for_graph[map_index]].clone()
     } else {
         posterior_class_prediction
     };
-    let truth_cpdag = cpdag_marks(truth, graphs);
+    let truth_cpdag = classes.cpdag_marks[classes.class_for_graph[truth_index]].clone();
     let (cpdag_skeleton_f1, compelled_direction_f1, cpdag_mark_distance, markov_class_correct) =
         cpdag_metrics(&predicted_cpdag, &truth_cpdag);
-    let posterior_true_markov_class = posterior_mass_on_class(&posterior, graphs, truth);
+    let posterior_true_markov_class = posterior_mass_on_class(&posterior, classes, truth_index);
     let max_probability = posterior[posterior_top_index(&posterior)].probability;
     let claim_accepted = policy != ScmGraphPolicy::StructureBlindRandomGraph
         && max_probability >= posterior_threshold;
@@ -1179,6 +1213,7 @@ pub fn run_scm_graph_benchmark(
     let priors = uniform_priors(&graphs);
     let scenarios = declared_model_scenarios(&graphs, &actions);
     let worlds = generate_worlds(seed);
+    let classes = build_markov_class_catalog(&graphs);
     let fixed_action_id = fixed_design_action(&graphs, &actions, &priors, &worlds)?;
     let policies = ScmGraphPolicy::all();
     let mut summaries = Vec::with_capacity(worlds.len() * policies.len());
@@ -1194,6 +1229,7 @@ pub fn run_scm_graph_benchmark(
                 trials.push(simulate_trial(
                     policy,
                     &graphs,
+                    &classes,
                     &actions,
                     &priors,
                     &scenarios,
@@ -1218,6 +1254,7 @@ pub fn run_scm_graph_benchmark(
         posterior_threshold,
         observed_node_count: NODE_COUNT,
         candidate_dag_count: graphs.len(),
+        markov_equivalence_class_count: classes.members.len(),
         world_variants_per_family: WORLD_VARIANTS_PER_FAMILY,
         world_count: worlds.len(),
         held_out_world_count: worlds.iter().filter(|world| world.family.held_out()).count(),
@@ -1386,9 +1423,11 @@ mod tests {
                 hypothesis.probability = remainder;
             }
         }
-        let (marks, class_mass) = posterior_cpdag(&posterior, &catalogue);
+        let classes = build_markov_class_catalog(&catalogue);
+        let (marks, class_mass, class_index) = posterior_cpdag(&posterior, &classes);
         assert_eq!(marks, cpdag_marks(chain_forward, &catalogue));
         assert!((class_mass - (0.6 + remainder)).abs() < 1.0e-12);
+        assert_eq!(classes.members[class_index].len(), 3);
     }
 
     #[test]
@@ -1435,6 +1474,7 @@ mod tests {
         assert_eq!(a.world_count, 28);
         assert_eq!(a.held_out_world_count, 20);
         assert_eq!(a.candidate_dag_count, 25);
+        assert_eq!(a.markov_equivalence_class_count, build_markov_class_catalog(&all_dags()).members.len());
         assert_eq!(a.worlds.len(), 28 * ScmGraphPolicy::all().len());
         assert_eq!(a.held_out_policy_aggregates.len(), ScmGraphPolicy::all().len());
     }
