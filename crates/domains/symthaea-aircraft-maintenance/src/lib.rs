@@ -98,6 +98,7 @@ pub struct ToolRequirement {
 pub struct PartRequirement {
     pub part_number: String,
     pub revision: String,
+    pub quantity: u32,
     pub source: ControlledDocumentRef,
 }
 
@@ -177,6 +178,8 @@ pub struct MaintenanceTaskCard {
     parts: Vec<PartRequirement>,
     steps: Vec<ControlledStep>,
     acceptance_checks: Vec<AcceptanceCheck>,
+    planned_hands_on_seconds: u64,
+    planned_elapsed_seconds: u64,
 }
 
 impl MaintenanceTaskCard {
@@ -198,6 +201,8 @@ impl MaintenanceTaskCard {
         parts: Vec<PartRequirement>,
         steps: Vec<ControlledStep>,
         acceptance_checks: Vec<AcceptanceCheck>,
+        planned_hands_on_seconds: u64,
+        planned_elapsed_seconds: u64,
     ) -> Self {
         Self {
             schema_version: TASK_CARD_SCHEMA_VERSION,
@@ -215,6 +220,8 @@ impl MaintenanceTaskCard {
             parts,
             steps,
             acceptance_checks,
+            planned_hands_on_seconds,
+            planned_elapsed_seconds,
         }
     }
 
@@ -264,6 +271,7 @@ pub struct ToolAvailability {
 pub struct PartAvailability {
     pub part_number: String,
     pub revision: String,
+    pub quantity: u32,
     pub source: ControlledDocumentRef,
 }
 
@@ -334,6 +342,21 @@ pub struct RecordedEvidence {
     pub recorded_by: String,
 }
 
+/// Task execution timing, with waiting separated from hands-on labor. All
+/// fields must be recorded (use zero when the category did not occur) before a
+/// completed work record can pass validation.
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub struct TaskTimingBreakdown {
+    pub preparation_seconds: Option<u64>,
+    pub access_seconds: Option<u64>,
+    pub execution_seconds: Option<u64>,
+    pub verification_seconds: Option<u64>,
+    pub closeout_seconds: Option<u64>,
+    pub record_seconds: Option<u64>,
+    pub scheduling_wait_seconds: Option<u64>,
+    pub parts_wait_seconds: Option<u64>,
+}
+
 /// Completion record for one task-card revision and one aircraft configuration.
 #[derive(Debug, Clone, PartialEq)]
 pub struct MaintenanceWorkRecord {
@@ -347,6 +370,7 @@ pub struct MaintenanceWorkRecord {
     pub evidence: Vec<RecordedEvidence>,
     pub measurements: Vec<NumericMeasurement>,
     pub human_reviews: Vec<CriterionReview>,
+    pub timing: TaskTimingBreakdown,
     pub recorded_on: String,
 }
 
@@ -425,6 +449,8 @@ pub enum TaskCardError {
     SoftwareCannotReleaseToService,
     MissingReleaseCredential,
     RecordIdentityMismatch { field: String },
+    MissingTaskTiming { field: String },
+    TaskTimingOverflow,
 }
 
 /// Validate the card's static shape and source/effectivity metadata. Draft
@@ -438,6 +464,12 @@ pub fn validate_task_card_static(
     }
     nonempty("task_id", &card.task_id, &mut errors);
     digest("card_sha256", &card.card_sha256, &mut errors);
+    if card.planned_hands_on_seconds == 0
+        || card.planned_elapsed_seconds == 0
+        || card.planned_elapsed_seconds < card.planned_hands_on_seconds
+    {
+        errors.push(TaskCardError::InvalidValue { field: "planned_task_timing".into(), reason: "planned elapsed seconds must be positive and no shorter than planned hands-on seconds".into() });
+    }
     if card.revision == 0 {
         errors.push(TaskCardError::EmptyField {
             field: "revision".into(),
@@ -502,6 +534,11 @@ pub fn validate_task_card_static(
     for (index, part) in card.parts.iter().enumerate() {
         nonempty(&format!("parts[{index}].part_number"), &part.part_number, &mut errors);
         nonempty(&format!("parts[{index}].revision"), &part.revision, &mut errors);
+        if part.quantity == 0 {
+            errors.push(TaskCardError::EmptyField {
+                field: format!("parts[{index}].quantity"),
+            });
+        }
         validate_document(&format!("parts[{index}].source"), &part.source, &mut errors);
     }
 
@@ -706,6 +743,7 @@ pub fn validate_task_ready(
         if !context.available_parts.iter().any(|available| {
             available.part_number == part.part_number
                 && available.revision == part.revision
+                && available.quantity >= part.quantity
                 && available.source == part.source
         }) {
             errors.push(TaskCardError::MissingPart {
@@ -837,6 +875,32 @@ pub fn validate_work_record(
             if !evidence_fields.contains(required.as_str()) {
                 errors.push(TaskCardError::MissingEvidence { field_id: required.clone() });
             }
+        }
+    }
+
+    let timing_values = [
+        ("preparation_seconds", record.timing.preparation_seconds),
+        ("access_seconds", record.timing.access_seconds),
+        ("execution_seconds", record.timing.execution_seconds),
+        ("verification_seconds", record.timing.verification_seconds),
+        ("closeout_seconds", record.timing.closeout_seconds),
+        ("record_seconds", record.timing.record_seconds),
+        ("scheduling_wait_seconds", record.timing.scheduling_wait_seconds),
+        ("parts_wait_seconds", record.timing.parts_wait_seconds),
+    ];
+    let mut total_seconds = 0u64;
+    for (field, seconds) in timing_values {
+        match seconds {
+            Some(value) => {
+                total_seconds = match total_seconds.checked_add(value) {
+                    Some(total) => total,
+                    None => {
+                        errors.push(TaskCardError::TaskTimingOverflow);
+                        total_seconds
+                    }
+                };
+            }
+            None => errors.push(TaskCardError::MissingTaskTiming { field: field.into() }),
         }
     }
 
@@ -1261,6 +1325,7 @@ mod tests {
             parts: vec![PartRequirement {
                 part_number: "part-fixture".into(),
                 revision: "rev-1".into(),
+                quantity: 1,
                 source: supporting.clone(),
             }],
             steps: vec![
@@ -1296,6 +1361,8 @@ mod tests {
                     rule: AcceptanceRule::SourceControlledReview,
                 },
             ],
+            planned_hands_on_seconds: 600,
+            planned_elapsed_seconds: 900,
         }
     }
 
@@ -1341,6 +1408,7 @@ mod tests {
             available_parts: vec![PartAvailability {
                 part_number: part.part_number,
                 revision: part.revision,
+                quantity: part.quantity,
                 source: part.source,
             }],
             completed_prerequisites: card.prerequisites.clone(),
@@ -1382,6 +1450,16 @@ mod tests {
                 reviewer_id: "qualified-reviewer-fixture".into(),
                 authority_reference: doc("review-authority", "rev-1", '2'),
             }],
+            timing: TaskTimingBreakdown {
+                preparation_seconds: Some(20),
+                access_seconds: Some(30),
+                execution_seconds: Some(200),
+                verification_seconds: Some(100),
+                closeout_seconds: Some(40),
+                record_seconds: Some(30),
+                scheduling_wait_seconds: Some(60),
+                parts_wait_seconds: Some(0),
+            },
             recorded_on: "2026-10-17".into(),
         }
     }
