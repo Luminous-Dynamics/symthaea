@@ -21,6 +21,9 @@ use super::{
     mission_model_contract::{MissionPhaseDemand, PowerUncertaintyBounds},
 };
 
+/// Bounded iteration count to keep caller-supplied settings finite.
+pub const MAX_COUPLING_ITERATIONS: usize = 10_000;
+
 /// Fixed aircraft mass not including the energy system sized by this module.
 /// Keep mass terms mutually exclusive; do not count the propulsion or consumables
 /// again in fixed_vehicle_mass_kg.
@@ -247,10 +250,10 @@ fn validate_inputs(
             reason: "must be finite and at least 1.0".into(),
         });
     }
-    if settings.max_iterations == 0 {
+    if settings.max_iterations == 0 || settings.max_iterations > MAX_COUPLING_ITERATIONS {
         findings.push(CouplingFinding::InvalidInput {
             field: "settings.max_iterations".into(),
-            reason: "must be greater than zero".into(),
+            reason: format!("must be between 1 and {MAX_COUPLING_ITERATIONS}"),
         });
     }
     if !settings.relative_mass_tolerance.is_finite() || settings.relative_mass_tolerance < 0.0 {
@@ -884,6 +887,41 @@ mod tests {
             .map(|phase| phase.power_uncertainty.upper_bound_w * phase.duration_s / 3_600.0)
             .sum::<f64>();
         assert!((report.worst_case_mission_energy_wh.unwrap() - expected_energy).abs() < 1e-8);
+    }
+
+    #[test]
+    fn malformed_uncertainty_bounds_fail_closed() {
+        struct MalformedModel;
+        impl MassSensitiveMissionModel for MalformedModel {
+            fn phase_demands(&self, _: &CoupledMissionContext, _: f64) -> Result<Vec<MissionPhaseDemand>, String> {
+                Ok(vec![MissionPhaseDemand {
+                    id: "bad-phase".into(),
+                    duration_s: 60.0,
+                    required_bus_power_w: 100.0,
+                    power_uncertainty: PowerUncertaintyBounds {
+                        lower_bound_w: 110.0,
+                        upper_bound_w: 90.0,
+                        method: "synthetic-negative-control".into(),
+                    },
+                    duty_class: DutyClass::Continuous,
+                }])
+            }
+        }
+        let report = solve_mass_coupled_battery(
+            &context(), &fixed_mass(), &battery(), &settings(), 50.0, &MalformedModel,
+        ).unwrap();
+        assert_eq!(report.disposition, CouplingDisposition::InvalidDemand);
+        assert!(report.findings.iter().any(|finding| matches!(finding, CouplingFinding::InvalidPhase { .. })));
+    }
+
+    #[test]
+    fn iteration_limit_is_bounded() {
+        let mut bounded = settings();
+        bounded.max_iterations = MAX_COUPLING_ITERATIONS + 1;
+        let model = SimpleMassSensitiveModel { base_power_w: 4_000.0, watts_per_kg: 0.0, duration_s: 1_800.0 };
+        assert!(solve_mass_coupled_battery(
+            &context(), &fixed_mass(), &battery(), &bounded, 50.0, &model,
+        ).is_err());
     }
 
     #[test]
