@@ -226,25 +226,95 @@ fn validate_reason_codes(value: &Value, context: &str) -> Result<Vec<String>> {
 fn derive_feasibility(facts: &Value, context: &str) -> Result<Decision> {
     ensure_exact_keys(facts, FEASIBILITY_FIELDS, context)?;
     let site = enum_at(facts, "site_authority", &["permitted", "prohibited", "unknown"], context)?;
-    let ecology = enum_at(facts, "ecological_constraint", &["within_limit", "violated", "unknown"], context)?;
-    let envelope = enum_at(facts, "environment_envelope", &["within", "outside", "unknown"], context)?;
-    let calibration = enum_at(facts, "sensor_calibration", &["current", "stale", "missing", "failed"], context)?;
-    let coordinate = enum_at(facts, "coordinate_reference", &["known", "ambiguous", "invalid"], context)?;
-    let energy = enum_at(facts, "energy_reserve", &["sufficient", "insufficient", "uncertain"], context)?;
+    let ecology = enum_at(
+        facts,
+        "ecological_constraint",
+        &["within_limit", "violated", "unknown"],
+        context,
+    )?;
+    let envelope = enum_at(
+        facts,
+        "environment_envelope",
+        &["within", "outside", "unknown"],
+        context,
+    )?;
+    let calibration = enum_at(
+        facts,
+        "sensor_calibration",
+        &["current", "stale", "missing", "failed"],
+        context,
+    )?;
+    let coordinate = enum_at(
+        facts,
+        "coordinate_reference",
+        &["known", "ambiguous", "invalid"],
+        context,
+    )?;
+    let energy = enum_at(
+        facts,
+        "energy_reserve",
+        &["sufficient", "insufficient", "uncertain"],
+        context,
+    )?;
     let recovery = enum_at(facts, "recovery_plan", &["viable", "unavailable", "unknown"], context)?;
-    let payload = enum_at(facts, "payload_compatibility", &["compatible", "incompatible", "unknown"], context)?;
-    let failsafe = enum_at(facts, "local_failsafe", &["present_tested", "absent", "unknown"], context)?;
+    let payload = enum_at(
+        facts,
+        "payload_compatibility",
+        &["compatible", "incompatible", "unknown"],
+        context,
+    )?;
+    let failsafe = enum_at(
+        facts,
+        "local_failsafe",
+        &["present_tested", "absent", "unknown"],
+        context,
+    )?;
     let communications = enum_at(facts, "communications", &["available", "partition"], context)?;
     let offline = enum_at(facts, "offline_policy", &["valid", "missing", "unknown"], context)?;
     let rights = enum_at(facts, "data_rights", &["permitted", "prohibited", "unknown"], context)?;
-    let source = enum_at(facts, "observation_source", &["measured", "derived", "estimated"], context)?;
+    let source = enum_at(
+        facts,
+        "observation_source",
+        &["measured", "derived", "estimated"],
+        context,
+    )?;
     let claim = enum_at(facts, "requested_claim", &["measured", "derived", "estimated"], context)?;
-    let source_status = enum_at(facts, "source_status", &["valid", "timeout_as_zero", "stale", "inconsistent"], context)?;
-    let configuration = enum_at(facts, "configuration_match", &["exact", "mismatch", "unknown"], context)?;
-    let reference_quality = enum_at(facts, "reference_quality", &["adequate", "insufficient", "unknown"], context)?;
-    let baseline = enum_at(facts, "baseline", &["robot_needed", "fixed_sensor_sufficient", "manual_preferred"], context)?;
-    let common_mode = enum_at(facts, "common_mode_assumption", &["not_claimed", "independence_verified", "shared_but_claimed_independent", "unknown"], context)?;
-    let recovery_history = enum_at(facts, "recovery_history", &["clean", "failed_attempts_reported", "failed_attempts_hidden", "unknown"], context)?;
+    let source_status = enum_at(
+        facts,
+        "source_status",
+        &["valid", "timeout_as_zero", "stale", "inconsistent"],
+        context,
+    )?;
+    let configuration = enum_at(
+        facts,
+        "configuration_match",
+        &["exact", "mismatch", "unknown"],
+        context,
+    )?;
+    let reference_quality = enum_at(
+        facts,
+        "reference_quality",
+        &["adequate", "insufficient", "unknown"],
+        context,
+    )?;
+    let baseline = enum_at(
+        facts,
+        "baseline",
+        &["robot_needed", "fixed_sensor_sufficient", "manual_preferred"],
+        context,
+    )?;
+    let common_mode = enum_at(
+        facts,
+        "common_mode_assumption",
+        &["not_claimed", "independence_verified", "shared_but_claimed_independent", "unknown"],
+        context,
+    )?;
+    let recovery_history = enum_at(
+        facts,
+        "recovery_history",
+        &["clean", "failed_attempts_reported", "failed_attempts_hidden", "unknown"],
+        context,
+    )?;
 
     // Known hard violations take precedence over missing evidence.
     if site == "prohibited" {
@@ -376,16 +446,61 @@ fn derive_repairability(case: &Value, context: &str) -> Result<Decision> {
     ensure_exact_keys(facts, REPAIRABILITY_FIELDS, context)?;
 
     let intent = enum_at(facts, "intent", &["repair", "local_fabrication"], context)?;
-    let source = enum_at(facts, "source_format", &["editable", "intermediate_only", "missing"], context)?;
-    let bom = enum_at(facts, "bom_status", &["exact", "approved_substitution", "unapproved_substitution", "unknown"], context)?;
-    let qualification = enum_at(facts, "component_qualification", &["qualified_for_profile", "bench_only", "failed", "unknown"], context)?;
+    let source = enum_at(
+        facts,
+        "source_format",
+        &["editable", "intermediate_only", "missing"],
+        context,
+    )?;
+    let bom = enum_at(
+        facts,
+        "bom_status",
+        &["exact", "approved_substitution", "unapproved_substitution", "unknown"],
+        context,
+    )?;
+    let qualification = enum_at(
+        facts,
+        "component_qualification",
+        &["qualified_for_profile", "bench_only", "failed", "unknown"],
+        context,
+    )?;
     let history = enum_at(facts, "article_history", &["known", "unknown", "quarantined"], context)?;
-    let access = enum_at(facts, "repair_access", &["non_destructive", "destructive", "blocked", "unknown"], context)?;
-    let tools = enum_at(facts, "routine_tools", &["within_profile", "specialist_required", "unknown"], context)?;
-    let post_check = enum_at(facts, "post_repair_check", &["complete", "missing", "failed"], context)?;
-    let calibration = enum_at(facts, "calibration", &["current", "stale", "missing", "failed"], context)?;
-    let configuration = enum_at(facts, "configuration_record", &["updated_exact", "stale", "missing"], context)?;
-    let fault = enum_at(facts, "fault_history", &["resolved", "recurring_unresolved", "failed_repair_reintroduced", "unknown"], context)?;
+    let access = enum_at(
+        facts,
+        "repair_access",
+        &["non_destructive", "destructive", "blocked", "unknown"],
+        context,
+    )?;
+    let tools = enum_at(
+        facts,
+        "routine_tools",
+        &["within_profile", "specialist_required", "unknown"],
+        context,
+    )?;
+    let post_check = enum_at(
+        facts,
+        "post_repair_check",
+        &["complete", "missing", "failed"],
+        context,
+    )?;
+    let calibration = enum_at(
+        facts,
+        "calibration",
+        &["current", "stale", "missing", "failed"],
+        context,
+    )?;
+    let configuration = enum_at(
+        facts,
+        "configuration_record",
+        &["updated_exact", "stale", "missing"],
+        context,
+    )?;
+    let fault = enum_at(
+        facts,
+        "fault_history",
+        &["resolved", "recurring_unresolved", "failed_repair_reintroduced", "unknown"],
+        context,
+    )?;
     let serviceability = enum_at(
         facts,
         "serviceability_target",
@@ -402,7 +517,9 @@ fn derive_repairability(case: &Value, context: &str) -> Result<Decision> {
     if qualification == "failed" {
         return Ok(Decision::one("quarantine", "COMPONENT_QUALIFICATION_FAILED"));
     }
-    if history == "unknown" && (criticality == "safety_relevant" || criticality == "pressure_boundary") {
+    if history == "unknown"
+        && (criticality == "safety_relevant" || criticality == "pressure_boundary")
+    {
         let reason = if criticality == "pressure_boundary" {
             "PRESSURE_BOUNDARY_HISTORY_UNKNOWN"
         } else {
@@ -436,12 +553,18 @@ fn derive_repairability(case: &Value, context: &str) -> Result<Decision> {
     }
 
     if intent == "local_fabrication" && source != "editable" {
-        return Ok(Decision::one("not_locally_reproducible", "PREFERRED_EDITABLE_SOURCE_UNAVAILABLE"));
+        return Ok(Decision::one(
+            "not_locally_reproducible",
+            "PREFERRED_EDITABLE_SOURCE_UNAVAILABLE",
+        ));
     }
     if serviceability == "field_replaceable"
         && (access == "destructive" || access == "blocked" || tools == "specialist_required")
     {
-        return Ok(Decision::one("redesign_for_serviceability", "ROUTINE_REPAIR_REQUIRES_DESTRUCTIVE_ACCESS"));
+        return Ok(Decision::one(
+            "redesign_for_serviceability",
+            "ROUTINE_REPAIR_REQUIRES_DESTRUCTIVE_ACCESS",
+        ));
     }
     if configuration != "updated_exact" {
         return Ok(Decision::one("hold_for_retest", "CONFIGURATION_RECORD_STALE"));
@@ -455,7 +578,12 @@ fn derive_repairability(case: &Value, context: &str) -> Result<Decision> {
     if bom == "unknown" {
         return Ok(Decision::one("hold_for_evidence", "SUBSTITUTION_STATUS_UNKNOWN"));
     }
-    if qualification == "unknown" || history == "unknown" || access == "unknown" || tools == "unknown" || fault == "unknown" {
+    if qualification == "unknown"
+        || history == "unknown"
+        || access == "unknown"
+        || tools == "unknown"
+        || fault == "unknown"
+    {
         return Ok(Decision::one("hold_for_evidence", "REPAIR_EVIDENCE_INCOMPLETE"));
     }
     Ok(Decision::one("release_to_acceptance", "ALL_DECLARED_REPAIR_GATES_SATISFIED"))
@@ -485,7 +613,11 @@ fn load_and_qualify(
 
     ensure_exact_keys(
         &parsed,
-        if corpus_kind == "feasibility" { FEASIBILITY_CORPUS_FIELDS } else { REPAIRABILITY_CORPUS_FIELDS },
+        if corpus_kind == "feasibility" {
+            FEASIBILITY_CORPUS_FIELDS
+        } else {
+            REPAIRABILITY_CORPUS_FIELDS
+        },
         &context,
     )?;
     ensure!(
@@ -514,7 +646,10 @@ fn load_and_qualify(
         ensure!(!binding.trim().is_empty(), "{context}: implementation_binding must not be empty");
     } else {
         let requirement = string_at(&parsed, "independent_verifier_requirement", &context)?;
-        ensure!(!requirement.trim().is_empty(), "{context}: independent_verifier_requirement must not be empty");
+        ensure!(
+            !requirement.trim().is_empty(),
+            "{context}: independent_verifier_requirement must not be empty"
+        );
     }
 
     let vocabulary: Vec<String> = array_at(&parsed, "disposition_vocabulary", &context)?
@@ -535,7 +670,10 @@ fn load_and_qualify(
 
     if corpus_kind == "feasibility" {
         ensure!(
-            parsed.get("expected_outcomes_are_independent_test_labels").and_then(Value::as_bool) == Some(true),
+            parsed
+                .get("expected_outcomes_are_independent_test_labels")
+                .and_then(Value::as_bool)
+                == Some(true),
             "{context}: expected labels must remain independent test labels"
         );
     }
@@ -567,7 +705,10 @@ fn load_and_qualify(
         if corpus_kind == "feasibility" {
             for key in ["mission_family", "platform_family"] {
                 let value = string_at(case, key, &case_context)?;
-                ensure!(!value.trim().is_empty(), "{case_context}: field {key:?} must not be empty");
+                ensure!(
+                    !value.trim().is_empty(),
+                    "{case_context}: field {key:?} must not be empty"
+                );
             }
         } else {
             let value = string_at(case, "component_family", &case_context)?;
@@ -581,7 +722,8 @@ fn load_and_qualify(
             derive_repairability(case, &case_context)?
         };
 
-        let expected_disposition = string_at(case, "expected_disposition", &case_context)?.to_owned();
+        let expected_disposition =
+            string_at(case, "expected_disposition", &case_context)?.to_owned();
         require_disposition(&expected_disposition, &vocabulary, &case_context)?;
         require_disposition(&decision.disposition, &vocabulary, &case_context)?;
         let expected_reason_codes = validate_reason_codes(case, &case_context)?;
@@ -628,7 +770,13 @@ pub fn run() -> Result<QualificationReport> {
     let (feasibility, mut feasibility_cases) =
         load_and_qualify(&root, FEASIBILITY_PATH, "env-mobility-case-v1", 48, "feasibility")?;
     let (repairability, repairability_cases) =
-        load_and_qualify(&root, REPAIRABILITY_PATH, "env-mobility-repair-case-v1", 28, "repairability")?;
+        load_and_qualify(
+            &root,
+            REPAIRABILITY_PATH,
+            "env-mobility-repair-case-v1",
+            28,
+            "repairability",
+        )?;
 
     let mut cases = Vec::with_capacity(feasibility_cases.len() + repairability_cases.len());
     cases.append(&mut feasibility_cases);
@@ -672,7 +820,12 @@ mod tests {
         assert!(report.feasibility.unique_case_ids);
         assert!(report.repairability.unique_case_ids);
         assert_eq!(report.total_cases, 76);
-        assert_eq!(report.total_mismatches, 0, "mismatches: {:?}", report.cases.iter().filter(|c| !c.matches).collect::<Vec<_>>());
+        assert_eq!(
+            report.total_mismatches,
+            0,
+            "mismatches: {:?}",
+            report.cases.iter().filter(|c| !c.matches).collect::<Vec<_>>()
+        );
         assert_eq!(report.protected_gate_false_accepts, 0);
     }
 
@@ -738,7 +891,10 @@ mod tests {
             "criticality_profile": "routine_replaceable",
             "facts": facts
         });
-        assert_eq!(derive_repairability(&case, context).unwrap().disposition, "redesign_for_serviceability");
+        assert_eq!(
+            derive_repairability(&case, context).unwrap().disposition,
+            "redesign_for_serviceability"
+        );
 
         let mut facts = read_first_facts(REPAIRABILITY_PATH);
         facts["fault_history"] = json!("failed_repair_reintroduced");
