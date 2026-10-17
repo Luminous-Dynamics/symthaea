@@ -170,3 +170,30 @@ IMO notes that passenger ships must meet applicable SOLAS and Load Lines require
 
 
 The Pareto ranking tests also consume `fixtures/modular-interiors/pareto-oracle-v1.json`, a frozen four-case oracle for mixed-direction trade-offs, cost/mass conflicts, exact ties and mixed minimize/maximize objectives. The test harness uses explicitly test-only in-memory sentinels to exercise an eligible ranking path; it does not relabel or modify production fixture evidence. These source-level cases have not been run in Rust yet.
+
+
+## MARINE-MOD-005 — deterministic drop-in module variants
+
+The companion `modular_interior_variants` module accepts a baseline configuration and a list of versioned module definitions. It only auto-materializes a direct drop-in variant when the target is unique, the module revision increases, its geometry and port catalogue are structurally valid, every declared port is preserved, and no port interface/rating or evidence-quality downgrade is detected. A changed port set, connector profile, direction, medium, unit, criticality or uncertain/lower rating requires explicit reconfiguration rather than silent adaptation.
+
+Generated variants receive deterministic candidate/configuration IDs. Each materialized configuration is sent through the existing configuration validator and change-impact analyzer; the report contains both downstream receipts. A generated candidate can still be rejected or remain indeterminate due to geometry, clearances, mass/CG, unknown service routing, assumptions, or safety gates. Preflight compatibility is not a claim that the variant is safe.
+
+Run when Rust is available:
+
+```sh
+cargo test -p symthaea-marine-bench modular_interior_variants
+cargo run -p symthaea-marine-bench --example modular_interior_variants
+```
+
+### Benchmark targets (not results)
+
+- 100% detection of seeded port-ID, medium, direction, connector-profile, unit, criticality, rating and evidence-status mutations.
+- Zero false drop-in accepts for an incompatible or downgraded interface.
+- 100% deterministic variant manifests when input option order changes.
+- Every auto-materialized variant includes an independently recomputed validation receipt and configuration-change impact report.
+- Zero automatic evidence carry-forward across module revisions; synthetic candidates remain evidence-indeterminate.
+- Report rejected, explicit-reconfiguration-required, validator-rejected and review-required counts separately.
+
+### Research context
+
+Configure-to-order modular adaptable ship-platform literature models alternative mission configurations and lifecycle cost rather than treating each ship as an isolated design (https://www.sciencedirect.com/science/article/abs/pii/S0029801818309065). IMDC research on naval-system modularity highlights interface standards and continued platform relevance (https://proceedings.open.tudelft.nl/imdc24/article/view/831). Ship-arrangement optimization reviews also cover cabin, compartment and equipment placement variables (https://academic.oup.com/jcde/article/12/1/100/7922870). This implementation contributes deterministic, versioned drop-in preflight and downstream evidence receipts; it does not replace actual engineering or class/flag review.
