@@ -45,7 +45,7 @@ The table transcribes metric values published on the Cessna/Textron Aviation Sky
 | Rated power | 180 hp / approximately 134 | kW |
 | Propeller | McCauley, two-blade, fixed pitch | manufacturer description |
 
-**Source:** Cessna/Textron Aviation, [Cessna Skyhawk — specifications](https://cessna.txtav.com/en/piston/cessna-skyhawk) (accessed 2026-10-17). The manufacturer’s values may change between page revisions; this card preserves the date reviewed, not a claim that these values are a controlled engineering dataset.
+**Sources:** Cessna/Textron Aviation, [Cessna Skyhawk — specifications](https://cessna.txtav.com/en/piston/cessna-skyhawk) and [official Skyhawk product card (PDF)](https://cessna.txtav.com/-/media/cessna/files/product-cards/piston/skyhawk_product_card.pdf) (accessed 2026-10-17). The product card states that performance figures assume standard conditions and zero wind, field performance assumes a level, hard-surface, dry runway, and maximum range is based on a ferry mission with one pilot at 45% power with IFR reserves. The manufacturer's values may change between page revisions; this card preserves the review date, not a claim that the figures are a controlled engineering dataset.
 
 ## 3. Critical interpretation boundaries
 
@@ -58,7 +58,7 @@ The table transcribes metric values published on the Cessna/Textron Aviation Sky
 
 ### Range, speed and field performance are not a single mission profile
 
-A maximum range, maximum cruise speed, maximum climb rate, takeoff distance and stall speed are achieved under different configurations/conditions and cannot be combined into one “best of every column” route calculation. The manufacturer brochure describes its performance data under standard conditions/zero wind and identifies a ferry range profile with a 45-minute VFR reserve; assumptions must be read with the specific source revision before using any range figure for comparison.
+A maximum range, maximum cruise speed, maximum climb rate, takeoff distance and stall speed are achieved under different configurations/conditions and cannot be combined into one “best of every column” route calculation. The manufacturer product card states that performance data use standard conditions and zero wind, field performance assumes a level, hard-surface, dry runway, and range is based on a ferry mission with one pilot at 45% power with IFR reserves. It does **not** establish one universal operational range, mission profile, or energy-consumption curve. Read the exact source revision before using a range figure for comparison.
 
 Therefore:
 - Do not derive a 100 km cruise energy trace directly by scaling maximum range.
