@@ -286,7 +286,10 @@ fn validate_corpus(corpus: &Value) -> Result<Value, String> {
 
         if actual_decision != expected_decision || actual_reason != expected_reason {
             return Err(format!(
-                "{id}: expected {expected_decision}/{expected_reason}, got {actual_decision}/{actual_reason}"
+                concat!(
+                    "{id}: expected {expected_decision}/{expected_reason}, ",
+                    "got {actual_decision}/{actual_reason}"
+                )
             ));
         }
 
