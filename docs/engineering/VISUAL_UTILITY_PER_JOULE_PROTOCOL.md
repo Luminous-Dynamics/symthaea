@@ -42,7 +42,7 @@ Record the power instrument make/model/serial or stable ID, calibration record/d
 
 ## 4. Matched-condition experiment
 
-A valid A/B pair holds constant—or explicitly records any difference in—device and firmware, panel size, refresh rate, resolution, color/profile configuration, target luminance, content/task, viewing geometry, ambient illumination, run duration, thermal start state, operating-system power policy, and background workload.
+A valid A/B pair holds constant—or explicitly records any difference in—device and firmware, panel size, refresh rate, resolution, color/profile configuration, nominal target luminance and declared drive/adaptation policy, content/task, viewing geometry, ambient illumination, run duration, thermal start state, operating-system power policy, and background workload. Actual emitted luminance is measured as an outcome; do not normalize away treatment-induced differences.
 
 Randomize or counterbalance run order. Include warm-up and repeatability runs. Use the same physical device for within-device comparisons; a cross-device comparison is a separate stratum, not an implicit equivalence. Calibrate optical measurement instruments and record calibration state before and after each experimental block.
 
@@ -105,7 +105,24 @@ Connect to [VIS-EXP-001 #7871](https://github.com/Luminous-Dynamics/symthaea/iss
 6. Recompute outcomes with an independent analysis; publish raw/derived digests, failures and uncertainty.
 7. Report all Pareto dimensions and each gate. If instrumentation or human-study capacity is unavailable, stop at software/synthetic protocol tests and leave the physical claim NOT EVALUATED.
 
-## 10. Evidence boundary
+## 10. First cohort mapped to the frozen workload
+
+Use existing IDs from `visual-display-workload-corpus-v0.1.json`; do not copy their definitions into a second corpus.
+
+| Corpus case | Role in VIS-ENERGY-001 | Evidence boundary |
+|---|---|---|
+| `VIS-DISP-POWER-026` | Core energy-per-matched-workload measurement | Physical measurement; requires calibrated power trace and declared task interval |
+| `VIS-DISP-PHYSICAL-SUSTAINED-017` | Sustained luminance and thermal drift floor | Physical measurement; report warm-up and time-series, not one peak reading |
+| `VIS-DISP-ACTIVE-DIMMING-019` | Adaptive/local-dimming treatment and contrast floor | Physical measurement; no energy win if mandatory contrast floor is violated |
+| `VIS-DISP-SUBTITLE-FLICKER-022` | Temporal negative/quality control during adaptive output | Physical measurement; inspect modulation/transition behavior and flicker criterion |
+| `VIS-DISP-TEXT-SCALING-027` | Human-task readability and completion outcome | Human-task study; software metrics do not substitute for participant performance |
+| `VIS-DISP-STALE-PROFILE-030` | Force a stale/mismatched profile | Negative control; reject or mark NOT EVALUATED |
+| `VIS-DISP-RAW-EVIDENCE-031` | Remove or corrupt a raw measurement block | Integrity negative control; fail closed |
+| `VIS-DISP-CORPUS-INTEGRITY-032` | Tamper with frozen corpus/oracle identity | Integrity negative control; fail closed |
+
+Run in stages. Start with the software/integrity negatives, then qualify the power instrument on known loads, then capture repeat B0 runs and the matched adaptive condition. Add sustained/temporal optical measurements and human-task trials only when the corresponding calibrated instruments and approved study protocol are available. Missing instrumentation blocks that evidence lane; it must not silently downgrade into a synthetic pass.
+
+## 11. Evidence boundary
 
 This document defines how a future study should be run. It contains no measured power saving, physical display result, human-subject result, or claim that adaptive output is universally better. Claims must be supported by exact device/configuration identity, calibrated instruments, raw traces, preregistered tasks, uncertainty estimates, and independent review.
 
