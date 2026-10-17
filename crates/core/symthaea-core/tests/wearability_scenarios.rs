@@ -119,6 +119,8 @@ fn corpus_preserves_positive_controls_and_blocked_workflows() {
                 | WearabilityDispositionV1::ReturnToServiceNotAdmitted
                 | WearabilityDispositionV1::RemainUnreadyAndOfferAccessibleOptions
                 | WearabilityDispositionV1::MigrationMetricMissing
+                | WearabilityDispositionV1::TaskNotAdmittedForProfile
+                | WearabilityDispositionV1::TaskReviewOrAlternateProfileRequired
         ))
         .count();
 
