@@ -29,6 +29,18 @@ The embedded manifest schema must accompany this crate at schemas/audio-evidence
 
 A successful check proves only that project invariants and listed artifact hashes are consistent. It does not prove that a microphone is calibrated, that physical measurements are correct, that a product meets IEC/CTA/AES requirements, or that a listening claim is valid.
 
+## Group-split integrity for preference benchmarks
+
+The `hifi-benchmark-check` command validates a declared train/validation/calibration/test split and its group-disjointness rules:
+
+~~~sh
+cargo run -p symthaea-audio-evidence --bin hifi-benchmark-check -- schemas/examples/hp-pref-001-split-manifest.json
+~~~
+
+The checked-in example is explicitly synthetic. The validator rejects missing identity fields, duplicate sample IDs, unknown roles, absent split policy and declared test-group overlap. It allows calibration/test listener overlap when the manifest intentionally permits personalization. It does **not** evaluate predictions, establish that a study is unbiased, or prove audio quality.
+
+See [HIFI_BENCHMARK_PROTOCOL_2026-10-17.md](../../../../docs/research/HIFI_BENCHMARK_PROTOCOL_2026-10-17.md) for benchmark regimes, metrics, negative controls and the decision rule.
+
 ## Tests
 
 ~~~sh
