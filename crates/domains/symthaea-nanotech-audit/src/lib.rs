@@ -322,6 +322,7 @@ struct OracleAccountingDeclaration {
     proposal_requests: usize,
     retry_requests: usize,
     cache_hits: usize,
+    local_rejections: usize,
     external_calls: usize,
     failed_external_calls: usize,
     total_cost: f64,
@@ -538,30 +539,36 @@ fn verify_provenance_manifest(
         .setup_requests
         .checked_add(accounting.proposal_requests)
         .and_then(|value| value.checked_add(accounting.retry_requests));
-    match request_total {
-        Some(total) if accounting.cache_hits <= total => {
-            let expected_external = total - accounting.cache_hits;
-            if expected_external != accounting.external_calls {
-                report.fail(
-                    "oracle_accounting_external_call_mismatch",
-                    format!(
-                        "external_calls is {}, expected setup + proposal + retry requests - cache_hits = {expected_external}",
-                        accounting.external_calls
-                    ),
-                );
-            }
-            if accounting.failed_external_calls > accounting.external_calls {
-                report.fail(
-                    "oracle_accounting_failed_call_mismatch",
-                    "failed_external_calls cannot exceed external_calls",
-                );
-            }
+    let classified_total = accounting
+        .external_calls
+        .checked_add(accounting.cache_hits)
+        .and_then(|value| value.checked_add(accounting.local_rejections));
+    match (request_total, classified_total) {
+        (Some(requests), Some(classified)) if requests == classified => {
+            report.checked("oracle_accounting_requests_partitioned_into_external_cache_or_local_rejection");
         }
-        Some(total) => report.fail(
-            "oracle_accounting_cache_hit_mismatch",
-            format!("cache_hits ({}) exceeds declared request count ({total})", accounting.cache_hits),
+        (Some(requests), Some(classified)) => report.fail(
+            "oracle_accounting_request_partition_mismatch",
+            format!(
+                "setup + proposal + retry requests totals {requests}, but external + cache-hit + local-rejection outcomes total {classified}"
+            ),
         ),
-        None => report.fail("oracle_accounting_count_overflow", "oracle request counters overflow usize"),
+        _ => report.fail(
+            "oracle_accounting_count_overflow",
+            "oracle request or classification counters overflow usize",
+        ),
+    }
+    if accounting.local_rejections > accounting.proposal_requests {
+        report.fail(
+            "oracle_accounting_local_rejection_mismatch",
+            "local_rejections cannot exceed proposal_requests",
+        );
+    }
+    if accounting.failed_external_calls > accounting.external_calls {
+        report.fail(
+            "oracle_accounting_failed_call_mismatch",
+            "failed_external_calls cannot exceed external_calls",
+        );
     }
     match expected_proposal_requests {
         Some(expected) if accounting.proposal_requests == expected => {
@@ -799,6 +806,7 @@ fn verify_oracle_call_ledger(
     let mut proposal_requests = 0usize;
     let mut retry_requests = 0usize;
     let mut cache_hits = 0usize;
+    let mut local_rejections = 0usize;
     let mut external_calls = 0usize;
     let mut failed_external_calls = 0usize;
     let mut total_cost = 0.0_f64;
@@ -852,15 +860,6 @@ fn verify_oracle_call_ledger(
                 format!("line {} stage must be setup, proposal, or retry", index + 1),
             ),
         }
-        if !matches!(
-            call.status.as_str(),
-            "evaluated" | "invalid_candidate" | "oracle_failed" | "timeout"
-        ) {
-            report.fail(
-                "oracle_call_ledger_status_invalid",
-                format!("line {} has unsupported status {:?}", index + 1, call.status),
-            );
-        }
         if call.cache_hit {
             cache_hits += 1;
         }
@@ -870,14 +869,45 @@ fn verify_oracle_call_ledger(
                 failed_external_calls += 1;
             }
         }
-        if call.external_invocation == call.cache_hit {
-            report.fail(
-                "oracle_call_ledger_invocation_cache_contradiction",
-                format!(
-                    "line {} must represent exactly one of cache_hit or external_invocation",
-                    index + 1
-                ),
-            );
+        match call.status.as_str() {
+            "evaluated" => {
+                if call.external_invocation == call.cache_hit {
+                    report.fail(
+                        "oracle_call_ledger_invocation_cache_contradiction",
+                        format!(
+                            "evaluated line {} must be exactly one of cache_hit or external_invocation",
+                            index + 1
+                        ),
+                    );
+                }
+            }
+            "invalid_candidate" => {
+                local_rejections += 1;
+                if call.stage != "proposal" || call.cache_hit || call.external_invocation {
+                    report.fail(
+                        "oracle_call_ledger_local_rejection_mismatch",
+                        format!(
+                            "invalid_candidate line {} must be a proposal rejected locally with no cache hit and no external invocation",
+                            index + 1
+                        ),
+                    );
+                }
+            }
+            "oracle_failed" | "timeout" => {
+                if !call.external_invocation || call.cache_hit {
+                    report.fail(
+                        "oracle_call_ledger_failed_call_mismatch",
+                        format!(
+                            "failed line {} must be an external invocation, not a cache hit",
+                            index + 1
+                        ),
+                    );
+                }
+            }
+            _ => report.fail(
+                "oracle_call_ledger_status_invalid",
+                format!("line {} has unsupported status {:?}", index + 1, call.status),
+            ),
         }
         if !call.cost.is_finite() || call.cost < 0.0 || call.cost > 1.0e12 {
             report.fail(
@@ -916,6 +946,7 @@ fn verify_oracle_call_ledger(
         ("proposal_requests", proposal_requests, accounting.proposal_requests),
         ("retry_requests", retry_requests, accounting.retry_requests),
         ("cache_hits", cache_hits, accounting.cache_hits),
+        ("local_rejections", local_rejections, accounting.local_rejections),
         ("external_calls", external_calls, accounting.external_calls),
         (
             "failed_external_calls",
@@ -1389,7 +1420,7 @@ mod tests {
                 ("proposal", Some("candidate-0"), 0.2_f64, false, true),
                 ("proposal", Some("candidate-1"), 0.2_f64, false, true),
                 ("proposal", Some("candidate-2"), 0.2_f64, false, true),
-                ("proposal", Some("candidate-3"), 0.2_f64, false, true),
+                ("proposal", Some("candidate-3"), 0.2_f64, false, false),
                 ("retry", None, 0.4_f64, false, true),
             ];
             let mut ledger_lines = Vec::new();
@@ -1480,7 +1511,8 @@ mod tests {
                     "proposal_requests": 4,
                     "retry_requests": 1,
                     "cache_hits": 1,
-                    "external_calls": 6,
+                    "local_rejections": 1,
+                    "external_calls": 5,
                     "failed_external_calls": 0,
                     "total_cost": 1.5,
                     "cost_unit": "synthetic-credit"
@@ -1660,7 +1692,7 @@ mod tests {
         let report = audit_run(&fixture.0);
         assert_eq!(report.status, "fail");
         assert!(report.findings.iter().any(|finding| {
-            finding.code == "oracle_accounting_external_call_mismatch"
+            finding.code == "oracle_accounting_request_partition_mismatch"
         }));
     }
 
