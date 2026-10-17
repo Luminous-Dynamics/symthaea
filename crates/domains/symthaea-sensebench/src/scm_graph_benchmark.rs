@@ -607,12 +607,12 @@ fn structure_metrics(predicted: CausalDag, truth: CausalDag) -> (f64, f64, f64, 
                 (true, false) => skeleton_fn += 1,
                 (false, false) => {}
             }
-            directed_tp += usize::from(pred_forward && true_forward);
-            directed_tp += usize::from(pred_reverse && true_reverse);
-            directed_fp += usize::from(pred_forward && !true_forward);
-            directed_fp += usize::from(pred_reverse && !true_reverse);
-            directed_fn += usize::from(true_forward && !pred_forward);
-            directed_fn += usize::from(true_reverse && !pred_reverse);
+            directed_tp += if pred_forward && true_forward { 1 } else { 0 };
+            directed_tp += if pred_reverse && true_reverse { 1 } else { 0 };
+            directed_fp += if pred_forward && !true_forward { 1 } else { 0 };
+            directed_fp += if pred_reverse && !true_reverse { 1 } else { 0 };
+            directed_fn += if true_forward && !pred_forward { 1 } else { 0 };
+            directed_fn += if true_reverse && !pred_reverse { 1 } else { 0 };
 
             let exact_pair = true_forward == pred_forward && true_reverse == pred_reverse;
             if !exact_pair {
