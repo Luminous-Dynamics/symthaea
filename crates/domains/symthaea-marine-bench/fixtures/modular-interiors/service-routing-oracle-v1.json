@@ -1,0 +1,24 @@
+{
+  "schema_version": "1.0.0",
+  "claim_ceiling": "Explicit-anchor synthetic 2D routing oracle only. It tests path detours and exact shared-cell detection, not installed service routing or vessel qualification.",
+  "cases": [
+    {
+      "case_id": "WETROOM-DETOUR-001",
+      "expected_disposition": "routed",
+      "expected_min_length_mm": 3700,
+      "expected_conflict_count": 0
+    },
+    {
+      "case_id": "SHARED-CELL-CONFLICT-002",
+      "expected_disposition": "routed",
+      "expected_min_length_mm": 100,
+      "expected_conflict_count": 1
+    },
+    {
+      "case_id": "SHARED-SERVICE-TERMINAL-003",
+      "expected_disposition": "routed",
+      "expected_min_length_mm": 100,
+      "expected_conflict_count": 0
+    }
+  ]
+}

@@ -20,6 +20,7 @@ pub mod modular_interior_pareto;
 pub mod modular_interior_variants;
 pub mod modular_interior_combinations;
 pub mod modular_interior_placement_search;
+pub mod modular_interior_service_routing;
 mod model;
 
 pub use assessor::{assess, AssessmentError, AssessmentReport, Finding, FindingStatus};
