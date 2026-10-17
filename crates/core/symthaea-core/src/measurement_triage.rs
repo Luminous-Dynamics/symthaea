@@ -12,7 +12,8 @@ use serde::{Deserialize, Serialize};
 use std::collections::HashSet;
 
 use crate::architecture_robustness::{
-    ArchitectureRobustnessReportV1, ARCHITECTURE_ROBUSTNESS_SCHEMA_VERSION_V1,
+    ArchitectureRobustnessReportV1, MetricIntervalV1,
+    ARCHITECTURE_ROBUSTNESS_SCHEMA_VERSION_V1, ROBUST_COMPARISON_EPSILON_V1,
 };
 use crate::architecture_pareto::{
     ArchitectureEvidenceLevelV1, ArchitectureMetricV1,
@@ -22,6 +23,24 @@ use crate::architecture_pareto::{
 pub const MEASUREMENT_TRIAGE_SCHEMA_VERSION_V1: u16 = 1;
 /// Floating-point tolerance used only for resource-cost Pareto comparison.
 pub const MEASUREMENT_TRIAGE_EPSILON_V1: f64 = 1.0e-9;
+
+const TRIAGE_REQUIRED_METRICS: [ArchitectureMetricV1; 15] = [
+    ArchitectureMetricV1::TaskSuccessRate,
+    ArchitectureMetricV1::WearerBorneMassKg,
+    ArchitectureMetricV1::TotalSystemMassKg,
+    ArchitectureMetricV1::OffboardMassKg,
+    ArchitectureMetricV1::TorsoMassKg,
+    ArchitectureMetricV1::PelvisMassKg,
+    ArchitectureMetricV1::ProximalLimbMassKg,
+    ArchitectureMetricV1::DistalLimbMassKg,
+    ArchitectureMetricV1::OtherWornMassKg,
+    ArchitectureMetricV1::EnergyWhPerTask,
+    ArchitectureMetricV1::SetupTimeSeconds,
+    ArchitectureMetricV1::MovementRestrictionIndex,
+    ArchitectureMetricV1::ComfortScore,
+    ArchitectureMetricV1::TetherInterferenceEventsPerTask,
+    ArchitectureMetricV1::RepairTimeMinutes,
+];
 
 /// Type of proposed information-gathering work. This is not an authorization to execute it.
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, Deserialize)]
@@ -195,6 +214,11 @@ pub enum MeasurementTriageFindingV1 {
     InvalidOrDuplicatePair { candidate_a_id: String, candidate_b_id: String },
     /// Source pairwise flags contradict each other.
     InconsistentPairClassification { candidate_a_id: String, candidate_b_id: String },
+    /// A source candidate lacks a metric, duplicates it, or supplies an invalid interval.
+    InvalidSourceMetricEvidence {
+        candidate_id: String,
+        metric: Option<ArchitectureMetricV1>,
+    },
     /// The source report cannot be serialized canonically for digesting.
     SourceReportSerializationFailed,
     /// An action's protocol revision differs from its source report.
@@ -213,8 +237,10 @@ pub enum MeasurementTriageFindingV1 {
 ///
 /// The only eligible comparison cells are pairs classified as
 /// `additional_evidence_may_change_dominance` and dimensions not separated throughout their
-/// declared intervals. Definite trade-offs are not sent to "measure more and a winner will
-/// emerge": they require an explicit user/task preference or a hard constraint.
+/// declared intervals. A metric-pair is a measurement target only if at least one candidate
+/// has interval width larger than the numerical comparison tolerance; equal point-valued bounds
+/// cannot be narrowed by another measurement. Definite trade-offs are not sent to "measure more
+/// and a winner will emerge": they require an explicit user/task preference or hard constraint.
 ///
 /// Eligible actions form a Pareto set under two transparent criteria:
 /// (1) coverage must be a superset of the dominated action's decision-sensitive cells, and
@@ -317,21 +343,37 @@ pub fn triage_measurement_actions(
         .filter(|pair| pair.additional_evidence_may_change_dominance)
         .collect();
 
-    let decision_sensitive_cell_count: usize = measurement_sensitive_pairs
-        .iter()
-        .map(|pair| pair.not_separated_dimensions.len())
-        .sum();
+    let candidate_map: std::collections::HashMap<&str, &RobustCandidateAssessmentV1> =
+        source.candidates.iter()
+            .map(|candidate| (candidate.candidate_id.as_str(), candidate))
+            .collect();
 
     let all_cells: Vec<DecisionSensitiveCellV1> = measurement_sensitive_pairs
         .iter()
         .flat_map(|pair| {
-            pair.not_separated_dimensions.iter().map(|metric| DecisionSensitiveCellV1 {
-                candidate_a_id: pair.candidate_a_id.clone(),
-                candidate_b_id: pair.candidate_b_id.clone(),
-                metric: *metric,
+            let candidate_a = candidate_map[pair.candidate_a_id.as_str()];
+            let candidate_b = candidate_map[pair.candidate_b_id.as_str()];
+            pair.not_separated_dimensions.iter().filter_map(move |metric| {
+                let interval_a = source_metric_interval(candidate_a, *metric);
+                let interval_b = source_metric_interval(candidate_b, *metric);
+                let a_has_width = interval_a.upper - interval_a.lower
+                    > ROBUST_COMPARISON_EPSILON_V1;
+                let b_has_width = interval_b.upper - interval_b.lower
+                    > ROBUST_COMPARISON_EPSILON_V1;
+                if a_has_width || b_has_width {
+                    Some(DecisionSensitiveCellV1 {
+                        candidate_a_id: pair.candidate_a_id.clone(),
+                        candidate_b_id: pair.candidate_b_id.clone(),
+                        metric: *metric,
+                    })
+                } else {
+                    None
+                }
             })
         })
         .collect();
+
+    let decision_sensitive_cell_count = all_cells.len();
 
     let mut assessments = Vec::with_capacity(actions.len());
     for action in actions {
@@ -428,6 +470,27 @@ pub fn triage_measurement_actions(
     })
 }
 
+fn source_metric_interval(
+    candidate: &RobustCandidateAssessmentV1,
+    metric: ArchitectureMetricV1,
+) -> MetricIntervalV1 {
+    candidate
+        .metrics
+        .iter()
+        .find(|entry| entry.metric == metric)
+        .expect("source metric completeness validated before deriving cells")
+        .interval
+}
+
+fn is_normalized_metric(metric: ArchitectureMetricV1) -> bool {
+    matches!(
+        metric,
+        ArchitectureMetricV1::TaskSuccessRate
+            | ArchitectureMetricV1::MovementRestrictionIndex
+            | ArchitectureMetricV1::ComfortScore
+    )
+}
+
 fn validate_source_report(
     source: &ArchitectureRobustnessReportV1,
     findings: &mut Vec<MeasurementTriageFindingV1>,
@@ -454,6 +517,42 @@ fn validate_source_report(
         {
             findings.push(MeasurementTriageFindingV1::InvalidOrDuplicateIdentity {
                 identity: candidate.candidate_id.clone(),
+            });
+        }
+
+        let mut seen_metrics = HashSet::with_capacity(candidate.metrics.len());
+        for entry in &candidate.metrics {
+            if !seen_metrics.insert(entry.metric) {
+                findings.push(MeasurementTriageFindingV1::InvalidSourceMetricEvidence {
+                    candidate_id: candidate.candidate_id.clone(),
+                    metric: Some(entry.metric),
+                });
+            }
+            if !entry.interval.lower.is_finite()
+                || !entry.interval.upper.is_finite()
+                || entry.interval.lower > entry.interval.upper
+                || entry.interval.lower < 0.0
+                || (is_normalized_metric(entry.metric)
+                    && entry.interval.upper > 1.0)
+            {
+                findings.push(MeasurementTriageFindingV1::InvalidSourceMetricEvidence {
+                    candidate_id: candidate.candidate_id.clone(),
+                    metric: Some(entry.metric),
+                });
+            }
+        }
+        for metric in TRIAGE_REQUIRED_METRICS {
+            if !seen_metrics.contains(&metric) {
+                findings.push(MeasurementTriageFindingV1::InvalidSourceMetricEvidence {
+                    candidate_id: candidate.candidate_id.clone(),
+                    metric: Some(metric),
+                });
+            }
+        }
+        if seen_metrics.len() != TRIAGE_REQUIRED_METRICS.len() {
+            findings.push(MeasurementTriageFindingV1::InvalidSourceMetricEvidence {
+                candidate_id: candidate.candidate_id.clone(),
+                metric: None,
             });
         }
     }
@@ -648,6 +747,62 @@ mod tests {
         }
     }
 
+    fn test_interval(id: &str, metric: ArchitectureMetricV1) -> MetricIntervalV1 {
+        use ArchitectureMetricV1 as M;
+        let point = |value: f64| MetricIntervalV1 {
+            lower: value,
+            upper: value,
+        };
+        match (id, metric) {
+            ("candidate-a", M::WearerBorneMassKg) => MetricIntervalV1 {
+                lower: 4.0, upper: 6.0,
+            },
+            ("candidate-b", M::WearerBorneMassKg) => MetricIntervalV1 {
+                lower: 4.5, upper: 5.5,
+            },
+            ("candidate-c", M::WearerBorneMassKg) => MetricIntervalV1 {
+                lower: 2.0, upper: 3.0,
+            },
+            ("candidate-a", M::EnergyWhPerTask) => MetricIntervalV1 {
+                lower: 1.0, upper: 3.0,
+            },
+            ("candidate-b", M::EnergyWhPerTask) => MetricIntervalV1 {
+                lower: 2.0, upper: 4.0,
+            },
+            ("candidate-c", M::EnergyWhPerTask) => MetricIntervalV1 {
+                lower: 0.4, upper: 0.8,
+            },
+            ("candidate-a", M::TaskSuccessRate) => MetricIntervalV1 {
+                lower: 0.8, upper: 0.9,
+            },
+            ("candidate-b", M::TaskSuccessRate) => MetricIntervalV1 {
+                lower: 0.75, upper: 0.85,
+            },
+            ("candidate-c", M::TaskSuccessRate) => MetricIntervalV1 {
+                lower: 0.4, upper: 0.6,
+            },
+            ("candidate-a", M::ComfortScore) => MetricIntervalV1 {
+                lower: 0.6, upper: 0.8,
+            },
+            ("candidate-b", M::ComfortScore) => MetricIntervalV1 {
+                lower: 0.5, upper: 0.7,
+            },
+            ("candidate-c", M::ComfortScore) => MetricIntervalV1 {
+                lower: 0.2, upper: 0.4,
+            },
+            (_, M::TaskSuccessRate | M::ComfortScore | M::MovementRestrictionIndex) => {
+                MetricIntervalV1 { lower: 0.4, upper: 0.6 }
+            }
+            (_, M::TetherInterferenceEventsPerTask) => point(0.0),
+            (_, M::TotalSystemMassKg) => point(8.0),
+            (_, M::OffboardMassKg) => point(1.0),
+            _ => MetricIntervalV1 {
+                lower: 1.0,
+                upper: 2.0,
+            },
+        }
+    }
+
     fn candidate(id: &str) -> RobustCandidateAssessmentV1 {
         RobustCandidateAssessmentV1 {
             candidate_id: id.to_owned(),
@@ -656,7 +811,13 @@ mod tests {
             on_robust_frontier: true,
             robustly_dominated_by: Vec::new(),
             unresolved_against: Vec::new(),
-            metrics: Vec::<MetricIntervalEntryV1>::new(),
+            metrics: TRIAGE_REQUIRED_METRICS
+            .into_iter()
+            .map(|metric| MetricIntervalEntryV1 {
+                metric,
+                interval: test_interval(id, metric),
+            })
+            .collect(),
         }
     }
 
@@ -1010,6 +1171,41 @@ mod tests {
         assert_eq!(blocked, fixture.expected_blocked);
         assert_eq!(report.measurement_sensitive_pair_count, 1);
         assert_eq!(report.decision_sensitive_cell_count, 2);
+    }
+
+    #[test]
+    fn exact_point_valued_overlap_is_not_suggested_as_a_measurement() {
+        let mut source = source_report();
+        for candidate in &mut source.candidates {
+            if candidate.candidate_id == "candidate-a"
+                || candidate.candidate_id == "candidate-b"
+            {
+                let energy = candidate
+                    .metrics
+                    .iter_mut()
+                    .find(|entry| entry.metric == ArchitectureMetricV1::EnergyWhPerTask)
+                    .expect("energy metric exists");
+                energy.interval = MetricIntervalV1 {
+                    lower: 2.0,
+                    upper: 2.0,
+                };
+            }
+        }
+        let report = triage_measurement_actions(
+            &source,
+            &[action(
+                "measure-energy",
+                &["candidate-a", "candidate-b"],
+                &[ArchitectureMetricV1::EnergyWhPerTask],
+                10.0,
+                MeasurementActionKindV1::BenchMeasurement,
+            )],
+            MEASUREMENT_TRIAGE_SCHEMA_VERSION_V1,
+        )
+        .expect("complete source receipt with point-valued energy bounds");
+        assert_eq!(report.decision_sensitive_cell_count, 1);
+        assert_eq!(report.actions[0].covered_cell_count, 0);
+        assert!(!report.actions[0].eligible_for_triage);
     }
 
     #[test]
