@@ -15,6 +15,7 @@ The first vertical is **capacitor dielectric + package + circuit co-design**. It
 This capacitor specialization should consume the repository's current materials/engineering contracts rather than establish competing frameworks:
 
 - [MAT-009 #4340](https://github.com/Luminous-Dynamics/symthaea/issues/4340): reuse the shared materials-discovery campaign and Pareto-objective contract.
+- [CAP-DISC-001 #7917](https://github.com/Luminous-Dynamics/symthaea/issues/7917): operationalize the capacitor-specific condition-aware dataset, frozen splits, baseline comparisons, and equal-budget discovery trial.
 - [MAT-GEN #5258](https://github.com/Luminous-Dynamics/symthaea/issues/5258): align held-out generalization, domain-shift, and split-integrity evaluation.
 - [MAT-PSPP #6224](https://github.com/Luminous-Dynamics/symthaea/issues/6224): use the process → structure → property → performance lineage for composition, microstructure, processing, and device context.
 - [MAT-ENG #6185](https://github.com/Luminous-Dynamics/symthaea/issues/6185): connect engineering demand, candidate materials discovery, and qualification evidence.
