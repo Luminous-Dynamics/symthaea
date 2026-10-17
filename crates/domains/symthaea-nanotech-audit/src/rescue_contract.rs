@@ -63,8 +63,9 @@ struct DecisionRecord {
     available_inputs_manifest_sha256: String,
     policy_revision_sha256: String,
     trigger_reason: String,
-    risk_score: Option<f64>,
-    reference_request_id: Option<String>,
+    // Value is intentional: these keys are required by contract but may contain JSON null.
+    risk_score: serde_json::Value,
+    reference_request_id: serde_json::Value,
     policy_cost: f64,
     policy_cost_unit: String,
 }
@@ -144,8 +145,9 @@ struct AuditResult {
     stratum_id: String,
     inclusion_probability: f64,
     reference_status: String,
-    severe_event: Option<bool>,
-    physical_integrity_pass: Option<bool>,
+    // Required nullable fields: missing and explicit null have different meanings.
+    severe_event: serde_json::Value,
+    physical_integrity_pass: serde_json::Value,
     policy_triggered_reference: bool,
     labels_revealed_to_policy: bool,
     audit_reference_cost: f64,
@@ -232,6 +234,9 @@ pub(crate) fn audit_optional_rescue_contract(run_dir: &Path) -> RescueContractAu
         "simple_random_without_replacement" | "stratified_random_without_replacement"
     ) {
         audit.fail("rescue_sampling_method_unsupported", "unsupported or adaptive sampling method");
+    }
+    if manifest.sampling_method == "simple_random_without_replacement" && manifest.strata.len() != 1 {
+        audit.fail("rescue_simple_random_multiple_strata", "simple random sampling must declare exactly one stratum");
     }
     if manifest.frame_population_size == 0 || manifest.sampled_windows.is_empty() {
         audit.fail("rescue_sampling_empty", "sampling frame and blinded audit sample must be non-empty");
@@ -436,16 +441,23 @@ pub(crate) fn audit_optional_rescue_contract(run_dir: &Path) -> RescueContractAu
         if row.max_observed_step > row.decision_step {
             audit.fail("rescue_future_step_observed", format!("window {} observes step {} after decision step {}", row.window_id, row.max_observed_step, row.decision_step));
         }
+        if !matches!(
+            row.trigger_reason.as_str(),
+            "nominal" | "uncertainty" | "shift_alarm" | "budget_guard" | "reference_result" | "integrity_guard" | "operator_override"
+        ) {
+            audit.fail("rescue_trigger_reason_invalid", format!("unknown trigger reason at window {}", row.window_id));
+        }
         if row.future_data_read || row.heldout_label_read {
             audit.fail("rescue_test_leakage_declared", format!("window {} declares future-data or held-out-label access", row.window_id));
         }
         if !matches!(row.action.as_str(), "continue" | "conservative_continue" | "abstain_stop" | "request_reference") {
             audit.fail("rescue_action_invalid", format!("invalid action {} at window {}", row.action, row.window_id));
         }
-        if row.action == "request_reference" && row.reference_request_id.as_deref().unwrap_or("").trim().is_empty() {
+        let reference_request_id = row.reference_request_id.as_str().unwrap_or("");
+        if row.action == "request_reference" && reference_request_id.trim().is_empty() {
             audit.fail("rescue_reference_request_id_missing", format!("window {} requests reference without request ID", row.window_id));
         }
-        if row.action != "request_reference" && row.reference_request_id.is_some() {
+        if row.action != "request_reference" && !row.reference_request_id.is_null() {
             audit.fail("rescue_unexpected_reference_request_id", format!("window {} has request ID but action is not request_reference", row.window_id));
         }
         if !is_sha256(&row.observed_state_sha256)
@@ -457,7 +469,9 @@ pub(crate) fn audit_optional_rescue_contract(run_dir: &Path) -> RescueContractAu
         if row.policy_revision_sha256 != manifest.policy_revision_sha256 {
             audit.fail("rescue_policy_revision_mismatch", format!("decision {} is from a different policy revision", row.window_id));
         }
-        if row.risk_score.is_some_and(|value| !value.is_finite() || !(0.0..=1.0).contains(&value)) {
+        if !row.risk_score.is_null()
+            && row.risk_score.as_f64().map_or(true, |value| !value.is_finite() || !(0.0..=1.0).contains(&value))
+        {
             audit.fail("rescue_risk_score_invalid", format!("window {} risk_score must be null or finite in [0,1]", row.window_id));
         }
         if !row.policy_cost.is_finite() || row.policy_cost < 0.0 || row.policy_cost_unit.trim().is_empty() {
@@ -526,12 +540,12 @@ pub(crate) fn audit_optional_rescue_contract(run_dir: &Path) -> RescueContractAu
         }
         match row.reference_status.as_str() {
             "evaluated" => {
-                if row.severe_event.is_none() || row.physical_integrity_pass.is_none() {
+                if row.severe_event.as_bool().is_none() || row.physical_integrity_pass.as_bool().is_none() {
                     audit.fail("rescue_audit_label_missing", format!("evaluated window {} needs severe_event and physical_integrity_pass", row.window_id));
                 }
             }
             "reference_failed" | "reference_unavailable" => {
-                if row.severe_event.is_some() || row.physical_integrity_pass.is_some() {
+                if !row.severe_event.is_null() || !row.physical_integrity_pass.is_null() {
                     audit.fail("rescue_audit_failed_reference_has_labels", format!("failed reference for {} cannot carry outcome labels", row.window_id));
                 }
             }
@@ -711,9 +725,9 @@ mod tests {
         )
         .expect("fixture audit results parse");
         let missed = rows.iter().find(|row| row.window_id == "w-003").expect("missed event fixture exists");
-        assert_eq!(missed.severe_event, Some(true));
+        assert_eq!(missed.severe_event.as_bool(), Some(true));
         assert!(!missed.policy_triggered_reference);
-        assert_eq!(missed.physical_integrity_pass, Some(false));
+        assert_eq!(missed.physical_integrity_pass.as_bool(), Some(false));
         // Structural integrity can pass while the synthetic policy plainly misses an event.
     }
 
