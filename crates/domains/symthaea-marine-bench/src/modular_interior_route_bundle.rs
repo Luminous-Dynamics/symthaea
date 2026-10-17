@@ -1048,6 +1048,28 @@ mod tests {
     }
 
     #[test]
+    fn aggregate_expansion_budget_is_fail_closed_and_never_enlarges_per_call_limit() {
+        let routing = RoutingLimits {
+            grid_pitch_mm: 100,
+            max_route_requests: 8,
+            max_grid_cells: 10_000,
+            max_expanded_states: 700,
+        };
+        assert_eq!(
+            routing_limits_with_remaining(&routing, 300, 500)
+                .expect("budget remains").max_expanded_states,
+            200,
+        );
+        assert_eq!(
+            routing_limits_with_remaining(&routing, 300, 2_000)
+                .expect("base call limit still applies").max_expanded_states,
+            700,
+        );
+        assert!(routing_limits_with_remaining(&routing, 500, 500).is_none());
+        assert!(routing_limits_with_remaining(&routing, 501, 500).is_none());
+    }
+
+    #[test]
     fn equivalent_request_order_is_normalized_by_route_id() {
         let a = dummy_request("A", "CA", service_anchor("BUS-A", 2, 0));
         let b = dummy_request("B", "CB", service_anchor("BUS-B", 3, 2));
