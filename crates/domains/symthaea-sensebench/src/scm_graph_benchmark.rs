@@ -112,6 +112,19 @@ pub struct ScmGraphPolicySummary {
     pub skeleton_f1_ci95: [f64; 2],
     pub mean_directed_edge_f1: f64,
     pub directed_edge_f1_ci95: [f64; 2],
+    /// Skeleton of the predicted Markov equivalence class; unresolved directions are allowed.
+    pub mean_cpdag_skeleton_f1: f64,
+    pub cpdag_skeleton_f1_ci95: [f64; 2],
+    /// F1 for arrows compelled by the true Markov equivalence class.
+    pub mean_compelled_direction_f1: f64,
+    pub compelled_direction_f1_ci95: [f64; 2],
+    /// Number of pairwise absent/undirected/forward/reverse mark disagreements.
+    pub mean_cpdag_mark_distance: f64,
+    pub cpdag_mark_distance_ci95: [f64; 2],
+    pub markov_equivalence_class_recovery_rate: f64,
+    pub markov_equivalence_class_recovery_wilson_ci95: [f64; 2],
+    pub mean_posterior_mass_on_true_markov_class: f64,
+    pub posterior_mass_on_true_markov_class_ci95: [f64; 2],
     /// One unit for a missing/extra adjacency or a reversed edge.
     pub mean_structural_hamming_distance: f64,
     pub structural_hamming_distance_ci95: [f64; 2],
@@ -143,6 +156,13 @@ pub struct ScmGraphPolicyAggregate {
     pub held_out_skeleton_f1_world_ci95: [f64; 2],
     pub mean_held_out_directed_edge_f1: f64,
     pub held_out_directed_edge_f1_world_ci95: [f64; 2],
+    pub mean_held_out_cpdag_skeleton_f1: f64,
+    pub held_out_cpdag_skeleton_f1_world_ci95: [f64; 2],
+    pub mean_held_out_compelled_direction_f1: f64,
+    pub held_out_compelled_direction_f1_world_ci95: [f64; 2],
+    pub mean_held_out_cpdag_mark_distance: f64,
+    pub held_out_cpdag_mark_distance_world_ci95: [f64; 2],
+    pub held_out_markov_equivalence_class_recovery_rate: f64,
     pub mean_held_out_shd: f64,
     pub held_out_shd_world_ci95: [f64; 2],
     pub worst_world_directed_edge_f1: f64,
@@ -210,6 +230,16 @@ impl CausalDag {
     }
 }
 
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+enum EdgeMark {
+    Absent,
+    Undirected,
+    Forward,
+    Reverse,
+}
+
+const UNORDERED_PAIRS: [(usize, usize); 3] = [(0, 1), (0, 2), (1, 2)];
+
 #[derive(Debug, Clone, Copy, PartialEq)]
 struct ScmParameters {
     intercept: f64,
@@ -244,7 +274,12 @@ struct TrialResult {
     directed_edge_f1: f64,
     shd: f64,
     exact_graph: bool,
+    cpdag_skeleton_f1: f64,
+    compelled_direction_f1: f64,
+    cpdag_mark_distance: f64,
+    markov_equivalence_class_correct: bool,
     posterior_true_graph: f64,
+    posterior_true_markov_class: f64,
     graph_posterior_brier: f64,
     claim_accepted: bool,
     false_graph_claim: bool,
