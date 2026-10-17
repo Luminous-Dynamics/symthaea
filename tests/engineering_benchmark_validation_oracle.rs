@@ -4,7 +4,7 @@
 //! Expected values and decisions below are fixed fixture data: they are not
 //! computed by BenchmarkValidation's production helpers.
 
-#![cfg(feature = "engineering-foundations")]
+#![cfg(all(feature = "engineering-foundations", feature = "school_learning"))]
 
 use symthaea::school::engineering_curriculum::BenchmarkValidation;
 
