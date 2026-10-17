@@ -1,6 +1,7 @@
 {
   "schema_version": "hifi-split-manifest-v1",
   "benchmark_id": "HP-PREF-001",
+  "evaluation_regime": "personalization",
   "partition_algorithm": "predeclared_group_holdout_v1",
   "source_revision": "synthetic-fixture-v1",
   "observations": [
