@@ -1638,6 +1638,25 @@ mod tests {
                         assert!(route.path_length_mm.unwrap_or(0) >= case.expected_min_length_mm.unwrap_or(0));
                     }
                 }
+                "SHARED-SERVICE-TERMINAL-003" => {
+                    let baseline = live();
+                    let cabin_route = request_for(
+                        "COMMON-TERMINAL-CABIN", "CONN-CABIN-01-AC_IN",
+                        module_anchor("CABIN-01", "AC_IN", 2800, 1800),
+                        service_anchor("AC-BUS", 4700, 1800),
+                    );
+                    let wetroom_route = request_for(
+                        "COMMON-TERMINAL-WETROOM", "CONN-WETROOM-01-AC_IN",
+                        module_anchor("WETROOM-01", "AC_IN", 4600, 1800),
+                        service_anchor("AC-BUS", 4700, 1800),
+                    );
+                    let report = route_services(&baseline, &[cabin_route, wetroom_route], limits()).unwrap();
+                    for route in &report.body.routes {
+                        assert_eq!(route.disposition, RouteDisposition::Routed);
+                        assert_eq!(route.conflicts_with_route_ids.len(), case.expected_conflict_count);
+                        assert!(route.path_length_mm.unwrap_or(0) >= case.expected_min_length_mm.unwrap_or(0));
+                    }
+                }
                 other => panic!("unknown routing oracle case: {other}"),
             }
         }
