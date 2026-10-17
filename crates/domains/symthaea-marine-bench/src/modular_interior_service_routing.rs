@@ -1823,6 +1823,11 @@ mod tests {
             }
             let cell = state / 3;
             let direction = (state % 3) as u8;
+            // A route terminates at the goal. Do not allow a cheaper-than-terminal
+            // cost by walking through the destination and returning in another direction.
+            if cell == goal {
+                continue;
+            }
             let x = cell % grid.width;
             let y = cell / grid.width;
             let candidates = [
