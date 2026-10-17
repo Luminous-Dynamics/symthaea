@@ -267,7 +267,11 @@ Select physically meaningful axes only after the system/reference data are admit
 - size, interface, passivation or substrate;
 - compounded shift, such as an unseen chemistry plus surface class and temperature.
 
-For each test, freeze a shift manifest with a short physical rationale, exact severity definition, source/reference hashes, group IDs, split membership hash, and split policy. Separate train, calibration/validation and untouched test lockbox. An independence key (such as material family, parent structure, substrate, wafer or trajectory origin) must never occur across different splits. Repeated measurements and replicas stay grouped. A new test split cannot share near-duplicate parent structures with training merely because frame IDs differ.
+For each test, freeze a shift manifest with a short physical rationale, exact severity definition, source/reference hashes, group IDs, split membership hash, and split policy. Separate the *physical group family* from the *mechanism of distribution shift*: feature-support shift, label/property-distribution shift, graph-topology shift, physical-regime shift, chemical-environment shift, and measurement-process shift are orthogonal mechanism labels, not synonyms for chemistry or surface families. A change in model inputs does not by itself prove a change in target labels, and an unchanged label range does not prove input support is in-distribution. Record each axis independently and test compounded axes separately.
+
+The NANO-010 shift manifest enforces axis cardinality: no axes for the in-distribution reference group, exactly one axis for a single-factor shift, and at least two axes for a compounded shift. A manifest is still only a frozen taxonomy and split receipt; domain experts must justify that the selected axes and severity correspond to a plausible physical/deployment shift.
+
+Separate train, calibration/validation and untouched test lockbox. An independence key (such as material family, parent structure, substrate, wafer or trajectory origin) must never occur across different splits. Repeated measurements and replicas stay grouped. A new test split cannot share near-duplicate parent structures with training merely because frame IDs differ.
 
 ### Required reporting
 
