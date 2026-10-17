@@ -1,0 +1,815 @@
+// Copyright (C) 2024-2026 Tristan Stoltz / Luminous Dynamics
+// SPDX-License-Identifier: AGPL-3.0-or-later
+// Commercial licensing: see COMMERCIAL_LICENSE.md at repository root
+//! Outcome-generating evaluation of active measurement selection under hidden
+//! likelihood misspecification.
+//!
+//! The policy receives declared likelihood scenarios and its evolving posterior.
+//! A separate evaluator path uses hidden-world likelihoods to sample outcomes and
+//! score decisions. "Held out" means excluded from policy model construction; this
+//! in-process benchmark is not a cryptographic sandbox or physical evidence.
+
+use serde::{Deserialize, Serialize};
+
+use crate::experiment_design::{
+    ExperimentCandidate, ExperimentDesignError, HypothesisPrior, ModelLikelihoodScenario,
+    rank_experiments, rank_experiments_robust, update_posterior,
+};
+
+const HYPOTHESIS_IDS: [&str; 3] = [
+    "direct_cause",
+    "shared_cause_confounder",
+    "no_direct_causal_effect",
+];
+const FIXED_CANDIDATE_ID: &str = "development_fixed_design";
+const MAX_TRIALS_PER_WORLD: usize = 100_000;
+const MAX_RESOURCE_BUDGET: usize = 256;
+
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, Deserialize)]
+#[serde(rename_all = "snake_case")]
+pub enum BlindWorldPolicy {
+    NominalExpectedGain,
+    NominalPredictiveVariance,
+    ModelWeightedExpectedGain,
+    WorstCaseRobust,
+    DevelopmentFixedDesign,
+    UniformRandom,
+    PassiveOnly,
+}
+
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, Deserialize)]
+#[serde(rename_all = "snake_case")]
+pub enum BlindWorldRegime {
+    NominalCalibration,
+    ConfounderCalibration,
+    InterventionArtifact,
+    SensorDegradation,
+    EffectReversal,
+    NullNegativeControl,
+}
+
+#[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
+pub struct BlindWorldPolicySummary {
+    pub world_id: String,
+    pub regime: BlindWorldRegime,
+    pub held_out_from_policy_models: bool,
+    pub policy: BlindWorldPolicy,
+    pub trials: usize,
+    pub resource_budget_units: usize,
+    pub mean_brier_score: f64,
+    pub brier_score_ci95: [f64; 2],
+    pub mean_log_loss: f64,
+    pub log_loss_ci95: [f64; 2],
+    pub top_hypothesis_accuracy: f64,
+    pub top_hypothesis_accuracy_wilson_ci95: [f64; 2],
+    pub mean_expected_information_gain_bits_per_cost: f64,
+    /// Can be negative: a surprising outcome can increase posterior entropy.
+    pub mean_realized_entropy_reduction_bits_per_cost: f64,
+    pub mean_calibration_error_10_bins: f64,
+    pub threshold_reached_fraction: f64,
+    pub threshold_reached_wilson_ci95: [f64; 2],
+    pub mean_experiments_used: f64,
+    pub mean_cost_spent: f64,
+    pub mean_experiments_to_threshold: Option<f64>,
+    pub mean_cost_to_threshold: Option<f64>,
+    /// Among trials where the true explanation is no direct causal effect,
+    /// fraction where a direct/shared causal explanation crosses the threshold.
+    pub unsupported_causal_claim_rate_on_null_truth: f64,
+    pub unsupported_causal_claim_rate_wilson_ci95: [f64; 2],
+    pub null_truth_trials: usize,
+}
+
+#[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
+pub struct BlindWorldBenchmarkReport {
+    pub schema_version: u16,
+    pub generator_version: String,
+    pub seed: u64,
+    pub trials_per_world: usize,
+    pub resource_budget_units: usize,
+    pub posterior_threshold: f64,
+    pub declared_model_scenarios: Vec<String>,
+    pub development_fixed_candidate_id: String,
+    pub world_count: usize,
+    pub held_out_world_count: usize,
+    pub summaries: Vec<BlindWorldPolicySummary>,
+    pub interpretation_boundary: String,
+}
+
+#[derive(Debug, Clone, PartialEq, Eq, thiserror::Error)]
+pub enum BlindWorldBenchmarkError {
+    #[error("trials per world must be between 3 and MAX_TRIALS_PER_WORLD")]
+    InvalidTrialCount,
+    #[error("resource budget must be between 1 and MAX_RESOURCE_BUDGET units")]
+    InvalidResourceBudget,
+    #[error("posterior threshold must be finite and in (1/3, 1]")]
+    InvalidPosteriorThreshold,
+    #[error("benchmark candidate library is empty")]
+    EmptyCandidateLibrary,
+    #[error("a selected candidate is absent from a declared or hidden candidate set")]
+    MissingCandidate,
+    #[error(transparent)]
+    InvalidExperimentDesign(#[from] ExperimentDesignError),
+}
+
+/// Evaluate seven measurement-selection strategies over two development regimes
+/// and four held-out regimes. All strategies receive the same prior, candidate
+/// identifiers/costs, posterior update rule, and total resource budget. Truth is
+/// balanced as closely as possible across the three hypotheses in every regime.
+///
+/// This benchmark samples synthetic outcomes; unlike the closed-form robustness
+/// fixture, it measures realized posterior quality, calibration, cost-to-threshold,
+/// and the gap between predicted information gain and realized entropy reduction.
+/// Its hidden tables are code-visible and must not be described as securely sealed.
+pub fn run_blind_world_benchmark(
+    trials_per_world: usize,
+    resource_budget_units: usize,
+    seed: u64,
+    posterior_threshold: f64,
+) -> Result<BlindWorldBenchmarkReport, BlindWorldBenchmarkError> {
+    if !(3..=MAX_TRIALS_PER_WORLD).contains(&trials_per_world) {
+        return Err(BlindWorldBenchmarkError::InvalidTrialCount);
+    }
+    if !(1..=MAX_RESOURCE_BUDGET).contains(&resource_budget_units) {
+        return Err(BlindWorldBenchmarkError::InvalidResourceBudget);
+    }
+    if !posterior_threshold.is_finite()
+        || posterior_threshold <= 1.0 / 3.0
+        || posterior_threshold > 1.0
+    {
+        return Err(BlindWorldBenchmarkError::InvalidPosteriorThreshold);
+    }
+
+    let priors = uniform_priors();
+    let model_scenarios = declared_model_scenarios();
+    let worlds = hidden_worlds();
+    let fixed_candidate_id = choose_development_fixed_design(&priors, &worlds[..2])?;
+    let policies = [
+        BlindWorldPolicy::NominalExpectedGain,
+        BlindWorldPolicy::NominalPredictiveVariance,
+        BlindWorldPolicy::ModelWeightedExpectedGain,
+        BlindWorldPolicy::WorstCaseRobust,
+        BlindWorldPolicy::DevelopmentFixedDesign,
+        BlindWorldPolicy::UniformRandom,
+        BlindWorldPolicy::PassiveOnly,
+    ];
+
+    let mut summaries = Vec::with_capacity(worlds.len() * policies.len());
+    for (world_index, world) in worlds.iter().enumerate() {
+        for policy in policies {
+            let mut trials = Vec::with_capacity(trials_per_world);
+            for trial_index in 0..trials_per_world {
+                let trial_seed = seed
+                    ^ (world_index as u64).wrapping_mul(0xD1B5_4A32_D192_ED03)
+                    ^ (trial_index as u64).wrapping_mul(0x9E37_79B9_7F4A_7C15);
+                trials.push(simulate_trial(
+                    policy,
+                    &priors,
+                    &model_scenarios,
+                    &world.candidates,
+                    &fixed_candidate_id,
+                    resource_budget_units,
+                    posterior_threshold,
+                    trial_index % HYPOTHESIS_IDS.len(),
+                    trial_seed,
+                )?);
+            }
+            summaries.push(summarize_world_policy(
+                world,
+                policy,
+                resource_budget_units,
+                posterior_threshold,
+                trials,
+            ));
+        }
+    }
+
+    Ok(BlindWorldBenchmarkReport {
+        schema_version: 1,
+        generator_version: "sensebench-blind-worlds-0.1.0".into(),
+        seed,
+        trials_per_world,
+        resource_budget_units,
+        posterior_threshold,
+        declared_model_scenarios: model_scenarios
+            .iter()
+            .map(|scenario| scenario.scenario_id.clone())
+            .collect(),
+        development_fixed_candidate_id: fixed_candidate_id,
+        world_count: worlds.len(),
+        held_out_world_count: worlds.iter().filter(|world| world.held_out).count(),
+        summaries,
+        interpretation_boundary: concat!(
+            "Synthetic software evaluation only. Held-out regimes are excluded from ",
+            "policy model construction, but their definitions remain visible in source; ",
+            "this is not cryptographic blinding, calibrated physical evidence, or proof ",
+            "of generalization to real instruments."
+        ).into(),
+    })
+}
+
+#[derive(Debug, Clone)]
+struct HiddenWorld {
+    id: String,
+    regime: BlindWorldRegime,
+    held_out: bool,
+    candidates: Vec<ExperimentCandidate>,
+}
+
+#[derive(Debug, Clone)]
+struct TrialResult {
+    brier: f64,
+    log_loss: f64,
+    top_correct: bool,
+    top_confidence: f64,
+    threshold_reached: bool,
+    experiments_used: usize,
+    cost_spent: f64,
+    steps_to_threshold: Option<usize>,
+    cost_to_threshold: Option<f64>,
+    expected_gain_bits_per_cost: f64,
+    realized_entropy_reduction_bits_per_cost: f64,
+    unsupported_causal_claim: bool,
+    null_truth: bool,
+}
+
+#[allow(clippy::too_many_arguments)]
+fn simulate_trial(
+    policy: BlindWorldPolicy,
+    priors: &[HypothesisPrior],
+    model_scenarios: &[ModelLikelihoodScenario],
+    hidden_candidates: &[ExperimentCandidate],
+    fixed_candidate_id: &str,
+    resource_budget_units: usize,
+    threshold: f64,
+    true_hypothesis_index: usize,
+    seed: u64,
+) -> Result<TrialResult, BlindWorldBenchmarkError> {
+    let mut posterior = priors.to_vec();
+    let mut outcome_rng = BenchmarkRng::new(seed ^ 0x0B5E_7A71);
+    let mut selection_rng = BenchmarkRng::new(seed ^ 0x51EC_7100);
+    let mut cost_spent = 0.0;
+    let mut experiments_used = 0usize;
+    let mut expected_gain_sum = 0.0;
+    let mut realized_gain_sum = 0.0;
+    let mut gain_cost_sum = 0.0;
+    let mut steps_to_threshold = None;
+    let mut cost_to_threshold = None;
+
+    for step in 1..=resource_budget_units {
+        let remaining = resource_budget_units as f64 - cost_spent;
+        let affordable_models: Vec<ModelLikelihoodScenario> = model_scenarios
+            .iter()
+            .map(|scenario| ModelLikelihoodScenario {
+                scenario_id: scenario.scenario_id.clone(),
+                weight: scenario.weight,
+                candidates: scenario.candidates.iter()
+                    .filter(|candidate| candidate.cost <= remaining + 1.0e-9)
+                    .cloned()
+                    .collect(),
+            })
+            .collect();
+        if affordable_models.first().is_none_or(|scenario| scenario.candidates.is_empty()) {
+            break;
+        }
+
+        // The selector API receives no hidden-world identifier, likelihood table,
+        // or true hypothesis index.
+        let selected_id = choose_candidate(
+            policy,
+            &posterior,
+            &affordable_models,
+            fixed_candidate_id,
+            &mut selection_rng,
+        )?;
+        let Some(selected_id) = selected_id else {
+            break;
+        };
+        let model_candidate = affordable_models[0].candidates.iter()
+            .find(|candidate| candidate.id == selected_id)
+            .ok_or(BlindWorldBenchmarkError::MissingCandidate)?;
+        let hidden_candidate = hidden_candidates.iter()
+            .find(|candidate| candidate.id == selected_id)
+            .ok_or(BlindWorldBenchmarkError::MissingCandidate)?;
+
+        let expected_score = rank_experiments(
+            &posterior,
+            std::slice::from_ref(model_candidate),
+        )?.into_iter().next()
+            .ok_or(BlindWorldBenchmarkError::EmptyCandidateLibrary)?;
+        let likelihood_row = &hidden_candidate.likelihoods[true_hypothesis_index];
+        let outcome_index = if outcome_rng.unit_f64() < likelihood_row[0] { 0 } else { 1 };
+        // Every strategy updates with the same declared nominal model. This keeps
+        // the experiment-choice comparison interpretable; the robust policies are
+        // not silently granted a separate posterior-inference advantage.
+        let update = update_posterior(&posterior, model_candidate, outcome_index)?;
+        posterior = update.posterior;
+
+        experiments_used += 1;
+        cost_spent += model_candidate.cost;
+        expected_gain_sum += expected_score.expected_information_gain_bits;
+        realized_gain_sum += update.realized_information_gain_bits;
+        gain_cost_sum += model_candidate.cost;
+
+        if top_confidence(&posterior) >= threshold {
+            steps_to_threshold = Some(step);
+            cost_to_threshold = Some(cost_spent);
+            break;
+        }
+    }
+
+    let true_probabilities: Vec<f64> = posterior.iter()
+        .map(|hypothesis| hypothesis.probability)
+        .collect();
+    let mut brier = 0.0;
+    for (index, probability) in true_probabilities.iter().enumerate() {
+        let target = if index == true_hypothesis_index { 1.0 } else { 0.0 };
+        brier += (probability - target).powi(2);
+    }
+    let true_probability = true_probabilities[true_hypothesis_index].clamp(1.0e-12, 1.0);
+    let most_likely = top_index(&posterior);
+    let confidence = posterior[most_likely].probability;
+    let unsupported_causal_claim = true_hypothesis_index == 2
+        && confidence >= threshold
+        && (most_likely == 0 || most_likely == 1);
+
+    Ok(TrialResult {
+        brier,
+        log_loss: -true_probability.ln(),
+        top_correct: most_likely == true_hypothesis_index,
+        top_confidence: confidence,
+        threshold_reached: steps_to_threshold.is_some(),
+        experiments_used,
+        cost_spent,
+        steps_to_threshold,
+        cost_to_threshold,
+        expected_gain_bits_per_cost: if gain_cost_sum > 0.0 {
+            expected_gain_sum / gain_cost_sum
+        } else {
+            0.0
+        },
+        realized_entropy_reduction_bits_per_cost: if gain_cost_sum > 0.0 {
+            realized_gain_sum / gain_cost_sum
+        } else {
+            0.0
+        },
+        unsupported_causal_claim,
+        null_truth: true_hypothesis_index == 2,
+    })
+}
+
+fn choose_candidate(
+    policy: BlindWorldPolicy,
+    posterior: &[HypothesisPrior],
+    model_scenarios: &[ModelLikelihoodScenario],
+    fixed_candidate_id: &str,
+    selection_rng: &mut BenchmarkRng,
+) -> Result<Option<String>, BlindWorldBenchmarkError> {
+    let nominal = model_scenarios.first()
+        .ok_or(BlindWorldBenchmarkError::EmptyCandidateLibrary)?;
+    if nominal.candidates.is_empty() {
+        return Ok(None);
+    }
+    let selected = match policy {
+        BlindWorldPolicy::NominalExpectedGain => rank_experiments(
+            posterior, &nominal.candidates,
+        )?.first().map(|score| score.candidate_id.clone()),
+        BlindWorldPolicy::NominalPredictiveVariance => nominal.candidates.iter()
+            .max_by(|left, right| {
+                (predictive_variance(left, posterior) / left.cost)
+                    .total_cmp(&(predictive_variance(right, posterior) / right.cost))
+                    .then_with(|| right.id.cmp(&left.id))
+            })
+            .map(|candidate| candidate.id.clone()),
+        BlindWorldPolicy::ModelWeightedExpectedGain => {
+            let scores = rank_experiments_robust(posterior, model_scenarios)?;
+            scores.into_iter().max_by(|left, right| {
+                left.expected_information_gain_per_cost
+                    .total_cmp(&right.expected_information_gain_per_cost)
+                    .then_with(|| right.candidate_id.cmp(&left.candidate_id))
+            }).map(|score| score.candidate_id)
+        }
+        BlindWorldPolicy::WorstCaseRobust => rank_experiments_robust(
+            posterior, model_scenarios,
+        )?.first().map(|score| score.candidate_id.clone()),
+        BlindWorldPolicy::DevelopmentFixedDesign => nominal.candidates.iter()
+            .find(|candidate| candidate.id == fixed_candidate_id)
+            .map(|candidate| candidate.id.clone()),
+        BlindWorldPolicy::UniformRandom => {
+            let index = (selection_rng.next_u64() % nominal.candidates.len() as u64) as usize;
+            nominal.candidates.get(index).map(|candidate| candidate.id.clone())
+        }
+        BlindWorldPolicy::PassiveOnly => nominal.candidates.iter()
+            .find(|candidate| candidate.id == "passive_correlation")
+            .map(|candidate| candidate.id.clone()),
+    };
+    Ok(selected)
+}
+
+fn predictive_variance(candidate: &ExperimentCandidate, priors: &[HypothesisPrior]) -> f64 {
+    let mean = priors.iter()
+        .zip(&candidate.likelihoods)
+        .map(|(prior, row)| prior.probability * row[0])
+        .sum::<f64>();
+    priors.iter()
+        .zip(&candidate.likelihoods)
+        .map(|(prior, row)| prior.probability * (row[0] - mean).powi(2))
+        .sum::<f64>()
+}
+
+fn choose_development_fixed_design(
+    priors: &[HypothesisPrior],
+    development_worlds: &[HiddenWorld],
+) -> Result<String, BlindWorldBenchmarkError> {
+    let first = development_worlds.first()
+        .ok_or(BlindWorldBenchmarkError::EmptyCandidateLibrary)?;
+    let mut totals: Vec<(String, f64)> = first.candidates.iter()
+        .map(|candidate| (candidate.id.clone(), 0.0))
+        .collect();
+    for world in development_worlds {
+        let ranking = rank_experiments(priors, &world.candidates)?;
+        for (candidate_id, total) in &mut totals {
+            let score = ranking.iter().find(|score| score.candidate_id == *candidate_id)
+                .ok_or(BlindWorldBenchmarkError::MissingCandidate)?;
+            *total += score.information_gain_per_cost / development_worlds.len() as f64;
+        }
+    }
+    totals.into_iter()
+        .max_by(|(left_id, left_score), (right_id, right_score)| {
+            left_score.total_cmp(right_score).then_with(|| right_id.cmp(left_id))
+        })
+        .map(|(candidate_id, _)| candidate_id)
+        .ok_or(BlindWorldBenchmarkError::EmptyCandidateLibrary)
+}
+
+fn summarize_world_policy(
+    world: &HiddenWorld,
+    policy: BlindWorldPolicy,
+    resource_budget_units: usize,
+    _threshold: f64,
+    trials: Vec<TrialResult>,
+) -> BlindWorldPolicySummary {
+    let brier: Vec<f64> = trials.iter().map(|trial| trial.brier).collect();
+    let log_loss: Vec<f64> = trials.iter().map(|trial| trial.log_loss).collect();
+    let count = trials.len();
+    let correct = trials.iter().filter(|trial| trial.top_correct).count();
+    let reached = trials.iter().filter(|trial| trial.threshold_reached).count();
+    let experiments_to_threshold: Vec<f64> = trials.iter()
+        .filter_map(|trial| trial.steps_to_threshold.map(|steps| steps as f64))
+        .collect();
+    let cost_to_threshold: Vec<f64> = trials.iter()
+        .filter_map(|trial| trial.cost_to_threshold)
+        .collect();
+    let null_truth_trials: Vec<&TrialResult> = trials.iter()
+        .filter(|trial| trial.null_truth)
+        .collect();
+    let unsupported = null_truth_trials.iter()
+        .filter(|trial| trial.unsupported_causal_claim)
+        .count();
+    let ece = calibration_error_10_bins(&trials);
+    let mean = |values: &[f64]| -> f64 {
+        if values.is_empty() { 0.0 } else {
+            values.iter().sum::<f64>() / values.len() as f64
+        }
+    };
+
+    BlindWorldPolicySummary {
+        world_id: world.id.clone(),
+        regime: world.regime,
+        held_out_from_policy_models: world.held_out,
+        policy,
+        trials: count,
+        resource_budget_units,
+        mean_brier_score: mean(&brier),
+        brier_score_ci95: mean_ci95(&brier, 0.0, 2.0),
+        mean_log_loss: mean(&log_loss),
+        log_loss_ci95: mean_ci95(&log_loss, 0.0, 30.0),
+        top_hypothesis_accuracy: correct as f64 / count as f64,
+        top_hypothesis_accuracy_wilson_ci95: wilson_ci95(correct, count),
+        mean_expected_information_gain_bits_per_cost: mean(&trials.iter()
+            .map(|trial| trial.expected_gain_bits_per_cost).collect::<Vec<_>>()),
+        mean_realized_entropy_reduction_bits_per_cost: mean(&trials.iter()
+            .map(|trial| trial.realized_entropy_reduction_bits_per_cost).collect::<Vec<_>>()),
+        mean_calibration_error_10_bins: ece,
+        threshold_reached_fraction: reached as f64 / count as f64,
+        threshold_reached_wilson_ci95: wilson_ci95(reached, count),
+        mean_experiments_used: mean(&trials.iter()
+            .map(|trial| trial.experiments_used as f64).collect::<Vec<_>>()),
+        mean_cost_spent: mean(&trials.iter().map(|trial| trial.cost_spent).collect::<Vec<_>>()),
+        mean_experiments_to_threshold: (!experiments_to_threshold.is_empty())
+            .then(|| mean(&experiments_to_threshold)),
+        mean_cost_to_threshold: (!cost_to_threshold.is_empty()).then(|| mean(&cost_to_threshold)),
+        unsupported_causal_claim_rate_on_null_truth: unsupported as f64
+            / null_truth_trials.len() as f64,
+        unsupported_causal_claim_rate_wilson_ci95: wilson_ci95(unsupported, null_truth_trials.len()),
+        null_truth_trials: null_truth_trials.len(),
+    }
+}
+
+fn calibration_error_10_bins(trials: &[TrialResult]) -> f64 {
+    let mut counts = [0usize; 10];
+    let mut confidence_sums = [0.0_f64; 10];
+    let mut correct_sums = [0usize; 10];
+    for trial in trials {
+        let bin = ((trial.top_confidence * 10.0).floor() as usize).min(9);
+        counts[bin] += 1;
+        confidence_sums[bin] += trial.top_confidence;
+        if trial.top_correct {
+            correct_sums[bin] += 1;
+        }
+    }
+    let n = trials.len() as f64;
+    counts.iter().enumerate().map(|(bin, count)| {
+        if *count == 0 { 0.0 } else {
+            (*count as f64 / n)
+                * ((confidence_sums[bin] / *count as f64)
+                    - (correct_sums[bin] as f64 / *count as f64)).abs()
+        }
+    }).sum()
+}
+
+fn mean_ci95(values: &[f64], minimum: f64, maximum: f64) -> [f64; 2] {
+    if values.len() < 2 {
+        return [minimum, maximum];
+    }
+    let n = values.len() as f64;
+    let mean = values.iter().sum::<f64>() / n;
+    let variance = values.iter().map(|value| (value - mean).powi(2)).sum::<f64>()
+        / (n - 1.0);
+    let half_width = 1.96 * (variance / n).sqrt();
+    [
+        (mean - half_width).clamp(minimum, maximum),
+        (mean + half_width).clamp(minimum, maximum),
+    ]
+}
+
+fn wilson_ci95(successes: usize, count: usize) -> [f64; 2] {
+    if count == 0 {
+        return [0.0, 1.0];
+    }
+    let n = count as f64;
+    let p = successes as f64 / n;
+    let z = 1.959_963_984_540_054_f64;
+    let z2 = z * z;
+    let denominator = 1.0 + z2 / n;
+    let center = (p + z2 / (2.0 * n)) / denominator;
+    let half_width = z * ((p * (1.0 - p) / n) + z2 / (4.0 * n * n)).sqrt()
+        / denominator;
+    [(center - half_width).clamp(0.0, 1.0), (center + half_width).clamp(0.0, 1.0)]
+}
+
+fn uniform_priors() -> Vec<HypothesisPrior> {
+    HYPOTHESIS_IDS.iter().map(|id| HypothesisPrior {
+        id: (*id).into(),
+        probability: 1.0 / HYPOTHESIS_IDS.len() as f64,
+    }).collect()
+}
+
+fn binary_candidate(id: &str, cost: f64, probabilities: [f64; 3]) -> ExperimentCandidate {
+    ExperimentCandidate {
+        id: id.into(),
+        cost,
+        likelihoods: probabilities.iter().map(|p| vec![*p, 1.0 - *p]).collect(),
+    }
+}
+
+fn candidate_set(
+    passive: [f64; 3],
+    intervention: [f64; 3],
+    confounder: [f64; 3],
+    negative: [f64; 3],
+    delayed: [f64; 3],
+) -> Vec<ExperimentCandidate> {
+    vec![
+        binary_candidate("passive_correlation", 1.0, passive),
+        binary_candidate("intervene_on_x", 1.5, intervention),
+        binary_candidate("measure_confounder", 1.25, confounder),
+        binary_candidate("negative_control", 1.0, negative),
+        binary_candidate("repeat_after_delay", 1.0, delayed),
+    ]
+}
+
+fn declared_model_scenarios() -> Vec<ModelLikelihoodScenario> {
+    vec![
+        ModelLikelihoodScenario {
+            scenario_id: "nominal_model_a".into(),
+            weight: 0.5,
+            candidates: candidate_set(
+                [0.82, 0.80, 0.52],
+                [0.90, 0.30, 0.50],
+                [0.38, 0.84, 0.51],
+                [0.51, 0.49, 0.50],
+                [0.72, 0.64, 0.55],
+            ),
+        },
+        ModelLikelihoodScenario {
+            scenario_id: "alternative_model_b".into(),
+            weight: 0.5,
+            candidates: candidate_set(
+                [0.78, 0.80, 0.58],
+                [0.67, 0.48, 0.52],
+                [0.45, 0.72, 0.55],
+                [0.50, 0.50, 0.50],
+                [0.65, 0.69, 0.58],
+            ),
+        },
+    ]
+}
+
+fn hidden_worlds() -> Vec<HiddenWorld> {
+    let nominal = candidate_set(
+        [0.82, 0.80, 0.52],
+        [0.90, 0.30, 0.50],
+        [0.38, 0.84, 0.51],
+        [0.51, 0.49, 0.50],
+        [0.72, 0.64, 0.55],
+    );
+    let confounder = candidate_set(
+        [0.82, 0.82, 0.54],
+        [0.82, 0.52, 0.50],
+        [0.36, 0.88, 0.52],
+        [0.50, 0.50, 0.50],
+        [0.71, 0.68, 0.55],
+    );
+    let intervention_artifact = candidate_set(
+        [0.82, 0.80, 0.52],
+        [0.58, 0.58, 0.57],
+        [0.36, 0.86, 0.52],
+        [0.50, 0.50, 0.50],
+        [0.71, 0.65, 0.55],
+    );
+    let base = candidate_set(
+        [0.82, 0.80, 0.52],
+        [0.90, 0.30, 0.50],
+        [0.38, 0.84, 0.51],
+        [0.51, 0.49, 0.50],
+        [0.72, 0.64, 0.55],
+    );
+    let degraded = base.iter().map(|candidate| ExperimentCandidate {
+        id: candidate.id.clone(),
+        cost: candidate.cost,
+        likelihoods: candidate.likelihoods.iter().map(|row| {
+            let p = 0.5 + (row[0] - 0.5) * 0.35;
+            vec![p, 1.0 - p]
+        }).collect(),
+    }).collect();
+    let reversal = candidate_set(
+        [0.78, 0.80, 0.53],
+        [0.32, 0.90, 0.50],
+        [0.86, 0.32, 0.51],
+        [0.50, 0.50, 0.50],
+        [0.61, 0.70, 0.55],
+    );
+    let null = candidate_set(
+        [0.55, 0.55, 0.55],
+        [0.57, 0.57, 0.57],
+        [0.53, 0.53, 0.53],
+        [0.50, 0.50, 0.50],
+        [0.54, 0.54, 0.54],
+    );
+
+    vec![
+        HiddenWorld {
+            id: "dev_nominal_calibration".into(),
+            regime: BlindWorldRegime::NominalCalibration,
+            held_out: false,
+            candidates: nominal,
+        },
+        HiddenWorld {
+            id: "dev_confounder_calibration".into(),
+            regime: BlindWorldRegime::ConfounderCalibration,
+            held_out: false,
+            candidates: confounder,
+        },
+        HiddenWorld {
+            id: "holdout_intervention_artifact".into(),
+            regime: BlindWorldRegime::InterventionArtifact,
+            held_out: true,
+            candidates: intervention_artifact,
+        },
+        HiddenWorld {
+            id: "holdout_sensor_degradation".into(),
+            regime: BlindWorldRegime::SensorDegradation,
+            held_out: true,
+            candidates: degraded,
+        },
+        HiddenWorld {
+            id: "holdout_effect_reversal".into(),
+            regime: BlindWorldRegime::EffectReversal,
+            held_out: true,
+            candidates: reversal,
+        },
+        HiddenWorld {
+            id: "holdout_null_negative_control".into(),
+            regime: BlindWorldRegime::NullNegativeControl,
+            held_out: true,
+            candidates: null,
+        },
+    ]
+}
+
+fn top_index(posterior: &[HypothesisPrior]) -> usize {
+    let mut best_index = 0;
+    for index in 1..posterior.len() {
+        if posterior[index].probability > posterior[best_index].probability {
+            best_index = index;
+        }
+    }
+    best_index
+}
+
+fn top_confidence(posterior: &[HypothesisPrior]) -> f64 {
+    posterior[top_index(posterior)].probability
+}
+
+struct BenchmarkRng {
+    state: u64,
+}
+
+impl BenchmarkRng {
+    fn new(seed: u64) -> Self {
+        Self { state: seed }
+    }
+
+    fn next_u64(&mut self) -> u64 {
+        self.state = self.state.wrapping_add(0x9E37_79B9_7F4A_7C15);
+        let mut z = self.state;
+        z = (z ^ (z >> 30)).wrapping_mul(0xBF58_476D_1CE4_E5B9);
+        z = (z ^ (z >> 27)).wrapping_mul(0x94D0_49BB_1331_11EB);
+        z ^ (z >> 31)
+    }
+
+    fn unit_f64(&mut self) -> f64 {
+        (self.next_u64() >> 11) as f64 / ((1_u64 << 53) as f64)
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    #[test]
+    fn repeated_runs_are_byte_stable_for_identical_configuration() {
+        let first = run_blind_world_benchmark(12, 8, 0x51A5, 0.95).unwrap();
+        let second = run_blind_world_benchmark(12, 8, 0x51A5, 0.95).unwrap();
+        assert_eq!(first, second);
+        assert_eq!(serde_json::to_vec(&first).unwrap(), serde_json::to_vec(&second).unwrap());
+    }
+
+    #[test]
+    fn suite_contains_development_and_held_out_world_regimes() {
+        let report = run_blind_world_benchmark(6, 6, 42, 0.95).unwrap();
+        assert_eq!(report.world_count, 6);
+        assert_eq!(report.held_out_world_count, 4);
+        assert_eq!(report.summaries.len(), 6 * 7);
+        assert!(report.summaries.iter().any(|row| {
+            row.regime == BlindWorldRegime::NullNegativeControl
+                && row.held_out_from_policy_models
+        }));
+        assert!(report.summaries.iter().any(|row| {
+            row.regime == BlindWorldRegime::EffectReversal
+                && row.held_out_from_policy_models
+        }));
+    }
+
+    #[test]
+    fn scoring_metrics_stay_in_declared_ranges() {
+        let report = run_blind_world_benchmark(30, 8, 123, 0.95).unwrap();
+        for row in report.summaries {
+            assert!((0.0..=2.0).contains(&row.mean_brier_score));
+            assert!((0.0..=30.0).contains(&row.mean_log_loss));
+            assert!((0.0..=1.0).contains(&row.top_hypothesis_accuracy));
+            assert!((0.0..=1.0).contains(&row.mean_calibration_error_10_bins));
+            assert!((0.0..=1.0).contains(&row.threshold_reached_fraction));
+            assert!((0.0..=1.0).contains(&row.unsupported_causal_claim_rate_on_null_truth));
+        }
+    }
+
+    #[test]
+    fn invalid_configuration_fails_closed() {
+        assert_eq!(
+            run_blind_world_benchmark(2, 8, 1, 0.95),
+            Err(BlindWorldBenchmarkError::InvalidTrialCount)
+        );
+        assert_eq!(
+            run_blind_world_benchmark(3, 0, 1, 0.95),
+            Err(BlindWorldBenchmarkError::InvalidResourceBudget)
+        );
+        assert_eq!(
+            run_blind_world_benchmark(3, 8, 1, 1.0 / 3.0),
+            Err(BlindWorldBenchmarkError::InvalidPosteriorThreshold)
+        );
+    }
+
+    #[test]
+    fn fixed_design_is_selected_from_development_regimes_only() {
+        let priors = uniform_priors();
+        let worlds = hidden_worlds();
+        let chosen = choose_development_fixed_design(&priors, &worlds[..2]).unwrap();
+        assert!(worlds[..2].iter().all(|world| {
+            world.candidates.iter().any(|candidate| candidate.id == chosen)
+        }));
+        assert!(worlds[2..].iter().all(|world| {
+            world.candidates.iter().any(|candidate| candidate.id == chosen)
+        }));
+    }
+}
