@@ -153,10 +153,12 @@ fn process_validators_reject_below_absolute_zero() {
 fn coagulation_rejects_astronomical_finite_temperature() {
     // Egg set-point logic used to accept any finite temperature above the set point.
     // The generic trajectory sanity bound must reject absurd finite values first.
-    assert_invalid_numeric(validate_coagulation(&Coagulation {
-        protein: Protein::EggWhite,
-        trajectory: ThermalTrajectory::hold(f64::MAX, 5.0),
-    }));
+    for temp_c in [1000.0, f64::MAX] {
+        assert_invalid_numeric(validate_coagulation(&Coagulation {
+            protein: Protein::EggWhite,
+            trajectory: ThermalTrajectory::hold(temp_c, 5.0),
+        }));
+    }
 }
 
 #[test]
@@ -165,7 +167,7 @@ fn pasteurization_rejects_overflowed_lethality_calculation() {
     // overflow the integrated lethality. Reject infinity rather than treating it as safe.
     assert_invalid_numeric(validate_pasteurization(&Pasteurization {
         pathogen: Pathogen::SalmonellaPoultry,
-        trajectory: ThermalTrajectory::hold(1000.0, f64::MAX),
+        trajectory: ThermalTrajectory::hold(999.0, f64::MAX),
         required_log_reduction: None,
     }));
 }
