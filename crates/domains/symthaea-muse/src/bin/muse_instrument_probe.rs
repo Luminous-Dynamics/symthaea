@@ -620,7 +620,7 @@ fn estimate_pitch_yin(
     };
     PitchDiagnostic {
         status: if confidence >= 0.60 {
-            "estimated"
+            "periodic_estimate_available"
         } else {
             "low_periodicity"
         },
@@ -817,7 +817,7 @@ mod tests {
             })
             .collect();
         let result = estimate_pitch_yin(&samples, sample_rate, 2, 100, 440.0);
-        assert_eq!(result.status, "estimated");
+        assert_eq!(result.status, "periodic_estimate_available");
         let estimate = result.estimated_pitch_hz.expect("tone should estimate");
         assert!((estimate - 440.0).abs() < 2.0, "estimated {estimate}");
         assert!(
