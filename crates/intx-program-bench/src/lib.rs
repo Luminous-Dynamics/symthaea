@@ -8,6 +8,7 @@
 use std::collections::{BTreeMap, BTreeSet};
 
 pub const CORPUS: &str = include_str!("../fixtures/cases.tsv");
+pub const EXPECTED_OUTCOMES: &str = include_str!("../fixtures/expected.tsv");
 
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub struct Case {
@@ -54,6 +55,95 @@ pub fn parse_cases(input: &str) -> Result<Vec<Case>, String> {
         });
     }
     Ok(cases)
+}
+
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub struct ExpectedOutcome {
+    pub id: String,
+    pub expected_state: String,
+    pub dispatch: String,
+    pub reconcile: String,
+}
+
+/// Parse the frozen golden-outcome table, stored separately from scenario inputs.
+pub fn parse_expected_outcomes(input: &str) -> Result<Vec<ExpectedOutcome>, String> {
+    let mut lines = input.lines();
+    let header = lines.next().ok_or_else(|| "missing oracle header".to_string())?;
+    if header != "id|expected_state|dispatch|reconcile" {
+        return Err("unexpected oracle header".to_string());
+    }
+
+    let mut outcomes = Vec::new();
+    for (offset, line) in lines.enumerate() {
+        if line.trim().is_empty() || line.starts_with('#') {
+            continue;
+        }
+        let fields: Vec<&str> = line.split('|').collect();
+        if fields.len() != 4 || fields.iter().any(|field| field.trim().is_empty()) {
+            return Err(format!("oracle line {}: expected 4 non-empty fields", offset + 2));
+        }
+        outcomes.push(ExpectedOutcome {
+            id: fields[0].to_string(),
+            expected_state: fields[1].to_string(),
+            dispatch: fields[2].to_string(),
+            reconcile: fields[3].to_string(),
+        });
+    }
+    if outcomes.len() != 50 {
+        return Err(format!("expected 50 oracle outcomes, got {}", outcomes.len()));
+    }
+    let mut ids = BTreeSet::new();
+    for outcome in &outcomes {
+        if !ids.insert(&outcome.id) {
+            return Err(format!("duplicate oracle ID: {}", outcome.id));
+        }
+    }
+    Ok(outcomes)
+}
+
+/// Compare scenario metadata with a separately frozen expected-outcome oracle.
+/// The oracle is a test expectation, never production authorization.
+pub fn validate_against_oracle(
+    cases: &[Case],
+    outcomes: &[ExpectedOutcome],
+) -> Result<(), String> {
+    if cases.len() != outcomes.len() || outcomes.len() != 50 {
+        return Err(format!(
+            "case/oracle cardinality mismatch: {} cases, {} outcomes",
+            cases.len(),
+            outcomes.len()
+        ));
+    }
+
+    let expected: BTreeMap<&str, &ExpectedOutcome> = outcomes
+        .iter()
+        .map(|outcome| (outcome.id.as_str(), outcome))
+        .collect();
+    if expected.len() != outcomes.len() {
+        return Err("duplicate outcome identifiers".to_string());
+    }
+
+    for case in cases {
+        let outcome = expected
+            .get(case.id.as_str())
+            .ok_or_else(|| format!("no frozen oracle outcome for {}", case.id))?;
+        if case.expected_state != outcome.expected_state
+            || case.dispatch != outcome.dispatch
+            || case.reconcile != outcome.reconcile
+        {
+            return Err(format!(
+                "scenario/oracle mismatch for {}: scenario=({},{},{}), oracle=({},{},{})",
+                case.id,
+                case.expected_state,
+                case.dispatch,
+                case.reconcile,
+                outcome.expected_state,
+                outcome.dispatch,
+                outcome.reconcile
+            ));
+        }
+    }
+    Ok(())
 }
 
 pub fn validate_cases(cases: &[Case]) -> Result<(), String> {
@@ -179,6 +269,30 @@ mod tests {
         validate_cases(&cases).expect("fixture corpus satisfies shape and safety invariants");
         assert_eq!(cases.first().map(|case| case.id.as_str()), Some("C0-01"));
         assert_eq!(cases.last().map(|case| case.id.as_str()), Some("C4-10"));
+    }
+
+    #[test]
+    fn every_scenario_matches_the_separately_frozen_outcome_oracle() {
+        let cases = parse_cases(CORPUS).expect("scenario corpus parses");
+        let outcomes =
+            parse_expected_outcomes(EXPECTED_OUTCOMES).expect("outcome oracle parses");
+        validate_cases(&cases).expect("scenario invariant checks pass");
+        validate_against_oracle(&cases, &outcomes)
+            .expect("scenarios match the separately frozen expected outcomes");
+    }
+
+    #[test]
+    fn semantic_mutation_is_detected_even_when_local_rules_still_hold() {
+        let mut cases = parse_cases(CORPUS).expect("scenario corpus parses");
+        let outcomes =
+            parse_expected_outcomes(EXPECTED_OUTCOMES).expect("outcome oracle parses");
+        let case = cases
+            .iter_mut()
+            .find(|case| case.id == "C2-05")
+            .expect("safety-invariant fixture exists");
+        case.expected_state = "observation_admitted".to_string();
+        assert!(validate_cases(&cases).is_ok());
+        assert!(validate_against_oracle(&cases, &outcomes).is_err());
     }
 
     #[test]
