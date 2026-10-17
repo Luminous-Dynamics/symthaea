@@ -552,6 +552,9 @@ pub enum ExpansionHistoryError {
     ClosureViolation,
     InvalidRedshift,
     InvalidIntegrationIntervals,
+    InvalidIntegrationTolerance,
+    InvalidIntegrationDepth,
+    IntegrationDidNotConverge,
     NonPhysicalExpansionRate,
     NumericalOverflow,
 }
@@ -565,6 +568,9 @@ impl std::fmt::Display for ExpansionHistoryError {
             Self::ClosureViolation => "density parameters must satisfy Ωr + Ωm + Ωk + Ωde = 1",
             Self::InvalidRedshift => "redshift must be finite and >= 0",
             Self::InvalidIntegrationIntervals => "Simpson integration requires an even interval count in 2..=1_000_000",
+            Self::InvalidIntegrationTolerance => "adaptive integration tolerances must be finite and positive",
+            Self::InvalidIntegrationDepth => "adaptive integration depth must be in 1..=30",
+            Self::IntegrationDidNotConverge => "adaptive Simpson integration did not meet its tolerance before the depth limit",
             Self::NonPhysicalExpansionRate => "the model produced a non-positive or non-finite H(z)^2",
             Self::NumericalOverflow => "the requested cosmology calculation overflowed",
         };
@@ -724,6 +730,47 @@ impl ExpansionHistory {
         }
     }
 
+    /// Adaptive line-of-sight comoving distance χ(z) [Mpc].
+    ///
+    /// The integrator recursively refines a Simpson estimate and reports a
+    /// non-convergence error instead of silently returning an under-resolved
+    /// value. Absolute tolerance is in Mpc; relative tolerance is dimensionless.
+    pub fn line_of_sight_comoving_distance_mpc_adaptive(
+        &self,
+        z: f64,
+        absolute_tolerance_mpc: f64,
+        relative_tolerance: f64,
+        max_depth: u32,
+    ) -> Result<f64, ExpansionHistoryError> {
+        self.validate()?;
+        Self::validate_redshift(z)?;
+        validate_adaptive_options(absolute_tolerance_mpc, relative_tolerance, max_depth)?;
+        if z == 0.0 {
+            return Ok(0.0);
+        }
+
+        const C_KM_S: f64 = 299_792.458;
+        adaptive_simpson(
+            |redshift| {
+                let e2 = self.e_squared_unchecked(redshift);
+                if !e2.is_finite() || e2 <= 0.0 {
+                    return Err(ExpansionHistoryError::NonPhysicalExpansionRate);
+                }
+                let value = C_KM_S / (self.h0_km_s_mpc * e2.sqrt());
+                if value.is_finite() {
+                    Ok(value)
+                } else {
+                    Err(ExpansionHistoryError::NumericalOverflow)
+                }
+            },
+            0.0,
+            z,
+            absolute_tolerance_mpc,
+            relative_tolerance,
+            max_depth,
+        )
+    }
+
     /// Transverse comoving distance D_M(z) [Mpc], applying the FLRW curvature
     /// mapping to the line-of-sight distance.
     pub fn transverse_comoving_distance_mpc(
@@ -776,6 +823,47 @@ impl ExpansionHistory {
     ) -> Result<f64, ExpansionHistoryError> {
         Self::validate_redshift(z)?;
         Ok(self.transverse_comoving_distance_mpc(z, intervals)? / (1.0 + z))
+    }
+
+    /// Adaptive cosmological lookback time from redshift z to the present [Gyr].
+    ///
+    /// Absolute tolerance is in Gyr; relative tolerance is dimensionless.
+    /// This computes lookback time, not the total age of the universe.
+    pub fn lookback_time_gyr_adaptive(
+        &self,
+        z: f64,
+        absolute_tolerance_gyr: f64,
+        relative_tolerance: f64,
+        max_depth: u32,
+    ) -> Result<f64, ExpansionHistoryError> {
+        self.validate()?;
+        Self::validate_redshift(z)?;
+        validate_adaptive_options(absolute_tolerance_gyr, relative_tolerance, max_depth)?;
+        if z == 0.0 {
+            return Ok(0.0);
+        }
+
+        const HUBBLE_TIME_CONVERSION_GYR: f64 = 977.792_221_680_789_2;
+        let conversion = HUBBLE_TIME_CONVERSION_GYR / self.h0_km_s_mpc;
+        adaptive_simpson(
+            |redshift| {
+                let e2 = self.e_squared_unchecked(redshift);
+                if !e2.is_finite() || e2 <= 0.0 {
+                    return Err(ExpansionHistoryError::NonPhysicalExpansionRate);
+                }
+                let value = conversion / ((1.0 + redshift) * e2.sqrt());
+                if value.is_finite() {
+                    Ok(value)
+                } else {
+                    Err(ExpansionHistoryError::NumericalOverflow)
+                }
+            },
+            0.0,
+            z,
+            absolute_tolerance_gyr,
+            relative_tolerance,
+            max_depth,
+        )
     }
 
     /// Cosmological lookback time from redshift z to the present [Gyr].
@@ -991,6 +1079,75 @@ mod expansion_history_tests {
         );
     }
 
+
+
+    #[test]
+    fn adaptive_integrals_match_analytic_matter_and_radiation_limits() {
+        let eds = einstein_de_sitter();
+        let z: f64 = 1.0;
+        let expected_distance =
+            2.0 * C_KM_S / 70.0 * (1.0 - 1.0 / (1.0 + z).sqrt());
+        let expected_time = (977.792_221_680_789_2 / 70.0)
+            * (2.0 / 3.0)
+            * (1.0 - (1.0 + z).powf(-1.5));
+        let adaptive_distance = eds
+            .line_of_sight_comoving_distance_mpc_adaptive(z, 1e-8, 1e-10, 20)
+            .unwrap();
+        let adaptive_time = eds
+            .lookback_time_gyr_adaptive(z, 1e-10, 1e-10, 20)
+            .unwrap();
+        assert!((adaptive_distance - expected_distance).abs() / expected_distance < 1e-9);
+        assert!((adaptive_time - expected_time).abs() / expected_time < 1e-9);
+
+        let radiation = ExpansionHistory {
+            h0_km_s_mpc: 70.0,
+            omega_r: 1.0,
+            omega_m: 0.0,
+            omega_k: 0.0,
+            omega_de: 0.0,
+            w0: -1.0,
+        };
+        let z: f64 = 3.0;
+        let expected_distance = C_KM_S / 70.0 * z / (1.0 + z);
+        let expected_time = (977.792_221_680_789_2 / 70.0)
+            * 0.5
+            * (1.0 - (1.0 + z).powi(-2));
+        let adaptive_distance = radiation
+            .line_of_sight_comoving_distance_mpc_adaptive(z, 1e-8, 1e-10, 20)
+            .unwrap();
+        let adaptive_time = radiation
+            .lookback_time_gyr_adaptive(z, 1e-10, 1e-10, 20)
+            .unwrap();
+        assert!((adaptive_distance - expected_distance).abs() / expected_distance < 1e-9);
+        assert!((adaptive_time - expected_time).abs() / expected_time < 1e-9);
+    }
+
+    #[test]
+    fn adaptive_integrator_rejects_bad_tolerances_and_depth() {
+        let model = ExpansionHistory::flat_lcdm_approx();
+        assert_eq!(
+            model.line_of_sight_comoving_distance_mpc_adaptive(1.0, 0.0, 1e-8, 10),
+            Err(ExpansionHistoryError::InvalidIntegrationTolerance)
+        );
+        assert_eq!(
+            model.lookback_time_gyr_adaptive(1.0, 1e-8, f64::NAN, 10),
+            Err(ExpansionHistoryError::InvalidIntegrationTolerance)
+        );
+        assert_eq!(
+            model.line_of_sight_comoving_distance_mpc_adaptive(1.0, 1e-8, 1e-8, 0),
+            Err(ExpansionHistoryError::InvalidIntegrationDepth)
+        );
+    }
+
+    #[test]
+    fn adaptive_integrator_fails_closed_at_insufficient_depth() {
+        let model = ExpansionHistory::flat_lcdm_approx();
+        assert_eq!(
+            model.line_of_sight_comoving_distance_mpc_adaptive(3.0, 1e-30, 1e-30, 1),
+            Err(ExpansionHistoryError::IntegrationDidNotConverge)
+        );
+    }
+
     #[test]
     fn curvature_changes_transverse_distance_in_expected_direction() {
         let open = ExpansionHistory {
@@ -1017,4 +1174,145 @@ mod expansion_history_tests {
         assert!(open_transverse > open_radial);
         assert!(closed_transverse < closed_radial);
     }
+}
+
+
+fn validate_adaptive_options(
+    absolute_tolerance: f64,
+    relative_tolerance: f64,
+    max_depth: u32,
+) -> Result<(), ExpansionHistoryError> {
+    if !absolute_tolerance.is_finite()
+        || absolute_tolerance <= 0.0
+        || !relative_tolerance.is_finite()
+        || relative_tolerance <= 0.0
+    {
+        return Err(ExpansionHistoryError::InvalidIntegrationTolerance);
+    }
+    if !(1..=30).contains(&max_depth) {
+        return Err(ExpansionHistoryError::InvalidIntegrationDepth);
+    }
+    Ok(())
+}
+
+/// Adaptive Simpson quadrature with a Richardson error estimate.
+///
+/// The returned value is corrected by (S_refined - S_whole) / 15. If the
+/// tolerance is not reached before max_depth, the function fails closed.
+fn adaptive_simpson<F>(
+    f: F,
+    a: f64,
+    b: f64,
+    absolute_tolerance: f64,
+    relative_tolerance: f64,
+    max_depth: u32,
+) -> Result<f64, ExpansionHistoryError>
+where
+    F: Fn(f64) -> Result<f64, ExpansionHistoryError>,
+{
+    let midpoint = a + (b - a) * 0.5;
+    if !midpoint.is_finite() || midpoint <= a || midpoint >= b {
+        return Err(ExpansionHistoryError::IntegrationDidNotConverge);
+    }
+    let fa = f(a)?;
+    let fm = f(midpoint)?;
+    let fb = f(b)?;
+    let whole = simpson_estimate(a, b, fa, fm, fb);
+    if !whole.is_finite() {
+        return Err(ExpansionHistoryError::NumericalOverflow);
+    }
+    adaptive_simpson_recursive(
+        &f,
+        a,
+        b,
+        fa,
+        fm,
+        fb,
+        whole,
+        absolute_tolerance,
+        relative_tolerance,
+        max_depth,
+    )
+}
+
+#[allow(clippy::too_many_arguments)]
+fn adaptive_simpson_recursive<F>(
+    f: &F,
+    a: f64,
+    b: f64,
+    fa: f64,
+    fm: f64,
+    fb: f64,
+    whole: f64,
+    absolute_tolerance: f64,
+    relative_tolerance: f64,
+    depth_remaining: u32,
+) -> Result<f64, ExpansionHistoryError>
+where
+    F: Fn(f64) -> Result<f64, ExpansionHistoryError>,
+{
+    let midpoint = a + (b - a) * 0.5;
+    let left_midpoint = a + (midpoint - a) * 0.5;
+    let right_midpoint = midpoint + (b - midpoint) * 0.5;
+    if left_midpoint <= a || left_midpoint >= midpoint
+        || right_midpoint <= midpoint || right_midpoint >= b
+    {
+        return Err(ExpansionHistoryError::IntegrationDidNotConverge);
+    }
+
+    let flm = f(left_midpoint)?;
+    let frm = f(right_midpoint)?;
+    let left = simpson_estimate(a, midpoint, fa, flm, fm);
+    let right = simpson_estimate(midpoint, b, fm, frm, fb);
+    let refined = left + right;
+    if !refined.is_finite() {
+        return Err(ExpansionHistoryError::NumericalOverflow);
+    }
+    let error_estimate = (refined - whole).abs() / 15.0;
+    let tolerance = absolute_tolerance + relative_tolerance * refined.abs();
+    if error_estimate <= tolerance {
+        let corrected = refined + (refined - whole) / 15.0;
+        if corrected.is_finite() {
+            return Ok(corrected);
+        }
+        return Err(ExpansionHistoryError::NumericalOverflow);
+    }
+    if depth_remaining == 0 {
+        return Err(ExpansionHistoryError::IntegrationDidNotConverge);
+    }
+
+    let left_result = adaptive_simpson_recursive(
+        f,
+        a,
+        midpoint,
+        fa,
+        flm,
+        fm,
+        left,
+        absolute_tolerance * 0.5,
+        relative_tolerance,
+        depth_remaining - 1,
+    )?;
+    let right_result = adaptive_simpson_recursive(
+        f,
+        midpoint,
+        b,
+        fm,
+        frm,
+        fb,
+        right,
+        absolute_tolerance * 0.5,
+        relative_tolerance,
+        depth_remaining - 1,
+    )?;
+    let total = left_result + right_result;
+    if total.is_finite() {
+        Ok(total)
+    } else {
+        Err(ExpansionHistoryError::NumericalOverflow)
+    }
+}
+
+fn simpson_estimate(a: f64, b: f64, fa: f64, fm: f64, fb: f64) -> f64 {
+    (b - a) * (fa + 4.0 * fm + fb) / 6.0
 }
