@@ -37,6 +37,8 @@ pub enum SweepInputError {
     DuplicateCandidateId { id: String },
     InvalidMissionFamilyId { id: String },
     MissionFamilyMismatch { candidate_id: String, expected: String, actual: String },
+    InvalidMissionFamilyDigest { candidate_id: String },
+    MissionFamilyDigestMismatch { candidate_id: String },
     MissionMetricShapeMismatch { candidate_id: String },
     ReservePolicyMismatch { candidate_id: String },
 }
@@ -194,6 +196,10 @@ fn dominates(a: &ScreeningResult, b: &ScreeningResult) -> bool {
 pub struct MissionFamilyCandidate {
     pub id: String,
     pub mission_family_id: String,
+    /// Digest of the frozen use-case/route/environment/reserve contract.
+    /// Syntax/equality are checked; digest production and source resolution
+    /// remain the caller's responsibility.
+    pub mission_family_sha256: String,
     pub mission: MissionProfile,
     pub system: EnergySystemEnvelope,
 }
@@ -220,6 +226,12 @@ pub fn compare_candidate_specific_missions(
         });
     }
 
+    let expected_family_digest = candidates[0].mission_family_sha256.as_str();
+    if !is_sha256_digest(expected_family_digest) {
+        return Err(SweepInputError::InvalidMissionFamilyDigest {
+            candidate_id: candidates[0].id.clone(),
+        });
+    }
     let expected_shape = mission_metric_shape(&candidates[0].mission);
     let mut seen = HashSet::with_capacity(candidates.len());
     for candidate in candidates {
@@ -238,6 +250,16 @@ pub fn compare_candidate_specific_missions(
                 candidate_id: candidate.id.clone(),
                 expected: expected_family.to_owned(),
                 actual: candidate.mission_family_id.clone(),
+            });
+        }
+        if !is_sha256_digest(candidate.mission_family_sha256.as_str()) {
+            return Err(SweepInputError::InvalidMissionFamilyDigest {
+                candidate_id: candidate.id.clone(),
+            });
+        }
+        if !candidate.mission_family_sha256.eq_ignore_ascii_case(expected_family_digest) {
+            return Err(SweepInputError::MissionFamilyDigestMismatch {
+                candidate_id: candidate.id.clone(),
             });
         }
         if mission_metric_shape(&candidate.mission) != expected_shape {
@@ -297,14 +319,16 @@ pub fn compare_candidate_specific_missions(
     })
 }
 
-fn mission_metric_shape(mission: &MissionProfile) -> (bool, bool) {
-    let has_continuous = mission.segments.iter().any(|segment| {
-        segment.duty_class == Some(super::DutyClass::Continuous)
-    });
-    let has_peak = mission.segments.iter().any(|segment| {
-        segment.duty_class == Some(super::DutyClass::Peak)
-    });
-    (has_continuous, has_peak)
+fn mission_metric_shape(mission: &MissionProfile) -> Vec<(String, Option<super::DutyClass>)> {
+    mission
+        .segments
+        .iter()
+        .map(|segment| (segment.id.clone(), segment.duty_class))
+        .collect()
+}
+
+fn is_sha256_digest(value: &str) -> bool {
+    value.len() == 64 && value.bytes().all(|byte| byte.is_ascii_hexdigit())
 }
 
 fn validate_common_reserve_policy<'a>(
@@ -434,6 +458,7 @@ mod tests {
         MissionFamilyCandidate {
             id: id.into(),
             mission_family_id: family_id.into(),
+            mission_family_sha256: "b".repeat(64),
             mission: MissionProfile {
                 id: mission_id.into(),
                 segments: vec![
@@ -464,6 +489,36 @@ mod tests {
         assert_eq!(report.pareto_front_ids, vec!["heavy", "light"]);
         assert_ne!(report.rows[0].result.required_mission_energy_wh,
                    report.rows[1].result.required_mission_energy_wh);
+    }
+
+    #[test]
+    fn candidate_specific_missions_reject_mismatched_family_digest() {
+        let mut candidates = vec![
+            family_candidate("first", "mission-a", "same-use-case", 500.0, 1_200.0, 100.0),
+            family_candidate("second", "mission-b", "same-use-case", 500.0, 1_200.0, 110.0),
+        ];
+        candidates[1].mission_family_sha256 = "c".repeat(64);
+        assert_eq!(
+            compare_candidate_specific_missions(&candidates),
+            Err(SweepInputError::MissionFamilyDigestMismatch {
+                candidate_id: "second".into()
+            })
+        );
+    }
+
+    #[test]
+    fn candidate_specific_missions_reject_renamed_phase_shape() {
+        let mut candidates = vec![
+            family_candidate("first", "mission-a", "same-use-case", 500.0, 1_200.0, 100.0),
+            family_candidate("second", "mission-b", "same-use-case", 500.0, 1_200.0, 110.0),
+        ];
+        candidates[1].mission.segments[1].id = "different-phase".into();
+        assert_eq!(
+            compare_candidate_specific_missions(&candidates),
+            Err(SweepInputError::MissionMetricShapeMismatch {
+                candidate_id: "second".into()
+            })
+        );
     }
 
     #[test]
