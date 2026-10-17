@@ -38,7 +38,7 @@ impl CognitiveLoopService {
     pub fn cycle(&mut self, input: &str) -> CycleResult {
         let cycle_start = Instant::now();
         self.stats.total_cycles += 1;
-        self.substrate_manager.tick_energy(&self.config);
+        self.substrate_manager.tick_energy_at(&self.config, cycle_start);
         // Feed substrate energy data to ThermodynamicManager
         self.thermodynamic_mgr.set_energy(
             self.substrate_manager.energy_per_cycle,

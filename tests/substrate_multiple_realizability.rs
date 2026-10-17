@@ -546,11 +546,15 @@ fn test_substrate_behavioral_differences() {
 
 #[test]
 fn test_energy_budget_consciousness_collapse() {
-    // Use an extremely small energy budget so it exhausts within a few cycles.
-    // SiliconDigital energy_per_op is ~1e-15 J, ops_per_cycle = 65536,
-    // so energy_per_cycle ~ 6.5e-11 J. With tau > 1.0 (speed modulation),
-    // actual per-tick is higher. Set budget to ~3 cycles' worth.
-    let budget = 2e-10; // ~3 cycles for silicon before exhaustion
+    // Use an extremely small modeled-power budget. Energy is accumulated in
+    // joules per cycle, but the configured limit is watts (joules/second); the
+    // gate evaluates average modeled power after a completed monotonic 1-second
+    // observation window instead of comparing energy directly to a rate.
+    // SiliconDigital's per-cycle estimate is ~6.5e-11 J from its modeled energy/op
+    // and operation count; cognitive tau is not an energy multiplier.
+    // The deliberately tiny watt budget should be exceeded once the first full
+    // monotonic window closes, regardless of small scheduler-cadence variation.
+    let budget = 1e-12; // watts; well below the model rate for the first completed window
 
     let mut service = CognitiveLoopService::new(CognitiveLoopConfig {
         enable_validation_overlay: true,
@@ -599,17 +603,18 @@ fn test_energy_budget_consciousness_collapse() {
     // 1. Collapse happens within a reasonable number of cycles (not infinite)
     assert!(
         collapse_cycle.is_some(),
-        "Energy budget should be exhausted within {max_cycles} cycles, \
-         but consciousness remained viable. total_energy={:.2e}, budget={budget:.2e}",
+        "Model-estimated energy rate should exceed the {budget:.2e} W budget within {max_cycles} cycles, \
+         but consciousness remained viable. total_energy={:.2e} J",
         service.substrate_total_energy_spent()
     );
     let cc = collapse_cycle.unwrap();
     eprintln!("Energy budget exhausted at cycle {cc}");
 
-    // 2. Collapse should happen relatively quickly with this tiny budget
+    // 2. Collapse should occur during the first completed wall-time window,
+    // with only scheduling/observation cadence adding delay.
     assert!(
         cc < 100,
-        "With budget {budget:.2e}, collapse should happen within 100 cycles, got {cc}"
+        "With budget {budget:.2e} W, the first over-budget window should close within 100 cycles, got {cc}"
     );
 
     // 3. Consciousness level never goes NaN after collapse
@@ -634,7 +639,7 @@ fn test_energy_budget_consciousness_collapse() {
     eprintln!("=== Energy Budget Consciousness Collapse Results ===");
     eprintln!("Collapse cycle: {cc}");
     eprintln!(
-        "Total energy spent: {:.2e} J (budget: {budget:.2e} J)",
+        "Total model-estimated energy: {:.2e} J (power budget: {budget:.2e} W)",
         service.substrate_total_energy_spent()
     );
     eprintln!(

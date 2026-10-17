@@ -1394,9 +1394,16 @@ pub struct SubstrateTelemetry {
     /// Total energy spent so far (joules). Monotonically increasing.
     #[serde(default)]
     pub total_energy_spent: f64,
-    /// Energy spent this cycle (joules, speed-adjusted via tau_factor).
+    /// Modeled joules assigned to this cognitive cycle from substrate energy/op; independent of cognitive tau.
     #[serde(default)]
     pub energy_this_cycle: f64,
+    /// Model-estimated average power over the last closed monotonic wall-time window (watts).
+    /// Zero until at least one valid energy-rate window has completed; not hardware power telemetry.
+    #[serde(default)]
+    pub estimated_energy_rate_watts: f64,
+    /// Monotonic elapsed duration represented by the last estimated energy-rate sample (seconds).
+    #[serde(default)]
+    pub energy_rate_window_seconds: f64,
     /// Energy throughput multiplier (ratio of bio energy to substrate energy).
     #[serde(default = "default_one_f32_substrate")]
     pub energy_throughput_multiplier: f32,
