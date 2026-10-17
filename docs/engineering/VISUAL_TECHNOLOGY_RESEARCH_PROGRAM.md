@@ -63,6 +63,8 @@ Keep scene intent and benchmark reports independent of a single display vendor. 
 
 Establish SDR/HDR calibration, tone mapping, black/shadow handling, color accuracy, motion/temporal stability, text readability, local-dimming interactions and energy per declared workload. Start with software processing on ordinary hardware, which is substantially more accessible than inventing a new panel. Use VESA DisplayHDR CTS 1.2 as a comparison framework while preserving raw measurements and test settings.
 
+The first SDR software baseline now has a bounded sRGB transfer/linear-light relative-luminance reference in [Symtropy PR #1808](https://github.com/Luminous-Dynamics/symtropy/pull/1808), checked against an unqualified analytic fixture and independent equations. This is useful for correct light-domain comparisons; it is not an HDR EOTF, calibrated luminance measurement or physical panel response. Color-space/transfer-function ground rules are documented in the W3C [CSS Color Module Level 4 (2026)](https://www.w3.org/TR/2026/CRD-css-color-4-20261008/).
+
 ### VIS-PROJ — projectors and spatial projection
 
 Model geometry, surface shape, lens/focus limits, brightness falloff and ambient light. Evaluate geometric correction, focus and color uniformity, multi-projector alignment and surface-aware rendering. Measure speckle only for relevant coherent-light systems; separate simulation metrics from camera/photometer measurements.
