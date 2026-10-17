@@ -105,6 +105,8 @@ A pooled metric is not a safe decision criterion when groups represent different
 - Confidence intervals must resample the true independent unit (e.g. geometry family, chemistry system, batch, device, or target query), not correlated rows alone.
 - Do not tune the descriptor transform, budget, policy parameters or primary metric against the final holdout.
 - Report the whole budget curve when possible; do not report only the best final point.
+- For shift studies, report each declared group and the worst-group success/AUC/coverage curve. Join group IDs to the frozen shift manifest; never infer shift severity from outcomes or reorder severity labels after unblinding.
+- Use a fixed, domain-reviewed worst-group guard in addition to the primary pooled metric. A favorable pooled average cannot compensate for a predeclared critical group crossing its hard physical/feasibility floor or exceeding its regression margin. If per-group sample/power is insufficient, report the worst-group estimate as descriptive and do not claim a robust shift improvement.
 
 ## 5. Proposed go/no-go rule
 
@@ -113,6 +115,8 @@ For a genuine task that supports budgeted selection, compare the best Symthaea p
 Provisional threshold: +5 percentage points in a preregistered success-at-budget metric **or** at least 20% lower median best-achieved error/cost, with a group-aware 95% confidence interval excluding no improvement, no leakage-control failure, and 100% reconstructible scored-run receipts. These are pilot targets, not universal standards; lock the primary metric, practical margin and sample/power rationale before opening the holdout.
 
 If the policy only increases descriptor-space distance or family coverage but does not improve the task-specific outcome, report a diversity result—not a discovery improvement.
+
+For shift-aware tasks, promotion additionally requires that no predeclared critical group violates its frozen non-inferiority/safety boundary. Do not choose that boundary universally: it depends on the scientific unit, measurement noise, risk of the predicted property, and powered sample size; write it into the task contract before evaluation.
 
 ## 6. Negative controls
 
