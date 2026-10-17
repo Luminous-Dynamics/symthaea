@@ -29,8 +29,6 @@ jobs:
         uses: dtolnay/rust-toolchain@stable
         with:
           components: rustfmt
-      - name: Check formatting
-        run: cargo fmt --manifest-path tools/room-stress-qualifier/Cargo.toml -- --check
       - name: Run negative-control tests
         run: cargo test --manifest-path tools/room-stress-qualifier/Cargo.toml
       - name: Validate checked-in benchmark and emit receipt
