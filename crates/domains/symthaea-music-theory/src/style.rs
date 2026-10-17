@@ -660,7 +660,7 @@ impl Style {
                 ]),
                 mode: None,
                 counter_instrument: None,
-                // Classical melodic DNA: 12 of 29 styles used to draw
+                // Historical census: 12 of the original 29 style presets drew
                 // hooks from the identical shared skeleton pool, Classical
                 // among them — this is the engine's own default-preset
                 // style, so it's the natural first fix. Elegant, balanced
@@ -2957,12 +2957,13 @@ mod tests {
 
     /// RATCHET: how many styles ship with NO melodic DNA of their own.
     ///
-    /// Measured 2026-07-30: **15 of 29** styles have `hook_contours == []` and
-    /// `hook_rhythms == []`, so `HookCell::generate_with` falls back to the same
-    /// shared `CONTOURS`/`RHYTHMS` defaults for all of them — Lullaby, Fugue,
-    /// Passacaglia, Impressionism, SacredChoral, Minimalism, ProgFolk, Ambient,
-    /// Sonata, RenaissancePolyphony, AfroCuban, BossaNova, Opera,
-    /// IrishTraditional, HindustaniInspired.
+    /// Baseline census (2026-07-30): 15 of the original 29 styles had
+    /// `hook_contours == []` and `hook_rhythms == []`, so `HookCell::generate_with`
+    /// fell back to shared default pools. This tranche adds Rondo and
+    /// ThemeAndVariations with their own spec melodies, but Erosion and Lineage
+    /// intentionally inherit Passacaglia's empty melodic DNA while the dedicated
+    /// ground engines own the transformation. Keep the live ratchet below tied
+    /// to actual preset contents rather than treating an old census as current.
     ///
     /// This is the structural cause of the 99.8% mean canonical duplicate rate
     /// `motif_foundry_style_survey` reports: over half the catalogue draws its
