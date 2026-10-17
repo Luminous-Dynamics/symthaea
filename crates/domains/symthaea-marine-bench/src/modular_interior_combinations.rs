@@ -13,7 +13,7 @@ use crate::modular_interior::{
 };
 use crate::modular_interior_impact::{analyze_configuration_change, ImpactReport};
 use crate::modular_interior_variants::{
-    generate_drop_in_variants, ModuleVariant, PreflightDisposition, VariantDisposition,
+    generate_drop_in_variants, ModuleVariant, VariantDisposition,
     VariantFinding, VariantGenerationReport,
 };
 use serde::{Deserialize, Serialize};
