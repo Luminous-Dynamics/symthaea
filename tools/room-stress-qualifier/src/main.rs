@@ -162,7 +162,9 @@ fn verify_evidence_reference(reference: &Value, evidence_root: &Path) -> Result<
             .components()
             .any(|component| !matches!(component, Component::Normal(_)))
     {
-        return Err("artifact_path must not contain absolute, current-directory, or parent components".into());
+        return Err(
+            "artifact_path must not contain absolute, current-directory, or parent components".into(),
+        );
     }
 
     let claimed_hash = reference
@@ -828,7 +830,7 @@ mod tests {
             EMBEDDED_SCHEMA,
             EMBEDDED_RUN_REPORT_SCHEMA,
             &report_text,
-        &repository_root(),
+            &repository_root(),
         )
         .expect("golden result report must evaluate");
         assert_eq!(summary.cases_evaluated, EXPECTED_CASE_COUNT);
@@ -898,7 +900,7 @@ mod tests {
     fn evidence_artifact_hash_mismatch_fails_closed() {
         let mut report = golden_report_value(EMBEDDED_BENCHMARK);
         report["results"][0]["evidence_refs"][0]["artifact_sha256"] =
-            Value::String("bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb".into());
+            Value::String("b".repeat(64));
         let report_text = serde_json::to_string(&report).unwrap();
         let summary = evaluate_run_report(
             EMBEDDED_BENCHMARK,
