@@ -220,9 +220,10 @@ pub fn humanize_score_note_with_profile(
         || note.duration < 0.0
         || note.duration > f32::MAX / profile.duration_scale
     {
-        return Err(
-            "note frequency/timing/velocity must be finite and valid, and scaled duration representable",
-        );
+        return Err(concat!(
+            "note frequency/timing/velocity must be finite and valid, ",
+            "and scaled duration representable",
+        ));
     }
 
     let beat_in_bar = beat_position.rem_euclid(beats_per_bar);
