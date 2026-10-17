@@ -121,19 +121,29 @@ pub enum RankingDisposition {
     NotRanked,
 }
 
-#[derive(Clone, Debug, PartialEq, Eq, Serialize, Deserialize)]
+#[derive(Clone, Debug, PartialEq, Serialize, Deserialize)]
 pub struct CandidateAssessment {
     pub id: String,
     pub gate_disposition: GateDisposition,
     pub ranking_disposition: RankingDisposition,
     pub on_frontier: bool,
+    /// Canonically sorted gate evidence, preserved for audit and explanation.
+    pub gates: Vec<GateEvidence>,
+    /// Canonically sorted objective values and provenance references.
+    pub objectives: Vec<ObjectiveMetric>,
+    /// Explicit failed gate keys, in lexical order.
+    pub failed_gate_keys: Vec<String>,
+    /// Explicit unknown gate keys, in lexical order.
+    pub unknown_gate_keys: Vec<String>,
+    /// Missing objective keys; no default value is imputed.
+    pub missing_objective_keys: Vec<String>,
     /// IDs this candidate Pareto-dominates, in lexical order.
     pub dominates: Vec<String>,
     /// IDs that Pareto-dominate this candidate, in lexical order.
     pub dominated_by: Vec<String>,
 }
 
-#[derive(Clone, Debug, PartialEq, Eq, Serialize, Deserialize)]
+#[derive(Clone, Debug, PartialEq, Serialize, Deserialize)]
 pub struct ParetoReport {
     /// Canonical, lexically sorted objective names.
     pub objective_keys: Vec<String>,
@@ -286,6 +296,26 @@ pub fn evaluate_frontier(
             RankingDisposition::Ranked
         };
 
+        let mut gates = candidate.gates.clone();
+        gates.sort_by(|left, right| left.key.cmp(&right.key));
+        let mut objectives = candidate.objectives.clone();
+        objectives.sort_by(|left, right| left.key.cmp(&right.key));
+        let failed_gate_keys = gates
+            .iter()
+            .filter(|gate| gate.status == GateStatus::Fail)
+            .map(|gate| gate.key.clone())
+            .collect();
+        let unknown_gate_keys = gates
+            .iter()
+            .filter(|gate| gate.status == GateStatus::Unknown)
+            .map(|gate| gate.key.clone())
+            .collect();
+        let missing_objective_keys = objectives
+            .iter()
+            .filter(|metric| metric.value.is_none())
+            .map(|metric| metric.key.clone())
+            .collect();
+
         assessments.insert(
             candidate.id.clone(),
             CandidateAssessment {
@@ -293,6 +323,11 @@ pub fn evaluate_frontier(
                 gate_disposition,
                 ranking_disposition,
                 on_frontier: false,
+                gates,
+                objectives,
+                failed_gate_keys,
+                unknown_gate_keys,
+                missing_objective_keys,
                 dominates: Vec::new(),
                 dominated_by: Vec::new(),
             },
@@ -610,6 +645,7 @@ mod tests {
             .find(|item| item.id == "blocked_but_cheap")
             .unwrap();
         assert_eq!(blocked.ranking_disposition, RankingDisposition::NotRanked);
+        assert_eq!(blocked.failed_gate_keys, vec!["food_safety_constraints"]);
         assert!(!blocked.on_frontier);
     }
 
@@ -646,6 +682,7 @@ mod tests {
             missing.ranking_disposition,
             RankingDisposition::IncompleteMetrics
         );
+        assert_eq!(missing.missing_objective_keys, vec!["cost_per_serving"]);
     }
 
     #[test]
