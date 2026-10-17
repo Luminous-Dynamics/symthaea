@@ -1167,12 +1167,17 @@ pub fn verify_service_route_geometry(
     {
         return false;
     }
-    let connection = match configuration.connections.iter()
-        .find(|connection| connection.connection_id == request.connection_id)
+    let connections: Vec<_> = configuration.connections.iter()
+        .filter(|connection| connection.connection_id == request.connection_id).collect();
+    if connections.len() != 1 {
+        return false;
+    }
+    let connection = connections[0];
+    if result.medium != connection.medium
+        || result.anchor_evidence_classes != vec![request.start.evidence_class, request.end.evidence_class]
     {
-        Some(connection) => connection,
-        None => return false,
-    };
+        return false;
+    }
     let forward = endpoint_matches_anchor(&connection.endpoint_a, &request.start)
         && endpoint_matches_anchor(&connection.endpoint_b, &request.end);
     let reverse = endpoint_matches_anchor(&connection.endpoint_a, &request.end)
