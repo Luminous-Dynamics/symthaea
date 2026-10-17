@@ -10,11 +10,11 @@ The accompanying research contract identifies the official DESI DR2 BAO ΛCDM + 
 - https://data.desi.lbl.gov/public/papers/y3/bao-cosmo-params/dr2_vac_dr2_bao-cosmo-params_v1.0.sha256sum
 - https://data.desi.lbl.gov/public/papers/y3/bao-cosmo-params/cobaya/base/desi-bao-all/
 
-The CLI reads an ASCII chain file whose first recognized comment header starts with “# weight minuslogpost”, then accepts a named column and emits JSON. It rejects malformed rows, duplicate columns, non-finite values, negative sample weights, absent parameters and zero-total-weight chains.
+The CLI accepts a named column followed by one or more ASCII chain files whose recognized comment header starts with “# weight minuslogpost”. It combines files only when their full column header and ordering match exactly, then emits one JSON summary. It rejects malformed rows, duplicate columns, non-finite values, negative sample weights, absent parameters, incompatible chain headers and zero-total-weight chains.
 
 Example command:
 
-    cargo run -p symthaea-cosmology-bench --bin symthaea-cosmology-chain-audit -- chain.1.txt H0
+    cargo run -p symthaea-cosmology-bench --bin symthaea-cosmology-chain-audit -- H0 chain.1.txt chain.2.txt chain.3.txt chain.4.txt
 
 Output reports per-file row count, total and positive-weight sample count, weighted mean/population variance, weighted empirical q16/q50/q84, and weight-only effective sample size.
 
