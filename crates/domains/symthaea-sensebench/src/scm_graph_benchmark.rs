@@ -230,6 +230,147 @@ impl CausalDag {
     }
 }
 
+fn adjacent(graph: CausalDag, first: usize, second: usize) -> bool {
+    graph.has_edge(first, second) || graph.has_edge(second, first)
+}
+
+fn same_skeleton(left: CausalDag, right: CausalDag) -> bool {
+    (0..NODE_COUNT).all(|first| {
+        ((first + 1)..NODE_COUNT).all(|second| {
+            adjacent(left, first, second) == adjacent(right, first, second)
+        })
+    })
+}
+
+fn has_unshielded_collider(graph: CausalDag, left: usize, center: usize, right: usize) -> bool {
+    left != center
+        && center != right
+        && left != right
+        && graph.has_edge(left, center)
+        && graph.has_edge(right, center)
+        && !adjacent(graph, left, right)
+}
+
+fn same_unshielded_colliders(left: CausalDag, right: CausalDag) -> bool {
+    (0..NODE_COUNT).all(|left_node| {
+        (0..NODE_COUNT).all(|center| {
+            (0..NODE_COUNT).all(|right_node| {
+                has_unshielded_collider(left, left_node, center, right_node)
+                    == has_unshielded_collider(right, left_node, center, right_node)
+            })
+        })
+    })
+}
+
+/// Two DAGs are Markov equivalent exactly when they have the same skeleton and
+/// the same unshielded colliders (for the Markov/faithfulness setting modelled here).
+fn markov_equivalent(left: CausalDag, right: CausalDag) -> bool {
+    same_skeleton(left, right) && same_unshielded_colliders(left, right)
+}
+
+fn cpdag_marks(graph: CausalDag, catalogue: &[CausalDag]) -> Vec<EdgeMark> {
+    let equivalent: Vec<CausalDag> = catalogue.iter().copied()
+        .filter(|candidate| markov_equivalent(graph, *candidate))
+        .collect();
+    UNORDERED_PAIRS.iter().map(|(first, second)| {
+        if !adjacent(graph, *first, *second) {
+            return EdgeMark::Absent;
+        }
+        let always_forward = equivalent.iter()
+            .all(|candidate| candidate.has_edge(*first, *second));
+        let always_reverse = equivalent.iter()
+            .all(|candidate| candidate.has_edge(*second, *first));
+        if always_forward {
+            EdgeMark::Forward
+        } else if always_reverse {
+            EdgeMark::Reverse
+        } else {
+            EdgeMark::Undirected
+        }
+    }).collect()
+}
+
+/// Choose the Markov equivalence class with the greatest summed posterior mass.
+/// This keeps the emitted partial graph aligned to a valid CPDAG class rather than
+/// independently thresholding pairwise arrow probabilities into a possibly cyclic
+/// or otherwise invalid partially directed graph.
+fn posterior_cpdag(
+    posterior: &[HypothesisPrior],
+    catalogue: &[CausalDag],
+) -> (Vec<EdgeMark>, f64) {
+    let mut best_graph_index = 0usize;
+    let mut best_mass = -1.0_f64;
+    for (candidate_index, candidate) in catalogue.iter().enumerate() {
+        let class_mass = catalogue.iter().enumerate()
+            .filter(|(_, other)| markov_equivalent(*candidate, **other))
+            .map(|(index, _)| posterior[index].probability)
+            .sum::<f64>();
+        if class_mass > best_mass {
+            best_mass = class_mass;
+            best_graph_index = candidate_index;
+        }
+    }
+    (
+        cpdag_marks(catalogue[best_graph_index], catalogue),
+        best_mass.max(0.0),
+    )
+}
+
+fn posterior_mass_on_class(
+    posterior: &[HypothesisPrior],
+    catalogue: &[CausalDag],
+    target: CausalDag,
+) -> f64 {
+    catalogue.iter().enumerate()
+        .filter(|(_, candidate)| markov_equivalent(target, **candidate))
+        .map(|(index, _)| posterior[index].probability)
+        .sum()
+}
+
+fn cpdag_metrics(predicted: &[EdgeMark], truth: &[EdgeMark]) -> (f64, f64, f64, bool) {
+    let mut skeleton_tp = 0usize;
+    let mut skeleton_fp = 0usize;
+    let mut skeleton_fn = 0usize;
+    let mut compelled_tp = 0usize;
+    let mut compelled_fp = 0usize;
+    let mut compelled_fn = 0usize;
+    let mut mark_distance = 0.0;
+
+    for (prediction, target) in predicted.iter().zip(truth) {
+        let predicted_adjacent = *prediction != EdgeMark::Absent;
+        let true_adjacent = *target != EdgeMark::Absent;
+        match (predicted_adjacent, true_adjacent) {
+            (true, true) => skeleton_tp += 1,
+            (true, false) => skeleton_fp += 1,
+            (false, true) => skeleton_fn += 1,
+            (false, false) => {}
+        }
+
+        let predicted_directed = matches!(prediction, EdgeMark::Forward | EdgeMark::Reverse);
+        let true_directed = matches!(target, EdgeMark::Forward | EdgeMark::Reverse);
+        if predicted_directed && prediction == target && true_directed {
+            compelled_tp += 1;
+        } else if predicted_directed {
+            // A direction on a truly undirected edge is an overclaim.
+            compelled_fp += 1;
+        }
+        if true_directed && prediction != target {
+            compelled_fn += 1;
+        }
+        if prediction != target {
+            mark_distance += 1.0;
+        }
+    }
+
+    (
+        f1_from_counts(skeleton_tp, skeleton_fp, skeleton_fn),
+        f1_from_counts(compelled_tp, compelled_fp, compelled_fn),
+        mark_distance,
+        predicted == truth,
+    )
+}
+
+
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
 enum EdgeMark {
     Absent,
