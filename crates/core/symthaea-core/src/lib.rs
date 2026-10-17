@@ -70,6 +70,9 @@ pub mod core;
 /// Shared embodiment types: MotorSafetyLevel, EmbodimentBridge trait, telemetry.
 #[allow(missing_docs)]
 pub mod embodiment;
+/// Report-only lifecycle and wearability evidence evaluator for exosuit research.
+#[allow(missing_docs)]
+pub mod wearability;
 /// System bootstrap and initialization.
 #[allow(missing_docs)]
 pub mod genesis;
