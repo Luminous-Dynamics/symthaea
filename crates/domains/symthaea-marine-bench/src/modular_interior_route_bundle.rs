@@ -441,12 +441,22 @@ fn build_catalog(
                 break 'catalog;
             }
             if candidate.disposition != RouteDisposition::Routed {
+                let inconclusive = candidate.disposition == RouteDisposition::InvalidGeneratedPath;
                 catalog.probes.push(AlternativeProbe {
                     banned_edge: Some(edge),
                     probe_configuration_sha256: Some(modified_digest),
                     route_disposition: Some(format!("{:?}", candidate.disposition)),
-                    decision: "no_route_under_edge_ban".to_owned(),
+                    decision: if inconclusive {
+                        "invalid_generated_path".to_owned()
+                    } else {
+                        "no_route_under_edge_ban".to_owned()
+                    },
                 });
+                if inconclusive {
+                    catalog.discovery_frontier_exhausted = false;
+                    catalog.truncation_reason = Some("ALTERNATIVE_INVALID_GENERATED_PATH".to_owned());
+                    break 'catalog;
+                }
                 continue;
             }
             if !verify_service_route_geometry(configuration, request, routing_limits.grid_pitch_mm, &candidate) {
