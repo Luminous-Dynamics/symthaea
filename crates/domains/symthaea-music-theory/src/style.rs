@@ -3524,7 +3524,8 @@ mod tests {
                 | Style::BaroqueSuite
                 | Style::Erosion
                 | Style::Lineage
-                | Style::Sarabande => 3,
+                | Style::Sarabande
+                | Style::MinuetAndTrio => 3,
                 Style::Celtic => 6,
                 Style::Flamenco => 12,
                 _ => 4,
