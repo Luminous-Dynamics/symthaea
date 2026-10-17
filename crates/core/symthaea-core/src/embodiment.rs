@@ -1755,6 +1755,9 @@ mod external_action_timing_v1_tests {
     #[test]
     fn rejects_source_time_when_no_observation_was_received() {
         let mut timing = valid_timing();
+        timing.observation_request_started_ns = None;
+        timing.observation_request_returned_ns = None;
+        timing.observation_request_succeeded = None;
         timing.observation_received_monotonic_ns = None;
         timing.observation_id = None;
         timing.observation_source_timestamp_ns = Some(123);
