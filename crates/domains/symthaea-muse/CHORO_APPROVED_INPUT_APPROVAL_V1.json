@@ -1,0 +1,9 @@
+{
+  "schema": "muse-choro-input-manifest-approval-v1",
+  "status": "not_approved",
+  "manifest_sha256": null,
+  "approver_id": null,
+  "approved_on": null,
+  "scope_statement": null,
+  "note": "No source artifact is approved. This receipt must remain unapproved until a non-empty manifest has been independently reviewed; its digest must bind the exact manifest bytes."
+}
