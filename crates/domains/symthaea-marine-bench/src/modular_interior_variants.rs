@@ -704,4 +704,70 @@ mod tests {
         tampered.body.claim_ceiling.push_str(" altered");
         assert!(!verify_variant_generation_report(&baseline, &second, &tampered));
     }
+
+    #[test]
+    fn interface_contract_mutations_require_explicit_reconfiguration() {
+        let mutations = [
+            "medium",
+            "direction",
+            "connector_profile",
+            "unit",
+            "criticality",
+        ];
+        for (index, mutation) in mutations.iter().enumerate() {
+            let baseline = live();
+            let mut variant = direct_drop_in(&baseline, &format!("SLEEP-POD-IF-{index}"), 2);
+            let port = variant.replacement.ports.iter_mut()
+                .find(|port| port.port_id == "AC_IN").expect("AC port exists");
+            match *mutation {
+                "medium" => port.medium = "data_network".to_owned(),
+                "direction" => port.direction = "out".to_owned(),
+                "connector_profile" => port.connector_profile = "OTHER-INTERFACE-V1".to_owned(),
+                "unit" => port.rating.unit = "kW".to_owned(),
+                "criticality" => port.criticality = "safety_critical".to_owned(),
+                _ => unreachable!(),
+            }
+            let report = generate_drop_in_variants(&baseline, &[variant]).expect("report serializes");
+            assert_eq!(
+                report.body.variants[0].disposition,
+                VariantDisposition::RequiresReconfiguration,
+                "mutation {mutation} must not auto-pass"
+            );
+            assert!(report.body.variants[0].preflight_findings.iter()
+                .any(|finding| finding.code == "PORT_CONTRACT_CHANGED"));
+        }
+    }
+
+    #[test]
+    fn unknown_rating_and_downgraded_system_evidence_require_review() {
+        let baseline = live();
+        let mut variant = direct_drop_in(&baseline, "SLEEP-POD-UNKNOWN-RATING", 2);
+        let ac = variant.replacement.ports.iter_mut()
+            .find(|port| port.port_id == "AC_IN").expect("AC port exists");
+        ac.rating.value = None;
+        ac.rating.status = "unknown".to_owned();
+        let report = generate_drop_in_variants(&baseline, &[variant]).expect("report serializes");
+        assert_eq!(report.body.variants[0].disposition, VariantDisposition::RequiresReconfiguration);
+        assert!(report.body.variants[0].preflight_findings.iter()
+            .any(|finding| finding.code == "PORT_RATING_UNKNOWN"));
+
+        let mut variant = direct_drop_in(&baseline, "SLEEP-POD-FIRE-EVIDENCE", 2);
+        variant.replacement.fire_material_status = "unknown".to_owned();
+        let report = generate_drop_in_variants(&baseline, &[variant]).expect("report serializes");
+        assert_eq!(report.body.variants[0].disposition, VariantDisposition::RequiresReconfiguration);
+        assert!(report.body.variants[0].preflight_findings.iter()
+            .any(|finding| finding.code == "MODULE_EVIDENCE_DOWNGRADE"));
+    }
+
+    #[test]
+    fn nonexistent_target_module_is_rejected() {
+        let baseline = live();
+        let mut variant = direct_drop_in(&baseline, "UNKNOWN-TARGET", 2);
+        variant.replacement.module_id = "NONEXISTENT-MODULE".to_owned();
+        let report = generate_drop_in_variants(&baseline, &[variant]).expect("report serializes");
+        assert_eq!(report.body.variants[0].disposition, VariantDisposition::RejectedPreflight);
+        assert!(report.body.variants[0].preflight_findings.iter()
+            .any(|finding| finding.code == "TARGET_MODULE_NOT_FOUND"));
+    }
+
 }
