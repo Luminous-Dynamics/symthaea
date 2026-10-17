@@ -510,13 +510,14 @@ pub fn evaluate_wearability_request(
     stage: WearabilityStageV1,
     input: &WearabilityInputV1,
 ) -> WearabilityDecisionV1 {
-    let disposition = if profile_id.trim().is_empty()
+    let disposition = if input.user_requested_doff == Some(true) {
+        // Explicit disengagement intent remains visible even if other metadata is invalid.
+        WearabilityDispositionV1::DoffRequestPreemptsNewMotion
+    } else if profile_id.trim().is_empty()
         || profile_id.trim() != profile_id
         || input.schema_version != WEARABILITY_SCHEMA_VERSION
     {
         WearabilityDispositionV1::InvalidInput
-    } else if input.user_requested_doff == Some(true) {
-        WearabilityDispositionV1::DoffRequestPreemptsNewMotion
     } else {
         match stage {
             WearabilityStageV1::FitCheck => evaluate_fit_check(input),
@@ -1057,6 +1058,26 @@ mod tests {
             evaluate_wearability_request("profile-a", WearabilityStageV1::FitCheck, &input).disposition,
             WearabilityDispositionV1::InvalidInput
         );
+    }
+
+    #[test]
+    fn explicit_doff_remains_highest_priority_with_invalid_other_metadata() {
+        let input = WearabilityInputV1 {
+            schema_version: WEARABILITY_SCHEMA_VERSION + 99,
+            user_requested_doff: Some(true),
+            ..Default::default()
+        };
+        let decision = evaluate_wearability_request(
+            "profile-a",
+            WearabilityStageV1::Perform,
+            &input,
+        );
+        assert_eq!(
+            decision.disposition,
+            WearabilityDispositionV1::DoffRequestPreemptsNewMotion
+        );
+        assert!(decision.findings.contains(&WearabilityFindingV1::UserRequestedDoff));
+        assert!(decision.findings.contains(&WearabilityFindingV1::UnsupportedSchemaVersion));
     }
 
     #[test]
