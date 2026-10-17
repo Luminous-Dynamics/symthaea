@@ -70,12 +70,24 @@ pub struct MissionEnvironment {
     pub wind_vector_mps: [f64; 3],
 }
 
+/// Explicit uncertainty interval for a phase power estimate.
+///
+/// These are engineering bounds, not a probability distribution or confidence
+/// interval unless the method field says so and its assumptions are documented.
+#[derive(Debug, Clone, PartialEq)]
+pub struct PowerUncertaintyBounds {
+    pub lower_bound_w: f64,
+    pub upper_bound_w: f64,
+    pub method: String,
+}
+
 /// One phase load emitted by the upstream candidate-specific model.
 #[derive(Debug, Clone, PartialEq)]
 pub struct MissionPhaseDemand {
     pub id: String,
     pub duration_s: f64,
     pub required_bus_power_w: f64,
+    pub power_uncertainty: PowerUncertaintyBounds,
     pub duty_class: DutyClass,
 }
 
@@ -87,6 +99,8 @@ pub struct CandidateMissionModelRun {
     pub model_version: String,
     pub source_revision: String,
     pub run_artifact: ModelArtifactRef,
+    /// Artifact for the canonical candidate configuration manifest.
+    pub configuration_artifact: ModelArtifactRef,
     pub model_artifact: ModelArtifactRef,
     pub aerodynamics_artifact: ModelArtifactRef,
     pub propulsion_artifact: ModelArtifactRef,
@@ -111,6 +125,8 @@ pub struct CandidateMissionManifest {
     pub mission_family_id: String,
     pub configuration_sha256: String,
     pub energy_system_envelope_sha256: String,
+    pub route_sha256: String,
+    pub mission_family_sha256: String,
     pub route_distance_m: f64,
     pub reserve_fraction: f64,
     pub mass_properties: CandidateMassProperties,
@@ -131,17 +147,27 @@ pub enum MissionModelContractFinding {
     AccumulationOverflow { field: String },
 }
 
+/// Validated mission profile returned with the source manifest and its nominal
+/// energy total so downstream reports can preserve provenance and uncertainty.
+#[derive(Debug, Clone, PartialEq)]
+pub struct ValidatedCandidateMissionProfile {
+    pub profile: MissionProfile,
+    pub manifest: CandidateMissionManifest,
+    pub nominal_total_energy_wh: f64,
+}
+
 /// Validate the candidate/model-run contract and construct the mission profile
 /// consumed by the existing energy screen.
 ///
 /// This function verifies consistency, not accuracy. It confirms that the
 /// model run declares the same candidate and system-envelope digests, that
 /// model/data artifacts have versioned content references, that mass closes,
-/// and that phase inputs are valid. It does not verify the underlying physics.
+/// and that phase inputs are valid. The returned object retains the manifest
+/// and uncertainty intervals. It does not verify the underlying physics.
 pub fn validate_candidate_mission_manifest(
     manifest: &CandidateMissionManifest,
     energy_system: &EnergySystemEnvelope,
-) -> Result<MissionProfile, Vec<MissionModelContractFinding>> {
+) -> Result<ValidatedCandidateMissionProfile, Vec<MissionModelContractFinding>> {
     let mut findings = Vec::new();
 
     for (field, value) in [
@@ -158,6 +184,12 @@ pub fn validate_candidate_mission_manifest(
     validate_digest(
         "energy_system_envelope_sha256",
         &manifest.energy_system_envelope_sha256,
+        &mut findings,
+    );
+    validate_digest("route_sha256", &manifest.route_sha256, &mut findings);
+    validate_digest(
+        "mission_family_sha256",
+        &manifest.mission_family_sha256,
         &mut findings,
     );
     validate_digest(
@@ -194,6 +226,7 @@ pub fn validate_candidate_mission_manifest(
 
     for (field, artifact) in [
         ("model_run.run_artifact", &manifest.model_run.run_artifact),
+        ("model_run.configuration_artifact", &manifest.model_run.configuration_artifact),
         ("model_run.model_artifact", &manifest.model_run.model_artifact),
         ("model_run.aerodynamics_artifact", &manifest.model_run.aerodynamics_artifact),
         ("model_run.propulsion_artifact", &manifest.model_run.propulsion_artifact),
@@ -205,6 +238,35 @@ pub fn validate_candidate_mission_manifest(
     ] {
         validate_artifact(field, artifact, &mut findings);
     }
+
+    validate_digest_binding(
+        "configuration_sha256",
+        &manifest.configuration_sha256,
+        "model_run.configuration_artifact.sha256",
+        &manifest.model_run.configuration_artifact.sha256,
+        &mut findings,
+    );
+    validate_digest_binding(
+        "energy_system_envelope_sha256",
+        &manifest.energy_system_envelope_sha256,
+        "model_run.energy_system_artifact.sha256",
+        &manifest.model_run.energy_system_artifact.sha256,
+        &mut findings,
+    );
+    validate_digest_binding(
+        "route_sha256",
+        &manifest.route_sha256,
+        "model_run.route_artifact.sha256",
+        &manifest.model_run.route_artifact.sha256,
+        &mut findings,
+    );
+    validate_digest_binding(
+        "mission_family_sha256",
+        &manifest.mission_family_sha256,
+        "model_run.mission_family_artifact.sha256",
+        &manifest.model_run.mission_family_artifact.sha256,
+        &mut findings,
+    );
 
     validate_positive("route_distance_m", manifest.route_distance_m, &mut findings);
     validate_fraction("reserve_fraction", manifest.reserve_fraction, &mut findings);
@@ -266,6 +328,48 @@ pub fn validate_candidate_mission_manifest(
             phase.required_bus_power_w,
             &mut findings,
         );
+        validate_nonempty(
+            "phases.power_uncertainty.method",
+            &phase.power_uncertainty.method,
+            &mut findings,
+        );
+        validate_nonnegative(
+            "phases.power_uncertainty.lower_bound_w",
+            phase.power_uncertainty.lower_bound_w,
+            &mut findings,
+        );
+        validate_nonnegative(
+            "phases.power_uncertainty.upper_bound_w",
+            phase.power_uncertainty.upper_bound_w,
+            &mut findings,
+        );
+        if phase.power_uncertainty.lower_bound_w.is_finite()
+            && phase.required_bus_power_w.is_finite()
+            && phase.power_uncertainty.lower_bound_w > phase.required_bus_power_w
+        {
+            findings.push(MissionModelContractFinding::InvalidValue {
+                field: "phases.power_uncertainty.lower_bound_w".into(),
+                reason: "lower bound must not exceed nominal bus power".into(),
+            });
+        }
+        if phase.power_uncertainty.upper_bound_w.is_finite()
+            && phase.required_bus_power_w.is_finite()
+            && phase.power_uncertainty.upper_bound_w < phase.required_bus_power_w
+        {
+            findings.push(MissionModelContractFinding::InvalidValue {
+                field: "phases.power_uncertainty.upper_bound_w".into(),
+                reason: "upper bound must not be below nominal bus power".into(),
+            });
+        }
+        if phase.power_uncertainty.lower_bound_w.is_finite()
+            && phase.power_uncertainty.upper_bound_w.is_finite()
+            && phase.power_uncertainty.lower_bound_w > phase.power_uncertainty.upper_bound_w
+        {
+            findings.push(MissionModelContractFinding::InvalidValue {
+                field: "phases.power_uncertainty".into(),
+                reason: "lower bound must not exceed upper bound".into(),
+            });
+        }
         if phase.duration_s.is_finite()
             && phase.duration_s > 0.0
             && phase.required_bus_power_w.is_finite()
@@ -286,21 +390,42 @@ pub fn validate_candidate_mission_manifest(
         return Err(findings);
     }
 
-    Ok(MissionProfile {
-        id: format!("{}::{}", manifest.mission_family_id, manifest.candidate_id),
-        segments: manifest
-            .phases
-            .iter()
-            .map(|phase| {
-                MissionSegment::new(
-                    phase.id.clone(),
-                    phase.duration_s,
-                    phase.required_bus_power_w,
-                    phase.duty_class,
-                )
-            })
-            .collect(),
+    Ok(ValidatedCandidateMissionProfile {
+        profile: MissionProfile {
+            id: format!("{}::{}", manifest.mission_family_id, manifest.candidate_id),
+            segments: manifest
+                .phases
+                .iter()
+                .map(|phase| {
+                    MissionSegment::new(
+                        phase.id.clone(),
+                        phase.duration_s,
+                        phase.required_bus_power_w,
+                        phase.duty_class,
+                    )
+                })
+                .collect(),
+        },
+        manifest: manifest.clone(),
+        nominal_total_energy_wh: total_energy_wh,
     })
+}
+
+fn validate_digest_binding(
+    expected_field: &str,
+    expected: &str,
+    artifact_field: &str,
+    artifact_digest: &str,
+    findings: &mut Vec<MissionModelContractFinding>,
+) {
+    if !expected.is_empty()
+        && !artifact_digest.is_empty()
+        && !expected.eq_ignore_ascii_case(artifact_digest)
+    {
+        findings.push(MissionModelContractFinding::DigestMismatch {
+            field: format!("{expected_field} != {artifact_field}"),
+        });
+    }
 }
 
 fn validate_artifact(
@@ -489,6 +614,8 @@ mod tests {
             mission_family_id: "two-seat-100km-v1".into(),
             configuration_sha256: config_digest.clone(),
             energy_system_envelope_sha256: energy_digest.clone(),
+            route_sha256: "8".repeat(64),
+            mission_family_sha256: "9".repeat(64),
             route_distance_m: 100_000.0,
             reserve_fraction: 0.1,
             mass_properties: CandidateMassProperties {
@@ -513,10 +640,11 @@ mod tests {
                 model_version: "fixture-model-v1".into(),
                 source_revision: "git-sha-fixture".into(),
                 run_artifact: artifact('a', "run"),
+                configuration_artifact: artifact('1', "configuration"),
                 model_artifact: artifact('b', "model"),
                 aerodynamics_artifact: artifact('c', "aero"),
                 propulsion_artifact: artifact('d', "propulsion"),
-                energy_system_artifact: artifact('e', "energy"),
+                energy_system_artifact: artifact('2', "energy"),
                 mass_properties_artifact: artifact('f', "mass"),
                 environment_artifact: artifact('7', "environment"),
                 route_artifact: artifact('8', "route"),
@@ -529,12 +657,22 @@ mod tests {
                     id: "cruise".into(),
                     duration_s: 100.0,
                     required_bus_power_w: 1_000.0,
+                    power_uncertainty: PowerUncertaintyBounds {
+                        lower_bound_w: 900.0,
+                        upper_bound_w: 1_100.0,
+                        method: "synthetic invariant fixture; not flight evidence".into(),
+                    },
                     duty_class: DutyClass::Continuous,
                 },
                 MissionPhaseDemand {
                     id: "climb".into(),
                     duration_s: 10.0,
                     required_bus_power_w: 1_500.0,
+                    power_uncertainty: PowerUncertaintyBounds {
+                        lower_bound_w: 1_300.0,
+                        upper_bound_w: 1_700.0,
+                        method: "synthetic invariant fixture; not flight evidence".into(),
+                    },
                     duty_class: DutyClass::Peak,
                 },
             ],
@@ -554,10 +692,12 @@ mod tests {
 
     #[test]
     fn valid_manifest_builds_a_candidate_specific_profile() {
-        let profile = validate_candidate_mission_manifest(&manifest(), &energy_system()).unwrap();
-        assert_eq!(profile.id, "two-seat-100km-v1::candidate-alpha");
-        assert_eq!(profile.segments.len(), 2);
-        assert_eq!(profile.segments[0].id, "cruise");
+        let validated = validate_candidate_mission_manifest(&manifest(), &energy_system()).unwrap();
+        assert_eq!(validated.profile.id, "two-seat-100km-v1::candidate-alpha");
+        assert_eq!(validated.profile.segments.len(), 2);
+        assert_eq!(validated.profile.segments[0].id, "cruise");
+        assert!((validated.nominal_total_energy_wh - 34.166666666666664).abs() < 1e-9);
+        assert_eq!(validated.manifest.phases[0].power_uncertainty.lower_bound_w, 900.0);
     }
 
     #[test]
@@ -598,6 +738,51 @@ mod tests {
             Err(findings) if findings.iter().any(|finding| matches!(
                 finding,
                 MissionModelContractFinding::MassLimitExceeded { .. }
+            ))
+        ));
+    }
+
+    #[test]
+    fn configuration_artifact_digest_must_match_manifest() {
+        let mut input = manifest();
+        input.model_run.configuration_artifact.sha256 = "4".repeat(64);
+        let result = validate_candidate_mission_manifest(&input, &energy_system());
+        assert!(matches!(
+            result,
+            Err(findings) if findings.iter().any(|finding| matches!(
+                finding,
+                MissionModelContractFinding::DigestMismatch { field }
+                    if field.contains("configuration_sha256")
+            ))
+        ));
+    }
+
+    #[test]
+    fn route_and_mission_family_artifacts_are_bound_to_declared_digests() {
+        let mut input = manifest();
+        input.route_sha256 = "3".repeat(64);
+        input.mission_family_sha256 = "5".repeat(64);
+        let result = validate_candidate_mission_manifest(&input, &energy_system());
+        assert!(matches!(
+            result,
+            Err(findings) if findings.iter().filter(|finding| matches!(
+                finding,
+                MissionModelContractFinding::DigestMismatch { .. }
+            )).count() >= 2
+        ));
+    }
+
+    #[test]
+    fn uncertainty_bounds_must_contain_nominal_power() {
+        let mut input = manifest();
+        input.phases[0].power_uncertainty.lower_bound_w = 1_100.0;
+        let result = validate_candidate_mission_manifest(&input, &energy_system());
+        assert!(matches!(
+            result,
+            Err(findings) if findings.iter().any(|finding| matches!(
+                finding,
+                MissionModelContractFinding::InvalidValue { field, .. }
+                    if field == "phases.power_uncertainty.lower_bound_w"
             ))
         ));
     }
