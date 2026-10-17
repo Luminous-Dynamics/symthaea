@@ -8,7 +8,8 @@ use std::io::BufReader;
 use std::process::ExitCode;
 
 use symthaea_cosmology_bench::{
-    sha256_file, verify_sha256_digest, ChainTable, CHAIN_AUDIT_PROTOCOL, CHAIN_AUDIT_VERSION,
+    sha256_file, verify_sha256_digest, verify_sha256_file_against_manifest, ChainTable,
+    CHAIN_AUDIT_PROTOCOL, CHAIN_AUDIT_VERSION,
 };
 
 fn json_string(value: &str) -> String {
@@ -38,6 +39,34 @@ fn json_string_array(values: &[String]) -> String {
 
 fn run() -> Result<bool, String> {
     let args = env::args().collect::<Vec<_>>();
+    if args.get(1).map(String::as_str) == Some("--verify-manifest") {
+        if args.len() != 5 {
+            return Err(format!(
+                "usage: {} --verify-manifest SHA256SUMS RELATIVE_PATH FILE",
+                args.first().map(String::as_str).unwrap_or("symthaea-cosmology-chain-audit")
+            ));
+        }
+        let manifest_path = &args[2];
+        let relative_path = &args[3];
+        let file_path = &args[4];
+        let manifest_text = std::fs::read_to_string(manifest_path)
+            .map_err(|error| format!("cannot read manifest {manifest_path}: {error}"))?;
+        let (expected, actual, matches) =
+            verify_sha256_file_against_manifest(file_path, &manifest_text, relative_path)
+                .map_err(|error| error.to_string())?;
+        println!("{{");
+        println!("  \"protocol\": {},", json_string(CHAIN_AUDIT_PROTOCOL));
+        println!("  \"version\": {},", CHAIN_AUDIT_VERSION);
+        println!("  \"mode\": \"sha256_manifest_verification\",");
+        println!("  \"manifest_path\": {},", json_string(manifest_path));
+        println!("  \"manifest_relative_path\": {},", json_string(relative_path));
+        println!("  \"input_path\": {},", json_string(file_path));
+        println!("  \"expected_sha256\": {},", json_string(&expected));
+        println!("  \"actual_sha256\": {},", json_string(&actual));
+        println!("  \"matches\": {}", matches);
+        println!("}}");
+        return Ok(matches);
+    }
     if args.get(1).map(String::as_str) == Some("--verify-sha256") {
         if args.len() != 4 {
             return Err(format!(
@@ -63,7 +92,7 @@ fn run() -> Result<bool, String> {
 
     if args.len() < 3 {
         return Err(format!(
-            "usage: {} COLUMN_NAME CHAIN_TXT [CHAIN_TXT ...] OR --verify-sha256 FILE EXPECTED_SHA256",
+            "usage: {} COLUMN_NAME CHAIN_TXT [CHAIN_TXT ...] OR --verify-sha256 FILE EXPECTED_SHA256 OR --verify-manifest SHA256SUMS RELATIVE_PATH FILE",
             args.first().map(String::as_str).unwrap_or("symthaea-cosmology-chain-audit")
         ));
     }
