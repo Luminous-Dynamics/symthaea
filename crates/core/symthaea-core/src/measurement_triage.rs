@@ -591,8 +591,8 @@ mod tests {
     use super::*;
     use serde::Deserialize;
     use crate::architecture_robustness::{
-        ArchitectureRobustnessReportV1, MetricIntervalEntryV1, RobustCandidateAssessmentV1,
-        RobustPairwiseAssessmentV1,
+        ArchitectureRobustnessReportV1, MetricIntervalEntryV1,
+        MetricIntervalSemanticsV1, RobustCandidateAssessmentV1, RobustPairwiseAssessmentV1,
     };
     use crate::architecture_pareto::{
         ArchitectureFamilyV1, ArchitectureOperatingConditionsV1,
@@ -712,8 +712,7 @@ mod tests {
                 grade_percent: 0.0,
                 ambient_temperature_c: 22.0,
             },
-            interval_semantics:
-                crate::architecture_robustness::MetricIntervalSemanticsV1::DeclaredConservativeEnvelope,
+            interval_semantics: MetricIntervalSemanticsV1::DeclaredConservativeEnvelope,
             evidence_level: ArchitectureEvidenceLevelV1::SyntheticReplay,
             candidates: vec![
                 candidate("candidate-a"),
