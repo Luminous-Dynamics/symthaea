@@ -625,6 +625,20 @@ pub struct BackendTimedEmbodimentStepV1 {
     pub timing: PlantStepTimingV1,
 }
 
+impl BackendTimedEmbodimentStepV1 {
+    /// Validate backend-owned timing evidence for the exact requested transition.
+    pub fn validate_for_step(&self, expected_step_index: u64) -> Result<(), PlantStepTimingErrorV1> {
+        self.timing.validate()?;
+        if self.timing.step_index != expected_step_index {
+            return Err(PlantStepTimingErrorV1::TimingStepIndexMismatch);
+        }
+        if self.timing.source == PlantStepTimeSourceV1::ConfiguredSimulationStep {
+            return Err(PlantStepTimingErrorV1::ConfiguredTimeReturnedForBackendMeasurement);
+        }
+        Ok(())
+    }
+}
+
 // ── Embodiment Bridge Trait ────────────────────────────────────────────────
 
 /// Platform-agnostic embodiment bridge trait.
@@ -1063,6 +1077,46 @@ mod tests {
         fn telemetry(&self) -> EmbodimentTelemetry {
             EmbodimentTelemetry::default()
         }
+    }
+
+    #[test]
+    fn backend_timing_must_match_step_and_be_measured() {
+        let result = EmbodimentResult {
+            num_actuators: 1,
+            control_effort: 0.0,
+            success: true,
+            prediction_error: 0.0,
+            safety_level: MotorSafetyLevel::Green,
+            epistemic_grounding: GROUNDING_SENSORIMOTOR,
+            observation_confidence: 1.0,
+        };
+        let measured = PlantStepTimingV1::measured_interval(
+            17,
+            PlantStepTimeSourceV1::MeasuredDeviceClock,
+            "device-ptp",
+            "session-12",
+            100,
+            5_000_100,
+        )
+        .unwrap();
+        let outcome = BackendTimedEmbodimentStepV1 {
+            result: result.clone(),
+            timing: measured,
+        };
+        assert_eq!(outcome.validate_for_step(17), Ok(()));
+        assert_eq!(
+            outcome.validate_for_step(18),
+            Err(PlantStepTimingErrorV1::TimingStepIndexMismatch)
+        );
+
+        let configured = BackendTimedEmbodimentStepV1 {
+            result,
+            timing: PlantStepTimingV1::configured_simulation(17, 0.005).unwrap(),
+        };
+        assert_eq!(
+            configured.validate_for_step(17),
+            Err(PlantStepTimingErrorV1::ConfiguredTimeReturnedForBackendMeasurement)
+        );
     }
 
     #[test]
