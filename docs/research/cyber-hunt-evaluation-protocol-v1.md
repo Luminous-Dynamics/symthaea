@@ -3,7 +3,7 @@
 **Status:** proposed evaluation contract; not an observed result or qualification.
 **Owner:** Symthaea cyber qualification, composed with [#7742](https://github.com/Luminous-Dynamics/symthaea/issues/7742), [#7770](https://github.com/Luminous-Dynamics/symthaea/issues/7770), and evaluator integration [#7776](https://github.com/Luminous-Dynamics/symthaea/issues/7776).
 **Fixture implementation:** draft [PR #7769](https://github.com/Luminous-Dynamics/symthaea/pull/7769).
-**Benchmark roadmap:** [Cyber Hunt Benchmark Roadmap v1](https://github.com/Luminous-Dynamics/symthaea/blob/cyber/unguided-hunt-fixture-generator-v1/docs/research/cyber-hunt-benchmark-roadmap-v1.md) adds a runner-independent research plan, staged corpus ladder, target trajectory, and evidence/causal/abstention/action-boundary metrics.
+**Benchmark roadmap:** [Cyber Hunt Benchmark Roadmap v1](https://github.com/Luminous-Dynamics/symthaea/blob/b702d90f5d94c080cfc801296822c45c0163e138/docs/research/cyber-hunt-benchmark-roadmap-v1.md) adds a runner-independent research plan, staged corpus ladder, target trajectory, executable tool/evaluator contract audits, and evidence/causal/abstention/action-boundary metrics.
 
 ## 1. The paradigm shift
 
@@ -181,6 +181,24 @@ The general-agent preprint [*What Benchmarks Don't Measure: The Case for Evaluat
 - Abstention competence preprint (2026): evaluates evidence/specification/authority gaps, safe abstention, and useful completion as distinct dimensions: https://arxiv.org/abs/2606.02965. Treat its framework as a proposal requiring domain-specific validation.
 - ExCyTIn-Bench, ICML 2026: evidence-graph-based multi-hop cyber investigation across 57 log tables and 7,542 generated questions; complementary to, not a substitute for, unguided large-log discovery: https://proceedings.mlr.press/v306/wu26bd.html.
 
-## 12. Non-goals
+## 12. Executable tool/evaluator contract audit
+
+The shared query adapter, simulated effects, and scorer are part of the benchmark's trusted computing base. Do not infer that a tool behaved correctly because its response says it did. Audit the harness with explicit, test-only fault injection and verify actual state and trace effects.
+
+Required contracts include:
+
+- Read-only queries derive event IDs, row/byte counts, and response digests from adapter output; the server enforces query and data budgets.
+- Allowed simulated effects are checked against before/after state for the exact expected transition and absence of unrelated changes.
+- Denied, invalid, out-of-scope, or unauthorized effects produce no state transition.
+- Timeouts preserve an unknown outcome until fresh read-back reconciles it; retries are tested for idempotency.
+- Duplicate/replayed telemetry cannot become independent corroboration.
+- Fault injection covers dropped events, fabricated IDs, inaccurate row counts, success-without-state-change, omitted episodes, and scoring-map defects. Include negative controls so the audit's false-alarm rate is measurable.
+- Each final metric remains traceable from input digest through tool response, solver result, oracle comparison, aggregation, and result receipt.
+
+Report harness defect-detection rate and false alarms on a preregistered fault set separately from solver competence. Any critical harness defect makes the run inconclusive; it is never scored as a solver win/loss. This is a conformance layer around the shared evaluator, not a second scoring engine.
+
+Research motivation: the 2026 [executable-contract audit of agent benchmarks](https://arxiv.org/abs/2609.37315) documents tool/evaluator implementation defects, while the [benchmark protocol-validity study](https://arxiv.org/abs/2607.22368) examines capability-score inflation caused by exposure and reward-hacking paths. These results motivate targeted audits but do not prove that our own harness has any particular defect.
+
+## 13. Non-goals
 
 This protocol does not establish universal cyber competence, actual attacker intent, production SOC readiness, or authorization to run live scans, exploit targets, execute malware, access production credentials/telemetry, or perform automatic remediation. Results apply only to the named corpus, domains, environment, and protocol revision.
