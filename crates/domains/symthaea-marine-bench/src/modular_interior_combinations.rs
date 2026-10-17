@@ -649,6 +649,7 @@ mod tests {
                     ids
                 }).collect();
             let mut expected_sets = case.expected_candidate_sets.clone();
+            for set in &mut expected_sets { set.sort(); }
             observed_sets.sort();
             expected_sets.sort();
             assert_eq!(observed_sets, expected_sets, "{}", case.case_id);
