@@ -765,6 +765,29 @@ mod tests {
     }
 
     #[test]
+    fn widening_any_single_metric_envelope_cannot_create_a_robust_winner() {
+        for metric in REQUIRED_METRICS {
+            let mut a = candidate("candidate-a", Profile::Balanced);
+            let b = candidate("candidate-b", Profile::Balanced);
+            let interval = &mut a.metrics.iter_mut().find(|entry| entry.metric == metric).unwrap().interval;
+
+            if is_higher_better(metric) {
+                interval.lower = (interval.lower - 0.05).max(0.0);
+            } else {
+                interval.upper += 0.5;
+            }
+
+            let report = evaluate_architecture_robustness(&request(vec![a, b]))
+                .expect("one-sided envelope widening preserves fixture integrity");
+            let pair = &report.pairwise_assessments[0];
+            assert!(
+                !pair.a_robustly_dominates_b && !pair.b_robustly_dominates_a,
+                "widening {metric:?} must not manufacture a robust dominance result"
+            );
+        }
+    }
+
+    #[test]
     fn missing_and_duplicate_metric_dimensions_fail_closed() {
         let mut missing = candidate("missing", Profile::Balanced);
         missing.metrics.pop();
