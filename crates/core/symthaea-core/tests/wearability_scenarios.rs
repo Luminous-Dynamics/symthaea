@@ -8,7 +8,8 @@ use serde::Deserialize;
 use std::collections::HashSet;
 use symthaea_core::wearability::{
     evaluate_wearability_request, WearabilityDecisionV1, WearabilityDispositionV1,
-    WearabilityFindingV1, WearabilityInputV1, WearabilityStageV1,
+    WearabilityEvidenceFieldV1, WearabilityEvidenceOriginV1, WearabilityEvidenceProvenanceV1,
+    WearabilityFindingV1, WearabilityInputV1, WearabilityProvenanceStatusV1, WearabilityStageV1,
     WEARABILITY_DECISION_SCHEMA_VERSION,
 };
 
@@ -73,6 +74,14 @@ fn wearability_fixture_dispositions_match_public_evaluator() {
         );
         assert_eq!(decision.profile_id, scenario.profile);
         assert_eq!(decision.stage, scenario.stage);
+        assert_eq!(
+            decision.provenance_status,
+            WearabilityProvenanceStatusV1::CompleteForPresentInputs,
+            "fixture {} must record provenance for every populated input",
+            scenario.id
+        );
+        assert!(decision.provenance_findings.is_empty(), "fixture {} has provenance defects: {:?}", scenario.id, decision.provenance_findings);
+        assert!(decision.evidence_provenance.iter().all(|entry| entry.origin == WearabilityEvidenceOriginV1::CallerAssertion), "synthetic fixture evidence must not masquerade as sensor data");
     }
 }
 
@@ -150,6 +159,70 @@ fn decision_receipt_schema_is_versioned_independently_from_input_schema() {
     // This type-level annotation prevents an accidental accidental removal of findings.
     fn assert_decision_type(_: &WearabilityDecisionV1) {}
     assert_decision_type(&decision);
+}
+
+#[test]
+fn missing_provenance_does_not_change_policy_status_but_remains_explicit() {
+    let cases = corpus();
+    let scenario = cases.scenarios.iter()
+        .find(|scenario| scenario.id == "WRB-001-verified-self-don")
+        .expect("fit positive control exists");
+    let mut input = scenario.input.clone();
+    input.evidence_provenance.clear();
+
+    let decision = evaluate_wearability_request(&scenario.profile, scenario.stage, &input);
+    assert_eq!(decision.disposition, WearabilityDispositionV1::ReadyForSimulation);
+    assert_eq!(decision.provenance_status, WearabilityProvenanceStatusV1::MissingForPresentInputs);
+    assert!(!decision.provenance_findings.is_empty());
+    assert!(decision.findings.contains(&WearabilityFindingV1::FitCheckAdmittedForSimulation));
+}
+
+#[test]
+fn sensor_provenance_missing_timebase_and_calibration_is_invalid() {
+    let input = WearabilityInputV1 {
+        fit_evidence: Some(symthaea_core::wearability::FitEvidenceV1::Current),
+        pressure_sensor: Some(symthaea_core::wearability::SignalEvidenceV1::Available),
+        evidence_provenance: vec![
+            WearabilityEvidenceProvenanceV1 {
+                field: WearabilityEvidenceFieldV1::FitEvidence,
+                origin: WearabilityEvidenceOriginV1::CallerAssertion,
+                evidence_id: Some("fit-assertion-1".to_owned()),
+                observed_at_ticks: None,
+                timebase_id: None,
+                calibration_reference: None,
+            },
+            WearabilityEvidenceProvenanceV1 {
+                field: WearabilityEvidenceFieldV1::PressureSensor,
+                origin: WearabilityEvidenceOriginV1::SensorObservation,
+                evidence_id: Some("pressure-sample-1".to_owned()),
+                observed_at_ticks: None,
+                timebase_id: None,
+                calibration_reference: None,
+            },
+        ],
+        ..Default::default()
+    };
+
+    let decision = evaluate_wearability_request("profile-a", WearabilityStageV1::Perform, &input);
+    assert_eq!(decision.provenance_status, WearabilityProvenanceStatusV1::Invalid);
+    assert!(decision.provenance_findings.iter().any(|finding| matches!(
+        finding,
+        symthaea_core::wearability::WearabilityProvenanceFindingV1::ObservationTimestampMissing {
+            field: WearabilityEvidenceFieldV1::PressureSensor
+        }
+    )));
+    assert!(decision.provenance_findings.iter().any(|finding| matches!(
+        finding,
+        symthaea_core::wearability::WearabilityProvenanceFindingV1::TimebaseMissing {
+            field: WearabilityEvidenceFieldV1::PressureSensor
+        }
+    )));
+    assert!(decision.provenance_findings.iter().any(|finding| matches!(
+        finding,
+        symthaea_core::wearability::WearabilityProvenanceFindingV1::SensorCalibrationReferenceMissing {
+            field: WearabilityEvidenceFieldV1::PressureSensor
+        }
+    )));
 }
 
 #[test]
