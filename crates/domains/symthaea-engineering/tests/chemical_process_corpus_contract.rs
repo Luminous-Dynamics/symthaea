@@ -246,7 +246,7 @@ fn analytic_residual_target_is_scoped_and_positive() {
         .and_then(Value::as_str)
         .expect("residual caveat must be documented");
     assert!(
-        caveat.contains("does not prove"),
+        caveat.contains("threshold proves"),
         "residual caveat must deny automatic promotion to physical truth"
     );
 }
