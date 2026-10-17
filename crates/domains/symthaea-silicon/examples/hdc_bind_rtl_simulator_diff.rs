@@ -29,6 +29,8 @@ const VECTOR_BYTES: usize = VECTOR_BITS / 8;
 const VECTOR_HEX_LEN: usize = VECTOR_BYTES * 2;
 const DEFAULT_RTL: &str = "crates/domains/symthaea-silicon/rtl/hdc_bind_xor.sv";
 const CANONICAL_ORACLE_FILE: &str = "crates/core/symthaea-core/src/hdc/binary_hv.rs";
+const BENCHMARK_CONTRACT_FILE: &str = "docs/research/NEURO_SILICON_001A_BENCHMARK_CONTRACT.md";
+const CORPUS_GENERATOR_FILE: &str = "crates/domains/symthaea-silicon/examples/hdc_rtl_reference_corpus.rs";
 
 #[derive(Debug, Deserialize)]
 struct Corpus {
@@ -100,10 +102,67 @@ fn run() -> Result<(), String> {
     let oracle_path = fs::canonicalize(repo_root.join(CANONICAL_ORACLE_FILE))
         .map_err(|error| format!("BLOCKED: canonical Rust oracle file is missing: {error}"))?;
     let oracle_relative = repo_relative_path(&repo_root, &oracle_path)?;
+    let contract_path = fs::canonicalize(repo_root.join(BENCHMARK_CONTRACT_FILE))
+        .map_err(|error| format!("BLOCKED: pinned benchmark contract file is missing: {error}"))?;
+    let contract_relative = repo_relative_path(&repo_root, &contract_path)?;
+    let generator_path = fs::canonicalize(repo_root.join(CORPUS_GENERATOR_FILE))
+        .map_err(|error| format!("BLOCKED: pinned corpus generator source is missing: {error}"))?;
+    let generator_relative = repo_relative_path(&repo_root, &generator_path)?;
     require_tracked_clean(&rtl_relative, "RTL source")?;
     require_tracked_clean(&oracle_relative, "canonical Rust oracle source")?;
+    require_tracked_clean(&contract_relative, "benchmark contract source")?;
+    require_tracked_clean(&generator_relative, "Rust corpus generator source")?;
     let rtl_blob_sha = git_blob_sha(&fs::read(&rtl_path).map_err(|e| e.to_string())?)?;
     let oracle_blob_sha = git_blob_sha(&fs::read(&oracle_path).map_err(|e| e.to_string())?)?;
+    let contract_blob_sha = git_blob_sha(&fs::read(&contract_path).map_err(|e| e.to_string())?)?;
+    let generator_blob_sha = git_blob_sha(&fs::read(&generator_path).map_err(|e| e.to_string())?)?;
+    let expected_oracle_blob_sha = git_tree_blob(ORACLE_SOURCE_SHA, CANONICAL_ORACLE_FILE, "pinned canonical oracle blob")?;
+    let expected_contract_blob_sha = git_tree_blob(BENCHMARK_CONTRACT_SHA, BENCHMARK_CONTRACT_FILE, "pinned benchmark contract blob")?;
+    if oracle_blob_sha != expected_oracle_blob_sha {
+        return Err(format!(
+            "BLOCKED: current canonical oracle blob {} differs from pinned commit {} blob {}",
+            oracle_blob_sha, ORACLE_SOURCE_SHA, expected_oracle_blob_sha
+        ));
+    }
+    if contract_blob_sha != expected_contract_blob_sha {
+        return Err(format!(
+            "BLOCKED: current benchmark contract blob {} differs from pinned commit {} blob {}",
+            contract_blob_sha, BENCHMARK_CONTRACT_SHA, expected_contract_blob_sha
+        ));
+    }
+
+    // Do not trust a supplied JSON file solely because it declares the expected
+    // commit IDs. Regenerate it from the tracked, clean canonical Rust oracle and
+    // require byte-for-byte equality before using any fixture as hardware input.
+    let cargo_version = checked_version("cargo", &["--version"])?;
+    let corpus_generation_command = vec![
+        "cargo".to_owned(), "run".to_owned(), "--locked".to_owned(), "--quiet".to_owned(),
+        "-p".to_owned(), "symthaea-silicon".to_owned(), "--example".to_owned(),
+        "hdc_rtl_reference_corpus".to_owned()
+    ];
+    let generated_corpus = run_command(
+        Command::new("cargo")
+            .arg("run").arg("--locked").arg("--quiet")
+            .arg("-p").arg("symthaea-silicon")
+            .arg("--example").arg("hdc_rtl_reference_corpus"),
+        "regenerate canonical Rust HDC oracle corpus",
+    )?;
+    if !generated_corpus.status.success() {
+        return Err(format!(
+            "BLOCKED: canonical corpus regeneration exited {:?}; stdout:\\n{}\\nstderr:\\n{}",
+            generated_corpus.status.code(),
+            output_text(&generated_corpus.stdout),
+            output_text(&generated_corpus.stderr)
+        ));
+    }
+    if generated_corpus.stdout != corpus_bytes {
+        return Err(format!(
+            "BLOCKED: supplied corpus is not byte-for-byte equal to the canonical generator output (supplied blob {}, regenerated blob {}). The new corpus should be captured from this exact HEAD.",
+            corpus_blob_sha,
+            git_blob_sha(&generated_corpus.stdout)?
+        ));
+    }
+    let regenerated_corpus_blob_sha = git_blob_sha(&generated_corpus.stdout)?;
     let corpus_blob_sha = git_blob_sha(&corpus_bytes)?;
 
     let selected = select_bind_fixtures(&corpus)?;
@@ -199,7 +258,16 @@ fn run() -> Result<(), String> {
         "corpus_schema_version": corpus.schema_version,
         "oracle_source_commit_sha": corpus.oracle_source_sha,
         "oracle_source_blob_sha": oracle_blob_sha,
+        "pinned_oracle_source_blob_sha": expected_oracle_blob_sha,
         "benchmark_contract_commit_sha": corpus.benchmark_contract_sha,
+        "benchmark_contract_blob_sha": contract_blob_sha,
+        "pinned_benchmark_contract_blob_sha": expected_contract_blob_sha,
+        "corpus_generator_path": generator_relative.display().to_string(),
+        "corpus_generator_blob_sha": generator_blob_sha,
+        "cargo_version_output": cargo_version,
+        "corpus_generation_command": corpus_generation_command,
+        "regenerated_corpus_blob_sha": regenerated_corpus_blob_sha,
+        "supplied_corpus_matches_regenerated_byte_for_byte": true,
         "corpus_git_blob_sha": corpus_blob_sha,
         "rtl_path": rtl_relative.display().to_string(),
         "rtl_git_blob_sha": rtl_blob_sha,
@@ -470,6 +538,11 @@ fn require_ancestor(ancestor: &str, head: &str, label: &str) -> Result<(), Strin
         ));
     }
     Ok(())
+}
+
+fn git_tree_blob(commit: &str, path: &str, label: &str) -> Result<String, String> {
+    let object_spec = format!("{commit}:{path}");
+    git_text(&["rev-parse", object_spec.as_str()], label)
 }
 
 fn repo_relative_path(repo_root: &Path, path: &Path) -> Result<PathBuf, String> {
