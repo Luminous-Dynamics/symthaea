@@ -246,7 +246,8 @@ fn run(args: &[String]) -> Result<(), String> {
         [benchmark, schema] => (benchmark.as_str(), schema.as_str()),
         _ => {
             return Err(
-                "usage: room-stress-qualifier [--json] [BENCHMARK.json SCHEMA.json]".to_string());
+                "usage: room-stress-qualifier [--json] [BENCHMARK.json SCHEMA.json]".to_string(),
+            );
         }
     };
 
@@ -394,11 +395,17 @@ mod tests {
         );
         assert_eq!(receipt["status"], "valid_manifest");
         assert_eq!(
-            receipt["inputs"]["benchmark_sha256"].as_str().unwrap().len(),
+            receipt["inputs"]["benchmark_sha256"]
+                .as_str()
+                .unwrap()
+                .len(),
             64
         );
         assert_eq!(
-            receipt["inputs"]["schema_sha256"].as_str().unwrap().len(),
+            receipt["inputs"]["schema_sha256"]
+                .as_str()
+                .unwrap()
+                .len(),
             64
         );
         assert!(
