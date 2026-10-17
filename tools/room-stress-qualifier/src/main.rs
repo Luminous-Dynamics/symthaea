@@ -12,6 +12,7 @@ use sha2::{Digest, Sha256};
 use std::collections::{BTreeMap, BTreeSet};
 use std::env;
 use std::fs;
+use std::io::Read;
 use std::path::{Component, Path};
 
 const EXPECTED_SCHEMA_VERSION: &str = "room-imagination-stress-benchmark-v0.1";
@@ -64,12 +65,10 @@ impl EvaluationSummary {
         for failure in &self.failures {
             println!("FAIL: {failure}");
         }
-        println!(
-            concat!(
-                "Claim ceiling: reported observations are compared with synthetic oracles; ",
-                "referenced artifacts are not independently qualified."
-            )
-        );
+        println!(concat!(
+            "Claim ceiling: reported observations are compared with synthetic oracles; ",
+            "artifact paths and hashes are checked but artifact semantics are not qualified."
+        ));
     }
 }
 
@@ -188,8 +187,18 @@ fn verify_evidence_reference(reference: &Value, evidence_root: &Path) -> Result<
         ));
     }
 
-    let bytes = fs::read(&canonical_artifact)
+    let file = fs::File::open(&canonical_artifact)
+        .map_err(|error| format!("cannot open evidence artifact: {error}"))?;
+    let mut bounded_reader = file.take(MAX_EVIDENCE_ARTIFACT_BYTES + 1);
+    let mut bytes = Vec::new();
+    bounded_reader
+        .read_to_end(&mut bytes)
         .map_err(|error| format!("cannot read evidence artifact: {error}"))?;
+    if bytes.len() as u64 > MAX_EVIDENCE_ARTIFACT_BYTES {
+        return Err(format!(
+            "evidence artifact exceeds the {MAX_EVIDENCE_ARTIFACT_BYTES}-byte limit"
+        ));
+    }
     let actual_hash = sha256_bytes_hex(&bytes);
     if actual_hash != claimed_hash {
         return Err(format!(
@@ -929,6 +938,26 @@ mod tests {
         .unwrap();
         assert!(summary.failures.iter().any(|failure| {
             failure.contains("artifact_path cannot contain absolute paths or dot segments")
+        }));
+    }
+
+    #[test]
+    fn missing_evidence_artifact_is_reported_as_failure() {
+        let mut report = golden_report_value(EMBEDDED_BENCHMARK);
+        report["results"][0]["evidence_refs"][0]["artifact_path"] =
+            Value::String("docs/research/spatial-design/not-present.bin".into());
+        let report_text = serde_json::to_string(&report).unwrap();
+        let summary = evaluate_run_report(
+            EMBEDDED_BENCHMARK,
+            EMBEDDED_SCHEMA,
+            EMBEDDED_RUN_REPORT_SCHEMA,
+            &report_text,
+            &repository_root(),
+        )
+        .unwrap();
+        assert!(summary.failures.iter().any(|failure| {
+            failure.contains("evidence artifact")
+                && failure.contains("is unavailable")
         }));
     }
 
