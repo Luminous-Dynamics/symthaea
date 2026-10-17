@@ -197,10 +197,10 @@ pub fn validate_split_manifest(manifest: &Value) -> Result<usize, String> {
         _ => unreachable!("evaluation regime was checked above"),
     };
     for (dimension, required_roles) in required_rules {
-        let declared = declared_roles.get(dimension).ok_or_else(|| {
+        let declared = declared_roles.get(*dimension).ok_or_else(|| {
             format!("regime {evaluation_regime} requires a holdout rule for {dimension}")
         })?;
-        for required_role in *required_roles {
+        for required_role in required_roles.iter().copied() {
             if !declared.contains(required_role) {
                 return Err(format!(
                     "regime {evaluation_regime} requires {dimension} to be disjoint from {required_role}"
@@ -328,7 +328,7 @@ mod tests {
         let mut manifest = fixture();
         manifest["evaluation_regime"] = serde_json::json!("unseen_product_revision");
         for row in manifest["observations"].as_array_mut().expect("rows") {
-            if row["role"] == "test" {
+            if row.get("role").and_then(Value::as_str) == Some("test") {
                 row["product_revision_id"] = serde_json::json!("headphone-h1-rev2");
             }
         }
