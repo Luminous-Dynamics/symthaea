@@ -9,7 +9,7 @@
 //! controlled ambiguity through shared facts rather than only independent random vectors.
 //!
 //! Run:
-//!   cargo run --release --example progressive_retrieval_reference -p symthaea-core -- /tmp/progressive-retrieval.csv
+//!   cargo run --release --example progressive_retrieval_reference -p symthaea-core -- /tmp/progressive-retrieval.csv 12345
 //!
 //! This experiment measures candidate preservation and coordinate-evaluation counts. It
 //! does NOT learn a threshold, claim an extreme-tail false-positive guarantee, or show
@@ -33,8 +33,7 @@ const QUERIES: usize = 64;
 const PROPERTIES: usize = 8;
 const VALUES_PER_PROPERTY: usize = 32;
 const QUERY_PROPERTY_COUNTS: &[usize] = &[1, 2, 4, 6];
-const CORPUS_SEED: u64 = 0xC0FF_EE77_2201_0001;
-const QUERY_SEED: u64 = 0x5155_4552_5900_0002;
+const DEFAULT_CORPUS_SEED: u64 = 0xC0FF_EE77_2201_0001;
 
 struct Record {
     values: [usize; PROPERTIES],
@@ -93,12 +92,12 @@ fn similarity_prefix(a: &ContinuousHV, b: &ContinuousHV, dim: usize) -> f64 {
     }
 }
 
-fn build_codebook() -> (Vec<ContinuousHV>, Vec<Vec<ContinuousHV>>) {
+fn build_codebook(corpus_seed: u64) -> (Vec<ContinuousHV>, Vec<Vec<ContinuousHV>>) {
     let roles = (0..PROPERTIES)
         .map(|property| {
             bipolar_continuous(
                 MAX_DIM,
-                item_seed(CORPUS_SEED, property, 0, 0x524F_4C45_0000_0001),
+                item_seed(corpus_seed, property, 0, 0x524F_4C45_0000_0001),
             )
         })
         .collect::<Vec<_>>();
@@ -108,7 +107,7 @@ fn build_codebook() -> (Vec<ContinuousHV>, Vec<Vec<ContinuousHV>>) {
                 .map(|value| {
                     bipolar_continuous(
                         MAX_DIM,
-                        item_seed(CORPUS_SEED, property, value, 0x5641_4C55_4500_0002),
+                        item_seed(corpus_seed, property, value, 0x5641_4C55_4500_0002),
                     )
                 })
                 .collect::<Vec<_>>()
@@ -118,10 +117,11 @@ fn build_codebook() -> (Vec<ContinuousHV>, Vec<Vec<ContinuousHV>>) {
 }
 
 fn build_corpus(
+    corpus_seed: u64,
     roles: &[ContinuousHV],
     values: &[Vec<ContinuousHV>],
 ) -> Vec<Record> {
-    let mut state = CORPUS_SEED ^ 0xA076_1D64_78BD_642F;
+    let mut state = corpus_seed ^ 0xA076_1D64_78BD_642F;
     let mut records = Vec::with_capacity(RECORDS);
     for _record_id in 0..RECORDS {
         let property_values = std::array::from_fn(|_| {
@@ -177,12 +177,18 @@ fn rank_records(
 
 fn main() {
     assert_prefix_stability();
-    let (roles, values) = build_codebook();
-    let records = build_corpus(&roles, &values);
+    let args = std::env::args().skip(1).collect::<Vec<_>>();
+    let output_path = args.first().cloned();
+    let corpus_seed = args
+        .get(1)
+        .map(|value| value.parse::<u64>().expect("corpus seed must be an unsigned integer"))
+        .unwrap_or(DEFAULT_CORPUS_SEED);
+    let (roles, values) = build_codebook(corpus_seed);
+    let records = build_corpus(corpus_seed, &roles, &values);
     let index_bytes = RECORDS * MAX_DIM * std::mem::size_of::<f32>();
 
     let mut csv = String::from(
-        "query_id,target_record_id,observed_properties,corpus_size,coarse_dimension,shortlist_k,reference_top1_id,coarse_top1_id,reference_top1_preserved,reference_topk_overlap_count,reference_topk_overlap_fraction,exact_matching_records,exact_matching_records_in_shortlist,exact_match_shortlist_recall,false_shortlist_candidates,target_in_shortlist,reference_top1_margin,coordinate_evaluations_staged,coordinate_evaluations_exhaustive,coordinate_reduction_ratio,full_index_vector_bytes\n",
+        "corpus_seed,query_id,target_record_id,observed_properties,corpus_size,coarse_dimension,shortlist_k,reference_top1_id,coarse_top1_id,reference_top1_preserved,reference_topk_overlap_count,reference_topk_overlap_fraction,exact_matching_records,exact_matching_records_in_shortlist,exact_match_shortlist_recall,false_shortlist_candidates,target_in_shortlist,reference_top1_margin,coordinate_evaluations_staged,coordinate_evaluations_exhaustive,coordinate_reduction_ratio,full_index_vector_bytes\n",
     );
 
     for query_id in 0..QUERIES {
@@ -199,10 +205,6 @@ fn main() {
         } else {
             1.0
         };
-
-        let mut query_state = QUERY_SEED
-            .wrapping_add((query_id as u64).wrapping_mul(0x9E37_79B9_7F4A_7C15));
-        let _query_replicate_tag = next_u64(&mut query_state);
 
         let relevant_ids = records
             .iter()
@@ -249,7 +251,7 @@ fn main() {
 
                 writeln!(
                     csv,
-                    "{query_id},{target_id},{query_properties},{RECORDS},{dim},{k},{reference_top1_id},{},{},{reference_overlap},{overlap_fraction:.8},{exact_match_count},{relevant_in_shortlist},{relevant_recall:.8},{false_shortlist_candidates},{target_in_shortlist},{reference_margin:.8},{coordinate_staged},{coordinate_exhaustive},{coordinate_reduction:.8},{index_bytes}",
+                    "{corpus_seed},{query_id},{target_id},{query_properties},{RECORDS},{dim},{k},{reference_top1_id},{},{},{reference_overlap},{overlap_fraction:.8},{exact_match_count},{relevant_in_shortlist},{relevant_recall:.8},{false_shortlist_candidates},{target_in_shortlist},{reference_margin:.8},{coordinate_staged},{coordinate_exhaustive},{coordinate_reduction:.8},{index_bytes}",
                     coarse_ranked[0].0,
                     reference_top1_preserved,
                 )
@@ -258,7 +260,7 @@ fn main() {
         }
     }
 
-    match std::env::args().nth(1) {
+    match output_path {
         Some(path) => {
             std::fs::write(&path, csv).unwrap_or_else(|error| {
                 panic!("failed to write progressive retrieval CSV to {path}: {error}");
