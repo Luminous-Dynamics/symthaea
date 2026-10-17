@@ -498,7 +498,10 @@ impl Z3Bridge {
 
         let mut component_residuals = Vec::with_capacity(expected);
         for (&ric, &g) in ricci_components.iter().zip(metric_components.iter()) {
-            let residual = (ric - k * g).abs();
+            // Preserve the signed residual so independent checks can evaluate
+            // the least-squares normal equation; summarize its absolute maximum
+            // separately for the tolerance disposition.
+            let residual = ric - k * g;
             if !residual.is_finite() {
                 return Err(EinsteinResidualError::NonFiniteArithmetic);
             }
@@ -506,7 +509,7 @@ impl Z3Bridge {
         }
         let max_abs_residual = component_residuals
             .iter()
-            .copied()
+            .map(|residual| residual.abs())
             .fold(0.0_f64, f64::max);
 
         Ok(EinsteinResidualReport {
