@@ -297,6 +297,8 @@ pub enum WearabilityEvidenceFieldV1 {
     WorkflowSupportRequirement,
     /// Caregiver availability.
     CaregiverAvailable,
+    /// Whether the wearer requested accessible assistance options.
+    UserRequestedHelp,
     /// User-requested disengagement.
     UserRequestedDoff,
     /// Pending motion-request state.
@@ -435,6 +437,8 @@ pub struct WearabilityInputV1 {
     pub workflow_support_requirement: Option<WorkflowSupportV1>,
     /// Whether the required caregiver is available.
     pub caregiver_available: Option<bool>,
+    /// Whether the wearer requested accessible help/options.
+    pub user_requested_help: Option<bool>,
     /// Explicit user request to remove/disengage.
     pub user_requested_doff: Option<bool>,
     /// Whether a motion request is currently pending.
@@ -487,6 +491,7 @@ impl Default for WearabilityInputV1 {
             hygiene_compatibility: None,
             workflow_support_requirement: None,
             caregiver_available: None,
+            user_requested_help: None,
             user_requested_doff: None,
             active_motion_request: None,
             prior_session_mode: None,
@@ -571,6 +576,8 @@ pub enum WearabilityFindingV1 {
     SensorEvidenceUncertain,
     /// Required caregiver is unavailable for this workflow.
     CaregiverUnavailable,
+    /// Wearer explicitly requested accessible assistance options.
+    UserRequestedHelp,
     /// Donning timed out before the critical workflow step completed.
     DonningTimedOutBeforeCriticalStep,
     /// A critical donning step is incomplete.
@@ -716,6 +723,7 @@ fn validate_wearability_provenance(
     present!(hygiene_compatibility, HygieneCompatibility);
     present!(workflow_support_requirement, WorkflowSupportRequirement);
     present!(caregiver_available, CaregiverAvailable);
+    present!(user_requested_help, UserRequestedHelp);
     present!(user_requested_doff, UserRequestedDoff);
     present!(active_motion_request, ActiveMotionRequest);
     present!(prior_session_mode, PriorSessionMode);
@@ -842,6 +850,9 @@ fn collect_wearability_findings(
     }
     if input.workflow_timeout == Some(true) && input.critical_step_completed != Some(true) {
         findings.push(F::DonningTimedOutBeforeCriticalStep);
+    }
+    if input.user_requested_help == Some(true) {
+        findings.push(F::UserRequestedHelp);
     }
     if stage == WearabilityStageV1::Don && input.critical_step_completed != Some(true) {
         findings.push(F::CriticalDonningStepIncomplete);
