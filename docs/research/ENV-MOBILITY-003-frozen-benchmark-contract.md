@@ -47,6 +47,8 @@ cargo run -p xtask -- env-mobility-qualify
 cargo test -p xtask env_mobility
 cargo run -p xtask -- env-mobility-route-audit
 cargo test -p xtask env_mobility_route
+cargo run -p xtask -- env-mobility-make-buy
+cargo test -p xtask env_mobility_economics
 ```
 
 The corpus qualifier emits deterministic JSON with raw SHA-256 digests of the exact corpus byte streams, per-case decisions, disposition counts, mismatches and protected-gate false accepts. The route audit independently checks the synthetic manufacturing-routing fixture's schema, candidate worker skills/resources, dependency DAG, mandatory operation set, calibration/manifest/inspection order, and mutation list. It **does not schedule the route** or establish shift feasibility/throughput. Neither command is a pass claim until compilation and exact-head tests are observed.
