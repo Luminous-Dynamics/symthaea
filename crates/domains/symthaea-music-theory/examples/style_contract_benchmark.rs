@@ -16,7 +16,7 @@ use std::collections::{HashMap, HashSet};
 
 use serde_json::{Value, json};
 use symthaea_music_theory::fingerprint::{
-    STRUCT_DIMS, dist, exact_fingerprint, structural_fingerprint,
+    LAYERS, STRUCT_DIMS, dist, exact_fingerprint, layer_dists, structural_fingerprint,
 };
 use symthaea_music_theory::rhythm::Duration;
 use symthaea_music_theory::pitch::Pitch;
@@ -200,6 +200,30 @@ fn mean(values: &[f64]) -> f64 {
     } else {
         values.iter().sum::<f64>() / values.len() as f64
     }
+}
+
+/// Equalizes the contribution of the 11 named fingerprint layers by comparing
+/// each layer's RMS feature difference, rather than letting long layers
+/// dominate simply because they contain more dimensions. This is still a
+/// structural diagnostic, not a learned or perceptually calibrated metric.
+fn layer_balanced_distance(
+    left: &[f64; STRUCT_DIMS],
+    right: &[f64; STRUCT_DIMS],
+) -> f64 {
+    let layer_distances = layer_dists(left, right);
+    let mean_squared_layer_rms = layer_distances
+        .iter()
+        .zip(LAYERS.iter())
+        .map(|(distance, (_, _, length))| {
+            if *length == 0 {
+                0.0
+            } else {
+                (distance / (*length as f64).sqrt()).powi(2)
+            }
+        })
+        .sum::<f64>()
+        / LAYERS.len() as f64;
+    mean_squared_layer_rms.sqrt()
 }
 
 /// A deliberately transposition-invariant representation: for each role, keep
@@ -508,8 +532,10 @@ fn main() {
                     let right_config = seed_right * INTENTS.len() + intent_index;
                     let left_sample = &samples[style_index * config_count + left_config];
                     let right_sample = &samples[style_index * config_count + right_config];
-                    within_seed_distances[style_index]
-                        .push(dist(&left_sample.structural, &right_sample.structural));
+                    within_seed_distances[style_index].push(layer_balanced_distance(
+                        &left_sample.structural,
+                        &right_sample.structural,
+                    ));
                 }
             }
         }
@@ -525,7 +551,10 @@ fn main() {
             for config_index in 0..config_count {
                 let left_sample = &samples[left * config_count + config_index];
                 let right_sample = &samples[right * config_count + config_index];
-                let distance = dist(&left_sample.structural, &right_sample.structural);
+                let distance = layer_balanced_distance(
+                    &left_sample.structural,
+                    &right_sample.structural,
+                );
                 matched_distances.push(distance);
                 between_style_distances.push(distance);
             }
@@ -548,9 +577,9 @@ fn main() {
             style_pair_rows.push(json!({
                 "style_a": counters[left].style_name,
                 "style_b": counters[right].style_name,
-                "mean_matched_between_style_distance": mean_between,
-                "mean_seed_conditioned_within_style_distance_a": left_within,
-                "mean_seed_conditioned_within_style_distance_b": right_within,
+                "mean_matched_between_style_layer_balanced_distance": mean_between,
+                "mean_seed_conditioned_within_style_layer_balanced_distance_a": left_within,
+                "mean_seed_conditioned_within_style_layer_balanced_distance_b": right_within,
                 "between_minus_within_margin": margin,
                 "between_to_within_ratio": ratio,
                 "between_exceeds_mean_seed_variation": above_seed_variation,
@@ -623,9 +652,9 @@ fn main() {
             "seed_diversity_test_seeds": SEEDS.len(),
             "mean_nearest_cross_style_structural_distance":
                 mean(&nearest_distances[index]),
-            "mean_seed_conditioned_within_style_structural_distance":
+            "mean_seed_conditioned_within_style_layer_balanced_distance":
                 mean(&within_seed_distances[index]),
-            "mean_matched_between_style_structural_distance":
+            "mean_matched_between_style_layer_balanced_distance":
                 mean(&between_style_by_style[index]),
             "between_to_within_seed_variation_ratio": {
                 let within = mean(&within_seed_distances[index]);
@@ -760,11 +789,12 @@ fn main() {
         },
         "validator_mutation_audit": validator_self_test,
         "style_identifiability_audit": {
-            "method": "compare matched between-style structural distances against same-style, same-intent distances across different seeds",
+            "method": "compare matched between-style distances against same-style, same-intent distances across different seeds",
+            "distance_metric": "layer-balanced RMS over the 11 named structural-fingerprint layers; each layer contributes equally regardless of dimensionality",
             "within_style_seed_comparison_count": all_within_seed_distances.len(),
-            "mean_seed_conditioned_within_style_distance": mean_within_seed_distance,
+            "mean_seed_conditioned_within_style_layer_balanced_distance": mean_within_seed_distance,
             "matched_between_style_comparison_count": between_style_distances.len(),
-            "mean_matched_between_style_distance": mean_between_style_distance,
+            "mean_matched_between_style_layer_balanced_distance": mean_between_style_distance,
             "global_between_to_within_distance_ratio": global_style_separation_ratio,
             "style_pairs_above_both_seed_variation_baselines": style_pairs_above_seed_variation,
             "style_pair_count": style_pair_rows.len(),
@@ -832,6 +862,21 @@ mod tests {
         let unique: HashSet<String> =
             Style::ALL.iter().map(|style| format!("{style:?}")).collect();
         assert_eq!(unique.len(), Style::ALL.len());
+    }
+
+    #[test]
+    fn layer_balanced_distance_is_symmetric_and_zero_for_identical_vectors() {
+        let baseline = [0.0; STRUCT_DIMS];
+        assert_eq!(layer_balanced_distance(&baseline, &baseline), 0.0);
+
+        let mut changed = baseline;
+        let (_, start, _) = LAYERS[0];
+        changed[start] = 1.0;
+        assert!(layer_balanced_distance(&baseline, &changed) > 0.0);
+        assert_eq!(
+            layer_balanced_distance(&baseline, &changed),
+            layer_balanced_distance(&changed, &baseline)
+        );
     }
 
     #[test]
