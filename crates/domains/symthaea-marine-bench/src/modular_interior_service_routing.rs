@@ -673,8 +673,8 @@ fn grid_for_route(
     let width_i = span_x / i128::from(limits.grid_pitch_mm) + 1;
     let height_i = span_y / i128::from(limits.grid_pitch_mm) + 1;
     let cell_count_i = width_i * height_i;
-    if cell_count_i <= 0 || cell_count_i > i128::from(limits.max_grid_cells)
-        || cell_count_i > i128::from(HARD_MAX_GRID_CELLS)
+    if cell_count_i <= 0 || cell_count_i > limits.max_grid_cells as i128
+        || cell_count_i > HARD_MAX_GRID_CELLS as i128
     {
         return Err(RoutingError::new(
             "GRID_CELL_LIMIT_EXCEEDED",
