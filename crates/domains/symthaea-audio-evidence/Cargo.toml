@@ -5,6 +5,10 @@ edition = "2024"
 license = "AGPL-3.0-or-later"
 description = "Fail-closed structural and artifact-integrity checks for open audio measurement manifests"
 
+[[bin]]
+name = "audio-evidence-check"
+path = "src/main.rs"
+
 [dependencies]
 chrono = { workspace = true }
 hex = { workspace = true }
