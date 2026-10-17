@@ -202,6 +202,53 @@ Cross-stack hypothesis: integration should beat independently optimized componen
 
 Source status is not equivalent to independent replication. Vendor claims stay vendor claims; simulation studies stay simulation results; no local field-performance or South African procurement result is asserted here.
 
+## 10. Standards-informed autonomy, safety, and evaluation refinement
+
+A current review published 20 April 2026 organizes agricultural robotics along task, platform, autonomy-stack, and evaluation-setting axes. It distinguishes laboratory, greenhouse, open-field single-season, and open-field multi-season/multi-site evidence, and notes that uptime, failure recovery, near-miss events, and human-proximity triggers are not consistently reported. Therefore results must be stratified by setting and environmental domain; a higher detector score in one dataset is not a field-readiness claim.
+
+Reference:
+- Almtireen and Ryalat, *Robotics in Precision Agriculture: Task-, Platform-, and Evaluation-Oriented Review* (2026): https://www.mdpi.com/2218-6581/15/4/81
+- Polanía et al., *Control System for the Navigation of the Agricultural Robots: A Review* (2026): https://onlinelibrary.wiley.com/doi/10.1002/rob.70199
+
+### Safety standards as design inputs, not badges
+
+Use ISO 18497-1:2024 for agricultural autonomous-machinery design principles, vocabulary, safe-work information and residual-risk disclosures, and ISO 18497-4:2024 for verification and validation principles:
+- https://www.iso.org/standard/82684.html
+- https://www.iso.org/standard/82688.html
+
+These standards do not, by themselves, establish legal compliance or certify any machine. The project should express a task- and configuration-specific Operating Domain (ODD) and Safety Case: robot/tool/software identity, allowed tasks, allowed environment, sensor freshness and calibration, stopping and recovery behavior, human override, foreseeable misuse, evidence references, residual-risk owner, and change-triggered requalification. South African rules and field-specific safety must be reviewed by qualified specialists before real operation.
+
+A model must not receive an ambient ability to drive, irrigate, dose, spray, seed, harvest, or route physical assets. Recommendations, authorizations, device effect receipts, and agronomic outcome observations remain separate types. Unknown, stale, conflicting, failed, and not-tested are different states.
+
+A dedicated follow-on safety work item is open: [AGRI-ROBOTICS-SAFETY-001 #7818](https://github.com/Luminous-Dynamics/symthaea/issues/7818). The first implementation target remains effects-disabled contract and corpus validation.
+
+### Benchmark expansion informed by the reviews
+
+For every robot-task pairing, preregister task-specific measures and record the test setting:
+- **Navigation:** cross-track and heading error, route completion, intervention rate, localization-loss recovery, and performance under canopy, dust, uneven soil, slope, and GNSS denial where relevant.
+- **Manipulation/harvest:** successful picks or tool placements, quality/damage/rejection, cycle time, throughput, occlusion, and exception-handling rate.
+- **Operational reliability:** uptime, failed missions, mean time to recover/repair, charging, cleaning, setup, tool change, maintenance and human-supervision hours.
+- **Safety:** stop response, obstacle/human-proximity triggers, near misses, crop/soil/property damage, failed interlocks, and every out-of-domain operation attempt.
+- **Economics:** full cost per completed service unit and per marketable kilogram, not only the robot purchase price.
+- **External validity:** hold out complete farms, seasons, and regions where feasible; never let neighboring video frames from the same plot leak into both train and test sets.
+
+A 5 cm navigation tracking error has been discussed as an evaluation metric in a 2026 navigation review; treat it only as a candidate metric for tasks where that tolerance matters. The engineering tolerance must be justified by crop/implement geometry, target size, crop damage, and hazard analysis, not adopted as a universal pass threshold.
+
+### Agrivoltaics: test integration rather than presume it
+
+The 2026 Annual Review meta-analysis includes 66 studies and reports substantial heterogeneity across module geometries and crops. Higher mean land-equivalent ratios in some crop groups do not establish that an arbitrary layout is superior. Each local design should jointly measure:
+- saleable crop yield and quality;
+- AC electricity delivered at the system boundary, including curtailment/storage losses if claimed;
+- land-equivalent ratio with explicit separate-system baselines;
+- irrigation withdrawal/consumption and microclimate response;
+- robot/tractor turning, clearance, headland, shade and maintenance access;
+- lifecycle material and ecological effects, capital and operating costs;
+- multi-season crop stability and downside outcomes.
+
+Reference: Barros et al., *Agrivoltaic Systems: Systematic Review and Meta-Analysis Relating to Energy, Soil, and Crop Parameters* (2026), https://www.annualreviews.org/content/journals/10.1146/annurev-environ-121224-073319
+
+The intended paradigm shift is a falsifiable co-design process: the best combined system must outperform relevant separate or conventional alternatives on declared objectives and constraints at a particular site. A visually integrated greenhouse, an autonomy demo, an LER above 1, or a vendor-reported input saving is not sufficient evidence by itself.
+
 ## 10. Explicit nonclaims
 
 This document does not establish crop/yield benefits, disease diagnosis, food safety, nutrient adequacy, regulatory compliance, safe machinery operation, commercial viability, positive ROI, improved farmer bargaining power, land-equivalent superiority, or any other real-world outcome. These require task- and site-specific evidence and independent validation.
