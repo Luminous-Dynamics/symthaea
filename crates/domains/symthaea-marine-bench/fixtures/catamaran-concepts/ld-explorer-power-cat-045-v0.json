@@ -1,0 +1,406 @@
+{
+  "schema_version": "1.0.0",
+  "concept_id": "LD-EXPLORER-POWER-CAT-045-V0",
+  "concept_name": "Bluewater Twin 45 — expedition hybrid power catamaran",
+  "archetype": "expedition_power_catamaran",
+  "maturity": "concept_hypothesis",
+  "mission": {
+    "mission_statement": "A long-range expedition power catamaran with quiet port modes, broad deck utility, shallow-water access where appropriate, comfortable offshore motion, maintainable twin machinery and strong degraded-operation capability.",
+    "operating_region": "Ocean/coastal expedition routes with declared weather avoidance, refuge and draft constraints; no polar/ice operation presumed.",
+    "route_profile": "Long displacement/semi-displacement passages with low-speed hotel/anchorage operation, tender handling, resupply and route-specific fuel/shore-power scenarios.",
+    "target_cruise_speed_kn": {
+      "value": 12,
+      "unit": "kn",
+      "status": "design_target",
+      "lower_bound": null,
+      "upper_bound": null,
+      "source_ref": null,
+      "rationale": "Provisional passage-speed target; propulsion demand must be computed against a hull/propulsor model."
+    },
+    "target_range_nmi": {
+      "value": 3000,
+      "unit": "nmi",
+      "status": "design_target",
+      "lower_bound": null,
+      "upper_bound": null,
+      "source_ref": null,
+      "rationale": "Provisional range including a reserve policy to be formalised."
+    },
+    "voyage_duration_days": {
+      "value": 21,
+      "unit": "days",
+      "status": "design_assumption",
+      "lower_bound": null,
+      "upper_bound": null,
+      "source_ref": null,
+      "rationale": "Initial endurance and store/maintenance stress scenario."
+    },
+    "passenger_capacity": {
+      "value": 20,
+      "unit": "persons",
+      "status": "design_assumption",
+      "lower_bound": null,
+      "upper_bound": null,
+      "source_ref": null,
+      "rationale": "Working guest capacity for the mission profile; final arrangement and safety review required."
+    },
+    "crew_capacity": {
+      "value": null,
+      "unit": "persons",
+      "status": "unknown",
+      "lower_bound": null,
+      "upper_bound": null,
+      "source_ref": null,
+      "rationale": "Mission, systems complexity, service level and safe manning determine crew complement."
+    },
+    "payload_capacity": {
+      "value": null,
+      "unit": "kg",
+      "status": "unknown",
+      "lower_bound": null,
+      "upper_bound": null,
+      "source_ref": null,
+      "rationale": "Tender, stores, science/work payload, fuel, batteries and consumables need a weight budget."
+    }
+  },
+  "geometry": {
+    "length_overall_m": {
+      "value": 45,
+      "unit": "m",
+      "status": "design_assumption",
+      "lower_bound": null,
+      "upper_bound": null,
+      "source_ref": null,
+      "rationale": "Concept scale for an expedition power catamaran."
+    },
+    "length_waterline_m": {
+      "value": null,
+      "unit": "m",
+      "status": "unknown",
+      "lower_bound": null,
+      "upper_bound": null,
+      "source_ref": null,
+      "rationale": "Requires hull/trim/displacement trade studies."
+    },
+    "overall_beam_m": {
+      "value": null,
+      "unit": "m",
+      "status": "unknown",
+      "lower_bound": null,
+      "upper_bound": null,
+      "source_ref": null,
+      "rationale": "Constrained by port, stability, structure, cross-deck loading and superstructure windage."
+    },
+    "demihull_beam_m": {
+      "value": null,
+      "unit": "m",
+      "status": "unknown",
+      "lower_bound": null,
+      "upper_bound": null,
+      "source_ref": null,
+      "rationale": "Set from required payload, tankage, machinery, slenderness and low-speed hull resistance."
+    },
+    "hull_centerline_spacing_m": {
+      "value": null,
+      "unit": "m",
+      "status": "unknown",
+      "lower_bound": null,
+      "upper_bound": null,
+      "source_ref": null,
+      "rationale": "Central design variable; optimise both wave interference and transverse/cross-deck consequences."
+    },
+    "hull_spacing_over_lwl": {
+      "value": null,
+      "unit": "ratio",
+      "status": "unknown",
+      "lower_bound": null,
+      "upper_bound": null,
+      "source_ref": null,
+      "rationale": "Do not select a dimensionless optimum outside demonstrated benchmark domain."
+    },
+    "design_draft_m": {
+      "value": null,
+      "unit": "m",
+      "status": "unknown",
+      "lower_bound": null,
+      "upper_bound": null,
+      "source_ref": null,
+      "rationale": "Determine for propulsors, appendages, displacement, port access and loaded reserve."
+    },
+    "wet_deck_clearance_m": {
+      "value": null,
+      "unit": "m",
+      "status": "unknown",
+      "lower_bound": null,
+      "upper_bound": null,
+      "source_ref": null,
+      "rationale": "Set by route wave climate, bridge-deck impacts and superstructure/CG trade."
+    },
+    "wet_deck_clearance_over_draft": {
+      "value": null,
+      "unit": "ratio",
+      "status": "unknown",
+      "lower_bound": null,
+      "upper_bound": null,
+      "source_ref": null,
+      "rationale": "Dimensionless screening variable to measure against encounter wave and loading cases."
+    },
+    "displacement_tonnes": {
+      "value": null,
+      "unit": "tonne",
+      "status": "unknown",
+      "lower_bound": null,
+      "upper_bound": null,
+      "source_ref": null,
+      "rationale": "Full mass, fuel, battery, stores, payload and growth-margin model required."
+    },
+    "demihull_slenderness_lwl_over_beam": {
+      "value": null,
+      "unit": "ratio",
+      "status": "unknown",
+      "lower_bound": null,
+      "upper_bound": null,
+      "source_ref": null,
+      "rationale": "Must co-optimise resistance, tankage, structure, propulsor integration and usable volume."
+    },
+    "hull_form_hypothesis": "Compare slender displacement and moderate semi-displacement twin hull families with multiple bow reserve-volume and stern/propulsor arrangements.",
+    "volume_distribution_hypothesis": "Optimise trim and reserve buoyancy under lightship, full fuel/stores, tender, payload and uneven loading."
+  },
+  "hydrodynamics": {
+    "speed_regime": "mixed_regime",
+    "design_froude_min": null,
+    "design_froude_max": null,
+    "hull_interference_method": "Sweep hull-spacing and demi-hull-form variables over speed/loading; measure interference versus a monohull and isolated-hull baseline without extrapolating one best point.",
+    "resistance_method": "Separate viscous/frictional, wave-making, appendage and propulsor terms only where the model supports them; use matched ITTC-style validation and keep error bars.",
+    "propulsor_configuration": "Compare twin propellers, pods or other appropriate propulsion with redundancy, cavitation/noise, shallow-water, serviceability and manoeuvring constraints.",
+    "foil_configuration": "No lift foils in baseline; optional foil-assist remains a separate variant requiring impact/failure analysis and independent gains accounting.",
+    "reference_cases": [
+      "Delft 372 resistance/trim/sinkage and hull-spacing studies as a methodology anchor only; not same displacement/design or direct full-scale performance.",
+      "ITTC resistance/propulsion validation database; exact compatible case and license must be checked."
+    ],
+    "uncertainty_method": "Separate numerical, model-form, measurement, load/weather, fouling and scale/applicability uncertainty; validate each speed regime and loading condition."
+  },
+  "seakeeping": {
+    "wave_climate_basis": "Build region-specific scatter diagrams and route encounters; include irregular waves, headings, currents and loading variation.",
+    "wave_heading_cases": [
+      "head seas",
+      "bow quartering",
+      "beam seas",
+      "stern quartering",
+      "following seas",
+      "oblique wind/waves"
+    ],
+    "response_metrics": [
+      "heave",
+      "pitch",
+      "roll",
+      "vertical_acceleration",
+      "added_resistance",
+      "cross_deck_pressure",
+      "slamming_event_rate",
+      "green_water",
+      "propulsor_immersion",
+      "passenger_motion_sickness"
+    ],
+    "wet_deck_impact_method": "Predict dynamic clearance and pressure/impact response with uncertainty; verify shortlisted candidates using model tests or validated time-domain methods.",
+    "slamming_disposition": "not_assessed",
+    "ride_comfort_method": "Quantify vertical/lateral acceleration, motions, noise and vibration at guest/crew locations across declared routes and speed choices.",
+    "operating_envelope_disposition": "not_assessed"
+  },
+  "structure_and_safety": {
+    "cross_deck_load_path": "Develop global cross-deck bending/torsion and local wet-deck pressure load paths for wave, asymmetric buoyancy, machinery and superstructure loads.",
+    "fatigue_method": "Define lifetime wave/propulsor/engine vibration spectra; inspectable details and maintenance allowances required.",
+    "asymmetric_flooding_method": "Analyse independent hull flooding, cross-flooding risk, compartmentation, residual stability and safe degraded operation.",
+    "stability_method": "Qualified intact/damage stability across tank/loading/sea states, tender loading, high windage and damage conditions.",
+    "foil_failure_mode_method": "Not applicable to the non-foiling baseline; if foil-assist is introduced it must be assessed as a separate fail-safe architecture.",
+    "redundancy_and_degraded_modes": "Independent propulsion/control/power paths; assess single machinery failure, steering failure, black-start, fire segregation and safe return.",
+    "approval_basis": "Determine applicable flag/class rules, route, passenger/crew category and intended operation with qualified naval architects."
+  },
+  "energy_architecture": {
+    "propulsion_candidates": [
+      "twin efficient diesel or renewable-fuel-capable propulsion baseline",
+      "diesel-electric hybrid with battery peak shaving and silent port mode",
+      "battery-electric for restricted route segments only where energy/mass/charging close"
+    ],
+    "energy_carriers": [
+      "conventional distillate baseline",
+      "lifecycle-reviewed renewable diesel/HVO",
+      "shore electricity",
+      "methanol or hydrogen as bounded future-fuel studies subject to safety/volume assessment"
+    ],
+    "battery_capacity_mwh": {
+      "value": null,
+      "unit": "MWh",
+      "status": "unknown",
+      "lower_bound": null,
+      "upper_bound": null,
+      "source_ref": null,
+      "rationale": "Size only after route power map, quiet-mode duration, battery aging, reserve, cooling/fire zone and mass closure."
+    },
+    "mode_resolved_load_basis": "Build 15-minute or finer loads for passage speeds, hotel/quiet mode, manoeuvring, tender handling, freshwater/waste systems, peak HVAC, generator loading and emergencies.",
+    "shore_power_or_charging": "Model only specific ports with verified connection rating, dwell times, grid constraints and seasonal availability.",
+    "renewable_assist": "Assess solar and wind assist as route- and geometry-dependent increments after structural, stability, maintenance and aerodynamic/foil effects are considered.",
+    "emissions_boundary": "Provide tank-to-wake and well-to-wake GHG, upstream energy factors, fuel logistics and battery/fuel-system lifecycle sensitivity.",
+    "reserve_policy": "Set mission reserve, safe divert range, one-generator/one-propulsor degraded case, battery reserve and fuel uncertainty."
+  },
+  "payload_and_operations": {
+    "mission_payload": "Tender/mission equipment, provisions, water, fuel, batteries and guest payload share the same mass, deck load and centre-of-gravity budget.",
+    "port_or_mooring_envelope": "Verify overall beam, draft, windage, mooring/tender access and service/charging availability for intended destinations.",
+    "maintainability": "Arrange twin machinery and electric/battery compartments for independent service and safe isolation; account for remote parts and specialist repair.",
+    "crew_workload": "Assess bridge/engineering manning, engine monitoring, tender operations, anchoring, redundancy transitions and emergency actions.",
+    "emergency_access": "Cross-deck and hull compartments need accessible escape/isolation; preserve rescue boat/tender launch, firefighting and abandon-ship arrangements.",
+    "availability_target": {
+      "value": 0.98,
+      "unit": "fraction",
+      "status": "design_target",
+      "lower_bound": null,
+      "upper_bound": null,
+      "source_ref": null,
+      "rationale": "Provisional expedition mission target; verify with redundancy, spares, maintenance and route model."
+    }
+  },
+  "performance_targets": [
+    {
+      "metric": "well_to_wake_ghg_per_guest_nautical_mile",
+      "unit": "gCO2e_per_guest_nmi",
+      "target_value": null,
+      "direction": "minimize",
+      "status": "requires_baseline",
+      "comparison_basis": "Matched same route, payload, speed, comfort, auxiliary service and reserve.",
+      "validation_method": "Lifecycle fuel/electricity factors plus validated mission energy model."
+    },
+    {
+      "metric": "range_at_target_speed",
+      "unit": "nmi",
+      "target_value": 3000,
+      "direction": "maximize",
+      "status": "provisional_target",
+      "comparison_basis": "Declared loading, weather, fouling, fuel quality and reserve.",
+      "validation_method": "Validated resistance/power map plus time-series load/fuel balance."
+    },
+    {
+      "metric": "quiet_mode_duration",
+      "unit": "hours",
+      "target_value": null,
+      "direction": "maximize",
+      "status": "requires_baseline",
+      "comparison_basis": "Same guest-service/HVAC loads and acceptable noise levels.",
+      "validation_method": "Measured hotel loads and acoustic tests; state battery reserve and ambient environment."
+    },
+    {
+      "metric": "false_robust_feasible_classifications",
+      "unit": "count",
+      "target_value": 0,
+      "direction": "threshold",
+      "status": "provisional_target",
+      "comparison_basis": "Stability, cross-deck slam, single machinery failure, route/draft, emissions and energy reserve negative controls.",
+      "validation_method": "Evaluator-hidden truth and qualified hard constraints; no compensatory scalar score."
+    }
+  ],
+  "hard_constraints": [
+    {
+      "constraint_id": "STABILITY-001",
+      "description": "Intact/damage stability across loading, tank, asymmetric flooding and wave conditions.",
+      "disposition": "not_assessed",
+      "evidence_needed": "Qualified calculations, applicable criteria and flag/class review."
+    },
+    {
+      "constraint_id": "CROSSDECK-001",
+      "description": "Cross-deck bending, torsion, fatigue and wet-deck impact loads.",
+      "disposition": "not_assessed",
+      "evidence_needed": "Design load cases, validated hydrodynamic pressures and structural/fatigue verification."
+    },
+    {
+      "constraint_id": "PROP-001",
+      "description": "Safe propulsion, steering and essential power under defined single failures.",
+      "disposition": "not_assessed",
+      "evidence_needed": "Reliability, FMEA and degraded-mode tests with qualified approval."
+    },
+    {
+      "constraint_id": "ENV-001",
+      "description": "Emissions and discharge compliance for declared routes and ports.",
+      "disposition": "not_assessed",
+      "evidence_needed": "Applicable MARPOL/flag/port compliance matrix and evidence."
+    },
+    {
+      "constraint_id": "ROUTE-001",
+      "description": "Draft, beam, port, anchorage, weather and rescue/refuge envelope.",
+      "disposition": "not_assessed",
+      "evidence_needed": "Verified route/port GIS, wave scatter diagrams and operations procedures."
+    },
+    {
+      "constraint_id": "FIRE-001",
+      "description": "Fuel/battery fire, ventilation, containment, escape and independent isolation.",
+      "disposition": "not_assessed",
+      "evidence_needed": "Energy-system hazard analyses and class/flag review."
+    }
+  ],
+  "assumptions": [
+    {
+      "assumption_id": "P-CAT-001",
+      "statement": "A slender twin-hull platform can provide useful deck volume and shallow-draft access without excessive wave interaction or structure mass.",
+      "category": "geometry",
+      "status": "untested",
+      "falsification_method": "Compare matched-payload candidates across beam, spacing, draft, resistance, structural weight and route access."
+    },
+    {
+      "assumption_id": "P-CAT-002",
+      "statement": "Hybrid electric dispatch and quiet modes can reduce fuel/emissions without over-sizing battery capacity.",
+      "category": "energy_storage",
+      "status": "untested",
+      "falsification_method": "Use measured or validated time-series hotel/propulsion loads with degradation, reserve, and lifecycle pathway factors."
+    },
+    {
+      "assumption_id": "P-CAT-003",
+      "statement": "A single catamaran geometry can meet both long-passage efficiency and useful port/low-speed handling.",
+      "category": "operations",
+      "status": "untested",
+      "falsification_method": "Evaluate full mission envelope and separate operational variants where no robust common optimum exists."
+    }
+  ],
+  "provenance": [
+    {
+      "source_id": "delft-372-static-drift",
+      "title": "CFD validation for Delft 372 Catamaran in static drift conditions",
+      "uri": "https://iris.cnr.it/handle/20.500.14243/351603",
+      "scope": "Reference methodology for calm-water drift, loads, sinkage/trim, PIV and wave-pattern validation; geometry/conditions must match before quantitative use.",
+      "rights_disposition": "public_metadata_only"
+    },
+    {
+      "source_id": "delft-372-wave-benchmark",
+      "title": "Experimental catamaran head-wave benchmark with uncertainty quantification",
+      "uri": "https://doi.org/10.1016/j.oceaneng.2019.106685",
+      "scope": "Regular and irregular head-wave responses and statistical uncertainty analysis; source record notes access restrictions, so do not redistribute source data without permission.",
+      "rights_disposition": "unknown_needs_review"
+    },
+    {
+      "source_id": "ittc-cfd-resistance",
+      "title": "ITTC CFD validation benchmark database for resistance and propulsion",
+      "uri": "https://www.ittc.info/media/9771/75-03-02-02.pdf",
+      "scope": "Procedure describing selection and use of resistance/propulsion CFD validation cases; not blanket permission to redistribute linked data.",
+      "rights_disposition": "public_metadata_only"
+    },
+    {
+      "source_id": "imo-hsc-code",
+      "title": "IMO High-speed craft safety framework",
+      "uri": "https://www.imo.org/en/ourwork/safety/pages/hsc.aspx",
+      "scope": "Applicability and overview of HSC Code for qualifying high-speed craft; route and vessel-specific applicability review required.",
+      "rights_disposition": "public_metadata_only"
+    },
+    {
+      "source_id": "imo-ship-design-stability",
+      "title": "IMO ship design and stability",
+      "uri": "https://www.imo.org/en/ourwork/safety/pages/shipdesignandstability-default.aspx",
+      "scope": "Public overview of SOLAS ship design, subdivision and stability requirements; not a complete compliance checklist.",
+      "rights_disposition": "public_metadata_only"
+    },
+    {
+      "source_id": "ef24-public-reported",
+      "title": "Condor/Artemis EF-24 electric ferry project report",
+      "uri": "https://www.itv.com/news/channel/2022-09-26/look-inside-condors-new-100-electric-ferry",
+      "scope": "Project-reported 24 m hydrofoil ferry concept with up to 150 passengers, 100 nmi and 38 kn; comparison anchor only, not independent validation.",
+      "rights_disposition": "public_metadata_only"
+    }
+  ],
+  "claim_ceiling": "Concept hypothesis only. No resistance, full-scale range, wave limit, structural strength, stability, seaworthiness or class approval is established."
+}

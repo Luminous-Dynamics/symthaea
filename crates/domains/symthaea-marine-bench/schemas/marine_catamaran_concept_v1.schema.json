@@ -1,0 +1,726 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "urn:luminous-dynamics:symthaea:marine-catamaran-concept:v1",
+  "title": "Symthaea Catamaran Concept Record v1",
+  "description": "Mission-bound multihull concept record with geometry ratios, hydrodynamic and seakeeping evidence, energy, and non-compensable safety gates. Not a vessel approval or performance certificate.",
+  "type": "object",
+  "additionalProperties": false,
+  "required": [
+    "schema_version",
+    "concept_id",
+    "concept_name",
+    "archetype",
+    "maturity",
+    "mission",
+    "geometry",
+    "hydrodynamics",
+    "seakeeping",
+    "structure_and_safety",
+    "energy_architecture",
+    "payload_and_operations",
+    "performance_targets",
+    "hard_constraints",
+    "assumptions",
+    "provenance",
+    "claim_ceiling"
+  ],
+  "properties": {
+    "schema_version": {
+      "const": "1.0.0"
+    },
+    "concept_id": {
+      "type": "string",
+      "minLength": 1
+    },
+    "concept_name": {
+      "type": "string",
+      "minLength": 1
+    },
+    "archetype": {
+      "enum": [
+        "bluewater_sailing_catamaran",
+        "electric_hydrofoil_passenger_catamaran",
+        "expedition_power_catamaran"
+      ]
+    },
+    "maturity": {
+      "enum": [
+        "concept_hypothesis",
+        "preliminary_design",
+        "modelled",
+        "bench_validated",
+        "sea_trial_validated",
+        "class_reviewed"
+      ]
+    },
+    "mission": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "mission_statement",
+        "operating_region",
+        "route_profile",
+        "target_cruise_speed_kn",
+        "target_range_nmi",
+        "voyage_duration_days",
+        "passenger_capacity",
+        "crew_capacity",
+        "payload_capacity"
+      ],
+      "properties": {
+        "mission_statement": {
+          "type": "string",
+          "minLength": 1
+        },
+        "operating_region": {
+          "type": "string",
+          "minLength": 1
+        },
+        "route_profile": {
+          "type": "string",
+          "minLength": 1
+        },
+        "target_cruise_speed_kn": {
+          "$ref": "#/$defs/quantity"
+        },
+        "target_range_nmi": {
+          "$ref": "#/$defs/quantity"
+        },
+        "voyage_duration_days": {
+          "$ref": "#/$defs/quantity"
+        },
+        "passenger_capacity": {
+          "$ref": "#/$defs/quantity"
+        },
+        "crew_capacity": {
+          "$ref": "#/$defs/quantity"
+        },
+        "payload_capacity": {
+          "$ref": "#/$defs/quantity"
+        }
+      }
+    },
+    "geometry": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "length_overall_m",
+        "length_waterline_m",
+        "overall_beam_m",
+        "demihull_beam_m",
+        "hull_centerline_spacing_m",
+        "hull_spacing_over_lwl",
+        "design_draft_m",
+        "wet_deck_clearance_m",
+        "wet_deck_clearance_over_draft",
+        "displacement_tonnes",
+        "demihull_slenderness_lwl_over_beam",
+        "hull_form_hypothesis",
+        "volume_distribution_hypothesis"
+      ],
+      "properties": {
+        "length_overall_m": {
+          "$ref": "#/$defs/quantity"
+        },
+        "length_waterline_m": {
+          "$ref": "#/$defs/quantity"
+        },
+        "overall_beam_m": {
+          "$ref": "#/$defs/quantity"
+        },
+        "demihull_beam_m": {
+          "$ref": "#/$defs/quantity"
+        },
+        "hull_centerline_spacing_m": {
+          "$ref": "#/$defs/quantity"
+        },
+        "hull_spacing_over_lwl": {
+          "$ref": "#/$defs/quantity"
+        },
+        "design_draft_m": {
+          "$ref": "#/$defs/quantity"
+        },
+        "wet_deck_clearance_m": {
+          "$ref": "#/$defs/quantity"
+        },
+        "wet_deck_clearance_over_draft": {
+          "$ref": "#/$defs/quantity"
+        },
+        "displacement_tonnes": {
+          "$ref": "#/$defs/quantity"
+        },
+        "demihull_slenderness_lwl_over_beam": {
+          "$ref": "#/$defs/quantity"
+        },
+        "hull_form_hypothesis": {
+          "type": "string",
+          "minLength": 1
+        },
+        "volume_distribution_hypothesis": {
+          "type": "string",
+          "minLength": 1
+        }
+      }
+    },
+    "hydrodynamics": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "speed_regime",
+        "design_froude_min",
+        "design_froude_max",
+        "hull_interference_method",
+        "resistance_method",
+        "propulsor_configuration",
+        "foil_configuration",
+        "reference_cases",
+        "uncertainty_method"
+      ],
+      "properties": {
+        "speed_regime": {
+          "enum": [
+            "displacement",
+            "semi_displacement",
+            "planing",
+            "foil_assisted",
+            "fully_foiling",
+            "mixed_regime"
+          ]
+        },
+        "design_froude_min": {
+          "type": [
+            "number",
+            "null"
+          ],
+          "minimum": 0
+        },
+        "design_froude_max": {
+          "type": [
+            "number",
+            "null"
+          ],
+          "minimum": 0
+        },
+        "hull_interference_method": {
+          "type": "string",
+          "minLength": 1
+        },
+        "resistance_method": {
+          "type": "string",
+          "minLength": 1
+        },
+        "propulsor_configuration": {
+          "type": "string",
+          "minLength": 1
+        },
+        "foil_configuration": {
+          "type": "string",
+          "minLength": 1
+        },
+        "reference_cases": {
+          "type": "array",
+          "items": {
+            "type": "string",
+            "minLength": 1
+          }
+        },
+        "uncertainty_method": {
+          "type": "string",
+          "minLength": 1
+        }
+      }
+    },
+    "seakeeping": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "wave_climate_basis",
+        "wave_heading_cases",
+        "response_metrics",
+        "wet_deck_impact_method",
+        "slamming_disposition",
+        "ride_comfort_method",
+        "operating_envelope_disposition"
+      ],
+      "properties": {
+        "wave_climate_basis": {
+          "type": "string",
+          "minLength": 1
+        },
+        "wave_heading_cases": {
+          "type": "array",
+          "minItems": 1,
+          "items": {
+            "type": "string",
+            "minLength": 1
+          }
+        },
+        "response_metrics": {
+          "type": "array",
+          "minItems": 1,
+          "uniqueItems": true,
+          "items": {
+            "enum": [
+              "heave",
+              "pitch",
+              "roll",
+              "vertical_acceleration",
+              "added_resistance",
+              "cross_deck_pressure",
+              "slamming_event_rate",
+              "green_water",
+              "propulsor_immersion",
+              "foil_loads",
+              "passenger_motion_sickness"
+            ]
+          }
+        },
+        "wet_deck_impact_method": {
+          "type": "string",
+          "minLength": 1
+        },
+        "slamming_disposition": {
+          "enum": [
+            "not_assessed",
+            "not_applicable_with_evidence",
+            "screened",
+            "model_test_validated"
+          ]
+        },
+        "ride_comfort_method": {
+          "type": "string",
+          "minLength": 1
+        },
+        "operating_envelope_disposition": {
+          "enum": [
+            "not_assessed",
+            "candidate_only",
+            "analysis_supported",
+            "validated",
+            "approved"
+          ]
+        }
+      }
+    },
+    "structure_and_safety": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "cross_deck_load_path",
+        "fatigue_method",
+        "asymmetric_flooding_method",
+        "stability_method",
+        "foil_failure_mode_method",
+        "redundancy_and_degraded_modes",
+        "approval_basis"
+      ],
+      "properties": {
+        "cross_deck_load_path": {
+          "type": "string",
+          "minLength": 1
+        },
+        "fatigue_method": {
+          "type": "string",
+          "minLength": 1
+        },
+        "asymmetric_flooding_method": {
+          "type": "string",
+          "minLength": 1
+        },
+        "stability_method": {
+          "type": "string",
+          "minLength": 1
+        },
+        "foil_failure_mode_method": {
+          "type": "string",
+          "minLength": 1
+        },
+        "redundancy_and_degraded_modes": {
+          "type": "string",
+          "minLength": 1
+        },
+        "approval_basis": {
+          "type": "string",
+          "minLength": 1
+        }
+      }
+    },
+    "energy_architecture": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "propulsion_candidates",
+        "energy_carriers",
+        "battery_capacity_mwh",
+        "mode_resolved_load_basis",
+        "shore_power_or_charging",
+        "renewable_assist",
+        "emissions_boundary",
+        "reserve_policy"
+      ],
+      "properties": {
+        "propulsion_candidates": {
+          "type": "array",
+          "minItems": 1,
+          "items": {
+            "type": "string",
+            "minLength": 1
+          }
+        },
+        "energy_carriers": {
+          "type": "array",
+          "minItems": 1,
+          "items": {
+            "type": "string",
+            "minLength": 1
+          }
+        },
+        "battery_capacity_mwh": {
+          "$ref": "#/$defs/quantity"
+        },
+        "mode_resolved_load_basis": {
+          "type": "string",
+          "minLength": 1
+        },
+        "shore_power_or_charging": {
+          "type": "string",
+          "minLength": 1
+        },
+        "renewable_assist": {
+          "type": "string",
+          "minLength": 1
+        },
+        "emissions_boundary": {
+          "type": "string",
+          "minLength": 1
+        },
+        "reserve_policy": {
+          "type": "string",
+          "minLength": 1
+        }
+      }
+    },
+    "payload_and_operations": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "mission_payload",
+        "port_or_mooring_envelope",
+        "maintainability",
+        "crew_workload",
+        "emergency_access",
+        "availability_target"
+      ],
+      "properties": {
+        "mission_payload": {
+          "type": "string",
+          "minLength": 1
+        },
+        "port_or_mooring_envelope": {
+          "type": "string",
+          "minLength": 1
+        },
+        "maintainability": {
+          "type": "string",
+          "minLength": 1
+        },
+        "crew_workload": {
+          "type": "string",
+          "minLength": 1
+        },
+        "emergency_access": {
+          "type": "string",
+          "minLength": 1
+        },
+        "availability_target": {
+          "$ref": "#/$defs/quantity"
+        }
+      }
+    },
+    "performance_targets": {
+      "type": "array",
+      "minItems": 1,
+      "items": {
+        "$ref": "#/$defs/performance_target"
+      }
+    },
+    "hard_constraints": {
+      "type": "array",
+      "minItems": 1,
+      "items": {
+        "$ref": "#/$defs/hard_constraint"
+      }
+    },
+    "assumptions": {
+      "type": "array",
+      "minItems": 1,
+      "items": {
+        "$ref": "#/$defs/assumption"
+      }
+    },
+    "provenance": {
+      "type": "array",
+      "items": {
+        "$ref": "#/$defs/provenance"
+      }
+    },
+    "claim_ceiling": {
+      "type": "string",
+      "minLength": 1
+    }
+  },
+  "$defs": {
+    "quantity": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "value",
+        "unit",
+        "status",
+        "lower_bound",
+        "upper_bound",
+        "source_ref",
+        "rationale"
+      ],
+      "properties": {
+        "value": {
+          "type": [
+            "number",
+            "null"
+          ]
+        },
+        "unit": {
+          "type": "string",
+          "minLength": 1
+        },
+        "status": {
+          "enum": [
+            "design_assumption",
+            "design_target",
+            "computed",
+            "measured",
+            "unknown"
+          ]
+        },
+        "lower_bound": {
+          "type": [
+            "number",
+            "null"
+          ]
+        },
+        "upper_bound": {
+          "type": [
+            "number",
+            "null"
+          ]
+        },
+        "source_ref": {
+          "type": [
+            "string",
+            "null"
+          ],
+          "minLength": 1
+        },
+        "rationale": {
+          "type": "string",
+          "minLength": 1
+        }
+      },
+      "allOf": [
+        {
+          "if": {
+            "properties": {
+              "status": {
+                "const": "unknown"
+              }
+            },
+            "required": [
+              "status"
+            ]
+          },
+          "then": {
+            "properties": {
+              "value": {
+                "type": "null"
+              }
+            }
+          }
+        }
+      ]
+    },
+    "performance_target": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "metric",
+        "unit",
+        "target_value",
+        "direction",
+        "status",
+        "comparison_basis",
+        "validation_method"
+      ],
+      "properties": {
+        "metric": {
+          "type": "string",
+          "minLength": 1
+        },
+        "unit": {
+          "type": "string",
+          "minLength": 1
+        },
+        "target_value": {
+          "type": [
+            "number",
+            "null"
+          ]
+        },
+        "direction": {
+          "enum": [
+            "minimize",
+            "maximize",
+            "threshold",
+            "report_only"
+          ]
+        },
+        "status": {
+          "enum": [
+            "aspirational_target",
+            "provisional_target",
+            "requires_baseline",
+            "not_quantified"
+          ]
+        },
+        "comparison_basis": {
+          "type": "string",
+          "minLength": 1
+        },
+        "validation_method": {
+          "type": "string",
+          "minLength": 1
+        }
+      }
+    },
+    "hard_constraint": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "constraint_id",
+        "description",
+        "disposition",
+        "evidence_needed"
+      ],
+      "properties": {
+        "constraint_id": {
+          "type": "string",
+          "minLength": 1
+        },
+        "description": {
+          "type": "string",
+          "minLength": 1
+        },
+        "disposition": {
+          "enum": [
+            "not_assessed",
+            "pass",
+            "fail",
+            "indeterminate",
+            "not_applicable"
+          ]
+        },
+        "evidence_needed": {
+          "type": "string",
+          "minLength": 1
+        }
+      }
+    },
+    "assumption": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "assumption_id",
+        "statement",
+        "category",
+        "status",
+        "falsification_method"
+      ],
+      "properties": {
+        "assumption_id": {
+          "type": "string",
+          "minLength": 1
+        },
+        "statement": {
+          "type": "string",
+          "minLength": 1
+        },
+        "category": {
+          "enum": [
+            "mission",
+            "geometry",
+            "hydrodynamics",
+            "seakeeping",
+            "structure",
+            "propulsion",
+            "energy_storage",
+            "foils",
+            "fuel",
+            "operations",
+            "regulatory",
+            "environmental",
+            "cost",
+            "comfort"
+          ]
+        },
+        "status": {
+          "enum": [
+            "untested",
+            "supported_by_literature",
+            "measured",
+            "rejected"
+          ]
+        },
+        "falsification_method": {
+          "type": "string",
+          "minLength": 1
+        }
+      }
+    },
+    "provenance": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "source_id",
+        "title",
+        "uri",
+        "scope",
+        "rights_disposition"
+      ],
+      "properties": {
+        "source_id": {
+          "type": "string",
+          "minLength": 1
+        },
+        "title": {
+          "type": "string",
+          "minLength": 1
+        },
+        "uri": {
+          "type": "string",
+          "format": "uri"
+        },
+        "scope": {
+          "type": "string",
+          "minLength": 1
+        },
+        "rights_disposition": {
+          "enum": [
+            "public_metadata_only",
+            "reviewed_for_use",
+            "unknown_needs_review",
+            "restricted"
+          ]
+        }
+      }
+    }
+  }
+}
