@@ -1,0 +1,403 @@
+{
+  "schema_version": "1.0.0",
+  "concept_id": "LD-EFOIL-CAT-024-V0",
+  "concept_name": "Coastal Swift 24 — electric hydrofoil passenger catamaran",
+  "archetype": "electric_hydrofoil_passenger_catamaran",
+  "maturity": "concept_hypothesis",
+  "mission": {
+    "mission_statement": "A high-utilisation short-route passenger craft with predictable ride quality, accessible boarding, rapid turnaround, low local emissions and a fail-safe return-to-port capability.",
+    "operating_region": "Sheltered/coastal routes only after a route-specific sea-state and refuge analysis; open-ocean operation is not assumed.",
+    "route_profile": "Frequent short legs, scheduled dwell/charging, wave/current variation, passenger boarding and accessible pier interfaces.",
+    "target_cruise_speed_kn": {
+      "value": 30,
+      "unit": "kn",
+      "status": "design_target",
+      "lower_bound": null,
+      "upper_bound": null,
+      "source_ref": null,
+      "rationale": "Concept performance target lower than the 38-kn project figure publicly reported for EF-24; not a prediction or guaranteed capability."
+    },
+    "target_range_nmi": {
+      "value": 60,
+      "unit": "nmi",
+      "status": "design_target",
+      "lower_bound": null,
+      "upper_bound": null,
+      "source_ref": null,
+      "rationale": "Provisional operating range includes reserve and degradation review; battery mass/energy closure unproven."
+    },
+    "voyage_duration_days": {
+      "value": 1,
+      "unit": "day",
+      "status": "design_assumption",
+      "lower_bound": null,
+      "upper_bound": null,
+      "source_ref": null,
+      "rationale": "High-utilisation daily-service profile rather than overnight mission."
+    },
+    "passenger_capacity": {
+      "value": 150,
+      "unit": "persons",
+      "status": "design_assumption",
+      "lower_bound": null,
+      "upper_bound": null,
+      "source_ref": null,
+      "rationale": "Working capacity inspired by public EF-24 project comparator; arrangement/evacuation not evaluated."
+    },
+    "crew_capacity": {
+      "value": null,
+      "unit": "persons",
+      "status": "unknown",
+      "lower_bound": null,
+      "upper_bound": null,
+      "source_ref": null,
+      "rationale": "Set through vessel operations, manning and applicable rules."
+    },
+    "payload_capacity": {
+      "value": null,
+      "unit": "kg",
+      "status": "unknown",
+      "lower_bound": null,
+      "upper_bound": null,
+      "source_ref": null,
+      "rationale": "Battery mass, passengers, baggage, accessible boarding system and structural margins need a full weight budget."
+    }
+  },
+  "geometry": {
+    "length_overall_m": {
+      "value": 24,
+      "unit": "m",
+      "status": "design_assumption",
+      "lower_bound": null,
+      "upper_bound": null,
+      "source_ref": null,
+      "rationale": "Comparable length tier to the public EF-24 project; this concept has no copied geometry."
+    },
+    "length_waterline_m": {
+      "value": null,
+      "unit": "m",
+      "status": "unknown",
+      "lower_bound": null,
+      "upper_bound": null,
+      "source_ref": null,
+      "rationale": "Foilborne and displacement-mode waterlines differ; define hull references explicitly."
+    },
+    "overall_beam_m": {
+      "value": null,
+      "unit": "m",
+      "status": "unknown",
+      "lower_bound": null,
+      "upper_bound": null,
+      "source_ref": null,
+      "rationale": "Set by passenger layout, docking envelope, foil span, stability and structural loads."
+    },
+    "demihull_beam_m": {
+      "value": null,
+      "unit": "m",
+      "status": "unknown",
+      "lower_bound": null,
+      "upper_bound": null,
+      "source_ref": null,
+      "rationale": "Optimize submerged-volume, takeoff power, low-speed operation and foiling drag."
+    },
+    "hull_centerline_spacing_m": {
+      "value": null,
+      "unit": "m",
+      "status": "unknown",
+      "lower_bound": null,
+      "upper_bound": null,
+      "source_ref": null,
+      "rationale": "Tune for hull wave interference, transverse structure, foil geometry, pier access and stability."
+    },
+    "hull_spacing_over_lwl": {
+      "value": null,
+      "unit": "ratio",
+      "status": "unknown",
+      "lower_bound": null,
+      "upper_bound": null,
+      "source_ref": null,
+      "rationale": "Dimensionless design variable requiring coupled hydrostatic, hydrodynamic and structural analysis."
+    },
+    "design_draft_m": {
+      "value": null,
+      "unit": "m",
+      "status": "unknown",
+      "lower_bound": null,
+      "upper_bound": null,
+      "source_ref": null,
+      "rationale": "Must include hullborne mode, foils/struts, retractability, grounding and port/charging access."
+    },
+    "wet_deck_clearance_m": {
+      "value": null,
+      "unit": "m",
+      "status": "unknown",
+      "lower_bound": null,
+      "upper_bound": null,
+      "source_ref": null,
+      "rationale": "Must pass non-foiling/slamming modes and transitional takeoff/landing conditions."
+    },
+    "wet_deck_clearance_over_draft": {
+      "value": null,
+      "unit": "ratio",
+      "status": "unknown",
+      "lower_bound": null,
+      "upper_bound": null,
+      "source_ref": null,
+      "rationale": "Compare over loading, foilborne transition and waves."
+    },
+    "displacement_tonnes": {
+      "value": null,
+      "unit": "tonne",
+      "status": "unknown",
+      "lower_bound": null,
+      "upper_bound": null,
+      "source_ref": null,
+      "rationale": "Must close passenger payload, battery, propulsion, structural and reserve masses."
+    },
+    "demihull_slenderness_lwl_over_beam": {
+      "value": null,
+      "unit": "ratio",
+      "status": "unknown",
+      "lower_bound": null,
+      "upper_bound": null,
+      "source_ref": null,
+      "rationale": "Optimize with takeoff drag, low-speed resistance, structure and passenger space."
+    },
+    "hull_form_hypothesis": "Compare slender foil-compatible demi-hulls, transitional hullborne resistance and takeoff/landing bow volumes.",
+    "volume_distribution_hypothesis": "Need sufficient reserve buoyancy and predictable transition response without assuming foilborne mode is always available."
+  },
+  "hydrodynamics": {
+    "speed_regime": "mixed_regime",
+    "design_froude_min": null,
+    "design_froude_max": null,
+    "hull_interference_method": "Evaluate hull-to-hull wave interference in hullborne modes plus foil-to-foil, strut and hull interaction; use matched non-foil and foil configurations.",
+    "resistance_method": "Build separate low-speed hullborne, takeoff/transition and foilborne power curves with appendage/propulsor interaction and uncertainty.",
+    "propulsor_configuration": "Compare redundant electric waterjets or suitable propulsors with efficiency, cavitation, manoeuvring, noise and fouling evaluated; final type remains open.",
+    "foil_configuration": "Fully foiling with retractability or safe fail-operational mode is a candidate, not a selected architecture; analyse control failure, impact, fouling and partial-lift states.",
+    "reference_cases": [
+      "Public EF-24 project dimensions/performance only as a project-reported comparator; no geometry/energy-saving claim transferred.",
+      "Delft 372 research as a monohull/catamaran interference and validation-method anchor, not direct foil performance data."
+    ],
+    "uncertainty_method": "Propagate battery capacity, vessel mass, foil/propulsion efficiency, waves, passenger payload and degradation; validate each regime independently."
+  },
+  "seakeeping": {
+    "wave_climate_basis": "Define the exact high-utilisation coastal route sea-state distribution and threshold for foilborne service versus hullborne safe return.",
+    "wave_heading_cases": [
+      "head seas",
+      "bow quartering",
+      "beam seas",
+      "stern quartering",
+      "following seas",
+      "cross-current and asymmetric waves"
+    ],
+    "response_metrics": [
+      "heave",
+      "pitch",
+      "roll",
+      "vertical_acceleration",
+      "added_resistance",
+      "cross_deck_pressure",
+      "slamming_event_rate",
+      "foil_loads",
+      "passenger_motion_sickness"
+    ],
+    "wet_deck_impact_method": "Analyse hullborne and transition states; foilborne lift cannot be used to waive slamming/impact checks while the hull or foils encounter waves.",
+    "slamming_disposition": "not_assessed",
+    "ride_comfort_method": "Use acceleration distributions, jerk and motion/comfort indicators over actual route spectra; verify with model tests and passenger-trial methods where permitted.",
+    "operating_envelope_disposition": "not_assessed"
+  },
+  "structure_and_safety": {
+    "cross_deck_load_path": "Design for foil/strut loads, asymmetric lift, propulsor thrust, cross-deck torsion, wave slam, fatigue and potential impact loads.",
+    "fatigue_method": "Variable-amplitude wave, foil-cycle, start/stop and docking loads with inspectability/maintenance assumptions.",
+    "asymmetric_flooding_method": "Evaluate hull compartmentation, asymmetric flooding, post-damage residual stability, watertight and accessible evacuation arrangements.",
+    "stability_method": "Apply vessel/route-appropriate high-speed craft, intact stability and damage/stability criteria as confirmed by flag/class; account for foil lift and failure states.",
+    "foil_failure_mode_method": "Explicit failure modes for sensor/control/power loss, foil strike/fouling, asymmetric lift, actuator jam and emergency transition to hullborne operation.",
+    "redundancy_and_degraded_modes": "Independent critical control/power paths; demonstrate reduced-speed hullborne return where physically possible and define weather/range limits when it is not.",
+    "approval_basis": "Determine HSC Code applicability based on speed, voyage, refuge times, vessel classification and route; compliance is not inferred from this concept record."
+  },
+  "energy_architecture": {
+    "propulsion_candidates": [
+      "battery-electric foilborne with hullborne limp-home reserve",
+      "battery-electric with shore charging and route dispatch",
+      "hybrid variant only if full lifecycle/local-emission trade demonstrates mission need"
+    ],
+    "energy_carriers": [
+      "shore electricity",
+      "battery storage"
+    ],
+    "battery_capacity_mwh": {
+      "value": null,
+      "unit": "MWh",
+      "status": "unknown",
+      "lower_bound": null,
+      "upper_bound": null,
+      "source_ref": null,
+      "rationale": "Calculate from regime-specific power/time histories, route duty cycle, reserve, degradation, thermal systems, charge efficiency and battery mass."
+    },
+    "mode_resolved_load_basis": "Separate standby/boarding, displacement departure, foiling acceleration, cruise, deceleration/docking, charging, HVAC, hotel and degraded return modes.",
+    "shore_power_or_charging": "Route-constrained charging model must include charger power, berth dwell, queue, connector/port availability, grid outage and seasonal emission factor.",
+    "renewable_assist": "Onboard solar is likely auxiliary at this speed scale; quantify net contribution after area, mass, shading and maintenance rather than claim primary energy.",
+    "emissions_boundary": "Report no onboard combustion separately from well-to-wake grid emissions and battery manufacture/replacement; do not equate electric with zero lifecycle emissions.",
+    "reserve_policy": "Define safe return reserve for wave-related foil restrictions, route deviation, charger failure, degraded battery and hullborne power."
+  },
+  "payload_and_operations": {
+    "mission_payload": "Passenger seating, baggage, accessibility, crew, emergency equipment, battery systems and structural margins are in one mass/space budget.",
+    "port_or_mooring_envelope": "Confirm passenger accessibility, fendering, mooring, foil/strut clearance, draft, charging connection and emergency access.",
+    "maintainability": "Foils, struts, actuators, underwater sensors and electric drives need inspection and replacement intervals with fault detection and spare parts.",
+    "crew_workload": "Design bridge/foil control with mode annunciation, overrides, alarm prioritization and clear weather/transition procedures.",
+    "emergency_access": "Safe passenger egress, life-saving appliances, evacuation in low-freeboard/high-speed layout and post-control-failure shelter/refuge strategy.",
+    "availability_target": {
+      "value": 0.97,
+      "unit": "fraction",
+      "status": "design_target",
+      "lower_bound": null,
+      "upper_bound": null,
+      "source_ref": null,
+      "rationale": "Provisional route-service goal; weather and charger availability are included, not excluded implicitly."
+    }
+  },
+  "performance_targets": [
+    {
+      "metric": "energy_per_passenger_nautical_mile",
+      "unit": "kWh_per_passenger_nmi",
+      "target_value": null,
+      "direction": "minimize",
+      "status": "requires_baseline",
+      "comparison_basis": "Matched route/speed, passenger load, weather gate, reserve and access service.",
+      "validation_method": "Independently validated duty-cycle energy model and measured pilot-vessel/sea-trial data."
+    },
+    {
+      "metric": "cruise_speed",
+      "unit": "knots",
+      "target_value": 30,
+      "direction": "maximize",
+      "status": "provisional_target",
+      "comparison_basis": "Same route accessibility, payload, reserve and operational availability.",
+      "validation_method": "Full-scale sea trials across specified loading and environmental conditions."
+    },
+    {
+      "metric": "direct_onboard_combustion_under_service",
+      "unit": "percent_of_service_energy",
+      "target_value": 0,
+      "direction": "threshold",
+      "status": "provisional_target",
+      "comparison_basis": "Battery-electric service; upstream energy and charging losses disclosed separately.",
+      "validation_method": "Energy metering and complete route/charging ledger."
+    },
+    {
+      "metric": "false_safe_foil_failure_decisions",
+      "unit": "count",
+      "target_value": 0,
+      "direction": "threshold",
+      "status": "provisional_target",
+      "comparison_basis": "Sensor/actuator/power failure, partial foil, impact, out-of-envelope and loss-of-lift controls.",
+      "validation_method": "Fault injection, hardware-in-loop and model tests plus qualified operating-envelope review."
+    }
+  ],
+  "hard_constraints": [
+    {
+      "constraint_id": "HSC-001",
+      "description": "Determine and meet the applicable HSC Code and other statutory requirements for vessel/route.",
+      "disposition": "not_assessed",
+      "evidence_needed": "Formal applicability matrix, flag/class engagement, and documented compliance evidence."
+    },
+    {
+      "constraint_id": "FOIL-001",
+      "description": "Foil/strut/actuator structural strength, fatigue, impact and corrosion safety.",
+      "disposition": "not_assessed",
+      "evidence_needed": "Qualified structural load cases, materials assessment, NDT and maintenance plan."
+    },
+    {
+      "constraint_id": "FAILURE-001",
+      "description": "Control/actuator/power fault cannot create an uncontained unsafe condition.",
+      "disposition": "not_assessed",
+      "evidence_needed": "FMEA/FMECA, fault injection, hardware-in-loop and demonstrated degraded modes."
+    },
+    {
+      "constraint_id": "ENERGY-001",
+      "description": "Required route plus reserve closes at full passenger load and expected battery degradation.",
+      "disposition": "not_assessed",
+      "evidence_needed": "Traceable mode-resolved route-energy model, uncertainty analysis and battery validation."
+    },
+    {
+      "constraint_id": "EVAC-001",
+      "description": "Accessible boarding, passenger seating, evacuation, lifesaving and rescue envelope.",
+      "disposition": "not_assessed",
+      "evidence_needed": "Applicable-rule design review and demonstrated evacuation/equipment access."
+    },
+    {
+      "constraint_id": "SEA-001",
+      "description": "Declare safe operating thresholds and prohibit use beyond unsupported wave/current conditions.",
+      "disposition": "not_assessed",
+      "evidence_needed": "Route-specific wave and refuge study with verified operational procedures."
+    }
+  ],
+  "assumptions": [
+    {
+      "assumption_id": "E-CAT-001",
+      "statement": "Foilborne lift can materially reduce total route energy against a conventional catamaran on this mission.",
+      "category": "foils",
+      "status": "untested",
+      "falsification_method": "Compare total electric energy from boarding to berth including takeoff, propulsion, foil drag, waves, ancillary loads and reserve."
+    },
+    {
+      "assumption_id": "E-CAT-002",
+      "statement": "The target range can close at the design speed while retaining safe reserve in degraded hullborne mode.",
+      "category": "energy_storage",
+      "status": "untested",
+      "falsification_method": "Battery mass-energy closure with high-fidelity power/time profiles, battery aging and harsh route cases."
+    },
+    {
+      "assumption_id": "E-CAT-003",
+      "statement": "Foil-control faults can transition to a safe hullborne/limp-home mode for all declared design cases.",
+      "category": "foils",
+      "status": "untested",
+      "falsification_method": "Fault-injection matrix for asymmetric lift, sensor dropout, actuator jam, impact, power loss and wave boundary."
+    }
+  ],
+  "provenance": [
+    {
+      "source_id": "delft-372-static-drift",
+      "title": "CFD validation for Delft 372 Catamaran in static drift conditions",
+      "uri": "https://iris.cnr.it/handle/20.500.14243/351603",
+      "scope": "Reference methodology for calm-water drift, loads, sinkage/trim, PIV and wave-pattern validation; geometry/conditions must match before quantitative use.",
+      "rights_disposition": "public_metadata_only"
+    },
+    {
+      "source_id": "delft-372-wave-benchmark",
+      "title": "Experimental catamaran head-wave benchmark with uncertainty quantification",
+      "uri": "https://doi.org/10.1016/j.oceaneng.2019.106685",
+      "scope": "Regular and irregular head-wave responses and statistical uncertainty analysis; source record notes access restrictions, so do not redistribute source data without permission.",
+      "rights_disposition": "unknown_needs_review"
+    },
+    {
+      "source_id": "ittc-cfd-resistance",
+      "title": "ITTC CFD validation benchmark database for resistance and propulsion",
+      "uri": "https://www.ittc.info/media/9771/75-03-02-02.pdf",
+      "scope": "Procedure describing selection and use of resistance/propulsion CFD validation cases; not blanket permission to redistribute linked data.",
+      "rights_disposition": "public_metadata_only"
+    },
+    {
+      "source_id": "imo-hsc-code",
+      "title": "IMO High-speed craft safety framework",
+      "uri": "https://www.imo.org/en/ourwork/safety/pages/hsc.aspx",
+      "scope": "Applicability and overview of HSC Code for qualifying high-speed craft; route and vessel-specific applicability review required.",
+      "rights_disposition": "public_metadata_only"
+    },
+    {
+      "source_id": "imo-ship-design-stability",
+      "title": "IMO ship design and stability",
+      "uri": "https://www.imo.org/en/ourwork/safety/pages/shipdesignandstability-default.aspx",
+      "scope": "Public overview of SOLAS ship design, subdivision and stability requirements; not a complete compliance checklist.",
+      "rights_disposition": "public_metadata_only"
+    },
+    {
+      "source_id": "ef24-public-reported",
+      "title": "Condor/Artemis EF-24 electric ferry project report",
+      "uri": "https://www.itv.com/news/channel/2022-09-26/look-inside-condors-new-100-electric-ferry",
+      "scope": "Project-reported 24 m hydrofoil ferry concept with up to 150 passengers, 100 nmi and 38 kn; comparison anchor only, not independent validation.",
+      "rights_disposition": "public_metadata_only"
+    }
+  ],
+  "claim_ceiling": "Concept hypothesis only. The EF-24 is a public project comparator; its reported speeds/range/energy claims are not independent validation of this design. No passenger-carrying approval or safe foilborne envelope is established."
+}
