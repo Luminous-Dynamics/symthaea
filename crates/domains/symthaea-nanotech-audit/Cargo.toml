@@ -9,6 +9,7 @@ description = "Read-only integrity auditor for exported closed-loop materials-di
 serde = { workspace = true }
 serde_json = { workspace = true }
 csv = { workspace = true }
+sha2 = { workspace = true }
 
 [[bin]]
 name = "symthaea-nanotech-audit"
