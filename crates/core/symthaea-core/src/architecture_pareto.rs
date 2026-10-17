@@ -738,6 +738,25 @@ mod tests {
     }
 
     #[test]
+    fn invalid_context_and_schema_cannot_produce_a_frontier() {
+        let mut input = request(vec![
+            candidate("candidate-a", 0.8, 2.5, 0.4, 0.9),
+            candidate("candidate-b", 0.95, 4.0, 0.8, 0.7),
+        ]);
+        input.schema_version += 1;
+        input.benchmark_case_id = " ".to_owned();
+        input.operating_conditions.speed_mps = f64::NAN;
+        let result = evaluate_architecture_pareto(&input);
+        assert!(matches!(
+            result,
+            Err(ref findings)
+                if findings.iter().any(|finding| matches!(finding, ArchitectureValidationFindingV1::UnsupportedSchemaVersion { .. }))
+                && findings.iter().any(|finding| matches!(finding, ArchitectureValidationFindingV1::InvalidComparisonIdentity { .. }))
+                && findings.iter().any(|finding| matches!(finding, ArchitectureValidationFindingV1::NonFiniteOperatingCondition { field: ArchitectureConditionFieldV1::SpeedMps }))
+        ));
+    }
+
+    #[test]
     fn deterministic_reports_round_trip_to_identical_json() {
         let input = request(vec![
             candidate("candidate-a", 0.8, 2.5, 0.4, 0.9),
