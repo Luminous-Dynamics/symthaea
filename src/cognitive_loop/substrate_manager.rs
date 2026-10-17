@@ -412,14 +412,14 @@ impl SubstrateManager {
             }
         }
 
-        let speed_adjusted_energy = self.energy_per_cycle * self.tau_factor as f64;
-        let next_total_energy = self.total_energy_spent + speed_adjusted_energy;
-        if !self.energy_per_cycle.is_finite()
-            || self.energy_per_cycle < 0.0
-            || !self.tau_factor.is_finite()
-            || self.tau_factor <= 0.0
-            || !speed_adjusted_energy.is_finite()
-            || speed_adjusted_energy < 0.0
+        // Joules per cognitive cycle come from the substrate's energy model.
+        // Cognitive tau changes internal integration dynamics; it is not an
+        // independent physical-energy multiplier. Wall-time throughput is captured
+        // by the measured observation interval below.
+        let modeled_energy_joules = self.energy_per_cycle;
+        let next_total_energy = self.total_energy_spent + modeled_energy_joules;
+        if !modeled_energy_joules.is_finite()
+            || modeled_energy_joules < 0.0
             || !next_total_energy.is_finite()
         {
             // Non-finite/negative samples and cumulative overflow cannot safely feed
@@ -432,13 +432,13 @@ impl SubstrateManager {
             self.energy_rate_window_seconds = 0.0;
             return;
         }
-        self.last_energy_spent = speed_adjusted_energy;
+        self.last_energy_spent = modeled_energy_joules;
 
         // The first call starts a fresh window. Do not include idle time between
         // manager construction and the first cognitive cycle in the denominator.
         let Some(window_started_at) = self.energy_rate_window_started_at else {
             self.energy_rate_window_started_at = Some(now);
-            self.energy_rate_window_joules = speed_adjusted_energy;
+            self.energy_rate_window_joules = modeled_energy_joules;
             self.total_energy_spent = next_total_energy;
             return;
         };
@@ -482,7 +482,7 @@ impl SubstrateManager {
         // Attribute this cycle's estimate after checking the previously completed
         // start-to-start interval, so the numerator and denominator refer to the
         // same completed cycles.
-        let next_window_energy = self.energy_rate_window_joules + speed_adjusted_energy;
+        let next_window_energy = self.energy_rate_window_joules + modeled_energy_joules;
         if !next_window_energy.is_finite() || next_window_energy < 0.0 {
             self.consciousness_viable = false;
             self.last_energy_spent = 0.0;
@@ -1486,22 +1486,13 @@ mod tests {
 
     #[test]
     fn test_invalid_modeled_energy_fails_closed_before_accounting() {
-        for (energy_per_cycle, tau_factor) in [
-            (f64::NAN, 1.0_f32),
-            (f64::INFINITY, 1.0_f32),
-            (-1.0, 1.0_f32),
-            (1.0, f32::NAN),
-            (1.0, f32::INFINITY),
-            (-1.0, -1.0),
-            (1.0, 0.0),
-        ] {
+        for energy_per_cycle in [f64::NAN, f64::INFINITY, f64::NEG_INFINITY, -1.0] {
             let mut config = default_config();
             config.enable_energy_budget = true;
             config.energy_budget_joules_per_sec = Some(1e9);
 
             let mut mgr = SubstrateManager::new(&config);
             mgr.energy_per_cycle = energy_per_cycle;
-            mgr.tau_factor = tau_factor;
             let now = std::time::Instant::now();
             mgr.energy_rate_window_started_at = Some(now);
             mgr.energy_rate_window_joules = 0.25;
@@ -1510,7 +1501,7 @@ mod tests {
 
             assert!(
                 !mgr.consciousness_viable,
-                "invalid energy model ({energy_per_cycle:?} J/cycle, tau={tau_factor:?}) must fail closed"
+                "invalid modeled energy {energy_per_cycle:?} J/cycle must fail closed"
             );
             assert_eq!(mgr.total_energy_spent, 0.0);
             assert_eq!(mgr.last_energy_spent, 0.0);
@@ -1563,7 +1554,7 @@ mod tests {
         mgr.energy_rate_window_started_at = Some(start);
 
         mgr.tick_energy_at(&config, start);
-        let expected_window_energy = mgr.energy_per_cycle * mgr.tau_factor as f64;
+        let expected_window_energy = mgr.energy_per_cycle;
         mgr.tick_energy_at(&config, start + std::time::Duration::from_secs(1));
 
         assert!((mgr.estimated_energy_rate_watts - expected_window_energy).abs() < 1e-18);
@@ -1594,25 +1585,25 @@ mod tests {
     }
 
     #[test]
-    fn test_energy_scales_with_tau() {
-        // Faster photonic substrate has tau > 1.0 under the current seconds/op model.
-        // The modeled per-cycle energy estimate scales with that rate factor; the
-        // watts budget itself is evaluated only after a monotonic wall-time window.
+    fn test_modeled_energy_per_cycle_is_independent_of_cognitive_tau() {
         let mut config = default_config();
         config.enable_energy_budget = true;
-        config.enable_substrate_speed_modulation = true;
-        config.substrate_type = SubstrateType::PhotonicProcessor;
-        config.energy_budget_joules_per_sec = Some(1e-6);
-        let mut mgr = SubstrateManager::new(&config);
-        let initial_energy = mgr.energy_per_cycle;
-        mgr.tick_energy(&config);
-        assert!(
-            mgr.last_energy_spent > initial_energy,
-            "Photonic tau-adjusted cycle energy {} should exceed base estimate {}",
-            mgr.last_energy_spent,
-            initial_energy
-        );
-        assert!(mgr.consciousness_viable, "no full wall-time window has elapsed");
+        config.energy_budget_joules_per_sec = Some(f64::MAX);
+
+        for tau in [0.5_f32, 1.0, 2.0] {
+            let mut mgr = SubstrateManager::new(&config);
+            mgr.tau_factor = tau;
+            let expected_energy = mgr.energy_per_cycle;
+            mgr.tick_energy_at(&config, std::time::Instant::now());
+
+            assert_eq!(
+                mgr.last_energy_spent, expected_energy,
+                "cognitive tau={tau} must not masquerade as an energy multiplier"
+            );
+            assert_eq!(mgr.total_energy_spent, expected_energy);
+            assert_eq!(mgr.energy_rate_window_joules, expected_energy);
+            assert!(mgr.consciousness_viable);
+        }
     }
 
     #[test]
