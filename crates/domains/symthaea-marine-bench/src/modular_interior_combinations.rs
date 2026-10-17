@@ -98,6 +98,8 @@ pub struct CombinationSearchReportBody {
     pub baseline_configuration_sha256: String,
     pub variant_input_manifest_sha256: String,
     pub limits: SearchLimits,
+    pub baseline_validation_receipt: ValidationReceipt,
+    pub candidate_count_lower_bound: usize,
     pub candidates: Vec<CombinationCandidate>,
     pub candidate_budget: usize,
     /// True only when all combinations within the declared cardinality scope
@@ -110,7 +112,6 @@ pub struct CombinationSearchReportBody {
 #[derive(Clone, Debug, Deserialize, Serialize)]
 pub struct CombinationSearchReport {
     pub body: CombinationSearchReportBody,
-    pub baseline_validation_receipt: ValidationReceipt,
     pub report_sha256: String,
 }
 
@@ -340,6 +341,11 @@ pub fn search_combinations(
         }
     }
     let truncated_by_candidate_cap = all_combinations.len() > limits.max_candidates;
+    let candidate_count_lower_bound = if truncated_by_candidate_cap {
+        limits.max_candidates.saturating_add(1)
+    } else {
+        all_combinations.len()
+    };
     if truncated_by_candidate_cap {
         all_combinations.truncate(limits.max_candidates);
     }
@@ -463,7 +469,7 @@ pub fn search_combinations(
         ).to_owned(),
     };
     let report_sha256 = digest(&body).map_err(search_error_from_serialization)?;
-    Ok(CombinationSearchReport { body, baseline_validation_receipt, report_sha256 })
+    Ok(CombinationSearchReport { body, report_sha256 })
 }
 
 /// Recomputes the complete bounded search from its exact inputs and compares the body digest.
@@ -481,8 +487,6 @@ pub fn verify_combination_search_report(
     };
     recomputed.report_sha256 == report.report_sha256
         && digest(&recomputed.body).ok() == digest(&report.body).ok()
-        && digest(&recomputed.baseline_validation_receipt).ok()
-            == digest(&report.baseline_validation_receipt).ok()
 }
 
 #[cfg(test)]
@@ -558,6 +562,7 @@ mod tests {
         limits.max_candidates = 2;
         let report = search_combinations(&baseline, &[a, b], limits).unwrap();
         assert_eq!(report.body.candidates.len(), 2);
+        assert_eq!(report.body.candidate_count_lower_bound, 3);
         assert!(!report.body.search_complete);
         assert!(report.body.truncated_by_candidate_cap);
     }
