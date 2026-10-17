@@ -88,6 +88,8 @@ These are proposed acceptance gates, not measured capabilities:
 7. **Stronger custody:** for a serious prospective benchmark, split generator/scorer into separate processes, publish a protocol commitment before scoring, hash the challenge corpus, and protect test labels/tables outside policy-accessible artifacts.
 8. **Real-stream bridge:** only after the synthetic suite is reproducible, replay an actual sensor stream with injected faults and compare to a trusted independent reference. Do not allow this suite to reconfigure or control physical hardware.
 
+The separate [SCM graph recovery suite](SENSEBENCH_SCM_GRAPH_PROTOCOL.md) provides a graph-level complement with CPDAG-aware scoring and a factorized split across graph topology and mechanism regimes. Use it for graph-structure claims; this three-hypothesis likelihood-table suite remains complementary rather than a substitute.
+
 ## Research basis
 
 - NIST AI 800-3 distinguishes performance on a fixed benchmark from generalized performance and emphasizes explicit estimands and defensible uncertainty estimates: https://www.nist.gov/news-events/news/2026/02/new-report-expanding-ai-evaluation-toolbox-statistical-models
