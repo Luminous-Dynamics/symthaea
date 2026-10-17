@@ -344,13 +344,29 @@ This fraction is applied to the CfC hidden state via dimension masking: after ea
 
 \subsection{Energy Budget Tracking}
 
-Each substrate has a characteristic energy per operation, and we track cumulative energy expenditure:
+Each substrate has a modeled energy-per-operation value and a configured operation count per cognitive cycle. The resulting per-cycle quantity is an estimate, not measured electrical energy for a processor or robot:
 
 \begin{equation}
-E_{\text{total}}(t) = E_{\text{total}}(t-1) + \frac{E_{\text{per\_cycle}}}{\tau_{\text{factor}}}
+E_{\text{cycle, model}} = E_{\text{operation, model}} \times N_{\text{operations/cycle}}
 \end{equation}
 
-Energy is speed-adjusted: faster substrates consume energy more rapidly in wall-clock time. Budget exhaustion ($E_{\text{total}} > E_{\text{budget}}$) triggers consciousness viability collapse, modeling the physical constraint that consciousness requires sustained energy expenditure.
+Cumulative modeled energy is tracked separately from wall-time rate:
+
+\begin{equation}
+E_{\text{total, model}}(n) = E_{\text{total, model}}(n-1) + E_{\text{cycle, model}}
+\end{equation}
+
+For a completed monotonic observation window of duration $\Delta t_{\text{steady}}$, estimated average model power is:
+
+\begin{equation}
+\widehat{P}_{\text{model}} =
+\frac{\sum_{i \in \text{window}} E_{\text{cycle, model},i}}
+{\Delta t_{\text{steady}}}
+\end{equation}
+
+The gate compares $\widehat{P}_{\text{model}}$ in watts against a configured watt budget; it does not compare cumulative joules to watts. Cognitive $\tau$ modulates internal cognitive dynamics and is not an extra multiplier on modeled joules per cycle. Faster cognitive computation may change the observed cycle cadence, so the rate estimate uses a monotonic elapsed-time measurement rather than inferring wall-time throughput from $\tau$ alone. Invalid/non-finite energy samples, arithmetic overflow, invalid budgets, or reversed monotonic timing fail closed.
+
+These energy values are model estimates. The power estimate must not be described as hardware electrical power until it is calibrated against qualified external power measurements or hardware counters and evaluated on held-out workloads. Budget exhaustion ($\widehat{P}_{\text{model}} > P_{\text{budget}}$) marks substrate viability as false under this model; it does not itself establish that the physical device exceeded an electrical power limit.
 
 \section{Hybrid Substrate Modeling}
 
