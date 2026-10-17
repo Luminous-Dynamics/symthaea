@@ -163,7 +163,7 @@ A first executable simulator now compares three policies across balanced trials 
 
 The runner reports posterior probability on the true hypothesis, multiclass Brier score, top-hypothesis accuracy, threshold-reaching fraction, experiments needed among successful trials, and informative interventions used. It requires an even trial count to balance ground truth and uses separate action-selection and outcome streams (common random numbers across policies). Results are deterministic for a fixed seed/configuration.
 
-This is a *toy control*, not evidence that Symthaea can discover causal structure in real environments. Its likelihood models are assumed correct and the hypothesis set is intentionally small. The robust ranking API is now present, but the causal simulation does not yet test it against diverse likelihood misspecification. The next phase must vary causal graph topology, add confounding and unknown-model scenarios, calibrate outcome likelihoods, split training/tuning/blind scenarios, compare against a strong fixed design and predictive-variance baseline, and report confidence intervals across seeds.
+The original `causal` suite is a *toy control*, not evidence that Symthaea can discover causal structure in real environments: it assumes correctly specified likelihoods and has a small hypothesis set. The new `blind-worlds` suite adds outcome-generating likelihood misspecification, a shared resource budget, a development-selected fixed-design baseline, predictive-variance and robust-selection policies, held-out regimes, calibration metrics, and null-truth causal-claim accounting. It remains synthetic and does not yet represent independently generated causal graph topologies or calibrated physical likelihoods.
 
 ### Model-misspecification regret fixture (software-only)
 
@@ -179,6 +179,21 @@ The suite compares nominal single-model expected gain, nominal predictive varian
 The hand-authored fixture is parameterized to exercise the proposed SE-13 gate mechanics: formula-level reference arithmetic gives nominal maximum regret of about 0.2781 bits/cost and worst-case robust maximum regret of about 0.0101 bits/cost, a 96.36% reduction; information-gain loss on the correctly specified model-A control is about 3.51%. These are not Rust-executed results or empirical performance. They are expected values computed from deliberately constructed likelihood tables to test evaluator wiring and acceptance checks.
 
 A crucial negative control remains: the fixed coarse comparator matches the robust policy's worst-case regret on this small fixture. It therefore does not establish active-policy superiority over strong fixed designs. It also does not yet meet the full research goal of hidden causal graph families, repeated-seed intervals, a sealed evaluator, calibrated likelihoods, or physical reference measurements. Those remain explicit next steps under the active-science benchmark issue.
+
+### Outcome-generating blind-world benchmark
+
+Run the new simulation suite:
+
+```sh
+SENSEBENCH_CODE_REVISION="$(git rev-parse HEAD)" \
+  cargo run -p symthaea-sensebench -- --suite blind-worlds --trials 512 --budget 8 --seed 42
+```
+
+This suite compares seven policies across six regime templates. Four deterministic, seed-derived parameter variants per template create 24 worlds: eight development worlds and 16 held-out worlds. The held-out regimes include intervention artifact, degraded sensing, effect reversal, and a null negative control. The fixed comparator is selected using development worlds only. Policy selection receives declared model scenarios; evaluator-only likelihood tables generate observed outcomes.
+
+Per-world reports include multiclass Brier/log loss, top-hypothesis accuracy, calibration error, threshold rate and resource cost, predicted information gain versus realized entropy change, and unsupported high-confidence causal claims when the true hypothesis is no direct causal effect. Negative entropy changes are not clamped. Trial-level intervals are conditional on each parameterized world; the variants are jittered versions of six hand-authored templates, not independently generated causal graph families.
+
+The tables remain source-visible, so held-out is an evaluation split rather than secure blinding. This software-only suite makes no claim about physical causal discovery. Rust tests are authored but not executed in the current environment; exact-head workflow runs marked `skipped` and empty commit statuses do not establish a pass. See [the protocol](SENSEBENCH_BLIND_WORLD_PROTOCOL.md) for acceptance gates and limitations.
 
 ### Domain-specific fixture: geophysics
 
@@ -229,7 +244,7 @@ Publish schema, provenance manifests, replayable datasets, benchmark reports, ad
 
 ## Benchmark report provenance
 
-The CLI now requires `SENSEBENCH_CODE_REVISION` before producing benchmark reports. Each anomaly report embeds the complete scenario manifest (schema/generator version, scenario ID/type, seed, sample count, sample interval, and split) plus evaluator configuration. The causal report records generator version, code revision, seed, trial count, experiment budget, posterior threshold, and per-policy summaries. `--allow-unversioned` is an explicit exploratory escape hatch; such output must not support benchmark claims. Operators should run from a clean worktree because the CLI records the caller-supplied commit string rather than inspecting Git state itself.
+The CLI now requires `SENSEBENCH_CODE_REVISION` before producing benchmark reports. Each anomaly report embeds the complete scenario manifest (schema/generator version, scenario ID/type, seed, sample count, sample interval, and split) plus evaluator configuration. The causal report records generator version, code revision, seed, trial count, experiment budget, posterior threshold, and per-policy summaries. The `blind-worlds` report also records the root seed, number of variants per regime, development-selected fixed candidate, held-out counts, per-world policy summaries, and its interpretation boundary. `--allow-unversioned` is an explicit exploratory escape hatch; such output must not support benchmark claims. Operators should run from a clean worktree because the CLI records the caller-supplied commit string rather than inspecting Git state itself.
 
 ## Exit criteria for the first milestone
 
