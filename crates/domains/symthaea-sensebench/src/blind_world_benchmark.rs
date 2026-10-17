@@ -1069,12 +1069,85 @@ mod tests {
         for row in report.summaries {
             assert!((0.0..=2.0).contains(&row.mean_brier_score));
             assert!((0.0..=30.0).contains(&row.mean_log_loss));
+            assert!((0.0..=30.0).contains(&row.mean_prequential_predictive_log_loss));
+            assert!((0.0..=1.0).contains(&row.model_adequacy_alarm_rate));
+            assert!((0.0..=1.0).contains(&row.accepted_trial_fraction_after_adequacy_gate));
+            assert!((0.0..=1.0).contains(&row.adequacy_gated_unsupported_causal_claim_rate_on_null_truth));
+            assert!((row.model_adequacy_alarm_rate
+                + row.accepted_trial_fraction_after_adequacy_gate - 1.0).abs() < 1.0e-12);
+            if row.regime == BlindWorldRegime::NullNegativeControl {
+                assert!(
+                    row.adequacy_gated_unsupported_causal_claim_rate_on_null_truth
+                        <= row.unsupported_causal_claim_rate_on_null_truth + 1.0e-12
+                );
+            }
             assert!((0.0..=2.0).contains(&row.mean_hidden_world_expected_information_gain_bits_per_cost));
             assert!((0.0..=2.0).contains(&row.mean_acquisition_regret_bits_per_selection));
             assert!((0.0..=1.0).contains(&row.top_hypothesis_accuracy));
             assert!((0.0..=1.0).contains(&row.mean_calibration_error_10_bins));
             assert!((0.0..=1.0).contains(&row.threshold_reached_fraction));
             assert!((0.0..=1.0).contains(&row.unsupported_causal_claim_rate_on_null_truth));
+        }
+    }
+
+    #[test]
+    fn adequacy_cutoffs_are_reported_from_independent_model_calibration() {
+        let report = run_blind_world_benchmark(6, 6, 777, 0.95).unwrap();
+        assert_eq!(report.model_adequacy_thresholds.len(), 7);
+        for threshold in &report.model_adequacy_thresholds {
+            assert_eq!(threshold.calibration_quantile, MODEL_ADEQUACY_QUANTILE);
+            assert_eq!(threshold.independent_calibration_trials, 12);
+            assert_eq!(
+                threshold.calibration_source,
+                "declared_model_scenarios_independent_seed"
+            );
+            assert!(threshold.threshold_mean_prequential_nll.is_finite());
+            assert!(threshold.threshold_mean_prequential_nll >= 0.0);
+        }
+    }
+
+    #[test]
+    fn ensemble_predictive_probability_uses_declared_model_weights() {
+        let priors = vec![
+            HypothesisPrior { id: "h0".into(), probability: 0.5 },
+            HypothesisPrior { id: "h1".into(), probability: 0.5 },
+        ];
+        let model_a = ModelLikelihoodScenario {
+            scenario_id: "a".into(),
+            weight: 0.25,
+            candidates: vec![ExperimentCandidate {
+                id: "measure".into(),
+                cost: 1.0,
+                likelihoods: vec![vec![0.9, 0.1], vec![0.7, 0.3]],
+            }],
+        };
+        let model_b = ModelLikelihoodScenario {
+            scenario_id: "b".into(),
+            weight: 0.75,
+            candidates: vec![ExperimentCandidate {
+                id: "measure".into(),
+                cost: 1.0,
+                likelihoods: vec![vec![0.8, 0.2], vec![0.6, 0.4]],
+            }],
+        };
+        let p = ensemble_predictive_outcome_probability(
+            &priors, &[model_a, model_b], "measure", 0
+        ).unwrap();
+        // Model A assigns 0.8 and B assigns 0.7 under the equal prior:
+        // 0.25 * 0.8 + 0.75 * 0.7 = 0.725.
+        assert!((p - 0.725).abs() < 1.0e-12);
+    }
+
+    #[test]
+    fn adequacy_gate_never_increases_null_false_claim_rate() {
+        let report = run_blind_world_benchmark(12, 8, 0xBADA55, 0.95).unwrap();
+        for row in report.summaries.iter()
+            .filter(|row| row.regime == BlindWorldRegime::NullNegativeControl)
+        {
+            assert!(
+                row.adequacy_gated_unsupported_causal_claim_rate_on_null_truth
+                    <= row.unsupported_causal_claim_rate_on_null_truth + 1.0e-12
+            );
         }
     }
 
