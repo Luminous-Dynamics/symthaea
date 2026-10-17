@@ -167,6 +167,7 @@ fn clopper_pearson_upper(events: u64, units: u64, alpha: f64) -> f64 {
     }
 
     let observed_rate = events as f64 / units as f64;
+    let log_coefficient = log_binomial_coefficient(units, events);
     let mut low = observed_rate;
     let mut high = 1.0;
 
@@ -176,7 +177,7 @@ fn clopper_pearson_upper(events: u64, units: u64, alpha: f64) -> f64 {
             low = midpoint;
             continue;
         }
-        if binomial_cdf(events, units, midpoint) > alpha {
+        if binomial_cdf(events, units, midpoint, log_coefficient) > alpha {
             low = midpoint;
         } else {
             high = midpoint;
@@ -188,7 +189,12 @@ fn clopper_pearson_upper(events: u64, units: u64, alpha: f64) -> f64 {
 /// This is only called at p > events / units, where the terms from k down to zero
 /// decrease monotonically. Starting at P(X=k) and recurring downward avoids summing
 /// tiny terms from j=0 upward and is stable for the supported count range.
-fn binomial_cdf(events: u64, units: u64, probability: f64) -> f64 {
+fn binomial_cdf(
+    events: u64,
+    units: u64,
+    probability: f64,
+    log_coefficient: f64,
+) -> f64 {
     if events >= units {
         return 1.0;
     }
@@ -199,7 +205,7 @@ fn binomial_cdf(events: u64, units: u64, probability: f64) -> f64 {
         return 0.0;
     }
 
-    let log_mass_at_k = log_binomial_coefficient(units, events)
+    let log_mass_at_k = log_coefficient
         + events as f64 * probability.ln()
         + (units - events) as f64 * (-probability).ln_1p();
     let mut mass = log_mass_at_k.exp();
@@ -284,7 +290,10 @@ mod tests {
     fn positive_event_bound_inverts_the_one_sided_cdf_at_alpha() {
         let result = assess_rare_event_risk(&evidence(1, 100)).unwrap();
         let p = upper(result);
-        assert!((binomial_cdf(1, 100, p) - 0.05).abs() < 1.0e-12);
+        assert!(
+            (binomial_cdf(1, 100, p, log_binomial_coefficient(100, 1)) - 0.05).abs()
+                < 1.0e-12
+        );
     }
 
     #[test]
