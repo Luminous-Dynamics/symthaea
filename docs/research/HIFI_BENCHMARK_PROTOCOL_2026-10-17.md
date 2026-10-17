@@ -66,6 +66,21 @@ All baselines receive identical permitted information. Tune only on development 
 
 Compare the proposed selector against random, fixed-grid and simple uncertainty-sampling baselines under the same total budget. Count setup, calibration, failed captures, repeats and deferred confirmatory tests in cost. Primary metric: reduction in uncertainty or regret per unit total cost, assessed against a known synthetic ground truth first, then on a separately governed physical experiment. Synthetic success is a software sanity check only.
 
+## Quantified launch goals
+
+These are ambitious project targets, not industry standards or achieved results. Freeze dataset-specific thresholds and the analysis plan before confirmatory evaluation.
+
+| Area | Target |
+|---|---|
+| Split-contract integrity | Reject 100% of seeded listener/excerpt/product/fixture/session leakage cases in the adversarial suite, with zero false passes; clean controls must pass. |
+| Preference prediction | At least 10% relative reduction in held-out pairwise log loss over the strongest frozen transparent baseline; a listener-clustered 95% interval must support improvement. The pilot must justify the meaningful-effect threshold. |
+| Calibration | No degradation beyond a preregistered Brier-score/calibration margin. Set that margin from pilot variability and decision consequences, not after seeing the confirmatory results. |
+| Active measurement | At matched predeclared uncertainty or decision regret, target at least 20% less total measurement cost than the strongest fixed/random baseline across at least three synthetic task families; count repeats, failed captures and confirmation budget. |
+| Robust design decisions | For candidates whose estimated advantage exceeds measurement uncertainty, target at least 95% stability of the down-selection under the preregistered reseat/unit/room/fixture perturbation set. Otherwise report the decision as unresolved. |
+| Evidence reproducibility | 100% of artifacts used for a published result have verified hashes and pinned processing/source revisions; a clean rerun reproduces the report within declared numeric tolerances. |
+
+The 10% and 20% targets are useful research ambitions, not guarantees that any model will achieve them. If a pilot shows the threshold is not distinguishable from measurement or sampling noise at a feasible sample size, revise the *future protocol before confirmation* or report that the proposed goal is currently unsupported. Never lower the threshold after observing the test result.
+
 ## Synthetic tests before human or hardware claims
 
 Use deterministic synthetic data with known latent listener preferences and known confounders to test whether the pipeline can detect:
