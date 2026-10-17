@@ -82,7 +82,7 @@ Therefore:
 - Do not infer climb, turn, stall margin, obstacle clearance or landing reserve from these summary values alone.
 - Keep the Cessna as a *reference card* until a full sourceable performance dataset and appropriate validation cases have been obtained.
 
-## 4. How to use this in the Symthaea program
+## 5. How to use this in the Symthaea program
 
 **Appropriate now**
 - Set plausible size/occupant/mass-class context for trade studies.
@@ -96,7 +96,7 @@ Therefore:
 - Claim a new vehicle beats the Skyhawk on payload, range, operational cost, safety, repairability or efficiency without equivalent mission profiles and evidence.
 - Treat agreement with the manufacturer summary as independent physical validation.
 
-## 5. Minimum data to collect before model validation
+## 6. Minimum data to collect before model validation
 
 For a defensible reference comparison, obtain a specific aircraft configuration and document source/revision for:
 - aircraft serial/configuration or a precise model-year variant;
@@ -109,7 +109,7 @@ For a defensible reference comparison, obtain a specific aircraft configuration 
 
 If those are unavailable, report the model-validation gate as **blocked on data**, not passed. Choose an additional independent published reference or analytic benchmark rather than tuning a model to this one summary.
 
-## 6. Validation plan linkage
+## 7. Validation plan linkage
 
 This is the proposed M1 starting card under #7729, not yet the M1 acceptance pass. The acceptance test should:
 1. preserve these manufacturer values in a versioned source manifest;
