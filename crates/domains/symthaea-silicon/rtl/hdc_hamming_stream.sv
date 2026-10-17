@@ -4,8 +4,8 @@
 // Exact streaming Hamming distance for packed BinaryHV vectors.
 // Count accumulation is local; one distance result is emitted per valid frame.
 // This is a synthesizable candidate, not a performance claim.
-\`timescale 1ns/1ps
-\`default_nettype none
+`timescale 1ns/1ps
+`default_nettype none
 
 module hdc_hamming_stream #(
     parameter integer DATA_WIDTH = 256,
@@ -88,4 +88,4 @@ module hdc_hamming_stream #(
     end
 endmodule
 
-\`default_nettype wire
+`default_nettype wire
