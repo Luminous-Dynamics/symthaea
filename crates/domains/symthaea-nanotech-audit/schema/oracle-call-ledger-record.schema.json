@@ -112,16 +112,47 @@
     {
       "if": {
         "properties": {
-          "cache_hit": {
-            "const": false
+          "status": {
+            "const": "invalid_candidate"
           }
         },
         "required": [
-          "cache_hit"
+          "status"
         ]
       },
       "then": {
         "properties": {
+          "stage": {
+            "const": "proposal"
+          },
+          "cache_hit": {
+            "const": false
+          },
+          "external_invocation": {
+            "const": false
+          }
+        }
+      }
+    },
+    {
+      "if": {
+        "properties": {
+          "status": {
+            "enum": [
+              "oracle_failed",
+              "timeout"
+            ]
+          }
+        },
+        "required": [
+          "status"
+        ]
+      },
+      "then": {
+        "properties": {
+          "cache_hit": {
+            "const": false
+          },
           "external_invocation": {
             "const": true
           }
