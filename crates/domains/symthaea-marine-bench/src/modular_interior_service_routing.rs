@@ -73,6 +73,15 @@ pub enum AnchorKind {
 
 #[derive(Clone, Copy, Debug, Deserialize, Serialize, PartialEq, Eq)]
 #[serde(rename_all = "snake_case")]
+pub enum AnchorSide {
+    North,
+    South,
+    East,
+    West,
+}
+
+#[derive(Clone, Copy, Debug, Deserialize, Serialize, PartialEq, Eq)]
+#[serde(rename_all = "snake_case")]
 pub enum AnchorEvidenceClass {
     DesignAssumption,
     Measured,
@@ -86,6 +95,9 @@ pub struct RoutingAnchor {
     pub instance_id: Option<String>,
     pub port_id: Option<String>,
     pub service_id: Option<String>,
+    /// Required on a module-port anchor to define an explicit outward approach.
+    /// Platform-service anchors must leave this unset.
+    pub side: Option<AnchorSide>,
     pub deck_id: String,
     pub position_mm: PositionMm,
     pub evidence_class: AnchorEvidenceClass,
@@ -160,6 +172,7 @@ struct AnchorFingerprint {
     instance_id: Option<String>,
     port_id: Option<String>,
     service_id: Option<String>,
+    side: Option<AnchorSide>,
     deck_id: String,
     x_mm: i64,
     y_mm: i64,
@@ -243,6 +256,7 @@ fn anchor_fingerprint(anchor: &RoutingAnchor) -> AnchorFingerprint {
         instance_id: anchor.instance_id.clone(),
         port_id: anchor.port_id.clone(),
         service_id: anchor.service_id.clone(),
+        side: anchor.side,
         deck_id: anchor.deck_id.clone(),
         x_mm: anchor.position_mm.x_mm,
         y_mm: anchor.position_mm.y_mm,
@@ -401,16 +415,18 @@ fn validate_anchor_shape(anchor: &RoutingAnchor) -> Result<(), RoutingError> {
             if anchor.instance_id.as_deref().is_none_or(str::is_empty)
                 || anchor.port_id.as_deref().is_none_or(str::is_empty)
                 || anchor.service_id.is_some()
+                || anchor.side.is_none()
             {
-                return Err(RoutingError::new("INVALID_MODULE_PORT_ANCHOR", "module-port anchor must have instance_id/port_id and no service_id"));
+                return Err(RoutingError::new("INVALID_MODULE_PORT_ANCHOR", "module-port anchor must have instance_id/port_id, an outward side, and no service_id"));
             }
         }
         AnchorKind::PlatformService => {
             if anchor.service_id.as_deref().is_none_or(str::is_empty)
                 || anchor.instance_id.is_some()
                 || anchor.port_id.is_some()
+                || anchor.side.is_some()
             {
-                return Err(RoutingError::new("INVALID_PLATFORM_SERVICE_ANCHOR", "platform-service anchor must have service_id and no module instance/port IDs"));
+                return Err(RoutingError::new("INVALID_PLATFORM_SERVICE_ANCHOR", "platform-service anchor must have service_id, no module instance/port IDs, and no port side"));
             }
         }
     }
@@ -472,13 +488,16 @@ fn anchor_on_module_boundary(
     let (deck_id, rect) = module_bounds(configuration, instance_id)?;
     let x = anchor.position_mm.x_mm;
     let y = anchor.position_mm.y_mm;
-    let on_boundary = x >= rect.x_min && x <= rect.x_max
-        && y >= rect.y_min && y <= rect.y_max
-        && (x == rect.x_min || x == rect.x_max || y == rect.y_min || y == rect.y_max);
-    if !on_boundary {
+    let on_side = match anchor.side.expect("shape checked") {
+        AnchorSide::West => x == rect.x_min && y > rect.y_min && y < rect.y_max,
+        AnchorSide::East => x == rect.x_max && y > rect.y_min && y < rect.y_max,
+        AnchorSide::South => y == rect.y_min && x > rect.x_min && x < rect.x_max,
+        AnchorSide::North => y == rect.y_max && x > rect.x_min && x < rect.x_max,
+    };
+    if !on_side {
         return Err(RoutingError::new(
-            "ANCHOR_NOT_ON_ENVELOPE_BOUNDARY",
-            format!("anchor for instance {:?} is not on its declared module envelope boundary", instance_id),
+            "ANCHOR_NOT_ON_DECLARED_ENVELOPE_SIDE",
+            format!("anchor for instance {:?} must lie strictly on its declared module side, not at a corner", instance_id),
         ));
     }
     if deck_id != anchor.deck_id {
@@ -916,6 +935,7 @@ mod tests {
             instance_id: Some(instance.to_owned()),
             port_id: Some(port.to_owned()),
             service_id: None,
+            side: Some(AnchorSide::East),
             deck_id: "MAIN".to_owned(),
             position_mm: PositionMm { x_mm: x, y_mm: y, z_mm: 0 },
             evidence_class: AnchorEvidenceClass::DesignAssumption,
@@ -929,6 +949,7 @@ mod tests {
             instance_id: None,
             port_id: None,
             service_id: Some(service.to_owned()),
+            side: None,
             deck_id: "MAIN".to_owned(),
             position_mm: PositionMm { x_mm: x, y_mm: y, z_mm: 0 },
             evidence_class: AnchorEvidenceClass::DesignAssumption,
@@ -1007,7 +1028,7 @@ mod tests {
             service_anchor("AC-BUS", 4700, 1800),
         );
         assert_eq!(route_services(&baseline, &[route], limits()).unwrap_err().code,
-            "ANCHOR_NOT_ON_ENVELOPE_BOUNDARY");
+            "ANCHOR_NOT_ON_DECLARED_ENVELOPE_SIDE");
     }
 
     #[test]
