@@ -51,6 +51,11 @@ impl HeliosEmbodiment {
 }
 
 impl EmbodimentBridge for HeliosEmbodiment {
+    fn plant_step_authority(&self) -> symthaea_core::embodiment::PlantStepAuthorityV1 {
+        // This implementation advances an in-process model, not a hardware clock.
+        symthaea_core::embodiment::PlantStepAuthorityV1::ConfiguredSimulation
+    }
+
     fn step(&mut self, _thought_hv: &ContinuousHV, _dt: f32, _phi: f64) -> EmbodimentResult {
         self.steps += 1;
 
