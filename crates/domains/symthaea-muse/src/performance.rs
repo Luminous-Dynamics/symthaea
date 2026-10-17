@@ -135,9 +135,182 @@ pub fn humanize_score_note(
     }
 }
 
+/// Explicit, versioned low-level performance parameters that can be calibrated from
+/// performer data rather than inferred from a cognitive-state variable.
+///
+/// This is a per-note realization primitive, not a complete groove or
+/// musicianship model: it does not coordinate multiple parts, generate fills,
+/// model articulation techniques such as bends/slides, or establish quality.
+/// Defaults are conservative engineering priors, not population estimates.
+#[derive(Debug, Clone, Copy, PartialEq)]
+pub struct PerformanceProfileV1 {
+    /// Standard deviation of onset perturbation in milliseconds, in [0, 50].
+    pub timing_stddev_ms: f32,
+    /// Multiplier for onset perturbation on the first beat of the bar, in [0, 1].
+    pub downbeat_timing_scale: f32,
+    /// Standard deviation of per-note velocity perturbation, in [0, 0.25].
+    pub velocity_stddev: f32,
+    /// Written duration multiplier, in [0.5, 1.5].
+    pub duration_scale: f32,
+}
+
+impl Default for PerformanceProfileV1 {
+    fn default() -> Self {
+        Self {
+            timing_stddev_ms: 7.0,
+            downbeat_timing_scale: 0.5,
+            velocity_stddev: 0.08,
+            duration_scale: 1.08,
+        }
+    }
+}
+
+impl PerformanceProfileV1 {
+    /// Check the versioned parameter bounds before applying the profile.
+    pub fn validate(self) -> Result<(), &'static str> {
+        if !self.timing_stddev_ms.is_finite()
+            || !(0.0..=50.0).contains(&self.timing_stddev_ms)
+        {
+            return Err("timing_stddev_ms must be finite and within 0..=50");
+        }
+        if !self.downbeat_timing_scale.is_finite()
+            || !(0.0..=1.0).contains(&self.downbeat_timing_scale)
+        {
+            return Err("downbeat_timing_scale must be finite and within 0..=1");
+        }
+        if !self.velocity_stddev.is_finite() || !(0.0..=0.25).contains(&self.velocity_stddev) {
+            return Err("velocity_stddev must be finite and within 0..=0.25");
+        }
+        if !self.duration_scale.is_finite() || !(0.5..=1.5).contains(&self.duration_scale) {
+            return Err("duration_scale must be finite and within 0.5..=1.5");
+        }
+        Ok(())
+    }
+}
+
+/// Apply explicit performance controls to one note without using Phi as a
+/// proxy for musical skill. The seed makes the perturbation deterministic;
+/// jitter is capped at three standard deviations to avoid pathological
+/// outliers. This function adds controlled variation only—it does not decide
+/// whether the resulting performance is musically effective.
+///
+/// Invalid profiles, timing context, or note state are rejected before the
+/// note is mutated.
+pub fn humanize_score_note_with_profile(
+    note: &mut Note,
+    beat_position: f32,
+    beats_per_bar: f32,
+    seed: u32,
+    profile: PerformanceProfileV1,
+) -> Result<(), &'static str> {
+    profile.validate()?;
+    if !beat_position.is_finite() || !beats_per_bar.is_finite() || beats_per_bar <= 0.0 {
+        return Err("beat_position must be finite and beats_per_bar must be finite and positive");
+    }
+    if !note.start_time.is_finite()
+        || !note.duration.is_finite()
+        || !note.velocity.is_finite()
+        || note.start_time < 0.0
+        || note.duration < 0.0
+    {
+        return Err("note timing, duration, and velocity must be finite and timing nonnegative");
+    }
+
+    let beat_in_bar = beat_position.rem_euclid(beats_per_bar);
+    let timing_scale = if beat_in_bar < 0.5 {
+        profile.downbeat_timing_scale
+    } else {
+        1.0
+    };
+    let max_jitter = 3.0 * profile.timing_stddev_ms;
+    let jitter_ms = (gaussian(seed) * profile.timing_stddev_ms * timing_scale)
+        .clamp(-max_jitter, max_jitter);
+    note.start_time = (note.start_time + jitter_ms / 1000.0).max(0.0);
+
+    let velocity_jitter = (gaussian(seed.wrapping_mul(7)) * profile.velocity_stddev)
+        .clamp(-3.0 * profile.velocity_stddev, 3.0 * profile.velocity_stddev);
+    note.velocity = (note.velocity + velocity_jitter).clamp(0.0, 1.0);
+    note.duration *= profile.duration_scale;
+    Ok(())
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;
+
+    #[test]
+    fn explicit_profile_can_disable_variation_without_changing_the_note() {
+        let mut note = Note {
+            frequency: 110.0,
+            start_time: 2.0,
+            duration: 0.25,
+            velocity: 0.6,
+        };
+        let original = note;
+        let profile = PerformanceProfileV1 {
+            timing_stddev_ms: 0.0,
+            downbeat_timing_scale: 0.0,
+            velocity_stddev: 0.0,
+            duration_scale: 1.0,
+        };
+        humanize_score_note_with_profile(&mut note, 1.0, 4.0, 17, profile).unwrap();
+        assert_eq!(note.start_time, original.start_time);
+        assert_eq!(note.duration, original.duration);
+        assert_eq!(note.velocity, original.velocity);
+    }
+
+    #[test]
+    fn explicit_profile_is_seed_deterministic_and_bounded() {
+        let make = || Note {
+            frequency: 110.0,
+            start_time: 1.0,
+            duration: 0.5,
+            velocity: 0.98,
+        };
+        let profile = PerformanceProfileV1::default();
+        let (mut a, mut b) = (make(), make());
+        humanize_score_note_with_profile(&mut a, 2.0, 4.0, 77, profile).unwrap();
+        humanize_score_note_with_profile(&mut b, 2.0, 4.0, 77, profile).unwrap();
+        assert_eq!(a.start_time, b.start_time);
+        assert_eq!(a.duration, b.duration);
+        assert_eq!(a.velocity, b.velocity);
+        assert!(a.start_time >= 0.0);
+        assert!((0.0..=1.0).contains(&a.velocity));
+        assert!((a.start_time - 1.0).abs() <= 0.150001);
+        assert_eq!(a.duration, 0.54);
+    }
+
+    #[test]
+    fn explicit_profile_rejects_bad_parameters_before_mutating_note() {
+        let original = Note {
+            frequency: 220.0,
+            start_time: 1.0,
+            duration: 0.25,
+            velocity: 0.5,
+        };
+        let mut note = original;
+        let mut invalid = PerformanceProfileV1::default();
+        invalid.timing_stddev_ms = f32::NAN;
+        assert!(humanize_score_note_with_profile(&mut note, 1.0, 4.0, 0, invalid).is_err());
+        assert_eq!(note.start_time, original.start_time);
+        assert_eq!(note.duration, original.duration);
+        assert_eq!(note.velocity, original.velocity);
+
+        assert!(humanize_score_note_with_profile(
+            &mut note,
+            f32::INFINITY,
+            4.0,
+            0,
+            PerformanceProfileV1::default()
+        ).is_err());
+        assert!(humanize_score_note_with_profile(
+            &mut note,
+            1.0,
+            0.0,
+            0,
+            PerformanceProfileV1::default()
+        ).is_err());
+    }
 
     #[test]
     fn timing_sd_high_phi() {
