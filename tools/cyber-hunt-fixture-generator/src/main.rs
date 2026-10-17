@@ -759,6 +759,7 @@ fn generate_cloud_data_movement_dataset(record_count: usize, seed: u64) -> Resul
             ("effective_scope", source_scope),
         ]),
     ));
+    let positive_request_id = format!("req-{:012x}", rng.next_u64() & 0x0000_ffff_ffff_ffff);
     positive_ids.push(push_event(
         &mut events, &mut rng, &mut used_ids, base + 50_000, &host, principal,
         "cloud_storage", "storage_list", "success",
@@ -767,7 +768,7 @@ fn generate_cloud_data_movement_dataset(record_count: usize, seed: u64) -> Resul
             ("session_id", &session_id),
             ("resource_scope", target_scope),
             ("container", "finance-prod"),
-            ("request_id", &format!("req-{:012x}", rng.next_u64() & 0x0000_ffff_ffff_ffff)),
+            ("request_id", &positive_request_id),
         ]),
     ));
     positive_ids.push(push_event(
@@ -817,6 +818,7 @@ fn generate_cloud_data_movement_dataset(record_count: usize, seed: u64) -> Resul
     let benign_count = 4_000 + rng.below(2_000);
     let benign_bytes = 1_000_000_000_u64 + rng.below(2_000_000_000);
     let benign_scope = "tenant-alpha/backup";
+    let benign_request_id = format!("req-{:012x}", rng.next_u64() & 0x0000_ffff_ffff_ffff);
 
     let benign_ids = vec![
         push_event(
@@ -850,7 +852,7 @@ fn generate_cloud_data_movement_dataset(record_count: usize, seed: u64) -> Resul
                 ("session_id", &benign_session),
                 ("resource_scope", benign_scope),
                 ("container", "backup"),
-                ("request_id", &format!("req-{:012x}", rng.next_u64() & 0x0000_ffff_ffff_ffff)),
+                ("request_id", &benign_request_id),
             ]),
         ),
         push_event(
@@ -1108,6 +1110,7 @@ fn generate_cross_domain_trust_chain_dataset(record_count: usize, seed: u64) -> 
             ("effective_scope", assigned_scope),
         ]),
     ));
+    let positive_request_id = format!("req-{:012x}", rng.next_u64() & 0x0000_ffff_ffff_ffff);
     positive_ids.push(push_event(
         &mut events, &mut rng, &mut used_ids, base + 160_000, &host, principal,
         "cloud_storage", "storage_list", "success",
@@ -1116,7 +1119,7 @@ fn generate_cross_domain_trust_chain_dataset(record_count: usize, seed: u64) -> 
             ("session_id", &session_id),
             ("resource_scope", accessed_scope),
             ("container", "finance-prod"),
-            ("request_id", &format!("req-{:012x}", rng.next_u64() & 0x0000_ffff_ffff_ffff)),
+            ("request_id", &positive_request_id),
         ]),
     ));
     positive_ids.push(push_event(
@@ -1251,7 +1254,7 @@ fn generate_cross_domain_trust_chain_dataset(record_count: usize, seed: u64) -> 
                 ("session_id", &benign_session),
                 ("resource_scope", benign_scope),
                 ("container", "backup"),
-                ("request_id", &format!("req-{:012x}", rng.next_u64() & 0x0000_ffff_ffff_ffff)),
+                ("request_id", &benign_request_id),
             ])),
         push_event(&mut events, &mut rng, &mut used_ids, base + 185_000, &benign_host, benign_principal,
             "cloud_storage", "object_read_batch", "success",
