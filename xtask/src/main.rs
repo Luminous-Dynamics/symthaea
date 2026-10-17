@@ -4,6 +4,7 @@ use std::path::PathBuf;
 mod crate_status;
 mod duplicate_scan;
 mod manifest;
+mod proof_corpus;
 mod rhn_sweep;
 
 #[derive(Parser)]
@@ -66,6 +67,12 @@ enum Commands {
         #[arg(long, default_value = ".")]
         root: PathBuf,
     },
+    /// Validate the pinned, candidate-only external Lean proof reference manifest.
+    /// This validates metadata only; it does not qualify any theorem.
+    ProofCorpusValidate {
+        #[arg(long, default_value = "docs/phase6-scoping/proof-corpus-manifest.yaml")]
+        manifest: PathBuf,
+    },
 }
 
 fn main() -> anyhow::Result<()> {
@@ -113,6 +120,18 @@ fn main() -> anyhow::Result<()> {
                 "Manifest generated at {}",
                 root.join("manifest.json").display()
             );
+        }
+        Commands::ProofCorpusValidate { manifest } => {
+            let root = PathBuf::from(env!("CARGO_MANIFEST_DIR"))
+                .parent()
+                .expect("xtask lives one level below the workspace root")
+                .to_path_buf();
+            let manifest_path = if manifest.is_absolute() {
+                manifest
+            } else {
+                root.join(manifest)
+            };
+            proof_corpus::validate(&manifest_path)?;
         }
         Commands::DuplicateScan { registry } => {
             let root = PathBuf::from(env!("CARGO_MANIFEST_DIR"))
