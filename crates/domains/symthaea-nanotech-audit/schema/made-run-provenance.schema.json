@@ -75,7 +75,9 @@
           "source_url",
           "revision",
           "license",
-          "rights_status"
+          "rights_status",
+          "source_artifact_path",
+          "source_artifact_sha256"
         ],
         "properties": {
           "source_id": {
@@ -105,6 +107,16 @@
               "restricted",
               "not_applicable"
             ]
+          },
+          "source_artifact_path": {
+            "type": "string",
+            "minLength": 1,
+            "maxLength": 1024,
+            "description": "Relative path under the run directory to the local snapshot of this source."
+          },
+          "source_artifact_sha256": {
+            "type": "string",
+            "pattern": "^[a-f0-9]{64}$"
           }
         }
       }
