@@ -53,7 +53,7 @@ The differential runner additionally regenerates the corpus from the clean, trac
 
 ## Ready/valid streaming XOR profiles
 
-\`hdc_bind_xor_stream.sv\` applies the same exact XOR operation to one lane per accepted transfer. The one-entry elastic stage uses a ready/valid handshake; an output beat must remain valid and stable while the consumer is stalled. The final-beat marker is forwarded unchanged.
+`hdc_bind_xor_stream.sv` applies the same exact XOR operation to one lane per accepted transfer. The one-entry elastic stage uses a ready/valid handshake; an output beat must remain valid and stable while the consumer is stalled. The final-beat marker is forwarded unchanged.
 
 The lane sweep bench runs each profile over the same 16,384-bit vectors:
 
@@ -65,16 +65,16 @@ The lane sweep bench runs each profile over the same 16,384-bit vectors:
 | 512 bits | 32 |
 | 16,384 bits | 1 |
 
-These counts follow directly from the declared vector/lane widths. They are not latency, frequency, area, power or energy measurements. The bench applies the same deterministic downstream-stall schedule, reconstructs the full output vector, asserts the \`last\` marker, and checks output stability during backpressure.
+These counts follow directly from the declared vector/lane widths. They are not latency, frequency, area, power or energy measurements. The bench applies the same deterministic downstream-stall schedule, reconstructs the full output vector, asserts the `last` marker, and checks output stability during backpressure.
 
 Run with Icarus Verilog:
 
-\`\`\`sh
+```sh
 iverilog -g2012 -Wall -s hdc_bind_xor_stream_tb -o /tmp/hdc_bind_xor_stream_tb.vvp \\
   crates/domains/symthaea-silicon/rtl/hdc_bind_xor_stream.sv \\
   crates/domains/symthaea-silicon/rtl/hdc_bind_xor_stream_tb.sv
 vvp /tmp/hdc_bind_xor_stream_tb.vvp
-\`\`\`
+```
 
 Only a captured exact-head simulator receipt qualifies the RTL/protocol bench. The next comparison should use frozen oracle vectors and then pinned synthesis/implementation flows; simulated cycles under artificial backpressure are not physical performance.
 
