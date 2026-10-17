@@ -33,7 +33,10 @@ pub struct ControlledDocumentRef {
     pub document_id: String,
     pub revision: String,
     pub sha256: String,
-    pub source_section: String,
+    /// Explicit section/paragraph anchors in this controlled document revision.
+    /// One manual reference may be cited by several task steps without weakening
+    /// the exact document revision and digest binding.
+    pub source_sections: Vec<String>,
 }
 
 /// Product-design task class. This is deliberately distinct from legal
