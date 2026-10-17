@@ -1295,6 +1295,132 @@ mod tests {
     }
 
     #[test]
+    fn provenance_is_complete_only_when_each_present_field_has_a_record() {
+        let mut input = valid_fit();
+        input.evidence_provenance = vec![
+            WearabilityEvidenceProvenanceV1 {
+                field: WearabilityEvidenceFieldV1::FasteningEvidence,
+                origin: WearabilityEvidenceOriginV1::CallerAssertion,
+                evidence_id: Some("fixture-fastening".to_owned()),
+                observed_at_ticks: None,
+                timebase_id: None,
+                calibration_reference: None,
+            },
+            WearabilityEvidenceProvenanceV1 {
+                field: WearabilityEvidenceFieldV1::ProfileMatch,
+                origin: WearabilityEvidenceOriginV1::CallerAssertion,
+                evidence_id: Some("fixture-profile".to_owned()),
+                observed_at_ticks: None,
+                timebase_id: None,
+                calibration_reference: None,
+            },
+            WearabilityEvidenceProvenanceV1 {
+                field: WearabilityEvidenceFieldV1::FitEvidence,
+                origin: WearabilityEvidenceOriginV1::CallerAssertion,
+                evidence_id: Some("fixture-fit".to_owned()),
+                observed_at_ticks: None,
+                timebase_id: None,
+                calibration_reference: None,
+            },
+            WearabilityEvidenceProvenanceV1 {
+                field: WearabilityEvidenceFieldV1::SensorConsistency,
+                origin: WearabilityEvidenceOriginV1::CallerAssertion,
+                evidence_id: Some("fixture-sensor-consistency".to_owned()),
+                observed_at_ticks: None,
+                timebase_id: None,
+                calibration_reference: None,
+            },
+        ];
+
+        let result = evaluate_wearability_request("profile-a", WearabilityStageV1::FitCheck, &input);
+        assert_eq!(
+            result.provenance_status,
+            WearabilityProvenanceStatusV1::CompleteForPresentInputs
+        );
+        assert!(result.provenance_findings.is_empty());
+        assert_eq!(result.evidence_provenance, input.evidence_provenance);
+    }
+
+    #[test]
+    fn missing_provenance_is_distinct_from_policy_disposition() {
+        let input = valid_fit();
+        let result = evaluate_wearability_request("profile-a", WearabilityStageV1::FitCheck, &input);
+        assert_eq!(result.disposition, WearabilityDispositionV1::ReadyForSimulation);
+        assert_eq!(
+            result.provenance_status,
+            WearabilityProvenanceStatusV1::MissingForPresentInputs
+        );
+        assert_eq!(result.provenance_findings.len(), 4);
+        assert!(result.findings.contains(&WearabilityFindingV1::FitCheckAdmittedForSimulation));
+    }
+
+    #[test]
+    fn sensor_provenance_requires_timestamp_timebase_and_calibration_reference() {
+        let mut input = valid_fit();
+        input.pressure_sensor = Some(SignalEvidenceV1::Available);
+        input.evidence_provenance = vec![
+            WearabilityEvidenceProvenanceV1 {
+                field: WearabilityEvidenceFieldV1::FasteningEvidence,
+                origin: WearabilityEvidenceOriginV1::CallerAssertion,
+                evidence_id: Some("fastening".to_owned()),
+                observed_at_ticks: None,
+                timebase_id: None,
+                calibration_reference: None,
+            },
+            WearabilityEvidenceProvenanceV1 {
+                field: WearabilityEvidenceFieldV1::ProfileMatch,
+                origin: WearabilityEvidenceOriginV1::CallerAssertion,
+                evidence_id: Some("profile".to_owned()),
+                observed_at_ticks: None,
+                timebase_id: None,
+                calibration_reference: None,
+            },
+            WearabilityEvidenceProvenanceV1 {
+                field: WearabilityEvidenceFieldV1::FitEvidence,
+                origin: WearabilityEvidenceOriginV1::CallerAssertion,
+                evidence_id: Some("fit".to_owned()),
+                observed_at_ticks: None,
+                timebase_id: None,
+                calibration_reference: None,
+            },
+            WearabilityEvidenceProvenanceV1 {
+                field: WearabilityEvidenceFieldV1::SensorConsistency,
+                origin: WearabilityEvidenceOriginV1::CallerAssertion,
+                evidence_id: Some("sensor-consistency".to_owned()),
+                observed_at_ticks: None,
+                timebase_id: None,
+                calibration_reference: None,
+            },
+            WearabilityEvidenceProvenanceV1 {
+                field: WearabilityEvidenceFieldV1::PressureSensor,
+                origin: WearabilityEvidenceOriginV1::SensorObservation,
+                evidence_id: Some("pressure-observation".to_owned()),
+                observed_at_ticks: None,
+                timebase_id: None,
+                calibration_reference: None,
+            },
+        ];
+
+        let result = evaluate_wearability_request("profile-a", WearabilityStageV1::FitCheck, &input);
+        assert_eq!(result.provenance_status, WearabilityProvenanceStatusV1::Invalid);
+        assert!(result.provenance_findings.contains(
+            &WearabilityProvenanceFindingV1::ObservationTimestampMissing {
+                field: WearabilityEvidenceFieldV1::PressureSensor
+            }
+        ));
+        assert!(result.provenance_findings.contains(
+            &WearabilityProvenanceFindingV1::TimebaseMissing {
+                field: WearabilityEvidenceFieldV1::PressureSensor
+            }
+        ));
+        assert!(result.provenance_findings.contains(
+            &WearabilityProvenanceFindingV1::SensorCalibrationReferenceMissing {
+                field: WearabilityEvidenceFieldV1::PressureSensor
+            }
+        ));
+    }
+
+    #[test]
     fn explicit_doff_remains_highest_priority_with_invalid_other_metadata() {
         let input = WearabilityInputV1 {
             schema_version: WEARABILITY_SCHEMA_VERSION + 99,
