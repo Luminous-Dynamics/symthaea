@@ -39,6 +39,27 @@ Build the importer as a deterministic transformation from a pinned source artifa
 
 **ENOLA constraint:** [The Zenodo record](https://zenodo.org/records/20111572) describes experimental and numerical propeller data, but explicitly restricts the dataset to research/education and disclaims operational, safety-critical, navigational and decision-making use. The record's license field is not sufficiently clear to infer redistribution rights. Initially use it only for permitted importer/schema experimentation after terms review; do not use it to select an aircraft propulsor or support an operational decision, and do not redistribute its archive. Prefer a separately permission- and license-verified source for model validation.
 
+## 2.1 Higher-value dataset and model-comparison leads
+
+The initial source review suggests that isolated-propeller maps and propeller/wing-interaction data should be separate benchmark tracks.
+
+### Propeller/wing interaction data
+
+TU Delft's **TUD-PROWIM-CAMB** experimental dataset records an inboard- and tip-mounted propeller/wing model from a 2017 low-turbulence wind-tunnel campaign. Its published description includes external-balance system forces/moments and total-pressure distributions in the wake. The associated geometry is published separately under [Zenodo DOI 10.5281/zenodo.18608585](https://zenodo.org/records/18608585). Source record: [TU Delft / 4TU.ResearchData, CAMB dataset](https://research.tudelft.nl/en/datasets/experimental-dataset-from-wind-tunnel-campaigns-with-tud-prowim-c/).
+
+The related **TUD-PROWIM-TIP** record describes an instrumented tip-mounted propeller model with a flap. Its listed data include system forces/moments, pressure-tap measurements, wake total pressure and velocity fields; the geometry is separately linked at [Zenodo DOI 10.5281/zenodo.18599612](https://zenodo.org/records/18599612). Source record: [TU Delft / 4TU.ResearchData, TIP dataset](https://research.tudelft.nl/en/datasets/experimental-dataset-from-wind-tunnel-campaigns-with-tud-prowim-t/).
+
+These are particularly relevant to testing claims about wingtip propellers and distributed/aero-propulsive integration, because they include wing-interaction evidence rather than only isolated propeller performance. They do not automatically provide the electrical power channels required by the current complete propulsor-map type. Treat these first as a potential *interaction-model validation* source, not as a drop-in electrical propulsor map. The portal says applicable licensing terms govern reuse; the dataset license was not confirmed during this review. Do not download, transform or redistribute data until the exact dataset record's license, attribution and use conditions are checked.
+
+### Model families worth comparing
+
+Recent 2026 publications suggest two additional baselines worth testing only after dataset rights and applicability are established:
+
+- A geometry-free machine-learning approach for predicting performance of unseen two-bladed propellers over changing conditions ([Aerospace Science and Technology, DOI 10.1016/j.ast.2026.112259](https://doi.org/10.1016/j.ast.2026.112259)).
+- A variable-fidelity deep-neural-network approach combining lower/higher-fidelity aerodynamic and aeroacoustic evidence with predictive uncertainty ([Aerospace Science and Technology, DOI 10.1016/j.ast.2026.112283](https://doi.org/10.1016/j.ast.2026.112283)).
+
+The benchmark should compare, on the same frozen splits, a simple physics baseline, bounded map interpolation, a data-driven model and—only if evidence supports it—a multi-fidelity surrogate. Use leave-one-propeller-family-out tests for generalization, not random row splits alone. Report accuracy, uncertainty calibration, computational cost, data requirements and failure/indeterminate rate separately. Publication claims are hypotheses to reproduce, not evidence that an ML or multi-fidelity approach will outperform Symthaea on its chosen dataset.
+
 ## 3. Avoid data leakage in validation
 
 Randomly holding out individual rows is not adequate when neighboring operating points share the same propeller, rig, calibration, geometry and acquisition campaign. Adjacent samples can make a weak model look more general than it is.
