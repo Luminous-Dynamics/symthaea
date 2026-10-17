@@ -1,0 +1,1396 @@
+// Copyright (C) 2024-2026 Tristan Stoltz / Luminous Dynamics
+// SPDX-License-Identifier: AGPL-3.0-or-later
+// Commercial licensing: see COMMERCIAL_LICENSE.md at repository root
+//! Shared embodiment types for consciousness-coupled motor control.
+//!
+//! These types are the canonical definitions used by the cognitive loop,
+//! all platform crates (flight, vehicle, helicopter, manipulator, AUV),
+//! and the hardware abstraction layer (HAL).
+
+use serde::{Deserialize, Serialize};
+
+use crate::hdc::ContinuousHV;
+
+// ── Motor Safety Level ─────────────────────────────────────────────────────
+
+/// NRC-inspired safety level for motor output gating.
+///
+/// Maps to consciousness level (Phi) thresholds:
+/// - Green (Phi > 0.6): full authority
+/// - Yellow (0.3–0.6): reduced speed/force
+/// - Orange (0.1–0.3): retreat to safe pose
+/// - Red (< 0.1): emergency stop, power cut
+///
+/// ⚠️ **VARIANT ORDER IS LOAD-BEARING — DO NOT REORDER.**
+///
+/// `Ord` is *derived*, so it follows declaration order: `Green < Yellow < Orange < Red`.
+/// Every most-restrictive-wins composition in the fleet is written as `a.max(b)` and
+/// relies on that. Moving `Red` to the top — the natural instinct when marking it
+/// `#[default]` — would silently **invert** each of those, turning every safety
+/// composition into a fail-open one with no compile error and no failing test that
+/// exercises only Green paths. That is why `#[default]` is attached in place below
+/// rather than by reordering.
+///
+/// `#[default]` was `Green` until 2026-07-31 — i.e. a defaulted safety level meant
+/// *full authority*. `EmbodimentTelemetry` derives `Default` and holds a
+/// `safety_level`, so `EmbodimentTelemetry::default()` reported Green regardless of
+/// the platform's real state, and three call sites do exactly that
+/// (`helios_bridge.rs`, `detritivore_bridge.rs`, plus a test mock). A defaulted
+/// safety level must mean "unknown, assume the worst", not "cleared for full torque".
+#[derive(
+    Debug, Clone, Copy, PartialEq, Eq, PartialOrd, Ord, Hash, Default, Serialize, Deserialize,
+)]
+pub enum MotorSafetyLevel {
+    Green,
+    Yellow,
+    Orange,
+    #[default]
+    Red,
+}
+
+impl std::fmt::Display for MotorSafetyLevel {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        write!(f, "{self:?}")
+    }
+}
+
+impl MotorSafetyLevel {
+    /// Determine safety level from current Phi value.
+    ///
+    /// Non-finite inputs (NaN, Inf, -Inf) map to `Red` (emergency mode).
+    ///
+    /// IMPORTANT: `Red` does NOT mean "zero motor force". It means
+    /// "execute the platform's SafeFallback behavior" — which for a
+    /// vehicle means emergency braking, for an exoskeleton means locking
+    /// in standing position, for a helicopter means autorotation, etc.
+    /// See the [`SafeFallback`] trait for platform-specific guarantees.
+    pub fn from_phi(phi: f64) -> Self {
+        if !phi.is_finite() {
+            return Self::Red;
+        }
+        if phi > 0.6 {
+            Self::Green
+        } else if phi > 0.3 {
+            Self::Yellow
+        } else if phi > 0.1 {
+            Self::Orange
+        } else {
+            Self::Red
+        }
+    }
+
+    /// Motor gain multiplier for consciousness-modulated commanded force.
+    ///
+    /// This is applied to COMMANDED torques only. Platforms that implement
+    /// [`SafeFallback`] produce an overriding command at Red that is NOT
+    /// scaled by this gain — the safe fallback must execute at full authority
+    /// to guarantee minimum safe behavior (emergency braking, lock, etc.).
+    ///
+    /// - Green: 1.0 (full commanded authority)
+    /// - Yellow: 0.6 (reduced)
+    /// - Orange: 0.3 (compliant)
+    /// - Red: 0.0 for commanded torques (but SafeFallback executes at 1.0)
+    pub fn motor_gain(&self) -> f32 {
+        match self {
+            Self::Green => 1.0,
+            Self::Yellow => 0.6,
+            Self::Orange => 0.3,
+            Self::Red => 0.0,
+        }
+    }
+}
+
+// ── Embodiment Result ──────────────────────────────────────────────────────
+
+/// Result of a single embodiment step.
+#[derive(Debug, Clone)]
+pub struct EmbodimentResult {
+    pub num_actuators: usize,
+    pub control_effort: f32,
+    pub success: bool,
+    pub prediction_error: f32,
+    pub safety_level: MotorSafetyLevel,
+    /// Epistemic grounding level: 0=Sensorimotor, 1=Temporal, 2=Social.
+    /// Uses u8 to keep symthaea-core free of epistemic-types dependency.
+    pub epistemic_grounding: u8,
+    /// Observation confidence derived from prediction error (low error = high confidence).
+    pub observation_confidence: f32,
+}
+
+// ── Embodiment Telemetry ───────────────────────────────────────────────────
+
+/// Telemetry from the embodiment subsystem, exposed in CycleMetadata.
+#[derive(Debug, Clone, Default, Serialize, Deserialize)]
+pub struct EmbodimentTelemetry {
+    pub total_steps: u64,
+    pub control_effort: f32,
+    pub prediction_error: f32,
+    /// Typed since 2026-07-12 (robotics plan Tier 2.2) — was a `format!("{:?}", ..)`
+    /// String; every producer already held a real `MotorSafetyLevel`, the string was
+    /// pure stringly-typed loss. `Display` (added alongside) still renders "Green" etc.
+    /// for any consumer that wants the old wire format (e.g. the Mycelix bridge).
+    pub safety_level: MotorSafetyLevel,
+    pub platform: String,
+    pub num_actuators: usize,
+    /// Human-readable epistemic grounding level (e.g. "Sensorimotor", "Temporal", "Social").
+    pub epistemic_grounding: String,
+    /// Observation confidence derived from prediction error.
+    pub observation_confidence: f32,
+    /// Platform-specific telemetry bytes (serialized by each platform).
+    /// Empty by default; platforms override `platform_telemetry_bytes()` to populate.
+    #[serde(default)]
+    pub platform_specific: Vec<u8>,
+}
+
+// ── Epistemic Grounding Constants ─────────────────────────────────────────
+
+/// Sensorimotor grounding: direct physical sensor data.
+pub const GROUNDING_SENSORIMOTOR: u8 = 0;
+/// Temporal grounding: derived from temporal patterns / prediction.
+pub const GROUNDING_TEMPORAL: u8 = 1;
+/// Social grounding: derived from social/swarm interaction.
+pub const GROUNDING_SOCIAL: u8 = 2;
+
+/// Convert a grounding level u8 to a human-readable string.
+pub fn grounding_label(level: u8) -> &'static str {
+    match level {
+        0 => "Sensorimotor",
+        1 => "Temporal",
+        2 => "Social",
+        _ => "Unknown",
+    }
+}
+
+// ── Grounding Estimator ──────────────────────────────────────────────
+
+/// Estimates epistemic grounding level from prediction error trends
+/// and optional peer interaction data.
+///
+/// - **Sensorimotor** (default): Raw proprioceptive data, no temporal model.
+/// - **Temporal**: Prediction errors are consistently decreasing and low — the
+///   platform has learned a temporal model of its body dynamics.
+/// - **Social**: Prediction incorporates multi-agent data (mesh swarm peers).
+#[derive(Debug, Clone)]
+pub struct GroundingEstimator {
+    /// Rolling window of prediction errors (most recent at end).
+    window: Vec<f32>,
+    /// Maximum window size.
+    capacity: usize,
+}
+
+impl GroundingEstimator {
+    /// Create with a 32-sample rolling window.
+    pub fn new() -> Self {
+        Self {
+            window: Vec::with_capacity(32),
+            capacity: 32,
+        }
+    }
+
+    /// Update with the latest prediction error and return the estimated grounding level.
+    ///
+    /// `peer_count`: number of mesh/swarm peers contributing to perception.
+    /// Pass `None` or `Some(0)` for platforms without social interaction.
+    pub fn estimate(&mut self, prediction_error: f32, peer_count: Option<usize>) -> u8 {
+        // Update rolling window
+        if self.window.len() >= self.capacity {
+            self.window.remove(0);
+        }
+        self.window.push(prediction_error);
+
+        // Social grounding: requires peers and a stable temporal model
+        if let Some(peers) = peer_count
+            && peers > 0
+            && self.window.len() >= 16
+        {
+            let mean = self.window.iter().sum::<f32>() / self.window.len() as f32;
+            if mean < 0.3 {
+                return GROUNDING_SOCIAL;
+            }
+        }
+
+        // Temporal grounding: full window, mean < 0.3, and trend is decreasing
+        if self.window.len() >= self.capacity {
+            let mean = self.window.iter().sum::<f32>() / self.window.len() as f32;
+            if mean < 0.3 {
+                // Check trend: compare first half mean to second half mean
+                let half = self.capacity / 2;
+                let first_half: f32 = self.window[..half].iter().sum::<f32>() / half as f32;
+                let second_half: f32 = self.window[half..].iter().sum::<f32>() / half as f32;
+                if second_half <= first_half {
+                    return GROUNDING_TEMPORAL;
+                }
+            }
+        }
+
+        GROUNDING_SENSORIMOTOR
+    }
+
+    /// Reset the estimator.
+    pub fn reset(&mut self) {
+        self.window.clear();
+    }
+}
+
+impl Default for GroundingEstimator {
+    fn default() -> Self {
+        Self::new()
+    }
+}
+
+/// Compute observation confidence from prediction error.
+///
+/// Low prediction error implies high confidence in the observation.
+/// Returns a value in \[0.0, 1.0\].
+pub fn grounding_from_prediction_error(prediction_error: f32) -> f32 {
+    1.0 - prediction_error.clamp(0.0, 1.0)
+}
+
+// ── Embodiment Platform ────────────────────────────────────────────────────
+
+/// Which embodiment platform to use.
+///
+/// Each variant (except `None` and `CareProvider`) maps to a robotics crate
+/// behind a feature flag.
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, Deserialize, Default)]
+pub enum EmbodimentPlatform {
+    #[default]
+    None,
+    Humanoid,
+    Quadrotor,
+    Vehicle,
+    Helicopter,
+    Auv,
+    Manipulator,
+    /// Lower-limb exoskeleton — shared authority with human user.
+    Exoskeleton,
+    /// Surgical robot — sub-mm RCM-constrained precision.
+    Surgical,
+    /// Orbital servicing arm — zero-g dual-body dynamics.
+    Orbital,
+    /// Legged quadruped — CPG-modulated locomotion.
+    Quadruped,
+    /// Subterranean scout / boring platform — digging, spoil, thermal load.
+    Subterranean,
+    /// Stationary infrastructure agent — hub, storage, microgrid, routing.
+    Infrastructure,
+    /// Recovery / recycling platform — salvage, teardown, materials sorting.
+    Scavenger,
+    /// Ecological stewardship platform — soil, water, light, crop tending.
+    Agribot,
+    /// Interspecies sanctuary platform — animal right-of-way and distress sensing.
+    Biota,
+    /// Habitat homeostasis platform — atmosphere, HVAC, circadian support.
+    Clime,
+    /// Virtual caregiver agent — no physical embodiment.
+    CareProvider,
+    /// Browser agent — web pages as sensory environment via CDP.
+    Browser,
+    /// Phone screen — ADB-controlled Android device as sensory environment.
+    Phone,
+    /// Desktop screen — mouse/keyboard control via xdotool/ydotool.
+    Desktop,
+    /// Mk0 plastic shredder/extruder recycler — distinct from the
+    /// `symthaea-scavenger` platform (`Scavenger`), which this used to
+    /// collide with before the 2026-07-07 unaudited-platforms review
+    /// flagged the identity clash as a latent footgun.
+    Detritivore,
+}
+
+// ── Agent Identity ────────────────────────────────────────────────────────
+
+/// Platform-agnostic agent identity for embodied components.
+///
+/// In Holochain contexts this maps to a uhCAk... Ed25519 public key.
+/// In standalone Symthaea it is a blake3 hash of the genesis seed.
+/// This keeps `symthaea-core` free of Holochain dependencies.
+#[derive(Debug, Clone, PartialEq, Eq, Hash, Serialize, Deserialize)]
+pub struct AgentIdentity(pub String);
+
+impl AgentIdentity {
+    pub fn new(id: impl Into<String>) -> Self {
+        Self(id.into())
+    }
+
+    pub fn as_str(&self) -> &str {
+        &self.0
+    }
+}
+
+impl std::fmt::Display for AgentIdentity {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        f.write_str(&self.0)
+    }
+}
+
+// ── Safe Fallback Trait ────────────────────────────────────────────────────
+
+/// Safe fallback behaviors for consciousness degradation.
+///
+/// # The Core Safety Principle
+///
+/// When consciousness degrades, a machine does not lose its strength —
+/// it loses its goal-directed authority. The machine's MINIMUM-SAFE
+/// behavior must execute regardless of consciousness state.
+///
+/// This trait defines what "minimum-safe behavior" means for each platform.
+///
+/// STATUS (2026-07, SafeFallback audit): this table previously promised
+/// fallback behavior for Manipulator/AUV/Quadruped/Surgical while only
+/// Humanoid/Multirotor/Vehicle/Helicopter actually implemented the
+/// `SafeFallback` trait — a real doc/code gap (Phase 1 of
+/// `SYMTHAEA_IMPROVEMENT_PLAN_2026-07.md`). All 10 platform crates now
+/// implement it; see each crate's `embodiment.rs` for the `impl SafeFallback`
+/// block, which is the authoritative source — this table is a summary.
+///
+/// | Platform | Red-tier Safe Fallback | Priority |
+/// |----------|------------------------|----------|
+/// | Humanoid | StandingLock: zero torque + gravity-comp hip pitch baseline | 9 |
+/// | Multirotor (Quadrotor) | Multi-stage: StabilizeHover → ControlledDescent → Touchdown | 10 |
+/// | **Vehicle** | **Multi-stage: MaintainCourse → GradualDeceleration → EmergencyBrake → PostStop** | 10 |
+/// | Helicopter | Multi-stage: StabilizeHover → AutorotationDescent → Touchdown flare | 10 |
+/// | Manipulator | GravityHold: per-joint gravity-compensation torque holds current pose; gripper frozen | 5 |
+/// | **Exoskeleton** | **Backdrivable: zero assistive torque on every joint — wearer retains full voluntary control** | 9 |
+/// | AUV | BuoyancyAscent: vertical thrusters commanded to surface, all other thrust suppressed | 6 |
+/// | Quadruped | SitDown: fold hip/thigh/knee joints into a stable low crouch, halt locomotion | 6 |
+/// | Surgical | Retract: withdraw tool tip, close jaw, disable cautery (also triggers on ethics-engine consent violation, not just Red) | 8 |
+/// | Orbital | Park: zero relative-motion torque on every joint, hold station attitude | 3 |
+///
+/// Orbital and Surgical previously had their own bespoke safety ladders
+/// running in parallel to `MotorSafetyLevel` (orbital's `gain <= 0.3` "hard
+/// cliff" collapsed Orange into the same hard-zero as Red; surgical's
+/// `SurgicalSafetyLevel` enum was a byte-for-byte duplicate of this type's
+/// own 4-tier thresholds). Both are now unified: `MotorSafetyLevel` is the
+/// single source of the tier decision for every platform; surgical keeps
+/// two small platform-specific derive functions (`surgical_torque_gain`,
+/// `surgical_cautery_allowed`) rather than a parallel enum, so the STRUCTURE
+/// (4 Phi-derived tiers) is shared while per-tier numeric tuning stays
+/// platform-appropriate and auditable against this one contract.
+///
+/// # Design Principle
+///
+/// `motor_gain=0` at Red is the DEFAULT behavior that requires no
+/// platform-specific safety knowledge — it's safe for manipulators
+/// and stationary arms. But for platforms carrying humans, moving at
+/// speed, or operating in environments where "no force" means "crash",
+/// the platform MUST implement this trait and override the step() logic
+/// to execute the safe fallback instead of the zero command.
+///
+/// # Invariants
+///
+/// 1. `safe_fallback_active()` returns true iff safety_level is Red or Orange
+/// 2. `safe_fallback_priority()` returns a numeric priority (higher = more critical)
+/// 3. The safe fallback command executes at FULL authority, not scaled by motor_gain
+/// 4. Safe fallback must NEVER require consciousness to execute (it's reflexive)
+pub trait SafeFallback {
+    /// Platform name for telemetry.
+    fn platform_name(&self) -> &'static str;
+
+    /// Whether the safe fallback is currently active (at Red/Orange safety).
+    fn safe_fallback_active(&self) -> bool {
+        matches!(
+            self.current_safety_level(),
+            MotorSafetyLevel::Red | MotorSafetyLevel::Orange
+        )
+    }
+
+    /// Current safety level driving fallback behavior.
+    fn current_safety_level(&self) -> MotorSafetyLevel;
+
+    /// Priority of this platform's safe fallback:
+    /// - 10: Critical (human-carrying, airborne, moving)
+    /// - 5: High (grasping, in-contact)
+    /// - 1: Low (stationary, contained)
+    fn safe_fallback_priority(&self) -> u8;
+
+    /// Human-readable description of the safe fallback behavior.
+    fn safe_fallback_description(&self) -> &'static str;
+
+    /// Latency in simulation cycles from Red trigger to fallback active.
+    /// MUST be 1 for human-carrying platforms.
+    fn safe_fallback_latency_cycles(&self) -> u32 {
+        1
+    }
+}
+
+// ── Plant-Time Contract V1 ──────────────────────────────────────────────────
+
+/// Provenance for the elapsed duration supplied to one physical/simulated plant step.
+///
+/// Cognitive integration time and scheduler cadence are intentionally not variants:
+/// neither is sufficient evidence for how much physical/model time elapsed.
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, Deserialize)]
+pub enum PlantStepTimeSourceV1 {
+    /// A deterministic simulator step configured by the backend/profile.
+    ConfiguredSimulationStep,
+    /// Elapsed duration measured with a local monotonic clock.
+    MeasuredMonotonicClock,
+    /// Elapsed duration measured from a named hardware/device clock.
+    MeasuredDeviceClock,
+}
+
+/// Declares which component is authorized to establish a plant-step duration.
+///
+/// The default trait authority is Unspecified and fails closed. A simulator must
+/// opt into configured model time; a hardware bridge must opt into bridge-owned
+/// timing and return validated timing evidence for each accepted physical step.
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, Deserialize)]
+pub enum PlantStepAuthorityV1 {
+    Unspecified,
+    ConfiguredSimulation,
+    BackendMeasuredClockRequired,
+}
+
+/// Timing evidence for one requested plant transition.
+///
+/// A configured simulation step describes model-time advancement, not wall-clock
+/// execution speed. A measured record binds the duration to an explicit source clock
+/// domain and monotonic timestamp interval. Legacy bridges can keep implementing
+/// step; hardware bridges should override step_with_timing when they need to
+/// enforce source-clock policy or attach physical timing evidence.
+#[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
+pub struct PlantStepTimingV1 {
+    pub step_index: u64,
+    pub dt_seconds: f32,
+    pub source: PlantStepTimeSourceV1,
+    pub clock_domain_id: Option<String>,
+    /// Generation/session of the source clock; separate from the clock domain name.
+    pub clock_epoch_id: Option<String>,
+    pub start_timestamp_ns: Option<u64>,
+    pub end_timestamp_ns: Option<u64>,
+}
+
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, Deserialize)]
+pub enum PlantStepTimingErrorV1 {
+    NonFiniteDuration,
+    NonPositiveDuration,
+    MissingClockDomain,
+    MissingClockEpoch,
+    NonIncreasingTimestamps,
+    ConfiguredSourceCannotBeMeasured,
+    UnexpectedClockMetadata,
+    MissingSourceTimestamps,
+    InconsistentDuration,
+    /// A legacy step adapter cannot consume measured-clock provenance safely.
+    MeasuredTimingRequiresExplicitBridge,
+    /// A bridge has not declared who is authorized to establish plant time.
+    TimingAuthorityUnspecified,
+    /// The bridge requires its own physical/device clock, not configured simulation dt.
+    ConfiguredSimulationStepNotAuthorized,
+    /// The bridge claims backend-owned timing but has not implemented that step method.
+    BackendMeasuredTimingUnsupported,
+    /// The backend timing evidence belongs to a different requested step.
+    TimingStepIndexMismatch,
+    /// A backend claiming measured time returned a configured simulation record.
+    ConfiguredTimeReturnedForBackendMeasurement,
+}
+
+impl PlantStepTimingV1 {
+    /// Validate invariants even when a record arrived through a non-constructor path
+    /// such as deserialization or a public-field update.
+    pub fn validate(&self) -> Result<(), PlantStepTimingErrorV1> {
+        if !self.dt_seconds.is_finite() {
+            return Err(PlantStepTimingErrorV1::NonFiniteDuration);
+        }
+        if self.dt_seconds <= 0.0 {
+            return Err(PlantStepTimingErrorV1::NonPositiveDuration);
+        }
+        match self.source {
+            PlantStepTimeSourceV1::ConfiguredSimulationStep => {
+                if self.clock_domain_id.is_some()
+                    || self.clock_epoch_id.is_some()
+                    || self.start_timestamp_ns.is_some()
+                    || self.end_timestamp_ns.is_some()
+                {
+                    return Err(PlantStepTimingErrorV1::UnexpectedClockMetadata);
+                }
+            }
+            PlantStepTimeSourceV1::MeasuredMonotonicClock
+            | PlantStepTimeSourceV1::MeasuredDeviceClock => {
+                let domain = self
+                    .clock_domain_id
+                    .as_deref()
+                    .ok_or(PlantStepTimingErrorV1::MissingClockDomain)?;
+                if domain.trim().is_empty() {
+                    return Err(PlantStepTimingErrorV1::MissingClockDomain);
+                }
+                let epoch = self
+                    .clock_epoch_id
+                    .as_deref()
+                    .ok_or(PlantStepTimingErrorV1::MissingClockEpoch)?;
+                if epoch.trim().is_empty() {
+                    return Err(PlantStepTimingErrorV1::MissingClockEpoch);
+                }
+                let start = self
+                    .start_timestamp_ns
+                    .ok_or(PlantStepTimingErrorV1::MissingSourceTimestamps)?;
+                let end = self
+                    .end_timestamp_ns
+                    .ok_or(PlantStepTimingErrorV1::MissingSourceTimestamps)?;
+                let elapsed_ns = end
+                    .checked_sub(start)
+                    .filter(|elapsed| *elapsed > 0)
+                    .ok_or(PlantStepTimingErrorV1::NonIncreasingTimestamps)?;
+                let expected_dt = (elapsed_ns as f64 / 1_000_000_000.0) as f32;
+                if !expected_dt.is_finite() || expected_dt <= 0.0 {
+                    return Err(PlantStepTimingErrorV1::NonPositiveDuration);
+                }
+                if expected_dt != self.dt_seconds {
+                    return Err(PlantStepTimingErrorV1::InconsistentDuration);
+                }
+            }
+        }
+        Ok(())
+    }
+
+    /// Create a deterministic fixed-step simulator timing record.
+    ///
+    /// This duration is model time and must not be scaled by cognitive tau_factor.
+    pub fn configured_simulation(
+        step_index: u64,
+        dt_seconds: f32,
+    ) -> Result<Self, PlantStepTimingErrorV1> {
+        if !dt_seconds.is_finite() {
+            return Err(PlantStepTimingErrorV1::NonFiniteDuration);
+        }
+        if dt_seconds <= 0.0 {
+            return Err(PlantStepTimingErrorV1::NonPositiveDuration);
+        }
+        let timing = Self {
+            step_index,
+            dt_seconds,
+            source: PlantStepTimeSourceV1::ConfiguredSimulationStep,
+            clock_domain_id: None,
+            clock_epoch_id: None,
+            start_timestamp_ns: None,
+            end_timestamp_ns: None,
+        };
+        timing.validate()?;
+        Ok(timing)
+    }
+
+    /// Construct a plant-step record from a qualified measured clock interval.
+    ///
+    /// Callers must validate that the source clock is authoritative for this plant
+    /// and that both timestamps belong to the same clock domain and epoch. This
+    /// constructor verifies only the interval's shape, not clock trustworthiness.
+    pub fn measured_interval(
+        step_index: u64,
+        source: PlantStepTimeSourceV1,
+        clock_domain_id: impl Into<String>,
+        clock_epoch_id: impl Into<String>,
+        start_timestamp_ns: u64,
+        end_timestamp_ns: u64,
+    ) -> Result<Self, PlantStepTimingErrorV1> {
+        if source == PlantStepTimeSourceV1::ConfiguredSimulationStep {
+            return Err(PlantStepTimingErrorV1::ConfiguredSourceCannotBeMeasured);
+        }
+        let clock_domain_id = clock_domain_id.into();
+        if clock_domain_id.trim().is_empty() {
+            return Err(PlantStepTimingErrorV1::MissingClockDomain);
+        }
+        let clock_epoch_id = clock_epoch_id.into();
+        if clock_epoch_id.trim().is_empty() {
+            return Err(PlantStepTimingErrorV1::MissingClockEpoch);
+        }
+        let elapsed_ns = end_timestamp_ns
+            .checked_sub(start_timestamp_ns)
+            .filter(|elapsed| *elapsed > 0)
+            .ok_or(PlantStepTimingErrorV1::NonIncreasingTimestamps)?;
+        let dt_seconds = (elapsed_ns as f64 / 1_000_000_000.0) as f32;
+        if !dt_seconds.is_finite() {
+            return Err(PlantStepTimingErrorV1::NonFiniteDuration);
+        }
+        if dt_seconds <= 0.0 {
+            return Err(PlantStepTimingErrorV1::NonPositiveDuration);
+        }
+        let timing = Self {
+            step_index,
+            dt_seconds,
+            source,
+            clock_domain_id: Some(clock_domain_id),
+            clock_epoch_id: Some(clock_epoch_id),
+            start_timestamp_ns: Some(start_timestamp_ns),
+            end_timestamp_ns: Some(end_timestamp_ns),
+        };
+        timing.validate()?;
+        Ok(timing)
+    }
+}
+
+/// Result of a backend-owned plant step plus the timing evidence for that step.
+#[derive(Debug, Clone)]
+pub struct BackendTimedEmbodimentStepV1 {
+    pub result: EmbodimentResult,
+    pub timing: PlantStepTimingV1,
+}
+
+// ── Embodiment Bridge Trait ────────────────────────────────────────────────
+
+/// Platform-agnostic embodiment bridge trait.
+///
+/// Any robotics platform that wants to close the proprioceptive loop
+/// with the cognitive loop must implement this trait.
+pub trait EmbodimentBridge: Send + Sync {
+    /// Legacy adapter: translate thought → motor commands and perform one step.
+    ///
+    /// dt is the caller's requested model/plant duration, not cognitive tau.
+    /// New hardware bridges should override step_with_timing to validate the
+    /// timing source and measure/use their own authoritative physical interval.
+    /// phi is the current consciousness level for safety gating.
+    fn step(&mut self, thought_hv: &ContinuousHV, dt: f32, phi: f64) -> EmbodimentResult;
+
+    /// Declare the source that owns the authority to establish plant/model time.
+    ///
+    /// Existing bridge implementations default to Unspecified, not simulation time.
+    /// Every bridge must opt into configured simulator time or implement its own
+    /// measured-clock stepping path before the cognitive loop will step it.
+    fn plant_step_authority(&self) -> PlantStepAuthorityV1 {
+        PlantStepAuthorityV1::Unspecified
+    }
+
+    /// Compatibility API for configured simulation steps.
+    ///
+    /// It forwards to dt-only legacy implementations only when the bridge explicitly
+    /// declares ConfiguredSimulation. Measured-clock records and undeclared authority
+    /// fail closed; hardware bridges must override this method or use
+    /// step_with_backend_timing to preserve their clock provenance.
+    fn step_with_timing(
+        &mut self,
+        thought_hv: &ContinuousHV,
+        timing: &PlantStepTimingV1,
+        phi: f64,
+    ) -> Result<EmbodimentResult, PlantStepTimingErrorV1> {
+        timing.validate()?;
+        match self.plant_step_authority() {
+            PlantStepAuthorityV1::Unspecified => {
+                Err(PlantStepTimingErrorV1::TimingAuthorityUnspecified)
+            }
+            PlantStepAuthorityV1::BackendMeasuredClockRequired => {
+                Err(PlantStepTimingErrorV1::ConfiguredSimulationStepNotAuthorized)
+            }
+            PlantStepAuthorityV1::ConfiguredSimulation => {
+                if timing.source != PlantStepTimeSourceV1::ConfiguredSimulationStep {
+                    return Err(PlantStepTimingErrorV1::MeasuredTimingRequiresExplicitBridge);
+                }
+                Ok(self.step(thought_hv, timing.dt_seconds, phi))
+            }
+        }
+    }
+
+    /// Let a hardware/backend-owned bridge perform a step and return the clock evidence
+    /// it actually used. The default is unsupported and fails closed.
+    ///
+    /// Implementations must return a measured monotonic/device record with the same
+    /// step index. Configured simulation time is not accepted through this path.
+    fn step_with_backend_timing(
+        &mut self,
+        _thought_hv: &ContinuousHV,
+        _step_index: u64,
+        _phi: f64,
+    ) -> Result<BackendTimedEmbodimentStepV1, PlantStepTimingErrorV1> {
+        Err(PlantStepTimingErrorV1::BackendMeasuredTimingUnsupported)
+    }
+
+    /// Apply active inference motor reflexes (Channel 1/3) based on prediction error.
+    ///
+    /// Prediction error (surprise) can trigger reflexive motor actions to
+    /// minimize that surprise by changing the physical world (active inference).
+    fn apply_active_inference(&mut self, error: &crate::hdc::unified_hv::ContinuousHV) {
+        // Default implementation is a no-op; platforms override to generate impulses.
+        let _ = error;
+    }
+
+    /// Encode the current body state into a proprioceptive 16,384D HV.
+    fn encode_perception(&mut self) -> ContinuousHV;
+
+    /// Reset body to default state.
+    fn reset(&mut self);
+
+    /// Current safety level.
+    fn safety_level(&self) -> MotorSafetyLevel;
+
+    /// Override safety level from SafetyAgent. Merged with phi via max().
+    fn set_safety_override(&mut self, level: MotorSafetyLevel);
+
+    /// Clear external safety override.
+    fn clear_safety_override(&mut self);
+
+    /// Platform identifier.
+    fn platform(&self) -> EmbodimentPlatform;
+
+    /// Number of actuators.
+    fn num_actuators(&self) -> usize;
+    /// Return current health/reliability for each actuator [0.0, 1.0].
+    fn actuator_health(&self) -> Vec<f32> {
+        vec![1.0; self.num_actuators()]
+    }
+
+    /// Return the last encoded perception HV.
+    fn last_perception_hv(&self) -> Option<ContinuousHV> {
+        None
+    }
+
+    /// Return current sensorimotor accuracy [0.0, 1.0].
+    fn sensorimotor_accuracy(&self) -> f32 {
+        1.0
+    }
+
+    /// Total steps executed.
+    fn total_steps(&self) -> usize;
+
+    /// Get telemetry for CycleMetadata.
+    fn telemetry(&self) -> EmbodimentTelemetry;
+
+    /// Platform-agnostic agent identity for trust and coordination.
+    ///
+    /// Default returns a placeholder; platform crates should override with
+    /// a deterministic identity derived from their genesis seed.
+    fn agent_identity(&self) -> AgentIdentity {
+        AgentIdentity::new("unset")
+    }
+
+    /// Physical reliability score (0.0–1.0) for reputation/trust gating.
+    ///
+    /// 1.0 = fully reliable sensor/actuator chain. Platforms with degraded
+    /// hardware should report lower values.
+    fn physical_reliability(&self) -> f64 {
+        1.0
+    }
+
+    /// Apply moral gate from the ethics engine.
+    ///
+    /// Platforms opt in by overriding this method. The default is a no-op.
+    /// Safety-critical platforms (manipulator, surgical) should override
+    /// to enforce: Blocked → Red, Caution → Yellow cap, consent → Orange,
+    /// ahimsa → Red.
+    fn apply_moral_gate(&mut self, _gate: MoralGateInput) {}
+
+    /// Platform-specific telemetry bytes for dispatch zome integration.
+    ///
+    /// Default returns empty vec. Override to serialize platform-specific
+    /// sensor data (e.g., joint angles, chemical readings, rotor RPM).
+    fn platform_telemetry_bytes(&self) -> Vec<u8> {
+        Vec::new()
+    }
+}
+
+// ── Moral Gate Input ─────────────────────────────────────────────────
+
+/// Ethics engine output forwarded to the embodiment bridge.
+///
+/// Uses u8 for `verdict` to keep symthaea-core free of ethics-types dependency:
+/// - 0 = Safe (no constraint)
+/// - 1 = Caution (cap at Yellow)
+/// - 2 = Blocked (force Red)
+#[derive(Debug, Clone, Copy)]
+pub struct MoralGateInput {
+    /// Ethical verdict: 0=Safe, 1=Caution, 2=Blocked.
+    pub verdict: u8,
+    /// True if consent was violated (force Orange or stricter).
+    pub consent_violation: bool,
+    /// True if ahimsa (non-harm) principle was violated (force Red).
+    pub ahimsa_violated: bool,
+}
+
+impl MoralGateInput {
+    pub const VERDICT_SAFE: u8 = 0;
+    pub const VERDICT_CAUTION: u8 = 1;
+    pub const VERDICT_BLOCKED: u8 = 2;
+}
+
+// ── Platform Plugin System ───────────────────────────────────────────────
+
+/// Factory + metadata for a robotics platform.
+///
+/// Each platform crate exports a `pub struct XPlugin;` implementing this trait.
+/// The main crate's `cognitive_loop::platform_registry::build_platform_registry()`
+/// collects all feature-enabled plugins into a [`PlatformRegistry`], and
+/// `switch_embodiment` dispatches bridge creation through it — the ONLY
+/// construction path (before 2026-07-12 it was a hand-written match and this
+/// plugin system was dead code).
+///
+/// This reduces "add a platform" to 3 steps:
+/// 1. Add variant to `EmbodimentPlatform`
+/// 2. Add feature flag + optional dep to Cargo.toml
+/// 3. Register the plugin in `build_platform_registry()`
+pub trait PlatformPlugin: Send + Sync {
+    /// Which platform this plugin provides.
+    fn platform(&self) -> EmbodimentPlatform;
+
+    /// Feature name for diagnostics (e.g., "helicopter", "exoskeleton").
+    fn feature_name(&self) -> &'static str;
+
+    /// Number of actuators for this platform.
+    fn num_actuators(&self) -> usize;
+    /// Return current health/reliability for each actuator [0.0, 1.0].
+    fn actuator_health(&self) -> Vec<f32> {
+        vec![1.0; self.num_actuators()]
+    }
+
+    /// Return the last encoded perception HV.
+    fn last_perception_hv(&self) -> Option<ContinuousHV> {
+        None
+    }
+
+    /// Return current sensorimotor accuracy [0.0, 1.0].
+    fn sensorimotor_accuracy(&self) -> f32 {
+        1.0
+    }
+
+    /// Create a new embodiment bridge from a genesis seed.
+    fn create_bridge(&self, genesis: &crate::genesis::GenesisSeed) -> Box<dyn EmbodimentBridge>;
+}
+
+/// Compile-time platform registry.
+///
+/// Collects `PlatformPlugin` implementations registered by feature-gated
+/// platform crates. The constructor calls `create_bridge()` on the matching
+/// plugin to instantiate the correct embodiment.
+pub struct PlatformRegistry {
+    plugins: Vec<Box<dyn PlatformPlugin>>,
+}
+
+impl PlatformRegistry {
+    /// Create an empty registry.
+    pub fn new() -> Self {
+        Self {
+            plugins: Vec::new(),
+        }
+    }
+
+    /// Register a platform plugin.
+    pub fn register(&mut self, plugin: Box<dyn PlatformPlugin>) {
+        self.plugins.push(plugin);
+    }
+
+    /// Create an embodiment bridge for the given platform.
+    /// Returns `None` if no plugin is registered for that platform.
+    pub fn create_bridge(
+        &self,
+        platform: EmbodimentPlatform,
+        genesis: &crate::genesis::GenesisSeed,
+    ) -> Option<Box<dyn EmbodimentBridge>> {
+        self.plugins
+            .iter()
+            .find(|p| p.platform() == platform)
+            .map(|p| p.create_bridge(genesis))
+    }
+
+    /// List all registered platforms.
+    pub fn registered_platforms(&self) -> Vec<EmbodimentPlatform> {
+        self.plugins.iter().map(|p| p.platform()).collect()
+    }
+
+    /// Number of registered plugins.
+    pub fn len(&self) -> usize {
+        self.plugins.len()
+    }
+
+    /// Whether the registry is empty.
+    pub fn is_empty(&self) -> bool {
+        self.plugins.is_empty()
+    }
+}
+
+impl Default for PlatformRegistry {
+    fn default() -> Self {
+        Self::new()
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    #[test]
+    fn fixed_simulation_step_uses_only_configured_plant_dt() {
+        let timing = PlantStepTimingV1::configured_simulation(42, 0.005).unwrap();
+        assert_eq!(timing.step_index, 42);
+        assert_eq!(timing.dt_seconds, 0.005);
+        assert_eq!(timing.source, PlantStepTimeSourceV1::ConfiguredSimulationStep);
+        assert_eq!(timing.clock_domain_id, None);
+        assert_eq!(timing.clock_epoch_id, None);
+        assert_eq!(timing.start_timestamp_ns, None);
+        assert_eq!(timing.end_timestamp_ns, None);
+    }
+
+    #[test]
+    fn measured_plant_time_requires_a_named_increasing_clock_interval() {
+        let timing = PlantStepTimingV1::measured_interval(
+            9,
+            PlantStepTimeSourceV1::MeasuredMonotonicClock,
+            "robot-steady-clock",
+            "boot-17",
+            1_000_000,
+            6_000_000,
+        )
+        .unwrap();
+        assert_eq!(timing.dt_seconds, 0.005);
+        assert_eq!(timing.clock_domain_id.as_deref(), Some("robot-steady-clock"));
+        assert_eq!(timing.clock_epoch_id.as_deref(), Some("boot-17"));
+        assert_eq!(timing.start_timestamp_ns, Some(1_000_000));
+        assert_eq!(timing.end_timestamp_ns, Some(6_000_000));
+
+        assert_eq!(
+            PlantStepTimingV1::measured_interval(
+                10,
+                PlantStepTimeSourceV1::MeasuredDeviceClock,
+                "device-ptp",
+                "session-4",
+                5,
+                5,
+            ),
+            Err(PlantStepTimingErrorV1::NonIncreasingTimestamps)
+        );
+        assert_eq!(
+            PlantStepTimingV1::measured_interval(
+                10,
+                PlantStepTimeSourceV1::MeasuredDeviceClock,
+                " ",
+                "session-4",
+                5,
+                6,
+            ),
+            Err(PlantStepTimingErrorV1::MissingClockDomain)
+        );
+        assert_eq!(
+            PlantStepTimingV1::measured_interval(
+                10,
+                PlantStepTimeSourceV1::MeasuredDeviceClock,
+                "device-ptp",
+                " ",
+                5,
+                6,
+            ),
+            Err(PlantStepTimingErrorV1::MissingClockEpoch)
+        );
+    }
+
+    #[test]
+    fn plant_timing_validation_rejects_deserialized_inconsistent_records() {
+        let mut timing = PlantStepTimingV1::measured_interval(
+            11,
+            PlantStepTimeSourceV1::MeasuredDeviceClock,
+            "device-clock",
+            "session-8",
+            100,
+            200,
+        )
+        .unwrap();
+        timing.dt_seconds = 0.25;
+        assert_eq!(
+            timing.validate(),
+            Err(PlantStepTimingErrorV1::InconsistentDuration)
+        );
+
+        let mut simulation = PlantStepTimingV1::configured_simulation(12, 0.01).unwrap();
+        simulation.clock_domain_id = Some("untrusted-extra-metadata".into());
+        assert_eq!(
+            simulation.validate(),
+            Err(PlantStepTimingErrorV1::UnexpectedClockMetadata)
+        );
+    }
+
+    #[test]
+    fn plant_step_duration_rejects_zero_negative_and_nonfinite_values() {
+        for dt in [0.0, -0.01, f32::NAN, f32::INFINITY, f32::NEG_INFINITY] {
+            assert!(
+                PlantStepTimingV1::configured_simulation(0, dt).is_err(),
+                "invalid dt {dt:?} must be rejected"
+            );
+        }
+    }
+
+    /// A minimal legacy bridge that records the exact dt crossing the adapter boundary.
+    /// This protects the compatibility layer from reintroducing cognitive-tau scaling.
+    struct TimingCaptureBridge {
+        last_dt: Option<f32>,
+        step_calls: usize,
+        authority: PlantStepAuthorityV1,
+    }
+
+    impl EmbodimentBridge for TimingCaptureBridge {
+        fn plant_step_authority(&self) -> PlantStepAuthorityV1 {
+            self.authority
+        }
+
+        fn step(
+            &mut self,
+            _thought_hv: &ContinuousHV,
+            dt: f32,
+            _phi: f64,
+        ) -> EmbodimentResult {
+            self.last_dt = Some(dt);
+            self.step_calls += 1;
+            EmbodimentResult {
+                num_actuators: 1,
+                control_effort: 0.0,
+                success: true,
+                prediction_error: 0.0,
+                safety_level: MotorSafetyLevel::Green,
+                epistemic_grounding: GROUNDING_SENSORIMOTOR,
+                observation_confidence: 1.0,
+            }
+        }
+
+        fn encode_perception(&mut self) -> ContinuousHV {
+            ContinuousHV::zero(16_384)
+        }
+
+        fn reset(&mut self) {}
+
+        fn safety_level(&self) -> MotorSafetyLevel {
+            MotorSafetyLevel::Green
+        }
+
+        fn set_safety_override(&mut self, _level: MotorSafetyLevel) {}
+
+        fn clear_safety_override(&mut self) {}
+
+        fn platform(&self) -> EmbodimentPlatform {
+            EmbodimentPlatform::None
+        }
+
+        fn num_actuators(&self) -> usize {
+            1
+        }
+
+        fn total_steps(&self) -> usize {
+            self.step_calls
+        }
+
+        fn telemetry(&self) -> EmbodimentTelemetry {
+            EmbodimentTelemetry::default()
+        }
+    }
+
+    #[test]
+    fn timing_adapter_forwards_exact_configured_plant_dt() {
+        let mut bridge = TimingCaptureBridge {
+            last_dt: None,
+            step_calls: 0,
+            authority: PlantStepAuthorityV1::ConfiguredSimulation,
+        };
+        let timing = PlantStepTimingV1::configured_simulation(7, 0.005).unwrap();
+
+        let result = bridge
+            .step_with_timing(&ContinuousHV::zero(16_384), &timing, 0.9)
+            .unwrap();
+
+        assert!(result.success);
+        assert_eq!(bridge.last_dt, Some(0.005));
+        assert_eq!(bridge.step_calls, 1);
+    }
+
+    #[test]
+    fn undeclared_timing_authority_fails_closed_before_calling_legacy_bridge() {
+        let mut bridge = TimingCaptureBridge {
+            last_dt: None,
+            step_calls: 0,
+            authority: PlantStepAuthorityV1::Unspecified,
+        };
+        let timing = PlantStepTimingV1::configured_simulation(7, 0.005).unwrap();
+
+        assert!(matches!(
+            bridge.step_with_timing(&ContinuousHV::zero(16_384), &timing, 0.9),
+            Err(PlantStepTimingErrorV1::TimingAuthorityUnspecified)
+        ));
+        assert_eq!(bridge.last_dt, None);
+        assert_eq!(bridge.step_calls, 0);
+    }
+
+    #[test]
+    fn backend_measured_authority_does_not_fall_back_to_configured_dt() {
+        let mut bridge = TimingCaptureBridge {
+            last_dt: None,
+            step_calls: 0,
+            authority: PlantStepAuthorityV1::BackendMeasuredClockRequired,
+        };
+        let timing = PlantStepTimingV1::configured_simulation(7, 0.005).unwrap();
+
+        assert!(matches!(
+            bridge.step_with_timing(&ContinuousHV::zero(16_384), &timing, 0.9),
+            Err(PlantStepTimingErrorV1::ConfiguredSimulationStepNotAuthorized)
+        ));
+        assert!(matches!(
+            bridge.step_with_backend_timing(&ContinuousHV::zero(16_384), 7, 0.9),
+            Err(PlantStepTimingErrorV1::BackendMeasuredTimingUnsupported)
+        ));
+        assert_eq!(bridge.last_dt, None);
+        assert_eq!(bridge.step_calls, 0);
+    }
+
+    #[test]
+    fn timing_adapter_rejects_invalid_evidence_before_calling_legacy_bridge() {
+        let mut bridge = TimingCaptureBridge {
+            last_dt: None,
+            step_calls: 0,
+            authority: PlantStepAuthorityV1::ConfiguredSimulation,
+        };
+        let mut timing = PlantStepTimingV1::configured_simulation(8, 0.005).unwrap();
+        timing.dt_seconds = f32::NAN;
+
+        assert!(matches!(
+            bridge.step_with_timing(&ContinuousHV::zero(16_384), &timing, 0.9),
+            Err(PlantStepTimingErrorV1::NonFiniteDuration)
+        ));
+        assert_eq!(bridge.last_dt, None);
+        assert_eq!(
+            bridge.step_calls, 0,
+            "invalid time evidence must not reach a legacy actuator/plant adapter"
+        );
+    }
+
+    #[test]
+    fn legacy_adapter_rejects_measured_time_until_bridge_handles_provenance() {
+        let mut bridge = TimingCaptureBridge {
+            last_dt: None,
+            step_calls: 0,
+            authority: PlantStepAuthorityV1::ConfiguredSimulation,
+        };
+        let timing = PlantStepTimingV1::measured_interval(
+            9,
+            PlantStepTimeSourceV1::MeasuredMonotonicClock,
+            "robot-steady-clock",
+            "boot-17",
+            1_000_000,
+            6_000_000,
+        )
+        .unwrap();
+
+        assert!(matches!(
+            bridge.step_with_timing(&ContinuousHV::zero(16_384), &timing, 0.9),
+            Err(PlantStepTimingErrorV1::MeasuredTimingRequiresExplicitBridge)
+        ));
+        assert_eq!(bridge.last_dt, None);
+        assert_eq!(
+            bridge.step_calls, 0,
+            "legacy dt-only adapter must not discard measured clock provenance"
+        );
+    }
+
+    /// Enforces the invariant the type's doc comment describes, because a comment
+    /// cannot stop a reorder and this one is silently catastrophic.
+    ///
+    /// Derived `Ord` follows declaration order, and every most-restrictive-wins safety
+    /// composition in the fleet is `a.max(b)`. Moving `Red` to the top — the instinct
+    /// when marking it `#[default]` — inverts all of them into fail-open with no
+    /// compile error. Any test exercising only Green paths would still pass.
+    #[test]
+    fn safety_ordering_is_most_restrictive_wins() {
+        assert!(MotorSafetyLevel::Green < MotorSafetyLevel::Yellow);
+        assert!(MotorSafetyLevel::Yellow < MotorSafetyLevel::Orange);
+        assert!(MotorSafetyLevel::Orange < MotorSafetyLevel::Red);
+
+        // The property every composition site actually depends on.
+        assert_eq!(
+            MotorSafetyLevel::Green.max(MotorSafetyLevel::Red),
+            MotorSafetyLevel::Red,
+            "max() must select the MORE restrictive level; if this fails, every \
+             `phi_level.max(moral_level)` in the fleet has become fail-open"
+        );
+        assert_eq!(
+            MotorSafetyLevel::Orange.max(MotorSafetyLevel::Yellow),
+            MotorSafetyLevel::Orange
+        );
+    }
+
+    /// A defaulted safety level must mean "unknown, assume the worst".
+    ///
+    /// `EmbodimentTelemetry` derives `Default` and holds this field, and three call
+    /// sites return `Default::default()` outright — so this default is reachable, not
+    /// theoretical. It was `Green` (full authority) until 2026-07-31.
+    #[test]
+    fn default_safety_level_fails_closed() {
+        assert_eq!(MotorSafetyLevel::default(), MotorSafetyLevel::Red);
+        assert_eq!(
+            EmbodimentTelemetry::default().safety_level,
+            MotorSafetyLevel::Red,
+            "default telemetry must not report full authority"
+        );
+    }
+
+    use super::*;
+
+    #[test]
+    fn test_from_phi_thresholds() {
+        assert_eq!(MotorSafetyLevel::from_phi(0.0), MotorSafetyLevel::Red);
+        assert_eq!(MotorSafetyLevel::from_phi(0.1), MotorSafetyLevel::Red);
+        assert_eq!(MotorSafetyLevel::from_phi(0.2), MotorSafetyLevel::Orange);
+        assert_eq!(MotorSafetyLevel::from_phi(0.3), MotorSafetyLevel::Orange);
+        assert_eq!(MotorSafetyLevel::from_phi(0.5), MotorSafetyLevel::Yellow);
+        assert_eq!(MotorSafetyLevel::from_phi(0.6), MotorSafetyLevel::Yellow);
+        assert_eq!(MotorSafetyLevel::from_phi(0.7), MotorSafetyLevel::Green);
+        assert_eq!(MotorSafetyLevel::from_phi(1.0), MotorSafetyLevel::Green);
+    }
+
+    #[test]
+    fn test_motor_gain_values() {
+        assert_eq!(MotorSafetyLevel::Green.motor_gain(), 1.0);
+        assert_eq!(MotorSafetyLevel::Yellow.motor_gain(), 0.6);
+        assert_eq!(MotorSafetyLevel::Orange.motor_gain(), 0.3);
+        assert_eq!(MotorSafetyLevel::Red.motor_gain(), 0.0);
+    }
+
+    #[test]
+    fn test_ordering() {
+        assert!(MotorSafetyLevel::Green < MotorSafetyLevel::Yellow);
+        assert!(MotorSafetyLevel::Yellow < MotorSafetyLevel::Orange);
+        assert!(MotorSafetyLevel::Orange < MotorSafetyLevel::Red);
+    }
+
+    #[test]
+    fn test_grounding_from_prediction_error() {
+        // Zero error = full confidence
+        assert!((grounding_from_prediction_error(0.0) - 1.0).abs() < f32::EPSILON);
+        // Full error = zero confidence
+        assert!((grounding_from_prediction_error(1.0) - 0.0).abs() < f32::EPSILON);
+        // Mid-range
+        assert!((grounding_from_prediction_error(0.3) - 0.7).abs() < 1e-6);
+        // Clamping: values outside [0,1] are clamped
+        assert!((grounding_from_prediction_error(-0.5) - 1.0).abs() < f32::EPSILON);
+        assert!((grounding_from_prediction_error(1.5) - 0.0).abs() < f32::EPSILON);
+    }
+
+    #[test]
+    fn test_from_phi_non_finite_returns_red() {
+        assert_eq!(MotorSafetyLevel::from_phi(f64::NAN), MotorSafetyLevel::Red);
+        assert_eq!(
+            MotorSafetyLevel::from_phi(f64::INFINITY),
+            MotorSafetyLevel::Red
+        );
+        assert_eq!(
+            MotorSafetyLevel::from_phi(f64::NEG_INFINITY),
+            MotorSafetyLevel::Red
+        );
+    }
+
+    #[test]
+    fn test_from_phi_negative_returns_red() {
+        assert_eq!(MotorSafetyLevel::from_phi(-1.0), MotorSafetyLevel::Red);
+        assert_eq!(MotorSafetyLevel::from_phi(-100.0), MotorSafetyLevel::Red);
+    }
+
+    /// `from_phi`'s non-finite fail-safe (above) is only *reachable* if callers
+    /// propagate a non-finite value to it. The main crate's composition does not:
+    /// it builds the gate scalar with `f64::max` chains
+    /// (`cognitive_loop/cycle_late_consciousness/integration.rs:988` and `:1147`),
+    /// and **`f64::max` silently discards NaN**. So a NaN from any single
+    /// contributing path (Psi, spectral MIP, structural Phi, MCE,
+    /// ConsciousnessEquationV2) is absorbed and the gate continues on whichever
+    /// path still returns a number — no `Red`, no tier change, no warning. The
+    /// fail-safe fires only when *every* path is simultaneously non-finite.
+    ///
+    /// This test pins that behaviour so that changing it becomes a deliberate act
+    /// with a failing test attached, rather than a silent shift. It asserts what
+    /// the code does today, **not** what it necessarily should do: "continue on a
+    /// surviving path" is arguably correct graceful degradation. The defensible
+    /// complaint is that it was never *chosen* — it is an artifact of `f64::max`'s
+    /// incidental NaN semantics.
+    ///
+    /// If you are here because this test failed: someone changed how non-finite
+    /// values flow into the motor-safety gate. Verify it was intentional, then
+    /// update this test and
+    /// `SYMTHAEA_COGNITIVE_CORE_RECONCILIATION_PLAN_2026-07-28.md`
+    /// ("Gate: invalid-value / fail-safe policy").
+    #[test]
+    fn test_max_composition_absorbs_partial_nan_so_failsafe_is_unreachable() {
+        let nan = f64::NAN;
+
+        // Shape of integration.rs:988 — phi_input = psi.max(spec).max(struc).clamp(0,1)
+        let psi_died = nan.max(0.5_f64).max(0.2_f64).clamp(0.0, 1.0);
+        let spec_died = 0.5_f64.max(nan).max(0.2_f64).clamp(0.0, 1.0);
+        assert_eq!(psi_died, 0.5, "a NaN Psi is silently dropped by f64::max");
+        assert_eq!(spec_died, 0.5, "a NaN spectral term is silently dropped");
+        assert_eq!(
+            MotorSafetyLevel::from_phi(psi_died),
+            MotorSafetyLevel::Yellow,
+            "partial failure does NOT reach the Red fail-safe — it degrades to \
+             whatever the surviving path says"
+        );
+
+        // Only total failure propagates.
+        assert!(
+            nan.max(nan).max(nan).clamp(0.0, 1.0).is_nan(),
+            "all-paths-NaN must stay NaN so the fail-safe can fire"
+        );
+        assert_eq!(
+            MotorSafetyLevel::from_phi(nan.max(nan).max(nan).clamp(0.0, 1.0)),
+            MotorSafetyLevel::Red,
+            "total failure is the ONLY case that reaches Red"
+        );
+
+        // Shape of integration.rs:1147 — level = level.max(v2_cached * 0.8), unclamped.
+        assert_eq!(
+            0.4_f64.max(nan * 0.8),
+            0.4,
+            "a NaN ConsciousnessEquationV2 reading is silently dropped"
+        );
+        assert_eq!(
+            0.4_f64.max(10.0_f64 * 0.8),
+            8.0,
+            "the final gate write is UNCLAMPED — an out-of-range V2 value \
+             propagates verbatim, so the gate is not guaranteed to be in [0,1]"
+        );
+    }
+
+    #[test]
+    fn test_grounding_labels() {
+        assert_eq!(grounding_label(GROUNDING_SENSORIMOTOR), "Sensorimotor");
+        assert_eq!(grounding_label(GROUNDING_TEMPORAL), "Temporal");
+        assert_eq!(grounding_label(GROUNDING_SOCIAL), "Social");
+        assert_eq!(grounding_label(42), "Unknown");
+    }
+
+    #[test]
+    fn test_grounding_estimator_starts_sensorimotor() {
+        let mut est = GroundingEstimator::new();
+        // Not enough samples yet
+        assert_eq!(est.estimate(0.1, None), GROUNDING_SENSORIMOTOR);
+    }
+
+    #[test]
+    fn test_grounding_estimator_temporal_after_stable_predictions() {
+        let mut est = GroundingEstimator::new();
+        // Fill window with low, decreasing prediction errors
+        for i in 0..32 {
+            let pe = 0.2 - (i as f32 * 0.005); // decreasing from 0.2 to 0.045
+            est.estimate(pe, None);
+        }
+        let level = est.estimate(0.05, None);
+        assert_eq!(level, GROUNDING_TEMPORAL);
+    }
+
+    #[test]
+    fn test_grounding_estimator_social_with_peers() {
+        let mut est = GroundingEstimator::new();
+        // Fill 16+ samples with low PE and provide peers
+        for _ in 0..20 {
+            est.estimate(0.1, Some(3));
+        }
+        let level = est.estimate(0.1, Some(3));
+        assert_eq!(level, GROUNDING_SOCIAL);
+    }
+
+    #[test]
+    fn test_grounding_estimator_no_social_without_peers() {
+        let mut est = GroundingEstimator::new();
+        for _ in 0..20 {
+            est.estimate(0.1, None);
+        }
+        let level = est.estimate(0.1, None);
+        // Without peers, should be temporal at best (if window is full)
+        assert_ne!(level, GROUNDING_SOCIAL);
+    }
+
+    #[test]
+    fn test_grounding_estimator_reset() {
+        let mut est = GroundingEstimator::new();
+        for _ in 0..32 {
+            est.estimate(0.1, None);
+        }
+        est.reset();
+        assert_eq!(est.estimate(0.5, None), GROUNDING_SENSORIMOTOR);
+    }
+}
