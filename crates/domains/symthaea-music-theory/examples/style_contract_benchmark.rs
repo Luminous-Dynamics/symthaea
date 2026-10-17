@@ -436,6 +436,7 @@ fn main() {
                 _ => {}
             }
         }
+        let transposition = transposition_audit(style);
         style_rows.push(json!({
             "style": stats.style_name,
             "grammar_family": format!("{:?}", style.grammar_family()),
@@ -460,7 +461,7 @@ fn main() {
             "mean_nearest_cross_style_structural_distance":
                 mean(&nearest_distances[index]),
             "metamorphic_audits": {
-                "tonic_transposition": transposition_audit(style),
+                "tonic_transposition": transposition,
             },
             "intent_sensitivity": sensitivities,
         }));
@@ -474,6 +475,31 @@ fn main() {
         counters.iter().map(|row| row.meter_mismatches).sum();
     let tempo_out_of_band_count: usize =
         counters.iter().map(|row| row.tempo_out_of_band).sum();
+    let transposition_audits: Vec<&Value> = style_rows
+        .iter()
+        .map(|row| &row["metamorphic_audits"]["tonic_transposition"])
+        .collect();
+    let transposition_pair_count: u64 = transposition_audits
+        .iter()
+        .map(|audit| audit["paired_samples"].as_u64().unwrap_or(0))
+        .sum();
+    let transposition_invariant_pairs: u64 = transposition_audits
+        .iter()
+        .map(|audit| {
+            audit["rhythm_and_interval_signature_preserved"]
+                .as_u64()
+                .unwrap_or(0)
+        })
+        .sum();
+    let transposition_exact_changed_pairs: u64 = transposition_audits
+        .iter()
+        .map(|audit| audit["exact_score_changed"].as_u64().unwrap_or(0))
+        .sum();
+    let transposition_mean_distances: Vec<f64> = transposition_audits
+        .iter()
+        .filter_map(|audit| audit["mean_structural_distance"].as_f64())
+        .collect();
+
     let replay_failure_count: usize = counters
         .iter()
         .map(|row| row.deterministic_replay_failures)
@@ -554,6 +580,22 @@ fn main() {
             "violation_count": control_contract_violation_count,
             "passed_at_test_points": control_contract_violation_count == 0,
             "scope": "paired high/low probes across fixed seeds; no effect at tested points is not proof of global inactivity",
+        },
+        "metamorphic_audit_summary": {
+            "probe": "same seed and intent in C vs G",
+            "style_count": style_count,
+            "paired_samples": transposition_pair_count,
+            "rhythm_and_interval_signature_preserved": transposition_invariant_pairs,
+            "signature_invariance_rate": if transposition_pair_count == 0 {
+                0.0
+            } else {
+                transposition_invariant_pairs as f64 / transposition_pair_count as f64
+            },
+            "exact_score_changed": transposition_exact_changed_pairs,
+            "mean_structural_distance_across_styles":
+                mean(&transposition_mean_distances),
+            "is_qualification_gate": false,
+            "reason": "first establish a measured baseline and review legitimate range-sensitive exceptions before declaring transposition a universal contract",
         },
         "per_style": style_rows,
         "exact_cross_style_collisions": exact_pair_rows,
