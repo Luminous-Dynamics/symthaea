@@ -12,7 +12,9 @@ use sha2::{Digest, Sha256};
 use std::io::{self, Write};
 use std::process::ExitCode;
 use symthaea_muse::instruments::Instrument;
-use symthaea_muse::synth::render_arrangement_with_evidence;
+use symthaea_muse::synth::{
+    SelectedSampleEvidence, render_arrangement_with_evidence,
+};
 use symthaea_muse::voice::{Arrangement, Voice, VoiceRole};
 use symthaea_muse::{AudioData, MuseConfig, MusicalState, Note, OutputFormat, ReverbConfig};
 
@@ -99,6 +101,7 @@ struct ProbeReport {
     cases_with_missing_receipts: usize,
     cases_with_mismatched_receipts: usize,
     cases_with_render_path_mismatch: usize,
+    cases_with_sample_evidence_mismatch: usize,
     evidence_boundary: &'static str,
     cases: Vec<ProbeCase>,
 }
@@ -124,6 +127,9 @@ struct ProbeCase {
     sample_attempt_status: String,
     repeated_render_paths: Vec<String>,
     repeated_sample_attempt_statuses: Vec<String>,
+    selected_sample: Option<SelectedSampleEvidence>,
+    repeated_selected_samples: Vec<Option<SelectedSampleEvidence>>,
+    sample_evidence_repeats_match: bool,
     receipt_matches_request: bool,
     repeated_receipt_matches_request: Vec<bool>,
     render_path_repeats_match: bool,
@@ -187,6 +193,7 @@ fn run() -> Result<(), String> {
                 let mut hashes = Vec::with_capacity(options.repeats);
                 let mut selected_paths = Vec::with_capacity(options.repeats);
                 let mut sample_statuses = Vec::with_capacity(options.repeats);
+                let mut selected_samples = Vec::with_capacity(options.repeats);
                 let mut receipt_matches = Vec::with_capacity(options.repeats);
                 let mut first_metrics = None;
                 for _ in 0..options.repeats {
@@ -219,6 +226,7 @@ fn run() -> Result<(), String> {
                             .unwrap_or("missing_render_receipt")
                             .to_string(),
                     );
+                    selected_samples.push(receipt.and_then(|item| item.selected_sample.clone()));
                     let (samples, frames) = flatten_audio(rendered.audio);
                     let hash = audio_sha256(&samples);
                     if first_metrics.is_none() {
@@ -230,6 +238,9 @@ fn run() -> Result<(), String> {
                     .ok_or_else(|| "internal error: no render repetitions".to_string())?;
                 let repeat_hashes_match = hashes.windows(2).all(|pair| pair[0] == pair[1]);
                 let receipt_matches_request = receipt_matches.first().copied().unwrap_or(false);
+                let sample_evidence_repeats_match =
+                    selected_samples.windows(2).all(|pair| pair[0] == pair[1]);
+                let selected_sample = selected_samples.first().cloned().unwrap_or(None);
                 let render_path_repeats_match =
                     selected_paths.windows(2).all(|pair| pair[0] == pair[1])
                         && sample_statuses.windows(2).all(|pair| pair[0] == pair[1])
@@ -248,6 +259,8 @@ fn run() -> Result<(), String> {
                     "missing_render_receipt"
                 } else if !receipt_matches_request {
                     "render_receipt_mismatch"
+                } else if !sample_evidence_repeats_match {
+                    "sample_evidence_mismatch"
                 } else if !render_path_repeats_match {
                     "render_path_mismatch"
                 } else if metrics.peak < 1.0e-5 {
@@ -277,6 +290,9 @@ fn run() -> Result<(), String> {
                     sample_attempt_status,
                     repeated_render_paths: selected_paths,
                     repeated_sample_attempt_statuses: sample_statuses,
+                    selected_sample,
+                    repeated_selected_samples: selected_samples,
+                    sample_evidence_repeats_match,
                     receipt_matches_request,
                     repeated_receipt_matches_request: receipt_matches,
                     render_path_repeats_match,
@@ -321,7 +337,11 @@ fn run() -> Result<(), String> {
             .iter()
             .filter(|case| !case.render_path_repeats_match)
             .count(),
-        evidence_boundary: "signal health, selected render-path receipt, and same-process repeat determinism only; not pitch accuracy, instrument fidelity, or human preference",
+        cases_with_sample_evidence_mismatch: cases
+            .iter()
+            .filter(|case| !case.sample_evidence_repeats_match)
+            .count(),
+        evidence_boundary: "signal health, selected render/source-sample receipts, and same-process repeat determinism only; not pitch accuracy, instrument fidelity, or human preference",
         cases,
     };
 
