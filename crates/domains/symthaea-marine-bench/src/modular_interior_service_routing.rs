@@ -1565,6 +1565,40 @@ mod tests {
     }
 
     #[test]
+    fn module_port_anchor_z_must_fit_the_module_envelope() {
+        let baseline = live();
+        let mut start = module_anchor("CABIN-01", "AC_IN", 2800, 1800);
+        start.position_mm.z_mm = 2_200;
+        let mut end = service_anchor("AC-BUS", 4700, 1800);
+        end.position_mm.z_mm = 2_200;
+        let route = request_for(
+            "PORT-Z-OUTSIDE-MODULE",
+            "CONN-CABIN-01-AC_IN",
+            start,
+            end,
+        );
+        assert_eq!(route_services(&baseline, &[route], limits()).unwrap_err().code,
+            "ANCHOR_Z_OUTSIDE_MODULE_ENVELOPE");
+    }
+
+    #[test]
+    fn anchors_outside_declared_deck_elevation_fail_closed() {
+        let baseline = live();
+        let mut start = module_anchor("CABIN-01", "AC_IN", 2800, 1800);
+        start.position_mm.z_mm = 2_500;
+        let mut end = service_anchor("AC-BUS", 4700, 1800);
+        end.position_mm.z_mm = 2_500;
+        let route = request_for(
+            "PORT-Z-OUTSIDE-DECK",
+            "CONN-CABIN-01-AC_IN",
+            start,
+            end,
+        );
+        assert_eq!(route_services(&baseline, &[route], limits()).unwrap_err().code,
+            "ANCHOR_Z_OUTSIDE_DECK");
+    }
+
+    #[test]
     fn duplicate_routes_for_connection_are_rejected() {
         let baseline = live();
         let first = request_for(
