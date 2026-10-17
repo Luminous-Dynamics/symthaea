@@ -1,0 +1,371 @@
+{
+  "schema_version": 1,
+  "scenarios": [
+    {
+      "id": "MOB-001-valid-mobility",
+      "request": {
+        "schema_version": 1,
+        "session_id": "session-open-mobility-001",
+        "active_session_id": "session-open-mobility-001",
+        "selected_profile_id": "profile-example-001",
+        "active_profile_id": "profile-example-001",
+        "mode": "mobility_conserve",
+        "explicit_training_opt_in": false,
+        "profile_training_eligible": false,
+        "effort_evidence": "fresh",
+        "user_requested_stop": false,
+        "user_requested_recovery": false,
+        "user_requested_more_assistance": false,
+        "resistance_increase_requested": false,
+        "requested_assistance": 0.4,
+        "assistance_limit": 0.8,
+        "requested_resistance": 0,
+        "resistance_limit": 0.5
+      },
+      "expected_status": "admissible_for_simulation",
+      "expected_findings": []
+    },
+    {
+      "id": "MOB-002-valid-assist-as-needed",
+      "request": {
+        "schema_version": 1,
+        "session_id": "session-open-mobility-001",
+        "active_session_id": "session-open-mobility-001",
+        "selected_profile_id": "profile-example-001",
+        "active_profile_id": "profile-example-001",
+        "mode": "assist_as_needed",
+        "explicit_training_opt_in": false,
+        "profile_training_eligible": false,
+        "effort_evidence": "fresh",
+        "user_requested_stop": false,
+        "user_requested_recovery": false,
+        "user_requested_more_assistance": false,
+        "resistance_increase_requested": false,
+        "requested_assistance": 0.4,
+        "assistance_limit": 0.8,
+        "requested_resistance": 0,
+        "resistance_limit": 0.5
+      },
+      "expected_status": "admissible_for_simulation",
+      "expected_findings": []
+    },
+    {
+      "id": "TRN-001-explicit-opt-in",
+      "request": {
+        "schema_version": 1,
+        "session_id": "session-open-mobility-001",
+        "active_session_id": "session-open-mobility-001",
+        "selected_profile_id": "profile-example-001",
+        "active_profile_id": "profile-example-001",
+        "mode": "training_resistive",
+        "explicit_training_opt_in": true,
+        "profile_training_eligible": true,
+        "effort_evidence": "fresh",
+        "user_requested_stop": false,
+        "user_requested_recovery": false,
+        "user_requested_more_assistance": false,
+        "resistance_increase_requested": false,
+        "requested_assistance": 0.4,
+        "assistance_limit": 0.8,
+        "requested_resistance": 0.3,
+        "resistance_limit": 0.5
+      },
+      "expected_status": "admissible_for_simulation",
+      "expected_findings": []
+    },
+    {
+      "id": "NEG-001-resistance-outside-training",
+      "request": {
+        "schema_version": 1,
+        "session_id": "session-open-mobility-001",
+        "active_session_id": "session-open-mobility-001",
+        "selected_profile_id": "profile-example-001",
+        "active_profile_id": "profile-example-001",
+        "mode": "mobility_conserve",
+        "explicit_training_opt_in": false,
+        "profile_training_eligible": false,
+        "effort_evidence": "fresh",
+        "user_requested_stop": false,
+        "user_requested_recovery": false,
+        "user_requested_more_assistance": false,
+        "resistance_increase_requested": false,
+        "requested_assistance": 0.4,
+        "assistance_limit": 0.8,
+        "requested_resistance": 0.2,
+        "resistance_limit": 0.5
+      },
+      "expected_status": "rejected",
+      "expected_findings": [
+        "resistance_requires_training_mode"
+      ]
+    },
+    {
+      "id": "NEG-002-training-without-opt-in",
+      "request": {
+        "schema_version": 1,
+        "session_id": "session-open-mobility-001",
+        "active_session_id": "session-open-mobility-001",
+        "selected_profile_id": "profile-example-001",
+        "active_profile_id": "profile-example-001",
+        "mode": "training_resistive",
+        "explicit_training_opt_in": false,
+        "profile_training_eligible": true,
+        "effort_evidence": "fresh",
+        "user_requested_stop": false,
+        "user_requested_recovery": false,
+        "user_requested_more_assistance": false,
+        "resistance_increase_requested": false,
+        "requested_assistance": 0.4,
+        "assistance_limit": 0.8,
+        "requested_resistance": 0.3,
+        "resistance_limit": 0.5
+      },
+      "expected_status": "rejected",
+      "expected_findings": [
+        "training_opt_in_required"
+      ]
+    },
+    {
+      "id": "NEG-003-profile-mismatch",
+      "request": {
+        "schema_version": 1,
+        "session_id": "session-open-mobility-001",
+        "active_session_id": "session-open-mobility-001",
+        "selected_profile_id": "profile-example-001",
+        "active_profile_id": "previous-profile",
+        "mode": "training_resistive",
+        "explicit_training_opt_in": true,
+        "profile_training_eligible": true,
+        "effort_evidence": "fresh",
+        "user_requested_stop": false,
+        "user_requested_recovery": false,
+        "user_requested_more_assistance": false,
+        "resistance_increase_requested": false,
+        "requested_assistance": 0.4,
+        "assistance_limit": 0.8,
+        "requested_resistance": 0.3,
+        "resistance_limit": 0.5
+      },
+      "expected_status": "rejected",
+      "expected_findings": [
+        "profile_mismatch"
+      ]
+    },
+    {
+      "id": "NEG-004-stale-session",
+      "request": {
+        "schema_version": 1,
+        "session_id": "session-open-mobility-001",
+        "active_session_id": "previous-session",
+        "selected_profile_id": "profile-example-001",
+        "active_profile_id": "profile-example-001",
+        "mode": "training_resistive",
+        "explicit_training_opt_in": true,
+        "profile_training_eligible": true,
+        "effort_evidence": "fresh",
+        "user_requested_stop": false,
+        "user_requested_recovery": false,
+        "user_requested_more_assistance": false,
+        "resistance_increase_requested": false,
+        "requested_assistance": 0.4,
+        "assistance_limit": 0.8,
+        "requested_resistance": 0.3,
+        "resistance_limit": 0.5
+      },
+      "expected_status": "rejected",
+      "expected_findings": [
+        "session_mismatch"
+      ]
+    },
+    {
+      "id": "NEG-005-stale-evidence-cannot-increase-resistance",
+      "request": {
+        "schema_version": 1,
+        "session_id": "session-open-mobility-001",
+        "active_session_id": "session-open-mobility-001",
+        "selected_profile_id": "profile-example-001",
+        "active_profile_id": "profile-example-001",
+        "mode": "training_resistive",
+        "explicit_training_opt_in": true,
+        "profile_training_eligible": true,
+        "effort_evidence": "stale",
+        "user_requested_stop": false,
+        "user_requested_recovery": false,
+        "user_requested_more_assistance": false,
+        "resistance_increase_requested": true,
+        "requested_assistance": 0.4,
+        "assistance_limit": 0.8,
+        "requested_resistance": 0.3,
+        "resistance_limit": 0.5
+      },
+      "expected_status": "rejected",
+      "expected_findings": [
+        "resistance_increase_requires_fresh_evidence"
+      ]
+    },
+    {
+      "id": "MOB-003-no-voluntary-signal-is-not-punitive",
+      "request": {
+        "schema_version": 1,
+        "session_id": "session-open-mobility-001",
+        "active_session_id": "session-open-mobility-001",
+        "selected_profile_id": "profile-example-001",
+        "active_profile_id": "profile-example-001",
+        "mode": "training_resistive",
+        "explicit_training_opt_in": true,
+        "profile_training_eligible": true,
+        "effort_evidence": "no_voluntary_signal",
+        "user_requested_stop": false,
+        "user_requested_recovery": false,
+        "user_requested_more_assistance": false,
+        "resistance_increase_requested": false,
+        "requested_assistance": 0.4,
+        "assistance_limit": 0.8,
+        "requested_resistance": 0.3,
+        "resistance_limit": 0.5
+      },
+      "expected_status": "admissible_for_simulation",
+      "expected_findings": []
+    },
+    {
+      "id": "PRI-001-stop-preempts-resistance",
+      "request": {
+        "schema_version": 1,
+        "session_id": "session-open-mobility-001",
+        "active_session_id": "session-open-mobility-001",
+        "selected_profile_id": "profile-example-001",
+        "active_profile_id": "profile-example-001",
+        "mode": "training_resistive",
+        "explicit_training_opt_in": true,
+        "profile_training_eligible": true,
+        "effort_evidence": "fresh",
+        "user_requested_stop": true,
+        "user_requested_recovery": false,
+        "user_requested_more_assistance": false,
+        "resistance_increase_requested": false,
+        "requested_assistance": 0.4,
+        "assistance_limit": 0.8,
+        "requested_resistance": 0.3,
+        "resistance_limit": 0.5
+      },
+      "expected_status": "stop_required",
+      "expected_findings": [
+        "stop_conflicts_with_resistance",
+        "user_requested_stop"
+      ]
+    },
+    {
+      "id": "PRI-002-recovery-mode",
+      "request": {
+        "schema_version": 1,
+        "session_id": "session-open-mobility-001",
+        "active_session_id": "session-open-mobility-001",
+        "selected_profile_id": "profile-example-001",
+        "active_profile_id": "profile-example-001",
+        "mode": "recovery_high_support",
+        "explicit_training_opt_in": false,
+        "profile_training_eligible": false,
+        "effort_evidence": "unavailable",
+        "user_requested_stop": false,
+        "user_requested_recovery": false,
+        "user_requested_more_assistance": false,
+        "resistance_increase_requested": false,
+        "requested_assistance": 0.4,
+        "assistance_limit": 0.8,
+        "requested_resistance": 0,
+        "resistance_limit": 0.5
+      },
+      "expected_status": "recovery_required",
+      "expected_findings": [
+        "user_requested_recovery"
+      ]
+    },
+    {
+      "id": "PRI-003-more-assistance-preempts-resistance",
+      "request": {
+        "schema_version": 1,
+        "session_id": "session-open-mobility-001",
+        "active_session_id": "session-open-mobility-001",
+        "selected_profile_id": "profile-example-001",
+        "active_profile_id": "profile-example-001",
+        "mode": "training_resistive",
+        "explicit_training_opt_in": true,
+        "profile_training_eligible": true,
+        "effort_evidence": "fresh",
+        "user_requested_stop": false,
+        "user_requested_recovery": false,
+        "user_requested_more_assistance": true,
+        "resistance_increase_requested": false,
+        "requested_assistance": 0.4,
+        "assistance_limit": 0.8,
+        "requested_resistance": 0.3,
+        "resistance_limit": 0.5
+      },
+      "expected_status": "support_required",
+      "expected_findings": [
+        "more_assistance_conflicts_with_resistance",
+        "user_requested_more_assistance"
+      ]
+    },
+    {
+      "id": "NEG-006-resistance-above-limit",
+      "request": {
+        "schema_version": 1,
+        "session_id": "session-open-mobility-001",
+        "active_session_id": "session-open-mobility-001",
+        "selected_profile_id": "profile-example-001",
+        "active_profile_id": "profile-example-001",
+        "mode": "training_resistive",
+        "explicit_training_opt_in": true,
+        "profile_training_eligible": true,
+        "effort_evidence": "fresh",
+        "user_requested_stop": false,
+        "user_requested_recovery": false,
+        "user_requested_more_assistance": false,
+        "resistance_increase_requested": false,
+        "requested_assistance": 0.4,
+        "assistance_limit": 0.8,
+        "requested_resistance": 0.7,
+        "resistance_limit": 0.5
+      },
+      "expected_status": "rejected",
+      "expected_findings": [
+        {
+          "requested_above_limit": {
+            "field": "requested_resistance"
+          }
+        }
+      ]
+    },
+    {
+      "id": "NEG-007-unsupported-schema",
+      "request": {
+        "schema_version": 2,
+        "session_id": "session-open-mobility-001",
+        "active_session_id": "session-open-mobility-001",
+        "selected_profile_id": "profile-example-001",
+        "active_profile_id": "profile-example-001",
+        "mode": "training_resistive",
+        "explicit_training_opt_in": true,
+        "profile_training_eligible": true,
+        "effort_evidence": "fresh",
+        "user_requested_stop": false,
+        "user_requested_recovery": false,
+        "user_requested_more_assistance": false,
+        "resistance_increase_requested": false,
+        "requested_assistance": 0.4,
+        "assistance_limit": 0.8,
+        "requested_resistance": 0.3,
+        "resistance_limit": 0.5
+      },
+      "expected_status": "rejected",
+      "expected_findings": [
+        {
+          "unsupported_schema_version": {
+            "received": 2
+          }
+        }
+      ]
+    }
+  ]
+}
