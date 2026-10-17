@@ -91,6 +91,9 @@ fn validate_frozen_receipt(candidate: &Value, errors: &mut Vec<String>, id: &str
         if freeze_state != "FROZEN" {
             errors.push(format!("{id}: frozen outputs require freeze_state=FROZEN"));
         }
+        if text(outputs, "state") != Some("FROZEN") {
+            errors.push(format!("{id}: frozen outputs require reference_outputs.state=FROZEN"));
+        }
         if status != "PASS" {
             errors.push(format!("{id}: frozen outputs require execution.status=PASS"));
         }
@@ -126,6 +129,9 @@ fn validate_frozen_receipt(candidate: &Value, errors: &mut Vec<String>, id: &str
     } else {
         if freeze_state == "FROZEN" {
             errors.push(format!("{id}: freeze_state=FROZEN requires exact outputs to be frozen"));
+        }
+        if text(outputs, "state") == Some("FROZEN") {
+            errors.push(format!("{id}: reference_outputs.state=FROZEN requires exact outputs to be frozen"));
         }
         if outputs["output_digest"].as_str().is_some_and(|digest| !digest.is_empty()) {
             errors.push(format!("{id}: non-frozen outputs may not declare an output_digest"));
@@ -178,6 +184,12 @@ fn validate_frozen_receipt(candidate: &Value, errors: &mut Vec<String>, id: &str
         "OUT_OF_DOMAIN" | "UNRESOLVED" => {
             if frozen {
                 errors.push(format!("{id}: {status} cannot be promoted to frozen gold outputs"));
+            }
+            if executed && !is_sha256(&execution["raw_output_hash"]) {
+                errors.push(format!("{id}: an executed unresolved/out-of-domain run requires a raw-output SHA-256"));
+            }
+            if executed && !nonempty_text(execution, "simulator_version") {
+                errors.push(format!("{id}: an executed unresolved/out-of-domain run requires simulator_version"));
             }
         }
         _ => errors.push(format!("{id}: unknown execution status {status:?}")),
