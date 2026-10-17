@@ -218,7 +218,7 @@ pub fn compare_candidate_specific_missions(
     let expected_shape = mission_metric_shape(&candidates[0].mission);
     let mut seen = HashSet::with_capacity(candidates.len());
     for candidate in candidates {
-        if candidate.id.trim().is_empty() || candidate.id.trim() != candidate.id {
+        if candidate.id.trim().is_empty() || candidate.id.trim() != candidate.id.as_str() {
             return Err(SweepInputError::InvalidCandidateId {
                 id: candidate.id.clone(),
             });
@@ -228,7 +228,7 @@ pub fn compare_candidate_specific_missions(
                 id: candidate.id.clone(),
             });
         }
-        if candidate.mission_family_id != expected_family {
+        if candidate.mission_family_id.as_str() != expected_family {
             return Err(SweepInputError::MissionFamilyMismatch {
                 candidate_id: candidate.id.clone(),
                 expected: expected_family.to_owned(),
