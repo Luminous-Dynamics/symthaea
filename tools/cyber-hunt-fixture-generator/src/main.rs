@@ -263,42 +263,45 @@ fn generate_dataset(record_count: usize, seed: u64) -> Result<Dataset, String> {
         background_event(index, &mut events, &mut rng, &mut used_ids);
     }
 
-    let base = BASE_TIME_MS.saturating_add(600_000);
-    let host = "host-044";
-    let principal = "svc-report";
+    // Seed-dependent shift and case-local identities make trivial fixed-value matching less useful.
+    // These identifiers are synthetic and do not refer to real hosts or principals.
+    let base = BASE_TIME_MS.saturating_add(600_000 + rng.below(7_200_000) as i64);
+    let host = format!("host-case-{:04x}", rng.next_u64() as u16);
+    let principal = format!("svc-case-{:04x}", rng.next_u64() as u16);
     let session_id = format!("sid-{:016x}", rng.next_u64());
-    let external_ip = "198.51.100.77"; // RFC 5737 documentation range; never a routable target.
+    let source_ip = format!("192.0.2.{}", 10 + rng.below(240)); // RFC 5737 documentation range.
+    let external_ip = format!("198.51.100.{}", 10 + rng.below(240)); // RFC 5737 documentation range.
 
     let mut attack_ids = Vec::with_capacity(ATTACK_EVENT_COUNT);
     for offset in [0_i64, 10_000, 20_000] {
-        let id = push_event(&mut events, &mut rng, &mut used_ids, base + offset, host, principal,
+        let id = push_event(&mut events, &mut rng, &mut used_ids, base + offset, &host, &principal,
             "windows_security", "authentication", "failure",
-            details(&[("source_address", "192.0.2.177"), ("status", "invalid_password"), ("logon_type", "network")]));
+            details(&[("source_address", source_ip.as_str()), ("status", "invalid_password"), ("logon_type", "network")]));
         attack_ids.push(id);
     }
-    attack_ids.push(push_event(&mut events, &mut rng, &mut used_ids, base + 120_000, host, principal,
+    attack_ids.push(push_event(&mut events, &mut rng, &mut used_ids, base + 120_000, &host, &principal,
         "windows_security", "authentication", "success",
-        details(&[("source_address", "192.0.2.177"), ("logon_type", "remote_interactive"), ("session_id", &session_id), ("device_posture", "not_reported")])));
+        details(&[("source_address", source_ip.as_str()), ("logon_type", "remote_interactive"), ("session_id", &session_id), ("device_posture", "not_reported")])));
 
-    attack_ids.push(push_event(&mut events, &mut rng, &mut used_ids, base + 145_000, host, principal,
+    attack_ids.push(push_event(&mut events, &mut rng, &mut used_ids, base + 145_000, &host, &principal,
         "windows_sysmon", "process_start", "observed",
         details(&[("parent_image", "winword.exe"), ("image", "powershell.exe"), ("command_summary", "script_host_child_process"), ("session_id", &session_id), ("process_id", "4812")])));
 
-    attack_ids.push(push_event(&mut events, &mut rng, &mut used_ids, base + 190_000, host, principal,
+    attack_ids.push(push_event(&mut events, &mut rng, &mut used_ids, base + 190_000, &host, &principal,
         "proxy_gateway", "network_connection", "allowed",
-        details(&[("destination_address", external_ip), ("destination_domain", "asset-review.example.invalid"), ("destination_port", "443"), ("process_image", "powershell.exe"), ("session_id", &session_id), ("bytes_out", "1280")])));
+        details(&[("destination_address", external_ip.as_str()), ("destination_domain", "asset-review.example.invalid"), ("destination_port", "443"), ("process_image", "powershell.exe"), ("session_id", &session_id), ("bytes_out", "1280")])));
 
-    attack_ids.push(push_event(&mut events, &mut rng, &mut used_ids, base + 240_000, host, principal,
+    attack_ids.push(push_event(&mut events, &mut rng, &mut used_ids, base + 240_000, &host, &principal,
         "file_audit", "file_write", "completed",
         details(&[("file_path", "C:\\Users\\Public\\cache\\report-bundle.tmp"), ("file_bytes", "1843200"), ("operation", "create"), ("session_id", &session_id)])));
 
-    attack_ids.push(push_event(&mut events, &mut rng, &mut used_ids, base + 260_000, host, principal,
+    attack_ids.push(push_event(&mut events, &mut rng, &mut used_ids, base + 260_000, &host, &principal,
         "windows_sysmon", "process_start", "observed",
         details(&[("parent_image", "powershell.exe"), ("image", "tar.exe"), ("command_summary", "archive_creation"), ("session_id", &session_id), ("process_id", "4820")])));
 
-    attack_ids.push(push_event(&mut events, &mut rng, &mut used_ids, base + 310_000, host, principal,
+    attack_ids.push(push_event(&mut events, &mut rng, &mut used_ids, base + 310_000, &host, &principal,
         "proxy_gateway", "network_transfer", "allowed",
-        details(&[("destination_address", external_ip), ("destination_domain", "asset-review.example.invalid"), ("destination_port", "443"), ("process_image", "tar.exe"), ("session_id", &session_id), ("bytes_out", "1761280")])));
+        details(&[("destination_address", external_ip.as_str()), ("destination_domain", "asset-review.example.invalid"), ("destination_port", "443"), ("process_image", "tar.exe"), ("session_id", &session_id), ("bytes_out", "1761280")])));
 
     // Deliberately plausible benign alternatives: ordinary password typos, approved PowerShell
     // administration, and scheduled backup activity. They must not be scored as positives.
@@ -582,6 +585,43 @@ mod tests {
         let a = generate_dataset(1_000, 2026).expect("dataset should generate");
         let b = generate_dataset(1_000, 2027).expect("dataset should generate");
         assert_ne!(a.manifest.event_store_sha256, b.manifest.event_store_sha256);
+    }
+
+    #[test]
+    fn planted_identity_and_timeline_vary_by_seed_while_the_chain_stays_coherent() {
+        let a = generate_dataset(1_000, 2026).expect("first dataset should generate");
+        let b = generate_dataset(1_000, 2027).expect("second dataset should generate");
+
+        let positive_signature = |dataset: &Dataset| {
+            let events: Vec<EventRecord> = std::str::from_utf8(&dataset.event_store)
+                .expect("JSONL should be UTF-8")
+                .lines()
+                .map(|line| serde_json::from_str(line).expect("event record should deserialize"))
+                .collect();
+            let positive_ids: BTreeSet<String> = dataset.truth.labels.iter()
+                .filter(|label| label.label == "positive")
+                .map(|label| label.event_id.clone())
+                .collect();
+            let positives: Vec<&EventRecord> = events.iter()
+                .filter(|event| positive_ids.contains(&event.event_id))
+                .collect();
+            let hosts: BTreeSet<String> = positives.iter().map(|event| event.host_id.clone()).collect();
+            let principals: BTreeSet<String> = positives.iter().map(|event| event.principal_id.clone()).collect();
+            let start = positives.iter().map(|event| event.event_time_ms).min().expect("attack start");
+            (hosts, principals, start, positives.len())
+        };
+
+        let (hosts_a, principals_a, start_a, count_a) = positive_signature(&a);
+        let (hosts_b, principals_b, start_b, count_b) = positive_signature(&b);
+        assert_eq!(count_a, ATTACK_EVENT_COUNT);
+        assert_eq!(count_b, ATTACK_EVENT_COUNT);
+        assert_eq!(hosts_a.len(), 1, "all planted attack events share one case-local host");
+        assert_eq!(hosts_b.len(), 1, "all planted attack events share one case-local host");
+        assert_eq!(principals_a.len(), 1, "all planted attack events share one case-local principal");
+        assert_eq!(principals_b.len(), 1, "all planted attack events share one case-local principal");
+        assert_ne!(hosts_a, hosts_b, "the planted host identity should be seed-dependent");
+        assert_ne!(principals_a, principals_b, "the planted principal should be seed-dependent");
+        assert_ne!(start_a, start_b, "the planted campaign time should be seed-dependent");
     }
 
     #[test]
