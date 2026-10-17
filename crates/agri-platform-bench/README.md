@@ -25,7 +25,7 @@ The crate defines its own Cargo workspace to avoid pulling the full Symthaea wor
 - Returns a component-wise assessment and a Pareto frontier; no weighted single “best robot” score is used.
 - Keeps manual/current practice as a first-class candidate. A robot can be rejected while the no-robot option remains feasible.
 
-The frozen synthetic case manifest is at `fixtures/scenario_manifest.tsv`. It currently contains 43 expected-disposition cases, mostly adversarial mutations of one synthetic Highveld vegetable-scouting fixture. Rust tests pin the expected disposition of each case, including capability-evidence, hard-constraint, currency, evidence-quality, budget, repairability, and boundary conditions. This is not yet a 30-family farm-context benchmark.
+The frozen synthetic case manifest is at `fixtures/scenario_manifest.tsv`. It currently contains 53 expected-disposition cases: 43 adversarial/evidence-boundary cases around a synthetic scouting fixture and 10 additional farm-task archetypes covering broad-acre tractor treatment, orchard scouting, greenhouse harvest, nursery handling, livestock monitoring, packhouse transport, fixed sensors, aerial survey, smallholder mechanical weeding, and an agrivoltaic access rejection. These are synthetic reference cases—not 10 real field validations—and expansion to 30+ distinct site/task families is still required.
 
 ## Important limitations
 
