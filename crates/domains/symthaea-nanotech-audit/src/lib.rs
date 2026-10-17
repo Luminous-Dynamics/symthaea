@@ -16,6 +16,8 @@ use std::fs::{self, File};
 use std::io::Read;
 use std::path::{Component, Path, PathBuf};
 
+mod rescue_contract;
+
 const ABS_TOLERANCE: f64 = 1.0e-10;
 const REL_TOLERANCE: f64 = 1.0e-9;
 
@@ -270,6 +272,16 @@ pub fn audit_run(run_dir: &Path) -> AuditReport {
 
     let proposal_requests = episode_rows.as_ref().and_then(sum_proposal_requests);
     verify_provenance_manifest(run_dir, proposal_requests, &mut report);
+
+    let rescue_audit = rescue_contract::audit_optional_rescue_contract(run_dir);
+    if rescue_audit.provided {
+        for check in rescue_audit.checks_completed {
+            report.checked(check);
+        }
+        for finding in rescue_audit.findings {
+            report.fail(finding.code, finding.detail);
+        }
+    }
 
     report.status = if report.findings.is_empty() {
         "artifact_integrity_pass".to_owned()
