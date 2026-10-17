@@ -186,12 +186,13 @@ fn push_event(
 
 fn background_event(
     index: usize,
+    campaign_anchor_ms: i64,
     events: &mut Vec<EventRecord>,
     rng: &mut Rng,
     used_ids: &mut BTreeSet<String>,
 ) {
     let time_offset = rng.below(3_600_000) as i64 - 1_800_000;
-    let event_time_ms = BASE_TIME_MS.saturating_add(time_offset);
+    let event_time_ms = campaign_anchor_ms.saturating_add(time_offset);
     let host_number = 1 + rng.below(48);
     let host_id = format!("host-{host_number:03}");
     let principal = SYNTHETIC_PRINCIPALS[rng.below(SYNTHETIC_PRINCIPALS.len() as u64) as usize];
@@ -259,13 +260,17 @@ fn generate_dataset(record_count: usize, seed: u64) -> Result<Dataset, String> {
     let mut events = Vec::with_capacity(record_count);
     let mut used_ids = BTreeSet::new();
 
+    // Shift the whole environment first, so the planted incident does not become an isolated
+    // time cluster when its clock changes. Background events share this shifted time anchor.
+    let campaign_anchor_ms = BASE_TIME_MS.saturating_add(rng.below(7_200_000) as i64);
+
     for index in 0..(record_count - PLANTED_EVENT_COUNT) {
-        background_event(index, &mut events, &mut rng, &mut used_ids);
+        background_event(index, campaign_anchor_ms, &mut events, &mut rng, &mut used_ids);
     }
 
-    // Vary the incident time and choose identities from the same naming pools as background activity.
-    // Do not add a special prefix or scenario marker that lets the solver spot planted records.
-    let base = BASE_TIME_MS.saturating_add(600_000 + rng.below(7_200_000) as i64);
+    // Start the planted incident within the shifted background window.
+    // Choose identities from the same naming pools as background activity; do not use a marker.
+    let base = campaign_anchor_ms.saturating_add(600_000);
     let host = format!("host-{:03}", 1 + rng.below(48));
     let principal = SYNTHETIC_PRINCIPALS[rng.below(SYNTHETIC_PRINCIPALS.len() as u64) as usize].to_string();
     let session_id = format!("sid-{:016x}", rng.next_u64());
@@ -650,6 +655,40 @@ mod tests {
         assert!(unique_source_ips.len() > 1, "source IP should vary across seeds");
         assert!(unique_destination_ips.len() > 1, "destination IP should vary across seeds");
         assert!(unique_starts.len() > 1, "campaign time should vary across seeds");
+    }
+
+    #[test]
+    fn background_activity_overlaps_the_shifted_planted_incident_window() {
+        let dataset = generate_dataset(1_000, 2026).expect("dataset should generate");
+        let events: Vec<EventRecord> = std::str::from_utf8(&dataset.event_store)
+            .expect("JSONL should be UTF-8")
+            .lines()
+            .map(|line| serde_json::from_str(line).expect("event record should deserialize"))
+            .collect();
+        let positive_ids: BTreeSet<String> = dataset.truth.labels.iter()
+            .filter(|label| label.label == "positive")
+            .map(|label| label.event_id.clone())
+            .collect();
+        let attack_times: Vec<i64> = events.iter()
+            .filter(|event| positive_ids.contains(&event.event_id))
+            .map(|event| event.event_time_ms)
+            .collect();
+        let attack_start = *attack_times.iter().min().expect("planted attack should contain events");
+        let attack_end = *attack_times.iter().max().expect("planted attack should contain events");
+        let background_times: Vec<i64> = events.iter()
+            .filter(|event| !positive_ids.contains(&event.event_id))
+            .map(|event| event.event_time_ms)
+            .collect();
+
+        let overlapped_background = background_times.iter()
+            .filter(|time| **time >= attack_start && **time <= attack_end)
+            .count();
+        assert!(background_times.iter().any(|time| *time < attack_start),
+            "ordinary background events should exist before the incident");
+        assert!(background_times.iter().any(|time| *time > attack_end),
+            "ordinary background events should exist after the incident");
+        assert!(overlapped_background >= 20,
+            "incident window must contain substantial background noise, got {overlapped_background}");
     }
 
     #[test]
