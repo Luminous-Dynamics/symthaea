@@ -102,7 +102,7 @@ Each connector profile should carry a machine-readable conformance contract: sup
 
 ## Benchmark roadmap
 
-The 50-case table in `crates/intx-program-bench/fixtures/cases.tsv` is the seed corpus. The current Rust harness checks the fixture structure and a few stated relationships; it does **not** yet execute the production action runtime or test a real protocol adapter. Do not report it as runtime conformance.
+The 50-case table in `crates/intx-program-bench/fixtures/cases.tsv` is the seed corpus. `fixtures/expected.tsv` now freezes expected states, dispatch classes, and reconciliation requirements separately; the Rust harness checks scenario data against this second table so a local consistency rule alone cannot bless a semantically wrong expectation. Both files have digests checked by the focused workflow. This is a frozen golden oracle, not independent proof of the production runtime. The current Rust harness still does **not** execute the production action runtime or test a real protocol adapter. Do not report it as runtime conformance.
 
 | Stage | Benchmark | Acceptance target | Evidence boundary |
 |---|---|---|---|
@@ -117,7 +117,13 @@ The 50-case table in `crates/intx-program-bench/fixtures/cases.tsv` is the seed 
 | B8 | Mutation/fault campaign | Start with the 50 seeds; generate at least 250 deterministic mutations across identity, data typing, staleness, approval, artifact digest, replay, timeout, and reconciliation. Zero hidden dispatch bypasses | Exact code/corpus/tool versions; expand based on found defects |
 | B9 | Staged commissioning | Every injected failure point leads to a documented safe state or unresolved/manual-recovery state; every live profile has its own independent approval and field qualification | Named target/site/process only |
 
-### Metrics that must remain separate
+#### B10 — Signed offline engineering-package integrity
+
+For targets that support OPC UA FX OfflineEngineering, test the native .amlx Descriptor profile rather than inventing a generic, unsigned equipment bundle. OPC 10000-83 v1.00.03 defines an AML Container package with a manifest, AML information-model files, optional supporting artifacts, and signature requirements. A static validator should reject archive/path ambiguity, malformed or unknown schema/profile versions, bad signature scope, untrusted or unsuitable certificates, stale or incompatible target mappings, and archive/XML resource-exhaustion inputs.
+
+Acceptance target: 100% rejection of the frozen invalid/tampered descriptor corpus, 100% detection of signature-scope mutations, no outgoing network from the initial validator, and zero promotion from a valid signature to commissioning authority. Signature verification, target compatibility, semantic correctness, and dispatch authority remain separate propositions. See [INTX-UAFX-DESCRIPTOR-001 / #7720](https://github.com/Luminous-Dynamics/symthaea/issues/7720) and the [official OPC 10000-83 specification](https://reference.opcfoundation.org/specs/OPC-10000-83/full).
+
+## Metrics that must remain separate
 
 Report separate counts/rates for:
 
@@ -143,7 +149,7 @@ Do not create a single “industrial readiness score” that lets throughput off
 4. Confirm exact action-runtime/INTX API ownership at the tested branch head before writing the integration layer.
 5. Next, add one read-only OPC UA profile against a reference/test server and preserve native status/time/type metadata. Keep it separate from any later effectful programming profile.
 6. Introduce offline source/configuration generation and differential validation only after the target language/vendor toolchain and exact target profile are declared.
-7. Require a documented independent review and target-specific qualification before any live commissioning pilot.
+7. Evaluate [INTX-UAFX-DESCRIPTOR-001 / #7720](https://github.com/Luminous-Dynamics/symthaea/issues/7720) as the offline signed-package gate for UAFX-capable equipment; preserve vendor-native package/signature semantics and never equate signature validity with authority.\n8. Require a documented independent review and target-specific qualification before any live commissioning pilot.
 
 ## Safety and scope boundary
 
