@@ -59,6 +59,8 @@ A seed change does not create an independent incident. Split by campaign, causal
 - **Initial capability study:** target 30+ independently authored/reviewed campaign templates with held-out causal structures and environments; report uncertainty, not just a point estimate.
 - **Long-term:** 100+ independent procedures/campaign templates, with new families added through versioned review. Near-identical transformations and extra rows do not increase the independent sample count.
 
+**Current implementation snapshot (draft PR #7769):** the Rust generator now emits two structurally different public smoke families: identity-to-egress and artifact lifecycle/provenance. The artifact family connects source checkout, build, artifact digest, signed attestation, promotion, and deployment. A benign complete chain uses the same six event types, so event-type presence alone is not enough; a deterministic mismatch between the observed artifact digest and attestation subject drives the planted finding. The manifest/truth schemas accept both scenario identifiers, and the targeted workflow is configured to verify the new family. These remain public smoke fixtures with synthetic labels—not independently reviewed campaigns, blind evaluation, or production supply-chain assurance. The corpus diversity target in #7786 still requires at least four genuinely distinct families and 12 independently reviewed campaigns for the pilot.
+
 ### 4. From ordinary test cases to counterfactual invariants
 
 Create paired cases where one declared fact changes and the expected result is explicit. Examples: current vs expired authorization; relevant vs irrelevant identity rename; complete vs missing critical telemetry; matching vs mismatched artifact digest; original event vs duplicate delivery; valid event ID vs fabricated ID.
@@ -148,10 +150,11 @@ A missing or inconsistent receipt makes the run inconclusive, not a pass.
 
 ## Execution sequence (runner-independent)
 
-1. **Now:** finish source-level review, improve fixtures/negative controls, and record current exact-head CI evidence without waiting for it.
-2. **Before capability claims:** obtain independent label review and create truly different causal families; do not multiply seeds to simulate diversity.
+1. **Now:** run source-level review on both public smoke families, assert the same event types have positive and benign examples where applicable, and record current exact-head CI evidence without waiting for it.
+2. **Next:** implement at least two more distinct causal graphs and build automated leakage audits across the whole suite; the new artifact family is a second smoke template, not the four-family/12-campaign pilot.
+3. **Before capability claims:** obtain independent label review and reserve held-out campaign families; do not multiply seeds to simulate diversity.
 3. **Next:** connect the fixture through #7776's existing evaluator and bounded query path. Do not create a parallel scoring engine.
-4. **Then:** publish baseline results on public, non-blind fixtures for reproducibility and reserve held-out labels/campaigns for capability testing.
+4. **Then:** connect all reviewed families to the shared #7776 evaluator and publish baseline results on public, non-blind fixtures for reproducibility while keeping held-out labels/campaigns controlled.
 5. **Only after:** run the frozen held-out study with campaign-level uncertainty and explicit safety vetoes; publish limits and failure cases alongside any successful result.
 
 The work may progress at each step even when CI is queued, but code correctness and capability qualification are not inferred from source review or elapsed time. Exact-head test results remain authoritative.
