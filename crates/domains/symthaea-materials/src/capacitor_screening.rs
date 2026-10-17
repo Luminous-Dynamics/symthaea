@@ -10,7 +10,7 @@
 
 use crate::dielectric::{
     BreakdownTestKind, CapacitorGeometry, DielectricEvidenceKind, DielectricPropertyRecord,
-    DielectricValidationError, IdealCapacitorMetrics, calculate_ideal_capacitor_metrics,
+    DielectricValidationError, IdealCapacitorMetrics, calculate_ideal_capacitor_metrics_at_frequency,
 };
 use serde::{Deserialize, Serialize};
 use std::error::Error;
@@ -447,11 +447,12 @@ pub fn screen_capacitor_candidate(
         });
     }
 
-    let metrics = calculate_ideal_capacitor_metrics(
+    let metrics = calculate_ideal_capacitor_metrics_at_frequency(
         material,
         geometry,
         peak_voltage_v,
         ac_rms_voltage_v,
+        requirements.operating_frequency_hz,
     )?;
 
     let mut violations = Vec::new();
