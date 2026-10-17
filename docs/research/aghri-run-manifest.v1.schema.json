@@ -1,6 +1,6 @@
 {
   "$schema": "https://json-schema.org/draft/2020-12/schema",
-  "$id": "https://luminousdynamics.org/schemas/aghri-run-manifest.v1.schema.json",
+  "$id": "urn:luminous-dynamics:schema:aghri-run-manifest:v1",
   "title": "AGHRI Benchmark Run Manifest V1",
   "description": "Metadata and provenance contract only; it is not a machine-safety certificate or dataset result.",
   "type": "object",
