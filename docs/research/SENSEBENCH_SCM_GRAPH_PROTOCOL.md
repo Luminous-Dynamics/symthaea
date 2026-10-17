@@ -1,0 +1,100 @@
+# SenseBench SCM Graph Recovery Protocol v0.1
+
+**Status:** implementation committed to the public `feat/symthaea-sense-observation-envelope` branch; authored Rust tests have not been executed in the present environment.
+
+## Question
+
+Does active measurement selection improve recovery of causal graph structure under mechanism shift, compared with a strong fixed action and simple baselines? Does the system know when it has enough evidence to submit a graph, and what does it cost to reach that threshold?
+
+This advances the earlier `blind-worlds` suite. That benchmark compares actions among three causal explanations described by hand-authored likelihood rows. The SCM-graph suite instead creates explicit graph hypotheses, generates exact outcome distributions from structural equations, samples intervention outcomes from a separate hidden world, updates a posterior over graphs, and scores the graph that would be submitted.
+
+## Reproduction
+
+Start with an exploratory run:
+
+```sh
+SENSEBENCH_CODE_REVISION="$(git rev-parse HEAD)" \
+  cargo run -p symthaea-sensebench -- --suite scm-graph --trials 32 --budget 8 --seed 42
+```
+
+The workspace CLI emits versioned JSON and requires an exact caller-provided `SENSEBENCH_CODE_REVISION`. Use a clean worktree and record that SHA with the configuration. Do not interpret a queued or skipped workflow as a passing build/test.
+
+## Graph catalogue and worlds
+
+- Enumerate all 25 labeled directed acyclic graphs on three observed variables. Every graph is checked for acyclicity; the catalogue size and unique edge masks have a known-answer test.
+- Generate seven world-family templates with four deterministic, seed-keyed variants each: chain and fork (development), collider, sparse random DAG, dense random DAG, inhibitory-mechanism shift, and an empty-graph negative control (held out).
+- The true graph is selected by the world generator. Hidden mechanism parameters are distinct from the policy's declared parameters and vary by family. One held-out family contains negative edge effects, challenging the declared positive-effect model.
+- All three-variable DAGs are included in the hypothesis catalogue, so the held-out split tests the specified family/mechanism distribution rather than a larger-than-catalogue node count. Graph structures and likelihoods remain visible in source and the split is not cryptographically sealed.
+
+The graph models are binary structural causal models. For each full state, each non-intervened variable's conditional probability is computed from the declared intercept plus the weights of active parents, clamped to the explicit range [0.01, 0.99]. Under a hard intervention, the intervention variable is fixed to the assigned value and its structural equation is bypassed. The evaluator enumerates every three-bit outcome exactly to construct likelihood distributions; each policy's observed state is sampled from the hidden graph and hidden parameter set.
+
+This is deliberately a small, auditable graph-recovery substrate. It does not yet use continuous linear-Gaussian SCMs, latent confounders, temporal graphs, nonlinear mechanism libraries, or larger graphs.
+
+## Policies
+
+All policies share the same initial uniform graph prior, nominal posterior-update rule, observation format, outcome generator, and measurement-count budget.
+
+1. Nominal expected information gain.
+2. Predictive outcome entropy, a simple uncertainty-seeking baseline that does not directly score hypothesis discrimination.
+3. Model-weighted expected information gain across the declared scenarios.
+4. Worst-case robust information-gain selection.
+5. Development-fixed action selected before held-out scoring.
+6. Uniform random measurement/intervention selection.
+7. Passive observation only.
+8. Known-mechanism oracle: uses the hidden world's mechanism parameters while retaining the graph-hypothesis task. This is an optimistic upper-bound diagnostic and is not a deployable method.
+9. Structure-blind random graph submission, with no measurements. This supplies a graph-recovery floor separate from the random-action baseline.
+
+The current comparison deliberately keeps the posterior update on the same nominal likelihood model for the action-selection policies, to isolate acquisition differences. Consequently, model-weighted/robust selection is not also receiving a privileged model-averaged posterior update. A future factorial ablation should vary acquisition and inference separately.
+
+## Outcomes and metrics
+
+For each world/policy pair, the JSON report includes:
+
+- **Skeleton F1:** adjacency recovery ignoring edge direction.
+- **Directed-edge F1:** exact arrow recovery; a reversed arrow counts as a directed false positive and false negative.
+- **Structural Hamming distance (SHD):** one edit per unordered variable pair whose state differs, including one edit for a reversal.
+- Exact graph recovery rate and its Wilson interval.
+- Posterior mass on the true graph and multiclass graph-posterior Brier score.
+- Graph-claim coverage at the configured posterior threshold.
+- False graph claim rate among accepted claims and across all trials.
+- Mean measurements/interventions used and counts to threshold when the threshold is reached.
+- Per-world metrics, trial-level intervals, and held-out policy summaries. World-level summaries weight generated worlds equally instead of pooling trials as if every observation were an independent world.
+
+The structure-blind random graph policy reports graph metrics but makes no confidence-qualified claim. Keep its no-measurement behavior separate from the random intervention policy.
+
+## Negative and known-answer controls
+
+- Exactly 25 unique DAG masks are generated.
+- Every generated graph passes the acyclicity check.
+- Exact binary SCM outcome distributions sum to one within numerical tolerance.
+- Hard interventions assign zero probability to states inconsistent with the imposed value.
+- An exactly reversed single edge has skeleton F1 1, directed-edge F1 0, and SHD 1.
+- The empty graph exactly matches itself with F1 1 and SHD 0.
+- The empty-graph held-out family is retained as a null causal control.
+- Repeated runs with identical configuration are required to be byte-stable.
+
+These are authored tests, not executed results. The benchmark has not been compiled or run on the current source head in this environment.
+
+## Proposed qualification gates (not measured capabilities)
+
+1. **Exactness:** all DAG catalogue, distribution normalization, intervention, and structural-metric known-answer tests pass.
+2. **Budget fairness:** all actionable policies use the same observation format and measurement budget; report actual costs if non-unit costs are introduced later.
+3. **Held-out graph recovery:** compare directed F1, skeleton F1 and SHD against the fixed-design, random-action, passive-only, and structure-blind graph baselines. Do not claim superiority unless paired differences and uncertainty support it.
+4. **Graph confidence:** report graph-claim coverage beside false-claim risk. Reject the trivial policy that wins by abstaining on every trial.
+5. **Negative controls:** on the empty-graph family, report spurious-edge frequency and false accepted graph claims explicitly.
+6. **World/family inference:** current summaries have four parameter variants per hand-designed family. These are not a sample of all possible causal systems. The next version should generate many graph families/mechanisms from preregistered design distributions and use family-level analysis, rather than treating within-family variants as independent evidence of generalization.
+7. **Observational equivalence:** add CPDAG-aware scoring so the learner is not penalized for leaving directions unresolved when observational data cannot identify direction. Then score interventional direction recovery separately.
+8. **Richer SCMs:** add continuous linear-Gaussian and nonlinear/additive-noise families, measurement noise, sampling constraints, intervention artifacts, latent confounding, and selection/censoring mechanisms.
+9. **Independent custody:** move the evaluation truth and score implementation to a separate process/corpus, bind test corpus hashes to the protocol, and keep policy-visible fixtures separated from the qualification set.
+10. **Physical bridge:** only after software correctness and reproducibility, use replayed sensor streams with injected faults and an independently calibrated reference. Synthetic success alone does not support physical scientific claims.
+
+## Research grounding
+
+- Deb, Shah and Krishnan, [Active Causal Discovery Benchmark: Evaluating LLM Agents Under Budgeted Interventions](https://arxiv.org/abs/2609.31675) (2026), motivates separate graph-structure recovery and intervention-efficiency scores. Its reported results caution against assuming that raw agent complexity beats simpler statistical baselines.
+- Herman, Wahl, Ninad and Runge, [Unitless Unrestricted Markov-Consistent SCM Generation: Better Benchmark Datasets for Causal Discovery](https://proceedings.mlr.press/v275/herman25a.html) (2025), discusses artifacts in common synthetic causal graph generators and motivates adversarial generator audits.
+- Göbler et al., [causalAssembly: Generating Realistic Production Data for Benchmarking Causal Discovery](https://proceedings.mlr.press/v236/gobler24a.html) (2024), provides a semisynthetic complement once a real process dataset and provenance are available.
+- Tang, Sloman and Kaski, [Representative, Informative, and De-Amplifying](https://proceedings.mlr.press/v300/tang26d.html) (AISTATS 2026), motivates the separate SENSE-EXP-002 question of whether acquisition should account for representativeness and model-error amplification in addition to information gain: https://github.com/Luminous-Dynamics/symthaea/issues/7825.
+
+## Non-claims
+
+A passing software test validates this implementation's stated behavior; it does not establish causal discovery in real environments, calibration of physical sensors, causal identification under latent confounding, superiority over state-of-the-art discovery methods, or scientific novelty. The three-node graph universe is a controlled test bed, not the final leaderboard.
