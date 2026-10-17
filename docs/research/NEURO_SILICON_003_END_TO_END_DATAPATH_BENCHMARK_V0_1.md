@@ -140,6 +140,8 @@ If initial host baselines show that these numerical promotion gates are inapprop
 
 The schema lives at [`end_to_end_receipt_v0_1.schema.json`](../../crates/domains/symthaea-silicon/schemas/end_to_end_receipt_v0_1.schema.json). The example file is intentionally an **incomplete planning receipt**; it contains no performance or energy claim.
 
+Schema v0.1 covers exact digital **end-to-end workload runs** on CPU/SIMD, GPU, or physically observed FPGA. Lower-level RTL differential and synthesis qualification remain owned by #5818 and the existing silicon PR train; future approximate/analogue hardware needs a separate contract/version rather than silently weakening exact-result rules. A `pass` receipt means the declared run/evidence contract was satisfied; it does **not** by itself prove a candidate beats the CPU baseline or crosses the material-advantage gate.
+
 - `pass`: the declared checks ran on the exact profile/input identities, all required invariants met and evidence is complete for the claim ceiling.
 - `fail`: a required check actually ran and failed, such as an oracle mismatch or a prohibited malformed frame accepted.
 - `incomplete`: required evidence/execution is absent, queued, skipped or unfinished.
