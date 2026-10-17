@@ -48,7 +48,7 @@ For each registered objective, values must share comparable units and direction.
 - A is no worse than B on every objective; and
 - A is strictly better than B on at least one objective.
 
-A candidate is on the frontier when it is fully rankable and no other rankable candidate dominates it. Ties do not dominate one another. Frontier results and explanation lists are deterministically sorted by candidate ID, independent of input order or objective declaration order.
+A candidate is on the frontier when it is fully rankable and no other rankable candidate dominates it. Ties do not dominate one another. Frontier results and explanation lists are deterministically sorted by candidate ID, independent of input order or objective declaration order. Each candidate assessment preserves its gate evidence and objective values (including provenance references) in canonical key order, and exposes explicit failed-gate keys, unknown-gate keys and missing-objective keys so downstream interfaces can explain every exclusion without reconstructing hidden state.
 
 ## Initial acceptance targets
 
