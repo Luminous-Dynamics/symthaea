@@ -1,0 +1,151 @@
+{
+  "protocol_id": "SYMA-HDC-LTC-TRAJECTORY",
+  "version": "0.1.0",
+  "status": "preregistered_target_contract_not_executed",
+  "scope": {
+    "active_implementation": "symthaea-core::hdc::hdc_ltc_unified",
+    "representation": "continuous_f32",
+    "semantic_dimensions": [16384, 32768, 65536, 131072, 262144],
+    "tier_status": {
+      "16384": "baseline",
+      "32768": "baseline",
+      "65536": "baseline",
+      "131072": "exploratory",
+      "262144": "exploratory"
+    },
+    "candidate_local_dynamical_dimensions": [1024, 4096, 16384, 32768],
+    "canonical_owners": [
+      "https://github.com/Luminous-Dynamics/symthaea/issues/6560",
+      "https://github.com/Luminous-Dynamics/symthaea/issues/6561",
+      "https://github.com/Luminous-Dynamics/symthaea/issues/6619",
+      "https://github.com/Luminous-Dynamics/symthaea/issues/6631",
+      "https://github.com/Luminous-Dynamics/symthaea/issues/7374",
+      "https://github.com/Luminous-Dynamics/symthaea/issues/3348",
+      "https://github.com/Luminous-Dynamics/symthaea/issues/7749"
+    ]
+  },
+  "comparison_arms": [
+    "active_incumbent_scalar_or_simd",
+    "fused_closed_form",
+    "bounded_iterative",
+    "fine_step_rk4_reference_when_equations_support_an_independent_oracle",
+    "simd_cache_tiled",
+    "streamed_chunked_only_if_update_dependencies_are_preserved",
+    "full_width_dynamics",
+    "matched_width_random_projection",
+    "deterministic_orthogonal_or_nested_projection_where_applicable",
+    "manifold_projection_with_explicit_residual_novelty_path",
+    "approximate_or_analogue_profile_separately_versioned"
+  ],
+  "input_time_profiles": [
+    "fixed_dt",
+    "jittered_irregular_dt",
+    "burst_gap_dt",
+    "abrupt_input_discontinuity",
+    "long_horizon_recovery_after_disturbance"
+  ],
+  "task_profiles": [
+    "temporal_associative_recall",
+    "streaming_sequence_classification",
+    "temporal_prediction_or_control",
+    "representative_edge_state_update"
+  ],
+  "evidence_ladder": [
+    { "level": "E0", "name": "protocol_and_schema_only", "permits": "no empirical performance claim" },
+    { "level": "E1", "name": "operator_correctness_and_cost", "permits": "operator-level claim only" },
+    { "level": "E2", "name": "trajectory_fidelity", "permits": "numerical-dynamics claim within declared workload" },
+    { "level": "E3", "name": "held_out_task_quality", "permits": "task claim within the frozen evaluation set" },
+    { "level": "E4", "name": "end_to_end_measured_system_cost", "permits": "measured performance/energy claim on declared platform" },
+    { "level": "E5", "name": "independent_hardware_or_external_replication", "permits": "only the specific externally supported hardware/replication claim" }
+  ],
+  "candidate_gates_to_freeze_before_candidate_results": {
+    "numerical_integrator": {
+      "applies_when": "An independent, refinement-checked numerical reference can be built for the same differential equations and input schedule.",
+      "trajectory_nrmse_vs_reference_max": 0.001,
+      "max_normalized_state_error": 0.01,
+      "relative_tau_gate_equilibrium_distortion_max": 0.005,
+      "reference_refinement_change_relative_to_allowed_error_max": 0.1,
+      "invariants": [
+        "zero_non_finite_states",
+        "zero_unbounded_runs",
+        "zero_invalid_state_mutations"
+      ]
+    },
+    "compressed_dynamics": {
+      "applies_when": "Semantic width is distinct from local dynamical width and full-width dynamics is the control.",
+      "held_out_classification_absolute_accuracy_drop_percentage_points_max": 1.0,
+      "held_out_control_return_relative_drop_max": 0.02,
+      "reconstructed_trajectory_nrmse_vs_full_width_max": 0.01,
+      "hidden_full_width_recurrent_work_allowed": false,
+      "full_source_vector_moved_by_residual_every_step_allowed": false,
+      "invariants": [
+        "zero_non_finite_states",
+        "zero_deadline_violations_for_declared_hard_real_time_tasks"
+      ]
+    },
+    "end_to_end_system_win": {
+      "requires_task_quality_gate": true,
+      "requires_numerical_or_trajectory_gate_for_the_claimed_profile": true,
+      "throughput_speedup_minimum_alternative_gate": 2.0,
+      "measured_system_energy_reduction_fraction_minimum_alternative_gate": 0.30,
+      "p95_latency_regression_fraction_max": 0.05,
+      "p99_latency_regression_fraction_max": 0.05,
+      "measurement_boundary": [
+        "initialization_and_warmup_policy",
+        "host_device_transfer",
+        "projection_and_lift",
+        "allocation_and_temporary_buffers",
+        "input_and_output_processing",
+        "peripherals_when_part_of_deployment",
+        "steady_state_compute",
+        "energy_sensor_and_calibration_uncertainty"
+      ],
+      "memory_budget": "Declare a target-platform budget including resident state and peak temporaries."
+    }
+  },
+  "measurement_plan": {
+    "data_seeds_minimum": 5,
+    "warmup_invocations_minimum": 10,
+    "timed_invocations_per_measurement_block_minimum": 1000,
+    "independent_measurement_blocks_per_configuration_minimum": 30,
+    "report_latency_percentiles": ["p50", "p95", "p99"],
+    "report_confidence_intervals": "95% bootstrap interval over independent measurement blocks; document the resampling unit.",
+    "report_fields": [
+      "source_commit_and_dirty_state",
+      "toolchain_and_build_flags",
+      "hardware_os_power_mode_and_thermal_context",
+      "input_corpus_hash_and_seed",
+      "configuration_hash",
+      "task_quality_and_failure_count",
+      "trajectory_and_tau_gate_error",
+      "updates_per_second",
+      "p50_p95_p99_latency",
+      "resident_bytes_and_peak_temporary_bytes",
+      "allocations_and_bytes_moved",
+      "cache_bandwidth_counters_when_available",
+      "whole_system_energy_and_uncertainty_when_measurable"
+    ]
+  },
+  "non_negotiable_rules": [
+    "Operator correctness does not imply trajectory fidelity.",
+    "Trajectory fidelity does not imply held-out task quality.",
+    "A speedup in a kernel does not imply end-to-end system improvement.",
+    "Missing, duplicate, malformed, hash-mismatched or unpinned evidence fails closed.",
+    "No default promotion above 65536 dimensions follows from representability alone.",
+    "An unevaluated cell is unknown, not a pass and not a failure.",
+    "Approximate and analogue results remain separate from exact digital results."
+  ],
+  "targets_are_not_results": true,
+  "external_research": [
+    {
+      "source": "MLPerf Tiny v1.4 methodology",
+      "url": "https://mlcommons.org/2026/07/mlperf-tiny-v1-4-results/",
+      "use": "Measurement-boundary and fixed-task/quality discipline; not a Symthaea result."
+    },
+    {
+      "source": "Hyperdimensional in-memory computing with analogue memristive crossbar arrays",
+      "url": "https://www.nature.com/articles/s41467-026-76067-5",
+      "use": "Motivates a separate approximate/analogue evidence track; it is a different architecture and benchmark."
+    }
+  ]
+}
