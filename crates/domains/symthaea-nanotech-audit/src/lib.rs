@@ -1787,6 +1787,93 @@ mod tests {
             )
             .expect("write provenance manifest");
         }
+
+        fn write_shift_manifest(&self, inject_leakage: bool) {
+            let (source_sha256, _) =
+                hash_artifact(&self.0, "synthetic-source.json").expect("hash source snapshot");
+            let provenance_path = self.0.join(PROVENANCE_MANIFEST_NAME);
+            let mut provenance: Value = serde_json::from_str(
+                &fs::read_to_string(&provenance_path).expect("read provenance manifest"),
+            )
+            .expect("parse provenance manifest");
+            let task_contract_sha256 = provenance["task_contract_sha256"]
+                .as_str()
+                .expect("task-contract digest")
+                .to_owned();
+
+            let test_independence_key = if inject_leakage {
+                "material-family-A"
+            } else {
+                "material-family-C"
+            };
+            let shift = json!({
+                "schema_version": SHIFT_MANIFEST_SCHEMA_VERSION,
+                "benchmark_id": "synthetic-made",
+                "task_contract_sha256": task_contract_sha256,
+                "split_policy": "independence_key_group_holdout_v1",
+                "shift_groups": [
+                    {
+                        "group_id": "train-composition",
+                        "shift_family": "composition",
+                        "severity": "baseline",
+                        "split": "train",
+                        "physical_rationale": "Synthetic baseline chemistry family for verifier tests.",
+                        "severity_definition": "No shift; reference group used only to exercise schema logic.",
+                        "source_artifact_path": "synthetic-source.json",
+                        "source_artifact_sha256": source_sha256,
+                        "independence_keys": ["material-family-A"],
+                        "sample_ids": ["sample-train-001"]
+                    },
+                    {
+                        "group_id": "calibration-temperature",
+                        "shift_family": "temperature_energy",
+                        "severity": "moderate",
+                        "split": "calibration",
+                        "physical_rationale": "Synthetic thermal regime for verifier tests.",
+                        "severity_definition": "Synthetic moderate label; no physical claim is implied by fixture data.",
+                        "source_artifact_path": "synthetic-source.json",
+                        "source_artifact_sha256": source_sha256,
+                        "independence_keys": ["material-family-B"],
+                        "sample_ids": ["sample-calibration-001"]
+                    },
+                    {
+                        "group_id": "test-surface",
+                        "shift_family": "surface_coordination",
+                        "severity": "severe",
+                        "split": "test_lockbox",
+                        "physical_rationale": "Synthetic surface family for verifier tests.",
+                        "severity_definition": "Synthetic severe label; not derived from experimental evidence.",
+                        "source_artifact_path": "synthetic-source.json",
+                        "source_artifact_sha256": source_sha256,
+                        "independence_keys": [test_independence_key],
+                        "sample_ids": ["sample-test-001"]
+                    }
+                ]
+            });
+            fs::write(
+                self.0.join("shift-manifest.json"),
+                serde_json::to_vec_pretty(&shift).expect("serialize shift manifest"),
+            )
+            .expect("write shift manifest");
+            let (shift_sha256, shift_size_bytes) =
+                hash_artifact(&self.0, "shift-manifest.json").expect("hash shift manifest");
+
+            provenance["shift_manifest_path"] = json!("shift-manifest.json");
+            provenance["shift_manifest_sha256"] = json!(shift_sha256);
+            provenance["artifacts"]
+                .as_array_mut()
+                .expect("artifact array")
+                .push(json!({
+                    "path": "shift-manifest.json",
+                    "sha256": shift_sha256,
+                    "size_bytes": shift_size_bytes
+                }));
+            fs::write(
+                &provenance_path,
+                serde_json::to_vec_pretty(&provenance).expect("serialize amended provenance"),
+            )
+            .expect("bind shift manifest into provenance");
+        }
     }
 
     impl Drop for Fixture {
@@ -1852,6 +1939,70 @@ mod tests {
         let report = audit_run(&fixture.0);
         assert_eq!(report.status, "fail");
         assert!(report.findings.iter().any(|finding| finding.code == "no_episode_rows"));
+    }
+
+    #[test]
+    fn accepts_grouped_shift_manifest_with_separate_splits() {
+        let fixture = Fixture::new();
+        fixture.write_provenance_manifest();
+        fixture.write_shift_manifest(false);
+
+        let report = audit_run(&fixture.0);
+        assert_eq!(report.status, "artifact_integrity_pass", "{:?}", report.findings);
+        assert_eq!(report.provenance_manifest_status, "manifest_consistent");
+        assert!(report.checks_completed.contains(
+            &"shift_manifest_provenance_and_group_split_integrity".to_owned()
+        ));
+    }
+
+    #[test]
+    fn rejects_independence_key_leakage_across_train_and_test() {
+        let fixture = Fixture::new();
+        fixture.write_provenance_manifest();
+        fixture.write_shift_manifest(true);
+
+        let report = audit_run(&fixture.0);
+        assert_eq!(report.status, "fail");
+        assert_eq!(report.provenance_manifest_status, "manifest_invalid");
+        assert!(report
+            .findings
+            .iter()
+            .any(|finding| finding.code == "shift_manifest_independence_leakage"));
+    }
+
+    #[test]
+    fn rejects_sample_id_leakage_across_train_and_test() {
+        let fixture = Fixture::new();
+        fixture.write_provenance_manifest();
+        fixture.write_shift_manifest(false);
+
+        let shift_path = fixture.0.join("shift-manifest.json");
+        let mut shift: Value =
+            serde_json::from_str(&fs::read_to_string(&shift_path).expect("read shift")).unwrap();
+        shift["shift_groups"][2]["sample_ids"] = json!(["sample-train-001"]);
+        fs::write(&shift_path, serde_json::to_vec_pretty(&shift).unwrap()).unwrap();
+
+        let (shift_sha256, shift_size_bytes) =
+            hash_artifact(&fixture.0, "shift-manifest.json").expect("rehash shift manifest");
+        let provenance_path = fixture.0.join(PROVENANCE_MANIFEST_NAME);
+        let mut provenance: Value =
+            serde_json::from_str(&fs::read_to_string(&provenance_path).expect("read provenance"))
+                .unwrap();
+        provenance["shift_manifest_sha256"] = json!(shift_sha256);
+        for artifact in provenance["artifacts"].as_array_mut().unwrap() {
+            if artifact["path"] == "shift-manifest.json" {
+                artifact["sha256"] = json!(shift_sha256);
+                artifact["size_bytes"] = json!(shift_size_bytes);
+            }
+        }
+        fs::write(&provenance_path, serde_json::to_vec_pretty(&provenance).unwrap()).unwrap();
+
+        let report = audit_run(&fixture.0);
+        assert_eq!(report.status, "fail");
+        assert!(report
+            .findings
+            .iter()
+            .any(|finding| finding.code == "shift_manifest_sample_leakage"));
     }
 
     #[test]
