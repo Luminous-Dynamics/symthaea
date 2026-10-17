@@ -1,9 +1,9 @@
 # MARINE-MOD-006 — Bounded interaction-aware modular-interior search
 
 **Status:** research prototype / synthetic contract oracle  
-**Implementation:** \`modular_interior_combinations.rs\`  
-**Example:** \`cargo run -p symthaea-marine-bench --example modular_interior_combinations\`  
-**Frozen oracle:** \`fixtures/modular-interiors/combination-search-oracle-v1.json\`
+**Implementation:** `modular_interior_combinations.rs`  
+**Example:** `cargo run -p symthaea-marine-bench --example modular_interior_combinations`  
+**Frozen oracle:** `fixtures/modular-interiors/combination-search-oracle-v1.json`
 
 ## The paradigm shift
 
@@ -20,16 +20,16 @@ This is not an optimizer and does not yet move placements, route services, prove
 3. **Require each alternative to pass single-change interface preflight.** The existing drop-in generator is reused. A port/interface contract change is not silently adapted.
 4. **Revalidate every complete combination.** The full configuration validator and change-impact analyzer run on materialized combinations. A single-module receipt is never reused as the combined receipt.
 5. **Report emergent findings conservatively.** An interaction finding is a code/subject finding absent from the baseline and every constituent single-change validation. It is a diagnostic difference, not proof of causal mechanism. A missing interaction finding is not proof that no interaction exists.
-6. **Make truncation explicit.** If more combinations exist than the configured candidate budget, the report exposes \`search_complete=false\` and \`truncated_by_candidate_cap=true\`. The deterministic output prefix must never be described as exhaustive.
+6. **Make truncation explicit.** If more combinations exist than the configured candidate budget, the report exposes `search_complete=false`, `truncated_by_candidate_cap=true`, and `candidate_count_lower_bound=budget+1`. The report hashes the baseline validation receipt inside the report body. The deterministic output prefix must never be described as exhaustive.
 7. **Bind output to exact inputs.** The report digest includes the baseline validation receipt, input-variant manifest, limits, completeness flags, and every generated candidate result. The verifier reruns the search and compares digests; this is integrity/recomputation, not a digital signature or source-authenticity claim.
-8. **Keep safety non-compensatory.** Rejected and indeterminate designs stay distinguishable. There is no weighted safety score and no evidence carry-forward. A \`candidate_only\` validator disposition still does not mean safe, compliant, certified, seaworthy, or authorized to operate.
+8. **Keep safety non-compensatory.** Rejected and indeterminate designs stay distinguishable. There is no weighted safety score and no evidence carry-forward. A `candidate_only` validator disposition still does not mean safe, compliant, certified, seaworthy, or authorized to operate.
 
 ## Current synthetic oracle
 
 The frozen JSON oracle contains two controls:
 
 - Two distinct module targets yield two singleton candidates and one pair, in cardinality-first order.
-- A synthetic +2,000 W increase to the galley and workspace AC-input ratings is designed so that each single change remains below the fixture's assumed AC-bus capacity while the pair crosses it. The expected pair finding is \`SERVICE_CAPACITY_EXCEEDED|AC-BUS\`.
+- A synthetic +2,000 W increase to the galley and workspace AC-input ratings is designed so that each single change remains below the fixture's assumed AC-bus capacity while the pair crosses it. The expected pair finding is `SERVICE_CAPACITY_EXCEEDED|AC-BUS`.
 
 The electrical values and vessel fixture are synthetic assumptions; the test asserts software behavior, not physical truth. The Rust test is authored into the crate, but until it is executed by a Rust toolchain it is not an executed test result.
 
