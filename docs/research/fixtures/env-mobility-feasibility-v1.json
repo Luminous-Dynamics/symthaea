@@ -6,8 +6,8 @@
   "source_class": "fully_synthetic_no_external_measurements",
   "claim_ceiling": "Fixture semantics only. No flight, marine, environmental, cost, calibration, manufacturing, safety, or regulatory capability is established.",
   "oracle_rule_order": [
-    "Reject known prohibited site/data use, exceeded ecological or operating envelope, invalid coordinate reference, insufficient energy reserve, unavailable recovery, incompatible payload, known absent local failsafe during communications partition, an estimated value claimed as measured, sensor timeout coerced to zero, and hardware/configuration evidence mismatch.",
-    "Abstain for unknown site/operating/permission evidence, stale/missing/failed calibration, ambiguous coordinates, uncertain/insufficient energy evidence where not known to be insufficient, unknown recovery or compatibility, unknown local failsafe, unestablished offline policy, unknown data rights, invalid/stale source data, unknown configuration match, or unknown reference quality.",
+    "Reject known prohibited site/data use, exceeded ecological or operating envelope, invalid coordinate reference, insufficient energy reserve, unavailable recovery, incompatible payload, known absent local failsafe during communications partition, a falsely independent redundancy claim with shared common-mode dependency, hidden failed recovery/docking attempts, an estimated value claimed as measured, sensor timeout coerced to a valid zero, and hardware/configuration evidence mismatch.",
+    "Abstain for unknown site/operating/permission evidence, stale/missing/failed calibration, invalid or stale source data, ambiguous coordinates, uncertain/insufficient energy evidence where not known to be insufficient, unknown recovery history or recovery plan, unknown common-mode independence, unknown compatibility, unknown local failsafe, unestablished offline policy, unknown data rights, unknown configuration match, or unknown reference quality.",
     "Prefer a lower-complexity baseline only when its sufficiency is declared and all previous hard-feasibility/evidence gates are satisfied.",
     "Permit degraded planning under communications partition only when a tested local failsafe and valid offline/store-and-forward policy are declared.",
     "Otherwise admit only to the next declared review stage, never directly to physical execution."
@@ -45,7 +45,9 @@
         "source_status": "valid",
         "configuration_match": "exact",
         "reference_quality": "adequate",
-        "baseline": "robot_needed"
+        "baseline": "robot_needed",
+        "common_mode_assumption": "not_claimed",
+        "recovery_history": "clean"
       },
       "expected_disposition": "admit",
       "expected_reason_codes": [
@@ -75,7 +77,9 @@
         "source_status": "valid",
         "configuration_match": "exact",
         "reference_quality": "adequate",
-        "baseline": "fixed_sensor_sufficient"
+        "baseline": "fixed_sensor_sufficient",
+        "common_mode_assumption": "not_claimed",
+        "recovery_history": "clean"
       },
       "expected_disposition": "prefer_baseline",
       "expected_reason_codes": [
@@ -105,7 +109,9 @@
         "source_status": "valid",
         "configuration_match": "exact",
         "reference_quality": "adequate",
-        "baseline": "robot_needed"
+        "baseline": "robot_needed",
+        "common_mode_assumption": "not_claimed",
+        "recovery_history": "clean"
       },
       "expected_disposition": "reject",
       "expected_reason_codes": [
@@ -135,7 +141,9 @@
         "source_status": "valid",
         "configuration_match": "exact",
         "reference_quality": "adequate",
-        "baseline": "robot_needed"
+        "baseline": "robot_needed",
+        "common_mode_assumption": "not_claimed",
+        "recovery_history": "clean"
       },
       "expected_disposition": "abstain",
       "expected_reason_codes": [
@@ -165,7 +173,9 @@
         "source_status": "valid",
         "configuration_match": "exact",
         "reference_quality": "adequate",
-        "baseline": "robot_needed"
+        "baseline": "robot_needed",
+        "common_mode_assumption": "not_claimed",
+        "recovery_history": "clean"
       },
       "expected_disposition": "reject",
       "expected_reason_codes": [
@@ -195,7 +205,9 @@
         "source_status": "valid",
         "configuration_match": "exact",
         "reference_quality": "adequate",
-        "baseline": "robot_needed"
+        "baseline": "robot_needed",
+        "common_mode_assumption": "not_claimed",
+        "recovery_history": "clean"
       },
       "expected_disposition": "reject",
       "expected_reason_codes": [
@@ -225,7 +237,9 @@
         "source_status": "valid",
         "configuration_match": "exact",
         "reference_quality": "adequate",
-        "baseline": "robot_needed"
+        "baseline": "robot_needed",
+        "common_mode_assumption": "not_claimed",
+        "recovery_history": "clean"
       },
       "expected_disposition": "abstain",
       "expected_reason_codes": [
@@ -236,7 +250,7 @@
       "case_id": "ENV-MOBILITY-WS-08",
       "mission_family": "watershed_lake",
       "platform_family": "usv",
-      "scenario": "network_partition_local_failsafe_valid",
+      "scenario": "redundancy_claimed_independent_but_shares_power",
       "facts": {
         "site_authority": "permitted",
         "ecological_constraint": "within_limit",
@@ -255,18 +269,20 @@
         "source_status": "valid",
         "configuration_match": "exact",
         "reference_quality": "adequate",
-        "baseline": "robot_needed"
+        "baseline": "robot_needed",
+        "common_mode_assumption": "shared_but_claimed_independent",
+        "recovery_history": "clean"
       },
-      "expected_disposition": "admit_degraded",
+      "expected_disposition": "reject",
       "expected_reason_codes": [
-        "STORE_AND_FORWARD_WITH_LOCAL_FAILSAFE"
+        "COMMON_MODE_REDUNDANCY_LAUNDERED"
       ]
     },
     {
       "case_id": "ENV-MOBILITY-CE-01",
       "mission_family": "coast_estuary",
       "platform_family": "auv",
-      "scenario": "nominal_subsurface_sample",
+      "scenario": "subsurface_dock_retries_hidden_from_service_record",
       "facts": {
         "site_authority": "permitted",
         "ecological_constraint": "within_limit",
@@ -285,11 +301,13 @@
         "source_status": "valid",
         "configuration_match": "exact",
         "reference_quality": "adequate",
-        "baseline": "robot_needed"
+        "baseline": "robot_needed",
+        "common_mode_assumption": "not_claimed",
+        "recovery_history": "failed_attempts_hidden"
       },
-      "expected_disposition": "admit",
+      "expected_disposition": "reject",
       "expected_reason_codes": [
-        "ALL_DECLARED_SYNTHETIC_GATES_SATISFIED"
+        "FAILED_RECOVERY_ATTEMPTS_HIDDEN"
       ]
     },
     {
@@ -315,7 +333,9 @@
         "source_status": "valid",
         "configuration_match": "exact",
         "reference_quality": "adequate",
-        "baseline": "fixed_sensor_sufficient"
+        "baseline": "fixed_sensor_sufficient",
+        "common_mode_assumption": "not_claimed",
+        "recovery_history": "clean"
       },
       "expected_disposition": "prefer_baseline",
       "expected_reason_codes": [
@@ -345,7 +365,9 @@
         "source_status": "valid",
         "configuration_match": "exact",
         "reference_quality": "adequate",
-        "baseline": "robot_needed"
+        "baseline": "robot_needed",
+        "common_mode_assumption": "not_claimed",
+        "recovery_history": "clean"
       },
       "expected_disposition": "reject",
       "expected_reason_codes": [
@@ -356,12 +378,12 @@
       "case_id": "ENV-MOBILITY-CE-04",
       "mission_family": "coast_estuary",
       "platform_family": "auv",
-      "scenario": "optical_payload_calibration_missing",
+      "scenario": "stale_water_column_record_presented_as_current",
       "facts": {
         "site_authority": "permitted",
         "ecological_constraint": "within_limit",
         "environment_envelope": "within",
-        "sensor_calibration": "missing",
+        "sensor_calibration": "current",
         "coordinate_reference": "known",
         "energy_reserve": "sufficient",
         "recovery_plan": "viable",
@@ -372,14 +394,16 @@
         "data_rights": "permitted",
         "observation_source": "measured",
         "requested_claim": "measured",
-        "source_status": "valid",
+        "source_status": "stale",
         "configuration_match": "exact",
         "reference_quality": "adequate",
-        "baseline": "robot_needed"
+        "baseline": "robot_needed",
+        "common_mode_assumption": "not_claimed",
+        "recovery_history": "clean"
       },
       "expected_disposition": "abstain",
       "expected_reason_codes": [
-        "CALIBRATION_NOT_CURRENT"
+        "SOURCE_DATA_INVALID_OR_STALE"
       ]
     },
     {
@@ -405,7 +429,9 @@
         "source_status": "valid",
         "configuration_match": "exact",
         "reference_quality": "adequate",
-        "baseline": "robot_needed"
+        "baseline": "robot_needed",
+        "common_mode_assumption": "not_claimed",
+        "recovery_history": "clean"
       },
       "expected_disposition": "reject",
       "expected_reason_codes": [
@@ -435,7 +461,9 @@
         "source_status": "valid",
         "configuration_match": "exact",
         "reference_quality": "adequate",
-        "baseline": "robot_needed"
+        "baseline": "robot_needed",
+        "common_mode_assumption": "not_claimed",
+        "recovery_history": "clean"
       },
       "expected_disposition": "reject",
       "expected_reason_codes": [
@@ -465,7 +493,9 @@
         "source_status": "valid",
         "configuration_match": "exact",
         "reference_quality": "adequate",
-        "baseline": "robot_needed"
+        "baseline": "robot_needed",
+        "common_mode_assumption": "not_claimed",
+        "recovery_history": "clean"
       },
       "expected_disposition": "reject",
       "expected_reason_codes": [
@@ -495,7 +525,9 @@
         "source_status": "valid",
         "configuration_match": "exact",
         "reference_quality": "adequate",
-        "baseline": "robot_needed"
+        "baseline": "robot_needed",
+        "common_mode_assumption": "not_claimed",
+        "recovery_history": "clean"
       },
       "expected_disposition": "abstain",
       "expected_reason_codes": [
@@ -525,7 +557,9 @@
         "source_status": "valid",
         "configuration_match": "exact",
         "reference_quality": "adequate",
-        "baseline": "robot_needed"
+        "baseline": "robot_needed",
+        "common_mode_assumption": "not_claimed",
+        "recovery_history": "clean"
       },
       "expected_disposition": "admit",
       "expected_reason_codes": [
@@ -555,7 +589,9 @@
         "source_status": "valid",
         "configuration_match": "exact",
         "reference_quality": "adequate",
-        "baseline": "fixed_sensor_sufficient"
+        "baseline": "fixed_sensor_sufficient",
+        "common_mode_assumption": "not_claimed",
+        "recovery_history": "clean"
       },
       "expected_disposition": "prefer_baseline",
       "expected_reason_codes": [
@@ -585,7 +621,9 @@
         "source_status": "valid",
         "configuration_match": "exact",
         "reference_quality": "adequate",
-        "baseline": "robot_needed"
+        "baseline": "robot_needed",
+        "common_mode_assumption": "not_claimed",
+        "recovery_history": "clean"
       },
       "expected_disposition": "abstain",
       "expected_reason_codes": [
@@ -615,7 +653,9 @@
         "source_status": "valid",
         "configuration_match": "exact",
         "reference_quality": "adequate",
-        "baseline": "robot_needed"
+        "baseline": "robot_needed",
+        "common_mode_assumption": "not_claimed",
+        "recovery_history": "clean"
       },
       "expected_disposition": "abstain",
       "expected_reason_codes": [
@@ -645,7 +685,9 @@
         "source_status": "valid",
         "configuration_match": "exact",
         "reference_quality": "adequate",
-        "baseline": "robot_needed"
+        "baseline": "robot_needed",
+        "common_mode_assumption": "not_claimed",
+        "recovery_history": "clean"
       },
       "expected_disposition": "reject",
       "expected_reason_codes": [
@@ -675,7 +717,9 @@
         "source_status": "valid",
         "configuration_match": "exact",
         "reference_quality": "adequate",
-        "baseline": "robot_needed"
+        "baseline": "robot_needed",
+        "common_mode_assumption": "not_claimed",
+        "recovery_history": "clean"
       },
       "expected_disposition": "reject",
       "expected_reason_codes": [
@@ -705,7 +749,9 @@
         "source_status": "timeout_as_zero",
         "configuration_match": "exact",
         "reference_quality": "adequate",
-        "baseline": "robot_needed"
+        "baseline": "robot_needed",
+        "common_mode_assumption": "not_claimed",
+        "recovery_history": "clean"
       },
       "expected_disposition": "reject",
       "expected_reason_codes": [
@@ -735,7 +781,9 @@
         "source_status": "valid",
         "configuration_match": "exact",
         "reference_quality": "adequate",
-        "baseline": "robot_needed"
+        "baseline": "robot_needed",
+        "common_mode_assumption": "not_claimed",
+        "recovery_history": "clean"
       },
       "expected_disposition": "admit_degraded",
       "expected_reason_codes": [
@@ -765,7 +813,9 @@
         "source_status": "valid",
         "configuration_match": "exact",
         "reference_quality": "adequate",
-        "baseline": "robot_needed"
+        "baseline": "robot_needed",
+        "common_mode_assumption": "not_claimed",
+        "recovery_history": "clean"
       },
       "expected_disposition": "admit",
       "expected_reason_codes": [
@@ -795,7 +845,9 @@
         "source_status": "valid",
         "configuration_match": "exact",
         "reference_quality": "adequate",
-        "baseline": "fixed_sensor_sufficient"
+        "baseline": "fixed_sensor_sufficient",
+        "common_mode_assumption": "not_claimed",
+        "recovery_history": "clean"
       },
       "expected_disposition": "prefer_baseline",
       "expected_reason_codes": [
@@ -825,7 +877,9 @@
         "source_status": "valid",
         "configuration_match": "exact",
         "reference_quality": "adequate",
-        "baseline": "robot_needed"
+        "baseline": "robot_needed",
+        "common_mode_assumption": "not_claimed",
+        "recovery_history": "clean"
       },
       "expected_disposition": "reject",
       "expected_reason_codes": [
@@ -855,7 +909,9 @@
         "source_status": "valid",
         "configuration_match": "exact",
         "reference_quality": "adequate",
-        "baseline": "robot_needed"
+        "baseline": "robot_needed",
+        "common_mode_assumption": "not_claimed",
+        "recovery_history": "clean"
       },
       "expected_disposition": "abstain",
       "expected_reason_codes": [
@@ -885,7 +941,9 @@
         "source_status": "valid",
         "configuration_match": "exact",
         "reference_quality": "adequate",
-        "baseline": "robot_needed"
+        "baseline": "robot_needed",
+        "common_mode_assumption": "not_claimed",
+        "recovery_history": "clean"
       },
       "expected_disposition": "reject",
       "expected_reason_codes": [
@@ -915,7 +973,9 @@
         "source_status": "valid",
         "configuration_match": "exact",
         "reference_quality": "adequate",
-        "baseline": "robot_needed"
+        "baseline": "robot_needed",
+        "common_mode_assumption": "not_claimed",
+        "recovery_history": "clean"
       },
       "expected_disposition": "reject",
       "expected_reason_codes": [
@@ -945,7 +1005,9 @@
         "source_status": "valid",
         "configuration_match": "mismatch",
         "reference_quality": "adequate",
-        "baseline": "robot_needed"
+        "baseline": "robot_needed",
+        "common_mode_assumption": "not_claimed",
+        "recovery_history": "clean"
       },
       "expected_disposition": "reject",
       "expected_reason_codes": [
@@ -975,7 +1037,9 @@
         "source_status": "valid",
         "configuration_match": "exact",
         "reference_quality": "adequate",
-        "baseline": "robot_needed"
+        "baseline": "robot_needed",
+        "common_mode_assumption": "not_claimed",
+        "recovery_history": "clean"
       },
       "expected_disposition": "admit_degraded",
       "expected_reason_codes": [
@@ -1005,7 +1069,9 @@
         "source_status": "valid",
         "configuration_match": "exact",
         "reference_quality": "adequate",
-        "baseline": "robot_needed"
+        "baseline": "robot_needed",
+        "common_mode_assumption": "not_claimed",
+        "recovery_history": "clean"
       },
       "expected_disposition": "admit",
       "expected_reason_codes": [
@@ -1035,7 +1101,9 @@
         "source_status": "valid",
         "configuration_match": "exact",
         "reference_quality": "adequate",
-        "baseline": "fixed_sensor_sufficient"
+        "baseline": "fixed_sensor_sufficient",
+        "common_mode_assumption": "not_claimed",
+        "recovery_history": "clean"
       },
       "expected_disposition": "prefer_baseline",
       "expected_reason_codes": [
@@ -1065,7 +1133,9 @@
         "source_status": "valid",
         "configuration_match": "exact",
         "reference_quality": "adequate",
-        "baseline": "robot_needed"
+        "baseline": "robot_needed",
+        "common_mode_assumption": "not_claimed",
+        "recovery_history": "clean"
       },
       "expected_disposition": "reject",
       "expected_reason_codes": [
@@ -1095,7 +1165,9 @@
         "source_status": "valid",
         "configuration_match": "exact",
         "reference_quality": "adequate",
-        "baseline": "robot_needed"
+        "baseline": "robot_needed",
+        "common_mode_assumption": "not_claimed",
+        "recovery_history": "clean"
       },
       "expected_disposition": "abstain",
       "expected_reason_codes": [
@@ -1125,7 +1197,9 @@
         "source_status": "valid",
         "configuration_match": "exact",
         "reference_quality": "adequate",
-        "baseline": "robot_needed"
+        "baseline": "robot_needed",
+        "common_mode_assumption": "not_claimed",
+        "recovery_history": "clean"
       },
       "expected_disposition": "reject",
       "expected_reason_codes": [
@@ -1155,7 +1229,9 @@
         "source_status": "valid",
         "configuration_match": "exact",
         "reference_quality": "adequate",
-        "baseline": "robot_needed"
+        "baseline": "robot_needed",
+        "common_mode_assumption": "not_claimed",
+        "recovery_history": "clean"
       },
       "expected_disposition": "abstain",
       "expected_reason_codes": [
@@ -1185,7 +1261,9 @@
         "source_status": "valid",
         "configuration_match": "exact",
         "reference_quality": "adequate",
-        "baseline": "robot_needed"
+        "baseline": "robot_needed",
+        "common_mode_assumption": "not_claimed",
+        "recovery_history": "clean"
       },
       "expected_disposition": "reject",
       "expected_reason_codes": [
@@ -1215,7 +1293,9 @@
         "source_status": "valid",
         "configuration_match": "exact",
         "reference_quality": "adequate",
-        "baseline": "robot_needed"
+        "baseline": "robot_needed",
+        "common_mode_assumption": "not_claimed",
+        "recovery_history": "clean"
       },
       "expected_disposition": "abstain",
       "expected_reason_codes": [
@@ -1245,7 +1325,9 @@
         "source_status": "valid",
         "configuration_match": "exact",
         "reference_quality": "adequate",
-        "baseline": "robot_needed"
+        "baseline": "robot_needed",
+        "common_mode_assumption": "not_claimed",
+        "recovery_history": "clean"
       },
       "expected_disposition": "admit",
       "expected_reason_codes": [
@@ -1275,7 +1357,9 @@
         "source_status": "valid",
         "configuration_match": "exact",
         "reference_quality": "adequate",
-        "baseline": "fixed_sensor_sufficient"
+        "baseline": "fixed_sensor_sufficient",
+        "common_mode_assumption": "not_claimed",
+        "recovery_history": "clean"
       },
       "expected_disposition": "prefer_baseline",
       "expected_reason_codes": [
@@ -1305,7 +1389,9 @@
         "source_status": "valid",
         "configuration_match": "exact",
         "reference_quality": "adequate",
-        "baseline": "robot_needed"
+        "baseline": "robot_needed",
+        "common_mode_assumption": "not_claimed",
+        "recovery_history": "clean"
       },
       "expected_disposition": "reject",
       "expected_reason_codes": [
@@ -1335,7 +1421,9 @@
         "source_status": "valid",
         "configuration_match": "exact",
         "reference_quality": "adequate",
-        "baseline": "robot_needed"
+        "baseline": "robot_needed",
+        "common_mode_assumption": "not_claimed",
+        "recovery_history": "clean"
       },
       "expected_disposition": "abstain",
       "expected_reason_codes": [
@@ -1365,7 +1453,9 @@
         "source_status": "valid",
         "configuration_match": "exact",
         "reference_quality": "adequate",
-        "baseline": "robot_needed"
+        "baseline": "robot_needed",
+        "common_mode_assumption": "not_claimed",
+        "recovery_history": "clean"
       },
       "expected_disposition": "reject",
       "expected_reason_codes": [
@@ -1395,7 +1485,9 @@
         "source_status": "valid",
         "configuration_match": "exact",
         "reference_quality": "adequate",
-        "baseline": "robot_needed"
+        "baseline": "robot_needed",
+        "common_mode_assumption": "not_claimed",
+        "recovery_history": "clean"
       },
       "expected_disposition": "reject",
       "expected_reason_codes": [
@@ -1425,7 +1517,9 @@
         "source_status": "valid",
         "configuration_match": "exact",
         "reference_quality": "adequate",
-        "baseline": "robot_needed"
+        "baseline": "robot_needed",
+        "common_mode_assumption": "not_claimed",
+        "recovery_history": "clean"
       },
       "expected_disposition": "reject",
       "expected_reason_codes": [
@@ -1455,7 +1549,9 @@
         "source_status": "valid",
         "configuration_match": "exact",
         "reference_quality": "adequate",
-        "baseline": "robot_needed"
+        "baseline": "robot_needed",
+        "common_mode_assumption": "not_claimed",
+        "recovery_history": "clean"
       },
       "expected_disposition": "reject",
       "expected_reason_codes": [
