@@ -6,6 +6,8 @@
 //! irrigation, procurement, or live inventory. A result is a candidate-screening
 //! artifact, not permission to operate machinery or proof of agronomic benefit.
 
+pub mod design_package;
+
 use std::collections::{BTreeMap, BTreeSet};
 
 pub const CONTRACT_VERSION: &str = "AGRI-ROBOTICS-BENCH-V1";
