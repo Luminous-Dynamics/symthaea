@@ -40,8 +40,8 @@
       "format": "uri"
     },
     "case_count": {
-      "type": "integer",
-      "minimum": 24
+      "const": 32,
+      "description": "Frozen corpus size for v0.1. Increment schema_version when changing it."
     },
     "minimum_case_count": {
       "const": 24
@@ -87,7 +87,7 @@
     },
     "cases": {
       "type": "array",
-      "minItems": 24,
+      "minItems": 32,
       "items": {
         "type": "object",
         "additionalProperties": false,
@@ -134,8 +134,12 @@
             "minItems": 1,
             "uniqueItems": true,
             "items": {
-              "type": "string",
-              "pattern": "^[a-z0-9-]+$"
+              "enum": [
+                "srgb",
+                "bt2100",
+                "displayhdr",
+                "clearmr"
+              ]
             }
           },
           "stimulus": {
@@ -171,8 +175,87 @@
           "status": {
             "const": "UNQUALIFIED"
           }
-        }
-      }
+        },
+        "allOf": [
+          {
+            "if": {
+              "properties": {
+                "lane": {
+                  "const": "software_math"
+                }
+              },
+              "required": [
+                "lane"
+              ]
+            },
+            "then": {
+              "properties": {
+                "minimum_evidence_class": {
+                  "const": "ANALYTIC_REFERENCE"
+                }
+              }
+            }
+          },
+          {
+            "if": {
+              "properties": {
+                "lane": {
+                  "const": "software_synthetic"
+                }
+              },
+              "required": [
+                "lane"
+              ]
+            },
+            "then": {
+              "properties": {
+                "minimum_evidence_class": {
+                  "const": "SYNTHETIC_MODEL"
+                }
+              }
+            }
+          },
+          {
+            "if": {
+              "properties": {
+                "lane": {
+                  "const": "physical_measurement"
+                }
+              },
+              "required": [
+                "lane"
+              ]
+            },
+            "then": {
+              "properties": {
+                "minimum_evidence_class": {
+                  "const": "BENCH_MEASURED"
+                }
+              }
+            }
+          },
+          {
+            "if": {
+              "properties": {
+                "lane": {
+                  "const": "human_task_study"
+                }
+              },
+              "required": [
+                "lane"
+              ]
+            },
+            "then": {
+              "properties": {
+                "minimum_evidence_class": {
+                  "const": "HUMAN_STUDY"
+                }
+              }
+            }
+          }
+        ]
+      },
+      "maxItems": 32
     }
   }
 }
