@@ -126,8 +126,8 @@ pub struct QualificationReport {
     feasibility: CorpusSummary,
     repairability: CorpusSummary,
     total_cases: usize,
-    total_mismatches: usize,
-    protected_gate_false_accepts: usize,
+    pub total_mismatches: usize,
+    pub protected_gate_false_accepts: usize,
     cases: Vec<CaseResult>,
 }
 
@@ -197,7 +197,7 @@ fn add_count(map: &mut BTreeMap<String, usize>, value: &str) {
 
 fn require_disposition(value: &str, allowed: &[String], context: &str) -> Result<()> {
     ensure!(
-        allowed.iter().any(|item| item == value),
+        allowed.iter().any(|item| item.as_str() == value),
         "{context}: disposition {value:?} is absent from the corpus vocabulary"
     );
     Ok(())
