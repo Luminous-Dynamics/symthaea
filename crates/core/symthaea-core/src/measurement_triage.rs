@@ -12,7 +12,7 @@ use serde::{Deserialize, Serialize};
 use std::collections::HashSet;
 
 use crate::architecture_robustness::{
-    ArchitectureRobustnessReportV1, MetricIntervalV1,
+    ArchitectureRobustnessReportV1, MetricIntervalV1, RobustCandidateAssessmentV1,
     ARCHITECTURE_ROBUSTNESS_SCHEMA_VERSION_V1, ROBUST_COMPARISON_EPSILON_V1,
 };
 use crate::architecture_pareto::{
