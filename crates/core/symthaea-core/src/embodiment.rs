@@ -429,6 +429,18 @@ pub enum PlantStepTimeSourceV1 {
     MeasuredDeviceClock,
 }
 
+/// Declares which component is authorized to establish a plant-step duration.
+///
+/// The default trait authority is Unspecified and fails closed. A simulator must
+/// opt into configured model time; a hardware bridge must opt into bridge-owned
+/// timing and return validated timing evidence for each accepted physical step.
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, Deserialize)]
+pub enum PlantStepAuthorityV1 {
+    Unspecified,
+    ConfiguredSimulation,
+    BackendMeasuredClockRequired,
+}
+
 /// Timing evidence for one requested plant transition.
 ///
 /// A configured simulation step describes model-time advancement, not wall-clock
@@ -461,6 +473,16 @@ pub enum PlantStepTimingErrorV1 {
     InconsistentDuration,
     /// A legacy step adapter cannot consume measured-clock provenance safely.
     MeasuredTimingRequiresExplicitBridge,
+    /// A bridge has not declared who is authorized to establish plant time.
+    TimingAuthorityUnspecified,
+    /// The bridge requires its own physical/device clock, not configured simulation dt.
+    ConfiguredSimulationStepNotAuthorized,
+    /// The bridge claims backend-owned timing but has not implemented that step method.
+    BackendMeasuredTimingUnsupported,
+    /// The backend timing evidence belongs to a different requested step.
+    TimingStepIndexMismatch,
+    /// A backend claiming measured time returned a configured simulation record.
+    ConfiguredTimeReturnedForBackendMeasurement,
 }
 
 impl PlantStepTimingV1 {
@@ -596,6 +618,13 @@ impl PlantStepTimingV1 {
     }
 }
 
+/// Result of a backend-owned plant step plus the timing evidence for that step.
+#[derive(Debug, Clone)]
+pub struct BackendTimedEmbodimentStepV1 {
+    pub result: EmbodimentResult,
+    pub timing: PlantStepTimingV1,
+}
+
 // ── Embodiment Bridge Trait ────────────────────────────────────────────────
 
 /// Platform-agnostic embodiment bridge trait.
@@ -611,12 +640,21 @@ pub trait EmbodimentBridge: Send + Sync {
     /// phi is the current consciousness level for safety gating.
     fn step(&mut self, thought_hv: &ContinuousHV, dt: f32, phi: f64) -> EmbodimentResult;
 
-    /// Step using an explicit timing record.
+    /// Declare the source that owns the authority to establish plant/model time.
     ///
-    /// The compatibility adapter forwards configured simulation steps to legacy
-    /// bridges using their dt-only method. Measured-clock records are rejected:
-    /// a legacy method cannot consume or preserve their clock provenance. A hardware
-    /// bridge must override this method and explicitly validate its timing contract.
+    /// Existing bridge implementations default to Unspecified, not simulation time.
+    /// Every bridge must opt into configured simulator time or implement its own
+    /// measured-clock stepping path before the cognitive loop will step it.
+    fn plant_step_authority(&self) -> PlantStepAuthorityV1 {
+        PlantStepAuthorityV1::Unspecified
+    }
+
+    /// Compatibility API for configured simulation steps.
+    ///
+    /// It forwards to dt-only legacy implementations only when the bridge explicitly
+    /// declares ConfiguredSimulation. Measured-clock records and undeclared authority
+    /// fail closed; hardware bridges must override this method or use
+    /// step_with_backend_timing to preserve their clock provenance.
     fn step_with_timing(
         &mut self,
         thought_hv: &ContinuousHV,
@@ -624,12 +662,34 @@ pub trait EmbodimentBridge: Send + Sync {
         phi: f64,
     ) -> Result<EmbodimentResult, PlantStepTimingErrorV1> {
         timing.validate()?;
-        if timing.source != PlantStepTimeSourceV1::ConfiguredSimulationStep {
-            // Legacy step(dt) has no way to preserve or interpret the measured clock
-            // evidence. Measured timing must be consumed by an explicit bridge override.
-            return Err(PlantStepTimingErrorV1::MeasuredTimingRequiresExplicitBridge);
+        match self.plant_step_authority() {
+            PlantStepAuthorityV1::Unspecified => {
+                Err(PlantStepTimingErrorV1::TimingAuthorityUnspecified)
+            }
+            PlantStepAuthorityV1::BackendMeasuredClockRequired => {
+                Err(PlantStepTimingErrorV1::ConfiguredSimulationStepNotAuthorized)
+            }
+            PlantStepAuthorityV1::ConfiguredSimulation => {
+                if timing.source != PlantStepTimeSourceV1::ConfiguredSimulationStep {
+                    return Err(PlantStepTimingErrorV1::MeasuredTimingRequiresExplicitBridge);
+                }
+                Ok(self.step(thought_hv, timing.dt_seconds, phi))
+            }
         }
-        Ok(self.step(thought_hv, timing.dt_seconds, phi))
+    }
+
+    /// Let a hardware/backend-owned bridge perform a step and return the clock evidence
+    /// it actually used. The default is unsupported and fails closed.
+    ///
+    /// Implementations must return a measured monotonic/device record with the same
+    /// step index. Configured simulation time is not accepted through this path.
+    fn step_with_backend_timing(
+        &mut self,
+        _thought_hv: &ContinuousHV,
+        _step_index: u64,
+        _phi: f64,
+    ) -> Result<BackendTimedEmbodimentStepV1, PlantStepTimingErrorV1> {
+        Err(PlantStepTimingErrorV1::BackendMeasuredTimingUnsupported)
     }
 
     /// Apply active inference motor reflexes (Channel 1/3) based on prediction error.
