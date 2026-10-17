@@ -384,14 +384,13 @@ fn evaluate_fit_check(input: &WearabilityInputV1) -> WearabilityDispositionV1 {
     if input.fit_evidence == Some(FitEvidenceV1::Stale) {
         return WearabilityDispositionV1::FitRecheckRequired;
     }
-    if fit_or_interface_unknown(input) {
-        return WearabilityDispositionV1::InterfaceStateUnknown;
-    }
     if input.profile_match != Some(ProfileMatchV1::Verified)
         || input.fastening_evidence != Some(FasteningEvidenceV1::Verified)
-        || input.fit_evidence != Some(FitEvidenceV1::Current)
     {
         return WearabilityDispositionV1::StartNotAdmitted;
+    }
+    if input.fit_evidence != Some(FitEvidenceV1::Current) || fit_or_interface_unknown(input) {
+        return WearabilityDispositionV1::InterfaceStateUnknown;
     }
     WearabilityDispositionV1::ReadyForSimulation
 }
@@ -412,7 +411,7 @@ fn evaluate_start(input: &WearabilityInputV1) -> WearabilityDispositionV1 {
     if input.fit_evidence == Some(FitEvidenceV1::Stale) {
         return WearabilityDispositionV1::FitRecheckRequired;
     }
-    if fit_or_interface_unknown(input) {
+    if input.fit_evidence != Some(FitEvidenceV1::Current) || fit_or_interface_unknown(input) {
         return WearabilityDispositionV1::InterfaceStateUnknown;
     }
     WearabilityDispositionV1::ReadyForSimulation
@@ -469,7 +468,7 @@ fn evaluate_perform(input: &WearabilityInputV1) -> WearabilityDispositionV1 {
     if input.fit_evidence == Some(FitEvidenceV1::Stale) {
         return WearabilityDispositionV1::FitRecheckRequired;
     }
-    if fit_or_interface_unknown(input) {
+    if input.fit_evidence != Some(FitEvidenceV1::Current) || fit_or_interface_unknown(input) {
         return WearabilityDispositionV1::InterfaceStateUnknown;
     }
     if input.interface_migration_sensor == Some(SignalEvidenceV1::Conflicted) {
