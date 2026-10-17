@@ -10,8 +10,9 @@ SenseBench is a deterministic, hardware-free starter harness for the Symthaea Se
     SENSEBENCH_CODE_REVISION="$(git rev-parse HEAD)" \
       cargo run -p symthaea-sensebench -- --suite anomaly --scenario null --seed 2026 --samples 4096
     SENSEBENCH_CODE_REVISION="$(git rev-parse HEAD)" \
-      SENSEBENCH_CODE_REVISION="$(git rev-parse HEAD)" \
       cargo run -p symthaea-sensebench -- --suite causal --trials 512 --budget 8 --seed 42
+    SENSEBENCH_CODE_REVISION="$(git rev-parse HEAD)" \
+      cargo run -p symthaea-sensebench -- --suite robustness
 
 The CLI requires `SENSEBENCH_CODE_REVISION` and emits a JSON report carrying the suite, generator version, exact revision string, full scenario manifest or causal-run configuration, seed, sample count/trials, and model-specific metrics. Run from a clean worktree so the Git commit identifies the exact code. `--allow-unversioned` permits exploratory output with a missing revision and must not be used for benchmark claims. Identical generator version, scenario, seed, sample count and interval produce identical observations. The report includes point metrics, average precision, event recall, missing sample count, contiguous false-alarm episodes per sensor-hour, and detection delay. Point-level false-positive sample counts remain available separately.
 
@@ -26,6 +27,17 @@ The synthetic evaluator compares three strategies on balanced (even-count) trial
 JSON output reports mean posterior probability assigned to the true hypothesis and a 95% normal-approximation interval across trials, multiclass Brier score and interval, top-hypothesis accuracy with a Wilson interval, threshold-reaching fraction with a Wilson interval, experiment count among successful threshold-reaching trials, and informative experiments used. Intervals quantify Monte Carlo variation conditional on this fixed synthetic model; they do not cover model misspecification or real-world generalization.
 
 This is intentionally a toy model with correctly specified likelihoods. It demonstrates the expected direction of results in a controlled environment; it does not show real-world causal-discovery capability, robust performance under model misspecification, or general superiority over a strong fixed experimental design. The next issue adds blinded causal graph families, model-misspecification conditions, uncertainty intervals across seeds, and stronger baselines.
+
+## Model-misspecification regret fixture
+
+Run:
+
+    SENSEBENCH_CODE_REVISION="$(git rev-parse HEAD)" \
+      cargo run -p symthaea-sensebench -- --suite robustness
+
+This deterministic fixture compares nominal single-model expected gain, model-weighted expected gain, worst-case robust ranking, one fixed comparator, and the exact expected score of uniform random selection. Selector policies receive only two declared likelihood-model scenarios; a separate evaluator scores their choices against two corresponding toy worlds and one held-out likelihood world. Reports include the oracle candidate, realized synthetic information gain per cost, regret, mean/worst-case regret, and maximum-regret reduction relative to the nominal selector.
+
+The fixture intentionally includes a strong fixed-design control. In this small constructed example, the fixed comparator matches the robust policy's worst-case regret; this is not evidence that active selection beats a good fixed design. The held-out world is separated in code, not in a cryptographic sandbox. All probabilities are hand-authored, synthetic mathematical inputs, not empirically calibrated instrument likelihoods. This suite tests that the evaluator can expose model brittleness and compare decision regret; it does not establish generalization to real experiments.
 
 ## Domain-specific hypothesis fixture
 
