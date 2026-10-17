@@ -25,7 +25,8 @@
     "generator_version": {
       "enum": [
         "cyber-hunt-fixture-generator/0.1.0",
-        "cyber-hunt-fixture-generator/0.2.0"
+        "cyber-hunt-fixture-generator/0.2.0",
+        "cyber-hunt-fixture-generator/0.3.0"
       ]
     },
     "generator_source_commit": {
@@ -48,7 +49,8 @@
     "scenario_id": {
       "enum": [
         "synthetic-identity-to-egress-v1",
-        "synthetic-artifact-lifecycle-v1"
+        "synthetic-artifact-lifecycle-v1",
+        "synthetic-cloud-data-movement-v1"
       ]
     },
     "seed": {
