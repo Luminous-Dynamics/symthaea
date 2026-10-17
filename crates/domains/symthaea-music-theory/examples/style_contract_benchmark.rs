@@ -970,6 +970,28 @@ mod tests {
     }
 
     #[test]
+    fn layer_balanced_distance_weights_uniform_layer_shifts_equally() {
+        let baseline = [0.0; STRUCT_DIMS];
+        let mut form_shift = baseline;
+        let mut orchestration_shift = baseline;
+        let (_, form_start, form_len) = LAYERS[0];
+        let (_, orchestration_start, orchestration_len) = LAYERS[2];
+
+        form_shift[form_start..form_start + form_len].fill(1.0);
+        orchestration_shift
+            [orchestration_start..orchestration_start + orchestration_len]
+            .fill(1.0);
+
+        let form_distance = layer_balanced_distance(&baseline, &form_shift);
+        let orchestration_distance =
+            layer_balanced_distance(&baseline, &orchestration_shift);
+        assert!(
+            (form_distance - orchestration_distance).abs() < 1e-12,
+            "each uniformly changed fingerprint layer should carry equal aggregate weight"
+        );
+    }
+
+    #[test]
     fn validator_mutation_audit_detects_seeded_universal_faults() {
         let report = validator_mutation_audit();
         assert!(
