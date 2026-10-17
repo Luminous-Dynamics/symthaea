@@ -184,6 +184,10 @@ The near-term research goal should be fewer expensive wrong experiments, more re
 - [NASA OpenMDAO](https://software.nasa.gov/software/LEW-18550-1): a multidisciplinary analysis and optimization framework whose scope includes integrating variable-fidelity discipline tools.
 - [ENG-OPT-001 #5635](https://github.com/Luminous-Dynamics/symthaea/issues/5635), [speaker uncertainty-frontier #7724](https://github.com/Luminous-Dynamics/symthaea/issues/7724), and [CRISPR interval-frontier #7602](https://github.com/Luminous-Dynamics/symthaea/issues/7602): existing Symthaea problem owners motivate sharing only the domain-neutral interval-relation primitive; their domain semantics remain separate.
 
+## Independent relation arithmetic check
+
+A separate endpoint-enumeration oracle was run during authoring against the **mathematical relation definitions**, not against the Rust binary. It enumerated every pair of two-objective interval vectors where each endpoint came from the integer set {0, 1, 2, 3}, and checked all four minimize/maximize direction combinations: 40,000 interval-pair/direction cases. Possible-dominance and robust-dominance classifications each matched exhaustive endpoint assignments with zero mismatches. This small discrete check exercises the relation formulas only; it is not proof of Rust compilation, implementation correctness outside those cases, calibrated uncertainty, or physical design validity.
+
 ## 10. Nonclaims
 
 This module is not a novel general-purpose optimizer, surrogate model, uncertainty generator, decision-maker, design approval, safety case, or certification. Interval dominance is established mathematics. The proposed contribution is a small shared Rust implementation with fail-closed data semantics and deterministic diagnostics that can be reused by qualified domain studies. Real-world value must be shown with independent analytical fixtures, actual compilation/test evidence, and domain-specific validation—not inferred from the fact that a frontier was computed.
