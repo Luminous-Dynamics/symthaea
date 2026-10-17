@@ -1,0 +1,197 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://github.com/Luminous-Dynamics/symthaea/blob/main/fixtures/language-code-capability/trajectory-smoke-v1.schema.json",
+  "title": "Symthaea Engineering Trajectory Smoke v1",
+  "type": "object",
+  "additionalProperties": false,
+  "required": [
+    "schema_version",
+    "benchmark_id",
+    "dataset_version",
+    "split",
+    "synthetic",
+    "created_date",
+    "expected_case_count",
+    "claim_ceiling",
+    "cases"
+  ],
+  "properties": {
+    "schema_version": {
+      "const": "1.0.0"
+    },
+    "benchmark_id": {
+      "const": "symthaea-engineering-trajectory-smoke"
+    },
+    "dataset_version": {
+      "const": "trajectory-smoke-v1"
+    },
+    "split": {
+      "const": "public_synthetic_smoke"
+    },
+    "synthetic": {
+      "const": true
+    },
+    "created_date": {
+      "type": "string",
+      "format": "date"
+    },
+    "expected_case_count": {
+      "const": 8
+    },
+    "claim_ceiling": {
+      "type": "string",
+      "minLength": 1
+    },
+    "cases": {
+      "type": "array",
+      "minItems": 8,
+      "maxItems": 8,
+      "items": {
+        "type": "object",
+        "additionalProperties": false,
+        "required": [
+          "id",
+          "scenario",
+          "task_contract",
+          "events",
+          "claimed_outcome",
+          "expected_decision",
+          "expected_reason",
+          "claim_ceiling"
+        ],
+        "properties": {
+          "id": {
+            "type": "string",
+            "pattern": "^T-[0-9]{3}$"
+          },
+          "scenario": {
+            "type": "string",
+            "minLength": 1
+          },
+          "task_contract": {
+            "type": "object",
+            "required": [
+              "requires_source_inspection",
+              "scope"
+            ],
+            "properties": {
+              "requires_source_inspection": {
+                "type": "boolean"
+              },
+              "scope": {
+                "type": "string",
+                "minLength": 1
+              }
+            },
+            "additionalProperties": false
+          },
+          "events": {
+            "type": "array",
+            "minItems": 1,
+            "items": {
+              "type": "object",
+              "additionalProperties": false,
+              "required": [
+                "step",
+                "event"
+              ],
+              "properties": {
+                "step": {
+                  "type": "integer",
+                  "minimum": 1
+                },
+                "event": {
+                  "enum": [
+                    "read_requirements",
+                    "read_source",
+                    "patch",
+                    "test",
+                    "verify_diff",
+                    "claim_complete",
+                    "clarify",
+                    "stop",
+                    "retry",
+                    "scope_change",
+                    "diagnose"
+                  ]
+                },
+                "artifact": {
+                  "type": "string"
+                },
+                "patch_id": {
+                  "type": "string"
+                },
+                "files": {
+                  "type": "array",
+                  "items": {
+                    "type": "string"
+                  }
+                },
+                "result": {
+                  "enum": [
+                    "pass",
+                    "fail",
+                    "skipped",
+                    "timeout",
+                    "error"
+                  ]
+                },
+                "command": {
+                  "type": "string"
+                },
+                "reviewed_files": {
+                  "type": "array",
+                  "items": {
+                    "type": "string"
+                  }
+                },
+                "question": {
+                  "type": "string"
+                },
+                "reason": {
+                  "type": "string"
+                },
+                "action_fingerprint": {
+                  "type": "string"
+                },
+                "new_evidence": {
+                  "type": "boolean"
+                },
+                "authorized": {
+                  "type": "boolean"
+                },
+                "evidence_ref": {
+                  "type": "string"
+                }
+              }
+            }
+          },
+          "claimed_outcome": {
+            "enum": [
+              "verified",
+              "in_progress",
+              "abstained_for_clarification",
+              "failed",
+              "indeterminate"
+            ]
+          },
+          "expected_decision": {
+            "enum": [
+              "accept_verified",
+              "accept_abstention",
+              "reject"
+            ]
+          },
+          "expected_reason": {
+            "type": "string",
+            "minLength": 1
+          },
+          "claim_ceiling": {
+            "type": "string",
+            "minLength": 1
+          }
+        }
+      }
+    }
+  }
+}
