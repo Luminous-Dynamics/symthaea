@@ -252,9 +252,17 @@ pub struct IdealCapacitorMetrics {
     pub property_temperature_k: f64,
     /// Frequency at which the input dielectric properties apply, in hertz.
     pub property_frequency_hz: f64,
-    /// Provenance preserved from the input property record.
+    /// Temperature associated with the reported breakdown field, if available.
+    pub breakdown_test_temperature_k: Option<f64>,
+    /// Protocol family used to measure the reported breakdown field, if available.
+    pub breakdown_test_kind: Option<BreakdownTestKind>,
+    /// Evidence class associated with the breakdown field, if available.
+    pub breakdown_evidence_kind: Option<DielectricEvidenceKind>,
+    /// Source/protocol reference for the breakdown field, if available.
+    pub breakdown_reference: Option<String>,
+    /// Provenance preserved from the input permittivity/loss record.
     pub evidence_kind: DielectricEvidenceKind,
-    /// Stable reference preserved from the input property record.
+    /// Stable reference preserved from the input permittivity/loss record.
     pub source_reference: String,
 }
 
@@ -326,6 +334,10 @@ pub fn calculate_ideal_capacitor_metrics(
         breakdown_field_ratio,
         property_temperature_k: material.test_temperature_k,
         property_frequency_hz: material.test_frequency_hz,
+        breakdown_test_temperature_k: material.breakdown_test_temperature_k,
+        breakdown_test_kind: material.breakdown_test_kind,
+        breakdown_evidence_kind: material.breakdown_evidence_kind,
+        breakdown_reference: material.breakdown_reference.clone(),
         evidence_kind: material.evidence_kind,
         source_reference: material.source_reference.clone(),
     };
