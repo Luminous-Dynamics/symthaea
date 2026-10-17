@@ -208,6 +208,9 @@ pub fn calculate_ideal_capacitor_metrics(
     if !ac_rms_voltage_v.is_finite() || ac_rms_voltage_v < 0.0 {
         return Err(DielectricValidationError::InvalidAcRmsVoltage);
     }
+    if ac_rms_voltage_v > 0.0 && material.test_frequency_hz == 0.0 {
+        return Err(DielectricValidationError::AcLossRequiresPositiveCharacterizationFrequency);
+    }
 
     let layers = f64::from(geometry.active_dielectric_layers);
     let capacitance_f = VACUUM_PERMITTIVITY_F_PER_M
@@ -312,6 +315,8 @@ pub enum DielectricValidationError {
     InvalidPeakVoltage,
     /// AC RMS voltage must be finite and non-negative.
     InvalidAcRmsVoltage,
+    /// A nonzero AC RMS voltage requires dielectric-loss data at a positive characterization frequency.
+    AcLossRequiresPositiveCharacterizationFrequency,
     /// An equation overflowed or produced a non-finite result.
     NonFiniteCalculatedMetric,
 }
@@ -334,6 +339,7 @@ impl fmt::Display for DielectricValidationError {
             Self::ZeroActiveLayers => "active dielectric layer count must be nonzero",
             Self::InvalidPeakVoltage => "peak voltage must be finite and non-negative",
             Self::InvalidAcRmsVoltage => "AC RMS voltage must be finite and non-negative",
+            Self::AcLossRequiresPositiveCharacterizationFrequency => "AC dielectric loss requires a positive characterization frequency",
             Self::NonFiniteCalculatedMetric => "calculated metric is non-finite; check input magnitudes",
         };
         f.write_str(message)
@@ -484,6 +490,16 @@ mod tests {
         assert_eq!(
             calculate_ideal_capacitor_metrics(&synthetic_record(), &geometry(), 1.0, f64::NAN),
             Err(DielectricValidationError::InvalidAcRmsVoltage)
+        );
+    }
+
+    #[test]
+    fn ac_loss_is_not_reported_from_quasistatic_material_data() {
+        let mut material = synthetic_record();
+        material.test_frequency_hz = 0.0;
+        assert_eq!(
+            calculate_ideal_capacitor_metrics(&material, &geometry(), 0.0, 1.0),
+            Err(DielectricValidationError::AcLossRequiresPositiveCharacterizationFrequency)
         );
     }
 
