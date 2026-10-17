@@ -16,7 +16,7 @@ fn assert_relative_close(actual: f64, expected: f64, tolerance: f64, context: &s
     let relative_error = (actual - expected).abs() / expected.abs().max(f64::MIN_POSITIVE);
     assert!(
         relative_error <= tolerance,
-        "relative error {relative_error:e} exceeds {tolerance:e}: {context}; actual={actual:e}; expected={expected:e}"
+        "{context}: relerr={relative_error:e} > {tolerance:e}; actual={actual:e}; expected={expected:e}"
     );
 }
 
