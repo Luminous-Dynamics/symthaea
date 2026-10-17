@@ -284,6 +284,7 @@ pub struct PerformerEvidence {
     pub certification_basis: String,
     pub training_ids: Vec<String>,
     pub aircraft_ownership_ids: Vec<String>,
+    pub credential_reference: ControlledDocumentRef,
 }
 
 /// Current source snapshot from the organization's controlled documentation
@@ -363,6 +364,7 @@ pub struct MaintenanceWorkRecord {
     pub task_id: String,
     pub task_revision: u32,
     pub task_card_sha256: String,
+    pub performer: PerformerEvidence,
     pub aircraft_serial_number: String,
     pub aircraft_configuration_sha256: String,
     pub controlling_manual_sha256: String,
@@ -739,6 +741,16 @@ pub fn validate_task_ready(
             });
         }
     }
+    validate_document(
+        "performer.credential_reference",
+        &context.performer.credential_reference,
+        &mut errors,
+    );
+    if !document_is_current(&context.performer.credential_reference, &context.current_documents) {
+        errors.push(TaskCardError::StaleOrMissingSource {
+            document_id: context.performer.credential_reference.document_id.clone(),
+        });
+    }
     for part in &card.parts {
         if !context.available_parts.iter().any(|available| {
             available.part_number == part.part_number
@@ -816,6 +828,30 @@ pub fn validate_work_record(
     }
     if record.task_revision != card.revision {
         errors.push(TaskCardError::RecordIdentityMismatch { field: "task_revision".into() });
+    }
+    if record.performer.person_id.trim().is_empty()
+        || record.performer.role != card.authority.required_role
+        || record.performer.jurisdiction != card.authority.jurisdiction
+        || record.performer.certification_basis != card.authority.certification_basis
+    {
+        errors.push(TaskCardError::WrongPerformerRole);
+    }
+    validate_document(
+        "record.performer.credential_reference",
+        &record.performer.credential_reference,
+        &mut errors,
+    );
+    for training in &card.authority.required_training_ids {
+        if !record.performer.training_ids.iter().any(|id| id == training) {
+            errors.push(TaskCardError::MissingTraining {
+                training_id: training.clone(),
+            });
+        }
+    }
+    if card.authority.ownership_interest_required
+        && !record.performer.aircraft_ownership_ids.iter().any(|id| id == &aircraft.serial_number)
+    {
+        errors.push(TaskCardError::OwnershipRequirementNotMet);
     }
     if !same_digest(&record.task_card_sha256, &card.card_sha256) {
         errors.push(TaskCardError::RecordIdentityMismatch { field: "task_card_sha256".into() });
@@ -1139,6 +1175,11 @@ pub fn release_task_to_service(
             }
         }
     }
+    if !document_is_current(&record.performer.credential_reference, current_documents) {
+        errors.push(TaskCardError::StaleOrMissingSource {
+            document_id: record.performer.credential_reference.document_id.clone(),
+        });
+    }
     for source in std::iter::once(&card.controlling_manual)
         .chain(card.supporting_sources.iter())
         .chain(card.parts.iter().map(|part| &part.source))
@@ -1383,6 +1424,7 @@ mod tests {
             certification_basis: card.authority.certification_basis.clone(),
             training_ids: vec!["training-fixture".into()],
             aircraft_ownership_ids: vec![],
+            credential_reference: doc("performer-credential", "rev-1", '5'),
         };
         let mut docs = vec![CurrentDocument { reference: card.controlling_manual.clone() }];
         docs.extend(card.supporting_sources.iter().cloned().map(|reference| CurrentDocument { reference }));
@@ -1390,6 +1432,7 @@ mod tests {
             docs.push(CurrentDocument { reference: permission_source.clone() });
         }
         docs.push(CurrentDocument { reference: doc("review-credential", "rev-1", '4') });
+        docs.push(CurrentDocument { reference: doc("performer-credential", "rev-1", '5') });
         let tool = ToolAvailability {
             tool_id: "tool-fixture".into(),
             calibration_valid_until: Some("2027-10-17".into()),
@@ -1420,6 +1463,15 @@ mod tests {
             task_id: card.task_id.clone(),
             task_revision: card.revision,
             task_card_sha256: card.card_sha256.clone(),
+            performer: PerformerEvidence {
+                person_id: "maintainer-fixture".into(),
+                role: card.authority.required_role,
+                jurisdiction: card.authority.jurisdiction.clone(),
+                certification_basis: card.authority.certification_basis.clone(),
+                training_ids: vec!["training-fixture".into()],
+                aircraft_ownership_ids: vec![],
+                credential_reference: doc("performer-credential", "rev-1", '5'),
+            },
             aircraft_serial_number: "SERIAL-001".into(),
             aircraft_configuration_sha256: card.applicability.configuration_sha256.clone(),
             controlling_manual_sha256: card.controlling_manual.sha256.clone(),
