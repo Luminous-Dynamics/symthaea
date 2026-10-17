@@ -1,0 +1,3465 @@
+{
+  "schema_version": "0.1.0",
+  "corpus_id": "APPLIANCE-ACTIVE-DIAG-001",
+  "evidence_class": "synthetic_contract_fixture",
+  "claim_ceiling": "policy_and_math_contract_only",
+  "traces": [
+    {
+      "trace_id": "ADT-001",
+      "scenario": "Competing fan faults with uncertain RPM, airflow, and vibration signatures.",
+      "observation_status": "complete",
+      "protection_state": "clear",
+      "hypotheses": [
+        {
+          "hypothesis_id": "bearing_wear",
+          "prior_probability": 0.25
+        },
+        {
+          "hypothesis_id": "impeller_obstruction",
+          "prior_probability": 0.25
+        },
+        {
+          "hypothesis_id": "motor_drive_fault",
+          "prior_probability": 0.25
+        },
+        {
+          "hypothesis_id": "sensor_fault",
+          "prior_probability": 0.25
+        }
+      ],
+      "candidate_measurements": [
+        {
+          "measurement_id": "rpm_check",
+          "cost_units": 1,
+          "risk_class": "low",
+          "available": true,
+          "outcome_ids": [
+            "low",
+            "normal"
+          ],
+          "likelihoods": [
+            {
+              "hypothesis_id": "bearing_wear",
+              "probabilities": [
+                {
+                  "outcome_id": "low",
+                  "probability": 0.85
+                },
+                {
+                  "outcome_id": "normal",
+                  "probability": 0.15
+                }
+              ]
+            },
+            {
+              "hypothesis_id": "impeller_obstruction",
+              "probabilities": [
+                {
+                  "outcome_id": "low",
+                  "probability": 0.15
+                },
+                {
+                  "outcome_id": "normal",
+                  "probability": 0.85
+                }
+              ]
+            },
+            {
+              "hypothesis_id": "motor_drive_fault",
+              "probabilities": [
+                {
+                  "outcome_id": "low",
+                  "probability": 0.9
+                },
+                {
+                  "outcome_id": "normal",
+                  "probability": 0.1
+                }
+              ]
+            },
+            {
+              "hypothesis_id": "sensor_fault",
+              "probabilities": [
+                {
+                  "outcome_id": "low",
+                  "probability": 0.2
+                },
+                {
+                  "outcome_id": "normal",
+                  "probability": 0.8
+                }
+              ]
+            }
+          ]
+        },
+        {
+          "measurement_id": "airflow_check",
+          "cost_units": 0.8,
+          "risk_class": "low",
+          "available": true,
+          "outcome_ids": [
+            "low",
+            "normal"
+          ],
+          "likelihoods": [
+            {
+              "hypothesis_id": "bearing_wear",
+              "probabilities": [
+                {
+                  "outcome_id": "low",
+                  "probability": 0.35
+                },
+                {
+                  "outcome_id": "normal",
+                  "probability": 0.65
+                }
+              ]
+            },
+            {
+              "hypothesis_id": "impeller_obstruction",
+              "probabilities": [
+                {
+                  "outcome_id": "low",
+                  "probability": 0.95
+                },
+                {
+                  "outcome_id": "normal",
+                  "probability": 0.05
+                }
+              ]
+            },
+            {
+              "hypothesis_id": "motor_drive_fault",
+              "probabilities": [
+                {
+                  "outcome_id": "low",
+                  "probability": 0.7
+                },
+                {
+                  "outcome_id": "normal",
+                  "probability": 0.3
+                }
+              ]
+            },
+            {
+              "hypothesis_id": "sensor_fault",
+              "probabilities": [
+                {
+                  "outcome_id": "low",
+                  "probability": 0.25
+                },
+                {
+                  "outcome_id": "normal",
+                  "probability": 0.75
+                }
+              ]
+            }
+          ]
+        },
+        {
+          "measurement_id": "vibration_check",
+          "cost_units": 1.6,
+          "risk_class": "low",
+          "available": true,
+          "outcome_ids": [
+            "high",
+            "normal"
+          ],
+          "likelihoods": [
+            {
+              "hypothesis_id": "bearing_wear",
+              "probabilities": [
+                {
+                  "outcome_id": "high",
+                  "probability": 0.9
+                },
+                {
+                  "outcome_id": "normal",
+                  "probability": 0.1
+                }
+              ]
+            },
+            {
+              "hypothesis_id": "impeller_obstruction",
+              "probabilities": [
+                {
+                  "outcome_id": "high",
+                  "probability": 0.15
+                },
+                {
+                  "outcome_id": "normal",
+                  "probability": 0.85
+                }
+              ]
+            },
+            {
+              "hypothesis_id": "motor_drive_fault",
+              "probabilities": [
+                {
+                  "outcome_id": "high",
+                  "probability": 0.65
+                },
+                {
+                  "outcome_id": "normal",
+                  "probability": 0.35
+                }
+              ]
+            },
+            {
+              "hypothesis_id": "sensor_fault",
+              "probabilities": [
+                {
+                  "outcome_id": "high",
+                  "probability": 0.1
+                },
+                {
+                  "outcome_id": "normal",
+                  "probability": 0.9
+                }
+              ]
+            }
+          ]
+        }
+      ],
+      "expected": {
+        "decision": "select_measurement",
+        "next_measurement_id": "rpm_check",
+        "reason_code": "information_gain_per_cost"
+      }
+    },
+    {
+      "trace_id": "ADT-002",
+      "scenario": "A less informative measurement may be preferable when it is substantially cheaper.",
+      "observation_status": "complete",
+      "protection_state": "clear",
+      "hypotheses": [
+        {
+          "hypothesis_id": "bearing_wear",
+          "prior_probability": 0.25
+        },
+        {
+          "hypothesis_id": "impeller_obstruction",
+          "prior_probability": 0.25
+        },
+        {
+          "hypothesis_id": "motor_drive_fault",
+          "prior_probability": 0.25
+        },
+        {
+          "hypothesis_id": "sensor_fault",
+          "prior_probability": 0.25
+        }
+      ],
+      "candidate_measurements": [
+        {
+          "measurement_id": "rpm_check",
+          "cost_units": 3,
+          "risk_class": "low",
+          "available": true,
+          "outcome_ids": [
+            "low",
+            "normal"
+          ],
+          "likelihoods": [
+            {
+              "hypothesis_id": "bearing_wear",
+              "probabilities": [
+                {
+                  "outcome_id": "low",
+                  "probability": 0.85
+                },
+                {
+                  "outcome_id": "normal",
+                  "probability": 0.15
+                }
+              ]
+            },
+            {
+              "hypothesis_id": "impeller_obstruction",
+              "probabilities": [
+                {
+                  "outcome_id": "low",
+                  "probability": 0.15
+                },
+                {
+                  "outcome_id": "normal",
+                  "probability": 0.85
+                }
+              ]
+            },
+            {
+              "hypothesis_id": "motor_drive_fault",
+              "probabilities": [
+                {
+                  "outcome_id": "low",
+                  "probability": 0.9
+                },
+                {
+                  "outcome_id": "normal",
+                  "probability": 0.1
+                }
+              ]
+            },
+            {
+              "hypothesis_id": "sensor_fault",
+              "probabilities": [
+                {
+                  "outcome_id": "low",
+                  "probability": 0.2
+                },
+                {
+                  "outcome_id": "normal",
+                  "probability": 0.8
+                }
+              ]
+            }
+          ]
+        },
+        {
+          "measurement_id": "airflow_check",
+          "cost_units": 0.4,
+          "risk_class": "low",
+          "available": true,
+          "outcome_ids": [
+            "low",
+            "normal"
+          ],
+          "likelihoods": [
+            {
+              "hypothesis_id": "bearing_wear",
+              "probabilities": [
+                {
+                  "outcome_id": "low",
+                  "probability": 0.35
+                },
+                {
+                  "outcome_id": "normal",
+                  "probability": 0.65
+                }
+              ]
+            },
+            {
+              "hypothesis_id": "impeller_obstruction",
+              "probabilities": [
+                {
+                  "outcome_id": "low",
+                  "probability": 0.95
+                },
+                {
+                  "outcome_id": "normal",
+                  "probability": 0.05
+                }
+              ]
+            },
+            {
+              "hypothesis_id": "motor_drive_fault",
+              "probabilities": [
+                {
+                  "outcome_id": "low",
+                  "probability": 0.7
+                },
+                {
+                  "outcome_id": "normal",
+                  "probability": 0.3
+                }
+              ]
+            },
+            {
+              "hypothesis_id": "sensor_fault",
+              "probabilities": [
+                {
+                  "outcome_id": "low",
+                  "probability": 0.25
+                },
+                {
+                  "outcome_id": "normal",
+                  "probability": 0.75
+                }
+              ]
+            }
+          ]
+        },
+        {
+          "measurement_id": "vibration_check",
+          "cost_units": 2.5,
+          "risk_class": "low",
+          "available": true,
+          "outcome_ids": [
+            "high",
+            "normal"
+          ],
+          "likelihoods": [
+            {
+              "hypothesis_id": "bearing_wear",
+              "probabilities": [
+                {
+                  "outcome_id": "high",
+                  "probability": 0.9
+                },
+                {
+                  "outcome_id": "normal",
+                  "probability": 0.1
+                }
+              ]
+            },
+            {
+              "hypothesis_id": "impeller_obstruction",
+              "probabilities": [
+                {
+                  "outcome_id": "high",
+                  "probability": 0.15
+                },
+                {
+                  "outcome_id": "normal",
+                  "probability": 0.85
+                }
+              ]
+            },
+            {
+              "hypothesis_id": "motor_drive_fault",
+              "probabilities": [
+                {
+                  "outcome_id": "high",
+                  "probability": 0.65
+                },
+                {
+                  "outcome_id": "normal",
+                  "probability": 0.35
+                }
+              ]
+            },
+            {
+              "hypothesis_id": "sensor_fault",
+              "probabilities": [
+                {
+                  "outcome_id": "high",
+                  "probability": 0.1
+                },
+                {
+                  "outcome_id": "normal",
+                  "probability": 0.9
+                }
+              ]
+            }
+          ]
+        }
+      ],
+      "expected": {
+        "decision": "select_measurement",
+        "next_measurement_id": "airflow_check",
+        "reason_code": "information_gain_per_cost"
+      }
+    },
+    {
+      "trace_id": "ADT-003",
+      "scenario": "Equal information-gain-per-cost measurements must resolve ties deterministically.",
+      "observation_status": "complete",
+      "protection_state": "clear",
+      "hypotheses": [
+        {
+          "hypothesis_id": "bearing_wear",
+          "prior_probability": 0.5
+        },
+        {
+          "hypothesis_id": "impeller_obstruction",
+          "prior_probability": 0.5
+        }
+      ],
+      "candidate_measurements": [
+        {
+          "measurement_id": "a_rpm_check",
+          "cost_units": 1,
+          "risk_class": "low",
+          "available": true,
+          "outcome_ids": [
+            "low",
+            "normal"
+          ],
+          "likelihoods": [
+            {
+              "hypothesis_id": "bearing_wear",
+              "probabilities": [
+                {
+                  "outcome_id": "low",
+                  "probability": 1
+                },
+                {
+                  "outcome_id": "normal",
+                  "probability": 0
+                }
+              ]
+            },
+            {
+              "hypothesis_id": "impeller_obstruction",
+              "probabilities": [
+                {
+                  "outcome_id": "low",
+                  "probability": 0
+                },
+                {
+                  "outcome_id": "normal",
+                  "probability": 1
+                }
+              ]
+            }
+          ]
+        },
+        {
+          "measurement_id": "b_airflow_check",
+          "cost_units": 1,
+          "risk_class": "low",
+          "available": true,
+          "outcome_ids": [
+            "low",
+            "normal"
+          ],
+          "likelihoods": [
+            {
+              "hypothesis_id": "bearing_wear",
+              "probabilities": [
+                {
+                  "outcome_id": "low",
+                  "probability": 1
+                },
+                {
+                  "outcome_id": "normal",
+                  "probability": 0
+                }
+              ]
+            },
+            {
+              "hypothesis_id": "impeller_obstruction",
+              "probabilities": [
+                {
+                  "outcome_id": "low",
+                  "probability": 0
+                },
+                {
+                  "outcome_id": "normal",
+                  "probability": 1
+                }
+              ]
+            }
+          ]
+        }
+      ],
+      "expected": {
+        "decision": "select_measurement",
+        "next_measurement_id": "a_rpm_check",
+        "reason_code": "information_gain_per_cost"
+      }
+    },
+    {
+      "trace_id": "ADT-004",
+      "scenario": "A tripped independent protection signal blocks measurement selection and operation.",
+      "observation_status": "complete",
+      "protection_state": "tripped",
+      "hypotheses": [
+        {
+          "hypothesis_id": "bearing_wear",
+          "prior_probability": 0.25
+        },
+        {
+          "hypothesis_id": "impeller_obstruction",
+          "prior_probability": 0.25
+        },
+        {
+          "hypothesis_id": "motor_drive_fault",
+          "prior_probability": 0.25
+        },
+        {
+          "hypothesis_id": "sensor_fault",
+          "prior_probability": 0.25
+        }
+      ],
+      "candidate_measurements": [
+        {
+          "measurement_id": "rpm_check",
+          "cost_units": 1,
+          "risk_class": "low",
+          "available": true,
+          "outcome_ids": [
+            "low",
+            "normal"
+          ],
+          "likelihoods": [
+            {
+              "hypothesis_id": "bearing_wear",
+              "probabilities": [
+                {
+                  "outcome_id": "low",
+                  "probability": 0.85
+                },
+                {
+                  "outcome_id": "normal",
+                  "probability": 0.15
+                }
+              ]
+            },
+            {
+              "hypothesis_id": "impeller_obstruction",
+              "probabilities": [
+                {
+                  "outcome_id": "low",
+                  "probability": 0.15
+                },
+                {
+                  "outcome_id": "normal",
+                  "probability": 0.85
+                }
+              ]
+            },
+            {
+              "hypothesis_id": "motor_drive_fault",
+              "probabilities": [
+                {
+                  "outcome_id": "low",
+                  "probability": 0.9
+                },
+                {
+                  "outcome_id": "normal",
+                  "probability": 0.1
+                }
+              ]
+            },
+            {
+              "hypothesis_id": "sensor_fault",
+              "probabilities": [
+                {
+                  "outcome_id": "low",
+                  "probability": 0.2
+                },
+                {
+                  "outcome_id": "normal",
+                  "probability": 0.8
+                }
+              ]
+            }
+          ]
+        },
+        {
+          "measurement_id": "airflow_check",
+          "cost_units": 0.8,
+          "risk_class": "low",
+          "available": true,
+          "outcome_ids": [
+            "low",
+            "normal"
+          ],
+          "likelihoods": [
+            {
+              "hypothesis_id": "bearing_wear",
+              "probabilities": [
+                {
+                  "outcome_id": "low",
+                  "probability": 0.35
+                },
+                {
+                  "outcome_id": "normal",
+                  "probability": 0.65
+                }
+              ]
+            },
+            {
+              "hypothesis_id": "impeller_obstruction",
+              "probabilities": [
+                {
+                  "outcome_id": "low",
+                  "probability": 0.95
+                },
+                {
+                  "outcome_id": "normal",
+                  "probability": 0.05
+                }
+              ]
+            },
+            {
+              "hypothesis_id": "motor_drive_fault",
+              "probabilities": [
+                {
+                  "outcome_id": "low",
+                  "probability": 0.7
+                },
+                {
+                  "outcome_id": "normal",
+                  "probability": 0.3
+                }
+              ]
+            },
+            {
+              "hypothesis_id": "sensor_fault",
+              "probabilities": [
+                {
+                  "outcome_id": "low",
+                  "probability": 0.25
+                },
+                {
+                  "outcome_id": "normal",
+                  "probability": 0.75
+                }
+              ]
+            }
+          ]
+        },
+        {
+          "measurement_id": "vibration_check",
+          "cost_units": 1.6,
+          "risk_class": "low",
+          "available": true,
+          "outcome_ids": [
+            "high",
+            "normal"
+          ],
+          "likelihoods": [
+            {
+              "hypothesis_id": "bearing_wear",
+              "probabilities": [
+                {
+                  "outcome_id": "high",
+                  "probability": 0.9
+                },
+                {
+                  "outcome_id": "normal",
+                  "probability": 0.1
+                }
+              ]
+            },
+            {
+              "hypothesis_id": "impeller_obstruction",
+              "probabilities": [
+                {
+                  "outcome_id": "high",
+                  "probability": 0.15
+                },
+                {
+                  "outcome_id": "normal",
+                  "probability": 0.85
+                }
+              ]
+            },
+            {
+              "hypothesis_id": "motor_drive_fault",
+              "probabilities": [
+                {
+                  "outcome_id": "high",
+                  "probability": 0.65
+                },
+                {
+                  "outcome_id": "normal",
+                  "probability": 0.35
+                }
+              ]
+            },
+            {
+              "hypothesis_id": "sensor_fault",
+              "probabilities": [
+                {
+                  "outcome_id": "high",
+                  "probability": 0.1
+                },
+                {
+                  "outcome_id": "normal",
+                  "probability": 0.9
+                }
+              ]
+            }
+          ]
+        }
+      ],
+      "expected": {
+        "decision": "abstain_and_review",
+        "next_measurement_id": null,
+        "reason_code": "protection_tripped"
+      }
+    },
+    {
+      "trace_id": "ADT-005",
+      "scenario": "Unknown protection state cannot be treated as clear.",
+      "observation_status": "complete",
+      "protection_state": "unknown",
+      "hypotheses": [
+        {
+          "hypothesis_id": "bearing_wear",
+          "prior_probability": 0.25
+        },
+        {
+          "hypothesis_id": "impeller_obstruction",
+          "prior_probability": 0.25
+        },
+        {
+          "hypothesis_id": "motor_drive_fault",
+          "prior_probability": 0.25
+        },
+        {
+          "hypothesis_id": "sensor_fault",
+          "prior_probability": 0.25
+        }
+      ],
+      "candidate_measurements": [
+        {
+          "measurement_id": "rpm_check",
+          "cost_units": 1,
+          "risk_class": "low",
+          "available": true,
+          "outcome_ids": [
+            "low",
+            "normal"
+          ],
+          "likelihoods": [
+            {
+              "hypothesis_id": "bearing_wear",
+              "probabilities": [
+                {
+                  "outcome_id": "low",
+                  "probability": 0.85
+                },
+                {
+                  "outcome_id": "normal",
+                  "probability": 0.15
+                }
+              ]
+            },
+            {
+              "hypothesis_id": "impeller_obstruction",
+              "probabilities": [
+                {
+                  "outcome_id": "low",
+                  "probability": 0.15
+                },
+                {
+                  "outcome_id": "normal",
+                  "probability": 0.85
+                }
+              ]
+            },
+            {
+              "hypothesis_id": "motor_drive_fault",
+              "probabilities": [
+                {
+                  "outcome_id": "low",
+                  "probability": 0.9
+                },
+                {
+                  "outcome_id": "normal",
+                  "probability": 0.1
+                }
+              ]
+            },
+            {
+              "hypothesis_id": "sensor_fault",
+              "probabilities": [
+                {
+                  "outcome_id": "low",
+                  "probability": 0.2
+                },
+                {
+                  "outcome_id": "normal",
+                  "probability": 0.8
+                }
+              ]
+            }
+          ]
+        },
+        {
+          "measurement_id": "airflow_check",
+          "cost_units": 0.8,
+          "risk_class": "low",
+          "available": true,
+          "outcome_ids": [
+            "low",
+            "normal"
+          ],
+          "likelihoods": [
+            {
+              "hypothesis_id": "bearing_wear",
+              "probabilities": [
+                {
+                  "outcome_id": "low",
+                  "probability": 0.35
+                },
+                {
+                  "outcome_id": "normal",
+                  "probability": 0.65
+                }
+              ]
+            },
+            {
+              "hypothesis_id": "impeller_obstruction",
+              "probabilities": [
+                {
+                  "outcome_id": "low",
+                  "probability": 0.95
+                },
+                {
+                  "outcome_id": "normal",
+                  "probability": 0.05
+                }
+              ]
+            },
+            {
+              "hypothesis_id": "motor_drive_fault",
+              "probabilities": [
+                {
+                  "outcome_id": "low",
+                  "probability": 0.7
+                },
+                {
+                  "outcome_id": "normal",
+                  "probability": 0.3
+                }
+              ]
+            },
+            {
+              "hypothesis_id": "sensor_fault",
+              "probabilities": [
+                {
+                  "outcome_id": "low",
+                  "probability": 0.25
+                },
+                {
+                  "outcome_id": "normal",
+                  "probability": 0.75
+                }
+              ]
+            }
+          ]
+        },
+        {
+          "measurement_id": "vibration_check",
+          "cost_units": 1.6,
+          "risk_class": "low",
+          "available": true,
+          "outcome_ids": [
+            "high",
+            "normal"
+          ],
+          "likelihoods": [
+            {
+              "hypothesis_id": "bearing_wear",
+              "probabilities": [
+                {
+                  "outcome_id": "high",
+                  "probability": 0.9
+                },
+                {
+                  "outcome_id": "normal",
+                  "probability": 0.1
+                }
+              ]
+            },
+            {
+              "hypothesis_id": "impeller_obstruction",
+              "probabilities": [
+                {
+                  "outcome_id": "high",
+                  "probability": 0.15
+                },
+                {
+                  "outcome_id": "normal",
+                  "probability": 0.85
+                }
+              ]
+            },
+            {
+              "hypothesis_id": "motor_drive_fault",
+              "probabilities": [
+                {
+                  "outcome_id": "high",
+                  "probability": 0.65
+                },
+                {
+                  "outcome_id": "normal",
+                  "probability": 0.35
+                }
+              ]
+            },
+            {
+              "hypothesis_id": "sensor_fault",
+              "probabilities": [
+                {
+                  "outcome_id": "high",
+                  "probability": 0.1
+                },
+                {
+                  "outcome_id": "normal",
+                  "probability": 0.9
+                }
+              ]
+            }
+          ]
+        }
+      ],
+      "expected": {
+        "decision": "abstain_and_review",
+        "next_measurement_id": null,
+        "reason_code": "protection_unknown"
+      }
+    },
+    {
+      "trace_id": "ADT-006",
+      "scenario": "Required observation channels are missing and must not be imputed as normal.",
+      "observation_status": "missing",
+      "protection_state": "clear",
+      "hypotheses": [
+        {
+          "hypothesis_id": "bearing_wear",
+          "prior_probability": 0.25
+        },
+        {
+          "hypothesis_id": "impeller_obstruction",
+          "prior_probability": 0.25
+        },
+        {
+          "hypothesis_id": "motor_drive_fault",
+          "prior_probability": 0.25
+        },
+        {
+          "hypothesis_id": "sensor_fault",
+          "prior_probability": 0.25
+        }
+      ],
+      "candidate_measurements": [
+        {
+          "measurement_id": "rpm_check",
+          "cost_units": 1,
+          "risk_class": "low",
+          "available": true,
+          "outcome_ids": [
+            "low",
+            "normal"
+          ],
+          "likelihoods": [
+            {
+              "hypothesis_id": "bearing_wear",
+              "probabilities": [
+                {
+                  "outcome_id": "low",
+                  "probability": 0.85
+                },
+                {
+                  "outcome_id": "normal",
+                  "probability": 0.15
+                }
+              ]
+            },
+            {
+              "hypothesis_id": "impeller_obstruction",
+              "probabilities": [
+                {
+                  "outcome_id": "low",
+                  "probability": 0.15
+                },
+                {
+                  "outcome_id": "normal",
+                  "probability": 0.85
+                }
+              ]
+            },
+            {
+              "hypothesis_id": "motor_drive_fault",
+              "probabilities": [
+                {
+                  "outcome_id": "low",
+                  "probability": 0.9
+                },
+                {
+                  "outcome_id": "normal",
+                  "probability": 0.1
+                }
+              ]
+            },
+            {
+              "hypothesis_id": "sensor_fault",
+              "probabilities": [
+                {
+                  "outcome_id": "low",
+                  "probability": 0.2
+                },
+                {
+                  "outcome_id": "normal",
+                  "probability": 0.8
+                }
+              ]
+            }
+          ]
+        },
+        {
+          "measurement_id": "airflow_check",
+          "cost_units": 0.8,
+          "risk_class": "low",
+          "available": true,
+          "outcome_ids": [
+            "low",
+            "normal"
+          ],
+          "likelihoods": [
+            {
+              "hypothesis_id": "bearing_wear",
+              "probabilities": [
+                {
+                  "outcome_id": "low",
+                  "probability": 0.35
+                },
+                {
+                  "outcome_id": "normal",
+                  "probability": 0.65
+                }
+              ]
+            },
+            {
+              "hypothesis_id": "impeller_obstruction",
+              "probabilities": [
+                {
+                  "outcome_id": "low",
+                  "probability": 0.95
+                },
+                {
+                  "outcome_id": "normal",
+                  "probability": 0.05
+                }
+              ]
+            },
+            {
+              "hypothesis_id": "motor_drive_fault",
+              "probabilities": [
+                {
+                  "outcome_id": "low",
+                  "probability": 0.7
+                },
+                {
+                  "outcome_id": "normal",
+                  "probability": 0.3
+                }
+              ]
+            },
+            {
+              "hypothesis_id": "sensor_fault",
+              "probabilities": [
+                {
+                  "outcome_id": "low",
+                  "probability": 0.25
+                },
+                {
+                  "outcome_id": "normal",
+                  "probability": 0.75
+                }
+              ]
+            }
+          ]
+        },
+        {
+          "measurement_id": "vibration_check",
+          "cost_units": 1.6,
+          "risk_class": "low",
+          "available": true,
+          "outcome_ids": [
+            "high",
+            "normal"
+          ],
+          "likelihoods": [
+            {
+              "hypothesis_id": "bearing_wear",
+              "probabilities": [
+                {
+                  "outcome_id": "high",
+                  "probability": 0.9
+                },
+                {
+                  "outcome_id": "normal",
+                  "probability": 0.1
+                }
+              ]
+            },
+            {
+              "hypothesis_id": "impeller_obstruction",
+              "probabilities": [
+                {
+                  "outcome_id": "high",
+                  "probability": 0.15
+                },
+                {
+                  "outcome_id": "normal",
+                  "probability": 0.85
+                }
+              ]
+            },
+            {
+              "hypothesis_id": "motor_drive_fault",
+              "probabilities": [
+                {
+                  "outcome_id": "high",
+                  "probability": 0.65
+                },
+                {
+                  "outcome_id": "normal",
+                  "probability": 0.35
+                }
+              ]
+            },
+            {
+              "hypothesis_id": "sensor_fault",
+              "probabilities": [
+                {
+                  "outcome_id": "high",
+                  "probability": 0.1
+                },
+                {
+                  "outcome_id": "normal",
+                  "probability": 0.9
+                }
+              ]
+            }
+          ]
+        }
+      ],
+      "expected": {
+        "decision": "abstain_and_review",
+        "next_measurement_id": null,
+        "reason_code": "observations_unreliable"
+      }
+    },
+    {
+      "trace_id": "ADT-007",
+      "scenario": "Observation timestamps are stale and must be refreshed before fault ranking.",
+      "observation_status": "stale",
+      "protection_state": "clear",
+      "hypotheses": [
+        {
+          "hypothesis_id": "bearing_wear",
+          "prior_probability": 0.25
+        },
+        {
+          "hypothesis_id": "impeller_obstruction",
+          "prior_probability": 0.25
+        },
+        {
+          "hypothesis_id": "motor_drive_fault",
+          "prior_probability": 0.25
+        },
+        {
+          "hypothesis_id": "sensor_fault",
+          "prior_probability": 0.25
+        }
+      ],
+      "candidate_measurements": [
+        {
+          "measurement_id": "rpm_check",
+          "cost_units": 1,
+          "risk_class": "low",
+          "available": true,
+          "outcome_ids": [
+            "low",
+            "normal"
+          ],
+          "likelihoods": [
+            {
+              "hypothesis_id": "bearing_wear",
+              "probabilities": [
+                {
+                  "outcome_id": "low",
+                  "probability": 0.85
+                },
+                {
+                  "outcome_id": "normal",
+                  "probability": 0.15
+                }
+              ]
+            },
+            {
+              "hypothesis_id": "impeller_obstruction",
+              "probabilities": [
+                {
+                  "outcome_id": "low",
+                  "probability": 0.15
+                },
+                {
+                  "outcome_id": "normal",
+                  "probability": 0.85
+                }
+              ]
+            },
+            {
+              "hypothesis_id": "motor_drive_fault",
+              "probabilities": [
+                {
+                  "outcome_id": "low",
+                  "probability": 0.9
+                },
+                {
+                  "outcome_id": "normal",
+                  "probability": 0.1
+                }
+              ]
+            },
+            {
+              "hypothesis_id": "sensor_fault",
+              "probabilities": [
+                {
+                  "outcome_id": "low",
+                  "probability": 0.2
+                },
+                {
+                  "outcome_id": "normal",
+                  "probability": 0.8
+                }
+              ]
+            }
+          ]
+        },
+        {
+          "measurement_id": "airflow_check",
+          "cost_units": 0.8,
+          "risk_class": "low",
+          "available": true,
+          "outcome_ids": [
+            "low",
+            "normal"
+          ],
+          "likelihoods": [
+            {
+              "hypothesis_id": "bearing_wear",
+              "probabilities": [
+                {
+                  "outcome_id": "low",
+                  "probability": 0.35
+                },
+                {
+                  "outcome_id": "normal",
+                  "probability": 0.65
+                }
+              ]
+            },
+            {
+              "hypothesis_id": "impeller_obstruction",
+              "probabilities": [
+                {
+                  "outcome_id": "low",
+                  "probability": 0.95
+                },
+                {
+                  "outcome_id": "normal",
+                  "probability": 0.05
+                }
+              ]
+            },
+            {
+              "hypothesis_id": "motor_drive_fault",
+              "probabilities": [
+                {
+                  "outcome_id": "low",
+                  "probability": 0.7
+                },
+                {
+                  "outcome_id": "normal",
+                  "probability": 0.3
+                }
+              ]
+            },
+            {
+              "hypothesis_id": "sensor_fault",
+              "probabilities": [
+                {
+                  "outcome_id": "low",
+                  "probability": 0.25
+                },
+                {
+                  "outcome_id": "normal",
+                  "probability": 0.75
+                }
+              ]
+            }
+          ]
+        },
+        {
+          "measurement_id": "vibration_check",
+          "cost_units": 1.6,
+          "risk_class": "low",
+          "available": true,
+          "outcome_ids": [
+            "high",
+            "normal"
+          ],
+          "likelihoods": [
+            {
+              "hypothesis_id": "bearing_wear",
+              "probabilities": [
+                {
+                  "outcome_id": "high",
+                  "probability": 0.9
+                },
+                {
+                  "outcome_id": "normal",
+                  "probability": 0.1
+                }
+              ]
+            },
+            {
+              "hypothesis_id": "impeller_obstruction",
+              "probabilities": [
+                {
+                  "outcome_id": "high",
+                  "probability": 0.15
+                },
+                {
+                  "outcome_id": "normal",
+                  "probability": 0.85
+                }
+              ]
+            },
+            {
+              "hypothesis_id": "motor_drive_fault",
+              "probabilities": [
+                {
+                  "outcome_id": "high",
+                  "probability": 0.65
+                },
+                {
+                  "outcome_id": "normal",
+                  "probability": 0.35
+                }
+              ]
+            },
+            {
+              "hypothesis_id": "sensor_fault",
+              "probabilities": [
+                {
+                  "outcome_id": "high",
+                  "probability": 0.1
+                },
+                {
+                  "outcome_id": "normal",
+                  "probability": 0.9
+                }
+              ]
+            }
+          ]
+        }
+      ],
+      "expected": {
+        "decision": "abstain_and_review",
+        "next_measurement_id": null,
+        "reason_code": "observations_unreliable"
+      }
+    },
+    {
+      "trace_id": "ADT-008",
+      "scenario": "Sensor observations conflict and require reconciliation before ranking.",
+      "observation_status": "conflicting",
+      "protection_state": "clear",
+      "hypotheses": [
+        {
+          "hypothesis_id": "bearing_wear",
+          "prior_probability": 0.25
+        },
+        {
+          "hypothesis_id": "impeller_obstruction",
+          "prior_probability": 0.25
+        },
+        {
+          "hypothesis_id": "motor_drive_fault",
+          "prior_probability": 0.25
+        },
+        {
+          "hypothesis_id": "sensor_fault",
+          "prior_probability": 0.25
+        }
+      ],
+      "candidate_measurements": [
+        {
+          "measurement_id": "rpm_check",
+          "cost_units": 1,
+          "risk_class": "low",
+          "available": true,
+          "outcome_ids": [
+            "low",
+            "normal"
+          ],
+          "likelihoods": [
+            {
+              "hypothesis_id": "bearing_wear",
+              "probabilities": [
+                {
+                  "outcome_id": "low",
+                  "probability": 0.85
+                },
+                {
+                  "outcome_id": "normal",
+                  "probability": 0.15
+                }
+              ]
+            },
+            {
+              "hypothesis_id": "impeller_obstruction",
+              "probabilities": [
+                {
+                  "outcome_id": "low",
+                  "probability": 0.15
+                },
+                {
+                  "outcome_id": "normal",
+                  "probability": 0.85
+                }
+              ]
+            },
+            {
+              "hypothesis_id": "motor_drive_fault",
+              "probabilities": [
+                {
+                  "outcome_id": "low",
+                  "probability": 0.9
+                },
+                {
+                  "outcome_id": "normal",
+                  "probability": 0.1
+                }
+              ]
+            },
+            {
+              "hypothesis_id": "sensor_fault",
+              "probabilities": [
+                {
+                  "outcome_id": "low",
+                  "probability": 0.2
+                },
+                {
+                  "outcome_id": "normal",
+                  "probability": 0.8
+                }
+              ]
+            }
+          ]
+        },
+        {
+          "measurement_id": "airflow_check",
+          "cost_units": 0.8,
+          "risk_class": "low",
+          "available": true,
+          "outcome_ids": [
+            "low",
+            "normal"
+          ],
+          "likelihoods": [
+            {
+              "hypothesis_id": "bearing_wear",
+              "probabilities": [
+                {
+                  "outcome_id": "low",
+                  "probability": 0.35
+                },
+                {
+                  "outcome_id": "normal",
+                  "probability": 0.65
+                }
+              ]
+            },
+            {
+              "hypothesis_id": "impeller_obstruction",
+              "probabilities": [
+                {
+                  "outcome_id": "low",
+                  "probability": 0.95
+                },
+                {
+                  "outcome_id": "normal",
+                  "probability": 0.05
+                }
+              ]
+            },
+            {
+              "hypothesis_id": "motor_drive_fault",
+              "probabilities": [
+                {
+                  "outcome_id": "low",
+                  "probability": 0.7
+                },
+                {
+                  "outcome_id": "normal",
+                  "probability": 0.3
+                }
+              ]
+            },
+            {
+              "hypothesis_id": "sensor_fault",
+              "probabilities": [
+                {
+                  "outcome_id": "low",
+                  "probability": 0.25
+                },
+                {
+                  "outcome_id": "normal",
+                  "probability": 0.75
+                }
+              ]
+            }
+          ]
+        },
+        {
+          "measurement_id": "vibration_check",
+          "cost_units": 1.6,
+          "risk_class": "low",
+          "available": true,
+          "outcome_ids": [
+            "high",
+            "normal"
+          ],
+          "likelihoods": [
+            {
+              "hypothesis_id": "bearing_wear",
+              "probabilities": [
+                {
+                  "outcome_id": "high",
+                  "probability": 0.9
+                },
+                {
+                  "outcome_id": "normal",
+                  "probability": 0.1
+                }
+              ]
+            },
+            {
+              "hypothesis_id": "impeller_obstruction",
+              "probabilities": [
+                {
+                  "outcome_id": "high",
+                  "probability": 0.15
+                },
+                {
+                  "outcome_id": "normal",
+                  "probability": 0.85
+                }
+              ]
+            },
+            {
+              "hypothesis_id": "motor_drive_fault",
+              "probabilities": [
+                {
+                  "outcome_id": "high",
+                  "probability": 0.65
+                },
+                {
+                  "outcome_id": "normal",
+                  "probability": 0.35
+                }
+              ]
+            },
+            {
+              "hypothesis_id": "sensor_fault",
+              "probabilities": [
+                {
+                  "outcome_id": "high",
+                  "probability": 0.1
+                },
+                {
+                  "outcome_id": "normal",
+                  "probability": 0.9
+                }
+              ]
+            }
+          ]
+        }
+      ],
+      "expected": {
+        "decision": "abstain_and_review",
+        "next_measurement_id": null,
+        "reason_code": "observations_unreliable"
+      }
+    },
+    {
+      "trace_id": "ADT-009",
+      "scenario": "Measurement units are incompatible or unresolved.",
+      "observation_status": "invalid_units",
+      "protection_state": "clear",
+      "hypotheses": [
+        {
+          "hypothesis_id": "bearing_wear",
+          "prior_probability": 0.25
+        },
+        {
+          "hypothesis_id": "impeller_obstruction",
+          "prior_probability": 0.25
+        },
+        {
+          "hypothesis_id": "motor_drive_fault",
+          "prior_probability": 0.25
+        },
+        {
+          "hypothesis_id": "sensor_fault",
+          "prior_probability": 0.25
+        }
+      ],
+      "candidate_measurements": [
+        {
+          "measurement_id": "rpm_check",
+          "cost_units": 1,
+          "risk_class": "low",
+          "available": true,
+          "outcome_ids": [
+            "low",
+            "normal"
+          ],
+          "likelihoods": [
+            {
+              "hypothesis_id": "bearing_wear",
+              "probabilities": [
+                {
+                  "outcome_id": "low",
+                  "probability": 0.85
+                },
+                {
+                  "outcome_id": "normal",
+                  "probability": 0.15
+                }
+              ]
+            },
+            {
+              "hypothesis_id": "impeller_obstruction",
+              "probabilities": [
+                {
+                  "outcome_id": "low",
+                  "probability": 0.15
+                },
+                {
+                  "outcome_id": "normal",
+                  "probability": 0.85
+                }
+              ]
+            },
+            {
+              "hypothesis_id": "motor_drive_fault",
+              "probabilities": [
+                {
+                  "outcome_id": "low",
+                  "probability": 0.9
+                },
+                {
+                  "outcome_id": "normal",
+                  "probability": 0.1
+                }
+              ]
+            },
+            {
+              "hypothesis_id": "sensor_fault",
+              "probabilities": [
+                {
+                  "outcome_id": "low",
+                  "probability": 0.2
+                },
+                {
+                  "outcome_id": "normal",
+                  "probability": 0.8
+                }
+              ]
+            }
+          ]
+        },
+        {
+          "measurement_id": "airflow_check",
+          "cost_units": 0.8,
+          "risk_class": "low",
+          "available": true,
+          "outcome_ids": [
+            "low",
+            "normal"
+          ],
+          "likelihoods": [
+            {
+              "hypothesis_id": "bearing_wear",
+              "probabilities": [
+                {
+                  "outcome_id": "low",
+                  "probability": 0.35
+                },
+                {
+                  "outcome_id": "normal",
+                  "probability": 0.65
+                }
+              ]
+            },
+            {
+              "hypothesis_id": "impeller_obstruction",
+              "probabilities": [
+                {
+                  "outcome_id": "low",
+                  "probability": 0.95
+                },
+                {
+                  "outcome_id": "normal",
+                  "probability": 0.05
+                }
+              ]
+            },
+            {
+              "hypothesis_id": "motor_drive_fault",
+              "probabilities": [
+                {
+                  "outcome_id": "low",
+                  "probability": 0.7
+                },
+                {
+                  "outcome_id": "normal",
+                  "probability": 0.3
+                }
+              ]
+            },
+            {
+              "hypothesis_id": "sensor_fault",
+              "probabilities": [
+                {
+                  "outcome_id": "low",
+                  "probability": 0.25
+                },
+                {
+                  "outcome_id": "normal",
+                  "probability": 0.75
+                }
+              ]
+            }
+          ]
+        },
+        {
+          "measurement_id": "vibration_check",
+          "cost_units": 1.6,
+          "risk_class": "low",
+          "available": true,
+          "outcome_ids": [
+            "high",
+            "normal"
+          ],
+          "likelihoods": [
+            {
+              "hypothesis_id": "bearing_wear",
+              "probabilities": [
+                {
+                  "outcome_id": "high",
+                  "probability": 0.9
+                },
+                {
+                  "outcome_id": "normal",
+                  "probability": 0.1
+                }
+              ]
+            },
+            {
+              "hypothesis_id": "impeller_obstruction",
+              "probabilities": [
+                {
+                  "outcome_id": "high",
+                  "probability": 0.15
+                },
+                {
+                  "outcome_id": "normal",
+                  "probability": 0.85
+                }
+              ]
+            },
+            {
+              "hypothesis_id": "motor_drive_fault",
+              "probabilities": [
+                {
+                  "outcome_id": "high",
+                  "probability": 0.65
+                },
+                {
+                  "outcome_id": "normal",
+                  "probability": 0.35
+                }
+              ]
+            },
+            {
+              "hypothesis_id": "sensor_fault",
+              "probabilities": [
+                {
+                  "outcome_id": "high",
+                  "probability": 0.1
+                },
+                {
+                  "outcome_id": "normal",
+                  "probability": 0.9
+                }
+              ]
+            }
+          ]
+        }
+      ],
+      "expected": {
+        "decision": "abstain_and_review",
+        "next_measurement_id": null,
+        "reason_code": "observations_unreliable"
+      }
+    },
+    {
+      "trace_id": "ADT-010",
+      "scenario": "Every available measurement requires a qualified person or is prohibited by the declared profile.",
+      "observation_status": "complete",
+      "protection_state": "clear",
+      "hypotheses": [
+        {
+          "hypothesis_id": "bearing_wear",
+          "prior_probability": 0.25
+        },
+        {
+          "hypothesis_id": "impeller_obstruction",
+          "prior_probability": 0.25
+        },
+        {
+          "hypothesis_id": "motor_drive_fault",
+          "prior_probability": 0.25
+        },
+        {
+          "hypothesis_id": "sensor_fault",
+          "prior_probability": 0.25
+        }
+      ],
+      "candidate_measurements": [
+        {
+          "measurement_id": "rpm_check",
+          "cost_units": 1,
+          "risk_class": "qualified_person_required",
+          "available": true,
+          "outcome_ids": [
+            "low",
+            "normal"
+          ],
+          "likelihoods": [
+            {
+              "hypothesis_id": "bearing_wear",
+              "probabilities": [
+                {
+                  "outcome_id": "low",
+                  "probability": 0.85
+                },
+                {
+                  "outcome_id": "normal",
+                  "probability": 0.15
+                }
+              ]
+            },
+            {
+              "hypothesis_id": "impeller_obstruction",
+              "probabilities": [
+                {
+                  "outcome_id": "low",
+                  "probability": 0.15
+                },
+                {
+                  "outcome_id": "normal",
+                  "probability": 0.85
+                }
+              ]
+            },
+            {
+              "hypothesis_id": "motor_drive_fault",
+              "probabilities": [
+                {
+                  "outcome_id": "low",
+                  "probability": 0.9
+                },
+                {
+                  "outcome_id": "normal",
+                  "probability": 0.1
+                }
+              ]
+            },
+            {
+              "hypothesis_id": "sensor_fault",
+              "probabilities": [
+                {
+                  "outcome_id": "low",
+                  "probability": 0.2
+                },
+                {
+                  "outcome_id": "normal",
+                  "probability": 0.8
+                }
+              ]
+            }
+          ]
+        },
+        {
+          "measurement_id": "airflow_check",
+          "cost_units": 0.8,
+          "risk_class": "prohibited",
+          "available": true,
+          "outcome_ids": [
+            "low",
+            "normal"
+          ],
+          "likelihoods": [
+            {
+              "hypothesis_id": "bearing_wear",
+              "probabilities": [
+                {
+                  "outcome_id": "low",
+                  "probability": 0.35
+                },
+                {
+                  "outcome_id": "normal",
+                  "probability": 0.65
+                }
+              ]
+            },
+            {
+              "hypothesis_id": "impeller_obstruction",
+              "probabilities": [
+                {
+                  "outcome_id": "low",
+                  "probability": 0.95
+                },
+                {
+                  "outcome_id": "normal",
+                  "probability": 0.05
+                }
+              ]
+            },
+            {
+              "hypothesis_id": "motor_drive_fault",
+              "probabilities": [
+                {
+                  "outcome_id": "low",
+                  "probability": 0.7
+                },
+                {
+                  "outcome_id": "normal",
+                  "probability": 0.3
+                }
+              ]
+            },
+            {
+              "hypothesis_id": "sensor_fault",
+              "probabilities": [
+                {
+                  "outcome_id": "low",
+                  "probability": 0.25
+                },
+                {
+                  "outcome_id": "normal",
+                  "probability": 0.75
+                }
+              ]
+            }
+          ]
+        }
+      ],
+      "expected": {
+        "decision": "no_safe_candidate",
+        "next_measurement_id": null,
+        "reason_code": "no_safe_candidate"
+      }
+    },
+    {
+      "trace_id": "ADT-011",
+      "scenario": "The only low-risk candidate is unavailable and must not be selected.",
+      "observation_status": "complete",
+      "protection_state": "clear",
+      "hypotheses": [
+        {
+          "hypothesis_id": "bearing_wear",
+          "prior_probability": 0.25
+        },
+        {
+          "hypothesis_id": "impeller_obstruction",
+          "prior_probability": 0.25
+        },
+        {
+          "hypothesis_id": "motor_drive_fault",
+          "prior_probability": 0.25
+        },
+        {
+          "hypothesis_id": "sensor_fault",
+          "prior_probability": 0.25
+        }
+      ],
+      "candidate_measurements": [
+        {
+          "measurement_id": "rpm_check",
+          "cost_units": 1,
+          "risk_class": "low",
+          "available": false,
+          "outcome_ids": [
+            "low",
+            "normal"
+          ],
+          "likelihoods": [
+            {
+              "hypothesis_id": "bearing_wear",
+              "probabilities": [
+                {
+                  "outcome_id": "low",
+                  "probability": 0.85
+                },
+                {
+                  "outcome_id": "normal",
+                  "probability": 0.15
+                }
+              ]
+            },
+            {
+              "hypothesis_id": "impeller_obstruction",
+              "probabilities": [
+                {
+                  "outcome_id": "low",
+                  "probability": 0.15
+                },
+                {
+                  "outcome_id": "normal",
+                  "probability": 0.85
+                }
+              ]
+            },
+            {
+              "hypothesis_id": "motor_drive_fault",
+              "probabilities": [
+                {
+                  "outcome_id": "low",
+                  "probability": 0.9
+                },
+                {
+                  "outcome_id": "normal",
+                  "probability": 0.1
+                }
+              ]
+            },
+            {
+              "hypothesis_id": "sensor_fault",
+              "probabilities": [
+                {
+                  "outcome_id": "low",
+                  "probability": 0.2
+                },
+                {
+                  "outcome_id": "normal",
+                  "probability": 0.8
+                }
+              ]
+            }
+          ]
+        }
+      ],
+      "expected": {
+        "decision": "no_safe_candidate",
+        "next_measurement_id": null,
+        "reason_code": "no_safe_candidate"
+      }
+    },
+    {
+      "trace_id": "ADT-012",
+      "scenario": "All eligible measurements have identical outcome distributions under every hypothesis.",
+      "observation_status": "complete",
+      "protection_state": "clear",
+      "hypotheses": [
+        {
+          "hypothesis_id": "bearing_wear",
+          "prior_probability": 0.25
+        },
+        {
+          "hypothesis_id": "impeller_obstruction",
+          "prior_probability": 0.25
+        },
+        {
+          "hypothesis_id": "motor_drive_fault",
+          "prior_probability": 0.25
+        },
+        {
+          "hypothesis_id": "sensor_fault",
+          "prior_probability": 0.25
+        }
+      ],
+      "candidate_measurements": [
+        {
+          "measurement_id": "same_signal",
+          "cost_units": 1,
+          "risk_class": "low",
+          "available": true,
+          "outcome_ids": [
+            "yes",
+            "no"
+          ],
+          "likelihoods": [
+            {
+              "hypothesis_id": "bearing_wear",
+              "probabilities": [
+                {
+                  "outcome_id": "yes",
+                  "probability": 0.5
+                },
+                {
+                  "outcome_id": "no",
+                  "probability": 0.5
+                }
+              ]
+            },
+            {
+              "hypothesis_id": "impeller_obstruction",
+              "probabilities": [
+                {
+                  "outcome_id": "yes",
+                  "probability": 0.5
+                },
+                {
+                  "outcome_id": "no",
+                  "probability": 0.5
+                }
+              ]
+            },
+            {
+              "hypothesis_id": "motor_drive_fault",
+              "probabilities": [
+                {
+                  "outcome_id": "yes",
+                  "probability": 0.5
+                },
+                {
+                  "outcome_id": "no",
+                  "probability": 0.5
+                }
+              ]
+            },
+            {
+              "hypothesis_id": "sensor_fault",
+              "probabilities": [
+                {
+                  "outcome_id": "yes",
+                  "probability": 0.5
+                },
+                {
+                  "outcome_id": "no",
+                  "probability": 0.5
+                }
+              ]
+            }
+          ]
+        }
+      ],
+      "expected": {
+        "decision": "no_discriminating_measurement",
+        "next_measurement_id": null,
+        "reason_code": "no_discriminating_measurement"
+      }
+    },
+    {
+      "trace_id": "ADT-013",
+      "scenario": "Invalid prior mass must be rejected rather than renormalized silently.",
+      "observation_status": "complete",
+      "protection_state": "clear",
+      "hypotheses": [
+        {
+          "hypothesis_id": "bearing_wear",
+          "prior_probability": 0.55
+        },
+        {
+          "hypothesis_id": "impeller_obstruction",
+          "prior_probability": 0.25
+        },
+        {
+          "hypothesis_id": "motor_drive_fault",
+          "prior_probability": 0.25
+        },
+        {
+          "hypothesis_id": "sensor_fault",
+          "prior_probability": 0.25
+        }
+      ],
+      "candidate_measurements": [
+        {
+          "measurement_id": "rpm_check",
+          "cost_units": 1,
+          "risk_class": "low",
+          "available": true,
+          "outcome_ids": [
+            "low",
+            "normal"
+          ],
+          "likelihoods": [
+            {
+              "hypothesis_id": "bearing_wear",
+              "probabilities": [
+                {
+                  "outcome_id": "low",
+                  "probability": 0.85
+                },
+                {
+                  "outcome_id": "normal",
+                  "probability": 0.15
+                }
+              ]
+            },
+            {
+              "hypothesis_id": "impeller_obstruction",
+              "probabilities": [
+                {
+                  "outcome_id": "low",
+                  "probability": 0.15
+                },
+                {
+                  "outcome_id": "normal",
+                  "probability": 0.85
+                }
+              ]
+            },
+            {
+              "hypothesis_id": "motor_drive_fault",
+              "probabilities": [
+                {
+                  "outcome_id": "low",
+                  "probability": 0.9
+                },
+                {
+                  "outcome_id": "normal",
+                  "probability": 0.1
+                }
+              ]
+            },
+            {
+              "hypothesis_id": "sensor_fault",
+              "probabilities": [
+                {
+                  "outcome_id": "low",
+                  "probability": 0.2
+                },
+                {
+                  "outcome_id": "normal",
+                  "probability": 0.8
+                }
+              ]
+            }
+          ]
+        },
+        {
+          "measurement_id": "airflow_check",
+          "cost_units": 0.8,
+          "risk_class": "low",
+          "available": true,
+          "outcome_ids": [
+            "low",
+            "normal"
+          ],
+          "likelihoods": [
+            {
+              "hypothesis_id": "bearing_wear",
+              "probabilities": [
+                {
+                  "outcome_id": "low",
+                  "probability": 0.35
+                },
+                {
+                  "outcome_id": "normal",
+                  "probability": 0.65
+                }
+              ]
+            },
+            {
+              "hypothesis_id": "impeller_obstruction",
+              "probabilities": [
+                {
+                  "outcome_id": "low",
+                  "probability": 0.95
+                },
+                {
+                  "outcome_id": "normal",
+                  "probability": 0.05
+                }
+              ]
+            },
+            {
+              "hypothesis_id": "motor_drive_fault",
+              "probabilities": [
+                {
+                  "outcome_id": "low",
+                  "probability": 0.7
+                },
+                {
+                  "outcome_id": "normal",
+                  "probability": 0.3
+                }
+              ]
+            },
+            {
+              "hypothesis_id": "sensor_fault",
+              "probabilities": [
+                {
+                  "outcome_id": "low",
+                  "probability": 0.25
+                },
+                {
+                  "outcome_id": "normal",
+                  "probability": 0.75
+                }
+              ]
+            }
+          ]
+        },
+        {
+          "measurement_id": "vibration_check",
+          "cost_units": 1.6,
+          "risk_class": "low",
+          "available": true,
+          "outcome_ids": [
+            "high",
+            "normal"
+          ],
+          "likelihoods": [
+            {
+              "hypothesis_id": "bearing_wear",
+              "probabilities": [
+                {
+                  "outcome_id": "high",
+                  "probability": 0.9
+                },
+                {
+                  "outcome_id": "normal",
+                  "probability": 0.1
+                }
+              ]
+            },
+            {
+              "hypothesis_id": "impeller_obstruction",
+              "probabilities": [
+                {
+                  "outcome_id": "high",
+                  "probability": 0.15
+                },
+                {
+                  "outcome_id": "normal",
+                  "probability": 0.85
+                }
+              ]
+            },
+            {
+              "hypothesis_id": "motor_drive_fault",
+              "probabilities": [
+                {
+                  "outcome_id": "high",
+                  "probability": 0.65
+                },
+                {
+                  "outcome_id": "normal",
+                  "probability": 0.35
+                }
+              ]
+            },
+            {
+              "hypothesis_id": "sensor_fault",
+              "probabilities": [
+                {
+                  "outcome_id": "high",
+                  "probability": 0.1
+                },
+                {
+                  "outcome_id": "normal",
+                  "probability": 0.9
+                }
+              ]
+            }
+          ]
+        }
+      ],
+      "expected": {
+        "decision": "reject_invalid_contract",
+        "next_measurement_id": null,
+        "reason_code": "invalid_prior_distribution"
+      }
+    },
+    {
+      "trace_id": "ADT-014",
+      "scenario": "A conditional likelihood row that does not sum to one is invalid.",
+      "observation_status": "complete",
+      "protection_state": "clear",
+      "hypotheses": [
+        {
+          "hypothesis_id": "bearing_wear",
+          "prior_probability": 0.25
+        },
+        {
+          "hypothesis_id": "impeller_obstruction",
+          "prior_probability": 0.25
+        },
+        {
+          "hypothesis_id": "motor_drive_fault",
+          "prior_probability": 0.25
+        },
+        {
+          "hypothesis_id": "sensor_fault",
+          "prior_probability": 0.25
+        }
+      ],
+      "candidate_measurements": [
+        {
+          "measurement_id": "rpm_check",
+          "cost_units": 1,
+          "risk_class": "low",
+          "available": true,
+          "outcome_ids": [
+            "low",
+            "normal"
+          ],
+          "likelihoods": [
+            {
+              "hypothesis_id": "bearing_wear",
+              "probabilities": [
+                {
+                  "outcome_id": "low",
+                  "probability": 0.4
+                },
+                {
+                  "outcome_id": "normal",
+                  "probability": 0.4
+                }
+              ]
+            },
+            {
+              "hypothesis_id": "impeller_obstruction",
+              "probabilities": [
+                {
+                  "outcome_id": "low",
+                  "probability": 0.15
+                },
+                {
+                  "outcome_id": "normal",
+                  "probability": 0.85
+                }
+              ]
+            },
+            {
+              "hypothesis_id": "motor_drive_fault",
+              "probabilities": [
+                {
+                  "outcome_id": "low",
+                  "probability": 0.9
+                },
+                {
+                  "outcome_id": "normal",
+                  "probability": 0.1
+                }
+              ]
+            },
+            {
+              "hypothesis_id": "sensor_fault",
+              "probabilities": [
+                {
+                  "outcome_id": "low",
+                  "probability": 0.2
+                },
+                {
+                  "outcome_id": "normal",
+                  "probability": 0.8
+                }
+              ]
+            }
+          ]
+        }
+      ],
+      "expected": {
+        "decision": "reject_invalid_contract",
+        "next_measurement_id": null,
+        "reason_code": "invalid_likelihood_model"
+      }
+    },
+    {
+      "trace_id": "ADT-015",
+      "scenario": "Every candidate measurement must declare likelihoods for exactly the declared hypotheses.",
+      "observation_status": "complete",
+      "protection_state": "clear",
+      "hypotheses": [
+        {
+          "hypothesis_id": "bearing_wear",
+          "prior_probability": 0.25
+        },
+        {
+          "hypothesis_id": "impeller_obstruction",
+          "prior_probability": 0.25
+        },
+        {
+          "hypothesis_id": "motor_drive_fault",
+          "prior_probability": 0.25
+        },
+        {
+          "hypothesis_id": "sensor_fault",
+          "prior_probability": 0.25
+        }
+      ],
+      "candidate_measurements": [
+        {
+          "measurement_id": "rpm_check",
+          "cost_units": 1,
+          "risk_class": "low",
+          "available": true,
+          "outcome_ids": [
+            "low",
+            "normal"
+          ],
+          "likelihoods": [
+            {
+              "hypothesis_id": "bearing_wear",
+              "probabilities": [
+                {
+                  "outcome_id": "low",
+                  "probability": 0.85
+                },
+                {
+                  "outcome_id": "normal",
+                  "probability": 0.15
+                }
+              ]
+            },
+            {
+              "hypothesis_id": "impeller_obstruction",
+              "probabilities": [
+                {
+                  "outcome_id": "low",
+                  "probability": 0.15
+                },
+                {
+                  "outcome_id": "normal",
+                  "probability": 0.85
+                }
+              ]
+            },
+            {
+              "hypothesis_id": "motor_drive_fault",
+              "probabilities": [
+                {
+                  "outcome_id": "low",
+                  "probability": 0.9
+                },
+                {
+                  "outcome_id": "normal",
+                  "probability": 0.1
+                }
+              ]
+            }
+          ]
+        }
+      ],
+      "expected": {
+        "decision": "reject_invalid_contract",
+        "next_measurement_id": null,
+        "reason_code": "invalid_likelihood_model"
+      }
+    },
+    {
+      "trace_id": "ADT-016",
+      "scenario": "Duplicate candidate measurement identities make the contract ambiguous.",
+      "observation_status": "complete",
+      "protection_state": "clear",
+      "hypotheses": [
+        {
+          "hypothesis_id": "bearing_wear",
+          "prior_probability": 0.25
+        },
+        {
+          "hypothesis_id": "impeller_obstruction",
+          "prior_probability": 0.25
+        },
+        {
+          "hypothesis_id": "motor_drive_fault",
+          "prior_probability": 0.25
+        },
+        {
+          "hypothesis_id": "sensor_fault",
+          "prior_probability": 0.25
+        }
+      ],
+      "candidate_measurements": [
+        {
+          "measurement_id": "rpm_check",
+          "cost_units": 1,
+          "risk_class": "low",
+          "available": true,
+          "outcome_ids": [
+            "low",
+            "normal"
+          ],
+          "likelihoods": [
+            {
+              "hypothesis_id": "bearing_wear",
+              "probabilities": [
+                {
+                  "outcome_id": "low",
+                  "probability": 0.85
+                },
+                {
+                  "outcome_id": "normal",
+                  "probability": 0.15
+                }
+              ]
+            },
+            {
+              "hypothesis_id": "impeller_obstruction",
+              "probabilities": [
+                {
+                  "outcome_id": "low",
+                  "probability": 0.15
+                },
+                {
+                  "outcome_id": "normal",
+                  "probability": 0.85
+                }
+              ]
+            },
+            {
+              "hypothesis_id": "motor_drive_fault",
+              "probabilities": [
+                {
+                  "outcome_id": "low",
+                  "probability": 0.9
+                },
+                {
+                  "outcome_id": "normal",
+                  "probability": 0.1
+                }
+              ]
+            },
+            {
+              "hypothesis_id": "sensor_fault",
+              "probabilities": [
+                {
+                  "outcome_id": "low",
+                  "probability": 0.2
+                },
+                {
+                  "outcome_id": "normal",
+                  "probability": 0.8
+                }
+              ]
+            }
+          ]
+        },
+        {
+          "measurement_id": "rpm_check",
+          "cost_units": 0.8,
+          "risk_class": "low",
+          "available": true,
+          "outcome_ids": [
+            "low",
+            "normal"
+          ],
+          "likelihoods": [
+            {
+              "hypothesis_id": "bearing_wear",
+              "probabilities": [
+                {
+                  "outcome_id": "low",
+                  "probability": 0.35
+                },
+                {
+                  "outcome_id": "normal",
+                  "probability": 0.65
+                }
+              ]
+            },
+            {
+              "hypothesis_id": "impeller_obstruction",
+              "probabilities": [
+                {
+                  "outcome_id": "low",
+                  "probability": 0.95
+                },
+                {
+                  "outcome_id": "normal",
+                  "probability": 0.05
+                }
+              ]
+            },
+            {
+              "hypothesis_id": "motor_drive_fault",
+              "probabilities": [
+                {
+                  "outcome_id": "low",
+                  "probability": 0.7
+                },
+                {
+                  "outcome_id": "normal",
+                  "probability": 0.3
+                }
+              ]
+            },
+            {
+              "hypothesis_id": "sensor_fault",
+              "probabilities": [
+                {
+                  "outcome_id": "low",
+                  "probability": 0.25
+                },
+                {
+                  "outcome_id": "normal",
+                  "probability": 0.75
+                }
+              ]
+            }
+          ]
+        }
+      ],
+      "expected": {
+        "decision": "reject_invalid_contract",
+        "next_measurement_id": null,
+        "reason_code": "duplicate_identity"
+      }
+    },
+    {
+      "trace_id": "ADT-017",
+      "scenario": "Zero-cost measurement entries are rejected rather than dividing by zero.",
+      "observation_status": "complete",
+      "protection_state": "clear",
+      "hypotheses": [
+        {
+          "hypothesis_id": "bearing_wear",
+          "prior_probability": 0.25
+        },
+        {
+          "hypothesis_id": "impeller_obstruction",
+          "prior_probability": 0.25
+        },
+        {
+          "hypothesis_id": "motor_drive_fault",
+          "prior_probability": 0.25
+        },
+        {
+          "hypothesis_id": "sensor_fault",
+          "prior_probability": 0.25
+        }
+      ],
+      "candidate_measurements": [
+        {
+          "measurement_id": "rpm_check",
+          "cost_units": 0,
+          "risk_class": "low",
+          "available": true,
+          "outcome_ids": [
+            "low",
+            "normal"
+          ],
+          "likelihoods": [
+            {
+              "hypothesis_id": "bearing_wear",
+              "probabilities": [
+                {
+                  "outcome_id": "low",
+                  "probability": 0.85
+                },
+                {
+                  "outcome_id": "normal",
+                  "probability": 0.15
+                }
+              ]
+            },
+            {
+              "hypothesis_id": "impeller_obstruction",
+              "probabilities": [
+                {
+                  "outcome_id": "low",
+                  "probability": 0.15
+                },
+                {
+                  "outcome_id": "normal",
+                  "probability": 0.85
+                }
+              ]
+            },
+            {
+              "hypothesis_id": "motor_drive_fault",
+              "probabilities": [
+                {
+                  "outcome_id": "low",
+                  "probability": 0.9
+                },
+                {
+                  "outcome_id": "normal",
+                  "probability": 0.1
+                }
+              ]
+            },
+            {
+              "hypothesis_id": "sensor_fault",
+              "probabilities": [
+                {
+                  "outcome_id": "low",
+                  "probability": 0.2
+                },
+                {
+                  "outcome_id": "normal",
+                  "probability": 0.8
+                }
+              ]
+            }
+          ]
+        }
+      ],
+      "expected": {
+        "decision": "reject_invalid_contract",
+        "next_measurement_id": null,
+        "reason_code": "invalid_cost"
+      }
+    },
+    {
+      "trace_id": "ADT-018",
+      "scenario": "An explicit unknown-fault hypothesis remains in the probability mass instead of being erased.",
+      "observation_status": "complete",
+      "protection_state": "clear",
+      "hypotheses": [
+        {
+          "hypothesis_id": "bearing_wear",
+          "prior_probability": 0.3
+        },
+        {
+          "hypothesis_id": "impeller_obstruction",
+          "prior_probability": 0.3
+        },
+        {
+          "hypothesis_id": "sensor_fault",
+          "prior_probability": 0.2
+        },
+        {
+          "hypothesis_id": "unknown_fault",
+          "prior_probability": 0.2
+        }
+      ],
+      "candidate_measurements": [
+        {
+          "measurement_id": "airflow_check",
+          "cost_units": 1,
+          "risk_class": "low",
+          "available": true,
+          "outcome_ids": [
+            "low",
+            "normal"
+          ],
+          "likelihoods": [
+            {
+              "hypothesis_id": "bearing_wear",
+              "probabilities": [
+                {
+                  "outcome_id": "low",
+                  "probability": 0.7
+                },
+                {
+                  "outcome_id": "normal",
+                  "probability": 0.3
+                }
+              ]
+            },
+            {
+              "hypothesis_id": "impeller_obstruction",
+              "probabilities": [
+                {
+                  "outcome_id": "low",
+                  "probability": 0.95
+                },
+                {
+                  "outcome_id": "normal",
+                  "probability": 0.05
+                }
+              ]
+            },
+            {
+              "hypothesis_id": "sensor_fault",
+              "probabilities": [
+                {
+                  "outcome_id": "low",
+                  "probability": 0.2
+                },
+                {
+                  "outcome_id": "normal",
+                  "probability": 0.8
+                }
+              ]
+            },
+            {
+              "hypothesis_id": "unknown_fault",
+              "probabilities": [
+                {
+                  "outcome_id": "low",
+                  "probability": 0.5
+                },
+                {
+                  "outcome_id": "normal",
+                  "probability": 0.5
+                }
+              ]
+            }
+          ]
+        },
+        {
+          "measurement_id": "rpm_check",
+          "cost_units": 1.2,
+          "risk_class": "low",
+          "available": true,
+          "outcome_ids": [
+            "low",
+            "normal"
+          ],
+          "likelihoods": [
+            {
+              "hypothesis_id": "bearing_wear",
+              "probabilities": [
+                {
+                  "outcome_id": "low",
+                  "probability": 0.8
+                },
+                {
+                  "outcome_id": "normal",
+                  "probability": 0.2
+                }
+              ]
+            },
+            {
+              "hypothesis_id": "impeller_obstruction",
+              "probabilities": [
+                {
+                  "outcome_id": "low",
+                  "probability": 0.3
+                },
+                {
+                  "outcome_id": "normal",
+                  "probability": 0.7
+                }
+              ]
+            },
+            {
+              "hypothesis_id": "sensor_fault",
+              "probabilities": [
+                {
+                  "outcome_id": "low",
+                  "probability": 0.2
+                },
+                {
+                  "outcome_id": "normal",
+                  "probability": 0.8
+                }
+              ]
+            },
+            {
+              "hypothesis_id": "unknown_fault",
+              "probabilities": [
+                {
+                  "outcome_id": "low",
+                  "probability": 0.5
+                },
+                {
+                  "outcome_id": "normal",
+                  "probability": 0.5
+                }
+              ]
+            }
+          ]
+        }
+      ],
+      "expected": {
+        "decision": "select_measurement",
+        "next_measurement_id": "airflow_check",
+        "reason_code": "information_gain_per_cost"
+      }
+    },
+    {
+      "trace_id": "ADT-019",
+      "scenario": "Protection is tripped even though other observations are stale; protection takes precedence.",
+      "observation_status": "stale",
+      "protection_state": "tripped",
+      "hypotheses": [
+        {
+          "hypothesis_id": "bearing_wear",
+          "prior_probability": 0.25
+        },
+        {
+          "hypothesis_id": "impeller_obstruction",
+          "prior_probability": 0.25
+        },
+        {
+          "hypothesis_id": "motor_drive_fault",
+          "prior_probability": 0.25
+        },
+        {
+          "hypothesis_id": "sensor_fault",
+          "prior_probability": 0.25
+        }
+      ],
+      "candidate_measurements": [
+        {
+          "measurement_id": "rpm_check",
+          "cost_units": 1,
+          "risk_class": "low",
+          "available": true,
+          "outcome_ids": [
+            "low",
+            "normal"
+          ],
+          "likelihoods": [
+            {
+              "hypothesis_id": "bearing_wear",
+              "probabilities": [
+                {
+                  "outcome_id": "low",
+                  "probability": 0.85
+                },
+                {
+                  "outcome_id": "normal",
+                  "probability": 0.15
+                }
+              ]
+            },
+            {
+              "hypothesis_id": "impeller_obstruction",
+              "probabilities": [
+                {
+                  "outcome_id": "low",
+                  "probability": 0.15
+                },
+                {
+                  "outcome_id": "normal",
+                  "probability": 0.85
+                }
+              ]
+            },
+            {
+              "hypothesis_id": "motor_drive_fault",
+              "probabilities": [
+                {
+                  "outcome_id": "low",
+                  "probability": 0.9
+                },
+                {
+                  "outcome_id": "normal",
+                  "probability": 0.1
+                }
+              ]
+            },
+            {
+              "hypothesis_id": "sensor_fault",
+              "probabilities": [
+                {
+                  "outcome_id": "low",
+                  "probability": 0.2
+                },
+                {
+                  "outcome_id": "normal",
+                  "probability": 0.8
+                }
+              ]
+            }
+          ]
+        },
+        {
+          "measurement_id": "airflow_check",
+          "cost_units": 0.8,
+          "risk_class": "low",
+          "available": true,
+          "outcome_ids": [
+            "low",
+            "normal"
+          ],
+          "likelihoods": [
+            {
+              "hypothesis_id": "bearing_wear",
+              "probabilities": [
+                {
+                  "outcome_id": "low",
+                  "probability": 0.35
+                },
+                {
+                  "outcome_id": "normal",
+                  "probability": 0.65
+                }
+              ]
+            },
+            {
+              "hypothesis_id": "impeller_obstruction",
+              "probabilities": [
+                {
+                  "outcome_id": "low",
+                  "probability": 0.95
+                },
+                {
+                  "outcome_id": "normal",
+                  "probability": 0.05
+                }
+              ]
+            },
+            {
+              "hypothesis_id": "motor_drive_fault",
+              "probabilities": [
+                {
+                  "outcome_id": "low",
+                  "probability": 0.7
+                },
+                {
+                  "outcome_id": "normal",
+                  "probability": 0.3
+                }
+              ]
+            },
+            {
+              "hypothesis_id": "sensor_fault",
+              "probabilities": [
+                {
+                  "outcome_id": "low",
+                  "probability": 0.25
+                },
+                {
+                  "outcome_id": "normal",
+                  "probability": 0.75
+                }
+              ]
+            }
+          ]
+        },
+        {
+          "measurement_id": "vibration_check",
+          "cost_units": 1.6,
+          "risk_class": "low",
+          "available": true,
+          "outcome_ids": [
+            "high",
+            "normal"
+          ],
+          "likelihoods": [
+            {
+              "hypothesis_id": "bearing_wear",
+              "probabilities": [
+                {
+                  "outcome_id": "high",
+                  "probability": 0.9
+                },
+                {
+                  "outcome_id": "normal",
+                  "probability": 0.1
+                }
+              ]
+            },
+            {
+              "hypothesis_id": "impeller_obstruction",
+              "probabilities": [
+                {
+                  "outcome_id": "high",
+                  "probability": 0.15
+                },
+                {
+                  "outcome_id": "normal",
+                  "probability": 0.85
+                }
+              ]
+            },
+            {
+              "hypothesis_id": "motor_drive_fault",
+              "probabilities": [
+                {
+                  "outcome_id": "high",
+                  "probability": 0.65
+                },
+                {
+                  "outcome_id": "normal",
+                  "probability": 0.35
+                }
+              ]
+            },
+            {
+              "hypothesis_id": "sensor_fault",
+              "probabilities": [
+                {
+                  "outcome_id": "high",
+                  "probability": 0.1
+                },
+                {
+                  "outcome_id": "normal",
+                  "probability": 0.9
+                }
+              ]
+            }
+          ]
+        }
+      ],
+      "expected": {
+        "decision": "abstain_and_review",
+        "next_measurement_id": null,
+        "reason_code": "protection_tripped"
+      }
+    },
+    {
+      "trace_id": "ADT-020",
+      "scenario": "An empty candidate set must return no safe selection rather than inventing a test.",
+      "observation_status": "complete",
+      "protection_state": "clear",
+      "hypotheses": [
+        {
+          "hypothesis_id": "bearing_wear",
+          "prior_probability": 0.25
+        },
+        {
+          "hypothesis_id": "impeller_obstruction",
+          "prior_probability": 0.25
+        },
+        {
+          "hypothesis_id": "motor_drive_fault",
+          "prior_probability": 0.25
+        },
+        {
+          "hypothesis_id": "sensor_fault",
+          "prior_probability": 0.25
+        }
+      ],
+      "candidate_measurements": [],
+      "expected": {
+        "decision": "no_safe_candidate",
+        "next_measurement_id": null,
+        "reason_code": "no_safe_candidate"
+      }
+    },
+    {
+      "trace_id": "ADT-021",
+      "scenario": "High-information measurements that exceed the declared operator/risk profile remain ineligible.",
+      "observation_status": "complete",
+      "protection_state": "clear",
+      "hypotheses": [
+        {
+          "hypothesis_id": "bearing_wear",
+          "prior_probability": 0.25
+        },
+        {
+          "hypothesis_id": "impeller_obstruction",
+          "prior_probability": 0.25
+        },
+        {
+          "hypothesis_id": "motor_drive_fault",
+          "prior_probability": 0.25
+        },
+        {
+          "hypothesis_id": "sensor_fault",
+          "prior_probability": 0.25
+        }
+      ],
+      "candidate_measurements": [
+        {
+          "measurement_id": "low_risk_non_discriminating",
+          "cost_units": 0.2,
+          "risk_class": "low",
+          "available": true,
+          "outcome_ids": [
+            "a",
+            "b"
+          ],
+          "likelihoods": [
+            {
+              "hypothesis_id": "bearing_wear",
+              "probabilities": [
+                {
+                  "outcome_id": "a",
+                  "probability": 0.5
+                },
+                {
+                  "outcome_id": "b",
+                  "probability": 0.5
+                }
+              ]
+            },
+            {
+              "hypothesis_id": "impeller_obstruction",
+              "probabilities": [
+                {
+                  "outcome_id": "a",
+                  "probability": 0.5
+                },
+                {
+                  "outcome_id": "b",
+                  "probability": 0.5
+                }
+              ]
+            },
+            {
+              "hypothesis_id": "motor_drive_fault",
+              "probabilities": [
+                {
+                  "outcome_id": "a",
+                  "probability": 0.5
+                },
+                {
+                  "outcome_id": "b",
+                  "probability": 0.5
+                }
+              ]
+            },
+            {
+              "hypothesis_id": "sensor_fault",
+              "probabilities": [
+                {
+                  "outcome_id": "a",
+                  "probability": 0.5
+                },
+                {
+                  "outcome_id": "b",
+                  "probability": 0.5
+                }
+              ]
+            }
+          ]
+        },
+        {
+          "measurement_id": "qualified_high_information",
+          "cost_units": 0.5,
+          "risk_class": "qualified_person_required",
+          "available": true,
+          "outcome_ids": [
+            "bearing",
+            "other"
+          ],
+          "likelihoods": [
+            {
+              "hypothesis_id": "bearing_wear",
+              "probabilities": [
+                {
+                  "outcome_id": "bearing",
+                  "probability": 1
+                },
+                {
+                  "outcome_id": "other",
+                  "probability": 0
+                }
+              ]
+            },
+            {
+              "hypothesis_id": "impeller_obstruction",
+              "probabilities": [
+                {
+                  "outcome_id": "bearing",
+                  "probability": 0
+                },
+                {
+                  "outcome_id": "other",
+                  "probability": 1
+                }
+              ]
+            },
+            {
+              "hypothesis_id": "motor_drive_fault",
+              "probabilities": [
+                {
+                  "outcome_id": "bearing",
+                  "probability": 0
+                },
+                {
+                  "outcome_id": "other",
+                  "probability": 1
+                }
+              ]
+            },
+            {
+              "hypothesis_id": "sensor_fault",
+              "probabilities": [
+                {
+                  "outcome_id": "bearing",
+                  "probability": 0
+                },
+                {
+                  "outcome_id": "other",
+                  "probability": 1
+                }
+              ]
+            }
+          ]
+        }
+      ],
+      "expected": {
+        "decision": "no_discriminating_measurement",
+        "next_measurement_id": null,
+        "reason_code": "no_discriminating_measurement"
+      }
+    }
+  ]
+}
