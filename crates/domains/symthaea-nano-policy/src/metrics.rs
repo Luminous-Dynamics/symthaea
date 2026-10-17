@@ -11,7 +11,7 @@ use std::collections::{BTreeMap, BTreeSet, HashSet};
 /// Post-run input-ledger contract version.
 pub const OUTCOME_LEDGER_SCHEMA_VERSION: &str = "nano-outcome-ledger-v1";
 /// Machine-readable metrics-report contract version.
-pub const METRICS_REPORT_SCHEMA_VERSION: &str = "nano-benchmark-metrics-v1";
+pub const METRICS_REPORT_SCHEMA_VERSION: &str = "nano-benchmark-metrics-v2";
 /// Maximum policy runs compared in one ledger.
 pub const MAX_ARMS: usize = 8;
 /// Maximum target queries per arm.
@@ -169,6 +169,30 @@ pub struct TargetMetrics {
     pub cost_to_success: Option<f64>,
 }
 
+/// Outcome summary for one declared independent group (for worst-group auditing).
+#[derive(Debug, Clone, Serialize, Deserialize, PartialEq)]
+#[serde(deny_unknown_fields)]
+pub struct GroupMetrics {
+    /// Stable group identifier from the frozen evaluation/shift manifest.
+    pub group_id: String,
+    /// Number of target queries assigned to this group.
+    pub target_query_count: usize,
+    /// Number of target queries with at least one usable outcome.
+    pub covered_target_queries: usize,
+    /// Covered target queries divided by this group's target count.
+    pub target_coverage_at_budget: f64,
+    /// Number of target queries that reached success by the final budget.
+    pub successful_target_queries: usize,
+    /// Success rate at the final budget, with fully failed targets retained in the denominator.
+    pub success_rate_at_budget: f64,
+    /// Mean success indicator over every point from 1..=query_budget.
+    pub normalized_success_auc: f64,
+    /// All-in recorded cost divided by this group's target count.
+    pub mean_cost_per_target_query: f64,
+    /// Success fraction at each shared query budget for this group.
+    pub success_curve: Vec<SuccessCurvePoint>,
+}
+
 /// Aggregate metrics for one policy arm.
 #[derive(Debug, Clone, Serialize, Deserialize, PartialEq)]
 #[serde(deny_unknown_fields)]
@@ -203,6 +227,14 @@ pub struct ArmMetrics {
     pub normalized_success_auc: f64,
     /// Success fraction at each common query budget.
     pub success_curve: Vec<SuccessCurvePoint>,
+    /// Lowest final-budget success rate across independent groups.
+    pub worst_group_success_rate_at_budget: f64,
+    /// Lowest normalized success AUC across independent groups.
+    pub worst_group_normalized_success_auc: f64,
+    /// Lowest target coverage across independent groups.
+    pub worst_group_target_coverage_at_budget: f64,
+    /// Per-group outcomes for shift-severity joins and worst-group audits.
+    pub group_metrics: Vec<GroupMetrics>,
     /// Mean best loss conditional on target coverage.
     pub mean_best_loss_given_coverage: Option<f64>,
     /// Median best loss conditional on target coverage.
@@ -682,6 +714,19 @@ fn evaluate_arm(ledger: &OutcomeLedger, arm: &OutcomeArm) -> ArmComputation {
         .map(|point| point.success_rate)
         .sum::<f64>()
         / ledger.query_budget as f64;
+    let group_metrics = evaluate_group_metrics(&targets, ledger.query_budget);
+    let worst_group_success_rate_at_budget = group_metrics
+        .iter()
+        .map(|group| group.success_rate_at_budget)
+        .fold(f64::INFINITY, f64::min);
+    let worst_group_normalized_success_auc = group_metrics
+        .iter()
+        .map(|group| group.normalized_success_auc)
+        .fold(f64::INFINITY, f64::min);
+    let worst_group_target_coverage_at_budget = group_metrics
+        .iter()
+        .map(|group| group.target_coverage_at_budget)
+        .fold(f64::INFINITY, f64::min);
 
     let metrics = ArmMetrics {
         arm_id: arm.arm_id.clone(),
@@ -705,6 +750,10 @@ fn evaluate_arm(ledger: &OutcomeLedger, arm: &OutcomeArm) -> ArmComputation {
         success_rate_at_budget: successful_targets as f64 / target_count as f64,
         normalized_success_auc,
         success_curve,
+        worst_group_success_rate_at_budget,
+        worst_group_normalized_success_auc,
+        worst_group_target_coverage_at_budget,
+        group_metrics,
         mean_best_loss_given_coverage: mean(&best_losses),
         median_best_loss_given_coverage: median(best_losses),
         mean_cost_per_target_query: total_cost / target_count as f64,
@@ -713,6 +762,67 @@ fn evaluate_arm(ledger: &OutcomeLedger, arm: &OutcomeArm) -> ArmComputation {
     };
 
     ArmComputation { metrics, targets }
+}
+
+fn evaluate_group_metrics(
+    targets: &BTreeMap<String, TargetComputation>,
+    query_budget: usize,
+) -> Vec<GroupMetrics> {
+    let mut targets_by_group: BTreeMap<String, Vec<&TargetComputation>> = BTreeMap::new();
+    for target in targets.values() {
+        targets_by_group
+            .entry(target.metrics.group_id.clone())
+            .or_default()
+            .push(target);
+    }
+
+    targets_by_group
+        .into_iter()
+        .map(|(group_id, group_targets)| {
+            let target_count = group_targets.len();
+            let covered_target_queries = group_targets
+                .iter()
+                .filter(|target| target.metrics.best_loss_at_budget.is_some())
+                .count();
+            let successful_target_queries = group_targets
+                .iter()
+                .filter(|target| target.metrics.success_at_budget)
+                .count();
+            let total_cost = group_targets
+                .iter()
+                .map(|target| target.metrics.total_cost)
+                .sum::<f64>();
+            let success_curve = (1..=query_budget)
+                .map(|query_count| {
+                    let successful = group_targets
+                        .iter()
+                        .filter(|target| target.success_by_budget[query_count - 1])
+                        .count();
+                    SuccessCurvePoint {
+                        query_count,
+                        success_rate: successful as f64 / target_count as f64,
+                    }
+                })
+                .collect::<Vec<_>>();
+            let normalized_success_auc = success_curve
+                .iter()
+                .map(|point| point.success_rate)
+                .sum::<f64>()
+                / query_budget as f64;
+
+            GroupMetrics {
+                group_id,
+                target_query_count: target_count,
+                covered_target_queries,
+                target_coverage_at_budget: covered_target_queries as f64 / target_count as f64,
+                successful_target_queries,
+                success_rate_at_budget: successful_target_queries as f64 / target_count as f64,
+                normalized_success_auc,
+                mean_cost_per_target_query: total_cost / target_count as f64,
+                success_curve,
+            }
+        })
+        .collect()
 }
 
 fn evaluate_target(ledger: &OutcomeLedger, target: &TargetQuery) -> TargetComputation {
