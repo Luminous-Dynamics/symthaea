@@ -66,3 +66,27 @@ For dynamical cells additionally record dt profile, tau/gate/equilibrium distort
 - Hasani et al., *Liquid Time-constant Networks*, AAAI (2021): grounds LTC as a time-continuous recurrent model for time-series prediction and varying time constants. https://doi.org/10.1609/aaai.v35i9.16936
 
 The literature provides useful hypotheses and baseline tasks, but does not establish which dimension is best for Symthaea’s current implementation. That requires the controlled measurements above.
+
+
+## New capacity-curve executable (first static association experiment)
+
+The repository's existing `binding_algebra_characterization.rs` remains the algebra-distribution audit. A separate executable now measures whether superposed role/filler associations remain retrievable as bundle fan-in increases:
+
+- Source: `crates/core/symthaea-core/examples/association_capacity_curves.rs`
+- Run with: `cargo run --release --example association_capacity_curves -p symthaea-core -- /tmp/association-capacity.csv`
+- Continuous bipolar-f32 widths: 1K / 2K / 4K / 8K / 16K / 32K / 64K.
+- Exact packed BSC/XOR/majority comparison: fixed 16,384-bit BinaryHV.
+- Odd bundle fan-ins: 1 / 3 / 7 / 15 / 31 / 63, with 12 deterministic seeds per cell.
+- Negative-control rows: 32 independent random pairs per seed/configuration.
+
+The continuous arm is intentionally **bipolar-valued f32**, not the native uniform[-1,1] ContinuousHV distribution. That gives a clean binding/unbinding control across continuous widths. It does not qualify the numerical behavior of native ContinuousHV inverse or the dynamical LTC/CfC path.
+
+Every CSV row retains its seed. Bundle rows include target similarity, strongest distractor similarity, their margin, and top-1 retrieval outcome; unrelated-pair rows preserve negative similarity samples. The initial run is intended to characterize the curve and validate the measurement plumbing, not establish a rare-event probability from a small sample.
+
+## Capacity must be query-scale aware
+
+For a declared decision threshold, let (p) be the false-match probability of one unrelated comparison and (M) the number of comparisons performed by the query. A conservative union-bound estimate is (P(\text{one or more false matches}) \le \min(1, M p)). A single query against (N) records makes (M=N) comparisons; checking all unordered record pairs makes (M=N(N-1)/2). The same per-comparison rate can therefore yield very different application-level risk.
+
+Thresholds must be chosen using positive/negative calibration data separate from the final evaluation data. Report the number of held-out negative comparisons, observed false matches and a confidence interval / upper bound. **Zero observed false matches in a small sample does not demonstrate an extreme tail rate** such as (10^{-9}). If a deployment requires such guarantees, use an appropriate exact or justified statistical model, conservative multiplicity accounting, and calibration on the real/representative distribution; keep model assumptions and measurements distinct.
+
+Recent HDC Labs practitioner work experimentally illustrates this single-query-versus-all-pairs distinction on synthetic records ([Oct 15, 2026](https://hyperdimensionalcomputing.ai/blog/testing-the-limits-of-bundling-capacity-2/)). We use it as an external hypothesis to replicate, not as Symthaea result evidence.
