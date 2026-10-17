@@ -23,6 +23,7 @@ const HYPOTHESIS_IDS: [&str; 3] = [
 ];
 const MAX_TRIALS_PER_WORLD: usize = 100_000;
 const MAX_RESOURCE_BUDGET: usize = 256;
+const WORLD_VARIANTS_PER_REGIME: usize = 4;
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, Deserialize)]
 #[serde(rename_all = "snake_case")]
@@ -85,6 +86,7 @@ pub struct BlindWorldBenchmarkReport {
     pub seed: u64,
     pub trials_per_world: usize,
     pub resource_budget_units: usize,
+    pub world_variants_per_regime: usize,
     pub posterior_threshold: f64,
     pub declared_model_scenarios: Vec<String>,
     pub development_fixed_candidate_id: String,
@@ -140,8 +142,12 @@ pub fn run_blind_world_benchmark(
 
     let priors = uniform_priors();
     let model_scenarios = declared_model_scenarios();
-    let worlds = hidden_worlds();
-    let fixed_candidate_id = choose_development_fixed_design(&priors, &worlds[..2])?;
+    let worlds = hidden_worlds(seed);
+    let development_worlds: Vec<HiddenWorld> = worlds.iter()
+        .filter(|world| !world.held_out)
+        .cloned()
+        .collect();
+    let fixed_candidate_id = choose_development_fixed_design(&priors, &development_worlds)?;
     let policies = [
         BlindWorldPolicy::NominalExpectedGain,
         BlindWorldPolicy::NominalPredictiveVariance,
@@ -188,6 +194,7 @@ pub fn run_blind_world_benchmark(
         seed,
         trials_per_world,
         resource_budget_units,
+        world_variants_per_regime: WORLD_VARIANTS_PER_REGIME,
         posterior_threshold,
         declared_model_scenarios: model_scenarios
             .iter()
@@ -206,7 +213,7 @@ pub fn run_blind_world_benchmark(
     })
 }
 
-#[derive(Debug, Clone)]
+#[derive(Debug, Clone, PartialEq)]
 struct HiddenWorld {
     id: String,
     regime: BlindWorldRegime,
@@ -614,7 +621,62 @@ fn declared_model_scenarios() -> Vec<ModelLikelihoodScenario> {
     ]
 }
 
-fn hidden_worlds() -> Vec<HiddenWorld> {
+fn hidden_worlds(seed: u64) -> Vec<HiddenWorld> {
+    let templates = hidden_world_templates();
+    let mut generated = Vec::with_capacity(templates.len() * WORLD_VARIANTS_PER_REGIME);
+    for (world_index, template) in templates.iter().enumerate() {
+        for replicate in 0..WORLD_VARIANTS_PER_REGIME {
+            let mut world = template.clone();
+            world.id = format!("{}-variant-{replicate:02}", template.id);
+            let world_seed = seed
+                ^ (world_index as u64).wrapping_mul(0xD1B5_4A32_D192_ED03)
+                ^ (replicate as u64).wrapping_mul(0x94D0_49BB_1331_11EB);
+            perturb_world_likelihoods(&mut world, world_seed);
+            generated.push(world);
+        }
+    }
+    generated
+}
+
+/// Perturb each regime with a versioned deterministic stream while preserving its
+/// defining control: null likelihoods remain equal across hypotheses, the
+/// intervention-artifact action remains uninformative, and effect reversal remains
+/// reversed. Independent world variants enable world-level resampling across runs.
+fn perturb_world_likelihoods(world: &mut HiddenWorld, seed: u64) {
+    let mut rng = BenchmarkRng::new(seed ^ 0xB11D_2026);
+    for candidate in &mut world.candidates {
+        if world.regime == BlindWorldRegime::NullNegativeControl
+            || (world.regime == BlindWorldRegime::InterventionArtifact
+                && candidate.id == "intervene_on_x")
+        {
+            let base = if world.regime == BlindWorldRegime::NullNegativeControl {
+                candidate.likelihoods[0][0]
+            } else {
+                0.58
+            };
+            let probability = (base + (rng.unit_f64() - 0.5) * 0.08).clamp(0.05, 0.95);
+            for row in &mut candidate.likelihoods {
+                row[0] = probability;
+                row[1] = 1.0 - probability;
+            }
+            continue;
+        }
+
+        let amplitude = match world.regime {
+            BlindWorldRegime::SensorDegradation => 0.012,
+            BlindWorldRegime::EffectReversal => 0.02,
+            _ => 0.035,
+        };
+        for row in &mut candidate.likelihoods {
+            let delta = (rng.unit_f64() - 0.5) * 2.0 * amplitude;
+            let probability = (row[0] + delta).clamp(0.05, 0.95);
+            row[0] = probability;
+            row[1] = 1.0 - probability;
+        }
+    }
+}
+
+fn hidden_world_templates() -> Vec<HiddenWorld> {
     let nominal = candidate_set(
         [0.82, 0.80, 0.52],
         [0.90, 0.30, 0.50],
@@ -757,9 +819,10 @@ mod tests {
     #[test]
     fn suite_contains_development_and_held_out_world_regimes() {
         let report = run_blind_world_benchmark(6, 6, 42, 0.95).unwrap();
-        assert_eq!(report.world_count, 6);
-        assert_eq!(report.held_out_world_count, 4);
-        assert_eq!(report.summaries.len(), 6 * 7);
+        assert_eq!(report.world_count, 24);
+        assert_eq!(report.held_out_world_count, 16);
+        assert_eq!(report.world_variants_per_regime, WORLD_VARIANTS_PER_REGIME);
+        assert_eq!(report.summaries.len(), 24 * 7);
         assert!(report.summaries.iter().any(|row| {
             row.regime == BlindWorldRegime::NullNegativeControl
                 && row.held_out_from_policy_models
@@ -800,14 +863,25 @@ mod tests {
     }
 
     #[test]
+    fn parameterized_worlds_replay_and_change_with_seed() {
+        let first = hidden_worlds(101);
+        let replay = hidden_worlds(101);
+        let other_seed = hidden_worlds(102);
+        assert_eq!(first, replay);
+        assert_ne!(first, other_seed);
+        assert_eq!(first.len(), 6 * WORLD_VARIANTS_PER_REGIME);
+    }
+
+    #[test]
     fn fixed_design_is_selected_from_development_regimes_only() {
         let priors = uniform_priors();
-        let worlds = hidden_worlds();
-        let chosen = choose_development_fixed_design(&priors, &worlds[..2]).unwrap();
-        assert!(worlds[..2].iter().all(|world| {
-            world.candidates.iter().any(|candidate| candidate.id == chosen)
-        }));
-        assert!(worlds[2..].iter().all(|world| {
+        let worlds = hidden_worlds(42);
+        let development: Vec<HiddenWorld> = worlds.iter()
+            .filter(|world| !world.held_out)
+            .cloned()
+            .collect();
+        let chosen = choose_development_fixed_design(&priors, &development).unwrap();
+        assert!(worlds.iter().all(|world| {
             world.candidates.iter().any(|candidate| candidate.id == chosen)
         }));
     }
