@@ -704,7 +704,7 @@ fn generate_holdout_initial_conditions(
 
 fn discovery_config_snapshot(config: &RegressorConfig) -> String {
     let mut snapshot = format!(
-        "RegressorConfigV1\\npopulation_size={}\\ngenerations={}\\nmax_depth={}\\nmax_complexity={}\\nlambda_bits={:016x}\\ntournament_size={}\\nmutation_rate_bits={:016x}\\nseed={}\\ndisable_macro_seeds={}\\nexclude_trig={}\\ndiverse_trajectory_count={}\\nprior_composition_rate_bits={:016x}\\nprior_fragment_bonus_bits={:016x}\\northogonality_penalty_bits={:016x}\\northogonality_threshold_bits={:016x}\\nuse_lie_fitness={}\\nknown_invariants={}",
+        "RegressorConfigV1\npopulation_size={}\ngenerations={}\nmax_depth={}\nmax_complexity={}\nlambda_bits={:016x}\ntournament_size={}\nmutation_rate_bits={:016x}\nseed={}\ndisable_macro_seeds={}\nexclude_trig={}\ndiverse_trajectory_count={}\nprior_composition_rate_bits={:016x}\nprior_fragment_bonus_bits={:016x}\northogonality_penalty_bits={:016x}\northogonality_threshold_bits={:016x}\nuse_lie_fitness={}\nknown_invariants={}",
         config.population_size,
         config.generations,
         config.max_depth,
@@ -726,7 +726,7 @@ fn discovery_config_snapshot(config: &RegressorConfig) -> String {
     for (index, invariant) in config.known_invariants.iter().enumerate() {
         let canonical = format!("{invariant}");
         snapshot.push_str(&format!(
-            "\\nknown_invariant_{index}_len={}\\nknown_invariant_{index}={canonical}",
+            "\nknown_invariant_{index}_len={}\nknown_invariant_{index}={canonical}",
             canonical.len()
         ));
     }
@@ -735,7 +735,7 @@ fn discovery_config_snapshot(config: &RegressorConfig) -> String {
 
 fn discovery_config_digest(snapshot: &str) -> String {
     let mut hasher = blake3::Hasher::new();
-    hasher.update(b"SymthaeaRegressorConfigDigestV1\\0");
+    hasher.update(b"SymthaeaRegressorConfigDigestV1\0");
     holdout_hash_string(&mut hasher, snapshot);
     hasher.finalize().to_hex().to_string()
 }
@@ -858,9 +858,10 @@ pub fn validate_invariant_holdout(
     let requested = holdout_trajectories;
     let discovery_seed = discovery_config.seed;
     let candidate_expression = format!("{candidate}");
-    let candidate_expression_digest = blake3::hash(candidate_expression.as_bytes())
-        .to_hex()
-        .to_string();
+    let mut candidate_hasher = blake3::Hasher::new();
+    candidate_hasher.update(b"SymthaeaCandidateExpressionV1\0");
+    holdout_hash_string(&mut candidate_hasher, &candidate_expression);
+    let candidate_expression_digest = candidate_hasher.finalize().to_hex().to_string();
     let discovery_config_snapshot = discovery_config_snapshot(discovery_config);
     let discovery_config_digest = discovery_config_digest(&discovery_config_snapshot);
 
