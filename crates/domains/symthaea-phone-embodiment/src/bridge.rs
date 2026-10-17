@@ -10,9 +10,32 @@
 
 use image::GenericImageView;
 use symthaea_core::embodiment::{
-    EmbodimentPlatform, EmbodimentResult, EmbodimentTelemetry, GROUNDING_TEMPORAL, MoralGateInput,
+    EmbodimentPlatform, EmbodimentResult, EmbodimentTelemetry, ExternalActionEmbodimentStepV1,
+    ExternalActionTimingErrorV1, ExternalActionTimingV1, GROUNDING_TEMPORAL, MoralGateInput,
     MotorSafetyLevel,
 };
+use std::sync::OnceLock;
+use std::time::{Instant, SystemTime, UNIX_EPOCH};
+
+/// All PhoneBridge instances in this process use the same monotonic origin and
+/// epoch ID. This makes cross-device host-side intervals comparable without
+/// pretending the host receive timestamp is the device's capture timestamp.
+static HOST_MONOTONIC_EPOCH: OnceLock<(Instant, String)> = OnceLock::new();
+
+fn shared_host_monotonic_epoch() -> (Instant, String) {
+    HOST_MONOTONIC_EPOCH
+        .get_or_init(|| {
+            let nonce = SystemTime::now()
+                .duration_since(UNIX_EPOCH)
+                .map(|d| d.as_nanos())
+                .unwrap_or_default();
+            (
+                Instant::now(),
+                format!("host-monotonic-pid-{}-{nonce}", std::process::id()),
+            )
+        })
+        .clone()
+}
 use symthaea_core::hdc::ContinuousHV;
 use symthaea_vision_manifold::{VisionConfig, VisionManifold};
 
@@ -58,6 +81,18 @@ pub struct PhoneBridge {
     /// Starts at 0.0 so that executing without ever having proposed refuses every
     /// mutating action — Φ can only ever *restrict* authority here, never grant it.
     last_phi: f64,
+    /// Origin for host-monotonic timestamps; values are meaningful only in host_clock_epoch_id.
+    host_clock_origin: Instant,
+    /// Identity for this process-local host monotonic clock epoch (identifier, not wall time).
+    host_clock_epoch_id: String,
+    /// Changes after an observed ADB disconnect/reconnect or explicit bridge reset.
+    device_session_epoch: u64,
+    device_disconnected: bool,
+    last_observation_request_started_ns: Option<u64>,
+    last_observation_request_returned_ns: Option<u64>,
+    last_observation_request_succeeded: Option<bool>,
+    last_observation_received_ns: Option<u64>,
+    last_external_action_timing: Option<ExternalActionTimingV1>,
 }
 
 impl PhoneBridge {
@@ -92,6 +127,10 @@ impl PhoneBridge {
         vision.enable_scene_graph();
         vision.enable_scene_memory(16);
 
+        // The origin and epoch ID are process-wide so host monotonic timestamps
+        // from separate PhoneBridge instances use the same coordinate system.
+        let (host_clock_origin, host_clock_epoch_id) = shared_host_monotonic_epoch();
+
         Self {
             adb: AdbDevice::new(serial),
             vision,
@@ -110,6 +149,58 @@ impl PhoneBridge {
             confirmation_mode: true,
             last_match_similarity: None,
             last_phi: 0.0,
+            host_clock_origin,
+            host_clock_epoch_id,
+            device_session_epoch: 0,
+            device_disconnected: false,
+            last_observation_request_started_ns: None,
+            last_observation_request_returned_ns: None,
+            last_observation_request_succeeded: None,
+            last_observation_received_ns: None,
+            last_external_action_timing: None,
+        }
+    }
+
+    fn monotonic_now_ns(&self) -> u64 {
+        self.host_clock_origin.elapsed().as_nanos().min(u64::MAX as u128) as u64
+    }
+
+    fn device_session_epoch_id(&self) -> String {
+        format!("{}/device-session-{}", self.host_clock_epoch_id, self.device_session_epoch)
+    }
+
+    /// Collect host-monotonic transport evidence without inventing a device-side
+    /// screenshot timestamp. A failed ADB capture opens a new device session epoch;
+    /// the next successful capture opens another so observations cannot bridge the gap.
+    fn capture_screenshot_bytes(&mut self) -> Result<Vec<u8>, String> {
+        let started = self.monotonic_now_ns();
+        self.last_observation_request_started_ns = Some(started);
+        self.last_observation_request_returned_ns = None;
+        self.last_observation_request_succeeded = None;
+        self.last_observation_received_ns = None;
+
+        match self.adb.screenshot() {
+            Ok(bytes) => {
+                let returned = self.monotonic_now_ns();
+                self.last_observation_request_returned_ns = Some(returned);
+                self.last_observation_request_succeeded = Some(true);
+                self.last_observation_received_ns = Some(returned);
+                if self.device_disconnected {
+                    self.device_session_epoch = self.device_session_epoch.saturating_add(1);
+                    self.device_disconnected = false;
+                }
+                Ok(bytes)
+            }
+            Err(error) => {
+                let returned = self.monotonic_now_ns();
+                self.last_observation_request_returned_ns = Some(returned);
+                self.last_observation_request_succeeded = Some(false);
+                if !self.device_disconnected {
+                    self.device_session_epoch = self.device_session_epoch.saturating_add(1);
+                    self.device_disconnected = true;
+                }
+                Err(error)
+            }
         }
     }
 
@@ -120,7 +211,7 @@ impl PhoneBridge {
         &mut self,
         dt: f32,
     ) -> Result<symthaea_vision_manifold::VisionTelemetry, String> {
-        let png_bytes = self.adb.screenshot()?;
+        let png_bytes = self.capture_screenshot_bytes()?;
         let img =
             image::load_from_memory(&png_bytes).map_err(|e| format!("Image decode failed: {e}"))?;
 
@@ -173,7 +264,7 @@ impl PhoneBridge {
         &mut self,
         dt: f32,
     ) -> Result<(symthaea_vision_manifold::VisionTelemetry, Vec<u8>, u32, u32), String> {
-        let png_bytes = self.adb.screenshot()?;
+        let png_bytes = self.capture_screenshot_bytes()?;
         let img =
             image::load_from_memory(&png_bytes).map_err(|e| format!("Image decode failed: {e}"))?;
 
@@ -769,31 +860,78 @@ impl PhoneBridge {
     /// across the whole upper Yellow band (φ ∈ [0.40, 0.60]).
     pub fn step_embodiment(
         &mut self,
-        _thought_hv: &symthaea_core::hdc::ContinuousHV,
+        thought_hv: &symthaea_core::hdc::ContinuousHV,
         dt: f32,
         phi: f64,
     ) -> symthaea_core::embodiment::EmbodimentResult {
+        let step_index = self.total_steps as u64;
+        self.step_embodiment_with_event_timing(thought_hv, step_index, dt, phi).result
+    }
+
+    fn step_embodiment_with_event_timing(
+        &mut self,
+        _thought_hv: &symthaea_core::hdc::ContinuousHV,
+        step_index: u64,
+        perception_dt_seconds: f32,
+        phi: f64,
+    ) -> ExternalActionEmbodimentStepV1 {
         use symthaea_core::embodiment::*;
 
-        // 1. Capture and observe
-        let capture_ok = self.capture_and_observe(dt).is_ok();
+        // Capture and observe. ADB returns no authoritative source timestamp for
+        // the UI state depicted, so only request/receive provenance is recorded.
+        let capture_ok = self.capture_and_observe(perception_dt_seconds).is_ok();
 
-        // 2. Propose action based on consciousness level
+        // Propose action based on consciousness level.
         let action = self.propose_action(phi);
 
-        // 3. Execute if not in confirmation mode and capture succeeded
+        // Execute only in explicitly enabled mode; the interval is the bridge
+        // dispatch-call duration, not proof that the target application completed.
+        let mut action_dispatch_started_ns = None;
+        let mut action_dispatch_returned_ns = None;
+        let mut action_dispatch_succeeded = None;
         let mut success = capture_ok;
         if capture_ok && !self.confirmation_mode && !matches!(action, PhoneAction::NoOp) {
-            if self.execute_action(&action).is_err() {
+            action_dispatch_started_ns = Some(self.monotonic_now_ns());
+            let action_result = self.execute_action(&action);
+            action_dispatch_returned_ns = Some(self.monotonic_now_ns());
+            action_dispatch_succeeded = Some(action_result.is_ok());
+            if action_result.is_err() {
                 success = false;
             }
         }
 
-        // 4. Compute prediction error from vision manifold
+        // Compute prediction error from the vision manifold.
         let pe = self.last_prediction_error;
         self.total_steps += 1;
 
-        EmbodimentResult {
+        let device_session_epoch_id = self.device_session_epoch_id();
+        let observation_received = self.last_observation_received_ns;
+        let timing = ExternalActionTimingV1 {
+            schema_version: 1,
+            step_index,
+            action_id: format!("{device_session_epoch_id}:action:{step_index}"),
+            action_kind: action.label().to_string(),
+            host_clock_domain_id: "host.monotonic".to_string(),
+            host_clock_epoch_id: self.host_clock_epoch_id.clone(),
+            device_session_epoch_id: device_session_epoch_id.clone(),
+            observation_request_started_ns: self.last_observation_request_started_ns,
+            observation_request_returned_ns: self.last_observation_request_returned_ns,
+            observation_request_succeeded: self.last_observation_request_succeeded,
+            observation_received_monotonic_ns: observation_received,
+            observation_id: observation_received
+                .map(|_| format!("{device_session_epoch_id}:observation:{step_index}")),
+            // ADB does not expose the source timestamp for the UI state in this
+            // adapter. Do not substitute host receive time as a source timestamp.
+            observation_source_timestamp_ns: None,
+            observation_source_clock_domain_id: None,
+            observation_source_clock_epoch_id: None,
+            action_dispatch_started_ns,
+            action_dispatch_returned_ns,
+            action_dispatch_succeeded,
+        };
+        self.last_external_action_timing = Some(timing.clone());
+
+        let result = EmbodimentResult {
             num_actuators: 5, // tap_x, tap_y, swipe_dx, swipe_dy, keyboard
             control_effort: if matches!(action, PhoneAction::NoOp | PhoneAction::Screenshot) {
                 0.0
@@ -805,7 +943,8 @@ impl PhoneBridge {
             safety_level: self.current_safety,
             epistemic_grounding: GROUNDING_SENSORIMOTOR,
             observation_confidence: grounding_from_prediction_error(pe),
-        }
+        };
+        ExternalActionEmbodimentStepV1 { result, timing }
     }
 
     /// Encode current screen perception as a 16,384D ContinuousHV.
@@ -829,6 +968,27 @@ impl symthaea_core::embodiment::EmbodimentBridge for PhoneBridge {
         self.step_embodiment(thought_hv, dt, phi)
     }
 
+    fn plant_step_authority(&self) -> symthaea_core::embodiment::PlantStepAuthorityV1 {
+        symthaea_core::embodiment::PlantStepAuthorityV1::EventDrivenExternal
+    }
+
+    fn step_event_driven(
+        &mut self,
+        thought_hv: &symthaea_core::hdc::ContinuousHV,
+        step_index: u64,
+        perception_dt_seconds: f32,
+        phi: f64,
+    ) -> Result<ExternalActionEmbodimentStepV1, ExternalActionTimingErrorV1> {
+        let outcome = self.step_embodiment_with_event_timing(
+            thought_hv,
+            step_index,
+            perception_dt_seconds,
+            phi,
+        );
+        outcome.validate_for_step(step_index)?;
+        Ok(outcome)
+    }
+
     fn apply_moral_gate(&mut self, gate: MoralGateInput) {
         PhoneBridge::apply_moral_gate(self, gate)
     }
@@ -846,6 +1006,13 @@ impl symthaea_core::embodiment::EmbodimentBridge for PhoneBridge {
         self.proposed_action = None;
         self.total_steps = 0;
         self.last_prediction_error = 0.0;
+        self.device_session_epoch = self.device_session_epoch.saturating_add(1);
+        self.device_disconnected = false;
+        self.last_observation_request_started_ns = None;
+        self.last_observation_request_returned_ns = None;
+        self.last_observation_request_succeeded = None;
+        self.last_observation_received_ns = None;
+        self.last_external_action_timing = None;
     }
 
     fn safety_level(&self) -> MotorSafetyLevel {
@@ -883,7 +1050,11 @@ impl symthaea_core::embodiment::EmbodimentBridge for PhoneBridge {
             num_actuators: 5,
             epistemic_grounding: grounding_label(GROUNDING_SENSORIMOTOR).to_string(),
             observation_confidence: grounding_from_prediction_error(self.last_prediction_error),
-            platform_specific: Vec::new(),
+            platform_specific: self
+                .last_external_action_timing
+                .as_ref()
+                .and_then(|timing| serde_json::to_vec(timing).ok())
+                .unwrap_or_default(),
         }
     }
 }
@@ -891,6 +1062,15 @@ impl symthaea_core::embodiment::EmbodimentBridge for PhoneBridge {
 #[cfg(test)]
 mod tests {
     use super::*;
+
+    #[test]
+    fn host_monotonic_epoch_is_shared_for_cross_device_comparison() {
+        let (origin_a, epoch_a) = shared_host_monotonic_epoch();
+        let (origin_b, epoch_b) = shared_host_monotonic_epoch();
+        assert_eq!(epoch_a, epoch_b);
+        assert_eq!(origin_a, origin_b);
+    }
+
 
     #[test]
     fn test_grid_to_screen_mapping() {

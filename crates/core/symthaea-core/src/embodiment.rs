@@ -439,6 +439,9 @@ pub enum PlantStepAuthorityV1 {
     Unspecified,
     ConfiguredSimulation,
     BackendMeasuredClockRequired,
+    /// An asynchronous external environment whose action/observation timing is
+    /// reported separately from physical/model plant time.
+    EventDrivenExternal,
 }
 
 /// Timing evidence for one requested plant transition.
@@ -477,6 +480,8 @@ pub enum PlantStepTimingErrorV1 {
     TimingAuthorityUnspecified,
     /// The bridge requires its own physical/device clock, not configured simulation dt.
     ConfiguredSimulationStepNotAuthorized,
+    /// Event-driven environments must use the event timing contract, never plant dt.
+    EventDrivenStepCannotUsePlantTiming,
     /// The bridge claims backend-owned timing but has not implemented that step method.
     BackendMeasuredTimingUnsupported,
     /// The backend timing evidence belongs to a different requested step.
@@ -639,6 +644,216 @@ impl BackendTimedEmbodimentStepV1 {
     }
 }
 
+// ── Event-driven external action timing v1 ──────────────────────────────────
+
+/// Timing evidence for an event-driven environment such as a phone UI.
+///
+/// This is intentionally not a plant timestep: ADB process latency and host
+/// observation-receive time do not establish when the external environment
+/// changed. Source timestamps remain absent unless the source actually provides
+/// them with clock-domain and epoch provenance.
+#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
+pub struct ExternalActionTimingV1 {
+    pub schema_version: u16,
+    pub step_index: u64,
+    /// Correlates the action attempt within this bridge/device-session lineage.
+    pub action_id: String,
+    pub action_kind: String,
+    pub host_clock_domain_id: String,
+    pub host_clock_epoch_id: String,
+    pub device_session_epoch_id: String,
+    /// Host-monotonic bounds of the screenshot/observation request to ADB.
+    pub observation_request_started_ns: Option<u64>,
+    pub observation_request_returned_ns: Option<u64>,
+    /// Whether the ADB screenshot request returned bytes, not whether the
+    /// depicted UI state was semantically fresh or the intended action completed.
+    pub observation_request_succeeded: Option<bool>,
+    /// Host-monotonic time when screenshot bytes returned from ADB.
+    pub observation_received_monotonic_ns: Option<u64>,
+    /// Identifier for the observation bytes, when a capture actually returned.
+    /// It is not proof of freshness or of the application state depicted.
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub observation_id: Option<String>,
+    /// Only populated when the observation source itself supplies a timestamp.
+    /// Source-side time is omitted when the adapter cannot provide it honestly.
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub observation_source_timestamp_ns: Option<u64>,
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub observation_source_clock_domain_id: Option<String>,
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub observation_source_clock_epoch_id: Option<String>,
+    /// Host-monotonic bounds of the bridge's action-dispatch call.
+    pub action_dispatch_started_ns: Option<u64>,
+    pub action_dispatch_returned_ns: Option<u64>,
+    /// Whether the dispatch call returned Ok. This is not proof that the target
+    /// application reached the intended postcondition.
+    pub action_dispatch_succeeded: Option<bool>,
+}
+
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, Deserialize)]
+pub enum ExternalActionTimingErrorV1 {
+    UnsupportedByBridge,
+    InvalidSchemaVersion,
+    MissingActionId,
+    MissingActionKind,
+    MissingHostClockDomain,
+    MissingHostClockEpoch,
+    MissingDeviceSessionEpoch,
+    PartialObservationRequest,
+    ReversedObservationRequestInterval,
+    ObservationReceiveOutsideRequest,
+    ObservationRequestOutcomeMismatch,
+    MissingObservationIdentity,
+    PartialActionDispatch,
+    ReversedActionDispatchInterval,
+    PartialSourceTimestampProvenance,
+    SourceTimeWithoutObservation,
+    EmptySourceClockIdentity,
+    StepIndexMismatch,
+}
+
+impl ExternalActionTimingV1 {
+    /// Validate the record even if it was deserialized or assembled by a caller.
+    pub fn validate(&self) -> Result<(), ExternalActionTimingErrorV1> {
+        if self.schema_version != 1 {
+            return Err(ExternalActionTimingErrorV1::InvalidSchemaVersion);
+        }
+        if self.action_id.trim().is_empty() {
+            return Err(ExternalActionTimingErrorV1::MissingActionId);
+        }
+        if self.action_kind.trim().is_empty() {
+            return Err(ExternalActionTimingErrorV1::MissingActionKind);
+        }
+        if self.host_clock_domain_id.trim().is_empty() {
+            return Err(ExternalActionTimingErrorV1::MissingHostClockDomain);
+        }
+        if self.host_clock_epoch_id.trim().is_empty() {
+            return Err(ExternalActionTimingErrorV1::MissingHostClockEpoch);
+        }
+        if self.device_session_epoch_id.trim().is_empty() {
+            return Err(ExternalActionTimingErrorV1::MissingDeviceSessionEpoch);
+        }
+
+        match (
+            self.observation_request_started_ns,
+            self.observation_request_returned_ns,
+            self.observation_request_succeeded,
+        ) {
+            (None, None, None) => {
+                if self.observation_received_monotonic_ns.is_some() || self.observation_id.is_some() {
+                    return Err(ExternalActionTimingErrorV1::ObservationRequestOutcomeMismatch);
+                }
+            }
+            (Some(start), Some(end), Some(succeeded)) => {
+                if end < start {
+                    return Err(ExternalActionTimingErrorV1::ReversedObservationRequestInterval);
+                }
+                match (succeeded, self.observation_received_monotonic_ns) {
+                    (true, Some(received)) if received >= start && received <= end => {
+                        if self.observation_id.as_deref().is_none_or(|id| id.trim().is_empty()) {
+                            return Err(ExternalActionTimingErrorV1::MissingObservationIdentity);
+                        }
+                    }
+                    (false, None) => {
+                        if self.observation_id.is_some() {
+                            return Err(ExternalActionTimingErrorV1::ObservationRequestOutcomeMismatch);
+                        }
+                    }
+                    (true, Some(_)) => {
+                        return Err(ExternalActionTimingErrorV1::ObservationReceiveOutsideRequest);
+                    }
+                    (true, None) => {
+                        return Err(ExternalActionTimingErrorV1::ObservationRequestOutcomeMismatch);
+                    }
+                    (false, Some(_)) => {
+                        return Err(ExternalActionTimingErrorV1::ObservationRequestOutcomeMismatch);
+                    }
+                }
+            }
+            _ => return Err(ExternalActionTimingErrorV1::PartialObservationRequest),
+        }
+
+        match (
+            self.action_dispatch_started_ns,
+            self.action_dispatch_returned_ns,
+            self.action_dispatch_succeeded,
+        ) {
+            (None, None, None) => {}
+            (Some(start), Some(end), Some(_)) if end >= start => {}
+            (Some(_), Some(_), Some(_)) => {
+                return Err(ExternalActionTimingErrorV1::ReversedActionDispatchInterval);
+            }
+            _ => return Err(ExternalActionTimingErrorV1::PartialActionDispatch),
+        }
+
+        match (
+            self.observation_source_timestamp_ns,
+            self.observation_source_clock_domain_id.as_deref(),
+            self.observation_source_clock_epoch_id.as_deref(),
+        ) {
+            (Some(_), Some(_), Some(_))
+                if self.observation_received_monotonic_ns.is_none() || self.observation_id.is_none() =>
+            {
+                return Err(ExternalActionTimingErrorV1::SourceTimeWithoutObservation);
+            }
+            (None, None, None) => {}
+            (Some(_), Some(domain), Some(epoch)) if !domain.trim().is_empty() && !epoch.trim().is_empty() => {}
+            (Some(_), Some(_), Some(_)) => {
+                return Err(ExternalActionTimingErrorV1::EmptySourceClockIdentity);
+            }
+            _ => return Err(ExternalActionTimingErrorV1::PartialSourceTimestampProvenance),
+        }
+        Ok(())
+    }
+}
+
+/// Result of one event-driven external action/observation cycle.
+#[derive(Debug, Clone)]
+pub struct ExternalActionEmbodimentStepV1 {
+    pub result: EmbodimentResult,
+    pub timing: ExternalActionTimingV1,
+}
+
+impl ExternalActionEmbodimentStepV1 {
+    pub fn validate_for_step(
+        &self,
+        expected_step_index: u64,
+    ) -> Result<(), ExternalActionTimingErrorV1> {
+        self.timing.validate()?;
+        if self.timing.step_index != expected_step_index {
+            return Err(ExternalActionTimingErrorV1::StepIndexMismatch);
+        }
+        Ok(())
+    }
+}
+
+/// Validated timing evidence for one bridge execution. Plant time and external
+/// action/observation time are intentionally distinct variants.
+#[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
+pub enum EmbodimentStepTimingEvidenceV1 {
+    Plant(PlantStepTimingV1),
+    External(ExternalActionTimingV1),
+}
+
+/// The timing contract that failed when a bridge step was refused.
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, Deserialize)]
+pub enum EmbodimentStepDispatchErrorV1 {
+    Plant(PlantStepTimingErrorV1),
+    External(ExternalActionTimingErrorV1),
+}
+
+impl From<PlantStepTimingErrorV1> for EmbodimentStepDispatchErrorV1 {
+    fn from(value: PlantStepTimingErrorV1) -> Self {
+        Self::Plant(value)
+    }
+}
+
+impl From<ExternalActionTimingErrorV1> for EmbodimentStepDispatchErrorV1 {
+    fn from(value: ExternalActionTimingErrorV1) -> Self {
+        Self::External(value)
+    }
+}
+
 // ── Embodiment Bridge Trait ────────────────────────────────────────────────
 
 /// Platform-agnostic embodiment bridge trait.
@@ -653,6 +868,21 @@ pub trait EmbodimentBridge: Send + Sync {
     /// timing source and measure/use their own authoritative physical interval.
     /// phi is the current consciousness level for safety gating.
     fn step(&mut self, thought_hv: &ContinuousHV, dt: f32, phi: f64) -> EmbodimentResult;
+
+    /// Execute an event-driven external action/observation cycle.
+    ///
+    /// The perception delta is used only by an adapter's internal perception
+    /// model. It does not advance or assert external-world time. The default
+    /// fails closed for bridges that do not implement this distinct contract.
+    fn step_event_driven(
+        &mut self,
+        _thought_hv: &ContinuousHV,
+        _step_index: u64,
+        _perception_dt_seconds: f32,
+        _phi: f64,
+    ) -> Result<ExternalActionEmbodimentStepV1, ExternalActionTimingErrorV1> {
+        Err(ExternalActionTimingErrorV1::UnsupportedByBridge)
+    }
 
     /// Declare the source that owns the authority to establish plant/model time.
     ///
@@ -688,6 +918,9 @@ pub trait EmbodimentBridge: Send + Sync {
                     return Err(PlantStepTimingErrorV1::MeasuredTimingRequiresExplicitBridge);
                 }
                 Ok(self.step(thought_hv, timing.dt_seconds, phi))
+            }
+            PlantStepAuthorityV1::EventDrivenExternal => {
+                Err(PlantStepTimingErrorV1::EventDrivenStepCannotUsePlantTiming)
             }
         }
     }
@@ -1176,6 +1409,26 @@ mod tests {
     }
 
     #[test]
+    fn event_driven_authority_rejects_plant_timing_api() {
+        let mut bridge = TimingCaptureBridge {
+            last_dt: None,
+            step_calls: 0,
+            authority: PlantStepAuthorityV1::EventDrivenExternal,
+        };
+        let timing = PlantStepTimingV1::configured_simulation(7, 0.005).unwrap();
+
+        assert!(matches!(
+            bridge.step_with_timing(&ContinuousHV::zero(16_384), &timing, 0.9),
+            Err(PlantStepTimingErrorV1::EventDrivenStepCannotUsePlantTiming)
+        ));
+        assert_eq!(bridge.last_dt, None);
+        assert_eq!(
+            bridge.step_calls, 0,
+            "event-driven bridge must not be reached through the plant-dt path"
+        );
+    }
+
+    #[test]
     fn timing_adapter_rejects_invalid_evidence_before_calling_legacy_bridge() {
         let mut bridge = TimingCaptureBridge {
             last_dt: None,
@@ -1446,5 +1699,121 @@ mod tests {
         }
         est.reset();
         assert_eq!(est.estimate(0.5, None), GROUNDING_SENSORIMOTOR);
+    }
+}
+
+
+#[cfg(test)]
+mod external_action_timing_v1_tests {
+    use super::*;
+
+    fn valid_timing() -> ExternalActionTimingV1 {
+        ExternalActionTimingV1 {
+            schema_version: 1,
+            step_index: 7,
+            action_id: "bridge-session-1:action:7".into(),
+            action_kind: "tap".into(),
+            host_clock_domain_id: "host.monotonic".into(),
+            host_clock_epoch_id: "host-epoch-1".into(),
+            device_session_epoch_id: "device-session-1".into(),
+            observation_request_started_ns: Some(10),
+            observation_request_returned_ns: Some(20),
+            observation_request_succeeded: Some(true),
+            observation_received_monotonic_ns: Some(20),
+            observation_id: Some("device-session-1:observation:7".into()),
+            observation_source_timestamp_ns: None,
+            observation_source_clock_domain_id: None,
+            observation_source_clock_epoch_id: None,
+            action_dispatch_started_ns: Some(25),
+            action_dispatch_returned_ns: Some(35),
+            action_dispatch_succeeded: Some(true),
+        }
+    }
+
+    #[test]
+    fn absent_source_timestamp_remains_absent_and_is_valid() {
+        let timing = valid_timing();
+        assert_eq!(timing.observation_source_timestamp_ns, None);
+        assert_eq!(timing.observation_source_clock_domain_id, None);
+        assert_eq!(timing.observation_source_clock_epoch_id, None);
+        assert_eq!(timing.validate(), Ok(()));
+    }
+
+    #[test]
+    fn rejects_partial_observation_interval() {
+        let mut timing = valid_timing();
+        timing.observation_request_returned_ns = None;
+        assert_eq!(
+            timing.validate(),
+            Err(ExternalActionTimingErrorV1::PartialObservationRequest)
+        );
+    }
+
+    #[test]
+    fn rejects_receive_timestamp_outside_request_interval() {
+        let mut timing = valid_timing();
+        timing.observation_received_monotonic_ns = Some(21);
+        assert_eq!(
+            timing.validate(),
+            Err(ExternalActionTimingErrorV1::ObservationReceiveOutsideRequest)
+        );
+    }
+
+    #[test]
+    fn rejects_reversed_action_dispatch_interval() {
+        let mut timing = valid_timing();
+        timing.action_dispatch_started_ns = Some(40);
+        timing.action_dispatch_returned_ns = Some(39);
+        assert_eq!(
+            timing.validate(),
+            Err(ExternalActionTimingErrorV1::ReversedActionDispatchInterval)
+        );
+    }
+
+    #[test]
+    fn rejects_source_timestamp_without_clock_provenance() {
+        let mut timing = valid_timing();
+        timing.observation_source_timestamp_ns = Some(1_234);
+        assert_eq!(
+            timing.validate(),
+            Err(ExternalActionTimingErrorV1::PartialSourceTimestampProvenance)
+        );
+    }
+
+    #[test]
+    fn rejects_source_time_when_no_observation_was_received() {
+        let mut timing = valid_timing();
+        timing.observation_request_started_ns = None;
+        timing.observation_request_returned_ns = None;
+        timing.observation_request_succeeded = None;
+        timing.observation_received_monotonic_ns = None;
+        timing.observation_id = None;
+        timing.observation_source_timestamp_ns = Some(123);
+        timing.observation_source_clock_domain_id = Some("device.capture".into());
+        timing.observation_source_clock_epoch_id = Some("device-epoch-2".into());
+        assert_eq!(
+            timing.validate(),
+            Err(ExternalActionTimingErrorV1::SourceTimeWithoutObservation)
+        );
+    }
+
+    #[test]
+    fn rejects_wrong_event_step_identity() {
+        let outcome = ExternalActionEmbodimentStepV1 {
+            result: EmbodimentResult {
+                num_actuators: 0,
+                control_effort: 0.0,
+                success: true,
+                prediction_error: 0.0,
+                safety_level: MotorSafetyLevel::Red,
+                epistemic_grounding: GROUNDING_SENSORIMOTOR,
+                observation_confidence: 1.0,
+            },
+            timing: valid_timing(),
+        };
+        assert_eq!(
+            outcome.validate_for_step(8),
+            Err(ExternalActionTimingErrorV1::StepIndexMismatch)
+        );
     }
 }

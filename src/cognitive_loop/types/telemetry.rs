@@ -1159,6 +1159,11 @@ pub struct CycleMetadata {
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub plant_step_timing: Option<symthaea_core::embodiment::PlantStepTimingV1>,
 
+    /// Validated external action/observation receipt accepted this cycle.
+    /// None when the bridge did not use the event-driven contract.
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub external_action_timing: Option<symthaea_core::embodiment::ExternalActionTimingV1>,
+
     // ── Radio/Spectrum Manager Telemetry ───────────────────────────────────
     /// Network health: 0=AllUp, 1=LocalDown, 2=MetroOnly, 3=Blackout.
     #[serde(default)]
@@ -1502,7 +1507,9 @@ pub struct CycleMetadata {
 #[cfg(test)]
 mod plant_timing_telemetry_tests {
     use super::CycleMetadata;
-    use symthaea_core::embodiment::{PlantStepTimingV1, PlantStepTimeSourceV1};
+    use symthaea_core::embodiment::{
+        ExternalActionTimingV1, PlantStepTimingV1, PlantStepTimeSourceV1,
+    };
 
     #[test]
     fn cycle_metadata_round_trips_validated_plant_timing() {
@@ -1538,4 +1545,61 @@ mod plant_timing_telemetry_tests {
             "absence of an accepted timing record should remain explicit in the schema"
         );
     }
+
+    fn valid_external_timing() -> ExternalActionTimingV1 {
+        ExternalActionTimingV1 {
+            schema_version: 1,
+            step_index: 31,
+            action_id: "phone-session-4:action:31".into(),
+            action_kind: "tap".into(),
+            host_clock_domain_id: "host.monotonic".into(),
+            host_clock_epoch_id: "host-epoch-9".into(),
+            device_session_epoch_id: "host-epoch-9/device-session-4".into(),
+            observation_request_started_ns: Some(1_000),
+            observation_request_returned_ns: Some(2_500),
+            observation_request_succeeded: Some(true),
+            observation_received_monotonic_ns: Some(2_500),
+            observation_id: Some("host-epoch-9/device-session-4:observation:31".into()),
+            // ADB does not expose source capture time; do not synthesize it.
+            observation_source_timestamp_ns: None,
+            observation_source_clock_domain_id: None,
+            observation_source_clock_epoch_id: None,
+            action_dispatch_started_ns: Some(3_000),
+            action_dispatch_returned_ns: Some(4_000),
+            action_dispatch_succeeded: Some(true),
+        }
+    }
+
+    #[test]
+    fn cycle_metadata_round_trips_external_action_timing_without_inventing_source_time() {
+        let timing = valid_external_timing();
+        assert_eq!(timing.validate(), Ok(()));
+        let mut metadata = CycleMetadata::default();
+        metadata.external_action_timing = Some(timing.clone());
+
+        let encoded = serde_json::to_value(&metadata).expect("serialize CycleMetadata");
+        let encoded_timing = encoded
+            .get("external_action_timing")
+            .expect("external event timing field");
+        assert_eq!(
+            encoded_timing.get("observation_source_timestamp_ns"),
+            None,
+            "unknown device-side capture time must remain absent"
+        );
+
+        let decoded: CycleMetadata =
+            serde_json::from_value(encoded).expect("deserialize CycleMetadata");
+        assert_eq!(decoded.external_action_timing, Some(timing));
+    }
+
+    #[test]
+    fn cycle_metadata_omits_external_action_timing_when_no_event_step_was_recorded() {
+        let metadata = CycleMetadata::default();
+        let encoded = serde_json::to_value(&metadata).expect("serialize CycleMetadata");
+        assert!(
+            encoded.get("external_action_timing").is_none(),
+            "absent event-driven evidence must not serialize as an empty or fabricated receipt"
+        );
+    }
+
 }

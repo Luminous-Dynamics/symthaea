@@ -39,6 +39,7 @@ impl CognitiveLoopService {
         let cycle_start = Instant::now();
         self.stats.total_cycles += 1;
         self.sensorimotor.plant_step_timing_this_cycle = None;
+        self.sensorimotor.external_action_timing_this_cycle = None;
         self.substrate_manager.tick_energy(&self.config);
         // Feed substrate energy data to ThermodynamicManager
         self.thermodynamic_mgr.set_energy(
@@ -381,50 +382,106 @@ impl CognitiveLoopService {
                     let timed_step: Result<
                         (
                             symthaea_core::embodiment::EmbodimentResult,
-                            symthaea_core::embodiment::PlantStepTimingV1,
+                            symthaea_core::embodiment::EmbodimentStepTimingEvidenceV1,
                         ),
-                        symthaea_core::embodiment::PlantStepTimingErrorV1,
+                        symthaea_core::embodiment::EmbodimentStepDispatchErrorV1,
                     > = match bridge.plant_step_authority() {
                         symthaea_core::embodiment::PlantStepAuthorityV1::Unspecified => {
-                            Err(symthaea_core::embodiment::PlantStepTimingErrorV1::TimingAuthorityUnspecified)
+                            Err(symthaea_core::embodiment::EmbodimentStepDispatchErrorV1::Plant(
+                                symthaea_core::embodiment::PlantStepTimingErrorV1::TimingAuthorityUnspecified,
+                            ))
                         }
                         symthaea_core::embodiment::PlantStepAuthorityV1::ConfiguredSimulation => {
                             symthaea_core::embodiment::PlantStepTimingV1::configured_simulation(
                                 plant_step_index,
                                 self.config.cfc_config.delta_t,
                             )
+                            .map_err(symthaea_core::embodiment::EmbodimentStepDispatchErrorV1::Plant)
                             .and_then(|timing| {
                                 bridge
                                     .step_with_timing(&thought_hv, &timing, phi)
-                                    .map(|result| (result, timing))
+                                    .map(|result| (
+                                        result,
+                                        symthaea_core::embodiment::EmbodimentStepTimingEvidenceV1::Plant(timing),
+                                    ))
+                                    .map_err(symthaea_core::embodiment::EmbodimentStepDispatchErrorV1::Plant)
                             })
                         }
                         symthaea_core::embodiment::PlantStepAuthorityV1::BackendMeasuredClockRequired => {
                             bridge
                                 .step_with_backend_timing(&thought_hv, plant_step_index, phi)
+                                .map_err(symthaea_core::embodiment::EmbodimentStepDispatchErrorV1::Plant)
                                 .and_then(|outcome| {
-                                    outcome.validate_for_step(plant_step_index)?;
-                                    Ok((outcome.result, outcome.timing))
+                                    outcome
+                                        .validate_for_step(plant_step_index)
+                                        .map_err(symthaea_core::embodiment::EmbodimentStepDispatchErrorV1::Plant)?;
+                                    Ok((
+                                        outcome.result,
+                                        symthaea_core::embodiment::EmbodimentStepTimingEvidenceV1::Plant(outcome.timing),
+                                    ))
+                                })
+                        }
+                        symthaea_core::embodiment::PlantStepAuthorityV1::EventDrivenExternal => {
+                            bridge
+                                .step_event_driven(
+                                    &thought_hv,
+                                    plant_step_index,
+                                    self.config.cfc_config.delta_t,
+                                    phi,
+                                )
+                                .map_err(symthaea_core::embodiment::EmbodimentStepDispatchErrorV1::External)
+                                .and_then(|outcome| {
+                                    outcome
+                                        .validate_for_step(plant_step_index)
+                                        .map_err(symthaea_core::embodiment::EmbodimentStepDispatchErrorV1::External)?;
+                                    Ok((
+                                        outcome.result,
+                                        symthaea_core::embodiment::EmbodimentStepTimingEvidenceV1::External(outcome.timing),
+                                    ))
                                 })
                         }
                     };
 
-                    if let Ok((_result, timing)) = &timed_step {
-                        self.sensorimotor.plant_step_timing_this_cycle = Some(timing.clone());
+                    if let Ok((_result, evidence)) = &timed_step {
+                        match evidence {
+                            symthaea_core::embodiment::EmbodimentStepTimingEvidenceV1::Plant(timing) => {
+                                self.sensorimotor.plant_step_timing_this_cycle = Some(timing.clone());
+                            }
+                            symthaea_core::embodiment::EmbodimentStepTimingEvidenceV1::External(timing) => {
+                                self.sensorimotor.external_action_timing_this_cycle = Some(timing.clone());
+                            }
+                        }
                     }
 
                     match timed_step {
-                        Ok((result, timing)) if result.success => {
-                            tracing::debug!(
-                                target: "symthaea::embodiment",
-                                cycle = cycle_num,
-                                step_index = timing.step_index,
-                                source = ?timing.source,
-                                dt_seconds = timing.dt_seconds,
-                                clock_domain = ?timing.clock_domain_id,
-                                clock_epoch = ?timing.clock_epoch_id,
-                                "embodiment step accepted with validated plant-time authority"
-                            );
+                        Ok((result, evidence)) if result.success => {
+                            match &evidence {
+                                symthaea_core::embodiment::EmbodimentStepTimingEvidenceV1::Plant(timing) => {
+                                    tracing::debug!(
+                                        target: "symthaea::embodiment",
+                                        cycle = cycle_num,
+                                        step_index = timing.step_index,
+                                        source = ?timing.source,
+                                        dt_seconds = timing.dt_seconds,
+                                        clock_domain = ?timing.clock_domain_id,
+                                        clock_epoch = ?timing.clock_epoch_id,
+                                        "embodiment step accepted with validated plant-time authority"
+                                    );
+                                }
+                                symthaea_core::embodiment::EmbodimentStepTimingEvidenceV1::External(timing) => {
+                                    tracing::debug!(
+                                        target: "symthaea::embodiment",
+                                        cycle = cycle_num,
+                                        step_index = timing.step_index,
+                                        action_id = %timing.action_id,
+                                        action_kind = %timing.action_kind,
+                                        host_clock_domain = %timing.host_clock_domain_id,
+                                        host_clock_epoch = %timing.host_clock_epoch_id,
+                                        device_session_epoch = %timing.device_session_epoch_id,
+                                        "event-driven embodiment step accepted with validated action timing evidence"
+                                    );
+                                }
+                            }
                             let proprioceptive_hv = bridge.encode_perception();
                             let w = self.config.embodiment_blend_weight;
                             if w > 0.0 {
@@ -436,13 +493,13 @@ impl CognitiveLoopService {
                             }
                             self.sensorimotor.last_proprioceptive_hv = Some(proprioceptive_hv);
                         }
-                        Ok((_result, _timing)) => {}
+                        Ok((_result, _evidence)) => {}
                         Err(error) => {
                             tracing::error!(
                                 target: "symthaea::embodiment",
                                 cycle = cycle_num,
                                 error = ?error,
-                                "refusing embodiment step without authorized and valid plant timing"
+                                "refusing embodiment step without authorized and valid timing evidence"
                             );
                         }
                     }

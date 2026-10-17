@@ -127,6 +127,9 @@ pub(crate) struct SensoriMotorExecution {
     /// Reset at cycle entry and copied into serialized CycleMetadata during assembly.
     pub plant_step_timing_this_cycle: Option<symthaea_core::embodiment::PlantStepTimingV1>,
 
+    /// Validated event-driven action/observation evidence accepted during this cycle.
+    pub external_action_timing_this_cycle: Option<symthaea_core::embodiment::ExternalActionTimingV1>,
+
     /// Most recent [`crate::cognitive_loop::types::GateConsumption`] — what the safety
     /// path actually consumed, for the produced/consumed join the Phase 4 protocol
     /// requires (A1.1). Instrumentation only; nothing gates on it. Initialised to
@@ -313,6 +316,7 @@ impl SensoriMotorExecution {
                 feature = "phone"
             ))]
             plant_step_timing_this_cycle: None,
+            external_action_timing_this_cycle: None,
             last_gate_consumption: None,
         }
     }
