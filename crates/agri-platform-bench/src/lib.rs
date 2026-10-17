@@ -806,7 +806,7 @@ mod tests {
             Mutation::EstimatedSafetyEvidence => set_state(&mut platform.evidence, EvidenceDomain::SafetyEnvelope, EvidenceState::Estimated),
             Mutation::EstimatedCostEvidence => set_state(&mut platform.evidence, EvidenceDomain::CostModel, EvidenceState::Estimated),
             Mutation::EstimatedServiceabilityEvidence => set_state(&mut platform.evidence, EvidenceDomain::Serviceability, EvidenceState::Estimated),
-            Mutation::EstimatedTerrainEvidence => set_state(&mut scenario, EvidenceDomain::TerrainEnvelope, EvidenceState::Estimated),
+            Mutation::EstimatedTerrainEvidence => set_state(&mut scenario.evidence, EvidenceDomain::TerrainEnvelope, EvidenceState::Estimated),
             Mutation::MalformedVerifiedDigest => {
                 let record = platform.evidence.iter_mut().find(|r| r.domain == EvidenceDomain::CostModel).unwrap();
                 record.artifact_sha256 = Some("bad-digest".into());
@@ -843,10 +843,10 @@ mod tests {
             Mutation::ZeroAnnualHours => scenario.annual_operating_hours = 0,
             Mutation::KnownSlopePlusEstimatedCost => {
                 scenario.site_slope_permille = platform.max_slope_permille + 1;
-                set_state(&mut scenario, EvidenceDomain::CostModel, EvidenceState::Estimated);
+                set_state(&mut platform.evidence, EvidenceDomain::CostModel, EvidenceState::Estimated);
             }
-            Mutation::StaleCostEvidence => set_state(&mut scenario, EvidenceDomain::CostModel, EvidenceState::Stale),
-            Mutation::ConflictingServiceabilityEvidence => set_state(&mut scenario, EvidenceDomain::Serviceability, EvidenceState::Conflicting),
+            Mutation::StaleCostEvidence => set_state(&mut platform.evidence, EvidenceDomain::CostModel, EvidenceState::Stale),
+            Mutation::ConflictingServiceabilityEvidence => set_state(&mut platform.evidence, EvidenceDomain::Serviceability, EvidenceState::Conflicting),
             Mutation::EmptyVerifiedSourceReference => {
                 let record = scenario.evidence.iter_mut().find(|r| r.domain == EvidenceDomain::TaskDefinition).unwrap();
                 record.reference = Some("   ".into());
