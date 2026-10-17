@@ -19,6 +19,7 @@
 
 pub mod pareto;
 pub mod response_curve;
+pub mod robust_pareto;
 
 /// Speed of sound in dry air at `temp_celsius`: `c = 331.3·√(1 + T/273.15)` (m/s).
 pub fn speed_of_sound_air(temp_celsius: f64) -> f64 {
