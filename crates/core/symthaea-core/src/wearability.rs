@@ -200,6 +200,68 @@ pub enum DiagnosticResultV1 {
     NotRun,
 }
 
+/// Declared compatibility of a task with a selected exosuit profile.
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, Deserialize)]
+#[serde(rename_all = "snake_case")]
+pub enum TaskCompatibilityV1 {
+    /// This task was declared within the profile's scope.
+    Supported,
+    /// This task is explicitly outside the profile's scope.
+    Unsupported,
+    /// Compatibility has not been established.
+    Unknown,
+}
+
+/// Clearance state for the current physical environment.
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, Deserialize)]
+#[serde(rename_all = "snake_case")]
+pub enum MovementClearanceV1 {
+    /// Declared movement envelope fits this environment.
+    Compatible,
+    /// Space or obstacle geometry conflicts with the declared movement envelope.
+    Restricted,
+    /// Environmental clearance is unknown.
+    Unknown,
+}
+
+/// Wearer-reported thermal/comfort state; not a medical diagnosis.
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, Deserialize)]
+#[serde(rename_all = "snake_case")]
+pub enum ThermalComfortV1 {
+    /// No thermal discomfort was reported for this observation.
+    WithinPreference,
+    /// The wearer reported thermal discomfort.
+    DiscomfortReported,
+    /// No wearer comfort report was collected.
+    NotCollected,
+    /// State has not been assessed.
+    Unknown,
+}
+
+/// State of a declared task-specific wear-duration or duty-cycle constraint.
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, Deserialize)]
+#[serde(rename_all = "snake_case")]
+pub enum DutyCycleV1 {
+    /// The declared profile limit has not been reached.
+    WithinProfileLimit,
+    /// The declared profile limit has been reached.
+    LimitReached,
+    /// Duration or limit is unknown.
+    Unknown,
+}
+
+/// Compatibility with a declared hygiene/workflow requirement.
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, Deserialize)]
+#[serde(rename_all = "snake_case")]
+pub enum HygieneCompatibilityV1 {
+    /// The declared task and device cleaning requirements are compatible.
+    Compatible,
+    /// The device's declared cleaning/workflow requirements conflict with the task.
+    Incompatible,
+    /// Compatibility has not been established.
+    Unknown,
+}
+
 /// Versioned input assertions used by the deterministic wearability evaluator.
 ///
 /// All fields are optional because different lifecycle stages require different
@@ -225,6 +287,16 @@ pub struct WearabilityInputV1 {
     pub shear_sensor: Option<SignalEvidenceV1>,
     /// Whether a wearer comfort report was collected.
     pub user_comfort_report: Option<ComfortReportV1>,
+    /// Declared task suitability for the selected profile.
+    pub task_compatibility: Option<TaskCompatibilityV1>,
+    /// Movement-space suitability for the current environment.
+    pub movement_clearance: Option<MovementClearanceV1>,
+    /// Wearer-reported thermal comfort; not a safety sensor.
+    pub thermal_comfort: Option<ThermalComfortV1>,
+    /// Whether the profile-specific duty-cycle limit has been reached.
+    pub duty_cycle: Option<DutyCycleV1>,
+    /// Compatibility with the current task's hygiene requirements.
+    pub hygiene_compatibility: Option<HygieneCompatibilityV1>,
     /// Declared support needs for donning.
     pub workflow_support_requirement: Option<WorkflowSupportV1>,
     /// Whether the required caregiver is available.
@@ -273,6 +345,11 @@ impl Default for WearabilityInputV1 {
             pressure_sensor: None,
             shear_sensor: None,
             user_comfort_report: None,
+            task_compatibility: None,
+            movement_clearance: None,
+            thermal_comfort: None,
+            duty_cycle: None,
+            hygiene_compatibility: None,
             workflow_support_requirement: None,
             caregiver_available: None,
             user_requested_doff: None,
@@ -323,6 +400,10 @@ pub enum WearabilityDispositionV1 {
     RemainUnreadyAndOfferAccessibleOptions,
     /// A required interface-migration metric is not available.
     MigrationMetricMissing,
+    /// The current task/environment is outside the selected profile's declared scope.
+    TaskNotAdmittedForProfile,
+    /// Task compatibility, comfort or duty-cycle evidence requires review before proceeding.
+    TaskReviewOrAlternateProfileRequired,
     /// Input is not supported or lacks required identity/schema metadata.
     InvalidInput,
 }
@@ -474,6 +555,9 @@ fn evaluate_perform(input: &WearabilityInputV1) -> WearabilityDispositionV1 {
     if input.fit_evidence != Some(FitEvidenceV1::Current) || fit_or_interface_unknown(input) {
         return WearabilityDispositionV1::InterfaceStateUnknown;
     }
+    if let Some(task_disposition) = evaluate_task_context(input) {
+        return task_disposition;
+    }
     if input.interface_migration_sensor == Some(SignalEvidenceV1::Conflicted) {
         return WearabilityDispositionV1::InterfaceStateUnknown;
     }
@@ -486,6 +570,28 @@ fn evaluate_perform(input: &WearabilityInputV1) -> WearabilityDispositionV1 {
         return WearabilityDispositionV1::InterfaceStateUnknown;
     }
     WearabilityDispositionV1::ReadyForSimulation
+}
+
+fn evaluate_task_context(input: &WearabilityInputV1) -> Option<WearabilityDispositionV1> {
+    if input.task_compatibility == Some(TaskCompatibilityV1::Unsupported)
+        || input.movement_clearance == Some(MovementClearanceV1::Restricted)
+        || input.hygiene_compatibility == Some(HygieneCompatibilityV1::Incompatible)
+    {
+        return Some(WearabilityDispositionV1::TaskNotAdmittedForProfile);
+    }
+
+    if input.task_compatibility == Some(TaskCompatibilityV1::Unknown)
+        || input.movement_clearance == Some(MovementClearanceV1::Unknown)
+        || input.hygiene_compatibility == Some(HygieneCompatibilityV1::Unknown)
+        || input.thermal_comfort == Some(ThermalComfortV1::DiscomfortReported)
+        || input.thermal_comfort == Some(ThermalComfortV1::Unknown)
+        || input.duty_cycle == Some(DutyCycleV1::LimitReached)
+        || input.duty_cycle == Some(DutyCycleV1::Unknown)
+    {
+        return Some(WearabilityDispositionV1::TaskReviewOrAlternateProfileRequired);
+    }
+
+    None
 }
 
 fn fit_or_interface_unknown(input: &WearabilityInputV1) -> bool {
