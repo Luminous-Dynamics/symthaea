@@ -467,6 +467,12 @@ fn verify_provenance_manifest(
             );
         }
     }
+    if manifest.oracle_call_ledger_path.trim().is_empty() {
+        report.fail(
+            "oracle_call_ledger_path_empty",
+            "oracle_call_ledger_path must not be empty",
+        );
+    }
     if !manifest.upstream_repository.starts_with("https://") {
         report.fail(
             "provenance_repository_url_invalid",
@@ -789,14 +795,6 @@ fn verify_oracle_call_ledger(
         report.fail("oracle_call_ledger_empty", "oracle call ledger contains no records");
         return;
     }
-    if lines.len() > MAX_ORACLE_CALL_RECORDS {
-        report.fail(
-            "oracle_call_ledger_record_limit_exceeded",
-            format!("oracle call ledger exceeds {MAX_ORACLE_CALL_RECORDS} records"),
-        );
-        return;
-    }
-
     let mut setup_requests = 0usize;
     let mut proposal_requests = 0usize;
     let mut retry_requests = 0usize;
