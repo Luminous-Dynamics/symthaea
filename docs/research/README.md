@@ -19,6 +19,7 @@ Symthaea is not just software - it's a research platform exploring fundamental q
 | [Validation Studies](#validation-studies) | Empirical validation approaches |
 | [Publications](#publications) | Papers and manuscripts |
 | [Research Roadmap](#research-roadmap) | Future research directions |
+| [Nutrition-aware reasoning and local food planning](NUTRITION_AWARE_REASONING_AND_LOCAL_FOOD_PLANNING_V1.md) | Source-grounded nutrition reasoning, local food supply, data quality and validation boundaries |
 
 ---
 
@@ -250,6 +251,12 @@ See `papers/` directory for 15+ manuscripts in various stages of development.
 3. **Sympoietic partnership**: Validating the core thesis (Φ_dyad > Φ_human + Φ_ai)
 
 ---
+
+## Nutrition-Aware Reasoning and Local Food Planning
+
+See [Nutrition-Aware Reasoning and Local Food Planning v1](NUTRITION_AWARE_REASONING_AND_LOCAL_FOOD_PLANNING_V1.md) for a source-grounded contract connecting nutrition knowledge to local food production.
+
+The direction is to use versioned food-composition records and explicit uncertainty, not free-form recall as a source of numeric truth. It separates Symthaea's reasoning and explanation from Symtropy's numerical scenarios, Sol Atlas's site evidence and Mycelix's community governance. It is a research contract—not an implemented nutrition advisor, crop optimizer, or clinical system.
 
 ## Research Standards
 

@@ -1,0 +1,15 @@
+[package]
+name = "symthaea-nutrition-source-registry"
+version = "0.1.0"
+edition.workspace = true
+license.workspace = true
+description = "License-aware source provenance and eligibility checks for nutrition facts"
+
+[dependencies]
+chrono = { workspace = true }
+hex = { workspace = true }
+serde = { workspace = true }
+sha2 = { workspace = true }
+serde_json = { workspace = true }
+serde_json_canonicalizer = "=0.3.2"
+url = { workspace = true }
