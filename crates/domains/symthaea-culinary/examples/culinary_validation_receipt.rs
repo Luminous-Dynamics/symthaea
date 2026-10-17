@@ -25,7 +25,10 @@ use symthaea_culinary::validate::{CulinaryViolation, validate};
 const SCHEMA_VERSION: &str = "1.0.0";
 const BENCHMARK_ID: &str = "CULINARY-VALIDATOR-CORPUS";
 const BENCHMARK_VERSION: &str = "1.0.0";
-const EXPECTED_MANIFEST_SHA256: &str = "236a67bb3e91a7422fbbc27841bfda013c54ac29e85a0ef71cd303ade978483a";
+const EXPECTED_MANIFEST_SHA256: &str = concat!(
+    "236a67bb3e91a7422fbbc27841bfda01",
+    "3c54ac29e85a0ef71cd303ade978483a"
+);
 
 const REQUIRED_CASE_IDS: &[&str] = &[
     "EMULSION-VALID-INTERIOR-001",
@@ -142,9 +145,10 @@ fn main() -> ExitCode {
         Ok(args) => args,
         Err(message) => {
             eprintln!("{message}");
-            eprintln!(
-                "usage: culinary_validation_receipt [--manifest PATH] [--output PATH] [--expected-head SHA]"
-            );
+            eprintln!(concat!(
+                "usage: culinary_validation_receipt [--manifest PATH] [--output PATH] ",
+                "[--expected-head SHA]"
+            ));
             return ExitCode::from(2);
         }
     };
@@ -321,7 +325,10 @@ fn build_receipt(args: &Args, started: Instant) -> (Receipt, u8) {
     }
     if !digest_matches {
         issues.push(format!(
-            "manifest SHA-256 differs from the pinned corpus: expected {EXPECTED_MANIFEST_SHA256}, observed {manifest_digest}"
+            concat!(
+                "manifest SHA-256 differs from the pinned corpus: ",
+                "expected {EXPECTED_MANIFEST_SHA256}, observed {manifest_digest}"
+            )
         ));
     }
     add_checkout_issues(&mut issues, &commit, &head_matches);
@@ -551,11 +558,13 @@ fn make_spec(fixture: &Fixture) -> Result<CulinarySpec, String> {
             fat: parse_fat(string(input, "fat")?)?,
             trajectory: trajectory(input)?,
         }),
-        "pasteurization" => CulinarySpec::new(fixture.id.clone()).with_pasteurization(Pasteurization {
-            pathogen: parse_pathogen(string(input, "pathogen")?)?,
-            trajectory: trajectory(input)?,
-            required_log_reduction: optional_number(input, "required_log_reduction")?,
-        }),
+        "pasteurization" => {
+            CulinarySpec::new(fixture.id.clone()).with_pasteurization(Pasteurization {
+                pathogen: parse_pathogen(string(input, "pathogen")?)?,
+                trajectory: trajectory(input)?,
+                required_log_reduction: optional_number(input, "required_log_reduction")?,
+            })
+        },
         family => return Err(format!("unsupported fixture family: {family}")),
     };
     Ok(spec)
@@ -744,7 +753,11 @@ mod tests {
         assert_eq!(manifest.cases.len(), REQUIRED_CASE_IDS.len());
 
         let required: BTreeSet<&str> = REQUIRED_CASE_IDS.iter().copied().collect();
-        let observed: BTreeSet<&str> = manifest.cases.iter().map(|fixture| fixture.id.as_str()).collect();
+        let observed: BTreeSet<&str> = manifest
+            .cases
+            .iter()
+            .map(|fixture| fixture.id.as_str())
+            .collect();
         assert_eq!(observed, required, "manifest IDs must exactly match the runner contract");
         assert_eq!(
             manifest.cases.len(),
@@ -763,7 +776,10 @@ mod tests {
             .filter(|result| !result.matched_expectation)
             .map(|result| {
                 format!(
-                    "{}: expected {} / {:?}, got {} / {:?} ({:?})",
+                    concat!(
+                        "{}: expected {} / {:?}, got {} / {:?} ",
+                        "({:?})"
+                    ),
                     result.id,
                     result.expected_status,
                     result.expected_violation,
@@ -776,7 +792,7 @@ mod tests {
 
         assert!(
             failures.is_empty(),
-            "frozen culinary validator cases failed:\n{}",
+            concat!("frozen culinary validator cases failed:\n", "{}"),
             failures.join("\n")
         );
     }
