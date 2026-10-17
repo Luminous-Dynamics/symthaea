@@ -60,6 +60,6 @@ The D/z log-linear framework is widely used to summarize time-temperature lethal
 
 ## References
 
-1. van Asselt, E. D. and Zwietering, M. H. (2006), *A systematic approach to determine global thermal inactivation parameters for various food pathogens*, International Journal of Food Microbiology 107(1), 73–82. See also the methodological review, [Inactivation kinetics of food-borne pathogens subjected to thermal treatments](https://doi.org/10.1080/02656736.2017.1372643), for the definitions of D- and z-values and limitations of log-linear assumptions.
+1. [Inactivation kinetics of food-borne pathogens subjected to thermal treatments: a review](https://doi.org/10.1080/02656736.2017.1372643) (2017). Reviews the definitions and use of D- and z-values and the limits of log-linear assumptions.
 2. [Development of a Log-Quadratic Model To Describe Microbial Inactivation](https://pmc.ncbi.nlm.nih.gov/articles/PMC2786541/), Applied and Environmental Microbiology. Describes integrated non-isothermal lethality under the D/z framework and discusses departures from log-linear survival.
 3. Current crate model and its explicitly simplified parameters: `src/thermal.rs` and `src/thresholds.rs`. Threshold provenance and food-safety scope require separate review; a software test is not validation of a scientific parameter.
