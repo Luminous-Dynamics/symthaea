@@ -416,6 +416,75 @@ mod tests {
     }
 
     #[test]
+    fn neutral_phrase_timing_curve_is_an_exact_timing_noop() {
+        let mut notes = vec![
+            Note { frequency: 110.0, start_time: 0.0, duration: 0.25, velocity: 0.6 },
+            Note { frequency: 220.0, start_time: 0.5, duration: 0.25, velocity: 0.7 },
+            Note { frequency: 330.0, start_time: 1.0, duration: 0.5, velocity: 0.8 },
+        ];
+        let original = notes.clone();
+        let curve = PhraseTimingCurveV1 {
+            points: vec![
+                TimingCurvePointV1 { phrase_position: 0.0, offset_ms: 0.0 },
+                TimingCurvePointV1 { phrase_position: 0.5, offset_ms: 0.0 },
+                TimingCurvePointV1 { phrase_position: 1.0, offset_ms: 0.0 },
+            ],
+            max_abs_offset_ms: 0.0,
+        };
+        apply_phrase_timing_curve(&mut notes, &[0.0, 0.5, 1.0], &curve).unwrap();
+        for (actual, before) in notes.iter().zip(original) {
+            assert_eq!(actual.start_time, before.start_time);
+            assert_eq!(actual.duration, before.duration);
+            assert_eq!(actual.velocity, before.velocity);
+        }
+    }
+
+    #[test]
+    fn phrase_timing_curve_preserves_invariants_across_deterministic_grid() {
+        let original: Vec<Note> = (0..17)
+            .map(|index| Note {
+                frequency: 110.0 + index as f32 * 5.0,
+                start_time: index as f32 * 0.25,
+                duration: 0.18,
+                velocity: 0.4 + (index % 5) as f32 * 0.1,
+            })
+            .collect();
+        let positions: Vec<f32> = (0..17).map(|index| index as f32 / 16.0).collect();
+        let anchor_positions = [0.0, 0.25, 0.5, 0.75, 1.0];
+
+        for seed in 0_u32..128 {
+            let varied = |point: u32| {
+                ((seed.wrapping_mul(37).wrapping_add(point * 19).wrapping_add(11) % 101)
+                    as f32)
+                    - 50.0
+            };
+            let offsets = [0.0, varied(1), varied(2), varied(3), 0.0];
+            let curve = PhraseTimingCurveV1 {
+                points: anchor_positions
+                    .into_iter()
+                    .zip(offsets)
+                    .map(|(phrase_position, offset_ms)| TimingCurvePointV1 {
+                        phrase_position,
+                        offset_ms,
+                    })
+                    .collect(),
+                max_abs_offset_ms: 50.0,
+            };
+            let mut actual = original.clone();
+            apply_phrase_timing_curve(&mut actual, &positions, &curve).unwrap();
+
+            assert!(actual.windows(2).all(|pair| pair[0].start_time <= pair[1].start_time));
+            for (after, before) in actual.iter().zip(&original) {
+                let displacement_ms = (after.start_time - before.start_time) * 1000.0;
+                assert!(displacement_ms.abs() <= 50.1);
+                assert_eq!(after.frequency, before.frequency);
+                assert_eq!(after.duration, before.duration);
+                assert_eq!(after.velocity, before.velocity);
+            }
+        }
+    }
+
+    #[test]
     fn phrase_timing_curve_interpolates_correlated_offsets_and_preserves_note_data() {
         let mut notes = vec![
             Note { frequency: 110.0, start_time: 0.0, duration: 0.25, velocity: 0.6 },
