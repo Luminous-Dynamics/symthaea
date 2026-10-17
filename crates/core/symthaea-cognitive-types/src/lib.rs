@@ -1394,7 +1394,7 @@ pub struct SubstrateTelemetry {
     /// Total energy spent so far (joules). Monotonically increasing.
     #[serde(default)]
     pub total_energy_spent: f64,
-    /// Energy spent this cycle (model-estimated joules, speed-adjusted via tau_factor).
+    /// Modeled joules assigned to this cognitive cycle from substrate energy/op; independent of cognitive tau.
     #[serde(default)]
     pub energy_this_cycle: f64,
     /// Model-estimated average power over the last closed monotonic wall-time window (watts).
