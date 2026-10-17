@@ -59,7 +59,15 @@ fn nutrition_rejects_nan_and_negative_nutrient_quantities() {
     assert!(
         validate_nutrition(&nan_profile)
             .iter()
-            .any(|v| matches!(v, CulinaryViolation::InvalidNumericInput { field: "nutrition.sodium_mg", .. }))
+            .any(|v| {
+                matches!(
+                    v,
+                    CulinaryViolation::InvalidNumericInput {
+                        field: "nutrition.sodium_mg",
+                        ..
+                    }
+                )
+            })
     );
 
     let overflow_profile = NutrientProfile {
@@ -69,7 +77,15 @@ fn nutrition_rejects_nan_and_negative_nutrient_quantities() {
     assert!(
         validate_nutrition(&overflow_profile)
             .iter()
-            .any(|v| matches!(v, CulinaryViolation::InvalidNumericInput { field: "nutrition.energy_kcal", .. }))
+            .any(|v| {
+                matches!(
+                    v,
+                    CulinaryViolation::InvalidNumericInput {
+                        field: "nutrition.energy_kcal",
+                        ..
+                    }
+                )
+            })
     );
 
     let negative_profile = NutrientProfile {
@@ -79,7 +95,15 @@ fn nutrition_rejects_nan_and_negative_nutrient_quantities() {
     assert!(
         validate_nutrition(&negative_profile)
             .iter()
-            .any(|v| matches!(v, CulinaryViolation::InvalidNumericInput { field: "nutrition.protein_g", .. }))
+            .any(|v| {
+                matches!(
+                    v,
+                    CulinaryViolation::InvalidNumericInput {
+                        field: "nutrition.protein_g",
+                        ..
+                    }
+                )
+            })
     );
 }
 
