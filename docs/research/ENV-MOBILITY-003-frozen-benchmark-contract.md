@@ -38,6 +38,17 @@ Here, `admit` and `admit_degraded` do not authorize physical dispatch, energizat
 
 ## 4. Independent verifier requirements
 
+The first test-only Rust entry point now lives in repository tooling rather than a production vehicle/controller crate, so it remains effects-disabled and does not create a parallel domain engine.
+
+From the repository root, run:
+
+```sh
+cargo run -p xtask -- env-mobility-qualify
+cargo test -p xtask env_mobility
+```
+
+The command is intended to emit deterministic JSON with raw SHA-256 digests of the exact two corpus byte streams, per-case decisions, disposition counts, mismatches and protected-gate false accepts. It exits nonzero if the schema is invalid or any expected disposition/reason differs. Its presence is not a pass claim until compilation and exact-head tests are observed.
+
 The first Rust implementation should compose existing owners rather than create another universal robotics, manufacturing, or scheduling engine.
 
 The verifier must:
@@ -57,8 +68,8 @@ No weighted total score should allow a strong average to offset a hard failure. 
 
 The v1 feasibility corpus already covers permission, calibration, operating envelopes, energy, recovery, coordinate reference, configuration mismatch, data-rights and claim-laundering cases. The independent test harness should additionally generate mutations for:
 
-- shared power or clock dependencies falsely described as independent redundancy;
-- repeated docking/recovery failures hidden from the service record;
+- common-mode dependency failures involving power, clocks, radios or calibration systems that are not yet represented by a corpus case;
+- repeated docking/recovery failures with a different combination of environmental or mission constraints;
 - unknown/stale battery configuration or unrecorded replacement;
 - a communications partition with no offline policy or safe local fallback;
 - a failed repair followed by an unchanged “passed” acceptance record;
@@ -66,7 +77,7 @@ The v1 feasibility corpus already covers permission, calibration, operating enve
 - stale mission data presented as current;
 - calibration marked current solely because a vendor/status field says so, without the required evidence reference.
 
-The corpus labels and these desired reactions must remain reviewable by a human independent of the production selector.
+The v1 corpus and test-only Rust harness now include shared-power redundancy falsely claimed as independent, hidden failed recovery attempts, stale source data, and a failed repair reintroduced without acceptance. Continue adding mutations for the remaining cases below. All labels and reactions must remain reviewable by a human independent of the production selector.
 
 ## 6. Benchmark report format
 
