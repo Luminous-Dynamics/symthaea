@@ -919,6 +919,165 @@ fn evaluate_target(ledger: &OutcomeLedger, target: &TargetQuery) -> TargetComput
     }
 }
 
+fn compare_worst_group_arms(
+    baseline_arm_id: &str,
+    baseline: &BTreeMap<String, TargetComputation>,
+    candidate_arm_id: &str,
+    candidate: &BTreeMap<String, TargetComputation>,
+    metric: ComparisonMetric,
+    practical_margin: f64,
+    bootstrap_replicates: usize,
+    bootstrap_seed: u64,
+) -> Result<MetricComparison, String> {
+    if !matches!(
+        metric,
+        ComparisonMetric::WorstGroupSuccessRateAtBudget
+            | ComparisonMetric::WorstGroupNormalizedSuccessAuc
+    ) {
+        return Err("compare_worst_group_arms requires a worst-group metric".to_string());
+    }
+
+    let total_target_count = baseline.len();
+    let mut deltas_by_group: BTreeMap<String, Vec<f64>> = BTreeMap::new();
+    for (target_id, baseline_target) in baseline {
+        let candidate_target = candidate
+            .get(target_id)
+            .ok_or_else(|| format!("comparison arm lacks target {target_id:?}"))?;
+        if candidate_target.metrics.group_id != baseline_target.metrics.group_id {
+            return Err(format!(
+                "target {target_id:?} belongs to different groups across comparison arms"
+            ));
+        }
+        let delta = match metric {
+            ComparisonMetric::WorstGroupSuccessRateAtBudget => {
+                f64::from(candidate_target.metrics.success_at_budget)
+                    - f64::from(baseline_target.metrics.success_at_budget)
+            }
+            ComparisonMetric::WorstGroupNormalizedSuccessAuc => {
+                candidate_target.metrics.normalized_success_auc
+                    - baseline_target.metrics.normalized_success_auc
+            }
+            _ => unreachable!("metric variant checked at function entry"),
+        };
+        deltas_by_group
+            .entry(baseline_target.metrics.group_id.clone())
+            .or_default()
+            .push(delta);
+    }
+
+    if deltas_by_group.is_empty() {
+        return Err("worst-group comparison requires at least one paired target".to_string());
+    }
+    let covered_target_count = deltas_by_group.values().map(Vec::len).sum::<usize>();
+    let group_means = deltas_by_group
+        .iter()
+        .map(|(group_id, deltas)| {
+            (
+                group_id.clone(),
+                deltas.iter().sum::<f64>() / deltas.len() as f64,
+            )
+        })
+        .collect::<BTreeMap<_, _>>();
+    let estimated_delta = group_means
+        .values()
+        .copied()
+        .fold(f64::INFINITY, f64::min);
+    let group_count = deltas_by_group.len();
+
+    let no_interval = |disposition| MetricComparison {
+        baseline_arm_id: baseline_arm_id.to_string(),
+        comparison_arm_id: candidate_arm_id.to_string(),
+        metric,
+        estimated_delta,
+        confidence_interval_lower: None,
+        confidence_interval_upper: None,
+        confidence_level: 0.95,
+        practical_margin,
+        independent_group_count: group_count,
+        covered_target_count,
+        total_target_count,
+        bootstrap_replicates,
+        disposition,
+    };
+
+    if group_count < MIN_INDEPENDENT_GROUPS_FOR_INTERVAL {
+        return Ok(no_interval(
+            ComparisonDisposition::InsufficientIndependentGroups,
+        ));
+    }
+    if deltas_by_group.values().any(|deltas| deltas.len() < 2) {
+        return Ok(no_interval(
+            ComparisonDisposition::InsufficientWithinGroupReplication,
+        ));
+    }
+
+    // The groups are the predeclared worst-group set, not a random sample to be
+    // averaged away. Resample paired targets within every group, build a
+    // Bonferroni-adjusted percentile interval for each group, and bound the
+    // minimum of group effects using the minimum of simultaneous group bounds.
+    let tail_probability = 0.025 / group_count as f64;
+    let metric_salt = match metric {
+        ComparisonMetric::WorstGroupSuccessRateAtBudget => 0x5753_5543_4300_0004,
+        ComparisonMetric::WorstGroupNormalizedSuccessAuc => 0x5753_4155_4300_0005,
+        _ => unreachable!("metric variant checked at function entry"),
+    };
+    let mut group_lower_bounds = Vec::with_capacity(group_count);
+    let mut group_upper_bounds = Vec::with_capacity(group_count);
+
+    for (group_id, deltas) in &deltas_by_group {
+        let mut random = SplitMix64::new(
+            bootstrap_seed
+                ^ stable_hash64(candidate_arm_id.as_bytes())
+                ^ stable_hash64(group_id.as_bytes())
+                ^ metric_salt,
+        );
+        let mut bootstrap_means = Vec::with_capacity(bootstrap_replicates);
+        for _ in 0..bootstrap_replicates {
+            let mut sum = 0.0;
+            for _ in 0..deltas.len() {
+                sum += deltas[random.index(deltas.len())];
+            }
+            bootstrap_means.push(sum / deltas.len() as f64);
+        }
+        bootstrap_means.sort_by(f64::total_cmp);
+        let last = bootstrap_means.len() - 1;
+        let lower_index = ((last as f64) * tail_probability).floor() as usize;
+        let upper_index = ((last as f64) * (1.0 - tail_probability)).ceil() as usize;
+        group_lower_bounds.push(bootstrap_means[lower_index]);
+        group_upper_bounds.push(bootstrap_means[upper_index.min(last)]);
+    }
+
+    let lower = group_lower_bounds
+        .into_iter()
+        .fold(f64::INFINITY, f64::min);
+    let upper = group_upper_bounds
+        .into_iter()
+        .fold(f64::INFINITY, f64::min);
+    let disposition = if estimated_delta >= practical_margin && lower > 0.0 {
+        ComparisonDisposition::ImprovementBeyondMargin
+    } else if estimated_delta <= -practical_margin && upper < 0.0 {
+        ComparisonDisposition::RegressionBeyondMargin
+    } else {
+        ComparisonDisposition::Inconclusive
+    };
+
+    Ok(MetricComparison {
+        baseline_arm_id: baseline_arm_id.to_string(),
+        comparison_arm_id: candidate_arm_id.to_string(),
+        metric,
+        estimated_delta,
+        confidence_interval_lower: Some(lower),
+        confidence_interval_upper: Some(upper),
+        confidence_level: 0.95,
+        practical_margin,
+        independent_group_count: group_count,
+        covered_target_count,
+        total_target_count,
+        bootstrap_replicates,
+        disposition,
+    })
+}
+
 fn compare_arms(
     baseline_arm_id: &str,
     baseline: &BTreeMap<String, TargetComputation>,
