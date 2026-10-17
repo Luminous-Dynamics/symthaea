@@ -17,14 +17,15 @@ The crate defines its own Cargo workspace to avoid pulling the full Symthaea wor
 
 - Screens task compatibility and explicit service units.
 - Checks declared slope, terrain roughness, row clearance, turning radius, navigation assumptions, daily capacity, safety-case presence, and human override.
-- Separates site/task evidence from each candidate's safety, cost, and serviceability evidence; candidates cannot inherit one another's quotes or repair claims.
+- Separates site/task evidence from each candidate's capability, navigation, safety, cost, and serviceability evidence; candidates cannot inherit one another's capability claims, quotes, or repair claims.
+- Requires an explicit uppercase currency code and blocks cross-currency cost comparisons unless a future, separately evidenced conversion contract is added.
 - Distinguishes verified, estimated, missing, stale, and conflicting evidence.
 - Fails closed on missing/invalid evidence records and checked-arithmetic overflow.
 - Computes transparent annualized-capital plus operating cost, supervision time, maintenance time, and repair lead time when the inputs permit it.
 - Returns a component-wise assessment and a Pareto frontier; no weighted single “best robot” score is used.
 - Keeps manual/current practice as a first-class candidate. A robot can be rejected while the no-robot option remains feasible.
 
-The frozen synthetic case manifest is at `fixtures/scenario_manifest.tsv`. Rust tests independently pin the expected disposition of every listed case, including hard-constraint, evidence-quality, budget, repairability, and boundary conditions.
+The frozen synthetic case manifest is at `fixtures/scenario_manifest.tsv`. It currently contains 43 expected-disposition cases, mostly adversarial mutations of one synthetic Highveld vegetable-scouting fixture. Rust tests pin the expected disposition of each case, including capability-evidence, hard-constraint, currency, evidence-quality, budget, repairability, and boundary conditions. This is not yet a 30-family farm-context benchmark.
 
 ## Important limitations
 
@@ -45,7 +46,7 @@ Targets for this research tranche:
 - Zero acceptance of known hard-constraint violations represented in the corpus.
 - Deterministic output for identical inputs.
 - Candidate-specific metrics remain separate; no composite score hides trade-offs.
-- Expansion to 30+ scenario families and field calibration precedes any claim about real-world performance.
+- Expansion to 30+ distinct site/task scenario families (including orchards, greenhouses, broad-acre fields, nursery, livestock, and packhouse contexts), plus field calibration, precedes any claim about real-world performance.
 
 ## Research leads
 
