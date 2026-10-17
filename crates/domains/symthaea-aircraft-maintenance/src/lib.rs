@@ -1139,11 +1139,9 @@ pub fn transition_task(
                 {
                     return Err(TaskCardError::AuthorityReviewMismatch);
                 }
-                validate_document(
-                    "authority.review.permission_source",
-                    permission_source,
-                    &mut Vec::new(),
-                );
+                if !valid_document_shape(permission_source) {
+                    return Err(TaskCardError::AuthorityReviewMismatch);
+                }
                 if !document_is_current(permission_source, current_documents) {
                     return Err(TaskCardError::StaleOrMissingSource {
                         document_id: permission_source.document_id.clone(),
