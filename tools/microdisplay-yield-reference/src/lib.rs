@@ -251,14 +251,61 @@ fn validate_probability(probability: f64) -> Result<(), YieldError> {
 #[cfg(test)]
 mod tests {
     use super::*;
+    use serde_json::Value;
 
     const Z_95: f64 = 1.959_963_984_540_054;
+    const CORPUS: &str =
+        include_str!("../../../docs/engineering/microdisplay-yield-corpus-v0.1.json");
 
     fn close(actual: f64, expected: f64, tolerance: f64) {
         assert!(
             actual.is_finite() && (actual - expected).abs() <= tolerance,
             "actual={actual}, expected={expected}, tolerance={tolerance}"
         );
+    }
+
+    #[test]
+    fn checked_in_corpus_remains_unqualified_and_arithmetic_cases_drive_reference() {
+        let corpus: Value =
+            serde_json::from_str(CORPUS).expect("checked-in yield corpus JSON must parse");
+        assert_eq!(corpus["corpus_id"].as_str(), Some("MICRODISP-YIELD-CORPUS-001"));
+        assert_eq!(corpus["status"].as_str(), Some("UNQUALIFIED"));
+
+        let cases = corpus["cases"]
+            .as_array()
+            .expect("corpus cases must be an array");
+        assert_eq!(corpus["case_count"].as_u64(), Some(cases.len() as u64));
+        assert_eq!(cases.len(), 20);
+
+        let mut ids = std::collections::BTreeSet::new();
+        for case in cases {
+            assert_eq!(case["status"].as_str(), Some("UNQUALIFIED"));
+            assert_eq!(case["evidence_class"].as_str(), Some("SYNTHETIC_MODEL"));
+            let id = case["id"].as_str().expect("each case must have an ID");
+            assert!(ids.insert(id.to_owned()), "duplicate case ID: {id}");
+            assert!(!case["reference_ids"]
+                .as_array()
+                .expect("each case must have source references")
+                .is_empty());
+        }
+
+        for id in ["MICLED-YIELD-ARITH-001", "MICLED-YIELD-ARITH-002"] {
+            let case = cases
+                .iter()
+                .find(|case| case["id"].as_str() == Some(id))
+                .unwrap_or_else(|| panic!("required arithmetic case is missing: {id}"));
+            let population = case["inputs"]["population_count"]
+                .as_u64()
+                .expect("population_count must be an integer");
+            let probability = case["inputs"]["per_emitter_success_probability"]
+                .as_f64()
+                .expect("success probability must be numeric");
+            let output = expected_counts(population, probability)
+                .expect("corpus arithmetic inputs must be valid");
+            assert!(output.expected_defects.is_finite());
+            assert!(output.expected_good.is_finite());
+            assert!((output.expected_good + output.expected_defects - population as f64).abs() < 1e-6);
+        }
     }
 
     #[test]
