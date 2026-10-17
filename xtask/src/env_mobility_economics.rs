@@ -194,11 +194,31 @@ fn parse_alternative(value: &Value, context: &str) -> Result<Alternative> {
 
     let variable_components = value.get("variable_cost_per_attempt_components")
         .context("variable_cost_per_attempt_components missing")?;
-    let variable_cost_per_attempt = sum_components(variable_components, VARIABLE_COST_FIELDS, context, true)?;
-    if variable_cost_per_attempt.is_none() {
-        ensure!(evidence_status != "synthetic_complete",
-            "{context}: missing variable cost component cannot be labelled complete");
+    let reported_variable_cost = sum_components(
+        variable_components,
+        VARIABLE_COST_FIELDS,
+        context,
+        true,
+    )?;
+    if evidence_status == "synthetic_complete" {
+        ensure!(
+            reported_variable_cost.is_some(),
+            "{context}: missing variable-cost component cannot be labelled complete"
+        );
     }
+    if evidence_status == "missing_supplier_quote" {
+        ensure!(
+            variable_components.get("unit_material_or_quote").is_some_and(Value::is_null),
+            "{context}: missing_supplier_quote status requires the supplier quote field to be null"
+        );
+    }
+    // Any non-complete evidence state blocks cost comparison, even if placeholder
+    // numbers happen to be present in other fields.
+    let variable_cost_per_attempt = if evidence_status == "synthetic_complete" {
+        reported_variable_cost
+    } else {
+        None
+    };
     let yield_fraction = number_field(value, "yield_fraction", context)?;
     ensure!(
         yield_fraction.is_finite() && yield_fraction > 0.0 && yield_fraction <= 1.0,
@@ -215,6 +235,11 @@ fn parse_alternative(value: &Value, context: &str) -> Result<Alternative> {
 }
 
 fn derive_break_even(make: &Alternative, buy: &Alternative) -> (String, Option<f64>, Option<f64>, Option<f64>) {
+    if make.qualification_status != "qualified_for_profile"
+        || buy.qualification_status != "qualified_for_profile"
+    {
+        return ("not_computable".to_owned(), None, None, None);
+    }
     let (Some(make_variable), Some(buy_variable)) =
         (make.variable_cost_per_attempt, buy.variable_cost_per_attempt)
     else {
@@ -298,7 +323,13 @@ pub fn run() -> Result<EconomicsReport> {
         ensure!(!string_field(&parsed, key, context)?.trim().is_empty(),
             "{context}: metadata {key:?} is empty");
     }
-    let formula = object(parsed.get("formula_contract").context("formula_contract missing")?, "formula_contract")?;
+    let formula_value = parsed.get("formula_contract").context("formula_contract missing")?;
+    exact_keys(formula_value, &[
+        "annual_fixed_cost", "crf", "variable_cost_per_attempt", "variable_cost_per_accepted_unit",
+        "total_annual_cost_per_accepted_unit", "break_even_demand", "eligibility_gate",
+        "expected_decisions_are_independent_test_labels",
+    ], "formula_contract")?;
+    let formula = object(formula_value, "formula_contract")?;
     for key in [
         "annual_fixed_cost", "crf", "variable_cost_per_attempt", "variable_cost_per_accepted_unit",
         "total_annual_cost_per_accepted_unit", "break_even_demand", "eligibility_gate",
