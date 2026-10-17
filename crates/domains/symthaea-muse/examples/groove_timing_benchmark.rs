@@ -1291,6 +1291,21 @@ mod tests {
     }
 
     #[test]
+    fn bounded_reader_accepts_within_limit_and_rejects_oversized_files() {
+        let path = env::temp_dir().join(format!(
+            "melothaea-gmd-bounded-read-{}.bin",
+            std::process::id()
+        ));
+        let _ = fs::remove_file(&path);
+        fs::write(&path, b"four").unwrap();
+
+        assert_eq!(read_regular_file_limited(&path, 4).unwrap(), b"four");
+        assert!(read_regular_file_limited(&path, 3).is_err());
+
+        fs::remove_file(path).unwrap();
+    }
+
+    #[test]
     fn csv_parser_rejects_unclosed_quoted_field() {
         assert!(parse_csv_record(r#"a,"unfinished"#).is_none());
     }
