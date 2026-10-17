@@ -267,6 +267,8 @@ pub enum Style {
     /// This preset is Developing until the formal and expressive details have
     /// passed expert listening review; it is not an authenticity claim.
     Sarabande,
+    /// Da-capo minuet movement: measured A, contrasting Trio B, and A return.
+    MinuetAndTrio,
 }
 
 impl Style {
@@ -277,7 +279,7 @@ impl Style {
     /// exhaustiveness tests) should iterate this rather than hand-listing
     /// variants, which is exactly the drift risk `grammar_family`'s own doc
     /// comment below warns against for `HOME_STYLES`-style duplication.
-    pub const ALL: [Style; 34] = [
+    pub const ALL: [Style; 35] = [
         Style::Classical,
         Style::Waltz,
         Style::Folk,
@@ -312,6 +314,7 @@ impl Style {
         Style::Erosion,
         Style::Lineage,
         Style::Sarabande,
+        Style::MinuetAndTrio,
     ];
 
     /// The compositional grammar family this style specializes — the single
@@ -351,7 +354,8 @@ impl Style {
             | Style::BaroqueSuite
             | Style::Rondo
             | Style::ThemeAndVariations
-            | Style::Sarabande => PeriodSentence,
+            | Style::Sarabande
+            | Style::MinuetAndTrio => PeriodSentence,
             Style::Fugue => Contrapuntal,
             Style::Passacaglia | Style::Erosion | Style::Lineage => GroundVariation,
             Style::Tango
@@ -462,7 +466,8 @@ impl Style {
             | Style::Erosion
             | Style::Lineage
             | Style::BaroqueSuite
-            | Style::Sarabande => 3,
+            | Style::Sarabande
+            | Style::MinuetAndTrio => 3,
             Style::Celtic => 6,    // the jig's 3+3 lilt
             Style::Flamenco => 12, // the compás's 3+3+2+2+2 cycle
             _ => 4,
@@ -506,6 +511,7 @@ impl Style {
             Style::Erosion => (46.0, 76.0),
             Style::Lineage => (58.0, 92.0),
             Style::Sarabande => (42.0, 72.0),
+            Style::MinuetAndTrio => (82.0, 124.0),
         }
     }
 
@@ -2862,7 +2868,58 @@ impl Style {
                     t.hook_cell = false;
                     t
                 },
+            },            Style::MinuetAndTrio => CompositionSpec {
+                name: "MinuetAndTrio".into(),
+                attitude: None,
+                mode: None,
+                meter: 3,
+                tempo_range: (82.0, 124.0),
+                motifs_calm: vec![
+                    vec![(1, 1, 1), (3, 1, 1), (5, 1, 1)],
+                    vec![(5, 1, 1), (3, 1, 1), (2, 1, 1)],
+                ],
+                motifs_medium: vec![
+                    vec![(1, 1, 2), (3, 1, 2), (5, 1, 2), (3, 1, 2), (2, 1, 1)],
+                    vec![(3, 1, 2), (2, 1, 2), (1, 1, 2), (2, 1, 2), (3, 1, 1)],
+                ],
+                motifs_busy: vec![
+                    vec![(1, 1, 2), (2, 1, 2), (3, 1, 2), (5, 1, 2), (4, 1, 2), (3, 1, 2)],
+                    vec![(5, 1, 2), (4, 1, 2), (3, 1, 2), (2, 1, 2), (1, 1, 2), (2, 1, 2)],
+                ],
+                progression: ProgressionSpec::GrammarWithPalette(
+                    crate::harmony::HarmonicPalette::waltz(),
+                ),
+                accompaniment_pool: vec![A::Minuet],
+                form_pool: vec![FormKind::Ternary],
+                ensemble_pool: s(&[
+                    ["violin", "harpsichord", "cello"],
+                    ["flute", "harpsichord", "cello"],
+                ]),
+                counter_instrument: None,
+                melody: MelodicDna {
+                    hook_rhythms: vec![
+                        vec![(1, 1), (1, 1), (1, 1)],
+                        vec![(1, 2), (1, 2), (1, 2), (1, 2), (1, 1)],
+                        vec![(1, 2), (1, 2), (1, 2), (1, 2), (1, 2), (1, 2)],
+                    ],
+                    hook_contours: vec![vec![1, 3, 5], vec![5, 3, 2], vec![1, 2, 3, 5, 4, 3]],
+                    appoggiatura_rate: 0.04,
+                    ornament_rate: 0.08,
+                    blue_note_rate: 0.0,
+                    use_procedural_foundry: false,
+                    ..MelodicDna::default()
+                },
+                meter_pool: vec![],
+                mode_pool: vec![],
+                rhetoric: PhraseRhetoric::Classic,
+                development: DevelopmentDna::Sequential,
+                texture: {
+                    let mut t = texture(DrumPolicy::None);
+                    t.harmonic_sequence = true;
+                    t
+                },
             },
+
         }
     }
 }
@@ -3267,6 +3324,20 @@ mod tests {
     }
 
     #[test]
+    fn minuet_and_trio_preset_uses_dacapo_ternary_form() {
+        use crate::accompaniment::Accompaniment;
+        use crate::spec::FormKind;
+
+        let spec = Style::MinuetAndTrio.spec();
+        assert_eq!(spec.meter, 3);
+        assert_eq!(spec.tempo_range, (82.0, 124.0));
+        assert_eq!(spec.accompaniment_pool, vec![Accompaniment::Minuet]);
+        assert_eq!(spec.form_pool, vec![FormKind::Ternary]);
+        assert_eq!(spec.form_kind(1), FormKind::Ternary);
+        assert!(spec.validate().is_ok());
+    }
+
+    #[test]
     fn classical_is_the_default() {
         assert_eq!(Style::default(), Style::Classical);
     }
@@ -3323,6 +3394,7 @@ mod tests {
             Style::Erosion,
             Style::Lineage,
             Style::Sarabande,
+            Style::MinuetAndTrio,
         ] {
             let spec = style.spec();
             spec.validate()
