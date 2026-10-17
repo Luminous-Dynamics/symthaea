@@ -47,6 +47,7 @@ pub struct StaticActuatorDiskEstimate {
 pub enum StaticActuatorDiskError {
     NonFiniteInput { field: &'static str },
     NonPositiveInput { field: &'static str },
+    NegativeInput { field: &'static str },
     DerivedValueOutOfRange,
 }
 
@@ -151,7 +152,7 @@ pub fn ideal_axial_actuator_disk(
         });
     }
     if input.forward_speed_m_s < 0.0 {
-        return Err(StaticActuatorDiskError::NonPositiveInput {
+        return Err(StaticActuatorDiskError::NegativeInput {
             field: "forward_speed_m_s",
         });
     }
@@ -372,6 +373,24 @@ mod tests {
     }
 
     #[test]
+    fn forward_flight_known_answer_matches_independent_momentum_calculation() {
+        let result = ideal_axial_actuator_disk(AxialActuatorDiskInput {
+            thrust_n: 1_000.0,
+            air_density_kg_m3: 1.225,
+            disk_area_m2: 1.0,
+            forward_speed_m_s: 50.0,
+        })
+        .unwrap();
+
+        // The fixture reduces to vi = 50/7 m/s, ideal air power
+        // 57,142.857... W, useful thrust power 50,000 W, and eta = 7/8.
+        assert!((result.induced_velocity_m_s - (50.0 / 7.0)).abs() < 1e-12);
+        assert!((result.ideal_air_power_w - (400_000.0 / 7.0)).abs() < 1e-8);
+        assert_eq!(result.useful_thrust_power_w, 50_000.0);
+        assert!((result.ideal_propulsive_efficiency.unwrap() - 0.875).abs() < 1e-12);
+    }
+
+    #[test]
     fn negative_or_non_finite_forward_speed_fails_closed() {
         assert_eq!(
             ideal_axial_actuator_disk(AxialActuatorDiskInput {
@@ -380,7 +399,7 @@ mod tests {
                 disk_area_m2: 1.0,
                 forward_speed_m_s: -1.0,
             }),
-            Err(StaticActuatorDiskError::NonPositiveInput {
+            Err(StaticActuatorDiskError::NegativeInput {
                 field: "forward_speed_m_s"
             })
         );
