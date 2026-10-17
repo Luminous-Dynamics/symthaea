@@ -1390,7 +1390,7 @@ mod tests {
             certification_basis: card.authority.certification_basis.clone(),
             credential_reference: Some(doc("credential-fixture", "rev-1", '3')),
         };
-        let result = release_task_to_service(&card, &context.aircraft, &record, &signer).unwrap_err();
+        let result = release_task_to_service(&card, &context.aircraft, &record, &context.current_documents, &signer).unwrap_err();
         assert!(result.contains(&TaskCardError::MeasurementOutOfRange {
             criterion_id: "numeric-fixture".into()
         }));
