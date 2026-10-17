@@ -84,6 +84,8 @@ pub enum FitEvidenceV1 {
 pub enum SignalEvidenceV1 {
     /// A measurement is available; this does not prove calibration or accuracy.
     Available,
+    /// The relevant sensor sources agree under the caller's declared consistency check.
+    Consistent,
     /// Sources disagree or the channel failed a consistency check.
     Conflicted,
     /// The measurement is missing or unavailable.
