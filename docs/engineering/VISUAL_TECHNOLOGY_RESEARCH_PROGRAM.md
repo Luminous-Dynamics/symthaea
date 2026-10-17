@@ -183,6 +183,7 @@ The following are useful starting points, not blanket endorsements of any method
 6. Hong et al. (published online 2025; journal issue 2026), [Assembly and integration of micro-LED displays: a review of transfer methods targeting near-perfect yield](https://doi.org/10.1088/2631-7990/ae25a8). Highlights transfer/assembly yield as a commercialization bottleneck.
 7. Reichelt, Zimmermann, Brenner & Haist (2026), [Camera-in-the-Loop Optimization for High-Fidelity Far-Field Holography with SLMs](https://opg.optica.org/abstract.cfm?uri=DH-2026-Tu1A.3). Useful for camera-in-loop calibration and speckle suppression; system-specific results must be reproduced before transfer claims.
 8. [Quantifying spatial and angular resolution of light field 3D displays](https://trepo.tuni.fi/bitstream/handle/10024/213976/LFResolutionMeasurement_JSTSP_final.pdf?sequence=-1). Useful for test methodology beyond nominal panel resolution.
+9. Chen et al. (2026), [Super-Snell scanning light-field display for ultrawide-angle high-resolution glasses-free 3D displays](https://doi.org/10.1038/s41566-026-01938-8). Reports 150° viewing angle and up to 8.0×/3.2× horizontal/vertical resolution gains, while also documenting a luminance trade-off; benchmark dynamic performance and useful brightness as well as the headline angle.
 
 ## Explicit exclusions
 
