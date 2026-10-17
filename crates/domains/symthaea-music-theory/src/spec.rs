@@ -6,7 +6,7 @@
 //! banks, progression source, accompaniment textures, large-scale forms,
 //! ensembles, meter, tempo, texture/ornament policies — lives in one
 //! declarative, serializable structure. Built-in [`Style`] presets are
-//! nothing more than five preset values of this type ([`Style::spec`]);
+//! preset values of this type ([`Style::spec`]);
 //! a user can author their own spec (JSON in Muse Studio, or Rust) and get
 //! the same engine with THEIR aesthetics.
 //!
