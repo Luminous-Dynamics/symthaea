@@ -76,3 +76,19 @@ cargo run -p symthaea-marine-bench --example modular_interior_validator
 ```
 
 The example prints the complete receipt for both fixture configurations and exits non-zero if the bookkeeping checks reject either configuration. The expected fixture outcome is still `indeterminate`, since service/weight values are synthetic assumptions, physical routing is unknown, connector profiles are provisional, and safety gates are not assessed. A successful command would demonstrate only that the Rust validator ran on these manifests—not vessel feasibility or approval. These commands have not been executed in the current editing environment.
+
+
+## MARINE-MOD-003 — configuration-change impact
+
+The companion `modular_interior_impact` module compares exact typed configuration baselines and reports per-artifact changes plus the analysis domains requiring revalidation. A module swap, placement move, service/connection change, reserved-region edit or safety-evidence change cannot silently inherit all evidence from the prior layout.
+
+The analyzer computes canonical JSON digests that ignore ordering differences in arrays while keeping changes to actual item content visible. It binds the from/to configuration digests and report body into a SHA-256 receipt; this is a reproducibility/integrity mechanism, not a digital signature or evidence of source authenticity. Ambiguous duplicate IDs are explicitly marked, never collapsed silently. The dependency map is deliberately conservative and versioned; qualified reviewers must still determine regulatory applicability and the precise impact for each vessel.
+
+From the repository root, when the Rust toolchain is available:
+
+```sh
+cargo test -p symthaea-marine-bench modular_interior_impact
+cargo run -p symthaea-marine-bench --example modular_interior_impact
+```
+
+The benchmark plan should compare analyzer output with a frozen, manually authored change-impact oracle matrix. Proposed target: zero missed revalidation domains in that matrix, 100% deterministic reports, and zero automatic evidence carry-forward when the target configuration differs. These are targets, not achieved measurements. The example fixtures use synthetic mass, CG and service assumptions, so the change report is not a feasibility or safety assessment.
