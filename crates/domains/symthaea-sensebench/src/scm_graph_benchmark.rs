@@ -1495,9 +1495,50 @@ mod tests {
         assert_ne!(first.iter().map(|world| world.truth).collect::<Vec<_>>(),
             changed.iter().map(|world| world.truth).collect::<Vec<_>>());
         assert_eq!(first.iter().filter(|world| world.family.held_out()).count(), 20);
+        assert_eq!(first.iter().filter(|world| world.held_out).count(), 24);
+        assert_eq!(first.iter().filter(|world| !world.held_out).count(), 4);
         assert!(first.iter().filter(|world| {
             world.family == ScmGraphFamily::NullGraphNegativeControl
         }).all(|world| world.truth.edge_count() == 0));
+    }
+
+    #[test]
+    fn graph_families_are_crossed_with_independent_mechanism_regimes() {
+        let worlds = generate_worlds(90210);
+        for family in ScmGraphFamily::all() {
+            let family_worlds: Vec<&ScmWorld> = worlds.iter()
+                .filter(|world| world.family == family)
+                .collect();
+            assert_eq!(family_worlds.len(), ScmMechanismRegime::all().len());
+            for regime in ScmMechanismRegime::all() {
+                assert_eq!(
+                    family_worlds.iter().filter(|world| world.mechanism_regime == regime).count(),
+                    1,
+                    "each topology family must appear once with each mechanism regime"
+                );
+            }
+        }
+
+        for world in &worlds {
+            assert_eq!(
+                world.held_out,
+                world.family.held_out() || world.mechanism_regime.held_out()
+            );
+            match world.mechanism_regime {
+                ScmMechanismRegime::WeakPositiveDevelopment
+                | ScmMechanismRegime::StrongPositiveDevelopment => {
+                    assert!(world.parameters.edge_weights.iter().all(|weight| *weight > 0.0));
+                }
+                ScmMechanismRegime::MixedSignHeldOut => {
+                    assert!(world.parameters.edge_weights.iter().any(|weight| *weight < 0.0));
+                    assert!(world.parameters.edge_weights.iter().any(|weight| *weight > 0.0));
+                }
+                ScmMechanismRegime::NearNullHeldOut => {
+                    assert!(world.parameters.edge_weights.iter()
+                        .all(|weight| weight.abs() <= 0.095 + 1.0e-12));
+                }
+            }
+        }
     }
 
     #[test]
@@ -1508,7 +1549,7 @@ mod tests {
         let worlds = generate_worlds(42);
         let chosen_all = fixed_design_action(&graphs, &actions, &priors, &worlds).unwrap();
         let dev_only: Vec<ScmWorld> = worlds.iter()
-            .filter(|world| !world.family.held_out())
+            .filter(|world| !world.held_out)
             .cloned()
             .collect();
         let chosen_dev = fixed_design_action(&graphs, &actions, &priors, &dev_only).unwrap();
@@ -1523,7 +1564,9 @@ mod tests {
         assert_eq!(a, b);
         assert_eq!(serde_json::to_vec(&a).unwrap(), serde_json::to_vec(&b).unwrap());
         assert_eq!(a.world_count, 28);
-        assert_eq!(a.held_out_world_count, 20);
+        assert_eq!(a.development_world_count, 4);
+        assert_eq!(a.held_out_world_count, 24);
+        assert_eq!(a.mechanism_regime_count, 4);
         assert_eq!(a.candidate_dag_count, 25);
         assert_eq!(a.markov_equivalence_class_count, 11);
         assert_eq!(a.worlds.len(), 28 * ScmGraphPolicy::all().len());
@@ -1555,7 +1598,7 @@ mod tests {
             }
         }
         for aggregate in &report.held_out_policy_aggregates {
-            assert_eq!(aggregate.held_out_worlds, 20);
+            assert_eq!(aggregate.held_out_worlds, 24);
             assert!((0.0..=1.0).contains(&aggregate.mean_held_out_directed_edge_f1));
             assert!((0.0..=1.0).contains(&aggregate.mean_held_out_cpdag_skeleton_f1));
             assert!((0.0..=1.0).contains(&aggregate.mean_held_out_compelled_direction_f1));
