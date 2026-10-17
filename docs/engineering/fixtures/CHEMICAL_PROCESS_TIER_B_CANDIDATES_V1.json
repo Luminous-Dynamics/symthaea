@@ -1,6 +1,6 @@
 {
   "schema_id": "org.luminousdynamics.symthaea.chemical-process-tier-b-candidates",
-  "schema_version": "1.0.0",
+  "schema_version": "1.1.0",
   "record_date": "2026-10-17",
   "parent_issue": "https://github.com/Luminous-Dynamics/symthaea/issues/7869",
   "design_document": "docs/engineering/CHEMICAL_PROCESS_TIER_B_REFERENCE_CASES_2026-10-17.md",
@@ -42,6 +42,7 @@
     "stdout_stderr_and_raw_output_hashes",
     "independent_checker_version_and_result",
     "shared_dependency_audit",
+    "declared_context_of_use_and_validity_domain",
     "preregistered_case_specific_tolerance_and_rationale",
     "claim_ceiling"
   ],
@@ -377,6 +378,9 @@
     "frozen_case_provenance_coverage": {"target": 1.0, "unit": "fraction", "hard_gate": true},
     "shared_dependency_declaration_coverage": {"target": 1.0, "unit": "fraction", "hard_gate": true},
     "missing_or_skipped_results_counted_as_pass": {"target": 0, "unit": "count", "hard_gate": true},
+    "negative_control_false_accepts": {"target": 0, "unit": "count", "hard_gate": true},
+    "transitive_shared_dependency_mutation_detection": {"target": 1.0, "unit": "fraction", "hard_gate": true},
+    "malformed_lineage_graph_detection": {"target": 1.0, "unit": "fraction", "hard_gate": true},
     "frozen_matched_condition_cases_before_advanced_flowsheet_optimization": {"target": 3, "unit": "cases", "hard_gate": true},
     "aggregate_scores_may_mask_a_failed_hard_invariant": false,
     "tolerance_policy": "Case-specific, preregistered and justified from reference precision, numerical error and the context of use; no universal tolerance."
