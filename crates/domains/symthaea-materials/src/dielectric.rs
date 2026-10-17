@@ -542,6 +542,10 @@ mod tests {
         let mut no_breakdown = material;
         no_breakdown.breakdown_strength_v_per_m = None;
         no_breakdown.breakdown_reference = None;
+        no_breakdown.breakdown_test_temperature_k = None;
+        no_breakdown.breakdown_test_kind = None;
+        no_breakdown.breakdown_evidence_kind = None;
+        no_breakdown.breakdown_strength_uncertainty = None;
         let metrics =
             calculate_ideal_capacitor_metrics(&no_breakdown, &geometry(), 10.0, 0.0).unwrap();
         assert_eq!(metrics.ideal_breakdown_limited_energy_density_j_per_m3, None);
