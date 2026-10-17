@@ -1,0 +1,20 @@
+[package]
+name = "agri-platform-bench"
+version = "0.1.0"
+edition = "2024"
+rust-version = "1.94"
+license = "AGPL-3.0-or-later"
+description = "Effects-disabled, deterministic agricultural platform-selection benchmark kernel"
+repository = "https://github.com/Luminous-Dynamics/symthaea"
+
+[workspace]
+
+[lib]
+path = "src/lib.rs"
+
+[[bin]]
+name = "agri-platform-bench"
+path = "src/main.rs"
+
+[profile.release]
+overflow-checks = true
