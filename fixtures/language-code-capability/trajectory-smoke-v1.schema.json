@@ -36,7 +36,7 @@
       "format": "date"
     },
     "expected_case_count": {
-      "const": 8
+      "const": 9
     },
     "claim_ceiling": {
       "type": "string",
@@ -44,8 +44,8 @@
     },
     "cases": {
       "type": "array",
-      "minItems": 8,
-      "maxItems": 8,
+      "minItems": 9,
+      "maxItems": 9,
       "items": {
         "type": "object",
         "additionalProperties": false,
@@ -112,7 +112,9 @@
                     "stop",
                     "retry",
                     "scope_change",
-                    "diagnose"
+                    "diagnose",
+                    "plan_selected",
+                    "action_executed"
                   ]
                 },
                 "artifact": {
@@ -163,7 +165,45 @@
                 "evidence_ref": {
                   "type": "string"
                 }
-              }
+              },
+              "allOf": [
+                {
+                  "if": {
+                    "properties": {
+                      "event": {
+                        "const": "plan_selected"
+                      }
+                    },
+                    "required": [
+                      "event"
+                    ]
+                  },
+                  "then": {
+                    "required": [
+                      "plan_id",
+                      "action_fingerprint"
+                    ]
+                  }
+                },
+                {
+                  "if": {
+                    "properties": {
+                      "event": {
+                        "const": "action_executed"
+                      }
+                    },
+                    "required": [
+                      "event"
+                    ]
+                  },
+                  "then": {
+                    "required": [
+                      "plan_id",
+                      "action_fingerprint"
+                    ]
+                  }
+                }
+              ]
             }
           },
           "claimed_outcome": {
