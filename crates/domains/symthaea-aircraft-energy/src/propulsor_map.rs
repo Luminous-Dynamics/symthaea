@@ -17,6 +17,7 @@
 /// What kind of evidence populated a map. The categories remain separate.
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
 pub enum PropulsorMapDataKind {
+    SyntheticFixture,
     Experimental,
     NumericalSimulation,
     AnalyticalModel,
@@ -338,7 +339,7 @@ mod tests {
                 source_locator: "synthetic://propulsor-map".into(),
                 source_revision: "fixture-v1".into(),
                 source_sha256: "a".repeat(64),
-                data_kind: PropulsorMapDataKind::Experimental,
+                data_kind: PropulsorMapDataKind::SyntheticFixture,
                 reference_conditions_id: "synthetic-standard-day-v1".into(),
                 method_id: "synthetic-known-answer-v1".into(),
                 applicability_notes: "synthetic fixture only".into(),
