@@ -505,14 +505,38 @@ fn predictive_outcome_entropy(candidate: &ExperimentCandidate, priors: &[Hypothe
 }
 
 fn fixed_design_action(
+    graphs: &[CausalDag],
+    actions: &[ScmAction],
     priors: &[HypothesisPrior],
-    scenarios: &[ModelLikelihoodScenario],
+    development_worlds: &[ScmWorld],
 ) -> Result<String, ScmGraphBenchmarkError> {
-    let nominal = scenarios.first()
-        .ok_or(ScmGraphBenchmarkError::MissingCandidate)?;
-    rank_experiments(priors, &nominal.candidates)?
-        .first()
-        .map(|score| score.candidate_id.clone())
+    let development_count = development_worlds.iter()
+        .filter(|world| !world.family.held_out())
+        .count();
+    if development_count == 0 {
+        return Err(ScmGraphBenchmarkError::MissingCandidate);
+    }
+
+    // Tune a single action on development-family mechanism parameters only.
+    // Truth graph IDs are not used to choose the action. Held-out worlds are not
+    // passed to this function and therefore cannot affect this baseline.
+    let mut totals: Vec<(String, f64)> = actions.iter()
+        .map(|action| (action.id.clone(), 0.0))
+        .collect();
+    for world in development_worlds.iter().filter(|world| !world.family.held_out()) {
+        let candidates = candidate_set(graphs, actions, world.parameters);
+        let scores = rank_experiments(priors, &candidates)?;
+        for (action_id, total) in &mut totals {
+            let score = scores.iter().find(|score| score.candidate_id == *action_id)
+                .ok_or(ScmGraphBenchmarkError::MissingCandidate)?;
+            *total += score.information_gain_per_cost / development_count as f64;
+        }
+    }
+    totals.into_iter()
+        .max_by(|(left_id, left_score), (right_id, right_score)| {
+            left_score.total_cmp(right_score).then_with(|| right_id.cmp(left_id))
+        })
+        .map(|(action_id, _)| action_id)
         .ok_or(ScmGraphBenchmarkError::MissingCandidate)
 }
 
@@ -890,7 +914,7 @@ pub fn run_scm_graph_benchmark(
     let priors = uniform_priors(&graphs);
     let scenarios = declared_model_scenarios(&graphs, &actions);
     let worlds = generate_worlds(seed);
-    let fixed_action_id = fixed_design_action(&priors, &scenarios)?;
+    let fixed_action_id = fixed_design_action(&graphs, &actions, &priors, &worlds)?;
     let policies = ScmGraphPolicy::all();
     let mut summaries = Vec::with_capacity(worlds.len() * policies.len());
 
@@ -1050,6 +1074,22 @@ mod tests {
         assert!(first.iter().filter(|world| {
             world.family == ScmGraphFamily::NullGraphNegativeControl
         }).all(|world| world.truth.edge_count() == 0));
+    }
+
+    #[test]
+    fn development_fixed_action_ignores_held_out_worlds() {
+        let graphs = all_dags();
+        let actions = actions();
+        let priors = uniform_priors(&graphs);
+        let worlds = generate_worlds(42);
+        let chosen_all = fixed_design_action(&graphs, &actions, &priors, &worlds).unwrap();
+        let dev_only: Vec<ScmWorld> = worlds.iter()
+            .filter(|world| !world.family.held_out())
+            .cloned()
+            .collect();
+        let chosen_dev = fixed_design_action(&graphs, &actions, &priors, &dev_only).unwrap();
+        assert_eq!(chosen_all, chosen_dev);
+        assert!(!chosen_all.is_empty());
     }
 
     #[test]
