@@ -6,7 +6,7 @@
 
 use serde_json::{json, Value};
 use std::{
-    collections::BTreeSet,
+    collections::{BTreeMap, BTreeSet},
     env,
     error::Error,
     fs,
@@ -79,6 +79,127 @@ fn source_has_url(source: &Value) -> bool {
     })
 }
 
+fn digest_set(value: &Value) -> Option<BTreeSet<String>> {
+    let values = value.as_array()?;
+    if values.is_empty() {
+        return None;
+    }
+    let mut digests = BTreeSet::new();
+    for value in values {
+        if !is_sha256(value) || !digests.insert(value.as_str()?.to_owned()) {
+            return None;
+        }
+    }
+    Some(digests)
+}
+
+fn visit_lineage_node(
+    digest: &str,
+    graph: &BTreeMap<String, BTreeSet<String>>,
+    visiting: &mut BTreeSet<String>,
+    visited: &mut BTreeSet<String>,
+) -> Result<(), String> {
+    if visited.contains(digest) {
+        return Ok(());
+    }
+    if !visiting.insert(digest.to_owned()) {
+        return Err(format!("lineage graph contains a cycle through {digest}"));
+    }
+    let parents = graph
+        .get(digest)
+        .ok_or_else(|| format!("lineage graph references undeclared digest {digest}"))?;
+    for parent in parents {
+        if !graph.contains_key(parent) {
+            return Err(format!("{digest} derives from missing lineage node {parent}"));
+        }
+        visit_lineage_node(parent, graph, visiting, visited)?;
+    }
+    visiting.remove(digest);
+    visited.insert(digest.to_owned());
+    Ok(())
+}
+
+fn transitive_closure(
+    roots: &BTreeSet<String>,
+    graph: &BTreeMap<String, BTreeSet<String>>,
+) -> Result<BTreeSet<String>, String> {
+    let mut closure = BTreeSet::new();
+    let mut pending = roots.iter().cloned().collect::<Vec<_>>();
+    while let Some(digest) = pending.pop() {
+        if !closure.insert(digest.clone()) {
+            continue;
+        }
+        let parents = graph
+            .get(&digest)
+            .ok_or_else(|| format!("model dependency {digest} is absent from lineage_nodes"))?;
+        pending.extend(parents.iter().cloned());
+    }
+    Ok(closure)
+}
+
+fn computed_dependency_closures(
+    audit: &Value,
+) -> Result<(BTreeSet<String>, BTreeSet<String>), String> {
+    if audit["lineage_complete"].as_bool() != Some(true) {
+        return Err("lineage_complete must be true before independence can be assessed".to_owned());
+    }
+    let nodes = audit["lineage_nodes"]
+        .as_array()
+        .ok_or_else(|| "lineage_nodes must be an array".to_owned())?;
+    if nodes.is_empty() {
+        return Err("lineage_nodes must not be empty".to_owned());
+    }
+
+    let mut graph = BTreeMap::<String, BTreeSet<String>>::new();
+    for (index, node) in nodes.iter().enumerate() {
+        if !nonempty_text(node, "artifact") {
+            return Err(format!("lineage node {index} requires an artifact identifier"));
+        }
+        if !is_sha256(&node["sha256"]) {
+            return Err(format!("lineage node {index} requires a SHA-256 digest"));
+        }
+        let digest = node["sha256"]
+            .as_str()
+            .ok_or_else(|| format!("lineage node {index} digest is not a string"))?
+            .to_owned();
+        let parents = node["derived_from"]
+            .as_array()
+            .ok_or_else(|| format!("lineage node {digest} requires a derived_from array"))?;
+        let mut parent_set = BTreeSet::new();
+        for parent in parents {
+            if !is_sha256(parent) {
+                return Err(format!("lineage node {digest} has an invalid parent digest"));
+            }
+            let parent_digest = parent
+                .as_str()
+                .ok_or_else(|| format!("lineage node {digest} has a non-string parent digest"))?
+                .to_owned();
+            if parent_digest == digest {
+                return Err(format!("lineage node {digest} cannot derive from itself"));
+            }
+            if !parent_set.insert(parent_digest) {
+                return Err(format!("lineage node {digest} repeats a parent digest"));
+            }
+        }
+        if graph.insert(digest.clone(), parent_set).is_some() {
+            return Err(format!("lineage graph duplicates digest {digest}"));
+        }
+    }
+
+    let mut visited = BTreeSet::<String>::new();
+    for digest in graph.keys() {
+        visit_lineage_node(digest, &graph, &mut BTreeSet::new(), &mut visited)?;
+    }
+
+    let model_a = digest_set(&audit["model_a_dependency_digests"])
+        .ok_or_else(|| "model_a_dependency_digests must be nonempty, unique SHA-256 digests".to_owned())?;
+    let model_b = digest_set(&audit["model_b_dependency_digests"])
+        .ok_or_else(|| "model_b_dependency_digests must be nonempty, unique SHA-256 digests".to_owned())?;
+    let closure_a = transitive_closure(&model_a, &graph)?;
+    let closure_b = transitive_closure(&model_b, &graph)?;
+    Ok((closure_a, closure_b))
+}
+
 fn validate_receipt_shape(
     receipt: &Value,
     raw_output_hash: &Value,
@@ -117,50 +238,22 @@ fn validate_receipt_shape(
     }
 
     let dependency_audit = &receipt["shared_dependency_audit"];
-    let parse_digest_set = |field: &str| -> Option<BTreeSet<String>> {
-        let values = dependency_audit.get(field)?.as_array()?;
-        if values.is_empty() {
-            return None;
-        }
-        let mut digests = BTreeSet::new();
-        for value in values {
-            if !is_sha256(value) {
-                return None;
-            }
-            let digest = value.as_str()?.to_owned();
-            if !digests.insert(digest) {
-                return None;
-            }
-        }
-        Some(digests)
-    };
-    let model_a = parse_digest_set("model_a_dependency_digests");
-    let model_b = parse_digest_set("model_b_dependency_digests");
-    let declared_shared = dependency_audit
-        .get("shared_dependency_digests")
-        .and_then(Value::as_array)
-        .and_then(|values| {
-            let mut digests = BTreeSet::new();
-            for value in values {
-                if !is_sha256(value) || !digests.insert(value.as_str()?.to_owned()) {
-                    return None;
-                }
-            }
-            Some(digests)
-        });
-    let computed_shared = model_a
+    let declared_shared = digest_set(&dependency_audit["shared_dependency_digests"]);
+    let closures = computed_dependency_closures(dependency_audit);
+    let computed_shared = closures
         .as_ref()
-        .zip(model_b.as_ref())
         .map(|(a, b)| a.intersection(b).cloned().collect::<BTreeSet<_>>());
     if dependency_audit["complete"].as_bool() != Some(true)
         || dependency_audit["independence_assessed"].as_bool() != Some(true)
-        || model_a.is_none()
-        || model_b.is_none()
         || declared_shared.is_none()
     {
-        errors.push(format!("{id}: dependency audit must contain two nonempty, unique, SHA-256 dependency sets and a valid shared set"));
-    } else if declared_shared != computed_shared {
-        errors.push(format!("{id}: declared shared_dependency_digests do not equal the computed intersection of model dependency sets"));
+        errors.push(format!("{id}: dependency audit must be complete, assessed, and declare a valid unique shared dependency set"));
+    }
+    if let Err(reason) = &closures {
+        errors.push(format!("{id}: cannot verify transitive dependency lineage: {reason}"));
+    }
+    if declared_shared.is_some() && computed_shared.is_some() && declared_shared != computed_shared {
+        errors.push(format!("{id}: declared shared_dependency_digests do not equal the computed transitive intersection of model dependency closures"));
     }
     let independent_claimed = dependency_audit["independent_corroboration_claimed"].as_bool();
     if independent_claimed.is_none() {
@@ -168,7 +261,7 @@ fn validate_receipt_shape(
     } else if independent_claimed == Some(true)
         && computed_shared.as_ref().is_some_and(|shared| !shared.is_empty())
     {
-        errors.push(format!("{id}: independent corroboration cannot be claimed when source-data dependencies overlap"));
+        errors.push(format!("{id}: independent corroboration cannot be claimed when transitive source-data dependencies overlap"));
     }
 
     let tolerance = &receipt["preregistered_case_specific_tolerance_and_rationale"];
