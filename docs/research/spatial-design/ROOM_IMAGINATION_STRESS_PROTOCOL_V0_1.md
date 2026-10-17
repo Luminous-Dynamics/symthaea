@@ -104,3 +104,36 @@ These sources guide the proposed workflow and boundaries. They do not certify Sy
 ## Claim ceiling
 
 This artifact proposes benchmark cases and acceptance criteria. It does not claim that the tests have run, that a room model is qualified, or that any design is buildable, accessible, comfortable, safe, code-compliant or professionally approved.
+
+
+## New research update — uncertainty, calibration, and stability-feasible design (2026-10)
+
+Recent literature strengthens one implementation priority: uncertainty must be tied to *the decision and lifecycle stage*, rather than being a generic confidence badge.
+
+- Malihi (2026), *Towards Uncertainty-Aware Digital Twins in the Built Environment*, frames the model/physical-asset difference as a lifecycle- and level-of-detail-dependent residual envelope. Model calibration should test predicted uncertainty against benchmark residuals and observed behaviour, not merely output an interval: https://doi.org/10.1016/j.dte.2026.100140
+- NIST AMS 100-85 (5 October 2026), *On Methods of Uncertainty Quantification in Computational Modeling and Simulation*, recommends risk-based credibility assessment proportional to model influence and decision consequence and discusses when variance propagation is inadequate compared with distributional propagation: https://doi.org/10.6028/NIST.AMS.100-85
+- Zhou et al. (published 1 October 2026), *New Bayesian optimisation framework for robust multi-objective design*, explicitly separates expected performance from objective variance and computes a Pareto set only after designs that violate a declared uncertainty/stability tolerance are removed: https://doi.org/10.1016/j.ress.2026.112359
+
+### Consequences for room/building co-design
+
+1. **Every performance claim needs a decision context.** Attach model/version, input-data version, geometric fidelity/level of detail, operating scenarios, time horizon, units, uncertainty representation, calibration/validation domain, residual statistics, exclusions, and the decision tolerance used. A result calibrated for one room or climate is not automatically transportable to another.
+2. **Separate uncertainty sources.** Track at least input/measurement uncertainty, numerical/solver uncertainty, model-form uncertainty, and scenario/future-context uncertainty where the chosen method can support the distinction. Do not combine them into one confidence percentage unless the calculation and assumptions are explicit.
+3. **Use risk-proportionate evidence.** A moodboard concept can proceed with missing dimensions. A clearance claim needs a relevant geometry source. A daylight or energy claim needs an appropriately scoped model and inputs. A safety-critical or code-related claim requires qualified authority. Raise verification requirements with the consequence of being wrong.
+4. **Report stability-feasible Pareto alternatives.** First exclude alternatives that fail hard constraints. Then separately exclude alternatives that exceed explicitly declared robustness/uncertainty tolerances. Show the remaining Pareto set and uncertainty envelopes per scenario; do not silently use a favorable expected value to conceal excessive variation or a known failing scenario.
+5. **Calibrate across revisions and lifecycle.** After renovation, material substitution, control-system changes, or post-occupancy observations, compare predictions with measurements and update the model's valid scope only under a documented calibration procedure. Historical prediction accuracy cannot automatically qualify changed inputs or models.
+
+### Additional benchmarks to add after the manifest evaluator
+
+These are targets for later, separately validated model adapters—not properties proven by the current manifest evaluator.
+
+| Metric | Recommended target / reporting rule |
+|---|---|
+| Calibration coverage | On a held-out, scenario-representative corpus, empirical coverage of a nominal prediction interval should match its stated level within a preregistered statistical tolerance; report sample count and interval |
+| Residual-envelope validity | 100% of quantitative outputs state model scope, source-data revision, applicable scenario range, uncertainty method and known exclusions |
+| Robust feasibility | 100% of admitted designs pass every declared hard predicate in every required scenario; a failing/unsupported scenario cannot be averaged away |
+| Stability-feasible Pareto integrity | 100% of returned options are both hard-feasible and inside the declared objective-variability tolerance; compare Pareto coverage/regret only on a frozen known-answer fixture with explicit bounds |
+| Update invalidation | 100% of seeded dependent analyses become stale after a causal input/model/profile change; unrelated results remain current only when the dependency contract proves independence |
+| Out-of-domain behaviour | 100% of seeded out-of-scope inputs produce an explicit abstention/downgrade or a reviewed fallback, never an unqualified extrapolation |
+| Decision utility | Report whether a proposed clarification changes the feasible set or ranking on the known-answer cases; do not optimize question count alone |
+
+Do not set one universal numeric calibration tolerance across daylight, thermal comfort, acoustic, energy and structural models. Those require model-specific, risk-specific, data-backed tolerances selected before evaluation. Synthetic golden cases can test the checking logic, but only measured benchmark residuals and representative held-out data can inform real calibration claims.
