@@ -36,6 +36,7 @@ pub use dielectric::{
     IdealCapacitorMetrics, PropertyUncertainty, PropertyUncertaintySemantics,
     VACUUM_PERMITTIVITY_F_PER_M,
     calculate_ideal_capacitor_metrics, calculate_ideal_capacitor_metrics_at_frequency,
+    pair_conditioned_dielectric_observations,
 };
 pub use encoder::MaterialHdcEncoder;
 pub use mining::{
