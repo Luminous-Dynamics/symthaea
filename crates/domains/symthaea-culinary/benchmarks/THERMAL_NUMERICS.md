@@ -34,6 +34,17 @@ cargo test -p symthaea-culinary thermal::
 
 Bind any claimed test result to the exact commit SHA and a clean checkout. A queued check is not a pass.
 
+## Motivation: fixed-substep bias in illustrative ramps
+
+An independent arithmetic check of the previous 64-substep trapezoid rule against the endpoint-rate closed form gives the following relative quadrature errors for synthetic linear ramps using the crate's current D/z values (D = 0.396 min at 60 °C; z = 5.56 °C):
+
+| Synthetic ramp | Previous trapezoid | Closed-form integral | Relative overestimate |
+|---|---:|---:|---:|
+| 40 → 200 °C over 10 min | 6.27245095932e24 | 5.76633738898e24 | 8.78% |
+| 250 → 80 °C over 3 min | 1.75971452451e33 | 1.60139371908e33 | 9.89% |
+
+These are numerical integration comparisons for deliberately synthetic profiles, not empirical food experiments or estimates of real-world microbial safety error. They show that fixed resolution can introduce a material and trajectory-dependent algorithmic error when the exponential rate changes sharply. The analytic integral removes that quadrature error conditional on the D/z assumptions and supplied piecewise-linear temperature trace.
+
 ## Frozen tests and proposed gates
 
 | ID | Property | Initial gate |
