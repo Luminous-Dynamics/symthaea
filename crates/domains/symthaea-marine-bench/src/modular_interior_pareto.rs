@@ -740,17 +740,26 @@ mod tests {
     #[test]
     fn hand_calculated_pareto_frontier_excludes_dominated_candidate() {
         let base = evidence_complete_test_config(live(), "-TEST");
+        let mut a_quality = objective("quality", 0.7, "ratio", ObjectiveDirection::Maximize);
+        a_quality.comparison_basis = "TEST-ORACLE-ONLY".to_owned();
         let a = submission("A", base.clone(), vec![
             objective("mass", 100.0, "kg", ObjectiveDirection::Minimize),
             objective("cost", 50.0, "credits", ObjectiveDirection::Minimize),
+            a_quality,
         ]);
+        let mut b_quality = objective("quality", 0.8, "ratio", ObjectiveDirection::Maximize);
+        b_quality.comparison_basis = "TEST-ORACLE-ONLY".to_owned();
         let b = submission("B", base.clone(), vec![
             objective("mass", 80.0, "kg", ObjectiveDirection::Minimize),
             objective("cost", 70.0, "credits", ObjectiveDirection::Minimize),
+            b_quality,
         ]);
+        let mut c_quality = objective("quality", 0.6, "ratio", ObjectiveDirection::Maximize);
+        c_quality.comparison_basis = "TEST-ORACLE-ONLY".to_owned();
         let c = submission("C", base, vec![
             objective("mass", 120.0, "kg", ObjectiveDirection::Minimize),
             objective("cost", 80.0, "credits", ObjectiveDirection::Minimize),
+            c_quality,
         ]);
         let report = rank_candidates(vec![c, a, b]).expect("report serializes");
         assert_eq!(report.body.groups.len(), 1);
@@ -781,11 +790,14 @@ mod tests {
         let kg = submission("kg-candidate", base.clone(), vec![
             objective("mass", 100.0, "kg", ObjectiveDirection::Minimize),
         ]);
-        let pounds = submission("lb-candidate", base, vec![
+        let pounds = submission("lb-candidate", base.clone(), vec![
             objective("mass", 220.0, "lb", ObjectiveDirection::Minimize),
         ]);
-        let report = rank_candidates(vec![kg, pounds]).expect("report serializes");
-        assert_eq!(report.body.groups.len(), 2);
+        let mut other_basis = objective("mass", 100.0, "kg", ObjectiveDirection::Minimize);
+        other_basis.comparison_basis = "different operating envelope".to_owned();
+        let different_basis = submission("different-basis", base, vec![other_basis]);
+        let report = rank_candidates(vec![kg, pounds, different_basis]).expect("report serializes");
+        assert_eq!(report.body.groups.len(), 3);
     }
 
     #[test]
