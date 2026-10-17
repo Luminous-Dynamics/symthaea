@@ -1,0 +1,39 @@
+{
+  "suite_id": "SYM-LIFE-CIVIC-REFERENCE-001",
+  "version": "0.4.0",
+  "status": "research_fixture",
+  "scenario_file": "docs/research/life-civic/reference-scenarios.json",
+  "scenario_git_blob_sha1": "f93d01a1832c991e9284c7e7ad92a90a40e5776f",
+  "digest_semantics": "Git blob SHA-1 binds exact repository object bytes for drift detection. It is not a signature, source-authenticity proof, or independent collision-resistant trust claim.",
+  "claim_ceiling": [
+    "The scenario document is a pinned reference input for this branch revision.",
+    "Shape and boundary checks do not measure Symthaea reasoning accuracy.",
+    "City newsroom examples are synthetic summaries of attributed publisher claims; they are not captured observations or independent verification.",
+    "Survey-precision scenario presence does not constitute statistical analysis or benchmark qualification.",
+    "Corresponding Mycelix corpus version is a declared reference pointer, not proof of matching qualification or execution."
+  ],
+  "prohibited_inferences": [
+    "benchmark passed",
+    "legal applicability established",
+    "external action authorized",
+    "production readiness established",
+    "conflicting official service guidance can be resolved by source reputation alone",
+    "provider-reported completion proves independent service restoration",
+    "source-claim conflict necessarily establishes routing conflict",
+    "disagreement alone proves an official source false",
+    "a dated source observation proves when the system retrieved the source",
+    "synthetic fixture evidence may be represented as a captured source",
+    "purpose-labelled official contact channels are interchangeable without source evidence",
+    "a candidate contact channel proves that a civic request was submitted",
+    "official cross-utility coordination statement proves incident-level causality",
+    "historical public statement proves current service status",
+    "synthetic fixture timestamp is actual retrieval evidence",
+    "publisher-reported project progress proves commissioning or operational acceptance",
+    "announced traffic-signal/accessibility upgrades prove current uptime or independent safety impact",
+    "a clinic reopening announcement proves current staffing, supplies, daily availability or clinical outcomes",
+    "synthetic city-project fixture timestamps or null source digests are actual source-retrieval evidence",
+    "rounded GPSJS reporting point estimates alone establish statistical significance",
+    "Table 41 household-prevalence coefficient of variation is precision evidence for a distinct police-reporting indicator",
+    "national GPSJS figures establish Johannesburg intervention effects or individual criminal propensity"
+  ]
+}
