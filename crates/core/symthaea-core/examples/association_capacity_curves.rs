@@ -31,9 +31,12 @@ const BUNDLE_FAN_INS: &[usize] = &[1, 3, 7, 15, 31, 63];
 const SEEDS: u64 = 12;
 const NEGATIVE_PAIRS_PER_SEED: usize = 32;
 
-fn sub_seed(root: u64, dimension: usize, slot: usize, domain: u64) -> u64 {
+/// Derive the item identity independently of D. `ContinuousHV::random(D, seed)`
+/// generates a prefix-stable stream, so every wider profile contains the exact same
+/// first coordinates as the narrower profile for the same seed/slot/domain. This
+/// paired design isolates the effect of adding dimensions and reduces across-D noise.
+fn sub_seed(root: u64, slot: usize, domain: u64) -> u64 {
     root.wrapping_mul(0x9E37_79B9_7F4A_7C15)
-        .wrapping_add((dimension as u64).wrapping_mul(0xD1B5_4A32_D192_ED03))
         .wrapping_add((slot as u64).wrapping_mul(0x94D0_49BB_1331_11EB))
         .wrapping_add(domain)
 }
@@ -54,11 +57,11 @@ fn append_continuous_bundle_row(out: &mut String, dim: usize, fan_in: usize, see
     for slot in 0..fan_in {
         let role = bipolar_continuous(
             dim,
-            sub_seed(seed, dim, slot, 0xC011_0001),
+            sub_seed(seed, slot, 0xC011_0001),
         );
         let filler = bipolar_continuous(
             dim,
-            sub_seed(seed, dim, slot, 0xC011_0002),
+            sub_seed(seed, slot, 0xC011_0002),
         );
         let bound = role.bind(&filler);
         pairs.push((role, filler, bound));
@@ -95,8 +98,8 @@ fn append_binary_bundle_row(out: &mut String, fan_in: usize, seed: u64) {
     let dim = BinaryHV::DIM;
     let mut pairs = Vec::with_capacity(fan_in);
     for slot in 0..fan_in {
-        let role = BinaryHV::random(sub_seed(seed, dim, slot, 0xB1A0_0001));
-        let filler = BinaryHV::random(sub_seed(seed, dim, slot, 0xB1A0_0002));
+        let role = BinaryHV::random(sub_seed(seed, slot, 0xB1A0_0001));
+        let filler = BinaryHV::random(sub_seed(seed, slot, 0xB1A0_0002));
         let bound = role.bind(&filler);
         pairs.push((role, filler, bound));
     }
@@ -132,11 +135,11 @@ fn append_continuous_negative_rows(out: &mut String, dim: usize, seed: u64) {
     for pair_index in 0..NEGATIVE_PAIRS_PER_SEED {
         let a = bipolar_continuous(
             dim,
-            sub_seed(seed, dim, pair_index, 0xC011_1001),
+            sub_seed(seed, pair_index, 0xC011_1001),
         );
         let b = bipolar_continuous(
             dim,
-            sub_seed(seed, dim, pair_index, 0xC011_1002),
+            sub_seed(seed, pair_index, 0xC011_1002),
         );
         let score = a.similarity(&b);
         writeln!(
@@ -150,8 +153,8 @@ fn append_continuous_negative_rows(out: &mut String, dim: usize, seed: u64) {
 fn append_binary_negative_rows(out: &mut String, seed: u64) {
     let dim = BinaryHV::DIM;
     for pair_index in 0..NEGATIVE_PAIRS_PER_SEED {
-        let a = BinaryHV::random(sub_seed(seed, dim, pair_index, 0xB1A0_1001));
-        let b = BinaryHV::random(sub_seed(seed, dim, pair_index, 0xB1A0_1002));
+        let a = BinaryHV::random(sub_seed(seed, pair_index, 0xB1A0_1001));
+        let b = BinaryHV::random(sub_seed(seed, pair_index, 0xB1A0_1002));
         let score = a.cosine_similarity(&b);
         writeln!(
             out,
