@@ -120,6 +120,8 @@ pub struct ArchitectureMetricsV1 {
     /// Time to complete a declared repair/replacement task, minutes.
     pub repair_time_minutes: f64,
     /// Number of service-relevant components in the declared bill of materials.
+///
+/// Descriptive only: fewer components is not automatically more repairable.
     pub service_component_count: u32,
 }
 
@@ -209,8 +211,6 @@ pub enum ArchitectureMetricV1 {
     TetherInterferenceEventsPerTask,
     /// Lower is better.
     RepairTimeMinutes,
-    /// Lower is better.
-    ServiceComponentCount,
 }
 
 /// Why a candidate cannot be included in a meaningful comparison.
@@ -273,6 +273,12 @@ pub struct ArchitectureDominanceV1 {
 pub struct ArchitectureCandidateAssessmentV1 {
     /// Candidate identifier from the request.
     pub candidate_id: String,
+    /// Architecture family descriptor.
+    pub family: ArchitectureFamilyV1,
+    /// Whether the system relies on a physical tether for this task.
+    pub tethered: bool,
+    /// Metrics echoed into the receipt so the frontier is self-contained.
+    pub metrics: ArchitectureMetricsV1,
     /// Whether the candidate is on the non-dominated frontier.
     pub is_pareto_optimal: bool,
     /// All candidates that dominate this one, in original input order.
@@ -395,6 +401,9 @@ pub fn evaluate_architecture_pareto(
         }
         assessments.push(ArchitectureCandidateAssessmentV1 {
             candidate_id: candidate.candidate_id.clone(),
+            family: candidate.family,
+            tethered: candidate.tethered,
+            metrics: candidate.metrics.clone(),
             is_pareto_optimal: dominated_by.is_empty(),
             dominated_by,
         });
@@ -556,11 +565,8 @@ fn dominance_dimensions(
     compare_higher!(M::ComfortScore, a.comfort_score, b.comfort_score);
     compare_lower!(M::TetherInterferenceEventsPerTask, a.tether_interference_events_per_task, b.tether_interference_events_per_task);
     compare_lower!(M::RepairTimeMinutes, a.repair_time_minutes, b.repair_time_minutes);
-    if a.service_component_count < b.service_component_count {
-        improvements.push(M::ServiceComponentCount);
-    } else if a.service_component_count > b.service_component_count {
-        no_worse_everywhere = false;
-    }
+    // Component count is reported as a descriptor, not assumed to be monotonic:
+    // fewer parts can mean either easier servicing or a harder-to-replace integrated unit.
 
     if no_worse_everywhere && !improvements.is_empty() { improvements } else { Vec::new() }
 }
