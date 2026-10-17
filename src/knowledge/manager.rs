@@ -274,59 +274,95 @@ impl Default for KnowledgeManager {
 }
 
 impl KnowledgeManager {
+    /// Create a knowledge manager using the historical compatibility behavior.
+    ///
+    /// If configured persisted state cannot be loaded completely, the constructor
+    /// logs the failure and falls back to an in-memory manager. It does not retain
+    /// the broken persistence handle, so a later snapshot cannot overwrite the
+    /// unreadable database. Call [`try_new`](Self::try_new) when startup must fail
+    /// instead of operating without restored state.
     pub fn new(config: KnowledgeManagerConfig) -> Self {
+        match Self::try_new(config.clone()) {
+            Ok(manager) => manager,
+            Err(error) => {
+                tracing::error!(
+                    error = %error,
+                    "Knowledge: persisted state could not be loaded completely; falling back to in-memory compatibility mode"
+                );
+                let fallback_config = KnowledgeManagerConfig {
+                    db_path: None,
+                    ..config
+                };
+                Self::try_new(fallback_config)
+                    .expect("KnowledgeManager::try_new without persistence cannot fail")
+            }
+        }
+    }
+
+    /// Create a knowledge manager and restore all configured persisted state.
+    ///
+    /// Unlike [`new`](Self::new), this strict constructor returns an error if facts,
+    /// causal edges, or ontology records cannot be loaded. It never returns a
+    /// manager whose persistent state was only partially restored.
+    pub fn try_new(config: KnowledgeManagerConfig) -> Result<Self, String> {
         let mut graph = EnhancedKnowledgeGraph::new(config.graph_capacity);
         let mut causal_bridge = CausalKnowledgeBridge::new(config.causal_capacity);
         let mut ontology = AdaptiveOntology::new(config.ontology_config.clone());
 
-        // Initialize persistence and load existing knowledge
-        let persistence = config.db_path.as_ref().map(|path| {
+        // Restore all persistence sections before constructing a usable manager.
+        // Fail the whole initialization if any section cannot be decoded.
+        let persistence = if let Some(path) = config.db_path.as_ref() {
             let mut p = KnowledgePersistence::new(path);
-            // Load existing facts
-            if let Ok(facts) = p.load_facts() {
-                for record in &facts {
-                    graph.import_fact_record(record);
-                }
-                if !facts.is_empty() {
-                    tracing::info!(count = facts.len(), "Knowledge: loaded facts from SQLite");
-                }
+
+            let facts = p
+                .load_facts()
+                .map_err(|e| format!("KnowledgeManager failed to load persisted facts: {e}"))?;
+            for record in &facts {
+                graph.import_fact_record(record);
             }
-            // Load existing causal edges
-            if let Ok(edges) = p.load_causal_edges() {
-                let edge_count = edges.len();
-                for record in &edges {
-                    causal_bridge.import_edge(
-                        record.cause.clone(),
-                        record.effect.clone(),
-                        record.strength,
-                    );
-                }
-                if edge_count > 0 {
-                    tracing::info!(
-                        count = edge_count,
-                        "Knowledge: loaded causal edges from SQLite"
-                    );
-                }
+            if !facts.is_empty() {
+                tracing::info!(count = facts.len(), "Knowledge: loaded facts from SQLite");
             }
-            // Load existing ontology primitives
-            if let Ok(records) = p.load_ontology() {
-                let onto_count = records.len();
-                for record in &records {
-                    ontology.import_ontology_record(record);
-                }
-                if onto_count > 0 {
-                    tracing::info!(
-                        count = onto_count,
-                        "Knowledge: loaded ontology primitives from SQLite"
-                    );
-                }
+
+            let edges = p.load_causal_edges().map_err(|e| {
+                format!("KnowledgeManager failed to load persisted causal edges: {e}")
+            })?;
+            let edge_count = edges.len();
+            for record in &edges {
+                causal_bridge.import_edge(
+                    record.cause.clone(),
+                    record.effect.clone(),
+                    record.strength,
+                );
             }
-            p
-        });
+            if edge_count > 0 {
+                tracing::info!(
+                    count = edge_count,
+                    "Knowledge: loaded causal edges from SQLite"
+                );
+            }
+
+            let records = p
+                .load_ontology()
+                .map_err(|e| format!("KnowledgeManager failed to load persisted ontology: {e}"))?;
+            let onto_count = records.len();
+            for record in &records {
+                ontology.import_ontology_record(record);
+            }
+            if onto_count > 0 {
+                tracing::info!(
+                    count = onto_count,
+                    "Knowledge: loaded ontology primitives from SQLite"
+                );
+            }
+            Some(p)
+        } else {
+            None
+        };
 
         let save_interval = crate::cognitive_loop::thresholds::KNOWLEDGE_SAVE_INTERVAL;
 
-        Self {
+        Ok(Self {
             config,
             extractor: KnowledgeExtractor::new(),
             encoder: KnowledgeEncoder::new(),
@@ -344,9 +380,8 @@ impl KnowledgeManager {
             save_interval,
             ontology_lr_multiplier: 1.0,
             calibration_audit: CalibrationAudit::default(),
-        }
+        })
     }
-
     /// Bootstrap the knowledge engine with known entities from the primitive system.
     ///
     /// Call once at startup to pre-register geopolitical entities, organizations,
@@ -1315,6 +1350,152 @@ fn infer_domain(fact: &super::extraction::ExtractedFact) -> Option<String> {
 #[cfg(test)]
 mod tests {
     use super::*;
+
+    #[test]
+    fn test_try_new_rejects_corrupt_persisted_state() {
+        let dir = std::env::temp_dir().join(format!(
+            "symthaea_manager_corrupt_state_test_{}",
+            std::process::id()
+        ));
+        let _ = std::fs::remove_dir_all(&dir);
+        std::fs::create_dir_all(&dir).unwrap();
+        let db_path = dir.join("knowledge.db");
+
+        let mut persistence = KnowledgePersistence::new(&db_path);
+        persistence
+            .save_facts(&[super::super::persistence::FactRecord {
+                vector_bytes: vec![0u8; 2048],
+                source_text: "persisted fixture".into(),
+                confidence: 0.9,
+                domain: Some("test".into()),
+                cycle: 1,
+                is_causal: false,
+            }])
+            .unwrap();
+
+        let conn = rusqlite::Connection::open(&db_path).unwrap();
+        conn.execute(
+            "UPDATE knowledge_facts SET confidence = ?1",
+            rusqlite::params!["not-a-number"],
+        )
+        .unwrap();
+        drop(conn);
+
+        let result = KnowledgeManager::try_new(KnowledgeManagerConfig {
+            db_path: Some(db_path.to_string_lossy().into_owned()),
+            ..KnowledgeManagerConfig::default()
+        });
+        assert!(result.is_err(), "strict startup must reject corrupt persisted state");
+        let error = result.err().expect("error checked above");
+        assert!(
+            error.contains("persisted facts"),
+            "unexpected error context: {error}"
+        );
+
+        let _ = std::fs::remove_dir_all(&dir);
+    }
+
+    #[test]
+    fn test_try_new_rejects_wrong_length_persisted_fact_vector() {
+        let dir = std::env::temp_dir().join(format!(
+            "symthaea_manager_wrong_vector_test_{}",
+            std::process::id()
+        ));
+        let _ = std::fs::remove_dir_all(&dir);
+        std::fs::create_dir_all(&dir).unwrap();
+        let db_path = dir.join("knowledge.db");
+
+        let mut persistence = KnowledgePersistence::new(&db_path);
+        persistence
+            .save_facts(&[super::super::persistence::FactRecord {
+                vector_bytes: vec![0u8; BinaryHV::BYTES],
+                source_text: "persisted fixture".into(),
+                confidence: 0.9,
+                domain: Some("test".into()),
+                cycle: 1,
+                is_causal: false,
+            }])
+            .unwrap();
+
+        let conn = rusqlite::Connection::open(&db_path).unwrap();
+        conn.execute(
+            "UPDATE knowledge_facts SET vector_blob = ?1",
+            rusqlite::params![vec![0u8; 1]],
+        )
+        .unwrap();
+        drop(conn);
+
+        let result = KnowledgeManager::try_new(KnowledgeManagerConfig {
+            db_path: Some(db_path.to_string_lossy().into_owned()),
+            ..KnowledgeManagerConfig::default()
+        });
+        let error = result.err().expect("strict startup must reject invalid vector dimensions");
+        assert!(
+            error.contains("persisted facts") && error.contains("invalid hypervector length"),
+            "unexpected error context: {error}"
+        );
+
+        let _ = std::fs::remove_dir_all(&dir);
+    }
+
+    #[test]
+    fn test_new_falls_back_without_writing_to_unreadable_database() {
+        let dir = std::env::temp_dir().join(format!(
+            "symthaea_manager_fallback_test_{}",
+            std::process::id()
+        ));
+        let _ = std::fs::remove_dir_all(&dir);
+        std::fs::create_dir_all(&dir).unwrap();
+        let db_path = dir.join("knowledge.db");
+
+        let mut persistence = KnowledgePersistence::new(&db_path);
+        persistence
+            .save_facts(&[super::super::persistence::FactRecord {
+                vector_bytes: vec![0u8; 2048],
+                source_text: "preserve this record".into(),
+                confidence: 0.9,
+                domain: Some("test".into()),
+                cycle: 1,
+                is_causal: false,
+            }])
+            .unwrap();
+
+        let conn = rusqlite::Connection::open(&db_path).unwrap();
+        conn.execute(
+            "UPDATE knowledge_facts SET confidence = ?1",
+            rusqlite::params!["not-a-number"],
+        )
+        .unwrap();
+        drop(conn);
+
+        let mut manager = KnowledgeManager::new(KnowledgeManagerConfig {
+            db_path: Some(db_path.to_string_lossy().into_owned()),
+            ..KnowledgeManagerConfig::default()
+        });
+        assert!(
+            manager.persistence.is_none(),
+            "compatibility fallback must not keep the unreadable database writable"
+        );
+
+        manager.process("Iran caused sanctions to escalate.", 1);
+        manager.persist_snapshot();
+
+        let conn = rusqlite::Connection::open(&db_path).unwrap();
+        let row_count: i64 = conn
+            .query_row("SELECT COUNT(*) FROM knowledge_facts", [], |row| row.get(0))
+            .unwrap();
+        let confidence: String = conn
+            .query_row("SELECT confidence FROM knowledge_facts LIMIT 1", [], |row| row.get(0))
+            .unwrap();
+        assert_eq!(row_count, 1, "fallback must not write a partial snapshot");
+        assert_eq!(
+            confidence, "not-a-number",
+            "fallback must preserve unreadable source state"
+        );
+        drop(conn);
+
+        let _ = std::fs::remove_dir_all(&dir);
+    }
 
     #[test]
     fn test_basic_process() {
