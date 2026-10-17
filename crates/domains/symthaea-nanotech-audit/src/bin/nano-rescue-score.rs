@@ -6,6 +6,7 @@ mod rescue_metrics;
 
 use std::path::PathBuf;
 use std::process::ExitCode;
+use symthaea_nanotech_audit::audit_run;
 
 fn main() -> ExitCode {
     let mut args = std::env::args_os();
@@ -16,7 +17,7 @@ fn main() -> ExitCode {
             PathBuf::from(program).display()
         );
         eprintln!(
-            "Run the symthaea-nanotech-audit structural verifier first; scoring is not a scientific promotion verdict."
+            "The scorer requires a passing structural audit; a score report is not a scientific promotion verdict."
         );
         return ExitCode::from(2);
     };
@@ -25,7 +26,19 @@ fn main() -> ExitCode {
         return ExitCode::from(2);
     }
 
-    match rescue_metrics::score_run(&PathBuf::from(run_dir)) {
+    let run_dir = PathBuf::from(run_dir);
+    let audit = audit_run(&run_dir);
+    if audit.status != "artifact_integrity_pass" {
+        let details = serde_json::to_string_pretty(&audit)
+            .unwrap_or_else(|error| format!("could not serialize audit report: {error}"));
+        eprintln!(
+            "NANO-013 scoring refused because structural audit status was {}:\n{}",
+            audit.status, details
+        );
+        return ExitCode::from(1);
+    }
+
+    match rescue_metrics::score_run(&run_dir) {
         Ok(report) => {
             println!("{report}");
             ExitCode::SUCCESS
