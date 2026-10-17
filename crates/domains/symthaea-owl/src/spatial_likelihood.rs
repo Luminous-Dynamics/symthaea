@@ -326,7 +326,7 @@ mod tests {
             .unwrap();
 
         assert_eq!(best.position, source);
-        assert!((best.normalized_weight - 1.0).abs() < 1e-12);
+        assert!(best.relative_log_likelihood.abs() < 1e-12);
     }
 
     #[test]
