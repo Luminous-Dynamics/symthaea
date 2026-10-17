@@ -1345,24 +1345,69 @@ mod tests {
             )
             .expect("write evaluation manifest");
 
-            let paths = [
-                ".hydra/config.yaml",
-                "source-manifest.json",
-                "task-contract.json",
-                "evaluation-manifest.json",
-                "synthetic-source.json",
-                "summary/episodes.json",
-                "summary/episodes.csv",
-                "summary/summary.json",
-                "trajectories/episode_000.json",
-                "trajectories/episode_001.json",
+            let calls = [
+                ("setup", None, 0.1_f64, false, true),
+                ("setup", None, 0.2_f64, true, false),
+                ("proposal", Some("candidate-0"), 0.2_f64, false, true),
+                ("proposal", Some("candidate-1"), 0.2_f64, false, true),
+                ("proposal", Some("candidate-2"), 0.2_f64, false, true),
+                ("proposal", Some("candidate-3"), 0.2_f64, false, true),
+                ("retry", None, 0.4_f64, false, true),
             ];
+            let mut ledger_lines = Vec::new();
+            let mut receipt_paths = Vec::new();
+            for (index, (stage, candidate_id, cost, cache_hit, external_invocation)) in
+                calls.into_iter().enumerate()
+            {
+                let receipt_path = format!("receipts/receipt_{index:03}.json");
+                fs::create_dir_all(self.0.join("receipts")).expect("create receipts directory");
+                let receipt = serde_json::to_vec_pretty(&json!({
+                    "sequence": index + 1,
+                    "synthetic": true,
+                    "stage": stage
+                }))
+                .expect("serialize receipt");
+                fs::write(self.0.join(&receipt_path), &receipt).expect("write receipt");
+                let (receipt_sha256, _) =
+                    hash_artifact(&self.0, &receipt_path).expect("hash receipt");
+                let record = json!({
+                    "sequence": index + 1,
+                    "stage": stage,
+                    "status": "evaluated",
+                    "candidate_id": candidate_id,
+                    "receipt_path": receipt_path,
+                    "receipt_sha256": receipt_sha256,
+                    "cost": cost,
+                    "cache_hit": cache_hit,
+                    "external_invocation": external_invocation
+                });
+                ledger_lines.push(serde_json::to_string(&record).expect("serialize ledger row"));
+                receipt_paths.push(receipt_path);
+            }
+            let ledger_content = format!("{}\n", ledger_lines.join("\n"));
+            fs::write(self.0.join("oracle-call-ledger.jsonl"), &ledger_content)
+                .expect("write oracle call ledger");
+
+            let mut paths = vec![
+                ".hydra/config.yaml".to_owned(),
+                "source-manifest.json".to_owned(),
+                "task-contract.json".to_owned(),
+                "evaluation-manifest.json".to_owned(),
+                "synthetic-source.json".to_owned(),
+                "oracle-call-ledger.jsonl".to_owned(),
+                "summary/episodes.json".to_owned(),
+                "summary/episodes.csv".to_owned(),
+                "summary/summary.json".to_owned(),
+                "trajectories/episode_000.json".to_owned(),
+                "trajectories/episode_001.json".to_owned(),
+            ];
+            paths.extend(receipt_paths);
             let mut artifacts = Vec::new();
             let mut digests = BTreeMap::new();
             for path in paths {
                 let (sha256, size_bytes) =
-                    hash_artifact(&self.0, path).expect("hash fixture artifact");
-                digests.insert(path.to_owned(), sha256.clone());
+                    hash_artifact(&self.0, &path).expect("hash fixture artifact");
+                digests.insert(path.clone(), sha256.clone());
                 artifacts.push(json!({
                     "path": path,
                     "sha256": sha256,
@@ -1381,6 +1426,8 @@ mod tests {
                 "evaluation_manifest_sha256": digests["evaluation-manifest.json"],
                 "source_manifest_sha256": digests["source-manifest.json"],
                 "resolved_config_sha256": digests[".hydra/config.yaml"],
+                "oracle_call_ledger_path": "oracle-call-ledger.jsonl",
+                "oracle_call_ledger_sha256": digests["oracle-call-ledger.jsonl"],
                 "data_sources": [{
                     "source_id": "synthetic-data",
                     "source_url": "https://example.org/synthetic",
@@ -1407,6 +1454,7 @@ mod tests {
                 serde_json::to_vec_pretty(&manifest).expect("serialize provenance manifest"),
             )
             .expect("write provenance manifest");
+        }
         }
     }
 
