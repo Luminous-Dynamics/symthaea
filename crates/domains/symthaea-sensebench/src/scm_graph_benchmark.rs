@@ -33,7 +33,7 @@ pub enum ScmGraphFamily {
     ColliderHeldOut,
     SparseRandomHeldOut,
     DenseRandomHeldOut,
-    InhibitoryMechanismHeldOut,
+    RandomMotifHeldOut,
     NullGraphNegativeControl,
 }
 
@@ -45,7 +45,7 @@ impl ScmGraphFamily {
             Self::ColliderHeldOut,
             Self::SparseRandomHeldOut,
             Self::DenseRandomHeldOut,
-            Self::InhibitoryMechanismHeldOut,
+            Self::RandomMotifHeldOut,
             Self::NullGraphNegativeControl,
         ]
     }
@@ -61,8 +61,41 @@ impl ScmGraphFamily {
             Self::ColliderHeldOut => "collider_held_out",
             Self::SparseRandomHeldOut => "sparse_random_held_out",
             Self::DenseRandomHeldOut => "dense_random_held_out",
-            Self::InhibitoryMechanismHeldOut => "inhibitory_mechanism_held_out",
+            Self::RandomMotifHeldOut => "random_motif_held_out",
             Self::NullGraphNegativeControl => "null_graph_negative_control",
+        }
+    }
+}
+
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, Deserialize)]
+#[serde(rename_all = "snake_case")]
+pub enum ScmMechanismRegime {
+    WeakPositiveDevelopment,
+    StrongPositiveDevelopment,
+    MixedSignHeldOut,
+    NearNullHeldOut,
+}
+
+impl ScmMechanismRegime {
+    fn all() -> [Self; WORLD_VARIANTS_PER_FAMILY] {
+        [
+            Self::WeakPositiveDevelopment,
+            Self::StrongPositiveDevelopment,
+            Self::MixedSignHeldOut,
+            Self::NearNullHeldOut,
+        ]
+    }
+
+    fn held_out(self) -> bool {
+        matches!(self, Self::MixedSignHeldOut | Self::NearNullHeldOut)
+    }
+
+    fn as_str(self) -> &'static str {
+        match self {
+            Self::WeakPositiveDevelopment => "weak_positive_development",
+            Self::StrongPositiveDevelopment => "strong_positive_development",
+            Self::MixedSignHeldOut => "mixed_sign_held_out",
+            Self::NearNullHeldOut => "near_null_held_out",
         }
     }
 }
@@ -104,7 +137,9 @@ pub struct ScmGraphPolicySummary {
     pub truth_graph_id: String,
     pub truth_edge_count: usize,
     pub family: ScmGraphFamily,
+    pub mechanism_regime: ScmMechanismRegime,
     pub held_out_family: bool,
+    pub held_out_world: bool,
     pub policy: ScmGraphPolicy,
     pub trials: usize,
     pub measurement_budget: usize,
@@ -192,7 +227,9 @@ pub struct ScmGraphBenchmarkReport {
     pub candidate_dag_count: usize,
     pub markov_equivalence_class_count: usize,
     pub world_variants_per_family: usize,
+    pub mechanism_regime_count: usize,
     pub world_count: usize,
+    pub development_world_count: usize,
     pub held_out_world_count: usize,
     pub declared_model_scenarios: Vec<String>,
     pub fixed_design_action_id: String,
@@ -432,6 +469,8 @@ struct ScmParameters {
 struct ScmWorld {
     id: String,
     family: ScmGraphFamily,
+    mechanism_regime: ScmMechanismRegime,
+    held_out: bool,
     truth: CausalDag,
     parameters: ScmParameters,
 }
@@ -552,21 +591,21 @@ fn graph_for_family(family: ScmGraphFamily, rng: &mut BenchmarkRng) -> CausalDag
         }
         ScmGraphFamily::SparseRandomHeldOut => random_dag_mask(rng, 0.28),
         ScmGraphFamily::DenseRandomHeldOut => random_dag_mask(rng, 0.82),
-        ScmGraphFamily::InhibitoryMechanismHeldOut => random_dag_mask(rng, 0.52),
+        ScmGraphFamily::RandomMotifHeldOut => random_dag_mask(rng, 0.52),
         ScmGraphFamily::NullGraphNegativeControl => 0,
     };
     CausalDag { edge_mask: mask }
 }
 
-fn parameters_for_family(family: ScmGraphFamily, rng: &mut BenchmarkRng) -> ScmParameters {
-    let (intercept, magnitude, jitter, signed) = match family {
-        ScmGraphFamily::ChainDevelopment => (0.12, 0.60, 0.035, false),
-        ScmGraphFamily::ForkDevelopment => (0.16, 0.54, 0.04, false),
-        ScmGraphFamily::ColliderHeldOut => (0.24, 0.47, 0.06, false),
-        ScmGraphFamily::SparseRandomHeldOut => (0.20, 0.42, 0.12, false),
-        ScmGraphFamily::DenseRandomHeldOut => (0.12, 0.28, 0.025, false),
-        ScmGraphFamily::InhibitoryMechanismHeldOut => (0.22, 0.43, 0.08, true),
-        ScmGraphFamily::NullGraphNegativeControl => (0.24, 0.55, 0.10, true),
+fn parameters_for_regime(regime: ScmMechanismRegime, rng: &mut BenchmarkRng) -> ScmParameters {
+    // Mechanism parameters are sampled independently of graph-family identity.
+    // This crosses topology and mechanism so the generator does not hard-code a
+    // family-specific coefficient signature a policy could exploit.
+    let (intercept, magnitude, jitter, signed) = match regime {
+        ScmMechanismRegime::WeakPositiveDevelopment => (0.18, 0.34, 0.12, false),
+        ScmMechanismRegime::StrongPositiveDevelopment => (0.12, 0.60, 0.035, false),
+        ScmMechanismRegime::MixedSignHeldOut => (0.22, 0.43, 0.08, true),
+        ScmMechanismRegime::NearNullHeldOut => (0.24, 0.075, 0.02, true),
     };
     let mut edge_weights = [0.0; 6];
     for weight in &mut edge_weights {
@@ -579,18 +618,25 @@ fn parameters_for_family(family: ScmGraphFamily, rng: &mut BenchmarkRng) -> ScmP
 
 fn generate_worlds(seed: u64) -> Vec<ScmWorld> {
     let families = ScmGraphFamily::all();
-    let mut worlds = Vec::with_capacity(families.len() * WORLD_VARIANTS_PER_FAMILY);
+    let mechanism_regimes = ScmMechanismRegime::all();
+    let mut worlds = Vec::with_capacity(families.len() * mechanism_regimes.len());
     for (family_index, family) in families.iter().copied().enumerate() {
-        for variant in 0..WORLD_VARIANTS_PER_FAMILY {
+        for (variant, mechanism_regime) in mechanism_regimes.iter().copied().enumerate() {
             let world_seed = seed
                 ^ (family_index as u64).wrapping_mul(0xD1B5_4A32_D192_ED03)
                 ^ (variant as u64).wrapping_mul(0x94D0_49BB_1331_11EB);
-            let mut rng = BenchmarkRng::new(world_seed);
-            let truth = graph_for_family(family, &mut rng);
-            let parameters = parameters_for_family(family, &mut rng);
+            // Independent random streams prevent topology-generation control flow
+            // from influencing the mechanism parameter draw.
+            let mut graph_rng = BenchmarkRng::new(world_seed ^ 0x4752_4150_485F_5345);
+            let mut parameter_rng = BenchmarkRng::new(world_seed ^ 0x4D45_4348_414E_4953);
+            let truth = graph_for_family(family, &mut graph_rng);
+            let parameters = parameters_for_regime(mechanism_regime, &mut parameter_rng);
+            let held_out = family.held_out() || mechanism_regime.held_out();
             worlds.push(ScmWorld {
-                id: format!("{}-variant-{variant:02}", family.as_str()),
+                id: format!("{}-{}", family.as_str(), mechanism_regime.as_str()),
                 family,
+                mechanism_regime,
+                held_out,
                 truth,
                 parameters,
             });
@@ -735,7 +781,7 @@ fn fixed_design_action(
     development_worlds: &[ScmWorld],
 ) -> Result<String, ScmGraphBenchmarkError> {
     let development_count = development_worlds.iter()
-        .filter(|world| !world.family.held_out())
+        .filter(|world| !world.held_out)
         .count();
     if development_count == 0 {
         return Err(ScmGraphBenchmarkError::MissingCandidate);
@@ -747,7 +793,7 @@ fn fixed_design_action(
     let mut totals: Vec<(String, f64)> = actions.iter()
         .map(|action| (action.id.clone(), 0.0))
         .collect();
-    for world in development_worlds.iter().filter(|world| !world.family.held_out()) {
+    for world in development_worlds.iter().filter(|world| !world.held_out) {
         let candidates = candidate_set(graphs, actions, world.parameters);
         let scores = rank_experiments(priors, &candidates)?;
         for (action_id, total) in &mut totals {
@@ -1078,7 +1124,9 @@ fn summarize_world(
         truth_graph_id: world.truth.id(),
         truth_edge_count: world.truth.edge_count(),
         family: world.family,
+        mechanism_regime: world.mechanism_regime,
         held_out_family: world.family.held_out(),
+        held_out_world: world.held_out,
         policy,
         trials: count,
         measurement_budget,
@@ -1133,7 +1181,7 @@ fn aggregate_held_out(
 ) -> Vec<ScmGraphPolicyAggregate> {
     policies.iter().copied().map(|policy| {
         let rows: Vec<&ScmGraphPolicySummary> = summaries.iter()
-            .filter(|row| row.policy == policy && row.held_out_family)
+            .filter(|row| row.policy == policy && row.held_out_world)
             .collect();
         let skeleton: Vec<f64> = rows.iter().map(|row| row.mean_skeleton_f1).collect();
         let directed: Vec<f64> = rows.iter().map(|row| row.mean_directed_edge_f1).collect();
@@ -1256,8 +1304,10 @@ pub fn run_scm_graph_benchmark(
         candidate_dag_count: graphs.len(),
         markov_equivalence_class_count: classes.members.len(),
         world_variants_per_family: WORLD_VARIANTS_PER_FAMILY,
+        mechanism_regime_count: ScmMechanismRegime::all().len(),
         world_count: worlds.len(),
-        held_out_world_count: worlds.iter().filter(|world| world.family.held_out()).count(),
+        development_world_count: worlds.iter().filter(|world| !world.held_out).count(),
+        held_out_world_count: worlds.iter().filter(|world| world.held_out).count(),
         declared_model_scenarios: scenarios.iter()
             .map(|scenario| scenario.scenario_id.clone()).collect(),
         fixed_design_action_id: fixed_action_id,
