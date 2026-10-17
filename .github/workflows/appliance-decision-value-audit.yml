@@ -1,0 +1,43 @@
+name: Appliance Decision-Value Diagnostics Audit
+
+on:
+  push:
+    branches: ["research/appliance-decision-value-diagnostics-v0-1"]
+    paths:
+      - "docs/engineering/APPLIANCE_DECISION_VALUE_DIAGNOSTICS_V0_1.md"
+      - "schemas/diagnostics/**"
+      - "fixtures/diagnostics/**"
+      - "tools/appliance-active-diagnostics-audit/**"
+      - ".github/workflows/appliance-decision-value-audit.yml"
+  pull_request:
+    branches: ["research/appliance-active-diagnostics-v0-1", "main"]
+    paths:
+      - "docs/engineering/APPLIANCE_DECISION_VALUE_DIAGNOSTICS_V0_1.md"
+      - "schemas/diagnostics/**"
+      - "fixtures/diagnostics/**"
+      - "tools/appliance-active-diagnostics-audit/**"
+      - ".github/workflows/appliance-decision-value-audit.yml"
+
+permissions:
+  contents: read
+
+concurrency:
+  group: appliance-decision-value-audit-${{ github.workflow }}-${{ github.event.pull_request.number || github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  audit:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - name: Install pinned Rust toolchain
+        uses: dtolnay/rust-toolchain@stable
+        with:
+          toolchain: 1.96.0
+          components: rustfmt, clippy
+      - name: Check combined evaluator formatting
+        run: cargo fmt --manifest-path tools/appliance-active-diagnostics-audit/Cargo.toml -- --check
+      - name: Run baseline and decision-value schema, semantic and mutation tests
+        run: cargo test --manifest-path tools/appliance-active-diagnostics-audit/Cargo.toml --all-targets
+      - name: Audit the frozen baseline and decision-value corpus
+        run: cargo run --manifest-path tools/appliance-active-diagnostics-audit/Cargo.toml -- --schema schemas/diagnostics/appliance_active_diagnostic_corpus_v0_1.schema.json --corpus fixtures/diagnostics/appliance_active_diagnostic_corpus_v0_1.json --decision-schema schemas/diagnostics/appliance_decision_value_corpus_v0_1.schema.json --decision-corpus fixtures/diagnostics/appliance_decision_value_corpus_v0_1.json
