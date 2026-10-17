@@ -599,6 +599,12 @@ pub fn verify_pareto_report(
     submissions: &[CandidateSubmission],
     report: &ParetoReport,
 ) -> bool {
+    if submissions.iter().any(|submission| !verify_validation_receipt(
+        &submission.configuration,
+        &submission.validation_receipt,
+    )) {
+        return false;
+    }
     let Ok(fingerprints) = input_fingerprints(submissions) else { return false; };
     let Ok(input_digest) = digest(&fingerprints) else { return false; };
     let Ok(report_digest) = digest(&report.body) else { return false; };
@@ -823,4 +829,40 @@ mod tests {
         tampered.body.claim_ceiling.push_str(" altered");
         assert!(!verify_pareto_report(&first, &tampered));
     }
+
+    #[test]
+    fn synthetic_provenance_cannot_be_relabelled_as_an_objective_evidence_source() {
+        let mut config = evidence_complete_test_config(live(), "-TEST");
+        config.provenance[0].source_type = "authored_synthetic".to_owned();
+        for module in &mut config.module_catalog {
+            for source in &mut module.provenance {
+                source.source_type = "authored_synthetic".to_owned();
+            }
+        }
+        let candidate = submission("synthetic-source", config, vec![
+            objective("mass", 100.0, "kg", ObjectiveDirection::Minimize),
+        ]);
+        let report = rank_candidates(vec![candidate]).expect("report serializes");
+        assert!(report.body.groups.is_empty());
+        assert_eq!(report.body.candidates[0].eligibility, CandidateEligibility::ReviewRequired);
+        assert!(report.body.candidates[0].blockers.iter().any(|blocker|
+            blocker.contains("non-synthetic evidence")));
+    }
+
+    #[test]
+    fn report_verifier_rechecks_embedded_validation_receipts() {
+        let config = evidence_complete_test_config(live(), "-TEST");
+        let candidate = submission("A", config, vec![
+            objective("mass", 100.0, "kg", ObjectiveDirection::Minimize),
+        ]);
+        let submissions = vec![candidate.clone()];
+        let report = rank_candidates(submissions.clone()).expect("report serializes");
+        assert!(verify_pareto_report(&submissions, &report));
+
+        let mut tampered = candidate;
+        tampered.validation_receipt.body.claim_ceiling.push_str(" changed");
+        let altered_inputs = vec![tampered];
+        assert!(!verify_pareto_report(&altered_inputs, &report));
+    }
+
 }
