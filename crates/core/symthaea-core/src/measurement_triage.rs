@@ -1174,6 +1174,54 @@ mod tests {
     }
 
     #[test]
+    fn incomplete_or_invalid_source_metric_receipts_fail_closed() {
+        let mut source = source_report();
+        source.candidates[0].metrics.pop();
+        assert!(triage_measurement_actions(
+            &source,
+            &[],
+            MEASUREMENT_TRIAGE_SCHEMA_VERSION_V1,
+        )
+        .as_ref()
+        .err()
+        .unwrap()
+        .iter()
+        .any(|finding| {
+            matches!(
+                finding,
+                MeasurementTriageFindingV1::InvalidSourceMetricEvidence {
+                    candidate_id,
+                    metric: Some(ArchitectureMetricV1::RepairTimeMinutes)
+                } if candidate_id == "candidate-a"
+            )
+        }));
+
+        let mut source = source_report();
+        source.candidates[0].metrics[0].interval = MetricIntervalV1 {
+            lower: 0.9,
+            upper: 0.4,
+        };
+        assert!(triage_measurement_actions(
+            &source,
+            &[],
+            MEASUREMENT_TRIAGE_SCHEMA_VERSION_V1,
+        )
+        .as_ref()
+        .err()
+        .unwrap()
+        .iter()
+        .any(|finding| {
+            matches!(
+                finding,
+                MeasurementTriageFindingV1::InvalidSourceMetricEvidence {
+                    candidate_id,
+                    metric: Some(ArchitectureMetricV1::TaskSuccessRate)
+                } if candidate_id == "candidate-a"
+            )
+        }));
+    }
+
+    #[test]
     fn exact_point_valued_overlap_is_not_suggested_as_a_measurement() {
         let mut source = source_report();
         for candidate in &mut source.candidates {
