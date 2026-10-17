@@ -12,6 +12,7 @@
 
 mod assessor;
 pub mod experiment_selection;
+pub mod catamaran_design;
 mod model;
 
 pub use assessor::{assess, AssessmentError, AssessmentReport, Finding, FindingStatus};
