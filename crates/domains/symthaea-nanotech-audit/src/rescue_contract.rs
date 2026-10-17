@@ -181,7 +181,7 @@ pub(crate) fn audit_optional_rescue_contract(run_dir: &Path) -> RescueContractAu
     ];
     let present = required
         .iter()
-        .filter(|name| fs::symlink_metadata(root.join(name)).is_ok())
+        .filter(|name| fs::symlink_metadata(root.join(*name)).is_ok())
         .count();
     if present == 0 {
         return audit;
