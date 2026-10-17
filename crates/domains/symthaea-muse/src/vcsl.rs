@@ -86,6 +86,15 @@ enum SampleSource {
     Vsco2,
 }
 
+impl SampleSource {
+    fn id(self) -> &'static str {
+        match self {
+            Self::Vcsl => "vcsl",
+            Self::Vsco2 => "vsco2_ce",
+        }
+    }
+}
+
 #[derive(Debug, Clone, Copy)]
 struct SampleStyleMapping {
     style_name: &'static str,
@@ -613,16 +622,26 @@ pub(crate) struct DecodedSample {
     pub(crate) frames: Vec<f32>,
     pub(crate) sample_rate: u32,
     pub(crate) midi: u8,
+    pub(crate) source_library: String,
+    /// Source-root-relative path: excludes absolute machine-specific roots.
+    pub(crate) source_relative_path: String,
+    pub(crate) source_dynamic: f32,
 }
 
 /// All indexed samples for one instrument, with a decode cache.
 pub(crate) struct InstrumentBank {
     samples: Vec<SampleMeta>,
     cache: Mutex<HashMap<usize, Arc<DecodedSample>>>,
+    source_library: String,
+    source_relative_directory: String,
 }
 
 impl InstrumentBank {
-    fn index(dir: &Path) -> Option<Self> {
+    fn index(
+        dir: &Path,
+        source_library: &str,
+        source_relative_directory: &str,
+    ) -> Option<Self> {
         let mut samples = Vec::new();
         let entries = std::fs::read_dir(dir).ok()?;
         for entry in entries.flatten() {
@@ -689,6 +708,8 @@ impl InstrumentBank {
         Some(InstrumentBank {
             samples,
             cache: Mutex::new(HashMap::new()),
+            source_library: source_library.to_string(),
+            source_relative_directory: source_relative_directory.to_string(),
         })
     }
 
@@ -770,10 +791,19 @@ impl InstrumentBank {
         if mono.is_empty() {
             return None;
         }
+        let source_filename = meta.path.file_name()?.to_str()?;
+        let source_relative_path = format!(
+            "{}/{}",
+            self.source_relative_directory.trim_end_matches('/'),
+            source_filename
+        );
         let decoded = Arc::new(DecodedSample {
             frames: mono,
             sample_rate: spec.sample_rate,
             midi: meta.midi,
+            source_library: self.source_library.clone(),
+            source_relative_path,
+            source_dynamic: meta.dynamic,
         });
         self.cache.lock().ok()?.insert(idx, decoded.clone());
         Some(decoded)
@@ -841,7 +871,7 @@ impl VcslLibrary {
                     SampleSource::Vcsl => root,
                     SampleSource::Vsco2 => vsco2_root,
                 };
-                if let Some(bank) = InstrumentBank::index(&base.join(sub)) {
+                if let Some(bank) = InstrumentBank::index(&base.join(sub), source.id(), sub) {
                     banks.insert(instrument, bank);
                 }
             }
@@ -850,7 +880,7 @@ impl VcslLibrary {
                     SampleSource::Vcsl => root,
                     SampleSource::Vsco2 => vsco2_root,
                 };
-                if let Some(bank) = InstrumentBank::index(&base.join(sub)) {
+                if let Some(bank) = InstrumentBank::index(&base.join(sub), source.id(), sub) {
                     staccato_banks.insert(instrument, bank);
                 }
             }
@@ -866,7 +896,11 @@ impl VcslLibrary {
                     SampleSource::Vsco2 => vsco2_root,
                 };
                 if let Some(bank) =
-                    InstrumentBank::index(&base.join(style.relative_directory))
+                    InstrumentBank::index(
+                        &base.join(style.relative_directory),
+                        style.source.id(),
+                        style.relative_directory,
+                    )
                 {
                     style_banks.insert((instrument, style.style_name), bank);
                 }
@@ -1513,7 +1547,11 @@ fn sample_directory_evidence_for_mapping(
     let directory = root.join(relative_directory);
     let directory_present = directory.is_dir();
     let bank = if directory_present {
-        InstrumentBank::index(&directory)
+        InstrumentBank::index(
+            &directory,
+            source.id(),
+            relative_directory,
+        )
     } else {
         None
     };
@@ -3528,6 +3566,44 @@ mod tests {
 
         let error = soundfont_evidence(&soundfont).unwrap_err();
         assert_eq!(error.kind(), std::io::ErrorKind::InvalidData);
+        std::fs::remove_dir_all(root).unwrap();
+    }
+
+    #[test]
+    fn selected_sample_exposes_relative_source_and_root_pitch() {
+        let root = std::env::temp_dir().join(format!(
+            "muse-selected-sample-evidence-{}",
+            std::process::id()
+        ));
+        let _ = std::fs::remove_dir_all(&root);
+        let bank_dir = root.join("fixture/instrument");
+        std::fs::create_dir_all(&bank_dir).unwrap();
+        let sample_path = bank_dir.join("Harp_C4_vl2.wav");
+        let spec = hound::WavSpec {
+            channels: 1,
+            sample_rate: 22_050,
+            bits_per_sample: 16,
+            sample_format: hound::SampleFormat::Int,
+        };
+        let mut writer = hound::WavWriter::create(&sample_path, spec).unwrap();
+        for index in 0..256 {
+            writer.write_sample(if index % 2 == 0 { 10_000i16 } else { -10_000i16 }).unwrap();
+        }
+        writer.finalize().unwrap();
+
+        let bank = InstrumentBank::index(&bank_dir, "vcsl", "fixture/instrument")
+            .expect("fixture bank should index");
+        let sample = bank
+            .pick(60.0, 1.0, 42)
+            .expect("C4 layer should be selected and decoded");
+        assert_eq!(sample.source_library, "vcsl");
+        assert_eq!(
+            sample.source_relative_path,
+            "fixture/instrument/Harp_C4_vl2.wav"
+        );
+        assert_eq!(sample.midi, 60);
+        assert_eq!(sample.sample_rate, 22_050);
+        assert_eq!(sample.source_dynamic, 1.0);
         std::fs::remove_dir_all(root).unwrap();
     }
 
