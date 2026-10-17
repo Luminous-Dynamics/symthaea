@@ -604,6 +604,43 @@ mod tests {
     }
 
     #[test]
+    fn perform_requires_current_fit_evidence() {
+        let input = WearabilityInputV1 {
+            sensor_consistency: Some(SignalEvidenceV1::Consistent),
+            ..Default::default()
+        };
+        assert_eq!(
+            evaluate_wearability_request("profile-a", WearabilityStageV1::Perform, &input).disposition,
+            WearabilityDispositionV1::InterfaceStateUnknown
+        );
+    }
+
+    #[test]
+    fn optional_migration_sensor_does_not_block_an_uninstrumented_profile() {
+        let input = WearabilityInputV1 {
+            fit_evidence: Some(FitEvidenceV1::Current),
+            sensor_consistency: Some(SignalEvidenceV1::Consistent),
+            ..Default::default()
+        };
+        assert_eq!(
+            evaluate_wearability_request("profile-a", WearabilityStageV1::Perform, &input).disposition,
+            WearabilityDispositionV1::ReadyForSimulation
+        );
+    }
+
+    #[test]
+    fn unsupported_input_schema_fails_closed() {
+        let input = WearabilityInputV1 {
+            schema_version: WEARABILITY_SCHEMA_VERSION + 1,
+            ..Default::default()
+        };
+        assert_eq!(
+            evaluate_wearability_request("profile-a", WearabilityStageV1::FitCheck, &input).disposition,
+            WearabilityDispositionV1::InvalidInput
+        );
+    }
+
+    #[test]
     fn invalid_input_identity_fails_closed() {
         let input = valid_fit();
         assert_eq!(
