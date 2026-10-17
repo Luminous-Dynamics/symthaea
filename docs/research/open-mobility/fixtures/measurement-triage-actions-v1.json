@@ -1,0 +1,129 @@
+{
+  "schema_version": 1,
+  "fixture_id": "MOBILITY-ASSIST-010-TRIAGE-001",
+  "task_protocol_version": "walk-v1",
+  "claim_ceiling": "Synthetic action catalog only; coverage is not expected information gain and no experiment is authorized or executed.",
+  "actions": [
+    {
+      "action_id": "measure-mass",
+      "kind": "bench_measurement",
+      "task_protocol_version": "walk-v1",
+      "candidate_ids": ["candidate-a", "candidate-b"],
+      "metric_targets": ["wearer_borne_mass_kg"],
+      "cost_minutes": {"lower_minutes": 10.0, "upper_minutes": 20.0},
+      "gates": {
+        "protocol_frozen": "satisfied",
+        "candidate_coverage": "satisfied",
+        "feasibility_review": "satisfied",
+        "safety_review": "satisfied",
+        "consent_review": "not_applicable",
+        "calibration_status": "satisfied",
+        "evidence_provenance": "satisfied"
+      }
+    },
+    {
+      "action_id": "measure-energy",
+      "kind": "bench_measurement",
+      "task_protocol_version": "walk-v1",
+      "candidate_ids": ["candidate-a", "candidate-b"],
+      "metric_targets": ["energy_wh_per_task"],
+      "cost_minutes": {"lower_minutes": 9.0, "upper_minutes": 18.0},
+      "gates": {
+        "protocol_frozen": "satisfied",
+        "candidate_coverage": "satisfied",
+        "feasibility_review": "satisfied",
+        "safety_review": "satisfied",
+        "consent_review": "not_applicable",
+        "calibration_status": "satisfied",
+        "evidence_provenance": "satisfied"
+      }
+    },
+    {
+      "action_id": "measure-both",
+      "kind": "bench_measurement",
+      "task_protocol_version": "walk-v1",
+      "candidate_ids": ["candidate-a", "candidate-b"],
+      "metric_targets": ["wearer_borne_mass_kg", "energy_wh_per_task"],
+      "cost_minutes": {"lower_minutes": 16.0, "upper_minutes": 30.0},
+      "gates": {
+        "protocol_frozen": "satisfied",
+        "candidate_coverage": "satisfied",
+        "feasibility_review": "satisfied",
+        "safety_review": "satisfied",
+        "consent_review": "not_applicable",
+        "calibration_status": "satisfied",
+        "evidence_provenance": "satisfied"
+      }
+    },
+    {
+      "action_id": "measure-mass-cheap",
+      "kind": "bench_measurement",
+      "task_protocol_version": "walk-v1",
+      "candidate_ids": ["candidate-a", "candidate-b"],
+      "metric_targets": ["wearer_borne_mass_kg"],
+      "cost_minutes": {"lower_minutes": 2.0, "upper_minutes": 8.0},
+      "gates": {
+        "protocol_frozen": "satisfied",
+        "candidate_coverage": "satisfied",
+        "feasibility_review": "satisfied",
+        "safety_review": "satisfied",
+        "consent_review": "not_applicable",
+        "calibration_status": "satisfied",
+        "evidence_provenance": "satisfied"
+      }
+    },
+    {
+      "action_id": "measure-comfort-tradeoff",
+      "kind": "bench_measurement",
+      "task_protocol_version": "walk-v1",
+      "candidate_ids": ["candidate-a", "candidate-c"],
+      "metric_targets": ["comfort_score"],
+      "cost_minutes": {"lower_minutes": 2.0, "upper_minutes": 5.0},
+      "gates": {
+        "protocol_frozen": "satisfied",
+        "candidate_coverage": "satisfied",
+        "feasibility_review": "satisfied",
+        "safety_review": "satisfied",
+        "consent_review": "not_applicable",
+        "calibration_status": "satisfied",
+        "evidence_provenance": "satisfied"
+      }
+    },
+    {
+      "action_id": "unsafe-fast-measurement",
+      "kind": "bench_measurement",
+      "task_protocol_version": "walk-v1",
+      "candidate_ids": ["candidate-a", "candidate-b"],
+      "metric_targets": ["energy_wh_per_task"],
+      "cost_minutes": {"lower_minutes": 1.0, "upper_minutes": 2.0},
+      "gates": {
+        "protocol_frozen": "satisfied",
+        "candidate_coverage": "satisfied",
+        "feasibility_review": "blocked",
+        "safety_review": "blocked",
+        "consent_review": "not_applicable",
+        "calibration_status": "satisfied",
+        "evidence_provenance": "satisfied"
+      }
+    },
+    {
+      "action_id": "human-study-unknown-consent",
+      "kind": "human_study",
+      "task_protocol_version": "walk-v1",
+      "candidate_ids": ["candidate-a", "candidate-b"],
+      "metric_targets": ["comfort_score"],
+      "cost_minutes": {"lower_minutes": 20.0, "upper_minutes": 60.0},
+      "gates": {
+        "protocol_frozen": "satisfied",
+        "candidate_coverage": "satisfied",
+        "feasibility_review": "satisfied",
+        "safety_review": "satisfied",
+        "consent_review": "unknown",
+        "calibration_status": "satisfied",
+        "evidence_provenance": "satisfied"
+      }
+    }
+  ],
+  "expected_frontier": ["measure-energy", "measure-both", "measure-mass-cheap"],
+  "expected_blocked": ["measure-comfort-tradeoff", "unsafe-fast-measurement", "human-study-unknown-consent"]
+}
