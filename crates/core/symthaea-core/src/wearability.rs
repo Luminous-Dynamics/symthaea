@@ -700,6 +700,61 @@ mod tests {
     }
 
     #[test]
+    fn unsupported_task_or_restricted_clearance_is_not_admitted() {
+        let input = WearabilityInputV1 {
+            fit_evidence: Some(FitEvidenceV1::Current),
+            task_compatibility: Some(TaskCompatibilityV1::Unsupported),
+            movement_clearance: Some(MovementClearanceV1::Compatible),
+            ..Default::default()
+        };
+        assert_eq!(
+            evaluate_wearability_request("profile-a", WearabilityStageV1::Perform, &input).disposition,
+            WearabilityDispositionV1::TaskNotAdmittedForProfile
+        );
+
+        let restricted = WearabilityInputV1 {
+            task_compatibility: Some(TaskCompatibilityV1::Supported),
+            movement_clearance: Some(MovementClearanceV1::Restricted),
+            ..input
+        };
+        assert_eq!(
+            evaluate_wearability_request("profile-a", WearabilityStageV1::Perform, &restricted).disposition,
+            WearabilityDispositionV1::TaskNotAdmittedForProfile
+        );
+    }
+
+    #[test]
+    fn reported_thermal_discomfort_requires_review_not_a_medical_diagnosis() {
+        let input = WearabilityInputV1 {
+            fit_evidence: Some(FitEvidenceV1::Current),
+            task_compatibility: Some(TaskCompatibilityV1::Supported),
+            movement_clearance: Some(MovementClearanceV1::Compatible),
+            thermal_comfort: Some(ThermalComfortV1::DiscomfortReported),
+            duty_cycle: Some(DutyCycleV1::WithinProfileLimit),
+            ..Default::default()
+        };
+        assert_eq!(
+            evaluate_wearability_request("profile-a", WearabilityStageV1::Perform, &input).disposition,
+            WearabilityDispositionV1::TaskReviewOrAlternateProfileRequired
+        );
+    }
+
+    #[test]
+    fn duty_cycle_limit_requires_review() {
+        let input = WearabilityInputV1 {
+            fit_evidence: Some(FitEvidenceV1::Current),
+            task_compatibility: Some(TaskCompatibilityV1::Supported),
+            movement_clearance: Some(MovementClearanceV1::Compatible),
+            duty_cycle: Some(DutyCycleV1::LimitReached),
+            ..Default::default()
+        };
+        assert_eq!(
+            evaluate_wearability_request("profile-a", WearabilityStageV1::Perform, &input).disposition,
+            WearabilityDispositionV1::TaskReviewOrAlternateProfileRequired
+        );
+    }
+
+    #[test]
     fn reviewed_service_requires_calibration_and_diagnostics_to_be_declared() {
         let input = WearabilityInputV1 {
             module_changed: Some(true),
