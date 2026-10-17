@@ -8,6 +8,7 @@
 
 use jsonschema::draft202012;
 use serde_json::Value;
+use sha2::{Digest, Sha256};
 use std::collections::{BTreeMap, BTreeSet};
 use std::env;
 use std::fs;
@@ -41,6 +42,39 @@ impl ValidationSummary {
         println!();
         println!("Claim ceiling: manifest/schema integrity only; no geometry or building qualification.");
     }
+}
+
+fn sha256_hex(input: &str) -> String {
+    Sha256::digest(input.as_bytes())
+        .iter()
+        .map(|byte| format!("{byte:02x}"))
+        .collect()
+}
+
+fn receipt_value(
+    summary: &ValidationSummary,
+    benchmark_text: &str,
+    schema_text: &str,
+) -> Value {
+    serde_json::json!({
+        "receipt_version": "room-stress-manifest-receipt-v0.1",
+        "status": "valid_manifest",
+        "validator": {
+            "name": "room-stress-qualifier",
+            "version": env!("CARGO_PKG_VERSION")
+        },
+        "inputs": {
+            "benchmark_sha256": sha256_hex(benchmark_text),
+            "schema_sha256": sha256_hex(schema_text)
+        },
+        "summary": {
+            "schema_version": EXPECTED_SCHEMA_VERSION,
+            "case_count": summary.case_count,
+            "distinct_family_count": summary.family_count,
+            "risk_counts": &summary.risk_counts
+        },
+        "claim_ceiling": "Manifest/schema and semantic integrity only. This receipt does not qualify geometry, simulations, accessibility, comfort, safety, buildability, code compliance, professional approval, or human outcomes."
+    })
 }
 
 fn parse_json(label: &str, input: &str) -> Result<Value, String> {
@@ -116,6 +150,10 @@ fn validate_values(benchmark: Value, schema: Value) -> Result<ValidationSummary,
             .and_then(Value::as_str)
             .ok_or_else(|| format!("{case_label}.id must be a string"))?;
 
+        if !ids.insert(id.to_owned()) {
+            return Err(format!("duplicate case id: {id}"));
+        }
+
         // Schema validation checks the lexical pattern; this additional oracle
         // requires the initial sealed corpus to enumerate exactly 001..030.
         let expected_id = format!("ROOM-STRESS-{:03}", index + 1);
@@ -123,9 +161,6 @@ fn validate_values(benchmark: Value, schema: Value) -> Result<ValidationSummary,
             return Err(format!(
                 "{case_label}.id must be {expected_id} at this position, found {id}"
             ));
-        }
-        if !ids.insert(id.to_owned()) {
-            return Err(format!("duplicate case id: {id}"));
         }
 
         let family = case
@@ -174,7 +209,12 @@ fn validate_values(benchmark: Value, schema: Value) -> Result<ValidationSummary,
 }
 
 fn run(args: &[String]) -> Result<(), String> {
-    let (benchmark_path, schema_path) = match args {
+    let (json_mode, path_args) = match args.first().map(String::as_str) {
+        Some("--json") => (true, &args[1..]),
+        _ => (false, args),
+    };
+
+    let (benchmark_path, schema_path) = match path_args {
         [] => (
             "docs/research/spatial-design/ROOM_IMAGINATION_STRESS_BENCHMARK_V0_1.json",
             "docs/research/spatial-design/ROOM_IMAGINATION_STRESS_BENCHMARK_V0_1.schema.json",
@@ -182,7 +222,7 @@ fn run(args: &[String]) -> Result<(), String> {
         [benchmark, schema] => (benchmark.as_str(), schema.as_str()),
         _ => {
             return Err(
-                "usage: room-stress-qualifier [BENCHMARK.json SCHEMA.json]".to_string(),
+                "usage: room-stress-qualifier [--json] [BENCHMARK.json SCHEMA.json]".to_string(),
             );
         }
     };
@@ -192,7 +232,15 @@ fn run(args: &[String]) -> Result<(), String> {
     let schema_text = fs::read_to_string(Path::new(schema_path))
         .map_err(|error| format!("cannot read schema {schema_path}: {error}"))?;
 
-    validate_documents(&benchmark_text, &schema_text)?.print();
+    let summary = validate_documents(&benchmark_text, &schema_text)?;
+    if json_mode {
+        let receipt = receipt_value(&summary, &benchmark_text, &schema_text);
+        let rendered = serde_json::to_string_pretty(&receipt)
+            .map_err(|error| format!("could not serialize receipt: {error}"))?;
+        println!("{rendered}");
+    } else {
+        summary.print();
+    }
     Ok(())
 }
 
@@ -238,7 +286,7 @@ mod tests {
         let cases = benchmark["cases"].as_array_mut().unwrap();
         cases[1]["id"] = cases[0]["id"].clone();
         let error = validate_values(benchmark, schema).unwrap_err();
-        assert!(error.contains("must be ROOM-STRESS-002") || error.contains("duplicate case id"));
+        assert!(error.contains("duplicate case id"));
     }
 
     #[test]
@@ -290,6 +338,21 @@ mod tests {
         let (mut benchmark, schema) = fixture_values();
         benchmark["count"] = Value::from(29);
         assert!(validate_values(benchmark, schema).is_err());
+    }
+
+    #[test]
+    fn receipt_binds_exact_input_bytes_and_states_claim_ceiling() {
+        let summary = validate_documents(EMBEDDED_BENCHMARK, EMBEDDED_SCHEMA).unwrap();
+        let receipt = receipt_value(&summary, EMBEDDED_BENCHMARK, EMBEDDED_SCHEMA);
+        assert_eq!(receipt["status"], "valid_manifest");
+        assert_eq!(receipt["inputs"]["benchmark_sha256"].as_str().unwrap().len(), 64);
+        assert_eq!(receipt["inputs"]["schema_sha256"].as_str().unwrap().len(), 64);
+        assert!(receipt["claim_ceiling"].as_str().unwrap().contains("does not qualify geometry"));
+        assert_eq!(
+            receipt,
+            receipt_value(&summary, EMBEDDED_BENCHMARK, EMBEDDED_SCHEMA),
+            "the receipt must be deterministic for identical input bytes"
+        );
     }
 
     #[test]
