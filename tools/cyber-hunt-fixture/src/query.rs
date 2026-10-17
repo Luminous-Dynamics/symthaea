@@ -652,7 +652,6 @@ mod tests {
         ).expect("typed query should succeed");
         assert_eq!(response.receipt.disposition, "READ_ONLY_EVIDENCE_RESULTS_NOT_A_SECURITY_CONCLUSION");
         assert_eq!(response.receipt.rows_examined, 1_000);
-        assert!(!response.receipt.source_commit_pinned);
         assert!(response.records.len() <= 25);
         assert_eq!(usage.queries, 1);
         assert!(response.records.iter().all(|row| row.fields.contains_key("event_type")));
@@ -677,7 +676,6 @@ mod tests {
             &default_request(),
             &"a".repeat(64),
             &"b".repeat(64),
-            "test-source-commit",
             &budget,
             &mut usage,
         ).expect_err("second query should exceed the same session budget");
@@ -696,7 +694,6 @@ mod tests {
             &request,
             &"a".repeat(64),
             &"b".repeat(64),
-            "test-source-commit",
             &QueryBudget::default(),
             &mut usage,
         ).expect("bounded contextual query should pass");
@@ -734,7 +731,6 @@ mod tests {
             &default_request(),
             &"a".repeat(64),
             &"b".repeat(64),
-            "test-source-commit",
             &budget,
             &mut usage,
         ).expect_err("scan larger than budget must be rejected");
@@ -764,7 +760,6 @@ mod tests {
             &default_request(),
             &"a".repeat(64),
             &"b".repeat(64),
-            "test-source-commit",
             &QueryBudget::default(),
             &mut usage,
         ).expect("query should succeed");
@@ -808,10 +803,7 @@ mod tests {
         let manifest = SolverManifest {
             schema_version: SOLVER_MANIFEST_VERSION.to_string(),
             generator_version: GENERATOR_VERSION.to_string(),
-            source_commit: "test-source-commit".to_string(),
-            source_commit_pinned: false,
             synthetic_only: true,
-            seed: 42,
             record_count: 1_000,
             event_file: "events.jsonl".to_string(),
             event_sha256: sha256(&event_bytes),
