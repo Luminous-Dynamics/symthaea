@@ -16,7 +16,7 @@ cargo run --manifest-path tools/cyber-hunt-fixture-generator/Cargo.toml -- \
   --source-commit "$(git rev-parse HEAD)"
 ```
 
-Record count is bounded to 64–250,000. The same seed and count produce identical event bytes. The dataset has no network connectivity or live-target actions; all identities, hosts, addresses, destinations and events are synthetic. IPv4 addresses come from reserved documentation ranges or synthetic private ranges. Example domains use `.invalid`.
+Record count is bounded to 64–250,000. The same seed and count produce identical event bytes. Different seeds also vary the planted case-local host/principal IDs, source/destination documentation IPs, and attack start time while preserving the planted causal sequence. These seeded variations are still one public scenario template, not independent held-out incidents. The dataset has no network connectivity or live-target actions; all identities, hosts, addresses, destinations and events are synthetic. IPv4 addresses come from reserved documentation ranges or synthetic private ranges. Example domains use `.invalid`.
 
 ## Output separation
 
