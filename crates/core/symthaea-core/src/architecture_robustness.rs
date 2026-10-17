@@ -635,6 +635,10 @@ mod tests {
     use super::*;
     use serde::Deserialize;
 
+    const ROBUSTNESS_FIXTURE_JSON: &str = include_str!(
+        "../../../../docs/research/open-mobility/fixtures/architecture-robustness-scenarios-v1.json"
+    );
+
     #[derive(Clone, Copy)]
     enum Profile {
         Balanced,
@@ -1075,10 +1079,8 @@ mod tests {
 
     #[test]
     fn versioned_fixture_matches_expected_frontier_and_pairwise_results() {
-        let fixture: FixtureV1 = serde_json::from_str(include_str!(
-            "../../../../docs/research/open-mobility/fixtures/architecture-robustness-scenarios-v1.json"
-        ))
-        .expect("fixture JSON must parse");
+        let fixture: FixtureV1 =
+            serde_json::from_str(ROBUSTNESS_FIXTURE_JSON).expect("fixture JSON must parse");
         let report = evaluate_architecture_robustness(&fixture.request)
             .expect("versioned synthetic fixture must validate");
 
