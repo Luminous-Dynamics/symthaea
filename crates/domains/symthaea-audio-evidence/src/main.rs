@@ -25,7 +25,11 @@ fn main() -> ExitCode {
     let manifest_path = PathBuf::from(manifest_arg);
     let bundle_root = args.next().map(PathBuf::from).unwrap_or_else(|| {
         let parent = manifest_path.parent().unwrap_or_else(|| Path::new("."));
-        if parent.as_os_str().is_empty() { PathBuf::from(".") } else { parent.to_path_buf() }
+        if parent.as_os_str().is_empty() {
+            PathBuf::from(".")
+        } else {
+            parent.to_path_buf()
+        }
     });
     if args.next().is_some() {
         usage();
@@ -47,7 +51,10 @@ fn main() -> ExitCode {
     };
     match check_manifest_bundle(&manifest, &bundle_root) {
         Ok(count) => {
-            let status = manifest.get("data_status").and_then(Value::as_str).unwrap_or("unknown");
+            let status = manifest
+                .get("data_status")
+                .and_then(Value::as_str)
+                .unwrap_or("unknown");
             if status == "planned" {
                 println!("PLAN OK: no measurement verdict; {count} artifacts checked");
             } else {
