@@ -1,0 +1,62 @@
+# MARINE-MOD-001 — Constraint-carrying modular interiors
+
+## Design thesis
+
+Model the interior as a versioned product platform, not a one-off arrangement of furniture. A vessel has a declared deck coordinate frame and a set of structural and utility service interfaces. A configuration selects versioned modules, places instances in that frame, connects module ports to platform services, and records reserved regions and safety-evidence dispositions.
+
+The configuration manifest is an input to an eventual deterministic validator/compiler. JSON Schema is only the data contract: it cannot establish geometric fit, connector compatibility, loads, egress adequacy, stability, or regulatory compliance.
+
+## What can be customized
+
+The initial catalogue separates function from vessel archetype. Concepts include sleeping pods, wet rooms, compact galleys, convertible lounges/workspaces, storage, medical nooks, and later laboratory, workshop, laundry, crew and accessibility modules. The two fixtures intentionally share a catalogue but use different placements to demonstrate mission-specific configuration rather than two unrelated redraws.
+
+Interfaces are typed and revisioned: electrical power, fresh water, greywater, blackwater, supply/exhaust air, data networking and structural attachment are represented separately. The current LD-MOD-PORT-V1-PROVISIONAL profile is a placeholder, not a claimed industry standard. Real work must establish connector dimensions, ratings, isolation, service shutoff, inspection access and supplier compatibility.
+
+## Non-negotiable design constraints
+
+- Unknown mass or CG remains unknown. A design-assumption value is not measured evidence and cannot close a ship-level weight ledger.
+- The validator must derive module dimensions in the declared coordinate frame, account for rotation and service-clearance envelopes, and reject out-of-bounds or overlapping placements.
+- A connection is not valid merely because its media names match. It must verify direction, connector profile, capacity and required protection/isolation, including cumulative platform-service loads.
+- Escape routes, accessible paths, fire and watertight boundaries, emergency equipment, and maintenance clearances are hard constraints. They cannot be traded for cost, comfort or payload in a weighted score.
+- A module swap changes mass, CG, load paths, utility demand, noise/thermal performance and the configuration identity. Prior evidence is reused only where its applicability is demonstrated; otherwise it is stale or indeterminate.
+- Configurations should be immutable, versioned manifests. A digest should bind the module revisions, placements, interface connections, reserved regions, assumptions and validator version.
+
+## Proposed staged compiler
+
+1. **Contract layer:** schema validation, stable IDs, explicit unit declarations, provenance and unknown-state semantics.
+2. **Geometric layer:** 2D/3D envelope, deck boundary, module overlap, service-clearance and reserved-region checks; begin with axis-aligned boxes and then support polygon/mesh geometry.
+3. **Interface layer:** port direction/media/profile checks, rated capacity, utility load aggregation, connection routing, isolation and maintainability.
+4. **Weight-and-CG layer:** configuration-specific mass ledger; compute a CG only where all required masses and local CGs are available and coordinate transforms are verified. Return indeterminate instead of guessing.
+5. **Systems and safety layer:** egress/accessibility, fire and watertight boundaries, structural attachment, stability, sanitary and ventilation review. Computational flags support—not replace—qualified engineering and authority/class review.
+6. **Configuration search:** generate alternate valid interiors, then expose Pareto trade-offs among mission utility, payload, serviceability, lifecycle cost, energy and comfort only after hard-gate checks.
+
+## Benchmark plan — targets, not results
+
+Freeze a synthetic test corpus containing valid layouts plus adversarial cases. Preserve each case, expected result, test revision and source hash.
+
+| Benchmark | Proposed target | Measurement rule |
+|---|---|---|
+| Manifest determinism | 100% reproducibility | Identical inputs and validator version produce identical canonical manifest/digest |
+| Data completeness | 100% of placed modules have explicit mass status, ports and provenance | Unknown is allowed only when explicit; never silently impute |
+| Bounds and collisions | 100% detection on the frozen negative suite | Include rotations, boundary overrun, module overlap and service-clearance overlap |
+| Interface correctness | 100% detection of planted type/direction/profile/capacity errors | Include cumulative overload and missing source/sink services |
+| Safety negative controls | Zero false-safe accepts on the frozen adversarial corpus | A single missed escape, access, fire-boundary or emergency-equipment violation fails the gate |
+| Weight/CG | 100% agreement with hand-calculated synthetic cases within declared numeric tolerance | Missing inputs must produce indeterminate; compare transformed local CGs and totals |
+| Reconfiguration productivity | Measure time and edit count versus a documented manual-redraw baseline | Use identical tasks and score final constraint-valid configurations, not just time to produce a drawing |
+| Reuse across archetypes | Report reuse ratio and adapter count | Count reused module revisions separately from bespoke adapters and unresolved incompatibilities |
+| Robust optimization | Report Pareto coverage and constraint violations | Compare fixed-grid/random/search baselines on frozen scenarios; never allow hard constraints to be compensated by weighted scores |
+| Lifecycle maintainability | Measure replacement steps, isolation time and affected evidence | Simulate component swaps and require an explicit revalidation impact report |
+
+A numerical claim such as “10× faster design” or a target mass tolerance should be set only after a reproducible baseline and the benchmark's system boundaries are defined. The initial target is correctness, traceability and fast iteration without weakening constraints.
+
+## Research context
+
+- Fong, *Practical Applications in CADD for 3-D Machinery Space Design and Modular Outfitting*, TRID: https://trid.trb.org/View/403592. Historical prior art discusses 3-D module generation, service routing, clash checking, weight control and centre of gravity.
+- Erikstad, *Design for Modularity: Volume 1 — Optimisation of Ship Design and Operation for Life Cycle* (2019): https://doi.org/10.1007/978-3-030-02810-7_10. Frames modularity as a lifecycle decision and product-platform strategy.
+- Strickland, *An evaluation of system modularity and interface standards as a means for continued platform level relevance* (IMDC 2024): https://doi.org/10.59490/imdc.2024.831.
+- IMO passenger-ship context: https://www.imo.org/en/ourwork/safety/pages/passengerships.aspx.
+- IMO fire protection and escape-route context: https://www.imo.org/en/ourwork/safety/pages/fireprotection-default.aspx.
+
+## Current status and claim ceiling
+
+This change establishes a schema, two synthetic examples and a benchmark protocol. The fixture masses, centres of gravity, module dimensions and utility capacities are invented placeholders. No Rust layout validator, CAD integration, load aggregation, stability result, fire/accessibility assessment or certification is delivered by this schema-only increment. Those are the next implementation gates.
