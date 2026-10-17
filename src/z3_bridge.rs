@@ -1311,6 +1311,33 @@ mod tests {
     }
 
     #[test]
+    fn test_einstein_numeric_residual_flat_metric_has_zero_defect() {
+        let report = Z3Bridge::check_einstein_residual_numeric(
+            &[0.0, 0.0, 0.0, 0.0],
+            &[1.0, 0.0, 0.0, 1.0],
+            2,
+            1e-6,
+        )
+        .unwrap();
+
+        assert_eq!(report.estimated_k_from_diagonal_ratios, 0.0);
+        assert_eq!(report.max_abs_residual, 0.0);
+        assert!(report.within_tolerance);
+    }
+
+    #[test]
+    fn test_einstein_numeric_residual_rejects_non_finite_derived_arithmetic() {
+        let report = Z3Bridge::check_einstein_residual_numeric(
+            &[f64::MAX, 0.0, 0.0, f64::MAX],
+            &[f64::MIN_POSITIVE, 0.0, 0.0, f64::MIN_POSITIVE],
+            2,
+            1.0,
+        );
+
+        assert_eq!(report, Err(EinsteinResidualError::NonFiniteArithmetic));
+    }
+
+    #[test]
     fn test_einstein_numeric_residual_rejects_malformed_inputs() {
         assert_eq!(
             Z3Bridge::check_einstein_residual_numeric(
