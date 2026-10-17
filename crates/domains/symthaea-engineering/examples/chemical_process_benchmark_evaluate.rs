@@ -130,7 +130,9 @@ fn mixer_balance_oracle(fixture: &Value, tolerance: f64) -> Result<Value, String
                 .filter(|value| !value.trim().is_empty())
                 .ok_or_else(|| format!("{stream_group} stream has no component identity"))?;
             let flow = numeric_field(stream, "flow")
-                .ok_or_else(|| format!("{stream_group} stream for {component} has no numeric flow"))?;
+                .ok_or_else(|| {
+                    format!("{stream_group} stream for {component} has no numeric flow")
+                })?;
             let unit = text(stream, "unit")
                 .filter(|value| !value.trim().is_empty())
                 .ok_or_else(|| format!("{stream_group} stream for {component} has no unit"))?;
@@ -144,7 +146,10 @@ fn mixer_balance_oracle(fixture: &Value, tolerance: f64) -> Result<Value, String
                 .or_insert((0.0, 0.0, 0.0, unit.to_owned()));
             if entry.3 != unit {
                 return Err(format!(
-                    "component {component} mixes incompatible unit labels without explicit conversion"
+                    concat!(
+                        "component {component} mixes incompatible unit labels ",
+                        "without explicit conversion"
+                    )
                 ));
             }
 
@@ -218,7 +223,9 @@ fn unit_conversion_oracle(
         || factor_ref.is_empty()
         || rule != "to_value = from_value * conversion_factor"
     {
-        return Err("unit-conversion fixture has invalid values, units, reference, or rule".to_owned());
+        return Err(
+            "unit-conversion fixture has invalid values, units, reference, or rule".to_owned(),
+        );
     }
 
     let independently_converted = from_value * factor;
@@ -556,7 +563,10 @@ fn evaluate(corpus: &Value, results: &Value, expected_head: &str) -> Value {
                 .and_then(|fixture| mixer_balance_oracle(fixture, tolerance)) {
                 Ok(oracle) => {
                     if text(&oracle, "derived_disposition") != Some(expected_disposition) {
-                        errors.push("independent mixer oracle disagrees with frozen expected disposition".to_owned());
+                        errors.push(
+                            "independent mixer oracle disagrees with frozen expected disposition"
+                                .to_owned(),
+                        );
                     }
                     let observed_residuals = actual
                         .get("observed_numeric_values")
@@ -564,13 +574,20 @@ fn evaluate(corpus: &Value, results: &Value, expected_head: &str) -> Value {
                         .and_then(Value::as_object);
                     match observed_residuals {
                         Some(residuals) => {
-                            if let Some(components) = oracle.get("components").and_then(Value::as_object) {
+                            if let Some(components) = oracle
+                                .get("components")
+                                .and_then(Value::as_object)
+                            {
                                 for (component, expected_balance) in components {
-                                    let expected_residual = numeric_field(expected_balance, "raw_residual")
+                                    let expected_residual =
+                                        numeric_field(expected_balance, "raw_residual")
                                         .unwrap_or(f64::NAN);
-                                    let normalization_scale = numeric_field(expected_balance, "normalization_scale")
+                                    let normalization_scale =
+                                        numeric_field(expected_balance, "normalization_scale")
                                         .unwrap_or(f64::NAN);
-                                    let reported_residual = residuals.get(component).and_then(Value::as_f64);
+                                    let reported_residual = residuals
+                                        .get(component)
+                                        .and_then(Value::as_f64);
                                     match reported_residual {
                                         Some(reported) if reported.is_finite()
                                             && normalization_scale.is_finite()
@@ -578,7 +595,10 @@ fn evaluate(corpus: &Value, results: &Value, expected_head: &str) -> Value {
                                             && (reported - expected_residual).abs()
                                                 / normalization_scale <= tolerance => {}
                                         _ => errors.push(format!(
-                                            "reported residual for component {component:?} is missing or disagrees with independent oracle"
+                                            concat!(
+                                                "reported residual for component {component:?} ",
+                                                "is missing or disagrees with independent oracle"
+                                            )
                                         )),
                                     }
                                 }
@@ -592,7 +612,10 @@ fn evaluate(corpus: &Value, results: &Value, expected_head: &str) -> Value {
                             }
                         }
                         None => errors.push(
-                            "mixer case result is missing observed_numeric_values.component_balance_residuals"
+                            concat!(
+                                "mixer case result is missing observed_numeric_values.",
+                                "component_balance_residuals"
+                            )
                                 .to_owned()
                         ),
                     }
@@ -617,17 +640,24 @@ fn evaluate(corpus: &Value, results: &Value, expected_head: &str) -> Value {
                 .get("observed_numeric_values")
                 .unwrap_or(&empty_numeric_values);
             match expected.get("fixture").ok_or_else(|| "fixture missing".to_owned())
-                .and_then(|fixture| unit_conversion_oracle(fixture, observed_numeric_values, tolerance)) {
+                .and_then(|fixture| {
+                    unit_conversion_oracle(fixture, observed_numeric_values, tolerance)
+                }) {
                 Ok(oracle) => {
                     if oracle.get("passed").and_then(Value::as_bool) != Some(true) {
                         errors.push("independent unit-conversion oracle failed".to_owned());
                     }
                     if expected_disposition != "ACCEPTED_WITHIN_SCOPE" {
-                        errors.push("unit-conversion control must preserve its frozen expected disposition".to_owned());
+                        errors.push(
+                            "unit-conversion control must preserve its frozen expected disposition"
+                                .to_owned(),
+                        );
                     }
                     computed_numeric_checks = oracle;
                 }
-                Err(reason) => errors.push(format!("independent unit-conversion oracle failed: {reason}")),
+                Err(reason) => errors.push(format!(
+                    "independent unit-conversion oracle failed: {reason}"
+                )),
             }
         }
 
