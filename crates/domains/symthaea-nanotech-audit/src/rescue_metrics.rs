@@ -359,8 +359,83 @@ pub fn score_run(run_dir: &Path) -> Result<String, String> {
     if manifest.schema_version != "nano-rescue-audit-sampling-v1" {
         return Err("unsupported sampling manifest schema_version".to_owned());
     }
-    if manifest.run_id.trim().is_empty() || manifest.sampled_windows.is_empty() {
-        return Err("sampling manifest must declare a run_id and non-empty sample".to_owned());
+    if manifest.run_id.trim().is_empty()
+        || manifest.sampled_windows.is_empty()
+        || !is_sha256(&manifest.policy_revision_sha256)
+    {
+        return Err("sampling manifest must declare a run_id, non-empty sample, and valid policy revision digest".to_owned());
+    }
+
+    let decisions_path = root.join("decision-ledger.jsonl");
+    let decisions_bytes = read_regular_file(&decisions_path)?;
+    let decisions = parse_decisions(&decisions_bytes)?;
+    if decisions.is_empty() {
+        return Err("policy decision ledger is empty".to_owned());
+    }
+    let mut decision_by_id = BTreeMap::new();
+    let mut policy_cost_unit: Option<String> = None;
+    let mut observed_policy_cost = 0.0;
+    let mut policy_reference_query_count = 0usize;
+    let mut policy_intervention_count = 0usize;
+    for decision in &decisions {
+        if decision.schema_version != "nano-rescue-decision-v1"
+            || decision.run_id != manifest.run_id
+            || decision.policy_revision_sha256 != manifest.policy_revision_sha256
+        {
+            return Err(format!("decision {} has mismatched schema, run, or policy revision", decision.window_id));
+        }
+        if decision.window_id.trim().is_empty()
+            || decision.parent_group_id.trim().is_empty()
+            || decision.trajectory_id.trim().is_empty()
+            || decision.trigger_reason.trim().is_empty()
+        {
+            return Err("policy decision is missing required identity fields".to_owned());
+        }
+        if decision.max_observed_step > decision.decision_step {
+            return Err(format!("decision {} observes a future step", decision.window_id));
+        }
+        if decision.future_data_read || decision.heldout_label_read {
+            return Err(format!("decision {} declares evaluation leakage", decision.window_id));
+        }
+        if !matches!(
+            decision.action.as_str(),
+            "continue" | "conservative_continue" | "abstain_stop" | "request_reference"
+        ) {
+            return Err(format!("decision {} has an unsupported action", decision.window_id));
+        }
+        if !is_sha256(&decision.observed_state_sha256)
+            || !is_sha256(&decision.available_inputs_manifest_sha256)
+        {
+            return Err(format!("decision {} contains invalid state/input digest", decision.window_id));
+        }
+        if !decision.policy_cost.is_finite()
+            || decision.policy_cost < 0.0
+            || decision.policy_cost_unit.trim().is_empty()
+        {
+            return Err(format!("decision {} has invalid policy cost/unit", decision.window_id));
+        }
+        match &policy_cost_unit {
+            Some(unit) if unit != &decision.policy_cost_unit => {
+                return Err("policy costs use mixed units in the decision ledger".to_owned());
+            }
+            None => policy_cost_unit = Some(decision.policy_cost_unit.clone()),
+            _ => {}
+        }
+        if decision.action == "request_reference" {
+            if !decision.reference_request_id.as_str().is_some_and(|id| !id.trim().is_empty()) {
+                return Err(format!("reference request {} has no request ID", decision.window_id));
+            }
+            policy_reference_query_count += 1;
+        } else if !decision.reference_request_id.is_null() {
+            return Err(format!("non-query action {} contains a reference request ID", decision.window_id));
+        }
+        if decision.action != "continue" {
+            policy_intervention_count += 1;
+        }
+        observed_policy_cost += decision.policy_cost;
+        if decision_by_id.insert(decision.window_id.as_str(), decision).is_some() {
+            return Err(format!("duplicate window in policy decision ledger: {}", decision.window_id));
+        }
     }
 
     let mut sample_by_id = BTreeMap::new();
@@ -423,6 +498,16 @@ pub fn score_run(run_dir: &Path) -> Result<String, String> {
         {
             return Err(format!("result {} does not match sampled identity/probability", row.window_id));
         }
+        let decision = decision_by_id
+            .get(row.window_id.as_str())
+            .ok_or_else(|| format!("sampled window {} has no logged policy decision", row.window_id))?;
+        if decision.parent_group_id != row.parent_group_id
+            || decision.trajectory_id != row.trajectory_id
+            || (decision.action == "request_reference") != row.policy_triggered_reference
+        {
+            return Err(format!("decision/action does not reconcile with audited outcome for {}", row.window_id));
+        }
+        let intervention = decision.action != "continue";
         if !row.inclusion_probability.is_finite()
             || row.inclusion_probability <= 0.0
             || row.inclusion_probability > 1.0
@@ -458,7 +543,7 @@ pub fn score_run(run_dir: &Path) -> Result<String, String> {
         }
         trajectories.insert(row.trajectory_id.clone());
         observed_cost += row.audit_reference_cost;
-        let row_stats = SufficientStats::from_row(row);
+        let row_stats = SufficientStats::from_row(row, intervention);
         total.add(row_stats);
         groups.entry(row.parent_group_id.clone()).or_default().add(row_stats);
     }
@@ -476,7 +561,7 @@ pub fn score_run(run_dir: &Path) -> Result<String, String> {
     }
     if failed + unavailable > 0 {
         warnings.push(
-            "Some sampled windows lack reference labels. Recall and physical-integrity estimates are conditional on successful reference outcomes; known-label false-alarm burden is not a complete-population estimate. Do not silently treat missing outcomes as safe.".to_owned()
+            "Some sampled windows lack reference labels. Recall and physical-integrity estimates are conditional on successful reference outcomes; known-label false-alarm burdens are lower bounds, not complete-population estimates. Do not silently treat missing outcomes as safe.".to_owned()
         );
     }
     if groups.len() < 20 {
@@ -495,7 +580,12 @@ pub fn score_run(run_dir: &Path) -> Result<String, String> {
         reference_unavailable_windows: unavailable,
         independent_parent_groups: groups.len(),
         independent_trajectories: trajectories.len(),
+        policy_decision_count: decisions.len(),
+        policy_reference_query_count,
+        policy_intervention_count,
         weighted_estimated_population_windows: total.weight_total,
+        observed_policy_cost,
+        policy_cost_unit: policy_cost_unit.unwrap_or_else(|| "unknown".to_owned()),
         observed_audit_reference_cost: observed_cost,
         horvitz_thompson_estimated_population_audit_reference_cost: total.weighted_reference_cost,
         audit_cost_unit: cost_unit.unwrap_or_else(|| "unknown".to_owned()),
@@ -513,26 +603,54 @@ pub fn score_run(run_dir: &Path) -> Result<String, String> {
             0xa904_2d31_99c7_10ef,
             "Design-weighted fraction of eligible windows for which the policy requested a reference; independent of whether the evaluator reference later succeeded.",
         ),
-        severe_event_recall_on_evaluated_references: estimate(
-            Metric::SevereEventRecall,
+        policy_intervention_fraction: estimate(
+            Metric::InterventionFraction,
+            &groups,
+            &total,
+            0xe3b1_7a62_5c49_08df,
+            "Design-weighted fraction of eligible windows where policy action was not plain continue; includes conservative continuation, stop/abstain, and reference request.",
+        ),
+        severe_event_intervention_recall_on_evaluated_references: estimate(
+            Metric::SevereEventInterventionRecall,
             &groups,
             &total,
             0x17d3_5a2c_91b4_06ef,
-            "Design-weighted recall among successfully evaluated reference outcomes only; not a population recall estimate when any reference labels are missing.",
+            "Design-weighted recall of any intervention (conservative_continue, abstain_stop, or request_reference) among successfully evaluated severe outcomes; conditional if any reference labels are missing.",
         ),
-        false_alarm_rate_among_evaluated_nonsevere_windows: estimate(
-            Metric::FalseAlarmRate,
+        severe_event_reference_query_recall_on_evaluated_references: estimate(
+            Metric::SevereEventQueryRecall,
+            &groups,
+            &total,
+            0x7ce4_1b90_2d65_a83f,
+            "Design-weighted recall of explicit reference queries among successfully evaluated severe outcomes; conditional if any reference labels are missing.",
+        ),
+        false_intervention_rate_among_evaluated_nonsevere_windows: estimate(
+            Metric::FalseInterventionRate,
             &groups,
             &total,
             0x36c8_21af_73d9_450b,
-            "Design-weighted false-alarm rate among successfully evaluated non-severe windows only; conditional on observed reference labels.",
+            "Design-weighted fraction of successfully evaluated non-severe windows receiving any intervention; conditional on observed reference labels.",
         ),
-        known_label_false_alarm_burden_per_estimated_population_window: estimate(
-            Metric::FalseAlarmBurden,
+        false_reference_query_rate_among_evaluated_nonsevere_windows: estimate(
+            Metric::FalseQueryRate,
+            &groups,
+            &total,
+            0x11a8_2d74_c59e_630f,
+            "Design-weighted fraction of successfully evaluated non-severe windows receiving an explicit reference query; conditional on observed reference labels.",
+        ),
+        known_label_intervention_false_alarm_burden_per_estimated_population_window: estimate(
+            Metric::InterventionFalseAlarmBurden,
             &groups,
             &total,
             0xc0f1_25b8_794e_631d,
-            "Known-label false alarms divided by estimated eligible-window population. With missing reference labels this is a lower bound, not the total false-alarm burden.",
+            "Known non-severe windows receiving any intervention divided by estimated eligible-window population. With missing labels this is a lower bound on total intervention false-alarm burden.",
+        ),
+        known_label_reference_query_false_alarm_burden_per_estimated_population_window: estimate(
+            Metric::QueryFalseAlarmBurden,
+            &groups,
+            &total,
+            0x62ef_a137_9d45_80bc,
+            "Known non-severe windows receiving a reference query divided by estimated eligible-window population. With missing labels this is a lower bound on query false-alarm burden.",
         ),
         physical_integrity_failure_rate_on_evaluated_references: estimate(
             Metric::PhysicalIntegrityFailureRate,
