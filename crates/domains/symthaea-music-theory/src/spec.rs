@@ -818,7 +818,7 @@ mod tests {
 
     #[test]
     fn every_builtin_style_spec_validates() {
-        for style in Style::ALL {
+        for style in Style::ALL.iter().copied() {
             let spec = style.spec();
             assert_eq!(
                 spec.validate(),
