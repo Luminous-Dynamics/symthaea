@@ -387,6 +387,59 @@
       },
       "expected_decision": "prefer_buy_lower_annual_cost",
       "expected_break_even_class": "none"
+    },
+    {
+      "case_id": "MAKEBUY-UNQUALIFIED-NO-QUOTE",
+      "description": "The local process is unqualified and the only eligible supplier has no quote; do not turn eligibility into a costless purchase recommendation.",
+      "demand_good_units_per_year": 25,
+      "make": {
+        "qualification_status": "not_qualified",
+        "capex_upfront": 300,
+        "capital_life_years": 3,
+        "annual_discount_rate": 0.1,
+        "annual_fixed_costs": {
+          "maintenance": 20,
+          "site_support": 10,
+          "calibration_qualification": 0,
+          "training": 0,
+          "supplier_setup_or_tooling": 0
+        },
+        "variable_cost_per_attempt_components": {
+          "unit_material_or_quote": 2.5,
+          "direct_labor": 8,
+          "energy_consumables": 1,
+          "logistics": 0,
+          "variable_inspection": 0.5,
+          "expected_rework_scrap": 0
+        },
+        "yield_fraction": 0.9,
+        "evidence_status": "synthetic_complete"
+      },
+      "buy": {
+        "qualification_status": "qualified_for_profile",
+        "capex_upfront": 0,
+        "capital_life_years": 3,
+        "annual_discount_rate": 0.1,
+        "annual_fixed_costs": {
+          "maintenance": 0,
+          "site_support": 0,
+          "calibration_qualification": 0,
+          "training": 0,
+          "supplier_setup_or_tooling": 0
+        },
+        "variable_cost_per_attempt_components": {
+          "unit_material_or_quote": null,
+          "direct_labor": 0,
+          "energy_consumables": 0,
+          "logistics": 4,
+          "variable_inspection": 1,
+          "expected_rework_scrap": 1
+        },
+        "yield_fraction": 0.98,
+        "evidence_status": "missing_supplier_quote"
+      },
+      "expected_decision": "abstain_missing_cost_evidence",
+      "expected_break_even_class": "not_computable"
     }
   ]
 }
