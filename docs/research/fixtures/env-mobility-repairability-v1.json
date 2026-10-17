@@ -1,0 +1,670 @@
+{
+  "corpus_id": "env-mobility-repairability-v1",
+  "schema_version": "env-mobility-repair-case-v1",
+  "status": "synthetic_frozen_candidate",
+  "generated_on": "2026-10-17",
+  "source_class": "fully_synthetic_no_physical_measurements",
+  "claim_ceiling": "Fixture semantics only. No product has been repaired, manufactured, pressure-tested, electrically qualified, calibrated, or released by this corpus.",
+  "disposition_vocabulary": [
+    "release_to_acceptance",
+    "hold_for_retest",
+    "quarantine",
+    "redesign_for_serviceability",
+    "not_locally_reproducible",
+    "hold_for_evidence"
+  ],
+  "rule_order": [
+    "Quarantine known failed component qualification; unapproved substitutions; failed post-repair/calibration checks; unresolved recurring faults; unknown history for safety-relevant or pressure-boundary parts; and unqualified battery or pressure-boundary fabrication.",
+    "If a routine field-replaceable part requires destructive access, return redesign_for_serviceability unless a higher-priority quarantine condition exists.",
+    "Return not_locally_reproducible when local_fabrication is requested but preferred editable source files are unavailable; this is a manufacturing-closure result, not a blanket judgement that a commercially supplied qualified part is unsafe.",
+    "Hold for retest when required configuration records are stale or required post-repair checks are incomplete; hold for evidence when substitution/compatibility status is unknown.",
+    "Return release_to_acceptance only when all declared gates are satisfied. This is not a product release or qualification."
+  ],
+  "independent_verifier_requirement": "Future verifier must derive its answer from facts without importing production decision code or trusting expected labels.",
+  "cases": [
+    {
+      "case_id": "ENV-MFG-AA-01",
+      "component_family": "airframe_arm",
+      "criticality_profile": "routine_replaceable",
+      "scenario": "approved_arm_swap_checks_complete",
+      "facts": {
+        "intent": "repair",
+        "source_format": "editable",
+        "bom_status": "exact",
+        "component_qualification": "qualified_for_profile",
+        "article_history": "known",
+        "repair_access": "non_destructive",
+        "routine_tools": "within_profile",
+        "post_repair_check": "complete",
+        "calibration": "current",
+        "configuration_record": "updated_exact",
+        "fault_history": "resolved"
+      },
+      "expected_disposition": "release_to_acceptance",
+      "expected_reason_codes": [
+        "ALL_DECLARED_REPAIR_GATES_SATISFIED"
+      ]
+    },
+    {
+      "case_id": "ENV-MFG-AA-02",
+      "component_family": "airframe_arm",
+      "criticality_profile": "routine_replaceable",
+      "scenario": "arm_replaced_but_configuration_not_updated",
+      "facts": {
+        "intent": "repair",
+        "source_format": "editable",
+        "bom_status": "exact",
+        "component_qualification": "qualified_for_profile",
+        "article_history": "known",
+        "repair_access": "non_destructive",
+        "routine_tools": "within_profile",
+        "post_repair_check": "complete",
+        "calibration": "current",
+        "configuration_record": "stale",
+        "fault_history": "resolved"
+      },
+      "expected_disposition": "hold_for_retest",
+      "expected_reason_codes": [
+        "CONFIGURATION_RECORD_STALE"
+      ]
+    },
+    {
+      "case_id": "ENV-MFG-AA-03",
+      "component_family": "airframe_arm",
+      "criticality_profile": "routine_replaceable",
+      "scenario": "unapproved_material_substitution",
+      "facts": {
+        "intent": "repair",
+        "source_format": "editable",
+        "bom_status": "unapproved_substitution",
+        "component_qualification": "qualified_for_profile",
+        "article_history": "known",
+        "repair_access": "non_destructive",
+        "routine_tools": "within_profile",
+        "post_repair_check": "complete",
+        "calibration": "current",
+        "configuration_record": "updated_exact",
+        "fault_history": "resolved"
+      },
+      "expected_disposition": "quarantine",
+      "expected_reason_codes": [
+        "UNAPPROVED_SUBSTITUTION"
+      ]
+    },
+    {
+      "case_id": "ENV-MFG-AA-04",
+      "component_family": "airframe_arm",
+      "criticality_profile": "routine_replaceable",
+      "scenario": "routine_arm_cannot_be_removed_without_destructive_disassembly",
+      "facts": {
+        "intent": "repair",
+        "source_format": "editable",
+        "bom_status": "exact",
+        "component_qualification": "qualified_for_profile",
+        "article_history": "known",
+        "repair_access": "destructive",
+        "routine_tools": "within_profile",
+        "post_repair_check": "complete",
+        "calibration": "current",
+        "configuration_record": "updated_exact",
+        "fault_history": "resolved"
+      },
+      "expected_disposition": "redesign_for_serviceability",
+      "expected_reason_codes": [
+        "ROUTINE_REPAIR_REQUIRES_DESTRUCTIVE_ACCESS"
+      ]
+    },
+    {
+      "case_id": "ENV-MFG-PM-01",
+      "component_family": "propulsion_module",
+      "criticality_profile": "safety_relevant",
+      "scenario": "qualified_motor_module_replacement",
+      "facts": {
+        "intent": "repair",
+        "source_format": "editable",
+        "bom_status": "exact",
+        "component_qualification": "qualified_for_profile",
+        "article_history": "known",
+        "repair_access": "non_destructive",
+        "routine_tools": "within_profile",
+        "post_repair_check": "complete",
+        "calibration": "current",
+        "configuration_record": "updated_exact",
+        "fault_history": "resolved"
+      },
+      "expected_disposition": "release_to_acceptance",
+      "expected_reason_codes": [
+        "ALL_DECLARED_REPAIR_GATES_SATISFIED"
+      ]
+    },
+    {
+      "case_id": "ENV-MFG-PM-02",
+      "component_family": "propulsion_module",
+      "criticality_profile": "safety_relevant",
+      "scenario": "motor_mapping_and_thrust_check_missing",
+      "facts": {
+        "intent": "repair",
+        "source_format": "editable",
+        "bom_status": "exact",
+        "component_qualification": "qualified_for_profile",
+        "article_history": "known",
+        "repair_access": "non_destructive",
+        "routine_tools": "within_profile",
+        "post_repair_check": "missing",
+        "calibration": "current",
+        "configuration_record": "updated_exact",
+        "fault_history": "resolved"
+      },
+      "expected_disposition": "hold_for_retest",
+      "expected_reason_codes": [
+        "POST_REPAIR_CHECK_INCOMPLETE"
+      ]
+    },
+    {
+      "case_id": "ENV-MFG-PM-03",
+      "component_family": "propulsion_module",
+      "criticality_profile": "safety_relevant",
+      "scenario": "unknown_propulsion_part_history",
+      "facts": {
+        "intent": "repair",
+        "source_format": "editable",
+        "bom_status": "exact",
+        "component_qualification": "qualified_for_profile",
+        "article_history": "unknown",
+        "repair_access": "non_destructive",
+        "routine_tools": "within_profile",
+        "post_repair_check": "complete",
+        "calibration": "current",
+        "configuration_record": "updated_exact",
+        "fault_history": "resolved"
+      },
+      "expected_disposition": "quarantine",
+      "expected_reason_codes": [
+        "SAFETY_RELEVANT_HISTORY_UNKNOWN"
+      ]
+    },
+    {
+      "case_id": "ENV-MFG-PM-04",
+      "component_family": "propulsion_module",
+      "criticality_profile": "safety_relevant",
+      "scenario": "replacement_module_not_qualified_for_profile",
+      "facts": {
+        "intent": "repair",
+        "source_format": "editable",
+        "bom_status": "exact",
+        "component_qualification": "failed",
+        "article_history": "known",
+        "repair_access": "non_destructive",
+        "routine_tools": "within_profile",
+        "post_repair_check": "complete",
+        "calibration": "current",
+        "configuration_record": "updated_exact",
+        "fault_history": "resolved"
+      },
+      "expected_disposition": "quarantine",
+      "expected_reason_codes": [
+        "COMPONENT_QUALIFICATION_FAILED"
+      ]
+    },
+    {
+      "case_id": "ENV-MFG-WH-01",
+      "component_family": "wiring_harness",
+      "criticality_profile": "electrical_interface",
+      "scenario": "approved_harness_revision_and_polarity_checks_complete",
+      "facts": {
+        "intent": "repair",
+        "source_format": "editable",
+        "bom_status": "exact",
+        "component_qualification": "qualified_for_profile",
+        "article_history": "known",
+        "repair_access": "non_destructive",
+        "routine_tools": "within_profile",
+        "post_repair_check": "complete",
+        "calibration": "current",
+        "configuration_record": "updated_exact",
+        "fault_history": "resolved"
+      },
+      "expected_disposition": "release_to_acceptance",
+      "expected_reason_codes": [
+        "ALL_DECLARED_REPAIR_GATES_SATISFIED"
+      ]
+    },
+    {
+      "case_id": "ENV-MFG-WH-02",
+      "component_family": "wiring_harness",
+      "criticality_profile": "electrical_interface",
+      "scenario": "connector_replaced_but_continuity_test_missing",
+      "facts": {
+        "intent": "repair",
+        "source_format": "editable",
+        "bom_status": "exact",
+        "component_qualification": "qualified_for_profile",
+        "article_history": "known",
+        "repair_access": "non_destructive",
+        "routine_tools": "within_profile",
+        "post_repair_check": "missing",
+        "calibration": "current",
+        "configuration_record": "updated_exact",
+        "fault_history": "resolved"
+      },
+      "expected_disposition": "hold_for_retest",
+      "expected_reason_codes": [
+        "POST_REPAIR_CHECK_INCOMPLETE"
+      ]
+    },
+    {
+      "case_id": "ENV-MFG-WH-03",
+      "component_family": "wiring_harness",
+      "criticality_profile": "electrical_interface",
+      "scenario": "connector_shell_matches_but_pinout_is_unapproved",
+      "facts": {
+        "intent": "repair",
+        "source_format": "editable",
+        "bom_status": "unapproved_substitution",
+        "component_qualification": "qualified_for_profile",
+        "article_history": "known",
+        "repair_access": "non_destructive",
+        "routine_tools": "within_profile",
+        "post_repair_check": "complete",
+        "calibration": "current",
+        "configuration_record": "updated_exact",
+        "fault_history": "resolved"
+      },
+      "expected_disposition": "quarantine",
+      "expected_reason_codes": [
+        "UNAPPROVED_SUBSTITUTION"
+      ]
+    },
+    {
+      "case_id": "ENV-MFG-WH-04",
+      "component_family": "wiring_harness",
+      "criticality_profile": "electrical_interface",
+      "scenario": "local_harness_replication_only_has_intermediate_files",
+      "facts": {
+        "intent": "local_fabrication",
+        "source_format": "intermediate_only",
+        "bom_status": "exact",
+        "component_qualification": "qualified_for_profile",
+        "article_history": "known",
+        "repair_access": "non_destructive",
+        "routine_tools": "within_profile",
+        "post_repair_check": "complete",
+        "calibration": "current",
+        "configuration_record": "updated_exact",
+        "fault_history": "resolved"
+      },
+      "expected_disposition": "not_locally_reproducible",
+      "expected_reason_codes": [
+        "PREFERRED_EDITABLE_SOURCE_UNAVAILABLE"
+      ]
+    },
+    {
+      "case_id": "ENV-MFG-SP-01",
+      "component_family": "sensor_payload",
+      "criticality_profile": "measurement_critical",
+      "scenario": "payload_reinstalled_with_current_calibration",
+      "facts": {
+        "intent": "repair",
+        "source_format": "editable",
+        "bom_status": "exact",
+        "component_qualification": "qualified_for_profile",
+        "article_history": "known",
+        "repair_access": "non_destructive",
+        "routine_tools": "within_profile",
+        "post_repair_check": "complete",
+        "calibration": "current",
+        "configuration_record": "updated_exact",
+        "fault_history": "resolved"
+      },
+      "expected_disposition": "release_to_acceptance",
+      "expected_reason_codes": [
+        "ALL_DECLARED_REPAIR_GATES_SATISFIED"
+      ]
+    },
+    {
+      "case_id": "ENV-MFG-SP-02",
+      "component_family": "sensor_payload",
+      "criticality_profile": "measurement_critical",
+      "scenario": "payload_mount_changed_old_transform_retained",
+      "facts": {
+        "intent": "repair",
+        "source_format": "editable",
+        "bom_status": "exact",
+        "component_qualification": "qualified_for_profile",
+        "article_history": "known",
+        "repair_access": "non_destructive",
+        "routine_tools": "within_profile",
+        "post_repair_check": "complete",
+        "calibration": "current",
+        "configuration_record": "stale",
+        "fault_history": "resolved"
+      },
+      "expected_disposition": "hold_for_retest",
+      "expected_reason_codes": [
+        "CONFIGURATION_RECORD_STALE"
+      ]
+    },
+    {
+      "case_id": "ENV-MFG-SP-03",
+      "component_family": "sensor_payload",
+      "criticality_profile": "measurement_critical",
+      "scenario": "calibration_failed_after_repair",
+      "facts": {
+        "intent": "repair",
+        "source_format": "editable",
+        "bom_status": "exact",
+        "component_qualification": "qualified_for_profile",
+        "article_history": "known",
+        "repair_access": "non_destructive",
+        "routine_tools": "within_profile",
+        "post_repair_check": "complete",
+        "calibration": "failed",
+        "configuration_record": "updated_exact",
+        "fault_history": "resolved"
+      },
+      "expected_disposition": "quarantine",
+      "expected_reason_codes": [
+        "CALIBRATION_CHECK_FAILED"
+      ]
+    },
+    {
+      "case_id": "ENV-MFG-SP-04",
+      "component_family": "sensor_payload",
+      "criticality_profile": "measurement_critical",
+      "scenario": "routine_payload_service_requires_destructive_potting_removal",
+      "facts": {
+        "intent": "repair",
+        "source_format": "editable",
+        "bom_status": "exact",
+        "component_qualification": "qualified_for_profile",
+        "article_history": "known",
+        "repair_access": "destructive",
+        "routine_tools": "within_profile",
+        "post_repair_check": "complete",
+        "calibration": "current",
+        "configuration_record": "updated_exact",
+        "fault_history": "resolved"
+      },
+      "expected_disposition": "redesign_for_serviceability",
+      "expected_reason_codes": [
+        "ROUTINE_REPAIR_REQUIRES_DESTRUCTIVE_ACCESS"
+      ]
+    },
+    {
+      "case_id": "ENV-MFG-SV-01",
+      "component_family": "surface_vessel_module",
+      "criticality_profile": "environment_exposed",
+      "scenario": "thruster_cartridge_replaced_and_sealed_interface_checked",
+      "facts": {
+        "intent": "repair",
+        "source_format": "editable",
+        "bom_status": "exact",
+        "component_qualification": "qualified_for_profile",
+        "article_history": "known",
+        "repair_access": "non_destructive",
+        "routine_tools": "within_profile",
+        "post_repair_check": "complete",
+        "calibration": "current",
+        "configuration_record": "updated_exact",
+        "fault_history": "resolved"
+      },
+      "expected_disposition": "release_to_acceptance",
+      "expected_reason_codes": [
+        "ALL_DECLARED_REPAIR_GATES_SATISFIED"
+      ]
+    },
+    {
+      "case_id": "ENV-MFG-SV-02",
+      "component_family": "surface_vessel_module",
+      "criticality_profile": "environment_exposed",
+      "scenario": "seal_changed_but_ingress_check_missing",
+      "facts": {
+        "intent": "repair",
+        "source_format": "editable",
+        "bom_status": "exact",
+        "component_qualification": "qualified_for_profile",
+        "article_history": "known",
+        "repair_access": "non_destructive",
+        "routine_tools": "within_profile",
+        "post_repair_check": "missing",
+        "calibration": "current",
+        "configuration_record": "updated_exact",
+        "fault_history": "resolved"
+      },
+      "expected_disposition": "hold_for_retest",
+      "expected_reason_codes": [
+        "POST_REPAIR_CHECK_INCOMPLETE"
+      ]
+    },
+    {
+      "case_id": "ENV-MFG-SV-03",
+      "component_family": "surface_vessel_module",
+      "criticality_profile": "environment_exposed",
+      "scenario": "water_ingress_repeats_after_prior_repair",
+      "facts": {
+        "intent": "repair",
+        "source_format": "editable",
+        "bom_status": "exact",
+        "component_qualification": "qualified_for_profile",
+        "article_history": "known",
+        "repair_access": "non_destructive",
+        "routine_tools": "within_profile",
+        "post_repair_check": "complete",
+        "calibration": "current",
+        "configuration_record": "updated_exact",
+        "fault_history": "recurring_unresolved"
+      },
+      "expected_disposition": "quarantine",
+      "expected_reason_codes": [
+        "RECURRING_UNRESOLVED_FAULT"
+      ]
+    },
+    {
+      "case_id": "ENV-MFG-SV-04",
+      "component_family": "surface_vessel_module",
+      "criticality_profile": "environment_exposed",
+      "scenario": "module_part_number_known_but_approved_substitution_unknown",
+      "facts": {
+        "intent": "repair",
+        "source_format": "editable",
+        "bom_status": "unknown",
+        "component_qualification": "qualified_for_profile",
+        "article_history": "known",
+        "repair_access": "non_destructive",
+        "routine_tools": "within_profile",
+        "post_repair_check": "complete",
+        "calibration": "current",
+        "configuration_record": "updated_exact",
+        "fault_history": "resolved"
+      },
+      "expected_disposition": "hold_for_evidence",
+      "expected_reason_codes": [
+        "SUBSTITUTION_STATUS_UNKNOWN"
+      ]
+    },
+    {
+      "case_id": "ENV-MFG-UP-01",
+      "component_family": "underwater_pressure_interface",
+      "criticality_profile": "pressure_boundary",
+      "scenario": "rated_interface_reinstalled_after_required_inspection",
+      "facts": {
+        "intent": "repair",
+        "source_format": "editable",
+        "bom_status": "exact",
+        "component_qualification": "qualified_for_profile",
+        "article_history": "known",
+        "repair_access": "non_destructive",
+        "routine_tools": "within_profile",
+        "post_repair_check": "complete",
+        "calibration": "current",
+        "configuration_record": "updated_exact",
+        "fault_history": "resolved"
+      },
+      "expected_disposition": "release_to_acceptance",
+      "expected_reason_codes": [
+        "ALL_DECLARED_REPAIR_GATES_SATISFIED"
+      ]
+    },
+    {
+      "case_id": "ENV-MFG-UP-02",
+      "component_family": "underwater_pressure_interface",
+      "criticality_profile": "pressure_boundary",
+      "scenario": "rated_interface_test_evidence_is_stale",
+      "facts": {
+        "intent": "repair",
+        "source_format": "editable",
+        "bom_status": "exact",
+        "component_qualification": "qualified_for_profile",
+        "article_history": "known",
+        "repair_access": "non_destructive",
+        "routine_tools": "within_profile",
+        "post_repair_check": "missing",
+        "calibration": "current",
+        "configuration_record": "updated_exact",
+        "fault_history": "resolved"
+      },
+      "expected_disposition": "hold_for_retest",
+      "expected_reason_codes": [
+        "POST_REPAIR_CHECK_INCOMPLETE"
+      ]
+    },
+    {
+      "case_id": "ENV-MFG-UP-03",
+      "component_family": "underwater_pressure_interface",
+      "criticality_profile": "pressure_boundary",
+      "scenario": "pressure_boundary_has_unknown_history",
+      "facts": {
+        "intent": "repair",
+        "source_format": "editable",
+        "bom_status": "exact",
+        "component_qualification": "qualified_for_profile",
+        "article_history": "unknown",
+        "repair_access": "non_destructive",
+        "routine_tools": "within_profile",
+        "post_repair_check": "complete",
+        "calibration": "current",
+        "configuration_record": "updated_exact",
+        "fault_history": "resolved"
+      },
+      "expected_disposition": "quarantine",
+      "expected_reason_codes": [
+        "PRESSURE_BOUNDARY_HISTORY_UNKNOWN"
+      ]
+    },
+    {
+      "case_id": "ENV-MFG-UP-04",
+      "component_family": "underwater_pressure_interface",
+      "criticality_profile": "pressure_boundary",
+      "scenario": "pressure_part_requested_for_local_fabrication_without_qualified_process",
+      "facts": {
+        "intent": "local_fabrication",
+        "source_format": "editable",
+        "bom_status": "exact",
+        "component_qualification": "bench_only",
+        "article_history": "known",
+        "repair_access": "non_destructive",
+        "routine_tools": "within_profile",
+        "post_repair_check": "complete",
+        "calibration": "current",
+        "configuration_record": "updated_exact",
+        "fault_history": "resolved"
+      },
+      "expected_disposition": "quarantine",
+      "expected_reason_codes": [
+        "PRESSURE_BOUNDARY_NOT_QUALIFIED_FOR_PROFILE"
+      ]
+    },
+    {
+      "case_id": "ENV-MFG-BM-01",
+      "component_family": "battery_module",
+      "criticality_profile": "energy_storage_safety_relevant",
+      "scenario": "approved_battery_module_identity_and_checks_complete",
+      "facts": {
+        "intent": "repair",
+        "source_format": "editable",
+        "bom_status": "exact",
+        "component_qualification": "qualified_for_profile",
+        "article_history": "known",
+        "repair_access": "non_destructive",
+        "routine_tools": "within_profile",
+        "post_repair_check": "complete",
+        "calibration": "current",
+        "configuration_record": "updated_exact",
+        "fault_history": "resolved"
+      },
+      "expected_disposition": "release_to_acceptance",
+      "expected_reason_codes": [
+        "ALL_DECLARED_REPAIR_GATES_SATISFIED"
+      ]
+    },
+    {
+      "case_id": "ENV-MFG-BM-02",
+      "component_family": "battery_module",
+      "criticality_profile": "energy_storage_safety_relevant",
+      "scenario": "replacement_installed_but_firmware_energy_profile_stale",
+      "facts": {
+        "intent": "repair",
+        "source_format": "editable",
+        "bom_status": "exact",
+        "component_qualification": "qualified_for_profile",
+        "article_history": "known",
+        "repair_access": "non_destructive",
+        "routine_tools": "within_profile",
+        "post_repair_check": "complete",
+        "calibration": "current",
+        "configuration_record": "stale",
+        "fault_history": "resolved"
+      },
+      "expected_disposition": "hold_for_retest",
+      "expected_reason_codes": [
+        "CONFIGURATION_RECORD_STALE"
+      ]
+    },
+    {
+      "case_id": "ENV-MFG-BM-03",
+      "component_family": "battery_module",
+      "criticality_profile": "energy_storage_safety_relevant",
+      "scenario": "battery_module_failed_protection_check",
+      "facts": {
+        "intent": "repair",
+        "source_format": "editable",
+        "bom_status": "exact",
+        "component_qualification": "failed",
+        "article_history": "known",
+        "repair_access": "non_destructive",
+        "routine_tools": "within_profile",
+        "post_repair_check": "complete",
+        "calibration": "current",
+        "configuration_record": "updated_exact",
+        "fault_history": "resolved"
+      },
+      "expected_disposition": "quarantine",
+      "expected_reason_codes": [
+        "COMPONENT_QUALIFICATION_FAILED"
+      ]
+    },
+    {
+      "case_id": "ENV-MFG-BM-04",
+      "component_family": "battery_module",
+      "criticality_profile": "energy_storage_safety_relevant",
+      "scenario": "locally_rebuilt_module_lacks_approved_source_and_qualified_process",
+      "facts": {
+        "intent": "local_fabrication",
+        "source_format": "missing",
+        "bom_status": "exact",
+        "component_qualification": "unknown",
+        "article_history": "known",
+        "repair_access": "non_destructive",
+        "routine_tools": "within_profile",
+        "post_repair_check": "complete",
+        "calibration": "current",
+        "configuration_record": "updated_exact",
+        "fault_history": "resolved"
+      },
+      "expected_disposition": "quarantine",
+      "expected_reason_codes": [
+        "BATTERY_ASSEMBLY_NOT_QUALIFIED"
+      ]
+    }
+  ]
+}
