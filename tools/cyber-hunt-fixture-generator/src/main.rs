@@ -15,7 +15,7 @@ const MIN_RECORDS: usize = 64;
 const MAX_RECORDS: usize = 250_000;
 const BASE_TIME_MS: i64 = 1_800_000_000_000;
 const ATTACK_EVENT_COUNT: usize = 9;
-const BENIGN_DECOY_COUNT: usize = 6;
+const BENIGN_DECOY_COUNT: usize = 7;
 const PLANTED_EVENT_COUNT: usize = ATTACK_EVENT_COUNT + BENIGN_DECOY_COUNT;
 const SYNTHETIC_PRINCIPALS: [&str; 12] = [
     "a.chen", "j.smith", "m.patel", "it.admin", "svc-report", "svc-backup",
@@ -330,6 +330,22 @@ fn generate_dataset(record_count: usize, seed: u64) -> Result<Dataset, String> {
     decoy_ids.push(push_event(&mut events, &mut rng, &mut used_ids, decoy_base + 200_000, "host-025", "svc-backup",
         "file_audit", "file_write", "completed",
         details(&[("file_path", "D:\\Backups\\weekly-archive.zip"), ("file_bytes", "1761280"), ("operation", "create"), ("job_id", "BKP-2201")])));
+
+    // Counterexample for the planted network_transfer: same event type, outcome,
+    // process, and byte count, but an approved backup endpoint and benign job lineage.
+    let benign_backup_session = format!("sid-{:016x}", rng.next_u64());
+    decoy_ids.push(push_event(&mut events, &mut rng, &mut used_ids, decoy_base + 220_000, "host-025", "svc-backup",
+        "proxy_gateway", "network_transfer", "allowed",
+        details(&[
+            ("destination_address", "192.0.2.40"),
+            ("destination_domain", "backup.example.invalid"),
+            ("destination_port", "443"),
+            ("process_image", "tar.exe"),
+            ("session_id", &benign_backup_session),
+            ("bytes_out", "1761280"),
+            ("transfer_profile", "approved_backup_endpoint"),
+            ("job_id", "BKP-2201")
+        ])));
 
     if events.len() != record_count || attack_ids.len() != ATTACK_EVENT_COUNT || decoy_ids.len() != BENIGN_DECOY_COUNT {
         return Err("internal fixture construction count mismatch".to_string());
@@ -1567,6 +1583,37 @@ mod tests {
             .count();
         assert!(source_time_inversions > 0,
             "the fixture must include out-of-order source times after ingestion-time sorting");
+    }
+
+    #[test]
+    fn every_planted_event_type_has_a_benign_counterexample_in_its_family() {
+        let families = [
+            CampaignFamily::IdentityToEgress,
+            CampaignFamily::ArtifactProvenance,
+            CampaignFamily::CloudDataMovement,
+        ];
+        for family in families {
+            let dataset = generate_dataset_for_family(1_000, 2026, family)
+                .expect("family should generate");
+            let events: Vec<EventRecord> = std::str::from_utf8(&dataset.event_store)
+                .expect("event store should be UTF-8")
+                .lines()
+                .map(|line| serde_json::from_str(line).expect("event should deserialize"))
+                .collect();
+            let positive_ids: BTreeSet<String> = dataset.truth.labels.iter()
+                .filter(|label| label.label == "positive")
+                .map(|label| label.event_id.clone())
+                .collect();
+            let planted_types: BTreeSet<&str> = events.iter()
+                .filter(|event| positive_ids.contains(&event.event_id))
+                .map(|event| event.event_type.as_str())
+                .collect();
+            for event_type in planted_types {
+                assert!(events.iter().any(|event|
+                    event.event_type == event_type && !positive_ids.contains(&event.event_id)
+                ), "family {:?} must include a benign lookalike for event type {event_type}", family);
+            }
+        }
     }
 
     #[test]
