@@ -81,7 +81,13 @@ For each candidate, the software evaluates all declared metric directions. Candi
 - Invalid IDs, duplicate candidates, non-finite values, invalid normalized scores, inconsistent mass distributions and inconsistent whole-system mass prevent ranking.
 - The report echoes the declared evidence level; it never converts synthetic or simulation output into bench/human evidence.
 
-## 6. Proposed benchmark gates
+## 6. Reference implementation status
+
+Draft [PR #7882](https://github.com/Luminous-Dynamics/symthaea/pull/7882) adds a report-only Rust evaluator in `symthaea-core::architecture_pareto`. It validates mass denominators/distribution, rejects missing required numeric fields, reports each candidate's Pareto status and dominators, and has no scalar aggregate score. The v1 synthetic fixture has five illustrative candidates: four deliberately non-dominated architectures with different trade-offs and one dominated overbuilt candidate.
+
+Ten unit tests and three public-API integration tests are authored. They have **not been executed** in this environment; test counts are not passes. The fixture is synthetic, not a measurement campaign or product recommendation.
+
+## 7. Proposed benchmark gates
 
 These are software/research gates, not hardware or clinical standards.
 
@@ -96,7 +102,7 @@ These are software/research gates, not hardware or clinical standards.
 
 For the starter corpus, candidate values are deliberately illustrative. They must not be copied as engineering targets or treated as measured properties of any real product.
 
-## 7. Execution sequence
+## 8. Execution sequence
 
 1. Review the metric directions and operating-condition schema.
 2. Validate the strict JSON fixture and the deterministic Rust Pareto evaluator.
@@ -105,6 +111,6 @@ For the starter corpus, candidate values are deliberately illustrative. They mus
 5. Evaluate physical designs only after independent mass, electrical-energy, interface and task-outcome measurements are available with calibration and uncertainty records.
 6. Keep human-use and clinical outcomes separate and pursue them only under appropriate ethics, privacy and regulatory processes.
 
-## 8. Non-claims
+## 9. Non-claims
 
 This protocol does not establish that a passive, soft, rigid, remote-actuation or hybrid architecture is universally superior. It does not claim that synthetic mass/energy values are representative of real devices, and it does not validate torque, pressure, braking, emergency release or human-carrying flight. The goal is a reproducible method that makes trade-offs and missing evidence visible rather than producing a deceptively simple score.
