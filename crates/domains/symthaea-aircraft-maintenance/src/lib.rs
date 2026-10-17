@@ -1297,14 +1297,27 @@ fn document_is_current(source: &ControlledDocumentRef, current: &[CurrentDocumen
 fn valid_document_shape(source: &ControlledDocumentRef) -> bool {
     !source.document_id.trim().is_empty()
         && !source.revision.trim().is_empty()
-        && !source.source_section.trim().is_empty()
+        && !source.source_sections.is_empty()
+        && source.source_sections.iter().all(|section| {
+            !section.trim().is_empty() && section.trim() == section
+        })
+        && source.source_sections.iter().collect::<BTreeSet<_>>().len()
+            == source.source_sections.len()
         && is_sha256_digest(&source.sha256)
 }
 
 fn validate_document(field: &str, source: &ControlledDocumentRef, errors: &mut Vec<TaskCardError>) {
     nonempty(&format!("{field}.document_id"), &source.document_id, errors);
     nonempty(&format!("{field}.revision"), &source.revision, errors);
-    nonempty(&format!("{field}.source_section"), &source.source_section, errors);
+    if source.source_sections.is_empty() {
+        errors.push(TaskCardError::EmptyField {
+            field: format!("{field}.source_sections"),
+        });
+    }
+    for (index, section) in source.source_sections.iter().enumerate() {
+        nonempty(&format!("{field}.source_sections[{index}]"), section, errors);
+    }
+    unique_strings(&format!("{field}.source_sections"), &source.source_sections, errors);
     digest(&format!("{field}.sha256"), &source.sha256, errors);
 }
 
@@ -1391,14 +1404,20 @@ mod tests {
             document_id: id.into(),
             revision: revision.into(),
             sha256: digest(c),
-            source_section: "synthetic-fixture-only".into(),
+            source_sections: vec!["synthetic-fixture-only".into()],
         }
     }
 
     fn card() -> MaintenanceTaskCard {
-        let manual = doc("manual-main", "rev-1", 'a');
+        let mut manual = doc("manual-main", "rev-1", 'a');
+        manual.source_sections = vec![
+            "synthetic-section-1".into(),
+            "synthetic-section-2".into(),
+            "synthetic-human-check".into(),
+        ];
         let permission = doc("rule-1", "rev-1", 'b');
-        let supporting = doc("test-data", "rev-1", 'c');
+        let mut supporting = doc("test-data", "rev-1", 'c');
+        supporting.source_sections = vec!["synthetic-criterion".into()];
         MaintenanceTaskCard {
             schema_version: TASK_CARD_SCHEMA_VERSION,
             card_sha256: digest('8'),
