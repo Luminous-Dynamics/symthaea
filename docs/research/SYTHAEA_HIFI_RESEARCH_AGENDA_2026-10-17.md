@@ -37,7 +37,7 @@ Spinorama documents workflows that compute angular-response plots and preference
 
 ### Distortion needs a perceptual interpretation
 
-RTINGS' March 2026 distortion discussion distinguishes linear response deviation from level-dependent nonlinear distortion and describes the open methodological question of how to relate transducer distortion measurements to human detectability and preference. It also notes that perceptual metrics developed for electrical signals cannot automatically be assumed to predict degradations caused by electroacoustic transducers. Source: [Distortion, Audibility, and Preferences](https://www.rtings.com/headphones/learn/research/distortion-audibility).
+RTINGS' March 19, 2026 follow-up reports controlled headphone-distortion listening tests: for the tested models and conditions, thresholds were observed at 104–112 dBA SPL, and most listeners did not reliably discriminate isolated distortion in ABX tests using recordings standardized at 94 dBA SPL. The work covered six headphones, with 13 participants in threshold tests and nine in the similarity/ABX study; these are useful findings, not a universal audibility law. Source: [The Surprising Truth About Headphone Distortion](https://www.rtings.com/headphones/learn/research/distortion-audibility-listening-tests).
 
 **Implication:** quantify distortion physically, then test detection and preference separately. Don't assume a lower THD number is always audible or preferred, and don't substitute a score developed for electronic signal paths for a transducer-specific validation.
 
@@ -65,6 +65,8 @@ Compare the simplest baseline, known published predictors and any Symthaea model
 **Question:** Can we predict a range of valid preferences for different listeners, uses and content instead of forcing one target?
 
 Model listener, device, music excerpt and context as distinct effects. Separate the population-average prediction from uncertainty and potential listener-specific adaptations. Collect preferences for controlled EQ/profile alternatives with randomization, safe levels and counterbalanced order.
+
+There is evidence worth testing rather than treating as a universal law: an AES 2025 method-of-adjustment study of 36 mostly trained listeners found four preference segments in bass/treble adjustment across three music tracks. The segment ranges were broad enough to motivate controlled low-dimensional profile adaptation, but the cohort and stimuli were limited. Source: [The Preferred In-Ear Headphone Target Curve Based on Method of Adjustments](https://aes.org/publications/elibrary/elibrary-page/?id=22928).
 
 Candidate outcomes include preference probability, pairwise choice and expected utility with uncertainty. Personalization is only useful if it improves predictions for a held-out listener after a small amount of preference input. We should compare that against a static target and a transparent user-controlled bass/treble profile.
 
@@ -207,6 +209,8 @@ Symthaea can suggest experiments and profiles. Human study governance, hardware 
 - RTINGS, [One Curve Doesn't Fit All: 350 Headphone Listening Tests Show That Many Sound Profiles Can Be Preferred](https://www.rtings.com/headphones/learn/research/frequency-response-1-8), updated 2026-03-19.
 - Olive & Clark, AES, [A Preferred Headphone Target Curve Defined for the B&K 5128 and GRAS45CA-10 Test Fixtures](https://aes.org/publications/elibrary/elibrary-page/?id=23068), 2025.
 - RTINGS, [Distortion, Audibility, and Preferences: What We Know, and What's Missing](https://www.rtings.com/headphones/learn/research/distortion-audibility), updated 2026-03-19.
+- RTINGS, [The Surprising Truth About Headphone Distortion: Most Of It Is Inaudible](https://www.rtings.com/headphones/learn/research/distortion-audibility-listening-tests), updated 2026-03-19.
+- Olive, AES, [The Preferred In-Ear Headphone Target Curve Based on Method of Adjustments](https://aes.org/publications/elibrary/elibrary-page/?id=22928), 2025.
 - Olive, AES, [A Multiple Regression Model for Predicting Loudspeaker Preference Using Objective Measurements: Part II](https://aes.org/publications/elibrary/elibrary-page/?id=12847), 2004.
 - Spinorama, [Computing a spinorama from your own measurements](https://www.spinorama.org/docs/08_compute_spin.html), updated 2026-04.
 - ITU-R, [BS.1116 — small audio impairments](https://www.itu.int/rec/R-REC-BS.1116).
