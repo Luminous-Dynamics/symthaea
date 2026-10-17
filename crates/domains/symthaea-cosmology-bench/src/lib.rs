@@ -109,6 +109,13 @@ impl fmt::Display for ChainAuditError {
 
 impl std::error::Error for ChainAuditError {}
 
+/// Return the lowercase SHA-256 hex digest of the exact bytes supplied.
+pub fn sha256_bytes(bytes: &[u8]) -> String {
+    let mut hasher = Sha256::new();
+    hasher.update(bytes);
+    format!("{:x}", hasher.finalize())
+}
+
 /// Stream a file and return its lowercase SHA-256 hex digest.
 pub fn sha256_file(path: impl AsRef<Path>) -> Result<String, ChainAuditError> {
     let file = File::open(path.as_ref())
@@ -495,6 +502,14 @@ mod tests {
 1 -10 67 0.30\n\
 1 -11 68 0.31\n\
 2 -12 69 0.32\n";
+
+    #[test]
+    fn sha256_bytes_matches_the_published_known_vector() {
+        assert_eq!(
+            sha256_bytes(b"abc"),
+            "ba7816bf8f01cfea414140de5dae2223b00361a396177a9cb410ff61f20015ad"
+        );
+    }
 
     #[test]
     fn sha256_verifier_matches_known_vector_and_rejects_mutation() {
