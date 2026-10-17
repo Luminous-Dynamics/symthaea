@@ -35,6 +35,7 @@ fn demo_scenario() -> ScenarioProfile {
         available_turning_radius_cm: 150,
         site_roughness_mm: 40,
         gnss_available: true,
+        currency_code: "ZAR".into(),
         // Deliberately demonstrates that "no robot" remains eligible.
         max_upfront_budget_cents: 0,
         max_annualized_cost_cents: 500_000,
@@ -59,6 +60,7 @@ fn candidate(id: &str, class: PlatformClass) -> PlatformProfile {
         requires_gnss: !manual,
         gnss_denied_capable: false,
         daily_capacity_units: 2_000,
+        cost_currency_code: "ZAR".into(),
         acquisition_cost_cents: if manual { 0 } else { 100_000 },
         operating_cost_cents_per_hour: if manual { 100 } else { 500 },
         supervision_minutes_per_hour: if manual { 60 } else { 10 },
