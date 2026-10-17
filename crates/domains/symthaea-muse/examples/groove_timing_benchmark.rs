@@ -1248,9 +1248,13 @@ mod tests {
                 .abs()
                 < 1e-12
         );
-        assert_eq!(
-            kick.median_performer_median_abs_sixteenth_grid_residual_beats,
-            Some(0.05)
+        assert!(
+            (kick
+                .median_performer_median_abs_sixteenth_grid_residual_beats
+                .unwrap()
+                - 0.05)
+                .abs()
+                < 1e-12
         );
         assert!(
             (kick.mean_performer_velocity_mean_0_to_127.unwrap() - 55.0).abs() < 1e-12
