@@ -29,6 +29,20 @@ The crate defines its own Cargo workspace to avoid pulling the full Symthaea wor
 
 The independent `verify-manifest` binary does not import or call the screening kernel. It pins the raw manifest to a non-cryptographic FNV-1a regression fingerprint, checks header/row shape, duplicate IDs, status domain, required negative controls, and the named farm-task archetypes. Its `STRUCTURE_VALID_ONLY` output is a corpus-integrity result—not a claim that platform assessments or real farm data are correct.\n\nThe frozen synthetic case manifest is at `fixtures/scenario_manifest.tsv`. It currently contains 53 expected-disposition cases: 43 adversarial/evidence-boundary cases around a synthetic scouting fixture and 10 additional farm-task archetypes covering broad-acre tractor treatment, orchard scouting, greenhouse harvest, nursery handling, livestock monitoring, packhouse transport, fixed sensors, aerial survey, smallholder mechanical weeding, and an agrivoltaic access rejection. These are synthetic reference cases—not 10 real field validations—and expansion to 30+ distinct site/task families is still required.
 
+## Open design package qualification (V1)
+
+The `design_package` module checks whether an exact design revision has the documented artifacts required for independent build review: preferred editable source, neutral exports, dimensioned drawings, structured BOM, license notice, operating limits/exclusions, assembly instructions, inspection plan, test protocol, and maintenance/repair instructions. It checks BOM quantities/units/material or part specs/manufacturing process and refuses unknown part availability for the declared fabrication context.
+
+The module emits only `CompleteForIndependentBuildReview`, `Incomplete`, or `Blocked`. It never emits a safety certificate or operation authorization. License state is a reviewer declaration bound to a reviewer reference and digest; this structural checker does not parse license terms. Artifact hashes are shape-checked, not recalculated from external files. A missing quote prevents complete cost totals but does not pretend an unpriced component is free. Currency mismatches remain separate, and cost arithmetic uses checked integer operations.
+
+Run this contract with the existing dependency-free benchmark:
+
+```sh
+cargo test --manifest-path crates/agri-platform-bench/Cargo.toml --all-targets
+```
+
+The test fixtures are synthetic. Passing them establishes contract behavior only, not completeness or safety of any real farm design.
+
 ## Important limitations
 
 - The included values are synthetic fixture values. They are not measured conditions for Johannesburg, the Highveld, or any real farm.
