@@ -40,6 +40,7 @@ pub mod ingredient;
 pub mod kitchen;
 pub mod nutrition;
 pub mod palate;
+pub mod pareto;
 pub mod presets;
 pub mod reaction;
 pub mod rng;
