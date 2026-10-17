@@ -103,6 +103,9 @@ pub enum Accompaniment {
     /// accompaniment"). Reusable habit: syncopated timing and continuous
     /// sustain aren't opposites — a groove can be both at once.
     BossaComp,
+    /// Sarabande gait: three quarter-note chord pulses in a slow triple dance,
+    /// with the defining accent on beat two (1-STRONG-3), distinct from Waltz.
+    Sarabande,
 }
 
 /// Which half of the two-bar son-clave cycle a given bar falls on. The
@@ -417,6 +420,24 @@ impl Accompaniment {
                     }
                 }
             }
+            Accompaniment::Sarabande => {
+                // Full-chord quarter-note attacks with a primary accent on beat two.
+                let quarter = Duration::quarter();
+                for (beat, accent) in [(0_i64, 0.72_f32), (1, 1.0), (2, 0.62)] {
+                    if beat as f64 >= meter_beats {
+                        continue;
+                    }
+                    for &pitch in voiced {
+                        push(
+                            score,
+                            pitch,
+                            bar_onset + quarter.scale(beat, 1),
+                            quarter,
+                            velocity * accent,
+                        );
+                    }
+                }
+            }
         }
     }
 }
@@ -519,6 +540,7 @@ mod tests {
             Accompaniment::Alberti,
             Accompaniment::OomPah,
             Accompaniment::Comp,
+            Accompaniment::Sarabande,
         ] {
             for meter in [3.0, 4.0] {
                 for n in realize(pattern, meter) {
@@ -540,6 +562,7 @@ mod tests {
             Accompaniment::Alberti,
             Accompaniment::OomPah,
             Accompaniment::Comp,
+            Accompaniment::Sarabande,
         ] {
             for meter in [3.0, 4.0] {
                 for n in realize(pattern, meter) {
@@ -791,6 +814,28 @@ mod tests {
         // Understated: every stab softer than a Block chord at the same
         // input velocity (accent multipliers are all < 1.0).
         assert!(notes.iter().all(|n| n.velocity < 0.5));
+    }
+
+    #[test]
+    fn sarabande_gait_accents_beat_two_in_three_four() {
+        let notes = realize(Accompaniment::Sarabande, 3.0);
+        assert_eq!(notes.len(), 9); // three full-chord attacks
+        let mut onsets: Vec<f64> = notes.iter().map(|n| n.onset.beats()).collect();
+        onsets.sort_by(f64::total_cmp);
+        onsets.dedup_by(|a, b| (*a - *b).abs() < 1e-9);
+        assert_eq!(onsets, vec![0.0, 1.0, 2.0]);
+
+        let velocity_at = |beat: f64| {
+            notes
+                .iter()
+                .find(|n| (n.onset.beats() - beat).abs() < 1e-9)
+                .unwrap()
+                .velocity
+        };
+        assert!(velocity_at(1.0) > velocity_at(0.0));
+        assert!(velocity_at(1.0) > velocity_at(2.0));
+        assert!(velocity_at(0.0) > velocity_at(2.0));
+        assert!(notes.iter().all(|note| note.duration == Duration::quarter()));
     }
 
     #[test]
