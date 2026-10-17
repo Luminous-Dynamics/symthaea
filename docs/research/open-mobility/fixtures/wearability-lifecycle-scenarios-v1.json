@@ -1,0 +1,216 @@
+{
+  "schema_version": 1,
+  "benchmark_id": "OPEN-MOBILITY-WEARABILITY-001",
+  "evidence_level": "synthetic_replay",
+  "claim_ceiling": "No clinical, physical safety, regulatory compliance, or hardware qualification claim.",
+  "scenarios": [
+    {
+      "id": "WRB-001-verified-self-don",
+      "profile": "personal_mobility_self_service",
+      "stage": "fit_check",
+      "input": {
+        "fastening_evidence": "verified",
+        "profile_match": "verified",
+        "fit_evidence": "current",
+        "sensor_consistency": "consistent"
+      },
+      "expected_disposition": "ready_for_simulation",
+      "required_receipts": [
+        "profile_identity",
+        "fit_evidence_status",
+        "fastening_evidence",
+        "source_revision"
+      ],
+      "positive_control": true
+    },
+    {
+      "id": "WRB-002-missing-required-fastening",
+      "profile": "personal_mobility",
+      "stage": "fit_check",
+      "input": {
+        "fastening_evidence": "incomplete",
+        "profile_match": "verified",
+        "fit_evidence": "current",
+        "sensor_consistency": "consistent"
+      },
+      "expected_disposition": "start_not_admitted",
+      "required_receipts": [
+        "missing_fastening_reason",
+        "observed_evidence",
+        "required_recheck"
+      ],
+      "positive_control": false
+    },
+    {
+      "id": "WRB-003-fit-evidence-stale-after-movement",
+      "profile": "personal_mobility",
+      "stage": "perform",
+      "input": {
+        "fastening_evidence": "verified",
+        "profile_match": "verified",
+        "fit_evidence": "stale",
+        "sensor_consistency": "consistent"
+      },
+      "expected_disposition": "fit_recheck_required",
+      "required_receipts": [
+        "last_fit_check_reference",
+        "staleness_reason",
+        "subsequent_mode_decision"
+      ],
+      "positive_control": false
+    },
+    {
+      "id": "WRB-004-sensor-conflict-not-a-comfort-pass",
+      "profile": "research_interface_instrumented",
+      "stage": "perform",
+      "input": {
+        "pressure_sensor": "conflicted",
+        "shear_sensor": "unavailable",
+        "user_comfort_report": "not_collected"
+      },
+      "expected_disposition": "interface_state_unknown",
+      "required_receipts": [
+        "per_sensor_evidence_status",
+        "missingness_vs_zero",
+        "no_comfort_claim"
+      ],
+      "positive_control": false
+    },
+    {
+      "id": "WRB-005-caregiver-unavailable",
+      "profile": "personal_mobility_assisted",
+      "stage": "don",
+      "input": {
+        "workflow_support_requirement": "caregiver_required",
+        "caregiver_available": false
+      },
+      "expected_disposition": "workflow_blocked_with_support_path",
+      "required_receipts": [
+        "declared_support_requirement",
+        "block_reason",
+        "alternative_support_path"
+      ],
+      "positive_control": false
+    },
+    {
+      "id": "WRB-006-user-requests-doff",
+      "profile": "personal_mobility",
+      "stage": "perform",
+      "input": {
+        "user_requested_doff": true,
+        "active_motion_request": "present"
+      },
+      "expected_disposition": "doff_request_preempts_new_motion",
+      "required_receipts": [
+        "user_request_id",
+        "request_timebase",
+        "observed_disengagement_endpoint"
+      ],
+      "positive_control": true
+    },
+    {
+      "id": "WRB-007-restart-clears-prior-training-mode",
+      "profile": "personal_mobility",
+      "stage": "start",
+      "input": {
+        "prior_session_mode": "training_resistive",
+        "current_session_mode": "unset",
+        "configuration_lineage": "restart_boundary"
+      },
+      "expected_disposition": "explicit_mode_selection_required",
+      "required_receipts": [
+        "prior_session_reference",
+        "current_mode_state",
+        "stale_parameter_disposition"
+      ],
+      "positive_control": false
+    },
+    {
+      "id": "WRB-008-insufficient-task-energy-reserve",
+      "profile": "personal_mobility",
+      "stage": "prepare",
+      "input": {
+        "task_energy_estimate": "available",
+        "predicted_reserve_after_task": "below_profile_minimum",
+        "estimate_confidence": "declared_low"
+      },
+      "expected_disposition": "task_plan_requires_review_or_fallback",
+      "required_receipts": [
+        "task_and_load_profile",
+        "estimate_uncertainty",
+        "reserve_policy_version",
+        "fallback_choice"
+      ],
+      "positive_control": false
+    },
+    {
+      "id": "WRB-009-module-replacement-invalidates-calibration",
+      "profile": "serviceability_test",
+      "stage": "maintain",
+      "input": {
+        "module_changed": true,
+        "calibration_lineage_after_service": "missing"
+      },
+      "expected_disposition": "return_to_service_not_admitted",
+      "required_receipts": [
+        "part_identifier",
+        "tool_and_step_record",
+        "calibration_invalidation",
+        "requalification_required"
+      ],
+      "positive_control": false
+    },
+    {
+      "id": "WRB-010-successful-noncritical-module-service",
+      "profile": "serviceability_test",
+      "stage": "maintain",
+      "input": {
+        "module_changed": true,
+        "calibration_lineage_after_service": "verified_preserved_or_reestablished",
+        "diagnostic_result": "pass_declared_checks"
+      },
+      "expected_disposition": "eligible_for_reviewed_return_to_service",
+      "required_receipts": [
+        "part_identifier",
+        "tool_and_step_record",
+        "configuration_before_after",
+        "evidence_level"
+      ],
+      "positive_control": true
+    },
+    {
+      "id": "WRB-011-donning-timeout-preserves-user-agency",
+      "profile": "personal_mobility_self_service",
+      "stage": "don",
+      "input": {
+        "workflow_timeout": true,
+        "user_requested_help": false,
+        "critical_step_completed": false
+      },
+      "expected_disposition": "remain_unready_and_offer_accessible_options",
+      "required_receipts": [
+        "elapsed_time",
+        "incomplete_steps",
+        "offered_options",
+        "no_penalty_event"
+      ],
+      "positive_control": false
+    },
+    {
+      "id": "WRB-012-sensor-data-missing-not-measured-zero",
+      "profile": "research_interface_instrumented",
+      "stage": "perform",
+      "input": {
+        "interface_migration_sensor": "unavailable",
+        "measured_migration_value": null
+      },
+      "expected_disposition": "migration_metric_missing",
+      "required_receipts": [
+        "sensor_status",
+        "missingness_reason",
+        "metric_not_imputed"
+      ],
+      "positive_control": false
+    }
+  ]
+}
