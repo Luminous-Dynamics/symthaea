@@ -483,6 +483,12 @@ pub fn validate_nutrition(n: &NutrientProfile) -> Vec<CulinaryViolation> {
             });
         }
     }
+    if !n.energy_kcal().is_finite() {
+        v.push(CulinaryViolation::InvalidNumericInput {
+            field: "nutrition.energy_kcal",
+            requirement: "derived energy must be finite",
+        });
+    }
     if n.sodium_mg.is_finite()
         && n.sodium_mg >= 0.0
         && n.sodium_mg > th::FDA_SODIUM_DAILY_VALUE_MG
