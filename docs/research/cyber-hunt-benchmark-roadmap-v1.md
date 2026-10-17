@@ -151,10 +151,9 @@ A missing or inconsistent receipt makes the run inconclusive, not a pass.
 ## Execution sequence (runner-independent)
 
 1. **Now:** run source-level review on both public smoke families, assert the same event types have positive and benign examples where applicable, and record current exact-head CI evidence without waiting for it.
-2. **Next:** implement at least two more distinct causal graphs and build automated leakage audits across the whole suite; the new artifact family is a second smoke template, not the four-family/12-campaign pilot.
-3. **Before capability claims:** obtain independent label review and reserve held-out campaign families; do not multiply seeds to simulate diversity.
-3. **Next:** connect the fixture through #7776's existing evaluator and bounded query path. Do not create a parallel scoring engine.
-4. **Then:** connect all reviewed families to the shared #7776 evaluator and publish baseline results on public, non-blind fixtures for reproducibility while keeping held-out labels/campaigns controlled.
+2. **Next:** implement at least two more distinct causal graphs and build automated leakage audits across the whole suite; the artifact family is a second smoke template, not the four-family/12-campaign pilot.
+3. **Then:** connect all reviewed families through #7776's existing shared evaluator and bounded query path; publish baseline results on public, non-blind fixtures for reproducibility. Do not create a parallel scoring engine.
+4. **Before capability claims:** obtain independent label review and reserve held-out campaign families; do not multiply seeds to simulate diversity.
 5. **Only after:** run the frozen held-out study with campaign-level uncertainty and explicit safety vetoes; publish limits and failure cases alongside any successful result.
 
 The work may progress at each step even when CI is queued, but code correctness and capability qualification are not inferred from source review or elapsed time. Exact-head test results remain authoritative.
