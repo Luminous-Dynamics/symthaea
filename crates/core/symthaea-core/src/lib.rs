@@ -76,6 +76,9 @@ pub mod architecture_pareto;
 /// Report-only uncertainty-aware Pareto screening for wearable-robot architectures.
 #[allow(missing_docs)]
 pub mod architecture_robustness;
+/// Report-only decision-sensitive measurement triage for exosuit architecture research.
+#[allow(missing_docs)]
+pub mod measurement_triage;
 /// Report-only lifecycle and wearability evidence evaluator for exosuit research.
 #[allow(missing_docs)]
 pub mod wearability;
