@@ -3,7 +3,7 @@ use sha2::{Digest, Sha256};
 use std::collections::{BTreeMap, BTreeSet};
 use std::env;
 use std::fs;
-use std::path::PathBuf;
+use std::path::{Path, PathBuf};
 use std::process;
 
 const GENERATOR_VERSION: &str = "cyber-hunt-fixture-generator/0.1.0";
@@ -447,6 +447,23 @@ fn parse_args() -> Result<Option<Config>, String> {
     Ok(Some(Config { records, seed, events_out, manifest_out, truth_out, source_commit }))
 }
 
+fn canonical_output_path(path: &Path) -> Result<PathBuf, String> {
+    let parent = path
+        .parent()
+        .filter(|p| !p.as_os_str().is_empty())
+        .unwrap_or_else(|| Path::new("."));
+    let file_name = path
+        .file_name()
+        .ok_or_else(|| format!("output path has no file name: {}", path.display()))?;
+    let parent = fs::canonicalize(parent)
+        .map_err(|e| format!("cannot canonicalize output directory {}: {e}", parent.display()))?;
+    Ok(parent.join(file_name))
+}
+
+fn path_is_ancestor_or_equal(parent: &Path, child: &Path) -> bool {
+    child.starts_with(parent)
+}
+
 fn write_dataset(config: &Config) -> Result<(), String> {
     let dataset = generate_dataset(config.records, config.seed)?;
     let mut manifest = dataset.manifest;
@@ -468,11 +485,34 @@ fn write_dataset(config: &Config) -> Result<(), String> {
         if path.as_os_str().is_empty() {
             return Err("output paths must not be empty".to_string());
         }
-        if let Some(parent) = path.parent().filter(|p| !p.as_os_str().is_empty()) {
-            fs::create_dir_all(parent)
-                .map_err(|e| format!("cannot create output directory {}: {e}", parent.display()))?;
-        }
+        let parent = path
+            .parent()
+            .filter(|p| !p.as_os_str().is_empty())
+            .unwrap_or_else(|| Path::new("."));
+        fs::create_dir_all(parent)
+            .map_err(|e| format!("cannot create output directory {}: {e}", parent.display()))?;
     }
+
+    let events_path = canonical_output_path(&config.events_out)?;
+    let manifest_path = canonical_output_path(&config.manifest_out)?;
+    let truth_path = canonical_output_path(&config.truth_out)?;
+    if events_path == manifest_path || events_path == truth_path || manifest_path == truth_path {
+        return Err("output paths resolve to the same file".to_string());
+    }
+    let events_dir = events_path.parent().ok_or_else(|| "events output has no parent".to_string())?;
+    let manifest_dir = manifest_path.parent().ok_or_else(|| "manifest output has no parent".to_string())?;
+    let truth_dir = truth_path.parent().ok_or_else(|| "oracle output has no parent".to_string())?;
+    if path_is_ancestor_or_equal(events_dir, truth_dir)
+        || path_is_ancestor_or_equal(truth_dir, events_dir)
+        || path_is_ancestor_or_equal(manifest_dir, truth_dir)
+        || path_is_ancestor_or_equal(truth_dir, manifest_dir)
+    {
+        return Err(
+            "evaluator oracle directory must be a disjoint sibling tree from solver event/manifest directories"
+                .to_string(),
+        );
+    }
+
     fs::write(&config.events_out, &dataset.event_store)
         .map_err(|e| format!("cannot write event store {}: {e}", config.events_out.display()))?;
     fs::write(&config.manifest_out, &manifest_json)
@@ -574,6 +614,24 @@ mod tests {
             assert!(positive.contains(&relation.from_event_id));
             assert!(positive.contains(&relation.to_event_id));
         }
+    }
+
+    #[test]
+    fn canonical_paths_detect_aliases_and_separate_solver_from_oracle() {
+        let root = env::temp_dir().join(format!("cyber-hunt-path-test-{}", process::id()));
+        let solver = root.join("solver");
+        let evaluator = root.join("evaluator");
+        fs::create_dir_all(&solver).expect("solver directory should be created");
+        fs::create_dir_all(&evaluator).expect("evaluator directory should be created");
+
+        let events = canonical_output_path(&solver.join("events.jsonl")).expect("events path should resolve");
+        let manifest = canonical_output_path(&solver.join("./manifest.json")).expect("manifest path should resolve");
+        let truth = canonical_output_path(&evaluator.join("truth.json")).expect("truth path should resolve");
+        assert_ne!(events, manifest);
+        assert!(!path_is_ancestor_or_equal(events.parent().unwrap(), truth.parent().unwrap()));
+        assert!(!path_is_ancestor_or_equal(truth.parent().unwrap(), events.parent().unwrap()));
+
+        fs::remove_dir_all(root).expect("temporary directories should be removed");
     }
 
     #[test]
