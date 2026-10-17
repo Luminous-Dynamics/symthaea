@@ -7,6 +7,7 @@
 // to qualify or operate a physical process.
 
 use serde_json::{json, Value};
+use sha2::{Digest, Sha256};
 use std::{
     collections::{BTreeMap, BTreeSet},
     env,
@@ -77,10 +78,15 @@ fn parse_args() -> Result<Args, String> {
     })
 }
 
-fn read_json(path: &str) -> Result<Value, Box<dyn Error>> {
+fn sha256_hex(bytes: &[u8]) -> String {
+    format!("{:x}", Sha256::digest(bytes))
+}
+
+fn read_json_with_digest(path: &str) -> Result<(Value, String), Box<dyn Error>> {
     let bytes = fs::read(path)?;
+    let digest = sha256_hex(&bytes);
     let parsed = serde_json::from_slice(&bytes)?;
-    Ok(parsed)
+    Ok((parsed, digest))
 }
 
 fn text<'a>(value: &'a Value, field: &str) -> Option<&'a str> {
@@ -691,9 +697,13 @@ fn run() -> Result<bool, Box<dyn Error>> {
     let args = parse_args().map_err(|message| {
         std::io::Error::new(std::io::ErrorKind::InvalidInput, message)
     })?;
-    let corpus = read_json(&args.corpus_path)?;
-    let results = read_json(&args.results_path)?;
-    let report = evaluate(&corpus, &results, &args.expected_head);
+    let (corpus, corpus_sha256) = read_json_with_digest(&args.corpus_path)?;
+    let (results, results_sha256) = read_json_with_digest(&args.results_path)?;
+    let mut report = evaluate(&corpus, &results, &args.expected_head);
+    if let Some(report_object) = report.as_object_mut() {
+        report_object.insert("corpus_sha256".to_owned(), json!(corpus_sha256));
+        report_object.insert("results_sha256".to_owned(), json!(results_sha256));
+    }
     let passed = report.get("passed").and_then(Value::as_bool) == Some(true);
     println!("{}", serde_json::to_string_pretty(&report)?);
     Ok(passed)
@@ -716,6 +726,14 @@ mod tests {
     use super::*;
 
     const HEAD: &str = "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa";
+
+    #[test]
+    fn sha256_digest_matches_published_test_vector() {
+        assert_eq!(
+            sha256_hex(b"abc"),
+            "ba7816bf8f01cfea414140de5dae2223b00361a396177a9cb410ff61f20015ad"
+        );
+    }
 
     fn mini_corpus() -> Value {
         json!({
