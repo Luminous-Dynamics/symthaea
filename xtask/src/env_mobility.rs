@@ -28,6 +28,8 @@ const FEASIBILITY_FIELDS: &[&str] = &[
     "configuration_match",
     "reference_quality",
     "baseline",
+    "common_mode_assumption",
+    "recovery_history",
 ];
 
 const REPAIRABILITY_FIELDS: &[&str] = &[
@@ -235,6 +237,8 @@ fn derive_feasibility(facts: &Value, context: &str) -> Result<Decision> {
     let configuration = enum_at(facts, "configuration_match", &["exact", "mismatch", "unknown"], context)?;
     let reference_quality = enum_at(facts, "reference_quality", &["adequate", "insufficient", "unknown"], context)?;
     let baseline = enum_at(facts, "baseline", &["robot_needed", "fixed_sensor_sufficient", "manual_preferred"], context)?;
+    let common_mode = enum_at(facts, "common_mode_assumption", &["not_claimed", "independence_verified", "shared_but_claimed_independent", "unknown"], context)?;
+    let recovery_history = enum_at(facts, "recovery_history", &["clean", "failed_attempts_reported", "failed_attempts_hidden", "unknown"], context)?;
 
     // Known hard violations take precedence over missing evidence.
     if site == "prohibited" {
@@ -272,6 +276,12 @@ fn derive_feasibility(facts: &Value, context: &str) -> Result<Decision> {
     }
     if configuration == "mismatch" {
         return Ok(Decision::one("reject", "CONFIGURATION_EVIDENCE_MISMATCH"));
+    }
+    if common_mode == "shared_but_claimed_independent" {
+        return Ok(Decision::one("reject", "COMMON_MODE_REDUNDANCY_LAUNDERED"));
+    }
+    if recovery_history == "failed_attempts_hidden" {
+        return Ok(Decision::one("reject", "FAILED_RECOVERY_ATTEMPTS_HIDDEN"));
     }
 
     // Unknown, stale or invalid evidence is not permissive.
@@ -313,6 +323,12 @@ fn derive_feasibility(facts: &Value, context: &str) -> Result<Decision> {
     }
     if configuration == "unknown" {
         return Ok(Decision::one("abstain", "CONFIGURATION_MATCH_UNKNOWN"));
+    }
+    if common_mode == "unknown" {
+        return Ok(Decision::one("abstain", "COMMON_MODE_INDEPENDENCE_UNKNOWN"));
+    }
+    if recovery_history == "unknown" {
+        return Ok(Decision::one("abstain", "RECOVERY_HISTORY_UNKNOWN"));
     }
     if reference_quality == "unknown" {
         return Ok(Decision::one("abstain", "REFERENCE_QUALITY_UNKNOWN"));
@@ -363,7 +379,7 @@ fn derive_repairability(case: &Value, context: &str) -> Result<Decision> {
     let post_check = enum_at(facts, "post_repair_check", &["complete", "missing", "failed"], context)?;
     let calibration = enum_at(facts, "calibration", &["current", "stale", "missing", "failed"], context)?;
     let configuration = enum_at(facts, "configuration_record", &["updated_exact", "stale", "missing"], context)?;
-    let fault = enum_at(facts, "fault_history", &["resolved", "recurring_unresolved", "unknown"], context)?;
+    let fault = enum_at(facts, "fault_history", &["resolved", "recurring_unresolved", "failed_repair_reintroduced", "unknown"], context)?;
     let serviceability = enum_at(
         facts,
         "serviceability_target",
@@ -387,6 +403,9 @@ fn derive_repairability(case: &Value, context: &str) -> Result<Decision> {
             "SAFETY_RELEVANT_HISTORY_UNKNOWN"
         };
         return Ok(Decision::one("quarantine", reason));
+    }
+    if fault == "failed_repair_reintroduced" {
+        return Ok(Decision::one("quarantine", "FAILED_REPAIR_REINTRODUCED_WITHOUT_RECHECK"));
     }
     if fault == "recurring_unresolved" {
         return Ok(Decision::one("quarantine", "RECURRING_UNRESOLVED_FAULT"));
@@ -634,6 +653,22 @@ mod tests {
         facts["observation_source"] = json!("estimated");
         facts["requested_claim"] = json!("measured");
         assert_eq!(derive_feasibility(&facts, context).unwrap().disposition, "reject");
+
+        let mut facts = read_first_facts(FEASIBILITY_PATH);
+        facts["common_mode_assumption"] = json!("shared_but_claimed_independent");
+        assert_eq!(derive_feasibility(&facts, context).unwrap().disposition, "reject");
+
+        let mut facts = read_first_facts(FEASIBILITY_PATH);
+        facts["recovery_history"] = json!("failed_attempts_hidden");
+        assert_eq!(derive_feasibility(&facts, context).unwrap().disposition, "reject");
+
+        let mut facts = read_first_facts(FEASIBILITY_PATH);
+        facts["source_status"] = json!("stale");
+        assert_eq!(derive_feasibility(&facts, context).unwrap().disposition, "abstain");
+
+        let mut facts = read_first_facts(FEASIBILITY_PATH);
+        facts["site_authority"] = json!("not-a-valid-state");
+        assert!(derive_feasibility(&facts, context).is_err());
     }
 
     #[test]
@@ -662,5 +697,13 @@ mod tests {
             "facts": facts
         });
         assert_eq!(derive_repairability(&case, context).unwrap().disposition, "redesign_for_serviceability");
+
+        let mut facts = read_first_facts(REPAIRABILITY_PATH);
+        facts["fault_history"] = json!("failed_repair_reintroduced");
+        let case = json!({
+            "criticality_profile": "routine_replaceable",
+            "facts": facts
+        });
+        assert_eq!(derive_repairability(&case, context).unwrap().disposition, "quarantine");
     }
 }
