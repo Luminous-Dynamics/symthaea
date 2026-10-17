@@ -1486,7 +1486,7 @@ mod tests {
         assert!(!VerificationResult::Invalid.is_valid());
     }
 
-    // ── Verified Einstein Pipeline ──────────────────────────────────────────
+    // ── Numeric Einstein Residual Pipeline ──────────────────────────────────
 
     /// Formal induction proof: verify the triangular number formula T(n) = n(n+1)/2.
     ///
@@ -1520,7 +1520,6 @@ mod tests {
     #[test]
     fn test_numeric_einstein_residual_pipeline() {
         use symthaea_core::hdc::einstein_search::{EinsteinSearchConfig, search_einstein_metrics};
-        use symthaea_core::hdc::riemannian_geometry::MetricTensor;
 
         // Step 1: Search for Einstein metrics on S² (trivially the round sphere)
         let config = EinsteinSearchConfig {
