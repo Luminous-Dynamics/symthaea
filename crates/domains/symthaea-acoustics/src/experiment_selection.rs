@@ -161,6 +161,8 @@ pub struct ExperimentRanking {
 /// a physical measurement or hardware change.
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub struct BudgetedExperimentPlan {
+    /// Full frozen pool used to generate this plan; prevents stale-plan scoring.
+    pub input_option_snapshot: Vec<ExperimentOption>,
     pub selected_option_indices: Vec<usize>,
     pub selected_option_ids: Vec<String>,
     pub skipped_option_ids: Vec<String>,
@@ -289,6 +291,7 @@ pub fn select_under_budget(
     }
 
     Ok(BudgetedExperimentPlan {
+        input_option_snapshot: options.to_vec(),
         selected_option_indices,
         selected_option_ids,
         skipped_option_ids,
