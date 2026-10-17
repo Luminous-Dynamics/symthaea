@@ -17,65 +17,33 @@ The family should learn from the best of the Cessna design philosophy—conventi
 
 These names are working labels only. They do not imply finalized specifications or brands.
 
-<box gap={3}>
-  <row align="start" gap={3}>
-    <box background="surface-secondary" radius="lg" padding={3} align="center" justify="center" size="48px">
-      <icon name="graduation-cap" size="xl" />
-    </box>
-    <box flex="1" gap={1}>
-      **A. Wren 2 — two-seat trainer and local flyer**
+### A. Wren 2 — two-seat trainer and local flyer
 
-      <text color="secondary" size="sm">First product candidate</text>
+**First product candidate.** The job is training, proficiency, local recreation, short practical trips, and owner-pilot confidence.
 
-      **Job to be done:** training, proficiency, local recreation, short practical trips, and owner-pilot confidence.
+Begin by evaluating a conventional fixed-gear, single-engine layout with excellent visibility, robust ground handling, accessible routine service points, readable instrumentation, and a simple cockpit workflow. Keep the powerplant, airframe material and certification category as trade-study choices, not assumptions. A training-focused airframe should be designed for frequent cycles, student handling, and fast return to service rather than minimum empty weight alone.
 
-      Begin by evaluating a conventional fixed-gear, single-engine layout with excellent visibility, robust ground handling, accessible routine service points, readable analog-independent instrumentation, and a simple cockpit workflow. Keep the powerplant, airframe material and certification category as trade-study choices, not assumptions. A training-focused airframe should be designed for frequent cycles, student handling, and fast return to service rather than minimal empty weight alone.
+**Why first:** it creates serviceability and training evidence that can inform the whole family while limiting the number of seats, mission variants and cabin systems.
 
-      **Why first:** it creates the serviceability and training evidence that can inform the whole family while limiting the number of seats, mission variants and cabin systems.
-    </box>
-  </row>
-  <divider color="subtle" />
-  <row align="start" gap={3}>
-    <box background="surface-secondary" radius="lg" padding={3} align="center" justify="center" size="48px">
-      <icon name="plane" size="xl" />
-    </box>
-    <box flex="1" gap={1}>
-      **B. Wayfarer 4 — four-seat personal touring, a Skyhawk-class successor**
+### B. Wayfarer 4 — four-seat personal touring, a Skyhawk-class successor
 
-      **Job to be done:** useful local and cross-country travel for owner-pilots, with practical bags, comfortable ingress/egress, good visibility, cabin ventilation/heating, and maintainable systems.
+The job is useful local and cross-country travel for owner-pilots, with practical bags, comfortable ingress/egress, good visibility, cabin ventilation/heating and maintainable systems.
 
-      The primary requirements are *real payload with usable fuel and the declared reserve*, comfortable cabin geometry, accessible baggage, a calm ride, a supportable powerplant, and transparent total cost per flight hour. Separate the marketing range from a fully specified mission profile. Every range/payload result must disclose people/baggage, environmental assumptions, cruise policy, reserves, and exclusions.
+The primary requirements are real payload with usable fuel and the declared reserve, comfortable cabin geometry, accessible baggage, a calm ride, a supportable powerplant, and transparent total cost per flight hour. Separate marketing range from a fully specified mission profile. Every range/payload result must disclose people/baggage, environmental assumptions, cruise policy, reserves, and exclusions.
 
-      Treat retractable gear, pressurization, turbocharging, complex hybrid power, and novel flight-control architecture as options only if a frozen use case demonstrates a compelling benefit that offsets added maintenance, training, mass and certification burden. The default comparison is a conventional, fixed-gear single-engine design—not because it is automatically best, but because complexity must earn its place.
-    </box>
-  </row>
-  <divider color="subtle" />
-  <row align="start" gap={3}>
-    <box background="surface-secondary" radius="lg" padding={3} align="center" justify="center" size="48px">
-      <icon name="mountain" size="xl" />
-    </box>
-    <box flex="1" gap={1}>
-      **C. Ranger 4 — utility / rough-field derivative**
+Treat retractable gear, pressurization, turbocharging, complex hybrid power, and novel flight-control architecture as options only if a frozen use case demonstrates a compelling benefit that offsets added maintenance, training, mass and certification burden. The default comparison is a conventional, fixed-gear single-engine design—not because it is automatically best, but because complexity must earn its place.
 
-      **Job to be done:** practical load-carrying, farm and regional access, unpaved strips where lawful and approved, and mission flexibility for owners who need a tougher tool.
+### C. Ranger 4 — utility / rough-field derivative
 
-      Start with a distinct requirement set for payload, ground clearance, surface condition, corrosion and debris exposure, inspection access, tie-down/handling, braking and tire service. Do not merely lift the Wayfarer and add oversized tires. The utility version may warrant a different structure, wing, landing gear and certification basis. Shared parts are a benefit only when load ratings, inspection intervals, interchangeability and approved configuration support it.
-    </box>
-  </row>
-  <divider color="subtle" />
-  <row align="start" gap={3}>
-    <box background="surface-secondary" radius="lg" padding={3} align="center" justify="center" size="48px">
-      <icon name="battery-charging" size="xl" />
-    </box>
-    <box flex="1" gap={1}>
-      **D. Wren-E — electrified trainer demonstrator (gated branch, not a promised product)**
+The job is practical load-carrying, farm and regional access, unpaved strips where lawful and approved, and mission flexibility for owners who need a tougher tool.
 
-      **Job to be done:** very short, repeatable training/local missions at a site with dependable charging and a high utilization pattern that could justify battery replacement and ground infrastructure.
+Start with a distinct requirement set for payload, ground clearance, surface condition, corrosion and debris exposure, inspection access, tie-down/handling, braking and tire service. Do not merely lift the Wayfarer and add oversized tires. The utility version may warrant a different structure, wing, landing gear and certification basis. Shared parts are a benefit only when load ratings, inspection intervals, interchangeability and approved configuration support it.
 
-      Do not make this the first aircraft or assume electric propulsion makes ownership cheaper. Require a mission closure covering installed battery mass, end-of-life capacity, temperature derating, reserve, charging losses, turnaround, battery replacement, thermal management, dispatch effects and local grid/site requirements. Begin with ground powertrain and charging tests, then an appropriately approved uncrewed/subscale test programme if the case survives. Passenger operation requires the separate applicable certification and testing path.
-    </box>
-  </row>
-</box>
+### D. Wren-E — electrified trainer demonstrator (gated branch, not a promised product)
+
+The job is very short, repeatable training/local missions at a site with dependable charging and a utilization pattern that could justify battery replacement and ground infrastructure.
+
+Do not make this the first aircraft or assume electric propulsion makes ownership cheaper. Require a mission closure covering installed battery mass, end-of-life capacity, temperature derating, reserve, charging losses, turnaround, battery replacement, thermal management, dispatch effects and local site/grid requirements. Begin with ground powertrain and charging tests, then an appropriately approved uncrewed/subscale test programme if the case survives. Passenger operation requires the separate applicable certification and testing path.
 
 ## 3. Family architecture: commonality without a common-airframe trap
 
