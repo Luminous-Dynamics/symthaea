@@ -280,7 +280,7 @@
         "evidence_status": "synthetic_complete"
       },
       "expected_decision": "prefer_buy_qualified_even_if_make_cheaper",
-      "expected_break_even_class": "positive"
+      "expected_break_even_class": "not_computable"
     },
     {
       "case_id": "MAKEBUY-MISSING-QUOTE",
