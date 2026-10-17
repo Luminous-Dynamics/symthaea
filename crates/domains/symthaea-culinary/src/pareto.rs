@@ -597,7 +597,8 @@ mod tests {
 
     #[test]
     fn hard_gate_failure_cannot_be_compensated_by_better_objectives() {
-        let mut unsafe_candidate = candidate("blocked_but_cheap", Some(0.1), Some(100.0), Some(0.0));
+        let mut unsafe_candidate =
+            candidate("blocked_but_cheap", Some(0.1), Some(100.0), Some(0.0));
         unsafe_candidate.gates[0] =
             GateEvidence::fail("food_safety_constraints", "receipt:known-violation");
 
