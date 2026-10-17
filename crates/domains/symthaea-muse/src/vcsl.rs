@@ -86,6 +86,15 @@ enum SampleSource {
     Vsco2,
 }
 
+impl SampleSource {
+    fn id(self) -> &'static str {
+        match self {
+            Self::Vcsl => "vcsl",
+            Self::Vsco2 => "vsco2_ce",
+        }
+    }
+}
+
 #[derive(Debug, Clone, Copy)]
 struct SampleStyleMapping {
     style_name: &'static str,
@@ -613,16 +622,26 @@ pub(crate) struct DecodedSample {
     pub(crate) frames: Vec<f32>,
     pub(crate) sample_rate: u32,
     pub(crate) midi: u8,
+    pub(crate) source_library: String,
+    /// Source-root-relative path: excludes absolute machine-specific roots.
+    pub(crate) source_relative_path: String,
+    pub(crate) source_dynamic: f32,
 }
 
 /// All indexed samples for one instrument, with a decode cache.
 pub(crate) struct InstrumentBank {
     samples: Vec<SampleMeta>,
     cache: Mutex<HashMap<usize, Arc<DecodedSample>>>,
+    source_library: String,
+    source_relative_directory: String,
 }
 
 impl InstrumentBank {
-    fn index(dir: &Path) -> Option<Self> {
+    fn index(
+        dir: &Path,
+        source_library: &str,
+        source_relative_directory: &str,
+    ) -> Option<Self> {
         let mut samples = Vec::new();
         let entries = std::fs::read_dir(dir).ok()?;
         for entry in entries.flatten() {
@@ -689,6 +708,8 @@ impl InstrumentBank {
         Some(InstrumentBank {
             samples,
             cache: Mutex::new(HashMap::new()),
+            source_library: source_library.to_string(),
+            source_relative_directory: source_relative_directory.to_string(),
         })
     }
 
@@ -770,10 +791,19 @@ impl InstrumentBank {
         if mono.is_empty() {
             return None;
         }
+        let source_filename = meta.path.file_name()?.to_str()?;
+        let source_relative_path = format!(
+            "{}/{}",
+            self.source_relative_directory.trim_end_matches('/'),
+            source_filename
+        );
         let decoded = Arc::new(DecodedSample {
             frames: mono,
             sample_rate: spec.sample_rate,
             midi: meta.midi,
+            source_library: self.source_library.clone(),
+            source_relative_path,
+            source_dynamic: meta.dynamic,
         });
         self.cache.lock().ok()?.insert(idx, decoded.clone());
         Some(decoded)
@@ -841,7 +871,7 @@ impl VcslLibrary {
                     SampleSource::Vcsl => root,
                     SampleSource::Vsco2 => vsco2_root,
                 };
-                if let Some(bank) = InstrumentBank::index(&base.join(sub)) {
+                if let Some(bank) = InstrumentBank::index(&base.join(sub), source.id(), sub) {
                     banks.insert(instrument, bank);
                 }
             }
@@ -850,7 +880,7 @@ impl VcslLibrary {
                     SampleSource::Vcsl => root,
                     SampleSource::Vsco2 => vsco2_root,
                 };
-                if let Some(bank) = InstrumentBank::index(&base.join(sub)) {
+                if let Some(bank) = InstrumentBank::index(&base.join(sub), source.id(), sub) {
                     staccato_banks.insert(instrument, bank);
                 }
             }
@@ -866,7 +896,11 @@ impl VcslLibrary {
                     SampleSource::Vsco2 => vsco2_root,
                 };
                 if let Some(bank) =
-                    InstrumentBank::index(&base.join(style.relative_directory))
+                    InstrumentBank::index(
+                        &base.join(style.relative_directory),
+                        style.source.id(),
+                        style.relative_directory,
+                    )
                 {
                     style_banks.insert((instrument, style.style_name), bank);
                 }
@@ -1513,7 +1547,11 @@ fn sample_directory_evidence_for_mapping(
     let directory = root.join(relative_directory);
     let directory_present = directory.is_dir();
     let bank = if directory_present {
-        InstrumentBank::index(&directory)
+        InstrumentBank::index(
+            &directory,
+            source.id(),
+            relative_directory,
+        )
     } else {
         None
     };
