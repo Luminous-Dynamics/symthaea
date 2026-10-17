@@ -22,7 +22,11 @@ pub struct ExperimentOption {
     pub design_id: String,
     /// Stable identifier of the solver, measurement tier or fidelity source.
     pub fidelity_id: String,
-    /// Estimated cost in the common, caller-declared cost unit.
+    /// Evaluation profile fixing how the relevance estimates are defined.
+    pub evaluation_profile_id: String,
+    /// Unit shared by all estimated costs in this evaluation.
+    pub cost_unit_id: String,
+    /// Estimated cost in the declared cost unit.
     pub estimated_cost_units: u64,
     /// Count of currently blocking constraint questions this option may inform.
     ///
@@ -53,11 +57,28 @@ impl ExperimentOption {
             id: id.into(),
             design_id: design_id.into(),
             fidelity_id: fidelity_id.into(),
+            evaluation_profile_id: String::new(),
+            cost_unit_id: String::new(),
             estimated_cost_units,
             blocking_constraints_addressed,
             frontier_pairs_addressed,
             uncertainty_reduction_units,
         }
+    }
+
+    /// Bind the estimates to their versioned interpretation and common cost unit.
+    ///
+    /// Ranking rejects an option whose contract is empty or differs from the
+    /// expected ranking contract. This prevents cost ratios from comparing
+    /// incompatible units or relevance scores from different versions.
+    pub fn with_contract(
+        mut self,
+        evaluation_profile_id: impl Into<String>,
+        cost_unit_id: impl Into<String>,
+    ) -> Self {
+        self.evaluation_profile_id = evaluation_profile_id.into();
+        self.cost_unit_id = cost_unit_id.into();
+        self
     }
 }
 
@@ -82,6 +103,8 @@ pub enum ExperimentSelectionError {
     EmptyOptionId,
     EmptyDesignId,
     EmptyFidelityId,
+    OptionEvaluationProfileMismatch,
+    OptionCostUnitMismatch,
     DuplicateOptionId,
     ZeroEstimatedCost,
 }
@@ -94,6 +117,10 @@ impl fmt::Display for ExperimentSelectionError {
             Self::EmptyOptionId => "experiment option identifiers must not be empty",
             Self::EmptyDesignId => "design identifiers must not be empty",
             Self::EmptyFidelityId => "fidelity identifiers must not be empty",
+            Self::OptionEvaluationProfileMismatch => {
+                "experiment option uses a different evaluation profile"
+            }
+            Self::OptionCostUnitMismatch => "experiment option uses a different cost unit",
             Self::DuplicateOptionId => "experiment option identifiers must be unique",
             Self::ZeroEstimatedCost => "estimated experiment cost must be greater than zero",
         };
@@ -135,7 +162,7 @@ pub fn rank_experiments(
     if cost_unit_id.trim().is_empty() {
         return Err(ExperimentSelectionError::EmptyCostUnitId);
     }
-    validate_options(options)?;
+    validate_options(options, evaluation_profile_id, cost_unit_id)?;
 
     let mut indices: Vec<usize> = (0..options.len()).collect();
     indices.sort_by(|left_index, right_index| {
@@ -183,6 +210,8 @@ pub fn rank_experiments(
 
 fn validate_options(
     options: &[ExperimentOption],
+    expected_profile_id: &str,
+    expected_cost_unit_id: &str,
 ) -> Result<(), ExperimentSelectionError> {
     let mut ids = HashSet::with_capacity(options.len());
     for option in options {
@@ -194,6 +223,18 @@ fn validate_options(
         }
         if option.fidelity_id.trim().is_empty() {
             return Err(ExperimentSelectionError::EmptyFidelityId);
+        }
+        if option.evaluation_profile_id.trim().is_empty() {
+            return Err(ExperimentSelectionError::EmptyEvaluationProfileId);
+        }
+        if option.evaluation_profile_id != expected_profile_id {
+            return Err(ExperimentSelectionError::OptionEvaluationProfileMismatch);
+        }
+        if option.cost_unit_id.trim().is_empty() {
+            return Err(ExperimentSelectionError::EmptyCostUnitId);
+        }
+        if option.cost_unit_id != expected_cost_unit_id {
+            return Err(ExperimentSelectionError::OptionCostUnitMismatch);
         }
         if !ids.insert(option.id.as_str()) {
             return Err(ExperimentSelectionError::DuplicateOptionId);
@@ -233,10 +274,10 @@ mod tests {
 
     fn options() -> Vec<ExperimentOption> {
         vec![
-            ExperimentOption::new("physical-a", "design-a", "lab", 100, 2, 5, 100),
-            ExperimentOption::new("analytic-b", "design-b", "analytic", 2, 0, 1, 5),
-            ExperimentOption::new("simulation-c", "design-c", "simulation", 20, 1, 3, 80),
-            ExperimentOption::new("physical-d", "design-d", "lab", 80, 3, 2, 120),
+            ExperimentOption::new("physical-a", "design-a", "lab", 100, 2, 5, 100).with_contract(PROFILE, COST_UNIT),
+            ExperimentOption::new("analytic-b", "design-b", "analytic", 2, 0, 1, 5).with_contract(PROFILE, COST_UNIT),
+            ExperimentOption::new("simulation-c", "design-c", "simulation", 20, 1, 3, 80).with_contract(PROFILE, COST_UNIT),
+            ExperimentOption::new("physical-d", "design-d", "lab", 80, 3, 2, 120).with_contract(PROFILE, COST_UNIT),
         ]
     }
 
@@ -351,7 +392,7 @@ mod tests {
         );
         assert_eq!(
             rank_experiments(
-                &[ExperimentOption::new("x", "design", "lab", 0, 0, 0, 0)],
+                &[ExperimentOption::new("x", "design", "lab", 0, 0, 0, 0).with_contract(PROFILE, COST_UNIT)],
                 PROFILE,
                 COST_UNIT,
                 ExperimentSelectionPolicy::CheapestFirst
@@ -361,8 +402,8 @@ mod tests {
         assert_eq!(
             rank_experiments(
                 &[
-                    ExperimentOption::new("x", "design", "lab", 1, 0, 0, 0),
-                    ExperimentOption::new("x", "other-design", "simulation", 2, 0, 0, 0),
+                    ExperimentOption::new("x", "design", "lab", 1, 0, 0, 0).with_contract(PROFILE, COST_UNIT),
+                    ExperimentOption::new("x", "other-design", "simulation", 2, 0, 0, 0).with_contract(PROFILE, COST_UNIT),
                 ],
                 PROFILE,
                 COST_UNIT,
@@ -372,7 +413,7 @@ mod tests {
         );
         assert_eq!(
             rank_experiments(
-                &[ExperimentOption::new("x", " ", "lab", 1, 0, 0, 0)],
+                &[ExperimentOption::new("x", " ", "lab", 1, 0, 0, 0).with_contract(PROFILE, COST_UNIT)],
                 PROFILE,
                 COST_UNIT,
                 ExperimentSelectionPolicy::CheapestFirst
