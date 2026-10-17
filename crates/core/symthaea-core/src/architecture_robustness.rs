@@ -437,14 +437,28 @@ pub fn evaluate_architecture_robustness(
         candidates,
         pairwise_assessments,
         assumptions: vec![
-            "Bounds are caller-declared conservative envelopes and are not authenticated.".to_owned(),
-            "Intervals are treated as independent; cross-metric and within-person correlations are not modeled.".to_owned(),
-            "May-dominate results are logical possibilities, not probabilities or predictions.".to_owned(),
-            "Observed sample ranges and confidence intervals are not automatically valid conservative envelopes.".to_owned(),
-            "Mass-envelope consistency checks are necessary screens and do not prove physical consistency.".to_owned(),
-            "This is report-only research software; it emits no actuator commands and is not a safety case.".to_owned(),
+            "Bounds are caller-declared conservative envelopes and are not authenticated."
+                .to_owned(),
+            "Intervals are treated as independent; cross-metric and within-person"
+                .to_owned()
+                + " correlations are not modeled.",
+            "May-dominate results are logical possibilities, not probabilities or predictions."
+                .to_owned(),
+            "Observed sample ranges and confidence intervals are not automatically valid"
+                .to_owned()
+                + " conservative envelopes.",
+            "Mass-envelope consistency checks are necessary screens and do not prove"
+                .to_owned()
+                + " physical consistency.",
+            "This is report-only research software; it emits no actuator commands"
+                .to_owned()
+                + " and is not a safety case.",
         ],
-        claim_ceiling: "Interval-aware synthetic/replay screening only. No physical, clinical, safety, regulatory, or product-performance claim.".to_owned(),
+        claim_ceiling: concat!(
+            "Interval-aware synthetic/replay screening only. No physical, clinical, ",
+            "safety, regulatory, or product-performance claim."
+        )
+        .to_owned(),
     })
 }
 
@@ -631,51 +645,186 @@ mod tests {
     fn metric_interval(metric: ArchitectureMetricV1, profile: Profile) -> MetricIntervalV1 {
         use ArchitectureMetricV1 as M;
         match (metric, profile) {
-            (M::TaskSuccessRate, Profile::Balanced) => MetricIntervalV1 { lower: 0.90, upper: 0.95 },
-            (M::TaskSuccessRate, Profile::Overbuilt) => MetricIntervalV1 { lower: 0.65, upper: 0.75 },
-            (M::TaskSuccessRate, Profile::MassFirst) => MetricIntervalV1 { lower: 0.55, upper: 0.62 },
-            (M::ComfortScore, Profile::Balanced) => MetricIntervalV1 { lower: 0.82, upper: 0.88 },
-            (M::ComfortScore, Profile::Overbuilt) => MetricIntervalV1 { lower: 0.50, upper: 0.60 },
-            (M::ComfortScore, Profile::MassFirst) => MetricIntervalV1 { lower: 0.55, upper: 0.65 },
-            (M::MovementRestrictionIndex, Profile::Balanced) => MetricIntervalV1 { lower: 0.10, upper: 0.20 },
-            (M::MovementRestrictionIndex, Profile::Overbuilt) => MetricIntervalV1 { lower: 0.45, upper: 0.55 },
-            (M::MovementRestrictionIndex, Profile::MassFirst) => MetricIntervalV1 { lower: 0.05, upper: 0.10 },
-            (M::WearerBorneMassKg, Profile::Balanced) => MetricIntervalV1 { lower: 4.5, upper: 5.0 },
-            (M::WearerBorneMassKg, Profile::Overbuilt) => MetricIntervalV1 { lower: 7.7, upper: 8.2 },
-            (M::WearerBorneMassKg, Profile::MassFirst) => MetricIntervalV1 { lower: 2.0, upper: 2.4 },
-            (M::TotalSystemMassKg, Profile::Balanced) => MetricIntervalV1 { lower: 5.2, upper: 5.7 },
-            (M::TotalSystemMassKg, Profile::Overbuilt) => MetricIntervalV1 { lower: 8.8, upper: 9.3 },
-            (M::TotalSystemMassKg, Profile::MassFirst) => MetricIntervalV1 { lower: 2.3, upper: 2.8 },
-            (M::OffboardMassKg, Profile::Balanced) => MetricIntervalV1 { lower: 0.3, upper: 0.5 },
-            (M::OffboardMassKg, Profile::Overbuilt) => MetricIntervalV1 { lower: 0.5, upper: 0.7 },
-            (M::OffboardMassKg, Profile::MassFirst) => MetricIntervalV1 { lower: 0.1, upper: 0.2 },
-            (M::TorsoMassKg, Profile::Balanced) => MetricIntervalV1 { lower: 0.5, upper: 0.7 },
-            (M::TorsoMassKg, Profile::Overbuilt) => MetricIntervalV1 { lower: 0.9, upper: 1.1 },
-            (M::TorsoMassKg, Profile::MassFirst) => MetricIntervalV1 { lower: 0.2, upper: 0.3 },
-            (M::PelvisMassKg, Profile::Balanced) => MetricIntervalV1 { lower: 0.8, upper: 1.0 },
-            (M::PelvisMassKg, Profile::Overbuilt) => MetricIntervalV1 { lower: 1.4, upper: 1.6 },
-            (M::PelvisMassKg, Profile::MassFirst) => MetricIntervalV1 { lower: 0.3, upper: 0.5 },
-            (M::ProximalLimbMassKg, Profile::Balanced) => MetricIntervalV1 { lower: 1.1, upper: 1.3 },
-            (M::ProximalLimbMassKg, Profile::Overbuilt) => MetricIntervalV1 { lower: 2.0, upper: 2.2 },
-            (M::ProximalLimbMassKg, Profile::MassFirst) => MetricIntervalV1 { lower: 0.5, upper: 0.7 },
-            (M::DistalLimbMassKg, Profile::Balanced) => MetricIntervalV1 { lower: 1.0, upper: 1.2 },
-            (M::DistalLimbMassKg, Profile::Overbuilt) => MetricIntervalV1 { lower: 2.0, upper: 2.3 },
-            (M::DistalLimbMassKg, Profile::MassFirst) => MetricIntervalV1 { lower: 0.5, upper: 0.7 },
-            (M::OtherWornMassKg, Profile::Balanced) => MetricIntervalV1 { lower: 0.4, upper: 0.5 },
-            (M::OtherWornMassKg, Profile::Overbuilt) => MetricIntervalV1 { lower: 0.6, upper: 0.8 },
-            (M::OtherWornMassKg, Profile::MassFirst) => MetricIntervalV1 { lower: 0.3, upper: 0.4 },
-            (M::EnergyWhPerTask, Profile::Balanced) => MetricIntervalV1 { lower: 1.0, upper: 1.2 },
-            (M::EnergyWhPerTask, Profile::Overbuilt) => MetricIntervalV1 { lower: 2.0, upper: 2.2 },
-            (M::EnergyWhPerTask, Profile::MassFirst) => MetricIntervalV1 { lower: 0.4, upper: 0.6 },
-            (M::SetupTimeSeconds, Profile::Balanced) => MetricIntervalV1 { lower: 40.0, upper: 45.0 },
-            (M::SetupTimeSeconds, Profile::Overbuilt) => MetricIntervalV1 { lower: 70.0, upper: 80.0 },
-            (M::SetupTimeSeconds, Profile::MassFirst) => MetricIntervalV1 { lower: 20.0, upper: 30.0 },
-            (M::TetherInterferenceEventsPerTask, Profile::Balanced) => MetricIntervalV1 { lower: 0.0, upper: 0.1 },
-            (M::TetherInterferenceEventsPerTask, Profile::Overbuilt) => MetricIntervalV1 { lower: 0.2, upper: 0.3 },
-            (M::TetherInterferenceEventsPerTask, Profile::MassFirst) => MetricIntervalV1 { lower: 0.05, upper: 0.1 },
-            (M::RepairTimeMinutes, Profile::Balanced) => MetricIntervalV1 { lower: 20.0, upper: 25.0 },
-            (M::RepairTimeMinutes, Profile::Overbuilt) => MetricIntervalV1 { lower: 40.0, upper: 50.0 },
-            (M::RepairTimeMinutes, Profile::MassFirst) => MetricIntervalV1 { lower: 10.0, upper: 15.0 },
+            (M::TaskSuccessRate, Profile::Balanced) => MetricIntervalV1 {
+                lower: 0.90,
+                upper: 0.95,
+            },
+            (M::TaskSuccessRate, Profile::Overbuilt) => MetricIntervalV1 {
+                lower: 0.65,
+                upper: 0.75,
+            },
+            (M::TaskSuccessRate, Profile::MassFirst) => MetricIntervalV1 {
+                lower: 0.55,
+                upper: 0.62,
+            },
+            (M::ComfortScore, Profile::Balanced) => MetricIntervalV1 {
+                lower: 0.82,
+                upper: 0.88,
+            },
+            (M::ComfortScore, Profile::Overbuilt) => MetricIntervalV1 {
+                lower: 0.50,
+                upper: 0.60,
+            },
+            (M::ComfortScore, Profile::MassFirst) => MetricIntervalV1 {
+                lower: 0.55,
+                upper: 0.65,
+            },
+            (M::MovementRestrictionIndex, Profile::Balanced) => MetricIntervalV1 {
+                lower: 0.10,
+                upper: 0.20,
+            },
+            (M::MovementRestrictionIndex, Profile::Overbuilt) => MetricIntervalV1 {
+                lower: 0.45,
+                upper: 0.55,
+            },
+            (M::MovementRestrictionIndex, Profile::MassFirst) => MetricIntervalV1 {
+                lower: 0.05,
+                upper: 0.10,
+            },
+            (M::WearerBorneMassKg, Profile::Balanced) => MetricIntervalV1 {
+                lower: 4.5,
+                upper: 5.0,
+            },
+            (M::WearerBorneMassKg, Profile::Overbuilt) => MetricIntervalV1 {
+                lower: 7.7,
+                upper: 8.2,
+            },
+            (M::WearerBorneMassKg, Profile::MassFirst) => MetricIntervalV1 {
+                lower: 2.0,
+                upper: 2.4,
+            },
+            (M::TotalSystemMassKg, Profile::Balanced) => MetricIntervalV1 {
+                lower: 5.2,
+                upper: 5.7,
+            },
+            (M::TotalSystemMassKg, Profile::Overbuilt) => MetricIntervalV1 {
+                lower: 8.8,
+                upper: 9.3,
+            },
+            (M::TotalSystemMassKg, Profile::MassFirst) => MetricIntervalV1 {
+                lower: 2.3,
+                upper: 2.8,
+            },
+            (M::OffboardMassKg, Profile::Balanced) => MetricIntervalV1 {
+                lower: 0.3,
+                upper: 0.5,
+            },
+            (M::OffboardMassKg, Profile::Overbuilt) => MetricIntervalV1 {
+                lower: 0.5,
+                upper: 0.7,
+            },
+            (M::OffboardMassKg, Profile::MassFirst) => MetricIntervalV1 {
+                lower: 0.1,
+                upper: 0.2,
+            },
+            (M::TorsoMassKg, Profile::Balanced) => MetricIntervalV1 {
+                lower: 0.5,
+                upper: 0.7,
+            },
+            (M::TorsoMassKg, Profile::Overbuilt) => MetricIntervalV1 {
+                lower: 0.9,
+                upper: 1.1,
+            },
+            (M::TorsoMassKg, Profile::MassFirst) => MetricIntervalV1 {
+                lower: 0.2,
+                upper: 0.3,
+            },
+            (M::PelvisMassKg, Profile::Balanced) => MetricIntervalV1 {
+                lower: 0.8,
+                upper: 1.0,
+            },
+            (M::PelvisMassKg, Profile::Overbuilt) => MetricIntervalV1 {
+                lower: 1.4,
+                upper: 1.6,
+            },
+            (M::PelvisMassKg, Profile::MassFirst) => MetricIntervalV1 {
+                lower: 0.3,
+                upper: 0.5,
+            },
+            (M::ProximalLimbMassKg, Profile::Balanced) => MetricIntervalV1 {
+                lower: 1.1,
+                upper: 1.3,
+            },
+            (M::ProximalLimbMassKg, Profile::Overbuilt) => MetricIntervalV1 {
+                lower: 2.0,
+                upper: 2.2,
+            },
+            (M::ProximalLimbMassKg, Profile::MassFirst) => MetricIntervalV1 {
+                lower: 0.5,
+                upper: 0.7,
+            },
+            (M::DistalLimbMassKg, Profile::Balanced) => MetricIntervalV1 {
+                lower: 1.0,
+                upper: 1.2,
+            },
+            (M::DistalLimbMassKg, Profile::Overbuilt) => MetricIntervalV1 {
+                lower: 2.0,
+                upper: 2.3,
+            },
+            (M::DistalLimbMassKg, Profile::MassFirst) => MetricIntervalV1 {
+                lower: 0.5,
+                upper: 0.7,
+            },
+            (M::OtherWornMassKg, Profile::Balanced) => MetricIntervalV1 {
+                lower: 0.4,
+                upper: 0.5,
+            },
+            (M::OtherWornMassKg, Profile::Overbuilt) => MetricIntervalV1 {
+                lower: 0.6,
+                upper: 0.8,
+            },
+            (M::OtherWornMassKg, Profile::MassFirst) => MetricIntervalV1 {
+                lower: 0.3,
+                upper: 0.4,
+            },
+            (M::EnergyWhPerTask, Profile::Balanced) => MetricIntervalV1 {
+                lower: 1.0,
+                upper: 1.2,
+            },
+            (M::EnergyWhPerTask, Profile::Overbuilt) => MetricIntervalV1 {
+                lower: 2.0,
+                upper: 2.2,
+            },
+            (M::EnergyWhPerTask, Profile::MassFirst) => MetricIntervalV1 {
+                lower: 0.4,
+                upper: 0.6,
+            },
+            (M::SetupTimeSeconds, Profile::Balanced) => MetricIntervalV1 {
+                lower: 40.0,
+                upper: 45.0,
+            },
+            (M::SetupTimeSeconds, Profile::Overbuilt) => MetricIntervalV1 {
+                lower: 70.0,
+                upper: 80.0,
+            },
+            (M::SetupTimeSeconds, Profile::MassFirst) => MetricIntervalV1 {
+                lower: 20.0,
+                upper: 30.0,
+            },
+            (M::TetherInterferenceEventsPerTask, Profile::Balanced) => MetricIntervalV1 {
+                lower: 0.0,
+                upper: 0.1,
+            },
+            (M::TetherInterferenceEventsPerTask, Profile::Overbuilt) => MetricIntervalV1 {
+                lower: 0.2,
+                upper: 0.3,
+            },
+            (M::TetherInterferenceEventsPerTask, Profile::MassFirst) => MetricIntervalV1 {
+                lower: 0.05,
+                upper: 0.1,
+            },
+            (M::RepairTimeMinutes, Profile::Balanced) => MetricIntervalV1 {
+                lower: 20.0,
+                upper: 25.0,
+            },
+            (M::RepairTimeMinutes, Profile::Overbuilt) => MetricIntervalV1 {
+                lower: 40.0,
+                upper: 50.0,
+            },
+            (M::RepairTimeMinutes, Profile::MassFirst) => MetricIntervalV1 {
+                lower: 10.0,
+                upper: 15.0,
+            },
         }
     }
 
@@ -736,7 +885,12 @@ mod tests {
         assert!(report.candidates[1].on_robust_frontier);
         assert!(!report.candidates[2].on_robust_frontier);
         assert_eq!(
-            report.candidates.iter().find(|c| c.candidate_id == "overbuilt").unwrap().robustly_dominated_by,
+            report
+                .candidates
+                .iter()
+                .find(|candidate| candidate.candidate_id == "overbuilt")
+                .expect("overbuilt assessment exists")
+                .robustly_dominated_by,
             vec!["balanced".to_owned()]
         );
         assert!(report.pairwise_assessments.iter().any(|pair| {
@@ -773,8 +927,18 @@ mod tests {
                 .expect("baseline envelopes are valid");
             assert!(baseline.pairwise_assessments[0].a_robustly_dominates_b);
 
-            let b_interval = b.metrics.iter().find(|entry| entry.metric == metric).unwrap().interval;
-            let a_interval = &mut a.metrics.iter_mut().find(|entry| entry.metric == metric).unwrap().interval;
+            let b_interval = b
+                .metrics
+                .iter()
+                .find(|entry| entry.metric == metric)
+                .expect("required metric exists")
+                .interval;
+            let a_interval = &mut a
+                .metrics
+                .iter_mut()
+                .find(|entry| entry.metric == metric)
+                .expect("required metric exists")
+                .interval;
             if is_higher_better(metric) {
                 a_interval.lower = (b_interval.upper - 0.1).max(0.0);
             } else {
@@ -838,10 +1002,20 @@ mod tests {
         .err()
         .unwrap()
         .iter()
-        .any(|finding| matches!(finding, ArchitectureRobustnessFindingV1::InvertedInterval { .. })));
+        .any(|finding| {
+            matches!(
+                finding,
+                ArchitectureRobustnessFindingV1::InvertedInterval { .. }
+            )
+        }));
 
         let mut normalized = candidate("normalized", Profile::Balanced);
-        normalized.metrics.iter_mut().find(|entry| entry.metric == ArchitectureMetricV1::ComfortScore).unwrap().interval =
+        normalized
+            .metrics
+            .iter_mut()
+            .find(|entry| entry.metric == ArchitectureMetricV1::ComfortScore)
+            .expect("comfort metric exists")
+            .interval =
             MetricIntervalV1 { lower: 0.8, upper: 1.1 };
         assert!(evaluate_architecture_robustness(&request(vec![
             normalized,
@@ -851,13 +1025,23 @@ mod tests {
         .err()
         .unwrap()
         .iter()
-        .any(|finding| matches!(finding, ArchitectureRobustnessFindingV1::OutsideNormalizedRange { .. })));
+        .any(|finding| {
+            matches!(
+                finding,
+                ArchitectureRobustnessFindingV1::OutsideNormalizedRange { .. }
+            )
+        }));
     }
 
     #[test]
     fn inconsistent_mass_envelopes_are_rejected() {
         let mut inconsistent = candidate("mass-invalid", Profile::Balanced);
-        inconsistent.metrics.iter_mut().find(|entry| entry.metric == ArchitectureMetricV1::WearerBorneMassKg).unwrap().interval =
+        inconsistent
+            .metrics
+            .iter_mut()
+            .find(|entry| entry.metric == ArchitectureMetricV1::WearerBorneMassKg)
+            .expect("wearer mass metric exists")
+            .interval =
             MetricIntervalV1 { lower: 40.0, upper: 50.0 };
         assert!(evaluate_architecture_robustness(&request(vec![
             inconsistent,
@@ -867,7 +1051,12 @@ mod tests {
         .err()
         .unwrap()
         .iter()
-        .any(|finding| matches!(finding, ArchitectureRobustnessFindingV1::MassEnvelopeMismatch { .. })));
+        .any(|finding| {
+            matches!(
+                finding,
+                ArchitectureRobustnessFindingV1::MassEnvelopeMismatch { .. }
+            )
+        }));
     }
 
     #[derive(Deserialize)]
