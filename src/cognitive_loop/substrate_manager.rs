@@ -1515,6 +1515,39 @@ mod tests {
     }
 
     #[test]
+    fn test_energy_accumulation_overflow_fails_closed() {
+        let mut config = default_config();
+        config.enable_energy_budget = true;
+        config.energy_budget_joules_per_sec = Some(f64::MAX);
+
+        // A finite sample that overflows the cumulative sum is still invalid evidence.
+        let mut total_overflow = SubstrateManager::new(&config);
+        total_overflow.total_energy_spent = f64::MAX;
+        total_overflow.energy_per_cycle = f64::MAX;
+        total_overflow.tau_factor = 1.0;
+        total_overflow.tick_energy_at(&config, std::time::Instant::now());
+        assert!(!total_overflow.consciousness_viable);
+        assert_eq!(total_overflow.total_energy_spent, f64::MAX);
+        assert_eq!(total_overflow.energy_rate_window_started_at, None);
+
+        // Window accumulation can overflow independently before its rate closes.
+        let mut window_overflow = SubstrateManager::new(&config);
+        window_overflow.energy_per_cycle = 1.0e308;
+        window_overflow.tau_factor = 1.0;
+        window_overflow.energy_rate_window_joules = 1.0e308;
+        let start = std::time::Instant::now();
+        window_overflow.energy_rate_window_started_at = Some(start);
+        window_overflow.tick_energy_at(
+            &config,
+            start + std::time::Duration::from_millis(500),
+        );
+        assert!(!window_overflow.consciousness_viable);
+        assert_eq!(window_overflow.energy_rate_window_joules, 0.0);
+        assert_eq!(window_overflow.energy_rate_window_started_at, None);
+        assert_eq!(window_overflow.total_energy_spent, 1.0e308);
+    }
+
+    #[test]
     fn test_energy_rate_telemetry_reports_the_closed_monotonic_window() {
         let mut config = default_config();
         config.enable_energy_budget = true;
