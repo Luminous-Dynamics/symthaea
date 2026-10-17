@@ -737,7 +737,7 @@ mod tests {
         let (parent, run_dir) = copy_fixture_to_temp();
         let path = run_dir.join("decision-ledger.jsonl");
         let raw = fs::read_to_string(&path).expect("read copied decision ledger");
-        let changed = raw.replacen("\\"future_data_read\\":false", "\\"future_data_read\\":true", 1);
+        let changed = raw.replacen(r#""future_data_read":false"#, r#""future_data_read":true"#, 1);
         assert_ne!(raw, changed);
         fs::write(&path, changed).expect("write manipulated decision ledger");
         let audit = audit_optional_rescue_contract(&parent);
@@ -763,8 +763,8 @@ mod tests {
         let path = run_dir.join("audit-sampling-manifest.json");
         let raw = fs::read_to_string(&path).expect("read copied sampling manifest");
         let changed = raw.replace(
-            "\\"manifest_visibility\\": \\"evaluator_sealed_until_policy_run_complete\\"",
-            "\\"manifest_visibility\\": \\"public_before_run\\"",
+            r#""manifest_visibility": "evaluator_sealed_until_policy_run_complete""# ,
+            r#""manifest_visibility": "public_before_run""#,
         );
         assert_ne!(raw, changed);
         fs::write(&path, changed).expect("write exposed-sample manifest");
@@ -778,7 +778,7 @@ mod tests {
         let (parent, run_dir) = copy_fixture_to_temp();
         let path = run_dir.join("blinded-audit-results.jsonl");
         let raw = fs::read_to_string(&path).expect("read copied blinded outcomes");
-        let changed = raw.replacen("\\"labels_revealed_to_policy\\":false", "\\"labels_revealed_to_policy\\":true", 1);
+        let changed = raw.replacen(r#""labels_revealed_to_policy":false"#, r#""labels_revealed_to_policy":true"#, 1);
         assert_ne!(raw, changed);
         fs::write(&path, changed).expect("write revealed-label audit result");
         let audit = audit_optional_rescue_contract(&parent);
