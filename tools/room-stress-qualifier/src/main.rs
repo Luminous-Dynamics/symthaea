@@ -162,9 +162,7 @@ fn verify_evidence_reference(reference: &Value, evidence_root: &Path) -> Result<
             .components()
             .any(|component| !matches!(component, Component::Normal(_)))
     {
-        return Err(
-            "artifact_path must not contain absolute, current-directory, or parent components".into(),
-        );
+        return Err("artifact_path cannot contain absolute paths or dot segments".into());
     }
 
     let claimed_hash = reference
@@ -850,7 +848,7 @@ mod tests {
             EMBEDDED_SCHEMA,
             EMBEDDED_RUN_REPORT_SCHEMA,
             &report_text,
-        &repository_root(),
+            &repository_root(),
         )
         .unwrap();
         assert_eq!(summary.assertions_passed, 46);
@@ -870,7 +868,7 @@ mod tests {
             EMBEDDED_SCHEMA,
             EMBEDDED_RUN_REPORT_SCHEMA,
             &report_text,
-        &repository_root(),
+            &repository_root(),
         )
         .unwrap();
         assert!(summary.failures.iter().any(|failure| {
@@ -890,7 +888,7 @@ mod tests {
             EMBEDDED_SCHEMA,
             EMBEDDED_RUN_REPORT_SCHEMA,
             &report_text,
-        &repository_root(),
+            &repository_root(),
         )
         .unwrap_err();
         assert!(error.contains("benchmark digest mismatch"));
@@ -930,7 +928,7 @@ mod tests {
         )
         .unwrap();
         assert!(summary.failures.iter().any(|failure| {
-            failure.contains("must not contain absolute, current-directory, or parent components")
+            failure.contains("artifact_path cannot contain absolute paths or dot segments")
         }));
     }
 
@@ -945,7 +943,7 @@ mod tests {
             EMBEDDED_SCHEMA,
             EMBEDDED_RUN_REPORT_SCHEMA,
             &report_text,
-        &repository_root(),
+            &repository_root(),
         )
         .unwrap_err();
         assert!(error.contains("duplicate run result"));
