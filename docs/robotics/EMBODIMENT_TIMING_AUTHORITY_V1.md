@@ -28,7 +28,7 @@ A bridge that declares `BackendMeasuredClockRequired` must implement `step_with_
 - its step index matches the requested step;
 - its source is a measured monotonic or device clock, not configured simulation time.
 
-The bridge must additionally establish that the clock domain and epoch are authoritative for its plant. Constructors validate record shape; they cannot prove clock trustworthiness. Do not subtract timestamps across domains or epochs. Preserve the source timestamp separately from receive/arrival timestamps and command age.
+The bridge must additionally establish that the clock domain and epoch are authoritative for its plant. Constructors validate record shape; they cannot prove clock trustworthiness. Do not subtract timestamps across domains or epochs. Preserve the source timestamp separately from receive/arrival timestamps and command age. A validated record returned for an accepted step is also attached to the serialized `CycleMetadata.plant_step_timing` field so the evidence is available to replay/qualification tooling instead of existing only in debug logs; the field is omitted when no authorized timing record was accepted.
 
 The trait's default backend-measured method returns an error. A hardware implementation cannot silently fall back to configured cognitive `dt`.
 
