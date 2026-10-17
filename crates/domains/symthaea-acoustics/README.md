@@ -15,8 +15,10 @@ Pure std, zero dependencies, no symthaea-core link.
 - pareto — deterministic unweighted Pareto-front extraction for point estimates.
 - robust_pareto — conservative Pareto-front extraction from objective intervals
   under one declared profile.
-- experiment_selection — deterministic baselines and budgeted plans for already
-  eligible design × fidelity experiments.
+- experiment_selection — deterministic baselines and budgeted plans for eligible
+  design × fidelity experiments.
+- experiment_benchmark — synthetic known-truth scoring for policy comparisons,
+  with separate immediate spend and deferred validation obligations.
 
 ## Multi-objective acoustic design
 
@@ -39,20 +41,20 @@ evaluation profile; they are not probabilities and do not promise a measurement
 will resolve a question. Each option must identify its evaluation profile and
 common cost unit; mismatches fail closed.
 
-The ranker returns a full option order and profile metadata. Budget planning
-consumes that ranking only when the entire option snapshot is unchanged, which
-prevents stale indices being reused after costs, fidelity or relevance estimates
-change. The planner skips options that do not fit the remaining budget so a
-cheaper later option can still be selected. It returns selected and skipped IDs,
-estimated spend, remaining budget, profile, unit and policy as a replayable
-planning receipt. This receipt is not authorization to execute physical tests.
+Budget planning consumes a ranking only when the complete option snapshot is
+unchanged. The plan retains that snapshot, selected and skipped IDs, spend and
+unused budget. The benchmark scorer rejects a changed pool, stale indices,
+unknown/missing oracle outcomes, duplicate question resolution and arithmetic
+overflow. Oracle values are stored in a scorer-only case, not in the options
+passed to ranking. Each known question's value is counted at most once, and
+deferred validation cost is reported separately from immediate spend and
+end-to-end cost. These are synthetic benchmark units, not field-calibrated value.
 
-These utilities analyze derived inputs; they do not ingest raw measurements,
-establish microphone calibration, establish simulation validity, implement
-CTA-2034/AES75/IEC compliance, guarantee safety, or predict human preference.
-Raw observation and calibration provenance remains owned by FIELD. Objective
-measurements, model predictions, room response and listening-study outcomes
-must remain distinct evidence classes.
+These utilities do not ingest raw measurements, establish microphone calibration,
+establish simulation validity, implement CTA-2034/AES75/IEC compliance, guarantee
+safety, authorize physical actuation, or predict human preference. Raw observation
+and calibration provenance remains owned by FIELD. Objective measurements, model
+predictions, room response and listening-study outcomes must remain distinct.
 
 Run tests locally with:
 
