@@ -66,8 +66,8 @@ The optional NANO-013 contract is audited automatically when a run contains all 
 
 - `decision-ledger.jsonl`: one strict record per policy decision, with action, policy revision, input/state digests, per-decision cost, and explicit future-data/held-out-label leakage flags.
 - `eligible-window-frame.jsonl`: frozen frame used to define the probability-sampling population.
-- `preregistration-receipt.json`: binds the run, exact policy revision, frame digest, sampling method, seed commitment and pre-run/blinding declarations.
-- `audit-sampling-manifest.json`: declares a simple or stratified random sample, stratum population/sample counts and per-window inclusion probabilities.
+- `preregistration-receipt.json`: binds the run, exact policy revision, frame digest, seed commitment, and SHA-256 of the sealed sampling manifest, without listing the sampled window IDs.
+- `audit-sampling-manifest.json`: evaluator-only and sealed until the policy run completes; declares the sample, stratum population/sample counts and per-window inclusion probabilities. Its digest is committed in the pre-run receipt, and the post-run audit results bind to the exact raw manifest bytes.
 - `sampling-seed-reveal.json`: post-run seed disclosure checked against the precommitted digest.
 - `blinded-audit-results.jsonl`: independent reference outcomes with policy-query status, reference failures, and an explicit assertion that labels were not revealed to the policy.
 
@@ -77,7 +77,7 @@ Schemas: [decision record](schema/nano-rescue-decision.schema.json), [eligible-f
 
 The synthetic fixture lives at `fixtures/nano-rescue-valid/rescue-controller/`. It intentionally contains a sampled severe event where the policy chose `continue` instead of requesting reference. The structural audit may pass that bundle: this means only that the declared records reconcile. It is explicitly **not** a policy-performance pass. Unit tests also mutate the decision ledger to declare future-data access and mutate the manifest bytes to confirm fail-closed detection.
 
-A local manifest's own claim that it was frozen before the run is not independent proof of timestamp or blinding. Obtain a trusted signed/timestamped preregistration receipt and reference-provider evidence for real campaigns. A stratified estimate must apply the recorded inclusion probabilities; this integrity auditor validates the sampling contract but does not yet compute weighted recall, physical fidelity, survival estimates or confidence intervals. Those remain a separately preregistered evaluator responsibility.
+The evaluator-only manifest must not be mounted in the policy's readable filesystem before completion; a string flag cannot enforce access control. A local manifest's own claim that it was frozen before the run is not independent proof of timestamp or blinding. The pre-registration receipt's manifest digest enables trusted external timestamping/signing without disclosing the sample IDs. Obtain a trusted signed/timestamped preregistration receipt and reference-provider evidence for real campaigns. A stratified estimate must apply the recorded inclusion probabilities; this integrity auditor validates the sampling contract but does not yet compute weighted recall, physical fidelity, survival estimates or confidence intervals. Those remain a separately preregistered evaluator responsibility.
 
 ## Explicit claim ceiling
 
