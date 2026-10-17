@@ -26,16 +26,19 @@ The present increment is intentionally limited to capacitor-specific dielectric-
 
 ## Why this is timely
 
-1. **High-κ ceramic MLCCs.** The 2026 paper *Temperature-stable high-κ oxides for miniaturized capacitors* reports a hierarchical ML-guided strategy: identify promising structural families, then optimize local atomic features to balance high permittivity, low loss, and near-zero temperature dependence. This is a useful reference workflow—not evidence that Symthaea has reproduced it.  
-   Source: https://www.nature.com/articles/s41928-026-01721-1
+1. **High-κ ceramic MLCCs.** The October 2026 *Nature Electronics* research and briefing on dielectric design for microchip capacitors report a hierarchical ML-guided strategy: identify promising structural families, then optimize local atomic features to balance high permittivity, low loss, and temperature stability. This is a reference workflow—not evidence that Symthaea has reproduced it.  
+   Sources: https://www.nature.com/articles/s41928-026-01721-1 and https://www.nature.com/articles/s41928-026-01726-w
 
 2. **High-temperature polymer energy storage.** A 2024 *Nature Communications* study combined AI, polymer chemistry, and molecular engineering; it reported 8.3 J/cm³ at 200 °C for a discovered dielectric and compared it with commercially available polymer dielectrics at that temperature. This is a distinct capacitor regime from MLCC miniaturization, so its numbers must not be compared as if the applications and test protocols were interchangeable.  
    Source: https://www.nature.com/articles/s41467-024-50413-x
 
-3. **Calculated dielectric properties need uncertainty.** Materials Project dielectric tensors use first-principles density-functional perturbation theory, with published comparisons reporting typical nontrivial deviations and systematic overestimation. Its methodology reports a 16.2% mean absolute relative deviation for a specified GGA setup with local-field effects. This is a baseline for interpreting computed values, not a universal error bar for all materials or capacitor operating conditions.  
+3. **Calculated dielectric properties need uncertainty and an explicit applicability domain.** Materials Project dielectric tensors use first-principles density-functional perturbation theory. Its methodology reports a 16.2% mean absolute relative deviation for a specified GGA setup with local-field effects, along with a tendency to overestimate dielectric constants. That is a historical methodology-specific benchmark, not a universal error bar for every material. More importantly, the reported response is for a single crystal and a static/long-wavelength field; a polycrystalline processed ceramic, polymer film, or packaged capacitor at AC frequency and DC bias is a different engineering subject. Use these calculated values for candidate triage, not as direct product-performance labels.  
    Source: https://docs.materialsproject.org/methodology/materials-methodology/dielectricity
 
-4. **Real solver output must be interpreted.** ngspice supports batch analyses and raw-file output. Symthaea's current ngspice adapter can invoke the executable but explicitly does not yet parse real results into validated metrics; the next implementation step must complete that path rather than fill in fictional values.  
+4. **Research is moving toward generative, multi-objective dielectric design.** A June 2026 review surveys a transition from passive screening toward AI-driven generative design and highlights the coupled permittivity–breakdown-strength trade-off as a central challenge. Treat the review as a research map, not independent proof that one algorithm or model will outperform baselines.  
+   Source: https://doi.org/10.1021/acsami.6c05353
+
+5. **Real solver output must be interpreted.** ngspice supports batch analyses and raw-file output. Symthaea's current ngspice adapter can invoke the executable but explicitly does not yet parse real results into validated metrics; the next implementation step must complete that path rather than fill in fictional values.  
    Sources: https://ngspice.sourceforge.io/docs/ngspice-44-manual.pdf and https://github.com/Luminous-Dynamics/symthaea/blob/main/crates/bridges/symthaea-ngspice-bridge/src/lib.rs
 
 ## Paradigm shifts
@@ -52,6 +55,14 @@ No single metric defines a better capacitor. Search against application-specific
 - Lifetime/reliability evidence, cost, manufacturing yield, supply risk, and environmental impact.
 
 Hard electrical and safety constraints are not soft objectives that can be traded away for a prettier score. Keep a candidate's hard-constraint feasibility separate from its ranking.
+
+For a first-pass *linear, field-independent* dielectric model, a useful candidate-screening figure of merit is:
+
+```
+u_ideal,bd = 0.5 * epsilon_0 * epsilon_r * E_bd^2
+```
+
+where `E_bd` is the reported breakdown field. This exposes why maximizing `epsilon_r` alone is a bad search objective: breakdown strength enters quadratically. This equation is only an ideal theoretical bound and must not be reported as usable/rated energy density or safety margin. It omits defects, geometry, reliability statistics, leakage, thermal behavior, aging, and process variation. For nonlinear/ferroelectric storage materials, use measured charge/discharge `D(E)` or `P(E)` curves to calculate recoverable energy and efficiency rather than treating constant-permittivity equations as authoritative.
 
 ### 2. From material formula to process–structure–property–device lineage
 
