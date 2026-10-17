@@ -1,0 +1,242 @@
+{
+  "schema_version": "1.0.0",
+  "benchmark_id": "CULINARY-VALIDATOR-CORPUS",
+  "benchmark_version": "1.0.0",
+  "expected_case_count": 26,
+  "cases": [
+    {
+      "id": "EMULSION-VALID-INTERIOR-001",
+      "family": "emulsion",
+      "expected_status": "pass",
+      "expected_violation": null,
+      "input": { "dispersed_phase_fraction": 0.35 },
+      "rationale": "A physically admissible interior fraction is a positive control.",
+      "reference": "Project invariant implementation: crates/domains/symthaea-culinary/src/validate.rs"
+    },
+    {
+      "id": "EMULSION-RCP-BOUNDARY-001",
+      "family": "emulsion",
+      "expected_status": "pass",
+      "expected_violation": null,
+      "input": { "dispersed_phase_fraction": 0.7405 },
+      "rationale": "The defined model uses an inclusive random-close-packing boundary; equality must remain accepted.",
+      "reference": "Berryman (1983), Physical Review A 27; project parameter in thresholds.rs"
+    },
+    {
+      "id": "EMULSION-OVER-RCP-001",
+      "family": "emulsion",
+      "expected_status": "reject",
+      "expected_violation": "EmulsionBreaks",
+      "input": { "dispersed_phase_fraction": 0.75 },
+      "rationale": "A fraction above the configured model limit must be rejected, not silently clamped.",
+      "reference": "Berryman (1983), Physical Review A 27; project parameter in thresholds.rs"
+    },
+    {
+      "id": "EMULSION-NAN-001",
+      "family": "emulsion",
+      "expected_status": "reject",
+      "expected_violation": "InvalidNumericInput",
+      "input": { "dispersed_phase_fraction": "NaN" },
+      "rationale": "IEEE-754 NaN makes ordinary greater-than comparisons false; the validator must reject it explicitly.",
+      "reference": "Adversarial numeric regression; project input-integrity invariant"
+    },
+    {
+      "id": "HYDRATION-BREAD-VALID-001",
+      "family": "hydration",
+      "expected_status": "pass",
+      "expected_violation": null,
+      "input": { "dough": "Bread", "flour_g": 1000.0, "water_g": 700.0 },
+      "rationale": "70% bread hydration is a valid positive control under the configured model window.",
+      "reference": "Project parameter in thresholds.rs; culinary thresholds require contextual review"
+    },
+    {
+      "id": "HYDRATION-NEGATIVE-PAIRED-MASS-001",
+      "family": "hydration",
+      "expected_status": "reject",
+      "expected_violation": "InvalidNumericInput",
+      "input": { "dough": "Bread", "flour_g": -100.0, "water_g": -70.0 },
+      "rationale": "A plausible ratio formed by two negative masses must not bypass domain checks.",
+      "reference": "Adversarial numeric regression; project input-integrity invariant"
+    },
+    {
+      "id": "HYDRATION-ZERO-FLOUR-001",
+      "family": "hydration",
+      "expected_status": "reject",
+      "expected_violation": "InvalidNumericInput",
+      "input": { "dough": "Bread", "flour_g": 0.0, "water_g": 700.0 },
+      "rationale": "Hydration has a positive denominator requirement; zero flour cannot be normalized.",
+      "reference": "Adversarial numeric regression; project input-integrity invariant"
+    },
+    {
+      "id": "HYDRATION-OUTSIDE-WINDOW-001",
+      "family": "hydration",
+      "expected_status": "reject",
+      "expected_violation": "HydrationOutOfRange",
+      "input": { "dough": "Bread", "flour_g": 1000.0, "water_g": 900.0 },
+      "rationale": "A finite, non-negative ratio can still violate a declared process window.",
+      "reference": "Project parameter in thresholds.rs; culinary thresholds require contextual review"
+    },
+    {
+      "id": "DAIRY-PH-SMOOTH-VALID-001",
+      "family": "dairy",
+      "expected_status": "pass",
+      "expected_violation": null,
+      "input": { "ph": 6.5, "should_curdle": false },
+      "rationale": "The intent and configured pH rule agree for this positive control.",
+      "reference": "McGee (2004), On Food and Cooking; project parameter in thresholds.rs"
+    },
+    {
+      "id": "DAIRY-PH-OUT-OF-DOMAIN-001",
+      "family": "dairy",
+      "expected_status": "reject",
+      "expected_violation": "InvalidNumericInput",
+      "input": { "ph": 15.0, "should_curdle": false },
+      "rationale": "A pH value outside the declared numeric domain must not be interpreted as an ordinary dairy state.",
+      "reference": "Project input-domain invariant in validate.rs"
+    },
+    {
+      "id": "NUTRITION-REFERENCE-VALID-001",
+      "family": "nutrition",
+      "expected_status": "pass",
+      "expected_violation": null,
+      "input": { "protein_g": 10.0, "carb_g": 20.0, "fat_g": 5.0, "alcohol_g": 0.0, "sodium_mg": 600.0, "added_sugar_g": 10.0 },
+      "rationale": "A finite non-negative nutrient profile below the configured sodium and added-sugar thresholds is a positive control.",
+      "reference": "Merrill and Watt (1955), USDA Agriculture Handbook 74; FDA 21 CFR 101.9; project thresholds.rs"
+    },
+    {
+      "id": "NUTRITION-NAN-SODIUM-001",
+      "family": "nutrition",
+      "expected_status": "reject",
+      "expected_violation": "InvalidNumericInput",
+      "input": { "protein_g": 10.0, "carb_g": 20.0, "fat_g": 5.0, "alcohol_g": 0.0, "sodium_mg": "NaN", "added_sugar_g": 10.0 },
+      "rationale": "A non-finite nutrient quantity must be surfaced as invalid data rather than omitted from threshold checks.",
+      "reference": "Adversarial numeric regression; project input-integrity invariant"
+    },
+    {
+      "id": "NUTRITION-ENERGY-OVERFLOW-001",
+      "family": "nutrition",
+      "expected_status": "reject",
+      "expected_violation": "InvalidNumericInput",
+      "input": { "protein_g": "MAX", "carb_g": 0.0, "fat_g": 0.0, "alcohol_g": 0.0, "sodium_mg": 0.0, "added_sugar_g": 0.0 },
+      "rationale": "Finite component inputs whose derived energy overflows must not produce an apparently valid profile.",
+      "reference": "Atwater factor implementation; numeric overflow regression"
+    },
+    {
+      "id": "COAGULATION-EGG-WHITE-SETPOINT-001",
+      "family": "coagulation",
+      "expected_status": "pass",
+      "expected_violation": null,
+      "input": { "protein": "EggWhite", "trajectory_points": [[0.0, 63.0], [2.0, 63.0]] },
+      "rationale": "A trajectory exactly at the configured set-point is retained as a positive boundary control.",
+      "reference": "McGee (2004), On Food and Cooking; project parameter in thresholds.rs"
+    },
+    {
+      "id": "COAGULATION-EMPTY-TRAJECTORY-001",
+      "family": "coagulation",
+      "expected_status": "reject",
+      "expected_violation": "InvalidNumericInput",
+      "input": { "protein": "EggWhite", "trajectory_points": [] },
+      "rationale": "An empty process trajectory is not evidence that a process reached a set-point.",
+      "reference": "Project input-integrity invariant in validate.rs"
+    },
+    {
+      "id": "COAGULATION-ASTRONOMICAL-TEMP-001",
+      "family": "coagulation",
+      "expected_status": "reject",
+      "expected_violation": "InvalidNumericInput",
+      "input": { "protein": "EggWhite", "trajectory_points": [[0.0, 25.0], [5.0, "MAX"]] },
+      "rationale": "Extremely large finite temperature values must fail the input-envelope guard before set-point logic.",
+      "reference": "Project input sanity envelope in validate.rs; not a cooking or food-safety threshold"
+    },
+    {
+      "id": "COAGULATION-BELOW-ABSOLUTE-ZERO-001",
+      "family": "coagulation",
+      "expected_status": "reject",
+      "expected_violation": "InvalidNumericInput",
+      "input": { "protein": "EggWhite", "trajectory_points": [[0.0, -300.0], [5.0, -300.0]] },
+      "rationale": "A time-temperature trajectory below absolute zero is outside the model domain.",
+      "reference": "Project input-domain invariant in validate.rs"
+    },
+    {
+      "id": "CANDY-SOFT-BALL-VALID-001",
+      "family": "candy",
+      "expected_status": "pass",
+      "expected_violation": null,
+      "input": { "stage": "SoftBall", "trajectory_points": [[0.0, 100.0], [2.0, 114.0]] },
+      "rationale": "A valid positive trajectory reaches the configured soft-ball stage window.",
+      "reference": "McGee (2004), On Food and Cooking; project parameter in thresholds.rs"
+    },
+    {
+      "id": "CANDY-REVERSED-TIME-001",
+      "family": "candy",
+      "expected_status": "reject",
+      "expected_violation": "InvalidNumericInput",
+      "input": { "stage": "SoftBall", "trajectory_points": [[5.0, 114.0], [0.0, 114.0]] },
+      "rationale": "Out-of-order time values must not be silently skipped by process integration.",
+      "reference": "Project trajectory integrity invariant in validate.rs"
+    },
+    {
+      "id": "FRYING-CANOLA-BOUNDARY-001",
+      "family": "frying",
+      "expected_status": "pass",
+      "expected_violation": null,
+      "input": { "fat": "CanolaOil", "trajectory_points": [[0.0, 180.0], [3.0, 204.0]] },
+      "rationale": "The configured smoke-point comparison is inclusive at equality; this anchors the implemented behavior without asserting all oils share one value.",
+      "reference": "Project parameter in thresholds.rs; values vary by refinement and product"
+    },
+    {
+      "id": "FRYING-ABOVE-SMOKE-POINT-001",
+      "family": "frying",
+      "expected_status": "reject",
+      "expected_violation": "FatSmoking",
+      "input": { "fat": "CanolaOil", "trajectory_points": [[0.0, 180.0], [3.0, 205.0]] },
+      "rationale": "The configured smoke-point constraint must reject a trajectory that exceeds the selected fat's model parameter.",
+      "reference": "Project parameter in thresholds.rs; not a fire-safety certification"
+    },
+    {
+      "id": "PASTEURIZATION-NAN-TARGET-001",
+      "family": "pasteurization",
+      "expected_status": "reject",
+      "expected_violation": "InvalidNumericInput",
+      "input": { "pathogen": "SalmonellaPoultry", "required_log_reduction": "NaN", "trajectory_points": [[0.0, 60.0], [5.0, 60.0]] },
+      "rationale": "A non-finite requested target is invalid even when the trajectory is finite.",
+      "reference": "Project numeric-integrity invariant; Murphy et al. (2004) model parameters"
+    },
+    {
+      "id": "PASTEURIZATION-LETHALITY-OVERFLOW-001",
+      "family": "pasteurization",
+      "expected_status": "reject",
+      "expected_violation": "InvalidNumericInput",
+      "input": { "pathogen": "SalmonellaPoultry", "required_log_reduction": null, "trajectory_points": [[0.0, 999.0], ["MAX", 999.0]] },
+      "rationale": "A finite but absurd-duration trajectory that overflows integrated lethality must be rejected as invalid computation, not treated as successful pathogen reduction.",
+      "reference": "Murphy et al. (2004) model parameters; project 1000 C input-envelope guard is not a validated process limit"
+    },
+    {
+      "id": "NUTRITION-SODIUM-THRESHOLD-001",
+      "family": "nutrition",
+      "expected_status": "reject",
+      "expected_violation": "SodiumExceedsLimit",
+      "input": { "protein_g": 10.0, "carb_g": 20.0, "fat_g": 5.0, "alcohol_g": 0.0, "sodium_mg": 3000.0, "added_sugar_g": 10.0 },
+      "rationale": "A valid finite nutrient value above the configured daily-value threshold remains a distinct policy violation.",
+      "reference": "FDA 21 CFR 101.9; project threshold in thresholds.rs"
+    },
+    {
+      "id": "DAIRY-CURDLING-INTENT-MISMATCH-001",
+      "family": "dairy",
+      "expected_status": "reject",
+      "expected_violation": "DairyWillCurdle",
+      "input": { "ph": 4.2, "should_curdle": false },
+      "rationale": "A valid pH can still conflict with the requested smooth-dairy outcome.",
+      "reference": "McGee (2004), On Food and Cooking; project parameter in thresholds.rs"
+    },
+    {
+      "id": "CANDY-UNDERCOOKED-001",
+      "family": "candy",
+      "expected_status": "reject",
+      "expected_violation": "CandyUndercooked",
+      "input": { "stage": "SoftBall", "trajectory_points": [[0.0, 100.0], [2.0, 108.0]] },
+      "rationale": "A numerically valid trajectory below the requested stage is a modeled process violation, not invalid numeric input.",
+      "reference": "McGee (2004), On Food and Cooking; project parameter in thresholds.rs"
+    }
+  ]
+}
