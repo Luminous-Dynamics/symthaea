@@ -30,7 +30,7 @@ The first oracle tests two behaviours:
 - **SHARED-CELL-CONFLICT-002:** a route from the wet-room AC port to a different declared tap coordinate on the same service ID shares a multi-cell path segment with the cabin route. Both routes must list each other as conflicts.
 - **SHARED-SERVICE-TERMINAL-003:** two routes that share only the exact declared AC-bus service endpoint must not be called a collision just because they terminate at the same point. Additional shared path cells remain conflicts. This is a conservative graph distinction, not proof that a physical junction or manifold is approved.
 
-Additional tests cover connection-ID binding, port-side validation, reserved-zone endpoint blockage, route-request uniqueness, search-budget exhaustion, and recomputed-report integrity. These are authored Rust tests, not executed test results.
+Additional tests cover connection-ID binding, port-side and Z-elevation validation, reserved-zone endpoint blockage, a full-width no-path wall, a thin sub-grid obstacle crossing, route-request uniqueness, search-budget exhaustion, a hand-calculated open-grid optimum, independent emitted-path tamper rejection, shared-terminal classification, and recomputed-report integrity. These are authored Rust tests, not executed test results.
 
 ## Benchmark targets (proposals, not measured results)
 
@@ -74,7 +74,7 @@ If a route is blocked or unresolved, report which missing input would change the
 
 ### 5. Independent verification
 
-Check A* against Dijkstra on tiny grids, fuzz obstacle boundaries, and inject false port anchors, route clearance violations, stale connection references, no-path walls, and shared-cell conflicts. Add a second route checker that reconstructs and independently validates every emitted path from raw inputs.
+Check A* against Dijkstra on tiny grids, fuzz obstacle boundaries, and inject false port anchors, route clearance violations, stale connection references, no-path walls, and shared-cell conflicts. A separate emitted-path audit now checks declared endpoints, grid alignment, orthogonal step size, obstacle crossings, route metrics and route-conflict lists before report verification accepts the recomputed result. Continue testing that checker independently against hand-built bad polylines and exhaustive tiny grids.
 
 ## Verification boundary
 
