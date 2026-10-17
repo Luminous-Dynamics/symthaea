@@ -126,12 +126,15 @@ Report listener counts, uncertainty, per-class confusion, source/baseline and fa
 ### P2 — Per-instrument render receipts and probe grid
 - First increment now exists as `src/bin/muse_instrument_probe.rs` and is auto-discovered by Cargo as `muse_instrument_probe`.
 - It probes all 46 registered instrument variants on a common 3-pitch × 3-velocity grid (220/440/880 Hz; velocities 0.2/0.5/0.9), with two exact rerenders by default.
-- Per-case JSON reports peak, RMS, DC mean, non-finite count, near-silence classification, clipped sample count, SHA-256 of the actual rendered float samples, and whether repeated hashes match.
+- Per-case JSON reports peak, RMS, DC mean, non-finite count, near-silence classification, clipped sample count, SHA-256 of the actual rendered float samples, whether repeated hashes match, and an exploratory YIN-periodicity pitch estimate with signed cents error and confidence when measurable.
+- The probe aggregates RMS across the 0.2 / 0.5 / 0.9 velocity cells for each instrument/pitch, including adjacent level changes in dB and an RMS-monotonicity flag. This is a diagnostic—not a universal requirement that all sample layers or percussive timbres be strictly monotonic.
 - The new `render_arrangement_with_evidence` API attaches the selected per-note renderer path and sample-selection outcome. The probe checks that receipts match the requested note controls and remain stable across repeated renders.
 - Receipt paths distinguish named/default sample rendering, Karplus–Strong, FM, ordinary additive synthesis, and the legacy mood-derived path when no instrument identity is assigned. Sample fallback status differentiates a missing library from an unavailable bank, pitch/velocity selection, or short articulation.
 - When an actual WAV is selected, the receipt includes source library, exact source-root-relative path, recorded root MIDI pitch, sample rate, filename-derived dynamic layer, and applied pitch shift in semitones. The absolute machine-specific asset root is excluded.
 - The common pitch grid is a **signal-health smoke grid, not a valid range claim for every instrument**. Use a future source-derived capability-range manifest to choose each instrument's real test register.
 - A selected sample path means the renderer picked and rendered a compatible sample; it does not prove pitch fidelity, full source-bank coverage, authentic technique, or perceptual quality.
+- The pitch estimator searches 60–1500 Hz on a post-onset window. Status and periodicity confidence remain part of the output: low-periodicity or inharmonic tones must not be assigned a false pass or treated as a calibrated pitch failure. No pitch metric changes the current render outcome gate.
+- Schema revision is `melothaea.instrument-probe.v2`. The shared grid remains a smoke test; once source-derived ranges and per-family calibration are added, use those instead of scoring all 46 instruments with one generic range.
 - The tool makes no network calls and performs no heavyweight asset download by default.
 
 Example commands:
@@ -147,7 +150,7 @@ cargo run -p symthaea-muse --bin muse_instrument_probe -- --instrument all > mel
 cargo run -p symthaea-muse --bin muse_instrument_probe -- --instrument harmonica --repeats 1
 ```
 
-Use `cargo test -p symthaea-muse --bin muse_instrument_probe` for the CLI's roster, bounds and signal-metric unit tests. These tests and commands are authored/documented but are not marked as executed by this change.
+Use `cargo test -p symthaea-muse --bin muse_instrument_probe` for roster/bounds checks, synthetic sine pitch-estimator sanity tests, silence rejection and velocity-response summary tests. These tests and commands are authored/documented but are not marked as executed by this change.
 
 The next increment should add instrument-specific range, pitch-accuracy and gesture tests, and bind receipts to explicit renderer and asset-content digests. Keep a per-note evidence record linking the requested instrument, selected renderer, selected source sample when known, signal checks, and exact renderer/asset digests. Do not collapse these fields into a pooled “instrument score.”
 
@@ -170,8 +173,29 @@ This plan is designed to let source work and local evaluation proceed without wa
 
 ## 7. Research anchors for evaluation design
 
-- [MIREX 2026 Music Evaluation via CMI-RewardBench](https://www.music-ir.org/mirex/wiki/2026%3AMusic_Evaluation_via_CMI-RewardBench) uses pairwise comparisons and evaluates automatic metrics against human preference; the lesson for Melothaea is to publish signal measurements and human ratings as separate evidence channels.
+- [MIREX 2026 Music Evaluation via CMI-RewardBench](https://www.music-ir.org/mirex/wiki/2026%3AMusic_Evaluation_via_CMI-RewardBench) uses pairwise comparisons to evaluate automatic metrics against human preference; the lesson for Melothaea is to publish signal measurements and human ratings as separate evidence channels.
+- The [YIN fundamental-frequency method](https://pubmed.ncbi.nlm.nih.gov/12002874/) provides a computationally efficient F0 diagnostic. Melothaea's first implementation is deliberately labelled exploratory, with confidence/status visible; it still needs instrument-family calibration and independent tests against known reference tones and acoustically inharmonic instruments.
 - [MIREX 2026 Symbolic Music Generation](https://www.music-ir.org/mirex/wiki/2026%3ASymbolic_Music_Generation) evaluates blind listener judgements along separate dimensions such as prompt coherence, creativity, structuredness, and musicality. These can guide later music-level studies, but they do not replace isolated instrument tests.
 - [ITU-R BS.1770-5](https://www.itu.int/rec/R-REC-BS.1770-5-202311-I) is the in-force recommendation for programme loudness and true-peak measurement. The initial probe only measures raw sample peak/RMS/DC and therefore must not label these as LUFS or true-peak compliance.
+
+
+
+## 8. Provisional performance gates (not yet achieved)
+
+These are engineering targets to adopt after the new v2 measurements are locally run and calibrated; they are not results.
+
+| Dimension | Proposed target | Qualification note |
+|---|---:|---|
+| Identity / receipt fidelity | 100% of probe cells have correct per-note receipts; zero missing or mismatched instrument/control fields | Hard deterministic gate |
+| Deterministic rendering | 100% exact PCM hashes match for deterministic paths under pinned environment/assets | Stochastic paths must declare seed/policy rather than be silently excluded |
+| Signal health | Zero non-finite samples; zero unexplained near-silent cells in declared playable range | Unsupported cells must be explicit, not counted as passes |
+| Periodic-tone pitch accuracy | Synthetic sine fixtures: median absolute error ≤ 2 cents; p95 ≤ 5 cents | Calibrate estimator using exact generated fixtures before using it to score instruments |
+| Instrument pitch accuracy | For calibrated, pitched instruments: median absolute error ≤ 5 cents and p95 ≤ 15 cents over supported range | Exclude or separately model inharmonic/percussive timbres and report low-confidence cells |
+| Velocity controllability | ≥95% of declared velocity-sensitive cells show expected loudness direction; exceptions explicitly documented | Treat this as a target only after per-instrument baseline and within-velocity repeatability are measured |
+| Source coverage | 100% of sample-backed cells trace to a relative source path, source root pitch, source rate, and asset manifest digest | Current receipts lack selected-WAV byte hash and complete root/manifest coupling |
+| Gesture semantics | 100% of marketed gestures have positive controls, negative controls, and renderer receipts | Untested gestures remain unavailable |
+| Human preference | Paired preference accuracy reported with confidence intervals; target ≥60% preference for improved vs matched baseline with lower 95% CI >50% | Separate instrumental identity, musicality, prompt alignment and production quality; blind review is required |
+
+**Do not collapse the table into one weighted score.** Report coverage per instrument, renderer/source route, pitch region, velocity region, and gesture. An aggregate score can conceal one instrument that is completely broken.
 
 **Definition of progress:** fewer unsupported musical requests, more reliably playable pitches/gestures, less undocumented fallback, and stronger audible distinction—not simply a larger instrument count. Style diversity expansion should resume after the instrument inventory, render grid, and first instrument-specific listening pack identify concrete gaps.

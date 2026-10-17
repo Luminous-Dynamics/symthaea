@@ -102,8 +102,11 @@ struct ProbeReport {
     cases_with_mismatched_receipts: usize,
     cases_with_render_path_mismatch: usize,
     cases_with_sample_evidence_mismatch: usize,
+    velocity_response_group_count: usize,
+    velocity_groups_with_non_monotonic_rms: usize,
     evidence_boundary: &'static str,
     cases: Vec<ProbeCase>,
+    velocity_response_groups: Vec<VelocityResponseGroup>,
 }
 
 #[derive(Debug, Serialize)]
@@ -133,7 +136,29 @@ struct ProbeCase {
     receipt_matches_request: bool,
     repeated_receipt_matches_request: Vec<bool>,
     render_path_repeats_match: bool,
+    estimated_pitch_hz: Option<f64>,
+    pitch_error_cents: Option<f64>,
+    pitch_periodicity_confidence: Option<f64>,
+    pitch_estimate_status: &'static str,
     outcome: &'static str,
+}
+
+#[derive(Debug, Serialize)]
+struct VelocityResponseGroup {
+    instrument: String,
+    requested_pitch_hz: f32,
+    velocities: Vec<f32>,
+    rms_levels: Vec<f64>,
+    adjacent_level_steps_db: Vec<Option<f64>>,
+    rms_is_monotonic_non_decreasing: bool,
+}
+
+#[derive(Debug, Clone, Copy, Serialize)]
+struct PitchDiagnostic {
+    status: &'static str,
+    estimated_pitch_hz: Option<f64>,
+    error_cents: Option<f64>,
+    periodicity_confidence: Option<f64>,
 }
 
 fn main() -> ExitCode {
@@ -196,6 +221,7 @@ fn run() -> Result<(), String> {
                 let mut selected_samples = Vec::with_capacity(options.repeats);
                 let mut receipt_matches = Vec::with_capacity(options.repeats);
                 let mut first_metrics = None;
+                let mut first_pitch: Option<PitchDiagnostic> = None;
                 for _ in 0..options.repeats {
                     let rendered = render_arrangement_with_evidence(
                         &arrangement,
@@ -231,11 +257,24 @@ fn run() -> Result<(), String> {
                     let hash = audio_sha256(&samples);
                     if first_metrics.is_none() {
                         first_metrics = Some(measure_signal(&samples, frames));
+                        first_pitch = Some(estimate_pitch_yin(
+                            &samples,
+                            options.sample_rate,
+                            2,
+                            options.note_ms,
+                            frequency_hz,
+                        ));
                     }
                     hashes.push(hash);
                 }
                 let metrics = first_metrics
                     .ok_or_else(|| "internal error: no render repetitions".to_string())?;
+                let pitch = first_pitch.unwrap_or(PitchDiagnostic {
+                    status: "missing_pitch_analysis",
+                    estimated_pitch_hz: None,
+                    error_cents: None,
+                    periodicity_confidence: None,
+                });
                 let repeat_hashes_match = hashes.windows(2).all(|pair| pair[0] == pair[1]);
                 let receipt_matches_request = receipt_matches.first().copied().unwrap_or(false);
                 let sample_evidence_repeats_match =
@@ -296,14 +335,23 @@ fn run() -> Result<(), String> {
                     receipt_matches_request,
                     repeated_receipt_matches_request: receipt_matches,
                     render_path_repeats_match,
+                    estimated_pitch_hz: pitch.estimated_pitch_hz,
+                    pitch_error_cents: pitch.error_cents,
+                    pitch_periodicity_confidence: pitch.periodicity_confidence,
+                    pitch_estimate_status: pitch.status,
                     outcome,
                 });
             }
         }
     }
 
+    let velocity_response_groups = build_velocity_response_groups(&cases);
+    let velocity_groups_with_non_monotonic_rms = velocity_response_groups
+        .iter()
+        .filter(|group| !group.rms_is_monotonic_non_decreasing)
+        .count();
     let report = ProbeReport {
-        schema_version: "melothaea.instrument-probe.v1",
+        schema_version: "melothaea.instrument-probe.v2",
         benchmark: "MEL-INST-PROBE-001",
         code_revision: option_env!("MEL_INSTRUMENT_PROBE_REV").unwrap_or("not_embedded"),
         sample_rate_hz: options.sample_rate,
@@ -341,8 +389,11 @@ fn run() -> Result<(), String> {
             .iter()
             .filter(|case| !case.sample_evidence_repeats_match)
             .count(),
-        evidence_boundary: "signal health, selected render/source-sample receipts, and same-process repeat determinism only; not pitch accuracy, instrument fidelity, or human preference",
+        velocity_response_group_count: velocity_response_groups.len(),
+        velocity_groups_with_non_monotonic_rms,
+        evidence_boundary: "signal health, renderer/source receipts, exploratory pitch estimate, velocity-response shape, and same-process repeat determinism; pitch diagnostics are not instrument-family calibrated and do not prove fidelity or human preference",
         cases,
+        velocity_response_groups,
     };
 
     let stdout = io::stdout();
@@ -439,6 +490,189 @@ fn procedural_family(instrument: Instrument) -> &'static str {
     } else {
         "additive_declared"
     }
+}
+
+
+/// Estimate the dominant periodicity in an onset-trimmed mono window with
+/// YIN's cumulative-mean-normalized difference function. For inharmonic or
+/// noisy timbres this can be low-confidence or octave-ambiguous; callers must
+/// retain status/confidence and must not treat a number as a pass by itself.
+fn estimate_pitch_yin(
+    interleaved_samples: &[f32],
+    sample_rate: u32,
+    channels: usize,
+    note_duration_ms: u64,
+    target_hz: f32,
+) -> PitchDiagnostic {
+    let unavailable = |status| PitchDiagnostic {
+        status,
+        estimated_pitch_hz: None,
+        error_cents: None,
+        periodicity_confidence: None,
+    };
+    if channels == 0 || sample_rate < 1 {
+        return unavailable("invalid_audio_shape");
+    }
+    let frames = interleaved_samples.len() / channels;
+    let declared_note_frames = ((note_duration_ms as u128) * (sample_rate as u128) / 1_000)
+        .min(frames as u128) as usize;
+    let start_frame = ((sample_rate as usize * 20) / 1_000).min(declared_note_frames / 5);
+    let end_frame = declared_note_frames;
+    if end_frame <= start_frame + 16 {
+        return unavailable("window_too_short");
+    }
+
+    let mut mono = Vec::with_capacity(end_frame - start_frame);
+    for frame in start_frame..end_frame {
+        let offset = frame * channels;
+        let mut frame_sum = 0.0_f64;
+        for channel in 0..channels {
+            let sample = interleaved_samples[offset + channel];
+            if !sample.is_finite() {
+                return unavailable("non_finite_analysis_window");
+            }
+            frame_sum += f64::from(sample);
+        }
+        mono.push(frame_sum / channels as f64);
+    }
+    if mono.is_empty() {
+        return unavailable("window_too_short");
+    }
+    let mean = mono.iter().sum::<f64>() / mono.len() as f64;
+    for sample in &mut mono {
+        *sample -= mean;
+    }
+    let rms = (mono.iter().map(|sample| sample * sample).sum::<f64>()
+        / mono.len() as f64)
+        .sqrt();
+    if !rms.is_finite() || rms < 1.0e-7 {
+        return unavailable("near_silent_window");
+    }
+
+    let min_frequency = 60.0_f64;
+    let max_frequency = 1_500.0_f64.min(f64::from(sample_rate) * 0.24);
+    let min_lag = (f64::from(sample_rate) / max_frequency).floor().max(2.0) as usize;
+    let max_lag = ((f64::from(sample_rate) / min_frequency).floor() as usize)
+        .min(mono.len() / 2);
+    if max_lag <= min_lag + 1 {
+        return unavailable("window_too_short_for_period_range");
+    }
+
+    let mut difference = vec![0.0_f64; max_lag + 1];
+    for tau in 1..=max_lag {
+        let mut sum = 0.0_f64;
+        let comparison_len = mono.len() - tau;
+        for index in 0..comparison_len {
+            let delta = mono[index] - mono[index + tau];
+            sum += delta * delta;
+        }
+        difference[tau] = sum;
+    }
+    let mut cumulative = 0.0_f64;
+    let mut cmnd = vec![1.0_f64; max_lag + 1];
+    for tau in 1..=max_lag {
+        cumulative += difference[tau];
+        cmnd[tau] = if cumulative > 1.0e-18 {
+            difference[tau] * tau as f64 / cumulative
+        } else {
+            1.0
+        };
+    }
+
+    // Prefer the first trough below the YIN threshold; otherwise retain the
+    // best observed lag but label low periodicity rather than declaring a pass.
+    const YIN_THRESHOLD: f64 = 0.15;
+    let mut chosen = None;
+    for tau in min_lag..max_lag {
+        if cmnd[tau] < YIN_THRESHOLD {
+            let mut trough = tau;
+            while trough + 1 < max_lag && cmnd[trough + 1] < cmnd[trough] {
+                trough += 1;
+            }
+            chosen = Some(trough);
+            break;
+        }
+    }
+    let tau = chosen.unwrap_or_else(|| {
+        (min_lag..=max_lag)
+            .min_by(|left, right| cmnd[*left].total_cmp(&cmnd[*right]))
+            .unwrap_or(min_lag)
+    });
+    let left = cmnd[tau.saturating_sub(1)];
+    let center = cmnd[tau];
+    let right = cmnd[(tau + 1).min(max_lag)];
+    let denominator = left - 2.0 * center + right;
+    let adjustment = if denominator.abs() > 1.0e-12 {
+        (0.5 * (left - right) / denominator).clamp(-0.5, 0.5)
+    } else {
+        0.0
+    };
+    let refined_lag = tau as f64 + adjustment;
+    if refined_lag <= 0.0 || !refined_lag.is_finite() {
+        return unavailable("invalid_period_estimate");
+    }
+    let estimate = f64::from(sample_rate) / refined_lag;
+    let confidence = (1.0 - center).clamp(0.0, 1.0);
+    let error_cents = if target_hz.is_finite() && target_hz > 0.0 {
+        Some(1_200.0 * (estimate / f64::from(target_hz)).log2())
+    } else {
+        None
+    };
+    PitchDiagnostic {
+        status: if confidence >= 0.60 {
+            "periodic_estimate_available"
+        } else {
+            "low_periodicity"
+        },
+        estimated_pitch_hz: Some(estimate),
+        error_cents,
+        periodicity_confidence: Some(confidence),
+    }
+}
+
+fn build_velocity_response_groups(cases: &[ProbeCase]) -> Vec<VelocityResponseGroup> {
+    let mut keys: Vec<(String, f32)> = cases
+        .iter()
+        .map(|case| (case.instrument.clone(), case.frequency_hz))
+        .collect();
+    keys.sort_by(|left, right| {
+        left.0
+            .cmp(&right.0)
+            .then_with(|| left.1.total_cmp(&right.1))
+    });
+    keys.dedup_by(|left, right| left.0 == right.0 && left.1 == right.1);
+    keys.into_iter()
+        .map(|(instrument, requested_pitch_hz)| {
+            let mut matching: Vec<&ProbeCase> = cases
+                .iter()
+                .filter(|case| {
+                    case.instrument == instrument && case.frequency_hz == requested_pitch_hz
+                })
+                .collect();
+            matching.sort_by(|left, right| left.velocity.total_cmp(&right.velocity));
+            let velocities: Vec<f32> = matching.iter().map(|case| case.velocity).collect();
+            let rms_levels: Vec<f64> = matching.iter().map(|case| case.rms).collect();
+            let adjacent_level_steps_db: Vec<Option<f64>> = rms_levels
+                .windows(2)
+                .map(|pair| {
+                    (pair[0].is_finite() && pair[1].is_finite()).then(|| {
+                        20.0 * (pair[1].max(1.0e-12) / pair[0].max(1.0e-12)).log10()
+                    })
+                })
+                .collect();
+            let rms_is_monotonic_non_decreasing = rms_levels
+                .windows(2)
+                .all(|pair| pair[1] + 1.0e-12 >= pair[0]);
+            VelocityResponseGroup {
+                instrument,
+                requested_pitch_hz,
+                velocities,
+                rms_levels,
+                adjacent_level_steps_db,
+                rms_is_monotonic_non_decreasing,
+            }
+        })
+        .collect()
 }
 
 fn parse_args() -> Result<Options, String> {
@@ -567,6 +801,92 @@ mod tests {
         assert!((metrics.peak - 0.5).abs() < 1.0e-12);
         assert!((metrics.rms - 0.5).abs() < 1.0e-12);
         assert!((metrics.dc_mean).abs() < 1.0e-12);
+    }
+
+    #[test]
+    fn yin_recovers_clean_stereo_tone_and_reports_cents() {
+        let sample_rate = 22_050_u32;
+        let frames = (sample_rate as usize) / 10;
+        let samples: Vec<f32> = (0..frames)
+            .flat_map(|index| {
+                let sample = (2.0 * std::f64::consts::PI * 440.0 * index as f64
+                    / sample_rate as f64)
+                    .sin() as f32
+                    * 0.5;
+                [sample, sample]
+            })
+            .collect();
+        let result = estimate_pitch_yin(&samples, sample_rate, 2, 100, 440.0);
+        assert_eq!(result.status, "periodic_estimate_available");
+        let estimate = result.estimated_pitch_hz.expect("tone should estimate");
+        assert!((estimate - 440.0).abs() < 2.0, "estimated {estimate}");
+        assert!(
+            result.error_cents.expect("error should exist").abs() < 5.0,
+            "{result:?}"
+        );
+        assert!(result.periodicity_confidence.unwrap() >= 0.60);
+    }
+
+    #[test]
+    fn yin_never_claims_pitch_from_silence() {
+        let result = estimate_pitch_yin(&vec![0.0; 4_410], 22_050, 2, 100, 440.0);
+        assert_eq!(result.status, "near_silent_window");
+        assert!(result.estimated_pitch_hz.is_none());
+        assert!(result.error_cents.is_none());
+    }
+
+    #[test]
+    fn velocity_response_group_reports_monotonic_rms_as_diagnostic() {
+        fn sample(velocity: f32, rms: f64) -> ProbeCase {
+            ProbeCase {
+                instrument: "Harmonica".into(),
+                gm_program_0_based: 22,
+                declared_procedural_family: "additive_declared",
+                frequency_hz: 440.0,
+                velocity,
+                frames: 2_205,
+                scalar_sample_count: 4_410,
+                non_finite_sample_count: 0,
+                peak: rms,
+                rms,
+                dc_mean: 0.0,
+                clipped_sample_count_at_or_above_0_999: 0,
+                output_sha256: String::new(),
+                repeated_hashes: vec![],
+                repeat_hashes_match: true,
+                selected_render_path: "additive_synthesis".into(),
+                sample_attempt_status: "sample_library_not_loaded".into(),
+                repeated_render_paths: vec![],
+                repeated_sample_attempt_statuses: vec![],
+                selected_sample: None,
+                repeated_selected_samples: vec![],
+                sample_evidence_repeats_match: true,
+                receipt_matches_request: true,
+                repeated_receipt_matches_request: vec![],
+                render_path_repeats_match: true,
+                estimated_pitch_hz: Some(440.0),
+                pitch_error_cents: Some(0.0),
+                pitch_periodicity_confidence: Some(0.9),
+                pitch_estimate_status: "periodic_estimate_available",
+                outcome: "signal_present",
+            }
+        }
+        let monotonic = build_velocity_response_groups(&[
+            sample(0.9, 0.3),
+            sample(0.2, 0.1),
+            sample(0.5, 0.2),
+        ]);
+        assert_eq!(monotonic.len(), 1);
+        assert_eq!(monotonic[0].velocities, vec![0.2, 0.5, 0.9]);
+        assert!(monotonic[0].rms_is_monotonic_non_decreasing);
+
+        let non_monotonic = build_velocity_response_groups(&[
+            sample(0.2, 0.1),
+            sample(0.5, 0.07),
+            sample(0.9, 0.3),
+        ]);
+        assert!(!non_monotonic[0].rms_is_monotonic_non_decreasing);
+        assert_eq!(non_monotonic[0].adjacent_level_steps_db.len(), 2);
     }
 
     #[test]
