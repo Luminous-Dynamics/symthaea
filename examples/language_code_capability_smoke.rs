@@ -268,7 +268,9 @@ mod tests {
         // Keep this mutated case valid for its new lane so the lane-count
         // invariant, rather than a missing-field check, is what rejects it.
         catalog["cases"][0]["signature"] = json!("fn synthetic() -> bool");
-        catalog["cases"][0]["test_source"] = json!("#[test] fn synthetic_test() { assert!(synthetic()); }");
+        catalog["cases"][0]["test_source"] = json!(
+            "#[test] fn synthetic_test() { assert!(synthetic()); }"
+        );
         assert!(validate_catalog(&catalog)
             .expect_err("lane counts must remain balanced")
             .contains("lane `language`"));
