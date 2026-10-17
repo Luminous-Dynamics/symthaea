@@ -234,7 +234,7 @@ pub fn sweep_battery_design_space(
         let ranked: HashMap<String, _> = comparison
             .rows
             .into_iter()
-            .map(|row| (row.candidate_id, row))
+            .map(|row| (row.candidate_id.clone(), row))
             .collect();
         for row in &mut rows {
             if let Some(ranked_row) = ranked.get(&row.candidate_id) {
