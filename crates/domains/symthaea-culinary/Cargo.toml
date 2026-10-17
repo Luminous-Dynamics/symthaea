@@ -15,3 +15,10 @@ symthaea-fep = { workspace = true }
 serde = { workspace = true }
 serde_json = { workspace = true }
 sha2 = { workspace = true }
+
+# Test the receipt runner itself, including the frozen corpus, pinned hash,
+# positive controls, expected-head enforcement, and special-float parsing.
+[[example]]
+name = "culinary_validation_receipt"
+path = "examples/culinary_validation_receipt.rs"
+test = true
