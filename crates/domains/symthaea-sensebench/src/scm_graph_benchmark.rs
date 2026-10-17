@@ -1802,7 +1802,7 @@ pub fn run_scm_graph_benchmark(
     }
 
     Ok(ScmGraphBenchmarkReport {
-        schema_version: 4,
+        schema_version: 5,
         generator_version: GENERATOR_VERSION.into(),
         seed,
         trials_per_world,
@@ -2197,7 +2197,7 @@ mod tests {
         assert_eq!(a, b);
         assert_eq!(serde_json::to_vec(&a).unwrap(), serde_json::to_vec(&b).unwrap());
         assert_eq!(a.schema_version, 4);
-        assert_eq!(a.generator_version, "sensebench-scm-graphs-0.4.0");
+        assert_eq!(a.generator_version, "sensebench-scm-graphs-0.5.0");
         assert_eq!(ScmGraphPolicy::all().len(), 10);
         assert_eq!(a.observational_pc_baseline, ScmGraphPolicy::PcObservationalBaseline);
         assert_eq!(a.world_count, 112);
