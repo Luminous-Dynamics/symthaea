@@ -16,6 +16,7 @@
 use std::collections::HashSet;
 
 pub mod design_space;
+pub mod mass_coupled_sizing;
 pub mod mission_model_contract;
 pub mod scenario_sweep;
 
