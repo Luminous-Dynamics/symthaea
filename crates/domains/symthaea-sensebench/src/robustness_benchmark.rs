@@ -109,7 +109,7 @@ pub fn run_model_misspecification_benchmark(
             scenario_id: "declared_model_a".into(),
             weight: 0.5,
             candidates: vec![
-                binary_candidate("targeted_brittle_measurement", 0.85),
+                binary_candidate("targeted_brittle_measurement", 0.805),
                 binary_candidate(FIXED_DESIGN_ID, 0.80),
                 binary_candidate("negative_control", 0.50),
             ],
@@ -131,7 +131,7 @@ pub fn run_model_misspecification_benchmark(
             id: "world_a".into(),
             held_out: false,
             candidates: vec![
-                binary_candidate("targeted_brittle_measurement", 0.85),
+                binary_candidate("targeted_brittle_measurement", 0.805),
                 binary_candidate(FIXED_DESIGN_ID, 0.80),
                 binary_candidate("negative_control", 0.50),
             ],
@@ -352,6 +352,16 @@ mod tests {
             row(&report, "held_out_world_c", RobustnessPolicy::WorstCaseRobust)
                 .selected_candidate_id.as_deref(),
             Some(FIXED_DESIGN_ID)
+        );
+        let correctly_specified = row(
+            &report,
+            "world_a",
+            RobustnessPolicy::WorstCaseRobust,
+        );
+        assert!(
+            correctly_specified.selected_true_information_gain_per_cost
+                >= correctly_specified.oracle_true_information_gain_per_cost * 0.90,
+            "robust gain loss on the correctly specified control must be <= 10%",
         );
         assert!(
             robust.max_regret_bits_per_cost < nominal.max_regret_bits_per_cost * 0.45,
