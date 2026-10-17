@@ -220,7 +220,9 @@ pub fn humanize_score_note_with_profile(
         || note.duration < 0.0
         || note.duration > f32::MAX / profile.duration_scale
     {
-        return Err("note frequency/timing/velocity must be finite and valid, and scaled duration representable");
+        return Err(
+            "note frequency/timing/velocity must be finite and valid, and scaled duration representable",
+        );
     }
 
     let beat_in_bar = beat_position.rem_euclid(beats_per_bar);
@@ -417,16 +419,40 @@ mod tests {
     #[test]
     fn neutral_phrase_timing_curve_is_an_exact_timing_noop() {
         let mut notes = vec![
-            Note { frequency: 110.0, start_time: 0.0, duration: 0.25, velocity: 0.6 },
-            Note { frequency: 220.0, start_time: 0.5, duration: 0.25, velocity: 0.7 },
-            Note { frequency: 330.0, start_time: 1.0, duration: 0.5, velocity: 0.8 },
+            Note {
+                frequency: 110.0,
+                start_time: 0.0,
+                duration: 0.25,
+                velocity: 0.6,
+            },
+            Note {
+                frequency: 220.0,
+                start_time: 0.5,
+                duration: 0.25,
+                velocity: 0.7,
+            },
+            Note {
+                frequency: 330.0,
+                start_time: 1.0,
+                duration: 0.5,
+                velocity: 0.8,
+            },
         ];
         let original = notes.clone();
         let curve = PhraseTimingCurveV1 {
             points: vec![
-                TimingCurvePointV1 { phrase_position: 0.0, offset_ms: 0.0 },
-                TimingCurvePointV1 { phrase_position: 0.5, offset_ms: 0.0 },
-                TimingCurvePointV1 { phrase_position: 1.0, offset_ms: 0.0 },
+                TimingCurvePointV1 {
+                    phrase_position: 0.0,
+                    offset_ms: 0.0,
+                },
+                TimingCurvePointV1 {
+                    phrase_position: 0.5,
+                    offset_ms: 0.0,
+                },
+                TimingCurvePointV1 {
+                    phrase_position: 1.0,
+                    offset_ms: 0.0,
+                },
             ],
             max_abs_offset_ms: 0.0,
         };
@@ -486,9 +512,24 @@ mod tests {
     #[test]
     fn phrase_timing_curve_interpolates_correlated_offsets_and_preserves_note_data() {
         let mut notes = vec![
-            Note { frequency: 110.0, start_time: 0.0, duration: 0.25, velocity: 0.6 },
-            Note { frequency: 220.0, start_time: 0.5, duration: 0.25, velocity: 0.7 },
-            Note { frequency: 330.0, start_time: 1.0, duration: 0.5, velocity: 0.8 },
+            Note {
+                frequency: 110.0,
+                start_time: 0.0,
+                duration: 0.25,
+                velocity: 0.6,
+            },
+            Note {
+                frequency: 220.0,
+                start_time: 0.5,
+                duration: 0.25,
+                velocity: 0.7,
+            },
+            Note {
+                frequency: 330.0,
+                start_time: 1.0,
+                duration: 0.5,
+                velocity: 0.8,
+            },
         ];
         let original = notes.clone();
         apply_phrase_timing_curve(&mut notes, &[0.0, 0.5, 1.0], &test_timing_curve()).unwrap();
@@ -506,9 +547,24 @@ mod tests {
     #[test]
     fn phrase_timing_curve_keeps_simultaneous_chord_attacks_together() {
         let mut notes = vec![
-            Note { frequency: 220.0, start_time: 0.5, duration: 0.5, velocity: 0.7 },
-            Note { frequency: 330.0, start_time: 0.5, duration: 0.5, velocity: 0.6 },
-            Note { frequency: 440.0, start_time: 0.5, duration: 0.5, velocity: 0.6 },
+            Note {
+                frequency: 220.0,
+                start_time: 0.5,
+                duration: 0.5,
+                velocity: 0.7,
+            },
+            Note {
+                frequency: 330.0,
+                start_time: 0.5,
+                duration: 0.5,
+                velocity: 0.6,
+            },
+            Note {
+                frequency: 440.0,
+                start_time: 0.5,
+                duration: 0.5,
+                velocity: 0.6,
+            },
         ];
         apply_phrase_timing_curve(&mut notes, &[0.5, 0.5, 0.5], &test_timing_curve()).unwrap();
         assert_eq!(notes[0].start_time, notes[1].start_time);
@@ -519,15 +575,34 @@ mod tests {
     #[test]
     fn phrase_timing_curve_rejects_attack_reordering_atomically() {
         let mut notes = vec![
-            Note { frequency: 220.0, start_time: 1.0, duration: 0.2, velocity: 0.7 },
-            Note { frequency: 330.0, start_time: 1.05, duration: 0.2, velocity: 0.6 },
+            Note {
+                frequency: 220.0,
+                start_time: 1.0,
+                duration: 0.2,
+                velocity: 0.7,
+            },
+            Note {
+                frequency: 330.0,
+                start_time: 1.05,
+                duration: 0.2,
+                velocity: 0.6,
+            },
         ];
         let original = notes.clone();
         let curve = PhraseTimingCurveV1 {
             points: vec![
-                TimingCurvePointV1 { phrase_position: 0.0, offset_ms: 0.0 },
-                TimingCurvePointV1 { phrase_position: 0.1, offset_ms: -100.0 },
-                TimingCurvePointV1 { phrase_position: 1.0, offset_ms: 0.0 },
+                TimingCurvePointV1 {
+                    phrase_position: 0.0,
+                    offset_ms: 0.0,
+                },
+                TimingCurvePointV1 {
+                    phrase_position: 0.1,
+                    offset_ms: -100.0,
+                },
+                TimingCurvePointV1 {
+                    phrase_position: 1.0,
+                    offset_ms: 0.0,
+                },
             ],
             max_abs_offset_ms: 100.0,
         };
@@ -542,8 +617,18 @@ mod tests {
     fn phrase_timing_curve_rejects_unsorted_input_and_float_overflow_atomically() {
         let curve = test_timing_curve();
         let mut unsorted = vec![
-            Note { frequency: 220.0, start_time: 1.0, duration: 0.2, velocity: 0.7 },
-            Note { frequency: 330.0, start_time: 0.5, duration: 0.2, velocity: 0.6 },
+            Note {
+                frequency: 220.0,
+                start_time: 1.0,
+                duration: 0.2,
+                velocity: 0.7,
+            },
+            Note {
+                frequency: 330.0,
+                start_time: 0.5,
+                duration: 0.2,
+                velocity: 0.6,
+            },
         ];
         let original = unsorted.clone();
         assert!(apply_phrase_timing_curve(&mut unsorted, &[0.0, 1.0], &curve).is_err());
@@ -561,8 +646,14 @@ mod tests {
             &[0.0],
             &PhraseTimingCurveV1 {
                 points: vec![
-                    TimingCurvePointV1 { phrase_position: 0.0, offset_ms: 250.0 },
-                    TimingCurvePointV1 { phrase_position: 1.0, offset_ms: 0.0 },
+                    TimingCurvePointV1 {
+                        phrase_position: 0.0,
+                        offset_ms: 250.0,
+                    },
+                    TimingCurvePointV1 {
+                        phrase_position: 1.0,
+                        offset_ms: 0.0,
+                    },
                 ],
                 max_abs_offset_ms: 250.0,
             }
@@ -573,8 +664,18 @@ mod tests {
     #[test]
     fn phrase_timing_curve_rejects_invalid_shape_and_negative_onset_atomically() {
         let mut notes = vec![
-            Note { frequency: 220.0, start_time: 0.01, duration: 0.2, velocity: 0.7 },
-            Note { frequency: 330.0, start_time: 0.5, duration: 0.2, velocity: 0.6 },
+            Note {
+                frequency: 220.0,
+                start_time: 0.01,
+                duration: 0.2,
+                velocity: 0.7,
+            },
+            Note {
+                frequency: 330.0,
+                start_time: 0.5,
+                duration: 0.2,
+                velocity: 0.6,
+            },
         ];
         let original = notes.clone();
         let mut invalid_curve = test_timing_curve();
@@ -585,8 +686,14 @@ mod tests {
 
         let negative_curve = PhraseTimingCurveV1 {
             points: vec![
-                TimingCurvePointV1 { phrase_position: 0.0, offset_ms: -20.0 },
-                TimingCurvePointV1 { phrase_position: 1.0, offset_ms: 0.0 },
+                TimingCurvePointV1 {
+                    phrase_position: 0.0,
+                    offset_ms: -20.0,
+                },
+                TimingCurvePointV1 {
+                    phrase_position: 1.0,
+                    offset_ms: 0.0,
+                },
             ],
             max_abs_offset_ms: 20.0,
         };
