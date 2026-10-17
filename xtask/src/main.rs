@@ -3,6 +3,7 @@ use std::path::PathBuf;
 
 mod crate_status;
 mod duplicate_scan;
+mod env_mobility;
 mod manifest;
 mod rhn_sweep;
 
@@ -62,6 +63,8 @@ enum Commands {
         #[arg(long)]
         out: PathBuf,
     },
+    /// Independently qualify the frozen synthetic survey-feasibility and repairability corpora.
+    EnvMobilityQualify,
     GenerateManifest {
         #[arg(long, default_value = ".")]
         root: PathBuf,
@@ -105,6 +108,18 @@ fn main() -> anyhow::Result<()> {
         }
         Commands::RhnFinalize { input, out } => {
             rhn_sweep::run_finalize(input, out)?;
+        }
+        Commands::EnvMobilityQualify => {
+            let report = env_mobility::run()?;
+            let failed = report.total_mismatches > 0 || report.protected_gate_false_accepts > 0;
+            println!("{}", serde_json::to_string_pretty(&report)?);
+            if failed {
+                anyhow::bail!(
+                    "environmental mobility qualification failed: {} mismatches, {} protected-gate false accepts",
+                    report.total_mismatches,
+                    report.protected_gate_false_accepts
+                );
+            }
         }
         Commands::GenerateManifest { root } => {
             let files = vec!["Cargo.toml", "src/lib.rs", "symthaea-core/Cargo.toml"];
