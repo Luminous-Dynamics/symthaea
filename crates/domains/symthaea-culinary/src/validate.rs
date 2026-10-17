@@ -200,6 +200,18 @@ fn validate_thermal_trajectory(
             requirement: "all times and temperatures must be finite",
         });
     }
+    if trajectory.points.iter().any(|(time, _)| *time < 0.0) {
+        return Err(CulinaryViolation::InvalidNumericInput {
+            field,
+            requirement: "process times must be non-negative",
+        });
+    }
+    if trajectory.points.iter().any(|(_, temp)| *temp < -273.15) {
+        return Err(CulinaryViolation::InvalidNumericInput {
+            field,
+            requirement: "temperatures cannot be below absolute zero (-273.15 °C)",
+        });
+    }
     if trajectory.points.windows(2).any(|w| w[1].0 < w[0].0) {
         return Err(CulinaryViolation::InvalidNumericInput {
             field,
@@ -286,6 +298,12 @@ pub fn validate_pasteurization(p: &Pasteurization) -> Result<(), CulinaryViolati
     };
     let required = p.required_log_reduction.unwrap_or(default_target);
     let delivered = p.trajectory.log_reduction(d_ref, t_ref, z);
+    if !delivered.is_finite() || delivered < 0.0 {
+        return Err(CulinaryViolation::InvalidNumericInput {
+            field: "pasteurization.trajectory",
+            requirement: "computed lethality must be finite and non-negative",
+        });
+    }
     if delivered + 1e-9 < required {
         Err(CulinaryViolation::InsufficientPasteurization {
             delivered_log: delivered,
