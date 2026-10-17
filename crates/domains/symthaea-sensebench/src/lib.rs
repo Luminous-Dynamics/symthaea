@@ -11,6 +11,7 @@ use serde::{Deserialize, Serialize};
 
 pub mod experiment_design;
 pub mod causal_benchmark;
+pub mod blind_world_benchmark;
 pub mod geophysics;
 pub mod robustness_benchmark;
 
