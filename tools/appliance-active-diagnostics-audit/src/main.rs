@@ -646,6 +646,62 @@ mod tests {
     }
 
     #[test]
+    fn perfect_binary_measurement_yields_one_bit_information_gain() {
+        let trace = canonical_corpus()["traces"][2].clone();
+        let measurement = &trace["candidate_measurements"][0];
+        let gain = information_gain(&trace, measurement);
+        assert!((gain - 1.0).abs() <= 1e-12, "expected 1 bit, got {gain}");
+    }
+
+    #[test]
+    fn non_discriminating_measurement_yields_zero_information_gain() {
+        let trace = canonical_corpus()["traces"][11].clone();
+        let measurement = &trace["candidate_measurements"][0];
+        let gain = information_gain(&trace, measurement);
+        assert!(gain.abs() <= 1e-12, "expected 0 bits, got {gain}");
+    }
+
+    #[test]
+    fn information_gain_is_finite_and_bounded_by_prior_entropy() {
+        for trace in canonical_corpus()["traces"].as_array().expect("trace array") {
+            if validate_trace(trace).is_err() {
+                continue;
+            }
+            let prior_entropy = entropy(
+                trace["hypotheses"]
+                    .as_array()
+                    .expect("hypothesis array")
+                    .iter()
+                    .map(|hypothesis| {
+                        number_at(hypothesis, "prior_probability").expect("prior probability")
+                    }),
+            );
+            for measurement in trace["candidate_measurements"]
+                .as_array()
+                .expect("measurement array")
+            {
+                let gain = information_gain(trace, measurement);
+                assert!(gain.is_finite(), "non-finite information gain in {}", text_at(trace, "trace_id").unwrap_or("?"));
+                assert!(gain >= -1e-12, "negative information gain in {}", text_at(trace, "trace_id").unwrap_or("?"));
+                assert!(gain <= prior_entropy + 1e-12, "information gain exceeds prior entropy in {}", text_at(trace, "trace_id").unwrap_or("?"));
+            }
+        }
+    }
+
+    #[test]
+    fn canonical_corpus_replay_preserves_identical_digests_and_summary() {
+        let schema_raw = include_str!(
+            "../../../schemas/diagnostics/appliance_active_diagnostic_corpus_v0_1.schema.json"
+        );
+        let corpus_raw = include_str!(
+            "../../../fixtures/diagnostics/appliance_active_diagnostic_corpus_v0_1.json"
+        );
+        let first = audit_texts(schema_raw, corpus_raw).expect("first audit");
+        let second = audit_texts(schema_raw, corpus_raw).expect("second audit");
+        assert_eq!(first, second);
+    }
+
+    #[test]
     fn missing_hypothesis_likelihood_is_rejected() {
         let mut trace = canonical_corpus()["traces"][14].clone();
         trace["candidate_measurements"][0]["likelihoods"]
