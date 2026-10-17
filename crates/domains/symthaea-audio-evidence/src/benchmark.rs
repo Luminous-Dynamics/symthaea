@@ -78,7 +78,7 @@ pub fn validate_split_manifest(manifest: &Value) -> Result<usize, String> {
         let role = required_string(row.get("role"), index, "role")?;
         if !ROLES.contains(&role) {
             return Err(format!(
-                "observation {index} has unknown role; expected train, validation, calibration or test"
+                "observation {index} has unknown role; use train/validation/calibration/test"
             ));
         }
         if !sample_ids.insert(sample_id) {
@@ -144,7 +144,7 @@ pub fn validate_split_manifest(manifest: &Value) -> Result<usize, String> {
             })?;
             if !ROLES.contains(&requested_role) || requested_role == "test" {
                 return Err(format!(
-                    "holdout rule {rule_index} may compare test only against train, validation or calibration"
+                    "holdout rule {rule_index} may compare test with fit roles only"
                 ));
             }
             if !compared_roles.insert(requested_role) {
@@ -166,7 +166,7 @@ pub fn validate_split_manifest(manifest: &Value) -> Result<usize, String> {
             let comparison_values = identity_values(observations, requested_role, dimension)?;
             if test_values.iter().any(|value| comparison_values.contains(value)) {
                 return Err(format!(
-                    "group leakage: dimension {dimension} overlaps between test and {requested_role}"
+                    "group leakage on {dimension}: test overlaps {requested_role}"
                 ));
             }
         }
@@ -203,7 +203,7 @@ pub fn validate_split_manifest(manifest: &Value) -> Result<usize, String> {
         for required_role in required_roles.iter().copied() {
             if !declared.contains(required_role) {
                 return Err(format!(
-                    "regime {evaluation_regime} requires {dimension} to be disjoint from {required_role}"
+                    "regime {evaluation_regime}: {dimension} must exclude {required_role}"
                 ));
             }
         }
@@ -277,7 +277,7 @@ mod tests {
         let mut manifest = fixture();
         manifest["observations"][6]["excerpt_id"] = serde_json::json!("excerpt-train-1");
         let error = validate_split_manifest(&manifest).expect_err("excerpt leakage must fail");
-        assert!(error.contains("group leakage: dimension excerpt_id"));
+        assert!(error.contains("group leakage on excerpt_id"));
     }
 
     #[test]
@@ -319,7 +319,8 @@ mod tests {
         manifest["holdout_rules"] = serde_json::json!([
             { "dimension": "listener_id", "disjoint_from_roles": ["train", "validation"] }
         ]);
-        let error = validate_split_manifest(&manifest).expect_err("required dimensions cannot be omitted");
+        let error = validate_split_manifest(&manifest)
+            .expect_err("required dimensions cannot be omitted");
         assert!(error.contains("requires a holdout rule for excerpt_id"));
     }
 
@@ -339,7 +340,7 @@ mod tests {
         assert!(validate_split_manifest(&manifest).is_ok(), "clean product holdout should pass");
         manifest["observations"][5]["product_revision_id"] = serde_json::json!("headphone-h1-rev1");
         let error = validate_split_manifest(&manifest).expect_err("product leakage must fail");
-        assert!(error.contains("group leakage: dimension product_revision_id"));
+        assert!(error.contains("group leakage on product_revision_id"));
     }
 
     #[test]
@@ -358,6 +359,6 @@ mod tests {
         assert!(validate_split_manifest(&manifest).is_ok(), "clean fixture transfer should pass");
         manifest["observations"][5]["fixture_id"] = serde_json::json!("fixture-a");
         let error = validate_split_manifest(&manifest).expect_err("fixture leakage must fail");
-        assert!(error.contains("group leakage: dimension fixture_id"));
+        assert!(error.contains("group leakage on fixture_id"));
     }
 }
