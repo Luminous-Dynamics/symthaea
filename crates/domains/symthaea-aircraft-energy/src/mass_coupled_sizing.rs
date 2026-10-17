@@ -776,8 +776,12 @@ mod tests {
         ).unwrap();
         assert_eq!(report.disposition, CouplingDisposition::ConvergedWithinModel);
         assert!(report.iteration_trace.len() > 1);
-        assert!(report.mass_closure_residual_kg.unwrap().abs() <= 0.02);
-        assert!(report.final_phase_demands[0].required_bus_power_w > 4_600.0);
+        let evaluated_mass = report.evaluated_gross_mass_kg.unwrap();
+        let target_mass = report.required_takeoff_mass_kg.unwrap();
+        assert!(report.mass_closure_residual_kg.unwrap().abs()
+            <= 0.01 + 0.00001 * evaluated_mass.max(target_mass));
+        assert!((report.final_phase_demands[0].required_bus_power_w
+            - (4_000.0 + evaluated_mass)).abs() < 1e-8);
         assert!(report.required_installed_energy_system_mass_kg.unwrap() > 0.0);
     }
 
@@ -845,7 +849,6 @@ mod tests {
     #[test]
     fn takeoff_mass_limit_is_not_hidden_by_energy_margin() {
         let mut mass = fixed_mass();
-        mass.maximum_takeoff_mass_limit_kg = 650.0;
         let model = SimpleMassSensitiveModel {
             base_power_w: 4_000.0,
             watts_per_kg: 0.0,
