@@ -719,6 +719,268 @@ fn verify_provenance_manifest(
     }
 }
 
+fn verify_optional_shift_manifest(
+    run_dir: &Path,
+    provenance: &ProvenanceManifest,
+    artifacts: &BTreeMap<String, &ArtifactDeclaration>,
+    report: &mut AuditReport,
+) {
+    let (path, expected_digest) = match (
+        provenance.shift_manifest_path.as_deref(),
+        provenance.shift_manifest_sha256.as_deref(),
+    ) {
+        (None, None) => return,
+        (Some(path), Some(digest)) => (path, digest),
+        _ => {
+            report.fail(
+                "shift_manifest_reference_incomplete",
+                "shift_manifest_path and shift_manifest_sha256 must either both be present or both be absent",
+            );
+            return;
+        }
+    };
+    let findings_before = report.findings.len();
+
+    if !is_lower_hex(expected_digest, 64) {
+        report.fail(
+            "shift_manifest_digest_invalid",
+            "shift_manifest_sha256 must be a 64-character lowercase SHA-256 digest",
+        );
+        return;
+    }
+    let Some(artifact) = artifacts.get(path) else {
+        report.fail(
+            "shift_manifest_artifact_missing",
+            format!("shift manifest {path} is not listed in the provenance artifact manifest"),
+        );
+        return;
+    };
+    if artifact.sha256 != expected_digest {
+        report.fail(
+            "shift_manifest_digest_link_mismatch",
+            "shift_manifest_sha256 does not match the artifact-list digest",
+        );
+        return;
+    }
+    let (_, size_bytes) = match hash_artifact(run_dir, path) {
+        Ok(result) => result,
+        Err(error) => {
+            report.fail("shift_manifest_invalid_path", error);
+            return;
+        }
+    };
+    if size_bytes > MAX_SHIFT_MANIFEST_BYTES {
+        report.fail(
+            "shift_manifest_too_large",
+            format!("shift manifest exceeds {MAX_SHIFT_MANIFEST_BYTES} bytes"),
+        );
+        return;
+    }
+    let raw = match fs::read(run_dir.join(path)) {
+        Ok(raw) => raw,
+        Err(error) => {
+            report.fail(
+                "shift_manifest_unreadable",
+                format!("cannot read shift manifest: {error}"),
+            );
+            return;
+        }
+    };
+    let shift: ShiftManifest = match serde_json::from_slice(&raw) {
+        Ok(shift) => shift,
+        Err(error) => {
+            report.fail(
+                "shift_manifest_invalid_schema",
+                format!("shift manifest does not match the strict Rust contract: {error}"),
+            );
+            return;
+        }
+    };
+
+    if shift.schema_version != SHIFT_MANIFEST_SCHEMA_VERSION {
+        report.fail(
+            "shift_manifest_schema_version_mismatch",
+            format!(
+                "expected {SHIFT_MANIFEST_SCHEMA_VERSION}, found {}",
+                shift.schema_version
+            ),
+        );
+    }
+    if shift.benchmark_id != provenance.benchmark_id {
+        report.fail(
+            "shift_manifest_benchmark_mismatch",
+            "shift manifest benchmark_id must match the provenance manifest",
+        );
+    }
+    if shift.task_contract_sha256 != provenance.task_contract_sha256
+        || !is_lower_hex(&shift.task_contract_sha256, 64)
+    {
+        report.fail(
+            "shift_manifest_task_contract_mismatch",
+            "shift manifest task_contract_sha256 must match the valid provenance task contract hash",
+        );
+    }
+    if shift.split_policy != "independence_key_group_holdout_v1" {
+        report.fail(
+            "shift_manifest_split_policy_unsupported",
+            "split_policy must be independence_key_group_holdout_v1",
+        );
+    }
+    if shift.shift_groups.is_empty() {
+        report.fail("shift_manifest_groups_missing", "shift_groups must not be empty");
+        return;
+    }
+    if shift.shift_groups.len() > MAX_SHIFT_GROUPS {
+        report.fail(
+            "shift_manifest_group_limit_exceeded",
+            format!("shift manifest exceeds {MAX_SHIFT_GROUPS} groups"),
+        );
+        return;
+    }
+
+    let valid_families = [
+        "composition",
+        "surface_coordination",
+        "defects",
+        "temperature_energy",
+        "strain_pressure_phase",
+        "size_interface_passivation_substrate",
+        "compounded",
+    ];
+    let valid_severity = ["baseline", "mild", "moderate", "severe", "compounded"];
+    let valid_splits = ["train", "calibration", "validation", "test_lockbox"];
+    let mut group_ids = BTreeSet::new();
+    let mut independence_splits: BTreeMap<String, String> = BTreeMap::new();
+    let mut sample_splits: BTreeMap<String, String> = BTreeMap::new();
+
+    for (index, group) in shift.shift_groups.iter().enumerate() {
+        for (field, value) in [
+            ("group_id", group.group_id.as_str()),
+            ("shift_family", group.shift_family.as_str()),
+            ("severity", group.severity.as_str()),
+            ("split", group.split.as_str()),
+            ("physical_rationale", group.physical_rationale.as_str()),
+            ("severity_definition", group.severity_definition.as_str()),
+            ("source_artifact_path", group.source_artifact_path.as_str()),
+            ("source_artifact_sha256", group.source_artifact_sha256.as_str()),
+        ] {
+            if value.trim().is_empty() {
+                report.fail(
+                    "shift_manifest_group_field_empty",
+                    format!("shift_groups[{index}].{field} must not be empty"),
+                );
+            }
+        }
+        if !group_ids.insert(group.group_id.clone()) {
+            report.fail(
+                "shift_manifest_duplicate_group_id",
+                format!("group_id {:?} appears more than once", group.group_id),
+            );
+        }
+        if !valid_families.contains(&group.shift_family.as_str()) {
+            report.fail(
+                "shift_manifest_family_invalid",
+                format!("shift_groups[{index}] has unsupported shift_family {:?}", group.shift_family),
+            );
+        }
+        if !valid_severity.contains(&group.severity.as_str()) {
+            report.fail(
+                "shift_manifest_severity_invalid",
+                format!("shift_groups[{index}] has unsupported severity {:?}", group.severity),
+            );
+        }
+        if !valid_splits.contains(&group.split.as_str()) {
+            report.fail(
+                "shift_manifest_split_invalid",
+                format!("shift_groups[{index}] has unsupported split {:?}", group.split),
+            );
+        }
+        if !is_lower_hex(&group.source_artifact_sha256, 64) {
+            report.fail(
+                "shift_manifest_source_digest_invalid",
+                format!("shift_groups[{index}].source_artifact_sha256 is invalid"),
+            );
+        }
+        match artifacts.get(&group.source_artifact_path) {
+            Some(source) if source.sha256 == group.source_artifact_sha256 => {}
+            Some(_) => report.fail(
+                "shift_manifest_source_digest_mismatch",
+                format!("shift_groups[{index}] source digest differs from the artifact list"),
+            ),
+            None => report.fail(
+                "shift_manifest_source_artifact_missing",
+                format!(
+                    "shift_groups[{index}] source artifact {} is not listed",
+                    group.source_artifact_path
+                ),
+            ),
+        }
+        if group.independence_keys.is_empty() {
+            report.fail(
+                "shift_manifest_independence_keys_missing",
+                format!("shift_groups[{index}] must declare at least one independence key"),
+            );
+        }
+        if group.sample_ids.is_empty() {
+            report.fail(
+                "shift_manifest_sample_ids_missing",
+                format!("shift_groups[{index}] must declare at least one sample ID"),
+            );
+        }
+
+        let mut local_keys = BTreeSet::new();
+        for key in &group.independence_keys {
+            if key.trim().is_empty() || !local_keys.insert(key.clone()) {
+                report.fail(
+                    "shift_manifest_independence_key_empty_or_duplicate",
+                    format!("shift_groups[{index}] contains an empty or duplicate independence key"),
+                );
+                continue;
+            }
+            if let Some(previous_split) = independence_splits.get(key) {
+                if previous_split != &group.split {
+                    report.fail(
+                        "shift_manifest_independence_leakage",
+                        format!(
+                            "independence key {key:?} occurs in both {previous_split:?} and {:?} splits",
+                            group.split
+                        ),
+                    );
+                }
+            } else {
+                independence_splits.insert(key.clone(), group.split.clone());
+            }
+        }
+        let mut local_samples = BTreeSet::new();
+        for sample_id in &group.sample_ids {
+            if sample_id.trim().is_empty() || !local_samples.insert(sample_id.clone()) {
+                report.fail(
+                    "shift_manifest_sample_id_empty_or_duplicate",
+                    format!("shift_groups[{index}] contains an empty or duplicate sample ID"),
+                );
+                continue;
+            }
+            if let Some(previous_split) = sample_splits.get(sample_id) {
+                if previous_split != &group.split {
+                    report.fail(
+                        "shift_manifest_sample_leakage",
+                        format!(
+                            "sample ID {sample_id:?} occurs in both {previous_split:?} and {:?} splits",
+                            group.split
+                        ),
+                    );
+                }
+            } else {
+                sample_splits.insert(sample_id.clone(), group.split.clone());
+            }
+        }
+    }
+
+    if report.findings.len() == findings_before {
+        report.checked("shift_manifest_provenance_and_group_split_integrity");
+    }
+}
+
 fn verify_oracle_call_ledger(
     run_dir: &Path,
     manifest: &ProvenanceManifest,
