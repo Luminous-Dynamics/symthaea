@@ -647,6 +647,8 @@ pub struct AutonomousHoldoutValidation {
     /// Canonical, versioned snapshot of every search configuration field.
     pub discovery_config_snapshot: String,
     pub discovery_config_digest: String,
+    /// Digest of the deterministic discovery initial-condition manifest.
+    pub discovery_initial_conditions_digest: String,
     /// Exact initial state and variable order used to construct holdout ICs.
     pub initial_state: Vec<f64>,
     pub var_names: Vec<String>,
@@ -660,6 +662,7 @@ pub struct AutonomousHoldoutValidation {
 }
 
 const MAX_HOLDOUT_TRAJECTORIES: usize = 10_000;
+const MAX_DISCOVERY_TRAJECTORIES: usize = 10_000;
 const HOLDOUT_SCORING_METRIC_V1: &str = "lie_derivative_variance_v1";
 
 fn holdout_hash_string(hasher: &mut blake3::Hasher, value: &str) {
@@ -701,6 +704,65 @@ fn generate_holdout_initial_conditions(
         conditions.push(ic);
     }
     conditions
+}
+
+fn generate_discovery_initial_conditions(
+    initial_state: &[f64],
+    discovery_seed: u64,
+    diverse_trajectory_count: usize,
+) -> Vec<Vec<f64>> {
+    let count = diverse_trajectory_count.max(1);
+    let mut conditions = Vec::with_capacity(count);
+    conditions.push(initial_state.to_vec());
+
+    // Mirror the deterministic initial-condition perturbation used by
+    // discover_invariants_autonomous_with_mode.
+    let mut prng = discovery_seed.wrapping_mul(0x517cc1b727220a95);
+    for _ in 1..count {
+        prng = lcg_step(prng);
+        let mut condition = initial_state.to_vec();
+        for value in &mut condition {
+            prng = lcg_step(prng);
+            let u = (prng as f64 / u64::MAX as f64) * 2.0 - 1.0;
+            let scale = value.abs().max(0.05);
+            *value += u * 0.1 * scale;
+        }
+        conditions.push(condition);
+    }
+    conditions
+}
+
+fn discovery_initial_conditions_digest(
+    initial_state: &[f64],
+    var_names: &[&str],
+    t_max: f64,
+    dt: f64,
+    config: &RegressorConfig,
+    conditions: &[Vec<f64>],
+) -> String {
+    let mut hasher = blake3::Hasher::new();
+    hasher.update(b"SymthaeaInvariantDiscoveryInitialConditionsV1\0");
+    hasher.update(&config.seed.to_le_bytes());
+    hasher.update(&(config.diverse_trajectory_count.max(1) as u64).to_le_bytes());
+    holdout_hash_f64(&mut hasher, t_max);
+    holdout_hash_f64(&mut hasher, dt);
+    hasher.update(&(initial_state.len() as u64).to_le_bytes());
+    for value in initial_state {
+        holdout_hash_f64(&mut hasher, *value);
+    }
+    hasher.update(&(var_names.len() as u64).to_le_bytes());
+    for name in var_names {
+        holdout_hash_string(&mut hasher, name);
+    }
+    hasher.update(&(conditions.len() as u64).to_le_bytes());
+    for (index, condition) in conditions.iter().enumerate() {
+        hasher.update(&(index as u64).to_le_bytes());
+        hasher.update(&(condition.len() as u64).to_le_bytes());
+        for value in condition {
+            holdout_hash_f64(&mut hasher, *value);
+        }
+    }
+    hasher.finalize().to_hex().to_string()
 }
 
 fn discovery_config_snapshot(config: &RegressorConfig) -> String {
