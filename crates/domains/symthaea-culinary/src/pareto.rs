@@ -764,21 +764,38 @@ mod tests {
     #[test]
     fn objective_declaration_order_does_not_change_dominance() {
         let baseline = candidate("baseline", Some(8.0), Some(8.0), Some(2.0));
-        let mut reordered = candidate("reordered", Some(9.0), Some(9.0), Some(1.0));
+        let mut reordered = candidate("reordered", Some(9.0), Some(7.0), Some(3.0));
         reordered.objectives.reverse();
 
         let report = evaluate_frontier(&[baseline, reordered]).unwrap();
-        assert_eq!(report.frontier_ids, vec!["baseline", "reordered"]);
-        assert!(report.candidates.iter().all(|item| item.dominated_by.is_empty()));
+        assert_eq!(report.frontier_ids, vec!["baseline"]);
+        assert_eq!(
+            report
+                .candidates
+                .iter()
+                .find(|item| item.id == "reordered")
+                .unwrap()
+                .dominated_by,
+            vec!["baseline"]
+        );
     }
 
     #[test]
-    fn one_objective_must_be_strictly_better_to_dominate() {
+    fn one_strict_improvement_with_all_other_metrics_tied_is_dominance() {
         let report = evaluate_frontier(&[
             candidate("a", Some(5.0), Some(8.0), Some(2.0)),
-            candidate("b", Some(5.0), Some(8.0), Some(2.0)),
+            candidate("b", Some(6.0), Some(8.0), Some(2.0)),
         ])
         .unwrap();
-        assert_eq!(report.frontier_ids, vec!["a", "b"]);
+        assert_eq!(report.frontier_ids, vec!["a"]);
+        assert_eq!(
+            report
+                .candidates
+                .iter()
+                .find(|item| item.id == "b")
+                .unwrap()
+                .dominated_by,
+            vec!["a"]
+        );
     }
 }
