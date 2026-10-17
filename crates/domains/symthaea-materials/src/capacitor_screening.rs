@@ -351,19 +351,21 @@ pub fn screen_capacitor_candidate(
         }
     }
 
-    if requirements.min_breakdown_field_ratio.is_some() {
-        match (
-            material.breakdown_strength_v_per_m,
-            material.breakdown_reference.as_deref(),
-            material.breakdown_evidence_kind,
-        ) {
-            (Some(_), Some(reference), Some(kind)) if !reference.trim().is_empty() => {
-                if !requirements.accepted_evidence_kinds.contains(&kind) {
-                    limitations.push(ScreeningLimitation::BreakdownEvidenceClassNotAllowed);
-                }
-            }
-            _ => limitations.push(ScreeningLimitation::MissingBreakdownEvidence),
-        }
+    if material.breakdown_strength_v_per_m.is_some()
+        && material
+            .breakdown_evidence_kind
+            .is_some_and(|kind| !requirements.accepted_evidence_kinds.contains(&kind))
+    {
+        // The report includes breakdown-derived metrics, so their evidence class
+        // must satisfy the allow-list even when no minimum-ratio constraint is requested.
+        limitations.push(ScreeningLimitation::BreakdownEvidenceClassNotAllowed);
+    }
+    if requirements.min_breakdown_field_ratio.is_some()
+        && (material.breakdown_strength_v_per_m.is_none()
+            || material.breakdown_reference.as_deref().is_none_or(|reference| reference.trim().is_empty())
+            || material.breakdown_evidence_kind.is_none())
+    {
+        limitations.push(ScreeningLimitation::MissingBreakdownEvidence);
     }
 
     if !limitations.is_empty() {
