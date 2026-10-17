@@ -191,5 +191,39 @@
     "document": "docs/research/HDC_TASK_DIMENSION_ASSOCIATION_MAP_V0_1.md",
     "machine_readable_matrix": "crates/domains/symthaea-capability-closure/fixtures/hdc-task-dimension-association-matrix-v0.1.json",
     "status": "literature_grounded_hypotheses_not_measurements"
+  },
+  "association_capacity_curve": {
+    "tracking_issue": "https://github.com/Luminous-Dynamics/symthaea/issues/7772",
+    "status": "authored_not_executed",
+    "example": "crates/core/symthaea-core/examples/association_capacity_curves.rs",
+    "task_dimension_matrix": "crates/domains/symthaea-capability-closure/fixtures/hdc-task-dimension-association-matrix-v0.1.json",
+    "dimensions_continuous_bipolar_f32": [
+      1024,
+      2048,
+      4096,
+      8192,
+      16384,
+      32768,
+      65536
+    ],
+    "binary_bsc_dimension": 16384,
+    "odd_fan_in": [
+      1,
+      3,
+      7,
+      15,
+      31,
+      63
+    ],
+    "seeds": 12,
+    "negative_pairs_per_seed": 32,
+    "query_scale_risk_model": "P(any false match) <= min(1, M*p); M=N for one query against N records, M=N*(N-1)/2 for all-pairs comparisons.",
+    "hard_rules": [
+      "Retain raw per-seed rows and explicit negative controls.",
+      "Choose thresholds on calibration data, evaluate on held-out comparisons, and report confidence bounds.",
+      "Zero false matches in a small Monte Carlo sample does not establish an extreme-tail guarantee.",
+      "Do not generalize the bipolar-f32 result to native uniform-f32 ContinuousHV or LTC/CfC dynamics.",
+      "Do not change the existing binding algebra implementation as part of this characterization example."
+    ]
   }
 }
