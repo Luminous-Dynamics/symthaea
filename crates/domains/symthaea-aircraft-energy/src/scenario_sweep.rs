@@ -10,6 +10,11 @@ use std::collections::HashSet;
 
 use super::{evaluate_mission, Disposition, EnergySystemEnvelope, MissionProfile, ScreeningResult};
 
+/// Pairwise Pareto comparison is O(n^2); reject oversized candidate sets before
+/// allocation of pairwise work. Larger studies must be chunked and merged with
+/// a separately verified frontier algorithm.
+pub const MAX_PARETO_CANDIDATES: usize = 2_000;
+
 /// One candidate energy-system envelope to evaluate against the same mission.
 #[derive(Debug, Clone, PartialEq)]
 pub struct SystemCandidate {
@@ -33,6 +38,7 @@ pub struct ScenarioRow {
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub enum SweepInputError {
     EmptyCandidateSet,
+    TooManyCandidates { requested: usize, maximum: usize },
     InvalidCandidateId { id: String },
     DuplicateCandidateId { id: String },
     InvalidMissionFamilyId { id: String },
@@ -75,6 +81,12 @@ pub fn compare_systems_on_mission(
 ) -> Result<ScenarioSweepReport, SweepInputError> {
     if candidates.is_empty() {
         return Err(SweepInputError::EmptyCandidateSet);
+    }
+    if candidates.len() > MAX_PARETO_CANDIDATES {
+        return Err(SweepInputError::TooManyCandidates {
+            requested: candidates.len(),
+            maximum: MAX_PARETO_CANDIDATES,
+        });
     }
 
     let mut seen = HashSet::with_capacity(candidates.len());
@@ -220,6 +232,12 @@ pub fn compare_candidate_specific_missions(
 ) -> Result<ScenarioSweepReport, SweepInputError> {
     if candidates.is_empty() {
         return Err(SweepInputError::EmptyCandidateSet);
+    }
+    if candidates.len() > MAX_PARETO_CANDIDATES {
+        return Err(SweepInputError::TooManyCandidates {
+            requested: candidates.len(),
+            maximum: MAX_PARETO_CANDIDATES,
+        });
     }
     let expected_family = candidates[0].mission_family_id.as_str();
     if expected_family.trim().is_empty() || expected_family.trim() != expected_family {
@@ -396,6 +414,27 @@ mod tests {
                 max_peak_duration_s: Some(peak_duration_s),
             },
         }
+    }
+
+    #[test]
+    fn oversized_candidate_sets_fail_before_pairwise_work() {
+        let candidates: Vec<SystemCandidate> = (0..=MAX_PARETO_CANDIDATES)
+            .map(|index| candidate(
+                &format!("candidate-{index:04}"),
+                100.0,
+                1_500.0,
+                600.0,
+                1_200.0,
+                30.0,
+            ))
+            .collect();
+        assert_eq!(
+            compare_systems_on_mission(&mission(), &candidates),
+            Err(SweepInputError::TooManyCandidates {
+                requested: MAX_PARETO_CANDIDATES + 1,
+                maximum: MAX_PARETO_CANDIDATES,
+            })
+        );
     }
 
     #[test]
