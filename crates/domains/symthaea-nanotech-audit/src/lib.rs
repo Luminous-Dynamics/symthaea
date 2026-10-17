@@ -308,6 +308,8 @@ struct DataSourceDeclaration {
     revision: String,
     license: String,
     rights_status: String,
+    source_artifact_path: String,
+    source_artifact_sha256: String,
 }
 
 #[derive(Debug, Deserialize)]
@@ -452,6 +454,8 @@ fn verify_provenance_manifest(
             ("revision", source.revision.as_str()),
             ("license", source.license.as_str()),
             ("rights_status", source.rights_status.as_str()),
+            ("source_artifact_path", source.source_artifact_path.as_str()),
+            ("source_artifact_sha256", source.source_artifact_sha256.as_str()),
         ] {
             if value.trim().is_empty() {
                 report.fail(
@@ -464,6 +468,12 @@ fn verify_provenance_manifest(
             report.fail(
                 "provenance_source_url_invalid",
                 format!("data_sources[{index}].source_url must be an HTTPS URL"),
+            );
+        }
+        if !is_lower_hex(&source.source_artifact_sha256, 64) {
+            report.fail(
+                "provenance_source_digest_invalid",
+                format!("data_sources[{index}].source_artifact_sha256 must be a 64-character lowercase SHA-256 digest"),
             );
         }
         if !matches!(
@@ -586,6 +596,20 @@ fn verify_provenance_manifest(
             Err(error) => report.fail(
                 "provenance_artifact_invalid_path_or_unreadable",
                 format!("{}: {error}", artifact.path),
+            ),
+        }
+    }
+
+    for (index, source) in manifest.data_sources.iter().enumerate() {
+        match by_path.get(&source.source_artifact_path) {
+            Some(artifact) if artifact.sha256 == source.source_artifact_sha256 => {}
+            Some(_) => report.fail(
+                "provenance_source_artifact_digest_mismatch",
+                format!("data_sources[{index}] source artifact digest does not match its artifact record"),
+            ),
+            None => report.fail(
+                "provenance_source_artifact_missing",
+                format!("data_sources[{index}] source artifact {} is not listed in artifacts", source.source_artifact_path),
             ),
         }
     }
@@ -1052,6 +1076,8 @@ mod tests {
         fn write_provenance_manifest(&self) {
             fs::write(self.0.join("source-manifest.json"), b"{\"source\":\"synthetic fixture\"}")
                 .expect("write source manifest");
+            fs::write(self.0.join("synthetic-source.json"), b"{\"dataset\":\"fixture-only\"}")
+                .expect("write synthetic source artifact");
             fs::write(self.0.join("task-contract.json"), b"{\"task\":\"synthetic fixture task\"}")
                 .expect("write task contract");
             fs::write(
@@ -1065,6 +1091,7 @@ mod tests {
                 "source-manifest.json",
                 "task-contract.json",
                 "evaluation-manifest.json",
+                "synthetic-source.json",
                 "summary/episodes.json",
                 "summary/episodes.csv",
                 "summary/summary.json",
@@ -1100,7 +1127,9 @@ mod tests {
                     "source_url": "https://example.org/synthetic",
                     "revision": "fixture-v1",
                     "license": "synthetic-only",
-                    "rights_status": "not_applicable"
+                    "rights_status": "not_applicable",
+                    "source_artifact_path": "synthetic-source.json",
+                    "source_artifact_sha256": digests["synthetic-source.json"]
                 }],
                 "oracle_accounting": {
                     "setup_requests": 2,
