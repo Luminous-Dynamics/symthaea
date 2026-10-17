@@ -203,6 +203,10 @@ impl fmt::Display for ParetoError {
                 formatter,
                 "candidate {candidate_id} supplies objective {key} without evidence"
             ),
+            Self::MissingObjectiveEvidence { candidate_id, key } => write!(
+                formatter,
+                "candidate {candidate_id} supplies objective {key} without evidence"
+            ),
             Self::EmptyEvidenceReference { candidate_id, key } => write!(
                 formatter,
                 "candidate {candidate_id} supplies an empty evidence reference for {key}"
@@ -434,12 +438,36 @@ fn validate_objectives(
                     key: metric.key.clone(),
                 });
             }
-            validate_evidence_ref(candidate, &metric.key, metric.evidence_ref.as_deref())?;
+            validate_objective_evidence_ref(
+                candidate,
+                &metric.key,
+                metric.evidence_ref.as_deref(),
+            )?;
         }
         schema.push((metric.key.clone(), metric.direction));
     }
     schema.sort();
     Ok(schema)
+}
+
+fn validate_objective_evidence_ref(
+    candidate: &CulinaryCandidate,
+    key: &str,
+    evidence_ref: Option<&str>,
+) -> Result<(), ParetoError> {
+    match evidence_ref {
+        None => Err(ParetoError::MissingObjectiveEvidence {
+            candidate_id: candidate.id.clone(),
+            key: key.to_owned(),
+        }),
+        Some(reference) if reference.trim().is_empty() => {
+            Err(ParetoError::EmptyEvidenceReference {
+                candidate_id: candidate.id.clone(),
+                key: key.to_owned(),
+            })
+        }
+        Some(_) => Ok(()),
+    }
 }
 
 fn validate_evidence_ref(
@@ -479,8 +507,13 @@ fn gate_disposition(candidate: &CulinaryCandidate) -> GateDisposition {
 fn dominates(left: &CulinaryCandidate, right: &CulinaryCandidate) -> bool {
     let mut strictly_better = false;
 
-    for (left_metric, right_metric) in left.objectives.iter().zip(&right.objectives) {
-        // Called only for complete, schema-validated candidates.
+    for left_metric in &left.objectives {
+        // Match by key: equivalent schemas may declare metrics in different orders.
+        let right_metric = right
+            .objectives
+            .iter()
+            .find(|metric| metric.key == left_metric.key)
+            .expect("validated candidates share every objective key");
         let left_value = left_metric.value.expect("ranked metrics are complete");
         let right_value = right_metric.value.expect("ranked metrics are complete");
         let (no_worse, better) = match left_metric.direction {
@@ -679,7 +712,7 @@ mod tests {
 
         assert_eq!(
             evaluate_frontier(&[invalid]),
-            Err(ParetoError::MissingGateEvidence {
+            Err(ParetoError::MissingObjectiveEvidence {
                 candidate_id: "untraced_cost".to_owned(),
                 key: "cost_per_serving".to_owned(),
             })
@@ -731,6 +764,17 @@ mod tests {
             evaluate_frontier(&forward).unwrap(),
             evaluate_frontier(&reverse).unwrap()
         );
+    }
+
+    #[test]
+    fn objective_declaration_order_does_not_change_dominance() {
+        let baseline = candidate("baseline", Some(8.0), Some(8.0), Some(2.0));
+        let mut reordered = candidate("reordered", Some(9.0), Some(9.0), Some(1.0));
+        reordered.objectives.reverse();
+
+        let report = evaluate_frontier(&[baseline, reordered]).unwrap();
+        assert_eq!(report.frontier_ids, vec!["baseline", "reordered"]);
+        assert!(report.candidates.iter().all(|item| item.dominated_by.is_empty()));
     }
 
     #[test]
