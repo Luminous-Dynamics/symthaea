@@ -611,7 +611,7 @@ fn main() {
     let source_commit = std::env::var("GIT_COMMIT").ok();
     let validator_self_test = validator_mutation_audit();
     let report = json!({
-        "schema_version": 1,
+        "schema_version": 2,
         "engine_version": MUSIC_THEORY_ENGINE_VERSION,
         "provenance": {
             "git_commit": source_commit,
