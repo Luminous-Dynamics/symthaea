@@ -1117,6 +1117,61 @@ mod tests {
         assert_eq!(estimate.valid_bootstrap_replicates, BOOTSTRAP_REPLICATES);
     }
 
+
+    #[test]
+    fn bootstrap_withholds_interval_for_singleton_stratum() {
+        let mut groups = BTreeMap::<String, SufficientStats>::new();
+        let mut strata = BTreeMap::<String, BTreeMap<String, SufficientStats>>::new();
+        let mut total = SufficientStats::default();
+
+        for index in 0..9 {
+            let mut row = row(
+                &format!("a-window-{index}"),
+                &format!("a-parent-{index}"),
+                1.0,
+                "evaluated",
+                Some(false),
+                true,
+            );
+            row.stratum_id = "large-stratum".to_owned();
+            let stats = SufficientStats::from_row(&row, true);
+            groups.insert(row.parent_group_id.clone(), stats);
+            strata
+                .entry(row.stratum_id.clone())
+                .or_default()
+                .insert(row.parent_group_id.clone(), stats);
+            total.add(stats);
+        }
+
+        let mut singleton = row(
+            "b-window",
+            "b-parent",
+            1.0,
+            "evaluated",
+            Some(false),
+            false,
+        );
+        singleton.stratum_id = "singleton-stratum".to_owned();
+        let stats = SufficientStats::from_row(&singleton, false);
+        groups.insert(singleton.parent_group_id.clone(), stats);
+        strata
+            .entry(singleton.stratum_id.clone())
+            .or_default()
+            .insert(singleton.parent_group_id.clone(), stats);
+        total.add(stats);
+
+        let result = estimate(
+            Metric::QueryFraction,
+            &groups,
+            Some(&strata),
+            &total,
+            0x5a11_f1ed,
+            "singleton-stratum fixture",
+        );
+        assert_eq!(result.cluster_bootstrap_95_ci, None);
+        assert_eq!(result.valid_bootstrap_replicates, 0);
+    }
+
     #[test]
     fn intervals_are_withheld_without_a_stratified_cluster_design() {
         let mut groups = BTreeMap::<String, SufficientStats>::new();
