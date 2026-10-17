@@ -640,8 +640,17 @@ pub struct AutonomousHoldoutValidation {
     pub median_lie_derivative_variance: f64,
     pub threshold: f64,
     pub scoring_metric: String,
+    /// Canonical candidate expression whose digest is reported below.
+    pub candidate_expression: String,
     pub candidate_expression_digest: String,
+    /// Canonical, versioned snapshot of every search configuration field.
+    pub discovery_config_snapshot: String,
     pub discovery_config_digest: String,
+    /// Exact initial state and variable order used to construct holdout ICs.
+    pub initial_state: Vec<f64>,
+    pub var_names: Vec<String>,
+    pub t_max: f64,
+    pub dt: f64,
     pub holdout_initial_conditions_digest: String,
     pub validation_profile_digest: String,
     pub receipt_digest: String,
@@ -693,32 +702,41 @@ fn generate_holdout_initial_conditions(
     conditions
 }
 
-fn discovery_config_digest(config: &RegressorConfig) -> String {
-    let mut hasher = blake3::Hasher::new();
-    hasher.update(b"SymthaeaRegressorConfigV1\0");
-    hasher.update(&(config.population_size as u64).to_le_bytes());
-    hasher.update(&(config.generations as u64).to_le_bytes());
-    hasher.update(&(config.max_depth as u64).to_le_bytes());
-    hasher.update(&(config.max_complexity as u64).to_le_bytes());
-    holdout_hash_f64(&mut hasher, config.lambda);
-    hasher.update(&(config.tournament_size as u64).to_le_bytes());
-    holdout_hash_f64(&mut hasher, config.mutation_rate);
-    hasher.update(&config.seed.to_le_bytes());
-    hasher.update(&[
-        u8::from(config.disable_macro_seeds),
-        u8::from(config.exclude_trig),
-    ]);
-    hasher.update(&(config.diverse_trajectory_count as u64).to_le_bytes());
-    holdout_hash_f64(&mut hasher, config.prior_composition_rate);
-    holdout_hash_f64(&mut hasher, config.prior_fragment_bonus);
-    holdout_hash_f64(&mut hasher, config.orthogonality_penalty);
-    holdout_hash_f64(&mut hasher, config.orthogonality_threshold);
-    hasher.update(&(config.known_invariants.len() as u64).to_le_bytes());
-    for invariant in &config.known_invariants {
+fn discovery_config_snapshot(config: &RegressorConfig) -> String {
+    let mut snapshot = format!(
+        "RegressorConfigV1\\npopulation_size={}\\ngenerations={}\\nmax_depth={}\\nmax_complexity={}\\nlambda_bits={:016x}\\ntournament_size={}\\nmutation_rate_bits={:016x}\\nseed={}\\ndisable_macro_seeds={}\\nexclude_trig={}\\ndiverse_trajectory_count={}\\nprior_composition_rate_bits={:016x}\\nprior_fragment_bonus_bits={:016x}\\northogonality_penalty_bits={:016x}\\northogonality_threshold_bits={:016x}\\nuse_lie_fitness={}\\nknown_invariants={}",
+        config.population_size,
+        config.generations,
+        config.max_depth,
+        config.max_complexity,
+        config.lambda.to_bits(),
+        config.tournament_size,
+        config.mutation_rate.to_bits(),
+        config.seed,
+        config.disable_macro_seeds,
+        config.exclude_trig,
+        config.diverse_trajectory_count,
+        config.prior_composition_rate.to_bits(),
+        config.prior_fragment_bonus.to_bits(),
+        config.orthogonality_penalty.to_bits(),
+        config.orthogonality_threshold.to_bits(),
+        config.use_lie_fitness,
+        config.known_invariants.len(),
+    );
+    for (index, invariant) in config.known_invariants.iter().enumerate() {
         let canonical = format!("{invariant}");
-        holdout_hash_string(&mut hasher, &canonical);
+        snapshot.push_str(&format!(
+            "\\nknown_invariant_{index}_len={}\\nknown_invariant_{index}={canonical}",
+            canonical.len()
+        ));
     }
-    hasher.update(&[u8::from(config.use_lie_fitness)]);
+    snapshot
+}
+
+fn discovery_config_digest(snapshot: &str) -> String {
+    let mut hasher = blake3::Hasher::new();
+    hasher.update(b"SymthaeaRegressorConfigDigestV1\\0");
+    holdout_hash_string(&mut hasher, snapshot);
     hasher.finalize().to_hex().to_string()
 }
 
@@ -795,8 +813,20 @@ fn finalize_holdout_validation(
     holdout_hash_f64(&mut hasher, result.median_lie_derivative_variance);
     holdout_hash_f64(&mut hasher, result.threshold);
     holdout_hash_string(&mut hasher, &result.scoring_metric);
+    holdout_hash_string(&mut hasher, &result.candidate_expression);
     holdout_hash_string(&mut hasher, &result.candidate_expression_digest);
+    holdout_hash_string(&mut hasher, &result.discovery_config_snapshot);
     holdout_hash_string(&mut hasher, &result.discovery_config_digest);
+    hasher.update(&(result.initial_state.len() as u64).to_le_bytes());
+    for value in &result.initial_state {
+        holdout_hash_f64(&mut hasher, *value);
+    }
+    hasher.update(&(result.var_names.len() as u64).to_le_bytes());
+    for name in &result.var_names {
+        holdout_hash_string(&mut hasher, name);
+    }
+    holdout_hash_f64(&mut hasher, result.t_max);
+    holdout_hash_f64(&mut hasher, result.dt);
     holdout_hash_string(&mut hasher, &result.holdout_initial_conditions_digest);
     holdout_hash_string(&mut hasher, &result.validation_profile_digest);
     holdout_hash_failure(&mut hasher, result.failure);
@@ -828,9 +858,11 @@ pub fn validate_invariant_holdout(
     let requested = holdout_trajectories;
     let discovery_seed = discovery_config.seed;
     let candidate_expression = format!("{candidate}");
-    let candidate_expression_digest =
-        blake3::hash(candidate_expression.as_bytes()).to_hex().to_string();
-    let discovery_config_digest = discovery_config_digest(discovery_config);
+    let candidate_expression_digest = blake3::hash(candidate_expression.as_bytes())
+        .to_hex()
+        .to_string();
+    let discovery_config_snapshot = discovery_config_snapshot(discovery_config);
+    let discovery_config_digest = discovery_config_digest(&discovery_config_snapshot);
 
     let bounded_request = requested <= MAX_HOLDOUT_TRAJECTORIES;
     let conditions = if bounded_request {
@@ -879,8 +911,14 @@ pub fn validate_invariant_holdout(
         median_lie_derivative_variance: f64::MAX,
         threshold,
         scoring_metric: HOLDOUT_SCORING_METRIC_V1.to_owned(),
+        candidate_expression,
         candidate_expression_digest,
+        discovery_config_snapshot,
         discovery_config_digest,
+        initial_state: initial_state.to_vec(),
+        var_names: var_names.iter().map(|name| (*name).to_owned()).collect(),
+        t_max,
+        dt,
         holdout_initial_conditions_digest: holdout_manifest_digest,
         validation_profile_digest,
         receipt_digest: String::new(),
