@@ -41,6 +41,7 @@ const INTENTS: [(f32, f32, f32, usize); 4] = [
 ];
 const AXIS_SEEDS: [u64; 3] = [13, 29, 73];
 const AXES: [&str; 4] = ["valence", "arousal", "energy", "bars"];
+const REPORT_SCHEMA_VERSION: u32 = 6;
 
 #[derive(Clone)]
 struct Sample {
@@ -1021,7 +1022,7 @@ fn main() {
     let validator_self_test = validator_mutation_audit();
     let minuet_trio_contract = minuet_trio_texture_audit();
     let report = json!({
-        "schema_version": 5,
+        "schema_version": REPORT_SCHEMA_VERSION,
         "engine_version": MUSIC_THEORY_ENGINE_VERSION,
         "provenance": {
             "git_commit": source_commit,
@@ -1205,6 +1206,11 @@ mod tests {
         assert_eq!(summary["finite_count"].as_u64(), Some(0));
         assert!(summary["median"].is_null());
         assert!(summary["mean"].is_null());
+    }
+
+    #[test]
+    fn report_schema_version_tracks_the_named_style_contract_fields() {
+        assert_eq!(REPORT_SCHEMA_VERSION, 6);
     }
 
     #[test]
