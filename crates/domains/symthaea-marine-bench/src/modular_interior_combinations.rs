@@ -8,7 +8,7 @@
 //! states that it is partial; it never claims exhaustive coverage.
 
 use crate::modular_interior::{
-    validate_configuration, verify_validation_receipt, Configuration, Finding, Severity,
+    validate_configuration, verify_validation_receipt, Configuration, Finding,
     ValidationReceipt,
 };
 use crate::modular_interior_impact::{analyze_configuration_change, ImpactReport};
@@ -523,14 +523,14 @@ mod tests {
         let b = variant(&baseline, "MODULE-STORAGE", "STORAGE-V2", 0.0);
         let limits = default_limits();
         let first = search_combinations(&baseline, &[a.clone(), b.clone()], limits.clone()).unwrap();
-        let second = search_combinations(&baseline, &[b, a], limits.clone()).unwrap();
+        let second = search_combinations(&baseline, &[b.clone(), a.clone()], limits.clone()).unwrap();
         assert_eq!(first.report_sha256, second.report_sha256);
         assert!(first.body.search_complete);
         assert_eq!(first.body.candidates.len(), 3);
         assert_eq!(first.body.candidates[0].selected_variant_ids.len(), 1);
         assert_eq!(first.body.candidates[1].selected_variant_ids.len(), 1);
         assert_eq!(first.body.candidates[2].selected_variant_ids.len(), 2);
-        assert!(verify_combination_search_report(&baseline, &[a, variant(&baseline, "MODULE-STORAGE", "STORAGE-V2", 0.0)], &limits, &first));
+        assert!(verify_combination_search_report(&baseline, &[a, b], &limits, &first));
     }
 
     #[test]
