@@ -64,7 +64,7 @@ fn parse(path: &Path) -> Option<Vec<Ev>> {
         midly::Timing::Metrical(t) => t.as_int() as f64,
         _ => return None,
     };
-    if !ppq.is_finite() || ppq <= 0.0 {
+    if !ppq.is_finite() || !(1.0..=32_767.0).contains(&ppq) || ppq.fract() != 0.0 {
         return None;
     }
     let mut out = Vec::new();
@@ -80,6 +80,9 @@ fn parse(path: &Path) -> Option<Vec<Ev>> {
 /// different channels, or silently discard unmatched events: any such file is
 /// excluded as ambiguous rather than allowed to distort performance statistics.
 fn parse_track(track: &[midly::TrackEvent<'_>], ppq: f64) -> Option<Vec<Ev>> {
+    if !ppq.is_finite() || !(1.0..=32_767.0).contains(&ppq) || ppq.fract() != 0.0 {
+        return None;
+    }
     let mut open: BTreeMap<(u8, u8), (u32, u8)> = BTreeMap::new();
     let mut out = Vec::new();
     let mut tick = 0_u32;
@@ -192,6 +195,17 @@ mod midi_pairing_tests {
 
         let unmatched = vec![event(0, 0, note_on(60, 100))];
         assert!(parse_track(&unmatched, 480.0).is_none());
+    }
+
+    #[test]
+    fn rejects_invalid_pulses_per_quarter() {
+        let track = vec![
+            event(0, 0, note_on(60, 100)),
+            event(480, 0, note_off(60)),
+        ];
+        assert!(parse_track(&track, 0.0).is_none());
+        assert!(parse_track(&track, 480.5).is_none());
+        assert!(parse_track(&track, 32_768.0).is_none());
     }
 
     #[test]
