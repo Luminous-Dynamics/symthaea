@@ -1191,4 +1191,49 @@ mod tests {
         config.connections.push(duplicate);
         assert!(has(&validate_configuration(&config).expect("receipt serializes"), "PORT_CONNECTED_MULTIPLE_TIMES"));
     }
+
+    #[test]
+    fn mixed_service_units_are_rejected_before_load_aggregation() {
+        let mut config = live();
+        let module = config.module_catalog.iter_mut().find(|m| m.module_id == "SLEEP-POD")
+            .expect("sleep pod exists");
+        module.ports.iter_mut().find(|p| p.port_id == "AC_IN")
+            .expect("AC port exists").rating.unit = "kg".to_owned();
+        let receipt = validate_configuration(&config).expect("receipt serializes");
+        assert_eq!(receipt.body.overall_disposition, "rejected");
+        assert!(has(&receipt, "SERVICE_CAPACITY_UNIT_MISMATCH"));
+        assert!(has(&receipt, "MIXED_SERVICE_LOAD_UNITS"));
+    }
+
+    #[test]
+    fn endpoint_shape_and_unknown_numeric_ratings_fail_closed() {
+        let mut config = live();
+        config.connections[0].endpoint_a.kind = "platform_service".to_owned();
+        let receipt = validate_configuration(&config).expect("receipt serializes");
+        assert_eq!(receipt.body.overall_disposition, "rejected");
+        assert!(has(&receipt, "INVALID_CONNECTION_ENDPOINT_SHAPE"));
+
+        let mut config = live();
+        let port = config.module_catalog.iter_mut().find(|m| m.module_id == "SLEEP-POD")
+            .expect("sleep pod exists").ports.iter_mut().find(|p| p.port_id == "AC_IN")
+            .expect("AC port exists");
+        port.rating.status = "unknown".to_owned();
+        port.rating.value = Some(300.0);
+        let receipt = validate_configuration(&config).expect("receipt serializes");
+        assert_eq!(receipt.body.overall_disposition, "rejected");
+        assert!(has(&receipt, "UNKNOWN_RATING_HAS_VALUE"));
+    }
+
+    #[test]
+    fn safety_gate_pass_requires_evidence() {
+        let mut config = live();
+        let gate = config.safety_gates.iter_mut().find(|g| g.category == "fire_safety")
+            .expect("fire safety gate exists");
+        gate.disposition = "pass".to_owned();
+        gate.evidence_refs.clear();
+        let receipt = validate_configuration(&config).expect("receipt serializes");
+        assert_eq!(receipt.body.overall_disposition, "rejected");
+        assert!(has(&receipt, "SAFETY_GATE_PASS_WITHOUT_EVIDENCE"));
+    }
+
 }
