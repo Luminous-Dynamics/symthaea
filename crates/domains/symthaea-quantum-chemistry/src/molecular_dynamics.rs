@@ -88,30 +88,11 @@ pub struct MdResult {
     pub total_steps: usize,
 }
 
-/// Compute forces on all atoms via central finite differences.
+/// Compatibility helper for callers that expect finite-difference forces directly.
+/// The checked AIMD runner calls compute_forces_checked and returns typed failures.
 fn compute_forces(mol: &Molecule, fd_step: f64) -> Vec<[f64; 3]> {
-    let n_atoms = mol.n_atoms();
-    let mut forces = vec![[0.0; 3]; n_atoms];
-    let scf_config = RhfConfig::default();
-
-    for atom_idx in 0..n_atoms {
-        for coord in 0..3 {
-            let mut mol_plus = mol.clone();
-            mol_plus.atoms[atom_idx].position[coord] += fd_step;
-            let basis_p = Sto3g::build(&mol_plus);
-            let e_plus = restricted_hartree_fock(&mol_plus, &basis_p, &scf_config).total_energy;
-
-            let mut mol_minus = mol.clone();
-            mol_minus.atoms[atom_idx].position[coord] -= fd_step;
-            let basis_m = Sto3g::build(&mol_minus);
-            let e_minus = restricted_hartree_fock(&mol_minus, &basis_m, &scf_config).total_energy;
-
-            // Force = -dE/dx
-            forces[atom_idx][coord] = -(e_plus - e_minus) / (2.0 * fd_step);
-        }
-    }
-
-    forces
+    compute_forces_checked(mol, fd_step, 0)
+        .unwrap_or_else(|error| panic!("finite-difference force evaluation failed: {error}"))
 }
 
 /// Checked central-difference forces; perturbations and energies are validated
