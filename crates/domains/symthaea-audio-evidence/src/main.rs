@@ -52,7 +52,8 @@ fn main() -> ExitCode {
                 println!("PLAN OK: no measurement verdict; {count} artifacts checked");
             } else {
                 println!(
-                    "MANIFEST OK: status={status}; {count} artifacts checked; acoustic gate and compliance not assessed"
+                    "MANIFEST OK: status={status}; {count} artifacts checked; \
+                     acoustic gate and compliance not assessed"
                 );
             }
             ExitCode::SUCCESS
