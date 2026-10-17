@@ -2248,6 +2248,7 @@ mod tests {
             CampaignFamily::IdentityToEgress,
             CampaignFamily::ArtifactProvenance,
             CampaignFamily::CloudDataMovement,
+            CampaignFamily::CrossDomainTrustChain,
         ];
         for family in families {
             let dataset = generate_dataset_for_family(1_000, 2026, family)
