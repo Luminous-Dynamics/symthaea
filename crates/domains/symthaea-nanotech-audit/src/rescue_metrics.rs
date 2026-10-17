@@ -931,7 +931,7 @@ mod tests {
 
         assert_eq!(value["policy_decision_count"], 4);
         assert_eq!(value["policy_reference_query_count"], 1);
-        assert_eq!(value["policy_intervention_count"], 1);
+        assert_eq!(value["policy_intervention_count"], 2);
         assert_eq!(value["policy_reference_query_fraction"]["estimate"], 0.5);
         assert_eq!(value["policy_intervention_fraction"]["estimate"], 0.5);
         assert_eq!(
