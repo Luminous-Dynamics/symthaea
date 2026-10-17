@@ -164,7 +164,19 @@ fn append_binary_negative_rows(out: &mut String, seed: u64) {
     }
 }
 
+/// Fail closed if the generator ever stops preserving common prefixes across widths.
+/// Capacity results then remain paired by item identity instead of comparing unrelated codebooks.
+fn assert_prefix_stability() {
+    let seed = 0xA55A_1234_9876_FEDCu64;
+    let small = bipolar_continuous(1_024, seed);
+    let medium = bipolar_continuous(4_096, seed);
+    let large = bipolar_continuous(16_384, seed);
+    assert_eq!(&small.values[..], &medium.values[..1_024]);
+    assert_eq!(&medium.values[..], &large.values[..4_096]);
+}
+
 fn main() {
+    assert_prefix_stability();
     let mut csv = String::from(
         "record_kind,representation,dimension,bundle_fan_in,seed,sample_index,target_similarity,best_distractor_similarity,margin,top1_hit,unrelated_pair_similarity\n",
     );
