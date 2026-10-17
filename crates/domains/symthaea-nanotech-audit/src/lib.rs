@@ -1623,6 +1623,53 @@ mod tests {
     }
 
     #[test]
+    fn rejects_local_candidate_rejection_misreported_as_external_call() {
+        let fixture = Fixture::new();
+        fixture.write_provenance_manifest();
+
+        let ledger_path = fixture.0.join("oracle-call-ledger.jsonl");
+        let mut records = fs::read_to_string(&ledger_path)
+            .expect("read oracle ledger")
+            .lines()
+            .map(|line| serde_json::from_str::<Value>(line).expect("parse ledger record"))
+            .collect::<Vec<_>>();
+        let rejected = records
+            .iter_mut()
+            .find(|record| record["status"] == "invalid_candidate")
+            .expect("fixture has local rejection");
+        rejected["external_invocation"] = json!(true);
+        let ledger_content = records
+            .iter()
+            .map(|record| serde_json::to_string(record).expect("serialize ledger record"))
+            .collect::<Vec<_>>()
+            .join("\n");
+        fs::write(&ledger_path, format!("{ledger_content}\n")).expect("rewrite ledger");
+
+        let (ledger_sha256, ledger_size) =
+            hash_artifact(&fixture.0, "oracle-call-ledger.jsonl").expect("hash mutated ledger");
+        let manifest_path = fixture.0.join(PROVENANCE_MANIFEST_NAME);
+        let mut manifest: Value =
+            serde_json::from_str(&fs::read_to_string(&manifest_path).expect("read provenance"))
+                .unwrap();
+        manifest["oracle_call_ledger_sha256"] = json!(ledger_sha256);
+        for artifact in manifest["artifacts"].as_array_mut().unwrap() {
+            if artifact["path"] == "oracle-call-ledger.jsonl" {
+                artifact["sha256"] = json!(ledger_sha256);
+                artifact["size_bytes"] = json!(ledger_size);
+            }
+        }
+        fs::write(&manifest_path, serde_json::to_vec_pretty(&manifest).unwrap())
+            .expect("update provenance hashes");
+
+        let report = audit_run(&fixture.0);
+        assert_eq!(report.status, "fail");
+        assert_eq!(report.provenance_manifest_status, "manifest_invalid");
+        assert!(report.findings.iter().any(|finding| {
+            finding.code == "oracle_call_ledger_local_rejection_mismatch"
+        }));
+    }
+
+    #[test]
     fn rejects_omitted_call_even_when_ledger_hashes_are_updated() {
         let fixture = Fixture::new();
         fixture.write_provenance_manifest();
