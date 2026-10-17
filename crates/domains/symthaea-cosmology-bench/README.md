@@ -22,7 +22,7 @@ Audit and combine the four compatible DESI chain files for a selected parameter 
 
     cargo run -p symthaea-cosmology-bench --bin symthaea-cosmology-chain-audit -- H0 data/bao-cosmo-params/cobaya/base/desi-bao-all/chain.1.txt data/bao-cosmo-params/cobaya/base/desi-bao-all/chain.2.txt data/bao-cosmo-params/cobaya/base/desi-bao-all/chain.3.txt data/bao-cosmo-params/cobaya/base/desi-bao-all/chain.4.txt
 
-Output reports input paths, row count, total and positive-weight sample count, weighted mean/population variance, weighted empirical q16/q50/q84, and weight-only effective sample size.
+The JSON summary includes each exact parsed input's SHA-256 and byte size, plus row count, total and positive-weight sample count, weighted mean/population variance, weighted empirical q16/q50/q84, and weight-only effective sample size. The hashes are computed from the same in-memory bytes passed to the parser.
 
 ## Scientific boundaries
 
