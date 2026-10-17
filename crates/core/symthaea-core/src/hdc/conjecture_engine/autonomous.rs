@@ -612,61 +612,261 @@ pub fn discover_invariants_autonomous_cold(
     )
 }
 
-/// Independent holdout assessment for an invariant discovered by the autonomous
-/// search.
+/// A bounded failure disposition for the autonomous holdout qualification.
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub enum AutonomousHoldoutFailure {
+    DiscoveryAndHoldoutSeedsEqual,
+    NoTrajectoriesRequested,
+    InvalidValidationProfile,
+    IncompleteHoldout,
+    ThresholdExceeded,
+}
+
+/// Independent holdout assessment for one discovered candidate.
 ///
-/// The holdout initial conditions are generated from a caller-supplied seed that
-/// must be kept distinct from the search seed. No search result is used to
-/// construct the holdout trajectories. A passing result is generalization
-/// evidence only; it is not a symbolic or formal proof.
-#[derive(Debug, Clone)]
+/// This records auditable provenance for a numerical generalization check. It
+/// does not establish a symbolic identity or formal theorem. The component
+/// digests bind the candidate expression, discovery configuration, generated
+/// holdout initial-condition manifest, and declared validation profile.
+#[derive(Debug, Clone, PartialEq)]
 pub struct AutonomousHoldoutValidation {
-    /// Seed used only for holdout initial-condition generation.
+    pub dynamics_id: String,
+    pub discovery_seed: u64,
     pub holdout_seed: u64,
-    /// Number of holdout trajectories requested.
+    pub seeds_independent: bool,
     pub requested_trajectories: usize,
-    /// Number of trajectories with enough finite samples to score.
     pub trajectories_checked: usize,
-    /// Largest Lie-derivative variance observed across checked holdouts.
     pub max_lie_derivative_variance: f64,
-    /// Median Lie-derivative variance across checked holdouts.
     pub median_lie_derivative_variance: f64,
-    /// Maximum allowed Lie-derivative variance.
     pub threshold: f64,
-    /// True only when every requested trajectory was checkable and stayed
-    /// below the supplied threshold.
+    pub scoring_metric: String,
+    pub candidate_expression_digest: String,
+    pub discovery_config_digest: String,
+    pub holdout_initial_conditions_digest: String,
+    pub validation_profile_digest: String,
+    pub receipt_digest: String,
+    pub failure: Option<AutonomousHoldoutFailure>,
     pub passed: bool,
 }
 
-/// Validate one candidate on fresh trajectories generated independently from
-/// the discovery trajectories.
+const MAX_HOLDOUT_TRAJECTORIES: usize = 10_000;
+const HOLDOUT_SCORING_METRIC_V1: &str = "lie_derivative_variance_v1";
+
+fn holdout_hash_string(hasher: &mut blake3::Hasher, value: &str) {
+    hasher.update(&(value.len() as u64).to_le_bytes());
+    hasher.update(value.as_bytes());
+}
+
+fn holdout_hash_f64(hasher: &mut blake3::Hasher, value: f64) {
+    hasher.update(&value.to_bits().to_le_bytes());
+}
+
+fn holdout_hash_failure(hasher: &mut blake3::Hasher, failure: Option<AutonomousHoldoutFailure>) {
+    let tag = match failure {
+        None => 0,
+        Some(AutonomousHoldoutFailure::DiscoveryAndHoldoutSeedsEqual) => 1,
+        Some(AutonomousHoldoutFailure::NoTrajectoriesRequested) => 2,
+        Some(AutonomousHoldoutFailure::InvalidValidationProfile) => 3,
+        Some(AutonomousHoldoutFailure::IncompleteHoldout) => 4,
+        Some(AutonomousHoldoutFailure::ThresholdExceeded) => 5,
+    };
+    hasher.update(&[tag]);
+}
+
+fn generate_holdout_initial_conditions(
+    initial_state: &[f64],
+    holdout_seed: u64,
+    requested: usize,
+) -> Vec<Vec<f64>> {
+    let mut prng = holdout_seed;
+    let mut conditions = Vec::with_capacity(requested);
+    for _ in 0..requested {
+        let mut ic = initial_state.to_vec();
+        for value in &mut ic {
+            prng = lcg_step(prng);
+            let u = (prng as f64 / u64::MAX as f64) * 2.0 - 1.0;
+            let scale = value.abs().max(0.05);
+            *value += u * 0.25 * scale;
+        }
+        conditions.push(ic);
+    }
+    conditions
+}
+
+fn holdout_initial_conditions_digest(
+    initial_state: &[f64],
+    var_names: &[&str],
+    holdout_seed: u64,
+    requested: usize,
+    conditions: &[Vec<f64>],
+) -> String {
+    let mut hasher = blake3::Hasher::new();
+    hasher.update(b"SymthaeaInvariantHoldoutInitialConditionsV1\0");
+    hasher.update(&holdout_seed.to_le_bytes());
+    hasher.update(&(requested as u64).to_le_bytes());
+    hasher.update(&(initial_state.len() as u64).to_le_bytes());
+    for value in initial_state {
+        holdout_hash_f64(&mut hasher, *value);
+    }
+    hasher.update(&(var_names.len() as u64).to_le_bytes());
+    for name in var_names {
+        holdout_hash_string(&mut hasher, name);
+    }
+    hasher.update(&(conditions.len() as u64).to_le_bytes());
+    for (index, condition) in conditions.iter().enumerate() {
+        hasher.update(&(index as u64).to_le_bytes());
+        hasher.update(&(condition.len() as u64).to_le_bytes());
+        for value in condition {
+            holdout_hash_f64(&mut hasher, *value);
+        }
+    }
+    hasher.finalize().to_hex().to_string()
+}
+
+fn holdout_validation_profile_digest(
+    dynamics_id: &str,
+    candidate_digest: &str,
+    discovery_config_digest: &str,
+    holdout_manifest_digest: &str,
+    discovery_seed: u64,
+    holdout_seed: u64,
+    t_max: f64,
+    dt: f64,
+    requested: usize,
+    threshold: f64,
+) -> String {
+    let mut hasher = blake3::Hasher::new();
+    hasher.update(b"SymthaeaInvariantHoldoutValidationProfileV1\0");
+    holdout_hash_string(&mut hasher, dynamics_id);
+    holdout_hash_string(&mut hasher, candidate_digest);
+    holdout_hash_string(&mut hasher, discovery_config_digest);
+    holdout_hash_string(&mut hasher, holdout_manifest_digest);
+    hasher.update(&discovery_seed.to_le_bytes());
+    hasher.update(&holdout_seed.to_le_bytes());
+    holdout_hash_f64(&mut hasher, t_max);
+    holdout_hash_f64(&mut hasher, dt);
+    hasher.update(&(requested as u64).to_le_bytes());
+    holdout_hash_f64(&mut hasher, threshold);
+    holdout_hash_string(&mut hasher, HOLDOUT_SCORING_METRIC_V1);
+    hasher.finalize().to_hex().to_string()
+}
+
+fn finalize_holdout_validation(mut result: AutonomousHoldoutValidation) -> AutonomousHoldoutValidation {
+    let mut hasher = blake3::Hasher::new();
+    hasher.update(b"SymthaeaAutonomousHoldoutReceiptV1\0");
+    holdout_hash_string(&mut hasher, &result.dynamics_id);
+    hasher.update(&result.discovery_seed.to_le_bytes());
+    hasher.update(&result.holdout_seed.to_le_bytes());
+    hasher.update(&[u8::from(result.seeds_independent)]);
+    hasher.update(&(result.requested_trajectories as u64).to_le_bytes());
+    hasher.update(&(result.trajectories_checked as u64).to_le_bytes());
+    holdout_hash_f64(&mut hasher, result.max_lie_derivative_variance);
+    holdout_hash_f64(&mut hasher, result.median_lie_derivative_variance);
+    holdout_hash_f64(&mut hasher, result.threshold);
+    holdout_hash_string(&mut hasher, &result.scoring_metric);
+    holdout_hash_string(&mut hasher, &result.candidate_expression_digest);
+    holdout_hash_string(&mut hasher, &result.discovery_config_digest);
+    holdout_hash_string(&mut hasher, &result.holdout_initial_conditions_digest);
+    holdout_hash_string(&mut hasher, &result.validation_profile_digest);
+    holdout_hash_failure(&mut hasher, result.failure);
+    hasher.update(&[u8::from(result.passed)]);
+    result.receipt_digest = hasher.finalize().to_hex().to_string();
+    result
+}
+
+/// Validate one candidate on fresh, reproducibly generated initial conditions.
 ///
-/// holdout_seed is intentionally explicit so experiment records can bind the
-/// validation split independently from RegressorConfig::seed.
+/// The discovery seed comes from the exact RegressorConfig used for search and
+/// must differ from holdout_seed. The caller supplies a stable dynamics_id;
+/// source revision plus this ID and the generated IC-manifest digest bind the
+/// differential system profile. A passing result is numerical generalization
+/// evidence only, not symbolic or formal proof.
 pub fn validate_invariant_holdout(
     rhs: fn(&[f64], f64) -> Vec<f64>,
+    dynamics_id: &str,
     candidate: &Expr,
     initial_state: &[f64],
     var_names: &[&str],
+    discovery_config: &RegressorConfig,
     t_max: f64,
     dt: f64,
     holdout_trajectories: usize,
     holdout_seed: u64,
     threshold: f64,
 ) -> AutonomousHoldoutValidation {
-    assert_eq!(var_names.len(), initial_state.len());
-
     let requested = holdout_trajectories;
-    if requested == 0 {
-        return AutonomousHoldoutValidation {
-            holdout_seed,
-            requested_trajectories: 0,
-            trajectories_checked: 0,
-            max_lie_derivative_variance: f64::MAX,
-            median_lie_derivative_variance: f64::MAX,
-            threshold,
-            passed: false,
-        };
+    let discovery_seed = discovery_config.seed;
+    let candidate_expression = format!("{candidate}");
+    let candidate_expression_digest = blake3::hash(candidate_expression.as_bytes()).to_hex().to_string();
+    let config_serialization = format!("RegressorConfigV1:{discovery_config:?}");
+    let discovery_config_digest = blake3::hash(config_serialization.as_bytes()).to_hex().to_string();
+
+    let bounded_request = requested <= MAX_HOLDOUT_TRAJECTORIES;
+    let conditions = if bounded_request {
+        generate_holdout_initial_conditions(initial_state, holdout_seed, requested)
+    } else {
+        Vec::new()
+    };
+    let holdout_manifest_digest = holdout_initial_conditions_digest(
+        initial_state, var_names, holdout_seed, requested, &conditions,
+    );
+    let validation_profile_digest = holdout_validation_profile_digest(
+        dynamics_id,
+        &candidate_expression_digest,
+        &discovery_config_digest,
+        &holdout_manifest_digest,
+        discovery_seed,
+        holdout_seed,
+        t_max,
+        dt,
+        requested,
+        threshold,
+    );
+    let seeds_independent = discovery_seed != holdout_seed;
+    let input_valid = !dynamics_id.trim().is_empty()
+        && !initial_state.is_empty()
+        && initial_state.iter().all(|value| value.is_finite())
+        && var_names.len() == initial_state.len()
+        && var_names.iter().all(|name| !name.trim().is_empty())
+        && t_max.is_finite()
+        && t_max > 0.0
+        && dt.is_finite()
+        && dt > 0.0
+        && threshold.is_finite()
+        && threshold >= 0.0
+        && bounded_request;
+
+    let mut result = AutonomousHoldoutValidation {
+        dynamics_id: dynamics_id.to_owned(),
+        discovery_seed,
+        holdout_seed,
+        seeds_independent,
+        requested_trajectories: requested,
+        trajectories_checked: 0,
+        max_lie_derivative_variance: f64::MAX,
+        median_lie_derivative_variance: f64::MAX,
+        threshold,
+        scoring_metric: HOLDOUT_SCORING_METRIC_V1.to_owned(),
+        candidate_expression_digest,
+        discovery_config_digest,
+        holdout_initial_conditions_digest: holdout_manifest_digest,
+        validation_profile_digest,
+        receipt_digest: String::new(),
+        failure: None,
+        passed: false,
+    };
+
+    if !input_valid {
+        result.failure = Some(if requested == 0 {
+            AutonomousHoldoutFailure::NoTrajectoriesRequested
+        } else {
+            AutonomousHoldoutFailure::InvalidValidationProfile
+        });
+        return finalize_holdout_validation(result);
+    }
+    if !seeds_independent {
+        result.failure = Some(AutonomousHoldoutFailure::DiscoveryAndHoldoutSeedsEqual);
+        return finalize_holdout_validation(result);
     }
 
     let sample_orbit = |ic: &[f64]| -> Option<Vec<Vec<f64>>> {
@@ -676,65 +876,51 @@ pub fn validate_invariant_holdout(
             return None;
         }
         let step = states.len() / n_samples.max(1);
-        Some(
-            states
-                .iter()
-                .step_by(step.max(1))
-                .take(n_samples)
-                .cloned()
-                .collect(),
-        )
+        let samples: Vec<Vec<f64>> = states
+            .iter()
+            .step_by(step.max(1))
+            .take(n_samples)
+            .cloned()
+            .collect();
+        if samples.iter().any(|state| {
+            state.len() != var_names.len() || state.iter().any(|value| !value.is_finite())
+        }) {
+            return None;
+        }
+        Some(samples)
     };
 
-    let mut prng = holdout_seed;
     let mut variances = Vec::with_capacity(requested);
-    for _ in 0..requested {
-        let mut ic = initial_state.to_vec();
-        for x in &mut ic {
-            prng = lcg_step(prng);
-            let u = (prng as f64 / u64::MAX as f64) * 2.0 - 1.0;
-            let scale = x.abs().max(0.05);
-            *x += u * 0.25 * scale;
-        }
-        let Some(orbit) = sample_orbit(&ic) else {
+    for ic in &conditions {
+        let Some(orbit) = sample_orbit(ic) else {
             continue;
         };
         let variance = lie_derivative_variance(candidate, rhs, &orbit, var_names);
-        if variance.is_finite() {
+        if variance.is_finite() && variance >= 0.0 {
             variances.push(variance);
         }
     }
-
+    result.trajectories_checked = variances.len();
     if variances.len() != requested || variances.is_empty() {
-        return AutonomousHoldoutValidation {
-            holdout_seed,
-            requested_trajectories: requested,
-            trajectories_checked: variances.len(),
-            max_lie_derivative_variance: variances.iter().copied().fold(0.0, f64::max),
-            median_lie_derivative_variance: f64::MAX,
-            threshold,
-            passed: false,
-        };
+        result.max_lie_derivative_variance = variances.iter().copied().fold(0.0, f64::max);
+        result.failure = Some(AutonomousHoldoutFailure::IncompleteHoldout);
+        return finalize_holdout_validation(result);
     }
 
     variances.sort_by(f64::total_cmp);
-    let max_variance = variances.last().copied().unwrap_or(f64::MAX);
+    result.max_lie_derivative_variance = variances.last().copied().unwrap_or(f64::MAX);
     let mid = variances.len() / 2;
-    let median = if variances.len() % 2 == 0 {
-        (variances[mid - 1] + variances[mid]) * 0.5
+    result.median_lie_derivative_variance = if variances.len() % 2 == 0 {
+        variances[mid - 1] * 0.5 + variances[mid] * 0.5
     } else {
         variances[mid]
     };
-
-    AutonomousHoldoutValidation {
-        holdout_seed,
-        requested_trajectories: requested,
-        trajectories_checked: variances.len(),
-        max_lie_derivative_variance: max_variance,
-        median_lie_derivative_variance: median,
-        threshold,
-        passed: max_variance <= threshold,
+    if result.max_lie_derivative_variance > threshold {
+        result.failure = Some(AutonomousHoldoutFailure::ThresholdExceeded);
+    } else {
+        result.passed = true;
     }
+    finalize_holdout_validation(result)
 }
 pub fn discover_invariants_autonomous_with_seed_templates(
     rhs: fn(&[f64], f64) -> Vec<f64>,
@@ -1674,30 +1860,15 @@ mod holdout_validation_tests {
         vec![s[1], -s[0]]
     }
 
-    #[test]
-    fn holdout_rejects_nonconserved_candidate() {
-        let candidate = Expr::Var("x".into());
-        let result = validate_invariant_holdout(
-            harmonic_rhs,
-            &candidate,
-            &[1.0, 0.2],
-            &["x", "v"],
-            1.0,
-            0.02,
-            4,
-            0x1234_5678,
-            1e-8,
-        );
-
-        assert_eq!(result.requested_trajectories, 4);
-        assert_eq!(result.trajectories_checked, 4);
-        assert!(!result.passed);
-        assert!(result.max_lie_derivative_variance > result.threshold);
+    fn discovery_config(seed: u64) -> RegressorConfig {
+        RegressorConfig {
+            seed,
+            ..RegressorConfig::default()
+        }
     }
 
-    #[test]
-    fn holdout_validates_harmonic_energy_on_fresh_initial_conditions() {
-        let candidate = Expr::BinOp(
+    fn harmonic_energy_candidate() -> Expr {
+        Expr::BinOp(
             BinOp::Add,
             Box::new(Expr::BinOp(
                 BinOp::Pow,
@@ -1709,22 +1880,91 @@ mod holdout_validation_tests {
                 Box::new(Expr::Var("v".into())),
                 Box::new(Expr::Const(2.0)),
             )),
-        );
+        )
+    }
+
+    #[test]
+    fn holdout_rejects_nonconserved_candidate() {
+        let config = discovery_config(0x1234);
         let result = validate_invariant_holdout(
-            harmonic_rhs,
-            &candidate,
-            &[1.0, 0.2],
-            &["x", "v"],
-            1.0,
-            0.02,
-            4,
-            0x9abc_def0,
-            1e-8,
+            harmonic_rhs, "harmonic-oscillator-v1", &Expr::Var("x".into()),
+            &[1.0, 0.2], &["x", "v"], &config, 1.0, 0.02, 4, 0x5678, 1e-8,
         );
 
-        assert!(result.passed);
+        assert_eq!(result.requested_trajectories, 4);
+        assert_eq!(result.trajectories_checked, 4);
+        assert!(result.seeds_independent);
+        assert!(!result.passed);
+        assert_eq!(result.failure, Some(AutonomousHoldoutFailure::ThresholdExceeded));
+        assert!(result.max_lie_derivative_variance > result.threshold);
+        assert_eq!(result.candidate_expression_digest.len(), 64);
+        assert_eq!(result.discovery_config_digest.len(), 64);
+        assert_eq!(result.holdout_initial_conditions_digest.len(), 64);
+        assert_eq!(result.validation_profile_digest.len(), 64);
+        assert_eq!(result.receipt_digest.len(), 64);
+    }
+
+    #[test]
+    fn holdout_validates_harmonic_energy_on_fresh_initial_conditions() {
+        let config = discovery_config(0x1357);
+        let result = validate_invariant_holdout(
+            harmonic_rhs, "harmonic-oscillator-v1", &harmonic_energy_candidate(),
+            &[1.0, 0.2], &["x", "v"], &config, 1.0, 0.02, 4, 0x9abc_def0, 1e-8,
+        );
+
+        assert!(result.passed, "holdout should pass: {result:?}");
         assert_eq!(result.trajectories_checked, 4);
         assert!(result.max_lie_derivative_variance <= result.threshold);
+        assert_eq!(result.failure, None);
+    }
+
+    #[test]
+    fn equal_discovery_and_holdout_seeds_fail_closed() {
+        let config = discovery_config(1234);
+        let result = validate_invariant_holdout(
+            harmonic_rhs, "harmonic-oscillator-v1", &harmonic_energy_candidate(),
+            &[1.0, 0.2], &["x", "v"], &config, 1.0, 0.02, 4, 1234, 1e-8,
+        );
+
+        assert!(!result.seeds_independent);
+        assert!(!result.passed);
+        assert_eq!(result.trajectories_checked, 0);
+        assert_eq!(result.failure, Some(AutonomousHoldoutFailure::DiscoveryAndHoldoutSeedsEqual));
+        assert_eq!(result.holdout_initial_conditions_digest.len(), 64);
+    }
+
+    #[test]
+    fn holdout_manifest_and_receipt_are_deterministic_and_bound_to_profile() {
+        let config = discovery_config(100);
+        let candidate = harmonic_energy_candidate();
+        let first = validate_invariant_holdout(
+            harmonic_rhs, "harmonic-oscillator-v1", &candidate,
+            &[1.0, 0.2], &["x", "v"], &config, 1.0, 0.02, 4, 200, 1e-8,
+        );
+        let repeat = validate_invariant_holdout(
+            harmonic_rhs, "harmonic-oscillator-v1", &candidate,
+            &[1.0, 0.2], &["x", "v"], &config, 1.0, 0.02, 4, 200, 1e-8,
+        );
+        let changed = validate_invariant_holdout(
+            harmonic_rhs, "harmonic-oscillator-v1", &candidate,
+            &[1.0, 0.2], &["x", "v"], &config, 1.0, 0.02, 4, 200, 1e-7,
+        );
+
+        assert_eq!(first, repeat);
+        assert_ne!(first.receipt_digest, changed.receipt_digest);
+        assert_ne!(first.validation_profile_digest, changed.validation_profile_digest);
+    }
+
+    #[test]
+    fn invalid_holdout_profile_fails_closed_without_panicking() {
+        let config = discovery_config(88);
+        let result = validate_invariant_holdout(
+            harmonic_rhs, "harmonic-oscillator-v1", &harmonic_energy_candidate(),
+            &[f64::NAN, 0.2], &["x", "v"], &config, 1.0, 0.02, 4, 99, 1e-8,
+        );
+
+        assert!(!result.passed);
+        assert_eq!(result.failure, Some(AutonomousHoldoutFailure::InvalidValidationProfile));
     }
 }
 #[cfg(test)]
