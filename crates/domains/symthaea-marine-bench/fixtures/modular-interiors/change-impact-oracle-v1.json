@@ -1,0 +1,137 @@
+{
+  "schema_version": "1.0.0",
+  "oracle_id": "MARINE-MOD-003-IMPACT-ORACLE-V1",
+  "scope": "Manually authored expected outcomes for synthetic configuration-change mutations. This is a regression oracle for dependency mapping, not marine safety certification.",
+  "assertions": {
+    "deterministic_receipts": true,
+    "arrays_are_order_insensitive_for_canonical_digest": true,
+    "prior_evidence_automatically_carried_forward": false,
+    "unknown_or_assumption_data_cannot_establish_safety": true
+  },
+  "cases": [
+    {
+      "case_id": "NOOP-001",
+      "mutation": "no_change",
+      "expected_disposition": "no_declared_change",
+      "expected_sections": [],
+      "required_domains": []
+    },
+    {
+      "case_id": "ORDER-001",
+      "mutation": "reorder_collections",
+      "expected_disposition": "no_declared_change",
+      "expected_sections": [],
+      "required_domains": []
+    },
+    {
+      "case_id": "PLACEMENT-001",
+      "mutation": "move_cabin",
+      "expected_disposition": "revalidation_required",
+      "expected_sections": [
+        "placements"
+      ],
+      "required_domains": [
+        "layout_geometry",
+        "accessibility_and_egress",
+        "mass_and_centre_of_gravity",
+        "service_routing"
+      ]
+    },
+    {
+      "case_id": "MASS-001",
+      "mutation": "change_module_mass",
+      "expected_disposition": "revalidation_required",
+      "expected_sections": [
+        "module_catalog"
+      ],
+      "required_domains": [
+        "mass_and_centre_of_gravity",
+        "structural_attachments",
+        "evidence_provenance_review"
+      ]
+    },
+    {
+      "case_id": "SERVICE-001",
+      "mutation": "change_service_and_connection",
+      "expected_disposition": "revalidation_required",
+      "expected_sections": [
+        "connections",
+        "platform_services"
+      ],
+      "required_domains": [
+        "interface_compatibility",
+        "utility_capacity_and_protection",
+        "service_routing"
+      ]
+    },
+    {
+      "case_id": "REGION-001",
+      "mutation": "change_egress_region",
+      "expected_disposition": "revalidation_required",
+      "expected_sections": [
+        "reserved_regions"
+      ],
+      "required_domains": [
+        "accessibility_and_egress",
+        "fire_and_watertight_boundaries",
+        "emergency_equipment_access"
+      ]
+    },
+    {
+      "case_id": "PLATFORM-001",
+      "mutation": "change_platform_envelope",
+      "expected_disposition": "revalidation_required",
+      "expected_sections": [
+        "platform"
+      ],
+      "required_domains": [
+        "layout_geometry",
+        "service_routing",
+        "mass_and_centre_of_gravity",
+        "accessibility_and_egress"
+      ]
+    },
+    {
+      "case_id": "EVIDENCE-001",
+      "mutation": "change_assumption_provenance_and_safety",
+      "expected_disposition": "revalidation_required",
+      "expected_sections": [
+        "assumptions",
+        "provenance",
+        "safety_gates"
+      ],
+      "required_domains": [
+        "assumption_validity",
+        "evidence_provenance_review",
+        "safety_evidence_review",
+        "evidence_applicability"
+      ]
+    },
+    {
+      "case_id": "IDENTITY-001",
+      "mutation": "change_identity_and_intent",
+      "expected_disposition": "revalidation_required",
+      "expected_sections": [
+        "configuration_identity",
+        "configuration_metadata"
+      ],
+      "required_domains": [
+        "configuration_baseline",
+        "mission_intent_review"
+      ]
+    },
+    {
+      "case_id": "DUPLICATE-001",
+      "mutation": "duplicate_placement_identity",
+      "expected_disposition": "revalidation_required_identity_ambiguous",
+      "expected_sections": [
+        "placements"
+      ],
+      "required_domains": [
+        "artifact_identity_review",
+        "evidence_applicability",
+        "configuration_review"
+      ]
+    }
+  ]
+}
