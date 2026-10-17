@@ -1294,4 +1294,47 @@ mod tests {
             iter_sim
         );
     }
+
+    /// Smoke-test the active continuous-f32 dynamical path at the exploratory 128K/256K tiers.
+    ///
+    /// This is a bounded correctness/capability test, not a performance benchmark. It first
+    /// verifies an over-budget request is rejected without state mutation, then advances the
+    /// same high-dimensional state through a valid, explicitly budgeted update.
+    #[test]
+    fn test_exploratory_128k_256k_dynamic_smoke() {
+        for dim in [131_072usize, 262_144usize] {
+            let seed = 42u64 + dim as u64;
+            let input = ContinuousHV::random(dim, seed + 1);
+            let mut neuron = create_test_neuron(1.0, dim, seed);
+            let state_before_rejection = neuron.state().clone();
+
+            let rejected = neuron.try_evolve_closed_form_iterative(1.0, &input, 1);
+            assert!(
+                rejected.is_err(),
+                "dimension {dim}: a 1-second request must exceed a one-substep budget"
+            );
+            assert_eq!(
+                neuron.state().values,
+                state_before_rejection.values,
+                "dimension {dim}: rejected work must leave the state unchanged"
+            );
+
+            neuron
+                .try_evolve_closed_form_iterative(0.1, &input, 4)
+                .unwrap_or_else(|error| {
+                    panic!("dimension {dim}: bounded smoke update failed: {error}")
+                });
+
+            assert_eq!(neuron.state().dim(), dim);
+            assert!(
+                neuron.state().values.iter().all(|value| value.is_finite()),
+                "dimension {dim}: accepted update produced a non-finite component"
+            );
+            assert!(
+                neuron.state().norm().is_finite(),
+                "dimension {dim}: accepted update produced a non-finite state norm"
+            );
+        }
+    }
+
 }
