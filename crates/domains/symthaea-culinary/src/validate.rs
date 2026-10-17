@@ -220,7 +220,7 @@ fn validate_thermal_trajectory(
     if trajectory
         .points
         .iter()
-        .any(|(_, temp)| *temp > MAX_THERMAL_TRAJECTORY_TEMP_C)
+        .any(|(_, temp)| *temp >= MAX_THERMAL_TRAJECTORY_TEMP_C)
     {
         return Err(CulinaryViolation::InvalidNumericInput {
             field,
