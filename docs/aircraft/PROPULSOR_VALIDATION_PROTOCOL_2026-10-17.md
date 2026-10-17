@@ -60,6 +60,24 @@ Recent 2026 publications suggest two additional baselines worth testing only aft
 
 The benchmark should compare, on the same frozen splits, a simple physics baseline, bounded map interpolation, a data-driven model and—only if evidence supports it—a multi-fidelity surrogate. Use leave-one-propeller-family-out tests for generalization, not random row splits alone. Report accuracy, uncertainty calibration, computational cost, data requirements and failure/indeterminate rate separately. Publication claims are hypotheses to reproduce, not evidence that an ML or multi-fidelity approach will outperform Symthaea on its chosen dataset.
 
+## 2.2 Dimensionless comparison and scale-effect guardrails
+
+The University of Illinois Urbana-Champaign UIUC Propeller Database publishes wind-tunnel measurements for small-UAV/model-aircraft propellers and documents standard aerodynamic-coefficient definitions. It reports a specific Reynolds-number convention for its static-performance plots; that convention should be preserved rather than replaced with an undocumented generic Reynolds estimate. Source: [UIUC Propeller Database](https://m-selig.web.engr.illinois.edu/props/propDB.html).
+
+The first normalization benchmark should independently compute, in SI units:
+
+- Rotational frequency: n = RPM / 60.
+- Advance ratio: J = V / (n D).
+- Thrust coefficient: C_T = T / (rho n^2 D^4).
+- Shaft-power coefficient: C_P = P_shaft / (rho n^3 D^5).
+- Forward-flight propulsive efficiency: eta = T V / P_shaft, only where forward speed and shaft power are positive.
+
+The last ratio should agree with J C_T / C_P within declared floating-point tolerances when all quantities share the same definitions and measurement boundary. Static operation has J = 0 and the conventional forward-flight efficiency is not a meaningful static performance score; report it as undefined, not as a ranking metric.
+
+**Normalization is not magic.** Matching J, C_T and C_P does not prove dynamic similarity or scaling validity. The comparison report must preserve reference Reynolds number and tip Mach when available, plus geometry/family, blade pitch, inflow, installation/wing interaction, and experimental setup. Missing similarity variables must remain missing and constrain the claim. A model-scale propeller should not be treated as validated full-scale propulsion simply because its coefficients look comparable.
+
+Use the UIUC database only after checking the source file's actual redistribution/use terms. Its webpage documents the measurement database and coefficient conventions, but this review did not confirm an explicit license. Keep third-party archives out of the repository until rights and attribution are resolved.
+
 ## 3. Avoid data leakage in validation
 
 Randomly holding out individual rows is not adequate when neighboring operating points share the same propeller, rig, calibration, geometry and acquisition campaign. Adjacent samples can make a weak model look more general than it is.
