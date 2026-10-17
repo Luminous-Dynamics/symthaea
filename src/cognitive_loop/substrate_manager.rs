@@ -413,9 +413,13 @@ impl SubstrateManager {
         }
 
         let speed_adjusted_energy = self.energy_per_cycle * self.tau_factor as f64;
-        if !speed_adjusted_energy.is_finite() || speed_adjusted_energy < 0.0 {
-            // A non-finite or negative modeled-energy sample cannot safely feed
-            // a rate budget: in particular, NaN comparisons otherwise evaluate false.
+        let next_total_energy = self.total_energy_spent + speed_adjusted_energy;
+        if !speed_adjusted_energy.is_finite()
+            || speed_adjusted_energy < 0.0
+            || !next_total_energy.is_finite()
+        {
+            // Non-finite/negative samples and cumulative overflow cannot safely feed
+            // a rate budget: NaN comparisons otherwise evaluate false.
             self.consciousness_viable = false;
             self.last_energy_spent = 0.0;
             self.energy_rate_window_joules = 0.0;
@@ -431,7 +435,7 @@ impl SubstrateManager {
         let Some(window_started_at) = self.energy_rate_window_started_at else {
             self.energy_rate_window_started_at = Some(now);
             self.energy_rate_window_joules = speed_adjusted_energy;
-            self.total_energy_spent += speed_adjusted_energy;
+            self.total_energy_spent = next_total_energy;
             return;
         };
 
@@ -441,7 +445,7 @@ impl SubstrateManager {
             self.consciousness_viable = false;
             self.energy_rate_window_started_at = Some(now);
             self.energy_rate_window_joules = speed_adjusted_energy;
-            self.total_energy_spent += speed_adjusted_energy;
+            self.total_energy_spent = next_total_energy;
             self.estimated_energy_rate_watts = 0.0;
             self.energy_rate_window_seconds = 0.0;
             return;
@@ -449,6 +453,15 @@ impl SubstrateManager {
         let elapsed_seconds = elapsed.as_secs_f64();
         if elapsed_seconds >= ENERGY_RATE_WINDOW_MIN_SECONDS {
             let estimated_rate_watts = self.energy_rate_window_joules / elapsed_seconds;
+            if !estimated_rate_watts.is_finite() || estimated_rate_watts < 0.0 {
+                self.consciousness_viable = false;
+                self.last_energy_spent = 0.0;
+                self.energy_rate_window_joules = 0.0;
+                self.energy_rate_window_started_at = None;
+                self.estimated_energy_rate_watts = 0.0;
+                self.energy_rate_window_seconds = 0.0;
+                return;
+            }
             self.estimated_energy_rate_watts = estimated_rate_watts;
             self.energy_rate_window_seconds = elapsed_seconds;
 
@@ -465,8 +478,18 @@ impl SubstrateManager {
         // Attribute this cycle's estimate after checking the previously completed
         // start-to-start interval, so the numerator and denominator refer to the
         // same completed cycles.
-        self.energy_rate_window_joules += speed_adjusted_energy;
-        self.total_energy_spent += speed_adjusted_energy;
+        let next_window_energy = self.energy_rate_window_joules + speed_adjusted_energy;
+        if !next_window_energy.is_finite() || next_window_energy < 0.0 {
+            self.consciousness_viable = false;
+            self.last_energy_spent = 0.0;
+            self.energy_rate_window_joules = 0.0;
+            self.energy_rate_window_started_at = None;
+            self.estimated_energy_rate_watts = 0.0;
+            self.energy_rate_window_seconds = 0.0;
+            return;
+        }
+        self.energy_rate_window_joules = next_window_energy;
+        self.total_energy_spent = next_total_energy;
     }
     /// Smooth transition dynamics via EMA blending each cycle.
     ///
