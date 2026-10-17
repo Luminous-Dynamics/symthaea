@@ -18,7 +18,9 @@ A mission-feasibility pass does not establish vehicle qualification. A repairabi
 ## 2. Initial machine-readable artifacts
 
 - [ENV-MOBILITY feasibility corpus v1](fixtures/env-mobility-feasibility-v1.json): 48 deterministic synthetic scenarios across watershed/lake, coast/estuary, agriculture/catchment, disaster assessment, biodiversity/habitat, and remote infrastructure.
-- The repairability/production extension should be a separately versioned artifact. Do not extend one giant scenario schema to conflate field mission authority, part conformity, manufacturing capability, and production release.
+- [ENV-MOBILITY repairability corpus v1](fixtures/env-mobility-repairability-v1.json): 28 deterministic synthetic cases across airframe arms, propulsion, wiring harnesses, sensor payloads, surface-vessel modules, underwater pressure interfaces and battery modules. It distinguishes acceptance eligibility, retest, quarantine, serviceability redesign and local-manufacturing closure.
+
+Keep the schemas separate. Do not conflate field-mission authority, part conformity, manufacturing capability, and production release.
 
 The corpus is synthetic and currently has no authoritative physical measurements. No performance claim is supported by its case count.
 
