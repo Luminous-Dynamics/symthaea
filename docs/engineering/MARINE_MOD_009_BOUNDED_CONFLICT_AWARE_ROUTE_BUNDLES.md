@@ -6,7 +6,7 @@ Status: research implementation; local Rust execution and hosted checks are not 
 
 The independent service router can emit locally good paths that are jointly incompatible. This layer treats each route as a small candidate catalog, then chooses one path per request under a hard shared-cell constraint. It does not trade a safety conflict against a shorter length using a weighted penalty.
 
-Candidate discovery currently uses a deterministic edge-ban deviation heuristic:
+Candidate discovery currently uses a deterministic edge-ban deviation heuristic, with both per-route and aggregate probe caps (the default aggregate cap is 128 probes across the whole bundle):
 
 1. Run the existing evidence-bound A* router for the base path.
 2. For each eligible interior edge of each discovered path, add a temporary 1 mm obstacle that bans that edge (with the original route clearance applied by the router).
@@ -55,7 +55,7 @@ All values below are proposed targets, not measurements.
 | Obstacle, route endpoint, grid-step and clearance checks | 100% of frozen controls | Include thin/sub-grid barriers, boundary cases, budget exhaustion and tampered polylines |
 | Report determinism | 100/100 equivalent request-order permutations | Same canonical input/configuration must yield the same digest |
 | Tamper detection | 100% of frozen mutations | Mutate candidate route, selected index, probe record, objective and input manifest |
-| Candidate coverage | Reported, not hidden | Count distinct valid alternatives, duplicate probes, failed probes, budget stops and truncation reason |
+| Candidate coverage | Reported, not hidden | Count distinct valid alternatives, duplicate probes, failed probes, budget stops and truncation reason; retain both per-route and aggregate probe counters |
 | Bundle workloads | 2, 3, 4, 6 routes; 8 candidates per route | Report success rate, combinations evaluated, conflict rejections and whether catalog-product enumeration completed |
 | CPU/memory scaling | 10k, 50k, 100k, 250k grid-cell tiers | Pin host/toolchain; report p50/p95 runtime, peak RSS, expanded states and timeouts |
 | Initial latency target | 10k-cell, one-route base search below 1 s on a pinned host | Provisional engineering target only; never a pass/fail substitute for geometry validity |
