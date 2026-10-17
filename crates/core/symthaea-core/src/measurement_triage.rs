@@ -158,6 +158,11 @@ pub struct MeasurementTriageReportV1 {
     pub schema_version: u16,
     /// Source robust-comparison identity.
     pub comparison_id: String,
+    /// Schema version of the source robust-comparison report.
+    pub source_report_schema_version: u16,
+    /// BLAKE3 digest of the canonical serde_json serialization of the source report.
+    /// This binds report structure/content but does not authenticate its measurements.
+    pub source_report_digest_blake3: String,
     /// Exact shared task-protocol revision.
     pub task_protocol_version: String,
     /// Source evidence level; never promoted.
@@ -190,6 +195,8 @@ pub enum MeasurementTriageFindingV1 {
     InvalidOrDuplicatePair { candidate_a_id: String, candidate_b_id: String },
     /// Source pairwise flags contradict each other.
     InconsistentPairClassification { candidate_a_id: String, candidate_b_id: String },
+    /// The source report cannot be serialized canonically for digesting.
+    SourceReportSerializationFailed,
     /// An action's protocol revision differs from its source report.
     ProtocolMismatch { action_id: String },
     /// Action references an unknown or duplicate candidate ID.
@@ -293,6 +300,17 @@ pub fn triage_measurement_actions(
         return Err(findings);
     }
 
+    let source_report_bytes = match serde_json::to_vec(source) {
+        Ok(bytes) => bytes,
+        Err(_) => {
+            return Err(vec![
+                MeasurementTriageFindingV1::SourceReportSerializationFailed,
+            ]);
+        }
+    };
+    let source_report_digest_blake3 =
+        blake3::hash(&source_report_bytes).to_hex().to_string();
+
     let measurement_sensitive_pairs: Vec<_> = source
         .pairwise_assessments
         .iter()
@@ -370,6 +388,8 @@ pub fn triage_measurement_actions(
     Ok(MeasurementTriageReportV1 {
         schema_version: MEASUREMENT_TRIAGE_SCHEMA_VERSION_V1,
         comparison_id: source.comparison_id.clone(),
+        source_report_schema_version: source.schema_version,
+        source_report_digest_blake3,
         task_protocol_version: source.task_protocol_version.clone(),
         evidence_level: source.evidence_level,
         measurement_sensitive_pair_count: measurement_sensitive_pairs.len(),
@@ -518,10 +538,12 @@ fn evaluate_action_gates(action: &MeasurementActionV1) -> Vec<MeasurementActionB
                 status,
                 reason: if status == MeasurementGateStatusV1::Unknown {
                     "Unknown prerequisite status fails closed.".to_owned()
+                } else if status == MeasurementGateStatusV1::Blocked {
+                    "Prerequisite is explicitly blocked.".to_owned()
                 } else if is_required {
                     "Required prerequisite must be explicitly satisfied for this action.".to_owned()
                 } else {
-                    "A non-applicable gate may be omitted only when explicitly marked not_applicable.".to_owned()
+                    "A non-required gate must be satisfied or explicitly not_applicable.".to_owned()
                 },
             });
         }
@@ -748,6 +770,8 @@ mod tests {
         assert_eq!(frontier, vec!["measure-energy", "measure-both", "measure-mass-cheap"]);
         assert_eq!(report.measurement_sensitive_pair_count, 1);
         assert_eq!(report.decision_sensitive_cell_count, 2);
+        assert_eq!(report.source_report_digest_blake3.len(), 64);
+        assert_eq!(report.source_report_schema_version, 1);
         assert_eq!(report.actions[0].covered_cell_count, 1);
         assert_eq!(report.actions[2].covered_cell_count, 2);
     }
