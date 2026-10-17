@@ -650,7 +650,7 @@ mod tests {
     const SYNTHETIC_FIXTURE_REFERENCE: &str =
         "inline-fixture:synthetic-agri-platform-bench-fixture-v1";
     const SYNTHETIC_FIXTURE_SHA256: &str =
-        "db5822bd2544c966f3d8d5348e55551aef8e4d4f48cc562edf6a0deada73c3bf";
+        "aabaf7127a3953b6af8d95d9476191723c09145f2ffa15b275867ecd16b2e5d1";
 
     #[derive(Debug, Clone, Copy)]
     enum Mutation {
