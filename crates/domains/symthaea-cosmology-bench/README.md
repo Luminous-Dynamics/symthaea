@@ -12,13 +12,15 @@ The accompanying research contract identifies the official DESI DR2 BAO ΛCDM + 
 
 The CLI accepts a named column followed by one or more ASCII chain files whose recognized comment header starts with “# weight minuslogpost”. It combines files only when their full column header and ordering match exactly, then emits one JSON summary. It rejects malformed rows, duplicate columns, non-finite values, negative sample weights, absent parameters, incompatible chain headers and zero-total-weight chains.
 
-Verify one downloaded artifact before parsing, using its expected digest from the official SHA-256 manifest:
+Verify one downloaded artifact directly against the official SHA-256 manifest, without manually copying the digest:
 
-    cargo run -p symthaea-cosmology-bench --bin symthaea-cosmology-chain-audit -- --verify-sha256 chain.1.txt EXPECTED_SHA256_FROM_MANIFEST
+    cargo run -p symthaea-cosmology-bench --bin symthaea-cosmology-chain-audit -- --verify-manifest data/bao-cosmo-params/dr2_vac_dr2_bao-cosmo-params_v1.0.sha256sum cobaya/base/desi-bao-all/chain.1.txt data/bao-cosmo-params/cobaya/base/desi-bao-all/chain.1.txt
 
-Audit and combine the four compatible DESI chain files for a selected parameter:
+Repeat for chain.2.txt, chain.3.txt, chain.4.txt, chain.input.yaml, chain.updated.yaml, chain.checkpoint, chain.margestats, and chain.covmat as required. Use the relative path exactly as it appears in the official manifest; a missing or duplicate entry fails closed.
 
-    cargo run -p symthaea-cosmology-bench --bin symthaea-cosmology-chain-audit -- H0 chain.1.txt chain.2.txt chain.3.txt chain.4.txt
+Audit and combine the four compatible DESI chain files for a selected parameter only after checksum verification:
+
+    cargo run -p symthaea-cosmology-bench --bin symthaea-cosmology-chain-audit -- H0 data/bao-cosmo-params/cobaya/base/desi-bao-all/chain.1.txt data/bao-cosmo-params/cobaya/base/desi-bao-all/chain.2.txt data/bao-cosmo-params/cobaya/base/desi-bao-all/chain.3.txt data/bao-cosmo-params/cobaya/base/desi-bao-all/chain.4.txt
 
 Output reports input paths, row count, total and positive-weight sample count, weighted mean/population variance, weighted empirical q16/q50/q84, and weight-only effective sample size.
 
