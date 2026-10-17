@@ -34,7 +34,7 @@ pub use dielectric::{
     CapacitorGeometry, DielectricEvidenceKind, DielectricPropertyRecord, DielectricValidationError,
     BreakdownTestKind, IdealCapacitorMetrics, PropertyUncertainty, PropertyUncertaintySemantics,
     VACUUM_PERMITTIVITY_F_PER_M,
-    calculate_ideal_capacitor_metrics,
+    calculate_ideal_capacitor_metrics, calculate_ideal_capacitor_metrics_at_frequency,
 };
 pub use encoder::MaterialHdcEncoder;
 pub use mining::{
@@ -46,7 +46,7 @@ pub use robust_capacitor::{
     RobustCapacitorScreeningDisposition, RobustCapacitorScreeningReport,
     RobustMetricError, RobustMetricLimitation, RobustScreeningError,
     RobustScreeningLimitation, ScalarBounds, calculate_bounded_capacitor_metrics,
-    screen_capacitor_candidate_robust,
+    calculate_bounded_capacitor_metrics_at_frequency, screen_capacitor_candidate_robust,
 };
 pub use properties::{MaterialCategory, MaterialProperty};
 pub use strategic::{
