@@ -959,4 +959,135 @@ mod tests {
         assert_eq!(report.context.candidate_id, "synthetic-aircraft-b");
         assert_eq!(report.context.configuration_id, "synthetic-config-r1");
     }
+    struct LinearEnergyOnlyModel {
+        base_power_w: f64,
+        watts_per_kg: f64,
+        duration_s: f64,
+    }
+
+    impl MassSensitiveMissionModel for LinearEnergyOnlyModel {
+        fn phase_demands(
+            &self,
+            _context: &CoupledMissionContext,
+            gross_mass_kg: f64,
+        ) -> Result<Vec<MissionPhaseDemand>, String> {
+            let power = self.base_power_w + self.watts_per_kg * gross_mass_kg;
+            Ok(vec![MissionPhaseDemand {
+                id: "synthetic-linear-cruise".into(),
+                duration_s: self.duration_s,
+                required_bus_power_w: power,
+                power_uncertainty: PowerUncertaintyBounds {
+                    lower_bound_w: power * 0.95,
+                    upper_bound_w: power * 1.05,
+                    method: "independent-analytic-oracle-fixture".into(),
+                },
+                duty_class: DutyClass::Continuous,
+            }])
+        }
+    }
+
+    /// Independent closed-form oracle for a deliberately simplified synthetic
+    /// case where energy sizing dominates continuous-power sizing. It checks
+    /// the iterative coordinator against algebra, not against its own trace.
+    #[test]
+    fn linear_mass_feedback_matches_independent_closed_form_oracle() {
+        let mass = fixed_mass();
+        let battery = battery();
+        let model = LinearEnergyOnlyModel {
+            base_power_w: 2_000.0,
+            watts_per_kg: 2.0,
+            duration_s: 7_200.0,
+        };
+        let report = solve_mass_coupled_battery(
+            &context(), &mass, &battery, &settings(), 50.0, &model,
+        ).unwrap();
+        assert_eq!(report.disposition, CouplingDisposition::ConvergedWithinModel);
+
+        let usable_specific_energy_wh_per_kg =
+            battery.pack_specific_energy_wh_per_kg
+                * battery.usable_fraction
+                * battery.temperature_capacity_fraction
+                * battery.end_of_life_soh_fraction
+                * battery.discharge_efficiency_fraction
+                * (1.0 - battery.reserve_fraction);
+        let energy_feedback_per_watt_kg =
+            battery.installed_system_mass_multiplier
+                * 1.05
+                * model.duration_s
+                / 3_600.0
+                / usable_specific_energy_wh_per_kg;
+        let feedback_gain = energy_feedback_per_watt_kg * model.watts_per_kg;
+        assert!(feedback_gain < 1.0, "synthetic fixture must have a finite positive fixed point");
+
+        let fixed_mass_kg = mass.without_energy_system_kg();
+        let expected_gross_mass_kg =
+            (fixed_mass_kg + energy_feedback_per_watt_kg * model.base_power_w)
+                / (1.0 - feedback_gain);
+        let actual_gross_mass_kg = report.evaluated_gross_mass_kg.unwrap();
+        assert!(
+            (actual_gross_mass_kg - expected_gross_mass_kg).abs() < 0.05,
+            "iterative result {actual_gross_mass_kg} must match independent analytic result {expected_gross_mass_kg}"
+        );
+
+        let final_row = report.iteration_trace.last().unwrap();
+        assert!(
+            final_row.energy_limited_pack_mass_kg
+                > final_row.continuous_power_limited_pack_mass_kg * 5.0,
+            "fixture must be energy-dominated so the closed-form oracle applies"
+        );
+        assert!(
+            report.mass_closure_residual_kg.unwrap().abs()
+                <= settings().absolute_mass_tolerance_kg
+                    + settings().relative_mass_tolerance
+                        * actual_gross_mass_kg.max(report.required_takeoff_mass_kg.unwrap())
+        );
+    }
+
+    /// A frozen profile at the bare-aircraft mass must under-size the same
+    /// synthetic design when energy demand rises with installed battery mass.
+    /// This negative control detects the exact category of cross-candidate
+    /// profile reuse that the mass-coupled coordinator is designed to avoid.
+    #[test]
+    fn frozen_bare_aircraft_profile_is_detectably_optimistic() {
+        let mass = fixed_mass();
+        let battery = battery();
+        let model = LinearEnergyOnlyModel {
+            base_power_w: 2_000.0,
+            watts_per_kg: 2.0,
+            duration_s: 7_200.0,
+        };
+        let report = solve_mass_coupled_battery(
+            &context(), &mass, &battery, &settings(), 50.0, &model,
+        ).unwrap();
+        assert_eq!(report.disposition, CouplingDisposition::ConvergedWithinModel);
+
+        let fixed_mass_kg = mass.without_energy_system_kg();
+        let frozen_phase = model.phase_demands(&context(), fixed_mass_kg).unwrap().remove(0);
+        let usable_specific_energy_wh_per_kg =
+            battery.pack_specific_energy_wh_per_kg
+                * battery.usable_fraction
+                * battery.temperature_capacity_fraction
+                * battery.end_of_life_soh_fraction
+                * battery.discharge_efficiency_fraction
+                * (1.0 - battery.reserve_fraction);
+        let frozen_energy_wh =
+            frozen_phase.power_uncertainty.upper_bound_w * frozen_phase.duration_s / 3_600.0;
+        let frozen_energy_limited_pack_mass_kg =
+            frozen_energy_wh / usable_specific_energy_wh_per_kg;
+        let frozen_continuous_power_limited_pack_mass_kg =
+            frozen_phase.power_uncertainty.upper_bound_w
+                / (battery.continuous_specific_power_w_per_kg * battery.power_derating_fraction);
+        let frozen_pack_mass_kg =
+            frozen_energy_limited_pack_mass_kg.max(frozen_continuous_power_limited_pack_mass_kg);
+        let frozen_profile_gross_mass_kg =
+            fixed_mass_kg
+                + frozen_pack_mass_kg * battery.installed_system_mass_multiplier;
+        let coupled_gross_mass_kg = report.required_takeoff_mass_kg.unwrap();
+
+        assert!(
+            coupled_gross_mass_kg > frozen_profile_gross_mass_kg + 1.0,
+            "the mass-coupled result ({coupled_gross_mass_kg}) must expose materially higher mass than the frozen-profile negative control ({frozen_profile_gross_mass_kg})"
+        );
+    }
+
 }
