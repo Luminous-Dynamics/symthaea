@@ -39,7 +39,7 @@ pub struct RareEventEvidence {
 #[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
 #[serde(tag = "status", rename_all = "snake_case")]
 pub enum RareEventAssessment {
-    Estimable {
+    BoundUnderDeclaredAssumptions {
         unit_label: String,
         observed_units: u64,
         observed_events: u64,
@@ -50,7 +50,7 @@ pub enum RareEventAssessment {
         assumptions: Vec<String>,
         claim_ceiling: String,
     },
-    NotEstimable {
+    NotBoundUnderDeclaredAssumptions {
         unit_label: String,
         observed_units: u64,
         observed_events: u64,
@@ -62,7 +62,7 @@ pub enum RareEventAssessment {
 
 /// Assess a one-sided exact Clopper-Pearson upper confidence bound.
 ///
-/// An Ok(NotEstimable { .. }) is a valid result when design assumptions are not satisfied.
+/// An Ok(NotBoundUnderDeclaredAssumptions { .. }) is a valid result when design assumptions are not satisfied.
 /// An Err is reserved for malformed counts or numerical inputs. A bound is not emitted merely
 /// because a caller supplied counts: all design flags must be true and independently justified.
 pub fn assess_rare_event_risk(
@@ -117,7 +117,7 @@ pub fn assess_rare_event_risk(
     }
 
     if !reasons.is_empty() {
-        return Ok(RareEventAssessment::NotEstimable {
+        return Ok(RareEventAssessment::NotBoundUnderDeclaredAssumptions {
             unit_label: evidence.unit_label.clone(),
             observed_units: evidence.observed_units,
             observed_events: evidence.observed_events,
@@ -130,10 +130,13 @@ pub fn assess_rare_event_risk(
     let n = evidence.observed_units;
     let k = evidence.observed_events;
     let alpha = 1.0 - evidence.confidence_level;
+    if alpha <= 0.0 || alpha >= 1.0 {
+        return Err("confidence_level is too close to 0 or 1 for stable f64 significance arithmetic".to_owned());
+    }
     let upper = clopper_pearson_upper(k, n, alpha);
     let observed_rate = k as f64 / n as f64;
 
-    Ok(RareEventAssessment::Estimable {
+    Ok(RareEventAssessment::BoundUnderDeclaredAssumptions {
         unit_label: evidence.unit_label.clone(),
         observed_units: n,
         observed_events: k,
@@ -245,7 +248,7 @@ mod tests {
 
     fn upper(result: RareEventAssessment) -> f64 {
         match result {
-            RareEventAssessment::Estimable {
+            RareEventAssessment::BoundUnderDeclaredAssumptions {
                 upper_confidence_bound,
                 ..
             } => upper_confidence_bound,
@@ -297,7 +300,7 @@ mod tests {
         input.all_outcomes_observed = false;
         let report = assess_rare_event_risk(&input).unwrap();
         match report {
-            RareEventAssessment::NotEstimable { reasons, .. } => {
+            RareEventAssessment::NotBoundUnderDeclaredAssumptions { reasons, .. } => {
                 assert!(reasons.iter().any(|reason| reason.contains("missing")));
             }
             other => panic!("expected not-estimable, got {other:?}"),
@@ -309,12 +312,12 @@ mod tests {
         let mut clustered = evidence(0, 299);
         clustered.independent_units_justified = false;
         let report = assess_rare_event_risk(&clustered).unwrap();
-        assert!(matches!(report, RareEventAssessment::NotEstimable { .. }));
+        assert!(matches!(report, RareEventAssessment::NotBoundUnderDeclaredAssumptions { .. }));
 
         let mut unequal = evidence(0, 299);
         unequal.equal_probability_sampling = false;
         let report = assess_rare_event_risk(&unequal).unwrap();
-        assert!(matches!(report, RareEventAssessment::NotEstimable { .. }));
+        assert!(matches!(report, RareEventAssessment::NotBoundUnderDeclaredAssumptions { .. }));
     }
 
     #[test]
