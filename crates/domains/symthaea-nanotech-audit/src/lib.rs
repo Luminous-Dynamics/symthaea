@@ -1787,7 +1787,6 @@ mod tests {
             )
             .expect("write provenance manifest");
         }
-        }
     }
 
     impl Drop for Fixture {
