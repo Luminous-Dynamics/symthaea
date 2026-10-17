@@ -1,0 +1,165 @@
+{
+  "schema_version": 1,
+  "benchmark_id": "OPEN-MOBILITY-ARCHITECTURE-PARETO-001",
+  "evidence_level": "synthetic_replay",
+  "claim_ceiling": "Synthetic comparison only. Metrics are illustrative and are not physical measurements or product recommendations.",
+  "comparisons": [
+    {
+      "id": "ARCH-001-flat-walk-task-profile-a",
+      "request": {
+        "schema_version": 1,
+        "benchmark_case_id": "ARCH-001-flat-walk-task-profile-a",
+        "task_id": "overground_walk",
+        "wearer_profile_id": "profile-a",
+        "environment_profile_id": "flat_lab",
+        "task_protocol_version": "walk-protocol-v1",
+        "evidence_level": "synthetic_replay",
+        "operating_conditions": {
+          "speed_mps": 0.8,
+          "payload_kg": 0,
+          "grade_percent": 0,
+          "ambient_temperature_c": 22
+        },
+        "candidates": [
+          {
+            "candidate_id": "passive-soft-001",
+            "family": "passive",
+            "tethered": false,
+            "metrics": {
+              "task_success_rate": 0.78,
+              "wearer_borne_mass_kg": 2,
+              "total_system_mass_kg": 2,
+              "offboard_mass_kg": 0,
+              "mass_distribution": {
+                "torso_kg": 0.2,
+                "pelvis_kg": 0.4,
+                "proximal_limb_kg": 0.4,
+                "distal_limb_kg": 0.6,
+                "other_worn_kg": 0.4
+              },
+              "energy_wh_per_task": 0.3,
+              "setup_time_seconds": 40,
+              "movement_restriction_index": 0.2,
+              "comfort_score": 0.92,
+              "tether_interference_events_per_task": 0,
+              "repair_time_minutes": 20,
+              "service_component_count": 12
+            }
+          },
+          {
+            "candidate_id": "powered-rigid-001",
+            "family": "powered_rigid",
+            "tethered": false,
+            "metrics": {
+              "task_success_rate": 0.93,
+              "wearer_borne_mass_kg": 8.2,
+              "total_system_mass_kg": 9.1,
+              "offboard_mass_kg": 0.7,
+              "mass_distribution": {
+                "torso_kg": 0.9,
+                "pelvis_kg": 1.5,
+                "proximal_limb_kg": 2.8,
+                "distal_limb_kg": 2.2,
+                "other_worn_kg": 0.8
+              },
+              "energy_wh_per_task": 4.5,
+              "setup_time_seconds": 90,
+              "movement_restriction_index": 0.35,
+              "comfort_score": 0.62,
+              "tether_interference_events_per_task": 0,
+              "repair_time_minutes": 45,
+              "service_component_count": 28
+            }
+          },
+          {
+            "candidate_id": "remote-tethered-001",
+            "family": "remote_actuation_tethered",
+            "tethered": true,
+            "metrics": {
+              "task_success_rate": 0.9,
+              "wearer_borne_mass_kg": 2.4,
+              "total_system_mass_kg": 14.8,
+              "offboard_mass_kg": 12,
+              "mass_distribution": {
+                "torso_kg": 0.2,
+                "pelvis_kg": 0.3,
+                "proximal_limb_kg": 0.7,
+                "distal_limb_kg": 0.8,
+                "other_worn_kg": 0.4
+              },
+              "energy_wh_per_task": 2.8,
+              "setup_time_seconds": 120,
+              "movement_restriction_index": 0.5,
+              "comfort_score": 0.72,
+              "tether_interference_events_per_task": 0.6,
+              "repair_time_minutes": 35,
+              "service_component_count": 20
+            }
+          },
+          {
+            "candidate_id": "hybrid-compact-001",
+            "family": "hybrid_powered_passive",
+            "tethered": false,
+            "metrics": {
+              "task_success_rate": 0.92,
+              "wearer_borne_mass_kg": 4.8,
+              "total_system_mass_kg": 5.4,
+              "offboard_mass_kg": 0.4,
+              "mass_distribution": {
+                "torso_kg": 0.5,
+                "pelvis_kg": 0.9,
+                "proximal_limb_kg": 1.6,
+                "distal_limb_kg": 1.4,
+                "other_worn_kg": 0.4
+              },
+              "energy_wh_per_task": 1.8,
+              "setup_time_seconds": 55,
+              "movement_restriction_index": 0.22,
+              "comfort_score": 0.82,
+              "tether_interference_events_per_task": 0,
+              "repair_time_minutes": 30,
+              "service_component_count": 18
+            }
+          },
+          {
+            "candidate_id": "powered-rigid-overbuilt",
+            "family": "powered_rigid",
+            "tethered": false,
+            "metrics": {
+              "task_success_rate": 0.86,
+              "wearer_borne_mass_kg": 10,
+              "total_system_mass_kg": 11,
+              "offboard_mass_kg": 0.7,
+              "mass_distribution": {
+                "torso_kg": 1.2,
+                "pelvis_kg": 1.8,
+                "proximal_limb_kg": 3.2,
+                "distal_limb_kg": 2.8,
+                "other_worn_kg": 1
+              },
+              "energy_wh_per_task": 5.2,
+              "setup_time_seconds": 105,
+              "movement_restriction_index": 0.48,
+              "comfort_score": 0.55,
+              "tether_interference_events_per_task": 0,
+              "repair_time_minutes": 55,
+              "service_component_count": 34
+            }
+          }
+        ]
+      },
+      "expected_pareto_candidates": [
+        "passive-soft-001",
+        "powered-rigid-001",
+        "remote-tethered-001",
+        "hybrid-compact-001"
+      ],
+      "expected_dominated_by": {
+        "powered-rigid-overbuilt": [
+          "powered-rigid-001",
+          "hybrid-compact-001"
+        ]
+      }
+    }
+  ]
+}
