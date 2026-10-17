@@ -44,11 +44,32 @@ pub enum BreakdownTestKind {
     Other,
 }
 
+/// Meaning of a reported relative uncertainty value.
+///
+/// The uncertainty magnitude has different mathematical meaning depending on
+/// the method. Only `HardRelativeBound` may be used to claim deterministic
+/// lower/upper screening bounds. Statistical estimates and confidence intervals
+/// must not be silently reinterpreted as guaranteed bounds.
+#[derive(Debug, Clone, Copy, PartialEq, Serialize, Deserialize)]
+pub enum PropertyUncertaintySemantics {
+    /// A documented bound: the property lies within estimate × (1 ± relative_uncertainty).
+    HardRelativeBound,
+    /// A statistical uncertainty measure (for example, relative standard uncertainty); not a hard bound.
+    StatisticalEstimate,
+    /// A confidence interval half-width relative to the point estimate, with declared nominal coverage.
+    ConfidenceInterval {
+        /// Nominal coverage probability in (0, 1).
+        coverage_probability: f64,
+    },
+}
+
 /// Uncertainty attached to one individual property rather than to the material record as a whole.
 #[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
 pub struct PropertyUncertainty {
     /// Relative uncertainty as a fraction (e.g. 0.05 means 5%).
     pub relative_uncertainty: f64,
+    /// Meaning of the uncertainty magnitude; only a documented hard bound supports robust bounds.
+    pub semantics: PropertyUncertaintySemantics,
     /// Method/definition reference explaining how the uncertainty was calculated.
     pub method_reference: String,
 }
@@ -58,6 +79,14 @@ impl PropertyUncertainty {
     pub fn validate(&self) -> Result<(), DielectricValidationError> {
         if !self.relative_uncertainty.is_finite() || self.relative_uncertainty < 0.0 {
             return Err(DielectricValidationError::InvalidRelativeUncertainty);
+        }
+        if let PropertyUncertaintySemantics::ConfidenceInterval { coverage_probability } = self.semantics {
+            if !coverage_probability.is_finite()
+                || coverage_probability <= 0.0
+                || coverage_probability >= 1.0
+            {
+                return Err(DielectricValidationError::InvalidUncertaintySemantics);
+            }
         }
         if self.method_reference.trim().is_empty() {
             return Err(DielectricValidationError::MissingUncertaintyMethodReference);
@@ -397,6 +426,8 @@ pub enum DielectricValidationError {
     InvalidRelativeUncertainty,
     /// Property-level uncertainty must cite its definition/calculation method.
     MissingUncertaintyMethodReference,
+    /// Confidence-interval coverage probability must be finite and strictly between zero and one.
+    InvalidUncertaintySemantics,
     /// A reported breakdown value must carry an evidence class.
     MissingBreakdownEvidenceKind,
     /// Breakdown characterization temperature must be finite and above absolute zero.
@@ -436,6 +467,7 @@ impl fmt::Display for DielectricValidationError {
             Self::MissingBreakdownReference => "breakdown strength requires a protocol/source reference",
             Self::InvalidRelativeUncertainty => "relative uncertainty must be finite and non-negative",
             Self::MissingUncertaintyMethodReference => "property uncertainty requires a method reference",
+            Self::InvalidUncertaintySemantics => "confidence-interval coverage probability must be in (0, 1)",
             Self::MissingBreakdownEvidenceKind => "breakdown strength requires an evidence class",
             Self::InvalidBreakdownTestTemperature => "breakdown test temperature must be finite and above zero kelvin",
             Self::MissingBreakdownTestKind => "breakdown strength requires a test protocol kind",
@@ -477,15 +509,18 @@ mod tests {
             dataset_version: Some("unit-test-v1".to_string()),
             permittivity_uncertainty: Some(PropertyUncertainty {
                 relative_uncertainty: 0.05,
-                method_reference: "synthetic uncertainty fixture".to_string(),
+                semantics: PropertyUncertaintySemantics::HardRelativeBound,
+                method_reference: "synthetic uncertainty fixture (hard relative bound)".to_string(),
             }),
             loss_tangent_uncertainty: Some(PropertyUncertainty {
                 relative_uncertainty: 0.05,
-                method_reference: "synthetic uncertainty fixture".to_string(),
+                semantics: PropertyUncertaintySemantics::HardRelativeBound,
+                method_reference: "synthetic uncertainty fixture (hard relative bound)".to_string(),
             }),
             breakdown_strength_uncertainty: Some(PropertyUncertainty {
                 relative_uncertainty: 0.05,
-                method_reference: "synthetic uncertainty fixture".to_string(),
+                semantics: PropertyUncertaintySemantics::HardRelativeBound,
+                method_reference: "synthetic uncertainty fixture (hard relative bound)".to_string(),
             }),
         }
     }
