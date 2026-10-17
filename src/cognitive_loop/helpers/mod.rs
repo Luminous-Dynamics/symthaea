@@ -281,6 +281,7 @@ impl CognitiveLoopService {
         // This input path does not submit a plant step; prevent timing evidence
         // from a preceding text-driven cycle from leaking into its snapshot.
         self.sensorimotor.plant_step_timing_this_cycle = None;
+        self.sensorimotor.external_action_timing_this_cycle = None;
 
         // 1. Compress HDC -> CfC input dimension via random projection
         let compressed_state = self
