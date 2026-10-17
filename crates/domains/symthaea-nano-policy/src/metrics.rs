@@ -1246,6 +1246,28 @@ mod tests {
     }
 
     #[test]
+    fn carries_shift_manifest_digest_into_metrics_report() {
+        let mut ledger = fixture();
+        ledger.shift_manifest_sha256 = Some(hex('8', 64));
+
+        let report = evaluate_fixture(&ledger);
+        assert_eq!(
+            report.shift_manifest_sha256.as_deref(),
+            ledger.shift_manifest_sha256.as_deref()
+        );
+    }
+
+    #[test]
+    fn rejects_malformed_shift_manifest_digest() {
+        let mut ledger = fixture();
+        ledger.shift_manifest_sha256 = Some("not-a-sha256".to_string());
+        let bytes = serde_json::to_vec(&ledger).expect("serialize malformed fixture");
+
+        let error = evaluate_json_ledger(&bytes, 200, 17).expect_err("invalid shift digest");
+        assert!(error.contains("shift_manifest_sha256"));
+    }
+
+    #[test]
     fn reports_per_group_curves_and_worst_group_regression() {
         let mut ledger = fixture();
         for arm in &mut ledger.arms {
