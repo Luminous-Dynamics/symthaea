@@ -453,6 +453,7 @@ pub enum TaskCardError {
     RecordIdentityMismatch { field: String },
     MissingTaskTiming { field: String },
     TaskTimingOverflow,
+    TaskTimingNotPositive,
 }
 
 /// Validate the card's static shape and source/effectivity metadata. Draft
@@ -938,6 +939,10 @@ pub fn validate_work_record(
             }
             None => errors.push(TaskCardError::MissingTaskTiming { field: field.into() }),
         }
+    }
+
+    if total_seconds == 0 {
+        errors.push(TaskCardError::TaskTimingNotPositive);
     }
 
     let mut measurements = BTreeSet::new();
@@ -1627,6 +1632,39 @@ mod tests {
         assert!(result.contains(&TaskCardError::MissingProcedureStep {
             step_id: "step-2".into()
         }));
+    }
+
+    #[test]
+    fn work_record_requires_complete_task_time_breakdown() {
+        let mut card = card();
+        card.state = TaskState::ReviewPending;
+        let aircraft = context(&card).aircraft;
+        let mut record = work_record(&card);
+        record.timing.access_seconds = None;
+        let result = validate_work_record(&card, &aircraft, &record).unwrap_err();
+        assert!(result.contains(&TaskCardError::MissingTaskTiming {
+            field: "access_seconds".into()
+        }));
+    }
+
+    #[test]
+    fn work_record_rejects_zero_total_task_time() {
+        let mut card = card();
+        card.state = TaskState::ReviewPending;
+        let aircraft = context(&card).aircraft;
+        let mut record = work_record(&card);
+        record.timing = TaskTimingBreakdown {
+            preparation_seconds: Some(0),
+            access_seconds: Some(0),
+            execution_seconds: Some(0),
+            verification_seconds: Some(0),
+            closeout_seconds: Some(0),
+            record_seconds: Some(0),
+            scheduling_wait_seconds: Some(0),
+            parts_wait_seconds: Some(0),
+        };
+        let result = validate_work_record(&card, &aircraft, &record).unwrap_err();
+        assert!(result.contains(&TaskCardError::TaskTimingNotPositive));
     }
 
     #[test]
