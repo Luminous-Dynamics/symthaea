@@ -249,6 +249,23 @@ Reference: Barros et al., *Agrivoltaic Systems: Systematic Review and Meta-Analy
 
 The intended paradigm shift is a falsifiable co-design process: the best combined system must outperform relevant separate or conventional alternatives on declared objectives and constraints at a particular site. A visually integrated greenhouse, an autonomy demo, an LER above 1, or a vendor-reported input saving is not sufficient evidence by itself.
 
-## 10. Explicit nonclaims
+### Existing open human-robot safety data and field-robot economics
+
+AGHRI is an existing open agricultural human–robot interaction dataset and should be reused as the first perceptual HRI baseline rather than rebuilding its detector/tracker stack. The release is described as CC BY 4.0 and approximately 70 GB, with 65 sequences (~27.4 minutes), 10 participants, and sequence-level train/validation/test splits of 52/7/6. It combines synchronized RGB-D, three fisheye views and LiDAR with identity-consistent 2D/3D human annotations. Upstream benchmark code is Apache-2.0, and preparation tools are MIT-licensed. The dataset is hosted separately from those source repositories.
+
+- Dataset facts, attribution/license, sensor and split description: https://agri-opencore.org/software-stacks/datasets/
+- Upstream detection, tracking and fusion baseline: https://github.com/LCAS/AGHRI-dataset-benchmark
+- Upstream conversion/preparation tools: https://github.com/LCAS/AGHRI-dataset-tools
+- Symthaea metadata-only integration contract: [AGHRI-HRI-BENCH-001 #7828](https://github.com/Luminous-Dynamics/symthaea/issues/7828) and [draft PR #7831](https://github.com/Luminous-Dynamics/symthaea/pull/7831).
+
+The adapter must retain the upstream sequence-level split and keep the ~70 GB raw data outside this repository. Recorded sequences can assess perception, tracking and replay-monitor behavior; they do not qualify actual stopping distance, emergency stop, braking, tool safety or field deployment. The dataset's ten participants and one UK campus/time window are a bounded domain, not validation for all farms or Southern Africa.
+
+A 2026 open-access autonomous field-robot cost study used empirical data from 61 maize fields in northwestern Germany. Its model reported average total cost of €73/ha and fieldwork cost of €60/ha; field size explained 58% of total-cost variance, route distance 11%, and access points 1%. Logistics costs also had a wider interdecile range than fieldwork costs. This is evidence that farm geometry, access and logistics must be measured—not that those German cost values transfer to a Southern African farm.
+
+- *Structural cost modeling and sensitivity analysis of autonomous field robot operations*, Smart Agricultural Technology 13 (March 2026): https://doi.org/10.1016/j.atech.2026.101913
+
+For platform selection, record whole-task/season economics including plot size, access points, route distance, headland turns, setup, charging, transport between plots, supervision, failed missions, recovery, repairs and local parts lead times. Model low/base/high utilization and disruption cases. Compare robots against existing implements, fixed sensors, shared equipment and no-robot baselines.
+
+## 11. Explicit nonclaims
 
 This document does not establish crop/yield benefits, disease diagnosis, food safety, nutrient adequacy, regulatory compliance, safe machinery operation, commercial viability, positive ROI, improved farmer bargaining power, land-equivalent superiority, or any other real-world outcome. These require task- and site-specific evidence and independent validation.
