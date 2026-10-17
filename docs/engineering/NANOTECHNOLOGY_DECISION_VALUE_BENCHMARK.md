@@ -188,7 +188,7 @@ At the time this version was authored, **no one task above is declared rights-cl
 
 This is a **separate measured-photonics lane**, not a proxy for atomistic nanocrystal chemistry or material stability. It offers a useful paradigm shift because the outcome can be tied to fabricated geometries and measured spectra rather than treating simulator scores as reality.
 
-The [MOCLIP Nature Communications paper](https://www.nature.com/articles/s41467-026-76714-x), published 19 August 2026, reports a silicon-on-glass metasurface dataset with 466,537 unique measured geometry–spectrum pairs, 42 design degrees of freedom, inverse-design throughput around (2\times10^5) target spectra/s on GPU, and source-reported latent optimization accuracy above 95%. Its public repository offers a 10,000-sample subset. These are **source-reported reference numbers**, not independently reproduced Symthaea results. The paper also reports fabrication and hyperspectral measurement; a benchmark should exploit that empirical link instead of scoring only generated spectra.
+The [MOCLIP Nature Communications paper](https://www.nature.com/articles/s41467-026-76714-x), published 19 August 2026, reports a silicon-on-glass metasurface dataset with 466,537 unique measured geometry–spectrum pairs, 42 design degrees of freedom, inverse-design throughput around 200,000 target spectra/s on GPU, and source-reported latent optimization accuracy above 95%. Its public repository offers a 10,000-sample subset. These are **source-reported reference numbers**, not independently reproduced Symthaea results. The paper also reports fabrication and hyperspectral measurement; a benchmark should exploit that empirical link instead of scoring only generated spectra.
 
 ### Task contract and controls
 
