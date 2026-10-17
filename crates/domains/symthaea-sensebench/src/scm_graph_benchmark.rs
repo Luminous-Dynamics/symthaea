@@ -1356,8 +1356,7 @@ mod tests {
         }
         let (marks, class_mass) = posterior_cpdag(&posterior, &catalogue);
         assert_eq!(marks, cpdag_marks(chain_forward, &catalogue));
-        assert!((class_mass - (0.6 + 1.0 / 23.0 * 3.0)).abs() > 0.0);
-        assert!(class_mass >= 0.6);
+        assert!((class_mass - (0.6 + remainder)).abs() < 1.0e-12);
     }
 
     #[test]
