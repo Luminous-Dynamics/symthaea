@@ -22,9 +22,9 @@ The `blind-worlds` CLI suite compares:
 
 All policies receive the same three-hypothesis prior, declared candidate-model set, nominal posterior-update rule, and synthetic resource budget. Candidate likelihoods are used by selectors; hidden-world likelihoods independently generate each observed binary outcome. Policies do not receive the hidden world ID, regime label, truth table, or true hypothesis index.
 
-Three hypotheses are represented: direct cause, shared-cause/confounder, and no direct causal effect. Six generator regimes cover two development conditions and four held-out conditions: intervention artifact, sensor degradation, effect reversal, and a null negative-control regime. Each candidate has a declared synthetic cost. The fixed-design comparator is selected by mean expected information gain per cost over the two development regimes; it does not inspect the held-out regimes to choose its action.
+Three hypotheses are represented: direct cause, shared-cause/confounder, and no direct causal effect. Six regime templates cover two development conditions and four held-out conditions: intervention artifact, sensor degradation, effect reversal, and a null negative-control regime. Each template generates four deterministic likelihood perturbations keyed by the root seed, regime index, and variant index, yielding 24 parameterized worlds (eight development worlds and 16 held-out worlds). The generator preserves each regime's defining control: null likelihoods remain equal across hypotheses, the intervention-artifact candidate remains uninformative, and effect reversal remains reversed. Each candidate has a declared synthetic cost. The fixed-design comparator is selected by mean expected information gain per cost over the eight development worlds; it does not inspect held-out worlds to choose its action.
 
-Random streams are deterministic. The same world/trial seed is paired across policies, while action selection has a separate deterministic stream. Ground-truth hypotheses cycle across the three hypotheses so each regime's trial set remains approximately balanced. Each policy spends from the same total resource budget; it stops when it reaches the predeclared posterior threshold or no affordable candidate remains.
+World likelihood perturbations and outcome streams are both deterministic functions of the root seed. The same world/trial outcome stream is paired across policies, while action selection has a separate deterministic stream. Ground-truth hypotheses cycle across the three hypotheses so each world’s trial set remains approximately balanced. Each policy spends from the same total synthetic resource budget; it stops when it reaches the predeclared posterior threshold or no affordable candidate remains.
 
 ## Reported outcomes
 
@@ -60,7 +60,7 @@ Use the exact commit SHA for every recorded report. Do not attribute a report to
 
 - It does not prove causal discovery in real systems or validated physical measurement.
 - The likelihood tables are synthetic and source-visible.
-- Trial-level intervals quantify Monte Carlo uncertainty conditional on each declared fixture; they do not estimate generalization across all possible worlds.
+- Trial-level intervals quantify Monte Carlo uncertainty conditional on each parameterized world. The 24 worlds are variants of six hand-authored templates, not a random sample of all causal graph topologies; they do not establish broad generalization.
 - A model-weighted or worst-case policy may fail to outperform a competent fixed design. Preserve such a result.
 - Deterministic seeds and report manifests improve replayability; they do not establish independent data custody or prevent source-level leakage.
 
@@ -73,7 +73,7 @@ These are proposed acceptance gates, not measured capabilities:
 3. **Calibration:** report Brier, log loss and calibration error together; no success claim based on threshold-reaching rate alone. Report overconfidence separately from identification accuracy.
 4. **Null discipline:** target zero positive causal claims above the declared confidence threshold on null controls. Any violation is a benchmark result to investigate, not a reason to weaken the test.
 5. **Robustness:** compare worst-case regret and performance on the correctly specified control; quantify any conservatism cost.
-6. **World-level inference:** add many independently parameterized graph/measurement families and uncertainty intervals that resample both worlds and trial seeds. The present per-regime intervals are not substitutes for world-level generalization estimates.
+6. **World-level inference:** the current four variants per template are parameter jitters, not independently generated causal graph topologies. Add a graph/measurement-family generator and aggregate uncertainty by resampling both worlds and trial seeds; retain per-world results so a good average cannot hide a catastrophic regime.
 7. **Stronger custody:** for a serious prospective benchmark, split generator/scorer into separate processes, publish a protocol commitment before scoring, hash the challenge corpus, and protect test labels/tables outside policy-accessible artifacts.
 8. **Real-stream bridge:** only after the synthetic suite is reproducible, replay an actual sensor stream with injected faults and compare to a trusted independent reference. Do not allow this suite to reconfigure or control physical hardware.
 
