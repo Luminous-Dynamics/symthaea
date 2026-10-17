@@ -76,7 +76,7 @@ These are not all aggregateable into a single leaderboard score. Report denomina
 7. **Hard-constraint versus objective trade-off:** provide a candidate with lower cost but a failed mass/energy/material constraint. Expected outcome: hard constraint wins; aggregate score cannot rescue it.
 8. **Common-source “agreement” control:** have two implementations share property data or reference outputs. Expected outcome: similarity is reported as agreement, not independent corroboration.
 
-The checker/oracle must be designed independently from the candidate model where practical. Negative controls should be seeded and scored before new candidate results are inspected. Preserve all failed and unresolved rows; do not drop them from the denominator.
+The checker/oracle must be designed independently from the candidate model where practical. Negative controls should be seeded and scored before new candidate results are inspected. Preserve all failed and unresolved rows; do not drop them from the denominator. The current Rust integration suite now adds three **analytic-only** metamorphic controls for the mixer fixture: stream-order permutation, positive flow scaling, and equivalent kg/s-to-g/s conversion. These test the frozen arithmetic invariant only; they do not exercise a simulator or validate transformed simulator outputs.
 
 ## Physical validation and uncertainty
 
