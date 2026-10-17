@@ -113,10 +113,11 @@ pub enum ScmGraphPolicy {
     PassiveOnly,
     KnownMechanicsOracle,
     StructureBlindRandomGraph,
+    PcObservationalBaseline,
 }
 
 impl ScmGraphPolicy {
-    fn all() -> [Self; 9] {
+    fn all() -> [Self; 10] {
         [
             Self::NominalExpectedInformationGain,
             Self::PredictiveOutcomeEntropy,
@@ -127,6 +128,7 @@ impl ScmGraphPolicy {
             Self::PassiveOnly,
             Self::KnownMechanicsOracle,
             Self::StructureBlindRandomGraph,
+            Self::PcObservationalBaseline,
         ]
     }
 }
@@ -532,6 +534,165 @@ fn cpdag_metrics(predicted: &[EdgeMark], truth: &[EdgeMark]) -> (f64, f64, f64, 
     )
 }
 
+
+const PC_G2_CRITICAL_DF1_95: f64 = 3.841_458_820_694_124;
+const PC_G2_CRITICAL_DF2_95: f64 = 5.991_464_547_107_979;
+
+/// Conditional G-squared statistic for binary variables X and Y, optionally
+/// conditioning on the third binary variable. This transparent three-node PC
+/// baseline uses asymptotic 5% thresholds; at low sample counts these tests are
+/// approximate and must be judged on the held-out benchmark, not presumed reliable.
+fn g_squared_ci_statistic(
+    observations: &[usize],
+    x: usize,
+    y: usize,
+    conditioning: Option<usize>,
+) -> f64 {
+    if observations.is_empty() {
+        return 0.0;
+    }
+    let strata = if conditioning.is_some() { 2 } else { 1 };
+    let mut counts = vec![[[0.0_f64; 2]; 2]; strata];
+    for state in observations {
+        let x_value = (state >> x) & 1;
+        let y_value = (state >> y) & 1;
+        let stratum = conditioning.map_or(0, |node| (state >> node) & 1);
+        counts[stratum][x_value][y_value] += 1.0;
+    }
+
+    let mut g_squared = 0.0;
+    for table in &counts {
+        let n = table.iter().flatten().sum::<f64>();
+        if n == 0.0 {
+            continue;
+        }
+        let rows = [
+            table[0][0] + table[0][1],
+            table[1][0] + table[1][1],
+        ];
+        let columns = [
+            table[0][0] + table[1][0],
+            table[0][1] + table[1][1],
+        ];
+        for x_value in 0..2 {
+            for y_value in 0..2 {
+                let observed = table[x_value][y_value];
+                if observed == 0.0 {
+                    continue;
+                }
+                let expected = rows[x_value] * columns[y_value] / n;
+                if expected > 0.0 {
+                    g_squared += 2.0 * observed * (observed / expected).ln();
+                }
+            }
+        }
+    }
+    g_squared.max(0.0)
+}
+
+fn pc_observational_cpdag(
+    observations: &[usize],
+    classes: &MarkovClassCatalog,
+) -> (Vec<EdgeMark>, usize) {
+    if observations.is_empty() {
+        let marks = vec![EdgeMark::Undirected; UNORDERED_PAIRS.len()];
+        return project_to_valid_cpdag(&marks, classes);
+    }
+
+    let mut adjacent_matrix = [[true; NODE_COUNT]; NODE_COUNT];
+    for node in 0..NODE_COUNT {
+        adjacent_matrix[node][node] = false;
+    }
+    let mut separating_sets: [[Option<usize>; NODE_COUNT]; NODE_COUNT] =
+        [[None; NODE_COUNT]; NODE_COUNT];
+
+    // PC level 0: remove unconditionally independent pairs.
+    for (first, second) in UNORDERED_PAIRS {
+        let statistic = g_squared_ci_statistic(observations, first, second, None);
+        if statistic <= PC_G2_CRITICAL_DF1_95 {
+            adjacent_matrix[first][second] = false;
+            adjacent_matrix[second][first] = false;
+            separating_sets[first][second] = None;
+            separating_sets[second][first] = None;
+        }
+    }
+
+    // PC level 1: test the only possible third-node conditioning set while it
+    // belongs to at least one endpoint's current adjacency set.
+    for (first, second) in UNORDERED_PAIRS {
+        if !adjacent_matrix[first][second] {
+            continue;
+        }
+        let third = (0..NODE_COUNT)
+            .find(|node| *node != first && *node != second)
+            .expect("three-node graph has one third variable");
+        if adjacent_matrix[first][third] || adjacent_matrix[second][third] {
+            let statistic = g_squared_ci_statistic(observations, first, second, Some(third));
+            if statistic <= PC_G2_CRITICAL_DF2_95 {
+                adjacent_matrix[first][second] = false;
+                adjacent_matrix[second][first] = false;
+                separating_sets[first][second] = Some(third);
+                separating_sets[second][first] = Some(third);
+            }
+        }
+    }
+
+    let mut raw_marks = vec![EdgeMark::Undirected; UNORDERED_PAIRS.len()];
+    for (index, (first, second)) in UNORDERED_PAIRS.iter().copied().enumerate() {
+        if !adjacent_matrix[first][second] {
+            raw_marks[index] = EdgeMark::Absent;
+        }
+    }
+
+    // For three observed variables, the PC orientation phase's only compelled
+    // arrows are those entering an unshielded collider.
+    for center in 0..NODE_COUNT {
+        for left in 0..NODE_COUNT {
+            for right in (left + 1)..NODE_COUNT {
+                if left == center || right == center
+                    || adjacent_matrix[left][right]
+                    || !adjacent_matrix[left][center]
+                    || !adjacent_matrix[right][center]
+                {
+                    continue;
+                }
+                if separating_sets[left][right] == Some(center) {
+                    continue;
+                }
+                for parent in [left, right] {
+                    let pair = (parent.min(center), parent.max(center));
+                    if let Some(index) = UNORDERED_PAIRS.iter().position(|candidate| *candidate == pair) {
+                        raw_marks[index] = if parent < center {
+                            EdgeMark::Forward
+                        } else {
+                            EdgeMark::Reverse
+                        };
+                    }
+                }
+            }
+        }
+    }
+
+    project_to_valid_cpdag(&raw_marks, classes)
+}
+
+/// Project finite-sample PC output onto the nearest valid CPDAG in the enumerated
+/// catalogue. This tie-break is deterministic and prevents inconsistent edge marks.
+fn project_to_valid_cpdag(
+    raw_marks: &[EdgeMark],
+    classes: &MarkovClassCatalog,
+) -> (Vec<EdgeMark>, usize) {
+    let mut best_class_index = 0usize;
+    let mut best_distance = f64::INFINITY;
+    for (class_index, candidate_marks) in classes.cpdag_marks.iter().enumerate() {
+        let distance = cpdag_metrics(raw_marks, candidate_marks).2;
+        if distance < best_distance {
+            best_distance = distance;
+            best_class_index = class_index;
+        }
+    }
+    (classes.cpdag_marks[best_class_index].clone(), best_class_index)
+}
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
 enum EdgeMark {
@@ -953,7 +1114,9 @@ fn choose_action(
         ScmGraphPolicy::UniformRandomAction => {
             Some(nominal.candidates[rng.index(nominal.candidates.len())].id.clone())
         }
-        ScmGraphPolicy::PassiveOnly => Some("observe".into()),
+        ScmGraphPolicy::PassiveOnly | ScmGraphPolicy::PcObservationalBaseline => {
+            Some("observe".into())
+        }
         ScmGraphPolicy::KnownMechanicsOracle => rank_experiments(posterior, oracle_candidates)?
             .first().map(|score| score.candidate_id.clone()),
         ScmGraphPolicy::StructureBlindRandomGraph => None,
