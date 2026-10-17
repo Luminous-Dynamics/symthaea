@@ -40,7 +40,7 @@ All policies share the same initial uniform graph prior, nominal posterior-updat
 2. Predictive outcome entropy, a simple uncertainty-seeking baseline that does not directly score hypothesis discrimination.
 3. Model-weighted expected information gain across the declared scenarios.
 4. Worst-case robust information-gain selection.
-5. Development-fixed action chosen by mean one-step expected information gain across development-family mechanism parameters only; it does not use the development worlds' truth graph IDs and never inspects held-out worlds.
+5. Development-fixed action chosen by mean one-step expected information gain across the four development graph-family × mechanism-regime combinations only; it does not use the development worlds' truth graph IDs and never inspects held-out worlds.
 6. Uniform random measurement/intervention selection.
 7. Passive observation only.
 8. Known-mechanism oracle: uses the hidden world's mechanism parameters while retaining the graph-hypothesis task. This is an optimistic upper-bound diagnostic and is not a deployable method.
@@ -91,11 +91,12 @@ These are authored tests, not executed results. The benchmark has not been compi
 3. **Held-out graph recovery:** compare directed F1, skeleton F1 and SHD against the fixed-design, random-action, passive-only, and structure-blind graph baselines. Do not claim superiority unless paired differences and uncertainty support it.
 4. **Graph confidence:** report graph-claim coverage beside false-claim risk. Reject the trivial policy that wins by abstaining on every trial.
 5. **Negative controls:** on the empty-graph family, report spurious-edge frequency and false accepted graph claims explicitly.
-6. **World/family inference:** current summaries have four parameter variants per hand-designed family. These are not a sample of all possible causal systems. The next version should generate many graph families/mechanisms from preregistered design distributions and use family-level analysis, rather than treating within-family variants as independent evidence of generalization.
+6. **Factorial generator audit:** the suite crosses seven graph-family templates with four mechanism regimes using independent random streams. Confirm that each graph family occurs once with every mechanism regime and that the split remains four development / 24 held-out worlds. This removes a direct one-to-one graph-family-to-coefficient shortcut, but the seven graph templates are still hand-authored.
+7. **World/family inference:** use many independently generated graph families and parameter draws from preregistered distributions. Analyse topology-family and mechanism-regime generalization separately; do not treat 28 crossed combinations as 28 random samples from the universe of SCMs.
 7. **Observational equivalence:** the current suite now has a three-variable CPDAG-class scorer and separate compelled-direction metrics. Expand and cross-check it against a trusted CPDAG implementation before larger-graph use; then score interventional direction recovery separately.
-8. **Richer SCMs:** add continuous linear-Gaussian and nonlinear/additive-noise families, measurement noise, sampling constraints, intervention artifacts, latent confounding, and selection/censoring mechanisms.
-9. **Independent custody:** move the evaluation truth and score implementation to a separate process/corpus, bind test corpus hashes to the protocol, and keep policy-visible fixtures separated from the qualification set.
-10. **Physical bridge:** only after software correctness and reproducibility, use replayed sensor streams with injected faults and an independently calibrated reference. Synthetic success alone does not support physical scientific claims.
+9. **Richer SCMs:** add continuous linear-Gaussian and nonlinear/additive-noise families, measurement noise, sampling constraints, intervention artifacts, latent confounding, and selection/censoring mechanisms.
+10. **Independent custody:** move the evaluation truth and score implementation to a separate process/corpus, bind test corpus hashes to the protocol, and keep policy-visible fixtures separated from the qualification set.
+11. **Physical bridge:** only after software correctness and reproducibility, use replayed sensor streams with injected faults and an independently calibrated reference. Synthetic success alone does not support physical scientific claims.
 
 ## Research grounding
 
