@@ -6,7 +6,7 @@ use std::fs;
 use std::path::{Path, PathBuf};
 use std::process;
 
-const GENERATOR_VERSION: &str = "cyber-hunt-fixture-generator/0.4.0";
+const GENERATOR_VERSION: &str = "cyber-hunt-fixture-generator/0.5.0";
 const EVENT_SCHEMA: &str = "cyber-hunt-event-v1";
 const MANIFEST_SCHEMA: &str = "cyber-hunt-manifest-v1";
 const TRUTH_SCHEMA: &str = "cyber-hunt-truth-v1";
@@ -419,6 +419,7 @@ enum CampaignFamily {
     ArtifactProvenance,
     CloudDataMovement,
     CrossDomainTrustChain,
+    BenignOnlyControl,
 }
 
 impl CampaignFamily {
@@ -428,8 +429,9 @@ impl CampaignFamily {
             "artifact-provenance" => Ok(Self::ArtifactProvenance),
             "cloud-data-movement" => Ok(Self::CloudDataMovement),
             "cross-domain-trust-chain" => Ok(Self::CrossDomainTrustChain),
+            "benign-only-control" => Ok(Self::BenignOnlyControl),
             _ => Err(format!(
-                "unsupported --family {value}; expected identity-to-egress, artifact-provenance, cloud-data-movement, or cross-domain-trust-chain"
+                "unsupported --family {value}; expected identity-to-egress, artifact-provenance, cloud-data-movement, cross-domain-trust-chain, or benign-only-control"
             )),
         }
     }
@@ -440,6 +442,7 @@ impl CampaignFamily {
             Self::ArtifactProvenance => "artifact-provenance",
             Self::CloudDataMovement => "cloud-data-movement",
             Self::CrossDomainTrustChain => "cross-domain-trust-chain",
+            Self::BenignOnlyControl => "benign-only-control",
         }
     }
 }
@@ -1358,6 +1361,105 @@ fn generate_cross_domain_trust_chain_dataset(record_count: usize, seed: u64) -> 
     Ok(Dataset { event_store, manifest, truth })
 }
 
+fn extract_benign_chain_events(dataset: Dataset) -> Result<Vec<EventRecord>, String> {
+    let benign_ids: BTreeSet<String> = dataset.truth.labels.iter()
+        .filter(|label| label.label == "negative" && label.rationale.to_lowercase().contains("benign"))
+        .map(|label| label.event_id.clone())
+        .collect();
+    let text = std::str::from_utf8(&dataset.event_store)
+        .map_err(|e| format!("benign fixture event store is not UTF-8: {e}"))?;
+    let mut events = Vec::new();
+    for line in text.lines() {
+        let event: EventRecord = serde_json::from_str(line)
+            .map_err(|e| format!("cannot decode benign event while composing control corpus: {e}"))?;
+        if benign_ids.contains(&event.event_id) {
+            events.push(event);
+        }
+    }
+    if events.is_empty() {
+        return Err("family did not provide any benign-only chain events".to_string());
+    }
+    Ok(events)
+}
+
+fn generate_benign_only_control_dataset(record_count: usize, seed: u64) -> Result<Dataset, String> {
+    const SCENARIO: &str = "synthetic-benign-only-control-v1";
+    if !(MIN_RECORDS..=MAX_RECORDS).contains(&record_count) {
+        return Err(format!(
+            "record count must be between {MIN_RECORDS} and {MAX_RECORDS}"
+        ));
+    }
+
+    // Compose only oracle-designated benign chain records from each family. Relabeling
+    // happens only after filtering by the hidden oracle, and original event IDs are
+    // replaced with fresh deterministic IDs. No planted positive event is included.
+    let source_datasets = [
+        generate_dataset(64, seed ^ 0x11a2_b3c4_d5e6_f701)?,
+        generate_artifact_provenance_dataset(64, seed ^ 0x22b3_c4d5_e6f7_0812)?,
+        generate_cloud_data_movement_dataset(64, seed ^ 0x33c4_d5e6_f708_1923)?,
+        generate_cross_domain_trust_chain_dataset(64, seed ^ 0x44d5_e6f7_0819_2a34)?,
+    ];
+    let mut benign_events = Vec::new();
+    for dataset in source_datasets {
+        benign_events.extend(extract_benign_chain_events(dataset)?);
+    }
+    if benign_events.len() >= record_count {
+        return Err(format!(
+            "benign control chain count {} exceeds requested record count {record_count}",
+            benign_events.len()
+        ));
+    }
+
+    let mut rng = Rng::new(seed ^ 0x5ae1_2026_1017_0c01);
+    let mut events = Vec::with_capacity(record_count);
+    let mut used_ids = BTreeSet::new();
+    let background_count = record_count - benign_events.len();
+    for index in 0..background_count {
+        background_event(index, BASE_TIME_MS, &mut events, &mut rng, &mut used_ids);
+    }
+    for mut event in benign_events {
+        event.event_id = next_event_id(&mut rng, &mut used_ids);
+        events.push(event);
+    }
+    events.sort_by(|a, b| (a.ingest_time_ms, &a.event_id).cmp(&(b.ingest_time_ms, &b.event_id)));
+    let event_store = encode_jsonl(&events)?;
+    let event_store_sha256 = digest(&event_store);
+
+    let labels = events.iter().map(|event| EventLabel {
+        event_id: event.event_id.clone(),
+        label: "negative".to_string(),
+        rationale: "benign-only hard-negative control; no planted attack is asserted".to_string(),
+    }).collect::<Vec<_>>();
+
+    let truth = GroundTruth {
+        schema_version: TRUTH_SCHEMA.to_string(),
+        scenario_id: SCENARIO.to_string(),
+        profile: "public-benign-only-control-v1".to_string(),
+        seed,
+        event_count: record_count,
+        event_store_sha256: event_store_sha256.clone(),
+        labels,
+        expected_relations: Vec::new(),
+        claim_ceiling: "Synthetic benign-only false-positive/control-rate evaluation only; not solver capability or production assurance.".to_string(),
+    };
+    let manifest = DatasetManifest {
+        schema_version: MANIFEST_SCHEMA.to_string(),
+        generator_version: GENERATOR_VERSION.to_string(),
+        profile: "public-benign-only-control-v1".to_string(),
+        scenario_id: SCENARIO.to_string(),
+        seed,
+        record_count,
+        event_store_sha256,
+        event_store_utf8_bytes: event_store.len(),
+        ordering: "ingest_time_ms_then_event_id; event_time_ms remains distinct".to_string(),
+        qualification_state: "UNSCORED".to_string(),
+        generator_source_commit: "UNPINNED_LOCAL_SOURCE".to_string(),
+        source_commit_pinned: false,
+        claim_ceiling: "Exact deterministic benign-only hard-negative smoke fixture; not solver capability evidence.".to_string(),
+    };
+    Ok(Dataset { event_store, manifest, truth })
+}
+
 fn generate_dataset_for_family(
     record_count: usize,
     seed: u64,
@@ -1368,6 +1470,7 @@ fn generate_dataset_for_family(
         CampaignFamily::ArtifactProvenance => generate_artifact_provenance_dataset(record_count, seed),
         CampaignFamily::CloudDataMovement => generate_cloud_data_movement_dataset(record_count, seed),
         CampaignFamily::CrossDomainTrustChain => generate_cross_domain_trust_chain_dataset(record_count, seed),
+        CampaignFamily::BenignOnlyControl => generate_benign_only_control_dataset(record_count, seed),
     }
 }
 
@@ -1526,7 +1629,7 @@ fn main() {
     match parse_args() {
         Ok(None) => {
             println!(
-                "Usage: cyber-hunt-fixture-generator --events-out PATH --manifest-out PATH --truth-out PATH [--family identity-to-egress|artifact-provenance|cloud-data-movement|cross-domain-trust-chain] [--records N] [--seed N] [--source-commit 40_HEX_SHA]\n\
+                "Usage: cyber-hunt-fixture-generator --events-out PATH --manifest-out PATH --truth-out PATH [--family identity-to-egress|artifact-provenance|cloud-data-movement|cross-domain-trust-chain|benign-only-control] [--records N] [--seed N] [--source-commit 40_HEX_SHA]\n\
                  Generates deterministic synthetic defensive telemetry only. Keep --truth-out outside the solver-visible filesystem."
             );
         }
@@ -1639,6 +1742,56 @@ mod tests {
             .expect("benign matching attestation should exist");
         assert!(!positive_ids.contains(&benign_attestation.event_id));
         assert!(!positive_ids.contains(&benign_promotion.event_id));
+    }
+
+    #[test]
+    fn benign_only_control_has_zero_positives_and_zero_attack_relations() {
+        let dataset = generate_benign_only_control_dataset(1_000, 2026)
+            .expect("benign-only control should generate");
+        let events: Vec<EventRecord> = std::str::from_utf8(&dataset.event_store)
+            .expect("event store should be UTF-8")
+            .lines()
+            .map(|line| serde_json::from_str(line).expect("event should deserialize"))
+            .collect();
+        let event_ids: BTreeSet<String> = events.iter()
+            .map(|event| event.event_id.clone())
+            .collect();
+        let label_ids: BTreeSet<String> = dataset.truth.labels.iter()
+            .map(|label| label.event_id.clone())
+            .collect();
+        assert_eq!(dataset.manifest.scenario_id, "synthetic-benign-only-control-v1");
+        assert_eq!(events.len(), 1_000);
+        assert_eq!(event_ids.len(), 1_000);
+        assert_eq!(label_ids, event_ids);
+        assert!(dataset.truth.labels.iter().all(|label| label.label == "negative"));
+        assert!(dataset.truth.expected_relations.is_empty());
+        assert_eq!(dataset.truth.event_store_sha256, digest(&dataset.event_store));
+        for expected_type in [
+            "commit_checkout",
+            "build_job",
+            "artifact_publish",
+            "provenance_attestation",
+            "artifact_promotion",
+            "deployment",
+            "role_assignment",
+            "token_issue",
+            "storage_list",
+            "object_read_batch",
+            "export_job",
+            "data_transfer",
+            "network_transfer",
+        ] {
+            assert!(events.iter().any(|event| event.event_type == expected_type),
+                "benign-only control should include the {expected_type} hard negative");
+        }
+        assert!(events.iter().all(|event| event.synthetic));
+        let replay = generate_benign_only_control_dataset(1_000, 2026)
+            .expect("same seed should replay");
+        assert_eq!(dataset.event_store, replay.event_store);
+        assert_eq!(dataset.truth, replay.truth);
+        let other_seed = generate_benign_only_control_dataset(1_000, 2027)
+            .expect("other seed should generate");
+        assert_ne!(dataset.manifest.event_store_sha256, other_seed.manifest.event_store_sha256);
     }
 
     #[test]
@@ -1843,7 +1996,7 @@ mod tests {
             .as_array().expect("manifest schema should enumerate scenario IDs");
         let truth_ids = truth_schema["properties"]["scenario_id"]["enum"]
             .as_array().expect("truth schema should enumerate scenario IDs");
-        for scenario_id in [SCENARIO_ID, "synthetic-artifact-lifecycle-v1", "synthetic-cloud-data-movement-v1", "synthetic-cross-domain-trust-chain-v1"] {
+        for scenario_id in [SCENARIO_ID, "synthetic-artifact-lifecycle-v1", "synthetic-cloud-data-movement-v1", "synthetic-cross-domain-trust-chain-v1", "synthetic-benign-only-control-v1"] {
             assert!(manifest_ids.iter().any(|v| v.as_str() == Some(scenario_id)));
             assert!(truth_ids.iter().any(|v| v.as_str() == Some(scenario_id)));
         }
@@ -1867,6 +2020,10 @@ mod tests {
             CampaignFamily::parse("cross-domain-trust-chain").expect("cross-domain family should parse"),
             CampaignFamily::CrossDomainTrustChain
         );
+        assert_eq!(
+            CampaignFamily::parse("benign-only-control").expect("benign-only family should parse"),
+            CampaignFamily::BenignOnlyControl
+        );
         assert!(CampaignFamily::parse("invented-family").is_err());
         let cloud = generate_dataset_for_family(128, 2026, CampaignFamily::CloudDataMovement)
             .expect("cloud data movement family should generate");
@@ -1874,6 +2031,9 @@ mod tests {
         let cross_domain = generate_dataset_for_family(128, 2026, CampaignFamily::CrossDomainTrustChain)
             .expect("cross-domain family should generate");
         assert_eq!(cross_domain.manifest.scenario_id, "synthetic-cross-domain-trust-chain-v1");
+        let benign_only = generate_dataset_for_family(128, 2026, CampaignFamily::BenignOnlyControl)
+            .expect("benign-only family should generate");
+        assert_eq!(benign_only.manifest.scenario_id, "synthetic-benign-only-control-v1");
         let default = generate_dataset_for_family(128, 2026, CampaignFamily::IdentityToEgress)
             .expect("identity family should generate");
         let compatibility = generate_dataset(128, 2026)
@@ -1889,6 +2049,7 @@ mod tests {
             (CampaignFamily::ArtifactProvenance, 6_usize),
             (CampaignFamily::CloudDataMovement, 6_usize),
             (CampaignFamily::CrossDomainTrustChain, 12_usize),
+            (CampaignFamily::BenignOnlyControl, 0_usize),
         ];
         for (family, expected_positive_count) in scenarios {
             for seed in [0_u64, 1_u64, 2026_u64] {
