@@ -1,0 +1,3 @@
+AGRI-ROBOTICS-BENCH-V1
+synthetic evidence fixture
+This file contains no real farm data.
