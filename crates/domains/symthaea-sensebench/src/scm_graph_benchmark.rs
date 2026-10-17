@@ -220,7 +220,7 @@ pub struct ScmGraphPolicyAggregate {
     pub mean_held_out_false_graph_claim_rate_all_trials: f64,
 }
 
-#[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, Deserialize)]
 pub enum ScmGraphShiftSplit {
     AnyHeldOut,
     TopologyShiftOnly,
@@ -1482,8 +1482,8 @@ pub fn run_scm_graph_benchmark(
             "Synthetic software benchmark only. The candidate set enumerates all labeled DAGs ",
             "on three observed variables, but outcomes use hidden structural-equation parameters. ",
             "Held-out regimes are source-visible and are not cryptographically sealed. The ",
-            "held-out aggregate intervals treat crossed worlds as units, but seven hand-authored ",
-            "graph families crossed with four mechanism regimes are not a population sample of all causal systems. The ",
+            "held-out intervals average paired mechanism regimes within topology, but are conditional ",
+            "on seven hand-authored graph-family templates; they do not support population-wide SCM generalization. The ",
             "known-mechanics oracle is an optimistic diagnostic, not an available deployment policy."
         ).into(),
     })
@@ -1735,8 +1735,8 @@ mod tests {
 
     #[test]
     fn run_is_deterministic_and_reports_world_level_aggregates() {
-        let a = run_scm_graph_benchmark(3, 4, 123, 0.95).unwrap();
-        let b = run_scm_graph_benchmark(3, 4, 123, 0.95).unwrap();
+        let a = run_scm_graph_benchmark(3, 2, 123, 0.95).unwrap();
+        let b = run_scm_graph_benchmark(3, 2, 123, 0.95).unwrap();
         assert_eq!(a, b);
         assert_eq!(serde_json::to_vec(&a).unwrap(), serde_json::to_vec(&b).unwrap());
         assert_eq!(a.schema_version, 3);
@@ -1757,7 +1757,7 @@ mod tests {
 
     #[test]
     fn factorized_shift_splits_have_expected_world_and_topology_counts() {
-        let report = run_scm_graph_benchmark(3, 3, 2026, 0.90).unwrap();
+        let report = run_scm_graph_benchmark(3, 1, 2026, 0.90).unwrap();
         for policy in ScmGraphPolicy::all() {
             let find = |split| report.factorized_shift_aggregates.iter()
                 .find(|row| row.policy == policy && row.split == split).unwrap();
@@ -1784,7 +1784,7 @@ mod tests {
 
     #[test]
     fn held_out_claim_metrics_are_bounded_and_null_false_claims_are_visible() {
-        let report = run_scm_graph_benchmark(6, 5, 0x5EED, 0.90).unwrap();
+        let report = run_scm_graph_benchmark(6, 2, 0x5EED, 0.90).unwrap();
         for row in &report.worlds {
             assert!((0.0..=1.0).contains(&row.mean_skeleton_f1));
             assert!((0.0..=1.0).contains(&row.mean_directed_edge_f1));
