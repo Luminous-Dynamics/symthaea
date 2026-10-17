@@ -2029,14 +2029,64 @@ mod holdout_validation_tests {
             harmonic_rhs, "harmonic-oscillator-v1", &candidate,
             &[1.0, 0.2], &["x", "v"], &config, 1.0, 0.02, 4, 200, 1e-8,
         );
-        let changed = validate_invariant_holdout(
-            harmonic_rhs, "harmonic-oscillator-v1", &candidate,
-            &[1.0, 0.2], &["x", "v"], &config, 1.0, 0.02, 4, 200, 1e-7,
+        let changed_threshold = validate_invariant_holdout(
+            harmonic_rhs,
+            "harmonic-oscillator-v1",
+            &candidate,
+            &[1.0, 0.2],
+            &["x", "v"],
+            &config,
+            1.0,
+            0.02,
+            4,
+            200,
+            1e-7,
+        );
+        let changed_seed = validate_invariant_holdout(
+            harmonic_rhs,
+            "harmonic-oscillator-v1",
+            &candidate,
+            &[1.0, 0.2],
+            &["x", "v"],
+            &config,
+            1.0,
+            0.02,
+            4,
+            201,
+            1e-8,
         );
 
         assert_eq!(first, repeat);
-        assert_ne!(first.receipt_digest, changed.receipt_digest);
-        assert_ne!(first.validation_profile_digest, changed.validation_profile_digest);
+        assert_ne!(first.receipt_digest, changed_threshold.receipt_digest);
+        assert_ne!(first.validation_profile_digest, changed_threshold.validation_profile_digest);
+        assert_ne!(
+            first.holdout_initial_conditions_digest,
+            changed_seed.holdout_initial_conditions_digest
+        );
+        assert_ne!(first.receipt_digest, changed_seed.receipt_digest);
+        assert_eq!(first.candidate_expression, format!("{candidate}"));
+        assert!(first.discovery_config_snapshot.contains("mutation_rate_bits="));
+        assert_eq!(first.discovery_seed, config.seed);
+    }
+
+    #[test]
+    fn zero_holdout_requests_fail_closed() {
+        let config = discovery_config(7);
+        let result = validate_invariant_holdout(
+            harmonic_rhs,
+            "harmonic-oscillator-v1",
+            &harmonic_energy_candidate(),
+            &[1.0, 0.2],
+            &["x", "v"],
+            &config,
+            1.0,
+            0.02,
+            0,
+            8,
+            1e-8,
+        );
+        assert!(!result.passed);
+        assert_eq!(result.failure, Some(AutonomousHoldoutFailure::NoTrajectoriesRequested));
     }
 
     #[test]
