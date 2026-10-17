@@ -408,6 +408,82 @@ pub enum WearabilityDispositionV1 {
     InvalidInput,
 }
 
+/// Stable machine-readable reasons retained in a wearability decision receipt.
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, Deserialize)]
+#[serde(rename_all = "snake_case")]
+pub enum WearabilityFindingV1 {
+    /// Profile identifier is empty or contains surrounding whitespace.
+    InvalidProfileId,
+    /// Input schema version is unsupported.
+    UnsupportedSchemaVersion,
+    /// User explicitly requested disengagement/doff.
+    UserRequestedDoff,
+    /// Workflow requires a doff stage; that stage outranks ordinary motion planning.
+    DoffStageHasPriority,
+    /// A required fastening is explicitly incomplete.
+    RequiredFasteningIncomplete,
+    /// Required fastening evidence is missing or unknown.
+    RequiredFasteningEvidenceMissing,
+    /// Wearer/device profile was identified as incompatible.
+    ProfileMismatch,
+    /// Profile compatibility evidence is missing or unknown.
+    ProfileCompatibilityUnknown,
+    /// Fit evidence is stale.
+    FitEvidenceStale,
+    /// Fit evidence is missing, invalid, conflicted, or unavailable.
+    FitEvidenceNotCurrentOrUncertain,
+    /// Relevant sensors are unavailable or contradictory.
+    SensorEvidenceUncertain,
+    /// Required caregiver is unavailable for this workflow.
+    CaregiverUnavailable,
+    /// Donning timed out before the critical workflow step completed.
+    DonningTimedOutBeforeCriticalStep,
+    /// A critical donning step is incomplete.
+    CriticalDonningStepIncomplete,
+    /// Restart/configuration lineage requires explicit mode selection.
+    ExplicitModeSelectionRequired,
+    /// Energy reserve is below the profile-specific minimum.
+    EnergyReserveBelowProfileMinimum,
+    /// Energy estimate, reserve evidence, or confidence is unavailable/insufficient.
+    EnergyEstimateUncertain,
+    /// A module changed but calibration lineage is missing or invalid.
+    CalibrationLineageNotVerified,
+    /// Post-service diagnostic checks were not passed.
+    PostServiceDiagnosticsNotPassed,
+    /// Interface migration sensor reports conflict.
+    MigrationSensorConflicted,
+    /// Interface migration evidence is unavailable.
+    MigrationMeasurementUnavailable,
+    /// Interface migration value is non-finite.
+    MigrationMeasurementInvalid,
+    /// Task is outside the selected profile's scope.
+    TaskOutsideProfile,
+    /// Environment clearance conflicts with the profile.
+    MovementClearanceRestricted,
+    /// Task/environment compatibility is unknown.
+    TaskCompatibilityUnknown,
+    /// Wearer reported thermal discomfort.
+    ThermalDiscomfortReported,
+    /// Thermal comfort has not been assessed.
+    ThermalComfortUnknown,
+    /// Declared profile duty-cycle limit has been reached.
+    DutyCycleLimitReached,
+    /// Duty-cycle state or limit is unknown.
+    DutyCycleUnknown,
+    /// Task hygiene requirements conflict with the device/workflow.
+    HygieneWorkflowIncompatible,
+    /// Hygiene compatibility is unknown.
+    HygieneCompatibilityUnknown,
+    /// A simulated workflow is admitted under the declared fit/fastening evidence.
+    FitCheckAdmittedForSimulation,
+    /// Lifecycle task is admitted under current declared evidence.
+    TaskAdmittedForSimulation,
+    /// Declared module service is eligible for a separate review.
+    ServiceEligibleForReviewOnly,
+    /// The evaluator could not establish the evidence needed to decide.
+    RequiredEvidenceUnknown,
+}
+
 /// Deterministic decision receipt. This output is not a command or safety claim.
 #[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
 #[serde(deny_unknown_fields)]
@@ -420,6 +496,8 @@ pub struct WearabilityDecisionV1 {
     pub stage: WearabilityStageV1,
     /// Report-only disposition.
     pub disposition: WearabilityDispositionV1,
+    /// Ordered machine-readable reasons, using a stable evaluator-defined order.
+    pub findings: Vec<WearabilityFindingV1>,
 }
 
 /// Evaluate one lifecycle scenario using stable, explicit priority rules.
@@ -451,12 +529,173 @@ pub fn evaluate_wearability_request(
         }
     };
 
+    let findings = collect_wearability_findings(profile_id, stage, input, disposition);
+
     WearabilityDecisionV1 {
         schema_version: WEARABILITY_SCHEMA_VERSION,
         profile_id: profile_id.to_owned(),
         stage,
         disposition,
+        findings,
     }
+}
+
+fn collect_wearability_findings(
+    profile_id: &str,
+    stage: WearabilityStageV1,
+    input: &WearabilityInputV1,
+    disposition: WearabilityDispositionV1,
+) -> Vec<WearabilityFindingV1> {
+    use WearabilityFindingV1 as F;
+    let mut findings = Vec::new();
+
+    // Finding order is deliberately fixed; do not sort by debug/string output.
+    if profile_id.trim().is_empty() || profile_id.trim() != profile_id {
+        findings.push(F::InvalidProfileId);
+    }
+    if input.schema_version != WEARABILITY_SCHEMA_VERSION {
+        findings.push(F::UnsupportedSchemaVersion);
+    }
+    if input.user_requested_doff == Some(true) {
+        findings.push(F::UserRequestedDoff);
+    }
+    if stage == WearabilityStageV1::Doff {
+        findings.push(F::DoffStageHasPriority);
+    }
+    if input.fastening_evidence == Some(FasteningEvidenceV1::Incomplete) {
+        findings.push(F::RequiredFasteningIncomplete);
+    } else if input.fastening_evidence.is_none()
+        && matches!(stage, WearabilityStageV1::FitCheck | WearabilityStageV1::Start)
+    {
+        findings.push(F::RequiredFasteningEvidenceMissing);
+    }
+    match input.profile_match {
+        Some(ProfileMatchV1::Mismatch) => findings.push(F::ProfileMismatch),
+        Some(ProfileMatchV1::Unknown) | None
+            if matches!(stage, WearabilityStageV1::FitCheck | WearabilityStageV1::Start) =>
+        {
+            findings.push(F::ProfileCompatibilityUnknown);
+        }
+        _ => {}
+    }
+    match input.fit_evidence {
+        Some(FitEvidenceV1::Stale) => findings.push(F::FitEvidenceStale),
+        Some(FitEvidenceV1::Conflicted | FitEvidenceV1::Unavailable | FitEvidenceV1::Invalid)
+        | None
+            if matches!(stage, WearabilityStageV1::FitCheck | WearabilityStageV1::Start | WearabilityStageV1::Perform) =>
+        {
+            findings.push(F::FitEvidenceNotCurrentOrUncertain);
+        }
+        _ => {}
+    }
+    if matches!(
+        input.sensor_consistency,
+        Some(SignalEvidenceV1::Conflicted | SignalEvidenceV1::Unavailable)
+    ) || matches!(
+        input.pressure_sensor,
+        Some(SignalEvidenceV1::Conflicted | SignalEvidenceV1::Unavailable)
+    ) || matches!(
+        input.shear_sensor,
+        Some(SignalEvidenceV1::Conflicted | SignalEvidenceV1::Unavailable)
+    ) {
+        findings.push(F::SensorEvidenceUncertain);
+    }
+    if input.workflow_support_requirement == Some(WorkflowSupportV1::CaregiverRequired)
+        && input.caregiver_available != Some(true)
+    {
+        findings.push(F::CaregiverUnavailable);
+    }
+    if input.workflow_timeout == Some(true) && input.critical_step_completed != Some(true) {
+        findings.push(F::DonningTimedOutBeforeCriticalStep);
+    }
+    if stage == WearabilityStageV1::Don && input.critical_step_completed != Some(true) {
+        findings.push(F::CriticalDonningStepIncomplete);
+    }
+    if input.configuration_lineage == Some(ConfigurationLineageV1::RestartBoundary)
+        || input.configuration_lineage == Some(ConfigurationLineageV1::Unknown)
+        || input.current_session_mode == Some(WearabilityModeV1::Unset)
+        || (stage == WearabilityStageV1::Start && input.current_session_mode.is_none())
+    {
+        findings.push(F::ExplicitModeSelectionRequired);
+    }
+    if input.predicted_reserve_after_task == Some(EnergyReserveV1::BelowProfileMinimum) {
+        findings.push(F::EnergyReserveBelowProfileMinimum);
+    }
+    if matches!(
+        input.predicted_reserve_after_task,
+        Some(EnergyReserveV1::Unknown) | None
+    ) || input.task_energy_estimate != Some(SignalEvidenceV1::Available)
+        || input.estimate_confidence != Some(EstimateConfidenceV1::Adequate)
+    {
+        if stage == WearabilityStageV1::Prepare {
+            findings.push(F::EnergyEstimateUncertain);
+        }
+    }
+    if input.module_changed == Some(true)
+        && input.calibration_lineage_after_service
+            != Some(CalibrationLineageV1::VerifiedPreservedOrReestablished)
+    {
+        findings.push(F::CalibrationLineageNotVerified);
+    }
+    if input.module_changed == Some(true)
+        && input.diagnostic_result != Some(DiagnosticResultV1::PassDeclaredChecks)
+    {
+        findings.push(F::PostServiceDiagnosticsNotPassed);
+    }
+    if input.interface_migration_sensor == Some(SignalEvidenceV1::Conflicted) {
+        findings.push(F::MigrationSensorConflicted);
+    } else if input.interface_migration_sensor == Some(SignalEvidenceV1::Unavailable)
+        || (input.interface_migration_sensor.is_some() && input.measured_migration_value.is_none())
+    {
+        findings.push(F::MigrationMeasurementUnavailable);
+    }
+    if input.measured_migration_value.is_some_and(|value| !value.is_finite()) {
+        findings.push(F::MigrationMeasurementInvalid);
+    }
+    if input.task_compatibility == Some(TaskCompatibilityV1::Unsupported) {
+        findings.push(F::TaskOutsideProfile);
+    } else if input.task_compatibility == Some(TaskCompatibilityV1::Unknown) {
+        findings.push(F::TaskCompatibilityUnknown);
+    }
+    if input.movement_clearance == Some(MovementClearanceV1::Restricted) {
+        findings.push(F::MovementClearanceRestricted);
+    }
+    if input.thermal_comfort == Some(ThermalComfortV1::DiscomfortReported) {
+        findings.push(F::ThermalDiscomfortReported);
+    } else if input.thermal_comfort == Some(ThermalComfortV1::Unknown) {
+        findings.push(F::ThermalComfortUnknown);
+    }
+    if input.duty_cycle == Some(DutyCycleV1::LimitReached) {
+        findings.push(F::DutyCycleLimitReached);
+    } else if input.duty_cycle == Some(DutyCycleV1::Unknown) {
+        findings.push(F::DutyCycleUnknown);
+    }
+    if input.hygiene_compatibility == Some(HygieneCompatibilityV1::Incompatible) {
+        findings.push(F::HygieneWorkflowIncompatible);
+    } else if input.hygiene_compatibility == Some(HygieneCompatibilityV1::Unknown) {
+        findings.push(F::HygieneCompatibilityUnknown);
+    }
+
+    if findings.is_empty() {
+        match disposition {
+            WearabilityDispositionV1::ReadyForSimulation => {
+                if stage == WearabilityStageV1::FitCheck {
+                    findings.push(F::FitCheckAdmittedForSimulation);
+                } else {
+                    findings.push(F::TaskAdmittedForSimulation);
+                }
+            }
+            WearabilityDispositionV1::EligibleForReviewedReturnToService => {
+                findings.push(F::ServiceEligibleForReviewOnly);
+            }
+            WearabilityDispositionV1::DoffRequestPreemptsNewMotion => {
+                findings.push(F::DoffStageHasPriority);
+            }
+            _ => findings.push(F::RequiredEvidenceUnknown),
+        }
+    }
+
+    findings
 }
 
 fn evaluate_fit_check(input: &WearabilityInputV1) -> WearabilityDispositionV1 {
