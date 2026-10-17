@@ -38,16 +38,18 @@ Here, `admit` and `admit_degraded` do not authorize physical dispatch, energizat
 
 ## 4. Independent verifier requirements
 
-The first test-only Rust entry point now lives in repository tooling rather than a production vehicle/controller crate, so it remains effects-disabled and does not create a parallel domain engine.
+The test-only Rust tooling lives in repository `xtask` rather than a production vehicle/controller crate, so it remains effects-disabled and does not create a parallel domain engine. The route audit is a structural fixture validator only; route optimization and schedule verification remain owned by FACTORY-OPS-001 #7677 / PR #7678.
 
 From the repository root, run:
 
 ```sh
 cargo run -p xtask -- env-mobility-qualify
 cargo test -p xtask env_mobility
+cargo run -p xtask -- env-mobility-route-audit
+cargo test -p xtask env_mobility_route
 ```
 
-The command is intended to emit deterministic JSON with raw SHA-256 digests of the exact two corpus byte streams, per-case decisions, disposition counts, mismatches and protected-gate false accepts. It exits nonzero if the schema is invalid or any expected disposition/reason differs. Its presence is not a pass claim until compilation and exact-head tests are observed.
+The corpus qualifier emits deterministic JSON with raw SHA-256 digests of the exact corpus byte streams, per-case decisions, disposition counts, mismatches and protected-gate false accepts. The route audit independently checks the synthetic manufacturing-routing fixture's schema, candidate worker skills/resources, dependency DAG, mandatory operation set, calibration/manifest/inspection order, and mutation list. It **does not schedule the route** or establish shift feasibility/throughput. Neither command is a pass claim until compilation and exact-head tests are observed.
 
 The first Rust implementation should compose existing owners rather than create another universal robotics, manufacturing, or scheduling engine.
 
