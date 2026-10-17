@@ -249,7 +249,8 @@ pub fn audit_run(run_dir: &Path) -> AuditReport {
             }
         }
 
-        if trajectory_files.len() == rows.len()
+        if !rows.is_empty()
+            && trajectory_files.len() == rows.len()
             && report.findings.len() == trajectory_findings_before
         {
             report.checked("trajectory_and_per_episode_records_reconcile");
@@ -418,7 +419,6 @@ fn audit_aggregate(rows: &[Value], aggregate_value: Option<&Value>, report: &mut
     let Some(aggregate_object) = aggregate_value.and_then(Value::as_object) else {
         return;
     };
-    let findings_before = report.findings.len();
     let Some(aggregate) = aggregate_object.get("summary").and_then(Value::as_object) else {
         report.fail(
             "aggregate_summary_missing",
@@ -426,6 +426,10 @@ fn audit_aggregate(rows: &[Value], aggregate_value: Option<&Value>, report: &mut
         );
         return;
     };
+    if rows.is_empty() {
+        return;
+    }
+    let findings_before = report.findings.len();
 
     let mut values_by_metric: BTreeMap<String, Vec<f64>> = BTreeMap::new();
     for row in rows {
