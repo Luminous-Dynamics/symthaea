@@ -362,7 +362,18 @@ fn validate_values(benchmark: Value, schema: Value) -> Result<ValidationSummary,
         ));
     }
 
+    let manifest_fields = benchmark
+        .get("case_fields")
+        .ok_or_else(|| "case_fields is missing".to_string())?;
+    let schema_fields = schema
+        .pointer("/properties/case_fields/const")
+        .ok_or_else(|| "schema case_fields const is missing".to_string())?;
+    if manifest_fields != schema_fields {
+        return Err("manifest case_fields registry does not match schema contract".into());
+    }
+
     let mut ids = BTreeSet::new();
+    let mut assertion_ids = BTreeSet::new();
     let mut families = BTreeSet::new();
     let mut risk_counts = BTreeMap::<String, usize>::new();
 
@@ -427,6 +438,33 @@ fn validate_values(benchmark: Value, schema: Value) -> Result<ValidationSummary,
             .ok_or_else(|| format!("{case_label}.intervention must be a string"))?;
         if intervention.trim().is_empty() {
             return Err(format!("{case_label}.intervention must not be empty"));
+        }
+
+        let assertions = case
+            .get("assertions")
+            .and_then(Value::as_array)
+            .ok_or_else(|| format!("{case_label}.assertions must be an array"))?;
+        let mut observation_keys = BTreeSet::new();
+        for (assertion_index, assertion) in assertions.iter().enumerate() {
+            let assertion_label = format!("{case_label}.assertions[{assertion_index}]");
+            let assertion_id = assertion
+                .get("assertion_id")
+                .and_then(Value::as_str)
+                .ok_or_else(|| format!("{assertion_label}.assertion_id must be a string"))?;
+            if !assertion_ids.insert(assertion_id.to_owned()) {
+                return Err(format!("duplicate assertion id: {assertion_id}"));
+            }
+            let observation_key = assertion
+                .get("observation_key")
+                .and_then(Value::as_str)
+                .ok_or_else(|| {
+                    format!("{assertion_label}.observation_key must be a string")
+                })?;
+            if !observation_keys.insert(observation_key.to_owned()) {
+                return Err(format!(
+                    "duplicate observation key {observation_key} in {case_label}"
+                ));
+            }
         }
     }
 
@@ -770,6 +808,31 @@ mod tests {
         )
         .unwrap_err();
         assert!(error.contains("duplicate run result"));
+    }
+
+    #[test]
+    fn duplicate_assertion_ids_are_rejected() {
+        let (mut benchmark, schema) = fixture_values();
+        let duplicate = benchmark["cases"][0]["assertions"][0]["assertion_id"].clone();
+        benchmark["cases"][1]["assertions"][0]["assertion_id"] = duplicate;
+        let error = validate_values(benchmark, schema).unwrap_err();
+        assert!(error.contains("duplicate assertion id"));
+    }
+
+    #[test]
+    fn duplicate_observation_keys_within_a_case_are_rejected() {
+        let (mut benchmark, schema) = fixture_values();
+        let duplicate = benchmark["cases"][0]["assertions"][0]["observation_key"].clone();
+        benchmark["cases"][0]["assertions"][1]["observation_key"] = duplicate;
+        let error = validate_values(benchmark, schema).unwrap_err();
+        assert!(error.contains("duplicate observation key"));
+    }
+
+    #[test]
+    fn manifest_case_field_registry_must_match_schema() {
+        let (mut benchmark, schema) = fixture_values();
+        benchmark["case_fields"].as_array_mut().unwrap().pop();
+        assert!(validate_values(benchmark, schema).is_err());
     }
 
     #[test]
