@@ -18,19 +18,21 @@ cargo run -p symthaea-nanotech-audit -- <run-directory>
 
 The scoring CLI independently reruns the NANO-013 contract audit and refuses to score if the bundle is absent or has findings. For a full MADE export, run the general auditor as well; its **artifact_integrity_pass** concerns artifact consistency only and is not a scientific-performance pass.
 
-The scorer reads **rescue-controller/audit-sampling-manifest.json** and **rescue-controller/blinded-audit-results.jsonl**. It independently rechecks the raw manifest digest, sample membership, sample/result cardinality, parent/trajectory/stratum identities, inclusion probabilities, reference status/label consistency, and policy-label blinding. It fails closed for malformed records, duplicate/missing sampled windows, mixed cost units, and digest mismatches.
+The scorer reads **rescue-controller/audit-sampling-manifest.json**, **rescue-controller/decision-ledger.jsonl**, and **rescue-controller/blinded-audit-results.jsonl**. It independently checks raw manifest digest, sample membership, sample/result cardinality, parent/trajectory/stratum identities, inclusion probabilities, reference status/label consistency, action-to-outcome reconciliation, policy revision, contiguous per-trajectory decision sequences, leakage flags, and policy-label blinding. It fails closed for malformed records, duplicate/missing sampled windows, mixed cost units, and digest mismatches.
 
 ## Estimators
 
 For sampled window \(i\), let \(\pi_i\) be its preregistered inclusion probability and \(w_i=1/\pi_i\). The scorer reports Horvitz–Thompson weighted totals and ratio estimates:
 
-- **Policy reference-query fraction:** \(\sum_i w_i q_i / \sum_i w_i\), including windows whose reference calculation subsequently failed. This measures policy query behavior, not whether a reference answer was obtained.
+- **Policy reference-query fraction:** \(\sum_i w_i q_i / \sum_i w_i\), including windows whose reference calculation subsequently failed. This measures expensive reference-query behavior, not whether a reference answer was obtained.
+- **Policy intervention fraction:** the weighted fraction with any action other than plain \(continue\). It includes conservative continuation, stop/abstain and reference requests, and therefore measures a different trade-off from query fraction.
 - **Reference-outcome coverage:** \(\sum_i w_i 1[\text{reference evaluated}] / \sum_i w_i\).
-- **Severe-event recall:** weighted severe events that triggered a reference query divided by weighted severe events, among successfully evaluated reference outcomes.
-- **False-alarm rate:** weighted reference queries on known non-severe outcomes divided by weighted known non-severe outcomes.
-- **Known-label false-alarm burden:** known false alarms divided by the weighted eligible-window population. If any sampled labels are missing, this is explicitly only a lower bound on the total false-alarm burden.
+- **Severe-event intervention recall:** weighted severe outcomes on which the policy took any non-continue action, divided by weighted severe outcomes with successful reference labels.
+- **Severe-event reference-query recall:** weighted severe outcomes on which the policy explicitly requested a reference, divided by weighted severe outcomes with successful reference labels. It is narrower than intervention recall.
+- **False-intervention rate and false-query rate:** separately measure interventions or reference requests among known non-severe outcomes.
+- **Known-label false-alarm burdens:** report both known non-severe interventions and known non-severe reference queries divided by the weighted eligible-window population. If any sampled labels are missing, these are lower bounds on the corresponding total burdens.
 - **Physical-integrity failure rate:** weighted known integrity failures divided by the weighted number of outcomes with a known integrity label.
-- **Cost accounting:** the report separates actual recorded audit reference cost from an inclusion-weighted extrapolation. The extrapolation is not a bill, a measured compute budget, or a deployment cost; reconcile costs with reference-provider and resource records.
+- **Cost accounting:** the report separates recorded operational policy cost, observed probability-sample reference cost, and an inclusion-weighted hypothetical full-frame reference-cost equivalent. That last extrapolation estimates what it would cost to reference-evaluate every eligible window at the sampled per-window costs; it is not the actual audit expenditure, a bill, or a measured compute budget. Policy and reference costs retain separate units and should not be added unless reconciled to a common basis.
 
 A failed or unavailable reference is never recoded as a negative event or a safe physical outcome. If any labels are missing, recall and integrity rates are labelled as conditional on successful references and the report emits a warning. Missingness may be informative, so the conditional rates cannot be promoted to population claims without an explicit missing-data strategy or recovered reference outcomes.
 
