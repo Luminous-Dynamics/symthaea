@@ -87,6 +87,7 @@ A successor can earn one of these bounded classifications:
 - `externally_fabricated_hardware_evidence`;
 - `no_system_level_acceleration_advantage`;
 - `projected_only`;
+- `reproducible_design_artifact_only`;
 - `unresolved`;
 - `reject_or_conditional_pareto_only`.
 
