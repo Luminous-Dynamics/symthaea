@@ -17,7 +17,7 @@ fn assert_close(label: &str, actual: f64, expected: f64, relative_tolerance: f64
         actual.is_finite(),
         "{label}: actual value must be finite, got {actual}"
     );
-    let allowed = expected.abs().max(1.0) * relative_tolerance;
+    let allowed = expected.abs().max(1.0e-15) * relative_tolerance + 1.0e-30;
     assert!(
         (actual - expected).abs() <= allowed,
         "{label}: expected {expected:.16e}, got {actual:.16e}, allowed error {allowed:.3e}"
