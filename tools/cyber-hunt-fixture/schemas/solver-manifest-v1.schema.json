@@ -7,10 +7,7 @@
   "required": [
     "schema_version",
     "generator_version",
-    "source_commit",
-    "source_commit_pinned",
     "synthetic_only",
-    "seed",
     "record_count",
     "event_file",
     "event_sha256",
@@ -25,19 +22,8 @@
     "generator_version": {
       "const": "cyber-hunt-fixture-v1"
     },
-    "source_commit": {
-      "type": "string",
-      "minLength": 1
-    },
-    "source_commit_pinned": {
-      "type": "boolean"
-    },
     "synthetic_only": {
       "const": true
-    },
-    "seed": {
-      "type": "integer",
-      "minimum": 0
     },
     "record_count": {
       "type": "integer",
