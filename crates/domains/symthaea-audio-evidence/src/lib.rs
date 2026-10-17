@@ -238,22 +238,53 @@ fn validate_analysis_and_results(manifest: &Value, results: Option<&Vec<Value>>)
 }
 
 fn validate_artifact_shapes(manifest: &Value) -> Result<(), String> {
-    let mut artifacts = Vec::new();
-    collect_artifacts(manifest, &mut artifacts);
-    for artifact in artifacts {
-        let path = string_member(artifact, "path", "artifact")?;
-        validate_relative_path(path)?;
-        let digest = string_member(artifact, "sha256", path)?;
-        if digest.len() != 64 || !digest.bytes().all(|byte| byte.is_ascii_hexdigit()) {
-            return Err(format!("artifact {path:?} has malformed SHA-256 digest"));
-        }
-        if string_member(artifact, "media_type", path)?.trim().is_empty() {
-            return Err(format!("artifact {path:?} media_type must be non-empty"));
-        }
-        if let Some(size) = artifact.get("size_bytes") {
-            if size.as_u64().is_none() {
-                return Err(format!("artifact {path:?} size_bytes must be an unsigned integer"));
+    validate_artifact_references(manifest, "manifest")
+}
+
+fn validate_artifact_references(value: &Value, label: &str) -> Result<(), String> {
+    match value {
+        Value::Object(object) => {
+            for (key, child) in object {
+                let child_label = format!("{label}/{key}");
+                if key == "artifact" {
+                    validate_artifact_object(child, &child_label)?;
+                }
+                if key.ends_with("_artifacts") {
+                    let items = child.as_array().ok_or_else(|| {
+                        format!("{child_label} must be an array of artifact records")
+                    })?;
+                    for (index, item) in items.iter().enumerate() {
+                        validate_artifact_object(item, &format!("{child_label}/{index}"))?;
+                    }
+                }
+                validate_artifact_references(child, &child_label)?;
             }
+        }
+        Value::Array(items) => {
+            for (index, child) in items.iter().enumerate() {
+                validate_artifact_references(child, &format!("{label}/{index}"))?;
+            }
+        }
+        _ => {}
+    }
+    Ok(())
+}
+
+fn validate_artifact_object(value: &Value, label: &str) -> Result<(), String> {
+    let artifact = value.as_object().ok_or_else(|| format!("{label} must be an object"))?;
+    require_fields(artifact, label, &["path", "sha256", "media_type"])?;
+    let path = string_member(artifact, "path", label)?;
+    validate_relative_path(path).map_err(|error| format!("{label}: {error}"))?;
+    let digest = string_member(artifact, "sha256", path)?;
+    if digest.len() != 64 || !digest.bytes().all(|byte| byte.is_ascii_hexdigit()) {
+        return Err(format!("artifact {path:?} has malformed SHA-256 digest"));
+    }
+    if string_member(artifact, "media_type", path)?.trim().is_empty() {
+        return Err(format!("artifact {path:?} media_type must be non-empty"));
+    }
+    if let Some(size) = artifact.get("size_bytes") {
+        if size.as_u64().is_none() {
+            return Err(format!("artifact {path:?} size_bytes must be an unsigned integer"));
         }
     }
     Ok(())
@@ -435,6 +466,24 @@ mod tests {
         let mut manifest = started_manifest(b"test bytes");
         manifest["captures"][0]["artifact"]["path"] = json!("../escape.wav");
         assert!(validate_manifest(&manifest).expect_err("parent traversal must fail").contains("unsafe path component"));
+    }
+
+    #[test]
+    fn rejects_capture_artifact_that_is_not_an_object() {
+        let mut manifest = started_manifest(b"test bytes");
+        manifest["captures"][0]["artifact"] = json!("not an artifact object");
+        assert!(validate_manifest(&manifest)
+            .expect_err("capture artifact must be an object")
+            .contains("must be an object"));
+    }
+
+    #[test]
+    fn rejects_artifact_missing_digest() {
+        let mut manifest = started_manifest(b"test bytes");
+        manifest["captures"][0]["artifact"].as_object_mut().expect("artifact object").remove("sha256");
+        assert!(validate_manifest(&manifest)
+            .expect_err("digest is mandatory")
+            .contains("missing required field"));
     }
 
     #[test]
