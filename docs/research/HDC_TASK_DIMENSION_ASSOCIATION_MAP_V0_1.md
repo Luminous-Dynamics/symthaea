@@ -132,3 +132,8 @@ It uses a deterministic synthetic corpus of 512 eight-property records, 64 parti
 This is a first scaffold, **not an executed benchmark and not an adaptive confidence-threshold implementation**. The full-width vectors remain resident, so it measures coordinate-evaluation savings only; it does not claim persistent memory savings. Still needed: multi-seed aggregation and confidence intervals, correlated/nearly-duplicate distractors, query corruption, separate calibration/test corpora, and exact-head Rust formatting/compile/run receipts. A low-width shortlist is useful only if the right candidates survive.
 
 The paired-width invariant is protected by a runtime guard: for a shared item seed, 1K coordinates must exactly equal the first 1K of the 4K vector, and 4K must exactly equal the first 4K of the 16K vector. The capacity harness uses the same dimension-independent seed derivation so its dimension curves are paired.
+
+
+### Cross-representation score-scale correction
+
+Static audit found that BinaryHV bundle retrieval was using `similarity()` (Hamming agreement in ([0,1])) while ContinuousHV and the binary negative controls used bipolar cosine in ([-1,1]). The binary target/distractor scores and margins now use `cosine_similarity()` too. This makes the **score scale** comparable across the binary and bipolar-f32 arms; it does not make their storage, bundling noise, or algebra identical. The source has been read back after this correction, but remains uncompiled/unrun.
