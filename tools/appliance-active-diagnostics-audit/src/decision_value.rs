@@ -687,7 +687,7 @@ fn audit_values(
     }))
 }
 
-fn audit_decision_texts(
+pub(super) fn audit_decision_texts(
     base_schema_raw: &str,
     base_corpus_raw: &str,
     decision_schema_raw: &str,
