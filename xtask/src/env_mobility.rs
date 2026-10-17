@@ -206,7 +206,7 @@ fn require_disposition(value: &str, allowed: &[String], context: &str) -> Result
 fn validate_reason_codes(value: &Value, context: &str) -> Result<Vec<String>> {
     let items = array_at(value, "expected_reason_codes", context)?;
     ensure!(!items.is_empty(), "{context}: expected_reason_codes must not be empty");
-    items
+    let reasons: Vec<String> = items
         .iter()
         .enumerate()
         .map(|(index, item)| {
@@ -214,7 +214,13 @@ fn validate_reason_codes(value: &Value, context: &str) -> Result<Vec<String>> {
                 .map(str::to_owned)
                 .with_context(|| format!("{context}: reason code at index {index} must be a string"))
         })
-        .collect()
+        .collect::<Result<_>>()?;
+    let mut seen = HashSet::with_capacity(reasons.len());
+    ensure!(
+        reasons.iter().all(|reason| seen.insert(reason.clone())),
+        "{context}: duplicate expected reason codes"
+    );
+    Ok(reasons)
 }
 
 fn derive_feasibility(facts: &Value, context: &str) -> Result<Decision> {
@@ -490,6 +496,26 @@ fn load_and_qualify(
         string_at(&parsed, "status", &context)? == "synthetic_frozen_candidate",
         "{context}: this verifier accepts only the frozen synthetic-candidate status"
     );
+    for key in ["corpus_id", "generated_on", "source_class", "claim_ceiling"] {
+        let field = string_at(&parsed, key, &context)?;
+        ensure!(!field.trim().is_empty(), "{context}: metadata field {key:?} must not be empty");
+    }
+    let rules_key = if corpus_kind == "feasibility" { "oracle_rule_order" } else { "rule_order" };
+    let rules = array_at(&parsed, rules_key, &context)?;
+    ensure!(!rules.is_empty(), "{context}: decision rule list must not be empty");
+    for (index, rule) in rules.iter().enumerate() {
+        ensure!(
+            rule.as_str().is_some_and(|text| !text.trim().is_empty()),
+            "{context}: rule {index} must be a non-empty string"
+        );
+    }
+    if corpus_kind == "feasibility" {
+        let binding = string_at(&parsed, "implementation_binding", &context)?;
+        ensure!(!binding.trim().is_empty(), "{context}: implementation_binding must not be empty");
+    } else {
+        let requirement = string_at(&parsed, "independent_verifier_requirement", &context)?;
+        ensure!(!requirement.trim().is_empty(), "{context}: independent_verifier_requirement must not be empty");
+    }
 
     let vocabulary: Vec<String> = array_at(&parsed, "disposition_vocabulary", &context)?
         .iter()
@@ -501,6 +527,11 @@ fn load_and_qualify(
         })
         .collect::<Result<_>>()?;
     ensure!(!vocabulary.is_empty(), "{context}: empty disposition vocabulary");
+    let mut vocabulary_ids = HashSet::with_capacity(vocabulary.len());
+    ensure!(
+        vocabulary.iter().all(|item| vocabulary_ids.insert(item.clone())),
+        "{context}: duplicate disposition vocabulary entries"
+    );
 
     if corpus_kind == "feasibility" {
         ensure!(
@@ -531,6 +562,17 @@ fn load_and_qualify(
         let case_id = string_at(case, "case_id", &case_context)?.to_owned();
         ensure!(!case_id.trim().is_empty(), "{case_context}: empty case_id");
         ensure!(ids.insert(case_id.clone()), "{case_context}: duplicate case_id {case_id:?}");
+        let scenario = string_at(case, "scenario", &case_context)?;
+        ensure!(!scenario.trim().is_empty(), "{case_context}: scenario must not be empty");
+        if corpus_kind == "feasibility" {
+            for key in ["mission_family", "platform_family"] {
+                let value = string_at(case, key, &case_context)?;
+                ensure!(!value.trim().is_empty(), "{case_context}: field {key:?} must not be empty");
+            }
+        } else {
+            let value = string_at(case, "component_family", &case_context)?;
+            ensure!(!value.trim().is_empty(), "{case_context}: component_family must not be empty");
+        }
         let facts = case.get("facts").context("case facts missing")?;
 
         let decision = if corpus_kind == "feasibility" {
