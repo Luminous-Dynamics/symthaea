@@ -1294,6 +1294,73 @@ mod tests {
     }
 
     #[test]
+    fn cpdag_metrics_do_not_penalize_unidentifiable_chain_directions() {
+        let catalogue = all_dags();
+        let chain_forward = CausalDag {
+            edge_mask: edge_mask_with(&[(0, 1), (1, 2)]),
+        };
+        let chain_reverse = CausalDag {
+            edge_mask: edge_mask_with(&[(1, 0), (2, 1)]),
+        };
+        let collider = CausalDag {
+            edge_mask: edge_mask_with(&[(0, 1), (2, 1)]),
+        };
+        assert!(markov_equivalent(chain_forward, chain_reverse));
+        assert!(!markov_equivalent(chain_forward, collider));
+
+        let chain_marks = cpdag_marks(chain_forward, &catalogue);
+        assert_eq!(
+            chain_marks,
+            vec![EdgeMark::Undirected, EdgeMark::Absent, EdgeMark::Undirected]
+        );
+        let collider_marks = cpdag_marks(collider, &catalogue);
+        assert_eq!(
+            collider_marks,
+            vec![EdgeMark::Forward, EdgeMark::Absent, EdgeMark::Reverse]
+        );
+
+        let (skeleton, compelled, distance, same_class) =
+            cpdag_metrics(&chain_marks, &cpdag_marks(chain_reverse, &catalogue));
+        assert_eq!(skeleton, 1.0);
+        assert_eq!(compelled, 1.0);
+        assert_eq!(distance, 0.0);
+        assert!(same_class);
+
+        let (skeleton, compelled, distance, same_class) =
+            cpdag_metrics(&chain_marks, &collider_marks);
+        assert_eq!(skeleton, 1.0);
+        assert_eq!(compelled, 0.0);
+        assert_eq!(distance, 2.0);
+        assert!(!same_class);
+    }
+
+    #[test]
+    fn posterior_cpdag_sums_probability_over_markov_equivalent_dags() {
+        let catalogue = all_dags();
+        let chain_forward = CausalDag {
+            edge_mask: edge_mask_with(&[(0, 1), (1, 2)]),
+        };
+        let chain_reverse = CausalDag {
+            edge_mask: edge_mask_with(&[(1, 0), (2, 1)]),
+        };
+        let mut posterior = uniform_priors(&catalogue);
+        let forward_index = catalogue.iter().position(|graph| *graph == chain_forward).unwrap();
+        let reverse_index = catalogue.iter().position(|graph| *graph == chain_reverse).unwrap();
+        posterior[forward_index].probability = 0.3;
+        posterior[reverse_index].probability = 0.3;
+        let remainder = (1.0 - 0.6) / (catalogue.len() - 2) as f64;
+        for (index, hypothesis) in posterior.iter_mut().enumerate() {
+            if index != forward_index && index != reverse_index {
+                hypothesis.probability = remainder;
+            }
+        }
+        let (marks, class_mass) = posterior_cpdag(&posterior, &catalogue);
+        assert_eq!(marks, cpdag_marks(chain_forward, &catalogue));
+        assert!((class_mass - (0.6 + 1.0 / 23.0 * 3.0)).abs() > 0.0);
+        assert!(class_mass >= 0.6);
+    }
+
+    #[test]
     fn worlds_replay_for_a_seed_and_cover_held_out_families() {
         let first = generate_worlds(44);
         let replay = generate_worlds(44);
@@ -1347,6 +1414,11 @@ mod tests {
         for row in &report.worlds {
             assert!((0.0..=1.0).contains(&row.mean_skeleton_f1));
             assert!((0.0..=1.0).contains(&row.mean_directed_edge_f1));
+            assert!((0.0..=1.0).contains(&row.mean_cpdag_skeleton_f1));
+            assert!((0.0..=1.0).contains(&row.mean_compelled_direction_f1));
+            assert!((0.0..=3.0).contains(&row.mean_cpdag_mark_distance));
+            assert!((0.0..=1.0).contains(&row.markov_equivalence_class_recovery_rate));
+            assert!((0.0..=1.0).contains(&row.mean_posterior_mass_on_true_markov_class));
             assert!((0.0..=3.0).contains(&row.mean_structural_hamming_distance));
             assert!((0.0..=1.0).contains(&row.graph_claim_coverage));
             assert!((0.0..=1.0).contains(&row.false_graph_claim_rate_all_trials));
@@ -1357,6 +1429,10 @@ mod tests {
         for aggregate in &report.held_out_policy_aggregates {
             assert_eq!(aggregate.held_out_worlds, 20);
             assert!((0.0..=1.0).contains(&aggregate.mean_held_out_directed_edge_f1));
+            assert!((0.0..=1.0).contains(&aggregate.mean_held_out_cpdag_skeleton_f1));
+            assert!((0.0..=1.0).contains(&aggregate.mean_held_out_compelled_direction_f1));
+            assert!((0.0..=3.0).contains(&aggregate.mean_held_out_cpdag_mark_distance));
+            assert!((0.0..=1.0).contains(&aggregate.held_out_markov_equivalence_class_recovery_rate));
             assert!((0.0..=3.0).contains(&aggregate.mean_held_out_shd));
             assert!((0.0..=1.0).contains(&aggregate.mean_held_out_claim_coverage));
         }
