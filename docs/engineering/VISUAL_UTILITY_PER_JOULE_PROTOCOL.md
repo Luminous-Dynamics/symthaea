@@ -136,3 +136,6 @@ Use existing standards as the measurement floor rather than inventing incompatib
 
 Record the standard edition, test configuration, deviations and instrument uncertainty. Do not describe a task-conditioned research result as IEC/IEEE conformity or certification unless the full applicable process was followed.
 
+## Pattern context and conservative uncertainty
+
+The new [DISPLAY_PATTERN_ROBUSTNESS_AND_UNCERTAINTY.md](DISPLAY_PATTERN_ROBUSTNESS_AND_UNCERTAINTY.md) specifies the pattern/context contract, existing corpus ID mapping and conservative interval rule. The isolated `tools/visual-energy-reference` now implements `conservative_energy_saving_interval_percent`, which returns typed lower/upper percentage-saving bounds from baseline and treatment energy intervals. Malformed or non-finite intervals fail closed, and the baseline lower bound must be strictly positive. An interval crossing below the registered energy-saving threshold is inconclusive for that gate; it is not a pass. This interval is not a statistical confidence interval, and the implementation makes no independence assumption.
