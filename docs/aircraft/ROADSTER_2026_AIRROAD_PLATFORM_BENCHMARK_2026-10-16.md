@@ -26,6 +26,10 @@ Reuters reported that the revealed vehicle drove upside down on a ramp using a s
 
 TechCrunch's event reporting distinguishes three configurations: Performance (road-ready), Thrust (two seats and rear cold-gas thrusters), and Rocket (single-seat, with ten thrusters). It reports a 600-liter compressed-gas tank for the aerial manoeuvre system. Other coverage is inconsistent about the exact gas description and details of the operating cycle, so those specifics should remain provisional until Tesla releases a controlled technical specification. The demonstration itself was reported as autonomous for safety.
 
+**Official-page mismatch, checked 2026-10-17:** Tesla's public Roadster landing page still displays the older headline figures of 1.9 s to 60 mph, more than 250 mph top speed, 620 miles of range, and seating for four. These do not match the October 2026 media-reported reveal values/configurations above. Treat the public page as an unsynchronized or legacy specification until Tesla publishes a configuration-controlled technical data sheet; do not merge the two lists into one authoritative spec. The Roadster page is here: https://www.tesla.com/roadster. The public page's old values are not silently substituted for the newly reported trims.
+
+The event reporting also describes reservation deposits (reported as $50,000 for Performance and $250,000 for Thrust, with Rocket invitation-only), but a deposit is not the final vehicle price or evidence of delivery. The Rocket version is reported as not approved for public-road use. These statements are attributable to current reporting, not an independent homologation check. See [TechCrunch](https://techcrunch.com/2026/10/15/tesla-reveals-spacex-powered-roadster-that-flies-and-falls-with-style/), [The Verge](https://www.theverge.com/transportation/1012783/tesla-roadster-flying-stunt-production-reality-musk), and [Reuters](https://www.reuters.com/business/autos-transportation/tesla-set-unveil-next-generation-roadster-sports-ev-after-years-delay-2026-10-15/).
+
 The Associated Press reports cold-gas thrusters and a multi-mode suction system, notes regulatory hurdles, and reports production expectation as 2028. These details sharpen the comparison: the most dramatic Rocket configuration sacrifices passenger capacity and appears to target short, controlled stunts rather than a published, repeatable point-to-point flight mission. This is an engineering distinction, not a claim that the demonstration was fake or that the hardware could never be developed further. It does **not** by itself establish:
 - sustained, repeatable, controlled flight across a useful route;
 - payload and reserve capability under a defined mission profile;
@@ -38,6 +42,8 @@ Sources:
 - Reuters, 2026-10-15: https://www.reuters.com/business/autos-transportation/tesla-set-unveil-next-generation-roadster-sports-ev-after-years-delay-2026-10-15/
 - Associated Press, 2026-10-16: https://apnews.com/article/tesla-musk-roadster-rocket-7d5f19665435b7408025bfb7a2f2f0b7
 - TechCrunch, 2026-10-15: https://techcrunch.com/2026/10/15/tesla-reveals-spacex-powered-roadster-that-flies-and-falls-with-style/
+- Tesla public Roadster page, checked 2026-10-17 (still shows legacy headline specification): https://www.tesla.com/roadster
+- The Verge, 2026-10-16 (configuration/road-use reporting): https://www.theverge.com/transportation/1012783/tesla-roadster-flying-stunt-production-reality-musk
 
 ### Modular air–road competition
 
