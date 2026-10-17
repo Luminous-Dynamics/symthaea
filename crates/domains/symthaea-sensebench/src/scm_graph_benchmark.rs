@@ -1376,8 +1376,10 @@ fn aggregate_held_out(
             mean_held_out_false_cpdag_claim_rate_all_trials: mean(&cpdag_false_claims),
             mean_held_out_shd: mean(&shd),
             held_out_shd_topology_instance_ci95: mean_ci95(&shd, 0.0, (NODE_COUNT * (NODE_COUNT - 1) / 2) as f64),
-            worst_world_directed_edge_f1: directed.iter().copied().fold(1.0, f64::min),
-            worst_world_shd: shd.iter().copied().fold(0.0, f64::max),
+            worst_world_directed_edge_f1: rows.iter()
+                .map(|row| row.mean_directed_edge_f1).fold(1.0, f64::min),
+            worst_world_shd: rows.iter()
+                .map(|row| row.mean_structural_hamming_distance).fold(0.0, f64::max),
             mean_held_out_exact_graph_recovery_rate: mean(&exact),
             mean_held_out_claim_coverage: mean(&coverage),
             mean_held_out_false_graph_claim_rate_all_trials: mean(&false_claims),
@@ -1673,9 +1675,9 @@ mod tests {
                 .filter(|world| world.family == family)
                 .collect();
             assert_eq!(
-            family_worlds.len(),
-            WORLD_VARIANTS_PER_FAMILY * ScmMechanismRegime::all().len()
-        );
+                family_worlds.len(),
+                WORLD_VARIANTS_PER_FAMILY * ScmMechanismRegime::all().len()
+            );
             for graph_variant_index in 0..WORLD_VARIANTS_PER_FAMILY {
                 let paired: Vec<&ScmWorld> = family_worlds.iter()
                     .copied()
@@ -1751,6 +1753,33 @@ mod tests {
             a.factorized_shift_aggregates.len(),
             ScmGraphPolicy::all().len() * ScmGraphShiftSplit::all().len()
         );
+    }
+
+    #[test]
+    fn factorized_shift_splits_have_expected_world_and_topology_counts() {
+        let report = run_scm_graph_benchmark(3, 3, 2026, 0.90).unwrap();
+        for policy in ScmGraphPolicy::all() {
+            let find = |split| report.factorized_shift_aggregates.iter()
+                .find(|row| row.policy == policy && row.split == split).unwrap();
+            let any = find(ScmGraphShiftSplit::AnyHeldOut);
+            let topology = find(ScmGraphShiftSplit::TopologyShiftOnly);
+            let mechanism = find(ScmGraphShiftSplit::MechanismShiftOnly);
+            let joint = find(ScmGraphShiftSplit::JointShift);
+
+            assert_eq!((any.world_rows, any.topology_instances), (96, 28));
+            assert_eq!((topology.world_rows, topology.topology_instances), (40, 20));
+            assert_eq!((mechanism.world_rows, mechanism.topology_instances), (16, 8));
+            assert_eq!((joint.world_rows, joint.topology_instances), (40, 20));
+            assert_eq!(
+                topology.world_rows + mechanism.world_rows + joint.world_rows,
+                any.world_rows,
+                "the three factorized held-out partitions should be disjoint and exhaustive"
+            );
+            for split in [any, topology, mechanism, joint] {
+                assert!((0.0..=1.0).contains(&split.mean_directed_edge_f1));
+                assert!((0.0..=3.0).contains(&split.mean_structural_hamming_distance));
+            }
+        }
     }
 
     #[test]
