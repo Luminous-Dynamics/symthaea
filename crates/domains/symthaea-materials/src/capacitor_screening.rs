@@ -238,6 +238,16 @@ pub enum CapacitorConstraintViolation {
 pub struct CapacitorScreeningReport {
     /// Stable candidate/material identifier.
     pub candidate_id: String,
+    /// Exact dielectric-property record used for screening, including provenance and conditions.
+    pub material_record: DielectricPropertyRecord,
+    /// Exact idealized layer geometry used in calculations.
+    pub geometry: CapacitorGeometry,
+    /// Exact application requirements used to make the disposition.
+    pub requirements: CapacitorScreeningRequirements,
+    /// Peak terminal voltage used in the calculation, in volts.
+    pub peak_voltage_v: f64,
+    /// AC RMS voltage used for the sinusoidal dielectric-loss estimate, in volts.
+    pub ac_rms_voltage_v: f64,
     /// Result category, carefully scoped to the idealized model.
     pub disposition: CapacitorScreeningDisposition,
     /// Reasons the candidate was not evaluable. Empty unless disposition is NotEvaluable.
@@ -302,6 +312,11 @@ pub fn screen_capacitor_candidate(
             DielectricValidationError::InvalidAcRmsVoltage,
         ));
     }
+    if requirements.operating_frequency_hz == 0.0 && ac_rms_voltage_v > 0.0 {
+        return Err(CapacitorScreeningError::InvalidInput(
+            DielectricValidationError::AcLossRequiresPositiveCharacterizationFrequency,
+        ));
+    }
 
     let mut limitations = Vec::new();
 
@@ -324,6 +339,11 @@ pub fn screen_capacitor_candidate(
     }
 
     let operating_field = peak_voltage_v / geometry.dielectric_thickness_m;
+    if !operating_field.is_finite() {
+        return Err(CapacitorScreeningError::InvalidInput(
+            DielectricValidationError::NonFiniteCalculatedMetric,
+        ));
+    }
     if operating_field > 0.0 {
         match material.test_field_v_per_m {
             None => limitations.push(ScreeningLimitation::MissingFieldCharacterization),
@@ -410,6 +430,11 @@ pub fn screen_capacitor_candidate(
     if !limitations.is_empty() {
         return Ok(CapacitorScreeningReport {
             candidate_id: material.material_id.clone(),
+            material_record: material.clone(),
+            geometry: *geometry,
+            requirements: requirements.clone(),
+            peak_voltage_v,
+            ac_rms_voltage_v,
             disposition: CapacitorScreeningDisposition::NotEvaluable,
             limitations,
             violations: Vec::new(),
@@ -460,6 +485,11 @@ pub fn screen_capacitor_candidate(
 
     Ok(CapacitorScreeningReport {
         candidate_id: material.material_id.clone(),
+        material_record: material.clone(),
+        geometry: *geometry,
+        requirements: requirements.clone(),
+        peak_voltage_v,
+        ac_rms_voltage_v,
         disposition,
         limitations: Vec::new(),
         violations,
