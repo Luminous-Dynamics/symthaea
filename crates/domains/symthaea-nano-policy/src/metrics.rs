@@ -1229,6 +1229,56 @@ mod tests {
     }
 
     #[test]
+    fn reports_per_group_curves_and_worst_group_regression() {
+        let mut ledger = fixture();
+        for arm in &mut ledger.arms {
+            for target in &mut arm.target_queries {
+                target.group_id = match target.target_query_id.as_str() {
+                    "t1" | "t2" | "t3" => "strong_group".to_string(),
+                    _ => "weak_group".to_string(),
+                };
+            }
+        }
+
+        let report = evaluate_fixture(&ledger);
+        let baseline = report
+            .arms
+            .iter()
+            .find(|arm| arm.arm_id == "baseline")
+            .expect("baseline arm");
+        let candidate = report
+            .arms
+            .iter()
+            .find(|arm| arm.arm_id == "candidate")
+            .expect("candidate arm");
+
+        assert_eq!(candidate.group_metrics.len(), 2);
+        let weak_group = candidate
+            .group_metrics
+            .iter()
+            .find(|group| group.group_id == "weak_group")
+            .expect("weak group metrics");
+        assert_eq!(weak_group.target_query_count, 2);
+        assert_eq!(weak_group.successful_target_queries, 0);
+        assert_eq!(weak_group.success_rate_at_budget, 0.0);
+        assert_eq!(weak_group.success_curve.len(), ledger.query_budget);
+        assert_eq!(candidate.worst_group_success_rate_at_budget, 0.0);
+        assert!(baseline.worst_group_success_rate_at_budget > 0.0);
+        assert!(
+            candidate.worst_group_success_rate_at_budget
+                < baseline.worst_group_success_rate_at_budget
+        );
+        assert_eq!(
+            candidate.worst_group_success_rate_at_budget,
+            candidate
+                .group_metrics
+                .iter()
+                .map(|group| group.success_rate_at_budget)
+                .fold(f64::INFINITY, f64::min)
+        );
+    }
+
+    #[test]
     fn computes_normalized_success_auc_from_full_budget_curve() {
         let report = evaluate_fixture(&fixture());
         let baseline = report.arms.iter().find(|arm| arm.arm_id == "baseline").unwrap();
