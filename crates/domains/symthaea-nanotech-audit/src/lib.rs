@@ -18,6 +18,8 @@ use std::path::{Component, Path, PathBuf};
 
 mod rescue_contract;
 
+pub mod rare_event_bounds;
+
 const ABS_TOLERANCE: f64 = 1.0e-10;
 const REL_TOLERANCE: f64 = 1.0e-9;
 
