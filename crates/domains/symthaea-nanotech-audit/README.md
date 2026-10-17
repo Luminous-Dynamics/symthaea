@@ -47,11 +47,12 @@ Required artifact paths include `.hydra/config.yaml`, `source-manifest.json`, `t
 
 The accounting identities are reconstructed from the JSONL ledger and cross-checked against the manifest:
 ```
-requests_total = setup_requests + proposal_requests + retry_requests
+setup_requests + proposal_requests + retry_requests
+  = external_calls + cache_hits + local_rejections
+
 external_calls = count(records where external_invocation = true)
 cache_hits = count(records where cache_hit = true)
 local_rejections = count(proposal records with status = invalid_candidate)
-requests_total = external_calls + cache_hits + local_rejections
 failed_external_calls = count(external calls whose status is not evaluated)
 proposal_requests = count(stage = proposal) = sum(episode final/queries_used)
 total_cost = sum(per-record cost)
