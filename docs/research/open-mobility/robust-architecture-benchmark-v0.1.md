@@ -14,7 +14,10 @@ The objective is not to replace trade-offs with a probability-flavoured winner. 
 
 - **Robust dominance:** candidate A is no worse than candidate B across the full declared uncertainty envelope for every required objective, and is strictly better on at least one.
 - **Possible dominance:** a relationship could hold for at least one assignment within the declared independent intervals. This is a logical possibility, not a likelihood.
-- **Unresolved comparison:** neither candidate robustly dominates the other. Keep both in the conservative frontier unless a user-defined constraint or further evidence resolves the trade-off.
+- **Unresolved comparison:** neither candidate robustly dominates the other. This alone does not mean the intervals need more measurement.
+- **Definite trade-off:** at least one dimension robustly favors A and another robustly favors B. More precision alone cannot create a universal winner; an explicit user/task preference or hard constraint is needed.
+- **Evidence-sensitive comparison:** neither direction robustly dominates, no definite opposing-dimension trade-off is established, and at least one dominance direction remains logically possible inside the intervals. Additional measurement may change the dominance conclusion, but is not guaranteed to do so.
+- **Unseparated dimensions:** dimensions where neither candidate is definitely better throughout its interval. They are potential measurement targets, not promises that a test will change a decision.
 
 Research motivating the change:
 
@@ -58,6 +61,7 @@ label alone. These declarations still are not authenticated evidence.
 - Invalid inputs reject the comparison; the evaluator does not impute missing values or silently narrow an interval.
 - Evidence level is copied exactly and never promoted.
 - Output preserves caller candidate order and uses a canonical metric order for byte-stable replay.
+- Pairwise receipts distinguish `definite_tradeoff`, `additional_evidence_may_change_dominance`, and broad `unresolved` status; consumers must not treat these as synonyms.
 - Reports remain separate from actuator authority and cannot establish a physical safety case.
 
 The mass-envelope checks are necessary screens, not proof of joint physical consistency. The intervals are treated as independent, and cross-metric correlations are not estimated. A production metrology protocol must explicitly model dependencies if it intends to make stronger claims.
@@ -77,7 +81,7 @@ These are engineering targets for the **software and evidence pipeline**, not cl
 | Determinism | Identical request and schema produce byte-identical JSON across 100 replay iterations | Non-determinism breaks reproducible receipts |
 | Claim ceiling | 0 paths that turn synthetic intervals into physical, clinical, regulatory or safety claims | Any claim promotion is a release blocker |
 
-The draft now authors 11 unit tests, including context-binding and tether-integrity negative controls, plus fixture replay and one-dimension interval-widening checks. The 10,000-case sweep and exhaustive dimension mutation remain **future gates**, not tests claimed to have run or already passed.
+The draft now authors 11 unit tests, including context-binding and tether-integrity negative controls, explicit separation of trade-offs from potentially decision-changing interval overlap, plus fixture replay and one-dimension interval-widening checks. The 10,000-case sweep and exhaustive dimension mutation remain **future gates**, not tests claimed to have run or already passed.
 
 ## 4. Physical-data readiness targets
 
