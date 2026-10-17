@@ -247,7 +247,44 @@ Useful work can proceed without waiting for Actions, but no unavailable executio
 
 No dataset bytes, model weights, raw trajectories, or external solver outputs are included in this protocol. No model was trained, no trajectory was run, and no scientific performance gain is claimed.
 
-## 8. Decision record template
+
+
+## 9. Distribution shift is a first-class test dimension
+
+**Tracking:** [NANO-012 — worst-group trajectory reliability](https://github.com/Luminous-Dynamics/symthaea/issues/7762).
+
+A random held-out frame split can measure interpolation while hiding failures on a new chemical family, surface, temperature regime or defect class. Test distribution shift explicitly and keep each axis distinct from static error and nominal trajectory survival.
+
+Recent research directly motivates this design: Kreiman & Krishnapriyan analyze distribution shifts for universal ML interatomic potentials (*Digital Discovery*, 2026, https://doi.org/10.1039/D5DD00260E); Tahmasbi et al. benchmark generalization on elemental systems (*npj Computational Materials*, 28 July 2026, https://www.nature.com/articles/s41524-026-02251-2); and a 2026 multicomponent-alloy study compares transferability, finite-temperature robustness and uncertainty behavior (https://doi.org/10.1103/1qc9-ypyb). These support the benchmark questions, not any claim that Symthaea currently passes them.
+
+### Frozen axes
+
+Select physically meaningful axes only after the system/reference data are admitted:
+- chemistry/composition family;
+- surface/facet/coordination and defects;
+- temperature or energy regime;
+- strain/pressure and structural phase;
+- size, interface, passivation or substrate;
+- compounded shift, such as an unseen chemistry plus surface class and temperature.
+
+For each test, freeze a shift manifest with a short physical rationale, exact severity definition, source/reference hashes, group IDs, split membership hash, and split policy. Separate train, calibration/validation and untouched test lockbox. An independence key (such as material family, parent structure, substrate, wafer or trajectory origin) must never occur across different splits. Repeated measurements and replicas stay grouped. A new test split cannot share near-duplicate parent structures with training merely because frame IDs differ.
+
+### Required reporting
+
+For each shift family and severity, report static energy/force/stress error distributions; trajectory survival and structural fidelity at declared horizons; empirical coverage and interval width; selective risk/abstention; severe-error recall at fixed acquisition rates; false alarms and warning lead time; and reference cost to reach a fixed reliability target. Show worst-group results and curves against both shift severity and total budget. A pooled mean alone is not an acceptance result.
+
+### Proposed acceptance targets (not results)
+
+- Nominal 90% intervals target 85–95% empirical coverage on independent groups, with interval width and worst-group coverage shown.
+- Severe-error triage targets at least 90% recall while reviewing/querying at most 20% of windows; publish false-alarm rate and warning lead time.
+- Active adaptation targets at least 20% lower actual reference cost to reach a preregistered trajectory-reliability threshold than the strongest eligible non-adaptive comparator, without increasing physical constraint violations.
+- Replicate the finding on at least one separate held-out material/system family before making cross-system generalization claims. Power the group/replicate count for the preregistered effect rather than choosing a sample count after seeing results.
+
+### Mandatory negative controls
+
+The auditor/evaluator must reject: a single independence key shared between train and test; sample IDs duplicated across splits; missing or malformed source/shift digests; shift-severity labels shuffled after outcomes are viewed; and a policy that improves pooled metrics but materially degrades the predeclared worst group. Keep the official benchmark metrics intact; report shift metrics as separately named extensions.
+
+## 10. Decision record template
 
 Each run review should end with a durable decision:
 
