@@ -627,6 +627,22 @@ fn expected_criticality_for_component(family: &str) -> Option<&'static str> {
     }
 }
 
+fn validate_mission_platform(family: &str, platform: &str, context: &str) -> Result<()> {
+    ensure!(
+        expected_platform_for_mission(family) == Some(platform),
+        "{context}: mission/platform family pair is not supported"
+    );
+    Ok(())
+}
+
+fn validate_component_criticality(family: &str, criticality: &str, context: &str) -> Result<()> {
+    ensure!(
+        expected_criticality_for_component(family) == Some(criticality),
+        "{context}: component/criticality pair is not supported"
+    );
+    Ok(())
+}
+
 fn load_and_qualify(
     root: &Path,
     relative_path: &str,
@@ -736,18 +752,12 @@ fn load_and_qualify(
         if corpus_kind == "feasibility" {
             let mission_family = string_at(case, "mission_family", &case_context)?;
             let platform_family = string_at(case, "platform_family", &case_context)?;
-            ensure!(
-                expected_platform_for_mission(mission_family) == Some(platform_family),
-                "{case_context}: mission/platform family pair is not supported"
-            );
+            validate_mission_platform(mission_family, platform_family, &case_context)?;
             add_count(&mut family_counts, mission_family);
         } else {
             let component_family = string_at(case, "component_family", &case_context)?;
             let criticality = string_at(case, "criticality_profile", &case_context)?;
-            ensure!(
-                expected_criticality_for_component(component_family) == Some(criticality),
-                "{case_context}: component/criticality pair is not supported"
-            );
+            validate_component_criticality(component_family, criticality, &case_context)?;
             add_count(&mut family_counts, component_family);
         }
         let facts = case.get("facts").context("case facts missing")?;
@@ -908,14 +918,23 @@ mod tests {
 
     #[test]
     fn family_mappings_reject_cross_domain_relabeling() {
-        assert_eq!(expected_platform_for_mission("coast_estuary"), Some("auv"));
-        assert_eq!(expected_platform_for_mission("coast_estuary"), Some("auv"));
-        assert_eq!(expected_platform_for_mission("invented_family"), None);
-        assert_eq!(
-            expected_criticality_for_component("underwater_pressure_interface"),
-            Some("pressure_boundary")
-        );
-        assert_eq!(expected_criticality_for_component("invented_component"), None);
+        let context = "family mapping test";
+        assert!(validate_mission_platform("coast_estuary", "auv", context).is_ok());
+        assert!(validate_mission_platform("coast_estuary", "multirotor", context).is_err());
+        assert!(validate_mission_platform("invented_family", "auv", context).is_err());
+        assert!(validate_component_criticality(
+            "underwater_pressure_interface",
+            "pressure_boundary",
+            context
+        )
+        .is_ok());
+        assert!(validate_component_criticality(
+            "underwater_pressure_interface",
+            "routine_replaceable",
+            context
+        )
+        .is_err());
+        assert!(validate_component_criticality("invented_component", "routine_replaceable", context).is_err());
     }
 
     #[test]
