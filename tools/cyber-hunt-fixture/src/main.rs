@@ -109,10 +109,7 @@ struct Manifest {
 struct SolverManifest {
     schema_version: String,
     generator_version: String,
-    source_commit: String,
-    source_commit_pinned: bool,
     synthetic_only: bool,
-    seed: u64,
     record_count: usize,
     event_file: String,
     event_sha256: String,
@@ -637,10 +634,7 @@ fn verify_payloads(
         .map_err(|e| format!("cannot parse solver-only manifest: {e}"))?;
     if solver_manifest.schema_version != SOLVER_MANIFEST_VERSION
         || solver_manifest.generator_version != GENERATOR_VERSION
-        || solver_manifest.source_commit != manifest.source_commit
-        || solver_manifest.source_commit_pinned != is_full_git_sha(&solver_manifest.source_commit)
         || !solver_manifest.synthetic_only
-        || solver_manifest.seed != manifest.seed
         || solver_manifest.record_count != manifest.actual_record_count
         || solver_manifest.event_file != "events.jsonl"
         || solver_manifest.event_sha256 != event_identity.sha256
@@ -930,10 +924,7 @@ fn render_dataset(records: usize, seed: u64, source_commit: &str) -> Result<Rend
     let solver_manifest = SolverManifest {
         schema_version: SOLVER_MANIFEST_VERSION.to_string(),
         generator_version: GENERATOR_VERSION.to_string(),
-        source_commit: source_commit.to_string(),
-        source_commit_pinned: is_full_git_sha(source_commit),
         synthetic_only: true,
-        seed,
         record_count: files["solver/events.jsonl"].record_count,
         event_file: "events.jsonl".to_string(),
         event_sha256: files["solver/events.jsonl"].sha256.clone(),
