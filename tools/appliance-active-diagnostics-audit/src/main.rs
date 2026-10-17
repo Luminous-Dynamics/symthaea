@@ -7,6 +7,8 @@ use std::fs;
 use std::path::PathBuf;
 use std::process::ExitCode;
 
+mod decision_value;
+
 const SCHEMA_ID: &str = "urn:luminous-dynamics:appliance-active-diagnostics:0.1.0";
 const EXPECTED_TRACE_IDS: [&str; 21] = [
     "ADT-001", "ADT-002", "ADT-003", "ADT-004", "ADT-005", "ADT-006", "ADT-007", "ADT-008",
@@ -17,10 +19,10 @@ const EXPECTED_TRACE_IDS: [&str; 21] = [
 type Errors = Vec<String>;
 
 #[derive(Debug, Clone, PartialEq, Eq)]
-struct Decision {
-    decision: String,
-    next_measurement_id: Option<String>,
-    reason_code: String,
+pub(super) struct Decision {
+    pub(super) decision: String,
+    pub(super) next_measurement_id: Option<String>,
+    pub(super) reason_code: String,
 }
 
 #[derive(Debug, PartialEq, Eq)]
@@ -35,11 +37,11 @@ struct AuditSummary {
     corpus_sha256: String,
 }
 
-fn text_at<'a>(value: &'a Value, key: &str) -> Option<&'a str> {
+pub(super) fn text_at<'a>(value: &'a Value, key: &str) -> Option<&'a str> {
     value.get(key).and_then(Value::as_str)
 }
 
-fn number_at(value: &Value, key: &str) -> Option<f64> {
+pub(super) fn number_at(value: &Value, key: &str) -> Option<f64> {
     value.get(key).and_then(Value::as_f64)
 }
 
@@ -81,7 +83,7 @@ fn invalid_decision(reason_code: &str) -> Decision {
     }
 }
 
-fn validate_trace(trace: &Value) -> Result<(), String> {
+pub(super) fn validate_trace(trace: &Value) -> Result<(), String> {
     let Some(hypotheses) = trace.get("hypotheses").and_then(Value::as_array) else {
         return Err("invalid_prior_distribution".to_owned());
     };
@@ -234,7 +236,7 @@ fn likelihood<'a>(measurement: &'a Value, hypothesis_id: &str, outcome_id: &str)
         .as_f64()
 }
 
-fn information_gain(trace: &Value, measurement: &Value) -> f64 {
+pub(super) fn information_gain(trace: &Value, measurement: &Value) -> f64 {
     let hypotheses = trace
         .get("hypotheses")
         .and_then(Value::as_array)
@@ -277,7 +279,7 @@ fn information_gain(trace: &Value, measurement: &Value) -> f64 {
     (prior_entropy - expected_posterior_entropy).max(0.0)
 }
 
-fn evaluate_trace(trace: &Value) -> Decision {
+pub(super) fn evaluate_trace(trace: &Value) -> Decision {
     if let Err(reason_code) = validate_trace(trace) {
         return invalid_decision(&reason_code);
     }
@@ -481,7 +483,7 @@ fn audit_values(
     })
 }
 
-fn audit_texts(schema_raw: &str, corpus_raw: &str) -> Result<AuditSummary, Errors> {
+pub(super) fn audit_texts(schema_raw: &str, corpus_raw: &str) -> Result<AuditSummary, Errors> {
     let schema: Value = serde_json::from_str(schema_raw)
         .map_err(|error| vec![format!("schema JSON parse failed: {error}")])?;
     let corpus: Value = serde_json::from_str(corpus_raw)
@@ -502,13 +504,19 @@ fn read_arg_path(flag: &str) -> Option<PathBuf> {
 fn run() -> Result<(), String> {
     let schema_path = read_arg_path("--schema").unwrap_or_else(default_schema_path);
     let corpus_path = read_arg_path("--corpus").unwrap_or_else(default_corpus_path);
+    let decision_schema_path = read_arg_path("--decision-schema");
+    let decision_corpus_path = read_arg_path("--decision-corpus");
+    if decision_schema_path.is_some() != decision_corpus_path.is_some() {
+        return Err("--decision-schema and --decision-corpus must be supplied together".to_owned());
+    }
+
     let schema_raw = fs::read_to_string(&schema_path)
         .map_err(|error| format!("cannot read {}: {error}", schema_path.display()))?;
     let corpus_raw = fs::read_to_string(&corpus_path)
         .map_err(|error| format!("cannot read {}: {error}", corpus_path.display()))?;
     let summary = audit_texts(&schema_raw, &corpus_raw).map_err(|errors| errors.join("\n"))?;
 
-    let report = json!({
+    let mut report = json!({
         "report_version": "appliance-active-diagnostics-audit/0.1",
         "status": "PASS_SYNTHETIC_CONTRACT_ONLY",
         "evidence_class": "synthetic_contract_fixture",
@@ -525,6 +533,24 @@ fn run() -> Result<(), String> {
         "schema_path": schema_path.display().to_string(),
         "corpus_path": corpus_path.display().to_string()
     });
+
+    if let (Some(decision_schema_path), Some(decision_corpus_path)) =
+        (decision_schema_path, decision_corpus_path)
+    {
+        let decision_schema_raw = fs::read_to_string(&decision_schema_path)
+            .map_err(|error| format!("cannot read {}: {error}", decision_schema_path.display()))?;
+        let decision_corpus_raw = fs::read_to_string(&decision_corpus_path)
+            .map_err(|error| format!("cannot read {}: {error}", decision_corpus_path.display()))?;
+        let decision_report = decision_value::audit_decision_texts(
+            &schema_raw,
+            &corpus_raw,
+            &decision_schema_raw,
+            &decision_corpus_raw,
+        )
+        .map_err(|errors| errors.join("\n"))?;
+        report["decision_value"] = decision_report;
+    }
+
     println!(
         "{}",
         serde_json::to_string_pretty(&report).map_err(|error| error.to_string())?
