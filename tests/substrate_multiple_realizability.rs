@@ -550,8 +550,11 @@ fn test_energy_budget_consciousness_collapse() {
     // joules per cycle, but the configured limit is watts (joules/second); the
     // gate evaluates average modeled power after a completed monotonic 1-second
     // observation window instead of comparing energy directly to a rate.
-    // SiliconDigital's per-cycle estimate is ~6.5e-11 J before tau adjustment.
-    let budget = 2e-10; // watts; deliberately below the expected model-estimated rate
+    // SiliconDigital's per-cycle estimate is ~6.5e-11 J from its modeled energy/op
+    // and operation count; cognitive tau is not an energy multiplier.
+    // The deliberately tiny watt budget should be exceeded once the first full
+    // monotonic window closes, regardless of small scheduler-cadence variation.
+    let budget = 1e-12; // watts; well below the model rate for the first completed window
 
     let mut service = CognitiveLoopService::new(CognitiveLoopConfig {
         enable_validation_overlay: true,
