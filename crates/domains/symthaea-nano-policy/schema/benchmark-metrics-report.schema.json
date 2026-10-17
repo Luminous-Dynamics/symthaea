@@ -603,7 +603,7 @@
         "null"
       ],
       "pattern": "^[a-f0-9]{64}$",
-      "description": "Optional shift-manifest digest copied from the input outcome ledger so per-group metrics remain auditable when detached."
+      "description": "Optional shift-manifest digest copied from the input outcome ledger so per-group metrics remain auditable when detached; this evaluator checks its format, not the referenced file bytes."
     }
   }
 }
