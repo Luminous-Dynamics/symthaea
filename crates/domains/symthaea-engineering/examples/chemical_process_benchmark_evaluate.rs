@@ -31,7 +31,10 @@ const ALLOWED_CLASSES: &[&str] = &[
     "tamper-control",
 ];
 
-const USAGE: &str = "Usage: chemical_process_benchmark_evaluate --corpus <path> --results <path> --expected-head <git-commit-sha>";
+const USAGE: &str = concat!(
+    "Usage: chemical_process_benchmark_evaluate --corpus <path> ",
+    "--results <path> --expected-head <git-commit-sha>"
+);
 
 struct Args {
     corpus_path: String,
@@ -112,7 +115,10 @@ fn evaluate(corpus: &Value, results: &Value, expected_head: &str) -> Value {
         .map(|item| (*item).to_owned())
         .collect::<BTreeSet<_>>();
     if strings(corpus, "allowed_dispositions").as_ref() != Some(&canonical_dispositions) {
-        global_errors.push("corpus allowed_dispositions is missing or differs from the frozen vocabulary".to_owned());
+        global_errors.push(
+            "corpus allowed_dispositions is missing or differs from the frozen vocabulary"
+                .to_owned(),
+        );
     }
     if text(results, "benchmark_id") != Some(benchmark_id) {
         global_errors.push("results benchmark_id does not match corpus".to_owned());
@@ -160,10 +166,14 @@ fn evaluate(corpus: &Value, results: &Value, expected_head: &str) -> Value {
             global_errors.push(format!("corpus case {id:?} has a missing or malformed fixture"));
         }
         if strings(case, "required_findings").map_or(true, |items| items.is_empty()) {
-            global_errors.push(format!("corpus case {id:?} has missing or empty required_findings"));
+            global_errors.push(format!(
+                "corpus case {id:?} has missing or empty required_findings"
+            ));
         }
         if strings(case, "prohibited_promotions").map_or(true, |items| items.is_empty()) {
-            global_errors.push(format!("corpus case {id:?} has missing or empty prohibited_promotions"));
+            global_errors.push(format!(
+                "corpus case {id:?} has missing or empty prohibited_promotions"
+            ));
         }
     }
 
@@ -352,13 +362,20 @@ fn evaluate(corpus: &Value, results: &Value, expected_head: &str) -> Value {
                         && solution_relative_error <= tolerance;
                     if normalized_residual > tolerance {
                         errors.push(
-                            "independently calculated recycle-equation residual exceeds frozen tolerance"
-                                .to_owned(),
+                            concat!(
+                                "independently calculated recycle-equation residual exceeds ",
+                                "frozen tolerance"
+                            )
+                            .to_owned(),
                         );
                     }
                     if solution_relative_error > tolerance {
                         errors.push(
-                            "observed solution differs from the frozen analytic solution".to_owned(),
+                            concat!(
+                                "observed solution differs from the frozen ",
+                                "analytic solution"
+                            )
+                            .to_owned(),
                         );
                     }
                     computed_numeric_checks = json!({
