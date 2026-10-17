@@ -19,7 +19,8 @@
       "worker_id": "design_author_01",
       "skill_ids": [
         "design_release",
-        "cad_bom_revision"
+        "cad_bom_revision",
+        "artifact_manifest_binding"
       ],
       "available_minutes": 480
     },
@@ -360,7 +361,7 @@
         "OP-07-reference-measurement-check"
       ],
       "required_worker_skill_ids": [
-        "part_identity"
+        "artifact_manifest_binding"
       ],
       "required_resource_capability_ids": [
         "artifact_manifest_binding"
