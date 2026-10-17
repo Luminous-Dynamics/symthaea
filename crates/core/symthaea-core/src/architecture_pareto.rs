@@ -763,6 +763,20 @@ mod tests {
     }
 
     #[test]
+    fn component_count_is_reported_but_does_not_automatically_dominate() {
+        let fewer_parts = candidate("fewer-parts", 0.9, 3.0, 0.5, 0.8);
+        let mut more_modular = candidate("more-modular", 0.9, 3.0, 0.5, 0.8);
+        more_modular.metrics.service_component_count = 24;
+        let report = evaluate_architecture_pareto(&request(vec![fewer_parts, more_modular]))
+            .expect("valid comparison");
+
+        assert!(report.assessments.iter().all(|assessment| assessment.is_pareto_optimal));
+        assert!(report.assessments.iter().all(|assessment| assessment.dominated_by.is_empty()));
+        assert_eq!(report.assessments[0].metrics.service_component_count, 15);
+        assert_eq!(report.assessments[1].metrics.service_component_count, 24);
+    }
+
+    #[test]
     fn deterministic_reports_round_trip_to_identical_json() {
         let input = request(vec![
             candidate("candidate-a", 0.8, 2.5, 0.4, 0.9),
