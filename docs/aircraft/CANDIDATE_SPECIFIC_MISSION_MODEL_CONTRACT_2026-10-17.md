@@ -114,6 +114,10 @@ A model can be internally complete and still be inaccurate. Agreement with one r
 
 ## 6. Independent validation plan
 
+The first reference-data card is [Cessna Skyhawk manufacturer-published baseline](REFERENCE_BASELINE_SKYHAWK_2026-10-17.md). It captures basic dimensions, weight definitions, performance headline values and the limits of using a summary specification. This is **M1 scaffolding, not an M1 pass**: the public manufacturer page does not by itself provide the controlled performance tables, engine/propeller maps, configuration-specific loading, or independent measurements required to validate a candidate-specific mission model.
+
+
+
 Use references for verification, not as borrowed authority:
 - NASA OpenVSP/VSPAERO documentation for conceptual geometry and aerodynamic analysis. VSPAERO uses a potential-flow approach; the chosen method must suit the configuration and operating regime.
 - OpenVSP published verification/validation studies: https://github.com/OpenVSP/OpenVSP/blob/main/examples/scripts/python_scripts/report.md, each with its own geometry, assumptions and validity scope.
