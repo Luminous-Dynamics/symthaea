@@ -259,6 +259,331 @@ fn unit_conversion_oracle(
     }))
 }
 
+
+fn unit_dimension(unit: &str) -> Option<&'static str> {
+    match unit {
+        "kg/s" | "g/s" => Some("mass_flow"),
+        "mol/s" | "kmol/s" => Some("amount_flow"),
+        "m^3/s" | "L/s" => Some("volume_flow"),
+        _ => None,
+    }
+}
+
+fn required_number(fixture: &Value, field: &str) -> Result<f64, String> {
+    let value = numeric_field(fixture, field)
+        .ok_or_else(|| format!("fixture is missing numeric field {field:?}"))?;
+    if !value.is_finite() {
+        return Err(format!("fixture numeric field {field:?} is not finite"));
+    }
+    Ok(value)
+}
+
+fn derive_synthetic_disposition(
+    id: &str,
+    fixture: &Value,
+    tolerance: f64,
+) -> Result<Value, String> {
+    match id {
+        "CHEM-PROC-003" => {
+            let inlets = fixture
+                .get("inlets")
+                .and_then(Value::as_array)
+                .ok_or_else(|| "unit-compatibility fixture is missing inlets".to_owned())?;
+            let mut dimensions = BTreeMap::<String, BTreeSet<String>>::new();
+            let mut units_by_component = BTreeMap::<String, BTreeSet<String>>::new();
+            for inlet in inlets {
+                let component = text(inlet, "component")
+                    .filter(|value| !value.trim().is_empty())
+                    .ok_or_else(|| "unit-compatibility inlet is missing component".to_owned())?;
+                let unit = text(inlet, "unit")
+                    .filter(|value| !value.trim().is_empty())
+                    .ok_or_else(|| "unit-compatibility inlet is missing unit".to_owned())?;
+                let dimension = unit_dimension(unit)
+                    .ok_or_else(|| format!("unit {unit:?} is outside this synthetic oracle"))?;
+                dimensions.entry(component.to_owned())
+                    .or_default()
+                    .insert(dimension.to_owned());
+                units_by_component.entry(component.to_owned())
+                    .or_default()
+                    .insert(unit.to_owned());
+            }
+            let mismatches = dimensions
+                .iter()
+                .filter(|(_, values)| values.len() > 1)
+                .map(|(component, _)| component.clone())
+                .collect::<Vec<_>>();
+            let conversion_evidence_present = fixture
+                .get("conversion_evidence")
+                .is_some_and(|value| !value.is_null());
+            let blocked = !mismatches.is_empty() && !conversion_evidence_present;
+            Ok(json!({
+                "oracle": "synthetic_quantity_dimension_compatibility_v1",
+                "derived_disposition": if blocked { "BLOCKED" } else { "ACCEPTED_WITHIN_SCOPE" },
+                "component_units": units_by_component,
+                "incompatible_components": mismatches,
+                "conversion_evidence_present": conversion_evidence_present
+            }))
+        }
+        "CHEM-PROC-005" => {
+            let inlet = required_number(fixture, "inlet_flow")?;
+            let product = required_number(fixture, "known_product_flow")?;
+            let unknown_output_missing = fixture.get("unknown_output_flow").is_none_or(Value::is_null);
+            let sink_missing = fixture.get("declared_sink").is_none_or(Value::is_null);
+            let unexplained_residual = inlet - product > tolerance;
+            let unresolved = unknown_output_missing && sink_missing && unexplained_residual;
+            Ok(json!({
+                "oracle": "unaccounted_stream_disposition_v1",
+                "derived_disposition": if unresolved { "UNRESOLVED" } else { "ACCEPTED_WITHIN_SCOPE" },
+                "inlet_flow": inlet,
+                "known_product_flow": product,
+                "unaccounted_known_difference": inlet - product,
+                "unknown_output_missing": unknown_output_missing,
+                "declared_sink_missing": sink_missing
+            }))
+        }
+        "CHEM-PROC-006" => {
+            let inlet = required_number(fixture, "inlet_flow")?;
+            let product = required_number(fixture, "product_flow")?;
+            let sink = required_number(fixture, "declared_sink_flow")?;
+            let scale = 1.0_f64.max(inlet.abs() + product.abs() + sink.abs());
+            let residual = inlet - product - sink;
+            let normalized_residual = residual.abs() / scale;
+            let sink_declared = text(fixture, "sink_evidence_kind")
+                == Some("synthetic_accounting_fixture");
+            let closed = normalized_residual <= tolerance && sink_declared;
+            Ok(json!({
+                "oracle": "explicit_synthetic_accounting_sink_v1",
+                "derived_disposition": if closed { "ACCEPTED_WITHIN_SCOPE" } else { "BLOCKED" },
+                "raw_residual": residual,
+                "normalization_scale": scale,
+                "normalized_residual": normalized_residual,
+                "tolerance": tolerance,
+                "declared_synthetic_sink": sink_declared,
+                "accounting_closed": closed
+            }))
+        }
+        "CHEM-PROC-008" => {
+            let status = text(fixture, "solver_status").unwrap_or_default();
+            let residual = numeric_field(fixture, "convergence_residual");
+            let solution_present = numeric_field(fixture, "reported_solution")
+                .is_some_and(f64::is_finite);
+            let converged = status == "converged"
+                && solution_present
+                && residual.is_some_and(|value| value.is_finite() && value.abs() <= tolerance);
+            Ok(json!({
+                "oracle": "solver_convergence_state_v1",
+                "derived_disposition": if converged { "ACCEPTED_WITHIN_SCOPE" } else { "BLOCKED" },
+                "solver_status": status,
+                "convergence_residual": residual,
+                "convergence_claim_supported": converged
+            }))
+        }
+        "CHEM-PROC-009" => {
+            let reference_a = text(fixture, "stream_a_reference").unwrap_or_default();
+            let reference_b = text(fixture, "stream_b_reference").unwrap_or_default();
+            let evidence_present = fixture.get("reconciliation_evidence")
+                .is_some_and(|value| !value.is_null());
+            let unresolved = reference_a != reference_b && !evidence_present;
+            Ok(json!({
+                "oracle": "thermodynamic_reference_state_compatibility_v1",
+                "derived_disposition": if unresolved { "UNRESOLVED" } else { "ACCEPTED_WITHIN_SCOPE" },
+                "reference_states_match": reference_a == reference_b,
+                "reconciliation_evidence_present": evidence_present
+            }))
+        }
+        "CHEM-PROC-010" => {
+            let selectivity = numeric_field(fixture, "reported_selectivity").is_some_and(f64::is_finite);
+            let recovery = numeric_field(fixture, "reported_recovery").is_some_and(f64::is_finite);
+            let assay = fixture.get("product_assay").is_some_and(|value| !value.is_null());
+            let definition = text(fixture, "metric_definition").unwrap_or_default();
+            let complete = selectivity && recovery && assay && !definition.trim().is_empty();
+            Ok(json!({
+                "oracle": "separation_metric_completeness_v1",
+                "derived_disposition": if complete { "ACCEPTED_WITHIN_SCOPE" } else { "UNRESOLVED" },
+                "selectivity_present": selectivity,
+                "recovery_present": recovery,
+                "product_assay_present": assay,
+                "metric_definition_present": !definition.trim().is_empty()
+            }))
+        }
+        "CHEM-PROC-011" => {
+            let purity = text(fixture, "purity_status") == Some("known");
+            let contaminants = text(fixture, "contaminant_profile") == Some("resolved");
+            let admissible = purity && contaminants;
+            Ok(json!({
+                "oracle": "material_grade_evidence_v1",
+                "derived_disposition": if admissible { "ACCEPTED_WITHIN_SCOPE" } else { "BLOCKED" },
+                "purity_known": purity,
+                "contaminants_resolved": contaminants
+            }))
+        }
+        "CHEM-PROC-012" => {
+            let currentness = text(fixture, "currentness").unwrap_or_default();
+            let policy = text(fixture, "currentness_policy").unwrap_or_default();
+            let violation = currentness == "stale" && policy == "current_required";
+            Ok(json!({
+                "oracle": "property_currentness_policy_v1",
+                "derived_disposition": if violation { "BLOCKED" } else { "ACCEPTED_WITHIN_SCOPE" },
+                "currentness": currentness,
+                "policy": policy,
+                "stale_requirement_violation": violation
+            }))
+        }
+        "CHEM-PROC-013" => {
+            let domain = text(fixture, "model_validity_domain").unwrap_or_default();
+            let context = text(fixture, "candidate_context").unwrap_or_default();
+            let qualified = text(fixture, "extrapolation_policy") == Some("qualified_for_domain_shift");
+            let mismatch = domain != context && !qualified;
+            Ok(json!({
+                "oracle": "model_validity_domain_v1",
+                "derived_disposition": if mismatch { "OUT_OF_DOMAIN" } else { "ACCEPTED_WITHIN_SCOPE" },
+                "model_domain": domain,
+                "candidate_context": context,
+                "qualified_extrapolation": qualified
+            }))
+        }
+        "CHEM-PROC-014" => {
+            let required = strings(fixture, "required_utilities")
+                .ok_or_else(|| "required_utilities missing or malformed".to_owned())?;
+            let available = strings(fixture, "available_utilities")
+                .ok_or_else(|| "available_utilities missing or malformed".to_owned())?;
+            let missing = required.difference(&available).cloned().collect::<Vec<_>>();
+            Ok(json!({
+                "oracle": "required_utility_closure_v1",
+                "derived_disposition": if missing.is_empty() { "ACCEPTED_WITHIN_SCOPE" } else { "BLOCKED" },
+                "missing_utilities": missing
+            }))
+        }
+        "CHEM-PROC-015" => {
+            let violated = text(fixture, "hard_constraint_status") == Some("violated");
+            let hard_gates = text(fixture, "optimization_policy") == Some("hard_constraints_are_gates");
+            let blocked = violated && hard_gates;
+            Ok(json!({
+                "oracle": "noncompensatory_hard_constraint_v1",
+                "derived_disposition": if blocked { "BLOCKED" } else { "ACCEPTED_WITHIN_SCOPE" },
+                "hard_constraint_violated": violated,
+                "hard_constraints_are_gates": hard_gates
+            }))
+        }
+        "CHEM-PROC-016" => {
+            let overlap = fixture.get("uncertainty_overlap").and_then(Value::as_bool) == Some(true);
+            let rank_changes = fixture.get("sensitivity_changes_order").and_then(Value::as_bool) == Some(true);
+            let score_a = required_number(fixture, "candidate_A_point_score")?;
+            let score_b = required_number(fixture, "candidate_B_point_score")?;
+            let unresolved = overlap && rank_changes;
+            Ok(json!({
+                "oracle": "uncertainty_sensitive_ranking_v1",
+                "derived_disposition": if unresolved { "UNRESOLVED" } else { "ACCEPTED_WITHIN_SCOPE" },
+                "point_scores": { "A": score_a, "B": score_b },
+                "uncertainty_overlap": overlap,
+                "sensitivity_changes_order": rank_changes
+            }))
+        }
+        "CHEM-PROC-017" => {
+            let definitions = fixture.get("definitions").and_then(Value::as_array)
+                .ok_or_else(|| "stream identity fixture is missing definitions".to_owned())?;
+            let digests = definitions.iter().map(|definition| {
+                text(definition, "composition_digest")
+                    .map(ToOwned::to_owned)
+                    .ok_or_else(|| "stream definition is missing composition digest".to_owned())
+            }).collect::<Result<BTreeSet<_>, _>>()?;
+            let conflict = digests.len() > 1;
+            Ok(json!({
+                "oracle": "stream_identity_conflict_v1",
+                "derived_disposition": if conflict { "BLOCKED" } else { "ACCEPTED_WITHIN_SCOPE" },
+                "distinct_composition_digests": digests
+            }))
+        }
+        "CHEM-PROC-018" => {
+            let required = strings(fixture, "required_dependencies")
+                .ok_or_else(|| "required_dependencies missing or malformed".to_owned())?;
+            let available = strings(fixture, "available_dependencies")
+                .ok_or_else(|| "available_dependencies missing or malformed".to_owned())?;
+            let missing = required.difference(&available).cloned().collect::<Vec<_>>();
+            Ok(json!({
+                "oracle": "lifecycle_dependency_closure_v1",
+                "derived_disposition": if missing.is_empty() { "ACCEPTED_WITHIN_SCOPE" } else { "BLOCKED" },
+                "missing_dependencies": missing
+            }))
+        }
+        "CHEM-PROC-019" => {
+            let origin = text(fixture, "result_origin").unwrap_or_default();
+            let requested = text(fixture, "requested_evidence_class").unwrap_or_default();
+            let measurement = fixture.get("measurement_record").is_some_and(|value| !value.is_null());
+            let mismatch = origin == "simulation" && requested == "physical_observation" && !measurement;
+            Ok(json!({
+                "oracle": "evidence_origin_class_v1",
+                "derived_disposition": if mismatch { "BLOCKED" } else { "ACCEPTED_WITHIN_SCOPE" },
+                "result_origin": origin,
+                "requested_evidence_class": requested,
+                "measurement_record_present": measurement
+            }))
+        }
+        "CHEM-PROC-020" => {
+            let purity_present = fixture.get("purity_evidence").is_some_and(|value| !value.is_null());
+            Ok(json!({
+                "oracle": "inventory_is_not_purity_evidence_v1",
+                "derived_disposition": if purity_present { "ACCEPTED_WITHIN_SCOPE" } else { "BLOCKED" },
+                "purity_evidence_present": purity_present
+            }))
+        }
+        "CHEM-PROC-021" => {
+            let registered = text(fixture, "registered_digest").unwrap_or_default();
+            let presented = text(fixture, "presented_digest").unwrap_or_default();
+            let match_digest = !registered.is_empty() && registered == presented;
+            Ok(json!({
+                "oracle": "source_content_digest_identity_v1",
+                "derived_disposition": if match_digest { "ACCEPTED_WITHIN_SCOPE" } else { "BLOCKED" },
+                "registered_digest_matches_presented": match_digest
+            }))
+        }
+        "CHEM-PROC-022" => {
+            let status = text(fixture, "external_solver_status").unwrap_or_default();
+            let expected = fixture.get("expected_reference_comparison").and_then(Value::as_bool) == Some(true);
+            let comparison = status == "completed_pass" && expected;
+            Ok(json!({
+                "oracle": "reference_solver_execution_state_v1",
+                "derived_disposition": if comparison { "ACCEPTED_WITHIN_SCOPE" } else { "BLOCKED" },
+                "solver_status": status,
+                "expected_reference_comparison": expected,
+                "comparison_established": comparison
+            }))
+        }
+        "CHEM-PROC-023" => {
+            let assessed = text(fixture, "assessed_head").unwrap_or_default();
+            let receipt = text(fixture, "receipt_head").unwrap_or_default();
+            let match_head = !assessed.is_empty() && assessed == receipt;
+            Ok(json!({
+                "oracle": "receipt_exact_head_binding_v1",
+                "derived_disposition": if match_head { "ACCEPTED_WITHIN_SCOPE" } else { "BLOCKED" },
+                "exact_head_match": match_head
+            }))
+        }
+        "CHEM-PROC-024" => {
+            let graph_valid = fixture.get("graph_connected").and_then(Value::as_bool) == Some(true)
+                && fixture.get("stream_schema_valid").and_then(Value::as_bool) == Some(true);
+            let model_validated = text(fixture, "model_validation") == Some("validated");
+            let equipment_qualified = text(fixture, "equipment_qualification") == Some("qualified");
+            let disposition = if !graph_valid {
+                "BLOCKED"
+            } else if model_validated && equipment_qualified {
+                "ACCEPTED_WITHIN_SCOPE"
+            } else {
+                "UNRESOLVED"
+            };
+            Ok(json!({
+                "oracle": "structural_vs_physical_qualification_v1",
+                "derived_disposition": disposition,
+                "graph_structurally_valid": graph_valid,
+                "model_validated": model_validated,
+                "equipment_qualified": equipment_qualified
+            }))
+        }
+        _ => Err(format!("no semantic disposition oracle registered for {id}")),
+    }
+}
+
+
 fn evaluate(corpus: &Value, results: &Value, expected_head: &str) -> Value {
     let mut global_errors = Vec::<String>::new();
 
@@ -657,6 +982,38 @@ fn evaluate(corpus: &Value, results: &Value, expected_head: &str) -> Value {
                 }
                 Err(reason) => errors.push(format!(
                     "independent unit-conversion oracle failed: {reason}"
+                )),
+            }
+        }
+
+        let semantic_oracle_ids = [
+            "CHEM-PROC-003", "CHEM-PROC-005", "CHEM-PROC-006", "CHEM-PROC-008",
+            "CHEM-PROC-009", "CHEM-PROC-010", "CHEM-PROC-011", "CHEM-PROC-012",
+            "CHEM-PROC-013", "CHEM-PROC-014", "CHEM-PROC-015", "CHEM-PROC-016",
+            "CHEM-PROC-017", "CHEM-PROC-018", "CHEM-PROC-019", "CHEM-PROC-020",
+            "CHEM-PROC-021", "CHEM-PROC-022", "CHEM-PROC-023", "CHEM-PROC-024",
+        ];
+        if semantic_oracle_ids.contains(&id) {
+            let tolerance = corpus
+                .get("residual_profile")
+                .and_then(|profile| numeric_field(profile, "target_max"))
+                .unwrap_or(f64::NAN);
+            match expected
+                .get("fixture")
+                .ok_or_else(|| "fixture missing".to_owned())
+                .and_then(|fixture| derive_synthetic_disposition(id, fixture, tolerance))
+            {
+                Ok(oracle) => {
+                    if text(&oracle, "derived_disposition") != Some(expected_disposition) {
+                        errors.push(
+                            "independent synthetic oracle disagrees with frozen expected disposition"
+                                .to_owned(),
+                        );
+                    }
+                    computed_numeric_checks = oracle;
+                }
+                Err(reason) => errors.push(format!(
+                    "independent synthetic oracle failed: {reason}"
                 )),
             }
         }
