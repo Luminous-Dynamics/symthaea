@@ -695,7 +695,7 @@ fn generate_holdout_initial_conditions(
 
 fn discovery_config_digest(config: &RegressorConfig) -> String {
     let mut hasher = blake3::Hasher::new();
-    hasher.update(b"SymthaeaRegressorConfigV1\\0");
+    hasher.update(b"SymthaeaRegressorConfigV1\0");
     hasher.update(&(config.population_size as u64).to_le_bytes());
     hasher.update(&(config.generations as u64).to_le_bytes());
     hasher.update(&(config.max_depth as u64).to_le_bytes());
@@ -780,7 +780,9 @@ fn holdout_validation_profile_digest(
     hasher.finalize().to_hex().to_string()
 }
 
-fn finalize_holdout_validation(mut result: AutonomousHoldoutValidation) -> AutonomousHoldoutValidation {
+fn finalize_holdout_validation(
+    mut result: AutonomousHoldoutValidation,
+) -> AutonomousHoldoutValidation {
     let mut hasher = blake3::Hasher::new();
     hasher.update(b"SymthaeaAutonomousHoldoutReceiptV1\0");
     holdout_hash_string(&mut hasher, &result.dynamics_id);
@@ -826,7 +828,8 @@ pub fn validate_invariant_holdout(
     let requested = holdout_trajectories;
     let discovery_seed = discovery_config.seed;
     let candidate_expression = format!("{candidate}");
-    let candidate_expression_digest = blake3::hash(candidate_expression.as_bytes()).to_hex().to_string();
+    let candidate_expression_digest =
+        blake3::hash(candidate_expression.as_bytes()).to_hex().to_string();
     let discovery_config_digest = discovery_config_digest(discovery_config);
 
     let bounded_request = requested <= MAX_HOLDOUT_TRAJECTORIES;
@@ -862,6 +865,7 @@ pub fn validate_invariant_holdout(
         && dt > 0.0
         && threshold.is_finite()
         && threshold >= 0.0
+        && requested > 0
         && bounded_request;
 
     let mut result = AutonomousHoldoutValidation {
@@ -1919,8 +1923,17 @@ mod holdout_validation_tests {
     fn holdout_rejects_nonconserved_candidate() {
         let config = discovery_config(0x1234);
         let result = validate_invariant_holdout(
-            harmonic_rhs, "harmonic-oscillator-v1", &Expr::Var("x".into()),
-            &[1.0, 0.2], &["x", "v"], &config, 1.0, 0.02, 4, 0x5678, 1e-8,
+            harmonic_rhs,
+            "harmonic-oscillator-v1",
+            &Expr::Var("x".into()),
+            &[1.0, 0.2],
+            &["x", "v"],
+            &config,
+            1.0,
+            0.02,
+            4,
+            0x5678,
+            1e-8,
         );
 
         assert_eq!(result.requested_trajectories, 4);
