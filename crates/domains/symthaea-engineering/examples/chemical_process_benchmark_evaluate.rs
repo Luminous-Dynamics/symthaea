@@ -845,8 +845,6 @@ mod tests {
         assert_eq!(output["passed"], false);
         assert_eq!(output["cases"][1]["passed"], false);
     }
-}
-
 
     fn analytic_corpus() -> Value {
         json!({
@@ -928,3 +926,4 @@ mod tests {
         assert_eq!(output["passed"], false);
         assert_eq!(output["cases"][0]["computed_numeric_checks"]["passed"], false);
     }
+}
