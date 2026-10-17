@@ -32,7 +32,8 @@ pub use capacitor_screening::{
 pub use database::{MaterialDatabase, MaterialSearchResult};
 pub use dielectric::{
     CapacitorGeometry, DielectricEvidenceKind, DielectricPropertyRecord, DielectricValidationError,
-    BreakdownTestKind, IdealCapacitorMetrics, PropertyUncertainty, PropertyUncertaintySemantics,
+    BreakdownTestKind, ConditionedDielectricObservation, DielectricObservationProperty,
+    IdealCapacitorMetrics, PropertyUncertainty, PropertyUncertaintySemantics,
     VACUUM_PERMITTIVITY_F_PER_M,
     calculate_ideal_capacitor_metrics, calculate_ideal_capacitor_metrics_at_frequency,
 };
