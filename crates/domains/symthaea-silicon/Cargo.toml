@@ -18,3 +18,7 @@ sha2 = { workspace = true }
 tracing = { workspace = true }
 uuid = { workspace = true }
 anyhow = { workspace = true }
+[[example]]
+name = "hdc_retrieval_host_benchmark"
+path = "examples/hdc_retrieval_host_benchmark.rs"
+test = true
