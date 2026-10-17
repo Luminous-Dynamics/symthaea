@@ -11,7 +11,7 @@ cargo run -p symthaea-nanotech-audit -- <run-directory>
 cargo run -p symthaea-nanotech-audit --bin nano-rescue-score -- <run-directory>
 ~~~
 
-The first command must report **artifact_integrity_pass** before the second command's scores are considered. That status concerns artifact consistency only; it is not a scientific-performance pass.
+The scorer itself reruns the structural verifier and refuses to produce a report unless it returns **artifact_integrity_pass**. Running the first command separately is useful for inspecting its full report. That status concerns artifact consistency only; it is not a scientific-performance pass.
 
 The scorer reads **rescue-controller/audit-sampling-manifest.json** and **rescue-controller/blinded-audit-results.jsonl**. It independently rechecks the raw manifest digest, sample membership, sample/result cardinality, parent/trajectory/stratum identities, inclusion probabilities, reference status/label consistency, and policy-label blinding. It fails closed for malformed records, duplicate/missing sampled windows, mixed cost units, and digest mismatches.
 
