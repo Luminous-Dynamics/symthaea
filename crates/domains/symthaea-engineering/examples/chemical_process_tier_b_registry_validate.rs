@@ -437,6 +437,55 @@ mod tests {
     }
 
     #[test]
+    fn explicit_gold_label_is_rejected_for_tutorial_hints() {
+        let mut value = registry();
+        value["candidates"][0]["source_hints_not_gold"][0]["use"] = json!("exact_golden_output");
+        let errors = validate_registry(&value);
+        assert!(
+            errors.iter().any(|error| error.contains("explicit non-gold use")),
+            "tutorial hints must not be relabeled as exact golden outputs"
+        );
+    }
+
+    #[test]
+    fn complete_frozen_receipt_is_allowed_only_with_run_evidence() {
+        let mut value = registry();
+        let candidate = &mut value["candidates"][0];
+        candidate["freeze_state"] = json!("FROZEN");
+        candidate["execution"]["status"] = json!("PASS");
+        candidate["execution"]["simulator_executed"] = json!(true);
+        candidate["execution"]["simulator_version"] = json!("DWSIM exact build pinned in receipt");
+        candidate["execution"]["raw_output_hash"] =
+            json!("sha256:aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa");
+        candidate["reference_outputs"]["state"] = json!("FROZEN");
+        candidate["reference_outputs"]["exact_simulator_outputs_frozen"] = json!(true);
+        candidate["reference_outputs"]["output_digest"] =
+            json!("sha256:bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb");
+        candidate["freeze_blockers"] = json!([]);
+        candidate["reference_outputs"]["freeze_receipt"] = json!({
+            "primary_source_url_and_revision": "https://dwsim.org/tutorials/en/beginner/02-mixer-basics.html @ pinned revision",
+            "retrieved_at": "2026-10-17",
+            "native_input_files_and_transitive_data_hashes": ["sha256:cccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccc"],
+            "component_identity_and_order": "water",
+            "units_and_composition_basis": "SI; mass flow in kg/s",
+            "phase_and_reference_state_conventions": "captured and documented",
+            "property_package_or_mechanism_and_parameter_provenance": "pinned IAPWS-IF97 property data source",
+            "solver_build_and_runtime_versions": "exact DWSIM build recorded",
+            "numerical_methods_tolerances_and_convergence_status": "converged; case-specific tolerance preregistered",
+            "stdout_stderr_and_raw_output_hashes": "stdout/stderr archived; raw output SHA-256 above",
+            "independent_checker_version_and_result": "synthetic checker v1; result recorded",
+            "shared_dependency_audit": "data dependency graph archived",
+            "preregistered_case_specific_tolerance_and_rationale": "defined before candidate evaluation",
+            "claim_ceiling": "only matched-context water-mixer reference reproducibility"
+        });
+        assert!(
+            validate_registry(&value).is_empty(),
+            "complete frozen receipt should satisfy registry structure: {:?}",
+            validate_registry(&value)
+        );
+    }
+
+    #[test]
     fn missing_blockers_are_rejected_for_unfrozen_cases() {
         let mut value = registry();
         value["candidates"][2]["freeze_blockers"] = json!([]);
