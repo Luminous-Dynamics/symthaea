@@ -164,11 +164,12 @@ pub fn expected_sha256_from_manifest(
 ) -> Result<String, ChainAuditError> {
     if relative_path.trim().is_empty()
         || relative_path.starts_with('/')
+        || relative_path.contains('\\')
         || relative_path.chars().any(char::is_control)
-        || relative_path.split('/').any(|component| component == "..")
+        || relative_path.split('/').any(|component| component == ".." || component.is_empty())
     {
         return Err(ChainAuditError::InvalidHeader(
-            "manifest target must be a non-empty relative path without '..' components".to_string(),
+            "manifest target must be a non-empty POSIX relative path without empty or '..' components".to_string(),
         ));
     }
 
@@ -181,16 +182,22 @@ pub fn expected_sha256_from_manifest(
         }
         if line.len() < 66
             || !line.as_bytes()[..64].iter().all(|byte| byte.is_ascii_hexdigit())
-            || !line.as_bytes()[64].is_ascii_whitespace()
         {
             return Err(ChainAuditError::MalformedChecksumManifestLine { line: line_number });
         }
         let digest = &line[..64];
-        let mut path = line[64..].trim_start();
-        // GNU sha256sum may prefix a binary filename with '*'. The DESI
-        // manifest uses the usual two-space text-file form, but accept both.
-        if let Some(unstarred) = path.strip_prefix('*') {
-            path = unstarred;
+        let remainder = &line[64..];
+        let path = if let Some(path) = remainder.strip_prefix("  ") {
+            path
+        } else if let Some(path) = remainder.strip_prefix(" *") {
+            path
+        } else if let Some(path) = remainder.strip_prefix(' ') {
+            path
+        } else {
+            return Err(ChainAuditError::MalformedChecksumManifestLine { line: line_number });
+        };
+        if path.is_empty() || path.trim() != path {
+            return Err(ChainAuditError::MalformedChecksumManifestLine { line: line_number });
         }
         if path != relative_path {
             continue;
