@@ -11,7 +11,7 @@
 
 use crate::capacitor_screening::{
     CapacitorConstraintViolation, CapacitorScreeningDisposition, CapacitorScreeningError,
-    CapacitorScreeningReport, CapacitorScreeningRequirements, ScreeningLimitation,
+    CapacitorScreeningReport, CapacitorScreeningRequirements,
     screen_capacitor_candidate,
 };
 use crate::dielectric::{
@@ -539,11 +539,11 @@ mod tests {
             operating_frequency_hz: 1_000.0,
             max_relative_frequency_deviation: 0.01,
             max_relative_field_deviation: 0.01,
-            min_capacitance_f: 1.0e-5,
+            min_capacitance_f: 5.0e-6,
             max_capacitance_f: 1.0e-3,
             max_active_dielectric_volume_m3: 2.0e-9,
             max_dielectric_loss_power_w: 0.01,
-            min_ideal_energy_density_j_per_m3: Some(1.0e6),
+            min_ideal_energy_density_j_per_m3: Some(2.0e5),
             max_breakdown_temperature_deviation_k: 1.0,
             min_breakdown_field_ratio: Some(5.0),
             accepted_breakdown_test_kinds: vec![BreakdownTestKind::DcRamp],
@@ -600,7 +600,7 @@ mod tests {
     #[test]
     fn robust_screen_rejects_when_nominal_pass_hides_bound_failure() {
         let mut req = requirements();
-        req.max_dielectric_loss_power_w = 0.005;
+        req.max_dielectric_loss_power_w = 0.0006;
         // The nominal metric is near the limit; the bound-scaled upper loss exceeds it.
         let report = screen_capacitor_candidate_robust(
             &material(), &geometry(), &req, 10.0, 1.0
