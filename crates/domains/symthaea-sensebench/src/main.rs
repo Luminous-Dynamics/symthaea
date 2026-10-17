@@ -88,6 +88,7 @@ fn run() -> Result<(), String> {
     let mut seed = 42_u64;
     let mut samples = 512_usize;
     let mut trials = 512_usize;
+    let mut trials_explicit = false;
     let mut budget = 8_usize;
     let mut allow_unversioned = false;
     let mut args = env::args().skip(1);
@@ -100,8 +101,11 @@ fn run() -> Result<(), String> {
                 .parse().map_err(|_| "invalid --seed; expected unsigned integer")?,
             "--samples" => samples = args.next().ok_or("--samples requires a value")?
                 .parse().map_err(|_| "invalid --samples; expected positive integer")?,
-            "--trials" => trials = args.next().ok_or("--trials requires a value")?
-                .parse().map_err(|_| "invalid --trials; expected positive integer")?,
+            "--trials" => {
+                trials = args.next().ok_or("--trials requires a value")?
+                    .parse().map_err(|_| "invalid --trials; expected positive integer")?;
+                trials_explicit = true;
+            }
             "--budget" => budget = args.next().ok_or("--budget requires a value")?
                 .parse().map_err(|_| "invalid --budget; expected positive integer")?,
             "--help" | "-h" => {
@@ -119,6 +123,12 @@ fn run() -> Result<(), String> {
             }
             other => return Err(format!("unknown argument: {other}")),
         }
+    }
+
+    // The graph suite has 112 SCM worlds × nine policies. Default it to a
+    // reproducible exploratory run size while preserving other suites' defaults.
+    if suite == "scm-graph" && !trials_explicit {
+        trials = 32;
     }
 
     let revision = code_revision();
@@ -183,7 +193,7 @@ fn run() -> Result<(), String> {
             trials, budget, seed, 0.95,
         ).map_err(|error| error.to_string())?;
         let report = ScmGraphRunReport {
-            report_version: 1,
+            report_version: 2,
             suite: "scm_graph_recovery",
             code_revision: revision,
             benchmark,
