@@ -751,9 +751,13 @@ mod tests {
         assert!(report.body.variants[0].preflight_findings.iter()
             .any(|finding| finding.code == "PORT_RATING_UNKNOWN"));
 
-        let mut variant = direct_drop_in(&baseline, "SLEEP-POD-FIRE-EVIDENCE", 2);
+        let mut baseline_with_fire_evidence = baseline.clone();
+        baseline_with_fire_evidence.module_catalog.iter_mut()
+            .find(|module| module.module_id == "SLEEP-POD").expect("sleep pod exists")
+            .fire_material_status = "authority_reviewed".to_owned();
+        let mut variant = direct_drop_in(&baseline_with_fire_evidence, "SLEEP-POD-FIRE-EVIDENCE", 2);
         variant.replacement.fire_material_status = "unknown".to_owned();
-        let report = generate_drop_in_variants(&baseline, &[variant]).expect("report serializes");
+        let report = generate_drop_in_variants(&baseline_with_fire_evidence, &[variant]).expect("report serializes");
         assert_eq!(report.body.variants[0].disposition, VariantDisposition::RequiresReconfiguration);
         assert!(report.body.variants[0].preflight_findings.iter()
             .any(|finding| finding.code == "MODULE_EVIDENCE_DOWNGRADE"));
