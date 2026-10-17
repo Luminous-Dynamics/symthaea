@@ -74,7 +74,7 @@ impl From<RoutingError> for RouteBundleError {
     }
 }
 
-#[derive(Clone, Debug, Deserialize, Serialize, PartialEq, Eq, PartialOrd, Ord)]
+#[derive(Clone, Debug, Deserialize, Serialize, PartialEq, Eq)]
 #[serde(deny_unknown_fields)]
 pub struct GridEdge {
     pub a: GridPoint,
@@ -748,7 +748,7 @@ pub fn verify_route_bundle_report(
 mod tests {
     use super::*;
     use crate::modular_interior_service_routing::{
-        AnchorEvidenceClass, AnchorSide, RoutingAnchor,
+        AnchorEvidenceClass, RoutingAnchor,
     };
 
     fn service_anchor(service_id: &str, x: i64, y: i64) -> RoutingAnchor {
