@@ -3366,7 +3366,7 @@ mod tests {
         let classical = compose_with_spec(&MusicalIntent::default(), &Style::Classical.spec());
         for style in Style::ALL.into_iter().filter(|style| {
             !matches!(
-                style,
+                *style,
                 Style::Classical
                     | Style::Waltz
                     | Style::Folk
