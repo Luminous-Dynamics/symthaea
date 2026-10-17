@@ -212,8 +212,9 @@ pub fn humanize_score_note_with_profile(
         || !note.velocity.is_finite()
         || note.start_time < 0.0
         || note.duration < 0.0
+        || note.duration > f32::MAX / profile.duration_scale
     {
-        return Err("note timing, duration, and velocity must be finite and timing nonnegative");
+        return Err("note values must be finite and nonnegative, with duration multiplication representable");
     }
 
     let beat_in_bar = beat_position.rem_euclid(beats_per_bar);
@@ -310,6 +311,17 @@ mod tests {
             0,
             PerformanceProfileV1::default()
         ).is_err());
+
+        let mut oversized = original;
+        oversized.duration = f32::MAX;
+        assert!(humanize_score_note_with_profile(
+            &mut oversized,
+            1.0,
+            4.0,
+            0,
+            PerformanceProfileV1::default()
+        ).is_err());
+        assert_eq!(oversized.duration, f32::MAX, "invalid input must not mutate the note");
     }
 
     #[test]
