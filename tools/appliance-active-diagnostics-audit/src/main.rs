@@ -26,7 +26,7 @@ pub(crate) struct Decision {
 }
 
 #[derive(Debug, PartialEq, Eq)]
-struct AuditSummary {
+pub(crate) struct AuditSummary {
     trace_count: usize,
     selected: usize,
     abstained: usize,
