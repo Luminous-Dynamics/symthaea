@@ -338,6 +338,7 @@ pub enum MdInputError {
     NegativeTemperature,
     NonFiniteFiniteDifferenceStep,
     NonPositiveFiniteDifferenceStep,
+    NonFiniteFiniteDifferenceDenominator,
     StepCountOverflow,
     NonFiniteTrajectoryDuration,
 }
@@ -377,6 +378,9 @@ impl std::fmt::Display for MdInputError {
             Self::NonFiniteFiniteDifferenceStep => write!(f, "finite-difference step must be finite"),
             Self::NonPositiveFiniteDifferenceStep => {
                 write!(f, "finite-difference step must be greater than zero")
+            }
+            Self::NonFiniteFiniteDifferenceDenominator => {
+                write!(f, "twice the finite-difference step must be finite for the central-difference denominator")
             }
             Self::StepCountOverflow => {
                 write!(f, "step count plus initial frame overflows usize")
@@ -486,6 +490,11 @@ pub fn validate_md_inputs(molecule: &Molecule, config: &MdConfig) -> Result<(), 
     }
     if config.fd_step <= 0.0 {
         return Err(MdInputError::NonPositiveFiniteDifferenceStep);
+    }
+    // The central-difference formula divides by 2 * fd_step; reject overflow
+    // before any basis construction or SCF evaluation.
+    if !(2.0 * config.fd_step).is_finite() {
+        return Err(MdInputError::NonFiniteFiniteDifferenceDenominator);
     }
 
     for (atom_index, atom) in molecule.atoms.iter().enumerate() {
@@ -947,6 +956,11 @@ mod tests {
         assert_eq!(
             validate_md_inputs(&molecule, &config),
             Err(MdInputError::NonFiniteFiniteDifferenceStep)
+        );
+        config.fd_step = 1.0e308;
+        assert_eq!(
+            validate_md_inputs(&molecule, &config),
+            Err(MdInputError::NonFiniteFiniteDifferenceDenominator)
         );
     }
 
