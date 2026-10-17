@@ -107,6 +107,26 @@ fn process_validators_reject_empty_trajectories() {
 }
 
 #[test]
+fn process_validators_reject_below_absolute_zero() {
+    let impossible = ThermalTrajectory::hold(-300.0, 5.0);
+    assert_invalid_numeric(validate_candy(&Candy {
+        stage: SugarStage::SoftBall,
+        trajectory: impossible,
+    }));
+}
+
+#[test]
+fn pasteurization_rejects_overflowed_lethality_calculation() {
+    // A finite but absurd input can overflow the exponential lethality model.
+    // The validator must reject the result rather than interpret infinity as safe.
+    assert_invalid_numeric(validate_pasteurization(&Pasteurization {
+        pathogen: Pathogen::SalmonellaPoultry,
+        trajectory: ThermalTrajectory::hold(f64::MAX, 5.0),
+        required_log_reduction: None,
+    }));
+}
+
+#[test]
 fn process_validators_reject_reversed_time() {
     let reversed = ThermalTrajectory::new(vec![(5.0, 60.0), (0.0, 60.0)]);
     assert_invalid_numeric(validate_candy(&Candy {
