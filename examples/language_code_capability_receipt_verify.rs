@@ -10,6 +10,7 @@
 
 use serde_json::{json, Value};
 use sha2::{Digest, Sha256};
+use std::path::{Component, Path};
 use std::process;
 
 const CORPUS: &str =
@@ -43,7 +44,11 @@ fn nonempty_string<'a>(value: &'a Value, key: &str) -> Option<&'a str> {
 ///
 /// Specific tampering/negative-control conditions are checked before generic
 /// required fields so each frozen control tests the intended invariant.
-fn validate_receipt(receipt: &Value) -> Result<(), String> {
+fn validate_receipt(
+    receipt: &Value,
+    expected_source_sha: Option<&str>,
+    artifact_bytes_override: Option<&[u8]>,
+) -> Result<(), String> {
     let status = receipt.get("status").and_then(Value::as_str).unwrap_or("");
 
     let dataset_digest = receipt
@@ -60,11 +65,16 @@ fn validate_receipt(receipt: &Value) -> Result<(), String> {
         return Err("skipped_lane_cannot_claim_pass".to_owned());
     }
 
+    let actual_source = receipt
+        .get("source_sha")
+        .and_then(Value::as_str)
+        .unwrap_or("");
+    if let Some(pinned_source) = expected_source_sha {
+        if !is_lower_hex(pinned_source, 40) || actual_source != pinned_source {
+            return Err("source_revision_mismatch".to_owned());
+        }
+    }
     if let Some(expected_source) = receipt.get("expected_source_sha").and_then(Value::as_str) {
-        let actual_source = receipt
-            .get("source_sha")
-            .and_then(Value::as_str)
-            .unwrap_or("");
         if actual_source != expected_source {
             return Err("source_revision_mismatch".to_owned());
         }
@@ -78,11 +88,11 @@ fn validate_receipt(receipt: &Value) -> Result<(), String> {
 
     if let Some(declared_digest) = receipt.get("declared_artifact_sha256") {
         let declared = declared_digest.as_str().unwrap_or("");
-        let artifact = receipt
-            .get("artifact_bytes")
-            .and_then(Value::as_str)
-            .unwrap_or("");
-        if !is_lower_hex(declared, 64) || sha256_hex(artifact.as_bytes()) != declared {
+        let embedded_artifact = receipt.get("artifact_bytes").and_then(Value::as_str);
+        let artifact_bytes = artifact_bytes_override
+            .or_else(|| embedded_artifact.map(str::as_bytes))
+            .ok_or_else(|| "missing_artifact_bytes".to_owned())?;
+        if !is_lower_hex(declared, 64) || sha256_hex(artifact_bytes) != declared {
             return Err("artifact_digest_mismatch".to_owned());
         }
     }
@@ -149,16 +159,31 @@ fn validate_receipt(receipt: &Value) -> Result<(), String> {
             return Err("passed_receipt_without_tests_or_compile_only_policy".to_owned());
         }
 
-        let artifact = receipt
-            .get("artifact_bytes")
-            .and_then(Value::as_str)
+        let embedded_artifact = receipt.get("artifact_bytes").and_then(Value::as_str);
+        let artifact_bytes = artifact_bytes_override
+            .or_else(|| embedded_artifact.map(str::as_bytes))
             .ok_or_else(|| "missing_artifact_bytes".to_owned())?;
         let declared = receipt
             .get("declared_artifact_sha256")
             .and_then(Value::as_str)
             .ok_or_else(|| "missing_artifact_digest".to_owned())?;
-        if !is_lower_hex(declared, 64) || sha256_hex(artifact.as_bytes()) != declared {
+        if !is_lower_hex(declared, 64) || sha256_hex(artifact_bytes) != declared {
             return Err("artifact_digest_mismatch".to_owned());
+        }
+        let payload = receipt
+            .get("result_payload")
+            .ok_or_else(|| "missing_result_payload".to_owned())?;
+        let declared_result = receipt
+            .get("declared_result_sha256")
+            .and_then(Value::as_str)
+            .ok_or_else(|| "missing_result_payload_digest".to_owned())?;
+        let payload_bytes = serde_json::to_vec(payload)
+            .map_err(|_| "result_payload_digest_or_status_mismatch".to_owned())?;
+        if !is_lower_hex(declared_result, 64)
+            || sha256_hex(&payload_bytes) != declared_result
+            || payload.get("status").and_then(Value::as_str) != Some(status)
+        {
+            return Err("result_payload_digest_or_status_mismatch".to_owned());
         }
     }
 
@@ -189,7 +214,7 @@ fn run_negative_controls() -> Result<Value, String> {
             .get("receipt_fixture")
             .ok_or_else(|| format!("{id}: missing receipt_fixture"))?;
 
-        let actual = validate_receipt(receipt);
+        let actual = validate_receipt(receipt, None, None);
         match actual {
             Err(ref reason) if reason == expected_reason => {
                 rejected_as_expected += 1;
@@ -235,7 +260,112 @@ fn run_negative_controls() -> Result<Value, String> {
     }))
 }
 
+fn resolve_artifact_under_root(root: &Path, relative_path: &str) -> Result<Vec<u8>, String> {
+    let relative = Path::new(relative_path);
+    if relative.is_absolute()
+        || !relative.components().all(|component| matches!(component, Component::Normal(_)))
+    {
+        return Err("artifact_path_must_be_relative_and_cannot_traverse".to_owned());
+    }
+
+    let canonical_root = root
+        .canonicalize()
+        .map_err(|_| "artifact_root_unavailable".to_owned())?;
+    let candidate = canonical_root.join(relative);
+    let canonical_candidate = candidate
+        .canonicalize()
+        .map_err(|_| "artifact_file_unavailable".to_owned())?;
+    if !canonical_candidate.starts_with(&canonical_root) || !canonical_candidate.is_file() {
+        return Err("artifact_path_escapes_root_or_is_not_a_file".to_owned());
+    }
+
+    std::fs::read(canonical_candidate).map_err(|_| "artifact_file_unreadable".to_owned())
+}
+
+fn verify_external_receipt(args: &[String]) -> Result<(Value, bool), String> {
+    let mut receipt_path: Option<&str> = None;
+    let mut artifact_root: Option<&str> = None;
+    let mut expected_source: Option<&str> = None;
+    let mut index = 0usize;
+    while index < args.len() {
+        let key = args[index].as_str();
+        let value = args
+            .get(index + 1)
+            .map(String::as_str)
+            .ok_or_else(|| format!("missing value for {key}"))?;
+        match key {
+            "--receipt" => receipt_path = Some(value),
+            "--artifact-root" => artifact_root = Some(value),
+            "--expected-source-sha" => expected_source = Some(value),
+            _ => return Err(format!("unknown argument: {key}")),
+        }
+        index += 2;
+    }
+
+    let receipt_path = receipt_path.ok_or_else(|| "--receipt is required".to_owned())?;
+    let artifact_root = artifact_root.ok_or_else(|| "--artifact-root is required".to_owned())?;
+    let expected_source = expected_source
+        .ok_or_else(|| "--expected-source-sha is required to pin the expected head".to_owned())?;
+    if !is_lower_hex(expected_source, 40) {
+        return Err("--expected-source-sha must be 40 lowercase hexadecimal characters".to_owned());
+    }
+
+    let raw = std::fs::read(receipt_path).map_err(|_| "receipt_file_unavailable".to_owned())?;
+    let receipt: Value = serde_json::from_slice(&raw)
+        .map_err(|_| "receipt_file_is_not_valid_json".to_owned())?;
+    let relative_artifact = receipt
+        .get("artifact_path")
+        .and_then(Value::as_str)
+        .ok_or_else(|| "missing_artifact_path".to_owned())?;
+    let artifact_bytes = resolve_artifact_under_root(Path::new(artifact_root), relative_artifact)?;
+
+    match validate_receipt(&receipt, Some(expected_source), Some(&artifact_bytes)) {
+        Ok(()) => Ok((
+            json!({
+                "status": "RECEIPT_VALID",
+                "benchmark_evaluated": false,
+                "source_sha": expected_source,
+                "artifact_path": relative_artifact,
+                "artifact_sha256": sha256_hex(&artifact_bytes),
+                "claim_ceiling": "Receipt metadata and referenced artifact identity are internally consistent; this does not independently rerun the declared tests."
+            }),
+            true,
+        )),
+        Err(reason) => Ok((
+            json!({
+                "status": "RECEIPT_REJECTED",
+                "benchmark_evaluated": false,
+                "reason": reason,
+                "claim_ceiling": "The receipt did not satisfy the independent integrity contract."
+            }),
+            false,
+        )),
+    }
+}
+
 fn main() {
+    let args: Vec<String> = std::env::args().skip(1).collect();
+    if !args.is_empty() && args[0] == "--receipt" {
+        match verify_external_receipt(&args) {
+            Ok((report, accepted)) => {
+                println!("{}", serde_json::to_string_pretty(&report).unwrap_or_else(|_| "{}".into()));
+                if !accepted {
+                    process::exit(2);
+                }
+            }
+            Err(error) => {
+                eprintln!("receipt verifier could not evaluate input: {error}");
+                process::exit(3);
+            }
+        }
+        return;
+    }
+
+    if !args.is_empty() {
+        eprintln!("usage: language_code_capability_receipt_verify [--receipt FILE --artifact-root DIR --expected-source-sha SHA40]");
+        process::exit(64);
+    }
+
     match run_negative_controls() {
         Ok(report) => match serde_json::to_string_pretty(&report) {
             Ok(rendered) => println!("{rendered}"),
@@ -288,7 +418,12 @@ mod tests {
 
     #[test]
     fn accepts_consistent_receipt_with_recomputed_digests() {
-        assert_eq!(validate_receipt(&valid_receipt()), Ok(()));
+        let pinned_source = "a".repeat(40);
+        let receipt = valid_receipt();
+        assert_eq!(
+            validate_receipt(&receipt, Some(&pinned_source), None),
+            Ok(())
+        );
     }
 
     #[test]
@@ -296,7 +431,7 @@ mod tests {
         let mut receipt = valid_receipt();
         receipt.as_object_mut().unwrap().remove("dataset_sha256");
         assert_eq!(
-            validate_receipt(&receipt),
+            validate_receipt(&receipt, None, None),
             Err("missing_required_dataset_digest".to_owned())
         );
     }
@@ -306,7 +441,7 @@ mod tests {
         let mut receipt = valid_receipt();
         receipt["artifact_bytes"] = json!("different code bytes");
         assert_eq!(
-            validate_receipt(&receipt),
+            validate_receipt(&receipt, None, None),
             Err("artifact_digest_mismatch".to_owned())
         );
     }
@@ -316,8 +451,28 @@ mod tests {
         let mut receipt = valid_receipt();
         receipt["result_payload"]["tests_failed"] = json!(1);
         assert_eq!(
-            validate_receipt(&receipt),
+            validate_receipt(&receipt, None, None),
             Err("result_payload_digest_or_status_mismatch".to_owned())
+        );
+    }
+
+    #[test]
+    fn rejects_receipt_for_an_unexpected_source_revision() {
+        let mut receipt = valid_receipt();
+        receipt["source_sha"] = json!("c".repeat(40));
+        assert_eq!(
+            validate_receipt(&receipt, Some(&"a".repeat(40)), None),
+            Err("source_revision_mismatch".to_owned())
+        );
+    }
+
+    #[test]
+    fn uses_external_artifact_bytes_when_verifying_digest() {
+        let receipt = valid_receipt();
+        let different_bytes = b"not the artifact embedded in the test receipt";
+        assert_eq!(
+            validate_receipt(&receipt, Some(&"a".repeat(40)), Some(different_bytes)),
+            Err("artifact_digest_mismatch".to_owned())
         );
     }
 
@@ -326,7 +481,7 @@ mod tests {
         let mut receipt = valid_receipt();
         receipt["test_exit_code"] = json!(1);
         assert_eq!(
-            validate_receipt(&receipt),
+            validate_receipt(&receipt, None, None),
             Err("test_exit_status_conflicts_with_pass".to_owned())
         );
     }
@@ -337,7 +492,7 @@ mod tests {
         receipt["claim"] = json!("functional_correctness");
         receipt["tests_executed"] = json!(0);
         assert_eq!(
-            validate_receipt(&receipt),
+            validate_receipt(&receipt, None, None),
             Err("functional_claim_without_tests".to_owned())
         );
     }
@@ -347,7 +502,7 @@ mod tests {
         let mut receipt = valid_receipt();
         receipt["test_lane_status"] = json!("skipped");
         assert_eq!(
-            validate_receipt(&receipt),
+            validate_receipt(&receipt, None, None),
             Err("skipped_lane_cannot_claim_pass".to_owned())
         );
     }
