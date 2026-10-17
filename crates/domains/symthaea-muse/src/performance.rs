@@ -373,6 +373,9 @@ pub fn apply_phrase_timing_curve(
             return Err("timing curve would create an unrepresentable onset");
         }
         let proposed = proposed_f64 as f32;
+        if offset_seconds != 0.0 && proposed == note.start_time {
+            return Err("timing curve offset is below the representable onset precision");
+        }
         if proposed < previous_start {
             return Err("timing curve would reorder note attacks");
         }
