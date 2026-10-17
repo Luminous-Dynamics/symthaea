@@ -850,7 +850,7 @@ pub const CATALOG: [CanonicalStyle; 152] = [
     ),
     style!(10, "Minuet and Trio", BaroqueEarlyDance),
     style!(11, "Gavotte", BaroqueEarlyDance),
-    style!(12, "Sarabande", BaroqueEarlyDance),
+    style!(12, "Sarabande", BaroqueEarlyDance, "Sarabande", Developing),
     style!(13, "Gigue", BaroqueEarlyDance),
     style!(14, "Allemande", BaroqueEarlyDance),
     style!(15, "Toccata", BaroqueEarlyDance),
@@ -1208,12 +1208,12 @@ mod tests {
     #[test]
     fn all_current_composer_styles_are_mapped_once() {
         let implemented: Vec<_> = implemented_catalog().collect();
-        assert_eq!(implemented.len(), 33);
+        assert_eq!(implemented.len(), 34);
         let names: HashSet<_> = implemented
             .iter()
             .filter_map(|entry| entry.composer_style)
             .collect();
-        assert_eq!(names.len(), 33);
+        assert_eq!(names.len(), 34);
         assert!(
             implemented
                 .iter()
