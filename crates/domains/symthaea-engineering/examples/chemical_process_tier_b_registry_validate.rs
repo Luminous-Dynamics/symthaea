@@ -786,25 +786,27 @@ mod tests {
     #[test]
     fn transitive_common_ancestor_blocks_independence_even_when_leaf_hashes_differ() {
         let mut value = frozen_receipt_registry();
-        let audit = &mut value["candidates"][0]["reference_outputs"]["freeze_receipt"]["shared_dependency_audit"];
         let common = "sha256:ffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffff";
-        audit["lineage_nodes"][0]["derived_from"] = json!([common]);
-        audit["lineage_nodes"][1]["derived_from"] = json!([common]);
-        audit["lineage_nodes"].as_array_mut().unwrap().push(json!({
-            "artifact": "common-upstream-property-source",
-            "sha256": common,
-            "derived_from": []
-        }));
-        // Direct model outputs have different digests. The shared source is only visible transitively.
-        audit["shared_dependency_digests"] = json!([common]);
-        audit["independent_corroboration_claimed"] = json!(false);
+        {
+            let audit = &mut value["candidates"][0]["reference_outputs"]["freeze_receipt"]["shared_dependency_audit"];
+            audit["lineage_nodes"][0]["derived_from"] = json!([common]);
+            audit["lineage_nodes"][1]["derived_from"] = json!([common]);
+            audit["lineage_nodes"].as_array_mut().unwrap().push(json!({
+                "artifact": "common-upstream-property-source",
+                "sha256": common,
+                "derived_from": []
+            }));
+            // Direct model outputs have different digests. The shared source is only visible transitively.
+            audit["shared_dependency_digests"] = json!([common]);
+            audit["independent_corroboration_claimed"] = json!(false);
+        }
         assert!(
             validate_registry(&value).is_empty(),
             "transitive shared source should be accepted when disclosed without an independence claim: {:?}",
             validate_registry(&value)
         );
 
-        audit["independent_corroboration_claimed"] = json!(true);
+        value["candidates"][0]["reference_outputs"]["freeze_receipt"]["shared_dependency_audit"]["independent_corroboration_claimed"] = json!(true);
         assert!(
             validate_registry(&value).iter().any(|error| error.contains("transitive source-data dependencies overlap")),
             "a shared transitive ancestor must block independent corroboration"
