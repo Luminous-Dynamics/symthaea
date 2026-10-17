@@ -944,7 +944,10 @@ fn sample_outcome(distribution: &[f64], rng: &mut BenchmarkRng) -> usize {
             return outcome;
         }
     }
-    distribution.len().saturating_sub(1)
+    // Floating-point cumulative mass may end a few ulps below one. Falling back
+    // to the final *positive-mass* outcome prevents a hard intervention from
+    // ever sampling an impossible state just because of rounding.
+    distribution.iter().rposition(|probability| *probability > 0.0).unwrap_or(0)
 }
 
 fn posterior_top_index(posterior: &[HypothesisPrior]) -> usize {
@@ -1559,6 +1562,29 @@ mod tests {
                     assert!(distribution.iter().enumerate().all(|(state, probability)| {
                         ((state >> node) & 1) == value || *probability == 0.0
                     }));
+                }
+            }
+        }
+    }
+
+    #[test]
+    fn sampled_intervention_outcomes_respect_hard_do_assignments() {
+        for node in 0..NODE_COUNT {
+            for value in 0..=1 {
+                let action = ScmAction {
+                    id: format!("do_{node}_{value}"),
+                    kind: ActionKind::Intervene { node, value },
+                    cost: 1.0,
+                };
+                let distribution = outcome_distribution(
+                    CausalDag { edge_mask: edge_mask_with(&[(0, 1), (2, 1)]) },
+                    &action,
+                    params_alternative(),
+                );
+                for seed in 0..256_u64 {
+                    let mut rng = BenchmarkRng::new(seed);
+                    let state = sample_outcome(&distribution, &mut rng);
+                    assert_eq!((state >> node) & 1, value);
                 }
             }
         }
