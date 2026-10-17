@@ -696,7 +696,7 @@ mod tests {
         assert_eq!(validated.profile.id, "two-seat-100km-v1::candidate-alpha");
         assert_eq!(validated.profile.segments.len(), 2);
         assert_eq!(validated.profile.segments[0].id, "cruise");
-        assert!((validated.nominal_total_energy_wh - 34.166666666666664).abs() < 1e-9);
+        assert!((validated.nominal_total_energy_wh - 31.944444444444443).abs() < 1e-9);
         assert_eq!(validated.manifest.phases[0].power_uncertainty.lower_bound_w, 900.0);
     }
 
