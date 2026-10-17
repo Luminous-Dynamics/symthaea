@@ -260,6 +260,10 @@ pub enum ComparisonMetric {
     NormalizedSuccessAuc,
     /// Baseline best loss minus candidate best loss at the final budget; positive favors candidate.
     BestLossReductionAtBudget,
+    /// Minimum per-group candidate-minus-baseline success-rate delta across all declared groups.
+    WorstGroupSuccessRateAtBudget,
+    /// Minimum per-group candidate-minus-baseline normalized success-AUC delta across all declared groups.
+    WorstGroupNormalizedSuccessAuc,
 }
 
 /// Comparison interpretation against the predeclared practical-effect margin.
@@ -276,6 +280,8 @@ pub enum ComparisonDisposition {
     InsufficientIndependentGroups,
     /// At least one paired target lacks an evaluated outcome in either arm for the continuous-loss comparison.
     InsufficientTargetCoverage,
+    /// At least one group has fewer than two paired targets, so a within-group interval is not estimable.
+    InsufficientWithinGroupReplication,
 }
 
 /// Paired group-bootstrap result; positive deltas favour the candidate arm.
@@ -288,7 +294,7 @@ pub struct MetricComparison {
     pub comparison_arm_id: String,
     /// Compared metric.
     pub metric: ComparisonMetric,
-    /// Mean paired effect; loss reduction is baseline loss minus candidate loss, so positive is better.
+    /// Paired effect; for ordinary metrics this is the pooled mean difference, while for worst-group metrics it is the minimum group-level mean difference. Loss reduction is baseline minus candidate, so positive is better.
     /// With incomplete loss coverage this is descriptive over covered targets only; no interval is emitted.
     pub estimated_delta: f64,
     /// Percentile 95% interval lower bound; null if groups are insufficient.
@@ -407,7 +413,7 @@ pub fn evaluate_json_ledger(
         .ok_or_else(|| "baseline_arm_id is not present in arms".to_string())?;
     let baseline = &computations[baseline_index];
 
-    let mut comparisons = Vec::with_capacity((computations.len() - 1) * 3);
+    let mut comparisons = Vec::with_capacity((computations.len() - 1) * 5);
     for (index, candidate) in computations.iter().enumerate() {
         if index == baseline_index {
             continue;
@@ -439,6 +445,26 @@ pub fn evaluate_json_ledger(
             &candidate.targets,
             ComparisonMetric::BestLossReductionAtBudget,
             ledger.minimum_best_loss_reduction,
+            bootstrap_replicates,
+            bootstrap_seed,
+        )?);
+        comparisons.push(compare_worst_group_arms(
+            &ledger.baseline_arm_id,
+            &baseline.targets,
+            &candidate.metrics.arm_id,
+            &candidate.targets,
+            ComparisonMetric::WorstGroupSuccessRateAtBudget,
+            ledger.minimum_success_rate_delta,
+            bootstrap_replicates,
+            bootstrap_seed,
+        )?);
+        comparisons.push(compare_worst_group_arms(
+            &ledger.baseline_arm_id,
+            &baseline.targets,
+            &candidate.metrics.arm_id,
+            &candidate.targets,
+            ComparisonMetric::WorstGroupNormalizedSuccessAuc,
+            ledger.minimum_success_auc_delta,
             bootstrap_replicates,
             bootstrap_seed,
         )?);
@@ -930,6 +956,10 @@ fn compare_arms(
                     _ => None,
                 }
             }
+            ComparisonMetric::WorstGroupSuccessRateAtBudget
+            | ComparisonMetric::WorstGroupNormalizedSuccessAuc => {
+                return Err("worst-group comparisons must use compare_worst_group_arms".to_string());
+            }
         };
 
         if let Some(delta) = delta {
@@ -993,6 +1023,8 @@ fn compare_arms(
         ComparisonMetric::SuccessRateAtBudget => 0x5355_4343_4553_5301,
         ComparisonMetric::NormalizedSuccessAuc => 0x4155_4300_0000_0002,
         ComparisonMetric::BestLossReductionAtBudget => 0x4C4F_5353_5245_4403,
+        ComparisonMetric::WorstGroupSuccessRateAtBudget => 0x5753_5543_4300_0004,
+        ComparisonMetric::WorstGroupNormalizedSuccessAuc => 0x5753_4155_4300_0005,
     };
     let mut random = SplitMix64::new(
         bootstrap_seed ^ stable_hash64(candidate_arm_id.as_bytes()) ^ metric_salt,
@@ -1044,7 +1076,9 @@ fn target_metric(target: &TargetMetrics, metric: ComparisonMetric) -> Option<f64
     match metric {
         ComparisonMetric::SuccessRateAtBudget => Some(if target.success_at_budget { 1.0 } else { 0.0 }),
         ComparisonMetric::NormalizedSuccessAuc => Some(target.normalized_success_auc),
-        ComparisonMetric::BestLossReductionAtBudget => None,
+        ComparisonMetric::BestLossReductionAtBudget
+        | ComparisonMetric::WorstGroupSuccessRateAtBudget
+        | ComparisonMetric::WorstGroupNormalizedSuccessAuc => None,
     }
 }
 
