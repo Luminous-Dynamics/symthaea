@@ -19,7 +19,10 @@
       "const": "cyber-hunt-truth-v1"
     },
     "scenario_id": {
-      "const": "synthetic-identity-to-egress-v1"
+      "enum": [
+        "synthetic-identity-to-egress-v1",
+        "synthetic-artifact-lifecycle-v1"
+      ]
     },
     "profile": {
       "const": "public-synthetic-smoke-v1"
