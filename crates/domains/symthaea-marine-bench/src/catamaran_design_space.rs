@@ -151,18 +151,20 @@ fn validate_froude_axis(values: &[f64]) -> Result<(), DesignSpaceError> {
     Ok(())
 }
 
+fn checked_product(lengths: &[usize]) -> Result<usize, DesignSpaceError> {
+    lengths.iter().copied().try_fold(1_usize, |product, length| {
+        product.checked_mul(length).ok_or(DesignSpaceError::CardinalityOverflow)
+    })
+}
+
 fn checked_cardinality(spec: &DesignSpaceSpec) -> Result<usize, DesignSpaceError> {
-    [
+    checked_product(&[
         spec.hull_spacing_over_lwl.len(),
         spec.demihull_beam_over_lwl.len(),
         spec.draft_over_lwl.len(),
         spec.wet_deck_clearance_over_draft.len(),
         spec.froude_numbers.len(),
-    ]
-    .into_iter()
-    .try_fold(1_usize, |product, length| {
-        product.checked_mul(length).ok_or(DesignSpaceError::CardinalityOverflow)
-    })
+    ])
 }
 
 /// Generates a deterministic Cartesian design grid from caller-provided dimensionless
@@ -440,6 +442,14 @@ mod tests {
         assert_eq!(
             generate_design_space_with_revision(&spec(), " ").unwrap_err(),
             DesignSpaceError::EmptySourceRevision
+        );
+    }
+
+    #[test]
+    fn cardinality_overflow_is_rejected_without_allocating_axes() {
+        assert_eq!(
+            checked_product(&[usize::MAX, 2]),
+            Err(DesignSpaceError::CardinalityOverflow)
         );
     }
 
