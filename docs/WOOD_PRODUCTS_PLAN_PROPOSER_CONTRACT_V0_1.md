@@ -131,7 +131,9 @@ Real pilot work requires qualified forestry and mill input, calibrated/measured 
 
 ## Related implementation work
 
-- Symtropy benchmark and validator: https://github.com/Luminous-Dynamics/symtropy/pull/1742
+- Symtropy lifecycle benchmark and validator: https://github.com/Luminous-Dynamics/symtropy/pull/1742
+- Symtropy bounded cut-plan evaluator and greedy baseline: https://github.com/Luminous-Dynamics/symtropy/pull/1744
+- Follow-on geometry-aware sawlog validation issue: https://github.com/Luminous-Dynamics/symtropy/issues/1745
 - Mycelix material/provenance contracts: https://github.com/Luminous-Dynamics/mycelix/pull/5107
 - Sol-Atlas spatial evidence contract: https://github.com/Luminous-Dynamics/sol-atlas-leptos/pull/122
 - Tracking issue: https://github.com/Luminous-Dynamics/symthaea/issues/7711
