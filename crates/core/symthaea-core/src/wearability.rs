@@ -316,6 +316,9 @@ pub enum WearabilityDispositionV1 {
     TaskPlanRequiresReviewOrFallback,
     /// Device cannot be treated as returned to service.
     ReturnToServiceNotAdmitted,
+    /// Declared service checks passed; a responsible reviewer may consider return to service.
+    /// This disposition is not physical safety certification.
+    EligibleForReviewedReturnToService,
     /// Workflow remains incomplete; offer accessible help/options without penalty.
     RemainUnreadyAndOfferAccessibleOptions,
     /// A required interface-migration metric is not available.
@@ -459,7 +462,7 @@ fn evaluate_maintain(input: &WearabilityInputV1) -> WearabilityDispositionV1 {
         return WearabilityDispositionV1::ReadyForSimulation;
     }
     if module_changed {
-        return WearabilityDispositionV1::ReadyForSimulation;
+        return WearabilityDispositionV1::EligibleForReviewedReturnToService;
     }
     WearabilityDispositionV1::InvalidInput
 }
@@ -587,6 +590,22 @@ mod tests {
         assert_eq!(
             evaluate_wearability_request("profile-a", WearabilityStageV1::Maintain, &input).disposition,
             WearabilityDispositionV1::ReturnToServiceNotAdmitted
+        );
+    }
+
+    #[test]
+    fn reviewed_service_requires_calibration_and_diagnostics_to_be_declared() {
+        let input = WearabilityInputV1 {
+            module_changed: Some(true),
+            calibration_lineage_after_service: Some(
+                CalibrationLineageV1::VerifiedPreservedOrReestablished,
+            ),
+            diagnostic_result: Some(DiagnosticResultV1::PassDeclaredChecks),
+            ..Default::default()
+        };
+        assert_eq!(
+            evaluate_wearability_request("profile-a", WearabilityStageV1::Maintain, &input).disposition,
+            WearabilityDispositionV1::EligibleForReviewedReturnToService
         );
     }
 
