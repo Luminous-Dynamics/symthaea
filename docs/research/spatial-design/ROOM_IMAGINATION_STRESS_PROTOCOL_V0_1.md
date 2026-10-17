@@ -137,3 +137,39 @@ These are targets for later, separately validated model adapters—not propertie
 | Decision utility | Report whether a proposed clarification changes the feasible set or ranking on the known-answer cases; do not optimize question count alone |
 
 Do not set one universal numeric calibration tolerance across daylight, thermal comfort, acoustic, energy and structural models. Those require model-specific, risk-specific, data-backed tolerances selected before evaluation. Synthetic golden cases can test the checking logic, but only measured benchmark residuals and representative held-out data can inform real calibration claims.
+
+
+## Interoperability paradigm: requirement contracts, not another proprietary building format
+
+Use **open IFC for exchange and buildingSMART IDS for declared information requirements**, while keeping the spatial-design evidence graph as a separate traceability layer. IDS is a machine-readable standard that can state which objects, classifications, properties, values and units must be delivered and then check whether that information exists in the exchange. That is a strong foundation for the required-data contract, but it does not establish that the geometry itself is accurate, a simulation is valid, a building is buildable, or code compliance has been approved.
+
+- buildingSMART, *Information Delivery Specification (IDS)* — https://technical.buildingsmart.org/Projects/Information-Delivery-Specification-Ids/
+- buildingSMART, *IFC specifications; IFC 4.3.2.0 / ISO 16739-1:2024* — https://technical.buildingsmart.org/standards/ifc/ifc-schema-specifications/
+- buildingSMART, *IFC Validation Service* — https://info.buildingsmart.org/users/services/validation-service/
+
+### Design-handoff tests to add when a real adapter exists
+
+1. Freeze a versioned information-requirement profile for a particular handoff (for example, a room retrofit or maintenance/service access package); do not write one universal profile for all project stages.
+2. Validate the exported IFC against its IFC schema and the matching IDS profile using a recognized validator.
+3. Re-import into a different implementation, then compare required entities, relationships, properties, units, classifications and provenance mappings against the original model.
+4. For every missing, converted, defaulted or unmapped item, produce a machine-readable loss record. Opening successfully is not equivalence.
+5. Keep geometry correctness, performance validation, currentness and professional approval as separate qualification claims.
+
+The current stress case for lossy export tests only the manifest-level detection contract. It does not yet parse or validate IFC/IDS files. Do not claim IDS/IFC compatibility until an actual exporter/validator/round-trip corpus is available.
+
+## Benchmark scale-up: challenge-set discipline over raw case count
+
+A recent 2026 study reports a 679-query, expert-verified benchmark for geometry-intensive BIM/fire-safety reasoning and 84.3% accuracy for its proposed framework. This is a useful comparison point, not a reason to optimize for a larger headline count: the reported accuracy also shows why hard-gate false acceptance and traceable reasoning need to be measured separately. See Xiao et al. (2026), *Automating geometry-intensive compliance checking in BIM: Graph-based semantic reasoning framework*, *Automation in Construction* 189, 107038, https://doi.org/10.1016/j.autcon.2026.107038.
+
+Recommended maturity ladder after the current evaluator is running:
+
+| Level | Corpus and target |
+|---|---|
+| A — evaluator mechanics | All 47 current oracle assertions pass in the synthetic golden fixture; mutation tests reliably fail for altered observations and invalid evidence references |
+| B — exact geometry provider | At least 500 deterministically generated known-answer geometry questions, with 100 held out; 100% on declared synthetic hard predicates, explicit unknown for incomplete provider coverage, and zero renderer/collider-as-authority false accepts |
+| C — multi-hop design reasoning | At least 1,000 expert-adjudicated questions linking intent, context, geometry and evidence, with a sealed test split; report accuracy, abstention, calibration, source traceability, and false-accept rate separately |
+| D — solver-backed robustness | Per model, publish a held-out corpus and calibration report; every admitted candidate must meet the declared hard predicates across the required scenario set and remain within the predeclared uncertainty/stability envelope |
+| E — open handoff | At least 100 representative round-trip fixtures across supported exporters/importers and handoff profiles; 100% detection of seeded required-property loss, unit corruption and identity/reference breakage |
+| F — field evidence | Preregistered professional and resident studies, followed by measured post-occupancy comparisons with consent and governance; no synthetic-only claim of occupant benefit |
+
+These are proposed programme targets. Freeze the test split, oracle version, model envelopes, metric definitions and stopping rules *before* tuning against the evaluation set. A target of 100% is appropriate for the present small, deterministic synthetic hard-gate fixtures; real-world probabilistic or expert-adjudicated outcomes need confidence intervals, inter-rater disagreement, and a documented escalation/abstention policy rather than an unsupported universal guarantee.
