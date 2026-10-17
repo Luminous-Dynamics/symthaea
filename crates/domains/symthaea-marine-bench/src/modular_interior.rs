@@ -392,6 +392,28 @@ fn valid_bounds(bounds: &BoundsMm) -> bool {
         && bounds.z_min_mm < bounds.z_max_mm
 }
 
+fn validate_rated(value: &RatedValue, subject: &str, findings: &mut Vec<Finding>) {
+    if !matches!(
+        value.status.as_str(),
+        "unknown" | "design_assumption" | "computed" | "measured" | "source_verified"
+    ) {
+        add_finding(findings, "INVALID_RATING_STATUS", Severity::Error, subject,
+            "unsupported rating evidence status");
+    }
+    match value.value {
+        Some(number) if !number.is_finite() || number < 0.0 =>
+            add_finding(findings, "INVALID_RATING_VALUE", Severity::Error, subject,
+                "ratings must be finite and non-negative"),
+        Some(_) if value.status == "unknown" =>
+            add_finding(findings, "UNKNOWN_RATING_HAS_VALUE", Severity::Error, subject,
+                "unknown status cannot carry a numeric rating"),
+        None if value.status != "unknown" =>
+            add_finding(findings, "RATING_VALUE_MISSING", Severity::Indeterminate, subject,
+                "rating is missing despite a non-unknown status"),
+        _ => {}
+    }
+}
+
 fn physical_box(placement: &Placement, module: &ModuleDefinition) -> Option<Box3> {
     let length = module.envelope_mm.length_mm;
     let width = module.envelope_mm.width_mm;
@@ -508,7 +530,11 @@ fn compute_weight_ledger(
             continue;
         };
         let mp = &module.mass_properties;
-        let mass = mp.mass_kg.filter(|v| v.is_finite() && *v >= 0.0);
+        let mass = if mp.status == "unknown" {
+            None
+        } else {
+            mp.mass_kg.filter(|v| v.is_finite() && *v >= 0.0)
+        };
         if let Some(m) = mass {
             known_total += m;
             if !known_total.is_finite() {
@@ -639,10 +665,8 @@ pub fn validate_configuration(
             add_finding(&mut findings, "INVALID_DECK_BOUNDS", Severity::Error,
                 &deck.deck_id, "deck minimum coordinates must be below maximum coordinates");
         }
-        if deck.max_area_load_kg_m2.value.is_none() || deck.max_point_load_kg.value.is_none() {
-            add_finding(&mut findings, "DECK_LOAD_LIMIT_UNKNOWN", Severity::Indeterminate,
-                &deck.deck_id, "deck area/point load limits are not established");
-        }
+        validate_rated(&deck.max_area_load_kg_m2, &deck.deck_id, &mut findings);
+        validate_rated(&deck.max_point_load_kg, &deck.deck_id, &mut findings);
     }
 
     for module in &configuration.module_catalog {
@@ -666,10 +690,11 @@ pub fn validate_configuration(
                 add_finding(&mut findings, "DUPLICATE_PORT_ID", Severity::Error,
                     &module.module_id, format!("duplicate port ID {}", port.port_id));
             }
-            if port.rating.value.is_none() || port.rating.status == "unknown" {
-                add_finding(&mut findings, "PORT_RATING_UNKNOWN", Severity::Indeterminate,
-                    format!("{}.{}", module.module_id, port.port_id), "port rating is unknown");
-            } else if !matches!(port.rating.status.as_str(), "measured" | "source_verified") {
+            validate_rated(&port.rating, &format!("{}.{}", module.module_id, port.port_id), &mut findings);
+            if port.rating.value.is_some()
+                && port.rating.status != "unknown"
+                && !matches!(port.rating.status.as_str(), "measured" | "source_verified")
+            {
                 add_finding(&mut findings, "PORT_RATING_ASSUMED", Severity::Indeterminate,
                     format!("{}.{}", module.module_id, port.port_id), "port rating is not verified");
             }
@@ -689,10 +714,11 @@ pub fn validate_configuration(
     }
 
     for service in &configuration.platform_services {
-        if service.capacity.value.is_none() || service.capacity.status == "unknown" {
-            add_finding(&mut findings, "SERVICE_CAPACITY_UNKNOWN", Severity::Indeterminate,
-                &service.service_id, "platform service capacity is unknown");
-        } else if !matches!(service.capacity.status.as_str(), "measured" | "source_verified") {
+        validate_rated(&service.capacity, &service.service_id, &mut findings);
+        if service.capacity.value.is_some()
+            && service.capacity.status != "unknown"
+            && !matches!(service.capacity.status.as_str(), "measured" | "source_verified")
+        {
             add_finding(&mut findings, "SERVICE_CAPACITY_ASSUMED", Severity::Indeterminate,
                 &service.service_id, "platform service capacity is not verified");
         }
@@ -963,7 +989,9 @@ fn add_service_load(
         summary.disposition = "indeterminate_mixed_units".to_owned();
         return;
     }
-    if let (Some(sofar), Some(value)) = (summary.declared_load, port.rating.value) {
+    if port.rating.status == "unknown" {
+        summary.declared_load = None;
+    } else if let (Some(sofar), Some(value)) = (summary.declared_load, port.rating.value) {
         if value.is_finite() && value >= 0.0 && sofar.is_finite() {
             summary.declared_load = Some(sofar + value);
         } else {
@@ -973,7 +1001,9 @@ fn add_service_load(
         summary.declared_load = None;
     }
     match (summary.declared_load, service.capacity.value) {
-        (Some(load), Some(capacity)) if load > capacity + f64::EPSILON * capacity.abs().max(1.0) => {
+        (Some(load), Some(capacity))
+            if service.capacity.status != "unknown"
+                && load > capacity + f64::EPSILON * capacity.abs().max(1.0) => {
             summary.disposition = "exceeded_declared_capacity".to_owned();
             add_finding(findings, "SERVICE_CAPACITY_EXCEEDED", Severity::Error,
                 &service.service_id, format!("declared load {load} {} exceeds capacity {capacity} {}",
