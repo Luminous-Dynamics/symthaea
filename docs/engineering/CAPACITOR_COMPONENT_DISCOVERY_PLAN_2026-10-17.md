@@ -166,7 +166,10 @@ Evaluate each property separately: relative permittivity, loss tangent, breakdow
 
 ### B3 — Discovery efficiency
 
-Compare the proposed Symthaea-guided search against random search, a space-filling design, and a conventional Bayesian/multi-objective optimizer under equal candidate-evaluation budgets.
+Compare the proposed Symthaea-guided search against random feasible search, a space-filling design, random-forest and Gaussian-process Bayesian-optimization variants where appropriate, and a conventional multi-objective optimizer under equal candidate-evaluation budgets.
+
+A useful external benchmark across five experimental materials-science domains found that Bayesian optimization with random-forest surrogates was comparable to GP with automatic relevance detection, and both outperformed a GP baseline without ARD on those datasets. That result is not specific to dielectrics, but it demonstrates why Symthaea must compete against tuned conventional baselines rather than a deliberately weak strawman:
+https://www.nature.com/articles/s41524-021-00656-9
 
 - Pre-register at least 10 random seeds when evaluation is affordable.
 - Report feasible-candidate yield, time/cost per useful candidate, best feasible objective, Pareto hypervolume, uncertainty calibration, and number of expensive calculations avoided.
