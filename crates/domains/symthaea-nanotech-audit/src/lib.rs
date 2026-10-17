@@ -659,7 +659,7 @@ fn is_lower_hex(value: &str, expected_len: usize) -> bool {
 fn hash_artifact(run_dir: &Path, relative_path: &str) -> Result<(String, u64), String> {
     let relative = Path::new(relative_path);
     if relative.as_os_str().is_empty()
-        || relative_path.contains('\\\\')
+        || relative_path.contains('\\')
         || relative
             .components()
             .any(|component| !matches!(component, Component::Normal(_)))
