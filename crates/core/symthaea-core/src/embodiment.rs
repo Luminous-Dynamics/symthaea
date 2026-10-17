@@ -1007,9 +1007,14 @@ mod tests {
     struct TimingCaptureBridge {
         last_dt: Option<f32>,
         step_calls: usize,
+        authority: PlantStepAuthorityV1,
     }
 
     impl EmbodimentBridge for TimingCaptureBridge {
+        fn plant_step_authority(&self) -> PlantStepAuthorityV1 {
+            self.authority
+        }
+
         fn step(
             &mut self,
             _thought_hv: &ContinuousHV,
@@ -1065,6 +1070,7 @@ mod tests {
         let mut bridge = TimingCaptureBridge {
             last_dt: None,
             step_calls: 0,
+            authority: PlantStepAuthorityV1::ConfiguredSimulation,
         };
         let timing = PlantStepTimingV1::configured_simulation(7, 0.005).unwrap();
 
@@ -1075,6 +1081,44 @@ mod tests {
         assert!(result.success);
         assert_eq!(bridge.last_dt, Some(0.005));
         assert_eq!(bridge.step_calls, 1);
+    }
+
+    #[test]
+    fn undeclared_timing_authority_fails_closed_before_calling_legacy_bridge() {
+        let mut bridge = TimingCaptureBridge {
+            last_dt: None,
+            step_calls: 0,
+            authority: PlantStepAuthorityV1::Unspecified,
+        };
+        let timing = PlantStepTimingV1::configured_simulation(7, 0.005).unwrap();
+
+        assert!(matches!(
+            bridge.step_with_timing(&ContinuousHV::zero(16_384), &timing, 0.9),
+            Err(PlantStepTimingErrorV1::TimingAuthorityUnspecified)
+        ));
+        assert_eq!(bridge.last_dt, None);
+        assert_eq!(bridge.step_calls, 0);
+    }
+
+    #[test]
+    fn backend_measured_authority_does_not_fall_back_to_configured_dt() {
+        let mut bridge = TimingCaptureBridge {
+            last_dt: None,
+            step_calls: 0,
+            authority: PlantStepAuthorityV1::BackendMeasuredClockRequired,
+        };
+        let timing = PlantStepTimingV1::configured_simulation(7, 0.005).unwrap();
+
+        assert!(matches!(
+            bridge.step_with_timing(&ContinuousHV::zero(16_384), &timing, 0.9),
+            Err(PlantStepTimingErrorV1::ConfiguredSimulationStepNotAuthorized)
+        ));
+        assert!(matches!(
+            bridge.step_with_backend_timing(&ContinuousHV::zero(16_384), 7, 0.9),
+            Err(PlantStepTimingErrorV1::BackendMeasuredTimingUnsupported)
+        ));
+        assert_eq!(bridge.last_dt, None);
+        assert_eq!(bridge.step_calls, 0);
     }
 
     #[test]
