@@ -7,6 +7,7 @@ A standalone, standard-library-only Rust screening kernel for comparing farm-wor
 From the repository root:
 
 ```sh
+cargo run --manifest-path crates/agri-platform-bench/Cargo.toml --bin verify-manifest
 cargo test --manifest-path crates/agri-platform-bench/Cargo.toml --all-targets
 cargo run --manifest-path crates/agri-platform-bench/Cargo.toml --release
 ```
@@ -25,7 +26,7 @@ The crate defines its own Cargo workspace to avoid pulling the full Symthaea wor
 - Returns a component-wise assessment and a Pareto frontier; no weighted single “best robot” score is used.
 - Keeps manual/current practice as a first-class candidate. A robot can be rejected while the no-robot option remains feasible.
 
-The frozen synthetic case manifest is at `fixtures/scenario_manifest.tsv`. It currently contains 53 expected-disposition cases: 43 adversarial/evidence-boundary cases around a synthetic scouting fixture and 10 additional farm-task archetypes covering broad-acre tractor treatment, orchard scouting, greenhouse harvest, nursery handling, livestock monitoring, packhouse transport, fixed sensors, aerial survey, smallholder mechanical weeding, and an agrivoltaic access rejection. These are synthetic reference cases—not 10 real field validations—and expansion to 30+ distinct site/task families is still required.
+The independent `verify-manifest` binary does not import or call the screening kernel. It pins the raw manifest to a non-cryptographic FNV-1a regression fingerprint, checks header/row shape, duplicate IDs, status domain, required negative controls, and the named farm-task archetypes. Its `STRUCTURE_VALID_ONLY` output is a corpus-integrity result—not a claim that platform assessments or real farm data are correct.\n\nThe frozen synthetic case manifest is at `fixtures/scenario_manifest.tsv`. It currently contains 53 expected-disposition cases: 43 adversarial/evidence-boundary cases around a synthetic scouting fixture and 10 additional farm-task archetypes covering broad-acre tractor treatment, orchard scouting, greenhouse harvest, nursery handling, livestock monitoring, packhouse transport, fixed sensors, aerial survey, smallholder mechanical weeding, and an agrivoltaic access rejection. These are synthetic reference cases—not 10 real field validations—and expansion to 30+ distinct site/task families is still required.
 
 ## Important limitations
 
