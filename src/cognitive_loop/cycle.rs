@@ -402,15 +402,7 @@ impl CognitiveLoopService {
                             bridge
                                 .step_with_backend_timing(&thought_hv, plant_step_index, phi)
                                 .and_then(|outcome| {
-                                    outcome.timing.validate()?;
-                                    if outcome.timing.step_index != plant_step_index {
-                                        return Err(symthaea_core::embodiment::PlantStepTimingErrorV1::TimingStepIndexMismatch);
-                                    }
-                                    if outcome.timing.source
-                                        == symthaea_core::embodiment::PlantStepTimeSourceV1::ConfiguredSimulationStep
-                                    {
-                                        return Err(symthaea_core::embodiment::PlantStepTimingErrorV1::ConfiguredTimeReturnedForBackendMeasurement);
-                                    }
+                                    outcome.validate_for_step(plant_step_index)?;
                                     Ok((outcome.result, outcome.timing))
                                 })
                         }
