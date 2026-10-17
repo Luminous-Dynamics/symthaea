@@ -38,6 +38,21 @@ pub fn validate_split_manifest(manifest: &Value) -> Result<usize, String> {
     require_string(root.get("benchmark_id"), "benchmark_id")?;
     require_string(root.get("partition_algorithm"), "partition_algorithm")?;
     require_string(root.get("source_revision"), "source_revision")?;
+    let evaluation_regime = root
+        .get("evaluation_regime")
+        .and_then(Value::as_str)
+        .ok_or_else(|| "evaluation_regime must be a non-empty string".to_owned())?;
+    if ![
+        "unseen_listener",
+        "personalization",
+        "unseen_product_revision",
+        "fixture_transfer",
+        "session_transfer",
+    ]
+    .contains(&evaluation_regime)
+    {
+        return Err("evaluation_regime is not a supported benchmark regime".to_owned());
+    }
 
     let observations = root
         .get("observations")
@@ -92,6 +107,7 @@ pub fn validate_split_manifest(manifest: &Value) -> Result<usize, String> {
     }
 
     let mut seen_dimensions = HashSet::new();
+    let mut declared_roles: HashMap<&str, HashSet<&str>> = HashMap::new();
     for (rule_index, rule) in rules.iter().enumerate() {
         let rule = rule
             .as_object()
@@ -136,6 +152,10 @@ pub fn validate_split_manifest(manifest: &Value) -> Result<usize, String> {
                     "holdout rule {rule_index} repeats role {requested_role}"
                 ));
             }
+            declared_roles
+                .entry(dimension)
+                .or_default()
+                .insert(requested_role);
             if role_counts.get(requested_role).copied().unwrap_or(0) == 0 {
                 return Err(format!(
                     "holdout rule {rule_index} compares against empty role {requested_role}"
@@ -147,6 +167,43 @@ pub fn validate_split_manifest(manifest: &Value) -> Result<usize, String> {
             if test_values.iter().any(|value| comparison_values.contains(value)) {
                 return Err(format!(
                     "group leakage: dimension {dimension} overlaps between test and {requested_role}"
+                ));
+            }
+        }
+    }
+
+    let required_rules: &[(&str, &[&str])] = match evaluation_regime {
+        "unseen_listener" => &[("listener_id", &["train", "validation"])],
+        "personalization" => &[
+            ("listener_id", &["train", "validation"]),
+            ("excerpt_id", &["train", "validation", "calibration"]),
+            (
+                "measurement_session_id",
+                &["train", "validation", "calibration"],
+            ),
+        ],
+        "unseen_product_revision" => &[(
+            "product_revision_id",
+            &["train", "validation", "calibration"],
+        )],
+        "fixture_transfer" => &[(
+            "fixture_id",
+            &["train", "validation", "calibration"],
+        )],
+        "session_transfer" => &[(
+            "measurement_session_id",
+            &["train", "validation", "calibration"],
+        )],
+        _ => unreachable!("evaluation regime was checked above"),
+    };
+    for (dimension, required_roles) in required_rules {
+        let declared = declared_roles.get(dimension).ok_or_else(|| {
+            format!("regime {evaluation_regime} requires a holdout rule for {dimension}")
+        })?;
+        for required_role in *required_roles {
+            if !declared.contains(required_role) {
+                return Err(format!(
+                    "regime {evaluation_regime} requires {dimension} to be disjoint from {required_role}"
                 ));
             }
         }
@@ -246,5 +303,59 @@ mod tests {
         manifest["observations"][0]["role"] = serde_json::json!("test-ish");
         let error = validate_split_manifest(&manifest).expect_err("unknown role must fail");
         assert!(error.contains("unknown role"));
+    }
+
+    #[test]
+    fn rejects_unknown_evaluation_regime() {
+        let mut manifest = fixture();
+        manifest["evaluation_regime"] = serde_json::json!("random-row-split");
+        let error = validate_split_manifest(&manifest).expect_err("unknown regime must fail");
+        assert!(error.contains("evaluation_regime"));
+    }
+
+    #[test]
+    fn regime_requires_its_declared_holdout_dimensions() {
+        let mut manifest = fixture();
+        manifest["holdout_rules"] = serde_json::json!([
+            { "dimension": "listener_id", "disjoint_from_roles": ["train", "validation"] }
+        ]);
+        let error = validate_split_manifest(&manifest).expect_err("required dimensions cannot be omitted");
+        assert!(error.contains("requires a holdout rule for excerpt_id"));
+    }
+
+    #[test]
+    fn rejects_product_revision_leakage_in_product_transfer_regime() {
+        let mut manifest = fixture();
+        manifest["evaluation_regime"] = serde_json::json!("unseen_product_revision");
+        for row in manifest["observations"].as_array_mut().expect("rows") {
+            if row["role"] == "test" {
+                row["product_revision_id"] = serde_json::json!("headphone-h1-rev2");
+            }
+        }
+        manifest["holdout_rules"].as_array_mut().expect("rules").push(serde_json::json!({
+            "dimension": "product_revision_id",
+            "disjoint_from_roles": ["train", "validation", "calibration"]
+        }));
+        manifest["observations"][5]["product_revision_id"] = serde_json::json!("headphone-h1-rev1");
+        let error = validate_split_manifest(&manifest).expect_err("product leakage must fail");
+        assert!(error.contains("group leakage: dimension product_revision_id"));
+    }
+
+    #[test]
+    fn rejects_fixture_leakage_in_fixture_transfer_regime() {
+        let mut manifest = fixture();
+        manifest["evaluation_regime"] = serde_json::json!("fixture_transfer");
+        for row in manifest["observations"].as_array_mut().expect("rows") {
+            if row["role"] == "test" {
+                row["fixture_id"] = serde_json::json!("fixture-b");
+            }
+        }
+        manifest["holdout_rules"].as_array_mut().expect("rules").push(serde_json::json!({
+            "dimension": "fixture_id",
+            "disjoint_from_roles": ["train", "validation", "calibration"]
+        }));
+        manifest["observations"][5]["fixture_id"] = serde_json::json!("fixture-a");
+        let error = validate_split_manifest(&manifest).expect_err("fixture leakage must fail");
+        assert!(error.contains("group leakage: dimension fixture_id"));
     }
 }
