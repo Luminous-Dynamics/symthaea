@@ -245,7 +245,10 @@ fn run_negative_controls() -> Result<Value, String> {
 
     if examined != 8 || rejected_as_expected != examined {
         return Err(format!(
-            "negative-control gate failed: {rejected_as_expected}/{examined} controls rejected for the expected reason"
+            concat!(
+                "negative-control gate failed: ",
+                "{rejected_as_expected}/{examined} controls rejected for the expected reason"
+            )
         ));
     }
 
@@ -256,7 +259,10 @@ fn run_negative_controls() -> Result<Value, String> {
         "controls_examined": examined,
         "controls_rejected_as_expected": rejected_as_expected,
         "outcomes": outcomes,
-        "claim_ceiling": "The receipt checker rejected the frozen synthetic negative controls; this is not a model task score or a complete security audit."
+        "claim_ceiling": concat!(
+            "The receipt checker rejected the frozen synthetic negative controls; ",
+            "this is not a model task score or a complete security audit."
+        )
     }))
 }
 
@@ -327,7 +333,10 @@ fn verify_external_receipt(args: &[String]) -> Result<(Value, bool), String> {
                 "source_sha": expected_source,
                 "artifact_path": relative_artifact,
                 "artifact_sha256": sha256_hex(&artifact_bytes),
-                "claim_ceiling": "Receipt metadata and referenced artifact identity are internally consistent; this does not independently rerun the declared tests."
+                "claim_ceiling": concat!(
+                    "Receipt metadata and referenced artifact identity are internally consistent; ",
+                    "this does not independently rerun the declared tests."
+                )
             }),
             true,
         )),
@@ -364,7 +373,12 @@ fn main() {
     }
 
     if !args.is_empty() {
-        eprintln!("usage: language_code_capability_receipt_verify [--receipt FILE --artifact-root DIR --expected-source-sha SHA40]");
+        eprintln!(
+            concat!(
+                "usage: language_code_capability_receipt_verify ",
+                "[--receipt FILE --artifact-root DIR --expected-source-sha SHA40]"
+            )
+        );
         process::exit(64);
     }
 
