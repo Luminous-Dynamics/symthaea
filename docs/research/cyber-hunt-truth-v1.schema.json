@@ -23,11 +23,15 @@
         "synthetic-identity-to-egress-v1",
         "synthetic-artifact-lifecycle-v1",
         "synthetic-cloud-data-movement-v1",
-        "synthetic-cross-domain-trust-chain-v1"
+        "synthetic-cross-domain-trust-chain-v1",
+        "synthetic-benign-only-control-v1"
       ]
     },
     "profile": {
-      "const": "public-synthetic-smoke-v1"
+      "enum": [
+        "public-synthetic-smoke-v1",
+        "public-benign-only-control-v1"
+      ]
     },
     "seed": {
       "type": "integer",
@@ -74,7 +78,7 @@
     },
     "expected_relations": {
       "type": "array",
-      "minItems": 1,
+      "minItems": 0,
       "items": {
         "type": "object",
         "additionalProperties": false,
