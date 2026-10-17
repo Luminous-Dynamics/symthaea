@@ -14,6 +14,7 @@
 //! - [`inventory`]: economic order quantity (EOQ) + total cost.
 //! - [`queue`]: M/M/1 queue metrics (ρ, L, Lq, W, Wq).
 //! - [`graph`]: Dijkstra single-source shortest paths.
+//! - [`factory`]: deterministic skill/capability-constrained line scheduling and independent schedule verification.
 //!
 //! ## Example
 //!
@@ -23,10 +24,15 @@
 //! assert!((MM1 { arrival_rate: 2.0, service_rate: 3.0 }.avg_in_system() - 2.0).abs() < 1e-12);
 //! ```
 
+pub mod factory;
 pub mod graph;
 pub mod inventory;
 pub mod queue;
 
+pub use factory::{
+    FactoryOperation, FactoryResource, FactorySchedule, FactoryScheduleError, FactoryWorker,
+    ScheduledOperation, plan_factory_line, verify_factory_schedule,
+};
 pub use graph::dijkstra;
 pub use inventory::economic_order_quantity;
 pub use queue::MM1;
