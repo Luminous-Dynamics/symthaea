@@ -111,6 +111,7 @@ struct CorpusSummary {
 struct BenchmarkReceipt {
     schema: &'static str,
     result_scope: &'static str,
+    quality_qualified: bool,
     dataset: &'static str,
     selected_split: String,
     metadata_sha256: String,
@@ -250,6 +251,7 @@ fn run() -> Result<(), Box<dyn Error>> {
     let receipt = BenchmarkReceipt {
         schema: "melothaea-groove-timing-benchmark-v1",
         result_scope: "descriptive_profile_only_not_quality_qualified",
+        quality_qualified: false,
         dataset: "Groove MIDI Dataset; metadata and MIDI only; local user-supplied copy",
         selected_split: args.split,
         metadata_sha256,
@@ -261,7 +263,11 @@ fn run() -> Result<(), Box<dyn Error>> {
         source_files,
         generated_files,
         exclusions,
-        scope_boundary: "profile statistics only; no style-equated or score-matched superiority claim; no human preference evidence; generated and reference corpora differ in prompts, structure and style taxonomy",
+        scope_boundary: concat!(
+            "profile statistics only; no style-equated or score-matched superiority claim; ",
+            "no human preference evidence; generated and reference corpora differ in prompts, ",
+            "structure and style taxonomy",
+        ),
     };
 
     let json = serde_json::to_string_pretty(&receipt)?;
@@ -297,7 +303,10 @@ fn parse_arguments() -> Result<Option<Arguments>, Box<dyn Error>> {
             }
             "--split" => {
                 split = arguments.next().ok_or_else(|| {
-                    io::Error::new(io::ErrorKind::InvalidInput, "--split requires train, validation or test")
+                    io::Error::new(
+                        io::ErrorKind::InvalidInput,
+                        "--split requires train, validation or test",
+                    )
                 })?;
                 if !["train", "validation", "test"].contains(&split.as_str()) {
                     return Err(io::Error::new(
@@ -309,23 +318,35 @@ fn parse_arguments() -> Result<Option<Arguments>, Box<dyn Error>> {
             }
             "--limit" => {
                 let value = arguments.next().ok_or_else(|| {
-                    io::Error::new(io::ErrorKind::InvalidInput, "--limit requires a positive integer")
+                    io::Error::new(
+                        io::ErrorKind::InvalidInput,
+                        "--limit requires a positive integer",
+                    )
                 })?;
                 let parsed = value.parse::<usize>()?;
                 if parsed == 0 {
-                    return Err(io::Error::new(io::ErrorKind::InvalidInput, "--limit must be positive").into());
+                    return Err(
+                        io::Error::new(io::ErrorKind::InvalidInput, "--limit must be positive")
+                            .into(),
+                    );
                 }
                 file_limit = Some(parsed);
             }
             "--styles" => {
                 let value = arguments.next().ok_or_else(|| {
-                    io::Error::new(io::ErrorKind::InvalidInput, "--styles requires a positive integer")
+                    io::Error::new(
+                        io::ErrorKind::InvalidInput,
+                        "--styles requires a positive integer",
+                    )
                 })?;
                 generated_style_limit = value.parse::<usize>()?;
             }
             "--seeds" => {
                 let value = arguments.next().ok_or_else(|| {
-                    io::Error::new(io::ErrorKind::InvalidInput, "--seeds requires a positive integer")
+                    io::Error::new(
+                        io::ErrorKind::InvalidInput,
+                        "--seeds requires a positive integer",
+                    )
                 })?;
                 seeds_per_style = value.parse::<u64>()?;
             }
@@ -480,7 +501,7 @@ fn selected_dataset_rows(
             )
             .into());
         }
-        if fields[split_i] != split {
+        if fields[split_i].as_str() != split {
             continue;
         }
         let bpm = fields[bpm_i].parse::<f64>().map_err(|error| {
@@ -619,11 +640,6 @@ fn parse_drum_hits(bytes: &[u8], bpm: f64) -> Result<Vec<DrumHit>, String> {
 }
 
 impl CorpusAccumulator {
-    fn record_excluded_file(&mut self) {
-        self.files_examined += 1;
-        self.files_excluded += 1;
-    }
-
     fn record_file(&mut self, hits: &[DrumHit], bpm: f64) {
         self.files_examined += 1;
         if hits.is_empty() {
