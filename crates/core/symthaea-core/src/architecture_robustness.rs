@@ -211,7 +211,16 @@ pub struct RobustPairwiseAssessmentV1 {
     pub a_definitely_better_dimensions: Vec<ArchitectureMetricV1>,
     /// Dimensions where B is strictly better than A for every value in both intervals.
     pub b_definitely_better_dimensions: Vec<ArchitectureMetricV1>,
-    /// Neither candidate robustly dominates the other; do not infer a winner.
+    /// Dimensions where neither candidate is definitely better throughout its interval.
+    /// These are possible measurement targets, not guaranteed decision-changing experiments.
+    pub not_separated_dimensions: Vec<ArchitectureMetricV1>,
+    /// True when at least one dimension definitively favors A and another favors B.
+    /// This is a robustly established trade-off, not merely overlap or missing evidence.
+    pub definite_tradeoff: bool,
+    /// True when neither direction robustly dominates, there is no definite trade-off,
+    /// and at least one dominance direction remains logically possible within the bounds.
+    pub additional_evidence_may_change_dominance: bool,
+    /// Neither candidate robustly dominates the other; this alone does not imply uncertainty.
     pub unresolved: bool,
 }
 
@@ -489,6 +498,14 @@ pub fn evaluate_architecture_robustness(
                 unresolved_against[b_index].push(a.candidate_id.clone());
             }
 
+            let a_definitely_better = definitely_better_dimensions(a, b);
+            let b_definitely_better = definitely_better_dimensions(b, a);
+            let definite_tradeoff =
+                !a_definitely_better.is_empty() && !b_definitely_better.is_empty();
+            let additional_evidence_may_change_dominance = unresolved
+                && !definite_tradeoff
+                && (a_may || b_may);
+
             pairwise_assessments.push(RobustPairwiseAssessmentV1 {
                 candidate_a_id: a.candidate_id.clone(),
                 candidate_b_id: b.candidate_id.clone(),
@@ -496,8 +513,11 @@ pub fn evaluate_architecture_robustness(
                 b_robustly_dominates_a: b_robust,
                 a_may_dominate_b_within_bounds: a_may,
                 b_may_dominate_a_within_bounds: b_may,
-                a_definitely_better_dimensions: definitely_better_dimensions(a, b),
-                b_definitely_better_dimensions: definitely_better_dimensions(b, a),
+                not_separated_dimensions: not_separated_dimensions(a, b),
+                a_definitely_better_dimensions: a_definitely_better,
+                b_definitely_better_dimensions: b_definitely_better,
+                definite_tradeoff,
+                additional_evidence_may_change_dominance,
                 unresolved,
             });
 
@@ -705,6 +725,30 @@ fn may_dominate(
         strict_possible |= strict_possible_here;
     }
     no_worse_possible_on_all && strict_possible
+}
+
+fn not_separated_dimensions(
+    a: &RobustArchitectureCandidateV1,
+    b: &RobustArchitectureCandidateV1,
+) -> Vec<ArchitectureMetricV1> {
+    REQUIRED_METRICS
+        .into_iter()
+        .filter(|metric| {
+            let a_interval = interval_for(a, *metric);
+            let b_interval = interval_for(b, *metric);
+            let a_better = if is_higher_better(*metric) {
+                a_interval.lower > b_interval.upper + ROBUST_COMPARISON_EPSILON_V1
+            } else {
+                a_interval.upper < b_interval.lower - ROBUST_COMPARISON_EPSILON_V1
+            };
+            let b_better = if is_higher_better(*metric) {
+                b_interval.lower > a_interval.upper + ROBUST_COMPARISON_EPSILON_V1
+            } else {
+                b_interval.upper < a_interval.lower - ROBUST_COMPARISON_EPSILON_V1
+            };
+            !a_better && !b_better
+        })
+        .collect()
 }
 
 fn definitely_better_dimensions(
@@ -1005,13 +1049,20 @@ mod tests {
                 .robustly_dominated_by,
             vec!["balanced".to_owned()]
         );
-        assert!(report.pairwise_assessments.iter().any(|pair| {
-            pair.candidate_a_id == "balanced"
-                && pair.candidate_b_id == "mass-first"
-                && pair.unresolved
-                && !pair.a_robustly_dominates_b
-                && !pair.b_robustly_dominates_a
-        }));
+        let tradeoff = report
+            .pairwise_assessments
+            .iter()
+            .find(|pair| {
+                pair.candidate_a_id == "balanced"
+                    && pair.candidate_b_id == "mass-first"
+            })
+            .expect("balanced/mass-first pair exists");
+        assert!(tradeoff.unresolved);
+        assert!(!tradeoff.a_robustly_dominates_b && !tradeoff.b_robustly_dominates_a);
+        assert!(tradeoff.definite_tradeoff);
+        assert!(!tradeoff.additional_evidence_may_change_dominance);
+        assert!(!tradeoff.a_definitely_better_dimensions.is_empty());
+        assert!(!tradeoff.b_definitely_better_dimensions.is_empty());
     }
 
     #[test]
@@ -1028,6 +1079,9 @@ mod tests {
         assert!(pair.a_may_dominate_b_within_bounds);
         assert!(pair.b_may_dominate_a_within_bounds);
         assert!(pair.unresolved);
+        assert!(!pair.definite_tradeoff);
+        assert!(pair.additional_evidence_may_change_dominance);
+        assert_eq!(pair.not_separated_dimensions.len(), REQUIRED_METRICS.len());
     }
 
     #[test]
