@@ -71,6 +71,9 @@ pub enum ChainAuditError {
     ZeroTotalWeight,
     UnknownColumn(String),
     InvalidSha256(String),
+    MissingManifestEntry(String),
+    DuplicateManifestEntry(String),
+    MalformedChecksumManifestLine { line: usize },
     NumericalOverflow,
 }
 
@@ -96,6 +99,9 @@ impl fmt::Display for ChainAuditError {
             Self::ZeroTotalWeight => f.write_str("chain total weight must be finite and positive"),
             Self::UnknownColumn(name) => write!(f, "unknown chain column: {name}"),
             Self::InvalidSha256(value) => write!(f, "invalid SHA-256 digest: {value:?}"),
+            Self::MissingManifestEntry(path) => write!(f, "SHA-256 manifest has no entry for {path:?}"),
+            Self::DuplicateManifestEntry(path) => write!(f, "SHA-256 manifest has duplicate entries for {path:?}"),
+            Self::MalformedChecksumManifestLine { line } => write!(f, "malformed SHA-256 manifest line {line}"),
             Self::NumericalOverflow => f.write_str("chain summary overflowed floating-point arithmetic"),
         }
     }
@@ -146,6 +152,71 @@ fn validate_sha256_hex(value: &str) -> Result<(), ChainAuditError> {
         return Err(ChainAuditError::InvalidSha256(value.to_string()));
     }
     Ok(())
+}
+
+/// Resolve one exact relative-path entry from a standard SHA-256SUMS-style
+/// manifest (64 hex digits, whitespace separator, then the path). It rejects
+/// malformed non-empty lines, traversal-like target paths, missing entries,
+/// and duplicate entries rather than guessing which digest was intended.
+pub fn expected_sha256_from_manifest(
+    manifest_text: &str,
+    relative_path: &str,
+) -> Result<String, ChainAuditError> {
+    if relative_path.trim().is_empty()
+        || relative_path.starts_with('/')
+        || relative_path.chars().any(char::is_control)
+        || relative_path.split('/').any(|component| component == "..")
+    {
+        return Err(ChainAuditError::InvalidHeader(
+            "manifest target must be a non-empty relative path without '..' components".to_string(),
+        ));
+    }
+
+    let mut match_digest: Option<String> = None;
+    for (index, raw_line) in manifest_text.lines().enumerate() {
+        let line_number = index + 1;
+        let line = raw_line.trim_end_matches('\r');
+        if line.trim().is_empty() {
+            continue;
+        }
+        if line.len() < 66
+            || !line.as_bytes()[..64].iter().all(|byte| byte.is_ascii_hexdigit())
+            || !line.as_bytes()[64].is_ascii_whitespace()
+        {
+            return Err(ChainAuditError::MalformedChecksumManifestLine { line: line_number });
+        }
+        let digest = &line[..64];
+        let mut path = line[64..].trim_start();
+        // GNU sha256sum may prefix a binary filename with '*'. The DESI
+        // manifest uses the usual two-space text-file form, but accept both.
+        if let Some(unstarred) = path.strip_prefix('*') {
+            path = unstarred;
+        }
+        if path != relative_path {
+            continue;
+        }
+        validate_sha256_hex(digest)?;
+        if match_digest.is_some() {
+            return Err(ChainAuditError::DuplicateManifestEntry(relative_path.to_string()));
+        }
+        match_digest = Some(digest.to_ascii_lowercase());
+    }
+
+    match_digest.ok_or_else(|| ChainAuditError::MissingManifestEntry(relative_path.to_string()))
+}
+
+/// Verify a local file using the expected digest resolved from a frozen
+/// SHA-256SUMS-style manifest. The manifest itself must be acquired and
+/// retained separately; this function does not fetch remote resources.
+pub fn verify_sha256_file_against_manifest(
+    file_path: impl AsRef<Path>,
+    manifest_text: &str,
+    relative_path: &str,
+) -> Result<(String, String, bool), ChainAuditError> {
+    let expected = expected_sha256_from_manifest(manifest_text, relative_path)?;
+    let actual = sha256_file(file_path)?;
+    let matches = verify_sha256_digest(&actual, &expected)?;
+    Ok((expected, actual, matches))
 }
 
 impl ChainTable {
@@ -413,6 +484,58 @@ mod tests {
     }
 
     #[test]
+    fn checksum_manifest_lookup_is_exact_and_fail_closed() {
+        let digest = "ba7816bf8f01cfea414140de5dae2223b00361a396177a9cb410ff61f20015ad";
+        let manifest = format!("{digest}  data/abc.txt\n{digest}  data/def.txt\n");
+        assert_eq!(
+            expected_sha256_from_manifest(&manifest, "data/abc.txt").unwrap(),
+            digest
+        );
+        assert_eq!(
+            expected_sha256_from_manifest(&manifest, "missing.txt"),
+            Err(ChainAuditError::MissingManifestEntry("missing.txt".to_string()))
+        );
+        let duplicate = format!("{digest}  data/abc.txt\n{digest}  data/abc.txt\n");
+        assert_eq!(
+            expected_sha256_from_manifest(&duplicate, "data/abc.txt"),
+            Err(ChainAuditError::DuplicateManifestEntry("data/abc.txt".to_string()))
+        );
+        assert!(matches!(
+            expected_sha256_from_manifest("not a checksum line\n", "data/abc.txt"),
+            Err(ChainAuditError::MalformedChecksumManifestLine { line: 1 })
+        ));
+        assert!(expected_sha256_from_manifest(&manifest, "../abc.txt").is_err());
+    }
+
+    #[test]
+    fn manifest_file_verification_uses_the_named_entry() {
+        let directory = std::env::temp_dir().join(format!(
+            "symthaea-cosmology-manifest-{}",
+            std::process::id()
+        ));
+        std::fs::create_dir_all(&directory).unwrap();
+        let local = directory.join("chain.1.txt");
+        std::fs::write(&local, b"abc").unwrap();
+        let digest = "ba7816bf8f01cfea414140de5dae2223b00361a396177a9cb410ff61f20015ad";
+        let manifest = format!("{digest}  cobaya/base/desi-bao-all/chain.1.txt\n");
+        let result = verify_sha256_file_against_manifest(
+            &local,
+            &manifest,
+            "cobaya/base/desi-bao-all/chain.1.txt",
+        ).unwrap();
+        assert_eq!(result, (digest.to_string(), digest.to_string(), true));
+        std::fs::write(&local, b"abd").unwrap();
+        let result = verify_sha256_file_against_manifest(
+            &local,
+            &manifest,
+            "cobaya/base/desi-bao-all/chain.1.txt",
+        ).unwrap();
+        assert!(!result.2);
+        std::fs::remove_dir_all(directory).unwrap();
+    }
+
+    #[test]
+    fn weighted_summary_uses_named_columns_and_documented_quantiles() {    #[test]
     fn weighted_summary_uses_named_columns_and_documented_quantiles() {    #[test]
     fn weighted_summary_uses_named_columns_and_documented_quantiles() {
         let chain = ChainTable::parse(Cursor::new(FIXTURE)).unwrap();
