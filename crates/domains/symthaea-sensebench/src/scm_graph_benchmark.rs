@@ -21,6 +21,7 @@ const EDGE_PAIRS: [(usize, usize); 6] = [
     (0, 1), (0, 2), (1, 0), (1, 2), (2, 0), (2, 1),
 ];
 const WORLD_VARIANTS_PER_FAMILY: usize = 4;
+const MECHANISM_REGIME_COUNT: usize = 4;
 const MAX_TRIALS_PER_WORLD: usize = 10_000;
 const MAX_MEASUREMENT_BUDGET: usize = 64;
 const GENERATOR_VERSION: &str = "sensebench-scm-graphs-0.2.0";
@@ -77,7 +78,7 @@ pub enum ScmMechanismRegime {
 }
 
 impl ScmMechanismRegime {
-    fn all() -> [Self; WORLD_VARIANTS_PER_FAMILY] {
+    fn all() -> [Self; MECHANISM_REGIME_COUNT] {
         [
             Self::WeakPositiveDevelopment,
             Self::StrongPositiveDevelopment,
@@ -193,22 +194,25 @@ pub struct ScmGraphPolicySummary {
 pub struct ScmGraphPolicyAggregate {
     pub policy: ScmGraphPolicy,
     pub held_out_worlds: usize,
-    /// Each world has equal weight, regardless of trials run in that world.
+    /// Distinct graph topologies represented among the held-out worlds.
+    pub held_out_topology_instances: usize,
+    /// Confidence intervals resample topology instances, averaging their held-out
+    /// mechanism regimes first so paired worlds are not treated as independent.
     pub mean_held_out_skeleton_f1: f64,
-    pub held_out_skeleton_f1_world_ci95: [f64; 2],
+    pub held_out_skeleton_f1_topology_instance_ci95: [f64; 2],
     pub mean_held_out_directed_edge_f1: f64,
-    pub held_out_directed_edge_f1_world_ci95: [f64; 2],
+    pub held_out_directed_edge_f1_topology_instance_ci95: [f64; 2],
     pub mean_held_out_cpdag_skeleton_f1: f64,
-    pub held_out_cpdag_skeleton_f1_world_ci95: [f64; 2],
+    pub held_out_cpdag_skeleton_f1_topology_instance_ci95: [f64; 2],
     pub mean_held_out_compelled_direction_f1: f64,
-    pub held_out_compelled_direction_f1_world_ci95: [f64; 2],
+    pub held_out_compelled_direction_f1_topology_instance_ci95: [f64; 2],
     pub mean_held_out_cpdag_mark_distance: f64,
-    pub held_out_cpdag_mark_distance_world_ci95: [f64; 2],
+    pub held_out_cpdag_mark_distance_topology_instance_ci95: [f64; 2],
     pub held_out_markov_equivalence_class_recovery_rate: f64,
     pub mean_held_out_cpdag_claim_coverage: f64,
     pub mean_held_out_false_cpdag_claim_rate_all_trials: f64,
     pub mean_held_out_shd: f64,
-    pub held_out_shd_world_ci95: [f64; 2],
+    pub held_out_shd_topology_instance_ci95: [f64; 2],
     pub worst_world_directed_edge_f1: f64,
     pub worst_world_shd: f64,
     pub mean_held_out_exact_graph_recovery_rate: f64,
@@ -1199,6 +1203,26 @@ fn summarize_world(
     }
 }
 
+fn topology_instance_means(
+    rows: &[&ScmGraphPolicySummary],
+    metric: fn(&ScmGraphPolicySummary) -> f64,
+) -> Vec<f64> {
+    let mut keys: Vec<(ScmGraphFamily, usize)> = Vec::new();
+    for row in rows {
+        let key = (row.family, row.graph_variant_index);
+        if !keys.contains(&key) {
+            keys.push(key);
+        }
+    }
+    keys.iter().map(|(family, variant)| {
+        let paired_regime_scores: Vec<f64> = rows.iter()
+            .filter(|row| row.family == *family && row.graph_variant_index == *variant)
+            .map(|row| metric(row))
+            .collect();
+        mean(&paired_regime_scores)
+    }).collect()
+}
+
 fn aggregate_held_out(
     summaries: &[ScmGraphPolicySummary],
     policies: &[ScmGraphPolicy],
@@ -1207,40 +1231,39 @@ fn aggregate_held_out(
         let rows: Vec<&ScmGraphPolicySummary> = summaries.iter()
             .filter(|row| row.policy == policy && row.held_out_world)
             .collect();
-        let skeleton: Vec<f64> = rows.iter().map(|row| row.mean_skeleton_f1).collect();
-        let directed: Vec<f64> = rows.iter().map(|row| row.mean_directed_edge_f1).collect();
-        let cpdag_skeleton: Vec<f64> = rows.iter().map(|row| row.mean_cpdag_skeleton_f1).collect();
-        let compelled: Vec<f64> = rows.iter().map(|row| row.mean_compelled_direction_f1).collect();
-        let cpdag_distance: Vec<f64> = rows.iter().map(|row| row.mean_cpdag_mark_distance).collect();
-        let cpdag_accuracy: Vec<f64> = rows.iter()
-            .map(|row| row.markov_equivalence_class_recovery_rate).collect();
-        let cpdag_coverage: Vec<f64> = rows.iter()
-            .map(|row| row.cpdag_claim_coverage).collect();
-        let cpdag_false_claims: Vec<f64> = rows.iter()
-            .map(|row| row.false_cpdag_claim_rate_all_trials).collect();
-        let shd: Vec<f64> = rows.iter().map(|row| row.mean_structural_hamming_distance).collect();
-        let exact: Vec<f64> = rows.iter().map(|row| row.exact_graph_recovery_rate).collect();
-        let coverage: Vec<f64> = rows.iter().map(|row| row.graph_claim_coverage).collect();
-        let false_claims: Vec<f64> = rows.iter()
-            .map(|row| row.false_graph_claim_rate_all_trials).collect();
+        // First average over held-out mechanism regimes within each exact topology.
+        // The resulting uncertainty unit is one topology instance, not one regime row.
+        let skeleton = topology_instance_means(&rows, |row| row.mean_skeleton_f1);
+        let directed = topology_instance_means(&rows, |row| row.mean_directed_edge_f1);
+        let cpdag_skeleton = topology_instance_means(&rows, |row| row.mean_cpdag_skeleton_f1);
+        let compelled = topology_instance_means(&rows, |row| row.mean_compelled_direction_f1);
+        let cpdag_distance = topology_instance_means(&rows, |row| row.mean_cpdag_mark_distance);
+        let cpdag_accuracy = topology_instance_means(&rows, |row| row.markov_equivalence_class_recovery_rate);
+        let cpdag_coverage = topology_instance_means(&rows, |row| row.cpdag_claim_coverage);
+        let cpdag_false_claims = topology_instance_means(&rows, |row| row.false_cpdag_claim_rate_all_trials);
+        let shd = topology_instance_means(&rows, |row| row.mean_structural_hamming_distance);
+        let exact = topology_instance_means(&rows, |row| row.exact_graph_recovery_rate);
+        let coverage = topology_instance_means(&rows, |row| row.graph_claim_coverage);
+        let false_claims = topology_instance_means(&rows, |row| row.false_graph_claim_rate_all_trials);
         ScmGraphPolicyAggregate {
             policy,
             held_out_worlds: rows.len(),
+            held_out_topology_instances: skeleton.len(),
             mean_held_out_skeleton_f1: mean(&skeleton),
-            held_out_skeleton_f1_world_ci95: mean_ci95(&skeleton, 0.0, 1.0),
+            held_out_skeleton_f1_topology_instance_ci95: mean_ci95(&skeleton, 0.0, 1.0),
             mean_held_out_directed_edge_f1: mean(&directed),
-            held_out_directed_edge_f1_world_ci95: mean_ci95(&directed, 0.0, 1.0),
+            held_out_directed_edge_f1_topology_instance_ci95: mean_ci95(&directed, 0.0, 1.0),
             mean_held_out_cpdag_skeleton_f1: mean(&cpdag_skeleton),
-            held_out_cpdag_skeleton_f1_world_ci95: mean_ci95(&cpdag_skeleton, 0.0, 1.0),
+            held_out_cpdag_skeleton_f1_topology_instance_ci95: mean_ci95(&cpdag_skeleton, 0.0, 1.0),
             mean_held_out_compelled_direction_f1: mean(&compelled),
-            held_out_compelled_direction_f1_world_ci95: mean_ci95(&compelled, 0.0, 1.0),
+            held_out_compelled_direction_f1_topology_instance_ci95: mean_ci95(&compelled, 0.0, 1.0),
             mean_held_out_cpdag_mark_distance: mean(&cpdag_distance),
-            held_out_cpdag_mark_distance_world_ci95: mean_ci95(&cpdag_distance, 0.0, (NODE_COUNT * (NODE_COUNT - 1) / 2) as f64),
+            held_out_cpdag_mark_distance_topology_instance_ci95: mean_ci95(&cpdag_distance, 0.0, (NODE_COUNT * (NODE_COUNT - 1) / 2) as f64),
             held_out_markov_equivalence_class_recovery_rate: mean(&cpdag_accuracy),
             mean_held_out_cpdag_claim_coverage: mean(&cpdag_coverage),
             mean_held_out_false_cpdag_claim_rate_all_trials: mean(&cpdag_false_claims),
             mean_held_out_shd: mean(&shd),
-            held_out_shd_world_ci95: mean_ci95(&shd, 0.0, (NODE_COUNT * (NODE_COUNT - 1) / 2) as f64),
+            held_out_shd_topology_instance_ci95: mean_ci95(&shd, 0.0, (NODE_COUNT * (NODE_COUNT - 1) / 2) as f64),
             worst_world_directed_edge_f1: directed.iter().copied().fold(1.0, f64::min),
             worst_world_shd: shd.iter().copied().fold(0.0, f64::max),
             mean_held_out_exact_graph_recovery_rate: mean(&exact),
