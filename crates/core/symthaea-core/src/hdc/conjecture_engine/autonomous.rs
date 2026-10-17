@@ -917,10 +917,13 @@ fn finalize_holdout_validation(mut result: AutonomousHoldoutValidation) -> Auton
 /// Validate one candidate on fresh, reproducibly generated initial conditions.
 ///
 /// The discovery seed comes from the exact RegressorConfig used for search and
-/// must differ from holdout_seed. The caller supplies a stable dynamics_id;
-/// source revision plus this ID and the generated IC-manifest digest bind the
-/// differential system profile. A passing result is numerical generalization
-/// evidence only, not symbolic or formal proof.
+/// must differ from holdout_seed. The discovery IC digest mirrors the search's
+/// deterministic initial-condition generation; the holdout IC digest records
+/// the separate validation manifest. The caller-supplied dynamics_id must be
+/// bound to the exact source revision and toolchain in outer run provenance,
+/// because a function pointer cannot provide its own trustworthy source identity.
+/// A passing result is numerical generalization evidence only, not symbolic or
+/// formal proof.
 pub fn validate_invariant_holdout(
     rhs: fn(&[f64], f64) -> Vec<f64>,
     dynamics_id: &str,
@@ -950,6 +953,25 @@ pub fn validate_invariant_holdout(
     } else {
         Vec::new()
     };
+    let bounded_discovery_request =
+        discovery_config.diverse_trajectory_count.max(1) <= MAX_DISCOVERY_TRAJECTORIES;
+    let discovery_conditions = if bounded_discovery_request {
+        generate_discovery_initial_conditions(
+            initial_state,
+            discovery_seed,
+            discovery_config.diverse_trajectory_count,
+        )
+    } else {
+        Vec::new()
+    };
+    let discovery_ic_manifest_digest = discovery_initial_conditions_digest(
+        initial_state,
+        var_names,
+        t_max,
+        dt,
+        discovery_config,
+        &discovery_conditions,
+    );
     let holdout_manifest_digest = holdout_initial_conditions_digest(
         initial_state, var_names, holdout_seed, requested, &conditions,
     );
@@ -957,6 +979,7 @@ pub fn validate_invariant_holdout(
         dynamics_id,
         &candidate_expression_digest,
         &discovery_config_digest,
+        &discovery_ic_manifest_digest,
         &holdout_manifest_digest,
         discovery_seed,
         holdout_seed,
@@ -966,7 +989,8 @@ pub fn validate_invariant_holdout(
         threshold,
     );
     let seeds_independent = discovery_seed != holdout_seed;
-    let input_valid = !dynamics_id.trim().is_empty()
+    let input_valid = bounded_discovery_request
+        && !dynamics_id.trim().is_empty()
         && !initial_state.is_empty()
         && initial_state.iter().all(|value| value.is_finite())
         && var_names.len() == initial_state.len()
@@ -995,6 +1019,7 @@ pub fn validate_invariant_holdout(
         candidate_expression_digest,
         discovery_config_snapshot,
         discovery_config_digest,
+        discovery_initial_conditions_digest: discovery_ic_manifest_digest,
         initial_state: initial_state.to_vec(),
         var_names: var_names.iter().map(|name| (*name).to_owned()).collect(),
         t_max,
