@@ -12,6 +12,7 @@
 #![warn(missing_docs)]
 
 pub mod aging;
+pub mod capacitor_screening;
 pub mod compound_stability;
 pub mod database;
 pub mod dielectric;
@@ -22,6 +23,11 @@ pub mod properties;
 pub mod strategic;
 
 pub use aging::{AGING_HORIZON_LABELS, AGING_HORIZONS, AgingPrediction, MaterialAgingModel};
+pub use capacitor_screening::{
+    CapacitorConstraintViolation, CapacitorScreeningDisposition, CapacitorScreeningError,
+    CapacitorScreeningReport, CapacitorScreeningRequirements, ScreeningLimitation,
+    screen_capacitor_candidate,
+};
 pub use database::{MaterialDatabase, MaterialSearchResult};
 pub use dielectric::{
     CapacitorGeometry, DielectricEvidenceKind, DielectricPropertyRecord, DielectricValidationError,
