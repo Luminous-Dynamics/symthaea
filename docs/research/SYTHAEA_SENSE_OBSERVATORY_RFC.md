@@ -165,6 +165,21 @@ The runner reports posterior probability on the true hypothesis, multiclass Brie
 
 This is a *toy control*, not evidence that Symthaea can discover causal structure in real environments. Its likelihood models are assumed correct and the hypothesis set is intentionally small. The robust ranking API is now present, but the causal simulation does not yet test it against diverse likelihood misspecification. The next phase must vary causal graph topology, add confounding and unknown-model scenarios, calibrate outcome likelihoods, split training/tuning/blind scenarios, compare against a strong fixed design and predictive-variance baseline, and report confidence intervals across seeds.
 
+### Model-misspecification regret fixture (software-only)
+
+Run the synthetic fixture through the CLI:
+
+```sh
+SENSEBENCH_CODE_REVISION="$(git rev-parse HEAD)" \
+  cargo run -p symthaea-sensebench -- --suite robustness
+```
+
+The suite compares nominal single-model expected gain, model-weighted expected gain, worst-case robust ranking, a predeclared fixed comparator, and the exact expected gain for uniform-random selection. It scores decisions against two declared toy worlds and one likelihood world held out from selector inputs. Reports include the chosen candidate, evaluator-oracle candidate, realized synthetic information gain per declared cost, per-world regret, and mean/maximum regret.
+
+The hand-authored fixture is parameterized to exercise the proposed SE-13 gate mechanics: formula-level reference arithmetic gives nominal maximum regret of about 0.2781 bits/cost and worst-case robust maximum regret of about 0.0101 bits/cost, a 96.36% reduction; information-gain loss on the correctly specified model-A control is about 3.51%. These are not Rust-executed results or empirical performance. They are expected values computed from deliberately constructed likelihood tables to test evaluator wiring and acceptance checks.
+
+A crucial negative control remains: the fixed coarse comparator matches the robust policy's worst-case regret on this small fixture. It therefore does not establish active-policy superiority over strong fixed designs. It also does not yet meet the full research goal of hidden causal graph families, repeated-seed intervals, a sealed evaluator, calibrated likelihoods, or physical reference measurements. Those remain explicit next steps under the active-science benchmark issue.
+
 ### Domain-specific fixture: geophysics
 
 The `symthaea-sensebench/src/geophysics.rs` fixture reuses the generic experiment-ranker with two abstract Earth-interior hypotheses and three named observation candidates. All probabilities and costs are hand-authored toy values used to check determinism, entropy arithmetic, expected-gain ranking, and robust ranking across two alternative likelihood tables. In one toy table the targeted magnetic candidate is highly discriminating; in the other it is deliberately made uninformative, while a coarse comparator stays moderately informative. This checks that the maximin API responds to model uncertainty. The values are **not** fit to geophysical measurements, validated physical forward models, or claims about the Earth's core. No real-world conclusion may be inferred from its ranking. Before a domain-specific scientific selector is meaningful, freeze a documented generative/forward model, derive or calibrate likelihoods against public observations, disclose uncertainty, and test alternatives with independent references.
