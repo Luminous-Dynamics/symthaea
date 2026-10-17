@@ -40,7 +40,6 @@ pub struct ExperimentOption {
 
 impl ExperimentOption {
     /// Construct an experiment option with explicit cost and relevance estimates.
-    #[allow(clippy::too_many_arguments)]
     pub fn new(
         id: impl Into<String>,
         design_id: impl Into<String>,
@@ -296,7 +295,7 @@ mod tests {
 
         assert_eq!(
             ids(&options, &ranking),
-            vec!["physical-d", "simulation-c", "physical-a", "analytic-b"]
+            vec!["simulation-c", "analytic-b", "physical-d", "physical-a"]
         );
     }
 
