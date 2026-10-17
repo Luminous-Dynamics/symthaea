@@ -17,6 +17,7 @@ The crate defines its own Cargo workspace to avoid pulling the full Symthaea wor
 
 - Screens task compatibility and explicit service units.
 - Checks declared slope, terrain roughness, row clearance, turning radius, navigation assumptions, daily capacity, safety-case presence, and human override.
+- Separates site/task evidence from each candidate's safety, cost, and serviceability evidence; candidates cannot inherit one another's quotes or repair claims.
 - Distinguishes verified, estimated, missing, stale, and conflicting evidence.
 - Fails closed on missing/invalid evidence records and checked-arithmetic overflow.
 - Computes transparent annualized-capital plus operating cost, supervision time, maintenance time, and repair lead time when the inputs permit it.
