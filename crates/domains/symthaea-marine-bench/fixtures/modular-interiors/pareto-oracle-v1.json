@@ -23,7 +23,7 @@
             },
             {
               "metric_id": "quality",
-              "value": 0.7,
+              "value": 0.9,
               "unit": "ratio",
               "direction": "maximize",
               "evidence_status": "computed",
