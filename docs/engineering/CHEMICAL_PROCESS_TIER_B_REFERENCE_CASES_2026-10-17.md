@@ -143,7 +143,7 @@ This registry has been read back from the branch and structurally checked for pa
 
 ## Executable registry contract check
 
-The registry now has a Rust structural validator at `crates/domains/symthaea-engineering/examples/chemical_process_tier_b_registry_validate.rs` plus five integration contract tests at `crates/domains/symthaea-engineering/tests/chemical_process_tier_b_registry_contract.rs`.
+The registry now has a Rust structural validator at `crates/domains/symthaea-engineering/examples/chemical_process_tier_b_registry_validate.rs` plus six integration contract tests at `crates/domains/symthaea-engineering/tests/chemical_process_tier_b_registry_contract.rs`.
 
 From the repository root:
 
@@ -154,9 +154,9 @@ cargo run -p symthaea-engineering --example chemical_process_tier_b_registry_val
   --registry docs/engineering/fixtures/CHEMICAL_PROCESS_TIER_B_CANDIDATES_V1.json
 ```
 
-The validator checks schema/status vocabulary, source URLs, unique IDs, freeze blockers, non-gold hint labels and hard acceptance gates. It enforces cross-field rules: `NOT_RUN` cannot contain execution artifacts; `PASS` requires an actual declared run, simulator version and raw-output digest; and exact output freezing additionally requires a valid output digest, a complete freeze receipt and an empty blocker list. Skipped or reference-unavailable candidates cannot be promoted to frozen gold outputs.
+The validator has eight authored unit tests and checks schema/status vocabulary, source URLs, unique IDs, freeze blockers, non-gold hint labels and hard acceptance gates. It enforces cross-field rules: `NOT_RUN` cannot contain execution artifacts; `PASS` requires an actual declared run, simulator version and raw-output digest; and exact output freezing additionally requires a valid output digest, a complete freeze receipt and an empty blocker list. Skipped or reference-unavailable candidates cannot be promoted to frozen gold outputs.
 
-This is a **registry integrity check**, not a simulator runner. It cannot establish that an output is numerically correct, that the provenance is truthful, or that a physical model is valid. The Rust tests and CLI are authored but have not been executed in this environment; no compilation or passing test run is claimed.
+Six integration tests check the current registry, including the analytical-only 150 kg/s mixer invariant. These tests, like the eight validator unit tests, are authored but not run here. This is a **registry integrity check**, not a simulator runner. It cannot establish that an output is numerically correct, that the provenance is truthful, or that a physical model is valid. The Rust tests and CLI are authored but have not been executed in this environment; no compilation or passing test run is claimed.
 
 ## Freeze protocol for all Tier-B cases
 
