@@ -134,6 +134,7 @@ pub fn audit_run(run_dir: &Path) -> AuditReport {
             }
         }
 
+        let trajectory_findings_before = report.findings.len();
         if trajectory_files.len() == rows.len() {
             report.checked("trajectory_count_matches_episode_rows");
         } else {
@@ -249,21 +250,7 @@ pub fn audit_run(run_dir: &Path) -> AuditReport {
         }
 
         if trajectory_files.len() == rows.len()
-            && !report.findings.iter().any(|finding| {
-                matches!(
-                    finding.code.as_str(),
-                    "trajectory_count_mismatch"
-                        | "trajectory_sequence_gap"
-                        | "trajectory_metrics_missing"
-                        | "trajectory_episode_id_mismatch"
-                        | "episode_metrics_mismatch"
-                        | "raw_trajectory_missing"
-                        | "query_count_mismatch"
-                        | "query_count_missing"
-                        | "final_phase_diagram_missing"
-                        | "ground_truth_phase_diagram_missing"
-                )
-            })
+            && report.findings.len() == trajectory_findings_before
         {
             report.checked("trajectory_and_per_episode_records_reconcile");
         }
@@ -431,6 +418,7 @@ fn audit_aggregate(rows: &[Value], aggregate_value: Option<&Value>, report: &mut
     let Some(aggregate_object) = aggregate_value.and_then(Value::as_object) else {
         return;
     };
+    let findings_before = report.findings.len();
     let Some(aggregate) = aggregate_object.get("summary").and_then(Value::as_object) else {
         report.fail(
             "aggregate_summary_missing",
@@ -514,11 +502,7 @@ fn audit_aggregate(rows: &[Value], aggregate_value: Option<&Value>, report: &mut
         }
     }
 
-    if !report
-        .findings
-        .iter()
-        .any(|finding| finding.code.starts_with("aggregate_"))
-    {
+    if report.findings.len() == findings_before {
         report.checked("aggregate_mean_std_sem_reconstructed");
     }
 }
