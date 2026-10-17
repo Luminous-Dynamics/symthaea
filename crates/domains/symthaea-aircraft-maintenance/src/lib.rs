@@ -161,22 +161,82 @@ pub struct AircraftApplicability {
 /// One task card revision.
 #[derive(Debug, Clone, PartialEq)]
 pub struct MaintenanceTaskCard {
-    pub schema_version: u16,
+    schema_version: u16,
     /// Digest of the canonical, revision-bound task-card artifact.
-    pub card_sha256: String,
-    pub task_id: String,
-    pub revision: u32,
-    pub state: TaskState,
-    pub applicability: AircraftApplicability,
-    pub authority: TaskAuthority,
-    pub controlling_manual: ControlledDocumentRef,
-    pub supporting_sources: Vec<ControlledDocumentRef>,
-    pub task_class: TaskClass,
-    pub prerequisites: Vec<String>,
-    pub tools: Vec<ToolRequirement>,
-    pub parts: Vec<PartRequirement>,
-    pub steps: Vec<ControlledStep>,
-    pub acceptance_checks: Vec<AcceptanceCheck>,
+    card_sha256: String,
+    task_id: String,
+    revision: u32,
+    state: TaskState,
+    applicability: AircraftApplicability,
+    authority: TaskAuthority,
+    controlling_manual: ControlledDocumentRef,
+    supporting_sources: Vec<ControlledDocumentRef>,
+    task_class: TaskClass,
+    prerequisites: Vec<String>,
+    tools: Vec<ToolRequirement>,
+    parts: Vec<PartRequirement>,
+    steps: Vec<ControlledStep>,
+    acceptance_checks: Vec<AcceptanceCheck>,
+}
+
+impl MaintenanceTaskCard {
+    /// Create a new revision in Draft state. The caller supplies the digest of
+    /// its canonical payload; this crate intentionally does not canonicalize
+    /// or hash arbitrary caller-owned serialization.
+    #[allow(clippy::too_many_arguments)]
+    pub fn new(
+        card_sha256: String,
+        task_id: String,
+        revision: u32,
+        applicability: AircraftApplicability,
+        authority: TaskAuthority,
+        controlling_manual: ControlledDocumentRef,
+        supporting_sources: Vec<ControlledDocumentRef>,
+        task_class: TaskClass,
+        prerequisites: Vec<String>,
+        tools: Vec<ToolRequirement>,
+        parts: Vec<PartRequirement>,
+        steps: Vec<ControlledStep>,
+        acceptance_checks: Vec<AcceptanceCheck>,
+    ) -> Self {
+        Self {
+            schema_version: TASK_CARD_SCHEMA_VERSION,
+            card_sha256,
+            task_id,
+            revision,
+            state: TaskState::Draft,
+            applicability,
+            authority,
+            controlling_manual,
+            supporting_sources,
+            task_class,
+            prerequisites,
+            tools,
+            parts,
+            steps,
+            acceptance_checks,
+        }
+    }
+
+    pub fn state(&self) -> TaskState {
+        self.state
+    }
+
+    pub fn task_id(&self) -> &str {
+        &self.task_id
+    }
+
+    pub fn revision(&self) -> u32 {
+        self.revision
+    }
+
+    pub fn card_sha256(&self) -> &str {
+        &self.card_sha256
+    }
+
+    pub fn applicability(&self) -> &AircraftApplicability {
+        &self.applicability
+    }
 }
 
 /// Identity and current configuration of the actual aircraft being serviced.
@@ -859,7 +919,7 @@ pub fn validate_work_record(
 /// readiness validator succeeds for this exact aircraft, source register,
 /// person, tool/part inventory and prerequisite set.
 pub fn prepare_task_for_execution(
-    card: &MaintenanceTaskCard,
+    card: &mut MaintenanceTaskCard,
     context: &ExecutionContext,
     reviewer: &ActorEvidence,
 ) -> Result<TaskState, Vec<TaskCardError>> {
@@ -886,6 +946,7 @@ pub fn prepare_task_for_execution(
     }
 
     if errors.is_empty() {
+        card.state = TaskState::ReadyToPerform;
         Ok(TaskState::ReadyToPerform)
     } else {
         Err(errors)
@@ -898,7 +959,7 @@ pub fn prepare_task_for_execution(
 /// release_task_to_service with a valid work record and current source register.
 
 pub fn transition_task(
-    card: &MaintenanceTaskCard,
+    card: &mut MaintenanceTaskCard,
     transition: TaskTransition,
     actor: &ActorEvidence,
 ) -> Result<TaskState, TaskCardError> {
@@ -929,6 +990,7 @@ pub fn transition_task(
                 && actor.kind == ActorKind::HumanSourceReviewer => TaskState::Superseded,
         _ => return Err(TaskCardError::UnauthorizedTransition),
     };
+    card.state = next;
     Ok(next)
 }
 
@@ -938,7 +1000,7 @@ pub fn transition_task(
 /// traceable credential reference. The credential itself must still be
 /// authenticated by the responsible organization outside this crate.
 pub fn release_task_to_service(
-    card: &MaintenanceTaskCard,
+    card: &mut MaintenanceTaskCard,
     aircraft: &AircraftIdentity,
     record: &MaintenanceWorkRecord,
     current_documents: &[CurrentDocument],
@@ -1028,6 +1090,7 @@ pub fn release_task_to_service(
         errors.extend(record_errors);
     }
     if errors.is_empty() {
+        card.state = TaskState::Released;
         Ok(TaskState::Released)
     } else {
         Err(errors)
@@ -1352,7 +1415,7 @@ mod tests {
             certification_basis: card.authority.certification_basis.clone(),
             credential_reference: Some(doc("review-credential", "rev-1", '4')),
         };
-        let result = prepare_task_for_execution(&card, &context, &reviewer).unwrap_err();
+        let result = prepare_task_for_execution(&mut card, &context, &reviewer).unwrap_err();
         assert!(result.contains(&TaskCardError::MissingTool { tool_id: "tool-fixture".into() }));
     }
 
@@ -1393,7 +1456,7 @@ mod tests {
 
     #[test]
     fn software_checker_cannot_release_a_task() {
-        let card = card();
+        let mut card = card();
         let actor = ActorEvidence {
             actor_id: "checker-fixture".into(),
             kind: ActorKind::SoftwareChecker,
@@ -1403,7 +1466,7 @@ mod tests {
             credential_reference: None,
         };
         assert_eq!(
-            transition_task(&card, TaskTransition::ReleaseToService, &actor),
+            transition_task(&mut card, TaskTransition::ReleaseToService, &actor),
             Err(TaskCardError::SoftwareCannotReleaseToService)
         );
     }
@@ -1481,7 +1544,7 @@ mod tests {
             credential_reference: Some(doc("credential-fixture", "rev-1", '3')),
         };
         assert_eq!(
-            release_task_to_service(&card, &context.aircraft, &record, &context.current_documents, &signer),
+            release_task_to_service(&mut card, &context.aircraft, &record, &context.current_documents, &signer),
             Ok(TaskState::Released)
         );
     }
@@ -1501,7 +1564,7 @@ mod tests {
             credential_reference: None,
         };
         assert_eq!(
-            release_task_to_service(&card, &context.aircraft, &record, &context.current_documents, &checker),
+            release_task_to_service(&mut card, &context.aircraft, &record, &context.current_documents, &checker),
             Err(vec![TaskCardError::SoftwareCannotReleaseToService])
         );
     }
@@ -1526,7 +1589,7 @@ mod tests {
             .cloned()
             .collect();
         let result = release_task_to_service(
-            &card,
+            &mut card,
             &context.aircraft,
             &record,
             &current_without_manual,
