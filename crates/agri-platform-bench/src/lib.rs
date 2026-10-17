@@ -9,7 +9,7 @@
 use std::collections::{BTreeMap, BTreeSet};
 
 pub const CONTRACT_VERSION: &str = "AGRI-ROBOTICS-BENCH-V1";
-pub const MAX_ANNUAL_OPERATING_HOURS: u64 = 8_760;
+pub const MAX_ANNUAL_OPERATING_HOURS: u64 = 8_784;
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq, PartialOrd, Ord)]
 pub enum TaskKind {
@@ -63,17 +63,21 @@ pub enum EvidenceDomain {
     SiteGeometry,
     TerrainEnvelope,
     NavigationEnvelope,
+    PlatformCapability,
+    NavigationCapability,
     SafetyEnvelope,
     CostModel,
     Serviceability,
 }
 
 impl EvidenceDomain {
-    pub const ALL: [Self; 7] = [
+    pub const ALL: [Self; 9] = [
         Self::TaskDefinition,
         Self::SiteGeometry,
         Self::TerrainEnvelope,
         Self::NavigationEnvelope,
+        Self::PlatformCapability,
+        Self::NavigationCapability,
         Self::SafetyEnvelope,
         Self::CostModel,
         Self::Serviceability,
@@ -85,6 +89,8 @@ impl EvidenceDomain {
             Self::SiteGeometry => "site_geometry",
             Self::TerrainEnvelope => "terrain_envelope",
             Self::NavigationEnvelope => "navigation_envelope",
+            Self::PlatformCapability => "platform_capability",
+            Self::NavigationCapability => "navigation_capability",
             Self::SafetyEnvelope => "safety_envelope",
             Self::CostModel => "cost_model",
             Self::Serviceability => "serviceability",
@@ -99,7 +105,9 @@ pub const SCENARIO_EVIDENCE_DOMAINS: [EvidenceDomain; 4] = [
     EvidenceDomain::NavigationEnvelope,
 ];
 
-pub const PLATFORM_EVIDENCE_DOMAINS: [EvidenceDomain; 3] = [
+pub const PLATFORM_EVIDENCE_DOMAINS: [EvidenceDomain; 5] = [
+    EvidenceDomain::PlatformCapability,
+    EvidenceDomain::NavigationCapability,
     EvidenceDomain::SafetyEnvelope,
     EvidenceDomain::CostModel,
     EvidenceDomain::Serviceability,
@@ -161,6 +169,8 @@ pub struct ScenarioProfile {
     pub available_turning_radius_cm: u32,
     pub site_roughness_mm: u32,
     pub gnss_available: bool,
+    /// ISO 4217-style uppercase currency code for both scenario budgets.
+    pub currency_code: String,
     pub max_upfront_budget_cents: u64,
     pub max_annualized_cost_cents: u64,
     pub annual_operating_hours: u64,
@@ -182,6 +192,8 @@ pub struct PlatformProfile {
     pub requires_gnss: bool,
     pub gnss_denied_capable: bool,
     pub daily_capacity_units: u64,
+    /// Currency code used by acquisition and operating cost fields.
+    pub cost_currency_code: String,
     pub acquisition_cost_cents: u64,
     pub operating_cost_cents_per_hour: u64,
     pub supervision_minutes_per_hour: u64,
@@ -227,6 +239,8 @@ pub enum BlockerCode {
     HumanOverrideMissing,
     UpfrontBudgetExceeded,
     AnnualizedCostExceeded,
+    CurrencyMismatch,
+    InvalidCurrencyCode,
     LocalRepairUnavailable,
     RepairLeadTimeExceeded,
     ArithmeticOverflow,
@@ -253,6 +267,10 @@ pub struct Assessment {
 
 fn valid_sha256(value: &str) -> bool {
     value.len() == 64 && value.bytes().all(|b| b.is_ascii_hexdigit())
+}
+
+fn valid_currency_code(value: &str) -> bool {
+    value.len() == 3 && value.bytes().all(|b| b.is_ascii_uppercase())
 }
 
 fn nonempty(value: &Option<String>) -> bool {
@@ -407,6 +425,15 @@ pub fn assess(
             Vec::new(),
         );
     }
+    if !valid_currency_code(&scenario.currency_code)
+        || !valid_currency_code(&platform.cost_currency_code)
+    {
+        return blocked(
+            &platform.id,
+            BTreeSet::from([BlockerCode::InvalidCurrencyCode]),
+            Vec::new(),
+        );
+    }
 
     let mut states = match evidence_map(&scenario.evidence, &SCENARIO_EVIDENCE_DOMAINS) {
         Ok(states) => states,
@@ -445,11 +472,20 @@ pub fn assess(
     if !evidence_blockers.is_empty() {
         return blocked(&platform.id, evidence_blockers, uncertain_domains);
     }
+    if scenario.currency_code != platform.cost_currency_code {
+        return blocked(
+            &platform.id,
+            BTreeSet::from([BlockerCode::CurrencyMismatch]),
+            uncertain_domains,
+        );
+    }
 
     let state = |domain: EvidenceDomain| states.get(&domain).copied();
     let mut violations = BTreeSet::new();
 
-    if state(EvidenceDomain::TaskDefinition) == Some(EvidenceState::Verified) {
+    if state(EvidenceDomain::TaskDefinition) == Some(EvidenceState::Verified)
+        && state(EvidenceDomain::PlatformCapability) == Some(EvidenceState::Verified)
+    {
         if !platform.supported_tasks.contains(&scenario.task) {
             violations.insert(BlockerCode::UnsupportedTask);
         }
@@ -461,7 +497,9 @@ pub fn assess(
         }
     }
 
-    if state(EvidenceDomain::SiteGeometry) == Some(EvidenceState::Verified) {
+    if state(EvidenceDomain::SiteGeometry) == Some(EvidenceState::Verified)
+        && state(EvidenceDomain::PlatformCapability) == Some(EvidenceState::Verified)
+    {
         if platform.width_cm > scenario.available_row_clearance_cm {
             violations.insert(BlockerCode::RowClearanceTooNarrow);
         }
@@ -470,7 +508,9 @@ pub fn assess(
         }
     }
 
-    if state(EvidenceDomain::TerrainEnvelope) == Some(EvidenceState::Verified) {
+    if state(EvidenceDomain::TerrainEnvelope) == Some(EvidenceState::Verified)
+        && state(EvidenceDomain::PlatformCapability) == Some(EvidenceState::Verified)
+    {
         if scenario.site_slope_permille > platform.max_slope_permille {
             violations.insert(BlockerCode::SlopeExceeded);
         }
@@ -480,6 +520,7 @@ pub fn assess(
     }
 
     if state(EvidenceDomain::NavigationEnvelope) == Some(EvidenceState::Verified)
+        && state(EvidenceDomain::NavigationCapability) == Some(EvidenceState::Verified)
         && platform.requires_gnss
         && !scenario.gnss_available
         && !platform.gnss_denied_capable
@@ -632,6 +673,9 @@ mod tests {
         StaleGeometryEvidence,
         ConflictingTerrainEvidence,
         MissingNavigationEvidence,
+        EstimatedPlatformCapabilityEvidence,
+        MissingPlatformCapabilityEvidence,
+        EstimatedNavigationCapabilityEvidence,
         EstimatedSafetyEvidence,
         EstimatedCostEvidence,
         EstimatedServiceabilityEvidence,
@@ -651,6 +695,8 @@ mod tests {
         ConflictingServiceabilityEvidence,
         EmptyVerifiedSourceReference,
         InvalidOperatingHours,
+        CurrencyMismatch,
+        InvalidCurrencyCode,
     }
 
     struct FrozenCase {
@@ -679,6 +725,9 @@ mod tests {
         FrozenCase { id: "stale-geometry-evidence", mutation: Mutation::StaleGeometryEvidence, expected: AssessmentStatus::Blocked },
         FrozenCase { id: "conflicting-terrain-evidence", mutation: Mutation::ConflictingTerrainEvidence, expected: AssessmentStatus::Blocked },
         FrozenCase { id: "missing-navigation-evidence", mutation: Mutation::MissingNavigationEvidence, expected: AssessmentStatus::Blocked },
+        FrozenCase { id: "platform-capability-estimated", mutation: Mutation::EstimatedPlatformCapabilityEvidence, expected: AssessmentStatus::Provisional },
+        FrozenCase { id: "platform-capability-missing", mutation: Mutation::MissingPlatformCapabilityEvidence, expected: AssessmentStatus::Blocked },
+        FrozenCase { id: "navigation-capability-estimated", mutation: Mutation::EstimatedNavigationCapabilityEvidence, expected: AssessmentStatus::Provisional },
         FrozenCase { id: "estimated-safety-evidence", mutation: Mutation::EstimatedSafetyEvidence, expected: AssessmentStatus::Provisional },
         FrozenCase { id: "estimated-cost-evidence", mutation: Mutation::EstimatedCostEvidence, expected: AssessmentStatus::Provisional },
         FrozenCase { id: "estimated-serviceability-evidence", mutation: Mutation::EstimatedServiceabilityEvidence, expected: AssessmentStatus::Provisional },
@@ -698,6 +747,8 @@ mod tests {
         FrozenCase { id: "conflicting-serviceability-evidence", mutation: Mutation::ConflictingServiceabilityEvidence, expected: AssessmentStatus::Blocked },
         FrozenCase { id: "empty-verified-source-reference", mutation: Mutation::EmptyVerifiedSourceReference, expected: AssessmentStatus::Blocked },
         FrozenCase { id: "invalid-operating-hours", mutation: Mutation::InvalidOperatingHours, expected: AssessmentStatus::Blocked },
+        FrozenCase { id: "cross-currency-comparison", mutation: Mutation::CurrencyMismatch, expected: AssessmentStatus::Blocked },
+        FrozenCase { id: "invalid-currency-code", mutation: Mutation::InvalidCurrencyCode, expected: AssessmentStatus::Blocked },
     ];
 
     fn baseline_scenario() -> ScenarioProfile {
@@ -710,6 +761,7 @@ mod tests {
             available_turning_radius_cm: 150,
             site_roughness_mm: 40,
             gnss_available: true,
+            currency_code: "ZAR".into(),
             max_upfront_budget_cents: 1_000_000,
             max_annualized_cost_cents: 500_000,
             annual_operating_hours: 100,
@@ -741,6 +793,7 @@ mod tests {
             requires_gnss: true,
             gnss_denied_capable: false,
             daily_capacity_units: 2_000,
+            cost_currency_code: "ZAR".into(),
             acquisition_cost_cents: 100_000,
             operating_cost_cents_per_hour: 500,
             supervision_minutes_per_hour: 10,
@@ -805,6 +858,9 @@ mod tests {
             Mutation::StaleGeometryEvidence => set_state(&mut scenario.evidence, EvidenceDomain::SiteGeometry, EvidenceState::Stale),
             Mutation::ConflictingTerrainEvidence => set_state(&mut scenario.evidence, EvidenceDomain::TerrainEnvelope, EvidenceState::Conflicting),
             Mutation::MissingNavigationEvidence => set_state(&mut scenario.evidence, EvidenceDomain::NavigationEnvelope, EvidenceState::Missing),
+            Mutation::EstimatedPlatformCapabilityEvidence => set_state(&mut platform.evidence, EvidenceDomain::PlatformCapability, EvidenceState::Estimated),
+            Mutation::MissingPlatformCapabilityEvidence => set_state(&mut platform.evidence, EvidenceDomain::PlatformCapability, EvidenceState::Missing),
+            Mutation::EstimatedNavigationCapabilityEvidence => set_state(&mut platform.evidence, EvidenceDomain::NavigationCapability, EvidenceState::Estimated),
             Mutation::EstimatedSafetyEvidence => set_state(&mut platform.evidence, EvidenceDomain::SafetyEnvelope, EvidenceState::Estimated),
             Mutation::EstimatedCostEvidence => set_state(&mut platform.evidence, EvidenceDomain::CostModel, EvidenceState::Estimated),
             Mutation::EstimatedServiceabilityEvidence => set_state(&mut platform.evidence, EvidenceDomain::Serviceability, EvidenceState::Estimated),
@@ -854,6 +910,8 @@ mod tests {
                 record.reference = Some("   ".into());
             }
             Mutation::InvalidOperatingHours => scenario.annual_operating_hours = MAX_ANNUAL_OPERATING_HOURS + 1,
+            Mutation::CurrencyMismatch => platform.cost_currency_code = "USD".into(),
+            Mutation::InvalidCurrencyCode => scenario.currency_code = "zaR".into(),
         }
 
         (scenario, platform)
