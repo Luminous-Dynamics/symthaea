@@ -1,0 +1,50 @@
+name: Room Imagination Stress Qualifier
+
+on:
+  pull_request:
+    branches: [main]
+    paths:
+      - "docs/research/spatial-design/ROOM_IMAGINATION_STRESS_BENCHMARK_V0_1.json"
+      - "docs/research/spatial-design/ROOM_IMAGINATION_STRESS_BENCHMARK_V0_1.schema.json"
+      - "docs/research/spatial-design/ROOM_IMAGINATION_STRESS_RUN_REPORT_V0_1.schema.json"
+      - "tools/room-stress-qualifier/**"
+      - ".github/workflows/room-imagination-stress-qualifier.yml"
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+concurrency:
+  group: room-imagination-stress-qualifier-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  manifest-qualification:
+    name: Manifest schema and semantic tests
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+      - name: Install stable Rust
+        uses: dtolnay/rust-toolchain@stable
+        with:
+          components: rustfmt
+      - name: Check formatting
+        run: cargo fmt --manifest-path tools/room-stress-qualifier/Cargo.toml -- --check
+      - name: Run negative-control tests
+        run: cargo test --manifest-path tools/room-stress-qualifier/Cargo.toml
+      - name: Validate checked-in benchmark and emit receipt
+        run: |
+          cargo run --manifest-path tools/room-stress-qualifier/Cargo.toml -- --json \
+            docs/research/spatial-design/ROOM_IMAGINATION_STRESS_BENCHMARK_V0_1.json \
+            docs/research/spatial-design/ROOM_IMAGINATION_STRESS_BENCHMARK_V0_1.schema.json \
+            > room-stress-qualification-receipt.json
+          cat room-stress-qualification-receipt.json
+      - name: Upload manifest validation receipt
+        uses: actions/upload-artifact@v4
+        with:
+          name: room-stress-manifest-receipt-${{ github.sha }}
+          path: room-stress-qualification-receipt.json
+          if-no-files-found: error
+          retention-days: 30

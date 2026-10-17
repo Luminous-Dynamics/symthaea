@@ -1,0 +1,195 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://github.com/Luminous-Dynamics/symthaea/blob/main/docs/research/spatial-design/ROOM_IMAGINATION_STRESS_BENCHMARK_V0_1.schema.json",
+  "title": "Room Imagination Stress Benchmark v0.1",
+  "description": "Schema for synthetic adversarial qualification fixtures; schema validity is not design or building qualification.",
+  "type": "object",
+  "additionalProperties": false,
+  "required": [
+    "schema_version",
+    "status",
+    "count",
+    "purpose",
+    "claim_ceiling",
+    "case_fields",
+    "cases"
+  ],
+  "properties": {
+    "schema_version": {
+      "const": "room-imagination-stress-benchmark-v0.1"
+    },
+    "status": {
+      "const": "synthetic draft; cases not yet executed or qualified"
+    },
+    "count": {
+      "const": 30
+    },
+    "purpose": {
+      "type": "string",
+      "minLength": 20
+    },
+    "claim_ceiling": {
+      "type": "string",
+      "minLength": 20
+    },
+    "case_fields": {
+      "type": "array",
+      "const": [
+        "id",
+        "family",
+        "risk",
+        "prompt",
+        "known_facts",
+        "unknowns",
+        "intervention",
+        "required_behaviors",
+        "blocking_failures",
+        "expected",
+        "assertions"
+      ]
+    },
+    "cases": {
+      "type": "array",
+      "minItems": 30,
+      "maxItems": 30,
+      "items": {
+        "$ref": "#/$defs/case"
+      }
+    }
+  },
+  "$defs": {
+    "case": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "id",
+        "family",
+        "risk",
+        "prompt",
+        "known_facts",
+        "unknowns",
+        "intervention",
+        "required_behaviors",
+        "blocking_failures",
+        "expected",
+        "assertions"
+      ],
+      "properties": {
+        "id": {
+          "type": "string",
+          "pattern": "^ROOM-STRESS-[0-9]{3}$"
+        },
+        "family": {
+          "type": "string",
+          "minLength": 3
+        },
+        "risk": {
+          "enum": [
+            "blocking",
+            "high-gate",
+            "high-review",
+            "quality"
+          ]
+        },
+        "prompt": {
+          "type": "string",
+          "minLength": 10
+        },
+        "known_facts": {
+          "type": "array",
+          "minItems": 1,
+          "items": {
+            "type": "string",
+            "minLength": 1
+          },
+          "uniqueItems": true
+        },
+        "unknowns": {
+          "type": "array",
+          "minItems": 1,
+          "items": {
+            "type": "string",
+            "minLength": 1
+          },
+          "uniqueItems": true
+        },
+        "intervention": {
+          "type": "string",
+          "minLength": 10
+        },
+        "required_behaviors": {
+          "type": "array",
+          "minItems": 1,
+          "items": {
+            "type": "string",
+            "minLength": 1
+          },
+          "uniqueItems": true
+        },
+        "blocking_failures": {
+          "type": "array",
+          "minItems": 1,
+          "items": {
+            "type": "string",
+            "minLength": 1
+          },
+          "uniqueItems": true
+        },
+        "expected": {
+          "type": "string",
+          "minLength": 10
+        },
+        "assertions": {
+          "type": "array",
+          "minItems": 1,
+          "items": {
+            "type": "object",
+            "additionalProperties": false,
+            "required": [
+              "assertion_id",
+              "observation_key",
+              "operator",
+              "expected",
+              "failure_code",
+              "severity",
+              "evidence_required"
+            ],
+            "properties": {
+              "assertion_id": {
+                "type": "string",
+                "pattern": "^ROOM-ASSERT-[0-9]{3}-[0-9]{2}$"
+              },
+              "observation_key": {
+                "type": "string",
+                "pattern": "^[a-z][a-z0-9_]*$"
+              },
+              "operator": {
+                "const": "equals"
+              },
+              "expected": {
+                "type": [
+                  "string",
+                  "integer",
+                  "boolean"
+                ]
+              },
+              "failure_code": {
+                "type": "string",
+                "pattern": "^[A-Z][A-Z0-9_]+$"
+              },
+              "severity": {
+                "enum": [
+                  "blocking",
+                  "quality"
+                ]
+              },
+              "evidence_required": {
+                "const": true
+              }
+            }
+          }
+        }
+      }
+    }
+  }
+}

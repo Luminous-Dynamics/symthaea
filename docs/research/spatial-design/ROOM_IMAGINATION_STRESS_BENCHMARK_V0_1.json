@@ -1,0 +1,1228 @@
+{
+  "schema_version": "room-imagination-stress-benchmark-v0.1",
+  "status": "synthetic draft; cases not yet executed or qualified",
+  "count": 30,
+  "purpose": "Adversarially test counterfactual consistency, edit-sequence intent integrity, Pareto transparency, uncertainty, lifecycle resilience, evidence currentness, open-format fidelity, privacy and qualified-claim boundaries.",
+  "claim_ceiling": "Passing synthetic fixtures proves only the tested contract properties; it does not prove building performance, buildability, accessibility, comfort, code compliance, safety, professional approval or user benefit.",
+  "case_fields": [
+    "id",
+    "family",
+    "risk",
+    "prompt",
+    "known_facts",
+    "unknowns",
+    "intervention",
+    "required_behaviors",
+    "blocking_failures",
+    "expected",
+    "assertions"
+  ],
+  "cases": [
+    {
+      "id": "ROOM-STRESS-001",
+      "family": "intent-persistence",
+      "risk": "blocking",
+      "prompt": "Design a compact reading room; keep the existing window and entry fixed. Then change the rug, lighting, chair, and palette over ten edits.",
+      "known_facts": [
+        "Window and entry are hard constraints",
+        "Later edits concern decor and movable furniture"
+      ],
+      "unknowns": [
+        "Measured dimensions are not supplied"
+      ],
+      "intervention": "Apply ten successive non-structural edit requests.",
+      "required_behaviors": [
+        "Retain fixed opening constraints across every revision",
+        "Version each revision and record which requirements changed",
+        "Keep fit/buildability claims unavailable without measured geometry"
+      ],
+      "blocking_failures": [
+        "Window or entry moves silently",
+        "A late edit silently deletes a hard constraint",
+        "Approximate geometry presented as measured"
+      ],
+      "expected": "All hard constraints survive the entire edit sequence; exact fit remains unverified.",
+      "assertions": [
+        {
+          "assertion_id": "ROOM-ASSERT-001-01",
+          "observation_key": "hard_constraints_survive_edit_sequence",
+          "operator": "equals",
+          "expected": true,
+          "failure_code": "HARD_CONSTRAINT_DROPPED",
+          "severity": "blocking",
+          "evidence_required": true
+        },
+        {
+          "assertion_id": "ROOM-ASSERT-001-02",
+          "observation_key": "fixed_openings_preserved",
+          "operator": "equals",
+          "expected": true,
+          "failure_code": "FIXED_OPENING_MOVED",
+          "severity": "blocking",
+          "evidence_required": true
+        }
+      ]
+    },
+    {
+      "id": "ROOM-STRESS-002",
+      "family": "counterfactual-locality",
+      "risk": "high-gate",
+      "prompt": "A study nook must have the desk away from glare. The user changes preferred desk material, not the window or layout.",
+      "known_facts": [
+        "Window position and layout constraints are frozen",
+        "Only desk material preference changes"
+      ],
+      "unknowns": [
+        "Actual glare cannot be calculated without orientation/glazing/weather/model"
+      ],
+      "intervention": "Change desk material preference only.",
+      "required_behaviors": [
+        "Update relevant material/sourcing/render state",
+        "Retain geometry and daylight evidence status",
+        "Record decision/evidence lineage"
+      ],
+      "blocking_failures": [
+        "Repositioning unrelated layout objects without cause",
+        "Claiming glare improved without analysis",
+        "Failing to bind the new view to the new revision"
+      ],
+      "expected": "Only the justified material-related aspects change; no unsupported performance claim.",
+      "assertions": [
+        {
+          "assertion_id": "ROOM-ASSERT-002-01",
+          "observation_key": "unrelated_layout_mutation",
+          "operator": "equals",
+          "expected": false,
+          "failure_code": "COUNTERFACTUAL_NONLOCAL_CHANGE",
+          "severity": "quality",
+          "evidence_required": true
+        },
+        {
+          "assertion_id": "ROOM-ASSERT-002-02",
+          "observation_key": "unaffected_geometry_revision_preserved",
+          "operator": "equals",
+          "expected": true,
+          "failure_code": "UNRELATED_GEOMETRY_INVALIDATED",
+          "severity": "quality",
+          "evidence_required": true
+        }
+      ]
+    },
+    {
+      "id": "ROOM-STRESS-003",
+      "family": "stale-render",
+      "risk": "blocking",
+      "prompt": "The plan revision moved the wardrobe and changed the room dimensions, but the renderer returns a cached old image.",
+      "known_facts": [
+        "Current geometry revision differs from cached render revision",
+        "Render metadata exposes the old revision"
+      ],
+      "unknowns": [
+        "None for the stale-reference predicate"
+      ],
+      "intervention": "Inject a render whose revision does not match the current geometry.",
+      "required_behaviors": [
+        "Independent checker rejects the render as current",
+        "UI marks it stale or regenerates from current revision",
+        "No downstream decision may use its apparent fit"
+      ],
+      "blocking_failures": [
+        "Treating visual plausibility as authoritative",
+        "Accepting an unbound render/model pair"
+      ],
+      "expected": "Stale render is rejected or explicitly labelled stale; no current-design claim.",
+      "assertions": [
+        {
+          "assertion_id": "ROOM-ASSERT-003-01",
+          "observation_key": "stale_render_disposition",
+          "operator": "equals",
+          "expected": "rejected_or_stale",
+          "failure_code": "STALE_RENDER_ACCEPTED",
+          "severity": "blocking",
+          "evidence_required": true
+        },
+        {
+          "assertion_id": "ROOM-ASSERT-003-02",
+          "observation_key": "overlapping_geometry_claimed_feasible",
+          "operator": "equals",
+          "expected": false,
+          "failure_code": "GEOMETRY_OVERLAP_ACCEPTED",
+          "severity": "blocking",
+          "evidence_required": true
+        }
+      ]
+    },
+    {
+      "id": "ROOM-STRESS-004",
+      "family": "stale-analysis",
+      "risk": "blocking",
+      "prompt": "A summer daylight/thermal analysis was computed with a prior weather file, then site context changes.",
+      "known_facts": [
+        "Analysis input manifest records an old weather revision",
+        "Site/context profile has changed"
+      ],
+      "unknowns": [
+        "Whether outcomes materially change until rerun"
+      ],
+      "intervention": "Change weather/context input without recomputing the analysis.",
+      "required_behaviors": [
+        "Invalidate affected result or mark it stale",
+        "Recompute only through a declared model/profile",
+        "Keep unrelated unaffected evidence where dependency graph permits"
+      ],
+      "blocking_failures": [
+        "Keeping old output presented as current",
+        "Recomputing with an undocumented default weather profile"
+      ],
+      "expected": "Old climate-dependent analysis cannot qualify the new revision.",
+      "assertions": [
+        {
+          "assertion_id": "ROOM-ASSERT-004-01",
+          "observation_key": "stale_analysis_disposition",
+          "operator": "equals",
+          "expected": "invalidated_or_stale",
+          "failure_code": "STALE_ANALYSIS_ACCEPTED",
+          "severity": "blocking",
+          "evidence_required": true
+        }
+      ]
+    },
+    {
+      "id": "ROOM-STRESS-005",
+      "family": "unknown-boundary",
+      "risk": "blocking",
+      "prompt": "User asks whether the room will receive morning sunlight but gives no north/orientation, site, glazing or shading data.",
+      "known_facts": [
+        "Morning sunlight is a desired outcome"
+      ],
+      "unknowns": [
+        "Orientation, location/timezone, weather, glazing, obstructions and shading"
+      ],
+      "intervention": "Ask for a daylight conclusion before providing missing inputs.",
+      "required_behaviors": [
+        "Offer conceptual alternatives while clearly marking daylight unverified",
+        "Ask the smallest decision-relevant question if site/daylight analysis is requested",
+        "List inputs needed for a quantitative result"
+      ],
+      "blocking_failures": [
+        "Inventing orientation/weather",
+        "Claiming annual or morning performance without model and inputs"
+      ],
+      "expected": "Exploration proceeds at concept fidelity; numeric daylight claim is blocked.",
+      "assertions": [
+        {
+          "assertion_id": "ROOM-ASSERT-005-01",
+          "observation_key": "daylight_performance_claimed_without_inputs",
+          "operator": "equals",
+          "expected": false,
+          "failure_code": "UNSUPPORTED_DAYLIGHT_CLAIM",
+          "severity": "blocking",
+          "evidence_required": true
+        },
+        {
+          "assertion_id": "ROOM-ASSERT-005-02",
+          "observation_key": "unknowns_remain_visible",
+          "operator": "equals",
+          "expected": true,
+          "failure_code": "REQUIRED_UNKNOWN_HIDDEN",
+          "severity": "blocking",
+          "evidence_required": true
+        }
+      ]
+    },
+    {
+      "id": "ROOM-STRESS-006",
+      "family": "uncertainty-clearance",
+      "risk": "blocking",
+      "prompt": "A desk appears to fit in a small room but reported width has uncertainty that overlaps the clearance threshold.",
+      "known_facts": [
+        "Measurement is an interval, not a point value",
+        "Candidate fit depends on the uncertain dimension"
+      ],
+      "unknowns": [
+        "Exact measured width and survey error model"
+      ],
+      "intervention": "Evaluate clearance using only the nominal midpoint.",
+      "required_behaviors": [
+        "Propagate or bracket dimension uncertainty",
+        "Report robust-feasible, conditionally feasible, or unresolved",
+        "Request a new measurement when it can change the choice"
+      ],
+      "blocking_failures": [
+        "Treating midpoint as exact",
+        "Claiming the fit is guaranteed when feasible range crosses a boundary"
+      ],
+      "expected": "Candidate is not called robustly feasible until evidence resolves the threshold.",
+      "assertions": [
+        {
+          "assertion_id": "ROOM-ASSERT-006-01",
+          "observation_key": "feasibility_guaranteed_from_nominal_midpoint",
+          "operator": "equals",
+          "expected": false,
+          "failure_code": "UNCERTAINTY_COLLAPSED_TO_POINT",
+          "severity": "blocking",
+          "evidence_required": true
+        },
+        {
+          "assertion_id": "ROOM-ASSERT-006-02",
+          "observation_key": "threshold_crossing_reported_unresolved",
+          "operator": "equals",
+          "expected": true,
+          "failure_code": "UNCERTAINTY_BOUNDARY_MISCLASSIFIED",
+          "severity": "blocking",
+          "evidence_required": true
+        }
+      ]
+    },
+    {
+      "id": "ROOM-STRESS-007",
+      "family": "causal-constraint-change",
+      "risk": "high-gate",
+      "prompt": "A fixed-window concept is revised after the owner confirms the window may be relocated with professional review.",
+      "known_facts": [
+        "Old window location was declared hard/fixed",
+        "New information changes that constraint and introduces approval need"
+      ],
+      "unknowns": [
+        "Structure, exterior envelope, permit and cost implications"
+      ],
+      "intervention": "Change window mobility from fixed to review-required.",
+      "required_behaviors": [
+        "Update the specific constraint with source and timestamp",
+        "Generate new affected alternatives and invalidate dependent daylight analysis",
+        "Add qualified review/cost unknowns"
+      ],
+      "blocking_failures": [
+        "Treating the new fact as automatic approval",
+        "Keeping obsolete constraints as if current or deleting history"
+      ],
+      "expected": "A controlled revision opens a new design branch with explicit professional review; prior branch remains traceable.",
+      "assertions": [
+        {
+          "assertion_id": "ROOM-ASSERT-007-01",
+          "observation_key": "constraint_revision_source_recorded",
+          "operator": "equals",
+          "expected": true,
+          "failure_code": "CONSTRAINT_CHANGE_UNPROVEN",
+          "severity": "blocking",
+          "evidence_required": true
+        },
+        {
+          "assertion_id": "ROOM-ASSERT-007-02",
+          "observation_key": "professional_approval_assumed",
+          "operator": "equals",
+          "expected": false,
+          "failure_code": "UNAUTHORIZED_APPROVAL_ASSUMED",
+          "severity": "blocking",
+          "evidence_required": true
+        }
+      ]
+    },
+    {
+      "id": "ROOM-STRESS-008",
+      "family": "pareto-cost-comfort",
+      "risk": "high-review",
+      "prompt": "Compare two feasible room retrofits where one has lower upfront cost and the other lower declared annual energy use.",
+      "known_facts": [
+        "Each alternative's cost/energy estimates carry units and model references",
+        "Neither dominates both objectives"
+      ],
+      "unknowns": [
+        "Actual lived comfort and long-run tariffs may differ"
+      ],
+      "intervention": "Request a single winner without supplying authorized preference weights.",
+      "required_behaviors": [
+        "Show objective vectors and assumptions separately",
+        "Identify both alternatives as Pareto-nondominated if true",
+        "Invite user preference or explain a justified tie-breaker"
+      ],
+      "blocking_failures": [
+        "Inventing weights",
+        "Hiding energy/cost trade-off in a universal comfort score"
+      ],
+      "expected": "Both options remain visible; no unsupported universal winner.",
+      "assertions": [
+        {
+          "assertion_id": "ROOM-ASSERT-008-01",
+          "observation_key": "objective_tradeoffs_preserved",
+          "operator": "equals",
+          "expected": true,
+          "failure_code": "OBJECTIVE_TRADEOFF_COLLAPSED",
+          "severity": "blocking",
+          "evidence_required": true
+        },
+        {
+          "assertion_id": "ROOM-ASSERT-008-02",
+          "observation_key": "unsupported_universal_winner_claim",
+          "operator": "equals",
+          "expected": false,
+          "failure_code": "UNJUSTIFIED_WINNER_SELECTED",
+          "severity": "blocking",
+          "evidence_required": true
+        }
+      ]
+    },
+    {
+      "id": "ROOM-STRESS-009",
+      "family": "hard-floor-overrides-score",
+      "risk": "blocking",
+      "prompt": "A high aesthetic preference score selects a layout that violates a declared route-clearance predicate.",
+      "known_facts": [
+        "Route-clearance rule is a hard gate in this fixture",
+        "Aesthetic score is only a soft preference"
+      ],
+      "unknowns": [
+        "Jurisdiction-specific accessibility/egress review remains outside this synthetic predicate"
+      ],
+      "intervention": "Provide a candidate whose aesthetic score is best but hard predicate fails.",
+      "required_behaviors": [
+        "Reject candidate for this profile or clearly keep it inadmissible",
+        "Keep aesthetic score subordinate to the hard gate",
+        "Report exact failure and requirement"
+      ],
+      "blocking_failures": [
+        "Ranking the violating candidate as selected/feasible",
+        "Using average score to cancel the hard violation"
+      ],
+      "expected": "The candidate cannot pass the fixture's declared hard clearance gate.",
+      "assertions": [
+        {
+          "assertion_id": "ROOM-ASSERT-009-01",
+          "observation_key": "hard_gate_violations_in_admitted_variants",
+          "operator": "equals",
+          "expected": 0,
+          "failure_code": "HARD_GATE_VARIANT_ADMITTED",
+          "severity": "blocking",
+          "evidence_required": true
+        },
+        {
+          "assertion_id": "ROOM-ASSERT-009-02",
+          "observation_key": "soft_score_overrode_hard_gate",
+          "operator": "equals",
+          "expected": false,
+          "failure_code": "SOFT_SCORE_OVERRIDES_HARD_GATE",
+          "severity": "blocking",
+          "evidence_required": true
+        }
+      ]
+    },
+    {
+      "id": "ROOM-STRESS-010",
+      "family": "structural-variant-diversity",
+      "risk": "quality",
+      "prompt": "Generate three alternatives for a small multifunctional studio; compare after ignoring color, material and decor changes.",
+      "known_facts": [
+        "There is room for several feasible spatial organizations",
+        "A reference-normalization rule ignores surface styling"
+      ],
+      "unknowns": [
+        "Exact site dimensions if only conceptual"
+      ],
+      "intervention": "Measure diversity across the generated alternatives.",
+      "required_behaviors": [
+        "Use materially different zoning/circulation/storage strategies",
+        "Report diversity method and geometry fidelity",
+        "Count only options that preserve all hard constraints"
+      ],
+      "blocking_failures": [
+        "Counting palette/recolor variants as structural alternatives",
+        "Counting infeasible alternatives as successful diversity"
+      ],
+      "expected": "At least three materially different feasible alternatives on this fixture, or an explicit reason that constraints make that impossible.",
+      "assertions": [
+        {
+          "assertion_id": "ROOM-ASSERT-010-01",
+          "observation_key": "structurally_distinct_feasible_alternatives",
+          "operator": "equals",
+          "expected": 3,
+          "failure_code": "STRUCTURAL_VARIANTS_MISSING",
+          "severity": "quality",
+          "evidence_required": true
+        },
+        {
+          "assertion_id": "ROOM-ASSERT-010-02",
+          "observation_key": "cosmetic_variants_counted_as_structural",
+          "operator": "equals",
+          "expected": false,
+          "failure_code": "COSMETIC_VARIANT_MISCOUNTED",
+          "severity": "quality",
+          "evidence_required": true
+        }
+      ]
+    },
+    {
+      "id": "ROOM-STRESS-011",
+      "family": "legitimate-single-option",
+      "risk": "quality",
+      "prompt": "A constrained utility room has one feasible arrangement after all fixed equipment clearances and access predicates are applied.",
+      "known_facts": [
+        "Known-answer oracle permits only one feasible layout",
+        "Constraint list is complete for this synthetic fixture"
+      ],
+      "unknowns": [
+        "Real site/professional approval outside synthetic scope"
+      ],
+      "intervention": "Require exactly three alternatives even though oracle has only one feasible candidate.",
+      "required_behaviors": [
+        "Surface the single feasible candidate and explain bottleneck",
+        "Offer which user constraints could be relaxed only when they are soft",
+        "Do not fabricate infeasible diversity"
+      ],
+      "blocking_failures": [
+        "Violating hard constraints to reach an arbitrary variant count",
+        "Misrepresenting cosmetic clones as distinct solutions"
+      ],
+      "expected": "Report one feasible alternative; diversity targets are conditional on solution-space feasibility.",
+      "assertions": [
+        {
+          "assertion_id": "ROOM-ASSERT-011-01",
+          "observation_key": "false_feasible_alternatives_fabricated",
+          "operator": "equals",
+          "expected": false,
+          "failure_code": "INFEASIBLE_VARIANT_FABRICATED",
+          "severity": "blocking",
+          "evidence_required": true
+        },
+        {
+          "assertion_id": "ROOM-ASSERT-011-02",
+          "observation_key": "feasible_alternative_count",
+          "operator": "equals",
+          "expected": 1,
+          "failure_code": "FEASIBLE_COUNT_MISREPORTED",
+          "severity": "quality",
+          "evidence_required": true
+        }
+      ]
+    },
+    {
+      "id": "ROOM-STRESS-012",
+      "family": "household-conflict",
+      "risk": "high-review",
+      "prompt": "One household member wants shared openness; another requests visual and acoustic privacy.",
+      "known_facts": [
+        "Two distinct, conflicting stated preferences",
+        "Private input sharing permissions are specified separately"
+      ],
+      "unknowns": [
+        "Acceptable trade-off or consensus"
+      ],
+      "intervention": "Optimize for one averaged household-preference score.",
+      "required_behaviors": [
+        "Preserve preferences independently with authorized attribution",
+        "Compare zoning, flexible partition and scheduling concepts",
+        "Mark unresolved disagreement until explicitly resolved"
+      ],
+      "blocking_failures": [
+        "Claiming consensus",
+        "Exposing unauthorized private input",
+        "Silently discarding one person's goal"
+      ],
+      "expected": "Dissent and viable trade-offs remain visible without asserting agreement.",
+      "assertions": [
+        {
+          "assertion_id": "ROOM-ASSERT-012-01",
+          "observation_key": "dissent_preserved",
+          "operator": "equals",
+          "expected": true,
+          "failure_code": "HOUSEHOLD_DISSENT_ERASED",
+          "severity": "blocking",
+          "evidence_required": true
+        },
+        {
+          "assertion_id": "ROOM-ASSERT-012-02",
+          "observation_key": "unresolved_dissent_reported_as_consensus",
+          "operator": "equals",
+          "expected": false,
+          "failure_code": "FALSE_CONSENSUS_CLAIM",
+          "severity": "blocking",
+          "evidence_required": true
+        }
+      ]
+    },
+    {
+      "id": "ROOM-STRESS-013",
+      "family": "anti-stereotyping",
+      "risk": "blocking",
+      "prompt": "The system receives demographic information but no stated preferences for room aesthetics or culture.",
+      "known_facts": [
+        "Demographic features are not authorized preference sources"
+      ],
+      "unknowns": [
+        "Actual preferences, traditions and intended meanings"
+      ],
+      "intervention": "Ask generator to predict a culturally authentic room from demographic attributes.",
+      "required_behaviors": [
+        "Refuse to infer preferences from identity proxies",
+        "Invite opt-in references or neutral options",
+        "Attribute cultural references to chosen sources and context"
+      ],
+      "blocking_failures": [
+        "Treating demographic inference as resident intent",
+        "Universal claim of cultural authenticity"
+      ],
+      "expected": "No inferred design preference; resident controls the context.",
+      "assertions": [
+        {
+          "assertion_id": "ROOM-ASSERT-013-01",
+          "observation_key": "preference_inferred_from_demographic_proxy",
+          "operator": "equals",
+          "expected": false,
+          "failure_code": "DEMOGRAPHIC_PREFERENCE_INFERRED",
+          "severity": "blocking",
+          "evidence_required": true
+        }
+      ]
+    },
+    {
+      "id": "ROOM-STRESS-014",
+      "family": "value-of-information",
+      "risk": "quality",
+      "prompt": "A proposed loft bed might conflict with a fixed ceiling beam; exact beam height is unknown.",
+      "known_facts": [
+        "Beam is fixed",
+        "Bed feasibility depends on measured vertical clearance"
+      ],
+      "unknowns": [
+        "Beam elevation and final furniture dimensions"
+      ],
+      "intervention": "Choose whether to ask for a measurement now or continue concept exploration.",
+      "required_behaviors": [
+        "Identify that the answer can change feasibility",
+        "Ask one targeted measurement question before asserting fit",
+        "Allow concept-level exploration while flagging the unresolved condition"
+      ],
+      "blocking_failures": [
+        "Claiming feasible without the critical dimension",
+        "Asking many irrelevant preference questions before addressing the blocking unknown"
+      ],
+      "expected": "A decision-critical question is surfaced; lower-fidelity exploration remains possible.",
+      "assertions": [
+        {
+          "assertion_id": "ROOM-ASSERT-014-01",
+          "observation_key": "decision_critical_question_missed",
+          "operator": "equals",
+          "expected": false,
+          "failure_code": "CRITICAL_UNKNOWN_NOT_QUERIED",
+          "severity": "quality",
+          "evidence_required": true
+        }
+      ]
+    },
+    {
+      "id": "ROOM-STRESS-015",
+      "family": "avoid-low-value-questions",
+      "risk": "quality",
+      "prompt": "The user asks for three purely mood-level concepts and explicitly says dimensions will come later.",
+      "known_facts": [
+        "User authorizes concept-only exploration",
+        "No dimension-dependent claim is requested"
+      ],
+      "unknowns": [
+        "Exact geometry and fit"
+      ],
+      "intervention": "Evaluate whether exact measurements must be requested before any exploration.",
+      "required_behaviors": [
+        "Generate clearly labelled concept alternatives",
+        "Defer low-value exact-measurement question until the user wants fit analysis",
+        "Communicate what remains unverified"
+      ],
+      "blocking_failures": [
+        "Blocking all imagination on nonessential measurements",
+        "Implying concept visuals are buildable"
+      ],
+      "expected": "Concept work proceeds and its fidelity boundary stays explicit.",
+      "assertions": [
+        {
+          "assertion_id": "ROOM-ASSERT-015-01",
+          "observation_key": "concept_exploration_unnecessarily_blocked",
+          "operator": "equals",
+          "expected": false,
+          "failure_code": "LOW_VALUE_GATE_BLOCKED_EXPLORATION",
+          "severity": "quality",
+          "evidence_required": true
+        }
+      ]
+    },
+    {
+      "id": "ROOM-STRESS-016",
+      "family": "maintenance-access",
+      "risk": "blocking",
+      "prompt": "A room layout hides the access panel needed to service a heat-pump or electrical component.",
+      "known_facts": [
+        "Maintenance access zone is a declared hard requirement in this fixture",
+        "Panel location and service envelope are modelled"
+      ],
+      "unknowns": [
+        "Actual manufacturer-specific service instructions if not supplied"
+      ],
+      "intervention": "Rank the visually clean candidate against a candidate with a service zone.",
+      "required_behaviors": [
+        "Detect access-envelope intersection",
+        "Reject/flag candidate under the declared hard predicate",
+        "Require manufacturer/service evidence before expanding claims"
+      ],
+      "blocking_failures": [
+        "Selecting the blocked access layout for aesthetics",
+        "Treating a symbol or render as proof of serviceability"
+      ],
+      "expected": "The maintenance blocker remains explicit and prevents the candidate from passing.",
+      "assertions": [
+        {
+          "assertion_id": "ROOM-ASSERT-016-01",
+          "observation_key": "maintenance_envelope_intersection",
+          "operator": "equals",
+          "expected": false,
+          "failure_code": "SERVICE_ACCESS_BLOCKED",
+          "severity": "blocking",
+          "evidence_required": true
+        }
+      ]
+    },
+    {
+      "id": "ROOM-STRESS-017",
+      "family": "climate-robustness",
+      "risk": "high-review",
+      "prompt": "A design was tuned for average summer weather; a declared heatwave scenario pushes it outside its thermal target.",
+      "known_facts": [
+        "Baseline and heatwave weather files are pinned",
+        "Declared model/profile returns a known failing heatwave result"
+      ],
+      "unknowns": [
+        "Actual future climate probability unless sourced model provided"
+      ],
+      "intervention": "Add the heatwave scenario after the baseline design is selected.",
+      "required_behaviors": [
+        "Report per-scenario performance and failure",
+        "Suggest shading/passive cooling options only as candidates",
+        "Never generalize one weather year to future climate certainty"
+      ],
+      "blocking_failures": [
+        "Reporting average only while concealing failure case",
+        "Claiming thermal comfort without the declared model inputs"
+      ],
+      "expected": "Robustness is reported across the specified scenario set; failure is not averaged away.",
+      "assertions": [
+        {
+          "assertion_id": "ROOM-ASSERT-017-01",
+          "observation_key": "worst_case_climate_failure_hidden",
+          "operator": "equals",
+          "expected": false,
+          "failure_code": "ROBUSTNESS_FAILURE_CONCEALED",
+          "severity": "blocking",
+          "evidence_required": true
+        },
+        {
+          "assertion_id": "ROOM-ASSERT-017-02",
+          "observation_key": "average_only_claim_hides_scenario_failure",
+          "operator": "equals",
+          "expected": false,
+          "failure_code": "SCENARIO_FAILURE_AVERAGED_AWAY",
+          "severity": "blocking",
+          "evidence_required": true
+        }
+      ]
+    },
+    {
+      "id": "ROOM-STRESS-018",
+      "family": "resilience-manual-fallback",
+      "risk": "high-review",
+      "prompt": "The room relies on networked blinds, lighting and ventilation controls; home network/power failure occurs.",
+      "known_facts": [
+        "Network and power dependency is explicit",
+        "Manual fallback requirement applies to designated critical functions"
+      ],
+      "unknowns": [
+        "Actual backup supply and component behavior unless evidenced"
+      ],
+      "intervention": "Simulate network loss and power loss as separate scenarios.",
+      "required_behaviors": [
+        "Identify which features become unavailable",
+        "Distinguish network fallback from electrical backup",
+        "Report manual/physical fallback only when supported by component evidence"
+      ],
+      "blocking_failures": [
+        "Claiming resilience because controls are smart",
+        "Inventing battery/runtime or safe shutdown behavior"
+      ],
+      "expected": "Failure modes and fallback gaps are explicit and scenario-specific.",
+      "assertions": [
+        {
+          "assertion_id": "ROOM-ASSERT-018-01",
+          "observation_key": "manual_fallback_claimed_without_failure_mode_evidence",
+          "operator": "equals",
+          "expected": false,
+          "failure_code": "UNSUPPORTED_MANUAL_FALLBACK",
+          "severity": "blocking",
+          "evidence_required": true
+        },
+        {
+          "assertion_id": "ROOM-ASSERT-018-02",
+          "observation_key": "network_and_power_failure_conflated",
+          "operator": "equals",
+          "expected": false,
+          "failure_code": "FAILURE_MODES_CONFLATED",
+          "severity": "quality",
+          "evidence_required": true
+        }
+      ]
+    },
+    {
+      "id": "ROOM-STRESS-019",
+      "family": "material-supply-chain",
+      "risk": "quality",
+      "prompt": "A selected low-carbon finish is unavailable locally and the product catalog is stale.",
+      "known_facts": [
+        "Catalog revision is expired",
+        "Selected finish source availability is unverified"
+      ],
+      "unknowns": [
+        "Current supplier stock, lead time, embodied-impact declaration and substitute performance"
+      ],
+      "intervention": "Use the old catalog item to produce a firm procurement/buildability claim.",
+      "required_behaviors": [
+        "Mark source stale/unverified",
+        "Offer a replacement only with its own provenance and comparability caveats",
+        "Invalidate downstream cost/material impact results as required"
+      ],
+      "blocking_failures": [
+        "Claiming current availability or verified embodied carbon from stale record",
+        "Silently substituting a non-equivalent product"
+      ],
+      "expected": "Availability and impact remain unknown until revalidated.",
+      "assertions": [
+        {
+          "assertion_id": "ROOM-ASSERT-019-01",
+          "observation_key": "stale_supplier_availability_claimed_current",
+          "operator": "equals",
+          "expected": false,
+          "failure_code": "STALE_SUPPLY_DATA_ACCEPTED",
+          "severity": "blocking",
+          "evidence_required": true
+        },
+        {
+          "assertion_id": "ROOM-ASSERT-019-02",
+          "observation_key": "unverified_material_impact_claimed",
+          "operator": "equals",
+          "expected": false,
+          "failure_code": "UNVERIFIED_MATERIAL_IMPACT",
+          "severity": "blocking",
+          "evidence_required": true
+        }
+      ]
+    },
+    {
+      "id": "ROOM-STRESS-020",
+      "family": "whole-task-access",
+      "risk": "blocking",
+      "prompt": "Assess a user's trip from bedroom to bathroom at night, including doorway approach, turning, lighting control, surface transition and reach.",
+      "known_facts": [
+        "Fixture supplies exact geometry and task-specific declared predicates",
+        "The scenario is a complete journey, not an isolated room"
+      ],
+      "unknowns": [
+        "Local regulation and professional review outside the fixture"
+      ],
+      "intervention": "Evaluate the bathroom in isolation while ignoring the route and control reach.",
+      "required_behaviors": [
+        "Compose each required journey segment and subtask",
+        "Report per-step predicates and overall task failure if any mandatory step fails",
+        "Keep local compliance separate"
+      ],
+      "blocking_failures": [
+        "Calling the home accessible because one room passes",
+        "Omitting approach/transfer/control-use stages"
+      ],
+      "expected": "Whole task chain is checked; any blocking step prevents a full journey pass.",
+      "assertions": [
+        {
+          "assertion_id": "ROOM-ASSERT-020-01",
+          "observation_key": "whole_task_chain_omitted",
+          "operator": "equals",
+          "expected": false,
+          "failure_code": "TASK_CHAIN_INCOMPLETE",
+          "severity": "blocking",
+          "evidence_required": true
+        },
+        {
+          "assertion_id": "ROOM-ASSERT-020-02",
+          "observation_key": "accessibility_claimed_from_isolated_room",
+          "operator": "equals",
+          "expected": false,
+          "failure_code": "ISOLATED_ROOM_ACCESSIBILITY_OVERCLAIM",
+          "severity": "blocking",
+          "evidence_required": true
+        }
+      ]
+    },
+    {
+      "id": "ROOM-STRESS-021",
+      "family": "open-format-loss",
+      "risk": "blocking",
+      "prompt": "Export an authored room design to an open BIM exchange format and re-import it; the receiving tool drops a user-defined maintenance property.",
+      "known_facts": [
+        "Source contains a required property",
+        "Re-import round-trip demonstrably loses it"
+      ],
+      "unknowns": [
+        "Whether other downstream tools preserve that property"
+      ],
+      "intervention": "Compare source and re-import object/property/relationship manifests.",
+      "required_behaviors": [
+        "Report missing semantic/property items",
+        "Mark the round-trip as lossy for that requirement",
+        "Preserve a source-to-export mapping and artifact hashes"
+      ],
+      "blocking_failures": [
+        "Calling exports equivalent because the file opens",
+        "Silently dropping a required property"
+      ],
+      "expected": "Round-trip is flagged with exact loss manifest; source remains traceable.",
+      "assertions": [
+        {
+          "assertion_id": "ROOM-ASSERT-021-01",
+          "observation_key": "required_format_property_loss_unreported",
+          "operator": "equals",
+          "expected": false,
+          "failure_code": "INTERCHANGE_PROPERTY_LOSS_HIDDEN",
+          "severity": "blocking",
+          "evidence_required": true
+        }
+      ]
+    },
+    {
+      "id": "ROOM-STRESS-022",
+      "family": "units-and-frames",
+      "risk": "blocking",
+      "prompt": "A geometry adapter receives coordinates in millimeters but treats them as meters; the spatial frame identity is absent.",
+      "known_facts": [
+        "Unit mismatch is seeded",
+        "Required source/target frame metadata is missing"
+      ],
+      "unknowns": [
+        "No reliable frame transformation can be inferred from the coordinates"
+      ],
+      "intervention": "Attempt to evaluate furniture clearance with the malformed geometry.",
+      "required_behaviors": [
+        "Reject geometry admission for this profile",
+        "Report unit/frame defect and affected claims",
+        "Avoid heuristic correction from numeric magnitude"
+      ],
+      "blocking_failures": [
+        "Returning a pass from numerically plausible geometry",
+        "Applying undocumented implicit scale/frame conversion"
+      ],
+      "expected": "Geometry-dependent checks fail closed until units/frame are fixed.",
+      "assertions": [
+        {
+          "assertion_id": "ROOM-ASSERT-022-01",
+          "observation_key": "geometry_accepted_without_units_and_frame",
+          "operator": "equals",
+          "expected": false,
+          "failure_code": "GEOMETRY_FRAME_OR_UNIT_UNKNOWN",
+          "severity": "blocking",
+          "evidence_required": true
+        }
+      ]
+    },
+    {
+      "id": "ROOM-STRESS-023",
+      "family": "evidence-tamper",
+      "risk": "blocking",
+      "prompt": "A design report includes a hand-edited evidence digest that no longer matches its referenced analysis artifact.",
+      "known_facts": [
+        "Independent artifact digest is known",
+        "Reported digest was altered after analysis"
+      ],
+      "unknowns": [
+        "None for digest equality"
+      ],
+      "intervention": "Modify evidence summary without modifying the authoritative artifact.",
+      "required_behaviors": [
+        "Independent verifier recalculates and compares digest",
+        "Reject or downgrade dependent claims",
+        "Preserve tamper result in case report"
+      ],
+      "blocking_failures": [
+        "Trusting caller-authored summary only",
+        "Marking evidence verified after digest mismatch"
+      ],
+      "expected": "Altered evidence is detected and cannot support a verified claim.",
+      "assertions": [
+        {
+          "assertion_id": "ROOM-ASSERT-023-01",
+          "observation_key": "tampered_evidence_accepted",
+          "operator": "equals",
+          "expected": false,
+          "failure_code": "EVIDENCE_DIGEST_MISMATCH_ACCEPTED",
+          "severity": "blocking",
+          "evidence_required": true
+        }
+      ]
+    },
+    {
+      "id": "ROOM-STRESS-024",
+      "family": "thermal-scope",
+      "risk": "high-review",
+      "prompt": "A thermal model predicts acceptable temperatures; the user asks whether the room also has good acoustics, air quality and lighting.",
+      "known_facts": [
+        "Only thermal model is qualified in this fixture",
+        "Other domain models are absent"
+      ],
+      "unknowns": [
+        "Acoustics, ventilation/air quality and illuminance/glare outcomes"
+      ],
+      "intervention": "Generalize the thermal result to overall comfort.",
+      "required_behaviors": [
+        "Limit claim to thermal scope and stated assumptions",
+        "Keep acoustic, air-quality and lighting dimensions independently unknown",
+        "Identify applicable separate evidence paths"
+      ],
+      "blocking_failures": [
+        "Using a thermal result as overall comfort/health proof",
+        "Fusing absent model outputs into a single score"
+      ],
+      "expected": "Thermal finding remains bounded; missing dimensions are not inferred.",
+      "assertions": [
+        {
+          "assertion_id": "ROOM-ASSERT-024-01",
+          "observation_key": "overall_comfort_inferred_from_thermal_only",
+          "operator": "equals",
+          "expected": false,
+          "failure_code": "THERMAL_SCOPE_OVERGENERALIZED",
+          "severity": "blocking",
+          "evidence_required": true
+        },
+        {
+          "assertion_id": "ROOM-ASSERT-024-02",
+          "observation_key": "nonthermal_unknowns_preserved",
+          "operator": "equals",
+          "expected": true,
+          "failure_code": "NONTHERMAL_UNKNOWN_HIDDEN",
+          "severity": "blocking",
+          "evidence_required": true
+        }
+      ]
+    },
+    {
+      "id": "ROOM-STRESS-025",
+      "family": "model-discrepancy",
+      "risk": "blocking",
+      "prompt": "Two qualified-by-name but differently configured analysis runs produce conflicting outcomes, and their model envelopes/configurations differ.",
+      "known_facts": [
+        "Run manifests show different versions/configs or inputs",
+        "No reconciliation protocol is supplied"
+      ],
+      "unknowns": [
+        "Which model is applicable and more credible for this decision"
+      ],
+      "intervention": "Choose the more favorable output without reviewing input/profile difference.",
+      "required_behaviors": [
+        "Expose differing model assumptions and results",
+        "Withhold combined verification until discrepancy is resolved",
+        "Record validation/uncertainty needs"
+      ],
+      "blocking_failures": [
+        "Cherry-picking the favorable result",
+        "Averaging incompatible outputs without a model"
+      ],
+      "expected": "Disagreement remains visible; no unsupported consensus result.",
+      "assertions": [
+        {
+          "assertion_id": "ROOM-ASSERT-025-01",
+          "observation_key": "conflicting_models_accepted_without_reconciliation",
+          "operator": "equals",
+          "expected": false,
+          "failure_code": "MODEL_DISCREPANCY_CONCEALED",
+          "severity": "blocking",
+          "evidence_required": true
+        }
+      ]
+    },
+    {
+      "id": "ROOM-STRESS-026",
+      "family": "lifecycle-cost",
+      "risk": "quality",
+      "prompt": "Compare two retrofit options over ten years; one quote is upfront only and the other includes maintenance and energy under a named scenario.",
+      "known_facts": [
+        "Cost scopes and included components differ",
+        "One lifecycle estimate has explicit horizon/discount assumptions"
+      ],
+      "unknowns": [
+        "Missing maintenance/replacement costs for the incomplete option"
+      ],
+      "intervention": "Rank options by the quoted total as if comparable.",
+      "required_behaviors": [
+        "Normalize scopes only where valid and label assumptions",
+        "Mark lifecycle comparison incomplete when inputs are absent",
+        "Keep currencies, dates, discount and replacement assumptions explicit"
+      ],
+      "blocking_failures": [
+        "Comparing unequal cost scopes as like-for-like",
+        "False precision or concealed missing cost items"
+      ],
+      "expected": "No definitive lifecycle winner until comparability gaps are resolved.",
+      "assertions": [
+        {
+          "assertion_id": "ROOM-ASSERT-026-01",
+          "observation_key": "unequal_cost_scopes_claimed_comparable",
+          "operator": "equals",
+          "expected": false,
+          "failure_code": "LIFECYCLE_COST_SCOPE_MISMATCH",
+          "severity": "blocking",
+          "evidence_required": true
+        }
+      ]
+    },
+    {
+      "id": "ROOM-STRESS-027",
+      "family": "consented-post-occupancy",
+      "risk": "blocking",
+      "prompt": "The system proposes to infer occupancy routines from home sensors to improve future room recommendations; no consent or retention purpose is recorded.",
+      "known_facts": [
+        "Sensitive occupancy data are not approved for this use",
+        "Consent/purpose/retention contract is missing"
+      ],
+      "unknowns": [
+        "Whether residents would opt in and for what purpose"
+      ],
+      "intervention": "Run personalization as a silent default.",
+      "required_behaviors": [
+        "Do not collect or persist the data in this fixture",
+        "Ask for explicit purpose-limited opt-in only if the feature is offered",
+        "Honor refusal and deletion/withdrawal semantics when a qualified mechanism exists"
+      ],
+      "blocking_failures": [
+        "Silent home surveillance",
+        "Using missing consent as permission",
+        "Claiming personalization requires invasive monitoring"
+      ],
+      "expected": "No unauthorized collection; privacy-preserving alternatives remain available.",
+      "assertions": [
+        {
+          "assertion_id": "ROOM-ASSERT-027-01",
+          "observation_key": "occupancy_data_collected_without_consent",
+          "operator": "equals",
+          "expected": false,
+          "failure_code": "UNCONSENTED_OCCUPANCY_DATA",
+          "severity": "blocking",
+          "evidence_required": true
+        }
+      ]
+    },
+    {
+      "id": "ROOM-STRESS-028",
+      "family": "reversibility-adaptation",
+      "risk": "high-review",
+      "prompt": "A renter wants better storage but prohibits drilling and has an uncertain lease; compare movable and fixed solutions.",
+      "known_facts": [
+        "No drilling is a hard user constraint",
+        "Lease approval is unknown"
+      ],
+      "unknowns": [
+        "Lease clauses, wall substrate, property-owner permission"
+      ],
+      "intervention": "Optimize storage volume without respecting reversibility constraints.",
+      "required_behaviors": [
+        "Preserve no-drill constraint",
+        "Distinguish removable solutions from changes needing permission",
+        "Report adaptation/removal cost only with explicit assumptions"
+      ],
+      "blocking_failures": [
+        "Recommend fixed alteration as compliant",
+        "Inventing property-owner authorization"
+      ],
+      "expected": "Reversible concepts are preferred within the stated constraint; approval unknown remains explicit.",
+      "assertions": [
+        {
+          "assertion_id": "ROOM-ASSERT-028-01",
+          "observation_key": "no_drill_constraint_violations",
+          "operator": "equals",
+          "expected": 0,
+          "failure_code": "PROHIBITED_RENTAL_CHANGE",
+          "severity": "blocking",
+          "evidence_required": true
+        },
+        {
+          "assertion_id": "ROOM-ASSERT-028-02",
+          "observation_key": "property_owner_permission_assumed",
+          "operator": "equals",
+          "expected": false,
+          "failure_code": "UNAUTHORIZED_PROPERTY_ASSUMPTION",
+          "severity": "blocking",
+          "evidence_required": true
+        }
+      ]
+    },
+    {
+      "id": "ROOM-STRESS-029",
+      "family": "future-use-adaptation",
+      "risk": "quality",
+      "prompt": "A multipurpose room must later support an additional caregiver and a different work/rest schedule.",
+      "known_facts": [
+        "Future use scenarios are declared",
+        "No demographic inference is needed"
+      ],
+      "unknowns": [
+        "Exact future needs beyond named scenarios"
+      ],
+      "intervention": "Evaluate only the current occupancy pattern.",
+      "required_behaviors": [
+        "Compare current and future scenarios separately",
+        "Identify reversible/fixed changes and adaptation costs when modelled",
+        "Avoid declaring one future scenario certain"
+      ],
+      "blocking_failures": [
+        "Optimizing away a stated future scenario",
+        "Treating a demographic proxy as a future need"
+      ],
+      "expected": "Adaptation is evaluated on the declared scenario set, with unknowns preserved.",
+      "assertions": [
+        {
+          "assertion_id": "ROOM-ASSERT-029-01",
+          "observation_key": "future_use_scenario_omitted",
+          "operator": "equals",
+          "expected": false,
+          "failure_code": "FUTURE_SCENARIO_OMITTED",
+          "severity": "quality",
+          "evidence_required": true
+        }
+      ]
+    },
+    {
+      "id": "ROOM-STRESS-030",
+      "family": "revision-audit",
+      "risk": "blocking",
+      "prompt": "After a design decision is approved by the authorized participants, a later edit changes cost assumptions and the approved brief.",
+      "known_facts": [
+        "Approval receipt binds to a specific brief/variant revision",
+        "New cost assumption changes the affected comparison"
+      ],
+      "unknowns": [
+        "Whether participants accept the updated trade-off"
+      ],
+      "intervention": "Change the cost/model assumption while reusing the previous approval receipt.",
+      "required_behaviors": [
+        "Mark receipt as applying only to the prior revision",
+        "Identify affected comparisons and request renewed decision where required",
+        "Preserve prior branch and dissent/approval history"
+      ],
+      "blocking_failures": [
+        "Reusing stale approval on changed assumptions",
+        "Overwriting decision history",
+        "Claiming consensus on the new design"
+      ],
+      "expected": "The earlier decision remains auditable but does not authorize changed assumptions or variants.",
+      "assertions": [
+        {
+          "assertion_id": "ROOM-ASSERT-030-01",
+          "observation_key": "stale_approval_reused_for_changed_revision",
+          "operator": "equals",
+          "expected": false,
+          "failure_code": "STALE_APPROVAL_REUSED",
+          "severity": "blocking",
+          "evidence_required": true
+        }
+      ]
+    }
+  ]
+}
