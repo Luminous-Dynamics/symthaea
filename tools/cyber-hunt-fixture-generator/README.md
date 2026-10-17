@@ -46,25 +46,25 @@ cargo run --manifest-path tools/cyber-hunt-fixture-generator/Cargo.toml -- \
 
 Integrated cross-domain example:
 
-\`\`\`sh
-cargo run --manifest-path tools/cyber-hunt-fixture-generator/Cargo.toml -- \\
-  --family cross-domain-trust-chain --records 1000 --seed 20261020 \\
-  --events-out /tmp/cyber-hunt-cross-domain/solver/events.jsonl \\
-  --manifest-out /tmp/cyber-hunt-cross-domain/solver/manifest.json \\
-  --truth-out /tmp/cyber-hunt-cross-domain/evaluator/truth.json \\
+```sh
+cargo run --manifest-path tools/cyber-hunt-fixture-generator/Cargo.toml -- \
+  --family cross-domain-trust-chain --records 1000 --seed 20261020 \
+  --events-out /tmp/cyber-hunt-cross-domain/solver/events.jsonl \
+  --manifest-out /tmp/cyber-hunt-cross-domain/solver/manifest.json \
+  --truth-out /tmp/cyber-hunt-cross-domain/evaluator/truth.json \
   --source-commit "$(git rev-parse HEAD)"
-\`\`\`
+```
 
 All-negative false-positive control:
 
-\`\`\`sh
-cargo run --manifest-path tools/cyber-hunt-fixture-generator/Cargo.toml -- \\
-  --family benign-only-control --records 1000 --seed 20261021 \\
-  --events-out /tmp/cyber-hunt-benign/solver/events.jsonl \\
-  --manifest-out /tmp/cyber-hunt-benign/solver/manifest.json \\
-  --truth-out /tmp/cyber-hunt-benign/evaluator/truth.json \\
+```sh
+cargo run --manifest-path tools/cyber-hunt-fixture-generator/Cargo.toml -- \
+  --family benign-only-control --records 1000 --seed 20261021 \
+  --events-out /tmp/cyber-hunt-benign/solver/events.jsonl \
+  --manifest-out /tmp/cyber-hunt-benign/solver/manifest.json \
+  --truth-out /tmp/cyber-hunt-benign/evaluator/truth.json \
   --source-commit "$(git rev-parse HEAD)"
-\`\`\`
+```
 
 ## Output separation
 
