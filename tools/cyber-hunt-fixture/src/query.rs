@@ -267,8 +267,6 @@ struct QueryReceipt {
     request_sha256: String,
     solver_manifest_sha256: String,
     event_store_sha256: String,
-    source_commit: String,
-    source_commit_pinned: bool,
     rows_examined: usize,
     rows_matched: usize,
     rows_returned: usize,
@@ -290,7 +288,6 @@ struct QueryResponse {
 
 struct SolverStore {
     events: Vec<Event>,
-    manifest: SolverManifest,
     manifest_sha256: String,
     event_sha256: String,
 }
@@ -341,7 +338,6 @@ fn execute_query(
     request: &QueryRequest,
     event_store_sha256: &str,
     solver_manifest_sha256: &str,
-    source_commit: &str,
     budget: &QueryBudget,
     usage: &mut QueryUsage,
 ) -> Result<QueryResponse, String> {
@@ -415,8 +411,6 @@ fn execute_query(
             request_sha256,
             solver_manifest_sha256: solver_manifest_sha256.to_string(),
             event_store_sha256: event_store_sha256.to_string(),
-            source_commit: source_commit.to_string(),
-            source_commit_pinned: crate::is_full_git_sha(source_commit),
             rows_examined: events.len(),
             rows_matched,
             rows_returned: records.len(),
@@ -478,7 +472,6 @@ fn load_solver_store(root: &Path) -> Result<SolverStore, String> {
     if manifest.schema_version != SOLVER_MANIFEST_VERSION
         || manifest.generator_version != GENERATOR_VERSION
         || !manifest.synthetic_only
-        || manifest.source_commit_pinned != crate::is_full_git_sha(&manifest.source_commit)
         || manifest.qualification_state != "UNSCORED"
         || manifest.event_file != "events.jsonl"
         || manifest.record_count < 1
@@ -531,7 +524,6 @@ fn load_solver_store(root: &Path) -> Result<SolverStore, String> {
     }
     Ok(SolverStore {
         events,
-        manifest,
         manifest_sha256: sha256(&manifest_bytes),
         event_sha256: sha256(&event_bytes),
     })
@@ -588,7 +580,6 @@ fn run_cli(args: &[String]) -> Result<(), String> {
             request,
             &store.event_sha256,
             &store.manifest_sha256,
-            &store.manifest.source_commit,
             &budget,
             &mut usage,
         );
@@ -656,7 +647,6 @@ mod tests {
             &default_request(),
             &"a".repeat(64),
             &"b".repeat(64),
-            "test-source-commit",
             &QueryBudget::default(),
             &mut usage,
         ).expect("typed query should succeed");
@@ -678,7 +668,6 @@ mod tests {
             &default_request(),
             &"a".repeat(64),
             &"b".repeat(64),
-            "test-source-commit",
             &budget,
             &mut usage,
         ).expect("first query should be within budget");
