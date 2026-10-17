@@ -93,6 +93,9 @@ pub struct OutcomeLedger {
     pub evaluation_manifest_sha256: String,
     /// SHA-256 of the source, data-rights and artifact-provenance manifest.
     pub source_manifest_sha256: String,
+    /// Optional SHA-256 of the independently verified distribution-shift manifest.
+    #[serde(default)]
+    pub shift_manifest_sha256: Option<String>,
     /// Task loss name; lower is better.
     pub loss_name: String,
     /// Units/normalization definition for the loss.
@@ -326,6 +329,8 @@ pub struct BenchmarkReport {
     pub evaluation_manifest_sha256: String,
     /// Source/provenance-manifest digest.
     pub source_manifest_sha256: String,
+    /// Shift-manifest digest carried forward for audit joins, if the run is shift-aware.
+    pub shift_manifest_sha256: Option<String>,
     /// Loss name.
     pub loss_name: String,
     /// Loss units/definition.
@@ -447,6 +452,7 @@ pub fn evaluate_json_ledger(
         task_contract_sha256: ledger.task_contract_sha256,
         evaluation_manifest_sha256: ledger.evaluation_manifest_sha256,
         source_manifest_sha256: ledger.source_manifest_sha256,
+        shift_manifest_sha256: ledger.shift_manifest_sha256,
         loss_name: ledger.loss_name,
         loss_unit: ledger.loss_unit,
         success_threshold: ledger.success_threshold,
@@ -487,6 +493,16 @@ fn validate_ledger(ledger: &OutcomeLedger) -> Result<(), String> {
     {
         return Err(
             "task, evaluation and source manifest digests must be 64 lowercase hexadecimal characters"
+                .to_string(),
+        );
+    }
+    if ledger
+        .shift_manifest_sha256
+        .as_deref()
+        .is_some_and(|digest| !is_hex_digest(digest, 64))
+    {
+        return Err(
+            "shift_manifest_sha256 must be 64 lowercase hexadecimal characters when present"
                 .to_string(),
         );
     }
@@ -1139,6 +1155,7 @@ mod tests {
             task_contract_sha256: hex('d', 64),
             evaluation_manifest_sha256: hex('e', 64),
             source_manifest_sha256: hex('f', 64),
+            shift_manifest_sha256: None,
             loss_name: "synthetic_loss".to_string(),
             loss_unit: "dimensionless".to_string(),
             success_threshold: 0.01,
