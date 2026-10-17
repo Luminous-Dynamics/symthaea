@@ -313,7 +313,10 @@ fn validate_corpus(corpus: &Value) -> Result<Value, String> {
         "policy_positive_abstentions": accepted_abstentions,
         "policy_negative_controls": rejected,
         "outcomes": outcomes,
-        "claim_ceiling": "The policy auditor matched eight authored synthetic traces; this is not a score for a model or live coding agent."
+        "claim_ceiling": concat!(
+            "The policy auditor matched eight authored synthetic traces; ",
+            "this is not a score for a model or live coding agent."
+        )
     }))
 }
 
