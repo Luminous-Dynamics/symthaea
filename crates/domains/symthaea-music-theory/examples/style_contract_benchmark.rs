@@ -119,9 +119,12 @@ fn realize(style: Style, intent: &MusicalIntent) -> symthaea_music_theory::Gramm
 /// A and ReturnA keep the quarter-note Minuet gait; B must actually contain
 /// offbeat harmony attacks from the Trio's eighth-note arpeggiation.
 fn minuet_trio_texture_audit() -> Value {
-    let generated = realize(
-        Style::MinuetAndTrio,
-        &intent(0.2, 0.45, 0.4, 16, 42),
+    let spec = Style::MinuetAndTrio.spec();
+    let request = intent(0.2, 0.45, 0.4, 16, 42);
+    let generated = compose_with_grammar_plan(
+        Style::MinuetAndTrio.grammar_profile(),
+        &request,
+        &spec,
     );
     let Some(form) = generated.form.as_ref() else {
         return json!({
@@ -134,13 +137,14 @@ fn minuet_trio_texture_audit() -> Value {
 
     let score = &generated.score;
     let meter = f64::from(score.meter);
+    let intro_beats = spec.texture.intro_bars as f64 * meter;
     let mut start_bar = 0_i64;
     let mut metrics = Vec::<(String, usize, usize)>::new();
     for section in &form.sections {
         let section_bars = (section.period.antecedent.progression.len()
             + section.period.consequent.progression.len()) as i64;
-        let start = start_bar as f64 * meter;
-        let end = (start_bar + section_bars) as f64 * meter;
+        let start = intro_beats + start_bar as f64 * meter;
+        let end = intro_beats + (start_bar + section_bars) as f64 * meter;
         let harmony_onsets: Vec<f64> = score
             .notes
             .iter()
