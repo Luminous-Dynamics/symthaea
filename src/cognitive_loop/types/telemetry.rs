@@ -1159,6 +1159,11 @@ pub struct CycleMetadata {
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub plant_step_timing: Option<symthaea_core::embodiment::PlantStepTimingV1>,
 
+    /// Validated external action/observation receipt accepted this cycle.
+    /// None when the bridge did not use the event-driven contract.
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub external_action_timing: Option<symthaea_core::embodiment::ExternalActionTimingV1>,
+
     // ── Radio/Spectrum Manager Telemetry ───────────────────────────────────
     /// Network health: 0=AllUp, 1=LocalDown, 2=MetroOnly, 3=Blackout.
     #[serde(default)]
