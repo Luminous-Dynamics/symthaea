@@ -16,6 +16,25 @@ fn registry() -> Value {
         .expect("Tier-B candidate registry must be valid JSON")
 }
 
+// Analytic-only fixture accessor. It deliberately does not invoke DWSIM.
+fn mixer_inlet_mass_flows_kg_s() -> Vec<f64> {
+    let root = registry();
+    let mixer = root["candidates"]
+        .as_array()
+        .unwrap()
+        .iter()
+        .find(|candidate| candidate["case_id"].as_str() == Some("CHEM-B-TB-001"))
+        .expect("water mixer candidate must exist");
+    ["inlet_1", "inlet_2"]
+        .into_iter()
+        .map(|inlet| {
+            mixer["configuration"][inlet]["mass_flow"]["value"]
+                .as_f64()
+                .expect("mixer inlet mass flow must be numeric")
+        })
+        .collect()
+}
+
 #[test]
 fn registry_is_versioned_and_case_ids_are_unique() {
     let root = registry();
@@ -138,6 +157,35 @@ fn mixer_mass_sum_is_an_analytic_invariant_not_a_simulator_result() {
         Some(false),
         "the analytic mass sum must not imply simulator state variables are frozen"
     );
+}
+
+
+#[test]
+fn analytic_mixer_mass_balance_is_stream_order_invariant() {
+    let flows = mixer_inlet_mass_flows_kg_s();
+    let forward = flows.iter().sum::<f64>();
+    let reversed = flows.iter().rev().sum::<f64>();
+    assert_eq!(forward, 150.0);
+    assert_eq!(reversed, forward);
+}
+
+#[test]
+fn analytic_mixer_mass_balance_scales_linearly() {
+    let flows = mixer_inlet_mass_flows_kg_s();
+    for factor in [2.0, 10.0, 1_000.0] {
+        let scaled_total = flows.iter().map(|flow| flow * factor).sum::<f64>();
+        assert_eq!(scaled_total, 150.0 * factor);
+    }
+}
+
+#[test]
+fn analytic_mixer_mass_balance_is_unit_equivalent() {
+    let flows_kg_s = mixer_inlet_mass_flows_kg_s();
+    let total_kg_s = flows_kg_s.iter().sum::<f64>();
+    let total_g_s = flows_kg_s.iter().map(|flow| flow * 1_000.0).sum::<f64>();
+    assert_eq!(total_kg_s, 150.0);
+    assert_eq!(total_g_s, 150_000.0);
+    assert_eq!(total_g_s / 1_000.0, total_kg_s);
 }
 
 #[test]
