@@ -821,7 +821,7 @@ mod tests {
         let estimate = result.estimated_pitch_hz.expect("tone should estimate");
         assert!((estimate - 440.0).abs() < 2.0, "estimated {estimate}");
         assert!(
-            result.error_cents.expect("error should exist").abs() < 10.0,
+            result.error_cents.expect("error should exist").abs() < 5.0,
             "{result:?}"
         );
         assert!(result.periodicity_confidence.unwrap() >= 0.60);
@@ -867,7 +867,7 @@ mod tests {
                 estimated_pitch_hz: Some(440.0),
                 pitch_error_cents: Some(0.0),
                 pitch_periodicity_confidence: Some(0.9),
-                pitch_estimate_status: "estimated",
+                pitch_estimate_status: "periodic_estimate_available",
                 outcome: "signal_present",
             }
         }
