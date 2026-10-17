@@ -66,7 +66,8 @@
       "input": {
         "pressure_sensor": "conflicted",
         "shear_sensor": "unavailable",
-        "user_comfort_report": "not_collected"
+        "user_comfort_report": "not_collected",
+        "fit_evidence": "current"
       },
       "expected_disposition": "interface_state_unknown",
       "required_receipts": [
@@ -202,7 +203,8 @@
       "stage": "perform",
       "input": {
         "interface_migration_sensor": "unavailable",
-        "measured_migration_value": null
+        "measured_migration_value": null,
+        "fit_evidence": "current"
       },
       "expected_disposition": "migration_metric_missing",
       "required_receipts": [
