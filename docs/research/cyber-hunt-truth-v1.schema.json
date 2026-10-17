@@ -21,7 +21,8 @@
     "scenario_id": {
       "enum": [
         "synthetic-identity-to-egress-v1",
-        "synthetic-artifact-lifecycle-v1"
+        "synthetic-artifact-lifecycle-v1",
+        "synthetic-cloud-data-movement-v1"
       ]
     },
     "profile": {
