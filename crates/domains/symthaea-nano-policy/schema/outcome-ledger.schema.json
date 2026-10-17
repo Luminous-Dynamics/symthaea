@@ -256,9 +256,12 @@
       "description": "Minimum practical reduction in the final-budget best loss; positive reported comparison delta means the candidate lowered loss."
     },
     "shift_manifest_sha256": {
-      "type": "string",
+      "type": [
+        "string",
+        "null"
+      ],
       "pattern": "^[a-f0-9]{64}$",
-      "description": "Optional SHA-256 of the separately verified nano-shift-manifest-v1 used to label the groups."
+      "description": "Optional SHA-256 of the separately verified nano-shift-manifest-v1 used to label the groups; omitted/null means this ledger is not shift-manifest-bound."
     }
   }
 }
