@@ -6,7 +6,7 @@ use std::fs;
 use std::path::{Path, PathBuf};
 use std::process;
 
-const GENERATOR_VERSION: &str = "cyber-hunt-fixture-generator/0.3.0";
+const GENERATOR_VERSION: &str = "cyber-hunt-fixture-generator/0.4.0";
 const EVENT_SCHEMA: &str = "cyber-hunt-event-v1";
 const MANIFEST_SCHEMA: &str = "cyber-hunt-manifest-v1";
 const TRUTH_SCHEMA: &str = "cyber-hunt-truth-v1";
@@ -418,6 +418,7 @@ enum CampaignFamily {
     IdentityToEgress,
     ArtifactProvenance,
     CloudDataMovement,
+    CrossDomainTrustChain,
 }
 
 impl CampaignFamily {
@@ -426,8 +427,9 @@ impl CampaignFamily {
             "identity-to-egress" => Ok(Self::IdentityToEgress),
             "artifact-provenance" => Ok(Self::ArtifactProvenance),
             "cloud-data-movement" => Ok(Self::CloudDataMovement),
+            "cross-domain-trust-chain" => Ok(Self::CrossDomainTrustChain),
             _ => Err(format!(
-                "unsupported --family {value}; expected identity-to-egress, artifact-provenance, or cloud-data-movement"
+                "unsupported --family {value}; expected identity-to-egress, artifact-provenance, cloud-data-movement, or cross-domain-trust-chain"
             )),
         }
     }
@@ -437,6 +439,7 @@ impl CampaignFamily {
             Self::IdentityToEgress => "identity-to-egress",
             Self::ArtifactProvenance => "artifact-provenance",
             Self::CloudDataMovement => "cloud-data-movement",
+            Self::CrossDomainTrustChain => "cross-domain-trust-chain",
         }
     }
 }
@@ -972,6 +975,385 @@ fn generate_cloud_data_movement_dataset(record_count: usize, seed: u64) -> Resul
     Ok(Dataset { event_store, manifest, truth })
 }
 
+fn generate_cross_domain_trust_chain_dataset(record_count: usize, seed: u64) -> Result<Dataset, String> {
+    const POSITIVE_COUNT: usize = 12;
+    const BENIGN_LOOKALIKE_COUNT: usize = 12;
+    const PLANTED_COUNT: usize = POSITIVE_COUNT + BENIGN_LOOKALIKE_COUNT;
+    const SCENARIO: &str = "synthetic-cross-domain-trust-chain-v1";
+
+    if !(MIN_RECORDS..=MAX_RECORDS).contains(&record_count) {
+        return Err(format!(
+            "record count must be between {MIN_RECORDS} and {MAX_RECORDS}"
+        ));
+    }
+
+    let mut rng = Rng::new(seed);
+    let mut events = Vec::with_capacity(record_count);
+    let mut used_ids = BTreeSet::new();
+    let campaign_anchor_ms = BASE_TIME_MS.saturating_add(rng.below(7_200_000) as i64);
+
+    for index in 0..(record_count - PLANTED_COUNT) {
+        background_event(index, campaign_anchor_ms, &mut events, &mut rng, &mut used_ids);
+    }
+
+    // Cross-domain positive chain: CI identity, source revision, build, artifact,
+    // attestation, promotion, deployment, cloud role/token, out-of-scope reads, export.
+    // Every operation is synthetic; the intended signal is in joined evidence, not a
+    // unique event type. The benign mirror uses the same types/outcomes with valid joins.
+    let base = campaign_anchor_ms.saturating_add(600_000);
+    let principal_index = rng.below(SYNTHETIC_PRINCIPALS.len() as u64) as usize;
+    let principal = SYNTHETIC_PRINCIPALS[principal_index];
+    let host = format!("host-{:03}", 1 + rng.below(48));
+    let principal_object = format!("sp-{:016x}", rng.next_u64());
+    let commit_id = format!("commit-{:012x}", rng.next_u64() & 0x0000_ffff_ffff_ffff);
+    let build_id = format!("build-{:08x}", rng.next_u64() as u32);
+    let artifact_digest = format!("sha256:{}", digest(format!("cross-domain-artifact|{seed}|primary").as_bytes()));
+    let attestation_digest = format!("sha256:{}", digest(format!("cross-domain-artifact|{seed}|attestation-subject").as_bytes()));
+    let session_id = format!("cloud-session-{:016x}", rng.next_u64());
+    let token_id = format!("token-{:016x}", rng.next_u64());
+    let export_id = format!("export-{:012x}", rng.next_u64() & 0x0000_ffff_ffff_ffff);
+    let object_count = 18_000 + rng.below(8_000);
+    let bytes_read = 32_000_000_000_u64 + rng.below(20_000_000_000);
+    let assigned_scope = "tenant-beta/telemetry";
+    let accessed_scope = "tenant-alpha/finance-prod";
+    let outside_ip = format!("198.51.100.{}", 10 + rng.below(240));
+
+    let mut positive_ids = Vec::with_capacity(POSITIVE_COUNT);
+    positive_ids.push(push_event(
+        &mut events, &mut rng, &mut used_ids, base + 0, &host, principal,
+        "source_control", "commit_checkout", "completed",
+        details(&[
+            ("repository", "service/catalog"),
+            ("commit_id", &commit_id),
+            ("branch", "release"),
+            ("review_state", "pending"),
+            ("principal_object_id", &principal_object),
+        ]),
+    ));
+    positive_ids.push(push_event(
+        &mut events, &mut rng, &mut used_ids, base + 20_000, &host, principal,
+        "ci_audit", "build_job", "completed",
+        details(&[
+            ("build_id", &build_id),
+            ("source_commit_id", &commit_id),
+            ("workflow_revision", "build-workflow-unverified"),
+            ("workflow_trust", "unverified_revision"),
+            ("principal_object_id", &principal_object),
+        ]),
+    ));
+    positive_ids.push(push_event(
+        &mut events, &mut rng, &mut used_ids, base + 40_000, &host, principal,
+        "artifact_registry", "artifact_publish", "published",
+        details(&[
+            ("build_id", &build_id),
+            ("artifact_digest", &artifact_digest),
+            ("source_commit_id", &commit_id),
+            ("package", "service-catalog"),
+            ("principal_object_id", &principal_object),
+        ]),
+    ));
+    positive_ids.push(push_event(
+        &mut events, &mut rng, &mut used_ids, base + 60_000, &host, "builder-prod",
+        "attestation_verifier", "provenance_attestation", "signature_valid",
+        details(&[
+            ("subject_digest", &attestation_digest),
+            ("source_commit_id", &commit_id),
+            ("build_id", &build_id),
+            ("predicate_type", "build-provenance"),
+            ("signer", "builder-prod"),
+            ("principal_object_id", &principal_object),
+        ]),
+    ));
+    positive_ids.push(push_event(
+        &mut events, &mut rng, &mut used_ids, base + 80_000, &host, "release-controller",
+        "release_audit", "artifact_promotion", "promoted",
+        details(&[
+            ("artifact_digest", &artifact_digest),
+            ("attestation_subject_digest", &attestation_digest),
+            ("policy_decision", "override"),
+            ("change_ticket", "none"),
+            ("principal_object_id", &principal_object),
+        ]),
+    ));
+    positive_ids.push(push_event(
+        &mut events, &mut rng, &mut used_ids, base + 100_000, &host, "deploy-controller",
+        "deployment_audit", "deployment", "succeeded",
+        details(&[
+            ("artifact_digest", &artifact_digest),
+            ("environment", "production"),
+            ("release_channel", "stable"),
+            ("principal_object_id", &principal_object),
+            ("workload_identity", "enabled"),
+        ]),
+    ));
+    positive_ids.push(push_event(
+        &mut events, &mut rng, &mut used_ids, base + 120_000, &host, principal,
+        "cloud_identity", "role_assignment", "granted",
+        details(&[
+            ("principal_object_id", &principal_object),
+            ("cloud_role", "StorageDataReader"),
+            ("scope", assigned_scope),
+            ("approval_state", "missing"),
+            ("change_ticket", "none"),
+        ]),
+    ));
+    positive_ids.push(push_event(
+        &mut events, &mut rng, &mut used_ids, base + 140_000, &host, principal,
+        "cloud_identity", "token_issue", "issued",
+        details(&[
+            ("principal_object_id", &principal_object),
+            ("token_id", &token_id),
+            ("session_id", &session_id),
+            ("audience", "storage-api"),
+            ("effective_scope", assigned_scope),
+        ]),
+    ));
+    positive_ids.push(push_event(
+        &mut events, &mut rng, &mut used_ids, base + 160_000, &host, principal,
+        "cloud_storage", "storage_list", "success",
+        details(&[
+            ("principal_object_id", &principal_object),
+            ("session_id", &session_id),
+            ("resource_scope", accessed_scope),
+            ("container", "finance-prod"),
+            ("request_id", &format!("req-{:012x}", rng.next_u64() & 0x0000_ffff_ffff_ffff)),
+        ]),
+    ));
+    positive_ids.push(push_event(
+        &mut events, &mut rng, &mut used_ids, base + 180_000, &host, principal,
+        "cloud_storage", "object_read_batch", "success",
+        details(&[
+            ("principal_object_id", &principal_object),
+            ("session_id", &session_id),
+            ("resource_scope", accessed_scope),
+            ("object_count", &object_count.to_string()),
+            ("bytes_read", &bytes_read.to_string()),
+        ]),
+    ));
+    positive_ids.push(push_event(
+        &mut events, &mut rng, &mut used_ids, base + 200_000, &host, principal,
+        "cloud_audit", "export_job", "created",
+        details(&[
+            ("principal_object_id", &principal_object),
+            ("session_id", &session_id),
+            ("export_id", &export_id),
+            ("resource_scope", accessed_scope),
+            ("object_count", &object_count.to_string()),
+            ("bytes_written", &bytes_read.to_string()),
+        ]),
+    ));
+    positive_ids.push(push_event(
+        &mut events, &mut rng, &mut used_ids, base + 220_000, &host, principal,
+        "cloud_egress", "data_transfer", "allowed",
+        details(&[
+            ("principal_object_id", &principal_object),
+            ("session_id", &session_id),
+            ("export_id", &export_id),
+            ("destination_address", &outside_ip),
+            ("destination_profile", "unapproved_external"),
+            ("bytes_out", &bytes_read.to_string()),
+        ]),
+    ));
+
+    // Benign cross-domain mirror: reviewed build, matching attestation, normal
+    // promotion/deployment, approved role, scope-consistent reads and backup egress.
+    let benign_principal = SYNTHETIC_PRINCIPALS[(principal_index + 5) % SYNTHETIC_PRINCIPALS.len()];
+    let benign_host = format!("host-{:03}", 1 + rng.below(48));
+    let benign_object = format!("sp-{:016x}", rng.next_u64());
+    let benign_commit = format!("commit-{:012x}", rng.next_u64() & 0x0000_ffff_ffff_ffff);
+    let benign_build = format!("build-{:08x}", rng.next_u64() as u32);
+    let benign_digest = format!("sha256:{}", digest(format!("cross-domain-artifact|{seed}|benign").as_bytes()));
+    let benign_session = format!("cloud-session-{:016x}", rng.next_u64());
+    let benign_token = format!("token-{:016x}", rng.next_u64());
+    let benign_export = format!("export-{:012x}", rng.next_u64() & 0x0000_ffff_ffff_ffff);
+    let benign_count = 3_000 + rng.below(2_000);
+    let benign_bytes = 700_000_000_u64 + rng.below(1_500_000_000);
+    let benign_scope = "tenant-alpha/backup";
+
+    let benign_ids = vec![
+        push_event(&mut events, &mut rng, &mut used_ids, base + 5_000, &benign_host, benign_principal,
+            "source_control", "commit_checkout", "completed",
+            details(&[
+                ("repository", "service/catalog"),
+                ("commit_id", &benign_commit),
+                ("branch", "main"),
+                ("review_state", "approved"),
+                ("principal_object_id", &benign_object),
+            ])),
+        push_event(&mut events, &mut rng, &mut used_ids, base + 25_000, &benign_host, benign_principal,
+            "ci_audit", "build_job", "completed",
+            details(&[
+                ("build_id", &benign_build),
+                ("source_commit_id", &benign_commit),
+                ("workflow_revision", "build-workflow-reviewed"),
+                ("workflow_trust", "reviewed"),
+                ("principal_object_id", &benign_object),
+            ])),
+        push_event(&mut events, &mut rng, &mut used_ids, base + 45_000, &benign_host, benign_principal,
+            "artifact_registry", "artifact_publish", "published",
+            details(&[
+                ("build_id", &benign_build),
+                ("artifact_digest", &benign_digest),
+                ("source_commit_id", &benign_commit),
+                ("package", "service-catalog"),
+                ("principal_object_id", &benign_object),
+            ])),
+        push_event(&mut events, &mut rng, &mut used_ids, base + 65_000, &benign_host, "builder-prod",
+            "attestation_verifier", "provenance_attestation", "signature_valid",
+            details(&[
+                ("subject_digest", &benign_digest),
+                ("source_commit_id", &benign_commit),
+                ("build_id", &benign_build),
+                ("predicate_type", "build-provenance"),
+                ("signer", "builder-prod"),
+                ("principal_object_id", &benign_object),
+            ])),
+        push_event(&mut events, &mut rng, &mut used_ids, base + 85_000, &benign_host, "release-controller",
+            "release_audit", "artifact_promotion", "promoted",
+            details(&[
+                ("artifact_digest", &benign_digest),
+                ("attestation_subject_digest", &benign_digest),
+                ("policy_decision", "pass"),
+                ("change_ticket", "CHG-1042"),
+                ("principal_object_id", &benign_object),
+            ])),
+        push_event(&mut events, &mut rng, &mut used_ids, base + 105_000, &benign_host, "deploy-controller",
+            "deployment_audit", "deployment", "succeeded",
+            details(&[
+                ("artifact_digest", &benign_digest),
+                ("environment", "staging"),
+                ("release_channel", "stable"),
+                ("principal_object_id", &benign_object),
+                ("workload_identity", "enabled"),
+            ])),
+        push_event(&mut events, &mut rng, &mut used_ids, base + 125_000, &benign_host, benign_principal,
+            "cloud_identity", "role_assignment", "granted",
+            details(&[
+                ("principal_object_id", &benign_object),
+                ("cloud_role", "StorageDataReader"),
+                ("scope", benign_scope),
+                ("approval_state", "approved"),
+                ("change_ticket", "CHG-1042"),
+            ])),
+        push_event(&mut events, &mut rng, &mut used_ids, base + 145_000, &benign_host, benign_principal,
+            "cloud_identity", "token_issue", "issued",
+            details(&[
+                ("principal_object_id", &benign_object),
+                ("token_id", &benign_token),
+                ("session_id", &benign_session),
+                ("audience", "storage-api"),
+                ("effective_scope", benign_scope),
+            ])),
+        push_event(&mut events, &mut rng, &mut used_ids, base + 165_000, &benign_host, benign_principal,
+            "cloud_storage", "storage_list", "success",
+            details(&[
+                ("principal_object_id", &benign_object),
+                ("session_id", &benign_session),
+                ("resource_scope", benign_scope),
+                ("container", "backup"),
+                ("request_id", &format!("req-{:012x}", rng.next_u64() & 0x0000_ffff_ffff_ffff)),
+            ])),
+        push_event(&mut events, &mut rng, &mut used_ids, base + 185_000, &benign_host, benign_principal,
+            "cloud_storage", "object_read_batch", "success",
+            details(&[
+                ("principal_object_id", &benign_object),
+                ("session_id", &benign_session),
+                ("resource_scope", benign_scope),
+                ("object_count", &benign_count.to_string()),
+                ("bytes_read", &benign_bytes.to_string()),
+            ])),
+        push_event(&mut events, &mut rng, &mut used_ids, base + 205_000, &benign_host, benign_principal,
+            "cloud_audit", "export_job", "created",
+            details(&[
+                ("principal_object_id", &benign_object),
+                ("session_id", &benign_session),
+                ("export_id", &benign_export),
+                ("resource_scope", benign_scope),
+                ("object_count", &benign_count.to_string()),
+                ("bytes_written", &benign_bytes.to_string()),
+            ])),
+        push_event(&mut events, &mut rng, &mut used_ids, base + 225_000, &benign_host, benign_principal,
+            "cloud_egress", "data_transfer", "allowed",
+            details(&[
+                ("principal_object_id", &benign_object),
+                ("session_id", &benign_session),
+                ("export_id", &benign_export),
+                ("destination_address", "192.0.2.40"),
+                ("destination_profile", "approved_backup_endpoint"),
+                ("bytes_out", &benign_bytes.to_string()),
+            ])),
+    ];
+
+    if events.len() != record_count
+        || positive_ids.len() != POSITIVE_COUNT
+        || benign_ids.len() != BENIGN_LOOKALIKE_COUNT
+    {
+        return Err("internal cross-domain trust-chain fixture construction count mismatch".to_string());
+    }
+    events.sort_by(|a, b| (a.ingest_time_ms, &a.event_id).cmp(&(b.ingest_time_ms, &b.event_id)));
+    let event_store = encode_jsonl(&events)?;
+    let event_store_sha256 = digest(&event_store);
+    let positives: BTreeSet<String> = positive_ids.iter().cloned().collect();
+    let benign: BTreeSet<String> = benign_ids.iter().cloned().collect();
+    let mut labels = Vec::with_capacity(events.len());
+    for event in &events {
+        let (label, rationale) = if positives.contains(&event.event_id) {
+            ("positive", "member of the synthetic identity/build/deployment/cloud authorization causal chain")
+        } else if benign.contains(&event.event_id) {
+            ("negative", "benign reviewed build with matching attestation and scope-consistent approved cloud access")
+        } else {
+            ("negative", "synthetic background event outside the planted cross-domain causal chain")
+        };
+        labels.push(EventLabel {
+            event_id: event.event_id.clone(),
+            label: label.to_string(),
+            rationale: rationale.to_string(),
+        });
+    }
+
+    let expected_relations = vec![
+        ExpectedRelation { from_event_id: positive_ids[0].clone(), to_event_id: positive_ids[1].clone(), relation: "identity_used_for_source_build".to_string() },
+        ExpectedRelation { from_event_id: positive_ids[1].clone(), to_event_id: positive_ids[2].clone(), relation: "build_published_artifact".to_string() },
+        ExpectedRelation { from_event_id: positive_ids[2].clone(), to_event_id: positive_ids[3].clone(), relation: "attestation_subject_digest_mismatch".to_string() },
+        ExpectedRelation { from_event_id: positive_ids[3].clone(), to_event_id: positive_ids[4].clone(), relation: "mismatched_artifact_promoted".to_string() },
+        ExpectedRelation { from_event_id: positive_ids[4].clone(), to_event_id: positive_ids[5].clone(), relation: "artifact_deployed_with_workload_identity".to_string() },
+        ExpectedRelation { from_event_id: positive_ids[5].clone(), to_event_id: positive_ids[6].clone(), relation: "deployed_identity_granted_cloud_role".to_string() },
+        ExpectedRelation { from_event_id: positive_ids[6].clone(), to_event_id: positive_ids[7].clone(), relation: "role_grant_issued_token".to_string() },
+        ExpectedRelation { from_event_id: positive_ids[7].clone(), to_event_id: positive_ids[8].clone(), relation: "token_used_outside_assigned_scope".to_string() },
+        ExpectedRelation { from_event_id: positive_ids[8].clone(), to_event_id: positive_ids[9].clone(), relation: "storage_enumeration_preceded_bulk_reads".to_string() },
+        ExpectedRelation { from_event_id: positive_ids[9].clone(), to_event_id: positive_ids[10].clone(), relation: "bulk_reads_collected_for_export".to_string() },
+        ExpectedRelation { from_event_id: positive_ids[10].clone(), to_event_id: positive_ids[11].clone(), relation: "export_transferred_to_unapproved_destination".to_string() },
+    ];
+
+    let truth = GroundTruth {
+        schema_version: TRUTH_SCHEMA.to_string(),
+        scenario_id: SCENARIO.to_string(),
+        profile: "public-synthetic-smoke-v1".to_string(),
+        seed,
+        event_count: record_count,
+        event_store_sha256: event_store_sha256.clone(),
+        labels,
+        expected_relations,
+        claim_ceiling: "Synthetic cross-domain identity, build provenance, deployment, cloud scope, and causal correlation only; not production assurance or real-world security.".to_string(),
+    };
+    let manifest = DatasetManifest {
+        schema_version: MANIFEST_SCHEMA.to_string(),
+        generator_version: GENERATOR_VERSION.to_string(),
+        profile: "public-synthetic-smoke-v1".to_string(),
+        scenario_id: SCENARIO.to_string(),
+        seed,
+        record_count,
+        event_store_sha256,
+        event_store_utf8_bytes: event_store.len(),
+        ordering: "ingest_time_ms_then_event_id; event_time_ms remains distinct".to_string(),
+        qualification_state: "UNSCORED".to_string(),
+        generator_source_commit: "UNPINNED_LOCAL_SOURCE".to_string(),
+        source_commit_pinned: false,
+        claim_ceiling: "Synthetic cross-domain trust-chain smoke fixture only; not solver capability evidence.".to_string(),
+    };
+    Ok(Dataset { event_store, manifest, truth })
+}
+
 fn generate_dataset_for_family(
     record_count: usize,
     seed: u64,
@@ -981,6 +1363,7 @@ fn generate_dataset_for_family(
         CampaignFamily::IdentityToEgress => generate_dataset(record_count, seed),
         CampaignFamily::ArtifactProvenance => generate_artifact_provenance_dataset(record_count, seed),
         CampaignFamily::CloudDataMovement => generate_cloud_data_movement_dataset(record_count, seed),
+        CampaignFamily::CrossDomainTrustChain => generate_cross_domain_trust_chain_dataset(record_count, seed),
     }
 }
 
@@ -1139,7 +1522,7 @@ fn main() {
     match parse_args() {
         Ok(None) => {
             println!(
-                "Usage: cyber-hunt-fixture-generator --events-out PATH --manifest-out PATH --truth-out PATH [--family identity-to-egress|artifact-provenance|cloud-data-movement] [--records N] [--seed N] [--source-commit 40_HEX_SHA]\n\
+                "Usage: cyber-hunt-fixture-generator --events-out PATH --manifest-out PATH --truth-out PATH [--family identity-to-egress|artifact-provenance|cloud-data-movement|cross-domain-trust-chain] [--records N] [--seed N] [--source-commit 40_HEX_SHA]\n\
                  Generates deterministic synthetic defensive telemetry only. Keep --truth-out outside the solver-visible filesystem."
             );
         }
