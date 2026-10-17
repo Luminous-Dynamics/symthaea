@@ -57,6 +57,12 @@ pub struct BoundedCapacitorMetrics {
     pub active_dielectric_volume_m3: f64,
     /// Exact peak electric field from the supplied voltage and layer thickness, in V/m.
     pub peak_field_v_per_m: f64,
+    /// Temperature at which the permittivity and loss-tangent records apply, in kelvin.
+    pub property_temperature_k: f64,
+    /// Frequency at which the permittivity and loss-tangent records apply, in hertz.
+    pub property_frequency_hz: f64,
+    /// Frequency used by the sinusoidal loss equation, in hertz.
+    pub loss_evaluation_frequency_hz: f64,
     /// Evidence class for the relative-permittivity and loss-tangent record.
     pub evidence_kind: DielectricEvidenceKind,
     /// Source reference for relative permittivity and loss tangent.
@@ -156,6 +162,27 @@ pub fn calculate_bounded_capacitor_metrics(
     peak_voltage_v: f64,
     ac_rms_voltage_v: f64,
 ) -> Result<BoundedCapacitorMetrics, RobustMetricError> {
+    calculate_bounded_capacitor_metrics_at_frequency(
+        material,
+        geometry,
+        peak_voltage_v,
+        ac_rms_voltage_v,
+        material.test_frequency_hz,
+    )
+}
+
+/// Calculate interval bounds using an explicitly supplied operating frequency for AC loss.
+///
+/// The caller must establish that the recorded loss tangent is applicable at
+/// the evaluation frequency. The application-level robust screening function
+/// checks the declared frequency tolerance before using this function directly.
+pub fn calculate_bounded_capacitor_metrics_at_frequency(
+    material: &DielectricPropertyRecord,
+    geometry: &CapacitorGeometry,
+    peak_voltage_v: f64,
+    ac_rms_voltage_v: f64,
+    loss_evaluation_frequency_hz: f64,
+) -> Result<BoundedCapacitorMetrics, RobustMetricError> {
     material.validate()?;
     geometry.validate()?;
     if !peak_voltage_v.is_finite() || peak_voltage_v < 0.0 {
@@ -164,7 +191,10 @@ pub fn calculate_bounded_capacitor_metrics(
     if !ac_rms_voltage_v.is_finite() || ac_rms_voltage_v < 0.0 {
         return Err(DielectricValidationError::InvalidAcRmsVoltage.into());
     }
-    if ac_rms_voltage_v > 0.0 && material.test_frequency_hz == 0.0 {
+    if !loss_evaluation_frequency_hz.is_finite() || loss_evaluation_frequency_hz < 0.0 {
+        return Err(DielectricValidationError::InvalidEvaluationFrequency.into());
+    }
+    if ac_rms_voltage_v > 0.0 && loss_evaluation_frequency_hz == 0.0 {
         return Err(
             DielectricValidationError::AcLossRequiresPositiveCharacterizationFrequency.into(),
         );
@@ -213,7 +243,7 @@ pub fn calculate_bounded_capacitor_metrics(
         upper: energy_density_factor * epsilon_bounds.upper,
     };
 
-    let loss_factor = 2.0 * PI * material.test_frequency_hz
+    let loss_factor = 2.0 * PI * loss_evaluation_frequency_hz
         * capacitance_factor
         * ac_rms_voltage_v.powi(2);
     let dielectric_loss_power_w = ScalarBounds {
@@ -287,6 +317,9 @@ pub fn calculate_bounded_capacitor_metrics(
         breakdown_field_ratio,
         active_dielectric_volume_m3,
         peak_field_v_per_m,
+        property_temperature_k: material.test_temperature_k,
+        property_frequency_hz: material.test_frequency_hz,
+        loss_evaluation_frequency_hz,
         evidence_kind: material.evidence_kind,
         source_reference: material.source_reference.clone(),
     })
@@ -435,11 +468,12 @@ pub fn screen_capacitor_candidate_robust(
         });
     }
 
-    let bounds = calculate_bounded_capacitor_metrics(
+    let bounds = calculate_bounded_capacitor_metrics_at_frequency(
         material,
         geometry,
         peak_voltage_v,
         ac_rms_voltage_v,
+        requirements.operating_frequency_hz,
     )
     .map_err(RobustScreeningError::Bounds)?;
 
