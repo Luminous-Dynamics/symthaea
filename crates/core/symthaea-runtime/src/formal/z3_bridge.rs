@@ -76,12 +76,14 @@ impl std::fmt::Display for InductionProofResult {
 #[derive(Debug, Clone, PartialEq)]
 pub struct EinsteinResidualReport {
     pub dimension: usize,
-    /// Arithmetic mean of Ric_ii / g_ii over nonzero diagonal metric entries.
-    /// This is a simple diagnostic estimator, not a coordinate-invariant proof.
-    pub estimated_k_from_diagonal_ratios: f64,
+    /// Least-squares coefficient minimizing sum_ij (Ric_ij - k*g_ij)^2
+    /// in the supplied component basis. This is a numeric fit, not a
+    /// coordinate-invariant proof or a symbolic geometric derivation.
+    pub least_squares_k: f64,
     pub tolerance: f64,
     pub max_abs_residual: f64,
-    pub diagonal_ratios_used: usize,
+    /// Number of tensor components included in the least-squares fit.
+    pub components_compared: usize,
     pub component_residuals: Vec<f64>,
     pub within_tolerance: bool,
 }
@@ -93,7 +95,7 @@ pub enum EinsteinResidualError {
     ComponentCountMismatch,
     InvalidTolerance,
     NonFiniteInput,
-    NoUsableDiagonalMetricComponents,
+    NoUsableMetricComponents,
     NonFiniteArithmetic,
 }
 
@@ -110,9 +112,9 @@ impl std::fmt::Display for EinsteinResidualError {
             ),
             Self::InvalidTolerance => write!(f, "tolerance must be finite and nonnegative"),
             Self::NonFiniteInput => write!(f, "Ricci and metric components must all be finite"),
-            Self::NoUsableDiagonalMetricComponents => write!(
+            Self::NoUsableMetricComponents => write!(
                 f,
-                "no nonzero diagonal metric components are available to estimate k"
+                "all metric components are zero, so a proportionality coefficient is undefined"
             ),
             Self::NonFiniteArithmetic => write!(
                 f,
@@ -450,28 +452,46 @@ impl Z3Bridge {
             return Err(EinsteinResidualError::NonFiniteInput);
         }
 
-        let mut k_sum = 0.0_f64;
-        let mut diagonal_ratios_used = 0usize;
-        for i in 0..dim {
-            let g_ii = metric_components[i * dim + i];
-            let ric_ii = ricci_components[i * dim + i];
-            if g_ii != 0.0 {
-                let ratio = ric_ii / g_ii;
-                if !ratio.is_finite() {
-                    return Err(EinsteinResidualError::NonFiniteArithmetic);
-                }
-                k_sum += ratio;
-                if !k_sum.is_finite() {
-                    return Err(EinsteinResidualError::NonFiniteArithmetic);
-                }
-                diagonal_ratios_used += 1;
-            }
-        }
-        if diagonal_ratios_used == 0 {
-            return Err(EinsteinResidualError::NoUsableDiagonalMetricComponents);
+        // Fit k by least squares over every component:
+        // k = <Ric, g> / <g, g>, minimizing ||Ric - k*g||_F in this
+        // supplied component basis. Scale inputs before products so large
+        // finite components do not overflow merely during the dot products.
+        let ricci_scale = ricci_components
+            .iter()
+            .fold(0.0_f64, |maximum, value| maximum.max(value.abs()));
+        let metric_scale = metric_components
+            .iter()
+            .fold(0.0_f64, |maximum, value| maximum.max(value.abs()));
+        if metric_scale == 0.0 {
+            return Err(EinsteinResidualError::NoUsableMetricComponents);
         }
 
-        let k = k_sum / diagonal_ratios_used as f64;
+        let k = if ricci_scale == 0.0 {
+            0.0
+        } else {
+            let mut numerator_scaled = 0.0_f64;
+            let mut denominator_scaled = 0.0_f64;
+            for (&ric, &g) in ricci_components.iter().zip(metric_components.iter()) {
+                let scaled_ric = ric / ricci_scale;
+                let scaled_g = g / metric_scale;
+                numerator_scaled += scaled_ric * scaled_g;
+                denominator_scaled += scaled_g * scaled_g;
+            }
+            if !numerator_scaled.is_finite()
+                || !denominator_scaled.is_finite()
+                || denominator_scaled <= 0.0
+            {
+                return Err(EinsteinResidualError::NonFiniteArithmetic);
+            }
+            let scaled_ratio = numerator_scaled / denominator_scaled;
+            let scale_ratio = ricci_scale / metric_scale;
+            let coefficient = scaled_ratio * scale_ratio;
+            if !coefficient.is_finite() {
+                return Err(EinsteinResidualError::NonFiniteArithmetic);
+            }
+            coefficient
+        };
+
         if !k.is_finite() {
             return Err(EinsteinResidualError::NonFiniteArithmetic);
         }
@@ -491,10 +511,10 @@ impl Z3Bridge {
 
         Ok(EinsteinResidualReport {
             dimension: dim,
-            estimated_k_from_diagonal_ratios: k,
+            least_squares_k: k,
             tolerance,
             max_abs_residual,
-            diagonal_ratios_used,
+            components_compared,
             component_residuals,
             within_tolerance: max_abs_residual <= tolerance,
         })
@@ -525,7 +545,7 @@ impl Z3Bridge {
                 witness: Some(format!(
                     "NUMERIC_ONLY: max_residual={:.3e}, estimated_k={:.6}, tolerance={:.3e}",
                     report.max_abs_residual,
-                    report.estimated_k_from_diagonal_ratios,
+                    report.least_squares_k,
                     report.tolerance
                 )),
             },
@@ -1378,8 +1398,8 @@ mod tests {
         let metric = [1.0, 0.0, 0.0, 1.0];
         let report = Z3Bridge::check_einstein_residual_numeric(&ricci, &metric, 2, 1e-6).unwrap();
         assert_eq!(report.dimension, 2);
-        assert_eq!(report.estimated_k_from_diagonal_ratios, 1.0);
-        assert_eq!(report.diagonal_ratios_used, 2);
+        assert_eq!(report.least_squares_k, 1.0);
+        assert_eq!(report.components_compared, 2);
         assert_eq!(report.max_abs_residual, 0.0);
         assert!(report.within_tolerance);
         assert_eq!(report.tolerance, 1e-6);
@@ -1395,8 +1415,31 @@ mod tests {
         )
         .unwrap();
 
-        assert_eq!(report.estimated_k_from_diagonal_ratios, 0.0);
+        assert_eq!(report.least_squares_k, 0.0);
         assert_eq!(report.max_abs_residual, 0.0);
+        assert!(report.within_tolerance);
+    }
+
+    #[test]
+    fn test_einstein_numeric_residual_uses_all_component_least_squares_fit() {
+        // The diagonal ratios are 2 and 3, so their arithmetic mean is 2.5.
+        // The least-squares fit across all components is (2*1 + 30*10)/(1²+10²)
+        // = 302/101. Its residual is orthogonal to the metric under the
+        // component-space dot product, the normal-equation condition for the fit.
+        let ricci = [2.0, 0.0, 0.0, 30.0];
+        let metric = [1.0, 0.0, 0.0, 10.0];
+        let report =
+            Z3Bridge::check_einstein_residual_numeric(&ricci, &metric, 2, 1.0).unwrap();
+        assert!((report.least_squares_k - (302.0 / 101.0)).abs() < 1e-12);
+        assert_eq!(report.components_compared, 4);
+
+        let residual_dot_metric: f64 = report
+            .component_residuals
+            .iter()
+            .zip(metric.iter())
+            .map(|(residual, g)| residual * g)
+            .sum();
+        assert!(residual_dot_metric.abs() < 1e-12);
         assert!(report.within_tolerance);
     }
 
@@ -1438,7 +1481,7 @@ mod tests {
         );
         assert_eq!(
             Z3Bridge::check_einstein_residual_numeric(&[0.0], &[0.0], 1, 1e-6),
-            Err(EinsteinResidualError::NoUsableDiagonalMetricComponents)
+            Err(EinsteinResidualError::NoUsableMetricComponents)
         );
         assert_eq!(
             Z3Bridge::check_einstein_residual_numeric(&[], &[], 0, 1e-6),
