@@ -1,0 +1,33 @@
+name: OPEN-OBS-001 Evaluator
+
+on:
+  pull_request:
+    paths:
+      - "research/open-obs-001-evaluator/**"
+      - "docs/research/OPEN_OBS_001_BENCHMARK.md"
+  push:
+    branches: [main]
+    paths:
+      - "research/open-obs-001-evaluator/**"
+      - "docs/research/OPEN_OBS_001_BENCHMARK.md"
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+concurrency:
+  group: open-obs-001-evaluator-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  test:
+    name: Standalone evaluator tests
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - name: Install pinned Rust toolchain
+        uses: dtolnay/rust-toolchain@1.96.0
+      - name: Test standalone evaluator
+        run: cargo test --manifest-path research/open-obs-001-evaluator/Cargo.toml
+      - name: Check standalone evaluator formatting
+        run: rustfmt --edition 2024 --check research/open-obs-001-evaluator/src/lib.rs research/open-obs-001-evaluator/src/main.rs research/open-obs-001-evaluator/src/paired.rs research/open-obs-001-evaluator/src/synthetic.rs research/open-obs-001-evaluator/src/bin/open_obs_synthetic_demo.rs
