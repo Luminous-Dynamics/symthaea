@@ -35,6 +35,9 @@ pub enum SweepInputError {
     EmptyCandidateSet,
     InvalidCandidateId { id: String },
     DuplicateCandidateId { id: String },
+    InvalidMissionFamilyId { id: String },
+    MissionFamilyMismatch { candidate_id: String, expected: String, actual: String },
+    MissionMetricShapeMismatch { candidate_id: String },
 }
 
 /// Results for alternative energy-system envelopes evaluated on one identical mission.
@@ -174,6 +177,127 @@ fn dominates(a: &ScreeningResult, b: &ScreeningResult) -> bool {
     strictly_better
 }
 
+/// A candidate whose mission loads were calculated for that candidate by
+/// an upstream model, while preserving a common intended-use-case identifier.
+///
+/// This is the safer comparison seam for mass-sensitive architectures: the
+/// caller can recompute the profile after changing system mass instead of
+/// reusing one fixed power trace. The family identifier is a caller assertion,
+/// not a physical-equivalence proof; route, payload, weather, reserves, and
+/// other comparison assumptions still require an auditable manifest.
+#[derive(Debug, Clone, PartialEq)]
+pub struct MissionFamilyCandidate {
+    pub id: String,
+    pub mission_family_id: String,
+    pub mission: MissionProfile,
+    pub system: EnergySystemEnvelope,
+}
+
+/// Compare candidates whose mission profiles were independently supplied for
+/// the same intended use case. Unlike compare_systems_on_mission, this accepts
+/// different per-candidate power traces, allowing a validated upstream
+/// vehicle model to account for changes in aircraft mass and configuration.
+///
+/// Candidates must share one non-empty family identifier and the same power
+/// metric shape (continuous and/or peak classes present). Outputs remain
+/// fail-closed for invalid/missing inputs, and only arithmetic-screen-feasible
+/// candidates can enter the Pareto frontier.
+pub fn compare_candidate_specific_missions(
+    candidates: &[MissionFamilyCandidate],
+) -> Result<ScenarioSweepReport, SweepInputError> {
+    if candidates.is_empty() {
+        return Err(SweepInputError::EmptyCandidateSet);
+    }
+    let expected_family = candidates[0].mission_family_id.as_str();
+    if expected_family.trim().is_empty() || expected_family.trim() != expected_family {
+        return Err(SweepInputError::InvalidMissionFamilyId {
+            id: candidates[0].mission_family_id.clone(),
+        });
+    }
+
+    let expected_shape = mission_metric_shape(&candidates[0].mission);
+    let mut seen = HashSet::with_capacity(candidates.len());
+    for candidate in candidates {
+        if candidate.id.trim().is_empty() || candidate.id.trim() != candidate.id {
+            return Err(SweepInputError::InvalidCandidateId {
+                id: candidate.id.clone(),
+            });
+        }
+        if !seen.insert(candidate.id.clone()) {
+            return Err(SweepInputError::DuplicateCandidateId {
+                id: candidate.id.clone(),
+            });
+        }
+        if candidate.mission_family_id != expected_family {
+            return Err(SweepInputError::MissionFamilyMismatch {
+                candidate_id: candidate.id.clone(),
+                expected: expected_family.to_owned(),
+                actual: candidate.mission_family_id.clone(),
+            });
+        }
+        if mission_metric_shape(&candidate.mission) != expected_shape {
+            return Err(SweepInputError::MissionMetricShapeMismatch {
+                candidate_id: candidate.id.clone(),
+            });
+        }
+    }
+
+    let mut rows: Vec<ScenarioRow> = candidates
+        .iter()
+        .map(|candidate| ScenarioRow {
+            candidate_id: candidate.id.clone(),
+            result: evaluate_mission(&candidate.mission, &candidate.system),
+            on_pareto_front: false,
+        })
+        .collect();
+    rows.sort_by(|a, b| a.candidate_id.cmp(&b.candidate_id));
+
+    for index in 0..rows.len() {
+        if rows[index].result.disposition != Disposition::FeasibleWithinScreen {
+            continue;
+        }
+        let is_dominated = rows.iter().enumerate().any(|(other_index, other)| {
+            other_index != index
+                && other.result.disposition == Disposition::FeasibleWithinScreen
+                && dominates(&other.result, &rows[index].result)
+        });
+        rows[index].on_pareto_front = !is_dominated;
+    }
+
+    let feasible_count = rows.iter()
+        .filter(|row| row.result.disposition == Disposition::FeasibleWithinScreen)
+        .count();
+    let infeasible_count = rows.iter()
+        .filter(|row| row.result.disposition == Disposition::InfeasibleWithinScreen)
+        .count();
+    let indeterminate_count = rows.iter()
+        .filter(|row| row.result.disposition == Disposition::Indeterminate)
+        .count();
+    let pareto_front_ids = rows.iter()
+        .filter(|row| row.on_pareto_front)
+        .map(|row| row.candidate_id.clone())
+        .collect();
+
+    Ok(ScenarioSweepReport {
+        mission_id: expected_family.to_owned(),
+        rows,
+        pareto_front_ids,
+        feasible_count,
+        infeasible_count,
+        indeterminate_count,
+    })
+}
+
+fn mission_metric_shape(mission: &MissionProfile) -> (bool, bool) {
+    let has_continuous = mission.segments.iter().any(|segment| {
+        segment.duty_class == Some(super::DutyClass::Continuous)
+    });
+    let has_peak = mission.segments.iter().any(|segment| {
+        segment.duty_class == Some(super::DutyClass::Peak)
+    });
+    (has_continuous, has_peak)
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;
@@ -260,6 +384,79 @@ mod tests {
         assert!(report.rows.iter().any(|row| row.candidate_id == "infeasible"));
         assert!(report.rows.iter().any(|row| row.candidate_id == "unknown"));
     }
+ 
+    fn family_candidate(
+        id: &str,
+        mission_id: &str,
+        family_id: &str,
+        continuous_w: f64,
+        energy_wh: f64,
+        mass_kg: f64,
+    ) -> MissionFamilyCandidate {
+        MissionFamilyCandidate {
+            id: id.into(),
+            mission_family_id: family_id.into(),
+            mission: MissionProfile {
+                id: mission_id.into(),
+                segments: vec![
+                    MissionSegment::new("cruise", 3_600.0, continuous_w, DutyClass::Continuous),
+                    MissionSegment::new("climb", 10.0, 1_000.0, DutyClass::Peak),
+                ],
+            },
+            system: EnergySystemEnvelope {
+                installed_mass_kg: Some(mass_kg),
+                usable_energy_at_bus_wh: Some(energy_wh),
+                reserve_fraction: Some(0.1),
+                max_continuous_bus_power_w: Some(900.0),
+                max_peak_bus_power_w: Some(1_500.0),
+                max_peak_duration_s: Some(30.0),
+            },
+        }
+    }
+
+    #[test]
+    fn candidate_specific_missions_preserve_mass_energy_tradeoff() {
+        let candidates = vec![
+            family_candidate("light", "light-mass-mission", "two-seat-100km-v1", 500.0, 1_200.0, 100.0),
+            family_candidate("heavy", "heavy-mass-mission", "two-seat-100km-v1", 700.0, 2_500.0, 140.0),
+        ];
+        let report = compare_candidate_specific_missions(&candidates).unwrap();
+        assert_eq!(report.mission_id, "two-seat-100km-v1");
+        assert_eq!(report.feasible_count, 2);
+        assert_eq!(report.pareto_front_ids, vec!["heavy", "light"]);
+        assert_ne!(report.rows[0].result.required_mission_energy_wh,
+                   report.rows[1].result.required_mission_energy_wh);
+    }
+
+    #[test]
+    fn candidate_specific_missions_reject_different_use_case_families() {
+        let candidates = vec![
+            family_candidate("first", "mission-a", "same-use-case", 500.0, 1_200.0, 100.0),
+            family_candidate("second", "mission-b", "different-use-case", 500.0, 1_200.0, 110.0),
+        ];
+        assert_eq!(
+            compare_candidate_specific_missions(&candidates),
+            Err(SweepInputError::MissionFamilyMismatch {
+                candidate_id: "second".into(),
+                expected: "same-use-case".into(),
+                actual: "different-use-case".into(),
+            })
+        );
+    }
+
+    #[test]
+    fn candidate_specific_missions_reject_incomparable_metric_shapes() {
+        let mut candidates = vec![
+            family_candidate("first", "mission-a", "same-use-case", 500.0, 1_200.0, 100.0),
+            family_candidate("second", "mission-b", "same-use-case", 500.0, 1_200.0, 110.0),
+        ];
+        candidates[1].mission.segments.retain(|segment| segment.duty_class != Some(DutyClass::Peak));
+        assert_eq!(
+            compare_candidate_specific_missions(&candidates),
+            Err(SweepInputError::MissionMetricShapeMismatch { candidate_id: "second".into() })
+        );
+    }
+
 
     #[test]
     fn duplicate_ids_are_rejected() {
