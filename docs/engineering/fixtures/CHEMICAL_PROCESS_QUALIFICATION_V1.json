@@ -1,7 +1,7 @@
 {
   "schema_version": "1.0.0",
   "benchmark_id": "LUMINOUS-CHEM-PROC-QUAL",
-  "corpus_version": "1.0.0",
+  "corpus_version": "1.1.0",
   "created_utc": "2026-10-17",
   "baseline_commit": "5e83cea4986ba3845aa50e0d5dd03493c5adeddf",
   "source_specification": "docs/engineering/CHEMICAL_PROCESS_END_TO_END_QUALIFICATION_BENCHMARK_2026-10-17.md",
@@ -25,7 +25,8 @@
     "BLOCKED, UNRESOLVED, and OUT_OF_DOMAIN are valid expected outcomes; they are not benchmark failures when expected.",
     "A queued, skipped, missing, stale, non-converged, or unverified external result must never be counted as an independent pass.",
     "The evaluator must report all cases, including errors and malformed inputs; it must not silently drop failures.",
-    "Acceptance thresholds and expected dispositions must not be tuned after observing candidate results."
+    "Acceptance thresholds and expected dispositions must not be tuned after observing candidate results.",
+    "Different solver implementations sharing any evidence-data dependency cannot be counted as independent corroboration; missing dependency provenance remains unresolved."
   ],
   "residual_profile": {
     "name": "synthetic-analytic-v1",
@@ -547,12 +548,83 @@
         "process_route_qualified",
         "plant_build_authorized"
       ]
+    },
+    {
+      "id": "CHEM-PROC-025",
+      "class": "negative-control",
+      "scenario": "Different solver implementations share property evidence",
+      "claim_under_test": "Different solver identities and implementation digests do not establish independent corroboration when they share a property-data dependency.",
+      "fixture": {
+        "proposition_id": "SYNTHETIC-WATER-THERMOPHYSICS-PROPOSITION",
+        "dependency_manifests_complete": true,
+        "solver_a": {
+          "solver_id": "SOLVER_A",
+          "implementation_digest": "sha256:synthetic-implementation-a",
+          "evidence_dependency_digests": [
+            "sha256:shared-water-property-source-v1",
+            "sha256:source-a-parameter-set"
+          ]
+        },
+        "solver_b": {
+          "solver_id": "SOLVER_B",
+          "implementation_digest": "sha256:synthetic-implementation-b",
+          "evidence_dependency_digests": [
+            "sha256:shared-water-property-source-v1",
+            "sha256:source-b-parameter-set"
+          ]
+        }
+      },
+      "expected_disposition": "UNRESOLVED",
+      "required_findings": [
+        "shared_reference_dependency_detected",
+        "independent_corroboration_not_established"
+      ],
+      "prohibited_promotions": [
+        "independent_corroboration_established",
+        "physical_model_validated",
+        "plant_qualified"
+      ]
+    },
+    {
+      "id": "CHEM-PROC-026",
+      "class": "positive-control",
+      "scenario": "Complete disjoint evidence dependencies",
+      "claim_under_test": "A synthetic dependency audit passes only when both manifests are complete, solver implementations differ, and their declared evidence-data dependencies are disjoint.",
+      "fixture": {
+        "proposition_id": "SYNTHETIC-WATER-THERMOPHYSICS-PROPOSITION",
+        "dependency_manifests_complete": true,
+        "solver_a": {
+          "solver_id": "SOLVER_A",
+          "implementation_digest": "sha256:synthetic-implementation-a",
+          "evidence_dependency_digests": [
+            "sha256:independent-reference-source-a",
+            "sha256:source-a-parameter-set"
+          ]
+        },
+        "solver_b": {
+          "solver_id": "SOLVER_B",
+          "implementation_digest": "sha256:synthetic-implementation-b",
+          "evidence_dependency_digests": [
+            "sha256:independent-reference-source-b",
+            "sha256:source-b-parameter-set"
+          ]
+        }
+      },
+      "expected_disposition": "ACCEPTED_WITHIN_SCOPE",
+      "required_findings": [
+        "dependency_manifests_complete",
+        "evidence_dependency_sets_disjoint"
+      ],
+      "prohibited_promotions": [
+        "physical_model_validated",
+        "plant_qualified"
+      ]
     }
   ],
   "summary": {
-    "case_count": 24,
-    "positive_controls": 3,
-    "negative_controls": 16,
+    "case_count": 26,
+    "positive_controls": 4,
+    "negative_controls": 17,
     "metamorphic_cases": 1,
     "analytic_reference_cases": 1,
     "uncertainty_controls": 1,
