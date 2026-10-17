@@ -384,8 +384,8 @@ pub fn evaluate_architecture_robustness(
         for b_index in (a_index + 1)..canonical_candidates.len() {
             let a = &canonical_candidates[a_index];
             let b = &canonical_candidates[b_index];
-            let (a_robust, a_strict) = robustly_dominates(a, b);
-            let (b_robust, b_strict) = robustly_dominates(b, a);
+            let a_robust = robustly_dominates(a, b);
+            let b_robust = robustly_dominates(b, a);
             let a_may = may_dominate(a, b);
             let b_may = may_dominate(b, a);
             let unresolved = !a_robust && !b_robust;
@@ -413,9 +413,6 @@ pub fn evaluate_architecture_robustness(
                 unresolved,
             });
 
-            // A strict interval separation in one or more dimensions is explanatory only.
-            // It is not itself whole-candidate dominance.
-            let _ = (a_strict, b_strict);
         }
     }
 
@@ -465,12 +462,6 @@ fn is_normalized_metric(metric: ArchitectureMetricV1) -> bool {
             | ArchitectureMetricV1::MovementRestrictionIndex
             | ArchitectureMetricV1::ComfortScore
     )
-}
-
-fn is_non_negative_metric(metric: ArchitectureMetricV1) -> bool {
-    // Every current metric is a non-negative magnitude or normalized score.
-    let _ = metric;
-    true
 }
 
 fn has_valid_interval(
@@ -558,9 +549,9 @@ fn validate_mass_envelopes(
 fn robustly_dominates(
     a: &RobustArchitectureCandidateV1,
     b: &RobustArchitectureCandidateV1,
-) -> (bool, Vec<ArchitectureMetricV1>) {
+) -> bool {
     let mut no_worse_on_all = true;
-    let mut strict_dimensions = Vec::new();
+    let mut strict_on_at_least_one = false;
     for metric in REQUIRED_METRICS {
         let a_interval = interval_for(a, metric);
         let b_interval = interval_for(b, metric);
@@ -576,11 +567,9 @@ fn robustly_dominates(
             )
         };
         no_worse_on_all &= no_worse;
-        if strictly_better {
-            strict_dimensions.push(metric);
-        }
+        strict_on_at_least_one |= strictly_better;
     }
-    (no_worse_on_all && !strict_dimensions.is_empty(), strict_dimensions)
+    no_worse_on_all && strict_on_at_least_one
 }
 
 fn may_dominate(
