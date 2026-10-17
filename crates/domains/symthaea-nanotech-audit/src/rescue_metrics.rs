@@ -1015,6 +1015,98 @@ mod tests {
         assert_eq!(worst_group.severe_event_intervention_recall, Some(1.0));
     }
 
+
+    #[test]
+    fn cluster_bootstrap_preserves_sample_allocation_within_each_stratum() {
+        let mut groups = BTreeMap::<String, SufficientStats>::new();
+        let mut strata = BTreeMap::<String, BTreeMap<String, SufficientStats>>::new();
+        let mut total = SufficientStats::default();
+
+        for index in 0..10 {
+            let mut queried = row(
+                &format!("a-window-{index}"),
+                &format!("a-parent-{index}"),
+                1.0,
+                "evaluated",
+                Some(false),
+                true,
+            );
+            queried.stratum_id = "always-query".to_owned();
+            let queried_stats = SufficientStats::from_row(&queried, true);
+            groups.insert(queried.parent_group_id.clone(), queried_stats);
+            strata
+                .entry(queried.stratum_id.clone())
+                .or_default()
+                .insert(queried.parent_group_id.clone(), queried_stats);
+            total.add(queried_stats);
+
+            let mut not_queried = row(
+                &format!("b-window-{index}"),
+                &format!("b-parent-{index}"),
+                1.0,
+                "evaluated",
+                Some(false),
+                false,
+            );
+            not_queried.stratum_id = "never-query".to_owned();
+            let not_queried_stats = SufficientStats::from_row(&not_queried, false);
+            groups.insert(not_queried.parent_group_id.clone(), not_queried_stats);
+            strata
+                .entry(not_queried.stratum_id.clone())
+                .or_default()
+                .insert(not_queried.parent_group_id.clone(), not_queried_stats);
+            total.add(not_queried_stats);
+        }
+
+        let estimate = estimate(
+            Metric::QueryFraction,
+            &groups,
+            Some(&strata),
+            &total,
+            0x5a11_f1ed,
+            "stratified fixture",
+        );
+        assert_eq!(estimate.estimate, Some(0.5));
+        assert_eq!(estimate.cluster_bootstrap_95_ci, Some([0.5, 0.5]));
+        assert_eq!(estimate.valid_bootstrap_replicates, BOOTSTRAP_REPLICATES);
+    }
+
+    #[test]
+    fn intervals_are_withheld_when_parent_clusters_cross_strata() {
+        let mut groups = BTreeMap::<String, SufficientStats>::new();
+        let mut stats = BTreeMap::<String, SufficientStats>::new();
+        for index in 0..MIN_GROUPS_FOR_INTERVAL {
+            let row = row(
+                &format!("window-{index}"),
+                &format!("parent-{index}"),
+                1.0,
+                "evaluated",
+                Some(false),
+                false,
+            );
+            let value = SufficientStats::from_row(&row, false);
+            groups.insert(row.parent_group_id, value);
+            stats.insert(format!("parent-{index}"), value);
+        }
+        let total = groups.values().copied().fold(
+            SufficientStats::default(),
+            |mut sum, value| {
+                sum.add(value);
+                sum
+            },
+        );
+        let result = estimate(
+            Metric::QueryFraction,
+            &groups,
+            None,
+            &total,
+            0x5a11_f1ed,
+            "crossed cluster/strata fixture",
+        );
+        assert_eq!(result.cluster_bootstrap_95_ci, None);
+        assert_eq!(result.valid_bootstrap_replicates, 0);
+    }
+
     #[test]
     fn intervals_are_withheld_for_too_few_independent_groups() {
         let row = row("a", "parent-a", 0.5, "evaluated", Some(true), true);
