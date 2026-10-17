@@ -39,6 +39,7 @@ const RECEIPT_FIELD_NAMES: &[&str] = &[
     "stdout_stderr_and_raw_output_hashes",
     "independent_checker_version_and_result",
     "shared_dependency_audit",
+    "declared_context_of_use_and_validity_domain",
     "preregistered_case_specific_tolerance_and_rationale",
     "claim_ceiling",
 ];
@@ -282,6 +283,25 @@ fn validate_receipt_shape(
         errors.push(format!("{id}: tolerances must be case-specific, justified, and frozen before candidate evaluation"));
     }
 
+    let domain = &receipt["declared_context_of_use_and_validity_domain"];
+    let nonempty_string_array = |value: &Value, field: &str| {
+        value.get(field).and_then(Value::as_array).is_some_and(|items| {
+            !items.is_empty()
+                && items.iter().all(|item| {
+                    item.as_str().is_some_and(|text| !text.trim().is_empty())
+                })
+        })
+    };
+    if !nonempty_text(domain, "context_of_use")
+        || !nonempty_string_array(domain, "validity_domain")
+        || !nonempty_string_array(domain, "excluded_contexts")
+        || !nonempty_text(domain, "validation_basis")
+    {
+        errors.push(format!(
+            "{id}: freeze receipt requires context_of_use, nonempty validity_domain/excluded_contexts, and validation_basis"
+        ));
+    }
+
     if !receipt["claim_ceiling"]
         .as_str()
         .is_some_and(|value| !value.trim().is_empty())
@@ -428,8 +448,8 @@ fn validate_registry(registry: &Value) -> Vec<String> {
     {
         errors.push("schema_id is missing or unrecognized".to_owned());
     }
-    if text(registry, "schema_version") != Some("1.0.0") {
-        errors.push("schema_version must be 1.0.0".to_owned());
+    if text(registry, "schema_version") != Some("1.1.0") {
+        errors.push("schema_version must be 1.1.0".to_owned());
     }
     if text(registry, "purpose").is_none_or(|value| value.trim().is_empty()) {
         errors.push("purpose must be explicit".to_owned());
@@ -541,6 +561,9 @@ fn validate_registry(registry: &Value) -> Vec<String> {
         ("frozen_case_provenance_coverage", 1.0_f64),
         ("shared_dependency_declaration_coverage", 1.0_f64),
         ("missing_or_skipped_results_counted_as_pass", 0.0_f64),
+        ("negative_control_false_accepts", 0.0_f64),
+        ("transitive_shared_dependency_mutation_detection", 1.0_f64),
+        ("malformed_lineage_graph_detection", 1.0_f64),
     ] {
         let actual = targets[field]["target"].as_f64();
         if actual != Some(expected) || targets[field]["hard_gate"].as_bool() != Some(true) {
@@ -647,7 +670,7 @@ fn run() -> Result<bool, Box<dyn Error>> {
     println!(
         "{}",
         serde_json::to_string_pretty(&json!({
-            "validator": "chemical_process_tier_b_registry_contract_v1",
+            "validator": "chemical_process_tier_b_registry_contract_v1_1",
             "registry_path": path,
             "registry_bytes": bytes.len(),
             "schema_version": text(&registry, "schema_version"),
@@ -807,6 +830,23 @@ mod tests {
                     "acceptance_rule": "exact arithmetic invariant of 150 kg/s"
                 }]
             },
+            "declared_context_of_use_and_validity_domain": {
+                "context_of_use": "Matched-condition water-mixer material balance only",
+                "validity_domain": [
+                    "single-component water",
+                    "steady-state non-reactive mixer",
+                    "declared SI units and stream identities",
+                    "pinned IAPWS-IF97 property data context"
+                ],
+                "excluded_contexts": [
+                    "reactive systems",
+                    "unmodeled multiphase behavior",
+                    "industrial scale-up",
+                    "plant or product qualification",
+                    "safety certification"
+                ],
+                "validation_basis": "Analytical mass-flow conservation plus a pinned simulator receipt; no physical experiment is claimed."
+            },
             "claim_ceiling": "only matched-context water-mixer reference reproducibility"
         });
         value
@@ -964,4 +1004,17 @@ mod tests {
         assert!(errors.iter().any(|error| error.contains("frozen outputs require execution.status=PASS")));
         assert!(errors.iter().any(|error| error.contains("SKIPPED cannot become a frozen-output pass")));
     }
+
+    #[test]
+    fn frozen_receipt_requires_explicit_context_of_use_and_validity_domain() {
+        let mut value = frozen_receipt_registry();
+        value["candidates"][0]["reference_outputs"]["freeze_receipt"]
+            ["declared_context_of_use_and_validity_domain"]["excluded_contexts"] = json!([]);
+        let errors = validate_registry(&value);
+        assert!(
+            errors.iter().any(|error| error.contains("context_of_use")),
+            "a frozen receipt with an empty exclusions list must fail closed: {errors:?}"
+        );
+    }
+
 }
