@@ -902,6 +902,13 @@ fn audit_aggregate(rows: &[Value], aggregate_value: Option<&Value>, report: &mut
                         format!("episodes.json contains non-finite metric {key}"),
                     );
                 }
+            } else if let Some(boolean) = value.as_bool() {
+                // MADE's Python aggregator uses isinstance(value, (int, float));
+                // Python bool is an int subclass, so preserve its 0/1 semantics.
+                values_by_metric
+                    .entry(key.clone())
+                    .or_default()
+                    .push(if boolean { 1.0 } else { 0.0 });
             }
         }
     }
