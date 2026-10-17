@@ -97,6 +97,8 @@ Use the frozen Symtropy suite as the constraint and metric oracle; this contract
 | Residual double allocation | Offer the same chips/offcut quantity to two downstream routes. | Require the evaluator/ledger to reject double allocation; do not optimize impossible inventory. |
 | Preference perturbation | Alter one declared preference with feasibility held constant. | A recommendation changes only when the policy and metrics justify it; hard gates remain unchanged. |
 | Replay and correction | Replay an unchanged claim or append a correction to an origin claim. | Identical events are idempotent; corrections remain linked and history is not rewritten. |
+| Geometry target miss | Supply a schema-valid geometry estimate that exceeds its declared accuracy target while the reference record remains valid. | Preserve the evaluator's miss and error metrics, explain the uncertainty/source mismatch, and abstain from describing the prediction as accurate; do not mutate reference measurements or discard the sample. |
+| Cross-species holdout | Train/calibrate on one species/protocol and evaluate on a distinct held-out species such as TreeTrace_spruce. | Label distribution shift, report subgroup/held-out errors and ask for qualified review where transfer is unsupported. |
 
 ### Acceptance targets
 
@@ -108,6 +110,7 @@ Use the frozen Symtropy suite as the constraint and metric oracle; this contract
 - Zero unsupported certification, sustainability, legality or emissions claims.
 - Zero direct machine-actuation outputs.
 - Same deterministic seed/configuration yields the same normalized representation wherever the backend promises deterministic replay; nondeterminism must be declared and tested separately.
+- Never omit valid-but-inaccurate samples from evaluation metrics: preserve target misses, per-log absolute percentage error, median/mean/maximum error and held-out subgroup performance.
 - Measure latency, token/cycle budget, memory and explanation consistency against the current baseline before setting numeric performance goals. Report median and p95 for 10, 100 and 1,000 candidate alternatives.
 
 These are proposed acceptance criteria, not achieved results. Evaluate them on frozen fixtures with an independent checker, negative controls and exact source/tested-head binding.
@@ -133,7 +136,8 @@ Real pilot work requires qualified forestry and mill input, calibrated/measured 
 
 - Symtropy lifecycle benchmark and validator: https://github.com/Luminous-Dynamics/symtropy/pull/1742
 - Symtropy bounded cut-plan evaluator and greedy baseline: https://github.com/Luminous-Dynamics/symtropy/pull/1744
-- Follow-on geometry-aware sawlog validation issue: https://github.com/Luminous-Dynamics/symtropy/issues/1745
+- Geometry-aware evidence validator, fixed-point volume estimator and scored-miss benchmark: https://github.com/Luminous-Dynamics/symtropy/pull/1754
+- Follow-on measured-log validation issue: https://github.com/Luminous-Dynamics/symtropy/issues/1745
 - Mycelix material/provenance contracts: https://github.com/Luminous-Dynamics/mycelix/pull/5107
 - Sol-Atlas spatial evidence contract: https://github.com/Luminous-Dynamics/sol-atlas-leptos/pull/122
 - Tracking issue: https://github.com/Luminous-Dynamics/symthaea/issues/7711
