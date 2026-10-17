@@ -339,3 +339,72 @@ fn test_all_platforms_safety_invariants() {
         );
     }
 }
+
+
+// ═══════════════════════════════════════════════════════════════════════════════
+// Timing invariant: cognitive substrate may change cognition, never plant dt.
+// ═══════════════════════════════════════════════════════════════════════════════
+
+#[cfg(feature = "humanoid")]
+#[test]
+fn test_plant_time_is_invariant_under_cognitive_substrate_changes() {
+    use symthaea_core::embodiment::PlantStepTimeSourceV1;
+    use symthaea_core::hdc::substrate_independence::SubstrateType;
+
+    fn configured_service(substrate_type: SubstrateType) -> CognitiveLoopService {
+        CognitiveLoopService::new(CognitiveLoopConfig {
+            embodiment_platform: EmbodimentPlatform::Humanoid,
+            embodiment_blend_weight: 0.0,
+            embodiment_step_interval: 1,
+            enable_substrate_speed_modulation: true,
+            substrate_type,
+            genesis_phrase: Some("plant-time-invariance-regression-v1".to_string()),
+            async_training: false,
+            learning_threshold: 0.0,
+            ..Default::default()
+        })
+        .expect("cognitive service with humanoid simulator")
+    }
+
+    let mut biological = configured_service(SubstrateType::BiologicalNeurons);
+    let mut photonic = configured_service(SubstrateType::PhotonicProcessor);
+    assert_ne!(
+        biological.substrate_tau_factor(),
+        photonic.substrate_tau_factor(),
+        "test must exercise distinct cognitive substrate tau settings"
+    );
+    let configured_dt = CognitiveLoopConfig::default().cfc_config.delta_t;
+    let inputs = [
+        "walk toward the marked position",
+        "avoid the obstacle on the left",
+        "turn toward the next waypoint",
+        "stabilize and continue walking",
+        "stop at the target",
+    ];
+
+    for (index, input) in inputs.iter().enumerate() {
+        let biological_result = biological.cycle(input);
+        let photonic_result = photonic.cycle(input);
+        let biological_timing = biological_result
+            .metadata
+            .plant_step_timing
+            .as_ref()
+            .expect("biological simulator must emit accepted timing evidence");
+        let photonic_timing = photonic_result
+            .metadata
+            .plant_step_timing
+            .as_ref()
+            .expect("photonic simulator must emit accepted timing evidence");
+
+        assert_eq!(biological_timing.source, PlantStepTimeSourceV1::ConfiguredSimulationStep);
+        assert_eq!(photonic_timing.source, PlantStepTimeSourceV1::ConfiguredSimulationStep);
+        assert_eq!(biological_timing.dt_seconds, configured_dt);
+        assert_eq!(photonic_timing.dt_seconds, configured_dt);
+        assert_eq!(biological_timing.dt_seconds, photonic_timing.dt_seconds);
+        assert_eq!(biological_timing.step_index, (index + 1) as u64);
+        assert_eq!(biological_timing.step_index, photonic_timing.step_index);
+    }
+
+    // This pins time authority only. Because the cognitive substrate can change
+    // generated commands, equal plant dt is not a claim of identical trajectories.
+}
