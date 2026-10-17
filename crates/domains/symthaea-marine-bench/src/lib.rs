@@ -21,6 +21,7 @@ pub mod modular_interior_variants;
 pub mod modular_interior_combinations;
 pub mod modular_interior_placement_search;
 pub mod modular_interior_service_routing;
+pub mod modular_interior_route_bundle;
 mod model;
 
 pub use assessor::{assess, AssessmentError, AssessmentReport, Finding, FindingStatus};
