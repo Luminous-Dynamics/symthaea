@@ -1,0 +1,127 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "urn:luminous-dynamics:symthaea:nano-shift-manifest:v1",
+  "title": "Nanotechnology distribution-shift manifest",
+  "description": "Frozen shift groups, independent split assignments and sample provenance. Group-leakage checks are performed by the Rust auditor.",
+  "type": "object",
+  "additionalProperties": false,
+  "required": [
+    "schema_version",
+    "benchmark_id",
+    "task_contract_sha256",
+    "split_policy",
+    "shift_groups"
+  ],
+  "properties": {
+    "schema_version": {
+      "const": "nano-shift-manifest-v1"
+    },
+    "benchmark_id": {
+      "type": "string",
+      "minLength": 1,
+      "maxLength": 256
+    },
+    "task_contract_sha256": {
+      "type": "string",
+      "pattern": "^[a-f0-9]{64}$"
+    },
+    "split_policy": {
+      "const": "independence_key_group_holdout_v1"
+    },
+    "shift_groups": {
+      "type": "array",
+      "minItems": 1,
+      "maxItems": 10000,
+      "items": {
+        "type": "object",
+        "additionalProperties": false,
+        "required": [
+          "group_id",
+          "shift_family",
+          "severity",
+          "split",
+          "physical_rationale",
+          "severity_definition",
+          "source_artifact_path",
+          "source_artifact_sha256",
+          "independence_keys",
+          "sample_ids"
+        ],
+        "properties": {
+          "group_id": {
+            "type": "string",
+            "minLength": 1,
+            "maxLength": 256
+          },
+          "shift_family": {
+            "enum": [
+              "composition",
+              "surface_coordination",
+              "defects",
+              "temperature_energy",
+              "strain_pressure_phase",
+              "size_interface_passivation_substrate",
+              "compounded"
+            ]
+          },
+          "severity": {
+            "enum": [
+              "baseline",
+              "mild",
+              "moderate",
+              "severe",
+              "compounded"
+            ]
+          },
+          "split": {
+            "enum": [
+              "train",
+              "calibration",
+              "validation",
+              "test_lockbox"
+            ]
+          },
+          "physical_rationale": {
+            "type": "string",
+            "minLength": 1,
+            "maxLength": 2000
+          },
+          "severity_definition": {
+            "type": "string",
+            "minLength": 1,
+            "maxLength": 2000
+          },
+          "source_artifact_path": {
+            "type": "string",
+            "minLength": 1,
+            "maxLength": 1024
+          },
+          "source_artifact_sha256": {
+            "type": "string",
+            "pattern": "^[a-f0-9]{64}$"
+          },
+          "independence_keys": {
+            "type": "array",
+            "minItems": 1,
+            "uniqueItems": true,
+            "items": {
+              "type": "string",
+              "minLength": 1,
+              "maxLength": 512
+            }
+          },
+          "sample_ids": {
+            "type": "array",
+            "minItems": 1,
+            "uniqueItems": true,
+            "items": {
+              "type": "string",
+              "minLength": 1,
+              "maxLength": 512
+            }
+          }
+        }
+      }
+    }
+  }
+}
