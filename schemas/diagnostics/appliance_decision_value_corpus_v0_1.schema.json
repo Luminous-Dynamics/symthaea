@@ -1,0 +1,170 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "urn:luminous-dynamics:appliance-decision-value-corpus:0.1.0",
+  "title": "Appliance Decision-Value Benchmark Corpus v0.1",
+  "description": "Synthetic EVI/EVSI decision-model fixtures referencing one exact active-diagnostics corpus. Does not establish physical diagnosis or appliance safety.",
+  "type": "object",
+  "additionalProperties": false,
+  "required": [
+    "schema_version",
+    "corpus_id",
+    "status",
+    "base_corpus_path",
+    "base_corpus_sha256",
+    "claim_ceiling",
+    "cases"
+  ],
+  "properties": {
+    "schema_version": { "const": "0.1.0" },
+    "corpus_id": { "const": "APPLIANCE-DECISION-VALUE-001" },
+    "status": { "const": "synthetic_decision_model_only" },
+    "base_corpus_path": {
+      "const": "fixtures/diagnostics/appliance_active_diagnostic_corpus_v0_1.json"
+    },
+    "base_corpus_sha256": {
+      "const": "7626557b8a3da4c8c4f1e253fcf3a7d309d8041ef27304a493a21debb8779aa4"
+    },
+    "claim_ceiling": { "const": "synthetic_expected_decision_value_only" },
+    "cases": {
+      "type": "array",
+      "minItems": 8,
+      "items": {
+        "type": "object",
+        "additionalProperties": false,
+        "required": [
+          "case_id",
+          "base_trace_id",
+          "decision_model",
+          "measurement_costs",
+          "expected"
+        ],
+        "properties": {
+          "case_id": {
+            "type": "string",
+            "pattern": "^DVAL-[0-9]{3}$"
+          },
+          "base_trace_id": {
+            "type": "string",
+            "pattern": "^ADT-[0-9]{3}$"
+          },
+          "decision_model": {
+            "type": "object",
+            "additionalProperties": false,
+            "required": ["loss_unit", "actions"],
+            "properties": {
+              "loss_unit": {
+                "type": "string",
+                "minLength": 8
+              },
+              "actions": {
+                "type": "array",
+                "minItems": 1,
+                "items": {
+                  "type": "object",
+                  "additionalProperties": false,
+                  "required": ["action_id", "eligibility", "losses"],
+                  "properties": {
+                    "action_id": {
+                      "type": "string",
+                      "pattern": "^[a-z][a-z0-9_]{1,63}$"
+                    },
+                    "eligibility": {
+                      "enum": [
+                        "eligible",
+                        "requires_qualified_person",
+                        "prohibited"
+                      ]
+                    },
+                    "losses": {
+                      "type": "array",
+                      "minItems": 1,
+                      "items": {
+                        "type": "object",
+                        "additionalProperties": false,
+                        "required": ["hypothesis_id", "loss_units"],
+                        "properties": {
+                          "hypothesis_id": {
+                            "type": "string",
+                            "pattern": "^[a-z][a-z0-9_]{1,63}$"
+                          },
+                          "loss_units": { "type": "number" }
+                        }
+                      }
+                    }
+                  }
+                }
+              }
+            }
+          },
+          "measurement_costs": {
+            "type": "array",
+            "items": {
+              "type": "object",
+              "additionalProperties": false,
+              "required": ["measurement_id", "loss_units"],
+              "properties": {
+                "measurement_id": {
+                  "type": "string",
+                  "pattern": "^[a-z][a-z0-9_]{1,63}$"
+                },
+                "loss_units": { "type": "number" }
+              }
+            }
+          },
+          "expected": {
+            "type": "object",
+            "additionalProperties": false,
+            "required": [
+              "decision",
+              "reason_code",
+              "selected_measurement_id",
+              "best_candidate_measurement_id",
+              "prior_action_id",
+              "prior_risk_units",
+              "best_candidate_posterior_risk_units",
+              "best_candidate_evsi_units",
+              "best_candidate_cost_units",
+              "best_candidate_net_value_units",
+              "entropy_baseline_measurement_id"
+            ],
+            "properties": {
+              "decision": {
+                "enum": [
+                  "select_measurement",
+                  "choose_action_without_test",
+                  "abstain_and_review",
+                  "no_safe_candidate",
+                  "no_safe_action",
+                  "reject_invalid_model"
+                ]
+              },
+              "reason_code": {
+                "enum": [
+                  "positive_net_decision_value",
+                  "all_tests_nonpositive_net_value",
+                  "protection_tripped",
+                  "protection_unknown",
+                  "observations_unreliable",
+                  "no_safe_candidate",
+                  "no_safe_action",
+                  "invalid_action_loss_matrix",
+                  "invalid_measurement_cost",
+                  "duplicate_identity"
+                ]
+              },
+              "selected_measurement_id": { "type": ["string", "null"] },
+              "best_candidate_measurement_id": { "type": ["string", "null"] },
+              "prior_action_id": { "type": ["string", "null"] },
+              "prior_risk_units": { "type": ["number", "null"] },
+              "best_candidate_posterior_risk_units": { "type": ["number", "null"] },
+              "best_candidate_evsi_units": { "type": ["number", "null"] },
+              "best_candidate_cost_units": { "type": ["number", "null"] },
+              "best_candidate_net_value_units": { "type": ["number", "null"] },
+              "entropy_baseline_measurement_id": { "type": ["string", "null"] }
+            }
+          }
+        }
+      }
+    }
+  }
+}
