@@ -19,7 +19,8 @@ use symthaea_music_theory::fingerprint::{
     STRUCT_DIMS, dist, exact_fingerprint, structural_fingerprint,
 };
 use symthaea_music_theory::{
-    MUSIC_THEORY_ENGINE_VERSION, MusicalIntent, PitchClass, Style, compose_with_grammar_plan,
+    GrammarPlanEvidence, MUSIC_THEORY_ENGINE_VERSION, MusicalIntent, PitchClass, Style,
+    compose_with_grammar_plan,
 };
 
 const SEEDS: [u64; 4] = [0, 1, 7, 42];
@@ -50,6 +51,8 @@ struct StyleCounters {
     meter_mismatches: usize,
     tempo_out_of_band: usize,
     deterministic_replay_failures: usize,
+    form_available_samples: usize,
+    plan_kinds: HashSet<String>,
     seed_hashes: HashSet<u64>,
 }
 
@@ -64,6 +67,8 @@ impl StyleCounters {
             meter_mismatches: 0,
             tempo_out_of_band: 0,
             deterministic_replay_failures: 0,
+            form_available_samples: 0,
+            plan_kinds: HashSet::new(),
             seed_hashes: HashSet::new(),
         }
     }
@@ -89,6 +94,21 @@ fn intent(
 fn realize(style: Style, intent: &MusicalIntent) -> symthaea_music_theory::GrammarRealization {
     let spec = style.spec();
     compose_with_grammar_plan(style.grammar_profile(), intent, &spec)
+}
+
+fn plan_name(plan: &GrammarPlanEvidence) -> String {
+    match plan {
+        GrammarPlanEvidence::PeriodSentence(_) => "period_sentence".into(),
+        GrammarPlanEvidence::Contrapuntal(_) => "contrapuntal".into(),
+        GrammarPlanEvidence::GrooveCycle(_) => "groove_cycle".into(),
+        GrammarPlanEvidence::AdditiveProcess(_) => "additive_process".into(),
+        GrammarPlanEvidence::ModalArc(_) => "modal_arc".into(),
+        GrammarPlanEvidence::CallResponse(_) => "call_response".into(),
+        GrammarPlanEvidence::JazzChorus(_) => "jazz_chorus".into(),
+        GrammarPlanEvidence::Compatibility { family, .. } => {
+            format!("compatibility:{family:?}")
+        }
+    }
 }
 
 fn axis_intent(axis: &str, level: bool, seed: u64) -> MusicalIntent {
@@ -177,6 +197,10 @@ fn main() {
                 let replay_hash = exact_fingerprint(&replay.score);
 
                 stats.samples += 1;
+                stats.plan_kinds.insert(plan_name(&first.plan));
+                if first.form.is_some() {
+                    stats.form_available_samples += 1;
+                }
                 if first.score.notes.is_empty() {
                     stats.empty_scores += 1;
                 }
@@ -267,9 +291,22 @@ fn main() {
     let mut style_rows = Vec::with_capacity(style_count);
     for (index, style) in Style::ALL.iter().copied().enumerate() {
         let stats = &counters[index];
+        let mut plan_kinds = stats.plan_kinds.iter().cloned().collect::<Vec<_>>();
+        plan_kinds.sort();
+        let spec = style.spec();
+        let form_pool = spec.form_pool.iter().map(|form| format!("{form:?}")).collect::<Vec<_>>();
+        let accompaniment_pool = spec
+            .accompaniment_pool
+            .iter()
+            .map(|pattern| format!("{pattern:?}"))
+            .collect::<Vec<_>>();
         style_rows.push(json!({
             "style": stats.style_name,
             "grammar_family": format!("{:?}", style.grammar_family()),
+            "selected_plan_kinds": plan_kinds,
+            "form_available_samples": stats.form_available_samples,
+            "declared_form_pool": form_pool,
+            "declared_accompaniment_pool": accompaniment_pool,
             "spec_valid": stats.spec_valid,
             "samples": stats.samples,
             "empty_scores": stats.empty_scores,
