@@ -5,6 +5,7 @@
 **Tracker:** [HIFI-RESEARCH-001 #7888](https://github.com/Luminous-Dynamics/symthaea/issues/7888).  
 **Product family:** [OPEN-AUDIO-000 #7826](https://github.com/Luminous-Dynamics/symthaea/issues/7826).  
 **Evidence contract:** [OPEN_AUDIO_EVIDENCE_CONTRACT_2026-10-17.md](OPEN_AUDIO_EVIDENCE_CONTRACT_2026-10-17.md).
+**Benchmark protocol:** [HIFI_BENCHMARK_PROTOCOL_2026-10-17.md](HIFI_BENCHMARK_PROTOCOL_2026-10-17.md) and [HIFI-BENCHMARK-001 #7903](https://github.com/Luminous-Dynamics/symthaea/issues/7903).
 
 ## Executive thesis
 
