@@ -424,7 +424,7 @@ impl CampaignFamily {
 
 fn generate_artifact_provenance_dataset(record_count: usize, seed: u64) -> Result<Dataset, String> {
     const POSITIVE_COUNT: usize = 6;
-    const BENIGN_LOOKALIKE_COUNT: usize = 3;
+    const BENIGN_LOOKALIKE_COUNT: usize = 6;
     const PLANTED_COUNT: usize = POSITIVE_COUNT + BENIGN_LOOKALIKE_COUNT;
     const SCENARIO: &str = "synthetic-artifact-provenance-mismatch-v1";
 
@@ -524,7 +524,37 @@ fn generate_artifact_provenance_dataset(record_count: usize, seed: u64) -> Resul
     // and deployed artifact. It overlaps the suspicious chain in event types and time.
     let benign_ids = vec![
         push_event(
-            &mut events, &mut rng, &mut used_ids, base + 40_000, "host-018", "builder-prod",
+            &mut events, &mut rng, &mut used_ids, base + 5_000, "host-018", "svc-build",
+            "source_control", "commit_checkout", "completed",
+            details(&[
+                ("repository", "service/catalog"),
+                ("commit_id", &benign_commit),
+                ("branch", "main"),
+                ("review_state", "approved"),
+            ]),
+        ),
+        push_event(
+            &mut events, &mut rng, &mut used_ids, base + 35_000, "host-018", "svc-build",
+            "ci_audit", "build_job", "completed",
+            details(&[
+                ("build_id", &benign_build),
+                ("source_commit_id", &benign_commit),
+                ("workflow_revision", "build-workflow-12"),
+                ("workflow_trust", "reviewed"),
+            ]),
+        ),
+        push_event(
+            &mut events, &mut rng, &mut used_ids, base + 65_000, "host-018", "svc-build",
+            "artifact_registry", "artifact_publish", "published",
+            details(&[
+                ("build_id", &benign_build),
+                ("artifact_digest", &benign_digest),
+                ("source_commit_id", &benign_commit),
+                ("package", "service-catalog"),
+            ]),
+        ),
+        push_event(
+            &mut events, &mut rng, &mut used_ids, base + 100_000, "host-018", "builder-prod",
             "attestation_verifier", "provenance_attestation", "signature_valid",
             details(&[
                 ("subject_digest", &benign_digest),
