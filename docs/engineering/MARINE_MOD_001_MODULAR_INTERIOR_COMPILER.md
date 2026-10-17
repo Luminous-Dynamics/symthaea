@@ -136,3 +136,34 @@ cargo run -p symthaea-marine-bench --example modular_interior_pareto
 Configure-to-order modular ship-platform optimization is established prior art: it models multiple mission configurations and lifecycle costs rather than selecting one hull/layout in isolation (https://www.sciencedirect.com/science/article/abs/pii/S0029801818309065). The 2024/2025 review of ship arrangement optimization describes cabin, compartment and equipment-placement variables and constraints (https://academic.oup.com/jcde/article/12/1/100/7922870). Digital ship-design surveys cover parametric optimization, simulation-driven design and product-lifecycle workflows (https://doi.org/10.59490/imdc.2024.784). Our differentiator is evidence-gated comparison with explicit incompleteness and independently verified configuration receipts, not Pareto optimization itself.
 
 Safety basis remains vessel- and mission-specific: IMO explains that passenger ships must meet applicable SOLAS/Load Lines requirements and highlights escape and fire protection as key design concerns (https://www.imo.org/en/ourwork/safety/pages/passengerships.aspx; https://www.imo.org/en/ourwork/safety/pages/fireprotection-default.aspx).
+
+
+## MARINE-MOD-004 — evidence-gated Pareto ranking
+
+The companion `modular_interior_pareto` module separates constraint checks, evidence eligibility, and multi-objective preference. A candidate must have a validation receipt that verifies against the exact typed configuration and a receipt disposition of `candidate_only`. Rejected or indeterminate configurations never enter the Pareto frontier. The objective layer excludes unknown, assumption-only, non-finite or evidence-less values and requires objective evidence references to resolve to non-synthetic provenance declared by the configuration or its placed modules.
+
+Each comparison group requires exact matches for metric IDs, unit strings, minimize/maximize direction and comparison basis. There are no implicit unit conversions and no weighted scalar score that can compensate for a hard-gate failure. The report lists eligible candidates, frontier members, dominated candidates and their dominators, with a digest binding the normalized input manifest and report. This remains a ranking prototype, not a vessel approval; upstream source classification and validation quality are still material limitations.
+
+The example intentionally uses design-assumption mass values from synthetic fixtures. Expected behavior: zero candidates in the evidence-backed frontier until the physical configuration checks and objective evidence meet the threshold. A zero frontier is the correct result when no design meets the evidence gate.
+
+Run when Rust is available:
+
+```sh
+cargo test -p symthaea-marine-bench modular_interior_pareto
+cargo run -p symthaea-marine-bench --example modular_interior_pareto
+```
+
+### Benchmarks (targets, not results)
+
+- 100% agreement with a frozen hand-calculated Pareto oracle for minimizing/maximizing objectives, ties, dominated candidates and trade-offs.
+- 100% exclusion of invalid receipts, hard errors, indeterminate safety/engineering findings, unknown objectives, assumption-only objectives and unresolved/synthetic objective references.
+- Zero comparisons across different units, directions or comparison bases.
+- 100% repeatable report digests when candidate input order changes.
+- Zero safety false negatives: any unresolved hard evidence prevents entry to the evidence-backed frontier.
+- Report frontier size and review-required fraction together; do not maximize the number of “winners” at the expense of evidence quality.
+
+### Research basis
+
+Configure-to-order modular ship-platform optimization is established prior art: models evaluate multiple mission configurations and lifecycle costs instead of selecting one hull/layout in isolation (https://www.sciencedirect.com/science/article/abs/pii/S0029801818309065). A 2024/2025 review of ship arrangement optimization discusses cabin, compartment and equipment-placement variables and constraints (https://academic.oup.com/jcde/article/12/1/100/7922870). The IMDC digital ship-design review covers parametric optimization, simulation-driven design and product-lifecycle workflows (https://doi.org/10.59490/imdc.2024.784). The differentiator here is evidence-gated comparison, explicit incompleteness and a configuration-bound validation receipt—not Pareto optimization itself.
+
+IMO notes that passenger ships must meet applicable SOLAS and Load Lines requirements and emphasizes fire protection and escape routes as essential design concerns (https://www.imo.org/en/ourwork/safety/pages/passengerships.aspx; https://www.imo.org/en/ourwork/safety/pages/fireprotection-default.aspx). Actual regulatory applicability remains vessel-specific.
