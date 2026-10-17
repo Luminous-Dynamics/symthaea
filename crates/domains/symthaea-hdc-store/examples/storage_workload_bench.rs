@@ -12,7 +12,6 @@
 //! page cache or infer physical-media bytes/energy. Run on a named host/storage
 //! profile and preserve the exact executable/source identity with results.
 
-use std::collections::HashSet;
 use std::env;
 use std::error::Error;
 use std::fs;
@@ -35,6 +34,7 @@ struct Config {
     batch_size: usize,
     seed: u64,
     csv_path: Option<PathBuf>,
+    store_path: Option<PathBuf>,
 }
 
 impl Default for Config {
@@ -45,6 +45,7 @@ impl Default for Config {
             batch_size: 128,
             seed: 7,
             csv_path: None,
+            store_path: None,
         }
     }
 }
@@ -274,7 +275,7 @@ fn run() -> Result<(), Box<dyn Error>> {
             success,
             recall_hit,
             1,
-            u64::from(outcome.fell_back_to_exact),
+            if outcome.fell_back_to_exact { 1 } else { 0 },
             outcome.examined as u64,
             approximate_id.unwrap_or(0),
         ));
@@ -377,7 +378,7 @@ fn run() -> Result<(), Box<dyn Error>> {
         recovery_elapsed.as_nanos(),
         1,
         corpus_bytes,
-        u64::from(!recovery_report.changed_store()),
+        if !recovery_report.changed_store() { 1 } else { 0 },
         0,
         0,
         0,
@@ -474,6 +475,7 @@ fn sample(
     recall_hits: u64,
     recall_total: u64,
     exact_fallbacks: u64,
+    candidates_examined: u64,
     checksum_sink: u64,
 ) -> RawSample {
     RawSample {
@@ -486,7 +488,7 @@ fn sample(
         recall_hits,
         recall_total,
         exact_fallbacks,
-        candidates_examined: 0,
+        candidates_examined,
         checksum_sink,
     }
 }
