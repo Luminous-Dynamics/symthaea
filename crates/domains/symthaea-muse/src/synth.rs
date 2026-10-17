@@ -1628,6 +1628,91 @@ mod tests {
     }
 
     #[test]
+    fn instrument_evidence_reports_the_selected_procedural_renderer() {
+        for (instrument, expected_path) in [
+            (Instrument::Ocarina, "additive_synthesis"),
+            (Instrument::Harmonica, "additive_synthesis"),
+            (Instrument::DanTranh, "karplus_strong"),
+        ] {
+            let arrangement = Arrangement {
+                voices: vec![Voice {
+                    role: VoiceRole::Lead,
+                    notes: vec![Note {
+                        frequency: 440.0,
+                        start_time: 0.0,
+                        duration: 0.08,
+                        velocity: 0.7,
+                    }],
+                    pitch_range: (220.0, 880.0),
+                    volume: 1.0,
+                    pan: 0.0,
+                    instrument: Some(instrument),
+                }],
+            };
+            let rendered = render_arrangement_with_evidence(
+                &arrangement,
+                22_050,
+                4_410,
+                &MusicalState::default(),
+                &MuseConfig {
+                    sample_rate: 22_050,
+                    output_format: OutputFormat::StereoF32,
+                    ..MuseConfig::default()
+                },
+            );
+            assert_eq!(rendered.note_receipts.len(), 1, "{instrument:?}");
+            let receipt = &rendered.note_receipts[0];
+            assert_eq!(receipt.voice_index, 0);
+            assert_eq!(receipt.note_index, 0);
+            assert_eq!(receipt.instrument, Some(instrument));
+            assert_eq!(receipt.frequency_hz, 440.0);
+            assert_eq!(receipt.selected_render_path, expected_path);
+            assert!(
+                receipt.sample_attempt_status == "sample_library_not_loaded"
+                    || receipt.sample_attempt_status == "instrument_sample_bank_not_loaded",
+                "{instrument:?}: unexpected sample fallback status {}",
+                receipt.sample_attempt_status
+            );
+        }
+
+        let legacy_arrangement = Arrangement {
+            voices: vec![Voice {
+                role: VoiceRole::Lead,
+                notes: vec![Note {
+                    frequency: 440.0,
+                    start_time: 0.0,
+                    duration: 0.08,
+                    velocity: 0.7,
+                }],
+                pitch_range: (220.0, 880.0),
+                volume: 1.0,
+                pan: 0.0,
+                instrument: None,
+            }],
+        };
+        let legacy = render_arrangement_with_evidence(
+            &legacy_arrangement,
+            22_050,
+            4_410,
+            &MusicalState::default(),
+            &MuseConfig {
+                sample_rate: 22_050,
+                output_format: OutputFormat::StereoF32,
+                ..MuseConfig::default()
+            },
+        );
+        assert_eq!(legacy.note_receipts.len(), 1);
+        assert_eq!(
+            legacy.note_receipts[0].selected_render_path,
+            "legacy_mood_additive"
+        );
+        assert_eq!(
+            legacy.note_receipts[0].sample_attempt_status,
+            "no_instrument_identity_legacy_path"
+        );
+    }
+
+    #[test]
     fn styled_render_receipts_explain_unknown_style_and_invalid_voice() {
         let arrangement = Arrangement {
             voices: vec![Voice {
