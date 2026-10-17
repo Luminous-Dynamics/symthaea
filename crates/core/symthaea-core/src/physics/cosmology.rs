@@ -568,7 +568,7 @@ impl std::fmt::Display for ExpansionHistoryError {
             Self::ClosureViolation => "density parameters must satisfy Ωr + Ωm + Ωk + Ωde = 1",
             Self::InvalidRedshift => "redshift must be finite and >= 0",
             Self::InvalidIntegrationIntervals => "Simpson integration requires an even interval count in 2..=1_000_000",
-            Self::InvalidIntegrationTolerance => "adaptive integration tolerances must be finite and positive",
+            Self::InvalidIntegrationTolerance => "absolute tolerance must be positive; relative tolerance must be finite and in (0, 1)",
             Self::InvalidIntegrationDepth => "adaptive integration depth must be in 1..=20",
             Self::IntegrationDidNotConverge => "adaptive Simpson integration did not meet its tolerance before the depth limit",
             Self::NonPhysicalExpansionRate => "the model produced a non-positive or non-finite H(z)^2",
@@ -1120,6 +1120,24 @@ mod expansion_history_tests {
             .unwrap();
         assert!((adaptive_distance - expected_distance).abs() / expected_distance < 1e-9);
         assert!((adaptive_time - expected_time).abs() / expected_time < 1e-9);
+    }
+
+    #[test]
+    fn adaptive_and_fixed_grid_distances_agree_over_frozen_redshift_grid() {
+        let model = ExpansionHistory::flat_lcdm_approx();
+        for z in [0.01, 0.1, 0.5, 1.0, 2.0, 5.0] {
+            let fixed = model
+                .line_of_sight_comoving_distance_mpc(z, 16_384)
+                .unwrap();
+            let adaptive = model
+                .line_of_sight_comoving_distance_mpc_adaptive(z, 1e-7, 1e-10, 20)
+                .unwrap();
+            let relative_error = (fixed - adaptive).abs() / fixed.abs().max(1.0);
+            assert!(
+                relative_error < 1e-8,
+                "z={z}: fixed={fixed}, adaptive={adaptive}, relerr={relative_error}"
+            );
+        }
     }
 
     #[test]
