@@ -1,4 +1,5 @@
 use super::*;
+use serde::{Deserialize, Serialize};
 
 #[derive(Debug)]
 pub struct DiscoveredConservation {
@@ -613,7 +614,7 @@ pub fn discover_invariants_autonomous_cold(
 }
 
 /// A bounded failure disposition for the autonomous holdout qualification.
-#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, Deserialize)]
 pub enum AutonomousHoldoutFailure {
     DiscoveryAndHoldoutSeedsEqual,
     NoTrajectoriesRequested,
@@ -628,7 +629,7 @@ pub enum AutonomousHoldoutFailure {
 /// does not establish a symbolic identity or formal theorem. The component
 /// digests bind the candidate expression, discovery configuration, generated
 /// holdout initial-condition manifest, and declared validation profile.
-#[derive(Debug, Clone, PartialEq)]
+#[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
 pub struct AutonomousHoldoutValidation {
     pub dynamics_id: String,
     pub discovery_seed: u64,
@@ -798,9 +799,7 @@ fn holdout_validation_profile_digest(
     hasher.finalize().to_hex().to_string()
 }
 
-fn finalize_holdout_validation(
-    mut result: AutonomousHoldoutValidation,
-) -> AutonomousHoldoutValidation {
+fn compute_holdout_receipt_digest(result: &AutonomousHoldoutValidation) -> String {
     let mut hasher = blake3::Hasher::new();
     hasher.update(b"SymthaeaAutonomousHoldoutReceiptV1\0");
     holdout_hash_string(&mut hasher, &result.dynamics_id);
@@ -831,7 +830,22 @@ fn finalize_holdout_validation(
     holdout_hash_string(&mut hasher, &result.validation_profile_digest);
     holdout_hash_failure(&mut hasher, result.failure);
     hasher.update(&[u8::from(result.passed)]);
-    result.receipt_digest = hasher.finalize().to_hex().to_string();
+    hasher.finalize().to_hex().to_string()
+}
+
+impl AutonomousHoldoutValidation {
+    /// Verify that the public fields still match the canonical receipt digest.
+    ///
+    /// This checks report integrity only; it does not rerun the trajectories or
+    /// establish a physical, symbolic, or formal truth claim.
+    pub fn verify_receipt_digest(&self) -> bool {
+        self.receipt_digest.len() == 64
+            && self.receipt_digest == compute_holdout_receipt_digest(self)
+    }
+}
+
+fn finalize_holdout_validation(mut result: AutonomousHoldoutValidation) -> AutonomousHoldoutValidation {
+    result.receipt_digest = compute_holdout_receipt_digest(&result);
     result
 }
 
@@ -1986,6 +2000,10 @@ mod holdout_validation_tests {
         assert_eq!(result.holdout_initial_conditions_digest.len(), 64);
         assert_eq!(result.validation_profile_digest.len(), 64);
         assert_eq!(result.receipt_digest.len(), 64);
+        assert!(result.verify_receipt_digest());
+        let mut tampered = result.clone();
+        tampered.threshold = 2.0;
+        assert!(!tampered.verify_receipt_digest());
     }
 
     #[test]
