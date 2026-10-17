@@ -495,6 +495,84 @@ fn main() {
         nearest_distances[sample.style_index].push(nearest);
     }
 
+    // Estimate whether a style's signature survives random-seed variation.
+    // Compare different seeds for the SAME style and intent against different
+    // styles under the SAME seed and intent. This is a structural diagnostic,
+    // not a perceptual classifier or a quality score.
+    let mut within_seed_distances = vec![Vec::<f64>::new(); style_count];
+    for style_index in 0..style_count {
+        for intent_index in 0..INTENTS.len() {
+            for seed_left in 0..SEEDS.len() {
+                for seed_right in (seed_left + 1)..SEEDS.len() {
+                    let left_config = seed_left * INTENTS.len() + intent_index;
+                    let right_config = seed_right * INTENTS.len() + intent_index;
+                    let left_sample = &samples[style_index * config_count + left_config];
+                    let right_sample = &samples[style_index * config_count + right_config];
+                    within_seed_distances[style_index]
+                        .push(dist(&left_sample.structural, &right_sample.structural));
+                }
+            }
+        }
+    }
+
+    let mut between_style_distances = Vec::<f64>::new();
+    let mut between_style_by_style = vec![Vec::<f64>::new(); style_count];
+    let mut style_pair_rows = Vec::new();
+    let mut style_pairs_above_seed_variation = 0usize;
+    for left in 0..style_count {
+        for right in (left + 1)..style_count {
+            let mut matched_distances = Vec::with_capacity(config_count);
+            for config_index in 0..config_count {
+                let left_sample = &samples[left * config_count + config_index];
+                let right_sample = &samples[right * config_count + config_index];
+                let distance = dist(&left_sample.structural, &right_sample.structural);
+                matched_distances.push(distance);
+                between_style_distances.push(distance);
+            }
+            let mean_between = mean(&matched_distances);
+            let left_within = mean(&within_seed_distances[left]);
+            let right_within = mean(&within_seed_distances[right]);
+            let mean_within_pair = (left_within + right_within) / 2.0;
+            let margin = mean_between - mean_within_pair;
+            let ratio = if mean_within_pair > 1e-9 {
+                json!(mean_between / mean_within_pair)
+            } else {
+                Value::Null
+            };
+            let above_seed_variation = mean_between > mean_within_pair;
+            if above_seed_variation {
+                style_pairs_above_seed_variation += 1;
+            }
+            between_style_by_style[left].push(mean_between);
+            between_style_by_style[right].push(mean_between);
+            style_pair_rows.push(json!({
+                "style_a": counters[left].style_name,
+                "style_b": counters[right].style_name,
+                "mean_matched_between_style_distance": mean_between,
+                "mean_seed_conditioned_within_style_distance_a": left_within,
+                "mean_seed_conditioned_within_style_distance_b": right_within,
+                "between_minus_within_margin": margin,
+                "between_to_within_ratio": ratio,
+                "between_exceeds_mean_seed_variation": above_seed_variation,
+                "matched_config_count": config_count
+            }));
+        }
+    }
+    let all_within_seed_distances: Vec<f64> =
+        within_seed_distances.iter().flatten().copied().collect();
+    let mean_within_seed_distance = mean(&all_within_seed_distances);
+    let mean_between_style_distance = mean(&between_style_distances);
+    let global_style_separation_ratio = if mean_within_seed_distance > 1e-9 {
+        json!(mean_between_style_distance / mean_within_seed_distance)
+    } else {
+        Value::Null
+    };
+    style_pair_rows.sort_by(|a, b| {
+        let ar = a["between_minus_within_margin"].as_f64().unwrap_or(0.0);
+        let br = b["between_minus_within_margin"].as_f64().unwrap_or(0.0);
+        ar.total_cmp(&br)
+    });
+
     let mut style_rows = Vec::with_capacity(style_count);
     let mut declared_live_no_effect_count = 0usize;
     let mut declared_inert_with_effect_count = 0usize;
@@ -545,6 +623,18 @@ fn main() {
             "seed_diversity_test_seeds": SEEDS.len(),
             "mean_nearest_cross_style_structural_distance":
                 mean(&nearest_distances[index]),
+            "mean_seed_conditioned_within_style_structural_distance":
+                mean(&within_seed_distances[index]),
+            "mean_matched_between_style_structural_distance":
+                mean(&between_style_by_style[index]),
+            "between_to_within_seed_variation_ratio": {
+                let within = mean(&within_seed_distances[index]);
+                if within > 1e-9 {
+                    json!(mean(&between_style_by_style[index]) / within)
+                } else {
+                    Value::Null
+                }
+            },
             "metamorphic_audits": {
                 "tonic_transposition": transposition,
             },
@@ -611,7 +701,7 @@ fn main() {
     let source_commit = std::env::var("GIT_COMMIT").ok();
     let validator_self_test = validator_mutation_audit();
     let report = json!({
-        "schema_version": 2,
+        "schema_version": 3,
         "engine_version": MUSIC_THEORY_ENGINE_VERSION,
         "provenance": {
             "git_commit": source_commit,
@@ -669,6 +759,19 @@ fn main() {
             "scope": "paired high/low probes across fixed seeds; no effect at tested points is not proof of global inactivity",
         },
         "validator_mutation_audit": validator_self_test,
+        "style_identifiability_audit": {
+            "method": "compare matched between-style structural distances against same-style, same-intent distances across different seeds",
+            "within_style_seed_comparison_count": all_within_seed_distances.len(),
+            "mean_seed_conditioned_within_style_distance": mean_within_seed_distance,
+            "matched_between_style_comparison_count": between_style_distances.len(),
+            "mean_matched_between_style_distance": mean_between_style_distance,
+            "global_between_to_within_distance_ratio": global_style_separation_ratio,
+            "style_pairs_above_both_seed_variation_baselines": style_pairs_above_seed_variation,
+            "style_pair_count": style_pair_rows.len(),
+            "per_style_pair": style_pair_rows,
+            "is_qualification_gate": false,
+            "interpretation": "diagnostic only; structural Euclidean distances are neither human recognition nor cultural authenticity, and aggregate separation may hide individual style confusions"
+        },
         "metamorphic_audit_summary": {
             "probe": "same seed and intent in C vs G",
             "style_count": style_count,
