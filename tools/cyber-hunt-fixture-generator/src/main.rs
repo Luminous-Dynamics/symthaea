@@ -1651,6 +1651,78 @@ fn main() {
 mod tests {
     use super::*;
 
+    fn load_schema_validator(schema_file: &str) -> jsonschema::Validator {
+        let root = Path::new(env!("CARGO_MANIFEST_DIR")).join("../..");
+        let bytes = fs::read(root.join("docs/research").join(schema_file))
+            .expect("schema fixture should be readable");
+        let schema: serde_json::Value =
+            serde_json::from_slice(&bytes).expect("schema should be valid JSON");
+        assert_eq!(
+            schema.get("$schema").and_then(serde_json::Value::as_str),
+            Some("https://json-schema.org/draft/2020-12/schema"),
+            "schema should declare Draft 2020-12"
+        );
+
+        fn assert_local_references_only(value: &serde_json::Value) {
+            match value {
+                serde_json::Value::Object(object) => {
+                    for keyword in ["$ref", "$dynamicRef"] {
+                        if let Some(reference) = object.get(keyword) {
+                            let uri = reference.as_str().expect("schema reference should be a string");
+                            assert!(
+                                uri.starts_with('#'),
+                                "external/relative schema reference is forbidden: {keyword}={uri}"
+                            );
+                        }
+                    }
+                    for child in object.values() {
+                        assert_local_references_only(child);
+                    }
+                }
+                serde_json::Value::Array(items) => {
+                    for child in items {
+                        assert_local_references_only(child);
+                    }
+                }
+                _ => {}
+            }
+        }
+
+        assert_local_references_only(&schema);
+        assert!(
+            jsonschema::draft202012::meta::is_valid(&schema),
+            "{schema_file} must validate against the bundled Draft 2020-12 meta-schema"
+        );
+        jsonschema::draft202012::options()
+            .should_validate_formats(true)
+            .build(&schema)
+            .unwrap_or_else(|error| panic!("cannot compile {schema_file}: {error}"))
+    }
+
+    fn assert_schema_instance(
+        validator: &jsonschema::Validator,
+        value: &serde_json::Value,
+        label: &str,
+    ) {
+        if let Err(error) = validator.validate(value) {
+            panic!("{label} failed JSON Schema validation: {error}");
+        }
+    }
+
+    fn assert_jsonl_schema_instances(
+        validator: &jsonschema::Validator,
+        bytes: &[u8],
+        label: &str,
+    ) {
+        let text = std::str::from_utf8(bytes).expect("JSONL output should be UTF-8");
+        assert!(text.ends_with('\n'), "{label} should end with LF");
+        for (index, line) in text.split_terminator('\n').enumerate() {
+            let value: serde_json::Value = serde_json::from_str(line)
+                .unwrap_or_else(|error| panic!("{label} line {} is invalid JSON: {error}", index + 1));
+            assert_schema_instance(validator, &value, &format!("{label} line {}", index + 1));
+        }
+    }
+
     #[test]
     fn artifact_provenance_family_has_a_distinct_causal_graph_and_benign_matched_chain() {
         let dataset = generate_artifact_provenance_dataset(1_000, 2026)
@@ -1972,6 +2044,36 @@ mod tests {
         let other_seed = generate_cloud_data_movement_dataset(1_000, 2027)
             .expect("other seed should generate");
         assert_ne!(dataset.manifest.event_store_sha256, other_seed.manifest.event_store_sha256);
+    }
+
+    #[test]
+    fn every_family_output_validates_against_meta_validated_draft_2020_12_schemas() {
+        let event_validator = load_schema_validator("cyber-hunt-event-v1.schema.json");
+        let manifest_validator = load_schema_validator("cyber-hunt-manifest-v1.schema.json");
+        let truth_validator = load_schema_validator("cyber-hunt-truth-v1.schema.json");
+        let families = [
+            CampaignFamily::IdentityToEgress,
+            CampaignFamily::ArtifactProvenance,
+            CampaignFamily::CloudDataMovement,
+            CampaignFamily::CrossDomainTrustChain,
+            CampaignFamily::BenignOnlyControl,
+        ];
+
+        for family in families {
+            let dataset = generate_dataset_for_family(128, 2026, family)
+                .unwrap_or_else(|error| panic!("{family:?} should generate: {error}"));
+            assert_jsonl_schema_instances(
+                &event_validator,
+                &dataset.event_store,
+                &format!("{family:?} event store"),
+            );
+            let manifest = serde_json::to_value(&dataset.manifest)
+                .expect("manifest should serialize");
+            assert_schema_instance(&manifest_validator, &manifest, &format!("{family:?} manifest"));
+            let truth = serde_json::to_value(&dataset.truth)
+                .expect("oracle should serialize");
+            assert_schema_instance(&truth_validator, &truth, &format!("{family:?} oracle"));
+        }
     }
 
     #[test]
