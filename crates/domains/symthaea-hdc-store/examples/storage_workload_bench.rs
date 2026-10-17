@@ -144,14 +144,18 @@ fn run() -> Result<(), Box<dyn Error>> {
         }
     }
 
+    if config.csv_path.as_ref().is_some_and(|csv| {
+        csv == &store_path || csv.with_extension("meta.txt") == store_path
+    }) {
+        return Err("--csv and --store must name different paths".into());
+    }
+
+    let store_config = StoreConfig {
+        initial_capacity: config.vectors as u64,
+        ..StoreConfig::default()
+    };
     let create_start = Instant::now();
-    let mut store = HdcStore::create(
-        &store_path,
-        StoreConfig {
-            initial_capacity: config.vectors as u64,
-            ..StoreConfig::default()
-        },
-    )?;
+    let mut store = HdcStore::create(&store_path, store_config)?;
     let create_elapsed = create_start.elapsed();
     samples.push(sample(
         "store_create",
@@ -253,7 +257,7 @@ fn run() -> Result<(), Box<dyn Error>> {
         let Some((top_id, score)) = neighbors.first().copied() else {
             return Err(format!("exact scan returned no neighbor for query ID {query_id}").into());
         };
-        if score < 1.0 {
+        if score != 1.0 {
             return Err(format!(
                 "known in-store query {query_id} did not produce exact similarity 1.0 (found {score})"
             ).into());
@@ -466,13 +470,10 @@ fn run() -> Result<(), Box<dyn Error>> {
     println!("HDC store synthetic workload benchmark (no hardware/energy claim)");
     println!("vectors={}, queries={}, batch_size={}, seed={}", config.vectors, config.queries, config.batch_size, config.seed);
     println!("host_os={}, host_arch={}", env::consts::OS, env::consts::ARCH);
-    println!("source_sha={}", option_env!("SYMTHAEA_SOURCE_SHA").unwrap_or("not-injected"));
-    println!("rustc_version={}", option_env!("RUSTC_VERSION").unwrap_or("not-injected"));
+    println!("source_sha={}", env::var("SYMTHAEA_SOURCE_SHA").unwrap_or_else(|_| "not-injected".to_string()));
+    println!("rustc_version={}", env::var("RUSTC_VERSION").unwrap_or_else(|_| "not-injected".to_string()));
     println!("store_path={}", store_path.display());
-    println!("host_os={}, host_arch={}", env::consts::OS, env::consts::ARCH);
-    println!("source_sha={}", option_env!("SYMTHAEA_SOURCE_SHA").unwrap_or("not-injected"));
-    println!("rustc_version={}", option_env!("RUSTC_VERSION").unwrap_or("not-injected"));
-    println!("store_path={}", store_path.display());
+    println!("lsh_bands={}, lsh_rows={}", store_config.lsh_bands, store_config.lsh_rows);
     println!("corpus_fingerprint_fnv1a64_noncryptographic={corpus_fingerprint:016x}");
     println!("logical_vector_payload_bytes={corpus_bytes}");
     println!("store_file_bytes_including_preallocation_and_metadata={store_file_bytes}");
@@ -495,8 +496,8 @@ fn run() -> Result<(), Box<dyn Error>> {
         let meta_path = path.with_extension("meta.txt");
         let metadata = format!(
             "benchmark=storage_workload_bench\nsource_sha={}\nrustc_version={}\nhost_os={}\nhost_arch={}\nstore_path={}\nvectors={}\nqueries={}\nbatch_size={}\nseed={}\ncorpus_fingerprint_fnv1a64_noncryptographic={:016x}\nlogical_vector_payload_bytes={}\nstore_file_bytes_including_preallocation_and_metadata={}\ncontent_checksum={:?}\ngeneration={}\nlive_count={}\ntombstones={}\napprox_top1_recall={}/{}\nexact_fallbacks={}/{}\nphysical_media_bytes=not_measured\nenergy=not_measured\nos_page_cache_coldness=not_controlled\n",
-            option_env!("SYMTHAEA_SOURCE_SHA").unwrap_or("not-injected"),
-            option_env!("RUSTC_VERSION").unwrap_or("not-injected"),
+            env::var("SYMTHAEA_SOURCE_SHA").unwrap_or_else(|_| "not-injected".to_string()),
+            env::var("RUSTC_VERSION").unwrap_or_else(|_| "not-injected".to_string()),
             env::consts::OS,
             env::consts::ARCH,
             store_path.display(),
@@ -538,11 +539,6 @@ fn parse_args() -> Result<Config, Box<dyn Error>> {
             "--csv" => {
                 config.csv_path = Some(PathBuf::from(
                     args.next().ok_or("--csv requires a path")?,
-                ))
-            }
-            "--store" => {
-                config.store_path = Some(PathBuf::from(
-                    args.next().ok_or("--store requires a path")?,
                 ))
             }
             "--store" => {
