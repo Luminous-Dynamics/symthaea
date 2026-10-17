@@ -3,7 +3,7 @@
 **Date:** 2026-10-17  
 **Status:** concept/product-line study; not an aircraft design, approved maintenance manual, certification plan accepted by an authority, or performance prediction.  
 **Tracking:** [AIRCRAFT-LINE-001 #7761](https://github.com/Luminous-Dynamics/symthaea/issues/7761)  
-**Related:** [aircraft-energy screening #7647](https://github.com/Luminous-Dynamics/symthaea/pull/7647), [Roadster/air-road benchmarks #7692](https://github.com/Luminous-Dynamics/symthaea/pull/7692), [S4 next-generation personal aircraft concept](S4_NEXT_GENERATION_PERSONAL_AIRCRAFT_2026-10-17.md), [maintenance task-card contract](MAINTENANCE_TASK_CARD_CONTRACT_2026-10-17.md), [candidate-specific mission model contract](CANDIDATE_SPECIFIC_MISSION_MODEL_CONTRACT_2026-10-17.md), [Skyhawk reference data card](REFERENCE_BASELINE_SKYHAWK_2026-10-17.md).
+**Related:** [aircraft-energy screening #7647](https://github.com/Luminous-Dynamics/symthaea/pull/7647), [Roadster/air-road benchmarks #7692](https://github.com/Luminous-Dynamics/symthaea/pull/7692), [aircraft ownership-cost model #7763](https://github.com/Luminous-Dynamics/symthaea/pull/7763), [S4 next-generation personal aircraft concept](S4_NEXT_GENERATION_PERSONAL_AIRCRAFT_2026-10-17.md), [maintenance task-card contract](MAINTENANCE_TASK_CARD_CONTRACT_2026-10-17.md), [candidate-specific mission model contract](CANDIDATE_SPECIFIC_MISSION_MODEL_CONTRACT_2026-10-17.md), [Skyhawk reference data card](REFERENCE_BASELINE_SKYHAWK_2026-10-17.md).
 
 ## 1. North star
 
@@ -160,6 +160,7 @@ The numbers are targets to test, not promises. If measured results miss a goal, 
 
 - **Symthaea aircraft-energy work:** screen candidate mission profiles and battery assumptions. It must keep fixed-profile screening distinct from a vehicle model that updates loads when mass and geometry change.
 - **Candidate mission contract:** preserve configuration, route, mass, environment, model version, phase demand, uncertainty and evidence digests. The current validator checks input consistency; it does not validate aerodynamics or physical truth.
+- **Ownership cost model:** the new [Rust ownership-economics PR #7763](https://github.com/Luminous-Dynamics/symthaea/pull/7763) separately accounts for fixed ownership costs, owner/professional labor, hourly operating costs, reserves, failed dispatches and completed passenger-kilometres. Its example inputs are synthetic, and real affordability claims still need sourceable costs and observed maintenance/dispatch data.
 - **Factory operations research:** schedule operations with skills, tools, resources and dependencies; use measured time/rework values only after observing a real process. The current scheduler is a heuristic, not proof of globally optimal line planning.
 - **Mycelix evidence layer:** preserve traceability and governed sharing for as-built parts, repairs, revisions, inspections and training. Provenance is not proof that a measurement is correct; bad evidence must be correctable and auditable.
 - **Maintenance task cards:** start as versioned, reviewed schema/documentation, then evaluate a suitable implementation location after architecture ownership review. Do not create a second overlapping aircraft platform or a parallel crate just to hold a product matrix.
