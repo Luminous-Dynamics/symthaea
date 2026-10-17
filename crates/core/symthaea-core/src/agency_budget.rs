@@ -383,7 +383,7 @@ mod tests {
     #[test]
     fn autonomy_proposal_outside_budget_is_constrained_to_best_feasible_candidate() {
         let result = evaluate_agency_budget(&request(
-            vec![0.6, 0.3, 0.1],
+            vec![0.6, 0.35, 0.05],
             vec![0.05, 0.1, 0.85],
             0.25,
         ))
