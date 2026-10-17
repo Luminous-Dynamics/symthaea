@@ -3,7 +3,7 @@
 **Date:** 2026-10-17  
 **Status:** concept architecture and test plan; not an aircraft design approval, build specification, performance prediction, or authorization to maintain/fly an aircraft.  
 **Tracking:** [AIRFAMILY-001 #7745](https://github.com/Luminous-Dynamics/symthaea/issues/7745)  
-**Research context:** [Roadster / air-road platform benchmark #7692](https://github.com/Luminous-Dynamics/symthaea/pull/7692), [aircraft-energy screening #7647](https://github.com/Luminous-Dynamics/symthaea/pull/7647), [candidate-specific mission model contract](CANDIDATE_SPECIFIC_MISSION_MODEL_CONTRACT_2026-10-17.md), [Skyhawk reference card](REFERENCE_BASELINE_SKYHAWK_2026-10-17.md).
+**Research context:** [Roadster / air-road platform benchmark #7692](https://github.com/Luminous-Dynamics/symthaea/pull/7692), [aircraft-energy screening #7647](https://github.com/Luminous-Dynamics/symthaea/pull/7647), [candidate-specific mission model contract](https://github.com/Luminous-Dynamics/symthaea/blob/research/aircraft-energy-architecture-2026-10-16/docs/aircraft/CANDIDATE_SPECIFIC_MISSION_MODEL_CONTRACT_2026-10-17.md), [Skyhawk reference card](https://github.com/Luminous-Dynamics/symthaea/blob/research/aircraft-energy-architecture-2026-10-16/docs/aircraft/REFERENCE_BASELINE_SKYHAWK_2026-10-17.md).
 
 ## 1. Product ambition
 
@@ -164,7 +164,7 @@ Sources:
 
 Start with the Cessna Skyhawk as the best-known four-seat conventional baseline, then include at least one modern LSA trainer, one four-seat touring airplane, and a utility aircraft relevant to the intended region. Keep all published specs in dated source cards with their definitions and performance conditions.
 
-The official Skyhawk page lists 4 occupants, 398 kg useful load, 395 kg maximum payload, 254 kg payload with full fuel, 124 KTAS maximum cruise speed, 640 nmi maximum range, and 497 m takeoff distance. These are different operating points, not one simultaneously achievable mission. The separate [reference data card](REFERENCE_BASELINE_SKYHAWK_2026-10-17.md) records the source's performance assumptions and calculated ratios.
+The official Skyhawk page lists 4 occupants, 398 kg useful load, 395 kg maximum payload, 254 kg payload with full fuel, 124 KTAS maximum cruise speed, 640 nmi maximum range, and 497 m takeoff distance. These are different operating points, not one simultaneously achievable mission. The separate [reference data card](https://github.com/Luminous-Dynamics/symthaea/blob/research/aircraft-energy-architecture-2026-10-16/docs/aircraft/REFERENCE_BASELINE_SKYHAWK_2026-10-17.md) records the source's performance assumptions and calculated ratios.
 
 For each competitor, collect:
 - purchase price with date, market, currency, included equipment and taxes;
