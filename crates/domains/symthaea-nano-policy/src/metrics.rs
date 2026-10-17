@@ -950,8 +950,8 @@ fn compare_worst_group_arms(
         }
         let delta = match metric {
             ComparisonMetric::WorstGroupSuccessRateAtBudget => {
-                f64::from(candidate_target.metrics.success_at_budget)
-                    - f64::from(baseline_target.metrics.success_at_budget)
+                (if candidate_target.metrics.success_at_budget { 1.0 } else { 0.0 })
+                    - (if baseline_target.metrics.success_at_budget { 1.0 } else { 0.0 })
             }
             ComparisonMetric::WorstGroupNormalizedSuccessAuc => {
                 candidate_target.metrics.normalized_success_auc
@@ -1462,6 +1462,57 @@ mod tests {
     }
 
     #[test]
+    fn worst_group_comparison_rejects_hidden_pooled_win() {
+        let mut ledger = fixture();
+        for arm in &mut ledger.arms {
+            let mut replicate_targets = Vec::new();
+            for target in &arm.target_queries {
+                let mut replicate = target.clone();
+                replicate.target_query_id = format!("{}-replicate", target.target_query_id);
+                let success = match (arm.arm_id.as_str(), target.target_query_id.as_str()) {
+                    ("baseline", "t4") => true,
+                    ("candidate", "t2" | "t3" | "t5") => true,
+                    _ => false,
+                };
+                let loss = if success { 0.005 } else { 0.02 };
+                let candidate_id = format!("{}-replicate-candidate", target.target_query_id);
+                replicate.observations = vec![observation(
+                    1,
+                    &candidate_id,
+                    Some(loss),
+                    ObservationStatus::Evaluated,
+                )];
+                replicate_targets.push(replicate);
+            }
+            arm.target_queries.extend(replicate_targets);
+        }
+
+        let report = evaluate_fixture(&ledger);
+        let pooled = report
+            .comparisons
+            .iter()
+            .find(|comparison| comparison.metric == ComparisonMetric::SuccessRateAtBudget)
+            .expect("pooled success comparison");
+        let worst = report
+            .comparisons
+            .iter()
+            .find(|comparison| {
+                comparison.metric == ComparisonMetric::WorstGroupSuccessRateAtBudget
+            })
+            .expect("worst-group success comparison");
+
+        assert!(pooled.estimated_delta > 0.0, "pooled improvement should be positive");
+        assert!(worst.estimated_delta < 0.0, "weakest group should regress");
+        assert_eq!(worst.independent_group_count, 5);
+        assert_eq!(worst.covered_target_count, 10);
+        assert_eq!(worst.disposition, ComparisonDisposition::RegressionBeyondMargin);
+        assert!(
+            worst.confidence_interval_upper.unwrap() < 0.0,
+            "simultaneous worst-group upper confidence bound must stay below zero"
+        );
+    }
+
+    #[test]
     fn reports_per_group_curves_and_worst_group_regression() {
         let mut ledger = fixture();
         for arm in &mut ledger.arms {
@@ -1587,7 +1638,14 @@ mod tests {
         }
 
         let report = evaluate_fixture(&ledger);
-        assert!(report.comparisons.iter().all(|comparison| {
+        assert!(report.comparisons.iter().filter(|comparison| {
+            matches!(
+                comparison.metric,
+                ComparisonMetric::SuccessRateAtBudget
+                    | ComparisonMetric::NormalizedSuccessAuc
+                    | ComparisonMetric::BestLossReductionAtBudget
+            )
+        }).all(|comparison| {
             comparison.disposition == ComparisonDisposition::ImprovementBeyondMargin
                 && comparison.estimated_delta >= comparison.practical_margin
                 && comparison.confidence_interval_lower.unwrap() > 0.0
@@ -1700,12 +1758,16 @@ mod tests {
                 .contains(&json!("observation_artifact_sha256"))
         );
         assert_eq!(report_schema["properties"]["schema_version"]["const"], METRICS_REPORT_SCHEMA_VERSION);
-        assert!(
-            report_schema["properties"]["comparisons"]["items"]["properties"]["metric"]["enum"]
-                .as_array()
-                .unwrap()
-                .contains(&json!("best_loss_reduction_at_budget"))
-        );
+        let declared_metrics = report_schema["properties"]["comparisons"]["items"]["properties"]["metric"]["enum"]
+            .as_array()
+            .unwrap();
+        for metric_name in [
+            "best_loss_reduction_at_budget",
+            "worst_group_success_rate_at_budget",
+            "worst_group_normalized_success_auc",
+        ] {
+            assert!(declared_metrics.contains(&json!(metric_name)));
+        }
         assert!(
             ledger_schema["required"]
                 .as_array()
