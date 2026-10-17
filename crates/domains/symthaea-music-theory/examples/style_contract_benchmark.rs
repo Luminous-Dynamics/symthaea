@@ -12,12 +12,14 @@
 //!   cargo run --release -p symthaea-music-theory --example style_contract_benchmark
 //!   cargo run --release -p symthaea-music-theory --example style_contract_benchmark -- /tmp/style-contract.json
 
-use std::collections::HashSet;
+use std::collections::{HashMap, HashSet};
 
 use serde_json::{Value, json};
 use symthaea_music_theory::fingerprint::{
     STRUCT_DIMS, dist, exact_fingerprint, structural_fingerprint,
 };
+use symthaea_music_theory::rhythm::Duration;
+use symthaea_music_theory::score::Score;
 use symthaea_music_theory::{
     GrammarPlanEvidence, MUSIC_THEORY_ENGINE_VERSION, MusicalIntent, PitchClass, Style,
     compose_with_grammar_plan,
@@ -197,6 +199,80 @@ fn mean(values: &[f64]) -> f64 {
     } else {
         values.iter().sum::<f64>() / values.len() as f64
     }
+}
+
+/// A deliberately transposition-invariant representation: for each role, keep
+/// exact onset/duration and the interval from its previous note, not absolute
+/// pitch. It checks whether changing tonic preserves the score's rhythmic and
+/// interval skeleton without pretending that absolute register is irrelevant.
+fn transposition_shape_signature(score: &Score) -> Vec<(String, Duration, Duration, i32)> {
+    let mut previous_pitch_by_role = HashMap::<String, i32>::new();
+    score
+        .events()
+        .into_iter()
+        .map(|note| {
+            let role = format!("{:?}", note.role);
+            let pitch = i32::from(note.pitch.midi());
+            let interval_from_previous = previous_pitch_by_role
+                .get(&role)
+                .map_or(0, |previous| pitch - previous);
+            previous_pitch_by_role.insert(role.clone(), pitch);
+            (role, note.onset, note.duration, interval_from_previous)
+        })
+        .collect()
+}
+
+/// Metamorphic probe: ask for the same seeded intent in C and G, then measure
+/// whether the rhythm/interval skeleton survives transposition. This is
+/// diagnostic rather than a universal pass/fail rule: a style may make
+/// register-sensitive orchestration or range choices, but the deviation must
+/// be visible rather than silently conflated with ordinary diversity.
+fn transposition_audit(style: Style) -> Value {
+    let mut invariant_pairs = 0usize;
+    let mut exact_score_changed_pairs = 0usize;
+    let mut structural_distances = Vec::new();
+    let mut total_pairs = 0usize;
+
+    for seed in SEEDS {
+        for &(valence, arousal, energy, bars) in &INTENTS {
+            let c_intent = intent(valence, arousal, energy, bars, seed);
+            let mut g_intent = intent(valence, arousal, energy, bars, seed);
+            g_intent.tonic = PitchClass::new(7);
+
+            let c_output = realize(style, &c_intent);
+            let g_output = realize(style, &g_intent);
+            total_pairs += 1;
+
+            if transposition_shape_signature(&c_output.score)
+                == transposition_shape_signature(&g_output.score)
+            {
+                invariant_pairs += 1;
+            }
+            if exact_fingerprint(&c_output.score) != exact_fingerprint(&g_output.score) {
+                exact_score_changed_pairs += 1;
+            }
+            let c_structure =
+                structural_fingerprint(&c_output.score, c_output.form.as_ref());
+            let g_structure =
+                structural_fingerprint(&g_output.score, g_output.form.as_ref());
+            structural_distances.push(dist(&c_structure, &g_structure));
+        }
+    }
+
+    json!({
+        "source_tonic": "C",
+        "target_tonic": "G",
+        "paired_samples": total_pairs,
+        "rhythm_and_interval_signature_preserved": invariant_pairs,
+        "signature_invariance_rate": if total_pairs == 0 {
+            0.0
+        } else {
+            invariant_pairs as f64 / total_pairs as f64
+        },
+        "exact_score_changed": exact_score_changed_pairs,
+        "mean_structural_distance": mean(&structural_distances),
+        "interpretation": "diagnostic only; deviations can reveal tonic sensitivity, register effects, or grammar branches and must be reviewed before setting a universal gate"
+    })
 }
 
 fn main() {
@@ -383,6 +459,9 @@ fn main() {
             "seed_diversity_test_seeds": SEEDS.len(),
             "mean_nearest_cross_style_structural_distance":
                 mean(&nearest_distances[index]),
+            "metamorphic_audits": {
+                "tonic_transposition": transposition_audit(style),
+            },
             "intent_sensitivity": sensitivities,
         }));
     }
@@ -520,6 +599,20 @@ mod tests {
         let unique: HashSet<String> =
             Style::ALL.iter().map(|style| format!("{style:?}")).collect();
         assert_eq!(unique.len(), Style::ALL.len());
+    }
+
+    #[test]
+    fn transposition_signature_ignores_uniform_pitch_shift() {
+        let generated = realize(Style::Classical, &intent(0.0, 0.5, 0.5, 16, 42));
+        assert!(!generated.score.notes.is_empty());
+        let original = transposition_shape_signature(&generated.score);
+
+        let mut shifted = generated.score.clone();
+        for note in &mut shifted.notes {
+            note.pitch = note.pitch.transpose(7);
+        }
+
+        assert_eq!(original, transposition_shape_signature(&shifted));
     }
 
     #[test]
