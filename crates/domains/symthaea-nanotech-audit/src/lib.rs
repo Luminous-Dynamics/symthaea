@@ -3,10 +3,10 @@
 
 //! Read-only artifact integrity checks for exported MADE benchmark runs.
 //!
-//! This verifier checks whether exported trajectories, per-episode summaries,
-//! CSV records and aggregate metric summaries agree with one another. It does
-//! not verify source/data provenance, oracle call costs, scientific validity,
-//! or experimental confirmation.
+//! This verifier checks consistency across exported trajectories, episode/CSV/aggregate
+//! metrics, a declared source/task/config manifest, file digests, and a per-attempt oracle
+//! ledger. A self-declared manifest or ledger is not external attestation of source identity,
+//! legal rights, billed costs, scientific validity, or experimental confirmation.
 
 use serde::{Deserialize, Serialize};
 use serde_json::Value;
@@ -50,8 +50,8 @@ impl AuditReport {
             provenance_manifest_status: "not_provided".to_owned(),
             scope_ceiling: vec![
                 "An artifact-integrity pass is not a scientific-performance pass.".to_owned(),
-                "Source commit, data rights and dataset identity/hash are not verified.".to_owned(),
-                "Oracle setup calls, caching, retries and total compute cost are not verified.".to_owned(),
+                "Source commit, data rights and true upstream dataset identity are not externally attested; declarations and local hashes are checked only.".to_owned(),
+                "Oracle calls, caching, retries and costs reconcile to a self-declared ledger, not source-system logs or billing evidence.".to_owned(),
                 "No physical experiment or independent replication is verified.".to_owned(),
             ],
         }
