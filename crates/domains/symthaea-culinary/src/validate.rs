@@ -9,8 +9,8 @@ use crate::spec::{
     Candy, Coagulation, CulinarySpec, DairyAcidification, DoughClass, Emulsion, Fat, FryingFat,
     Hydration, Pasteurization, Pathogen, Protein, SugarStage,
 };
-use crate::thresholds as th;
 use crate::thermal::ThermalTrajectory;
+use crate::thresholds as th;
 
 /// A rejected invariant, with a human-readable, physics-grounded reason.
 #[derive(Clone, Debug, PartialEq)]
@@ -218,7 +218,9 @@ fn validate_thermal_trajectory(
             requirement: "time values must be nondecreasing",
         });
     }
-    if trajectory.points.last().unwrap().0 <= trajectory.points.first().unwrap().0 {
+    let start_time = trajectory.points[0].0;
+    let end_time = trajectory.points[trajectory.points.len() - 1].0;
+    if end_time <= start_time {
         return Err(CulinaryViolation::InvalidNumericInput {
             field,
             requirement: "trajectory must have positive duration",
