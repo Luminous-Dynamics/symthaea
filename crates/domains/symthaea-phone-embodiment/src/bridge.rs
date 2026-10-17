@@ -14,7 +14,28 @@ use symthaea_core::embodiment::{
     ExternalActionTimingErrorV1, ExternalActionTimingV1, GROUNDING_TEMPORAL, MoralGateInput,
     MotorSafetyLevel,
 };
+use std::sync::OnceLock;
 use std::time::{Instant, SystemTime, UNIX_EPOCH};
+
+/// All PhoneBridge instances in this process use the same monotonic origin and
+/// epoch ID. This makes cross-device host-side intervals comparable without
+/// pretending the host receive timestamp is the device's capture timestamp.
+static HOST_MONOTONIC_EPOCH: OnceLock<(Instant, String)> = OnceLock::new();
+
+fn shared_host_monotonic_epoch() -> (Instant, String) {
+    HOST_MONOTONIC_EPOCH
+        .get_or_init(|| {
+            let nonce = SystemTime::now()
+                .duration_since(UNIX_EPOCH)
+                .map(|d| d.as_nanos())
+                .unwrap_or_default();
+            (
+                Instant::now(),
+                format!("host-monotonic-pid-{}-{nonce}", std::process::id()),
+            )
+        })
+        .clone()
+}
 use symthaea_core::hdc::ContinuousHV;
 use symthaea_vision_manifold::{VisionConfig, VisionManifold};
 
@@ -106,13 +127,9 @@ impl PhoneBridge {
         vision.enable_scene_graph();
         vision.enable_scene_memory(16);
 
-        // This nonce names the epoch; all measured durations/timestamps below use
-        // Instant, never SystemTime. The wall-clock value is not used for latency.
-        let epoch_nonce = SystemTime::now()
-            .duration_since(UNIX_EPOCH)
-            .map(|d| d.as_nanos())
-            .unwrap_or_default();
-        let host_clock_epoch_id = format!("host-monotonic-pid-{}-{epoch_nonce}", std::process::id());
+        // The origin and epoch ID are process-wide so host monotonic timestamps
+        // from separate PhoneBridge instances use the same coordinate system.
+        let (host_clock_origin, host_clock_epoch_id) = shared_host_monotonic_epoch();
 
         Self {
             adb: AdbDevice::new(serial),
@@ -132,7 +149,7 @@ impl PhoneBridge {
             confirmation_mode: true,
             last_match_similarity: None,
             last_phi: 0.0,
-            host_clock_origin: Instant::now(),
+            host_clock_origin,
             host_clock_epoch_id,
             device_session_epoch: 0,
             device_disconnected: false,
@@ -1045,6 +1062,15 @@ impl symthaea_core::embodiment::EmbodimentBridge for PhoneBridge {
 #[cfg(test)]
 mod tests {
     use super::*;
+
+    #[test]
+    fn host_monotonic_epoch_is_shared_for_cross_device_comparison() {
+        let (origin_a, epoch_a) = shared_host_monotonic_epoch();
+        let (origin_b, epoch_b) = shared_host_monotonic_epoch();
+        assert_eq!(epoch_a, epoch_b);
+        assert_eq!(origin_a, origin_b);
+    }
+
 
     #[test]
     fn test_grid_to_screen_mapping() {
