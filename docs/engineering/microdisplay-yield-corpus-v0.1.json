@@ -67,7 +67,11 @@
       ],
       "claim_limit": "Analytical/synthetic arithmetic only; not a fabrication result.",
       "status": "UNQUALIFIED",
-      "evidence_class": "SYNTHETIC_MODEL"
+      "evidence_class": "SYNTHETIC_MODEL",
+      "reference_ids": [
+        "microled-yield-2026",
+        "microled-cmos-2026"
+      ]
     },
     {
       "id": "MICLED-YIELD-ARITH-002",
@@ -90,7 +94,11 @@
       ],
       "claim_limit": "The cited near-perfect figure is a research frontier, not an achieved Luminous result.",
       "status": "UNQUALIFIED",
-      "evidence_class": "SYNTHETIC_MODEL"
+      "evidence_class": "SYNTHETIC_MODEL",
+      "reference_ids": [
+        "microled-yield-2026",
+        "microled-cmos-2026"
+      ]
     },
     {
       "id": "MICLED-YIELD-ARITH-003",
@@ -114,7 +122,11 @@
       ],
       "claim_limit": "No population-level yield is accepted without denominator and coverage evidence.",
       "status": "UNQUALIFIED",
-      "evidence_class": "SYNTHETIC_MODEL"
+      "evidence_class": "SYNTHETIC_MODEL",
+      "reference_ids": [
+        "microled-yield-2026",
+        "microled-cmos-2026"
+      ]
     },
     {
       "id": "MICLED-DEFECT-INDEPENDENCE-004",
@@ -139,7 +151,11 @@
       ],
       "claim_limit": "Synthetic spatial patterns do not describe a real process without measured process data.",
       "status": "UNQUALIFIED",
-      "evidence_class": "SYNTHETIC_MODEL"
+      "evidence_class": "SYNTHETIC_MODEL",
+      "reference_ids": [
+        "microled-cmos-2026",
+        "semi-inspection"
+      ]
     },
     {
       "id": "MICLED-INSPECT-PRECISION-005",
@@ -169,7 +185,11 @@
       ],
       "claim_limit": "Synthetic detector performance is not physical inspection capability.",
       "status": "UNQUALIFIED",
-      "evidence_class": "SYNTHETIC_MODEL"
+      "evidence_class": "SYNTHETIC_MODEL",
+      "reference_ids": [
+        "microled-cmos-2026",
+        "semi-inspection"
+      ]
     },
     {
       "id": "MICLED-INSPECT-COVERAGE-006",
@@ -194,7 +214,11 @@
       ],
       "claim_limit": "Coverage metadata does not demonstrate actual optical instrument resolution.",
       "status": "UNQUALIFIED",
-      "evidence_class": "SYNTHETIC_MODEL"
+      "evidence_class": "SYNTHETIC_MODEL",
+      "reference_ids": [
+        "microled-cmos-2026",
+        "semi-inspection"
+      ]
     },
     {
       "id": "MICLED-PLACEMENT-007",
@@ -224,7 +248,11 @@
       ],
       "claim_limit": "Modelled tolerance is not as-built dimensional accuracy.",
       "status": "UNQUALIFIED",
-      "evidence_class": "SYNTHETIC_MODEL"
+      "evidence_class": "SYNTHETIC_MODEL",
+      "reference_ids": [
+        "microled-cmos-2026",
+        "phot-engineering"
+      ]
     },
     {
       "id": "MICLED-INTERCONNECT-008",
@@ -251,7 +279,11 @@
       ],
       "claim_limit": "No circuit/process recipe or measured failure rate is included.",
       "status": "UNQUALIFIED",
-      "evidence_class": "SYNTHETIC_MODEL"
+      "evidence_class": "SYNTHETIC_MODEL",
+      "reference_ids": [
+        "microled-cmos-2026",
+        "phot-engineering"
+      ]
     },
     {
       "id": "MICLED-STAGE-YIELD-009",
@@ -284,7 +316,11 @@
       ],
       "claim_limit": "Stage arithmetic is not module yield until validated with linked production counts.",
       "status": "UNQUALIFIED",
-      "evidence_class": "SYNTHETIC_MODEL"
+      "evidence_class": "SYNTHETIC_MODEL",
+      "reference_ids": [
+        "microled-yield-2026",
+        "microled-cmos-2026"
+      ]
     },
     {
       "id": "MICLED-REPAIR-010",
@@ -317,7 +353,11 @@
       ],
       "claim_limit": "No actual repair process is asserted.",
       "status": "UNQUALIFIED",
-      "evidence_class": "SYNTHETIC_MODEL"
+      "evidence_class": "SYNTHETIC_MODEL",
+      "reference_ids": [
+        "microled-yield-2026",
+        "microled-cmos-2026"
+      ]
     },
     {
       "id": "MICLED-REDUNDANCY-011",
@@ -349,7 +389,11 @@
       ],
       "claim_limit": "Synthetic design-space comparison, not a proposed production layout.",
       "status": "UNQUALIFIED",
-      "evidence_class": "SYNTHETIC_MODEL"
+      "evidence_class": "SYNTHETIC_MODEL",
+      "reference_ids": [
+        "microled-yield-2026",
+        "microled-cmos-2026"
+      ]
     },
     {
       "id": "MICLED-THERMAL-012",
@@ -379,7 +423,11 @@
       ],
       "claim_limit": "No physical thermal behavior is established by a synthetic reduced-order model.",
       "status": "UNQUALIFIED",
-      "evidence_class": "SYNTHETIC_MODEL"
+      "evidence_class": "SYNTHETIC_MODEL",
+      "reference_ids": [
+        "microled-cmos-2026",
+        "phot-engineering"
+      ]
     },
     {
       "id": "MICLED-QUALITY-013",
@@ -407,7 +455,11 @@
       ],
       "claim_limit": "Predicted optical utility remains model evidence until measured.",
       "status": "UNQUALIFIED",
-      "evidence_class": "SYNTHETIC_MODEL"
+      "evidence_class": "SYNTHETIC_MODEL",
+      "reference_ids": [
+        "microled-cmos-2026",
+        "phot-engineering"
+      ]
     },
     {
       "id": "MICLED-AGING-014",
@@ -439,7 +491,11 @@
       ],
       "claim_limit": "No lifetime or reliability claim without real accelerated/field evidence.",
       "status": "UNQUALIFIED",
-      "evidence_class": "SYNTHETIC_MODEL"
+      "evidence_class": "SYNTHETIC_MODEL",
+      "reference_ids": [
+        "microled-cmos-2026",
+        "phot-engineering"
+      ]
     },
     {
       "id": "MICLED-CAL-015",
@@ -464,7 +520,11 @@
       ],
       "claim_limit": "Tests metadata logic only.",
       "status": "UNQUALIFIED",
-      "evidence_class": "SYNTHETIC_MODEL"
+      "evidence_class": "SYNTHETIC_MODEL",
+      "reference_ids": [
+        "semi-inspection",
+        "mycelix-evidence"
+      ]
     },
     {
       "id": "MICLED-RAW-016",
@@ -491,7 +551,11 @@
       ],
       "claim_limit": "Evidence integrity does not establish physical truth.",
       "status": "UNQUALIFIED",
-      "evidence_class": "SYNTHETIC_MODEL"
+      "evidence_class": "SYNTHETIC_MODEL",
+      "reference_ids": [
+        "semi-inspection",
+        "mycelix-evidence"
+      ]
     },
     {
       "id": "MICLED-CONFIG-017",
@@ -517,7 +581,11 @@
       ],
       "claim_limit": "Similar product names do not prove equivalent configurations.",
       "status": "UNQUALIFIED",
-      "evidence_class": "SYNTHETIC_MODEL"
+      "evidence_class": "SYNTHETIC_MODEL",
+      "reference_ids": [
+        "semi-inspection",
+        "mycelix-evidence"
+      ]
     },
     {
       "id": "MICLED-COST-018",
@@ -548,7 +616,11 @@
       ],
       "claim_limit": "Economic model result is scenario analysis, not a vendor quote.",
       "status": "UNQUALIFIED",
-      "evidence_class": "SYNTHETIC_MODEL"
+      "evidence_class": "SYNTHETIC_MODEL",
+      "reference_ids": [
+        "microled-cmos-2026",
+        "microled-yield-2026"
+      ]
     },
     {
       "id": "MICLED-FRONTIER-019",
@@ -578,7 +650,11 @@
       ],
       "claim_limit": "The computed frontier is only as credible as its declared model and inputs.",
       "status": "UNQUALIFIED",
-      "evidence_class": "SYNTHETIC_MODEL"
+      "evidence_class": "SYNTHETIC_MODEL",
+      "reference_ids": [
+        "microled-cmos-2026",
+        "microled-yield-2026"
+      ]
     },
     {
       "id": "MICLED-SOURCE-020",
@@ -608,7 +684,12 @@
       ],
       "claim_limit": "Citation/provenance handling is not reproduction of the published experiments.",
       "status": "UNQUALIFIED",
-      "evidence_class": "SYNTHETIC_MODEL"
+      "evidence_class": "SYNTHETIC_MODEL",
+      "reference_ids": [
+        "microled-cmos-2026",
+        "microled-yield-2026",
+        "mycelix-evidence"
+      ]
     }
   ]
 }
