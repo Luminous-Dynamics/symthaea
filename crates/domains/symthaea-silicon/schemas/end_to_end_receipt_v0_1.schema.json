@@ -141,6 +141,7 @@
           "enum": [
             "cpu_scalar",
             "cpu_simd",
+            "cpu_dispatch",
             "gpu",
             "fpga_board",
             "unknown"
@@ -236,6 +237,10 @@
               }
             }
           }
+        },
+        "invocation": {
+          "type": "string",
+          "minLength": 1
         }
       }
     },
@@ -270,7 +275,10 @@
           "minimum": 0
         },
         "malformed_frames_accepted": {
-          "type": "integer",
+          "type": [
+            "integer",
+            "null"
+          ],
           "minimum": 0
         },
         "task_quality_metric": {
@@ -492,6 +500,7 @@
                 "enum": [
                   "cpu_scalar",
                   "cpu_simd",
+                  "cpu_dispatch",
                   "gpu",
                   "fpga_board"
                 ]
@@ -567,7 +576,8 @@
               "backend": {
                 "enum": [
                   "cpu_scalar",
-                  "cpu_simd"
+                  "cpu_simd",
+                  "cpu_dispatch"
                 ]
               }
             },
