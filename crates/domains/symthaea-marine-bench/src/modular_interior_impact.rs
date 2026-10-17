@@ -67,8 +67,27 @@ fn sha256_hex(data: &[u8]) -> String {
     Sha256::digest(data).iter().map(|byte| format!("{byte:02x}")).collect()
 }
 
+fn canonicalize(value: &mut serde_json::Value) {
+    match value {
+        serde_json::Value::Array(items) => {
+            for item in items.iter_mut() {
+                canonicalize(item);
+            }
+            items.sort_by_key(|item| item.to_string());
+        }
+        serde_json::Value::Object(object) => {
+            for item in object.values_mut() {
+                canonicalize(item);
+            }
+        }
+        _ => {}
+    }
+}
+
 fn digest<T: Serialize>(value: &T) -> Result<String, serde_json::Error> {
-    Ok(sha256_hex(&serde_json::to_vec(value)?))
+    let mut canonical = serde_json::to_value(value)?;
+    canonicalize(&mut canonical);
+    Ok(sha256_hex(&serde_json::to_vec(&canonical)?))
 }
 
 fn map_domain(
