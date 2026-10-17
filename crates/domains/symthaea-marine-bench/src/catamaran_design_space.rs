@@ -34,7 +34,7 @@ pub struct DesignSpaceSpec {
     pub max_candidates: usize,
 }
 
-#[derive(Clone, Debug, PartialEq, Eq)]
+#[derive(Clone, Debug, PartialEq)]
 pub enum DesignSpaceError {
     Geometry(GeometryError),
     NonFinite(&'static str),
