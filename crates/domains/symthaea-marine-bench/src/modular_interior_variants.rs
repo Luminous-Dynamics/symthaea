@@ -470,18 +470,19 @@ pub fn generate_drop_in_variants(
         *variant_id_counts.entry(variant.variant_id.clone()).or_default() += 1;
     }
 
-    let mut sorted_variants = variants.to_vec();
-    sorted_variants.sort_by(|a, b| {
-        a.variant_id.cmp(&b.variant_id)
-            .then(digest(&a.replacement).unwrap_or_default().cmp(&digest(&b.replacement).unwrap_or_default()))
+    let mut sorted_variants = Vec::with_capacity(variants.len());
+    for variant in variants {
+        sorted_variants.push((variant.clone(), digest(&variant.replacement)?));
+    }
+    sorted_variants.sort_by(|(a, a_digest), (b, b_digest)| {
+        a.variant_id.cmp(&b.variant_id).then(a_digest.cmp(b_digest))
     });
 
     let mut output = Vec::with_capacity(sorted_variants.len());
-    for variant in &sorted_variants {
+    for (variant, replacement_sha256) in &sorted_variants {
         let duplicate_id = variant_id_counts.get(&variant.variant_id).copied().unwrap_or(0) > 1;
         let (preflight_disposition, preflight_findings) =
             preflight(baseline, variant, duplicate_id);
-        let replacement_sha256 = digest(&variant.replacement)?;
         let seed = format!(
             "{}:{}:{}:{}",
             baseline_sha256,
