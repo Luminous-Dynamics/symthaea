@@ -743,6 +743,22 @@ const fn anatomy(
     }
 }
 
+/// Traditions whose repertoire labels require qualified human review before
+/// the catalog can make any claim of style fidelity or authenticity.
+const fn constellation_requires_expert_review(constellation: Constellation) -> bool {
+    matches!(
+        constellation,
+        Constellation::BluesGospelSoul
+            | Constellation::JazzImprovisatory
+            | Constellation::LatinCaribbeanCycles
+            | Constellation::EuropeanNorthAtlanticFolk
+            | Constellation::MediterraneanMiddleEasternNorthAfrican
+            | Constellation::SouthAsianRagaTala
+            | Constellation::EastSoutheastAsian
+            | Constellation::AfricanDiasporicGroove
+    )
+}
+
 macro_rules! style {
     ($id:literal, $name:literal, $constellation:ident) => {
         CanonicalStyle {
@@ -752,7 +768,9 @@ macro_rules! style {
             constellation: Constellation::$constellation,
             status: StyleStatus::Research,
             composer_style: None,
-            requires_expert_review: false,
+            requires_expert_review: constellation_requires_expert_review(
+                Constellation::$constellation,
+            ),
         }
     };
     ($id:literal, $name:literal, $constellation:ident, $composer:literal, $status:ident) => {
@@ -763,7 +781,9 @@ macro_rules! style {
             constellation: Constellation::$constellation,
             status: StyleStatus::$status,
             composer_style: Some($composer),
-            requires_expert_review: matches!(
+            requires_expert_review: constellation_requires_expert_review(
+                Constellation::$constellation,
+            ) || matches!(
                 StyleStatus::$status,
                 StyleStatus::ExpertReviewRequired
             ),
@@ -777,7 +797,9 @@ macro_rules! style {
             constellation: Constellation::$constellation,
             status: StyleStatus::$status,
             composer_style: Some($composer),
-            requires_expert_review: matches!(
+            requires_expert_review: constellation_requires_expert_review(
+                Constellation::$constellation,
+            ) || matches!(
                 StyleStatus::$status,
                 StyleStatus::ExpertReviewRequired
             ),
@@ -1197,6 +1219,52 @@ mod tests {
                 .iter()
                 .all(|entry| entry.status != StyleStatus::Foundation)
         );
+    }
+
+    #[test]
+    fn culturally_rooted_constellations_require_expert_review() {
+        let culturally_rooted = CATALOG
+            .iter()
+            .filter(|entry| {
+                matches!(
+                    entry.constellation,
+                    Constellation::BluesGospelSoul
+                        | Constellation::JazzImprovisatory
+                        | Constellation::LatinCaribbeanCycles
+                        | Constellation::EuropeanNorthAtlanticFolk
+                        | Constellation::MediterraneanMiddleEasternNorthAfrican
+                        | Constellation::SouthAsianRagaTala
+                        | Constellation::EastSoutheastAsian
+                        | Constellation::AfricanDiasporicGroove
+                )
+            })
+            .collect::<Vec<_>>();
+
+        assert_eq!(culturally_rooted.len(), 64);
+        for entry in culturally_rooted {
+            assert!(
+                entry.requires_expert_review,
+                "catalog entry {} ({}) must not imply style authenticity without qualified review",
+                entry.id,
+                entry.name
+            );
+            assert!(
+                entry.research_gaps().contains(&"review by knowledgeable musicians"),
+                "catalog entry {} must expose the review gate in its research gaps",
+                entry.id
+            );
+        }
+    }
+
+    #[test]
+    fn new_structural_styles_are_mapped_to_their_matching_composer_routes() {
+        assert_eq!(catalog_entry(18).unwrap().composer_style, Some("Rondo"));
+        assert_eq!(
+            catalog_entry(19).unwrap().composer_style,
+            Some("ThemeAndVariations")
+        );
+        assert_eq!(catalog_entry(39).unwrap().composer_style, Some("Erosion"));
+        assert_eq!(catalog_entry(40).unwrap().composer_style, Some("Lineage"));
     }
 
     #[test]
