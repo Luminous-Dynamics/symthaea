@@ -165,6 +165,12 @@ The 1° and 0.5° targets are mechanism-specific project hypotheses. For a manua
 
 Never let a result gain a higher trust tier simply because the software successfully parses its JSON.
 
+### Evidence checker implementation
+
+A first Rust CLI now exists at `crates/domains/symthaea-audio-evidence`. It provides a small, offline fail-closed layer for required project fields, planned-versus-captured lifecycle state, raw-capture requirements, path traversal/symlink protection and exact artifact SHA-256 / byte-length verification. Use its output only as an evidence-integrity check; it is not a complete JSON Schema implementation, a physical calibration, or product conformity assessment.
+
+The planned-only H1 sample should return success with zero artifacts; an actual run should not be accepted until its referenced raw files exist and their hashes match. Next engineering gates are to compile/test the crate, run a full Draft 2020-12 validator independently, and connect validation to a frozen known-answer fixture run.
+
 ## 7. Integrating Symthaea
 
 The existing response-curve and Pareto workflow can recommend the next physical experiment, but it should not autonomously change unsafe test levels or actuate an unsupported turntable.
