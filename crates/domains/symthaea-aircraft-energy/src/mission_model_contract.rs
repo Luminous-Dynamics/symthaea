@@ -23,6 +23,14 @@ pub struct ModelArtifactRef {
     pub revision: String,
     pub sha256: String,
     pub retrieved_at: String,
+    /// Units or an explicit "not applicable" declaration for this artifact.
+    pub units: String,
+    /// Reference state/conditions or an explicit "not applicable" declaration.
+    pub reference_conditions: String,
+    /// Supported conditions or an explicit non-physical-artifact declaration.
+    pub applicability_domain: String,
+    /// Quantified uncertainty or an explicit reason it does not apply.
+    pub uncertainty_description: String,
     pub limitations: String,
 }
 
@@ -111,6 +119,10 @@ pub struct CandidateMissionModelRun {
     pub mission_family_artifact: ModelArtifactRef,
     pub input_configuration_sha256: String,
     pub input_energy_system_envelope_sha256: String,
+    pub input_route_sha256: String,
+    pub input_mission_family_sha256: String,
+    pub input_mass_properties_sha256: String,
+    pub input_environment_sha256: String,
 }
 
 /// Complete provenance-bearing output from a candidate-specific mission model.
@@ -127,6 +139,8 @@ pub struct CandidateMissionManifest {
     pub energy_system_envelope_sha256: String,
     pub route_sha256: String,
     pub mission_family_sha256: String,
+    pub mass_properties_sha256: String,
+    pub environment_sha256: String,
     pub route_distance_m: f64,
     pub reserve_fraction: f64,
     pub mass_properties: CandidateMassProperties,
@@ -193,6 +207,16 @@ pub fn validate_candidate_mission_manifest(
         &mut findings,
     );
     validate_digest(
+        "mass_properties_sha256",
+        &manifest.mass_properties_sha256,
+        &mut findings,
+    );
+    validate_digest(
+        "environment_sha256",
+        &manifest.environment_sha256,
+        &mut findings,
+    );
+    validate_digest(
         "model_run.input_configuration_sha256",
         &manifest.model_run.input_configuration_sha256,
         &mut findings,
@@ -200,6 +224,22 @@ pub fn validate_candidate_mission_manifest(
     validate_digest(
         "model_run.input_energy_system_envelope_sha256",
         &manifest.model_run.input_energy_system_envelope_sha256,
+        &mut findings,
+    );
+    validate_digest("model_run.input_route_sha256", &manifest.model_run.input_route_sha256, &mut findings);
+    validate_digest(
+        "model_run.input_mission_family_sha256",
+        &manifest.model_run.input_mission_family_sha256,
+        &mut findings,
+    );
+    validate_digest(
+        "model_run.input_mass_properties_sha256",
+        &manifest.model_run.input_mass_properties_sha256,
+        &mut findings,
+    );
+    validate_digest(
+        "model_run.input_environment_sha256",
+        &manifest.model_run.input_environment_sha256,
         &mut findings,
     );
 
@@ -222,6 +262,40 @@ pub fn validate_candidate_mission_manifest(
         findings.push(MissionModelContractFinding::DigestMismatch {
             field: "model_run.input_energy_system_envelope_sha256".into(),
         });
+    }
+
+    for ((
+        expected_field,
+        expected,
+        actual_field,
+        actual,
+    )) in [
+        (
+            "route_sha256",
+            manifest.route_sha256.as_str(),
+            "model_run.input_route_sha256",
+            manifest.model_run.input_route_sha256.as_str(),
+        ),
+        (
+            "mission_family_sha256",
+            manifest.mission_family_sha256.as_str(),
+            "model_run.input_mission_family_sha256",
+            manifest.model_run.input_mission_family_sha256.as_str(),
+        ),
+        (
+            "mass_properties_sha256",
+            manifest.mass_properties_sha256.as_str(),
+            "model_run.input_mass_properties_sha256",
+            manifest.model_run.input_mass_properties_sha256.as_str(),
+        ),
+        (
+            "environment_sha256",
+            manifest.environment_sha256.as_str(),
+            "model_run.input_environment_sha256",
+            manifest.model_run.input_environment_sha256.as_str(),
+        ),
+    ] {
+        validate_digest_binding(expected_field, expected, actual_field, actual, &mut findings);
     }
 
     for (field, artifact) in [
@@ -265,6 +339,20 @@ pub fn validate_candidate_mission_manifest(
         &manifest.mission_family_sha256,
         "model_run.mission_family_artifact.sha256",
         &manifest.model_run.mission_family_artifact.sha256,
+        &mut findings,
+    );
+    validate_digest_binding(
+        "mass_properties_sha256",
+        &manifest.mass_properties_sha256,
+        "model_run.mass_properties_artifact.sha256",
+        &manifest.model_run.mass_properties_artifact.sha256,
+        &mut findings,
+    );
+    validate_digest_binding(
+        "environment_sha256",
+        &manifest.environment_sha256,
+        "model_run.environment_artifact.sha256",
+        &manifest.model_run.environment_artifact.sha256,
         &mut findings,
     );
 
@@ -437,6 +525,10 @@ fn validate_artifact(
         ("locator", artifact.locator.as_str()),
         ("revision", artifact.revision.as_str()),
         ("retrieved_at", artifact.retrieved_at.as_str()),
+        ("units", artifact.units.as_str()),
+        ("reference_conditions", artifact.reference_conditions.as_str()),
+        ("applicability_domain", artifact.applicability_domain.as_str()),
+        ("uncertainty_description", artifact.uncertainty_description.as_str()),
         ("limitations", artifact.limitations.as_str()),
     ] {
         validate_nonempty(&format!("{field}.{suffix}"), value, findings);
@@ -602,6 +694,10 @@ mod tests {
             revision: "fixture-v1".into(),
             sha256: ch.to_string().repeat(64),
             retrieved_at: "2026-10-17".into(),
+            units: "Not applicable: synthetic test fixture artifact.".into(),
+            reference_conditions: "Not applicable: synthetic test fixture.".into(),
+            applicability_domain: "Unit tests only; no physical aircraft applicability.".into(),
+            uncertainty_description: "No physical uncertainty represented in this synthetic fixture.".into(),
             limitations: "Synthetic fixture only; not flight evidence.".into(),
         }
     }
@@ -616,6 +712,8 @@ mod tests {
             energy_system_envelope_sha256: energy_digest.clone(),
             route_sha256: "8".repeat(64),
             mission_family_sha256: "9".repeat(64),
+            mass_properties_sha256: "f".repeat(64),
+            environment_sha256: "7".repeat(64),
             route_distance_m: 100_000.0,
             reserve_fraction: 0.1,
             mass_properties: CandidateMassProperties {
@@ -651,6 +749,10 @@ mod tests {
                 mission_family_artifact: artifact('9', "mission-family"),
                 input_configuration_sha256: config_digest,
                 input_energy_system_envelope_sha256: energy_digest,
+                input_route_sha256: "8".repeat(64),
+                input_mission_family_sha256: "9".repeat(64),
+                input_mass_properties_sha256: "f".repeat(64),
+                input_environment_sha256: "7".repeat(64),
             },
             phases: vec![
                 MissionPhaseDemand {
