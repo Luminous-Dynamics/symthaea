@@ -256,6 +256,8 @@ mod tests {
     const Z_95: f64 = 1.959_963_984_540_054;
     const CORPUS: &str =
         include_str!("../../../docs/engineering/microdisplay-yield-corpus-v0.1.json");
+    const SCHEMA: &str =
+        include_str!("../../../docs/engineering/microdisplay-yield-corpus.schema.json");
 
     fn close(actual: f64, expected: f64, tolerance: f64) {
         assert!(
@@ -268,8 +270,16 @@ mod tests {
     fn checked_in_corpus_remains_unqualified_and_arithmetic_cases_drive_reference() {
         let corpus: Value =
             serde_json::from_str(CORPUS).expect("checked-in yield corpus JSON must parse");
+        let schema: Value =
+            serde_json::from_str(SCHEMA).expect("checked-in yield schema JSON must parse");
         assert_eq!(corpus["corpus_id"].as_str(), Some("MICRODISP-YIELD-CORPUS-001"));
         assert_eq!(corpus["status"].as_str(), Some("UNQUALIFIED"));
+        assert_eq!(schema["$schema"].as_str(), Some("https://json-schema.org/draft/2020-12/schema"));
+        assert_eq!(schema["properties"]["corpus_id"]["const"].as_str(), Some("MICRODISP-YIELD-CORPUS-001"));
+        assert_eq!(schema["properties"]["case_count"]["const"].as_u64(), Some(20));
+        assert_eq!(schema["properties"]["cases"]["minItems"].as_u64(), Some(20));
+        assert_eq!(schema["properties"]["cases"]["maxItems"].as_u64(), Some(20));
+        assert_eq!(schema["properties"]["cases"]["items"]["properties"]["id"]["pattern"].as_str(), Some("^MICLED-[A-Z0-9-]+$"));
 
         let cases = corpus["cases"]
             .as_array()
@@ -277,16 +287,37 @@ mod tests {
         assert_eq!(corpus["case_count"].as_u64(), Some(cases.len() as u64));
         assert_eq!(cases.len(), 20);
 
+        let known_sources: std::collections::BTreeSet<String> = corpus["references"]
+            .as_array()
+            .expect("reference sources must be an array")
+            .iter()
+            .map(|source| source["id"].as_str().expect("source ID must be a string").to_owned())
+            .collect();
+        let schema_sources: std::collections::BTreeSet<String> = schema["properties"]["cases"]["items"]["properties"]["reference_ids"]["items"]["enum"]
+            .as_array()
+            .expect("schema must enumerate reference IDs")
+            .iter()
+            .map(|id| id.as_str().expect("schema reference ID must be a string").to_owned())
+            .collect();
+        assert_eq!(known_sources, schema_sources);
+
         let mut ids = std::collections::BTreeSet::new();
         for case in cases {
             assert_eq!(case["status"].as_str(), Some("UNQUALIFIED"));
             assert_eq!(case["evidence_class"].as_str(), Some("SYNTHETIC_MODEL"));
             let id = case["id"].as_str().expect("each case must have an ID");
+            assert!(id.starts_with("MICLED-"), "case ID prefix mismatch: {id}");
             assert!(ids.insert(id.to_owned()), "duplicate case ID: {id}");
-            assert!(!case["reference_ids"]
+            let references = case["reference_ids"]
                 .as_array()
-                .expect("each case must have source references")
-                .is_empty());
+                .expect("each case must have source references");
+            assert!(!references.is_empty());
+            for reference in references {
+                assert!(
+                    known_sources.contains(reference.as_str().expect("reference ID must be a string")),
+                    "unresolved reference in case {id}"
+                );
+            }
         }
 
         for id in ["MICLED-YIELD-ARITH-001", "MICLED-YIELD-ARITH-002"] {
