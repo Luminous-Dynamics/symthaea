@@ -130,7 +130,7 @@ Report listener counts, uncertainty, per-class confusion, source/baseline and fa
 - The probe aggregates RMS across the 0.2 / 0.5 / 0.9 velocity cells for each instrument/pitch, including adjacent level changes in dB and an RMS-monotonicity flag. This is a diagnostic—not a universal requirement that all sample layers or percussive timbres be strictly monotonic.
 - The new `render_arrangement_with_evidence` API attaches the selected per-note renderer path and sample-selection outcome. The probe checks that receipts match the requested note controls and remain stable across repeated renders.
 - Receipt paths distinguish named/default sample rendering, Karplus–Strong, FM, ordinary additive synthesis, and the legacy mood-derived path when no instrument identity is assigned. Sample fallback status differentiates a missing library from an unavailable bank, pitch/velocity selection, or short articulation.
-- When an actual WAV is selected, the receipt includes source library, exact source-root-relative path, recorded root MIDI pitch, sample rate, filename-derived dynamic layer, and applied pitch shift in semitones. The absolute machine-specific asset root is excluded.
+- When an actual WAV is selected, the receipt includes source library, exact source-root-relative path, SHA-256 over the exact source WAV bytes, recorded root MIDI pitch, sample rate, filename-derived dynamic layer, and applied pitch shift in semitones. The absolute machine-specific asset root is excluded.
 - The common pitch grid is a **signal-health smoke grid, not a valid range claim for every instrument**. Use a future source-derived capability-range manifest to choose each instrument's real test register.
 - A selected sample path means the renderer picked and rendered a compatible sample; it does not prove pitch fidelity, full source-bank coverage, authentic technique, or perceptual quality.
 - The pitch estimator searches 60–1500 Hz on a post-onset window. Status and periodicity confidence remain part of the output: low-periodicity or inharmonic tones must not be assigned a false pass or treated as a calibrated pitch failure. No pitch metric changes the current render outcome gate.
@@ -152,7 +152,7 @@ cargo run -p symthaea-muse --bin muse_instrument_probe -- --instrument harmonica
 
 Use `cargo test -p symthaea-muse --bin muse_instrument_probe` for roster/bounds checks, synthetic sine pitch-estimator sanity tests, silence rejection and velocity-response summary tests. These tests and commands are authored/documented but are not marked as executed by this change.
 
-The next increment should add instrument-specific range, pitch-accuracy and gesture tests, and bind receipts to explicit renderer and asset-content digests. Keep a per-note evidence record linking the requested instrument, selected renderer, selected source sample when known, signal checks, and exact renderer/asset digests. Do not collapse these fields into a pooled “instrument score.”
+The next increment should couple each selected-file hash to a pinned library/root manifest and add instrument-specific range, pitch-accuracy, and gesture tests. Keep a per-note evidence record linking the requested instrument, selected renderer, selected source sample, signal checks, and exact renderer/asset digests. Do not collapse these fields into a pooled “instrument score.”
 
 ### P3 — First-class gesture events
 - Add versioned typed events for a small subset of distinctive gestures and prove target sensitivity plus non-target invariance.
@@ -192,7 +192,7 @@ These are engineering targets to adopt after the new v2 measurements are locally
 | Periodic-tone pitch accuracy | Synthetic sine fixtures: median absolute error ≤ 2 cents; p95 ≤ 5 cents | Calibrate estimator using exact generated fixtures before using it to score instruments |
 | Instrument pitch accuracy | For calibrated, pitched instruments: median absolute error ≤ 5 cents and p95 ≤ 15 cents over supported range | Exclude or separately model inharmonic/percussive timbres and report low-confidence cells |
 | Velocity controllability | ≥95% of declared velocity-sensitive cells show expected loudness direction; exceptions explicitly documented | Treat this as a target only after per-instrument baseline and within-velocity repeatability are measured |
-| Source coverage | 100% of sample-backed cells trace to a relative source path, source root pitch, source rate, and asset manifest digest | Current receipts lack selected-WAV byte hash and complete root/manifest coupling |
+| Source coverage | 100% of sample-backed cells trace to a relative source path, source WAV byte hash, source root pitch, and source rate | Selected-file hash is now in each receipt; coupling to a full library/root manifest digest is still open |
 | Gesture semantics | 100% of marketed gestures have positive controls, negative controls, and renderer receipts | Untested gestures remain unavailable |
 | Human preference | Paired preference accuracy reported with confidence intervals; target ≥60% preference for improved vs matched baseline with lower 95% CI >50% | Separate instrumental identity, musicality, prompt alignment and production quality; blind review is required |
 
