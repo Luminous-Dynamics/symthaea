@@ -79,6 +79,12 @@ For the Johannesburg/Gauteng delivery context, obtain a dated delivered quote fr
 - a declared reference/check approach with reference instrument and uncertainty record;
 - post-repair checks and configuration identity for sensor/controller replacement.
 
+## 7. Machine-readable evidence register
+
+The exact catalog snapshot and dependency states are also frozen in [env-mobility-spm0-source-register-v1.json](fixtures/env-mobility-spm0-source-register-v1.json). It contains eight records: five public catalog listings with source URLs and explicit VAT/availability statements, and three unresolved dependencies with null prices and no supplier identity. The two arithmetic-only sensor/controller profiles are R102 (pressure + temperature) and R248 (temperature + relative humidity + pressure), excluding all unresolved/uncosted dependencies.
+
+A source-register audit is available in source via `cargo run -p xtask -- env-mobility-sourcing-audit` and its tests via `cargo test -p xtask env_mobility_sourcing`. It checks evidence classes, unique IDs, source URLs, null handling for unknown prices, and arithmetic/profile consistency. Its presence is not a passing test claim until exact-head Rust compilation and test execution have been observed.
+
 ## 7. Stop conditions
 
 Do not promote this snapshot to “frozen BOM,” “local supplier qualified,” “calibrated instrument,” “local production capability,” or “low-cost field-ready payload” without the additional evidence above. These listings merely support a small and affordable-looking first *bench article* and help identify what must be quoted, assembled and measured next.
