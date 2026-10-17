@@ -439,3 +439,56 @@ fn detect_cpu_identity() -> String {
     }
     format!("unidentified CPU; {} {}", env::consts::ARCH, env::consts::OS)
 }
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    #[test]
+    fn perturbation_is_deterministic_and_has_declared_hamming_distance() {
+        let base = BinaryHV::random(42);
+        let first = perturb_query(base, 7, 3, TARGET_NOISE_BITS);
+        let second = perturb_query(base, 7, 3, TARGET_NOISE_BITS);
+        assert_eq!(first, second);
+        assert_eq!(first.hamming_distance(&base), TARGET_NOISE_BITS as u32);
+    }
+
+    #[test]
+    fn deterministic_query_retrieves_declared_target() {
+        let store: Vec<BinaryHV> = (0..64)
+            .map(|index| BinaryHV::random(0x5349_4c49_434f_4e00_u64.wrapping_add(index)))
+            .collect();
+        let target_id = 3;
+        let query = perturb_query(store[target_id], 0, target_id, TARGET_NOISE_BITS);
+        let (actual_id, distance) = retrieve_top1(&store, &query);
+        assert_eq!(actual_id, target_id);
+        assert_eq!(distance, TARGET_NOISE_BITS as u32);
+    }
+
+    #[test]
+    fn equal_distance_ties_choose_lowest_stable_index() {
+        let vector = BinaryHV::random(99);
+        let store = vec![vector, vector];
+        assert_eq!(retrieve_top1(&store, &vector), (0, 0));
+    }
+
+    #[test]
+    fn percentile_uses_nearest_rank_for_small_samples() {
+        let samples = [10, 20, 30, 40, 50];
+        assert_eq!(percentile(&samples, 0.50), 30);
+        assert_eq!(percentile(&samples, 0.95), 50);
+        assert_eq!(percentile(&samples, 0.99), 50);
+    }
+
+    #[test]
+    fn unsupported_sweep_sizes_are_rejected() {
+        let result = parse_args(&[
+            "--store-size".to_owned(), "100".to_owned(),
+        ]);
+        assert!(result.is_err());
+        let result = parse_args(&[
+            "--batch-size".to_owned(), "3".to_owned(),
+        ]);
+        assert!(result.is_err());
+    }
+}
