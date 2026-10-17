@@ -135,7 +135,7 @@ pub fn validate_route(value: &Value, raw_sha256: String, context: &str) -> Resul
     let invariants = string_set(value, "route_invariants", context)?;
     ensure!(workers.len() == 8, "{context}: v1 expects eight worker profiles");
     ensure!(resources.len() == 11, "{context}: v1 expects eleven resource profiles");
-    ensure!(operations.len() == 10, "{context}: v1 expects ten operations");
+    ensure!(operations.len() == 11, "{context}: v1 expects eleven operations");
     ensure!(mutations.len() == 10, "{context}: v1 expects ten mutation cases");
     ensure!(invariants.len() >= 5, "{context}: route invariants are missing");
     let required_invariants = [
@@ -263,14 +263,15 @@ pub fn validate_route(value: &Value, raw_sha256: String, context: &str) -> Resul
         ("OP-00-release-design", "OP-01-incoming-inspection"),
         ("OP-00-release-design", "OP-02-adapter-fabrication"),
         ("OP-01-incoming-inspection", "OP-03-harness-prep"),
-        ("OP-02-adapter-fabrication", "OP-04-adapter-dimensional-check"),
-        ("OP-03-harness-prep", "OP-05-module-assembly"),
-        ("OP-04-adapter-dimensional-check", "OP-05-module-assembly"),
-        ("OP-01-incoming-inspection", "OP-05-module-assembly"),
-        ("OP-05-module-assembly", "OP-06-electrical-functional-check"),
-        ("OP-06-electrical-functional-check", "OP-07-reference-measurement-check"),
-        ("OP-07-reference-measurement-check", "OP-08-bind-build-manifest"),
-        ("OP-08-bind-build-manifest", "OP-09-independent-acceptance"),
+        ("OP-03-harness-prep", "OP-04-harness-continuity-check"),
+        ("OP-02-adapter-fabrication", "OP-05-adapter-dimensional-check"),
+        ("OP-04-harness-continuity-check", "OP-06-module-assembly"),
+        ("OP-05-adapter-dimensional-check", "OP-06-module-assembly"),
+        ("OP-01-incoming-inspection", "OP-06-module-assembly"),
+        ("OP-06-module-assembly", "OP-07-electrical-functional-check"),
+        ("OP-07-electrical-functional-check", "OP-08-reference-measurement-check"),
+        ("OP-08-reference-measurement-check", "OP-09-bind-build-manifest"),
+        ("OP-09-bind-build-manifest", "OP-10-independent-acceptance"),
     ];
     for (before, after) in required_order {
         ensure!(operation_map.contains_key(before) && operation_map.contains_key(after),
@@ -279,7 +280,7 @@ pub fn validate_route(value: &Value, raw_sha256: String, context: &str) -> Resul
             "{context}: required ordering {before:?} -> {after:?} not guaranteed");
     }
 
-    let acceptance = operation_map.get("OP-09-independent-acceptance").context("acceptance step missing")?;
+    let acceptance = operation_map.get("OP-10-independent-acceptance").context("acceptance step missing")?;
     let acceptance_skills = string_set(acceptance, "required_worker_skill_ids", context)?;
     let acceptance_caps = string_set(acceptance, "required_resource_capability_ids", context)?;
     ensure!(acceptance_skills.contains("independent_acceptance_review")
@@ -289,14 +290,14 @@ pub fn validate_route(value: &Value, raw_sha256: String, context: &str) -> Resul
             && acceptance_caps.contains("nonconformance_disposition"),
         "{context}: acceptance lacks required review resource");
 
-    let measurement = operation_map.get("OP-07-reference-measurement-check").context("measurement step missing")?;
+    let measurement = operation_map.get("OP-08-reference-measurement-check").context("measurement step missing")?;
     let measurement_skills = string_set(measurement, "required_worker_skill_ids", context)?;
     let measurement_caps = string_set(measurement, "required_resource_capability_ids", context)?;
     for gate in ["calibration_check", "uncertainty_recording", "reference_instrument_use"] {
         ensure!(measurement_skills.contains(gate) && measurement_caps.contains(gate),
             "{context}: reference measurement lacks {gate}");
     }
-    let harness = operation_map.get("OP-03-harness-prep").context("harness step missing")?;
+    let harness = operation_map.get("OP-04-harness-continuity-check").context("harness step missing")?;
     ensure!(string_set(harness, "required_worker_skill_ids", context)?.contains("continuity_polarity_test"),
         "{context}: harness preparation lacks continuity/polarity skill");
 
@@ -359,7 +360,7 @@ mod tests {
     #[test]
     fn routing_fixture_has_complete_acyclic_route_and_gates() {
         let report = run().expect("audit route fixture");
-        assert_eq!(report.operation_count, 10);
+        assert_eq!(report.operation_count, 11);
         assert_eq!(report.worker_count, 8);
         assert_eq!(report.resource_count, 11);
         assert_eq!(report.mutation_case_count, 10);
@@ -375,7 +376,7 @@ mod tests {
     #[test]
     fn route_mutations_fail_closed() {
         let mut value = fixture();
-        value["operations"][9]["required_worker_skill_ids"] = json!(["nonconformance_disposition"]);
+        value["operations"][10]["required_worker_skill_ids"] = json!(["nonconformance_disposition"]);
         assert!(validate_route(&value, "mutation".into(), "test missing inspection skill").is_err());
 
         let mut value = fixture();
@@ -383,7 +384,7 @@ mod tests {
         assert!(validate_route(&value, "mutation".into(), "test missing metrology capability").is_err());
 
         let mut value = fixture();
-        value["operations"][0]["predecessor_ids"] = json!(["OP-09-independent-acceptance"]);
+        value["operations"][0]["predecessor_ids"] = json!(["OP-10-independent-acceptance"]);
         assert!(validate_route(&value, "mutation".into(), "test dependency cycle").is_err());
 
         let mut value = fixture();
@@ -392,7 +393,7 @@ mod tests {
 
         let mut value = fixture();
         value["operations"].as_array_mut().expect("operations array")
-            .retain(|operation| operation["operation_id"] != "OP-07-reference-measurement-check");
+            .retain(|operation| operation["operation_id"] != "OP-08-reference-measurement-check");
         assert!(validate_route(&value, "mutation".into(), "test removed calibration step").is_err());
     }
 }
