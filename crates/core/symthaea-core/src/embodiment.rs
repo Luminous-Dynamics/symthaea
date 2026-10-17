@@ -1126,6 +1126,7 @@ mod tests {
         let mut bridge = TimingCaptureBridge {
             last_dt: None,
             step_calls: 0,
+            authority: PlantStepAuthorityV1::ConfiguredSimulation,
         };
         let mut timing = PlantStepTimingV1::configured_simulation(8, 0.005).unwrap();
         timing.dt_seconds = f32::NAN;
@@ -1146,6 +1147,7 @@ mod tests {
         let mut bridge = TimingCaptureBridge {
             last_dt: None,
             step_calls: 0,
+            authority: PlantStepAuthorityV1::ConfiguredSimulation,
         };
         let timing = PlantStepTimingV1::measured_interval(
             9,
