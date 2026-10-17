@@ -30,6 +30,7 @@ This is a proposal for benchmark design, not a claim that Symthaea or Praxis cur
 - [MITRE ATT&CK Evaluations Enterprise 2026](https://attackevals.mitre.org/enterprise/er8) emphasizes behavior/technique coverage, precision, false-positive validation, incident consolidation, speed, and transparent attribution of who or what took an action. Our reporting should preserve this multidimensional view instead of hiding trade-offs in one score.
 - [ExCyTIn-Bench (ICML 2026)](https://proceedings.mlr.press/v306/wu26bd.html) studies multi-hop investigations over a controlled cloud tenant and many log tables. This is complementary to unguided discovery: the benchmark needs both “find what matters” and “reason correctly once evidence is found.”
 - The 2026 [SecRespond preprint](https://arxiv.org/abs/2607.26791) examines post-compromise incident-response workflows. It motivates a separate simulated-response track; response planning should not be conflated with live action authority or with the event-detection score.
+- The September 2026 [executable-contract audit of agent benchmarks](https://arxiv.org/abs/2609.37315) found tool/evaluator defects in pinned benchmark implementations, illustrating that valid-looking agent outputs do not prove tools carried out their advertised effects. The July 2026 [benchmark protocol-validity study](https://arxiv.org/abs/2607.22368) further identifies score inflation from exposure and reward-hacking paths. These motivate auditing the evaluation harness itself, not just testing the solver.
 
 These benchmarks differ in corpus, task, metrics, and evidence access. Numbers should be compared only where the task and denominators genuinely align.
 
@@ -81,6 +82,24 @@ Separate (a) “what the evidence supports” from (b) “what the system is aut
 ### 7. From aggregate score to non-compensable safety gates
 
 Publish a score vector, denominators, scenario-level detail, and confidence intervals. Cluster uncertainty by independent campaign (or use a suitable cluster-aware method); events within one incident are not independent samples. A single critical safety/integrity violation cannot be averaged away by strong recall elsewhere.
+
+### 8. Audit the benchmark harness as an instrument
+
+The evaluator and its simulated tools are part of the trusted computing base. A benchmark can be internally consistent and still measure the wrong capability if a query adapter lies about its result, a simulated action claims success without changing state, a timeout hides an uncertain outcome, or the scorer rewards a requested payload instead of a verified state transition.
+
+Require executable contract tests for each tool operation:
+
+- **Read-only query:** returned event IDs, row/byte counts, and digests must be derived by the adapter from actual returned data, not asserted by the solver. Out-of-budget and unauthorized operations must be rejected by the adapter.
+- **Allowed simulated effect:** inspect before/after state and assert the exact declared transition occurred, with no unrelated changes. A response string saying "success" is not proof of effect.
+- **Denied or invalid effect:** assert state did not change.
+- **Timeout/unknown outcome:** preserve the explicit UNKNOWN disposition; reconcile against fresh state before retry. Never translate timeout into failure or success without new evidence.
+- **Duplicate/replay:** verify idempotency and distinguish duplicate observations from independent evidence.
+- **Scorer integrity:** perturb the tool implementation or evaluator in test-only fixtures—drop a returned event, fabricate an ID, misreport a row count, return success without state change, omit an episode, and alter the scorer's expected mapping. The suite must detect each injected defect, while benign/no-defect mutations act as negative controls.
+- **Trace lineage:** every metric must be traceable from exact input bytes through adapter response, solver output, oracle comparison, aggregation, and final receipt.
+
+Measure the harness's **defect-detection rate** on a preregistered set of injected adapter/scorer faults, false alarms on no-defect controls, action-state reconciliation accuracy, and fraction of scored metrics with complete lineage. A target of 100% detection is appropriate only for a frozen, finite critical-fault suite; report missed fault classes and never generalize it to all possible harness defects.
+
+This is not a second evaluator. It is a contract/conformance layer around the one shared query adapter and scorer tracked in #7776. Keep the agent's decision score separate from the harness-integrity verdict: a harness defect makes the episode or run inconclusive, never a model win or loss.
 
 ## Proposed benchmark gates and target trajectory
 
