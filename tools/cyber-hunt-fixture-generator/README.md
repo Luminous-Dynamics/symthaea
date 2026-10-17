@@ -2,7 +2,7 @@
 
 A standalone, deterministic Rust generator for a **public synthetic smoke corpus** supporting Symthaea issue [#7742](https://github.com/Luminous-Dynamics/symthaea/issues/7742), the unguided large-log threat-hunting tier.
 
-Generator version 0.2.0 supports two structurally different synthetic families: the default `identity-to-egress` story and the selectable `artifact-provenance` lifecycle. The latter links source revision, CI build, artifact digest, signed attestation, promotion, and deployment. Its benign comparison is a complete matched-digest chain using the same event types, so event-type presence alone cannot separate the planted incident. A valid signature over a different subject digest is not treated as provenance for the observed artifact. This is a test fixture, not a full software-supply-chain simulator or a blind benchmark.
+Generator version 0.3.0 supports three structurally different synthetic families: `identity-to-egress`, `artifact-provenance`, and `cloud-data-movement`. The artifact lifecycle links source revision, CI build, artifact digest, signed attestation, promotion, and deployment, with a benign complete chain sharing the same event types. The cloud family tests a role-scope/authorization mismatch followed by storage enumeration, bulk reads, export, and transfer; its benign backup chain has the same event types and consistent scope/approval. These are fixture controls, not production simulations or blind capability evidence.
 
 ## Run
 
@@ -31,7 +31,18 @@ cargo run --manifest-path tools/cyber-hunt-fixture-generator/Cargo.toml -- \
   --source-commit "$(git rev-parse HEAD)"
 ```
 
-`--family identity-to-egress` is the default for backward compatibility. Family changes select a distinct causal graph; new seeds within a family are still not independent campaigns.
+`--family identity-to-egress` is the default for backward compatibility. The additional options are `artifact-provenance` and `cloud-data-movement`. Family changes select a distinct causal graph; new seeds within a family are still not independent campaigns.
+
+Cloud-family example:
+
+```sh
+cargo run --manifest-path tools/cyber-hunt-fixture-generator/Cargo.toml -- \
+  --family cloud-data-movement --records 1000 --seed 20261019 \
+  --events-out /tmp/cyber-hunt-cloud/solver/events.jsonl \
+  --manifest-out /tmp/cyber-hunt-cloud/solver/manifest.json \
+  --truth-out /tmp/cyber-hunt-cloud/evaluator/truth.json \
+  --source-commit "$(git rev-parse HEAD)"
+```
 
 ## Output separation
 
