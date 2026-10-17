@@ -164,10 +164,24 @@ pub enum OwnershipCostError {
 /// Cost decomposition in the scenario's declared currency units.
 #[derive(Debug, Clone, Copy, PartialEq, Default)]
 pub struct AnnualCostBreakdown {
+    pub annual_capital_charge: f64,
+    pub annual_insurance: f64,
+    pub annual_storage_and_hangar: f64,
+    pub annual_calendar_inspection: f64,
+    pub annual_taxes_registration_and_fees: f64,
+    pub annual_other_fixed: f64,
     pub annual_fixed_costs: f64,
     pub preparation_costs_all_attempts: f64,
     pub failed_dispatch_costs: f64,
     pub completed_mission_costs: f64,
+    pub fuel_or_energy_costs: f64,
+    pub oil_and_consumables_costs: f64,
+    pub maintenance_labor_costs: f64,
+    pub maintenance_parts_costs: f64,
+    pub engine_overhaul_reserve_costs: f64,
+    pub propeller_reserve_costs: f64,
+    pub battery_replacement_reserve_costs: f64,
+    pub other_hourly_costs: f64,
     pub variable_flight_hour_costs: f64,
     pub annual_total_cost: f64,
 }
@@ -243,14 +257,45 @@ pub fn evaluate_ownership_scenario(
     let prep = attempts * scenario.per_mission_costs.preparation_per_attempt;
     let failed_cost = failed * scenario.per_mission_costs.failed_dispatch_per_attempt;
     let completed_cost = completed * scenario.per_mission_costs.completed_mission_per_success;
-    let hourly = flown_hours * scenario.hourly_costs.total();
+    let fixed_inputs = scenario.annual_fixed_costs;
+    let hourly_inputs = scenario.hourly_costs;
+    let fuel_or_energy_costs = flown_hours * hourly_inputs.fuel_or_energy;
+    let oil_and_consumables_costs = flown_hours * hourly_inputs.oil_and_consumables;
+    let maintenance_labor_costs = flown_hours * hourly_inputs.maintenance_labor;
+    let maintenance_parts_costs = flown_hours * hourly_inputs.maintenance_parts;
+    let engine_overhaul_reserve_costs = flown_hours * hourly_inputs.engine_overhaul_reserve;
+    let propeller_reserve_costs = flown_hours * hourly_inputs.propeller_reserve;
+    let battery_replacement_reserve_costs = flown_hours * hourly_inputs.battery_replacement_reserve;
+    let other_hourly_costs = flown_hours * hourly_inputs.other_hourly;
+    let hourly = fuel_or_energy_costs
+        + oil_and_consumables_costs
+        + maintenance_labor_costs
+        + maintenance_parts_costs
+        + engine_overhaul_reserve_costs
+        + propeller_reserve_costs
+        + battery_replacement_reserve_costs
+        + other_hourly_costs;
     let annual_total = fixed + prep + failed_cost + completed_cost + hourly;
 
     for (field, value) in [
+        ("annual_capital_charge", fixed_inputs.annual_capital_charge),
+        ("annual_insurance", fixed_inputs.annual_insurance),
+        ("annual_storage_and_hangar", fixed_inputs.annual_storage_and_hangar),
+        ("annual_calendar_inspection", fixed_inputs.annual_calendar_inspection),
+        ("annual_taxes_registration_and_fees", fixed_inputs.annual_taxes_registration_and_fees),
+        ("annual_other_fixed", fixed_inputs.annual_other_fixed),
         ("annual_fixed_costs", fixed),
         ("preparation_costs_all_attempts", prep),
         ("failed_dispatch_costs", failed_cost),
         ("completed_mission_costs", completed_cost),
+        ("fuel_or_energy_costs", fuel_or_energy_costs),
+        ("oil_and_consumables_costs", oil_and_consumables_costs),
+        ("maintenance_labor_costs", maintenance_labor_costs),
+        ("maintenance_parts_costs", maintenance_parts_costs),
+        ("engine_overhaul_reserve_costs", engine_overhaul_reserve_costs),
+        ("propeller_reserve_costs", propeller_reserve_costs),
+        ("battery_replacement_reserve_costs", battery_replacement_reserve_costs),
+        ("other_hourly_costs", other_hourly_costs),
         ("variable_flight_hour_costs", hourly),
         ("annual_total_cost", annual_total),
     ] {
@@ -285,10 +330,24 @@ pub fn evaluate_ownership_scenario(
         expected_flown_hours: flown_hours,
         completed_passenger_km,
         breakdown: AnnualCostBreakdown {
+            annual_capital_charge: fixed_inputs.annual_capital_charge,
+            annual_insurance: fixed_inputs.annual_insurance,
+            annual_storage_and_hangar: fixed_inputs.annual_storage_and_hangar,
+            annual_calendar_inspection: fixed_inputs.annual_calendar_inspection,
+            annual_taxes_registration_and_fees: fixed_inputs.annual_taxes_registration_and_fees,
+            annual_other_fixed: fixed_inputs.annual_other_fixed,
             annual_fixed_costs: fixed,
             preparation_costs_all_attempts: prep,
             failed_dispatch_costs: failed_cost,
             completed_mission_costs: completed_cost,
+            fuel_or_energy_costs,
+            oil_and_consumables_costs,
+            maintenance_labor_costs,
+            maintenance_parts_costs,
+            engine_overhaul_reserve_costs,
+            propeller_reserve_costs,
+            battery_replacement_reserve_costs,
+            other_hourly_costs,
             variable_flight_hour_costs: hourly,
             annual_total_cost: annual_total,
         },
@@ -377,12 +436,12 @@ pub fn compare_ownership_scenarios(
 
 fn validate_scenario(scenario: &AircraftOwnershipScenario) -> Result<(), OwnershipCostError> {
     if scenario.aircraft_id.trim().is_empty()
-        || scenario.aircraft_id.trim() != scenario.aircraft_id
+        || scenario.aircraft_id.trim() != scenario.aircraft_id.as_str()
     {
         return Err(OwnershipCostError::EmptyAircraftId);
     }
     if scenario.mission_family_id.trim().is_empty()
-        || scenario.mission_family_id.trim() != scenario.mission_family_id
+        || scenario.mission_family_id.trim() != scenario.mission_family_id.as_str()
     {
         return Err(OwnershipCostError::EmptyMissionFamilyId);
     }
