@@ -93,7 +93,20 @@
           "measurement_id": "vibration_check",
           "loss_units": 0.5
         }
-      ]
+      ],
+      "expected": {
+        "decision": "select_measurement",
+        "reason_code": "positive_net_decision_value",
+        "selected_measurement_id": "vibration_check",
+        "best_candidate_measurement_id": "vibration_check",
+        "prior_action_id": "replace_cartridge",
+        "prior_risk_units": 2.25,
+        "best_candidate_posterior_risk_units": 1.4999999999999998,
+        "best_candidate_evsi_units": 0.7500000000000002,
+        "best_candidate_cost_units": 0.5,
+        "best_candidate_net_value_units": 0.2500000000000002,
+        "entropy_baseline_measurement_id": "rpm_check"
+      }
     },
     {
       "case_id": "DVAL-002",
@@ -182,7 +195,20 @@
           "measurement_id": "vibration_check",
           "loss_units": 2
         }
-      ]
+      ],
+      "expected": {
+        "decision": "choose_action_without_test",
+        "reason_code": "all_tests_nonpositive_net_value",
+        "selected_measurement_id": null,
+        "best_candidate_measurement_id": "vibration_check",
+        "prior_action_id": "replace_cartridge",
+        "prior_risk_units": 2.25,
+        "best_candidate_posterior_risk_units": 1.4999999999999998,
+        "best_candidate_evsi_units": 0.7500000000000002,
+        "best_candidate_cost_units": 2,
+        "best_candidate_net_value_units": -1.2499999999999998,
+        "entropy_baseline_measurement_id": "rpm_check"
+      }
     },
     {
       "case_id": "DVAL-003",
@@ -227,7 +253,20 @@
           "measurement_id": "vibration_check",
           "loss_units": 0.5
         }
-      ]
+      ],
+      "expected": {
+        "decision": "abstain_and_review",
+        "reason_code": "protection_tripped",
+        "selected_measurement_id": null,
+        "best_candidate_measurement_id": null,
+        "prior_action_id": null,
+        "prior_risk_units": null,
+        "best_candidate_posterior_risk_units": null,
+        "best_candidate_evsi_units": null,
+        "best_candidate_cost_units": null,
+        "best_candidate_net_value_units": null,
+        "entropy_baseline_measurement_id": null
+      }
     },
     {
       "case_id": "DVAL-004",
@@ -272,7 +311,20 @@
           "measurement_id": "vibration_check",
           "loss_units": 0.5
         }
-      ]
+      ],
+      "expected": {
+        "decision": "abstain_and_review",
+        "reason_code": "observations_unreliable",
+        "selected_measurement_id": null,
+        "best_candidate_measurement_id": null,
+        "prior_action_id": null,
+        "prior_risk_units": null,
+        "best_candidate_posterior_risk_units": null,
+        "best_candidate_evsi_units": null,
+        "best_candidate_cost_units": null,
+        "best_candidate_net_value_units": null,
+        "entropy_baseline_measurement_id": null
+      }
     },
     {
       "case_id": "DVAL-005",
@@ -309,7 +361,20 @@
           "measurement_id": "rpm_check",
           "loss_units": 0.5
         }
-      ]
+      ],
+      "expected": {
+        "decision": "no_safe_candidate",
+        "reason_code": "no_safe_candidate",
+        "selected_measurement_id": null,
+        "best_candidate_measurement_id": null,
+        "prior_action_id": "replace_cartridge",
+        "prior_risk_units": 2.25,
+        "best_candidate_posterior_risk_units": null,
+        "best_candidate_evsi_units": null,
+        "best_candidate_cost_units": null,
+        "best_candidate_net_value_units": null,
+        "entropy_baseline_measurement_id": null
+      }
     },
     {
       "case_id": "DVAL-006",
@@ -356,7 +421,20 @@
           "measurement_id": "b_airflow_check",
           "loss_units": 0.5
         }
-      ]
+      ],
+      "expected": {
+        "decision": "select_measurement",
+        "reason_code": "positive_net_decision_value",
+        "selected_measurement_id": "a_rpm_check",
+        "best_candidate_measurement_id": "a_rpm_check",
+        "prior_action_id": "repair_a",
+        "prior_risk_units": 5,
+        "best_candidate_posterior_risk_units": 0,
+        "best_candidate_evsi_units": 5,
+        "best_candidate_cost_units": 0.5,
+        "best_candidate_net_value_units": 4.5,
+        "entropy_baseline_measurement_id": "a_rpm_check"
+      }
     },
     {
       "case_id": "DVAL-007",
@@ -419,7 +497,20 @@
           "measurement_id": "vibration_check",
           "loss_units": 0.5
         }
-      ]
+      ],
+      "expected": {
+        "decision": "reject_invalid_model",
+        "reason_code": "invalid_action_loss_matrix",
+        "selected_measurement_id": null,
+        "best_candidate_measurement_id": null,
+        "prior_action_id": null,
+        "prior_risk_units": null,
+        "best_candidate_posterior_risk_units": null,
+        "best_candidate_evsi_units": null,
+        "best_candidate_cost_units": null,
+        "best_candidate_net_value_units": null,
+        "entropy_baseline_measurement_id": null
+      }
     },
     {
       "case_id": "DVAL-008",
@@ -486,7 +577,20 @@
           "measurement_id": "vibration_check",
           "loss_units": 0.5
         }
-      ]
+      ],
+      "expected": {
+        "decision": "no_safe_action",
+        "reason_code": "no_safe_action",
+        "selected_measurement_id": null,
+        "best_candidate_measurement_id": null,
+        "prior_action_id": null,
+        "prior_risk_units": null,
+        "best_candidate_posterior_risk_units": null,
+        "best_candidate_evsi_units": null,
+        "best_candidate_cost_units": null,
+        "best_candidate_net_value_units": null,
+        "entropy_baseline_measurement_id": "rpm_check"
+      }
     }
   ]
 }
