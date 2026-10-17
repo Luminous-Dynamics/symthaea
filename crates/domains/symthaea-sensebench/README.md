@@ -13,6 +13,8 @@ SenseBench is a deterministic, hardware-free starter harness for the Symthaea Se
       cargo run -p symthaea-sensebench -- --suite causal --trials 512 --budget 8 --seed 42
     SENSEBENCH_CODE_REVISION="$(git rev-parse HEAD)" \
       cargo run -p symthaea-sensebench -- --suite robustness
+    SENSEBENCH_CODE_REVISION="$(git rev-parse HEAD)" \
+      cargo run -p symthaea-sensebench -- --suite blind-worlds --trials 512 --budget 8 --seed 42
 
 The CLI requires `SENSEBENCH_CODE_REVISION` and emits a JSON report carrying the suite, generator version, exact revision string, full scenario manifest or causal-run configuration, seed, sample count/trials, and model-specific metrics. Run from a clean worktree so the Git commit identifies the exact code. `--allow-unversioned` permits exploratory output with a missing revision and must not be used for benchmark claims. Identical generator version, scenario, seed, sample count and interval produce identical observations. The report includes point metrics, average precision, event recall, missing sample count, contiguous false-alarm episodes per sensor-hour, and detection delay. Point-level false-positive sample counts remain available separately.
 
@@ -38,6 +40,17 @@ Run:
 This deterministic fixture compares nominal single-model expected gain, nominal predictive variance, model-weighted expected gain, worst-case robust ranking, one fixed comparator, and the exact expected score of uniform random selection. Selector policies receive only two declared likelihood-model scenarios; a separate evaluator scores their choices against two corresponding toy worlds and one held-out likelihood world. Reports include the oracle candidate, expected information gain under evaluator-only hidden-world likelihoods per cost, regret, mean/worst-case regret, and maximum-regret reduction relative to the nominal selector.
 
 The fixture intentionally includes a strong fixed-design control. In this small constructed example, the fixed comparator matches the robust policy's worst-case regret; this is not evidence that active selection beats a good fixed design. The held-out world is separated in code, not in a cryptographic sandbox. All probabilities are hand-authored, synthetic mathematical inputs, not empirically calibrated instrument likelihoods. This suite tests that the evaluator can expose model brittleness and compare decision regret; it does not establish generalization to real experiments.
+
+## Outcome-generating blind-world benchmark
+
+Run:
+
+    SENSEBENCH_CODE_REVISION="$(git rev-parse HEAD)" \
+      cargo run -p symthaea-sensebench -- --suite blind-worlds --trials 512 --budget 8 --seed 42
+
+This simulation compares nominal expected information gain, predictive variance, model-weighted gain, worst-case robust ranking, a fixed design selected from development regimes, uniform random selection, and passive-only observation. Outcomes are sampled from evaluator-only likelihood tables across two development regimes and four held-out regimes covering intervention artifacts, sensor degradation, effect reversal, and a null negative control. All policies share the same nominal Bayesian update rule and synthetic resource budget.
+
+Reports include Brier score, log loss, top-hypothesis accuracy, calibration error, cost to a confidence threshold, predicted information gain versus realized entropy reduction, and the rate of high-confidence causal claims on no-direct-cause trials. Negative realized entropy reduction is preserved. This is an outcome-generating synthetic benchmark; test-world definitions are source-visible, so held-out regimes are not cryptographically sealed and results are not evidence of physical causal discovery. See [the full protocol](../../../docs/research/SENSEBENCH_BLIND_WORLD_PROTOCOL.md).
 
 ## Domain-specific hypothesis fixture
 
