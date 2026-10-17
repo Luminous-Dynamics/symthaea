@@ -10,10 +10,10 @@
 
 use serde::{Deserialize, Serialize};
 use sha2::{Digest, Sha256};
+use serde_json::Value;
 use std::collections::{BTreeMap, BTreeSet};
 use std::fs;
 use std::path::Path;
-use serde_json::Value;
 
 const BOOTSTRAP_REPLICATES: usize = 2_000;
 const MIN_GROUPS_FOR_INTERVAL: usize = 10;
@@ -228,7 +228,7 @@ struct ScoreReport {
     observed_policy_cost: f64,
     policy_cost_unit: String,
     observed_audit_reference_cost: f64,
-    horvitz_thompson_estimated_population_audit_reference_cost: f64,
+    horvitz_thompson_if_all_eligible_windows_reference_cost: f64,
     audit_cost_unit: String,
     reference_outcome_coverage: MetricEstimate,
     policy_reference_query_fraction: MetricEstimate,
@@ -404,6 +404,7 @@ pub fn score_run(run_dir: &Path) -> Result<String, String> {
     let mut observed_policy_cost = 0.0;
     let mut policy_reference_query_count = 0usize;
     let mut policy_intervention_count = 0usize;
+    let mut sequences_by_trajectory = BTreeMap::<String, Vec<u64>>::new();
     for decision in &decisions {
         if decision.schema_version != "nano-rescue-decision-v1"
             || decision.run_id != manifest.run_id
@@ -420,6 +421,19 @@ pub fn score_run(run_dir: &Path) -> Result<String, String> {
         }
         if decision.max_observed_step > decision.decision_step {
             return Err(format!("decision {} observes a future step", decision.window_id));
+        }
+        if !matches!(
+            decision.trigger_reason.as_str(),
+            "nominal" | "uncertainty" | "shift_alarm" | "budget_guard" | "reference_result" | "integrity_guard" | "operator_override"
+        ) {
+            return Err(format!("decision {} has an unsupported trigger reason", decision.window_id));
+        }
+        if !decision.risk_score.is_null()
+            && decision.risk_score.as_f64().map_or(true, |value| {
+                !value.is_finite() || !(0.0..=1.0).contains(&value)
+            })
+        {
+            return Err(format!("decision {} has an invalid risk score", decision.window_id));
         }
         if decision.future_data_read || decision.heldout_label_read {
             return Err(format!("decision {} declares evaluation leakage", decision.window_id));
@@ -460,8 +474,25 @@ pub fn score_run(run_dir: &Path) -> Result<String, String> {
             policy_intervention_count += 1;
         }
         observed_policy_cost += decision.policy_cost;
+        if !observed_policy_cost.is_finite() {
+            return Err("policy cost sum overflowed or became non-finite".to_owned());
+        }
+        sequences_by_trajectory
+            .entry(decision.trajectory_id.clone())
+            .or_default()
+            .push(decision.sequence);
         if decision_by_id.insert(decision.window_id.as_str(), decision).is_some() {
             return Err(format!("duplicate window in policy decision ledger: {}", decision.window_id));
+        }
+    }
+    for (trajectory, sequences) in &mut sequences_by_trajectory {
+        sequences.sort_unstable();
+        for (index, sequence) in sequences.iter().enumerate() {
+            if *sequence != index as u64 + 1 {
+                return Err(format!(
+                    "decision sequence for trajectory {trajectory} is not contiguous from 1"
+                ));
+            }
         }
     }
 
@@ -570,6 +601,9 @@ pub fn score_run(run_dir: &Path) -> Result<String, String> {
         }
         trajectories.insert(row.trajectory_id.clone());
         observed_cost += row.audit_reference_cost;
+        if !observed_cost.is_finite() {
+            return Err("observed audit-reference cost sum overflowed or became non-finite".to_owned());
+        }
         let row_stats = SufficientStats::from_row(row, intervention);
         total.add(row_stats);
         groups.entry(row.parent_group_id.clone()).or_default().add(row_stats);
@@ -614,7 +648,7 @@ pub fn score_run(run_dir: &Path) -> Result<String, String> {
         observed_policy_cost,
         policy_cost_unit: policy_cost_unit.unwrap_or_else(|| "unknown".to_owned()),
         observed_audit_reference_cost: observed_cost,
-        horvitz_thompson_estimated_population_audit_reference_cost: total.weighted_reference_cost,
+        horvitz_thompson_if_all_eligible_windows_reference_cost: total.weighted_reference_cost,
         audit_cost_unit: cost_unit.unwrap_or_else(|| "unknown".to_owned()),
         reference_outcome_coverage: estimate(
             Metric::ReferenceOutcomeCoverage,
