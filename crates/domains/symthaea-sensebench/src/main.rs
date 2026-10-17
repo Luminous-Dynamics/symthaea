@@ -193,7 +193,7 @@ fn run() -> Result<(), String> {
             trials, budget, seed, 0.95,
         ).map_err(|error| error.to_string())?;
         let report = ScmGraphRunReport {
-            report_version: 3,
+            report_version: 4,
             suite: "scm_graph_recovery",
             code_revision: revision,
             benchmark,
