@@ -1,0 +1,49 @@
+{
+  "schema_version": "0.1",
+  "status": "incomplete",
+  "claim_ceiling": "software_only",
+  "source": {
+    "repository": "Luminous-Dynamics/symthaea",
+    "commit_sha": "1fd1cfe8311253dbd98fbe1cf881167245c6c56e"
+  },
+  "workload": {
+    "workload_id": "synthetic-hdc-retrieval-v0.1-planned",
+    "vector_dimension_bits": 16384,
+    "store_vector_count": 64,
+    "query_batch_size": 1,
+    "operations": [
+      "encode",
+      "hamming_distance",
+      "retrieve"
+    ],
+    "tie_break_policy": "stable item identifier ascending"
+  },
+  "profile": {
+    "profile_id": "planned-cpu-baseline",
+    "backend": "cpu_scalar",
+    "host_stages": [
+      "query encoding",
+      "vector-store scan",
+      "distance reduction",
+      "deterministic result selection"
+    ],
+    "device_stages": [],
+    "hardware_identity": "not captured; populate on execution",
+    "memory_profile": "not captured; populate on execution"
+  },
+  "execution": {
+    "measurement_boundary": "full query path from frozen query input through final ranked result",
+    "boundary_complete": false,
+    "warmup_batches": 0,
+    "measured_batches": 0,
+    "commands": []
+  },
+  "correctness": {
+    "oracle_comparison": "not_run"
+  },
+  "metrics": [],
+  "artifacts": [],
+  "limitations": [
+    "Planning example only; no input manifest, oracle run, performance measurement, energy measurement, simulator run, synthesis run, or hardware observation is represented."
+  ]
+}
