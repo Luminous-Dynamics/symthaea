@@ -176,6 +176,7 @@ struct AnchorFingerprint {
     deck_id: String,
     x_mm: i64,
     y_mm: i64,
+    z_mm: i64,
     evidence_class: AnchorEvidenceClass,
     evidence_refs: Vec<String>,
 }
@@ -260,6 +261,7 @@ fn anchor_fingerprint(anchor: &RoutingAnchor) -> AnchorFingerprint {
         deck_id: anchor.deck_id.clone(),
         x_mm: anchor.position_mm.x_mm,
         y_mm: anchor.position_mm.y_mm,
+        z_mm: anchor.position_mm.z_mm,
         evidence_class: anchor.evidence_class,
         evidence_refs: refs,
     }
@@ -351,6 +353,12 @@ fn normalize_requests(
         }
         if connection.medium.trim().is_empty() {
             return Err(RoutingError::new("CONNECTION_MEDIUM_MISSING", "connection medium is empty"));
+        }
+        if request.start.position_mm.z_mm != request.end.position_mm.z_mm {
+            return Err(RoutingError::new(
+                "CROSS_ELEVATION_ROUTE_UNSUPPORTED",
+                "a 2D route requires start and end anchors to declare the same Z plane",
+            ));
         }
         for anchor in [&request.start, &request.end] {
             if anchor.evidence_refs.is_empty() {
@@ -1147,6 +1155,13 @@ mod tests {
         assert_eq!(result.disposition, RouteDisposition::Routed);
         assert!(result.path_length_mm.expect("route length") > 1_900);
         assert!(result.bend_count.unwrap_or(0) >= 2);
+        for pair in result.path.windows(2) {
+            let dx = pair[0].x_mm.abs_diff(pair[1].x_mm);
+            let dy = pair[0].y_mm.abs_diff(pair[1].y_mm);
+            assert_eq!(dx + dy, 100, "every route step is one orthogonal grid edge");
+        }
+        assert_eq!(result.path_length_mm,
+            Some((result.path.len().saturating_sub(1) as u64) * 100));
         assert!(verify_service_routing_report(&baseline, &[route.clone()], &limits(), &report));
         let mut permuted_request = route.clone();
         permuted_request.route_id = "AC-TRUNK-02".to_owned();
@@ -1201,6 +1216,31 @@ mod tests {
         second.route_id = "AC-TRUNK-02".to_owned();
         assert_eq!(route_services(&baseline, &[first, second], limits()).unwrap_err().code,
             "DUPLICATE_CONNECTION_ROUTE");
+    }
+
+    #[test]
+    fn open_grid_matches_exhaustive_manhattan_cost_oracle() {
+        let grid = Grid {
+            x_min_mm: 0,
+            y_min_mm: 0,
+            pitch_mm: 100,
+            width: 5,
+            height: 5,
+            blocked: vec![false; 25],
+        };
+        let request = request_for(
+            "GRID-ROUTE-001",
+            "CONN-CABIN-01-AC_IN",
+            module_anchor("CABIN-01", "AC_IN", 2800, 1800),
+            service_anchor("AC-BUS", 4700, 1800),
+        );
+        // Any shortest 4-connected path from (0,0) to (4,4) has 8 edges and
+        // exactly one bend at minimum; the optimal cost is 800 + 100.
+        let outcome = search_grid(&grid, 0, 24, &request, 1_000, 0, 0, &[]);
+        assert_eq!(outcome.disposition, RouteDisposition::Routed);
+        assert_eq!(outcome.length_mm, Some(800));
+        assert_eq!(outcome.bend_count, Some(1));
+        assert_eq!(outcome.search_cost_mm, Some(900));
     }
 
     #[test]
