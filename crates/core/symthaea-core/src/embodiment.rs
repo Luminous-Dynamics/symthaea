@@ -757,7 +757,10 @@ impl ExternalActionTimingV1 {
                             return Err(ExternalActionTimingErrorV1::ObservationRequestOutcomeMismatch);
                         }
                     }
-                    (true, _) => {
+                    (true, Some(_)) => {
+                        return Err(ExternalActionTimingErrorV1::ObservationReceiveOutsideRequest);
+                    }
+                    (true, None) => {
                         return Err(ExternalActionTimingErrorV1::ObservationRequestOutcomeMismatch);
                     }
                     (false, Some(_)) => {
@@ -1727,7 +1730,7 @@ mod external_action_timing_v1_tests {
         timing.observation_received_monotonic_ns = Some(21);
         assert_eq!(
             timing.validate(),
-            Err(ExternalActionTimingErrorV1::ObservationRequestOutcomeMismatch)
+            Err(ExternalActionTimingErrorV1::ObservationReceiveOutsideRequest)
         );
     }
 
