@@ -3570,6 +3570,44 @@ mod tests {
     }
 
     #[test]
+    fn selected_sample_exposes_relative_source_and_root_pitch() {
+        let root = std::env::temp_dir().join(format!(
+            "muse-selected-sample-evidence-{}",
+            std::process::id()
+        ));
+        let _ = std::fs::remove_dir_all(&root);
+        let bank_dir = root.join("fixture/instrument");
+        std::fs::create_dir_all(&bank_dir).unwrap();
+        let sample_path = bank_dir.join("Harp_C4_vl2.wav");
+        let spec = hound::WavSpec {
+            channels: 1,
+            sample_rate: 22_050,
+            bits_per_sample: 16,
+            sample_format: hound::SampleFormat::Int,
+        };
+        let mut writer = hound::WavWriter::create(&sample_path, spec).unwrap();
+        for index in 0..256 {
+            writer.write_sample(if index % 2 == 0 { 10_000i16 } else { -10_000i16 }).unwrap();
+        }
+        writer.finalize().unwrap();
+
+        let bank = InstrumentBank::index(&bank_dir, "vcsl", "fixture/instrument")
+            .expect("fixture bank should index");
+        let sample = bank
+            .pick(60.0, 1.0, 42)
+            .expect("C4 layer should be selected and decoded");
+        assert_eq!(sample.source_library, "vcsl");
+        assert_eq!(
+            sample.source_relative_path,
+            "fixture/instrument/Harp_C4_vl2.wav"
+        );
+        assert_eq!(sample.midi, 60);
+        assert_eq!(sample.sample_rate, 22_050);
+        assert_eq!(sample.source_dynamic, 1.0);
+        std::fs::remove_dir_all(root).unwrap();
+    }
+
+    #[test]
     fn indexed_sample_content_hash_detects_same_size_audio_changes() {
         let root = std::env::temp_dir().join(format!(
             "muse-instrument-inventory-content-hash-{}",
