@@ -28,7 +28,9 @@ fn fixture_model() -> FiniteHypothesisModel {
         .expect("fixture model must deserialize into the shared kernel model")
 }
 
-fn ranked(decision: ApplianceAcquisitionDecision) -> symthaea_manufacturing_active_learning_bench::AcquisitionRanking {
+fn ranked(
+    decision: ApplianceAcquisitionDecision,
+) -> symthaea_manufacturing_active_learning_bench::AcquisitionRanking {
     match decision {
         ApplianceAcquisitionDecision::Ranked { ranking } => ranking,
         other => panic!("expected ranking, got {other:?}"),
