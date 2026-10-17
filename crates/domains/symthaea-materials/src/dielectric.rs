@@ -31,12 +31,34 @@ pub enum DielectricEvidenceKind {
     Estimated,
 }
 
+/// Uncertainty attached to one individual property rather than to the material record as a whole.
+#[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
+pub struct PropertyUncertainty {
+    /// Relative uncertainty as a fraction (e.g. 0.05 means 5%).
+    pub relative_uncertainty: f64,
+    /// Method/definition reference explaining how the uncertainty was calculated.
+    pub method_reference: String,
+}
+
+impl PropertyUncertainty {
+    /// Ensure uncertainty magnitude and its interpretation reference are present.
+    pub fn validate(&self) -> Result<(), DielectricValidationError> {
+        if !self.relative_uncertainty.is_finite() || self.relative_uncertainty < 0.0 {
+            return Err(DielectricValidationError::InvalidRelativeUncertainty);
+        }
+        if self.method_reference.trim().is_empty() {
+            return Err(DielectricValidationError::MissingUncertaintyMethodReference);
+        }
+        Ok(())
+    }
+}
+
 /// Dielectric properties measured or calculated at one explicitly recorded point.
 ///
-/// The permittivity and loss tangent apply to `test_temperature_k` and
-/// `test_frequency_hz`. This type does not interpolate or extrapolate them.
-/// Breakdown strength may come from a separate protocol; its reference must
-/// identify that protocol and its conditions.
+/// The permittivity and loss tangent share the record's characterization
+/// temperature, frequency, and field conditions. Breakdown strength may come
+/// from a separate protocol; its own source, evidence class, and uncertainty are
+/// therefore stored separately. This type never interpolates or extrapolates.
 #[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
 pub struct DielectricPropertyRecord {
     /// Stable identifier for the material/composition and, where relevant, processing state.
@@ -53,16 +75,22 @@ pub struct DielectricPropertyRecord {
     pub test_field_v_per_m: Option<f64>,
     /// Optional reported breakdown field in V/m; not a guaranteed design limit.
     pub breakdown_strength_v_per_m: Option<f64>,
-    /// Source/protocol reference for the breakdown value, including its conditions.
+    /// Source/protocol reference for the breakdown value, including specimen/test conditions.
     pub breakdown_reference: Option<String>,
-    /// Evidence class for the recorded properties.
+    /// Evidence class for the reported breakdown value, when present.
+    pub breakdown_evidence_kind: Option<DielectricEvidenceKind>,
+    /// Evidence class for relative permittivity and loss tangent.
     pub evidence_kind: DielectricEvidenceKind,
-    /// DOI, URL, datasheet ID, dataset row, or another stable provenance reference.
+    /// DOI, URL, datasheet ID, dataset row, or another stable provenance reference for permittivity/loss.
     pub source_reference: String,
     /// Optional source dataset/release/version identifier.
     pub dataset_version: Option<String>,
-    /// Optional relative uncertainty as a fraction (e.g. 0.05 means 5%).
-    pub relative_uncertainty: Option<f64>,
+    /// Optional relative-permittivity uncertainty with its calculation method.
+    pub permittivity_uncertainty: Option<PropertyUncertainty>,
+    /// Optional loss-tangent uncertainty with its calculation method.
+    pub loss_tangent_uncertainty: Option<PropertyUncertainty>,
+    /// Optional breakdown-strength uncertainty with its calculation method.
+    pub breakdown_strength_uncertainty: Option<PropertyUncertainty>,
 }
 
 impl DielectricPropertyRecord {
@@ -103,11 +131,25 @@ impl DielectricPropertyRecord {
         {
             return Err(DielectricValidationError::MissingBreakdownReference);
         }
-        if self
-            .relative_uncertainty
-            .is_some_and(|value| !value.is_finite() || value < 0.0)
+        if self.breakdown_strength_v_per_m.is_some() && self.breakdown_evidence_kind.is_none() {
+            return Err(DielectricValidationError::MissingBreakdownEvidenceKind);
+        }
+        if self.breakdown_strength_v_per_m.is_none()
+            && (self.breakdown_reference.is_some()
+                || self.breakdown_evidence_kind.is_some()
+                || self.breakdown_strength_uncertainty.is_some())
         {
-            return Err(DielectricValidationError::InvalidRelativeUncertainty);
+            return Err(DielectricValidationError::OrphanedBreakdownMetadata);
+        }
+        for uncertainty in [
+            self.permittivity_uncertainty.as_ref(),
+            self.loss_tangent_uncertainty.as_ref(),
+            self.breakdown_strength_uncertainty.as_ref(),
+        ]
+        .into_iter()
+        .flatten()
+        {
+            uncertainty.validate()?;
         }
         if self.source_reference.trim().is_empty() {
             return Err(DielectricValidationError::MissingSourceReference);
@@ -301,8 +343,14 @@ pub enum DielectricValidationError {
     InvalidBreakdownStrength,
     /// A breakdown field requires a source/protocol reference.
     MissingBreakdownReference,
-    /// Optional relative uncertainty must be finite and non-negative.
+    /// Optional property-level relative uncertainty must be finite and non-negative.
     InvalidRelativeUncertainty,
+    /// Property-level uncertainty must cite its definition/calculation method.
+    MissingUncertaintyMethodReference,
+    /// A reported breakdown value must carry an evidence class.
+    MissingBreakdownEvidenceKind,
+    /// Breakdown reference/evidence/uncertainty cannot exist without a breakdown value.
+    OrphanedBreakdownMetadata,
     /// Every property record requires a non-empty provenance reference.
     MissingSourceReference,
     /// Electrode overlap area must be finite and strictly positive.
@@ -333,6 +381,9 @@ impl fmt::Display for DielectricValidationError {
             Self::InvalidBreakdownStrength => "breakdown strength must be finite and positive",
             Self::MissingBreakdownReference => "breakdown strength requires a protocol/source reference",
             Self::InvalidRelativeUncertainty => "relative uncertainty must be finite and non-negative",
+            Self::MissingUncertaintyMethodReference => "property uncertainty requires a method reference",
+            Self::MissingBreakdownEvidenceKind => "breakdown strength requires an evidence class",
+            Self::OrphanedBreakdownMetadata => "breakdown metadata requires a reported breakdown strength",
             Self::MissingSourceReference => "source_reference must not be empty",
             Self::InvalidElectrodeArea => "electrode overlap area must be finite and positive",
             Self::InvalidDielectricThickness => "dielectric thickness must be finite and positive",
@@ -362,10 +413,22 @@ mod tests {
             test_field_v_per_m: Some(1.0e6),
             breakdown_strength_v_per_m: Some(1.0e8),
             breakdown_reference: Some("synthetic test fixture only".to_string()),
+            breakdown_evidence_kind: Some(DielectricEvidenceKind::Estimated),
             evidence_kind: DielectricEvidenceKind::Estimated,
             source_reference: "test-fixture://not-real-data".to_string(),
             dataset_version: Some("unit-test-v1".to_string()),
-            relative_uncertainty: Some(0.05),
+            permittivity_uncertainty: Some(PropertyUncertainty {
+                relative_uncertainty: 0.05,
+                method_reference: "synthetic uncertainty fixture".to_string(),
+            }),
+            loss_tangent_uncertainty: Some(PropertyUncertainty {
+                relative_uncertainty: 0.05,
+                method_reference: "synthetic uncertainty fixture".to_string(),
+            }),
+            breakdown_strength_uncertainty: Some(PropertyUncertainty {
+                relative_uncertainty: 0.05,
+                method_reference: "synthetic uncertainty fixture".to_string(),
+            }),
         }
     }
 
@@ -472,6 +535,20 @@ mod tests {
         assert_eq!(
             material.validate(),
             Err(DielectricValidationError::MissingSourceReference)
+        );
+
+        let mut material = synthetic_record();
+        material.breakdown_evidence_kind = None;
+        assert_eq!(
+            material.validate(),
+            Err(DielectricValidationError::MissingBreakdownEvidenceKind)
+        );
+
+        let mut material = synthetic_record();
+        material.permittivity_uncertainty.as_mut().unwrap().method_reference.clear();
+        assert_eq!(
+            material.validate(),
+            Err(DielectricValidationError::MissingUncertaintyMethodReference)
         );
     }
 
