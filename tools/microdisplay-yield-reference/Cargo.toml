@@ -1,0 +1,19 @@
+[package]
+name = "microdisplay-yield-reference"
+version = "0.1.0"
+edition = "2024"
+rust-version = "1.96"
+license = "AGPL-3.0-or-later"
+description = "Dependency-free analytical reference arithmetic for microdisplay yield/repair benchmark fixtures"
+repository = "https://github.com/Luminous-Dynamics/symthaea"
+publish = false
+
+[lib]
+path = "src/lib.rs"
+
+[dev-dependencies]
+serde_json = "=1.0.154"
+jsonschema = { version = "=0.59.0", default-features = false }
+
+[workspace]
+resolver = "3"

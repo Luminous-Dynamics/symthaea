@@ -1,0 +1,261 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://luminousdynamics.io/schemas/visual-display-workload-corpus-0.1.0.json",
+  "title": "VIS-DISP-CORPUS-001",
+  "type": "object",
+  "additionalProperties": false,
+  "required": [
+    "title",
+    "corpus_id",
+    "schema_version",
+    "status",
+    "created_date",
+    "owner_issue",
+    "case_count",
+    "minimum_case_count",
+    "reference_sources",
+    "evidence_lanes",
+    "cases"
+  ],
+  "properties": {
+    "title": {
+      "type": "string",
+      "minLength": 1
+    },
+    "corpus_id": {
+      "const": "VIS-DISP-CORPUS-001"
+    },
+    "schema_version": {
+      "const": "0.1.0"
+    },
+    "status": {
+      "const": "UNQUALIFIED"
+    },
+    "created_date": {
+      "type": "string",
+      "format": "date"
+    },
+    "owner_issue": {
+      "type": "string",
+      "format": "uri"
+    },
+    "case_count": {
+      "const": 32,
+      "description": "Frozen corpus size for v0.1. Increment schema_version when changing it."
+    },
+    "minimum_case_count": {
+      "const": 24
+    },
+    "reference_sources": {
+      "type": "array",
+      "minItems": 4,
+      "items": {
+        "type": "object",
+        "additionalProperties": false,
+        "required": [
+          "id",
+          "url",
+          "title",
+          "use"
+        ],
+        "properties": {
+          "id": {
+            "type": "string",
+            "pattern": "^[a-z0-9-]+$"
+          },
+          "url": {
+            "type": "string",
+            "format": "uri"
+          },
+          "title": {
+            "type": "string",
+            "minLength": 1
+          },
+          "use": {
+            "type": "string",
+            "minLength": 1
+          }
+        }
+      }
+    },
+    "evidence_lanes": {
+      "type": "object",
+      "additionalProperties": {
+        "type": "string",
+        "minLength": 1
+      }
+    },
+    "cases": {
+      "type": "array",
+      "minItems": 32,
+      "items": {
+        "type": "object",
+        "additionalProperties": false,
+        "required": [
+          "id",
+          "title",
+          "lane",
+          "minimum_evidence_class",
+          "reference_ids",
+          "stimulus",
+          "expected_behavior",
+          "metrics",
+          "failure_modes",
+          "claim_limit",
+          "status"
+        ],
+        "properties": {
+          "id": {
+            "type": "string",
+            "pattern": "^VIS-DISP-[A-Z0-9-]+$"
+          },
+          "title": {
+            "type": "string",
+            "minLength": 1
+          },
+          "lane": {
+            "enum": [
+              "software_math",
+              "software_synthetic",
+              "physical_measurement",
+              "human_task_study"
+            ]
+          },
+          "minimum_evidence_class": {
+            "enum": [
+              "ANALYTIC_REFERENCE",
+              "SYNTHETIC_MODEL",
+              "BENCH_MEASURED",
+              "HUMAN_STUDY"
+            ]
+          },
+          "reference_ids": {
+            "type": "array",
+            "minItems": 1,
+            "uniqueItems": true,
+            "items": {
+              "enum": [
+                "srgb",
+                "bt2100",
+                "displayhdr",
+                "clearmr"
+              ]
+            }
+          },
+          "stimulus": {
+            "type": "object",
+            "minProperties": 1
+          },
+          "expected_behavior": {
+            "type": "string",
+            "minLength": 1
+          },
+          "metrics": {
+            "type": "array",
+            "minItems": 1,
+            "uniqueItems": true,
+            "items": {
+              "type": "string",
+              "minLength": 1
+            }
+          },
+          "failure_modes": {
+            "type": "array",
+            "minItems": 1,
+            "uniqueItems": true,
+            "items": {
+              "type": "string",
+              "minLength": 1
+            }
+          },
+          "claim_limit": {
+            "type": "string",
+            "minLength": 1
+          },
+          "status": {
+            "const": "UNQUALIFIED"
+          }
+        },
+        "allOf": [
+          {
+            "if": {
+              "properties": {
+                "lane": {
+                  "const": "software_math"
+                }
+              },
+              "required": [
+                "lane"
+              ]
+            },
+            "then": {
+              "properties": {
+                "minimum_evidence_class": {
+                  "const": "ANALYTIC_REFERENCE"
+                }
+              }
+            }
+          },
+          {
+            "if": {
+              "properties": {
+                "lane": {
+                  "const": "software_synthetic"
+                }
+              },
+              "required": [
+                "lane"
+              ]
+            },
+            "then": {
+              "properties": {
+                "minimum_evidence_class": {
+                  "const": "SYNTHETIC_MODEL"
+                }
+              }
+            }
+          },
+          {
+            "if": {
+              "properties": {
+                "lane": {
+                  "const": "physical_measurement"
+                }
+              },
+              "required": [
+                "lane"
+              ]
+            },
+            "then": {
+              "properties": {
+                "minimum_evidence_class": {
+                  "const": "BENCH_MEASURED"
+                }
+              }
+            }
+          },
+          {
+            "if": {
+              "properties": {
+                "lane": {
+                  "const": "human_task_study"
+                }
+              },
+              "required": [
+                "lane"
+              ]
+            },
+            "then": {
+              "properties": {
+                "minimum_evidence_class": {
+                  "const": "HUMAN_STUDY"
+                }
+              }
+            }
+          }
+        ]
+      },
+      "maxItems": 32
+    }
+  }
+}
