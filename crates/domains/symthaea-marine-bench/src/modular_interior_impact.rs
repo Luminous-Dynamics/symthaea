@@ -177,6 +177,18 @@ fn apply_section_impacts(
                 map_domain(impact, domain, &reason);
             }
         }
+        "configuration_identity" => {
+            map_domain(impact, "configuration_baseline", &reason);
+        }
+        "configuration_metadata" => {
+            for domain in [
+                "configuration_metadata_review",
+                "mission_intent_review",
+                "evidence_applicability",
+            ] {
+                map_domain(impact, domain, &reason);
+            }
+        }
         "provenance" => {
             map_domain(impact, "evidence_provenance_review", &reason);
             map_domain(impact, "evidence_applicability", &reason);
@@ -296,6 +308,41 @@ pub fn analyze_configuration_change(
     let after_digest = digest(after)?;
     let mut changes = Vec::new();
     let mut impacts: BTreeMap<String, BTreeSet<String>> = BTreeMap::new();
+
+    if before.configuration_id != after.configuration_id {
+        changes.push(ArtifactChange {
+            section: "configuration_identity".to_owned(),
+            artifact_id: "configuration_id".to_owned(),
+            kind: ChangeKind::Modified,
+            before_sha256: Some(digest(&before.configuration_id)?),
+            after_sha256: Some(digest(&after.configuration_id)?),
+            identity_ambiguous: false,
+        });
+        apply_section_impacts("configuration_identity", "configuration_id", &mut impacts);
+    }
+    let before_metadata = (
+        &before.schema_version,
+        &before.configuration_name,
+        &before.customization_intent,
+        &before.claim_ceiling,
+    );
+    let after_metadata = (
+        &after.schema_version,
+        &after.configuration_name,
+        &after.customization_intent,
+        &after.claim_ceiling,
+    );
+    if digest(&before_metadata)? != digest(&after_metadata)? {
+        changes.push(ArtifactChange {
+            section: "configuration_metadata".to_owned(),
+            artifact_id: "configuration_metadata".to_owned(),
+            kind: ChangeKind::Modified,
+            before_sha256: Some(digest(&before_metadata)?),
+            after_sha256: Some(digest(&after_metadata)?),
+            identity_ambiguous: false,
+        });
+        apply_section_impacts("configuration_metadata", "configuration_metadata", &mut impacts);
+    }
 
     if digest(&before.platform)? != digest(&after.platform)? {
         changes.push(ArtifactChange {
@@ -523,4 +570,18 @@ mod tests {
         assert_eq!(report.body.disposition, "no_declared_change");
         assert!(report.body.changes.is_empty());
     }
+
+    #[test]
+    fn changing_configuration_identity_or_mission_metadata_is_reported() {
+        let before = live();
+        let mut after = before.clone();
+        after.configuration_id = "LD-LIVEABOARD-REV2".to_owned();
+        after.customization_intent.push_str(" Add wheelchair access.");
+        let report = analyze_configuration_change(&before, &after).expect("diff serializes");
+        assert!(report.body.changes.iter().any(|c| c.section == "configuration_identity"));
+        assert!(report.body.changes.iter().any(|c| c.section == "configuration_metadata"));
+        assert!(domains(&report).contains(&"configuration_baseline"));
+        assert!(domains(&report).contains(&"mission_intent_review"));
+    }
+
 }
