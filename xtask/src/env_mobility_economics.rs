@@ -281,10 +281,36 @@ fn derive_decision(
         return ("no_qualified_alternative".into(), "neither alternative meets the declared quality/qualification profile".into(), make_annual, buy_annual);
     }
     if make.qualification_status != "qualified_for_profile" {
-        return ("prefer_buy_qualified_even_if_make_cheaper".into(), "in-house process is not qualified for the comparable output profile".into(), make_annual, buy_annual);
+        if buy.variable_cost_per_attempt.is_none() {
+            return (
+                "abstain_missing_cost_evidence".into(),
+                "only qualified alternative lacks complete supplier cost evidence".into(),
+                make_annual,
+                buy_annual,
+            );
+        }
+        return (
+            "prefer_buy_qualified_even_if_make_cheaper".into(),
+            "in-house process is not qualified for the comparable output profile".into(),
+            make_annual,
+            buy_annual,
+        );
     }
     if buy.qualification_status != "qualified_for_profile" {
-        return ("prefer_make_qualified".into(), "supplier alternative is not qualified for the comparable output profile".into(), make_annual, buy_annual);
+        if make.variable_cost_per_attempt.is_none() {
+            return (
+                "abstain_missing_cost_evidence".into(),
+                "only qualified alternative lacks complete in-house cost evidence".into(),
+                make_annual,
+                buy_annual,
+            );
+        }
+        return (
+            "prefer_make_qualified".into(),
+            "supplier alternative is not qualified for the comparable output profile".into(),
+            make_annual,
+            buy_annual,
+        );
     }
     if make.variable_cost_per_attempt.is_none() || buy.variable_cost_per_attempt.is_none() {
         return ("abstain_missing_cost_evidence".into(), "a required variable-cost component is missing; missing is not zero".into(), make_annual, buy_annual);
@@ -342,7 +368,7 @@ pub fn run() -> Result<EconomicsReport> {
         "{context}: expected decisions must be independent test labels");
 
     let cases = parsed.get("cases").and_then(Value::as_array).context("cases must be an array")?;
-    ensure!(cases.len() == 7, "{context}: expected seven synthetic make/buy cases");
+    ensure!(cases.len() == 8, "{context}: expected eight synthetic make/buy cases");
     let mut ids = HashSet::new();
     let mut results = Vec::with_capacity(cases.len());
     let mut expected_counts = BTreeMap::new();
@@ -432,7 +458,7 @@ mod tests {
     #[test]
     fn frozen_make_buy_fixture_matches_independent_labels() {
         let report = run().expect("run synthetic make/buy corpus");
-        assert_eq!(report.case_count, 7);
+        assert_eq!(report.case_count, 8);
         assert_eq!(report.decision_mismatch_count, 0);
         assert_eq!(report.break_even_mismatch_count, 0);
         assert_eq!(report.total_mismatch_count, 0);
@@ -458,6 +484,18 @@ mod tests {
         let unqualified = report.cases.iter().find(|c| c.case_id == "MAKEBUY-UNQUALIFIED").unwrap();
         assert!(!unqualified.make_qualified);
         assert_eq!(unqualified.derived_decision, "prefer_buy_qualified_even_if_make_cheaper");
+    }
+
+    #[test]
+    fn missing_quote_blocks_even_when_make_is_unqualified() {
+        let report = run().expect("run synthetic make/buy corpus");
+        let case = report
+            .cases
+            .iter()
+            .find(|item| item.case_id == "MAKEBUY-UNQUALIFIED-NO-QUOTE")
+            .expect("combined gate scenario");
+        assert_eq!(case.derived_decision, "abstain_missing_cost_evidence");
+        assert_eq!(case.derived_break_even_class, "not_computable");
     }
 
     #[test]
