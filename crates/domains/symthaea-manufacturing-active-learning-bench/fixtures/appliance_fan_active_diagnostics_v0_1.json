@@ -7,7 +7,8 @@
     "branch": "research/appliance-active-diagnostics-v0-1",
     "path": "fixtures/diagnostics/appliance_active_diagnostic_corpus_v0_1.json",
     "trace_id": "ADT-001",
-    "mapping": "hypotheses and categorical likelihoods are copied exactly into integer parts-per-million; measurement costs are separately declared in this fixture's relative cost profile."
+    "mapping": "hypotheses and categorical likelihoods are copied exactly into integer parts-per-million; measurement costs are separately declared in this fixture's relative cost profile.",
+    "sha256": "7626557b8a3da4c8c4f1e253fcf3a7d309d8041ef27304a493a21debb8779aa4"
   },
   "cost_profile": {
     "id": "fan-test-relative-cost-v0.1",
@@ -287,5 +288,12 @@
         ]
       }
     ]
+  },
+  "shared_kernel": {
+    "repository": "Luminous-Dynamics/symthaea",
+    "pull_request": 7695,
+    "branch": "feat/mfg-posterior-eig-v1",
+    "source_path": "crates/domains/symthaea-manufacturing-active-learning-bench/src/acquisition.rs",
+    "reuse_contract": "FiniteHypothesisModel, expected_information_gain, rank_feasible_actions, DecisionValuePerCost"
   }
 }
