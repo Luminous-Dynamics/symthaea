@@ -11,7 +11,7 @@
 
 use serde::{Deserialize, Serialize};
 
-use crate::experiment_design::{
+use symthaea_sensebench::experiment_design::{
     ExperimentCandidate, ExperimentDesignError, HypothesisPrior, ModelLikelihoodScenario,
     rank_experiments, rank_experiments_robust, update_posterior,
 };
@@ -21,7 +21,6 @@ const HYPOTHESIS_IDS: [&str; 3] = [
     "shared_cause_confounder",
     "no_direct_causal_effect",
 ];
-const FIXED_CANDIDATE_ID: &str = "development_fixed_design";
 const MAX_TRIALS_PER_WORLD: usize = 100_000;
 const MAX_RESOURCE_BUDGET: usize = 256;
 
