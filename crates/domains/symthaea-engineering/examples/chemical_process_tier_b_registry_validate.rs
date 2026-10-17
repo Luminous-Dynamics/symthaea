@@ -723,6 +723,19 @@ mod tests {
             "shared_dependency_audit": {
                 "complete": true,
                 "independence_assessed": true,
+                "lineage_complete": true,
+                "lineage_nodes": [
+                    {
+                        "artifact": "model-a-property-table",
+                        "sha256": "sha256:dddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddd",
+                        "derived_from": []
+                    },
+                    {
+                        "artifact": "model-b-property-table",
+                        "sha256": "sha256:eeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeee",
+                        "derived_from": []
+                    }
+                ],
                 "model_a_dependency_digests": [
                     "sha256:dddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddd"
                 ],
