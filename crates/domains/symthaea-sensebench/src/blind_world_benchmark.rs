@@ -603,7 +603,7 @@ fn declared_model_scenarios() -> Vec<ModelLikelihoodScenario> {
                 [0.82, 0.80, 0.52],
                 [0.90, 0.30, 0.50],
                 [0.38, 0.84, 0.51],
-                [0.51, 0.49, 0.50],
+                [0.50, 0.50, 0.50],
                 [0.72, 0.64, 0.55],
             ),
         },
@@ -645,11 +645,14 @@ fn hidden_worlds(seed: u64) -> Vec<HiddenWorld> {
 fn perturb_world_likelihoods(world: &mut HiddenWorld, seed: u64) {
     let mut rng = BenchmarkRng::new(seed ^ 0xB11D_2026);
     for candidate in &mut world.candidates {
-        if world.regime == BlindWorldRegime::NullNegativeControl
+        if candidate.id == "negative_control"
+            || world.regime == BlindWorldRegime::NullNegativeControl
             || (world.regime == BlindWorldRegime::InterventionArtifact
                 && candidate.id == "intervene_on_x")
         {
-            let base = if world.regime == BlindWorldRegime::NullNegativeControl {
+            let base = if candidate.id == "negative_control" {
+                0.5
+            } else if world.regime == BlindWorldRegime::NullNegativeControl {
                 candidate.likelihoods[0][0]
             } else {
                 0.58
@@ -681,7 +684,7 @@ fn hidden_world_templates() -> Vec<HiddenWorld> {
         [0.82, 0.80, 0.52],
         [0.90, 0.30, 0.50],
         [0.38, 0.84, 0.51],
-        [0.51, 0.49, 0.50],
+        [0.50, 0.50, 0.50],
         [0.72, 0.64, 0.55],
     );
     let confounder = candidate_set(
@@ -702,7 +705,7 @@ fn hidden_world_templates() -> Vec<HiddenWorld> {
         [0.82, 0.80, 0.52],
         [0.90, 0.30, 0.50],
         [0.38, 0.84, 0.51],
-        [0.51, 0.49, 0.50],
+        [0.50, 0.50, 0.50],
         [0.72, 0.64, 0.55],
     );
     let degraded = base.iter().map(|candidate| ExperimentCandidate {
@@ -876,6 +879,11 @@ mod tests {
     fn generated_world_variants_preserve_declared_control_invariants() {
         let worlds = hidden_worlds(2026);
         for world in &worlds {
+            let negative_control = world.candidates.iter()
+                .find(|candidate| candidate.id == "negative_control").unwrap();
+            let negative_probability = negative_control.likelihoods[0][0];
+            assert!(negative_control.likelihoods.iter()
+                .all(|row| (row[0] - negative_probability).abs() < 1.0e-12));
             match world.regime {
                 BlindWorldRegime::NullNegativeControl => {
                     for candidate in &world.candidates {
