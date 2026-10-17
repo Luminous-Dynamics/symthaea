@@ -31,6 +31,19 @@ pub enum DielectricEvidenceKind {
     Estimated,
 }
 
+/// Broad protocol family for dielectric breakdown characterization.
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, Deserialize)]
+pub enum BreakdownTestKind {
+    /// Slowly ramped direct-voltage breakdown test.
+    DcRamp,
+    /// Sinusoidal alternating-voltage breakdown test.
+    AcSinusoidal,
+    /// Impulse or surge breakdown test.
+    Impulse,
+    /// Another explicitly documented protocol.
+    Other,
+}
+
 /// Uncertainty attached to one individual property rather than to the material record as a whole.
 #[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
 pub struct PropertyUncertainty {
@@ -77,6 +90,10 @@ pub struct DielectricPropertyRecord {
     pub breakdown_strength_v_per_m: Option<f64>,
     /// Source/protocol reference for the breakdown value, including specimen/test conditions.
     pub breakdown_reference: Option<String>,
+    /// Temperature in kelvin at which breakdown strength was characterized.
+    pub breakdown_test_temperature_k: Option<f64>,
+    /// Broad protocol family used to characterize breakdown strength.
+    pub breakdown_test_kind: Option<BreakdownTestKind>,
     /// Evidence class for the reported breakdown value, when present.
     pub breakdown_evidence_kind: Option<DielectricEvidenceKind>,
     /// Evidence class for relative permittivity and loss tangent.
@@ -134,8 +151,20 @@ impl DielectricPropertyRecord {
         if self.breakdown_strength_v_per_m.is_some() && self.breakdown_evidence_kind.is_none() {
             return Err(DielectricValidationError::MissingBreakdownEvidenceKind);
         }
+        if self.breakdown_strength_v_per_m.is_some()
+            && self
+                .breakdown_test_temperature_k
+                .is_none_or(|value| !value.is_finite() || value <= 0.0)
+        {
+            return Err(DielectricValidationError::InvalidBreakdownTestTemperature);
+        }
+        if self.breakdown_strength_v_per_m.is_some() && self.breakdown_test_kind.is_none() {
+            return Err(DielectricValidationError::MissingBreakdownTestKind);
+        }
         if self.breakdown_strength_v_per_m.is_none()
             && (self.breakdown_reference.is_some()
+                || self.breakdown_test_temperature_k.is_some()
+                || self.breakdown_test_kind.is_some()
                 || self.breakdown_evidence_kind.is_some()
                 || self.breakdown_strength_uncertainty.is_some())
         {
@@ -349,6 +378,10 @@ pub enum DielectricValidationError {
     MissingUncertaintyMethodReference,
     /// A reported breakdown value must carry an evidence class.
     MissingBreakdownEvidenceKind,
+    /// Breakdown characterization temperature must be finite and above absolute zero.
+    InvalidBreakdownTestTemperature,
+    /// A reported breakdown value must declare its test protocol family.
+    MissingBreakdownTestKind,
     /// Breakdown reference/evidence/uncertainty cannot exist without a breakdown value.
     OrphanedBreakdownMetadata,
     /// Every property record requires a non-empty provenance reference.
@@ -383,6 +416,8 @@ impl fmt::Display for DielectricValidationError {
             Self::InvalidRelativeUncertainty => "relative uncertainty must be finite and non-negative",
             Self::MissingUncertaintyMethodReference => "property uncertainty requires a method reference",
             Self::MissingBreakdownEvidenceKind => "breakdown strength requires an evidence class",
+            Self::InvalidBreakdownTestTemperature => "breakdown test temperature must be finite and above zero kelvin",
+            Self::MissingBreakdownTestKind => "breakdown strength requires a test protocol kind",
             Self::OrphanedBreakdownMetadata => "breakdown metadata requires a reported breakdown strength",
             Self::MissingSourceReference => "source_reference must not be empty",
             Self::InvalidElectrodeArea => "electrode overlap area must be finite and positive",
@@ -413,6 +448,8 @@ mod tests {
             test_field_v_per_m: Some(1.0e6),
             breakdown_strength_v_per_m: Some(1.0e8),
             breakdown_reference: Some("synthetic test fixture only".to_string()),
+            breakdown_test_temperature_k: Some(298.15),
+            breakdown_test_kind: Some(BreakdownTestKind::DcRamp),
             breakdown_evidence_kind: Some(DielectricEvidenceKind::Estimated),
             evidence_kind: DielectricEvidenceKind::Estimated,
             source_reference: "test-fixture://not-real-data".to_string(),
@@ -542,6 +579,20 @@ mod tests {
         assert_eq!(
             material.validate(),
             Err(DielectricValidationError::MissingBreakdownEvidenceKind)
+        );
+
+        let mut material = synthetic_record();
+        material.breakdown_test_temperature_k = None;
+        assert_eq!(
+            material.validate(),
+            Err(DielectricValidationError::InvalidBreakdownTestTemperature)
+        );
+
+        let mut material = synthetic_record();
+        material.breakdown_test_kind = None;
+        assert_eq!(
+            material.validate(),
+            Err(DielectricValidationError::MissingBreakdownTestKind)
         );
 
         let mut material = synthetic_record();
