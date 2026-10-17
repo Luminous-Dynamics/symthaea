@@ -34,7 +34,7 @@ Energy per task is meaningful only under a declared task protocol, speed, payloa
 
 ### 2.4 Mechanical performance → mechanical + interaction + maintenance evidence
 
-Retain human outcomes, machine performance and human–robot interaction as separate layers. Comfort and movement-restriction metrics require declared measurement methods. Service component count is a proxy, not a full measure of repairability; later bench work must measure actual tool, skill, time, calibration and part availability.
+Retain human outcomes, machine performance and human–robot interaction as separate layers. Comfort and movement-restriction metrics require declared measurement methods. Service component count is descriptive, not an optimization direction: one integrated module may have fewer parts but be slower or costlier to replace than a modular assembly. Later bench work must measure actual tools, skill, time, calibration, part availability and whether a repaired unit returns to service correctly.
 
 ### 2.5 Learned optimizer → transparent evidence pipeline
 
@@ -66,7 +66,7 @@ The evaluator accepts one common comparison request to make cross-context rankin
 | Mobility | Movement-restriction index | Declared normalized scale [0, 1], lower is better |
 | Comfort | Declared comfort score and measurement method | Normalized [0, 1], higher is better; self-report and proxy must be distinguished |
 | Tether burden | Tether interference events | Events/task, lower is better; no tether can be a structural zero but missing data is never zero |
-| Serviceability | Repair/replacement time and service-component count | minutes and count, lower is better; follow with real repair tests |
+| Serviceability | Repair/replacement time and service-component count | minutes lower is better; component count is descriptive only, because fewer parts do not always mean easier repair |
 
 Mass distribution must reconcile with wearer-borne mass within a declared tolerance. Total-system mass must not understate wearer plus off-board mass. These consistency checks catch denominator games; they cannot verify the mass measurement itself.
 
