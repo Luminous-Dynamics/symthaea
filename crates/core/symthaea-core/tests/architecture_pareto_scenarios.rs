@@ -73,6 +73,18 @@ fn architecture_pareto_fixture_matches_expected_frontier_and_dominators() {
             "unexpected frontier for {}",
             scenario.id
         );
+        let actual_dominated_ids: HashSet<&str> = report.assessments.iter()
+            .filter(|assessment| !assessment.is_pareto_optimal)
+            .map(|assessment| assessment.candidate_id.as_str())
+            .collect();
+        let expected_dominated_ids: HashSet<&str> = scenario.expected_dominated_by.keys()
+            .map(String::as_str)
+            .collect();
+        assert_eq!(
+            actual_dominated_ids, expected_dominated_ids,
+            "scenario {} must enumerate every and only dominated candidate",
+            scenario.id
+        );
 
         for (candidate_id, expected_dominators) in &scenario.expected_dominated_by {
             let assessment = report.assessments.iter()
