@@ -512,10 +512,24 @@ mod tests {
             test_field_v_per_m: Some(1.0e7),
             breakdown_strength_v_per_m: Some(1.0e8),
             breakdown_reference: Some("synthetic test fixture only".to_string()),
+            breakdown_test_temperature_k: Some(298.15),
+            breakdown_test_kind: Some(BreakdownTestKind::DcRamp),
+            breakdown_evidence_kind: Some(DielectricEvidenceKind::Estimated),
             evidence_kind: DielectricEvidenceKind::Estimated,
             source_reference: "test-fixture://not-real-data".to_string(),
             dataset_version: Some("synthetic-v1".to_string()),
-            relative_uncertainty: Some(0.05),
+            permittivity_uncertainty: Some(crate::dielectric::PropertyUncertainty {
+                relative_uncertainty: 0.05,
+                method_reference: "synthetic uncertainty fixture".to_string(),
+            }),
+            loss_tangent_uncertainty: Some(crate::dielectric::PropertyUncertainty {
+                relative_uncertainty: 0.05,
+                method_reference: "synthetic uncertainty fixture".to_string(),
+            }),
+            breakdown_strength_uncertainty: Some(crate::dielectric::PropertyUncertainty {
+                relative_uncertainty: 0.05,
+                method_reference: "synthetic uncertainty fixture".to_string(),
+            }),
         }
     }
 
