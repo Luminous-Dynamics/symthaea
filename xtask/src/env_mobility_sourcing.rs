@@ -168,7 +168,7 @@ fn validate_register(value: &Value, raw_sha256: String, context: &str) -> Result
     let mut unpriced_dependency_count = 0usize;
     let mut item_prices = std::collections::BTreeMap::new();
     let mut item_measurands = std::collections::BTreeMap::new();
-    let mut no_prices_defaulted = true;
+    let no_prices_defaulted = true;
     let mut all_public_links = true;
 
     for (index, item) in items.iter().enumerate() {
