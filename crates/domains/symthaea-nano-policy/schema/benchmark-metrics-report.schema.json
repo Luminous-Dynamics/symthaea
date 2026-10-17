@@ -23,7 +23,8 @@
     "bootstrap_seed",
     "arms",
     "comparisons",
-    "limitations"
+    "limitations",
+    "shift_manifest_sha256"
   ],
   "properties": {
     "schema_version": {
@@ -595,6 +596,14 @@
         "minLength": 1,
         "maxLength": 512
       }
+    },
+    "shift_manifest_sha256": {
+      "type": [
+        "string",
+        "null"
+      ],
+      "pattern": "^[a-f0-9]{64}$",
+      "description": "Optional shift-manifest digest copied from the input outcome ledger so per-group metrics remain auditable when detached."
     }
   }
 }
