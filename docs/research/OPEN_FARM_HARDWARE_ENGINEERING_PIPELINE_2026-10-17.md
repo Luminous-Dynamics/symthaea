@@ -90,6 +90,18 @@ Use [ISO 18497-1:2024](https://www.iso.org/standard/82684.html) as a reference f
 
 Bind requirements and operating envelope, source files and revision, BOM and quote context, toolchain/configuration and artifact hashes, test method/results, failure modes and exclusions, safety-review status, instructions/maintenance, and compatibility/change history. Mycelix may record consented contribution, inspection receipts, custody and cooperative commitments. Neither reputation nor a credential proves machine safety.
 
+## First executable qualification slice
+
+The first code slice is now proposed as a module inside the existing standalone, standard-library-only agricultural platform benchmark, rather than a duplicate crate:
+
+- [Stacked draft PR #7891](https://github.com/Luminous-Dynamics/symthaea/pull/7891) adds `crates/agri-platform-bench/src/design_package.rs` on top of [platform benchmark PR #7817](https://github.com/Luminous-Dynamics/symthaea/pull/7817).
+- It checks required release-artifact presence, exact revision binding, digest shape, traceable rights-review declaration, BOM structure and source availability for a declared fabrication context.
+- It separates design-package completeness from cost evidence. Missing price quotes cannot become zero; mixed currencies do not yield a single total; checked arithmetic overflow blocks the computed cost claim.
+- It emits only `CompleteForIndependentBuildReview`, `Incomplete`, or `Blocked`. The report never marks a package safety-certified or authorizes equipment use.
+- Its tests are synthetic unit tests, **not** an independent verifier and not proof that external hashes, license terms, CAD geometry, safety, or the design itself are valid. The exact-head benchmark workflow is currently queued; no pass is inferred from that state.
+
+This is a deliberately small step toward a real evidence pipeline. Before using it to qualify a real design, add a separately implemented verifier over a frozen fixture corpus, bind actual artifact bytes/manifests, and review the contract against a named part/tool/build scenario.
+
 ## First design target: choose after field discovery
 
 Do not start by committing to an autonomous tractor. Compare with farmers and local fabricators:
@@ -165,7 +177,7 @@ A pilot report includes participants/non-participants, exact hardware revisions,
 - [x] Research and canonical workstream boundaries linked.
 - [x] Design-to-field evidence lifecycle and initial candidate classes documented.
 - [x] Synthetic targets and staged safety boundary defined.
-- [ ] Typed schemas implemented and validated.
+- [x] Initial dependency-free package-completeness contract and synthetic unit tests added in stacked draft PR #7891; exact-head checks and independent verification remain open.
 - [ ] Independent corpus and checker implemented.
 - [ ] One existing design qualified for a named service/site.
 - [ ] Physical bench tests run.
