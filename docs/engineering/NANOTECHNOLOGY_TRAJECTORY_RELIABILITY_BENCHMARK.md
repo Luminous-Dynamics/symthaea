@@ -135,6 +135,8 @@ Calibration method arms should be explicit, not silently substituted under one g
 
 Freeze a calibration-budget curve (for example 5, 10, 25, 50 and 100 independent calibration configurations where sample availability permits) and report the number of independent parent systems, groups, atoms and trajectory windows at each point. The article's report of efficient calibration in a particular setting must not be generalized into a universal “25 configurations is enough” rule. Calibration and test windows must be separated by the actual independence unit; many atoms or adjacent frames from one parent system do not constitute many independent material examples.
 
+For heterogeneous interfaces, keep local atom-environment error detection as its own evaluation layer rather than allowing structure-average metrics to mask hotspots; the follow-on protocol is tracked by [NANO-014 — atom-local risk detection](https://github.com/Luminous-Dynamics/symthaea/issues/7791).
+
 Pre-register the prediction and reference unit: atom/component, whole structure, trajectory window, or candidate-level decision. Do not compare atom-level scores to structure-level outcomes without a fixed aggregation rule. Evaluate at least:
 
 - **Error-ranking utility:** Spearman rank correlation between uncertainty and absolute reference error, plus precision/recall for predeclared worst-error tails (for example, the top 5% and 10% of held-out force-error windows).
