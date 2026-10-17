@@ -172,6 +172,14 @@ pub fn validate_split_manifest(manifest: &Value) -> Result<usize, String> {
         }
     }
 
+    if evaluation_regime == "unseen_listener"
+        && role_counts.get("calibration").copied().unwrap_or(0) > 0
+    {
+        return Err(
+            "unseen_listener regime must not include calibration observations".to_owned(),
+        );
+    }
+
     let required_rules: &[(&str, &[&str])] = match evaluation_regime {
         "unseen_listener" => &[("listener_id", &["train", "validation"])],
         "personalization" => &[
@@ -278,6 +286,24 @@ mod tests {
         manifest["observations"][6]["excerpt_id"] = serde_json::json!("excerpt-train-1");
         let error = validate_split_manifest(&manifest).expect_err("excerpt leakage must fail");
         assert!(error.contains("group leakage on excerpt_id"));
+    }
+
+    #[test]
+    fn rejects_reused_test_session() {
+        let mut manifest = fixture();
+        manifest["observations"][5]["measurement_session_id"] =
+            serde_json::json!("session-calibration-01");
+        let error = validate_split_manifest(&manifest).expect_err("session leakage must fail");
+        assert!(error.contains("group leakage on measurement_session_id"));
+    }
+
+    #[test]
+    fn unseen_listener_regime_rejects_calibration_rows() {
+        let mut manifest = fixture();
+        manifest["evaluation_regime"] = serde_json::json!("unseen_listener");
+        let error = validate_split_manifest(&manifest)
+            .expect_err("unseen-listener benchmark must not use calibration");
+        assert!(error.contains("must not include calibration observations"));
     }
 
     #[test]
