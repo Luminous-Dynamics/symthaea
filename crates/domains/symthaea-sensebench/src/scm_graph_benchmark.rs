@@ -346,8 +346,8 @@ fn cpdag_metrics(predicted: &[EdgeMark], truth: &[EdgeMark]) -> (f64, f64, f64, 
             (false, false) => {}
         }
 
-        let predicted_directed = matches!(prediction, EdgeMark::Forward | EdgeMark::Reverse);
-        let true_directed = matches!(target, EdgeMark::Forward | EdgeMark::Reverse);
+        let predicted_directed = matches!(*prediction, EdgeMark::Forward | EdgeMark::Reverse);
+        let true_directed = matches!(*target, EdgeMark::Forward | EdgeMark::Reverse);
         if predicted_directed && prediction == target && true_directed {
             compelled_tp += 1;
         } else if predicted_directed {
@@ -875,7 +875,7 @@ fn simulate_trial(
             policy,
             &posterior,
             scenarios,
-            &oracle_candidates,
+            oracle_candidates,
             fixed_action_id,
             &mut selection_rng,
         )?.ok_or(ScmGraphBenchmarkError::MissingCandidate)?;
@@ -910,6 +910,16 @@ fn simulate_trial(
     let predicted = graphs[map_index];
     let truth = graphs[truth_index];
     let (skeleton_f1, directed_edge_f1, shd, exact_graph) = structure_metrics(predicted, truth);
+    let posterior_class_prediction = posterior_cpdag(&posterior, graphs).0;
+    let predicted_cpdag = if policy == ScmGraphPolicy::StructureBlindRandomGraph {
+        cpdag_marks(predicted, graphs)
+    } else {
+        posterior_class_prediction
+    };
+    let truth_cpdag = cpdag_marks(truth, graphs);
+    let (cpdag_skeleton_f1, compelled_direction_f1, cpdag_mark_distance, markov_class_correct) =
+        cpdag_metrics(&predicted_cpdag, &truth_cpdag);
+    let posterior_true_markov_class = posterior_mass_on_class(&posterior, graphs, truth);
     let max_probability = posterior[posterior_top_index(&posterior)].probability;
     let claim_accepted = policy != ScmGraphPolicy::StructureBlindRandomGraph
         && max_probability >= posterior_threshold;
@@ -926,7 +936,12 @@ fn simulate_trial(
         directed_edge_f1,
         shd,
         exact_graph,
+        cpdag_skeleton_f1,
+        compelled_direction_f1,
+        cpdag_mark_distance,
+        markov_equivalence_class_correct: markov_class_correct,
         posterior_true_graph: posterior[truth_index].probability,
+        posterior_true_markov_class,
         graph_posterior_brier_score,
         claim_accepted,
         false_graph_claim,
@@ -981,7 +996,15 @@ fn summarize_world(
     let skeleton: Vec<f64> = trials.iter().map(|trial| trial.skeleton_f1).collect();
     let directed: Vec<f64> = trials.iter().map(|trial| trial.directed_edge_f1).collect();
     let shd: Vec<f64> = trials.iter().map(|trial| trial.shd).collect();
+    let cpdag_skeleton: Vec<f64> = trials.iter().map(|trial| trial.cpdag_skeleton_f1).collect();
+    let compelled_direction: Vec<f64> = trials.iter()
+        .map(|trial| trial.compelled_direction_f1).collect();
+    let cpdag_distance: Vec<f64> = trials.iter().map(|trial| trial.cpdag_mark_distance).collect();
+    let cpdag_correct = trials.iter()
+        .filter(|trial| trial.markov_equivalence_class_correct).count();
     let true_mass: Vec<f64> = trials.iter().map(|trial| trial.posterior_true_graph).collect();
+    let true_class_mass: Vec<f64> = trials.iter()
+        .map(|trial| trial.posterior_true_markov_class).collect();
     let brier: Vec<f64> = trials.iter().map(|trial| trial.graph_posterior_brier_score).collect();
     let exact = trials.iter().filter(|trial| trial.exact_graph).count();
     let accepted = trials.iter().filter(|trial| trial.claim_accepted).count();
@@ -1010,6 +1033,16 @@ fn summarize_world(
         skeleton_f1_ci95: mean_ci95(&skeleton, 0.0, 1.0),
         mean_directed_edge_f1: mean(&directed),
         directed_edge_f1_ci95: mean_ci95(&directed, 0.0, 1.0),
+        mean_cpdag_skeleton_f1: mean(&cpdag_skeleton),
+        cpdag_skeleton_f1_ci95: mean_ci95(&cpdag_skeleton, 0.0, 1.0),
+        mean_compelled_direction_f1: mean(&compelled_direction),
+        compelled_direction_f1_ci95: mean_ci95(&compelled_direction, 0.0, 1.0),
+        mean_cpdag_mark_distance: mean(&cpdag_distance),
+        cpdag_mark_distance_ci95: mean_ci95(&cpdag_distance, 0.0, (NODE_COUNT * (NODE_COUNT - 1) / 2) as f64),
+        markov_equivalence_class_recovery_rate: cpdag_correct as f64 / count as f64,
+        markov_equivalence_class_recovery_wilson_ci95: wilson_ci95(cpdag_correct, count),
+        mean_posterior_mass_on_true_markov_class: mean(&true_class_mass),
+        posterior_mass_on_true_markov_class_ci95: mean_ci95(&true_class_mass, 0.0, 1.0),
         mean_structural_hamming_distance: mean(&shd),
         structural_hamming_distance_ci95: mean_ci95(&shd, 0.0, (NODE_COUNT * (NODE_COUNT - 1) / 2) as f64),
         exact_graph_recovery_rate: exact as f64 / count as f64,
@@ -1044,6 +1077,11 @@ fn aggregate_held_out(
             .collect();
         let skeleton: Vec<f64> = rows.iter().map(|row| row.mean_skeleton_f1).collect();
         let directed: Vec<f64> = rows.iter().map(|row| row.mean_directed_edge_f1).collect();
+        let cpdag_skeleton: Vec<f64> = rows.iter().map(|row| row.mean_cpdag_skeleton_f1).collect();
+        let compelled: Vec<f64> = rows.iter().map(|row| row.mean_compelled_direction_f1).collect();
+        let cpdag_distance: Vec<f64> = rows.iter().map(|row| row.mean_cpdag_mark_distance).collect();
+        let cpdag_accuracy: Vec<f64> = rows.iter()
+            .map(|row| row.markov_equivalence_class_recovery_rate).collect();
         let shd: Vec<f64> = rows.iter().map(|row| row.mean_structural_hamming_distance).collect();
         let exact: Vec<f64> = rows.iter().map(|row| row.exact_graph_recovery_rate).collect();
         let coverage: Vec<f64> = rows.iter().map(|row| row.graph_claim_coverage).collect();
@@ -1056,6 +1094,13 @@ fn aggregate_held_out(
             held_out_skeleton_f1_world_ci95: mean_ci95(&skeleton, 0.0, 1.0),
             mean_held_out_directed_edge_f1: mean(&directed),
             held_out_directed_edge_f1_world_ci95: mean_ci95(&directed, 0.0, 1.0),
+            mean_held_out_cpdag_skeleton_f1: mean(&cpdag_skeleton),
+            held_out_cpdag_skeleton_f1_world_ci95: mean_ci95(&cpdag_skeleton, 0.0, 1.0),
+            mean_held_out_compelled_direction_f1: mean(&compelled),
+            held_out_compelled_direction_f1_world_ci95: mean_ci95(&compelled, 0.0, 1.0),
+            mean_held_out_cpdag_mark_distance: mean(&cpdag_distance),
+            held_out_cpdag_mark_distance_world_ci95: mean_ci95(&cpdag_distance, 0.0, (NODE_COUNT * (NODE_COUNT - 1) / 2) as f64),
+            held_out_markov_equivalence_class_recovery_rate: mean(&cpdag_accuracy),
             mean_held_out_shd: mean(&shd),
             held_out_shd_world_ci95: mean_ci95(&shd, 0.0, (NODE_COUNT * (NODE_COUNT - 1) / 2) as f64),
             worst_world_directed_edge_f1: directed.iter().copied().fold(1.0, f64::min),
