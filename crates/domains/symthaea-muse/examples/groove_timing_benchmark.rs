@@ -110,6 +110,26 @@ struct CorpusSummary {
 }
 
 #[derive(Debug, Serialize)]
+struct PerformerMacroSummary {
+    performers_with_role: usize,
+    mean_performer_median_abs_sixteenth_grid_residual_beats: Option<f64>,
+    median_performer_median_abs_sixteenth_grid_residual_beats: Option<f64>,
+    mean_performer_p95_abs_sixteenth_grid_residual_beats: Option<f64>,
+    mean_performer_velocity_mean_0_to_127: Option<f64>,
+    mean_performer_velocity_standard_deviation: Option<f64>,
+    mean_performer_lag1_residual_correlation: Option<f64>,
+}
+
+#[derive(Debug, Default)]
+struct PerformerMacroAccumulator {
+    timing_medians_beats: Vec<f64>,
+    timing_p95_beats: Vec<f64>,
+    velocity_means: Vec<f64>,
+    velocity_standard_deviations: Vec<f64>,
+    lag1_correlations: Vec<f64>,
+}
+
+#[derive(Debug, Serialize)]
 struct BenchmarkReceipt {
     schema: &'static str,
     result_scope: &'static str,
@@ -124,6 +144,7 @@ struct BenchmarkReceipt {
     generated_styles_requested: usize,
     generated_seeds_per_style: u64,
     human_reference: CorpusSummary,
+    human_performer_macro: BTreeMap<String, PerformerMacroSummary>,
     human_by_drummer: BTreeMap<String, CorpusSummary>,
     human_by_drummer_session: BTreeMap<String, CorpusSummary>,
     melothaea_generated: CorpusSummary,
@@ -278,6 +299,7 @@ fn run() -> Result<(), Box<dyn Error>> {
 
     let performer_count = human_by_drummer.len();
     let performer_session_count = human_by_drummer_session.len();
+    let human_performer_macro = performer_macro_summary(&human_by_drummer);
     let receipt = BenchmarkReceipt {
         schema: "melothaea-groove-timing-benchmark-v1",
         result_scope: "descriptive_profile_only_not_quality_qualified",
@@ -292,6 +314,7 @@ fn run() -> Result<(), Box<dyn Error>> {
         generated_styles_requested: args.generated_style_limit,
         generated_seeds_per_style: args.seeds_per_style,
         human_reference: human.summarize(),
+        human_performer_macro,
         human_by_drummer: human_by_drummer
             .into_iter()
             .map(|(drummer, corpus)| (drummer, corpus.summarize()))
@@ -837,6 +860,64 @@ fn record_observed_grouped(
         .entry(drummer_session_key(row))
         .or_default()
         .record_file(hits, row.bpm);
+}
+
+/// Macro-average performer summaries so one high-volume drummer cannot
+/// dominate the descriptive human profile. These are descriptive summaries,
+/// not confidence intervals or population estimates.
+fn performer_macro_summary(
+    by_drummer: &BTreeMap<String, CorpusSummary>,
+) -> BTreeMap<String, PerformerMacroSummary> {
+    let mut roles: BTreeMap<String, PerformerMacroAccumulator> = BTreeMap::new();
+    for corpus in by_drummer.values() {
+        for (role, summary) in &corpus.roles {
+            let accumulator = roles.entry(role.clone()).or_default();
+            if let Some(value) = summary.median_absolute_sixteenth_grid_residual_beats {
+                accumulator.timing_medians_beats.push(value);
+            }
+            if let Some(value) = summary.p95_absolute_sixteenth_grid_residual_beats {
+                accumulator.timing_p95_beats.push(value);
+            }
+            if let Some(value) = summary.mean_velocity_0_to_127 {
+                accumulator.velocity_means.push(value);
+            }
+            if let Some(value) = summary.velocity_standard_deviation {
+                accumulator.velocity_standard_deviations.push(value);
+            }
+            if let Some(value) = summary.mean_file_lag1_residual_correlation {
+                accumulator.lag1_correlations.push(value);
+            }
+        }
+    }
+
+    roles
+        .into_iter()
+        .map(|(role, accumulator)| {
+            let performers_with_role = accumulator.timing_medians_beats.len();
+            (
+                role,
+                PerformerMacroSummary {
+                    performers_with_role,
+                    mean_performer_median_abs_sixteenth_grid_residual_beats: mean(
+                        &accumulator.timing_medians_beats,
+                    ),
+                    median_performer_median_abs_sixteenth_grid_residual_beats: median(
+                        &accumulator.timing_medians_beats,
+                    ),
+                    mean_performer_p95_abs_sixteenth_grid_residual_beats: mean(
+                        &accumulator.timing_p95_beats,
+                    ),
+                    mean_performer_velocity_mean_0_to_127: mean(&accumulator.velocity_means),
+                    mean_performer_velocity_standard_deviation: mean(
+                        &accumulator.velocity_standard_deviations,
+                    ),
+                    mean_performer_lag1_residual_correlation: mean(
+                        &accumulator.lag1_correlations,
+                    ),
+                },
+            )
+        })
+        .collect()
 }
 
 fn drum_role(pitch: u8) -> &'static str {
