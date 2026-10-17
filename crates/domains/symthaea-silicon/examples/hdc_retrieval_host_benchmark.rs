@@ -220,7 +220,7 @@ fn run() -> Result<(), String> {
     let raw_bytes = json_bytes(&raw)?;
     let raw_artifact = write_artifact(&output_dir, "raw_observations.json", &raw_bytes)?;
 
-    let hardware_identity = env::var("SYTHAEA_BENCH_HARDWARE")
+    let hardware_identity = env::var("SYMTHAEA_BENCH_HARDWARE")
         .ok()
         .filter(|value| !value.trim().is_empty())
         .unwrap_or_else(detect_cpu_identity);
@@ -278,7 +278,7 @@ fn run() -> Result<(), String> {
             "device_stages": [],
             "hardware_identity": hardware_identity,
             "memory_profile": format!("host-resident vector store; logical working set {working_set_bytes} bytes; actual cache/DRAM residency not measured"),
-            "clock_power_profile": env::var("SYTHAEA_BENCH_CLOCK_POWER_PROFILE").unwrap_or_else(|_| "not captured".to_owned())
+            "clock_power_profile": env::var("SYMTHAEA_BENCH_CLOCK_POWER_PROFILE").unwrap_or_else(|_| "not captured".to_owned())
         },
         "execution": {
             "measurement_boundary": latency_scope,
@@ -335,6 +335,8 @@ fn validate_receipt(receipt: &Value, base_dir: &Path) -> Result<(), String> {
         }
     }
 
+    let canonical_base = fs::canonicalize(base_dir)
+        .map_err(|error| format!("cannot resolve receipt artifact directory {}: {error}", base_dir.display()))?;
     let mut artifact_hashes = std::collections::BTreeMap::<String, String>::new();
     let artifacts = receipt.get("artifacts").and_then(Value::as_array)
         .ok_or_else(|| "receipt artifacts must be an array".to_owned())?;
@@ -350,7 +352,13 @@ fn validate_receipt(receipt: &Value, base_dir: &Path) -> Result<(), String> {
         }) {
             return Err(format!("artifact path must be relative and cannot escape receipt directory: {path_text}"));
         }
-        let bytes = fs::read(base_dir.join(relative))
+        let candidate_path = canonical_base.join(relative);
+        let canonical_artifact = fs::canonicalize(&candidate_path)
+            .map_err(|error| format!("cannot resolve artifact {path_text}: {error}"))?;
+        if !canonical_artifact.starts_with(&canonical_base) {
+            return Err(format!("artifact resolves outside the receipt directory: {path_text}"));
+        }
+        let bytes = fs::read(&canonical_artifact)
             .map_err(|error| format!("cannot read artifact {path_text}: {error}"))?;
         let expected_sha = artifact.get("sha256").and_then(Value::as_str)
             .ok_or_else(|| format!("artifact {path_text} is missing sha256"))?;
