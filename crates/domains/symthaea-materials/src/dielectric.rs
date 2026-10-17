@@ -95,6 +95,116 @@ impl PropertyUncertainty {
     }
 }
 
+/// Individual dielectric property types. Each observation records only one
+/// property so values from separate sources/protocols can be preserved without
+/// pretending they share provenance or characterization conditions.
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, Deserialize)]
+pub enum DielectricObservationProperty {
+    /// Relative permittivity, dimensionless.
+    RelativePermittivity,
+    /// Dielectric loss tangent, dimensionless.
+    LossTangent,
+    /// Dielectric breakdown field strength, in volts per metre.
+    BreakdownStrength,
+}
+
+/// One source-bound dielectric scalar measurement or calculation.
+///
+/// Values are expressed in the canonical units stated by the property variant.
+/// Relative permittivity and loss tangent require a characterization frequency;
+/// breakdown strength requires an explicit breakdown-test family and records
+/// its test temperature. This type permits one property to exist without
+/// forcing placeholders for other unmeasured properties.
+#[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
+pub struct ConditionedDielectricObservation {
+    /// Stable material/composition/sample identifier.
+    pub material_id: String,
+    /// Which physical property this observation measures or estimates.
+    pub property: DielectricObservationProperty,
+    /// Value in the canonical unit specified by the property variant.
+    pub value: f64,
+    /// Characterization temperature, in kelvin.
+    pub test_temperature_k: f64,
+    /// Characterization frequency, in hertz, for permittivity/loss; None for breakdown tests.
+    pub test_frequency_hz: Option<f64>,
+    /// Optional characterization electric-field magnitude, in V/m.
+    pub test_field_v_per_m: Option<f64>,
+    /// Required breakdown protocol for breakdown-strength observations; absent for other properties.
+    pub breakdown_test_kind: Option<BreakdownTestKind>,
+    /// Evidence class for this specific property value.
+    pub evidence_kind: DielectricEvidenceKind,
+    /// Stable source reference specific to this property value.
+    pub source_reference: String,
+    /// Optional dataset/release version.
+    pub dataset_version: Option<String>,
+    /// Optional property-specific uncertainty with an explicit interpretation.
+    pub uncertainty: Option<PropertyUncertainty>,
+}
+
+impl ConditionedDielectricObservation {
+    /// Validate the value, required conditions, provenance, and uncertainty semantics.
+    pub fn validate(&self) -> Result<(), DielectricValidationError> {
+        if self.material_id.trim().is_empty() {
+            return Err(DielectricValidationError::EmptyMaterialId);
+        }
+        if !self.value.is_finite() {
+            return Err(DielectricValidationError::InvalidObservationValue);
+        }
+        match self.property {
+            DielectricObservationProperty::RelativePermittivity if self.value <= 0.0 => {
+                return Err(DielectricValidationError::InvalidRelativePermittivity);
+            }
+            DielectricObservationProperty::LossTangent if self.value < 0.0 => {
+                return Err(DielectricValidationError::InvalidLossTangent);
+            }
+            DielectricObservationProperty::BreakdownStrength if self.value <= 0.0 => {
+                return Err(DielectricValidationError::InvalidBreakdownStrength);
+            }
+            _ => {}
+        }
+        if !self.test_temperature_k.is_finite() || self.test_temperature_k <= 0.0 {
+            return Err(DielectricValidationError::InvalidTestTemperature);
+        }
+        if self
+            .test_field_v_per_m
+            .is_some_and(|value| !value.is_finite() || value < 0.0)
+        {
+            return Err(DielectricValidationError::InvalidTestField);
+        }
+
+        match self.property {
+            DielectricObservationProperty::RelativePermittivity
+            | DielectricObservationProperty::LossTangent => {
+                let frequency = self.test_frequency_hz.ok_or(
+                    DielectricValidationError::MissingObservationFrequency,
+                )?;
+                if !frequency.is_finite() || frequency < 0.0 {
+                    return Err(DielectricValidationError::InvalidTestFrequency);
+                }
+                if self.breakdown_test_kind.is_some() {
+                    return Err(DielectricValidationError::UnexpectedBreakdownTestKind);
+                }
+            }
+            DielectricObservationProperty::BreakdownStrength => {
+                if self.test_frequency_hz.is_some() {
+                    return Err(DielectricValidationError::UnexpectedObservationFrequency);
+                }
+                if self.breakdown_test_kind.is_none() {
+                    return Err(DielectricValidationError::MissingBreakdownTestKind);
+                }
+            }
+        }
+
+        if self.source_reference.trim().is_empty() {
+            return Err(DielectricValidationError::MissingSourceReference);
+        }
+        if let Some(uncertainty) = &self.uncertainty {
+            uncertainty.validate()?;
+        }
+        Ok(())
+    }
+}
+
 /// Dielectric properties measured or calculated at one explicitly recorded point.
 ///
 /// The permittivity and loss tangent share the record's characterization
@@ -457,6 +567,14 @@ pub enum DielectricValidationError {
     MissingUncertaintyMethodReference,
     /// Confidence-interval coverage probability must be finite and strictly between zero and one.
     InvalidUncertaintySemantics,
+    /// A conditioned dielectric observation's scalar value must be finite.
+    InvalidObservationValue,
+    /// A permittivity/loss-tangent observation requires a characterization frequency.
+    MissingObservationFrequency,
+    /// A breakdown observation must not be represented as a frequency-domain dielectric measurement.
+    UnexpectedObservationFrequency,
+    /// A permittivity/loss-tangent observation cannot carry a breakdown-test protocol.
+    UnexpectedBreakdownTestKind,
     /// A reported breakdown value must carry an evidence class.
     MissingBreakdownEvidenceKind,
     /// Breakdown characterization temperature must be finite and above absolute zero.
@@ -499,6 +617,10 @@ impl fmt::Display for DielectricValidationError {
             Self::InvalidRelativeUncertainty => "relative uncertainty must be finite and non-negative",
             Self::MissingUncertaintyMethodReference => "property uncertainty requires a method reference",
             Self::InvalidUncertaintySemantics => "confidence-interval coverage probability must be in (0, 1)",
+            Self::InvalidObservationValue => "conditioned dielectric observation value must be finite",
+            Self::MissingObservationFrequency => "permittivity/loss-tangent observation requires a test frequency",
+            Self::UnexpectedObservationFrequency => "breakdown observation must not carry a dielectric test frequency",
+            Self::UnexpectedBreakdownTestKind => "permittivity/loss-tangent observation cannot carry a breakdown protocol",
             Self::MissingBreakdownEvidenceKind => "breakdown strength requires an evidence class",
             Self::InvalidBreakdownTestTemperature => "breakdown test temperature must be finite and above zero kelvin",
             Self::MissingBreakdownTestKind => "breakdown strength requires a test protocol kind",
@@ -721,6 +843,75 @@ mod tests {
         assert_eq!(
             calculate_ideal_capacitor_metrics(&material, &geometry(), 0.0, 1.0),
             Err(DielectricValidationError::AcLossRequiresPositiveCharacterizationFrequency)
+        );
+    }
+
+    #[test]
+    fn single_property_observations_keep_distinct_sources_and_conditions() {
+        let permittivity = ConditionedDielectricObservation {
+            material_id: "same-material".to_string(),
+            property: DielectricObservationProperty::RelativePermittivity,
+            value: 180.0,
+            test_temperature_k: 298.15,
+            test_frequency_hz: Some(1_000.0),
+            test_field_v_per_m: Some(1.0e6),
+            breakdown_test_kind: None,
+            evidence_kind: DielectricEvidenceKind::Experimental,
+            source_reference: "doi:example-permittivity-paper".to_string(),
+            dataset_version: Some("paper-table-2".to_string()),
+            uncertainty: Some(PropertyUncertainty {
+                relative_uncertainty: 0.03,
+                semantics: PropertyUncertaintySemantics::ConfidenceInterval {
+                    coverage_probability: 0.95,
+                },
+                method_reference: "reported 95% confidence interval".to_string(),
+            }),
+        };
+        let loss = ConditionedDielectricObservation {
+            material_id: "same-material".to_string(),
+            property: DielectricObservationProperty::LossTangent,
+            value: 0.0008,
+            test_temperature_k: 298.15,
+            test_frequency_hz: Some(10_000.0),
+            test_field_v_per_m: None,
+            breakdown_test_kind: None,
+            evidence_kind: DielectricEvidenceKind::ManufacturerDatasheet,
+            source_reference: "datasheet:example-mlcc".to_string(),
+            dataset_version: Some("rev-b".to_string()),
+            uncertainty: None,
+        };
+        assert!(permittivity.validate().is_ok());
+        assert!(loss.validate().is_ok());
+        assert_ne!(permittivity.source_reference, loss.source_reference);
+        assert_ne!(permittivity.test_frequency_hz, loss.test_frequency_hz);
+        assert_eq!(permittivity.evidence_kind, DielectricEvidenceKind::Experimental);
+        assert_eq!(loss.evidence_kind, DielectricEvidenceKind::ManufacturerDatasheet);
+    }
+
+    #[test]
+    fn conditioned_observation_rejects_missing_frequency_or_misplaced_breakdown_protocol() {
+        let mut sample = ConditionedDielectricObservation {
+            material_id: "synthetic-observation".to_string(),
+            property: DielectricObservationProperty::RelativePermittivity,
+            value: 10.0,
+            test_temperature_k: 298.15,
+            test_frequency_hz: None,
+            test_field_v_per_m: None,
+            breakdown_test_kind: None,
+            evidence_kind: DielectricEvidenceKind::Estimated,
+            source_reference: "test-fixture://observation".to_string(),
+            dataset_version: None,
+            uncertainty: None,
+        };
+        assert_eq!(
+            sample.validate(),
+            Err(DielectricValidationError::MissingObservationFrequency)
+        );
+        sample.test_frequency_hz = Some(1_000.0);
+        sample.breakdown_test_kind = Some(BreakdownTestKind::DcRamp);
+        assert_eq!(
+            sample.validate(),
+            Err(DielectricValidationError::UnexpectedBreakdownTestKind)
         );
     }
 
