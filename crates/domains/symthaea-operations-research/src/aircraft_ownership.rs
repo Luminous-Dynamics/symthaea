@@ -578,6 +578,40 @@ fn validate_cost(field: &'static str, value: f64) -> Result<(), OwnershipCostErr
     }
 }
 
+fn is_iso_calendar_date(value: &str) -> bool {
+    if value.len() != 10
+        || value.as_bytes().get(4) != Some(&b'-')
+        || value.as_bytes().get(7) != Some(&b'-')
+        || !value.bytes().enumerate().all(|(index, byte)| {
+            if index == 4 || index == 7 {
+                byte == b'-'
+            } else {
+                byte.is_ascii_digit()
+            }
+        })
+    {
+        return false;
+    }
+    let year = value[0..4].parse::<u32>().ok();
+    let month = value[5..7].parse::<u32>().ok();
+    let day = value[8..10].parse::<u32>().ok();
+    let (Some(year), Some(month), Some(day)) = (year, month, day) else {
+        return false;
+    };
+    if year == 0 {
+        return false;
+    }
+    let leap_year = year % 4 == 0 && (year % 100 != 0 || year % 400 == 0);
+    let days_in_month = match month {
+        1 | 3 | 5 | 7 | 8 | 10 | 12 => 31,
+        4 | 6 | 9 | 11 => 30,
+        2 if leap_year => 29,
+        2 => 28,
+        _ => return false,
+    };
+    (1..=days_in_month).contains(&day)
+}
+
 fn is_sha256_digest(value: &str) -> bool {
     value.len() == 64 && value.bytes().all(|byte| byte.is_ascii_hexdigit())
 }
@@ -647,6 +681,8 @@ mod tests {
         assert!((report.breakdown.failed_dispatch_costs - 1_000.0).abs() < 1e-12);
         assert!((report.breakdown.completed_mission_costs - 4_500.0).abs() < 1e-12);
         assert!((report.breakdown.variable_flight_hour_costs - 20_925.0).abs() < 1e-12);
+        assert!((report.breakdown.owner_maintenance_labor_costs - 1_350.0).abs() < 1e-12);
+        assert!((report.breakdown.professional_maintenance_labor_costs - 2_025.0).abs() < 1e-12);
         assert!((report.breakdown.annual_total_cost - 44_425.0).abs() < 1e-12);
         assert!((report.fully_loaded_cost_per_flown_hour - 44_425.0 / 135.0).abs() < 1e-9);
         assert!((report.cost_per_completed_mission - 44_425.0 / 90.0).abs() < 1e-9);
@@ -669,6 +705,21 @@ mod tests {
         input.annual_fixed_costs.annual_taxes_registration_and_fees = 0.0;
         input.hourly_costs.battery_replacement_reserve = 0.0;
         assert!(evaluate_ownership_scenario(&input).is_ok());
+    }
+
+    #[test]
+    fn synthetic_50_100_200_attempts_sweep_has_expected_cost_curve() {
+        let at_50 = evaluate_ownership_scenario(&scenario("s4-50", 50)).unwrap();
+        let at_100 = evaluate_ownership_scenario(&scenario("s4-100", 100)).unwrap();
+        let at_200 = evaluate_ownership_scenario(&scenario("s4-200", 200)).unwrap();
+
+        assert!((at_50.breakdown.annual_total_cost - 30_212.5).abs() < 1e-9);
+        assert!((at_100.breakdown.annual_total_cost - 44_425.0).abs() < 1e-9);
+        assert!((at_200.breakdown.annual_total_cost - 78_850.0).abs() < 1e-9);
+        assert!(at_50.cost_per_completed_passenger_km
+            > at_100.cost_per_completed_passenger_km);
+        assert!(at_100.cost_per_completed_passenger_km
+            > at_200.cost_per_completed_passenger_km);
     }
 
     #[test]
@@ -746,6 +797,16 @@ mod tests {
             Err(OwnershipCostError::CostDataDateMismatch {
                 aircraft_id: "gamma".into()
             })
+        );
+    }
+
+    #[test]
+    fn impossible_cost_data_calendar_dates_fail_closed() {
+        let mut input = scenario("bad-date", 10);
+        input.cost_data_as_of = "2026-02-30".into();
+        assert_eq!(
+            evaluate_ownership_scenario(&input),
+            Err(OwnershipCostError::InvalidCostDataDate)
         );
     }
 
