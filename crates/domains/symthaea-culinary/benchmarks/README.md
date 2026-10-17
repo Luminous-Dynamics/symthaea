@@ -29,6 +29,14 @@ receipt. Exit code 0 means the receipt status is `pass`; non-zero means the
 result must not be promoted as passing. Inspect the receipt status rather than
 inferring success from process logs alone.
 
+Before running the receipt CLI, run the runner's self-tests and corpus oracle:
+
+```bash
+cargo test -p symthaea-culinary --example culinary_validation_receipt
+```
+
+These tests check the pinned raw manifest digest, exact fixture IDs, all preregistered expected validator outcomes, fail-closed expected-head handling, and special-float parsing. They are intended to fail on a fixture/code mismatch before a receipt run is promoted.
+
 ## Status semantics
 
 - `pass`: the complete pinned corpus ran at the exact identifiable commit and
