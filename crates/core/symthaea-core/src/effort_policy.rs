@@ -76,13 +76,25 @@ pub enum EffortFindingV1 {
     /// Selected profile and active configuration do not match.
     ProfileMismatch,
     /// Request uses a schema version this evaluator does not understand.
-    UnsupportedSchemaVersion { received: u16 },
+    UnsupportedSchemaVersion {
+        /// Schema version declared by the request.
+        received: u16,
+    },
     /// A numeric value is NaN or infinite.
-    NonFiniteValue { field: EffortFieldV1 },
+    NonFiniteValue {
+        /// Quantity that contained a non-finite value.
+        field: EffortFieldV1,
+    },
     /// A normalized numeric value is outside [0, 1].
-    OutsideNormalizedRange { field: EffortFieldV1 },
+    OutsideNormalizedRange {
+        /// Quantity outside the normalized range.
+        field: EffortFieldV1,
+    },
     /// Requested assistance or resistance exceeds its declared ceiling.
-    RequestedAboveLimit { field: EffortFieldV1 },
+    RequestedAboveLimit {
+        /// Quantity above the declared ceiling.
+        field: EffortFieldV1,
+    },
     /// Nonzero resistance was requested outside the training mode.
     ResistanceRequiresTrainingMode,
     /// Training mode lacks explicit opt-in.
@@ -241,7 +253,9 @@ pub fn evaluate_effort_request(request: &EffortRequestV1) -> EffortDecisionV1 {
         });
     }
 
-    if request.mode != EffortModeV1::TrainingResistive && request.requested_resistance != 0.0 {
+    if request.mode != EffortModeV1::TrainingResistive
+        && (request.requested_resistance != 0.0 || request.resistance_increase_requested)
+    {
         findings.push(EffortFindingV1::ResistanceRequiresTrainingMode);
     }
     if request.mode == EffortModeV1::TrainingResistive {
@@ -356,6 +370,20 @@ mod tests {
     }
 
     #[test]
+    fn resistance_progression_is_forbidden_outside_training_mode() {
+        let mut request = valid_training_request();
+        request.mode = EffortModeV1::MobilityConserve;
+        request.requested_resistance = 0.0;
+        request.resistance_increase_requested = true;
+        let decision = evaluate_effort_request(&request);
+        assert_eq!(decision.status, EffortDecisionStatusV1::Rejected);
+        assert!(has_finding(
+            &decision,
+            EffortFindingV1::ResistanceRequiresTrainingMode
+        ));
+    }
+
+    #[test]
     fn training_requires_opt_in_and_eligible_profile() {
         let mut request = valid_training_request();
         request.explicit_training_opt_in = false;
@@ -380,6 +408,10 @@ mod tests {
         assert!(has_finding(
             &decision,
             EffortFindingV1::UserRequestedStop
+        ));
+        assert!(has_finding(
+            &decision,
+            EffortFindingV1::StopConflictsWithResistance
         ));
         assert!(!matches!(
             decision.status,
