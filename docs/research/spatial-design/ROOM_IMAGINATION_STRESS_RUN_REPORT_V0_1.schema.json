@@ -85,7 +85,8 @@
       "required": [
         "observation_key",
         "artifact_sha256",
-        "artifact_revision"
+        "artifact_revision",
+        "artifact_path"
       ],
       "properties": {
         "observation_key": {
@@ -97,6 +98,10 @@
           "pattern": "^[a-f0-9]{64}$"
         },
         "artifact_revision": {
+          "type": "string",
+          "minLength": 1
+        },
+        "artifact_path": {
           "type": "string",
           "minLength": 1
         }
