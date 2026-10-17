@@ -136,10 +136,16 @@
       "id": "CHEM-PROC-004",
       "class": "metamorphic",
       "scenario": "Equivalent unit representations",
-      "claim_under_test": "Explicitly converted equivalent values yield equivalent normalized balances.",
+      "claim_under_test": "An explicit, versioned unit-conversion factor reproduces an equivalent representation within the frozen tolerance.",
       "fixture": {
-        "case_pair": "CHEM-PROC-001",
-        "representation": "equivalent_units_after_explicit_conversion"
+        "conversion_kind": "volume_flow",
+        "from_value": 1,
+        "from_unit": "m^3/s",
+        "to_value": 1000,
+        "to_unit": "L/s",
+        "conversion_factor": 1000,
+        "conversion_factor_ref": "synthetic-unit-conversion-v1",
+        "conversion_rule": "to_value = from_value * conversion_factor"
       },
       "expected_disposition": "ACCEPTED_WITHIN_SCOPE",
       "required_findings": [
