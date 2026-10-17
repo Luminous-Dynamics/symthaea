@@ -18,3 +18,7 @@ path = "src/main.rs"
 [[bin]]
 name = "nano-rescue-score"
 path = "src/bin/nano-rescue-score.rs"
+
+[[bin]]
+name = "nano-qoi-acquisition"
+path = "src/bin/nano-qoi-acquisition.rs"
