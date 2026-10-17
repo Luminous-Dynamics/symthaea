@@ -473,10 +473,10 @@ fn sample_subdir(instrument: Instrument) -> Option<(SampleSource, &'static str)>
             Vcsl,
             "Idiophones/Struck Idiophones/Xylophone/Hard Mallets",
         )),
-        // Real flute from VSCO2; the breathy baroque recorder stays the
-        // honest stand-in for the ney (an end-blown flute).
         Instrument::Flute => Some((Vsco2, "Woodwinds/Flute/susvib")),
-        Instrument::Ney => Some((
+        // VCSL's baroque alto recorder is now mapped to Recorder itself.
+        // Ney remains procedural until a source-faithful ney bank is verified.
+        Instrument::Recorder => Some((
             Vcsl,
             "Aerophones/Edge-blown Aerophones/Baroque Alto Recorder/Sustain",
         )),
@@ -820,7 +820,7 @@ impl VcslLibrary {
             Instrument::Tuba,
             Instrument::Trombone,
             Instrument::Flute,
-            Instrument::Ney,
+            Instrument::Recorder,
             Instrument::Violin,
             Instrument::Viola,
             Instrument::Cello,
@@ -1232,7 +1232,7 @@ pub fn capability_inventory_with_options(
         ));
     }
 
-    const INSTRUMENTS: [Instrument; 42] = [
+    const INSTRUMENTS: [Instrument; 46] = [
         Instrument::Piano,
         Instrument::PianoPP,
         Instrument::Violin,
@@ -1254,6 +1254,10 @@ pub fn capability_inventory_with_options(
         Instrument::Koto,
         Instrument::Oud,
         Instrument::Ney,
+        Instrument::Recorder,
+        Instrument::Ocarina,
+        Instrument::Harmonica,
+        Instrument::DanTranh,
         Instrument::UprightBass,
         Instrument::Viola,
         Instrument::Oboe,
@@ -3158,7 +3162,20 @@ mod tests {
         assert_eq!(selectable_styles, 44);
         assert_eq!(release_only_styles, 4);
 
-        // These two still lack a matching sample set in either inspected source.
+        // Source mapping stays instrument-faithful: a recorder sample is not
+        // passed off as a ney. The three newly introduced non-recorder sources
+        // remain procedural until their files and pitch maps are verified.
+        assert!(sample_subdir(Instrument::Ney).is_none());
+        assert_eq!(
+            sample_subdir(Instrument::Recorder),
+            Some((
+                SampleSource::Vcsl,
+                "Aerophones/Edge-blown Aerophones/Baroque Alto Recorder/Sustain"
+            ))
+        );
+        assert!(sample_subdir(Instrument::Ocarina).is_none());
+        assert!(sample_subdir(Instrument::Harmonica).is_none());
+        assert!(sample_subdir(Instrument::DanTranh).is_none());
         assert!(sample_subdir(Instrument::Duduk).is_none());
         assert!(sample_subdir(Instrument::ChoirOoh).is_none());
         std::fs::remove_dir_all(root).unwrap();
