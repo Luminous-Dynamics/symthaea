@@ -1,0 +1,159 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "urn:luminous-dynamics:appliance-active-diagnostics:0.1.0",
+  "title": "Appliance Active-Diagnostics Synthetic Corpus v0.1",
+  "description": "Synthetic mathematical fixtures for testing next-measurement selection and abstention. Does not estimate real fault probabilities or validate appliance safety.",
+  "type": "object",
+  "additionalProperties": false,
+  "required": [
+    "schema_version",
+    "corpus_id",
+    "evidence_class",
+    "claim_ceiling",
+    "traces"
+  ],
+  "properties": {
+    "schema_version": { "const": "0.1.0" },
+    "corpus_id": { "const": "APPLIANCE-ACTIVE-DIAG-001" },
+    "evidence_class": { "const": "synthetic_contract_fixture" },
+    "claim_ceiling": { "const": "policy_and_math_contract_only" },
+    "traces": {
+      "type": "array",
+      "minItems": 15,
+      "items": {
+        "type": "object",
+        "additionalProperties": false,
+        "required": [
+          "trace_id",
+          "scenario",
+          "observation_status",
+          "protection_state",
+          "hypotheses",
+          "candidate_measurements",
+          "expected"
+        ],
+        "properties": {
+          "trace_id": { "type": "string", "pattern": "^ADT-[0-9]{3}$" },
+          "scenario": { "type": "string", "minLength": 20 },
+          "observation_status": {
+            "enum": ["complete", "missing", "stale", "conflicting", "invalid_units"]
+          },
+          "protection_state": { "enum": ["clear", "tripped", "unknown"] },
+          "hypotheses": {
+            "type": "array",
+            "minItems": 2,
+            "items": {
+              "type": "object",
+              "additionalProperties": false,
+              "required": ["hypothesis_id", "prior_probability"],
+              "properties": {
+                "hypothesis_id": {
+                  "type": "string",
+                  "pattern": "^[a-z][a-z0-9_]{1,63}$"
+                },
+                "prior_probability": {
+                  "type": "number",
+                  "minimum": 0,
+                  "maximum": 1
+                }
+              }
+            }
+          },
+          "candidate_measurements": {
+            "type": "array",
+            "items": {
+              "type": "object",
+              "additionalProperties": false,
+              "required": [
+                "measurement_id",
+                "cost_units",
+                "risk_class",
+                "available",
+                "outcome_ids",
+                "likelihoods"
+              ],
+              "properties": {
+                "measurement_id": {
+                  "type": "string",
+                  "pattern": "^[a-z][a-z0-9_]{1,63}$"
+                },
+                "cost_units": { "type": "number", "minimum": 0 },
+                "risk_class": {
+                  "enum": ["low", "qualified_person_required", "prohibited"]
+                },
+                "available": { "type": "boolean" },
+                "outcome_ids": {
+                  "type": "array",
+                  "minItems": 2,
+                  "items": { "type": "string", "minLength": 1 }
+                },
+                "likelihoods": {
+                  "type": "array",
+                  "minItems": 1,
+                  "items": {
+                    "type": "object",
+                    "additionalProperties": false,
+                    "required": ["hypothesis_id", "probabilities"],
+                    "properties": {
+                      "hypothesis_id": { "type": "string", "minLength": 1 },
+                      "probabilities": {
+                        "type": "array",
+                        "minItems": 2,
+                        "items": {
+                          "type": "object",
+                          "additionalProperties": false,
+                          "required": ["outcome_id", "probability"],
+                          "properties": {
+                            "outcome_id": { "type": "string", "minLength": 1 },
+                            "probability": {
+                              "type": "number",
+                              "minimum": 0,
+                              "maximum": 1
+                            }
+                          }
+                        }
+                      }
+                    }
+                  }
+                }
+              }
+            }
+          },
+          "expected": {
+            "type": "object",
+            "additionalProperties": false,
+            "required": ["decision", "next_measurement_id", "reason_code"],
+            "properties": {
+              "decision": {
+                "enum": [
+                  "select_measurement",
+                  "abstain_and_review",
+                  "no_safe_candidate",
+                  "no_discriminating_measurement",
+                  "reject_invalid_contract"
+                ]
+              },
+              "next_measurement_id": {
+                "type": ["string", "null"]
+              },
+              "reason_code": {
+                "enum": [
+                  "information_gain_per_cost",
+                  "protection_tripped",
+                  "protection_unknown",
+                  "observations_unreliable",
+                  "no_safe_candidate",
+                  "no_discriminating_measurement",
+                  "invalid_prior_distribution",
+                  "invalid_likelihood_model",
+                  "duplicate_identity",
+                  "invalid_cost"
+                ]
+              }
+            }
+          }
+        }
+      }
+    }
+  }
+}
