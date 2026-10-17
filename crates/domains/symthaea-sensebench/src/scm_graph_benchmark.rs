@@ -665,8 +665,10 @@ fn f1_from_counts(tp: usize, fp: usize, fn_: usize) -> f64 {
 fn simulate_trial(
     policy: ScmGraphPolicy,
     graphs: &[CausalDag],
+    actions: &[ScmAction],
     priors: &[HypothesisPrior],
     scenarios: &[ModelLikelihoodScenario],
+    oracle_candidates: &[ExperimentCandidate],
     world: &ScmWorld,
     fixed_action_id: &str,
     measurement_budget: usize,
@@ -676,8 +678,6 @@ fn simulate_trial(
     let mut posterior = priors.to_vec();
     let mut outcome_rng = BenchmarkRng::new(seed ^ 0x0B5E_7A71);
     let mut selection_rng = BenchmarkRng::new(seed ^ 0x51EC_7100);
-    let actions = actions();
-    let oracle_candidates = candidate_set(graphs, &actions, world.parameters);
     let truth_index = graphs.iter().position(|graph| *graph == world.truth)
         .ok_or(ScmGraphBenchmarkError::InvalidDagCatalogue)?;
     let mut measurements_used = 0usize;
@@ -699,8 +699,12 @@ fn simulate_trial(
         )?.ok_or(ScmGraphBenchmarkError::MissingCandidate)?;
         let action = actions.iter().find(|action| action.id == selected_id)
             .ok_or(ScmGraphBenchmarkError::MissingCandidate)?;
-        let true_distribution = outcome_distribution(world.truth, action, world.parameters);
-        let observed_outcome = sample_outcome(&true_distribution, &mut outcome_rng);
+        let hidden_candidate = oracle_candidates.iter()
+            .find(|candidate| candidate.id == selected_id)
+            .ok_or(ScmGraphBenchmarkError::MissingCandidate)?;
+        let true_distribution = hidden_candidate.likelihoods.get(truth_index)
+            .ok_or(ScmGraphBenchmarkError::MissingCandidate)?;
+        let observed_outcome = sample_outcome(true_distribution, &mut outcome_rng);
         let model_candidate = scenarios[0].candidates.iter()
             .find(|candidate| candidate.id == selected_id)
             .ok_or(ScmGraphBenchmarkError::MissingCandidate)?;
@@ -919,6 +923,7 @@ pub fn run_scm_graph_benchmark(
     let mut summaries = Vec::with_capacity(worlds.len() * policies.len());
 
     for (world_index, world) in worlds.iter().enumerate() {
+        let oracle_candidates = candidate_set(&graphs, &actions, world.parameters);
         for policy in policies {
             let mut trials = Vec::with_capacity(trials_per_world);
             for trial_index in 0..trials_per_world {
@@ -928,8 +933,10 @@ pub fn run_scm_graph_benchmark(
                 trials.push(simulate_trial(
                     policy,
                     &graphs,
+                    &actions,
                     &priors,
                     &scenarios,
+                    &oracle_candidates,
                     world,
                     &fixed_action_id,
                     measurement_budget,
