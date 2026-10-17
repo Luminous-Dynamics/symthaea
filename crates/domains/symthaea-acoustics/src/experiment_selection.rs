@@ -87,7 +87,7 @@ impl ExperimentOption {
 pub enum ExperimentSelectionPolicy {
     /// Lowest estimated cost first; stable ID breaks ties.
     CheapestFirst,
-    /// Resolve the most consequential declared questions first; cost breaks ties.
+    /// Prioritize declared blocking questions and frontier pairs; cost breaks ties.
     FrontierRelevanceFirst,
     /// Highest declared uncertainty-reduction proxy per cost unit first.
     UncertaintyReductionPerCost,
@@ -146,8 +146,9 @@ impl std::error::Error for ExperimentSelectionError {}
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub struct ExperimentRanking {
     pub option_indices: Vec<usize>,
-    /// Snapshot of option IDs in original input order; guards index reuse.
-    pub input_option_ids: Vec<String>,
+    /// Full snapshot in original input order; guards stale rankings after any
+    /// option cost, profile, fidelity or heuristic assessment changes.
+    pub input_option_snapshot: Vec<ExperimentOption>,
     pub policy: ExperimentSelectionPolicy,
     pub evaluation_profile_id: String,
     pub cost_unit_id: String,
@@ -230,7 +231,7 @@ pub fn rank_experiments(
 
     Ok(ExperimentRanking {
         option_indices: indices,
-        input_option_ids: options.iter().map(|option| option.id.clone()).collect(),
+        input_option_snapshot: options.to_vec(),
         policy,
         evaluation_profile_id: evaluation_profile_id.to_owned(),
         cost_unit_id: cost_unit_id.to_owned(),
@@ -253,8 +254,7 @@ pub fn select_under_budget(
         &ranking.evaluation_profile_id,
         &ranking.cost_unit_id,
     )?;
-    let input_option_ids: Vec<_> = options.iter().map(|option| option.id.clone()).collect();
-    if input_option_ids != ranking.input_option_ids {
+    if options != ranking.input_option_snapshot.as_slice() {
         return Err(ExperimentSelectionError::RankingOptionPoolMismatch);
     }
     if ranking.option_indices.len() != options.len() {
@@ -448,10 +448,7 @@ mod tests {
         assert_eq!(first.option_indices.len(), options.len());
         let unique: HashSet<_> = first.option_indices.iter().copied().collect();
         assert_eq!(unique.len(), options.len());
-        assert_eq!(
-            first.input_option_ids,
-            options.iter().map(|option| option.id.clone()).collect::<Vec<_>>()
-        );
+        assert_eq!(first.input_option_snapshot, options);
     }
 
     #[test]
