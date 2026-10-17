@@ -3,8 +3,8 @@
 //
 // Ready/valid streaming XOR primitive for exact BinaryHV chunks.
 // This is a parameterized architectural profile, not a performance claim.
-\`timescale 1ns/1ps
-\`default_nettype none
+`timescale 1ns/1ps
+`default_nettype none
 
 module hdc_bind_xor_stream #(
     parameter integer DATA_WIDTH = 256
@@ -50,4 +50,4 @@ module hdc_bind_xor_stream #(
     end
 endmodule
 
-\`default_nettype wire
+`default_nettype wire
