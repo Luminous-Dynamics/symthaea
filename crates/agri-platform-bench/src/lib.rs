@@ -92,6 +92,19 @@ impl EvidenceDomain {
     }
 }
 
+pub const SCENARIO_EVIDENCE_DOMAINS: [EvidenceDomain; 4] = [
+    EvidenceDomain::TaskDefinition,
+    EvidenceDomain::SiteGeometry,
+    EvidenceDomain::TerrainEnvelope,
+    EvidenceDomain::NavigationEnvelope,
+];
+
+pub const PLATFORM_EVIDENCE_DOMAINS: [EvidenceDomain; 3] = [
+    EvidenceDomain::SafetyEnvelope,
+    EvidenceDomain::CostModel,
+    EvidenceDomain::Serviceability,
+];
+
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
 pub enum EvidenceState {
     Verified,
@@ -180,6 +193,8 @@ pub struct PlatformProfile {
     pub bounded_safety_case_verified: bool,
     /// A person can stop or take over the operation in the declared envelope.
     pub human_override_available: bool,
+    /// Candidate-specific evidence (safety, quote/cost model, serviceability).
+    pub evidence: Vec<EvidenceRecord>,
 }
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
@@ -264,6 +279,7 @@ fn evidence_record_is_well_formed(record: &EvidenceRecord) -> bool {
 
 fn evidence_map(
     records: &[EvidenceRecord],
+    required_domains: &[EvidenceDomain],
 ) -> Result<BTreeMap<EvidenceDomain, EvidenceState>, BTreeSet<BlockerCode>> {
     let mut states = BTreeMap::new();
     let mut problems = BTreeSet::new();
@@ -277,8 +293,8 @@ fn evidence_map(
         }
     }
 
-    for domain in EvidenceDomain::ALL {
-        if !states.contains_key(&domain) {
+    for domain in required_domains {
+        if !states.contains_key(domain) {
             problems.insert(BlockerCode::MissingEvidenceRecord);
         }
     }
@@ -390,10 +406,15 @@ pub fn assess(
         );
     }
 
-    let states = match evidence_map(&scenario.evidence) {
+    let mut states = match evidence_map(&scenario.evidence, &SCENARIO_EVIDENCE_DOMAINS) {
         Ok(states) => states,
         Err(problems) => return blocked(&platform.id, problems, Vec::new()),
     };
+    let platform_states = match evidence_map(&platform.evidence, &PLATFORM_EVIDENCE_DOMAINS) {
+        Ok(states) => states,
+        Err(problems) => return blocked(&platform.id, problems, Vec::new()),
+    };
+    states.extend(platform_states);
 
     let mut evidence_blockers = BTreeSet::new();
     let mut uncertain_domains = Vec::new();
@@ -692,7 +713,7 @@ mod tests {
             annual_operating_hours: 100,
             require_local_repair: true,
             max_repair_lead_days: 14,
-            evidence: EvidenceDomain::ALL
+            evidence: SCENARIO_EVIDENCE_DOMAINS
                 .into_iter()
                 .map(|domain| {
                     EvidenceRecord::verified(
@@ -727,11 +748,21 @@ mod tests {
             repair_lead_days: 7,
             bounded_safety_case_verified: true,
             human_override_available: true,
+            evidence: PLATFORM_EVIDENCE_DOMAINS
+                .into_iter()
+                .map(|domain| {
+                    EvidenceRecord::verified(
+                        domain,
+                        SYNTHETIC_FIXTURE_REFERENCE,
+                        SYNTHETIC_FIXTURE_SHA256,
+                    )
+                })
+                .collect(),
         }
     }
 
-    fn set_state(scenario: &mut ScenarioProfile, domain: EvidenceDomain, state: EvidenceState) {
-        let record = scenario.evidence.iter_mut().find(|r| r.domain == domain).unwrap();
+    fn set_state(records: &mut [EvidenceRecord], domain: EvidenceDomain, state: EvidenceState) {
+        let record = records.iter_mut().find(|r| r.domain == domain).unwrap();
         record.state = state;
         record.reference = match state {
             EvidenceState::Missing => None,
@@ -768,16 +799,16 @@ mod tests {
             Mutation::RepairLeadTooLong => platform.repair_lead_days = 15,
             Mutation::SafetyCaseMissing => platform.bounded_safety_case_verified = false,
             Mutation::HumanOverrideMissing => platform.human_override_available = false,
-            Mutation::MissingTaskEvidence => set_state(&mut scenario, EvidenceDomain::TaskDefinition, EvidenceState::Missing),
-            Mutation::StaleGeometryEvidence => set_state(&mut scenario, EvidenceDomain::SiteGeometry, EvidenceState::Stale),
-            Mutation::ConflictingTerrainEvidence => set_state(&mut scenario, EvidenceDomain::TerrainEnvelope, EvidenceState::Conflicting),
-            Mutation::MissingNavigationEvidence => set_state(&mut scenario, EvidenceDomain::NavigationEnvelope, EvidenceState::Missing),
-            Mutation::EstimatedSafetyEvidence => set_state(&mut scenario, EvidenceDomain::SafetyEnvelope, EvidenceState::Estimated),
-            Mutation::EstimatedCostEvidence => set_state(&mut scenario, EvidenceDomain::CostModel, EvidenceState::Estimated),
-            Mutation::EstimatedServiceabilityEvidence => set_state(&mut scenario, EvidenceDomain::Serviceability, EvidenceState::Estimated),
+            Mutation::MissingTaskEvidence => set_state(&mut scenario.evidence, EvidenceDomain::TaskDefinition, EvidenceState::Missing),
+            Mutation::StaleGeometryEvidence => set_state(&mut scenario.evidence, EvidenceDomain::SiteGeometry, EvidenceState::Stale),
+            Mutation::ConflictingTerrainEvidence => set_state(&mut scenario.evidence, EvidenceDomain::TerrainEnvelope, EvidenceState::Conflicting),
+            Mutation::MissingNavigationEvidence => set_state(&mut scenario.evidence, EvidenceDomain::NavigationEnvelope, EvidenceState::Missing),
+            Mutation::EstimatedSafetyEvidence => set_state(&mut platform.evidence, EvidenceDomain::SafetyEnvelope, EvidenceState::Estimated),
+            Mutation::EstimatedCostEvidence => set_state(&mut platform.evidence, EvidenceDomain::CostModel, EvidenceState::Estimated),
+            Mutation::EstimatedServiceabilityEvidence => set_state(&mut platform.evidence, EvidenceDomain::Serviceability, EvidenceState::Estimated),
             Mutation::EstimatedTerrainEvidence => set_state(&mut scenario, EvidenceDomain::TerrainEnvelope, EvidenceState::Estimated),
             Mutation::MalformedVerifiedDigest => {
-                let record = scenario.evidence.iter_mut().find(|r| r.domain == EvidenceDomain::CostModel).unwrap();
+                let record = platform.evidence.iter_mut().find(|r| r.domain == EvidenceDomain::CostModel).unwrap();
                 record.artifact_sha256 = Some("bad-digest".into());
             }
             Mutation::DuplicateEvidenceDomain => {
