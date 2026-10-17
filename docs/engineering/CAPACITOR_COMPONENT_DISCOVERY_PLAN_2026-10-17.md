@@ -118,7 +118,9 @@ Lock test splits, seed sets, evaluation budgets, baseline implementations, and m
 
 The initial increment adds `dielectric.rs`, `capacitor_screening.rs`, and `robust_capacitor.rs`, exported from `symthaea-materials`. It includes:
 
-- Explicit evidence classes and source references; uncertainty is attached to each property with a reference describing how that uncertainty was obtained, and semantics distinguishing a hard bound, statistical estimate, or confidence interval.
+- A source-bound `ConditionedDielectricObservation` for one scalar property, so permittivity, loss tangent, and breakdown strength can be stored independently with their own source, evidence class, conditions, dataset version, and uncertainty semantics. This avoids inventing placeholders when a source reports only one property.
+- A paired `DielectricPropertyRecord` for the initial screening path, with permittivity and loss tangent at shared characterization conditions; do not silently merge separately sourced observations until an explicit compatibility/aggregation adapter exists.
+- Uncertainty is attached to each property with a method reference and semantics distinguishing a hard bound, statistical estimate, or confidence interval.
 - Permittivity/loss test temperature, frequency and optional characterization field; separate evidence metadata for breakdown strength.
 - Multilayer parallel-plate geometry with input validation.
 - First-order capacitance, peak stored energy, active volume, ideal linear energy density, sinusoidal dielectric-loss, ideal breakdown-limited energy-density figure of merit, and optional breakdown-field ratio.
@@ -190,6 +192,7 @@ https://doi.org/10.1038/s42256-026-01283-z
 
 ### B4 — Robustness and reliability
 
+- Validate the single-property observation schema with property-specific source/condition metadata and ensure incomplete or mismatched observations cannot be silently merged.
 - First verify interval algebra with synthetic hard-bound fixtures: nominal metrics lie inside each calculated interval; upper-loss and lower-breakdown cases are exercised; statistically described uncertainty is rejected from deterministic interval claims.
 - Next perturb geometry, manufacturing dimensions, material parameters, ESR/ESL, temperature, ripple waveform, and aging assumptions using separately supported models/data.
 - Report deterministic hard-bound feasibility separately from statistical constraint-violation probability. Only estimate probabilities when distributions/correlations are justified and calibration can be assessed.
