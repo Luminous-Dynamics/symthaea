@@ -374,6 +374,8 @@ struct ShiftManifest {
 struct ShiftGroupDeclaration {
     group_id: String,
     shift_family: String,
+    /// Statistical/physical mechanism axes can differ even within one physical family.
+    shift_axes: Vec<String>,
     shift_kind: String,
     severity: String,
     split: String,
@@ -884,6 +886,14 @@ fn verify_optional_shift_manifest(
     ];
     let valid_severity = ["baseline", "mild", "moderate", "severe"];
     let valid_kinds = ["in_distribution", "single_factor", "compounded"];
+    let valid_axes = [
+        "feature_support",
+        "label_distribution",
+        "graph_topology",
+        "physical_regime",
+        "chemical_environment",
+        "measurement_process",
+    ];
     let valid_splits = ["train", "calibration", "validation", "test_lockbox"];
     let mut group_ids = BTreeSet::new();
     let mut independence_splits: BTreeMap<String, String> = BTreeMap::new();
@@ -939,6 +949,35 @@ fn verify_optional_shift_manifest(
                 "shift_manifest_kind_severity_mismatch",
                 format!(
                     "shift_groups[{index}] must use baseline severity only for in_distribution data; shift_family=compounded and shift_kind=compounded must agree"
+                ),
+            );
+        }
+        let mut axes_seen = BTreeSet::new();
+        for axis in &group.shift_axes {
+            if !valid_axes.contains(&axis.as_str()) {
+                report.fail(
+                    "shift_manifest_axis_invalid",
+                    format!("shift_groups[{index}] has unsupported shift axis {axis:?}"),
+                );
+            }
+            if !axes_seen.insert(axis) {
+                report.fail(
+                    "shift_manifest_axis_duplicate",
+                    format!("shift_groups[{index}] repeats shift axis {axis:?}"),
+                );
+            }
+        }
+        let axes_cardinality_valid = match group.shift_kind.as_str() {
+            "in_distribution" => group.shift_axes.is_empty(),
+            "single_factor" => group.shift_axes.len() == 1,
+            "compounded" => group.shift_axes.len() >= 2,
+            _ => false,
+        };
+        if !axes_cardinality_valid {
+            report.fail(
+                "shift_manifest_axis_kind_mismatch",
+                format!(
+                    "shift_groups[{index}] must have 0 axes for in_distribution, exactly 1 for single_factor, and at least 2 for compounded shifts"
                 ),
             );
         }
@@ -1868,6 +1907,7 @@ mod tests {
                     {
                         "group_id": "train-composition",
                         "shift_family": "composition",
+                        "shift_axes": [],
                         "shift_kind": "in_distribution",
                         "severity": "baseline",
                         "split": "train",
@@ -1881,6 +1921,7 @@ mod tests {
                     {
                         "group_id": "calibration-temperature",
                         "shift_family": "temperature_energy",
+                        "shift_axes": ["physical_regime"],
                         "shift_kind": "single_factor",
                         "severity": "moderate",
                         "split": "calibration",
@@ -1894,6 +1935,7 @@ mod tests {
                     {
                         "group_id": "test-surface",
                         "shift_family": "surface_coordination",
+                        "shift_axes": ["graph_topology"],
                         "shift_kind": "single_factor",
                         "severity": "severe",
                         "split": "test_lockbox",
