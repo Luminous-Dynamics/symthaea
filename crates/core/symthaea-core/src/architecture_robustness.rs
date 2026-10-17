@@ -1030,6 +1030,61 @@ mod tests {
     }
 
     #[test]
+    fn invalid_operating_conditions_and_identity_fail_closed() {
+        let baseline = request(vec![
+            candidate("balanced", Profile::Balanced),
+            candidate("overbuilt", Profile::Overbuilt),
+        ]);
+
+        let mut negative_payload = baseline.clone();
+        negative_payload.operating_conditions.payload_kg = -0.1;
+        assert!(evaluate_architecture_robustness(&negative_payload)
+            .as_ref()
+            .err()
+            .unwrap()
+            .iter()
+            .any(|finding| {
+                matches!(
+                    finding,
+                    ArchitectureRobustnessFindingV1::NegativeOperatingCondition {
+                        field: ArchitectureConditionFieldV1::PayloadKg
+                    }
+                )
+            }));
+
+        let mut nonfinite_speed = baseline.clone();
+        nonfinite_speed.operating_conditions.speed_mps = f64::INFINITY;
+        assert!(evaluate_architecture_robustness(&nonfinite_speed)
+            .as_ref()
+            .err()
+            .unwrap()
+            .iter()
+            .any(|finding| {
+                matches!(
+                    finding,
+                    ArchitectureRobustnessFindingV1::NonFiniteOperatingCondition {
+                        field: ArchitectureConditionFieldV1::SpeedMps
+                    }
+                )
+            }));
+
+        let mut missing_identity = baseline;
+        missing_identity.task_id = " overground_walk".to_owned();
+        assert!(evaluate_architecture_robustness(&missing_identity)
+            .as_ref()
+            .err()
+            .unwrap()
+            .iter()
+            .any(|finding| {
+                matches!(
+                    finding,
+                    ArchitectureRobustnessFindingV1::InvalidIdentity { field }
+                        if field == "task_id"
+                )
+            }));
+    }
+
+    #[test]
     fn missing_and_duplicate_metric_dimensions_fail_closed() {
         let mut missing = candidate("missing", Profile::Balanced);
         missing.metrics.pop();
