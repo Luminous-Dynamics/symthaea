@@ -1,12 +1,13 @@
 // Copyright (C) 2024-2026 Tristan Stoltz / Luminous Dynamics
 // SPDX-License-Identifier: AGPL-3.0-or-later
 
+#[path = "../rescue_contract.rs"]
+mod rescue_contract;
 #[path = "../rescue_metrics.rs"]
 mod rescue_metrics;
 
 use std::path::PathBuf;
 use std::process::ExitCode;
-use symthaea_nanotech_audit::audit_run;
 
 fn main() -> ExitCode {
     let mut args = std::env::args_os();
@@ -17,7 +18,7 @@ fn main() -> ExitCode {
             PathBuf::from(program).display()
         );
         eprintln!(
-            "The scorer requires a passing structural audit; a score report is not a scientific promotion verdict."
+            "The scorer audits the NANO-013 contract first; a score report is not a scientific promotion verdict."
         );
         return ExitCode::from(2);
     };
@@ -27,13 +28,11 @@ fn main() -> ExitCode {
     }
 
     let run_dir = PathBuf::from(run_dir);
-    let audit = audit_run(&run_dir);
-    if audit.status != "artifact_integrity_pass" {
-        let details = serde_json::to_string_pretty(&audit)
-            .unwrap_or_else(|error| format!("could not serialize audit report: {error}"));
+    let contract = rescue_contract::audit_optional_rescue_contract(&run_dir);
+    if !contract.provided || !contract.findings.is_empty() {
         eprintln!(
-            "NANO-013 scoring refused because structural audit status was {}:\n{}",
-            audit.status, details
+            "NANO-013 scoring refused: contract provided={}, findings={:#?}",
+            contract.provided, contract.findings
         );
         return ExitCode::from(1);
     }
