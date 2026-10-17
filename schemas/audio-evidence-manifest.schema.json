@@ -780,7 +780,18 @@
             "minItems": 1
           },
           "captures": {
-            "minItems": 1
+            "minItems": 1,
+            "contains": {
+              "properties": {
+                "capture_role": {
+                  "const": "raw"
+                }
+              },
+              "required": [
+                "capture_role"
+              ]
+            },
+            "minContains": 1
           }
         }
       }
@@ -835,6 +846,32 @@
                   "fail",
                   "inconclusive"
                 ]
+              }
+            }
+          }
+        }
+      }
+    },
+    {
+      "if": {
+        "properties": {
+          "data_status": {
+            "enum": [
+              "captured",
+              "analyzed"
+            ]
+          }
+        },
+        "required": [
+          "data_status"
+        ]
+      },
+      "then": {
+        "properties": {
+          "decision": {
+            "properties": {
+              "disposition": {
+                "const": "not_evaluated"
               }
             }
           }
