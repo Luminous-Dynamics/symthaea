@@ -27,6 +27,9 @@ use std::{
 use symthaea_muse::{MusicalState, midi_export::export_performance_midi};
 use symthaea_music_theory::{MusicalIntent, Style, compose_styled};
 
+const MAX_GMD_INFO_BYTES: u64 = 32 * 1024 * 1024;
+const MAX_GMD_MIDI_BYTES: u64 = 16 * 1024 * 1024;
+
 #[derive(Debug)]
 struct Arguments {
     dataset_root: PathBuf,
@@ -192,8 +195,7 @@ fn run() -> Result<(), Box<dyn Error>> {
 
     let dataset_root = locate_dataset_root(&args.dataset_root)?;
     let metadata_path = dataset_root.join("info.csv");
-    ensure_regular_non_symlink(&metadata_path)?;
-    let metadata_bytes = fs::read(&metadata_path)?;
+    let metadata_bytes = read_regular_file_limited(&metadata_path, MAX_GMD_INFO_BYTES)?;
     let metadata_sha256 = sha256_hex(&metadata_bytes);
     let metadata_text = std::str::from_utf8(&metadata_bytes)?;
     let rows = selected_dataset_rows(metadata_text, &args.split, args.file_limit)?;
@@ -227,7 +229,7 @@ fn run() -> Result<(), Box<dyn Error>> {
             }
         };
 
-        let bytes = match fs::read(&resolved) {
+        let bytes = match read_regular_file_limited(&resolved, MAX_GMD_MIDI_BYTES) {
             Ok(bytes) => bytes,
             Err(error) => {
                 record_excluded_grouped(
@@ -493,7 +495,10 @@ fn locate_dataset_root(requested: &Path) -> Result<PathBuf, Box<dyn Error>> {
     .into())
 }
 
-fn ensure_regular_non_symlink(path: &Path) -> Result<(), Box<dyn Error>> {
+fn read_regular_file_limited(
+    path: &Path,
+    max_bytes: u64,
+) -> Result<Vec<u8>, Box<dyn Error>> {
     let metadata = fs::symlink_metadata(path)?;
     if metadata.file_type().is_symlink() || !metadata.file_type().is_file() {
         return Err(io::Error::new(
@@ -502,7 +507,14 @@ fn ensure_regular_non_symlink(path: &Path) -> Result<(), Box<dyn Error>> {
         )
         .into());
     }
-    Ok(())
+    if metadata.len() > max_bytes {
+        return Err(io::Error::new(
+            io::ErrorKind::InvalidData,
+            format!("file exceeds {max_bytes} byte read limit"),
+        )
+        .into());
+    }
+    Ok(fs::read(path)?)
 }
 
 fn selected_dataset_rows(
@@ -511,9 +523,11 @@ fn selected_dataset_rows(
     limit: Option<usize>,
 ) -> Result<Vec<DatasetRow>, Box<dyn Error>> {
     let mut lines = csv_text.lines();
-    let header = parse_csv_record(lines.next().ok_or_else(|| {
+    let header_line = lines.next().ok_or_else(|| {
         io::Error::new(io::ErrorKind::InvalidData, "info.csv is empty")
-    })?)
+    })?;
+    let header_line = header_line.trim_start_matches('\u{feff}');
+    let header = parse_csv_record(header_line)
     .ok_or_else(|| io::Error::new(io::ErrorKind::InvalidData, "info.csv header is malformed"))?;
     let columns: BTreeMap<String, usize> = header
         .iter()
@@ -1226,6 +1240,35 @@ mod tests {
         assert!(
             (kick.mean_performer_velocity_mean_0_to_127.unwrap() - 55.0).abs() < 1e-12
         );
+    }
+
+    #[test]
+    fn dataset_selection_filters_split_and_preserves_group_metadata() {
+        let csv = concat!(
+            "drummer,session,id,style,bpm,beat_type,time_signature,",
+            "midi_filename,audio_filename,duration,split\n",
+            "1,2,100,rock,120,beat,4/4,drummer1/session2/a.mid,a.wav,12.0,test\n",
+            "2,3,101,jazz,90,half,4/4,drummer2/session3/b.mid,b.wav,10.0,train\n",
+            "1,2,102,funk,110,beat,4/4,drummer1/session2/c.mid,c.wav,11.0,test\n",
+        );
+        let selected = selected_dataset_rows(csv, "test", Some(1)).unwrap();
+        assert_eq!(selected.len(), 1);
+        assert_eq!(selected[0].drummer, "1");
+        assert_eq!(selected[0].session, "2");
+        assert_eq!(selected[0].performance_id, "100");
+        assert_eq!(selected[0].midi_filename, "drummer1/session2/a.mid");
+        assert_eq!(selected[0].split, "test");
+    }
+
+    #[test]
+    fn dataset_selection_accepts_utf8_bom_and_rejects_missing_columns() {
+        let csv = concat!(
+            "\u{feff}drummer,session,id,style,bpm,beat_type,time_signature,",
+            "midi_filename,audio_filename,duration,split\n",
+            "1,2,100,rock,120,beat,4/4,drummer1/session2/a.mid,a.wav,12.0,test\n",
+        );
+        assert_eq!(selected_dataset_rows(csv, "test", None).unwrap().len(), 1);
+        assert!(selected_dataset_rows("drummer,session\n1,2\n", "test", None).is_err());
     }
 
     #[test]
