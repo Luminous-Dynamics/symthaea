@@ -23,7 +23,7 @@ const EDGE_PAIRS: [(usize, usize); 6] = [
 const WORLD_VARIANTS_PER_FAMILY: usize = 4;
 const MAX_TRIALS_PER_WORLD: usize = 10_000;
 const MAX_MEASUREMENT_BUDGET: usize = 64;
-const GENERATOR_VERSION: &str = "sensebench-scm-graphs-0.1.0";
+const GENERATOR_VERSION: &str = "sensebench-scm-graphs-0.2.0";
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, Deserialize)]
 #[serde(rename_all = "snake_case")]
@@ -1321,7 +1321,7 @@ pub fn run_scm_graph_benchmark(
     }
 
     Ok(ScmGraphBenchmarkReport {
-        schema_version: 1,
+        schema_version: 2,
         generator_version: GENERATOR_VERSION.into(),
         seed,
         trials_per_world,
@@ -1537,9 +1537,9 @@ mod tests {
                 .filter(|world| world.family == family)
                 .collect();
             assert_eq!(
-                family_worlds.len(),
-                WORLD_VARIANTS_PER_FAMILY * ScmMechanismRegime::all().len()
-            );
+            family_worlds.len(),
+            WORLD_VARIANTS_PER_FAMILY * ScmMechanismRegime::all().len()
+        );
             for graph_variant_index in 0..WORLD_VARIANTS_PER_FAMILY {
                 let paired: Vec<&ScmWorld> = family_worlds.iter()
                     .copied()
@@ -1601,6 +1601,8 @@ mod tests {
         let b = run_scm_graph_benchmark(3, 4, 123, 0.95).unwrap();
         assert_eq!(a, b);
         assert_eq!(serde_json::to_vec(&a).unwrap(), serde_json::to_vec(&b).unwrap());
+        assert_eq!(a.schema_version, 2);
+        assert_eq!(a.generator_version, "sensebench-scm-graphs-0.2.0");
         assert_eq!(a.world_count, 112);
         assert_eq!(a.development_world_count, 16);
         assert_eq!(a.held_out_world_count, 96);
