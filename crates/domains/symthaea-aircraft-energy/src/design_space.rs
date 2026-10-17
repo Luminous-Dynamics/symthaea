@@ -104,7 +104,7 @@ pub fn sweep_battery_design_space(
 
     for (name, axis) in &mut axes {
         if axis.is_empty() {
-            return Err(DesignSpaceError::EmptyAxis { name });
+            return Err(DesignSpaceError::EmptyAxis { name: *name });
         }
         axis.sort_by(f64::total_cmp);
         axis.dedup_by(|left, right| left.to_bits() == right.to_bits());
