@@ -211,14 +211,16 @@ pub fn humanize_score_note_with_profile(
     if !beat_position.is_finite() || !beats_per_bar.is_finite() || beats_per_bar <= 0.0 {
         return Err("beat_position must be finite and beats_per_bar must be finite and positive");
     }
-    if !note.start_time.is_finite()
+    if !note.frequency.is_finite()
+        || note.frequency <= 0.0
+        || !note.start_time.is_finite()
         || !note.duration.is_finite()
         || !note.velocity.is_finite()
         || note.start_time < 0.0
         || note.duration < 0.0
         || note.duration > f32::MAX / profile.duration_scale
     {
-        return Err("note values must be finite and nonnegative, with duration multiplication representable");
+        return Err("note frequency/timing/velocity must be finite and valid, and scaled duration representable");
     }
 
     let beat_in_bar = beat_position.rem_euclid(beats_per_bar);
@@ -326,6 +328,17 @@ mod tests {
             PerformanceProfileV1::default()
         ).is_err());
         assert_eq!(oversized.duration, f32::MAX, "invalid input must not mutate the note");
+
+        let mut nonfinite_frequency = original;
+        nonfinite_frequency.frequency = f32::NAN;
+        assert!(humanize_score_note_with_profile(
+            &mut nonfinite_frequency,
+            1.0,
+            4.0,
+            0,
+            PerformanceProfileV1::default()
+        ).is_err());
+        assert_eq!(nonfinite_frequency.start_time, original.start_time);
     }
 
     #[test]
