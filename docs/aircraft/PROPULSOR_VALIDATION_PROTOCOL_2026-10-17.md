@@ -78,6 +78,39 @@ The last ratio should agree with J C_T / C_P within declared floating-point tole
 
 Use the UIUC database only after checking the source file's actual redistribution/use terms. Its webpage documents the measurement database and coefficient conventions, but this review did not confirm an explicit license. Keep third-party archives out of the repository until rights and attribution are resolved.
 
+## 2.3 Can Symthaea invent new propulsion regimes?
+
+Potentially—but the term needs two distinct meanings.
+
+**A new engineering classification** can be designed now: label signed power/flow modes, normalized aerodynamic operating domains, installation interactions, and evidence/decision confidence separately. This prevents the ordinary powered-propulsion map from silently implying that reverse flow, power extraction, unusual thrust signs, or system interactions do not exist. [PROP-REGIME-001 #7896](https://github.com/Luminous-Dynamics/symthaea/issues/7896) tracks this direction; [PR #7895](https://github.com/Luminous-Dynamics/symthaea/pull/7895) starts a signed-mode vocabulary.
+
+**A new empirical/physical regime** cannot be established by creating an enum or clustering data. It needs a reproducible response boundary or qualitatively distinct behavior that survives independent measurements and competing explanations. For example, a candidate “interaction-dominated” regime would mean isolated-propulsor coefficients no longer predict installed wing/array response within the declared uncertainty. A candidate “power-flow reversal” boundary is where the sign of shaft power changes under a well-defined sweep. Both are testable hypotheses, not novel discoveries until reproduced.
+
+Use a four-layer regime atlas:
+
+1. **Power-flow topology:** axial-flow direction, rotation direction, thrust sign, and shaft-power direction. Preserve all four axes even when a shorthand archetype is assigned.
+2. **Dimensionless operating domain:** advance ratio J, thrust coefficient C_T, shaft-power coefficient C_P, source-defined Reynolds number and tip Mach where available. Normalization is descriptive, not proof of full-scale similarity.
+3. **Aero-propulsive interaction:** isolated propulsor versus propulsor-wing, propulsor-array and wake-interaction evidence. Only compare matched geometry/flow cases; report interaction residuals against component-only expectations.
+4. **Evidence/decision state:** in-domain evidence, near-domain-boundary, out-of-domain, uncertainty-unquantified, robust ranking, preference-sensitive ranking, or decision-indeterminate.
+
+### Candidate regime-discovery hypotheses
+
+- **Power-flow reversal:** a reproducible boundary between net shaft power supplied to and extracted from the propulsor. Preserve thrust and rotation states; do not equate negative shaft power with a single thrust outcome.
+- **Interaction-dominated response:** installed system forces/moments differ from the isolated component expectation by more than the combined measurement/model uncertainty in a reproducible region of angle of attack, fan speed, placement and array size.
+- **Scale-sensitive normalization:** apparently collapsed C_T/C_P/J curves separate by Reynolds number, tip Mach or geometry. That is a failed similarity assumption to characterize, not noise to average away.
+- **Decision-boundary regime:** candidate rankings change or become statistically/uncertainty-wise indistinguishable across an operating condition or mass/mission boundary. This is a decision regime, not a new flow-physics claim.
+
+NASA X-57 work describes high-lift propeller test/model development across conditions and the need to identify adverse operating cases; NASA's ADEPT-Wing experimental campaign varied ducted-fan placement, array size, angle of attack and fan speed to study aero-propulsive interactions. These provide evidence dimensions, not proof that a Symthaea-defined regime is novel. Sources: [NASA X-57 technical papers](https://www.nasa.gov/directorates/armd/x-57-technical-papers/) and [NASA ADEPT-Wing experimental study](https://ntrs.nasa.gov/citations/20250007333).
+
+### Proposed acceptance gates (targets, not achieved)
+
+- 100% synthetic known-answer regime labels under preregistered signs and deadbands.
+- Zero silent treatment of missing sign conventions, unknown channels or out-of-domain conditions as a validated named regime.
+- 100% of assignments trace to pinned source, configuration, condition profile and classifier/model revision.
+- Candidate empirical regime boundaries must reproduce on grouped holdouts or an independent configuration; a clustering plot alone is insufficient.
+- Publish boundary uncertainty, label stability, false-discovery rate, out-of-domain rate, and downstream decision impact separately.
+- Demonstrate incremental value over the existing positive-RPM/positive-shaft-input map on held-out evidence; in-sample separation alone does not justify the extra taxonomy.
+
 ## 3. Avoid data leakage in validation
 
 Randomly holding out individual rows is not adequate when neighboring operating points share the same propeller, rig, calibration, geometry and acquisition campaign. Adjacent samples can make a weak model look more general than it is.
