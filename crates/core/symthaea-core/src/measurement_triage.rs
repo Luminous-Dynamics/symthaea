@@ -807,7 +807,11 @@ mod tests {
         }
     }
 
-    fn test_interval(id: &str, metric: ArchitectureMetricV1) -> MetricIntervalV1 {
+    fn test_interval(
+        id: &str,
+        metric: ArchitectureMetricV1,
+        point_energy: bool,
+    ) -> MetricIntervalV1 {
         use ArchitectureMetricV1 as M;
         let point = |value: f64| MetricIntervalV1 {
             lower: value,
@@ -815,120 +819,83 @@ mod tests {
         };
         match (id, metric) {
             ("candidate-a", M::WearerBorneMassKg) => MetricIntervalV1 {
-                lower: 4.0, upper: 6.0,
+                lower: 4.0,
+                upper: 6.0,
             },
             ("candidate-b", M::WearerBorneMassKg) => MetricIntervalV1 {
-                lower: 4.5, upper: 5.5,
+                lower: 4.5,
+                upper: 5.5,
             },
             ("candidate-c", M::WearerBorneMassKg) => MetricIntervalV1 {
-                lower: 2.0, upper: 3.0,
+                lower: 2.0,
+                upper: 3.0,
             },
+            ("candidate-a", M::EnergyWhPerTask) if point_energy => point(2.0),
+            ("candidate-b", M::EnergyWhPerTask) if point_energy => point(2.0),
             ("candidate-a", M::EnergyWhPerTask) => MetricIntervalV1 {
-                lower: 1.0, upper: 3.0,
+                lower: 1.0,
+                upper: 3.0,
             },
             ("candidate-b", M::EnergyWhPerTask) => MetricIntervalV1 {
-                lower: 2.0, upper: 4.0,
+                lower: 2.0,
+                upper: 4.0,
             },
             ("candidate-c", M::EnergyWhPerTask) => MetricIntervalV1 {
-                lower: 0.4, upper: 0.8,
+                lower: 0.4,
+                upper: 0.8,
             },
-            ("candidate-a", M::TaskSuccessRate) => MetricIntervalV1 {
-                lower: 0.8, upper: 0.9,
-            },
-            ("candidate-b", M::TaskSuccessRate) => MetricIntervalV1 {
-                lower: 0.75, upper: 0.85,
-            },
-            ("candidate-c", M::TaskSuccessRate) => MetricIntervalV1 {
-                lower: 0.4, upper: 0.6,
-            },
-            ("candidate-a", M::ComfortScore) => MetricIntervalV1 {
-                lower: 0.6, upper: 0.8,
-            },
-            ("candidate-b", M::ComfortScore) => MetricIntervalV1 {
-                lower: 0.5, upper: 0.7,
-            },
-            ("candidate-c", M::ComfortScore) => MetricIntervalV1 {
-                lower: 0.2, upper: 0.4,
-            },
-            (_, M::TaskSuccessRate | M::ComfortScore | M::MovementRestrictionIndex) => {
-                MetricIntervalV1 { lower: 0.4, upper: 0.6 }
-            }
+            ("candidate-a", M::TaskSuccessRate) => point(0.85),
+            ("candidate-b", M::TaskSuccessRate) => point(0.80),
+            ("candidate-c", M::TaskSuccessRate) => point(0.50),
+            ("candidate-a", M::ComfortScore) => point(0.70),
+            ("candidate-b", M::ComfortScore) => point(0.65),
+            ("candidate-c", M::ComfortScore) => point(0.30),
+            ("candidate-a", M::MovementRestrictionIndex) => point(0.20),
+            ("candidate-b", M::MovementRestrictionIndex) => point(0.25),
+            ("candidate-c", M::MovementRestrictionIndex) => point(0.10),
+            ("candidate-a", M::SetupTimeSeconds) => point(30.0),
+            ("candidate-b", M::SetupTimeSeconds) => point(35.0),
+            ("candidate-c", M::SetupTimeSeconds) => point(15.0),
+            ("candidate-a", M::RepairTimeMinutes) => point(20.0),
+            ("candidate-b", M::RepairTimeMinutes) => point(25.0),
+            ("candidate-c", M::RepairTimeMinutes) => point(10.0),
+            ("candidate-a" | "candidate-b", M::TotalSystemMassKg) => point(6.0),
+            ("candidate-c", M::TotalSystemMassKg) => point(3.0),
+            ("candidate-a" | "candidate-b", M::OffboardMassKg) => point(0.5),
+            ("candidate-c", M::OffboardMassKg) => point(0.1),
+            ("candidate-a" | "candidate-b", M::TorsoMassKg)
+            | ("candidate-a" | "candidate-b", M::PelvisMassKg)
+            | ("candidate-a" | "candidate-b", M::ProximalLimbMassKg)
+            | ("candidate-a" | "candidate-b", M::DistalLimbMassKg)
+            | ("candidate-a" | "candidate-b", M::OtherWornMassKg) => point(1.0),
+            ("candidate-c", M::TorsoMassKg)
+            | ("candidate-c", M::PelvisMassKg)
+            | ("candidate-c", M::ProximalLimbMassKg)
+            | ("candidate-c", M::DistalLimbMassKg)
+            | ("candidate-c", M::OtherWornMassKg) => point(0.4),
             (_, M::TetherInterferenceEventsPerTask) => point(0.0),
-            (_, M::TotalSystemMassKg) => point(8.0),
-            (_, M::OffboardMassKg) => point(1.0),
-            _ => MetricIntervalV1 {
-                lower: 1.0,
-                upper: 2.0,
-            },
+            _ => point(1.0),
         }
     }
 
-    fn candidate(id: &str) -> RobustCandidateAssessmentV1 {
-        RobustCandidateAssessmentV1 {
+    fn candidate(id: &str, point_energy: bool) -> RobustArchitectureCandidateV1 {
+        RobustArchitectureCandidateV1 {
             candidate_id: id.to_owned(),
             family: ArchitectureFamilyV1::HybridPoweredPassive,
             tethered: false,
-            on_robust_frontier: true,
-            robustly_dominated_by: Vec::new(),
-            unresolved_against: Vec::new(),
             metrics: TRIAGE_REQUIRED_METRICS
-            .into_iter()
-            .map(|metric| MetricIntervalEntryV1 {
-                metric,
-                interval: test_interval(id, metric),
-            })
-            .collect(),
+                .into_iter()
+                .map(|metric| MetricIntervalEntryV1 {
+                    metric,
+                    interval: test_interval(id, metric, point_energy),
+                })
+                .collect(),
         }
     }
 
-    fn source_report() -> ArchitectureRobustnessReportV1 {
-        let ambiguous = RobustPairwiseAssessmentV1 {
-            candidate_a_id: "candidate-a".to_owned(),
-            candidate_b_id: "candidate-b".to_owned(),
-            a_robustly_dominates_b: false,
-            b_robustly_dominates_a: false,
-            a_may_dominate_b_within_bounds: true,
-            b_may_dominate_a_within_bounds: true,
-            not_separated_dimensions: vec![
-                ArchitectureMetricV1::WearerBorneMassKg,
-                ArchitectureMetricV1::EnergyWhPerTask,
-            ],
-            a_definitely_better_dimensions: Vec::new(),
-            b_definitely_better_dimensions: Vec::new(),
-            definite_tradeoff: false,
-            additional_evidence_may_change_dominance: true,
-            unresolved: true,
-        };
-        let tradeoff = RobustPairwiseAssessmentV1 {
-            candidate_a_id: "candidate-a".to_owned(),
-            candidate_b_id: "candidate-c".to_owned(),
-            a_robustly_dominates_b: false,
-            b_robustly_dominates_a: false,
-            a_may_dominate_b_within_bounds: false,
-            b_may_dominate_a_within_bounds: false,
-            not_separated_dimensions: vec![ArchitectureMetricV1::ComfortScore],
-            a_definitely_better_dimensions: vec![ArchitectureMetricV1::TaskSuccessRate],
-            b_definitely_better_dimensions: vec![ArchitectureMetricV1::WearerBorneMassKg],
-            definite_tradeoff: true,
-            additional_evidence_may_change_dominance: false,
-            unresolved: true,
-        };
-        let third_pair = RobustPairwiseAssessmentV1 {
-            candidate_a_id: "candidate-b".to_owned(),
-            candidate_b_id: "candidate-c".to_owned(),
-            a_robustly_dominates_b: false,
-            b_robustly_dominates_a: true,
-            a_may_dominate_b_within_bounds: false,
-            b_may_dominate_a_within_bounds: true,
-            not_separated_dimensions: Vec::new(),
-            a_definitely_better_dimensions: Vec::new(),
-            b_definitely_better_dimensions: vec![ArchitectureMetricV1::TaskSuccessRate],
-            definite_tradeoff: false,
-            additional_evidence_may_change_dominance: false,
-            unresolved: false,
-        };
-        ArchitectureRobustnessReportV1 {
-            schema_version: 1,
+    fn source_report(point_energy: bool) -> ArchitectureRobustnessReportV1 {
+        let request = ArchitectureRobustnessRequestV1 {
+            schema_version: ARCHITECTURE_ROBUSTNESS_SCHEMA_VERSION_V1,
             comparison_id: "triage-fixture-001".to_owned(),
             benchmark_case_id: "walking-case".to_owned(),
             task_id: "walk".to_owned(),
@@ -941,17 +908,16 @@ mod tests {
                 grade_percent: 0.0,
                 ambient_temperature_c: 22.0,
             },
-            interval_semantics: MetricIntervalSemanticsV1::DeclaredConservativeEnvelope,
             evidence_level: ArchitectureEvidenceLevelV1::SyntheticReplay,
+            interval_semantics: MetricIntervalSemanticsV1::DeclaredConservativeEnvelope,
             candidates: vec![
-                candidate("candidate-a"),
-                candidate("candidate-b"),
-                candidate("candidate-c"),
+                candidate("candidate-a", point_energy),
+                candidate("candidate-b", point_energy),
+                candidate("candidate-c", point_energy),
             ],
-            pairwise_assessments: vec![ambiguous, tradeoff, third_pair],
-            assumptions: Vec::new(),
-            claim_ceiling: "Synthetic triage fixture only".to_owned(),
-        }
+        };
+        evaluate_architecture_robustness(&request)
+            .expect("hand-calculated synthetic source request must evaluate")
     }
 
     fn action(
@@ -1011,7 +977,7 @@ mod tests {
             ),
         ];
         let report = triage_measurement_actions(
-            &source_report(),
+            &source_report(false),
             &actions,
             MEASUREMENT_TRIAGE_SCHEMA_VERSION_V1,
         )
@@ -1034,7 +1000,7 @@ mod tests {
     #[test]
     fn definite_tradeoffs_are_not_misreported_as_measurement_sensitive() {
         let report = triage_measurement_actions(
-            &source_report(),
+            &source_report(false),
             &[action(
                 "measure-comfort",
                 &["candidate-a", "candidate-c"],
@@ -1081,7 +1047,7 @@ mod tests {
                 _ => unreachable!(),
             }
             let report = triage_measurement_actions(
-                &source_report(),
+                &source_report(false),
                 &[candidate_action],
                 MEASUREMENT_TRIAGE_SCHEMA_VERSION_V1,
             )
@@ -1107,7 +1073,7 @@ mod tests {
         candidate_action.task_protocol_version = "walk-v0".to_owned();
         assert!(
             triage_measurement_actions(
-                &source_report(),
+                &source_report(false),
                 &[candidate_action],
                 MEASUREMENT_TRIAGE_SCHEMA_VERSION_V1,
             )
@@ -1124,7 +1090,7 @@ mod tests {
 
     #[test]
     fn inconsistent_source_classification_fails_closed() {
-        let mut source = source_report();
+        let mut source = source_report(false);
         source.pairwise_assessments[0].additional_evidence_may_change_dominance = false;
         assert!(triage_measurement_actions(
             &source,
@@ -1142,7 +1108,7 @@ mod tests {
             )
         }));
 
-        let mut source = source_report();
+        let mut source = source_report(false);
         source.pairwise_assessments[0]
             .not_separated_dimensions
             .push(ArchitectureMetricV1::EnergyWhPerTask);
@@ -1174,7 +1140,7 @@ mod tests {
         );
         duplicate_metric.metric_targets.push(ArchitectureMetricV1::WearerBorneMassKg);
         assert!(triage_measurement_actions(
-            &source_report(),
+            &source_report(false),
             &[duplicate_metric],
             MEASUREMENT_TRIAGE_SCHEMA_VERSION_V1,
         )
@@ -1195,7 +1161,7 @@ mod tests {
             MeasurementActionKindV1::BenchMeasurement,
         );
         assert!(triage_measurement_actions(
-            &source_report(),
+            &source_report(false),
             &[repeated, repeated2],
             MEASUREMENT_TRIAGE_SCHEMA_VERSION_V1,
         )
@@ -1208,7 +1174,7 @@ mod tests {
             serde_json::from_str(TRIAGE_ACTIONS_FIXTURE_JSON)
                 .expect("measurement action fixture parses");
         let report = triage_measurement_actions(
-            &source_report(),
+            &source_report(false),
             &fixture.actions,
             fixture.schema_version,
         )
@@ -1235,7 +1201,7 @@ mod tests {
 
     #[test]
     fn incomplete_or_invalid_source_metric_receipts_fail_closed() {
-        let mut source = source_report();
+        let mut source = source_report(false);
         source.candidates[0].metrics.pop();
         assert!(triage_measurement_actions(
             &source,
@@ -1256,7 +1222,7 @@ mod tests {
             )
         }));
 
-        let mut source = source_report();
+        let mut source = source_report(false);
         source.candidates[0].metrics[0].interval = MetricIntervalV1 {
             lower: 0.9,
             upper: 0.4,
@@ -1283,22 +1249,7 @@ mod tests {
 
     #[test]
     fn exact_point_valued_overlap_is_not_suggested_as_a_measurement() {
-        let mut source = source_report();
-        for candidate in &mut source.candidates {
-            if candidate.candidate_id == "candidate-a"
-                || candidate.candidate_id == "candidate-b"
-            {
-                let energy = candidate
-                    .metrics
-                    .iter_mut()
-                    .find(|entry| entry.metric == ArchitectureMetricV1::EnergyWhPerTask)
-                    .expect("energy metric exists");
-                energy.interval = MetricIntervalV1 {
-                    lower: 2.0,
-                    upper: 2.0,
-                };
-            }
-        }
+        let source = source_report(true);
         let report = triage_measurement_actions(
             &source,
             &[action(
@@ -1318,7 +1269,7 @@ mod tests {
 
     #[test]
     fn same_catalog_produces_byte_stable_report() {
-        let source = source_report();
+        let source = source_report(false);
         let actions = vec![
             action(
                 "measure-mass",
