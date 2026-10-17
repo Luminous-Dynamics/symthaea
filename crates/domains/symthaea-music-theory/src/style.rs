@@ -383,33 +383,34 @@ impl Style {
     /// they always vary the output for every style, so they're not
     /// interesting to report here.
     ///
-    /// Ground truth from the Causal Diversity Validation census
-    /// (`examples/diversity_census.rs`'s one-factor-at-a-time sensitivity
-    /// matrix): 26 of 174 style×parameter cells showed NO measurable effect
-    /// on composition-level output. Every one of the 26 is a genuine
-    /// grammar limitation, not a wiring bug — verified against the actual
-    /// composer code (not inferred from the census numbers alone):
+    /// Baseline result from the 2026-07-30 Causal Diversity Validation census
+    /// (`examples/diversity_census.rs`): 26 of 174 style×parameter cells showed
+    /// NO measurable effect across the then-current 29 presets. That ratio is
+    /// historical, not a result for the expanded roster; rerun the census before
+    /// quoting current coverage. The original dead cells were verified against
+    /// the composer code rather than inferred from counts alone:
     ///
     /// - `valence` selects major-vs-minor tonality only when this style's
     ///   `CompositionSpec.mode` is `None` (see `compose_with_spec_and_form`'s
-    ///   key derivation). The 12 styles below deliberately pin a fixed mode
+    ///   key derivation). The styles below deliberately pin a fixed mode
     ///   (Dorian, Phrygian, Mixolydian, …) as their harmonic identity —
     ///   valence has no key left to choose between.
     /// - `energy`/`bars` (and, for two styles, `arousal`) are consumed only
     ///   by the shared period/`Form` pipeline (the `use_sentence` phrase
     ///   choice and phrase-length building). Fugue, the three ground-music
-    ///   forms (Passacaglia/Erosion/Lineage — one `Style` variant,
-    ///   `Style::Passacaglia`), ProgSuite, Sonata, Renaissance, and Opera
-    ///   all bypass that pipeline entirely via early-return in
+    ///   forms (Passacaglia/Erosion/Lineage — three presets using a shared
+    ///   ground engine with different `FormKind` identities), ProgSuite,
+    ///   Sonata, Renaissance, and Opera all bypass that pipeline entirely
+    ///   via early-return in
     ///   `compose_with_spec_and_form`, calling their own fixed-plan
     ///   realizers (`realize_fugue`, `realize_passacaglia`,
     ///   `compose_sonata_with_plan`, etc.) whose signatures never receive
     ///   `energy`/`bars` at all (confirmed by inspection, not guessed).
-    ///   Passacaglia and RenaissancePolyphony additionally show `arousal`
-    ///   dead — those two also pin a fixed mode, so BOTH of arousal's and
-    ///   valence's usual levers (subject/motif-bank shape and mode
-    ///   selection) are foreclosed for them, alongside the shared
-    ///   energy/bars limitation every bypass grammar has.
+    ///   The Passacaglia/Erosion/Lineage presets and RenaissancePolyphony
+    ///   additionally show `arousal` dead: they pin a fixed mode, so both
+    ///   arousal's and valence's usual levers (subject/motif-bank shape and
+    ///   mode selection) are foreclosed alongside the shared energy/bars
+    ///   limitation of their dedicated structural engines.
     ///
     /// Giving these styles a real energy/bars lever would mean designing
     /// genuinely new structural grammar (e.g. an energy-driven episode
