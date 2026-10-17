@@ -507,6 +507,9 @@ fn render_arrangement_internal(
                         if done {
                             rendered_path = "default_short_articulation_sample";
                             sample_attempt_status = "sample_bank_rendered";
+                        } else {
+                            sample_attempt_status =
+                                "instrument_short_articulation_pitch_velocity_unavailable";
                         }
                     }
                     if !done && let Some(bank) = lib.bank(instrument) {
