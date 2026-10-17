@@ -406,7 +406,7 @@ mod tests {
         );
         assert_eq!(
             rank_experiments(
-                &[ExperimentOption::new("x", "design", "design", 1, 0, 0, 0)
+                &[ExperimentOption::new("x", "design", " ", 1, 0, 0, 0)
                     .with_contract(PROFILE, COST_UNIT)],
                 PROFILE,
                 COST_UNIT,
@@ -451,7 +451,7 @@ mod tests {
         );
         assert_eq!(
             rank_experiments(
-                &[ExperimentOption::new("x", "design", " ", 1, 0, 0, 0)
+                &[ExperimentOption::new("x", " ", "lab", 1, 0, 0, 0)
                     .with_contract(PROFILE, COST_UNIT)],
                 PROFILE,
                 COST_UNIT,
