@@ -40,12 +40,14 @@ pub struct CandidateMassProperties {
     pub consumables_mass_kg: f64,
     pub payload_mass_kg: f64,
     pub maximum_takeoff_mass_limit_kg: f64,
-    /// x/y/z in a declared vehicle datum, in metres.
+    /// Explicit coordinate frame/datum for x/y/z, not an implicit default.
+    pub center_of_gravity_frame: String,
+    /// x/y/z in that datum, in metres.
     pub center_of_gravity_m: [f64; 3],
 }
 
 impl CandidateMassProperties {
-    /// Sum of the four non-overlapping mass terms, if the arithmetic is finite.
+    /// Sum of the five non-overlapping mass terms, if the arithmetic is finite.
     pub fn mission_takeoff_mass_kg(&self) -> Option<f64> {
         let total = self.fixed_vehicle_mass_kg
             + self.energy_system_installed_mass_kg
@@ -333,6 +335,11 @@ fn validate_mass_properties(
         mass.maximum_takeoff_mass_limit_kg,
         findings,
     );
+    validate_nonempty(
+        "mass.center_of_gravity_frame",
+        &mass.center_of_gravity_frame,
+        findings,
+    );
     for (index, coordinate) in mass.center_of_gravity_m.iter().enumerate() {
         if !coordinate.is_finite() {
             findings.push(MissionModelContractFinding::InvalidValue {
@@ -480,6 +487,7 @@ mod tests {
                 consumables_mass_kg: 0.0,
                 payload_mass_kg: 160.0,
                 maximum_takeoff_mass_limit_kg: 900.0,
+                center_of_gravity_frame: "body-datum-v1".into(),
                 center_of_gravity_m: [1.2, 0.0, 0.3],
             },
             environment: MissionEnvironment {
