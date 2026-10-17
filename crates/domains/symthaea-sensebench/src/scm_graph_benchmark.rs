@@ -1921,6 +1921,60 @@ mod tests {
     }
 
     #[test]
+    fn pc_g_squared_baseline_recovers_independence_and_an_unshielded_collider() {
+        let catalogue = all_dags();
+        let classes = build_markov_class_catalog(&catalogue);
+
+        // Exactly balanced observations make all three variables independent.
+        let mut independent = Vec::new();
+        for state in 0..OUTCOME_COUNT {
+            independent.extend(std::iter::repeat_n(state, 40));
+        }
+        for (first, second) in UNORDERED_PAIRS {
+            assert!(g_squared_ci_statistic(&independent, first, second, None) < 1.0e-10);
+        }
+        let (empty_marks, empty_class) = pc_observational_cpdag(&independent, &classes);
+        assert_eq!(empty_marks, vec![EdgeMark::Absent; UNORDERED_PAIRS.len()]);
+        assert_eq!(
+            empty_marks,
+            classes.cpdag_marks[empty_class],
+            "PC output must be projected to a valid catalogue CPDAG"
+        );
+
+        // Build a balanced collider distribution: X and Y are independent roots,
+        // while Z has P(Z=1)=0.2 when X=Y=0 and 0.8 otherwise.
+        // The exact finite sample uses counts that realize those probabilities.
+        let mut collider_observations = Vec::new();
+        for x in 0..=1_usize {
+            for y in 0..=1_usize {
+                let z_ones = if x == 0 && y == 0 { 20 } else { 80 };
+                let z_zeros = 100 - z_ones;
+                let state_zero = x | (y << 2);
+                let state_one = state_zero | (1 << 1);
+                collider_observations.extend(std::iter::repeat_n(state_zero, z_zeros));
+                collider_observations.extend(std::iter::repeat_n(state_one, z_ones));
+            }
+        }
+        assert!(
+            g_squared_ci_statistic(&collider_observations, 0, 2, None)
+                < PC_G2_CRITICAL_DF1_95,
+            "collider parents should be marginally independent"
+        );
+        assert!(
+            g_squared_ci_statistic(&collider_observations, 0, 1, None)
+                > PC_G2_CRITICAL_DF1_95,
+            "parent and collider child should be dependent"
+        );
+        let (collider_marks, collider_class) =
+            pc_observational_cpdag(&collider_observations, &classes);
+        assert_eq!(
+            collider_marks,
+            vec![EdgeMark::Forward, EdgeMark::Absent, EdgeMark::Reverse]
+        );
+        assert_eq!(collider_marks, classes.cpdag_marks[collider_class]);
+    }
+
+    #[test]
     fn cpdag_metrics_do_not_penalize_unidentifiable_chain_directions() {
         let catalogue = all_dags();
         let chain_forward = CausalDag {
@@ -2175,6 +2229,14 @@ mod tests {
     #[test]
     fn held_out_claim_metrics_are_bounded_and_null_false_claims_are_visible() {
         let report = run_scm_graph_benchmark(6, 2, 0x5EED, 0.90).unwrap();
+        for row in report.worlds.iter()
+            .filter(|row| row.policy == ScmGraphPolicy::PcObservationalBaseline)
+        {
+            assert_eq!(row.mean_measurements_used, 2.0);
+            assert_eq!(row.mean_interventions_used, 0.0);
+            assert_eq!(row.graph_claim_coverage, 0.0);
+            assert_eq!(row.cpdag_claim_coverage, 1.0);
+        }
         for row in &report.worlds {
             assert!((0.0..=1.0).contains(&row.mean_skeleton_f1));
             assert!((0.0..=1.0).contains(&row.mean_directed_edge_f1));
