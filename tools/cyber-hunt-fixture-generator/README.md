@@ -2,7 +2,7 @@
 
 A standalone, deterministic Rust generator for a **public synthetic smoke corpus** supporting Symthaea issue [#7742](https://github.com/Luminous-Dynamics/symthaea/issues/7742), the unguided large-log threat-hunting tier.
 
-Generator version 0.3.0 supports three structurally different synthetic families: `identity-to-egress`, `artifact-provenance`, and `cloud-data-movement`. The artifact lifecycle links source revision, CI build, artifact digest, signed attestation, promotion, and deployment, with a benign complete chain sharing the same event types. The cloud family tests a role-scope/authorization mismatch followed by storage enumeration, bulk reads, export, and transfer; its benign backup chain has the same event types and consistent scope/approval. These are fixture controls, not production simulations or blind capability evidence.
+Generator version 0.4.0 supports four structurally different synthetic families: `identity-to-egress`, `artifact-provenance`, `cloud-data-movement`, and `cross-domain-trust-chain`. The artifact lifecycle tests consistency between source revision, build, artifact digest, signed attestation, promotion, and deployment. The cloud family tests authorization-scope consistency through storage access, export, and transfer. The cross-domain family links identity, CI/build provenance, deployment, role assignment, scoped data access, and export into one causal chain. Each family includes a benign chain with the same event types, and the suite includes cross-family checks for complete labels, unique IDs, causal-link validity, digest binding, and event-type counterexamples. These are fixture controls, not production simulations or blind capability evidence.
 
 ## Run
 
@@ -31,7 +31,7 @@ cargo run --manifest-path tools/cyber-hunt-fixture-generator/Cargo.toml -- \
   --source-commit "$(git rev-parse HEAD)"
 ```
 
-`--family identity-to-egress` is the default for backward compatibility. The additional options are `artifact-provenance` and `cloud-data-movement`. Family changes select a distinct causal graph; new seeds within a family are still not independent campaigns.
+`--family identity-to-egress` is the default for backward compatibility. The additional options are `artifact-provenance`, `cloud-data-movement`, and `cross-domain-trust-chain`. Family changes select a distinct causal graph; new seeds within a family are still not independent campaigns.
 
 Cloud-family example:
 
@@ -43,6 +43,17 @@ cargo run --manifest-path tools/cyber-hunt-fixture-generator/Cargo.toml -- \
   --truth-out /tmp/cyber-hunt-cloud/evaluator/truth.json \
   --source-commit "$(git rev-parse HEAD)"
 ```
+
+Integrated cross-domain example:
+
+\`\`\`sh
+cargo run --manifest-path tools/cyber-hunt-fixture-generator/Cargo.toml -- \\
+  --family cross-domain-trust-chain --records 1000 --seed 20261020 \\
+  --events-out /tmp/cyber-hunt-cross-domain/solver/events.jsonl \\
+  --manifest-out /tmp/cyber-hunt-cross-domain/solver/manifest.json \\
+  --truth-out /tmp/cyber-hunt-cross-domain/evaluator/truth.json \\
+  --source-commit "$(git rev-parse HEAD)"
+\`\`\`
 
 ## Output separation
 
