@@ -622,6 +622,81 @@ mod tests {
     }
 
     #[test]
+    fn deterministic_adversarial_sweep_covers_ten_thousand_requests() {
+        let modes = [
+            EffortModeV1::MobilityConserve,
+            EffortModeV1::AssistAsNeeded,
+            EffortModeV1::TrainingResistive,
+            EffortModeV1::RecoveryHighSupport,
+        ];
+        let evidence = [
+            EffortEvidenceStatusV1::Fresh,
+            EffortEvidenceStatusV1::Unavailable,
+            EffortEvidenceStatusV1::NoVoluntarySignal,
+            EffortEvidenceStatusV1::Stale,
+            EffortEvidenceStatusV1::Conflicted,
+            EffortEvidenceStatusV1::Invalid,
+        ];
+        let values = [
+            0.0_f32,
+            0.1,
+            0.5,
+            1.0,
+            -0.01,
+            1.01,
+            f32::NAN,
+            f32::INFINITY,
+            f32::NEG_INFINITY,
+        ];
+
+        for case in 0..10_000_usize {
+            let mut request = valid_training_request();
+            request.mode = modes[case % modes.len()];
+            request.effort_evidence = evidence[(case / 2) % evidence.len()];
+            request.explicit_training_opt_in = (case / 3) % 2 == 0;
+            request.profile_training_eligible = (case / 5) % 2 == 0;
+            request.user_requested_stop = case % 97 == 0;
+            request.user_requested_recovery = case % 89 == 0;
+            request.user_requested_more_assistance = case % 83 == 0;
+            request.resistance_increase_requested = case % 7 == 0;
+            request.requested_assistance = values[(case / 11) % values.len()];
+            request.requested_resistance = values[(case / 13) % values.len()];
+            request.assistance_limit = values[(case / 17) % values.len()];
+            request.resistance_limit = values[(case / 19) % values.len()];
+
+            if case % 31 == 0 {
+                request.active_session_id = "prior-session".to_owned();
+            }
+            if case % 37 == 0 {
+                request.active_profile_id = "prior-profile".to_owned();
+            }
+            if case % 41 == 0 {
+                request.schema_version = EFFORT_POLICY_SCHEMA_VERSION + 1;
+            }
+
+            let first = evaluate_effort_request(&request);
+            let replay = evaluate_effort_request(&request);
+            assert_eq!(first, replay, "non-deterministic result for case {case}");
+
+            if !matches!(
+                first.status,
+                EffortDecisionStatusV1::StopRequired
+                    | EffortDecisionStatusV1::RecoveryRequired
+                    | EffortDecisionStatusV1::SupportRequired
+            ) && request.mode != EffortModeV1::TrainingResistive
+                && (request.requested_resistance != 0.0
+                    || request.resistance_increase_requested)
+            {
+                assert_eq!(
+                    first.status,
+                    EffortDecisionStatusV1::Rejected,
+                    "non-training resistance admitted in case {case}"
+                );
+            }
+        }
+    }
+
+    #[test]
     fn unknown_json_fields_are_rejected() {
         let json = serde_json::to_string(&valid_training_request()).expect("request serializes");
         let with_unknown = json.trim_end_matches('}').to_owned() + ",\"surprise\":true}";
