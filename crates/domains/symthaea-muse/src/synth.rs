@@ -6,6 +6,7 @@
 //! sub-bass, detuned unison, filtered noise, per-voice stereo panning.
 
 use crate::instruments::Instrument;
+use serde::Serialize;
 use crate::voice::{Arrangement, VoiceRole};
 use crate::{AudioData, MuseConfig, MusicalState, Note, OutputFormat};
 
@@ -165,7 +166,20 @@ pub struct SampleStyleRenderReceipt {
 ///
 /// A sample-bank path means a compatible sample was picked and rendered; it does
 /// not by itself prove that the sample is perceptually faithful to the named model.
-#[derive(Debug, Clone)]
+#[derive(Debug, Clone, PartialEq, Serialize)]
+pub struct SelectedSampleEvidence {
+    pub source_library: String,
+    /// Exact source-root-relative WAV path; no absolute machine-local root.
+    pub source_relative_path: String,
+    pub source_root_midi: u8,
+    pub source_sample_rate_hz: u32,
+    /// Normalized dynamic layer inferred from the indexed source filename.
+    pub source_dynamic: f32,
+    /// Target MIDI pitch minus source root note, in semitones.
+    pub pitch_shift_semitones: f32,
+}
+
+#[derive(Debug, Clone, Serialize)]
 pub struct InstrumentRenderReceipt {
     pub voice_index: usize,
     pub note_index: usize,
@@ -176,6 +190,8 @@ pub struct InstrumentRenderReceipt {
     pub selected_render_path: &'static str,
     /// Why a sample was used, unavailable, or bypassed in favor of synthesis.
     pub sample_attempt_status: &'static str,
+    /// Present only if the sample renderer picked and decoded a specific WAV.
+    pub selected_sample: Option<SelectedSampleEvidence>,
 }
 
 /// Audio and per-note render-path evidence from the legacy arrangement policy.
@@ -419,7 +435,7 @@ fn render_arrangement_internal(
                                             Some("style_bank_not_loaded_fell_back");
                                     }
                                     Some(bank) => {
-                                        if render_vcsl_note(
+                                        if let Some(selected_sample) = render_vcsl_note_with_evidence(
                                             &mut bl,
                                             &mut br,
                                             sr,
@@ -448,6 +464,7 @@ fn render_arrangement_internal(
                                                 duration_secs: note.duration,
                                                 selected_render_path: "named_sample_style",
                                                 sample_attempt_status: "named_style_sample_rendered",
+                                                selected_sample: Some(selected_sample),
                                             });
                                             continue;
                                         } else {
@@ -482,6 +499,7 @@ fn render_arrangement_internal(
                     // like an actual short bow. Falls through to the
                     // sustain bank, then to synthesis.
                     let mut done = false;
+                    let mut selected_sample: Option<SelectedSampleEvidence> = None;
                     // 130ms, not 250: the MAESTRO articulation model can
                     // shorten ordinary detached eighths below 250ms at
                     // brisk tempi, and merely-detached notes must not flip
@@ -492,7 +510,7 @@ fn render_arrangement_internal(
                         && let Some(stac) = lib.staccato_bank(instrument)
                     {
                         // A staccato note IS its attack — never legato.
-                        done = render_vcsl_note(
+                        if let Some(evidence) = render_vcsl_note_with_evidence(
                             &mut bl,
                             &mut br,
                             sr,
@@ -503,8 +521,9 @@ fn render_arrangement_internal(
                             stac,
                             false,
                             false,
-                        );
-                        if done {
+                        ) {
+                            done = true;
+                            selected_sample = Some(evidence);
                             rendered_path = "default_short_articulation_sample";
                             sample_attempt_status = "sample_bank_rendered";
                         } else {
@@ -514,7 +533,7 @@ fn render_arrangement_internal(
                     }
                     if !done && let Some(bank) = lib.bank(instrument) {
                         sample_attempt_status = "instrument_sample_pitch_velocity_unavailable";
-                        done = render_vcsl_note(
+                        if let Some(evidence) = render_vcsl_note_with_evidence(
                             &mut bl,
                             &mut br,
                             sr,
@@ -525,8 +544,9 @@ fn render_arrangement_internal(
                             bank,
                             legato_from_prev,
                             sustained_shape,
-                        );
-                        if done {
+                        ) {
+                            done = true;
+                            selected_sample = Some(evidence);
                             rendered_path = "default_sustain_sample";
                             sample_attempt_status = "sample_bank_rendered";
                         }
@@ -541,6 +561,7 @@ fn render_arrangement_internal(
                             duration_secs: note.duration,
                             selected_render_path: rendered_path,
                             sample_attempt_status,
+                            selected_sample,
                         });
                         if let (Some(style_name), Some(decision)) =
                             (requested_style, style_decision)
@@ -578,6 +599,7 @@ fn render_arrangement_internal(
                         duration_secs: note.duration,
                         selected_render_path: rendered_path,
                         sample_attempt_status,
+                        selected_sample: None,
                     });
                     if let (Some(style_name), Some(decision)) =
                         (requested_style, style_decision)
@@ -614,6 +636,7 @@ fn render_arrangement_internal(
                         duration_secs: note.duration,
                         selected_render_path: rendered_path,
                         sample_attempt_status,
+                        selected_sample: None,
                     });
                     if let (Some(style_name), Some(decision)) =
                         (requested_style, style_decision)
@@ -1213,6 +1236,8 @@ fn instrument_benefits_from_legato(instrument: Instrument) -> bool {
 /// instead of parking at constant gain for seconds.
 #[cfg(not(target_arch = "wasm32"))]
 #[allow(clippy::too_many_arguments)] // matches render_tone/render_karplus_note convention
+#[cfg(not(target_arch = "wasm32"))]
+#[allow(clippy::too_many_arguments)]
 fn render_vcsl_note(
     bl: &mut [f32],
     br: &mut [f32],
@@ -1225,6 +1250,23 @@ fn render_vcsl_note(
     legato_from_prev: bool,
     sustained_shape: bool,
 ) -> bool {
+    render_vcsl_note_with_evidence(
+        bl, br, sr, note, vol, gl, gr, bank, legato_from_prev, sustained_shape,
+    ).is_some()
+}
+
+fn render_vcsl_note_with_evidence(
+    bl: &mut [f32],
+    br: &mut [f32],
+    sr: f32,
+    note: &Note,
+    vol: f32,
+    gl: f32,
+    gr: f32,
+    bank: &crate::vcsl::InstrumentBank,
+    legato_from_prev: bool,
+    sustained_shape: bool,
+) -> Option<SelectedSampleEvidence> {
     let target_midi = 69.0 + 12.0 * (note.frequency / 440.0).log2();
     // Strict window first; then relaxed (a far-shifted recording beats a
     // mid-line timbre switch to synthesis — see pick_with_window).
@@ -1232,12 +1274,12 @@ fn render_vcsl_note(
         .pick(target_midi, note.velocity, note_seed(note))
         .or_else(|| bank.pick_with_window(target_midi, note.velocity, note_seed(note), 12.0, 24.0));
     let Some(sample) = picked else {
-        return false;
+        return None;
     };
     let ratio =
         2f32.powf((target_midi - sample.midi as f32) / 12.0) * (sample.sample_rate as f32 / sr);
     if !ratio.is_finite() || ratio <= 0.0 {
-        return false;
+        return None;
     }
     let start = (note.start_time * sr) as usize;
     let release = 0.25f32;
@@ -1306,7 +1348,14 @@ fn render_vcsl_note(
         br[si] += o * gr;
         src_pos += ratio;
     }
-    true
+    Some(SelectedSampleEvidence {
+        source_library: sample.source_library.clone(),
+        source_relative_path: sample.source_relative_path.clone(),
+        source_root_midi: sample.midi,
+        source_sample_rate_hz: sample.sample_rate,
+        source_dynamic: sample.source_dynamic,
+        pitch_shift_semitones: target_midi - sample.midi as f32,
+    })
 }
 
 /// Render one note through FM synthesis (see
