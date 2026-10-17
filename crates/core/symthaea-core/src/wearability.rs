@@ -443,7 +443,7 @@ fn evaluate_perform(input: &WearabilityInputV1) -> WearabilityDispositionV1 {
         return WearabilityDispositionV1::InterfaceStateUnknown;
     }
     if input.interface_migration_sensor == Some(SignalEvidenceV1::Unavailable)
-        || input.measured_migration_value.is_none()
+        || (input.interface_migration_sensor.is_some() && input.measured_migration_value.is_none())
     {
         return WearabilityDispositionV1::MigrationMetricMissing;
     }
