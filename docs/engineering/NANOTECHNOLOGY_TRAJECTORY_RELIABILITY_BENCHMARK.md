@@ -307,6 +307,21 @@ Each policy may select only from actions declared before lockbox evaluation:
 
 The policy receives only information that would have existed at that time: prior coordinates/observables, its own predictions and uncertainty, past reference returns, elapsed cost, and frozen metadata. It may not read future frames, held-out labels, post hoc failure annotations, test-group identity that would not be operationally available, or an evaluation-only oracle flag. The final test lockbox cannot tune trigger thresholds or retraining schedules.
 
+### Separate intervention queries from blinded evaluation audits
+
+An adaptive policy cannot validate itself by asking for expensive references only when its own score is high. That design leaves most accepted/continued windows unevaluated and can make a selective or overconfident policy appear safer simply because it did not inspect its own blind spots.
+
+Use two explicitly separate lanes:
+
+- **Policy lane:** references requested by the controller to decide whether/how to resume. These requests, failures, retries, cache hits and all associated costs belong to the policy's deployable-budget ledger and may influence future policy actions only under the frozen update rule.
+- **Evaluation-audit lane:** a precommitted, policy-blind probability sample of eligible windows/systems, selected independently of the policy's query decisions. These reference labels are hidden from the controller until the tested trajectory/policy run is complete and must not change the arm's decisions. Include continued, stopped/abstained and high-/low-risk portions of the eligible population so that false negatives can be estimated; do not evaluate only queried windows or surviving runs.
+
+Freeze the audit sampling frame, strata, randomization seed, inclusion probabilities, missing-label handling and reference method before lockbox runs. Stratified oversampling of rare severe events is permitted only when selection probabilities are retained and the estimator respects them. Report raw sample counts and group coverage. Use inverse-probability weighting or another preregistered design-based estimate when inclusion probabilities differ; a simple unweighted rate is not justified for a nonuniform audit sample.
+
+The evaluation-audit lane is **not free compute**. Report (1) operational policy cost excluding evaluation-only audits, (2) full study cost including evaluation audits, and (3) the audit/reference budget required to make the reported safety claim. Do not smuggle audit labels or their costs into only one arm. The deployment comparison uses matched policy budgets, while the scientific claim about unqueried windows is supported by the independent audit sample and its uncertainty. If no eligible evaluation-audit sample exists, mark unobserved windows as unverified and block a broad reliability claim rather than imputing success.
+
+This separation prevents query-selection bias and survivorship bias. It does not by itself solve dataset shift, reference-model error, or dependence among windows; those remain separate gates.
+
 ### Matched-budget comparison arms
 
 Include at least:
@@ -325,7 +340,7 @@ A policy combining signals must include ablations so that each component's value
 
 Report as separate endpoints rather than collapsing them into a weighted score:
 
-- **Useful simulated time per all-in budget**: reference-validated trajectory time before the declared horizon or first adjudicated physical/numerical failure, divided by the complete declared resource cost. Define the numerator for each scientific task before running; a merely finite trajectory is not necessarily useful.
+- **Useful simulated time per all-in budget**: estimate the total duration of eligible windows passing the task's preregistered reference-fidelity and physical-integrity gates, divided by the policy-lane cost, using the independent evaluation-audit sampling design to estimate unqueried windows. The numerator must not be inferred solely from the controller's own query outcomes. Report a second ratio using full study cost (including evaluation-audit calls). Count every attempted arm and preserve the initial matched cohort; a merely finite trajectory is not necessarily useful.
 - **Fixed-horizon survival**: fraction of independent attempts still eligible and physically credible at each preregistered horizon, with group-aware uncertainty.
 - **Time and cause of first failure**: retain numerical divergence, unphysical structure, invalid chemistry/passivation, wrong reference-disagreed transition, solver/runtime failure, and other predeclared causes separately.
 - **Intervention value**: additional validated time saved by a warning or conservative action; fraction of true severe events detected before the deadline; warning lead time in windows and physical time; missed-event rate; false alarms per 100 eligible windows; number and cost of unnecessary stops/checkpoints.
