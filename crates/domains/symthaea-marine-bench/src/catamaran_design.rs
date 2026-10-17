@@ -8,6 +8,7 @@
 //! energy use, safety, or an operating envelope. Those require declared methods
 //! validated against comparable experimental/reference data.
 
+use serde::Serialize;
 use std::fmt;
 
 /// Standard gravitational acceleration in metres per second squared.
@@ -92,7 +93,7 @@ pub struct CatamaranGeometry {
     pub wet_deck_clearance_m: f64,
 }
 
-#[derive(Clone, Copy, Debug, PartialEq)]
+#[derive(Clone, Copy, Debug, PartialEq, Serialize)]
 pub struct DimensionlessGeometry {
     pub overall_beam_over_lwl: f64,
     pub demihull_beam_over_lwl: f64,
