@@ -956,9 +956,9 @@ fn add_service_load(
     };
     let summary = &mut summaries[index];
     summary.connection_count += 1;
-    if summary.unit != port.rating.unit {
+    if summary.unit != port.rating.unit || service.capacity.unit != port.rating.unit {
         add_finding(findings, "MIXED_SERVICE_LOAD_UNITS", Severity::Error,
-            &service.service_id, "connected port ratings use different units");
+            &service.service_id, "connected port ratings and service capacity must use the same unit");
         summary.declared_load = None;
         summary.disposition = "indeterminate_mixed_units".to_owned();
         return;
@@ -1100,8 +1100,9 @@ mod tests {
         assert!(has(&validate_configuration(&config).expect("receipt serializes"), "MODULE_REVISION_MISMATCH"));
 
         let mut config = live();
-        config.connections.push(config.connections[0].clone());
-        config.connections.last_mut().expect("just pushed").connection_id = "CONN-DUPLICATE-TEST".to_owned();
+        let mut duplicate = config.connections[0].clone();
+        duplicate.connection_id = "CONN-DUPLICATE-TEST".to_owned();
+        config.connections.push(duplicate);
         assert!(has(&validate_configuration(&config).expect("receipt serializes"), "PORT_CONNECTED_MULTIPLE_TIMES"));
     }
 }
