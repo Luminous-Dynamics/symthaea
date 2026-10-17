@@ -1028,11 +1028,13 @@ mod tests {
 
             let metrics0 = json!({
                 "episode_id": 0,
+                "final/is_stable": true,
                 "final/queries_used": 2,
                 "final/score": 1.0
             });
             let metrics1 = json!({
                 "episode_id": 1,
+                "final/is_stable": false,
                 "final/queries_used": 2,
                 "final/score": 3.0
             });
@@ -1061,6 +1063,11 @@ mod tests {
                 serde_json::to_vec_pretty(&json!({
                     "episodes": 2,
                     "summary": {
+                        "final/is_stable": {
+                            "mean": 0.5,
+                            "std": 0.5,
+                            "sem": 0.35355339059327373
+                        },
                         "final/queries_used": { "mean": 2.0, "std": 0.0, "sem": 0.0 },
                         "final/score": {
                             "mean": 2.0,
@@ -1074,7 +1081,7 @@ mod tests {
             .expect("write aggregate");
             fs::write(
                 path.join("summary/episodes.csv"),
-                "episode_id,final/queries_used,final/score\n0,2,1.0\n1,2,3.0\n",
+                "episode_id,final/is_stable,final/queries_used,final/score\n0,True,2,1.0\n1,False,2,3.0\n",
             )
             .expect("write csv");
             Self(path)
