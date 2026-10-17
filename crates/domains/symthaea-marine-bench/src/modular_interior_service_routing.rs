@@ -580,11 +580,47 @@ fn rect_for_anchor_owner_from_anchor(anchor: &RoutingAnchor) -> Option<String> {
         .then(|| format!("module:{}", anchor.instance_id.as_deref().unwrap_or_default()))
 }
 
+fn anchor_approach_points(
+    anchor: &RoutingAnchor,
+    clearance_mm: i64,
+    grid_pitch_mm: i64,
+) -> Result<Vec<GridPoint>, RoutingError> {
+    let origin = GridPoint {
+        x_mm: anchor.position_mm.x_mm,
+        y_mm: anchor.position_mm.y_mm,
+    };
+    if anchor.kind != AnchorKind::ModulePort {
+        return Ok(vec![origin]);
+    }
+    let side = anchor.side.expect("module-port anchor shape checked");
+    let steps_i = ((i128::from(clearance_mm) + i128::from(grid_pitch_mm) - 1)
+        / i128::from(grid_pitch_mm)).max(1);
+    let steps = usize::try_from(steps_i)
+        .map_err(|_| RoutingError::new("APPROACH_STEP_OVERFLOW", "approach step count overflows usize"))?;
+    let (dx, dy) = match side {
+        AnchorSide::North => (0i128, 1i128),
+        AnchorSide::South => (0, -1),
+        AnchorSide::East => (1, 0),
+        AnchorSide::West => (-1, 0),
+    };
+    let mut points = Vec::with_capacity(steps.saturating_add(1));
+    for step in 0..=steps {
+        let offset = i128::from(grid_pitch_mm) * step as i128;
+        let x = i128::from(origin.x_mm) + dx * offset;
+        let y = i128::from(origin.y_mm) + dy * offset;
+        points.push(GridPoint {
+            x_mm: i64::try_from(x).map_err(|_| RoutingError::new("APPROACH_COORDINATE_OVERFLOW", "approach X coordinate overflows i64"))?,
+            y_mm: i64::try_from(y).map_err(|_| RoutingError::new("APPROACH_COORDINATE_OVERFLOW", "approach Y coordinate overflows i64"))?,
+        });
+    }
+    Ok(points)
+}
+
 fn grid_for_route(
     configuration: &Configuration,
     request: &ServiceRouteRequest,
     limits: &RoutingLimits,
-) -> Result<(Grid, usize, usize, Vec<Obstacle>), RoutingError> {
+) -> Result<(Grid, usize, usize, Vec<usize>, Vec<usize>, Vec<Obstacle>, bool), RoutingError> {
     anchor_on_module_boundary(configuration, &request.start)?;
     anchor_on_module_boundary(configuration, &request.end)?;
     if request.start.deck_id != request.end.deck_id {
@@ -626,57 +662,77 @@ fn grid_for_route(
         }
         usize::try_from(delta / i128::from(limits.grid_pitch_mm)).ok()
     };
-    let sx = aligned_index(request.start.position_mm.x_mm, bounds.x_min_mm)
-        .ok_or_else(|| RoutingError::new("START_NOT_GRID_ALIGNED", "start anchor is outside bounds or not aligned to grid pitch"))?;
-    let sy = aligned_index(request.start.position_mm.y_mm, bounds.y_min_mm)
-        .ok_or_else(|| RoutingError::new("START_NOT_GRID_ALIGNED", "start anchor is outside bounds or not aligned to grid pitch"))?;
-    let gx = aligned_index(request.end.position_mm.x_mm, bounds.x_min_mm)
-        .ok_or_else(|| RoutingError::new("END_NOT_GRID_ALIGNED", "end anchor is outside bounds or not aligned to grid pitch"))?;
-    let gy = aligned_index(request.end.position_mm.y_mm, bounds.y_min_mm)
-        .ok_or_else(|| RoutingError::new("END_NOT_GRID_ALIGNED", "end anchor is outside bounds or not aligned to grid pitch"))?;
-    if sx >= width || gx >= width || sy >= height || gy >= height {
-        return Err(RoutingError::new("ANCHOR_OUT_OF_BOUNDS", "start or end anchor is outside the deck grid"));
-    }
+    let cell_for_point = |point: &GridPoint| -> Result<usize, RoutingError> {
+        let xi = aligned_index(point.x_mm, bounds.x_min_mm)
+            .ok_or_else(|| RoutingError::new("ANCHOR_NOT_GRID_ALIGNED", "anchor/approach X is outside bounds or not aligned to grid pitch"))?;
+        let yi = aligned_index(point.y_mm, bounds.y_min_mm)
+            .ok_or_else(|| RoutingError::new("ANCHOR_NOT_GRID_ALIGNED", "anchor/approach Y is outside bounds or not aligned to grid pitch"))?;
+        if xi >= width || yi >= height {
+            return Err(RoutingError::new("ANCHOR_APPROACH_OUT_OF_BOUNDS", "anchor or port-clearance approach extends outside deck bounds"));
+        }
+        Ok(yi * width + xi)
+    };
+
+    let start_points = anchor_approach_points(&request.start, request.clearance_mm, limits.grid_pitch_mm)?;
+    let end_points = anchor_approach_points(&request.end, request.clearance_mm, limits.grid_pitch_mm)?;
+    let start_approach: Vec<usize> = start_points.iter().map(cell_for_point).collect::<Result<_, _>>()?;
+    let end_approach: Vec<usize> = end_points.iter().map(cell_for_point).collect::<Result<_, _>>()?;
+    let start_anchor_cell = cell_for_point(&GridPoint { x_mm: request.start.position_mm.x_mm, y_mm: request.start.position_mm.y_mm })?;
+    let end_anchor_cell = cell_for_point(&GridPoint { x_mm: request.end.position_mm.x_mm, y_mm: request.end.position_mm.y_mm })?;
+    let start_escape = *start_approach.last().expect("approach contains anchor");
+    let end_escape = *end_approach.last().expect("approach contains anchor");
 
     let obstacles = build_obstacles(configuration, &request.start.deck_id, &request.start, &request.end)?;
-    if point_blocked_by_foreign_obstacle(&obstacles, &request.start, request.clearance_mm)?
-        || point_blocked_by_foreign_obstacle(&obstacles, &request.end, request.clearance_mm)?
-    {
-        return Ok((Grid {
-            x_min_mm: bounds.x_min_mm, y_min_mm: bounds.y_min_mm,
-            pitch_mm: limits.grid_pitch_mm, width, height,
-            blocked: vec![true; cell_count],
-        }, sy * width + sx, gy * width + gx, obstacles));
+    let point_is_blocked = |anchor: &RoutingAnchor, point: &GridPoint| -> Result<bool, RoutingError> {
+        let owner = rect_for_anchor_owner_from_anchor(anchor).unwrap_or_default();
+        Ok(obstacles.iter().any(|obstacle| {
+            obstacle.owner != owner
+                && contains(&obstacle.rect, point.x_mm, point.y_mm, request.clearance_mm)
+        }))
+    };
+    let mut endpoint_blocked = point_is_blocked(&request.start, &start_points[0])?
+        || point_is_blocked(&request.end, &end_points[0])?;
+    for point in start_points.iter().chain(end_points.iter()) {
+        // The port's own module is the only obstacle permitted inside its outward
+        // approach clearance. A different module or reserved area blocks the approach.
+        if point_is_blocked(&request.start, point)? {
+            endpoint_blocked = true;
+        }
+    }
+    for point in &end_points {
+        if point_is_blocked(&request.end, point)? {
+            endpoint_blocked = true;
+        }
     }
 
     let mut blocked = vec![false; cell_count];
     for yi in 0..height {
-        let y = i128::from(bounds.y_min_mm) + i128::from(yi as u64) * i128::from(limits.grid_pitch_mm);
+        let y = i128::from(bounds.y_min_mm) + (yi as i128) * i128::from(limits.grid_pitch_mm);
         for xi in 0..width {
-            let x = i128::from(bounds.x_min_mm) + i128::from(xi as u64) * i128::from(limits.grid_pitch_mm);
+            let x = i128::from(bounds.x_min_mm) + (xi as i128) * i128::from(limits.grid_pitch_mm);
             let point_x = i64::try_from(x).map_err(|_| RoutingError::new("GRID_COORDINATE_OVERFLOW", "grid X coordinate overflows"))?;
             let point_y = i64::try_from(y).map_err(|_| RoutingError::new("GRID_COORDINATE_OVERFLOW", "grid Y coordinate overflows"))?;
             let index = yi * width + xi;
             blocked[index] = obstacles.iter().any(|obstacle| {
-                let own_terminal_module = rect_for_anchor_owner_from_anchor(&request.start)
-                    .as_deref() == Some(obstacle.owner.as_str())
-                    || rect_for_anchor_owner_from_anchor(&request.end)
-                        .as_deref() == Some(obstacle.owner.as_str());
-                let clearance = if own_terminal_module { 0 } else { request.clearance_mm };
-                contains(&obstacle.rect, point_x, point_y, clearance)
+                contains(&obstacle.rect, point_x, point_y, request.clearance_mm)
             });
         }
     }
-    let start_index = sy * width + sx;
-    let goal_index = gy * width + gx;
-    // A port anchor lives on the envelope boundary; allow only the exact terminal
-    // grid cells to be traversable through their host-module occupancy.
-    blocked[start_index] = false;
-    blocked[goal_index] = false;
+
+    if !endpoint_blocked {
+        // These cells form explicit, directional port escape corridors. This is
+        // preferable to suppressing clearance around an entire terminal module.
+        for cell in start_approach.iter().chain(end_approach.iter()) {
+            blocked[*cell] = false;
+        }
+    } else {
+        blocked.fill(true);
+    }
+
     Ok((Grid {
         x_min_mm: bounds.x_min_mm, y_min_mm: bounds.y_min_mm,
         pitch_mm: limits.grid_pitch_mm, width, height, blocked,
-    }, start_index, goal_index, obstacles))
+    }, start_escape, end_escape, start_approach, end_approach, obstacles, endpoint_blocked))
 }
 
 fn cell_to_point(grid: &Grid, cell: usize) -> Result<GridPoint, RoutingError> {
