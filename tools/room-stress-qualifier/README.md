@@ -6,15 +6,16 @@ Independent Rust CLI for validating the synthetic room-imagination stress manife
 
 ```sh
 cargo test --manifest-path tools/room-stress-qualifier/Cargo.toml
-cargo run --manifest-path tools/room-stress-qualifier/Cargo.toml -- \
-  docs/research/spatial-design/ROOM_IMAGINATION_STRESS_BENCHMARK_V0_1.json \
-  docs/research/spatial-design/ROOM_IMAGINATION_STRESS_BENCHMARK_V0_1.schema.json
+cargo run --manifest-path tools/room-stress-qualifier/Cargo.toml
+cargo run --manifest-path tools/room-stress-qualifier/Cargo.toml -- --json
 ```
 
-With no CLI arguments, the executable reads the default benchmark and schema paths relative to the current working directory (repository root). With exactly two arguments, it reads the given benchmark and schema files. Invalid input exits nonzero.
+The default paths point to the checked-in benchmark and schema relative to the repository root. To validate alternate files, pass both paths, optionally after `--json`. Invalid input exits nonzero.
+
+In JSON mode the tool emits a deterministic, content-addressed receipt with the SHA-256 digests of the exact benchmark and schema bytes, the validator version, the case/family/risk counts and an explicit claim ceiling. The receipt proves only that this validator accepted those manifest inputs; it is not a signed attestation and does not qualify spatial geometry or building performance.
 
 ## What this does — and does not — prove
 
-It checks the manifest/schema contract, exact case ordering and IDs, non-empty required lists, allowed risk values, unknown-field rejection and duplicate IDs. Unit tests include negative controls for malformed JSON, missing/extra fields, unsupported risk values, empty required lists, sequence gaps, wrong counts, and an invalid schema.
+It checks the schema itself, the manifest/schema contract, exact case ordering and IDs, non-empty required lists, allowed risk values, unknown-field rejection and duplicate IDs. Unit tests include negative controls for malformed JSON, missing/extra fields, unsupported risk values, empty required lists, sequence gaps, wrong counts, invalid schemas, and deterministic receipt behavior.
 
 It does **not** run geometry predicates, daylight/energy/thermal/acoustic simulation, accessibility assessments, code compliance, safety reviews, professional approval or human studies. Its success means only that the fixture manifest passes these checks. A future geometry/simulation adapter needs its own qualified contract, golden corpus, uncertainty model and independent checker.
