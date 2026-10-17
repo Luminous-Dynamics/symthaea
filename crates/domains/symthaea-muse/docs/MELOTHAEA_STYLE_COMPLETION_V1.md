@@ -75,6 +75,66 @@ A style should only be promoted through these layers:
 7. **Blind listening:** compare samples without labels, with experts and target listeners. Record task, sample identities, seed/config, reviewer expertise, outcomes and uncertainty. Do not promote to Foundation from implementation tests alone.
 8. **Qualified review:** traditions requiring expert review cannot make authenticity/foundation claims without that evidence. User-created and open/public-domain corpora still need source and license provenance.
 
+## Paradigm shift: from genre labels to executable, falsifiable contracts
+
+A “style” should stop being a preset name attached to a shared generator. Treat it as a versioned, testable contract:
+
+1. **Identity is a bundle of constraints, not one embedding or label.** A Sarabande contract should state its metre, characteristic beat-two weighting, phrase/harmonic behavior, intended pace, and ensemble assumptions. A Minuet-and-Trio contract must additionally demonstrate a recognizable A–B–A return and an audible/structural distinction between A and the Trio. Requirements differ by style; the contract declares which are invariant and which allow variation.
+2. **Separate composition, performance, and audio.** A correct symbolic score does not prove believable rubato, articulation, instrumentation, mix, or sound design. Score-level tests, performance-realization metrics, and audio/listener tests must remain separate linked scorecards.
+3. **One grammar engine, many honest presets — but no false equivalence.** Reuse a real engine when its invariants match. Route every named style through the public production dispatcher and expose the selected grammar/form plan. If two named styles share an engine or motif bank, record that fact and measure whether their signatures actually differ. Never mark a style complete merely because an enum, tempo band, or catalog mapping exists.
+4. **Measure causes, not correlations alone.** Change valence, arousal, energy, duration, or tonal center one factor at a time, hold the rest fixed, and report which features actually move. An advertised control that is inert is a disclosed gap; a feature that moves for unrelated changes is not evidence of causal control.
+5. **Diversity must be conditional.** Maximize within-style variation without erasing the style's invariants; penalize cross-style collisions without rewarding random noise. Report exact duplicates, structural neighbors, style-conditional diversity and human-labeled confusion separately.
+6. **Human judgment is an instrument, not a final decoration.** Blind listeners should evaluate style recognition, coherence, creativity, structure, performance quality and preference separately. Tradition-specific evaluations need knowledgeable practitioners and must not infer authenticity from a classifier score.
+
+### New executable benchmark
+
+A Rust example, **examples/style_contract_benchmark.rs**, is now added to audit the real public composition path, **compose_with_grammar_plan(style.grammar_profile(), intent, style.spec())**. It reports spec validity, empty/invalid timelines, meter and tempo-band violations, deterministic replay failures, seed-level exact-fingerprint diversity, matched-intent exact collisions between styles, nearest cross-style structural neighbors, and the gap between declared and observed sensitivity for valence/arousal/energy/bars.
+
+Run it with:
+
+    cargo run --release -p symthaea-music-theory --example style_contract_benchmark
+
+Or write a machine-readable report:
+
+    cargo run --release -p symthaea-music-theory --example style_contract_benchmark -- /tmp/style-contract.json
+
+The diversity census now uses **Style::ALL** for its current causal-diversity pass so new presets enter by default. Its historical 29-style pilot remains fixed for reproducibility. The new contract benchmark runs through the actual grammar dispatcher, including dedicated grammar families; that distinction matters because the older diversity census uses the shared composition-and-form path and is a different measurement layer.
+
+**Neither tool evaluates human preference, style authenticity, cultural legitimacy or artistic superiority.** Both must emit diagnostic evidence, not a claim that the style passed a listener test.
+
+## Proposed benchmark targets
+
+These are **prospective engineering goals**, not current results. First collect a reproducible baseline and publish every failure.
+
+| Dimension | Proposed target | Conditions and caveats |
+|---|---|---|
+| Mechanical correctness | 100% of presets validate; zero empty scores, non-finite/non-positive timelines, meter mismatches or deterministic-replay failures | Initial smoke sweep, then at least 10,000 fixed-seed/config cases. Fail closed on any unexplained violation. |
+| Control sensitivity | At least 95% of *declared-live* style/control pairs show an effect on a pre-registered intended feature across a seed sweep; every remaining no-effect case is documented | Keep intentionally inert controls distinct from bugs; report exact and structural changes separately. |
+| Style identity, broad families | Macro-F1 ≥ 0.80 across expert-reviewed family labels on held-out seeds/templates | Use a frozen evaluator only as a diagnostic, with a blinded human panel as the deciding evidence. Balance classes and report per-family results. |
+| Style identity, exact labels | Top-1 ≥ 0.65 and top-3 ≥ 0.85 on the reviewed style subset | Initial target for a 35-style tranche, not a universal 152-class claim. Report a confusion matrix and confidence intervals; do not collapse culturally distinct labels to inflate the score. |
+| Pairwise preference | ≥ 60% preference over the strongest *matched* baseline, with the 95% confidence-interval lower bound above 50%, replicated on held-out prompts and listeners | Score composition, style adherence, and performance separately. Match duration, loudness, instruments/rendering and selection budget. |
+| Objective metric validity | Rank correlation ρ ≥ 0.50 between the pre-registered aggregate metric and expert judgments on held-out styles, with confidence intervals | Validate metric agreement rather than optimizing for the metric; publish the dimensions and groups where agreement fails. |
+| Cross-style bleed | Reduce human-confirmed cross-style confusion by ≥ 30% relative to the frozen baseline without reducing within-style coherence or preference | Calibrate the structural-neighbor threshold using blinded human labels; raw feature distance alone is not ground truth. |
+| Reproducibility | Every report records engine version, source/head SHA, configuration, seed set and corpus provenance; reruns reproduce exact symbolic hashes | Keep benchmark fixtures immutable, version threshold changes, and never count queued/skipped/stale CI as a pass. |
+| Runtime and resource use | Report p50/p95 generation latency, memory and score size for 8/16/32-bar cases on named reference hardware | Establish the baseline before adopting a hard latency SLO; symbolic composition and audio rendering need separate budgets. |
+
+### Benchmark design that resists self-deception
+
+- **Matched comparisons:** same intent, tonic, length, rendering loudness and instrument budget; compare against the current engine, a simple style-agnostic baseline and human-authored controls where licensing permits.
+- **Held-out evaluation:** hold out seeds, motif templates, prompts, and—where the tradition calls for it—composers/performers. Report tuning items separately from final items.
+- **Negative controls:** intentionally remove the defining accent, change the required metre, shuffle the style label, or replace a dedicated preset with the nearest generic fallback. The benchmark should detect those regressions. Retain controls even when the system improves.
+- **Blinded panels:** randomize labels and output order; collect independent ratings before discussion. Use clustered/bootstrap confidence intervals over both listeners and source prompts; report expertise, disagreements and missing responses.
+- **Cultural governance:** recruit qualified reviewers for the specific tradition, pay/credit them appropriately, and let them flag a misleading label. Do not average away serious authenticity concerns into one universal “music score.”
+- **No hidden cherry-picking:** record candidate count, rejection/selection rules and any manual edits. Report best-of-N performance separately from one-shot generation.
+- **Release gates:** mechanics first, frozen objective report second, blind listening third, qualified cultural review where needed. A style is Foundation only after the relevant evidence exists, not because an enum and tests landed.
+
+### External evaluation references
+
+- [MIREX 2026 Symbolic Music Generation](https://www.music-ir.org/mirex/wiki/2026%3ASymbolic_Music_Generation) uses blind subjective evaluation for prompt coherence, creativity, structuredness and overall musicality; these are useful separate dimensions for our protocol.
+- [MIREX 2026 CMI-RewardBench results](https://music-ir.org/mirex/wiki/2026%3AMusic_Evaluation_via_CMI-RewardBench_Results) compare automatic reward models against human pairwise preference. They demonstrate a practical evaluator benchmark, but its scores are not directly comparable to Melothaea's proposed style-recognition or composition targets.
+- [A Survey on Evaluation Metrics for Music Generation](https://arxiv.org/abs/2509.00051) highlights limitations in objective-metric/human-perception alignment, cross-cultural bias and standardization.
+- [Benchmarking Music Generation Models and Metrics via Human Preference Studies](https://arxiv.org/abs/2506.19085) reports a large human-preference study (12 systems, 6,000 generated songs, 15,000 pairwise comparisons, 2,500 participants). This gives a scale reference—not a minimum viable requirement for our first controlled panel.
+
 ## Recommended remaining sequence
 
 **Next: Classical and Baroque forms.** Expand the Minuet and Trio's actual A-versus-Trio contrast, then build Gavotte, Gigue, Allemande, Toccata, French Overture, Rondo-adjacent developmental forms and Elegy; expand the Sarabande's current rhythm-focused preset into a reviewed form/performance model from actual formal/rhythmic differences, not aliases. Reuse existing form machinery when its invariants really match; add a new engine only when the structure cannot be represented faithfully.
