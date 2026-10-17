@@ -13,7 +13,7 @@ cargo run --manifest-path tools/cyber-hunt-fixture-generator/Cargo.toml -- \
   --events-out /tmp/cyber-hunt/solver/events.jsonl \
   --manifest-out /tmp/cyber-hunt/solver/manifest.json \
   --truth-out /tmp/cyber-hunt/evaluator/truth.json \
-  --source-commit ${GIT_COMMIT_SHA}
+  --source-commit "$(git rev-parse HEAD)"
 ```
 
 Record count is bounded to 64–250,000. The same seed and count produce identical event bytes. The dataset has no network connectivity or live-target actions; all identities, hosts, addresses, destinations and events are synthetic. IPv4 addresses come from reserved documentation ranges or synthetic private ranges. Example domains use `.invalid`.
