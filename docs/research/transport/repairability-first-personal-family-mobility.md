@@ -160,6 +160,38 @@ Every result should be paired with mission requirements: usable seats, secure ch
 
 The first deliverable should be the **market-specific benchmark protocol and requirements matrix**, not a speculative render or an unsupported claim that a new vehicle is ready to build.
 
+## Cross-project architecture: reuse the existing transport owners
+
+A source review on 2026-10-17 found that we should specialize existing work instead of creating another generic transport framework.
+
+- Symthaea [TRANSPORT-ENG-001 #6244](https://github.com/Luminous-Dynamics/symthaea/issues/6244) is the shared transport engineering architecture.
+- Symthaea [TRANSPORT-ROAD-001 #6247](https://github.com/Luminous-Dynamics/symthaea/issues/6247) already owns tire/contact, braking, handling, stability, payload/CG and vehicle qualification semantics. The family-car program should add a bounded passenger-vehicle profile and benchmark there, not duplicate a road-dynamics solver.
+- Symthaea [TRANSPORT-CLOSURE-001 #6253](https://github.com/Luminous-Dynamics/symthaea/issues/6253) owns productive-closure/resilience concerns; [TRANSPORT-PILOT-001 #6254](https://github.com/Luminous-Dynamics/symthaea/issues/6254) covers the low-consequence physical qualification ladder.
+- Symtropy [TRANSPORT-OPT-001 #1601](https://github.com/Luminous-Dynamics/symtropy/issues/1601) already owns whole-life social-cost transport comparison, and [TRANSPORT-SAFETY-001 #1636](https://github.com/Luminous-Dynamics/symtropy/issues/1636) addresses physical-load qualification.
+- Mycelix has transport under Commons, but [DORMANT_TRANSPORT.md](https://github.com/Luminous-Dynamics/mycelix/blob/main/mycelix-commons/zomes/DORMANT_TRANSPORT.md) records serious correctness, deployment and multi-agent test gaps for route/sharing/impact zomes. Treat existing transport capabilities as dormant until their exact current head, WASM builds, HApp packaging and real multi-agent flows are independently verified.
+
+### Evidence path across all three projects
+
+```text
+Symthaea requirements + candidate design
+        -> Symtropy versioned simulation + Pareto/TCO scenarios
+        -> independent physical testing / engineering review / applicable authority
+        -> Mycelix owner-consented asset dossier + repair/part/inspection claims
+        -> minimized, consented field observations feed future design
+```
+
+Use immutable artifact references and typed claim classes across repositories, not synchronous dependencies. Every evidence envelope should bind schema version, artifact identity, exact subject/configuration, producer repository/commit/build/solver, canonical input/output digests, units, evidence class, scope, uncertainty, limitations, source/rights references, and a claim ceiling. Owner identity, financial agreements and raw trip/location data are excluded by default.
+
+Keep authority separate: Mycelix records and validates signed claims but does not establish legal title, workmanship or safety by signature alone; Symtropy simulation is not physical qualification; Symthaea does not certify its own designs. No consciousness or Phi measure may grant safety-critical actuator authority.
+
+### Additional paradigm shifts and testable targets
+
+- **Repair cost is designed in:** optimize the tasks/components that contribute most to lifetime service and collision-repair cost, not modularity as an aesthetic. SAE J1555 links repairability, serviceability and diagnostics and recommends focusing on the largest repair-cost contributors ([source](https://saemobilus.sae.org/standards/j1555_201910-recommended-practice-optimizing-automobile-damageability-repairability)).
+- **Optimize under uncertainty:** compare actual local powertrain/platform options across mileage, energy prices, repair labour, downtime, supplier availability and climate; report Pareto alternatives, not an opaque score.
+- **Use provisional numeric targets as hypotheses:** at least 15% lower modelled 10-year/150,000 km TCO than a matched local baseline with equivalent safety and utility; at least 25% lower median and 90th-percentile time for 10+ preregistered common service jobs, physically measured; and dated local price/lead-time/supplier data for the 20 highest-impact repair parts.
+- **Simulation must prove usefulness before it steers decisions:** on independently held-out measured profiles, initially target about 10% error for explicitly defined energy and braking observables, while reporting absolute error, confidence/measurement uncertainty, exclusions and out-of-domain cases. This is a design-screening ambition—not certification.
+- **Autonomy is a later, separately qualified program:** use an explicit operational design domain, frozen nominal/edge/adversarial/negative scenarios, sensor/actuator/software fault injection, fallback metrics and a safety case. Zero collisions within a finite simulation corpus is not proof of road safety. NHTSA's [published ADS reports](https://www.nhtsa.gov/automated-vehicles-safety/published-reports-and-documents) distinguish modeling, simulation, track and open-road testing; [ISO 21448](https://www.iso.org/standard/77490.html) addresses SOTIF but is not satisfied merely by referencing it.
+
 ## Decision gates
 
 Do not advance an architecture merely because an optimizer ranks it first.
