@@ -2,7 +2,7 @@
 
 **Status:** research protocol draft  
 **Tracking issue:** [MOBILITY-ASSIST-009 / #7890](https://github.com/Luminous-Dynamics/symthaea/issues/7890)  
-**Implementation:** draft [PR for interval-aware Pareto screening](https://github.com/Luminous-Dynamics/symthaea/pull/REPLACE_AFTER_PR_CREATION)  
+**Implementation:** draft [PR for interval-aware Pareto screening](https://github.com/Luminous-Dynamics/symthaea/pull/7892)  
 **Point-estimate comparator:** [MOBILITY-ASSIST-008 / PR #7882](https://github.com/Luminous-Dynamics/symthaea/pull/7882)  
 **Synthetic corpus:** [architecture-robustness-scenarios-v1.json](./fixtures/architecture-robustness-scenarios-v1.json)
 
