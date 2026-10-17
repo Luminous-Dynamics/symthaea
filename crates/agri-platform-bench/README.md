@@ -19,6 +19,7 @@ The crate defines its own Cargo workspace to avoid pulling the full Symthaea wor
 - Screens task compatibility and explicit service units.
 - Checks declared slope, terrain roughness, row clearance, turning radius, navigation assumptions, daily capacity, safety-case presence, and human override.
 - Separates site/task evidence from each candidate's capability, navigation, safety, cost, and serviceability evidence; candidates cannot inherit one another's capability claims, quotes, or repair claims.
+- Binds verified synthetic evidence to the retained `fixtures/synthetic_evidence_source.v1.txt` bytes; the focused workflow checks its SHA-256 sidecar before tests.
 - Requires an explicit uppercase currency code and blocks cross-currency cost comparisons unless a future, separately evidenced conversion contract is added.
 - Distinguishes verified, estimated, missing, stale, and conflicting evidence.
 - Fails closed on missing/invalid evidence records and checked-arithmetic overflow.
