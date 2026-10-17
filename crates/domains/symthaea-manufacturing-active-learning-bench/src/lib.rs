@@ -12,6 +12,7 @@ use std::collections::{BTreeMap, BTreeSet};
 
 pub mod acquisition;
 pub mod analysis;
+pub mod appliance_adapter;
 pub mod evaluator;
 pub use acquisition::{
     AcquisitionMetrics, AcquisitionObjective, AcquisitionRanking, DecisionAlternative,
@@ -20,6 +21,10 @@ pub use acquisition::{
     PosteriorState, PosteriorUpdate, RankedAction, RejectedAction, condition_posterior,
     expected_information_gain, expected_information_gain_for_state, initial_posterior_state,
     rank_feasible_actions, rank_feasible_actions_for_state,
+};
+pub use appliance_adapter::{
+    ApplianceAbstentionReason, ApplianceAcquisitionDecision, ApplianceObservationQuality,
+    ApplianceProtectionState, rank_appliance_measurements,
 };
 pub use analysis::{
     BenchmarkSummary, CampaignEvaluationSample, PairedPolicyComparison, PolicyAggregate,
