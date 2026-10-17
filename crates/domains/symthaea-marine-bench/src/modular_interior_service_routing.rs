@@ -1205,6 +1205,23 @@ mod tests {
     }
 
     #[test]
+    fn mixed_elevation_anchors_are_not_projected_into_a_fake_2d_route() {
+        let baseline = live();
+        let mut end = service_anchor("AC-BUS", 4700, 1800);
+        end.position_mm.z_mm = 1_000;
+        let route = request_for(
+            "CROSS-ELEVATION-ROUTE",
+            "CONN-CABIN-01-AC_IN",
+            module_anchor("CABIN-01", "AC_IN", 2800, 1800),
+            end,
+        );
+        assert_eq!(
+            route_services(&baseline, &[route], limits()).unwrap_err().code,
+            "CROSS_ELEVATION_ROUTE_UNSUPPORTED"
+        );
+    }
+
+    #[test]
     fn duplicate_routes_for_connection_are_rejected() {
         let baseline = live();
         let first = request_for(
@@ -1219,7 +1236,7 @@ mod tests {
     }
 
     #[test]
-    fn open_grid_matches_exhaustive_manhattan_cost_oracle() {
+    fn open_grid_matches_hand_calculated_manhattan_cost_oracle() {
         let grid = Grid {
             x_min_mm: 0,
             y_min_mm: 0,
