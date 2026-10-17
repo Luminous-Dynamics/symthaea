@@ -1409,6 +1409,26 @@ mod tests {
     }
 
     #[test]
+    fn event_driven_authority_rejects_plant_timing_api() {
+        let mut bridge = TimingCaptureBridge {
+            last_dt: None,
+            step_calls: 0,
+            authority: PlantStepAuthorityV1::EventDrivenExternal,
+        };
+        let timing = PlantStepTimingV1::configured_simulation(7, 0.005).unwrap();
+
+        assert!(matches!(
+            bridge.step_with_timing(&ContinuousHV::zero(16_384), &timing, 0.9),
+            Err(PlantStepTimingErrorV1::EventDrivenStepCannotUsePlantTiming)
+        ));
+        assert_eq!(bridge.last_dt, None);
+        assert_eq!(
+            bridge.step_calls, 0,
+            "event-driven bridge must not be reached through the plant-dt path"
+        );
+    }
+
+    #[test]
     fn timing_adapter_rejects_invalid_evidence_before_calling_legacy_bridge() {
         let mut bridge = TimingCaptureBridge {
             last_dt: None,
