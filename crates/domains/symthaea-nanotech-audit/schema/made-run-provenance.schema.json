@@ -225,6 +225,42 @@
     "oracle_call_ledger_sha256": {
       "type": "string",
       "pattern": "^[a-f0-9]{64}$"
+    },
+    "shift_manifest_path": {
+      "type": "string",
+      "minLength": 1,
+      "maxLength": 1024,
+      "description": "Optional relative path to a frozen nano-shift-manifest-v1 included in artifacts."
+    },
+    "shift_manifest_sha256": {
+      "type": "string",
+      "pattern": "^[a-f0-9]{64}$"
     }
-  }
+  },
+  "allOf": [
+    {
+      "if": {
+        "required": [
+          "shift_manifest_path"
+        ]
+      },
+      "then": {
+        "required": [
+          "shift_manifest_sha256"
+        ]
+      }
+    },
+    {
+      "if": {
+        "required": [
+          "shift_manifest_sha256"
+        ]
+      },
+      "then": {
+        "required": [
+          "shift_manifest_path"
+        ]
+      }
+    }
+  ]
 }
