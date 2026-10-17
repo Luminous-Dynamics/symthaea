@@ -211,7 +211,9 @@ fn binomial_cdf(events: u64, units: u64, probability: f64) -> f64 {
             * ((1.0 - probability) / probability);
         mass *= ratio;
         sum += mass;
-        if mass <= sum * TAIL_RELATIVE_TOLERANCE {
+        // The remaining lower tail is bounded by a geometric series with this ratio
+        // (subsequent ratios only decrease). Include that amplification in the stop test.
+        if ratio < 1.0 && mass <= sum * TAIL_RELATIVE_TOLERANCE * (1.0 - ratio) {
             break;
         }
         j -= 1;
@@ -275,6 +277,14 @@ mod tests {
     fn positive_event_count_uses_exact_binomial_cdf_inversion() {
         let result = assess_rare_event_risk(&evidence(1, 100)).unwrap();
         assert!((upper(result) - 0.046_559_811_453_539).abs() < 1.0e-10);
+    }
+
+
+    #[test]
+    fn positive_event_bound_inverts_the_one_sided_cdf_at_alpha() {
+        let result = assess_rare_event_risk(&evidence(1, 100)).unwrap();
+        let p = upper(result);
+        assert!((binomial_cdf(1, 100, p) - 0.05).abs() < 1.0e-12);
     }
 
     #[test]
