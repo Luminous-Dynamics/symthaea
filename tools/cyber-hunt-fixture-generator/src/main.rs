@@ -6,7 +6,7 @@ use std::fs;
 use std::path::{Path, PathBuf};
 use std::process;
 
-const GENERATOR_VERSION: &str = "cyber-hunt-fixture-generator/0.2.0";
+const GENERATOR_VERSION: &str = "cyber-hunt-fixture-generator/0.3.0";
 const EVENT_SCHEMA: &str = "cyber-hunt-event-v1";
 const MANIFEST_SCHEMA: &str = "cyber-hunt-manifest-v1";
 const TRUTH_SCHEMA: &str = "cyber-hunt-truth-v1";
@@ -401,6 +401,7 @@ fn generate_dataset(record_count: usize, seed: u64) -> Result<Dataset, String> {
 enum CampaignFamily {
     IdentityToEgress,
     ArtifactProvenance,
+    CloudDataMovement,
 }
 
 impl CampaignFamily {
@@ -408,6 +409,7 @@ impl CampaignFamily {
         match value {
             "identity-to-egress" => Ok(Self::IdentityToEgress),
             "artifact-provenance" => Ok(Self::ArtifactProvenance),
+            "cloud-data-movement" => Ok(Self::CloudDataMovement),
             _ => Err(format!(
                 "unsupported --family {value}; expected identity-to-egress or artifact-provenance"
             )),
@@ -418,6 +420,7 @@ impl CampaignFamily {
         match self {
             Self::IdentityToEgress => "identity-to-egress",
             Self::ArtifactProvenance => "artifact-provenance",
+            Self::CloudDataMovement => "cloud-data-movement",
         }
     }
 }
@@ -676,6 +679,283 @@ fn generate_artifact_provenance_dataset(record_count: usize, seed: u64) -> Resul
     Ok(Dataset { event_store, manifest, truth })
 }
 
+fn generate_cloud_data_movement_dataset(record_count: usize, seed: u64) -> Result<Dataset, String> {
+    const POSITIVE_COUNT: usize = 6;
+    const BENIGN_LOOKALIKE_COUNT: usize = 6;
+    const PLANTED_COUNT: usize = POSITIVE_COUNT + BENIGN_LOOKALIKE_COUNT;
+    const SCENARIO: &str = "synthetic-cloud-data-movement-v1";
+
+    if !(MIN_RECORDS..=MAX_RECORDS).contains(&record_count) {
+        return Err(format!(
+            "record count must be between {MIN_RECORDS} and {MAX_RECORDS}"
+        ));
+    }
+
+    let mut rng = Rng::new(seed);
+    let mut events = Vec::with_capacity(record_count);
+    let mut used_ids = BTreeSet::new();
+    let campaign_anchor_ms = BASE_TIME_MS.saturating_add(rng.below(7_200_000) as i64);
+
+    for index in 0..(record_count - PLANTED_COUNT) {
+        background_event(index, campaign_anchor_ms, &mut events, &mut rng, &mut used_ids);
+    }
+
+    // The granted role is scoped to one tenant path, but later storage reads target
+    // another path; approval is absent. All operations are synthetic and offline.
+    let base = campaign_anchor_ms.saturating_add(600_000);
+    let principal_index = rng.below(SYNTHETIC_PRINCIPALS.len() as u64) as usize;
+    let principal = SYNTHETIC_PRINCIPALS[principal_index];
+    let host = format!("host-{:03}", 1 + rng.below(48));
+    let object_id = format!("sp-{:016x}", rng.next_u64());
+    let session_id = format!("cloud-session-{:016x}", rng.next_u64());
+    let token_id = format!("token-{:016x}", rng.next_u64());
+    let export_id = format!("export-{:012x}", rng.next_u64() & 0x0000_ffff_ffff_ffff);
+    let object_count = 28_104 + rng.below(5_000);
+    let bytes_read = 48_000_000_000_u64 + rng.below(12_000_000_000);
+    let source_scope = "tenant-beta/telemetry";
+    let target_scope = "tenant-alpha/finance-prod";
+    let destination_ip = format!("198.51.100.{}", 10 + rng.below(240));
+
+    let mut positive_ids = Vec::with_capacity(POSITIVE_COUNT);
+    positive_ids.push(push_event(
+        &mut events, &mut rng, &mut used_ids, base, &host, principal,
+        "cloud_identity", "role_assignment", "granted",
+        details(&[
+            ("principal_object_id", &object_id),
+            ("cloud_role", "StorageDataReader"),
+            ("scope", source_scope),
+            ("approval_state", "missing"),
+            ("change_ticket", "none"),
+            ("grant_source", "automation"),
+        ]),
+    ));
+    positive_ids.push(push_event(
+        &mut events, &mut rng, &mut used_ids, base + 25_000, &host, principal,
+        "cloud_identity", "token_issue", "issued",
+        details(&[
+            ("principal_object_id", &object_id),
+            ("token_id", &token_id),
+            ("session_id", &session_id),
+            ("audience", "storage-api"),
+            ("effective_scope", source_scope),
+        ]),
+    ));
+    positive_ids.push(push_event(
+        &mut events, &mut rng, &mut used_ids, base + 50_000, &host, principal,
+        "cloud_storage", "storage_list", "success",
+        details(&[
+            ("principal_object_id", &object_id),
+            ("session_id", &session_id),
+            ("resource_scope", target_scope),
+            ("container", "finance-prod"),
+            ("request_id", &format!("req-{:012x}", rng.next_u64() & 0x0000_ffff_ffff_ffff)),
+        ]),
+    ));
+    positive_ids.push(push_event(
+        &mut events, &mut rng, &mut used_ids, base + 80_000, &host, principal,
+        "cloud_storage", "object_read_batch", "success",
+        details(&[
+            ("principal_object_id", &object_id),
+            ("session_id", &session_id),
+            ("resource_scope", target_scope),
+            ("object_count", &object_count.to_string()),
+            ("bytes_read", &bytes_read.to_string()),
+        ]),
+    ));
+    positive_ids.push(push_event(
+        &mut events, &mut rng, &mut used_ids, base + 110_000, &host, principal,
+        "cloud_audit", "export_job", "created",
+        details(&[
+            ("principal_object_id", &object_id),
+            ("session_id", &session_id),
+            ("export_id", &export_id),
+            ("resource_scope", target_scope),
+            ("object_count", &object_count.to_string()),
+            ("bytes_written", &bytes_read.to_string()),
+        ]),
+    ));
+    positive_ids.push(push_event(
+        &mut events, &mut rng, &mut used_ids, base + 140_000, &host, principal,
+        "cloud_egress", "data_transfer", "allowed",
+        details(&[
+            ("principal_object_id", &object_id),
+            ("session_id", &session_id),
+            ("export_id", &export_id),
+            ("destination_address", &destination_ip),
+            ("destination_profile", "unapproved_external"),
+            ("bytes_out", &bytes_read.to_string()),
+        ]),
+    ));
+
+    // Benign matched chain: same event types/outcomes, but the approved role scope,
+    // read scope, export and destination are consistent with a routine backup.
+    let benign_principal = SYNTHETIC_PRINCIPALS[(principal_index + 5) % SYNTHETIC_PRINCIPALS.len()];
+    let benign_host = format!("host-{:03}", 1 + rng.below(48));
+    let benign_object_id = format!("sp-{:016x}", rng.next_u64());
+    let benign_session = format!("cloud-session-{:016x}", rng.next_u64());
+    let benign_token = format!("token-{:016x}", rng.next_u64());
+    let benign_export = format!("export-{:012x}", rng.next_u64() & 0x0000_ffff_ffff_ffff);
+    let benign_count = 4_000 + rng.below(2_000);
+    let benign_bytes = 1_000_000_000_u64 + rng.below(2_000_000_000);
+    let benign_scope = "tenant-alpha/backup";
+
+    let benign_ids = vec![
+        push_event(
+            &mut events, &mut rng, &mut used_ids, base + 5_000, &benign_host, benign_principal,
+            "cloud_identity", "role_assignment", "granted",
+            details(&[
+                ("principal_object_id", &benign_object_id),
+                ("cloud_role", "StorageDataReader"),
+                ("scope", benign_scope),
+                ("approval_state", "approved"),
+                ("change_ticket", "CHG-1042"),
+                ("grant_source", "change_management"),
+            ]),
+        ),
+        push_event(
+            &mut events, &mut rng, &mut used_ids, base + 30_000, &benign_host, benign_principal,
+            "cloud_identity", "token_issue", "issued",
+            details(&[
+                ("principal_object_id", &benign_object_id),
+                ("token_id", &benign_token),
+                ("session_id", &benign_session),
+                ("audience", "storage-api"),
+                ("effective_scope", benign_scope),
+            ]),
+        ),
+        push_event(
+            &mut events, &mut rng, &mut used_ids, base + 55_000, &benign_host, benign_principal,
+            "cloud_storage", "storage_list", "success",
+            details(&[
+                ("principal_object_id", &benign_object_id),
+                ("session_id", &benign_session),
+                ("resource_scope", benign_scope),
+                ("container", "backup"),
+                ("request_id", &format!("req-{:012x}", rng.next_u64() & 0x0000_ffff_ffff_ffff)),
+            ]),
+        ),
+        push_event(
+            &mut events, &mut rng, &mut used_ids, base + 85_000, &benign_host, benign_principal,
+            "cloud_storage", "object_read_batch", "success",
+            details(&[
+                ("principal_object_id", &benign_object_id),
+                ("session_id", &benign_session),
+                ("resource_scope", benign_scope),
+                ("object_count", &benign_count.to_string()),
+                ("bytes_read", &benign_bytes.to_string()),
+            ]),
+        ),
+        push_event(
+            &mut events, &mut rng, &mut used_ids, base + 115_000, &benign_host, benign_principal,
+            "cloud_audit", "export_job", "created",
+            details(&[
+                ("principal_object_id", &benign_object_id),
+                ("session_id", &benign_session),
+                ("export_id", &benign_export),
+                ("resource_scope", benign_scope),
+                ("object_count", &benign_count.to_string()),
+                ("bytes_written", &benign_bytes.to_string()),
+            ]),
+        ),
+        push_event(
+            &mut events, &mut rng, &mut used_ids, base + 145_000, &benign_host, benign_principal,
+            "cloud_egress", "data_transfer", "allowed",
+            details(&[
+                ("principal_object_id", &benign_object_id),
+                ("session_id", &benign_session),
+                ("export_id", &benign_export),
+                ("destination_address", "192.0.2.40"),
+                ("destination_profile", "approved_backup_endpoint"),
+                ("bytes_out", &benign_bytes.to_string()),
+            ]),
+        ),
+    ];
+
+    if events.len() != record_count
+        || positive_ids.len() != POSITIVE_COUNT
+        || benign_ids.len() != BENIGN_LOOKALIKE_COUNT
+    {
+        return Err("internal cloud data movement fixture construction count mismatch".to_string());
+    }
+
+    events.sort_by(|a, b| (a.ingest_time_ms, &a.event_id).cmp(&(b.ingest_time_ms, &b.event_id)));
+    let event_store = encode_jsonl(&events)?;
+    let event_store_sha256 = digest(&event_store);
+    let positives: BTreeSet<String> = positive_ids.iter().cloned().collect();
+    let benign: BTreeSet<String> = benign_ids.iter().cloned().collect();
+    let mut labels = Vec::with_capacity(events.len());
+    for event in &events {
+        let (label, rationale) = if positives.contains(&event.event_id) {
+            ("positive", "member of the synthetic cloud authorization-scope mismatch and data-movement chain")
+        } else if benign.contains(&event.event_id) {
+            ("negative", "benign approved, scope-consistent cloud backup lifecycle lookalike")
+        } else {
+            ("negative", "synthetic background event outside the planted causal sequence")
+        };
+        labels.push(EventLabel {
+            event_id: event.event_id.clone(),
+            label: label.to_string(),
+            rationale: rationale.to_string(),
+        });
+    }
+
+    let expected_relations = vec![
+        ExpectedRelation {
+            from_event_id: positive_ids[0].clone(),
+            to_event_id: positive_ids[1].clone(),
+            relation: "role_grant_issued_token".to_string(),
+        },
+        ExpectedRelation {
+            from_event_id: positive_ids[1].clone(),
+            to_event_id: positive_ids[2].clone(),
+            relation: "token_used_for_out_of_scope_storage_list".to_string(),
+        },
+        ExpectedRelation {
+            from_event_id: positive_ids[2].clone(),
+            to_event_id: positive_ids[3].clone(),
+            relation: "enumeration_followed_by_bulk_object_reads".to_string(),
+        },
+        ExpectedRelation {
+            from_event_id: positive_ids[3].clone(),
+            to_event_id: positive_ids[4].clone(),
+            relation: "bulk_reads_collected_into_export".to_string(),
+        },
+        ExpectedRelation {
+            from_event_id: positive_ids[4].clone(),
+            to_event_id: positive_ids[5].clone(),
+            relation: "export_transferred_to_unapproved_destination".to_string(),
+        },
+    ];
+
+    let truth = GroundTruth {
+        schema_version: TRUTH_SCHEMA.to_string(),
+        scenario_id: SCENARIO.to_string(),
+        profile: "public-synthetic-smoke-v1".to_string(),
+        seed,
+        event_count: record_count,
+        event_store_sha256: event_store_sha256.clone(),
+        labels,
+        expected_relations,
+        claim_ceiling: "Synthetic cloud identity authorization-scope and data-movement correlation only; not real cloud security assurance or real-world security.".to_string(),
+    };
+    let manifest = DatasetManifest {
+        schema_version: MANIFEST_SCHEMA.to_string(),
+        generator_version: GENERATOR_VERSION.to_string(),
+        profile: "public-synthetic-smoke-v1".to_string(),
+        scenario_id: SCENARIO.to_string(),
+        seed,
+        record_count,
+        event_store_sha256,
+        event_store_utf8_bytes: event_store.len(),
+        ordering: "ingest_time_ms_then_event_id; event_time_ms remains distinct".to_string(),
+        qualification_state: "UNSCORED".to_string(),
+        generator_source_commit: "UNPINNED_LOCAL_SOURCE".to_string(),
+        source_commit_pinned: false,
+        claim_ceiling: "Exact deterministic cloud data-movement smoke fixture only; not solver capability evidence.".to_string(),
+    };
+    Ok(Dataset { event_store, manifest, truth })
+}
+
 fn generate_dataset_for_family(
     record_count: usize,
     seed: u64,
@@ -684,6 +964,7 @@ fn generate_dataset_for_family(
     match family {
         CampaignFamily::IdentityToEgress => generate_dataset(record_count, seed),
         CampaignFamily::ArtifactProvenance => generate_artifact_provenance_dataset(record_count, seed),
+        CampaignFamily::CloudDataMovement => generate_cloud_data_movement_dataset(record_count, seed),
     }
 }
 
@@ -842,7 +1123,7 @@ fn main() {
     match parse_args() {
         Ok(None) => {
             println!(
-                "Usage: cyber-hunt-fixture-generator --events-out PATH --manifest-out PATH --truth-out PATH [--family identity-to-egress|artifact-provenance] [--records N] [--seed N] [--source-commit 40_HEX_SHA]\n\
+                "Usage: cyber-hunt-fixture-generator --events-out PATH --manifest-out PATH --truth-out PATH [--family identity-to-egress|artifact-provenance|cloud-data-movement] [--records N] [--seed N] [--source-commit 40_HEX_SHA]\n\
                  Generates deterministic synthetic defensive telemetry only. Keep --truth-out outside the solver-visible filesystem."
             );
         }
@@ -958,6 +1239,85 @@ mod tests {
     }
 
     #[test]
+    fn cloud_data_movement_family_masks_event_type_and_checks_scope_authority() {
+        let dataset = generate_cloud_data_movement_dataset(1_000, 2026)
+            .expect("cloud data movement dataset should generate");
+        let events: Vec<EventRecord> = std::str::from_utf8(&dataset.event_store)
+            .expect("JSONL should be UTF-8")
+            .lines()
+            .map(|line| serde_json::from_str(line).expect("event should deserialize"))
+            .collect();
+        let positive_ids: BTreeSet<String> = dataset.truth.labels.iter()
+            .filter(|label| label.label == "positive")
+            .map(|label| label.event_id.clone())
+            .collect();
+        let positive_events: Vec<&EventRecord> = events.iter()
+            .filter(|event| positive_ids.contains(&event.event_id))
+            .collect();
+
+        assert_eq!(dataset.manifest.scenario_id, "synthetic-cloud-data-movement-v1");
+        assert_eq!(positive_events.len(), 6);
+        assert_eq!(dataset.truth.expected_relations.len(), 5);
+        assert_eq!(
+            dataset.truth.labels.iter().filter(|label| label.label == "negative").count(),
+            994
+        );
+        for expected_type in [
+            "role_assignment",
+            "token_issue",
+            "storage_list",
+            "object_read_batch",
+            "export_job",
+            "data_transfer",
+        ] {
+            assert!(positive_events.iter().any(|event| event.event_type == expected_type));
+            assert!(events.iter().any(|event| event.event_type == expected_type
+                && !positive_ids.contains(&event.event_id)),
+                "benign chain must contain a lookalike {expected_type}");
+        }
+
+        let role = positive_events.iter().find(|event| event.event_type == "role_assignment")
+            .expect("positive role assignment");
+        let token = positive_events.iter().find(|event| event.event_type == "token_issue")
+            .expect("positive token issue");
+        let storage = positive_events.iter().find(|event| event.event_type == "storage_list")
+            .expect("positive storage list");
+        let transfer = positive_events.iter().find(|event| event.event_type == "data_transfer")
+            .expect("positive transfer");
+        assert_eq!(role.details.get("approval_state").map(String::as_str), Some("missing"));
+        assert_eq!(role.details.get("scope"), token.details.get("effective_scope"));
+        assert_ne!(token.details.get("effective_scope"), storage.details.get("resource_scope"));
+        assert_eq!(transfer.details.get("destination_profile").map(String::as_str), Some("unapproved_external"));
+
+        let benign_transfer = events.iter().find(|event| event.event_type == "data_transfer"
+            && !positive_ids.contains(&event.event_id)
+            && event.details.get("destination_profile").map(String::as_str) == Some("approved_backup_endpoint"))
+            .expect("approved benign transfer should exist");
+        let benign_object_id = benign_transfer.details.get("principal_object_id")
+            .expect("benign principal object ID");
+        let benign_role = events.iter().find(|event| event.event_type == "role_assignment"
+            && event.details.get("principal_object_id") == Some(benign_object_id))
+            .expect("benign role assignment should exist");
+        let benign_token = events.iter().find(|event| event.event_type == "token_issue"
+            && event.details.get("principal_object_id") == Some(benign_object_id))
+            .expect("benign token issue should exist");
+        let benign_storage = events.iter().find(|event| event.event_type == "storage_list"
+            && event.details.get("principal_object_id") == Some(benign_object_id))
+            .expect("benign storage list should exist");
+        assert_eq!(benign_role.details.get("approval_state").map(String::as_str), Some("approved"));
+        assert_eq!(benign_role.details.get("scope"), benign_token.details.get("effective_scope"));
+        assert_eq!(benign_token.details.get("effective_scope"), benign_storage.details.get("resource_scope"));
+
+        let replay = generate_cloud_data_movement_dataset(1_000, 2026)
+            .expect("same seed should replay");
+        assert_eq!(dataset.event_store, replay.event_store);
+        assert_eq!(dataset.truth, replay.truth);
+        let other_seed = generate_cloud_data_movement_dataset(1_000, 2027)
+            .expect("other seed should generate");
+        assert_ne!(dataset.manifest.event_store_sha256, other_seed.manifest.event_store_sha256);
+    }
+
+    #[test]
     fn schemas_declare_current_generator_version_and_both_scenario_ids() {
         let root = Path::new(env!("CARGO_MANIFEST_DIR")).join("../..");
         let manifest_schema: serde_json::Value = serde_json::from_slice(
@@ -979,7 +1339,7 @@ mod tests {
             .as_array().expect("manifest schema should enumerate scenario IDs");
         let truth_ids = truth_schema["properties"]["scenario_id"]["enum"]
             .as_array().expect("truth schema should enumerate scenario IDs");
-        for scenario_id in [SCENARIO_ID, "synthetic-artifact-lifecycle-v1"] {
+        for scenario_id in [SCENARIO_ID, "synthetic-artifact-lifecycle-v1", "synthetic-cloud-data-movement-v1"] {
             assert!(manifest_ids.iter().any(|v| v.as_str() == Some(scenario_id)));
             assert!(truth_ids.iter().any(|v| v.as_str() == Some(scenario_id)));
         }
@@ -995,7 +1355,14 @@ mod tests {
             CampaignFamily::parse("artifact-provenance").expect("artifact family should parse"),
             CampaignFamily::ArtifactProvenance
         );
+        assert_eq!(
+            CampaignFamily::parse("cloud-data-movement").expect("cloud family should parse"),
+            CampaignFamily::CloudDataMovement
+        );
         assert!(CampaignFamily::parse("invented-family").is_err());
+        let cloud = generate_dataset_for_family(128, 2026, CampaignFamily::CloudDataMovement)
+            .expect("cloud data movement family should generate");
+        assert_eq!(cloud.manifest.scenario_id, "synthetic-cloud-data-movement-v1");
         let default = generate_dataset_for_family(128, 2026, CampaignFamily::IdentityToEgress)
             .expect("identity family should generate");
         let compatibility = generate_dataset(128, 2026)
