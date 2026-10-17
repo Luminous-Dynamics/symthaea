@@ -133,6 +133,7 @@ impl ScmGraphPolicy {
 #[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
 pub struct ScmGraphPolicySummary {
     pub world_id: String,
+    pub graph_variant_index: usize,
     /// Evaluator-side truth is emitted only in the final report, not supplied to policies.
     pub truth_graph_id: String,
     pub truth_edge_count: usize,
@@ -468,6 +469,7 @@ struct ScmParameters {
 #[derive(Debug, Clone)]
 struct ScmWorld {
     id: String,
+    graph_variant_index: usize,
     family: ScmGraphFamily,
     mechanism_regime: ScmMechanismRegime,
     held_out: bool,
@@ -622,27 +624,45 @@ fn parameters_for_regime(regime: ScmMechanismRegime, rng: &mut BenchmarkRng) -> 
 fn generate_worlds(seed: u64) -> Vec<ScmWorld> {
     let families = ScmGraphFamily::all();
     let mechanism_regimes = ScmMechanismRegime::all();
-    let mut worlds = Vec::with_capacity(families.len() * mechanism_regimes.len());
+    let mut worlds = Vec::with_capacity(
+        families.len() * WORLD_VARIANTS_PER_FAMILY * mechanism_regimes.len(),
+    );
     for (family_index, family) in families.iter().copied().enumerate() {
-        for (variant, mechanism_regime) in mechanism_regimes.iter().copied().enumerate() {
-            let world_seed = seed
+        for graph_variant_index in 0..WORLD_VARIANTS_PER_FAMILY {
+            // Draw each graph once; hold this exact topology fixed across all
+            // mechanism regimes to create paired factorial comparisons.
+            let topology_seed = seed
                 ^ (family_index as u64).wrapping_mul(0xD1B5_4A32_D192_ED03)
-                ^ (variant as u64).wrapping_mul(0x94D0_49BB_1331_11EB);
-            // Independent random streams prevent topology-generation control flow
-            // from influencing the mechanism parameter draw.
-            let mut graph_rng = BenchmarkRng::new(world_seed ^ 0x4752_4150_485F_5345);
-            let mut parameter_rng = BenchmarkRng::new(world_seed ^ 0x4D45_4348_414E_4953);
+                ^ (graph_variant_index as u64).wrapping_mul(0x94D0_49BB_1331_11EB)
+                ^ 0x4752_4150_485F_5345;
+            let mut graph_rng = BenchmarkRng::new(topology_seed);
             let truth = graph_for_family(family, &mut graph_rng);
-            let parameters = parameters_for_regime(mechanism_regime, &mut parameter_rng);
-            let held_out = family.held_out() || mechanism_regime.held_out();
-            worlds.push(ScmWorld {
-                id: format!("{}-{}", family.as_str(), mechanism_regime.as_str()),
-                family,
-                mechanism_regime,
-                held_out,
-                truth,
-                parameters,
-            });
+
+            for (regime_index, mechanism_regime) in mechanism_regimes.iter().copied().enumerate() {
+                // Parameters are drawn from a disjoint stream, independently of
+                // the number/pattern of random draws used to choose the topology.
+                let parameter_seed = seed
+                    ^ (family_index as u64).wrapping_mul(0xD1B5_4A32_D192_ED03)
+                    ^ (graph_variant_index as u64).wrapping_mul(0x94D0_49BB_1331_11EB)
+                    ^ (regime_index as u64).wrapping_mul(0x9E37_79B9_7F4A_7C15)
+                    ^ 0x4D45_4348_414E_4953;
+                let mut parameter_rng = BenchmarkRng::new(parameter_seed);
+                let parameters = parameters_for_regime(mechanism_regime, &mut parameter_rng);
+                let held_out = family.held_out() || mechanism_regime.held_out();
+                worlds.push(ScmWorld {
+                    id: format!(
+                        "{}-graph-{graph_variant_index:02}-{}",
+                        family.as_str(),
+                        mechanism_regime.as_str()
+                    ),
+                    graph_variant_index,
+                    family,
+                    mechanism_regime,
+                    held_out,
+                    truth,
+                    parameters,
+                });
+            }
         }
     }
     worlds
@@ -1124,6 +1144,7 @@ fn summarize_world(
 
     ScmGraphPolicySummary {
         world_id: world.id.clone(),
+        graph_variant_index: world.graph_variant_index,
         truth_graph_id: world.truth.id(),
         truth_edge_count: world.truth.edge_count(),
         family: world.family,
@@ -1232,9 +1253,10 @@ fn aggregate_held_out(
 /// Run a deterministic graph-recovery experiment under equal measurement budgets.
 ///
 /// Candidate hypotheses are all 25 labeled DAGs over three observed variables.
-/// Seven graph-family templates are crossed with four distinct mechanism regimes.
+/// Seven graph-family templates each generate four graph variants. Every exact
+/// topology is crossed with four distinct mechanism regimes, giving 112 worlds.
 /// Two graph families and two mechanism regimes are development-only; a world is
-/// held out if either factor is held out (4 development / 24 held-out worlds).
+/// held out if either factor is held out (16 development / 96 held-out worlds).
 /// Topology and mechanism use separate RNG streams. The policy never receives the
 /// hidden truth graph or hidden structural-equation parameters.
 /// Outcomes are sampled from the hidden graph's exact binary SCM distribution.
@@ -1491,7 +1513,7 @@ mod tests {
         let first = generate_worlds(44);
         let replay = generate_worlds(44);
         let changed = generate_worlds(45);
-        assert_eq!(first.len(), 28);
+        assert_eq!(first.len(), 112);
         assert_eq!(first.len(), replay.len());
         assert_eq!(first.iter().map(|world| world.truth).collect::<Vec<_>>(),
             replay.iter().map(|world| world.truth).collect::<Vec<_>>());
@@ -1499,9 +1521,9 @@ mod tests {
             replay.iter().map(|world| world.parameters).collect::<Vec<_>>());
         assert_ne!(first.iter().map(|world| world.truth).collect::<Vec<_>>(),
             changed.iter().map(|world| world.truth).collect::<Vec<_>>());
-        assert_eq!(first.iter().filter(|world| world.family.held_out()).count(), 20);
-        assert_eq!(first.iter().filter(|world| world.held_out).count(), 24);
-        assert_eq!(first.iter().filter(|world| !world.held_out).count(), 4);
+        assert_eq!(first.iter().filter(|world| world.family.held_out()).count(), 80);
+        assert_eq!(first.iter().filter(|world| world.held_out).count(), 96);
+        assert_eq!(first.iter().filter(|world| !world.held_out).count(), 16);
         assert!(first.iter().filter(|world| {
             world.family == ScmGraphFamily::NullGraphNegativeControl
         }).all(|world| world.truth.edge_count() == 0));
@@ -1514,13 +1536,24 @@ mod tests {
             let family_worlds: Vec<&ScmWorld> = worlds.iter()
                 .filter(|world| world.family == family)
                 .collect();
-            assert_eq!(family_worlds.len(), ScmMechanismRegime::all().len());
-            for regime in ScmMechanismRegime::all() {
-                assert_eq!(
-                    family_worlds.iter().filter(|world| world.mechanism_regime == regime).count(),
-                    1,
-                    "each topology family must appear once with each mechanism regime"
-                );
+            assert_eq!(
+                family_worlds.len(),
+                WORLD_VARIANTS_PER_FAMILY * ScmMechanismRegime::all().len()
+            );
+            for graph_variant_index in 0..WORLD_VARIANTS_PER_FAMILY {
+                let paired: Vec<&ScmWorld> = family_worlds.iter()
+                    .copied()
+                    .filter(|world| world.graph_variant_index == graph_variant_index)
+                    .collect();
+                assert_eq!(paired.len(), ScmMechanismRegime::all().len());
+                for regime in ScmMechanismRegime::all() {
+                    assert_eq!(
+                        paired.iter().filter(|world| world.mechanism_regime == regime).count(),
+                        1,
+                        "each exact topology must appear once with every mechanism regime"
+                    );
+                }
+                assert!(paired.iter().all(|world| world.truth == paired[0].truth));
             }
         }
 
@@ -1568,13 +1601,13 @@ mod tests {
         let b = run_scm_graph_benchmark(3, 4, 123, 0.95).unwrap();
         assert_eq!(a, b);
         assert_eq!(serde_json::to_vec(&a).unwrap(), serde_json::to_vec(&b).unwrap());
-        assert_eq!(a.world_count, 28);
-        assert_eq!(a.development_world_count, 4);
-        assert_eq!(a.held_out_world_count, 24);
+        assert_eq!(a.world_count, 112);
+        assert_eq!(a.development_world_count, 16);
+        assert_eq!(a.held_out_world_count, 96);
         assert_eq!(a.mechanism_regime_count, 4);
         assert_eq!(a.candidate_dag_count, 25);
         assert_eq!(a.markov_equivalence_class_count, 11);
-        assert_eq!(a.worlds.len(), 28 * ScmGraphPolicy::all().len());
+        assert_eq!(a.worlds.len(), 112 * ScmGraphPolicy::all().len());
         assert_eq!(a.held_out_policy_aggregates.len(), ScmGraphPolicy::all().len());
     }
 
@@ -1603,7 +1636,7 @@ mod tests {
             }
         }
         for aggregate in &report.held_out_policy_aggregates {
-            assert_eq!(aggregate.held_out_worlds, 24);
+            assert_eq!(aggregate.held_out_worlds, 96);
             assert!((0.0..=1.0).contains(&aggregate.mean_held_out_directed_edge_f1));
             assert!((0.0..=1.0).contains(&aggregate.mean_held_out_cpdag_skeleton_f1));
             assert!((0.0..=1.0).contains(&aggregate.mean_held_out_compelled_direction_f1));
