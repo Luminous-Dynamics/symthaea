@@ -71,6 +71,10 @@ pub enum EffortFindingV1 {
     MissingSessionId,
     /// Selected profile identifier is empty.
     MissingSelectedProfileId,
+    /// Active session identifier is empty.
+    MissingActiveSessionId,
+    /// Request session and active configuration session do not match.
+    SessionMismatch,
     /// Active profile identifier is empty.
     MissingActiveProfileId,
     /// Selected profile and active configuration do not match.
@@ -142,8 +146,10 @@ pub enum EffortDecisionStatusV1 {
 pub struct EffortRequestV1 {
     /// Input schema version; currently must equal EFFORT_POLICY_SCHEMA_VERSION.
     pub schema_version: u16,
-    /// Session identity used to prevent configuration from leaking across sessions.
+    /// Session requested by the caller.
     pub session_id: String,
+    /// Session identity bound to the currently active configuration.
+    pub active_session_id: String,
     /// Profile selected by the user or session coordinator.
     pub selected_profile_id: String,
     /// Profile actually bound to the active session configuration.
@@ -200,6 +206,12 @@ pub fn evaluate_effort_request(request: &EffortRequestV1) -> EffortDecisionV1 {
 
     if request.session_id.trim().is_empty() {
         findings.push(EffortFindingV1::MissingSessionId);
+    }
+    if request.active_session_id.trim().is_empty() {
+        findings.push(EffortFindingV1::MissingActiveSessionId);
+    }
+    if request.session_id != request.active_session_id {
+        findings.push(EffortFindingV1::SessionMismatch);
     }
     if request.selected_profile_id.trim().is_empty() {
         findings.push(EffortFindingV1::MissingSelectedProfileId);
@@ -326,6 +338,7 @@ mod tests {
         EffortRequestV1 {
             schema_version: EFFORT_POLICY_SCHEMA_VERSION,
             session_id: "session-001".to_owned(),
+            active_session_id: "session-001".to_owned(),
             selected_profile_id: "profile-training-a".to_owned(),
             active_profile_id: "profile-training-a".to_owned(),
             mode: EffortModeV1::TrainingResistive,
@@ -440,6 +453,39 @@ mod tests {
         assert!(has_finding(
             &decision,
             EffortFindingV1::MoreAssistanceConflictsWithResistance
+        ));
+    }
+
+    #[test]
+    fn stale_session_configuration_fails_closed() {
+        let mut request = valid_training_request();
+        request.active_session_id = "previous-session".to_owned();
+        let decision = evaluate_effort_request(&request);
+        assert_eq!(decision.status, EffortDecisionStatusV1::Rejected);
+        assert!(has_finding(&decision, EffortFindingV1::SessionMismatch));
+    }
+
+    #[test]
+    fn empty_identity_fields_fail_closed() {
+        let mut request = valid_training_request();
+        request.session_id.clear();
+        request.active_session_id.clear();
+        request.selected_profile_id.clear();
+        request.active_profile_id.clear();
+        let decision = evaluate_effort_request(&request);
+        assert_eq!(decision.status, EffortDecisionStatusV1::Rejected);
+        assert!(has_finding(&decision, EffortFindingV1::MissingSessionId));
+        assert!(has_finding(
+            &decision,
+            EffortFindingV1::MissingActiveSessionId
+        ));
+        assert!(has_finding(
+            &decision,
+            EffortFindingV1::MissingSelectedProfileId
+        ));
+        assert!(has_finding(
+            &decision,
+            EffortFindingV1::MissingActiveProfileId
         ));
     }
 
