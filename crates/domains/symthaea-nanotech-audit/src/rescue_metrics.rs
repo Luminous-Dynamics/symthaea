@@ -357,7 +357,7 @@ fn parent_cluster_crosses_strata(
     stratum_id: &str,
 ) -> bool {
     match parent_strata.get(parent_group_id) {
-        Some(existing) => existing != stratum_id,
+        Some(existing) => existing.as_str() != stratum_id,
         None => {
             parent_strata.insert(parent_group_id.to_owned(), stratum_id.to_owned());
             false
