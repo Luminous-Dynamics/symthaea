@@ -26,7 +26,7 @@ Files must be relative paths; absolute paths and parent-directory traversal are 
 - `schemas/examples/h1-fit-repeatability-plan.json`: an intentionally `planned` example, not a measurement report and not evidence of a prototype.
 - `docs/research/OPEN_AUDIO_EVIDENCE_CONTRACT_2026-10-17.md`: this protocol.
 
-The lifecycle is `planned`, `captured`, `analyzed`, `validated`, `invalid`, or `excluded`. Planned runs cannot carry captures/results or a pass decision. Any run that started must link its fixture, instruments, environment and raw captures. Analyzed/validated states also require source-pinned analysis and structured results. Validated means the declared project gate was evaluated—it does not mean product safety or formal standard certification.
+The lifecycle is `planned`, `captured`, `analyzed`, `validated`, `invalid`, or `excluded`. Planned runs cannot carry captures/results or a pass decision. Any run that started must link its fixture, instruments, environment and at least one raw capture. The schema requires a raw capture role for every started run, and captured/analyzed states cannot claim pass or fail. Analyzed/validated states also require source-pinned analysis and structured results. Validated means the declared project gate was evaluated—it does not mean product safety or formal standard certification.
 
 Schema v1 is an evidence index, not a universal interchange format for every waveform and response array. Keep native raw data in durable versioned files and reference it with path, SHA-256, media type and size. Derived CSV/JSON/plots are separate artifacts and never replace raw captures.
 
