@@ -242,6 +242,70 @@
       "end_to_end_query_latency",
       "end_to_end_bytes_moved",
       "end_to_end_energy_where_measurable"
+    ],
+    "paired_width_design": {
+      "status": "added_source_level_control_not_runtime_verified",
+      "seed_identity_excludes_dimension": true,
+      "prefix_stability_runtime_guard": true,
+      "checked_widths": [
+        1024,
+        4096,
+        16384
+      ],
+      "reason": "Paired common prefixes isolate effect of adding coordinates from a change in codebook samples."
+    }
+  },
+  "progressive_precision_routing": {
+    "tracking_issue": "https://github.com/Luminous-Dynamics/symthaea/issues/7778",
+    "status": "protocol_and_issue_open_harness_not_implemented",
+    "width_schedule": [
+      1024,
+      2048,
+      4096,
+      8192,
+      16384
+    ],
+    "baseline": "exhaustive highest-width reference on identical item IDs, queries, and held-out split",
+    "shortlist_k": [
+      1,
+      4,
+      8,
+      16,
+      32
+    ],
+    "candidate_gates": {
+      "prefix_coordinates_exactly_equal": true,
+      "held_out_recall_at_k_reference_minimum": 0.999,
+      "relevant_target_recall_loss_percentage_points_max": 0.1,
+      "compared_coordinates_reduction_minimum": 2,
+      "p95_p99_latency_or_task_deadline_regression_allowed": false
+    },
+    "metrics": [
+      "recall_at_k_vs_exhaustive_reference",
+      "relevant_target_recall",
+      "final_top1_agreement",
+      "false_acceptance_and_abstention_rate",
+      "mean_dimensions_evaluated_per_query",
+      "compared_coordinates_and_bytes_moved",
+      "p50_p95_p99_latency",
+      "index_storage_and_update_cost",
+      "energy_when_measurable",
+      "coverage_versus_error_curve"
+    ],
+    "controls": [
+      "unrelated_records",
+      "known_shared_fact_counts",
+      "correlated_near_duplicate_distractors",
+      "missing_properties",
+      "query_noise",
+      "non_nested_or_dimension_independent_negative_control"
+    ],
+    "rules": [
+      "Calibrate thresholds on a calibration split, freeze, then evaluate on distinct held-out data.",
+      "Low-D shortlist recall is a hard gate because the verifier cannot recover discarded candidates.",
+      "Support explicit abstain/refine decisions for ambiguous margins.",
+      "Count stored refinement data and index update cost; prefix sharing is not free.",
+      "All threshold targets are proposals and not measured results."
     ]
   }
 }
