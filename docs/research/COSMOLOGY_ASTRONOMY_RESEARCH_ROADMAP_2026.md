@@ -26,7 +26,7 @@ The output should be a **reproducible scientific claim**, not a free-floating an
 
 ## Immediate code increment
 
-The companion implementation adds a validated FLRW background expansion model with constant dark-energy equation of state, radiation, matter, curvature, fixed-grid and tolerance-driven adaptive Simpson integrations for line-of-sight comoving distance and lookback time, curvature-adjusted transverse distance, luminosity distance, and angular-diameter distance. Analytic tests cover Einstein–de Sitter, radiation-only, and de Sitter limits, distance reciprocity, curvature direction, invalid inputs, non-finite expansion rates, adaptive-convergence failure, and tolerance validation. Adaptive integration has a bounded recursion depth and fails closed instead of silently returning an under-resolved answer.
+The companion implementation adds a validated FLRW background expansion model with constant dark-energy equation of state, radiation, matter, curvature, fixed-grid and tolerance-driven adaptive Simpson integrations for line-of-sight comoving distance and lookback time, curvature-adjusted transverse distance, luminosity distance, angular-diameter distance, and standard BAO observables D_M/r_d, D_H/r_d, and D_V/r_d with an explicit caller-supplied sound horizon. Analytic tests cover Einstein–de Sitter, radiation-only, and de Sitter limits, distance reciprocity, curvature direction, invalid inputs, non-finite expansion rates, adaptive-convergence failure, and tolerance validation. Adaptive integration has a bounded recursion depth and fails closed instead of silently returning an under-resolved answer.
 
 It deliberately does **not** claim to provide a CMB Boltzmann solver, perturbation evolution, nonlinear structure formation, survey likelihoods, parameter inference, or precision Planck constraints. The default helper is an explicitly radiation-free flat-ΛCDM approximation for continuity with existing code, not a precision parameter release.
 
@@ -41,6 +41,7 @@ Fixtures must cover:
 - Open and closed FLRW models. Test the sign of the transverse-distance correction against radial distance.
 - Distance reciprocity: DL=(1+z)^2 DA for a transparent metric theory on the same background.
 - Lookback time in Einstein–de Sitter and de Sitter limits; H0-to-Gyr conversion must be explicit and tested.
+- BAO distance ratios D_M/r_d, D_H/r_d, and D_V/r_d with explicit r_d input; this helper must not imply it models recombination or infers r_d.
 - Invalid/non-finite inputs, closure failures, pathological expansion rates, and invalid integration interval counts must fail closed.
 - Adaptive integration must honour declared absolute/relative tolerances or return an explicit non-convergence error; recursion depth and arithmetic must be bounded.
 
