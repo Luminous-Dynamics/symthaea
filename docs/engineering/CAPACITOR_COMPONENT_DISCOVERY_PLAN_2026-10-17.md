@@ -119,7 +119,7 @@ Lock test splits, seed sets, evaluation budgets, baseline implementations, and m
 The initial increment adds `dielectric.rs`, `capacitor_screening.rs`, and `robust_capacitor.rs`, exported from `symthaea-materials`. It includes:
 
 - A source-bound `ConditionedDielectricObservation` for one scalar property, so permittivity, loss tangent, and breakdown strength can be stored independently with their own source, evidence class, conditions, dataset version, and uncertainty semantics. This avoids inventing placeholders when a source reports only one property.
-- A paired `DielectricPropertyRecord` for the initial screening path, with permittivity and loss tangent at shared characterization conditions; do not silently merge separately sourced observations until an explicit compatibility/aggregation adapter exists.
+- A paired `DielectricPropertyRecord` for the initial screen. The strict `pair_conditioned_dielectric_observations` adapter requires exact match on material, temperature, frequency, field, evidence class, source and dataset version for permittivity/loss tangent. Breakdown evidence may have a distinct source/protocol because its provenance is retained separately. Incompatible permittivity/loss observations are rejected rather than merged; cross-source fusion remains follow-on work.
 - Uncertainty is attached to each property with a method reference and semantics distinguishing a hard bound, statistical estimate, or confidence interval.
 - Permittivity/loss test temperature, frequency and optional characterization field; separate evidence metadata for breakdown strength.
 - Multilayer parallel-plate geometry with input validation.
