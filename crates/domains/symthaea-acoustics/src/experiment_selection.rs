@@ -274,10 +274,14 @@ mod tests {
 
     fn options() -> Vec<ExperimentOption> {
         vec![
-            ExperimentOption::new("physical-a", "design-a", "lab", 100, 2, 5, 100).with_contract(PROFILE, COST_UNIT),
-            ExperimentOption::new("analytic-b", "design-b", "analytic", 2, 0, 1, 5).with_contract(PROFILE, COST_UNIT),
-            ExperimentOption::new("simulation-c", "design-c", "simulation", 20, 1, 3, 80).with_contract(PROFILE, COST_UNIT),
-            ExperimentOption::new("physical-d", "design-d", "lab", 80, 3, 2, 120).with_contract(PROFILE, COST_UNIT),
+            ExperimentOption::new("physical-a", "design-a", "lab", 100, 2, 5, 100)
+                .with_contract(PROFILE, COST_UNIT),
+            ExperimentOption::new("analytic-b", "design-b", "analytic", 2, 0, 1, 5)
+                .with_contract(PROFILE, COST_UNIT),
+            ExperimentOption::new("simulation-c", "design-c", "simulation", 20, 1, 3, 80)
+                .with_contract(PROFILE, COST_UNIT),
+            ExperimentOption::new("physical-d", "design-d", "lab", 80, 3, 2, 120)
+                .with_contract(PROFILE, COST_UNIT),
         ]
     }
 
@@ -392,7 +396,8 @@ mod tests {
         );
         assert_eq!(
             rank_experiments(
-                &[ExperimentOption::new("x", "design", "lab", 0, 0, 0, 0).with_contract(PROFILE, COST_UNIT)],
+                &[ExperimentOption::new("x", "design", "lab", 0, 0, 0, 0)
+                    .with_contract(PROFILE, COST_UNIT)],
                 PROFILE,
                 COST_UNIT,
                 ExperimentSelectionPolicy::CheapestFirst
@@ -401,9 +406,42 @@ mod tests {
         );
         assert_eq!(
             rank_experiments(
+                &[ExperimentOption::new("x", "design", "design", 1, 0, 0, 0)
+                    .with_contract(PROFILE, COST_UNIT)],
+                PROFILE,
+                COST_UNIT,
+                ExperimentSelectionPolicy::CheapestFirst
+            ),
+            Err(ExperimentSelectionError::EmptyFidelityId)
+        );
+
+        assert_eq!(
+            rank_experiments(
+                &[ExperimentOption::new("wrong-profile", "d", "lab", 1, 0, 0, 0)
+                    .with_contract("another-profile", COST_UNIT)],
+                PROFILE,
+                COST_UNIT,
+                ExperimentSelectionPolicy::CheapestFirst
+            ),
+            Err(ExperimentSelectionError::OptionEvaluationProfileMismatch)
+        );
+        assert_eq!(
+            rank_experiments(
+                &[ExperimentOption::new("wrong-cost-unit", "d", "lab", 1, 0, 0, 0)
+                    .with_contract(PROFILE, "seconds")],
+                PROFILE,
+                COST_UNIT,
+                ExperimentSelectionPolicy::CheapestFirst
+            ),
+            Err(ExperimentSelectionError::OptionCostUnitMismatch)
+        );
+        assert_eq!(
+            rank_experiments(
                 &[
-                    ExperimentOption::new("x", "design", "lab", 1, 0, 0, 0).with_contract(PROFILE, COST_UNIT),
-                    ExperimentOption::new("x", "other-design", "simulation", 2, 0, 0, 0).with_contract(PROFILE, COST_UNIT),
+                    ExperimentOption::new("x", "design", "lab", 1, 0, 0, 0)
+                        .with_contract(PROFILE, COST_UNIT),
+                    ExperimentOption::new("x", "other-design", "simulation", 2, 0, 0, 0)
+                        .with_contract(PROFILE, COST_UNIT),
                 ],
                 PROFILE,
                 COST_UNIT,
@@ -413,7 +451,8 @@ mod tests {
         );
         assert_eq!(
             rank_experiments(
-                &[ExperimentOption::new("x", " ", "lab", 1, 0, 0, 0).with_contract(PROFILE, COST_UNIT)],
+                &[ExperimentOption::new("x", "design", " ", 1, 0, 0, 0)
+                    .with_contract(PROFILE, COST_UNIT)],
                 PROFILE,
                 COST_UNIT,
                 ExperimentSelectionPolicy::CheapestFirst
