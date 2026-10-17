@@ -260,6 +260,12 @@ pub struct IdealCapacitorMetrics {
     pub breakdown_evidence_kind: Option<DielectricEvidenceKind>,
     /// Source/protocol reference for the breakdown field, if available.
     pub breakdown_reference: Option<String>,
+    /// Property-specific uncertainty for relative permittivity, if recorded.
+    pub permittivity_uncertainty: Option<PropertyUncertainty>,
+    /// Property-specific uncertainty for loss tangent, if recorded.
+    pub loss_tangent_uncertainty: Option<PropertyUncertainty>,
+    /// Property-specific uncertainty for breakdown strength, if recorded.
+    pub breakdown_strength_uncertainty: Option<PropertyUncertainty>,
     /// Provenance preserved from the input permittivity/loss record.
     pub evidence_kind: DielectricEvidenceKind,
     /// Stable reference preserved from the input permittivity/loss record.
@@ -338,6 +344,9 @@ pub fn calculate_ideal_capacitor_metrics(
         breakdown_test_kind: material.breakdown_test_kind,
         breakdown_evidence_kind: material.breakdown_evidence_kind,
         breakdown_reference: material.breakdown_reference.clone(),
+        permittivity_uncertainty: material.permittivity_uncertainty.clone(),
+        loss_tangent_uncertainty: material.loss_tangent_uncertainty.clone(),
+        breakdown_strength_uncertainty: material.breakdown_strength_uncertainty.clone(),
         evidence_kind: material.evidence_kind,
         source_reference: material.source_reference.clone(),
     };
