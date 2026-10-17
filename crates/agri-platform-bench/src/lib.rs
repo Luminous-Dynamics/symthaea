@@ -697,6 +697,16 @@ mod tests {
         InvalidOperatingHours,
         CurrencyMismatch,
         InvalidCurrencyCode,
+        BroadAcreTractor,
+        OrchardCanopyUgv,
+        GreenhouseRailHarvest,
+        NurseryGantry,
+        LivestockMonitoringPlatform,
+        PackhouseProduceTransport,
+        FixedSensorWaterMonitor,
+        AerialSurveyPlatform,
+        SmallholderMechanicalWeeding,
+        AgrivoltaicAccessRejected,
     }
 
     struct FrozenCase {
@@ -749,6 +759,16 @@ mod tests {
         FrozenCase { id: "invalid-operating-hours", mutation: Mutation::InvalidOperatingHours, expected: AssessmentStatus::Blocked },
         FrozenCase { id: "cross-currency-comparison", mutation: Mutation::CurrencyMismatch, expected: AssessmentStatus::Blocked },
         FrozenCase { id: "invalid-currency-code", mutation: Mutation::InvalidCurrencyCode, expected: AssessmentStatus::Blocked },
+        FrozenCase { id: "broad-acre-tractor-treatment", mutation: Mutation::BroadAcreTractor, expected: AssessmentStatus::Feasible },
+        FrozenCase { id: "orchard-canopy-gnss-denied-scouting", mutation: Mutation::OrchardCanopyUgv, expected: AssessmentStatus::Feasible },
+        FrozenCase { id: "greenhouse-rail-harvest", mutation: Mutation::GreenhouseRailHarvest, expected: AssessmentStatus::Feasible },
+        FrozenCase { id: "nursery-gantry-handling", mutation: Mutation::NurseryGantry, expected: AssessmentStatus::Feasible },
+        FrozenCase { id: "livestock-specific-monitoring", mutation: Mutation::LivestockMonitoringPlatform, expected: AssessmentStatus::Feasible },
+        FrozenCase { id: "packhouse-produce-transport", mutation: Mutation::PackhouseProduceTransport, expected: AssessmentStatus::Feasible },
+        FrozenCase { id: "fixed-sensor-water-monitoring", mutation: Mutation::FixedSensorWaterMonitor, expected: AssessmentStatus::Feasible },
+        FrozenCase { id: "aerial-field-survey", mutation: Mutation::AerialSurveyPlatform, expected: AssessmentStatus::Feasible },
+        FrozenCase { id: "smallholder-mechanical-weeding", mutation: Mutation::SmallholderMechanicalWeeding, expected: AssessmentStatus::Feasible },
+        FrozenCase { id: "agrivoltaic-access-rejects-wide-tractor", mutation: Mutation::AgrivoltaicAccessRejected, expected: AssessmentStatus::Rejected },
     ];
 
     fn baseline_scenario() -> ScenarioProfile {
@@ -912,8 +932,223 @@ mod tests {
             Mutation::InvalidOperatingHours => scenario.annual_operating_hours = MAX_ANNUAL_OPERATING_HOURS + 1,
             Mutation::CurrencyMismatch => platform.cost_currency_code = "USD".into(),
             Mutation::InvalidCurrencyCode => scenario.currency_code = "zaR".into(),
+            Mutation::BroadAcreTractor => {
+                scenario.task = TaskKind::BroadAreaTreatment;
+                scenario.required_daily_capacity = 50_000;
+                scenario.site_slope_permille = 120;
+                scenario.available_row_clearance_cm = 600;
+                scenario.available_turning_radius_cm = 600;
+                scenario.site_roughness_mm = 20;
+                scenario.max_upfront_budget_cents = 5_000_000;
+                scenario.max_annualized_cost_cents = 1_000_000;
+                scenario.annual_operating_hours = 400;
+                platform.id = "tractor-precision-implement".into();
+                platform.class = PlatformClass::TractorImplement;
+                platform.supported_tasks = vec![TaskKind::BroadAreaTreatment];
+                platform.max_slope_permille = 200;
+                platform.width_cm = 400;
+                platform.turning_radius_cm = 450;
+                platform.max_roughness_mm = 30;
+                platform.daily_capacity_units = 60_000;
+                platform.acquisition_cost_cents = 2_000_000;
+                platform.operating_cost_cents_per_hour = 1_000;
+                platform.supervision_minutes_per_hour = 15;
+                platform.maintenance_minutes_per_100_hours = 80;
+                platform.useful_life_years = 20;
+                platform.repair_lead_days = 10;
+            }
+            Mutation::OrchardCanopyUgv => {
+                scenario.site_slope_permille = 150;
+                scenario.available_row_clearance_cm = 100;
+                scenario.available_turning_radius_cm = 110;
+                scenario.site_roughness_mm = 80;
+                scenario.gnss_available = false;
+                platform.width_cm = 90;
+                platform.turning_radius_cm = 100;
+                platform.max_slope_permille = 200;
+                platform.max_roughness_mm = 100;
+                platform.gnss_denied_capable = true;
+            }
+            Mutation::GreenhouseRailHarvest => {
+                scenario.task = TaskKind::GreenhouseHarvest;
+                scenario.required_daily_capacity = 80;
+                scenario.site_slope_permille = 0;
+                scenario.available_row_clearance_cm = 90;
+                scenario.available_turning_radius_cm = 90;
+                scenario.site_roughness_mm = 5;
+                scenario.gnss_available = false;
+                scenario.max_upfront_budget_cents = 300_000;
+                scenario.max_annualized_cost_cents = 400_000;
+                scenario.annual_operating_hours = 600;
+                platform.id = "greenhouse-rail-harvester".into();
+                platform.class = PlatformClass::RailOrGantry;
+                platform.supported_tasks = vec![TaskKind::GreenhouseHarvest];
+                platform.service_unit = ServiceUnit::KilogramsPerDay;
+                platform.max_slope_permille = 0;
+                platform.width_cm = 60;
+                platform.turning_radius_cm = 80;
+                platform.max_roughness_mm = 5;
+                platform.requires_gnss = false;
+                platform.daily_capacity_units = 100;
+                platform.acquisition_cost_cents = 150_000;
+                platform.operating_cost_cents_per_hour = 300;
+                platform.supervision_minutes_per_hour = 5;
+                platform.maintenance_minutes_per_100_hours = 50;
+                platform.useful_life_years = 5;
+                platform.repair_lead_days = 5;
+            }
+            Mutation::NurseryGantry => {
+                scenario.task = TaskKind::NurseryHandling;
+                scenario.required_daily_capacity = 8_000;
+                scenario.site_slope_permille = 0;
+                scenario.available_row_clearance_cm = 80;
+                scenario.available_turning_radius_cm = 100;
+                scenario.site_roughness_mm = 5;
+                scenario.gnss_available = false;
+                scenario.max_upfront_budget_cents = 500_000;
+                scenario.max_annualized_cost_cents = 300_000;
+                scenario.annual_operating_hours = 300;
+                platform.id = "nursery-tray-gantry".into();
+                platform.class = PlatformClass::RailOrGantry;
+                platform.supported_tasks = vec![TaskKind::NurseryHandling];
+                platform.service_unit = ServiceUnit::PlantsPerDay;
+                platform.max_slope_permille = 0;
+                platform.width_cm = 50;
+                platform.turning_radius_cm = 80;
+                platform.max_roughness_mm = 5;
+                platform.requires_gnss = false;
+                platform.daily_capacity_units = 10_000;
+                platform.acquisition_cost_cents = 200_000;
+                platform.operating_cost_cents_per_hour = 200;
+                platform.supervision_minutes_per_hour = 5;
+                platform.maintenance_minutes_per_100_hours = 30;
+                platform.useful_life_years = 10;
+                platform.repair_lead_days = 3;
+            }
+            Mutation::LivestockMonitoringPlatform => {
+                scenario.task = TaskKind::LivestockMonitoring;
+                scenario.required_daily_capacity = 500;
+                scenario.available_row_clearance_cm = 200;
+                scenario.available_turning_radius_cm = 200;
+                scenario.gnss_available = false;
+                scenario.annual_operating_hours = 250;
+                platform.id = "livestock-monitoring-platform".into();
+                platform.class = PlatformClass::LivestockSpecific;
+                platform.supported_tasks = vec![TaskKind::LivestockMonitoring];
+                platform.service_unit = ServiceUnit::AnimalsPerDay;
+                platform.max_slope_permille = 200;
+                platform.width_cm = 100;
+                platform.turning_radius_cm = 150;
+                platform.max_roughness_mm = 60;
+                platform.requires_gnss = false;
+                platform.daily_capacity_units = 600;
+                platform.acquisition_cost_cents = 150_000;
+                platform.operating_cost_cents_per_hour = 200;
+                platform.supervision_minutes_per_hour = 5;
+                platform.maintenance_minutes_per_100_hours = 35;
+                platform.useful_life_years = 5;
+                platform.repair_lead_days = 5;
+            }
+            Mutation::PackhouseProduceTransport => {
+                scenario.task = TaskKind::ProduceTransport;
+                scenario.required_daily_capacity = 5_000;
+                scenario.site_slope_permille = 0;
+                scenario.available_row_clearance_cm = 150;
+                scenario.available_turning_radius_cm = 200;
+                scenario.site_roughness_mm = 5;
+                scenario.gnss_available = false;
+                scenario.max_upfront_budget_cents = 500_000;
+                scenario.max_annualized_cost_cents = 400_000;
+                scenario.annual_operating_hours = 500;
+                platform.id = "packhouse-tote-transport".into();
+                platform.class = PlatformClass::PackhouseAutomation;
+                platform.supported_tasks = vec![TaskKind::ProduceTransport];
+                platform.service_unit = ServiceUnit::KilogramsPerDay;
+                platform.max_slope_permille = 50;
+                platform.width_cm = 100;
+                platform.turning_radius_cm = 100;
+                platform.max_roughness_mm = 10;
+                platform.requires_gnss = false;
+                platform.daily_capacity_units = 6_000;
+                platform.acquisition_cost_cents = 200_000;
+                platform.operating_cost_cents_per_hour = 300;
+                platform.supervision_minutes_per_hour = 5;
+                platform.maintenance_minutes_per_100_hours = 60;
+                platform.useful_life_years = 10;
+                platform.repair_lead_days = 2;
+            }
+            Mutation::FixedSensorWaterMonitor => {
+                scenario.task = TaskKind::SoilMoistureMonitoring;
+                scenario.required_daily_capacity = 5_000;
+                platform.id = "fixed-water-monitoring".into();
+                platform.class = PlatformClass::FixedSensorWorkflow;
+                platform.supported_tasks = vec![TaskKind::SoilMoistureMonitoring];
+                platform.width_cm = 0;
+                platform.turning_radius_cm = 0;
+                platform.max_slope_permille = 1_000;
+                platform.max_roughness_mm = 1_000;
+                platform.requires_gnss = false;
+                platform.daily_capacity_units = 10_000;
+                platform.acquisition_cost_cents = 10_000;
+                platform.operating_cost_cents_per_hour = 50;
+                platform.supervision_minutes_per_hour = 2;
+                platform.maintenance_minutes_per_100_hours = 5;
+                platform.useful_life_years = 10;
+            }
+            Mutation::AerialSurveyPlatform => {
+                scenario.required_daily_capacity = 10_000;
+                scenario.available_row_clearance_cm = 0;
+                scenario.available_turning_radius_cm = 0;
+                scenario.site_roughness_mm = 40;
+                platform.id = "aerial-field-survey".into();
+                platform.class = PlatformClass::AerialSurvey;
+                platform.width_cm = 0;
+                platform.turning_radius_cm = 0;
+                platform.max_slope_permille = 1_000;
+                platform.max_roughness_mm = 1_000;
+                platform.daily_capacity_units = 50_000;
+                platform.acquisition_cost_cents = 50_000;
+                platform.operating_cost_cents_per_hour = 1_000;
+                platform.supervision_minutes_per_hour = 20;
+                platform.maintenance_minutes_per_100_hours = 10;
+                platform.useful_life_years = 5;
+                platform.repair_lead_days = 1;
+            }
+            Mutation::SmallholderMechanicalWeeding => {
+                scenario.task = TaskKind::MechanicalWeeding;
+                scenario.required_daily_capacity = 800;
+                scenario.site_slope_permille = 150;
+                scenario.available_row_clearance_cm = 100;
+                scenario.available_turning_radius_cm = 120;
+                scenario.site_roughness_mm = 70;
+                platform.id = "smallholder-mechanical-weeder".into();
+                platform.supported_tasks = vec![TaskKind::MechanicalWeeding];
+                platform.max_slope_permille = 200;
+                platform.width_cm = 80;
+                platform.turning_radius_cm = 100;
+                platform.max_roughness_mm = 80;
+                platform.daily_capacity_units = 1_500;
+            }
+            Mutation::AgrivoltaicAccessRejected => {
+                scenario.task = TaskKind::MechanicalWeeding;
+                scenario.site_slope_permille = 50;
+                scenario.available_row_clearance_cm = 160;
+                scenario.available_turning_radius_cm = 200;
+                scenario.site_roughness_mm = 30;
+                platform.id = "wide-tractor-under-agrivoltaics".into();
+                platform.class = PlatformClass::TractorImplement;
+                platform.supported_tasks = vec![TaskKind::MechanicalWeeding];
+                platform.width_cm = 240;
+                platform.turning_radius_cm = 300;
+                platform.max_slope_permille = 200;
+                platform.max_roughness_mm = 100;
+                platform.daily_capacity_units = 5_000;
+                platform.acquisition_cost_cents = 300_000;
+                platform.operating_cost_cents_per_hour = 500;
+            }
         }
 
+        scenario.id = case.id.into();
         (scenario, platform)
     }
 
