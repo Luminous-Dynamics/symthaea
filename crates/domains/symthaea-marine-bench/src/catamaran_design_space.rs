@@ -17,7 +17,7 @@ use std::fmt;
 
 pub const DESIGN_SPACE_VERSION: &str = "catamaran-grid-v1";
 
-#[derive(Clone, Debug, PartialEq)]
+#[derive(Clone, Debug, PartialEq, Serialize)]
 pub struct DesignSpaceSpec {
     pub length_waterline_m: f64,
     /// Centreline spacing / waterline length.
@@ -96,6 +96,7 @@ pub struct CatamaranDesignCandidate {
 #[derive(Clone, Debug, PartialEq, Serialize)]
 pub struct DesignSpaceReceipt {
     pub design_space_version: String,
+    pub spec: DesignSpaceSpec,
     pub candidate_count: usize,
     pub candidate_manifest_sha256: String,
     pub candidates: Vec<CatamaranDesignCandidate>,
@@ -252,6 +253,7 @@ pub fn generate_design_space(
 
     Ok(DesignSpaceReceipt {
         design_space_version: DESIGN_SPACE_VERSION.to_owned(),
+        spec: spec.clone(),
         candidate_count: candidates.len(),
         candidate_manifest_sha256,
         candidates,
