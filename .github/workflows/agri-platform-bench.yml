@@ -1,0 +1,28 @@
+name: Agricultural Platform Benchmark
+
+on:
+  push:
+    paths:
+      - "crates/agri-platform-bench/**"
+      - ".github/workflows/agri-platform-bench.yml"
+  pull_request:
+    paths:
+      - "crates/agri-platform-bench/**"
+      - ".github/workflows/agri-platform-bench.yml"
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  rust-contract:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: dtolnay/rust-toolchain@stable
+        with:
+          components: clippy
+      - name: Run frozen corpus and unit tests
+        run: cargo test --manifest-path crates/agri-platform-bench/Cargo.toml --all-targets
+      - name: Lint benchmark crate
+        run: cargo clippy --manifest-path crates/agri-platform-bench/Cargo.toml --all-targets -- -D warnings
