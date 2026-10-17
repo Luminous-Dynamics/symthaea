@@ -325,6 +325,29 @@ mod tests {
     }
 
     #[test]
+    fn dimensionless_coefficients_are_invariant_under_declared_algebraic_rescaling() {
+        let baseline = known_point();
+        let baseline_result = calculate_propeller_coefficients(baseline).unwrap();
+
+        // Algebraic fixture only: double diameter and reduce rev/s by half to
+        // preserve nD and J. Scale T by D^4 n^2 and P by D^5 n^3 so C_T and
+        // C_P are unchanged by construction. This does not prove physical
+        // dynamic similarity; Reynolds/geometry/installation effects remain.
+        let mut scaled = baseline;
+        scaled.diameter_m = 4.0;
+        scaled.rpm = 300.0;
+        scaled.forward_speed_m_s = 10.0;
+        scaled.thrust_n = 400.0;
+        scaled.shaft_power_w = 20_000.0;
+        let scaled_result = calculate_propeller_coefficients(scaled).unwrap();
+
+        assert!((scaled_result.advance_ratio - baseline_result.advance_ratio).abs() < 1e-14);
+        assert!((scaled_result.thrust_coefficient - baseline_result.thrust_coefficient).abs() < 1e-14);
+        assert!((scaled_result.shaft_power_coefficient - baseline_result.shaft_power_coefficient).abs() < 1e-14);
+        assert!((scaled_result.propulsive_efficiency.unwrap() - baseline_result.propulsive_efficiency.unwrap()).abs() < 1e-14);
+    }
+
+    #[test]
     fn identical_pinned_point_is_deterministic() {
         let input = known_point();
         assert_eq!(
