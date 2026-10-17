@@ -251,10 +251,19 @@ fn evaluate(corpus: &Value, results: &Value, expected_head: &str) -> Value {
                 errors.push(
                     "analytic-reference fixture has no supported oracle equation".to_owned(),
                 );
-            } else if let (Some(fresh), Some(recycle_fraction), Some(analytic_solution),
-                Some(observed_solution), Some(tolerance)) =
-                (fresh, recycle_fraction, analytic_solution, observed_solution, tolerance)
-            {
+            } else if let (
+                Some(fresh),
+                Some(recycle_fraction),
+                Some(analytic_solution),
+                Some(observed_solution),
+                Some(tolerance),
+            ) = (
+                fresh,
+                recycle_fraction,
+                analytic_solution,
+                observed_solution,
+                tolerance,
+            ) {
                 if ![fresh, recycle_fraction, analytic_solution, observed_solution, tolerance]
                     .iter()
                     .all(|number| number.is_finite())
