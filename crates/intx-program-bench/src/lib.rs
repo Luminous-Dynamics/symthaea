@@ -344,6 +344,24 @@ mod tests {
     }
 
     #[test]
+    fn malformed_expected_outcome_rows_fail_closed() {
+        assert!(parse_expected_outcomes(
+            "id|expected_state|dispatch|reconcile\\nC0-01|denied"
+        )
+        .is_err());
+    }
+
+    #[test]
+    fn duplicate_expected_outcome_ids_fail_closed() {
+        let mutated = EXPECTED_OUTCOMES.replacen(
+            "C0-02|denied|none|no",
+            "C0-01|denied|none|no",
+            1,
+        );
+        assert!(parse_expected_outcomes(&mutated).is_err());
+    }
+
+    #[test]
     fn every_denied_or_blocked_case_rejects_dispatch_mutation() {
         let original = parse_cases(CORPUS).expect("scenario corpus parses");
         let blocked_states = [
