@@ -76,6 +76,19 @@ The names below are working engineering IDs, not verified trademarks.
 | M5 | Room measurement/correction workflow | Multiple listening positions; uncorrected and corrected data retained |
 | Service kit | Repair parts and manuals | BOM by revision, fastener list, diagnostics, sourcing and repair-time logs |
 
+### Open instruments and practical engineering kits
+
+The measurement layer is a product family, not just documentation. See [OPEN-AUDIO-INSTRUMENTS-001 #7874](https://github.com/Luminous-Dynamics/symthaea/issues/7874) and the [instrument and kit plan](OPEN_AUDIO_INSTRUMENTS_AND_KITS_2026-10-17.md).
+
+- **K0 Room & Speaker Starter Kit:** begin with a commercially calibrated sensor with its serial-specific calibration profile and an open, repairable physical mounting/measurement workflow; avoid inventing a microphone calibration claim.
+- **K1 Speaker Polar Kit:** start with a passive indexed angle fixture and known-angle checks; motorization only after geometry, repeatability, rated payload and safe failure behavior are verified.
+- **K2 Headphone Fit & Reseat Kit:** exploratory coupler/fixture, positioning and pad/seal sensitivity tooling; clearly distinguish custom coupler data from a standardized ear simulator.
+- **K3 Audio Loopback & Electrical Kit:** protected loopback, declared dummy loads, channel/polarity, gain/noise/distortion screening and interface characterization; no unqualified “reference analyzer” claims.
+- **K4 Room/Field Logging Kit:** useful offline spectrum/relative-SPL and multi-position workflow; do not claim IEC 61672 Class 1/2 or legal exposure measurement without complete qualification.
+- **K5 Reference & Inter-Lab Kit:** known-answer controls and qualified external calibration comparisons; do not claim primary microphone calibration from a hobby fixture.
+
+Every kit should export the shared [machine-readable evidence manifest](../../schemas/audio-evidence-manifest.schema.json) and preserve raw captures, calibration/profile identity, processing revisions and uncertainty. The first hardware-like kit should use a known calibrated sensor and passive/manual fixtures; this gives builders a useful experiment path before we attempt higher-risk electronics, custom microphone capsules or motorized mechanisms.
+
 ### Common system layers
 
 Interoperate through documented functional interfaces instead of an overfitted proprietary backplane:
