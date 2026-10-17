@@ -166,37 +166,6 @@
               "properties": {
                 "severity": {
                   "const": "baseline"
-                },
-                "shift_family": {
-                  "not": {
-                    "const": "compounded"
-                  }
-                }
-              }
-            }
-          },
-          {
-            "if": {
-              "properties": {
-                "shift_kind": {
-                  "const": "compounded"
-                }
-              },
-              "required": [
-                "shift_kind"
-              ]
-            },
-            "then": {
-              "properties": {
-                "shift_family": {
-                  "const": "compounded"
-                },
-                "severity": {
-                  "enum": [
-                    "mild",
-                    "moderate",
-                    "severe"
-                  ]
                 }
               }
             }
@@ -214,11 +183,29 @@
             },
             "then": {
               "properties": {
-                "shift_family": {
-                  "not": {
-                    "const": "compounded"
-                  }
-                },
+                "severity": {
+                  "enum": [
+                    "mild",
+                    "moderate",
+                    "severe"
+                  ]
+                }
+              }
+            }
+          },
+          {
+            "if": {
+              "properties": {
+                "shift_kind": {
+                  "const": "compounded"
+                }
+              },
+              "required": [
+                "shift_kind"
+              ]
+            },
+            "then": {
+              "properties": {
                 "severity": {
                   "enum": [
                     "mild",
@@ -263,12 +250,7 @@
               "properties": {
                 "shift_axes": {
                   "minItems": 1,
-                  "maxItems": 1,
-                  "items": {
-                    "not": {
-                      "const": "in_distribution"
-                    }
-                  }
+                  "maxItems": 1
                 }
               }
             }
