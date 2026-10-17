@@ -21,7 +21,7 @@ It does not predict a future aircraft's reliability or costs. Its output is only
 
 ## 2. Input contract
 
-All monetary inputs in one scenario must use the same declared three-letter currency code. This crate does not perform currency conversion or silently populate missing data.
+All monetary inputs in one scenario must use the same declared three-letter currency code. Every scenario also carries a cost-boundary ID, cost-assumption digest, source locator and ISO calendar date. A comparison rejects candidates with different currencies, cost boundaries, data dates, or mission contracts. The crate checks digest syntax but does not calculate the digest or retrieve the referenced input artifact; the report producer must preserve that evidence. This crate does not perform currency conversion or silently populate missing data.
 
 ### Annual fixed cost inputs
 
@@ -38,7 +38,8 @@ The annual capital charge is an input, not a financial model. The scenario manif
 
 - Fuel/electricity.
 - Oil and consumables.
-- Maintenance labor.
+- Owner maintenance labor, valued using an explicit opportunity-cost rate.
+- Professional/authorized maintenance labor.
 - Maintenance parts.
 - Engine overhaul reserve.
 - Propeller reserve.
@@ -53,7 +54,7 @@ Hourly-based inspection and labor should be included once. Calendar-based inspec
 - Additional failed-dispatch cost per cancelled attempt.
 - Cost per completed mission, such as landing/handling fees where applicable.
 
-The failed-dispatch input should include incremental cancellation costs not captured elsewhere (such as abort-specific preparation, ground activity or recovery). This first implementation does not infer fuel burned or maintenance time during each failed attempt; scenarios must include those incremental costs in the failed-dispatch field or extend the model with a measured cost boundary.
+The failed-dispatch input should include incremental cancellation costs not captured elsewhere (such as abort-specific preparation, ground activity or recovery). This first implementation does not infer fuel burned or maintenance time during each failed attempt; scenarios must include those incremental costs in the failed-dispatch field or extend the model with a measured cost boundary. Owner and professional maintenance labor are separate hourly categories so a maintenance-first design cannot make the human labor burden disappear into a single maintenance figure.
 
 ### Mission and utilization
 
@@ -164,7 +165,7 @@ AOPA's public ownership-cost guidance is a useful framing source because it call
 
 ## 6. Implementation scope and limitations
 
-The Rust implementation lives in the existing `symthaea-operations-research` crate and adds no third-party dependency. Its ten unit-test declarations cover a synthetic known answer, cost decomposition, dispatch effects, explicit zero components, negative/non-finite inputs, currency and mission-family mismatch, digest mismatch, schedule budget, deterministic ranking, route/passenger mismatch, and duplicate identifiers.
+The Rust implementation lives in the existing `symthaea-operations-research` crate and adds no third-party dependency. Its fourteen unit-test declarations cover a synthetic known answer, a 50/100/200-attempt utilization curve, owner/professional labor decomposition, dispatch effects, explicit zero components, negative/non-finite inputs, currency and mission-family mismatch, cost boundary/date mismatch, digest/source-reference errors, schedule budget and zero denominators, deterministic ranking, route/passenger mismatch, invalid calendar dates, and duplicate identifiers.
 
 This is a deterministic accounting helper—not:
 - a price database, operating-cost quote or investment-return promise;
