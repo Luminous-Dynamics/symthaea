@@ -24,6 +24,7 @@ const HYPOTHESIS_IDS: [&str; 3] = [
 const MAX_TRIALS_PER_WORLD: usize = 100_000;
 const MAX_RESOURCE_BUDGET: usize = 256;
 const WORLD_VARIANTS_PER_REGIME: usize = 4;
+const MODEL_ADEQUACY_QUANTILE: f64 = 0.99;
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, Deserialize)]
 #[serde(rename_all = "snake_case")]
@@ -60,6 +61,22 @@ pub struct BlindWorldPolicySummary {
     pub brier_score_ci95: [f64; 2],
     pub mean_log_loss: f64,
     pub log_loss_ci95: [f64; 2],
+    /// Mean prequential negative log likelihood assigned to observed outcomes
+    /// by the declared model at each observation, before updating the posterior.
+    pub mean_prequential_predictive_log_loss: f64,
+    pub prequential_predictive_log_loss_ci95: [f64; 2],
+    /// Rate of trials whose prequential predictive loss exceeds the cutoff
+    /// calibrated from independent-seed simulations under declared model scenarios.
+    pub model_adequacy_alarm_rate: f64,
+    pub model_adequacy_alarm_wilson_ci95: [f64; 2],
+    /// Fraction of trials not abstained after the model-adequacy check.
+    pub accepted_trial_fraction_after_adequacy_gate: f64,
+    /// Null-truth unsupported causal claims suppressed by the adequacy gate,
+    /// divided by all null-truth trials.
+    pub adequacy_gated_unsupported_causal_claim_rate_on_null_truth: f64,
+    /// False causal claim fraction among null-truth trials that passed the gate.
+    pub false_causal_claim_rate_among_accepted_null_trials: Option<f64>,
+    pub model_adequacy_threshold_mean_nll: f64,
     pub top_hypothesis_accuracy: f64,
     pub top_hypothesis_accuracy_wilson_ci95: [f64; 2],
     /// Expected gain predicted by the declared model for the chosen actions.
@@ -86,6 +103,15 @@ pub struct BlindWorldPolicySummary {
 }
 
 #[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
+pub struct ModelAdequacyThreshold {
+    pub policy: BlindWorldPolicy,
+    pub calibration_quantile: f64,
+    pub threshold_mean_prequential_nll: f64,
+    pub independent_calibration_trials: usize,
+    pub calibration_source: String,
+}
+
+#[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
 pub struct BlindWorldBenchmarkReport {
     pub schema_version: u16,
     pub generator_version: String,
@@ -94,6 +120,7 @@ pub struct BlindWorldBenchmarkReport {
     pub resource_budget_units: usize,
     pub world_variants_per_regime: usize,
     pub posterior_threshold: f64,
+    pub model_adequacy_thresholds: Vec<ModelAdequacyThreshold>,
     pub declared_model_scenarios: Vec<String>,
     pub development_fixed_candidate_id: String,
     pub world_count: usize,
@@ -163,6 +190,16 @@ pub fn run_blind_world_benchmark(
         BlindWorldPolicy::UniformRandom,
         BlindWorldPolicy::PassiveOnly,
     ];
+    let model_adequacy_thresholds = calibrate_model_adequacy_thresholds(
+        trials_per_world,
+        resource_budget_units,
+        seed,
+        posterior_threshold,
+        &priors,
+        &model_scenarios,
+        &fixed_candidate_id,
+        &policies,
+    )?;
 
     let mut summaries = Vec::with_capacity(worlds.len() * policies.len());
     for (world_index, world) in worlds.iter().enumerate() {
@@ -184,11 +221,16 @@ pub fn run_blind_world_benchmark(
                     trial_seed,
                 )?);
             }
+            let adequacy_threshold = model_adequacy_thresholds.iter()
+                .find(|entry| entry.policy == policy)
+                .map(|entry| entry.threshold_mean_prequential_nll)
+                .ok_or(BlindWorldBenchmarkError::EmptyCandidateLibrary)?;
             summaries.push(summarize_world_policy(
                 world,
                 policy,
                 resource_budget_units,
                 posterior_threshold,
+                adequacy_threshold,
                 trials,
             ));
         }
@@ -202,6 +244,7 @@ pub fn run_blind_world_benchmark(
         resource_budget_units,
         world_variants_per_regime: WORLD_VARIANTS_PER_REGIME,
         posterior_threshold,
+        model_adequacy_thresholds,
         declared_model_scenarios: model_scenarios
             .iter()
             .map(|scenario| scenario.scenario_id.clone())
@@ -242,6 +285,7 @@ struct TrialResult {
     hidden_world_gain_bits_per_cost: f64,
     acquisition_regret_bits_per_selection: f64,
     realized_entropy_reduction_bits_per_cost: f64,
+    mean_prequential_predictive_nll: f64,
     unsupported_causal_claim: bool,
     null_truth: bool,
 }
@@ -267,6 +311,7 @@ fn simulate_trial(
     let mut hidden_world_gain_sum = 0.0;
     let mut acquisition_regret_sum = 0.0;
     let mut realized_gain_sum = 0.0;
+    let mut predictive_nll_sum = 0.0;
     let mut gain_cost_sum = 0.0;
     let mut steps_to_threshold = None;
     let mut cost_to_threshold = None;
@@ -337,6 +382,7 @@ fn simulate_trial(
         // the experiment-choice comparison interpretable; the robust policies are
         // not silently granted a separate posterior-inference advantage.
         let update = update_posterior(&posterior, model_candidate, outcome_index)?;
+        predictive_nll_sum += -update.outcome_probability.max(1.0e-12).ln();
         posterior = update.posterior;
 
         experiments_used += 1;
@@ -394,6 +440,11 @@ fn simulate_trial(
         },
         realized_entropy_reduction_bits_per_cost: if gain_cost_sum > 0.0 {
             realized_gain_sum / gain_cost_sum
+        } else {
+            0.0
+        },
+        mean_prequential_predictive_nll: if experiments_used > 0 {
+            predictive_nll_sum / experiments_used as f64
         } else {
             0.0
         },
