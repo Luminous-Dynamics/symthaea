@@ -81,7 +81,7 @@ For both options, bind the acceptance profile and evidence maturity. Where local
 
 ## 5. Starter synthetic corpus and how to read it
 
-The companion JSON fixture env-mobility-make-buy-v1.json contains small numerical test cases built only to exercise the equations and gating rules. The fixture labels every price-like number as synthetic; it includes low-demand outsource preference, a higher-demand make-preference hypothesis, yield sensitivity, an unqualified local process, missing supplier quote data, and a no-positive-break-even case.
+The companion JSON fixture env-mobility-make-buy-v1.json contains eight numerical test cases built only to exercise the equations and gating rules. The last case combines an unqualified in-house process with a missing supplier quote to ensure qualification gates do not become an unpriced purchase recommendation. The fixture labels every price-like number as synthetic; it includes low-demand outsource preference, a higher-demand make-preference hypothesis, yield sensitivity, an unqualified local process, missing supplier quote data, and a no-positive-break-even case.
 
 These cases check arithmetic and decision semantics only. They are **not** estimates of the price of a 3D printer, local labor, South African suppliers, shipping, component cost, or actual factory utilization. Replace synthetic data with timestamped quotations, measured cycle times and a declared currency only after an exact SPM-0 BOM and local sourcing review exist.
 
