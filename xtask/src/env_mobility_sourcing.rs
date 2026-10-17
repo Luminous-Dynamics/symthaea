@@ -200,8 +200,8 @@ fn validate_register(value: &Value, raw_sha256: String, context: &str) -> Result
         .context("derived_arithmetic_only must be an array")?;
     ensure!(profiles.len() == 2, "{context}: expected two explicit arithmetic-only profiles");
     let mut profile_ids = HashSet::new();
-    let mut catalog_arithmetic_matches = true;
-    let mut profile_measurands_consistent = true;
+    let catalog_arithmetic_matches = true;
+    let profile_measurands_consistent = true;
 
     for (index, profile) in profiles.iter().enumerate() {
         let at = format!("{context} profile[{index}]");
