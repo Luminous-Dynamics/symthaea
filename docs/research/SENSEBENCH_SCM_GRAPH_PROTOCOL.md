@@ -1,4 +1,4 @@
-# SenseBench SCM Graph Recovery Protocol v0.5
+# SenseBench SCM Graph Recovery Protocol v0.6
 
 **Status:** implementation committed to the public `feat/symthaea-sense-observation-envelope` branch; authored Rust tests have not been executed in the present environment.
 
@@ -17,7 +17,7 @@ SENSEBENCH_CODE_REVISION="$(git rev-parse HEAD)" \
   cargo run -p symthaea-sensebench -- --suite scm-graph --trials 32 --budget 8 --seed 42
 ```
 
-The workspace CLI emits versioned JSON (SCM report schema v5) and requires an exact caller-provided `SENSEBENCH_CODE_REVISION`. Use a clean worktree and record that SHA with the configuration. Do not interpret a queued or skipped workflow as a passing build/test.
+The workspace CLI emits versioned JSON (SCM report schema v6) and requires an exact caller-provided `SENSEBENCH_CODE_REVISION`. Use a clean worktree and record that SHA with the configuration. Do not interpret a queued or skipped workflow as a passing build/test.
 
 ## Graph catalogue and worlds
 
@@ -34,7 +34,7 @@ This is deliberately a small, auditable graph-recovery substrate. It does not ye
 
 ## Policies
 
-The Bayesian acquisition policies share the same initial uniform graph prior, nominal posterior-update rule, observation format, outcome generator, and measurement-count budget. The PC baseline does not use the Bayesian graph posterior to estimate structure: it takes passive observations only, performs binary G-squared conditional-independence tests with asymptotic 5% cutoffs, and returns a projected valid CPDAG. Its finite-sample power and calibration are part of what the benchmark measures, not assumptions to take for granted.
+The Bayesian acquisition policies share the same initial uniform graph prior, nominal posterior-update rule, observation format, outcome generator, and measurement-count budget. Both PC baselines use passive observations only and do not use the Bayesian graph posterior to estimate structure. The asymptotic variant uses binary G-squared conditional-independence tests with 5% chi-square cutoffs; the exact-conditional variant enumerates the finite G-squared null distribution conditional on each 2×2 table's observed margins (one stratum for marginal independence, two strata for conditioning on the third variable). Both return a projected valid CPDAG and abstain from exact-DAG claims. Their finite-sample power and calibration are measured rather than assumed.
 
 1. Nominal expected information gain.
 2. Predictive outcome entropy, a simple uncertainty-seeking baseline that does not directly score hypothesis discrimination.
@@ -45,13 +45,14 @@ The Bayesian acquisition policies share the same initial uniform graph prior, no
 7. Passive observation only.
 8. Known-mechanism oracle: uses the hidden world's mechanism parameters while retaining the graph-hypothesis task. This is an optimistic upper-bound diagnostic and is not a deployable method.
 9. Structure-blind random graph submission, with no measurements. This supplies a graph-recovery floor separate from the random-action baseline.
-10. **Observational PC baseline:** passive-only measurements followed by unconditional and one-variable-conditioned G-squared independence tests; unshielded colliders are oriented from separating sets, then finite-sample edge marks are projected to the nearest valid CPDAG in the three-node catalogue. It submits a CPDAG claim, abstains from an exact full-DAG claim, and does not use the Bayesian likelihood model to recover structure.
+10. **Observational PC baseline (asymptotic):** passive-only measurements followed by unconditional and one-variable-conditioned G-squared independence tests using asymptotic 5% chi-square cutoffs. Unshielded colliders are oriented from separating sets, then finite-sample edge marks are projected to the nearest valid CPDAG in the three-node catalogue. It submits a CPDAG claim and abstains from an exact-DAG claim.
+11. **Observational PC baseline (exact conditional):** the same PC skeleton/orientation implementation and budget, but uses an exact finite null distribution for G-squared conditional on observed binary-table margins. This is a distinct calibration baseline, not a universal solution for CI testing; discreteness can make it conservative, and the test only covers the three-variable binary setting.
 
 The current comparison deliberately keeps the posterior update on the same nominal likelihood model for the action-selection policies, to isolate acquisition differences. Consequently, model-weighted/robust selection is not also receiving a privileged model-averaged posterior update. A future factorial ablation should vary acquisition and inference separately.
 
 ## Observational PC baseline details
 
-The reference PC comparator uses critical values 3.8415 for one degree of freedom and 5.9915 for two degrees of freedom (asymptotic 5% chi-square cutoffs for binary 2×2 and stratified 2×2 tests). It is transparent and limited to three observed variables. At the tiny budgets used by the exploratory default, asymptotic tests may have poor power or calibration; the benchmark must report graph recovery and CPDAG claim risk/coverage rather than presume the baseline is reliable. Schema v5 additionally reports how many raw edge marks the valid-catalogue projection changes, averaged per world and as the fraction of trials with at least one change. This exposes a previously hidden repair step: projection makes the submitted CPDAG valid, but does not retroactively validate an independence-test or collider decision. It does not yet expose full per-test p-values or constitute finite-sample calibration. This is an observational PC baseline, not a full reproduction of every PC/PC-stable variant, and does not yet include PC plus greedy active orientation.
+The reference PC comparator uses critical values 3.8415 for one degree of freedom and 5.9915 for two degrees of freedom (asymptotic 5% chi-square cutoffs for binary 2×2 and stratified 2×2 tests). It is transparent and limited to three observed variables. At the tiny budgets used by the exploratory default, asymptotic tests may have poor power or calibration; the benchmark must report graph recovery and CPDAG claim risk/coverage rather than presume the baseline is reliable. Schema v6 additionally reports how many raw edge marks the valid-catalogue projection changes, averaged per world and as the fraction of trials with at least one change, for both PC baselines. This exposes a previously hidden repair step: projection makes the submitted CPDAG valid, but does not retroactively validate an independence-test or collider decision. The exact-conditional variant does not yet expose every per-test p-value or establish correct behavior under arbitrary non-binary, missing-data, latent-confounder, or model-misspecification regimes. Neither baseline is a full reproduction of every PC/PC-stable variant, and neither includes PC plus greedy active orientation.
 
 ## Outcomes and metrics
 
