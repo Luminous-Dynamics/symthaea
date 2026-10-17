@@ -35,7 +35,7 @@ struct Scenario {
 
 fn corpus() -> ScenarioCorpus {
     let corpus: ScenarioCorpus = serde_json::from_str(include_str!(
-        "../../../docs/research/open-mobility/fixtures/wearability-lifecycle-scenarios-v1.json"
+        "../../../../docs/research/open-mobility/fixtures/wearability-lifecycle-scenarios-v1.json"
     ))
     .expect("versioned wearability lifecycle corpus parses");
     assert_eq!(corpus.schema_version, 1);
