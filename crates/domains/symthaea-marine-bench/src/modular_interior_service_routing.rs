@@ -1063,6 +1063,158 @@ pub fn route_services(
     Ok(ServiceRoutingReport { body, report_sha256 })
 }
 
+/// Independently audits an emitted route polyline without rerunning A*.
+/// This checks path geometry and reported metrics, not the physical truth of
+/// supplied port anchors or suitability of the 2D abstraction.
+pub fn verify_service_route_geometry(
+    configuration: &Configuration,
+    request: &ServiceRouteRequest,
+    grid_pitch_mm: i64,
+    result: &ServiceRouteResult,
+) -> bool {
+    if result.route_id != request.route_id
+        || result.connection_id != request.connection_id
+        || grid_pitch_mm <= 0
+    {
+        return false;
+    }
+    let connection = match configuration.connections.iter()
+        .find(|connection| connection.connection_id == request.connection_id)
+    {
+        Some(connection) => connection,
+        None => return false,
+    };
+    let forward = endpoint_matches_anchor(&connection.endpoint_a, &request.start)
+        && endpoint_matches_anchor(&connection.endpoint_b, &request.end);
+    let reverse = endpoint_matches_anchor(&connection.endpoint_a, &request.end)
+        && endpoint_matches_anchor(&connection.endpoint_b, &request.start);
+    if !forward && !reverse {
+        return false;
+    }
+    if request.start.deck_id != request.end.deck_id
+        || request.start.position_mm.z_mm != request.end.position_mm.z_mm
+    {
+        return false;
+    }
+    let deck_matches: Vec<_> = configuration.platform.deck_bounds.iter()
+        .filter(|deck| deck.deck_id == request.start.deck_id).collect();
+    if deck_matches.len() != 1 {
+        return false;
+    }
+    let bounds = &deck_matches[0].bounds_mm;
+    if bounds.x_max_mm <= bounds.x_min_mm || bounds.y_max_mm <= bounds.y_min_mm {
+        return false;
+    }
+
+    if result.disposition != RouteDisposition::Routed {
+        return result.path.is_empty()
+            && result.path_length_mm.is_none()
+            && result.bend_count.is_none()
+            && result.search_cost_mm.is_none()
+            && result.conflicts_with_route_ids.is_empty();
+    }
+    if result.path.is_empty() {
+        return false;
+    }
+    if result.path.first().is_none_or(|point| {
+        point.x_mm != request.start.position_mm.x_mm
+            || point.y_mm != request.start.position_mm.y_mm
+    }) || result.path.last().is_none_or(|point| {
+        point.x_mm != request.end.position_mm.x_mm
+            || point.y_mm != request.end.position_mm.y_mm
+    }) {
+        return false;
+    }
+    let aligned = |value: i64, min: i64| -> bool {
+        let delta = i128::from(value) - i128::from(min);
+        delta >= 0 && delta % i128::from(grid_pitch_mm) == 0
+    };
+    for point in &result.path {
+        if point.x_mm < bounds.x_min_mm || point.x_mm > bounds.x_max_mm
+            || point.y_mm < bounds.y_min_mm || point.y_mm > bounds.y_max_mm
+            || !aligned(point.x_mm, bounds.x_min_mm)
+            || !aligned(point.y_mm, bounds.y_min_mm)
+        {
+            return false;
+        }
+    }
+
+    let start_approach = match anchor_approach_points(&request.start, request.clearance_mm, grid_pitch_mm) {
+        Ok(points) => points,
+        Err(_) => return false,
+    };
+    let end_approach = match anchor_approach_points(&request.end, request.clearance_mm, grid_pitch_mm) {
+        Ok(points) => points,
+        Err(_) => return false,
+    };
+    if result.path.len() < start_approach.len() || result.path.len() < end_approach.len() {
+        return false;
+    }
+    let starts_with_approach = result.path.iter().take(start_approach.len())
+        .zip(start_approach.iter())
+        .all(|(point, expected)| point.x_mm == expected.x_mm && point.y_mm == expected.y_mm);
+    let expected_end: Vec<_> = end_approach.iter().rev().skip(1).collect();
+    let suffix_start = result.path.len().saturating_sub(expected_end.len());
+    let ends_with_approach = result.path.iter().skip(suffix_start)
+        .zip(expected_end.iter())
+        .all(|(point, expected)| point.x_mm == expected.x_mm && point.y_mm == expected.y_mm);
+    if !starts_with_approach || !ends_with_approach {
+        return false;
+    }
+
+    let obstacles = match build_obstacles(configuration, &request.start.deck_id, &request.start, &request.end) {
+        Ok(obstacles) => obstacles,
+        Err(_) => return false,
+    };
+    let start_owner = rect_for_anchor_owner_from_anchor(&request.start).unwrap_or_default();
+    let end_owner = rect_for_anchor_owner_from_anchor(&request.end).unwrap_or_default();
+    let start_segment_count = start_approach.len().saturating_sub(1);
+    let end_segment_count = expected_end.len();
+    for (index, pair) in result.path.windows(2).enumerate() {
+        let dx = (i128::from(pair[0].x_mm) - i128::from(pair[1].x_mm)).abs();
+        let dy = (i128::from(pair[0].y_mm) - i128::from(pair[1].y_mm)).abs();
+        let one_grid_step = (dx == i128::from(grid_pitch_mm) && dy == 0)
+            || (dy == i128::from(grid_pitch_mm) && dx == 0);
+        if !one_grid_step {
+            return false;
+        }
+        let source_escape_segment = index < start_segment_count;
+        let sink_escape_segment = index >= result.path.len().saturating_sub(1 + end_segment_count);
+        for obstacle in &obstacles {
+            if source_escape_segment && obstacle.owner == start_owner {
+                continue;
+            }
+            if sink_escape_segment && obstacle.owner == end_owner {
+                continue;
+            }
+            if segment_intersects_obstacle(&obstacle.rect, &pair[0], &pair[1], request.clearance_mm) {
+                return false;
+            }
+        }
+    }
+
+    let steps = result.path.len().saturating_sub(1);
+    let Some(length) = u64::try_from(steps).ok()
+        .and_then(|count| count.checked_mul(u64::try_from(grid_pitch_mm).ok()?))
+    else { return false; };
+    let mut previous_axis = None;
+    let mut bends = 0usize;
+    for pair in result.path.windows(2) {
+        let axis = if pair[0].y_mm == pair[1].y_mm { 1u8 } else { 2u8 };
+        if previous_axis.is_some_and(|prior| prior != axis) {
+            bends = bends.saturating_add(1);
+        }
+        previous_axis = Some(axis);
+    }
+    let Some(cost) = u64::try_from(bends).ok()
+        .and_then(|count| count.checked_mul(u64::try_from(request.bend_penalty_mm).ok()?))
+        .and_then(|penalty| length.checked_add(penalty))
+    else { return false; };
+    result.path_length_mm == Some(length)
+        && result.bend_count == Some(bends)
+        && result.search_cost_mm == Some(cost)
+}
+
 /// Recomputes the same bounded route search over exact inputs. This is integrity checking,
 /// not a signature or certification of anchor/source authenticity.
 pub fn verify_service_routing_report(
@@ -1073,6 +1225,56 @@ pub fn verify_service_routing_report(
 ) -> bool {
     if digest(&report.body).ok().as_deref() != Some(report.report_sha256.as_str()) {
         return false;
+    }
+    if report.body.configuration_id != configuration.configuration_id
+        || report.body.configuration_sha256 != digest(configuration).ok().unwrap_or_default()
+        || report.body.limits != *limits
+        || report.body.grid_pitch_mm != limits.grid_pitch_mm
+    {
+        return false;
+    }
+    let Ok((normalized_requests, manifest_sha256)) = normalize_requests(configuration, requests, limits) else {
+        return false;
+    };
+    if report.body.input_manifest_sha256 != manifest_sha256
+        || report.body.routes.len() != normalized_requests.len()
+    {
+        return false;
+    }
+    let request_by_id: BTreeMap<&str, &ServiceRouteRequest> = normalized_requests.iter()
+        .map(|request| (request.route_id.as_str(), request)).collect();
+    if report.body.routes.iter().any(|route| {
+        let Some(request) = request_by_id.get(route.route_id.as_str()) else { return true; };
+        !verify_service_route_geometry(configuration, request, limits.grid_pitch_mm, route)
+    }) {
+        return false;
+    }
+    // Independently recompute pairwise exact shared-cell conflicts from emitted paths.
+    let mut expected_conflicts = BTreeMap::<String, BTreeSet<String>>::new();
+    for i in 0..report.body.routes.len() {
+        for j in (i + 1)..report.body.routes.len() {
+            let a = &report.body.routes[i];
+            let b = &report.body.routes[j];
+            let Some(a_request) = request_by_id.get(a.route_id.as_str()) else { return false; };
+            let Some(b_request) = request_by_id.get(b.route_id.as_str()) else { return false; };
+            if a_request.start.deck_id != b_request.start.deck_id
+                || a.disposition != RouteDisposition::Routed
+                || b.disposition != RouteDisposition::Routed
+            {
+                continue;
+            }
+            if a.path.iter().any(|point| b.path.contains(point)) {
+                expected_conflicts.entry(a.route_id.clone()).or_default().insert(b.route_id.clone());
+                expected_conflicts.entry(b.route_id.clone()).or_default().insert(a.route_id.clone());
+            }
+        }
+    }
+    for route in &report.body.routes {
+        let expected: Vec<String> = expected_conflicts.get(&route.route_id)
+            .cloned().unwrap_or_default().into_iter().collect();
+        if route.conflicts_with_route_ids != expected {
+            return false;
+        }
     }
     let Ok(recomputed) = route_services(configuration, requests, limits.clone()) else {
         return false;
