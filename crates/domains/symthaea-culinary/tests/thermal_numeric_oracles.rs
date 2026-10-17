@@ -73,7 +73,6 @@ fn heating_and_cooling_ramps_match_independent_closed_form_oracle() {
         (80.0, 200.0, 0.5),
         (200.0, 40.0, 10.0),
         (250.0, 80.0, 3.0),
-        (60.0, 60.0 + 1e-10, 7.0),
     ] {
         let trajectory =
             ThermalTrajectory::new(vec![(0.0, start_c), (duration_min, end_c)]);
@@ -93,6 +92,22 @@ fn heating_and_cooling_ramps_match_independent_closed_form_oracle() {
             &format!("{start_c} C -> {end_c} C over {duration_min} min"),
         );
     }
+}
+
+#[test]
+fn near_constant_temperature_segment_uses_a_stable_small_delta_limit() {
+    let duration_min = 7.0;
+    let trajectory = ThermalTrajectory::new(vec![(0.0, 60.0), (duration_min, 60.0 + 1e-10)]);
+    let actual = model(&trajectory);
+    // The mean temperature differs from 60 C by only 5e-11 C; this limit
+    // avoids an endpoint-rate difference oracle dominated by cancellation.
+    let constant_limit = duration_min / D_REF;
+    assert_relative_close(
+        actual,
+        constant_limit,
+        5e-11,
+        "near-constant temperature stability",
+    );
 }
 
 #[test]
