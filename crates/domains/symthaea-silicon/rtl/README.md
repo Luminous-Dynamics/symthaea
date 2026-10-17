@@ -94,7 +94,7 @@ iverilog -g2012 -Wall -s hdc_hamming_stream_tb -o /tmp/hdc_hamming_stream_tb.vvp
 vvp /tmp/hdc_hamming_stream_tb.vvp
 \`\`\`
 
-The bench uses an independent bit-by-bit simulation reference to exercise arithmetic and streaming protocol; it is not yet the pinned Rust-oracle differential receipt. That remains an explicit follow-up before exact-HDC hardware correctness claims are promoted. Simulated cycle counts are not hardware latency or throughput claims.
+The directed bench uses a bit-by-bit simulation reference to exercise arithmetic and streaming protocol. The source-bound oracle differential runner is `examples/hdc_hamming_rtl_simulator_diff.rs`; it takes the output of `examples/hdc_rtl_reference_corpus.rs`, regenerates the canonical corpus, requires byte-for-byte equality, validates oracle/contract blobs against their pinned commits, and runs all required Hamming fixtures across the same lane widths. It records tool versions, fixture IDs, Git blob identities and simulator output. It has not yet been compiled or executed here; until an exact-head receipt exists, no Rust-oracle differential PASS is claimed. Simulated cycle counts are not hardware latency or throughput claims.
 
 ## Semantic/evidence boundary
 
