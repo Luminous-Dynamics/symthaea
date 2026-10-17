@@ -958,6 +958,34 @@ mod tests {
     }
 
     #[test]
+    fn schemas_declare_current_generator_version_and_both_scenario_ids() {
+        let root = Path::new(env!("CARGO_MANIFEST_DIR")).join("../..");
+        let manifest_schema: serde_json::Value = serde_json::from_slice(
+            &fs::read(root.join("docs/research/cyber-hunt-manifest-v1.schema.json"))
+                .expect("manifest schema should be readable"),
+        )
+        .expect("manifest schema should be valid JSON");
+        let truth_schema: serde_json::Value = serde_json::from_slice(
+            &fs::read(root.join("docs/research/cyber-hunt-truth-v1.schema.json"))
+                .expect("truth schema should be readable"),
+        )
+        .expect("truth schema should be valid JSON");
+
+        let versions = manifest_schema["properties"]["generator_version"]["enum"]
+            .as_array().expect("manifest schema should enumerate supported generator versions");
+        assert!(versions.iter().any(|v| v.as_str() == Some(GENERATOR_VERSION)));
+
+        let manifest_ids = manifest_schema["properties"]["scenario_id"]["enum"]
+            .as_array().expect("manifest schema should enumerate scenario IDs");
+        let truth_ids = truth_schema["properties"]["scenario_id"]["enum"]
+            .as_array().expect("truth schema should enumerate scenario IDs");
+        for scenario_id in [SCENARIO_ID, "synthetic-artifact-lifecycle-v1"] {
+            assert!(manifest_ids.iter().any(|v| v.as_str() == Some(scenario_id)));
+            assert!(truth_ids.iter().any(|v| v.as_str() == Some(scenario_id)));
+        }
+    }
+
+    #[test]
     fn campaign_family_selection_keeps_existing_family_as_default() {
         assert_eq!(
             CampaignFamily::parse("identity-to-egress").expect("identity family should parse"),
