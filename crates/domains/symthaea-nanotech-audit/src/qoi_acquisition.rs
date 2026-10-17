@@ -35,7 +35,8 @@ pub struct AcquisitionStep {
 #[derive(Debug, Clone, Serialize)]
 pub struct AcquisitionArm {
     pub arm: String,
-    pub calls_to_target_variance_tolerance: Option<usize>,
+    pub mean_calls_to_target_variance_tolerance_among_successes: Option<f64>,
+    pub fraction_reaching_target_variance_tolerance_within_budget: f64,
     pub steps: Vec<AcquisitionStep>,
 }
 
@@ -225,10 +226,11 @@ fn greedy_arm(
     let calls_to_target_variance_tolerance = steps
         .iter()
         .find(|step| step.target_qoi_posterior_variance <= TARGET_QOI_VARIANCE_TOLERANCE)
-        .map(|step| step.budget_used);
+        .map(|step| step.budget_used as f64);
     AcquisitionArm {
         arm: arm_name.to_owned(),
-        calls_to_target_variance_tolerance,
+        mean_calls_to_target_variance_tolerance_among_successes: calls_to_target_variance_tolerance,
+        fraction_reaching_target_variance_tolerance_within_budget: if calls_to_target_variance_tolerance.is_some() { 1.0 } else { 0.0 },
         steps,
     }
 }
@@ -244,6 +246,7 @@ fn random_arm_mean(
     let max_budget = budget.min(all_candidates.len());
     let mut qoi_sums = vec![0.0; max_budget];
     let mut trace_sums = vec![0.0; max_budget];
+    let mut target_tolerance_calls = Vec::new();
     let mut rng = DeterministicRng::new(seed);
 
     for _ in 0..trials {
@@ -256,8 +259,12 @@ fn random_arm_mean(
                 all_candidates[candidate_index].features,
                 noise_variance,
             );
-            qoi_sums[step_index] += target_variance(&covariance, qoi_direction);
+            let target_variance = target_variance(&covariance, qoi_direction);
+            qoi_sums[step_index] += target_variance;
             trace_sums[step_index] += trace(&covariance);
+            if target_tolerance_calls.is_empty() && target_variance <= TARGET_QOI_VARIANCE_TOLERANCE {
+                target_tolerance_calls.push(step_index + 1);
+            }
         }
     }
 
@@ -274,9 +281,24 @@ fn random_arm_mean(
         .iter()
         .find(|step| step.target_qoi_posterior_variance <= TARGET_QOI_VARIANCE_TOLERANCE)
         .map(|step| step.budget_used);
+    let calls_to_target_variance_tolerance = target_tolerance_calls
+        .iter()
+        .map(|calls| *calls as f64)
+        .sum::<f64>()
+        / trials as f64;
+    let fraction_reaching_target_variance_tolerance_within_budget =
+        target_tolerance_calls.len() as f64 / trials as f64;
     AcquisitionArm {
         arm: "uniform_random_average".to_owned(),
-        calls_to_target_variance_tolerance,
+        mean_calls_to_target_variance_tolerance_among_successes: if target_tolerance_calls.is_empty() {
+            None
+        } else {
+            Some(
+                target_tolerance_calls.iter().map(|calls| *calls as f64).sum::<f64>()
+                    / target_tolerance_calls.len() as f64,
+            )
+        },
+        fraction_reaching_target_variance_tolerance_within_budget,
         steps,
     }
 }
@@ -379,9 +401,15 @@ mod tests {
     fn target_qoi_tolerance_reports_reference_call_efficiency() {
         let report = run_qoi_acquisition_benchmark(8, 256, 0x51a7).unwrap();
         assert_eq!(report.target_qoi_variance_tolerance, 0.03);
-        assert_eq!(report.arms[0].calls_to_target_variance_tolerance, Some(4));
-        assert_eq!(report.arms[1].calls_to_target_variance_tolerance, Some(7));
-        assert_eq!(report.arms[2].calls_to_target_variance_tolerance, Some(8));
+        assert_eq!(report.arms[0].mean_calls_to_target_variance_tolerance_among_successes, Some(4.0));
+        assert_eq!(report.arms[1].mean_calls_to_target_variance_tolerance_among_successes, Some(7.0));
+        assert_eq!(report.arms[2].fraction_reaching_target_variance_tolerance_within_budget, 177.0 / 256.0);
+        assert!(
+            (report.arms[2].mean_calls_to_target_variance_tolerance_among_successes.unwrap()
+                - 6.474_576_271_186_44)
+                .abs()
+                < 1.0e-12
+        );
     }
 
     #[test]
