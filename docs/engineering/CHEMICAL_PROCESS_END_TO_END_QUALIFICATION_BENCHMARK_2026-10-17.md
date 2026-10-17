@@ -234,7 +234,7 @@ The evaluator must run independently of candidate generation. Golden fixtures an
 
 ## Executable Tier-A contract checker
 
-The first Rust checker lives at `crates/domains/symthaea-engineering/examples/chemical_process_benchmark_evaluate.rs`. It checks a **candidate result report** against this frozen corpus. It does not generate process candidates or execute a chemistry/physics solver; its independent numeric oracles are deliberately limited to basic synthetic bookkeeping. The CLI adds SHA-256 digests of the exact corpus and candidate-result file bytes to each emitted receipt.
+The first Rust checker lives at `crates/domains/symthaea-engineering/examples/chemical_process_benchmark_evaluate.rs`. It checks a **candidate result report** against this frozen corpus. It does not generate process candidates or execute a chemistry/physics solver; its independent numeric oracles are deliberately limited to basic synthetic bookkeeping. The CLI adds SHA-256 digests of the exact corpus and candidate-result file bytes to each emitted receipt. The evaluator uses the existing workspace `sha2` dependency; `Cargo.toml` and the direct dependency edge in `Cargo.lock` are updated together.
 
 Commands, run from the repository root:
 
