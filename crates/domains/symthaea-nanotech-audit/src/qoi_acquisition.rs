@@ -284,6 +284,11 @@ pub fn run_qoi_acquisition_benchmark(
     if random_trials == 0 {
         return Err("random_trials must be greater than zero".to_owned());
     }
+    if random_trials > MAX_RANDOM_TRIALS {
+        return Err(format!(
+            "random_trials exceeds the supported limit of {MAX_RANDOM_TRIALS}"
+        ));
+    }
 
     let candidates = candidates();
     let budget = reference_budget.min(candidates.len());
@@ -352,6 +357,23 @@ mod tests {
         assert!(generic[0].selected_candidate_id.starts_with("nuisance-focused-"));
     }
 
+
+    #[test]
+    fn deterministic_curve_matches_independent_numeric_reference_values() {
+        let report = run_qoi_acquisition_benchmark(8, 256, 0x51a7).unwrap();
+        let qoi = &report.arms[0].steps;
+        let generic = &report.arms[1].steps;
+        let random = &report.arms[2].steps;
+
+        assert!((qoi[0].target_qoi_posterior_variance - 0.091_224_064_386_775_1).abs() < 1.0e-12);
+        assert!((qoi[3].target_qoi_posterior_variance - 0.024_390_243_902_439_032).abs() < 1.0e-12);
+        assert!((qoi[7].target_qoi_posterior_variance - 0.012_345_679_012_345_682).abs() < 1.0e-12);
+        assert!((generic[0].target_qoi_posterior_variance - 0.998_378_948_849_644_7).abs() < 1.0e-12);
+        assert!((generic[3].target_qoi_posterior_variance - 0.047_673_853_275_877_52).abs() < 1.0e-12);
+        assert!((random[0].target_qoi_posterior_variance - 0.530_845_796_210_270_1).abs() < 1.0e-12);
+        assert!((random[3].target_qoi_posterior_variance - 0.079_575_644_253_677_45).abs() < 1.0e-12);
+    }
+
     #[test]
     fn qoi_benchmark_is_deterministic_for_fixed_seed() {
         let first = run_qoi_acquisition_benchmark(8, 128, 0x51a7).unwrap();
@@ -366,6 +388,7 @@ mod tests {
     fn invalid_budget_and_random_trial_counts_fail_closed() {
         assert!(run_qoi_acquisition_benchmark(0, 128, 1).is_err());
         assert!(run_qoi_acquisition_benchmark(4, 0, 1).is_err());
+        assert!(run_qoi_acquisition_benchmark(4, 1_000_001, 1).is_err());
     }
 
     #[test]
