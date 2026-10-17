@@ -88,7 +88,7 @@ A “style” should stop being a preset name attached to a shared generator. Tr
 
 ### New executable benchmark
 
-A Rust example, **examples/style_contract_benchmark.rs**, is now added to audit the real public composition path, **compose_with_grammar_plan(style.grammar_profile(), intent, style.spec())**. It reports spec validity, empty/invalid timelines, meter and tempo-band violations, deterministic replay failures, seed-level exact-fingerprint diversity, matched-intent exact collisions between styles, nearest cross-style structural neighbors, and the gap between declared and observed sensitivity for valence/arousal/energy/bars.
+A Rust example, **examples/style_contract_benchmark.rs**, is now added to audit the real public composition path, **compose_with_grammar_plan(style.grammar_profile(), intent, style.spec())**. It reports the selected grammar-plan families alongside the declared form/accompaniment pools, spec validity, empty/invalid timelines, meter and tempo-band violations, deterministic replay failures, seed-level exact-fingerprint diversity, matched-intent exact collisions between styles, nearest cross-style structural neighbors, and the gap between declared and observed sensitivity for valence/arousal/energy/bars.
 
 Run it with source provenance captured:
 
