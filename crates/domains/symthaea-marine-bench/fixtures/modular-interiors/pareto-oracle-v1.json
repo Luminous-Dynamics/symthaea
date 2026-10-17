@@ -1,0 +1,341 @@
+{
+  "schema_version": "1.0.0",
+  "oracle_id": "MARINE-MOD-004-PARETO-ORACLE-V1",
+  "claim_ceiling": "Synthetic hand-calculated test oracle only. Values are not vessel design recommendations or measured engineering results.",
+  "cases": [
+    {
+      "case_id": "TRADEOFF-MIXED-DIRECTION-001",
+      "description": "Mass and quality trade off; candidate C is dominated by A and B, with lexical tie-break selecting A as the reported dominator.",
+      "candidates": [
+        {
+          "candidate_id": "A",
+          "objectives": [
+            {
+              "metric_id": "mass",
+              "value": 100,
+              "unit": "kg",
+              "direction": "minimize",
+              "evidence_status": "computed",
+              "comparison_basis": "oracle-case-1",
+              "evidence_refs": [
+                "TEST-HARNESS-ONLY"
+              ]
+            },
+            {
+              "metric_id": "quality",
+              "value": 0.7,
+              "unit": "ratio",
+              "direction": "maximize",
+              "evidence_status": "computed",
+              "comparison_basis": "oracle-case-1",
+              "evidence_refs": [
+                "TEST-HARNESS-ONLY"
+              ]
+            }
+          ]
+        },
+        {
+          "candidate_id": "B",
+          "objectives": [
+            {
+              "metric_id": "mass",
+              "value": 80,
+              "unit": "kg",
+              "direction": "minimize",
+              "evidence_status": "computed",
+              "comparison_basis": "oracle-case-1",
+              "evidence_refs": [
+                "TEST-HARNESS-ONLY"
+              ]
+            },
+            {
+              "metric_id": "quality",
+              "value": 0.8,
+              "unit": "ratio",
+              "direction": "maximize",
+              "evidence_status": "computed",
+              "comparison_basis": "oracle-case-1",
+              "evidence_refs": [
+                "TEST-HARNESS-ONLY"
+              ]
+            }
+          ]
+        },
+        {
+          "candidate_id": "C",
+          "objectives": [
+            {
+              "metric_id": "mass",
+              "value": 120,
+              "unit": "kg",
+              "direction": "minimize",
+              "evidence_status": "computed",
+              "comparison_basis": "oracle-case-1",
+              "evidence_refs": [
+                "TEST-HARNESS-ONLY"
+              ]
+            },
+            {
+              "metric_id": "quality",
+              "value": 0.6,
+              "unit": "ratio",
+              "direction": "maximize",
+              "evidence_status": "computed",
+              "comparison_basis": "oracle-case-1",
+              "evidence_refs": [
+                "TEST-HARNESS-ONLY"
+              ]
+            }
+          ]
+        }
+      ],
+      "expected_frontier_ids": [
+        "A",
+        "B"
+      ],
+      "expected_dominance": [
+        {
+          "dominated_candidate_id": "C",
+          "dominator_candidate_id": "A"
+        }
+      ]
+    },
+    {
+      "case_id": "COST-MASS-TRADEOFF-002",
+      "description": "The cheaper design is heavier; a third candidate is worse than the first two on both objectives.",
+      "candidates": [
+        {
+          "candidate_id": "A",
+          "objectives": [
+            {
+              "metric_id": "mass",
+              "value": 10,
+              "unit": "kg",
+              "direction": "minimize",
+              "evidence_status": "computed",
+              "comparison_basis": "oracle-case-2",
+              "evidence_refs": [
+                "TEST-HARNESS-ONLY"
+              ]
+            },
+            {
+              "metric_id": "cost",
+              "value": 60,
+              "unit": "credits",
+              "direction": "minimize",
+              "evidence_status": "computed",
+              "comparison_basis": "oracle-case-2",
+              "evidence_refs": [
+                "TEST-HARNESS-ONLY"
+              ]
+            }
+          ]
+        },
+        {
+          "candidate_id": "B",
+          "objectives": [
+            {
+              "metric_id": "mass",
+              "value": 12,
+              "unit": "kg",
+              "direction": "minimize",
+              "evidence_status": "computed",
+              "comparison_basis": "oracle-case-2",
+              "evidence_refs": [
+                "TEST-HARNESS-ONLY"
+              ]
+            },
+            {
+              "metric_id": "cost",
+              "value": 50,
+              "unit": "credits",
+              "direction": "minimize",
+              "evidence_status": "computed",
+              "comparison_basis": "oracle-case-2",
+              "evidence_refs": [
+                "TEST-HARNESS-ONLY"
+              ]
+            }
+          ]
+        },
+        {
+          "candidate_id": "C",
+          "objectives": [
+            {
+              "metric_id": "mass",
+              "value": 15,
+              "unit": "kg",
+              "direction": "minimize",
+              "evidence_status": "computed",
+              "comparison_basis": "oracle-case-2",
+              "evidence_refs": [
+                "TEST-HARNESS-ONLY"
+              ]
+            },
+            {
+              "metric_id": "cost",
+              "value": 80,
+              "unit": "credits",
+              "direction": "minimize",
+              "evidence_status": "computed",
+              "comparison_basis": "oracle-case-2",
+              "evidence_refs": [
+                "TEST-HARNESS-ONLY"
+              ]
+            }
+          ]
+        }
+      ],
+      "expected_frontier_ids": [
+        "A",
+        "B"
+      ],
+      "expected_dominance": [
+        {
+          "dominated_candidate_id": "C",
+          "dominator_candidate_id": "A"
+        }
+      ]
+    },
+    {
+      "case_id": "TIE-003",
+      "description": "Equal objective vectors are both nondominated; neither should falsely dominate the other.",
+      "candidates": [
+        {
+          "candidate_id": "A",
+          "objectives": [
+            {
+              "metric_id": "uptime",
+              "value": 0.99,
+              "unit": "ratio",
+              "direction": "maximize",
+              "evidence_status": "computed",
+              "comparison_basis": "oracle-case-3",
+              "evidence_refs": [
+                "TEST-HARNESS-ONLY"
+              ]
+            }
+          ]
+        },
+        {
+          "candidate_id": "B",
+          "objectives": [
+            {
+              "metric_id": "uptime",
+              "value": 0.99,
+              "unit": "ratio",
+              "direction": "maximize",
+              "evidence_status": "computed",
+              "comparison_basis": "oracle-case-3",
+              "evidence_refs": [
+                "TEST-HARNESS-ONLY"
+              ]
+            }
+          ]
+        }
+      ],
+      "expected_frontier_ids": [
+        "A",
+        "B"
+      ],
+      "expected_dominance": []
+    },
+    {
+      "case_id": "MAXIMIZE-MINIMIZE-004",
+      "description": "A and B are nondominated due to the uptime/mass trade-off; C is dominated.",
+      "candidates": [
+        {
+          "candidate_id": "A",
+          "objectives": [
+            {
+              "metric_id": "mass",
+              "value": 100,
+              "unit": "kg",
+              "direction": "minimize",
+              "evidence_status": "computed",
+              "comparison_basis": "oracle-case-4",
+              "evidence_refs": [
+                "TEST-HARNESS-ONLY"
+              ]
+            },
+            {
+              "metric_id": "uptime",
+              "value": 0.99,
+              "unit": "ratio",
+              "direction": "maximize",
+              "evidence_status": "computed",
+              "comparison_basis": "oracle-case-4",
+              "evidence_refs": [
+                "TEST-HARNESS-ONLY"
+              ]
+            }
+          ]
+        },
+        {
+          "candidate_id": "B",
+          "objectives": [
+            {
+              "metric_id": "mass",
+              "value": 90,
+              "unit": "kg",
+              "direction": "minimize",
+              "evidence_status": "computed",
+              "comparison_basis": "oracle-case-4",
+              "evidence_refs": [
+                "TEST-HARNESS-ONLY"
+              ]
+            },
+            {
+              "metric_id": "uptime",
+              "value": 0.95,
+              "unit": "ratio",
+              "direction": "maximize",
+              "evidence_status": "computed",
+              "comparison_basis": "oracle-case-4",
+              "evidence_refs": [
+                "TEST-HARNESS-ONLY"
+              ]
+            }
+          ]
+        },
+        {
+          "candidate_id": "C",
+          "objectives": [
+            {
+              "metric_id": "mass",
+              "value": 110,
+              "unit": "kg",
+              "direction": "minimize",
+              "evidence_status": "computed",
+              "comparison_basis": "oracle-case-4",
+              "evidence_refs": [
+                "TEST-HARNESS-ONLY"
+              ]
+            },
+            {
+              "metric_id": "uptime",
+              "value": 0.9,
+              "unit": "ratio",
+              "direction": "maximize",
+              "evidence_status": "computed",
+              "comparison_basis": "oracle-case-4",
+              "evidence_refs": [
+                "TEST-HARNESS-ONLY"
+              ]
+            }
+          ]
+        }
+      ],
+      "expected_frontier_ids": [
+        "A",
+        "B"
+      ],
+      "expected_dominance": [
+        {
+          "dominated_candidate_id": "C",
+          "dominator_candidate_id": "A"
+        }
+      ]
+    }
+  ]
+}
