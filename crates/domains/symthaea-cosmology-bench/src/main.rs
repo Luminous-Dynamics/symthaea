@@ -4,12 +4,11 @@
 
 use std::env;
 use std::fs::File;
-use std::io::BufReader;
 use std::process::ExitCode;
 
 use symthaea_cosmology_bench::{
-    sha256_bytes, sha256_file, verify_sha256_digest, verify_sha256_file_against_manifest, ChainTable,
-    CHAIN_AUDIT_PROTOCOL, CHAIN_AUDIT_VERSION,
+    sha256_bytes, sha256_file, verify_sha256_digest, verify_sha256_file_against_manifest,
+    ChainTable, CHAIN_AUDIT_PROTOCOL, CHAIN_AUDIT_VERSION,
 };
 
 fn json_string(value: &str) -> String {
