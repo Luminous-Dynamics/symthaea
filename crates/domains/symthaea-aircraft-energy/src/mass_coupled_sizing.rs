@@ -95,7 +95,7 @@ pub trait MassSensitiveMissionModel {
     ) -> Result<Vec<MissionPhaseDemand>, String>;
 }
 
-#[derive(Debug, Clone, PartialEq, Eq)]
+#[derive(Debug, Clone, PartialEq)]
 pub enum CouplingFinding {
     InvalidInput { field: String, reason: String },
     ModelFailure { iteration: usize, reason: String },
@@ -103,7 +103,7 @@ pub enum CouplingFinding {
     EmptyPhaseList { iteration: usize },
     DuplicatePhaseId { iteration: usize, phase_id: String },
     PeakDurationExceeded { required_s: f64, available_s: f64 },
-    TakeoffMassLimitExceeded { required_kg_milli: u64, limit_kg_milli: u64 },
+    TakeoffMassLimitExceeded { required_kg: f64, limit_kg: f64 },
     NonConverged { iterations: usize },
 }
 
@@ -532,11 +532,7 @@ pub fn solve_mass_coupled_battery<M: MassSensitiveMissionModel>(
             }
         };
         if let Err(phase_findings) = validate_phases(&phases, iteration) {
-            let disposition = if phase_findings.iter().any(|f| matches!(f, CouplingFinding::EmptyPhaseList { .. })) {
-                CouplingDisposition::InvalidDemand
-            } else {
-                CouplingDisposition::InvalidDemand
-            };
+            let disposition = CouplingDisposition::InvalidDemand;
             findings.extend(phase_findings);
             return Ok(CoupledSizingReport {
                 disposition,
@@ -597,8 +593,8 @@ pub fn solve_mass_coupled_battery<M: MassSensitiveMissionModel>(
 
         if sizing.target_takeoff_mass_kg > fixed_mass.maximum_takeoff_mass_limit_kg {
             findings.push(CouplingFinding::TakeoffMassLimitExceeded {
-                required_kg_milli: (sizing.target_takeoff_mass_kg * 1000.0).round().max(0.0) as u64,
-                limit_kg_milli: (fixed_mass.maximum_takeoff_mass_limit_kg * 1000.0).round().max(0.0) as u64,
+                required_kg: sizing.target_takeoff_mass_kg,
+                limit_kg: fixed_mass.maximum_takeoff_mass_limit_kg,
             });
             return Ok(CoupledSizingReport {
                 disposition: CouplingDisposition::TakeoffMassLimitExceeded,
@@ -835,8 +831,10 @@ mod tests {
             watts_per_kg: 0.0,
             duration_s: 3_600.0,
         };
+        let mut short_peak_budget = battery();
+        short_peak_budget.max_peak_duration_s = 60.0;
         let report = solve_mass_coupled_battery(
-            &context(), &fixed_mass(), &battery(), &settings(), 50.0, &model,
+            &context(), &fixed_mass(), &short_peak_budget, &settings(), 50.0, &model,
         ).unwrap();
         assert_eq!(report.disposition, CouplingDisposition::PeakDurationExceeded);
     }
@@ -850,6 +848,7 @@ mod tests {
             watts_per_kg: 0.0,
             duration_s: 3_600.0,
         };
+        mass.maximum_takeoff_mass_limit_kg = 675.0;
         let report = solve_mass_coupled_battery(
             &context(), &mass, &battery(), &settings(), 10.0, &model,
         ).unwrap();
