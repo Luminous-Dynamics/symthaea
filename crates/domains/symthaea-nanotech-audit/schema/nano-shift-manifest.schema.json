@@ -45,7 +45,8 @@
           "source_artifact_path",
           "source_artifact_sha256",
           "independence_keys",
-          "sample_ids"
+          "sample_ids",
+          "shift_kind"
         ],
         "properties": {
           "group_id": {
@@ -69,8 +70,7 @@
               "baseline",
               "mild",
               "moderate",
-              "severe",
-              "compounded"
+              "severe"
             ]
           },
           "split": {
@@ -119,8 +119,86 @@
               "minLength": 1,
               "maxLength": 512
             }
+          },
+          "shift_kind": {
+            "enum": [
+              "in_distribution",
+              "single_factor",
+              "compounded"
+            ]
           }
-        }
+        },
+        "allOf": [
+          {
+            "if": {
+              "properties": {
+                "shift_kind": {
+                  "const": "in_distribution"
+                }
+              },
+              "required": [
+                "shift_kind"
+              ]
+            },
+            "then": {
+              "properties": {
+                "severity": {
+                  "const": "baseline"
+                },
+                "shift_family": {
+                  "not": {
+                    "const": "compounded"
+                  }
+                }
+              }
+            }
+          },
+          {
+            "if": {
+              "properties": {
+                "shift_kind": {
+                  "const": "compounded"
+                }
+              },
+              "required": [
+                "shift_kind"
+              ]
+            },
+            "then": {
+              "properties": {
+                "shift_family": {
+                  "const": "compounded"
+                },
+                "severity": {
+                  "enum": [
+                    "mild",
+                    "moderate",
+                    "severe"
+                  ]
+                }
+              }
+            }
+          },
+          {
+            "if": {
+              "properties": {
+                "shift_family": {
+                  "const": "compounded"
+                }
+              },
+              "required": [
+                "shift_family"
+              ]
+            },
+            "then": {
+              "properties": {
+                "shift_kind": {
+                  "const": "compounded"
+                }
+              }
+            }
+          }
+        ]
       }
     }
   }
