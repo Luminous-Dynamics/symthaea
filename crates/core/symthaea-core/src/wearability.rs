@@ -1432,6 +1432,56 @@ mod tests {
     }
 
     #[test]
+    fn duplicate_provenance_for_one_field_is_invalid() {
+        let mut input = valid_fit();
+        input.evidence_provenance = vec![
+            WearabilityEvidenceProvenanceV1 {
+                field: WearabilityEvidenceFieldV1::FitEvidence,
+                origin: WearabilityEvidenceOriginV1::CallerAssertion,
+                evidence_id: Some("fit-assertion-a".to_owned()),
+                observed_at_ticks: None,
+                timebase_id: None,
+                calibration_reference: None,
+            },
+            WearabilityEvidenceProvenanceV1 {
+                field: WearabilityEvidenceFieldV1::FitEvidence,
+                origin: WearabilityEvidenceOriginV1::CallerAssertion,
+                evidence_id: Some("fit-assertion-b".to_owned()),
+                observed_at_ticks: None,
+                timebase_id: None,
+                calibration_reference: None,
+            },
+        ];
+        let result = evaluate_wearability_request("profile-a", WearabilityStageV1::FitCheck, &input);
+        assert_eq!(result.provenance_status, WearabilityProvenanceStatusV1::Invalid);
+        assert!(result.provenance_findings.contains(
+            &WearabilityProvenanceFindingV1::DuplicateProvenance {
+                field: WearabilityEvidenceFieldV1::FitEvidence
+            }
+        ));
+    }
+
+    #[test]
+    fn empty_evidence_id_is_invalid_even_for_caller_assertions() {
+        let mut input = valid_fit();
+        input.evidence_provenance = vec![WearabilityEvidenceProvenanceV1 {
+            field: WearabilityEvidenceFieldV1::FitEvidence,
+            origin: WearabilityEvidenceOriginV1::CallerAssertion,
+            evidence_id: Some(" ".to_owned()),
+            observed_at_ticks: None,
+            timebase_id: None,
+            calibration_reference: None,
+        }];
+        let result = evaluate_wearability_request("profile-a", WearabilityStageV1::FitCheck, &input);
+        assert_eq!(result.provenance_status, WearabilityProvenanceStatusV1::Invalid);
+        assert!(result.provenance_findings.contains(
+            &WearabilityProvenanceFindingV1::InvalidEvidenceId {
+                field: WearabilityEvidenceFieldV1::FitEvidence
+            }
+        ));
+    }
+
+    #[test]
     fn explicit_doff_remains_highest_priority_with_invalid_other_metadata() {
         let input = WearabilityInputV1 {
             schema_version: WEARABILITY_SCHEMA_VERSION + 99,
