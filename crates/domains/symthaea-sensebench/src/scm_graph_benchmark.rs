@@ -605,12 +605,15 @@ fn parameters_for_regime(regime: ScmMechanismRegime, rng: &mut BenchmarkRng) -> 
         ScmMechanismRegime::WeakPositiveDevelopment => (0.18, 0.34, 0.12, false),
         ScmMechanismRegime::StrongPositiveDevelopment => (0.12, 0.60, 0.035, false),
         ScmMechanismRegime::MixedSignHeldOut => (0.22, 0.43, 0.08, true),
-        ScmMechanismRegime::NearNullHeldOut => (0.24, 0.075, 0.02, true),
+        ScmMechanismRegime::NearNullHeldOut => (0.24, 0.075, 0.02, false),
     };
+    let flip_signs = signed && rng.unit_f64() < 0.5;
     let mut edge_weights = [0.0; 6];
-    for weight in &mut edge_weights {
+    for (index, weight) in edge_weights.iter_mut().enumerate() {
         let amplitude = (magnitude + (rng.unit_f64() - 0.5) * 2.0 * jitter).max(0.02);
-        let sign = if signed && rng.unit_f64() < 0.5 { -1.0 } else { 1.0 };
+        // Mixed-sign worlds always contain both positive and negative coefficients;
+        // a seeded polarity flip varies which edge indices carry each sign.
+        let sign = if signed && ((index % 2 == 0) ^ flip_signs) { -1.0 } else { 1.0 };
         *weight = sign * amplitude;
     }
     ScmParameters { intercept, edge_weights }
@@ -787,7 +790,7 @@ fn fixed_design_action(
         return Err(ScmGraphBenchmarkError::MissingCandidate);
     }
 
-    // Tune a single action on development-family mechanism parameters only.
+    // Tune a single action on development graph/mechanism combinations only.
     // Truth graph IDs are not used to choose the action. Held-out worlds are not
     // passed to this function and therefore cannot affect this baseline.
     let mut totals: Vec<(String, f64)> = actions.iter()
@@ -1229,9 +1232,11 @@ fn aggregate_held_out(
 /// Run a deterministic graph-recovery experiment under equal measurement budgets.
 ///
 /// Candidate hypotheses are all 25 labeled DAGs over three observed variables.
-/// There are seven seed-generated world families (two development families and
-/// five held-out families), each with four parameterized worlds. The policy never
-/// receives the hidden truth graph or hidden structural-equation parameters.
+/// Seven graph-family templates are crossed with four distinct mechanism regimes.
+/// Two graph families and two mechanism regimes are development-only; a world is
+/// held out if either factor is held out (4 development / 24 held-out worlds).
+/// Topology and mechanism use separate RNG streams. The policy never receives the
+/// hidden truth graph or hidden structural-equation parameters.
 /// Outcomes are sampled from the hidden graph's exact binary SCM distribution.
 pub fn run_scm_graph_benchmark(
     trials_per_world: usize,
@@ -1317,8 +1322,8 @@ pub fn run_scm_graph_benchmark(
             "Synthetic software benchmark only. The candidate set enumerates all labeled DAGs ",
             "on three observed variables, but outcomes use hidden structural-equation parameters. ",
             "Held-out regimes are source-visible and are not cryptographically sealed. The ",
-            "held-out aggregate confidence intervals treat parameterized worlds as units, but ",
-            "four variants per family are not a population sample of all causal systems. The ",
+            "held-out aggregate intervals treat crossed worlds as units, but seven hand-authored ",
+            "graph families crossed with four mechanism regimes are not a population sample of all causal systems. The ",
             "known-mechanics oracle is an optimistic diagnostic, not an available deployment policy."
         ).into(),
     })
