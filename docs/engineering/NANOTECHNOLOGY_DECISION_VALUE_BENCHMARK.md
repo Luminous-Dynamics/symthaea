@@ -175,6 +175,14 @@ A paradigm shift is to share a *decision/receipt/audit architecture* without col
 
 Use one policy/evidence interface across lanes where possible, but keep distinct task contracts, units, thresholds, denominators, and reports. Report lane-specific results side-by-side; do not average them into a single score. A cross-lane transfer claim requires a fourth, explicitly preregistered experiment in which the transfer mechanism and held-out target domain are defined in advance.
 
+### Distribution shift is not just another random test split
+
+The atomistic lane must include a first-class shift-manifest and worst-group protocol, tracked in [NANO-012](https://github.com/Luminous-Dynamics/symthaea/issues/7762) and the [trajectory reliability benchmark](https://github.com/Luminous-Dynamics/symthaea/blob/research/nano-008-trajectory-reliability/docs/engineering/NANOTECHNOLOGY_TRAJECTORY_RELIABILITY_BENCHMARK.md). Kreiman & Krishnapriyan analyze distribution shifts for universal interatomic potentials (2026, https://doi.org/10.1039/D5DD00260E); a later 2026 elemental-system benchmark compares potential generalization across structural search settings (https://www.nature.com/articles/s41524-026-02251-2); and a multicomponent-alloy study reports separate transferability, finite-temperature robustness and uncertainty behavior (https://doi.org/10.1103/1qc9-ypyb).
+
+For every admitted material task, freeze the physical shift family, severity definition, independence keys, sample-to-split mapping, and source/reference hashes before fitting or evaluating. Report performance versus shift severity and all-in budget; show worst-group error, trajectory survival, calibration, failure-detection recall, false alarms and adaptation cost independently. Never summarize those outcomes into a composite score that conceals a failed chemistry/surface/temperature regime.
+
+NANO-010's optional shift-manifest checker validates the metadata/hash chain and rejects shared sample IDs or independence keys across data splits. That is a split-integrity guard only; domain review must still justify that the shift categories and severities represent physically relevant deployment conditions.
+
 ### Current candidate tasks and rights status
 
 - **MADE convex-hull campaign:** the official repository says its run harness can use ORB/MACE/analytic oracles, and some data/agents rely on Materials Project, checkpoints, and API services. The README's MIT code license does not automatically settle upstream dataset, model-weight, or API terms. Freeze one task, oracle, cached/source artifacts, data rights, start state, setup invocations, and actual external-call ledger before using it for a fair cost comparison.
