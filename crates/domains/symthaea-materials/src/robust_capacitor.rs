@@ -605,6 +605,31 @@ mod tests {
     }
 
     #[test]
+    fn robust_loss_bound_uses_requested_operating_frequency() {
+        let mut sample = material();
+        sample.test_frequency_hz = 995.0;
+        let req = requirements();
+        let report = screen_capacitor_candidate_robust(
+            &sample, &geometry(), &req, 10.0, 1.0
+        ).unwrap();
+        let bounds = report.bounded_metrics.unwrap();
+        let expected_upper = 2.0
+            * PI
+            * req.operating_frequency_hz
+            * VACUUM_PERMITTIVITY_F_PER_M
+            * sample.relative_permittivity
+            * (1.0 + sample.permittivity_uncertainty.as_ref().unwrap().relative_uncertainty)
+            * geometry().electrode_overlap_area_m2
+            * f64::from(geometry().active_dielectric_layers)
+            / geometry().dielectric_thickness_m
+            * sample.loss_tangent
+            * (1.0 + sample.loss_tangent_uncertainty.as_ref().unwrap().relative_uncertainty);
+        assert_eq!(bounds.property_frequency_hz, 995.0);
+        assert_eq!(bounds.loss_evaluation_frequency_hz, 1_000.0);
+        assert!((bounds.dielectric_loss_power_w.upper - expected_upper).abs() <= expected_upper * 1.0e-12);
+    }
+
+    #[test]
     fn statistical_uncertainty_cannot_be_promoted_to_hard_bound() {
         let mut sample = material();
         sample.permittivity_uncertainty.as_mut().unwrap().semantics =
