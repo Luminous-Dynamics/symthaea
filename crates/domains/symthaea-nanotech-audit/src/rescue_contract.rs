@@ -18,7 +18,6 @@ use std::path::{Component, Path, PathBuf};
 const MAX_FILE_BYTES: u64 = 64 * 1024 * 1024;
 const MAX_JSONL_ROWS: usize = 1_000_000;
 const MAX_FRAME_ROWS: usize = 5_000_000;
-const MAX_STRING: usize = 4096;
 
 #[derive(Debug, Clone)]
 pub(crate) struct ContractFinding {
@@ -193,7 +192,6 @@ pub(crate) fn audit_optional_rescue_contract(run_dir: &Path) -> RescueContractAu
         return audit;
     }
 
-    let manifest_path = root.join("audit-sampling-manifest.json");
     let manifest_bytes = match read_regular_file(run_dir, Path::new("rescue-controller/audit-sampling-manifest.json")) {
         Ok(bytes) => bytes,
         Err(error) => {
@@ -644,6 +642,32 @@ fn close(left: f64, right: f64) -> bool {
 #[cfg(test)]
 mod tests {
     use super::*;
+    use std::time::{SystemTime, UNIX_EPOCH};
+
+    fn fixture_root() -> PathBuf {
+        Path::new(env!("CARGO_MANIFEST_DIR"))
+            .join("fixtures")
+            .join("nano-rescue-valid")
+    }
+
+    fn copy_fixture_to_temp() -> (PathBuf, PathBuf) {
+        let stamp = SystemTime::now()
+            .duration_since(UNIX_EPOCH)
+            .expect("clock should be after epoch")
+            .as_nanos();
+        let parent = std::env::temp_dir().join(format!(
+            "symthaea-nano-rescue-test-{}-{stamp}",
+            std::process::id()
+        ));
+        let dest = parent.join("rescue-controller");
+        fs::create_dir_all(&dest).expect("create test output directory");
+        let source = fixture_root().join("rescue-controller");
+        for entry in fs::read_dir(source).expect("read fixture directory") {
+            let entry = entry.expect("fixture directory entry");
+            fs::copy(entry.path(), dest.join(entry.file_name())).expect("copy fixture artifact");
+        }
+        (parent, dest)
+    }
 
     #[test]
     fn digest_validator_accepts_only_lowercase_sha256() {
@@ -670,33 +694,57 @@ mod tests {
     }
 
     #[test]
-    fn future_observation_and_heldout_labels_are_separate_hard_failures() {
-        let observed_step = 18_u64;
-        let decision_step = 17_u64;
-        assert!(observed_step > decision_step);
+    fn valid_fixture_reconciles_and_blind_audit_exposes_a_missed_severe_event() {
+        let audit = audit_optional_rescue_contract(&fixture_root());
+        assert!(audit.provided);
+        assert!(
+            audit.findings.is_empty(),
+            "unexpected findings: {:?}",
+            audit.findings.iter().map(|f| (&f.code, &f.detail)).collect::<Vec<_>>()
+        );
+        assert!(audit.checks_completed.iter().any(|c| c == "rescue_blinded_sample_and_decision_reconciliation_checked"));
+
+        let results_path = fixture_root().join("rescue-controller").join("blinded-audit-results.jsonl");
+        let rows: Vec<AuditResult> = parse_jsonl(
+            &fs::read(results_path).expect("read synthetic audit results"),
+            MAX_JSONL_ROWS,
+        )
+        .expect("fixture audit results parse");
+        let missed = rows.iter().find(|row| row.window_id == "w-003").expect("missed event fixture exists");
+        assert_eq!(missed.severe_event, Some(true));
+        assert!(!missed.policy_triggered_reference);
+        assert_eq!(missed.physical_integrity_pass, Some(false));
+        // Structural integrity can pass while the synthetic policy plainly misses an event.
     }
 
     #[test]
-    fn sample_and_audit_lane_must_not_be_self_selected() {
-        let frozen_before_run = true;
-        let policy_blind = true;
-        let labels_revealed_to_policy = false;
-        assert!(frozen_before_run && policy_blind && !labels_revealed_to_policy);
+    fn future_data_and_heldout_label_access_fail_closed() {
+        let (parent, run_dir) = copy_fixture_to_temp();
+        let path = run_dir.join("decision-ledger.jsonl");
+        let raw = fs::read_to_string(&path).expect("read copied decision ledger");
+        let changed = raw.replacen("\\"future_data_read\\":false", "\\"future_data_read\\":true", 1);
+        assert_ne!(raw, changed);
+        fs::write(&path, changed).expect("write manipulated decision ledger");
+        let audit = audit_optional_rescue_contract(&parent);
+        assert!(audit.findings.iter().any(|f| f.code == "rescue_test_leakage_declared"));
+        fs::remove_dir_all(parent).expect("remove temporary fixture");
     }
 
     #[test]
-    fn failed_reference_cannot_supply_outcome_labels() {
-        let reference_status = "reference_failed";
-        let severe_event: Option<bool> = None;
-        let physical_integrity_pass: Option<bool> = None;
-        assert!(matches!(reference_status, "reference_failed" | "reference_unavailable"));
-        assert!(severe_event.is_none() && physical_integrity_pass.is_none());
+    fn audit_result_must_bind_exact_sampling_manifest_bytes() {
+        let (parent, run_dir) = copy_fixture_to_temp();
+        let path = run_dir.join("audit-sampling-manifest.json");
+        let mut raw = fs::read(&path).expect("read sampling manifest");
+        raw.push(b'\n');
+        fs::write(&path, raw).expect("mutate sampling-manifest bytes");
+        let audit = audit_optional_rescue_contract(&parent);
+        assert!(audit.findings.iter().any(|f| f.code == "rescue_audit_manifest_digest_mismatch"));
+        fs::remove_dir_all(parent).expect("remove temporary fixture");
     }
 
     #[test]
-    fn independent_audit_detects_a_severe_event_on_a_continued_window() {
-        let policy_triggered_reference = false;
-        let severe_event = true;
-        assert!(!policy_triggered_reference && severe_event);
+    fn unsafe_relative_paths_are_rejected_before_reading() {
+        let result = read_regular_file(Path::new("/tmp"), Path::new("../outside.json"));
+        assert!(result.unwrap_err().contains("unsafe relative path"));
     }
 }
