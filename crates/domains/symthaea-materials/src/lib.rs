@@ -31,7 +31,8 @@ pub use capacitor_screening::{
 pub use database::{MaterialDatabase, MaterialSearchResult};
 pub use dielectric::{
     CapacitorGeometry, DielectricEvidenceKind, DielectricPropertyRecord, DielectricValidationError,
-    IdealCapacitorMetrics, VACUUM_PERMITTIVITY_F_PER_M, calculate_ideal_capacitor_metrics,
+    IdealCapacitorMetrics, PropertyUncertainty, VACUUM_PERMITTIVITY_F_PER_M,
+    calculate_ideal_capacitor_metrics,
 };
 pub use encoder::MaterialHdcEncoder;
 pub use mining::{
