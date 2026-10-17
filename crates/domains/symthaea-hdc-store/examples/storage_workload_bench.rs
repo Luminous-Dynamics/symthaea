@@ -164,8 +164,8 @@ fn run() -> Result<(), Box<dyn Error>> {
         0,
         0,
         0,
-    )0,
-            );
+        0,
+    ));
 
     // Each WriteBatch publishes one generation. Time each commit separately
     // rather than hiding durable-append cost inside corpus generation.
