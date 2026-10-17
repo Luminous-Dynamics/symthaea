@@ -1,0 +1,384 @@
+{
+  "schema_id": "org.luminousdynamics.symthaea.chemical-process-tier-b-candidates",
+  "schema_version": "1.0.0",
+  "record_date": "2026-10-17",
+  "parent_issue": "https://github.com/Luminous-Dynamics/symthaea/issues/7869",
+  "design_document": "docs/engineering/CHEMICAL_PROCESS_TIER_B_REFERENCE_CASES_2026-10-17.md",
+  "purpose": "Machine-readable inventory of candidate Tier-B process-engineering benchmarks. This file is a selection and freeze checklist, not a record of executed simulations or validated plant models.",
+  "safety_and_claim_policy": {
+    "candidate_registry_is_not_a_simulation_receipt": true,
+    "tutorial_approximate_values_are_never_exact_gold_outputs": true,
+    "not_run_or_unavailable_never_counts_as_pass": true,
+    "solver_exit_code_alone_is_not_model_validation": true,
+    "cross_solver_agreement_is_not_independent_if_evidence_dependencies_are_shared": true,
+    "no_operational_authority": true,
+    "prohibited_claims_without_separate_evidence": [
+      "physical validation",
+      "plant or product qualification",
+      "safety certification",
+      "industrial purity or yield qualification",
+      "economic feasibility"
+    ]
+  },
+  "result_statuses": [
+    "PASS",
+    "FAIL",
+    "SKIPPED",
+    "NOT_RUN",
+    "OUT_OF_DOMAIN",
+    "REFERENCE_UNAVAILABLE",
+    "UNRESOLVED"
+  ],
+  "freeze_receipt_required_fields": [
+    "primary_source_url_and_revision",
+    "retrieved_at",
+    "native_input_files_and_transitive_data_hashes",
+    "component_identity_and_order",
+    "units_and_composition_basis",
+    "phase_and_reference_state_conventions",
+    "property_package_or_mechanism_and_parameter_provenance",
+    "solver_build_and_runtime_versions",
+    "numerical_methods_tolerances_and_convergence_status",
+    "stdout_stderr_and_raw_output_hashes",
+    "independent_checker_version_and_result",
+    "shared_dependency_audit",
+    "preregistered_case_specific_tolerance_and_rationale",
+    "claim_ceiling"
+  ],
+  "candidates": [
+    {
+      "case_id": "CHEM-B-TB-001",
+      "name": "DWSIM water mixer: material balance",
+      "category": "steady_state_material_balance",
+      "freeze_state": "CANDIDATE_NOT_FROZEN",
+      "execution": {
+        "status": "NOT_RUN",
+        "simulator_executed": false,
+        "raw_output_hash": null,
+        "simulator_version": null
+      },
+      "source": {
+        "publisher": "DWSIM",
+        "url": "https://dwsim.org/tutorials/en/beginner/02-mixer-basics.html",
+        "source_type": "official_tutorial",
+        "source_values_are_exact_golden_outputs": false
+      },
+      "configuration": {
+        "compound": "water",
+        "property_package": "Steam Tables (IAPWS-IF97)",
+        "inlet_1": {
+          "temperature": {"value": 300, "unit": "K"},
+          "pressure": {"value": 101325, "unit": "Pa"},
+          "mass_flow": {"value": 100, "unit": "kg/s"}
+        },
+        "inlet_2": {
+          "temperature": {"value": 348, "unit": "K"},
+          "pressure": {"value": 101325, "unit": "Pa"},
+          "mass_flow": {"value": 50, "unit": "kg/s"}
+        }
+      },
+      "analytic_invariants": [
+        {
+          "id": "MASS-FLOW-SUM",
+          "quantity": "outlet_total_mass_flow",
+          "expected": {"value": 150, "unit": "kg/s"},
+          "tolerance": {"value": 0, "unit": "kg/s", "basis": "exact arithmetic for the declared input values"},
+          "status": "FROZEN_ANALYTIC_INVARIANT"
+        }
+      ],
+      "source_hints_not_gold": [
+        {
+          "quantity": "outlet_temperature",
+          "reported_value": {"value": 316, "unit": "K"},
+          "qualifier": "approximately",
+          "use": "sanity_hint_only"
+        },
+        {
+          "quantity": "outlet_vapor_fraction",
+          "reported_value": 0,
+          "qualifier": "tutorial_reported; exact build and convention not captured",
+          "use": "sanity_hint_only"
+        }
+      ],
+      "reference_outputs": {
+        "state": "PARTIAL_ANALYTIC_ONLY",
+        "exact_simulator_outputs_frozen": false,
+        "output_digest": null
+      },
+      "freeze_blockers": [
+        "capture an exact native DWSIM input/project file",
+        "pin DWSIM build and property-package data",
+        "execute the case and preserve raw output plus stdout/stderr",
+        "independently check state and mass conservation",
+        "pre-register numerical tolerance for state variables"
+      ],
+      "claim_ceiling": "Analytical total mass-flow closure only until a reproducible simulator receipt exists."
+    },
+    {
+      "case_id": "CHEM-B-TB-002",
+      "name": "DWSIM water heater/cooler: energy closure and sign convention",
+      "category": "steady_state_energy_balance",
+      "freeze_state": "CANDIDATE_NOT_FROZEN",
+      "execution": {
+        "status": "NOT_RUN",
+        "simulator_executed": false,
+        "raw_output_hash": null,
+        "simulator_version": null
+      },
+      "source": {
+        "publisher": "DWSIM",
+        "url": "https://dwsim.org/tutorials/en/beginner/03-heater-cooler.html",
+        "source_type": "official_tutorial",
+        "source_values_are_exact_golden_outputs": false
+      },
+      "configuration": {
+        "compound": "water",
+        "property_package": "Steam Tables (IAPWS-IF97)",
+        "feed": {
+          "temperature": {"value": 298.15, "unit": "K"},
+          "pressure": {"value": 101325, "unit": "Pa"},
+          "mass_flow": {"value": 1, "unit": "kg/s"}
+        },
+        "heater": {
+          "target_outlet_temperature": {"value": 353.15, "unit": "K"},
+          "pressure_drop": {"value": 0, "unit": "Pa"},
+          "efficiency": {"value": 100, "unit": "%"}
+        },
+        "cooler": {
+          "target_outlet_temperature": {"value": 298.15, "unit": "K"},
+          "pressure_drop": {"value": 0, "unit": "Pa"},
+          "efficiency": {"value": 100, "unit": "%"}
+        },
+        "duty_convention": "Q = mass_flow * (h_out - h_in); simulator sign convention must be captured explicitly"
+      },
+      "analytic_invariants": [
+        {
+          "id": "ENERGY-DUTY-FORM",
+          "quantity": "unit_duty",
+          "expected": null,
+          "tolerance": null,
+          "status": "FORM_FROZEN_NUMERICAL_VALUE_NOT_FROZEN",
+          "definition": "Compute Q from matched inlet/outlet specific enthalpies, mass flow and explicitly declared sign convention."
+        },
+        {
+          "id": "HEATER-COOLER-NET",
+          "quantity": "net_heat_exchange_for_sequential_cycle",
+          "expected": null,
+          "tolerance": null,
+          "status": "NOT_FROZEN",
+          "definition": "Check the sum using captured enthalpy states; near-zero depends on identical property context and tolerances."
+        }
+      ],
+      "source_hints_not_gold": [
+        {
+          "quantity": "heater_duty",
+          "reported_value": {"value": 230, "unit": "kW"},
+          "qualifier": "about; tutorial sign convention",
+          "use": "sanity_hint_only"
+        },
+        {
+          "quantity": "cooler_duty",
+          "reported_value": {"value": -230, "unit": "kW"},
+          "qualifier": "about; tutorial sign convention",
+          "use": "sanity_hint_only"
+        }
+      ],
+      "reference_outputs": {
+        "state": "NOT_FROZEN",
+        "exact_simulator_outputs_frozen": false,
+        "output_digest": null
+      },
+      "freeze_blockers": [
+        "capture exact simulator and property-package versions",
+        "capture enthalpy reference state and duty sign convention",
+        "preserve raw inlet/outlet enthalpy and duty outputs",
+        "independently calculate energy residual using matched states",
+        "pre-register case-specific tolerance with numerical and source-precision rationale"
+      ],
+      "claim_ceiling": "Energy-accounting benchmark only after the model context and duty convention are explicit; no equipment or utility qualification."
+    },
+    {
+      "case_id": "CHEM-B-TB-003",
+      "name": "DWSIM water/ethanol flash: component balance and phase enrichment",
+      "category": "steady_state_phase_separation",
+      "freeze_state": "CANDIDATE_NOT_FROZEN",
+      "execution": {
+        "status": "NOT_RUN",
+        "simulator_executed": false,
+        "raw_output_hash": null,
+        "simulator_version": null
+      },
+      "source": {
+        "publisher": "DWSIM",
+        "url": "https://dwsim.org/tutorials/en/beginner/04-simple-flash-drum.html",
+        "source_type": "official_tutorial",
+        "source_values_are_exact_golden_outputs": false
+      },
+      "configuration": {
+        "components": ["water", "ethanol"],
+        "composition_basis": "mass_fraction",
+        "property_package": "NRTL",
+        "feed": {
+          "temperature": {"value": 300, "unit": "K"},
+          "pressure": {"value": 101325, "unit": "Pa"},
+          "mass_flow": {"value": 1, "unit": "kg/s"},
+          "mass_fractions": {"water": 0.5, "ethanol": 0.5}
+        },
+        "heater": {
+          "target_outlet_temperature": {"value": 360, "unit": "K"},
+          "pressure_drop": {"value": 0, "unit": "Pa"},
+          "efficiency": {"value": 100, "unit": "%"}
+        },
+        "flash": {
+          "exact_model_settings_captured": false
+        }
+      },
+      "analytic_invariants": [
+        {
+          "id": "TOTAL-MASS-CLOSURE",
+          "quantity": "vapor_mass_flow_plus_liquid_mass_flow",
+          "expected": {"value": 1, "unit": "kg/s"},
+          "tolerance": null,
+          "status": "EQUATION_FROZEN_TOLERANCE_NOT_FROZEN",
+          "definition": "Compare the sum of outlet phase mass flows with the declared feed mass flow using a pre-registered tolerance."
+        },
+        {
+          "id": "COMPONENT-MASS-CLOSURE",
+          "quantity": "component-wise_outlet_sum",
+          "expected": null,
+          "tolerance": null,
+          "status": "NOT_FROZEN",
+          "definition": "For each component, sum phase mass flows times component mass fraction and compare with the feed component mass flow."
+        }
+      ],
+      "source_hints_not_gold": [
+        {
+          "quantity": "vapor_mass_flow",
+          "reported_range": [{"value": 0.4, "unit": "kg/s"}, {"value": 0.8, "unit": "kg/s"}],
+          "qualifier": "around; tutorial range",
+          "use": "broad_sanity_bound_only"
+        },
+        {
+          "quantity": "liquid_mass_flow",
+          "reported_range": [{"value": 0.2, "unit": "kg/s"}, {"value": 0.6, "unit": "kg/s"}],
+          "qualifier": "around; tutorial range",
+          "use": "broad_sanity_bound_only"
+        },
+        {
+          "quantity": "ethanol_mass_fraction",
+          "reported_expectations": {
+            "vapor": "greater_than_0.50",
+            "liquid": "less_than_0.50"
+          },
+          "qualifier": "qualitative tutorial hint; do not treat as exact property validation",
+          "use": "sanity_hint_only"
+        }
+      ],
+      "reference_outputs": {
+        "state": "NOT_FROZEN",
+        "exact_simulator_outputs_frozen": false,
+        "output_digest": null
+      },
+      "freeze_blockers": [
+        "identify and hash the exact NRTL interaction parameter source and values",
+        "capture exact DWSIM version, input project and all transitive input hashes",
+        "capture component order, phase convention and exact outlet stream states",
+        "preserve raw outputs and convergence diagnostics",
+        "independently check total and component mass balance",
+        "do not infer purity, recovery, economic performance or industrial separation quality from qualitative hints"
+      ],
+      "claim_ceiling": "Material/component balance and phase-enrichment tests only under a frozen context; tutorial ranges are not a quantitative reference oracle."
+    },
+    {
+      "case_id": "CHEM-B-TB-004",
+      "name": "Cantera dynamic reactor-network candidate",
+      "category": "dynamic_model_reproducibility",
+      "freeze_state": "DESIGN_ONLY",
+      "execution": {
+        "status": "NOT_RUN",
+        "simulator_executed": false,
+        "raw_output_hash": null,
+        "simulator_version": null
+      },
+      "source": {
+        "publisher": "Cantera",
+        "reactor_reference_url": "https://cantera.org/stable/reference/reactors/index.html",
+        "example_index_url": "https://cantera.org/stable/examples/python/index.html",
+        "source_type": "official_documentation",
+        "source_values_are_exact_golden_outputs": false
+      },
+      "configuration": {
+        "selected_example": null,
+        "mechanism_file": null,
+        "mechanism_file_sha256": null,
+        "initial_conditions": null,
+        "boundary_conditions": null,
+        "integrator": null,
+        "tolerances": null,
+        "independent_comparator": null
+      },
+      "reference_outputs": {
+        "state": "REFERENCE_UNAVAILABLE",
+        "exact_simulator_outputs_frozen": false,
+        "output_digest": null
+      },
+      "freeze_blockers": [
+        "choose one exact public example with a redistributable, source-controlled mechanism",
+        "freeze the full transitive mechanism/data dependency graph",
+        "state the equations and context of use and capture integrator settings",
+        "choose a validated analytical or independent numerical comparator",
+        "otherwise label the result adapter/trajectory reproducibility, not physical model accuracy"
+      ],
+      "claim_ceiling": "No reactor-network accuracy claim until the exact example and independent comparator are frozen. Do not compare unmatched DWSIM steady-state and Cantera dynamic propositions."
+    },
+    {
+      "case_id": "CHEM-B-TB-005",
+      "name": "Common-mode evidence dependency challenge",
+      "category": "benchmark_assurance_and_independence",
+      "freeze_state": "DESIGN_ONLY",
+      "execution": {
+        "status": "NOT_RUN",
+        "simulator_executed": false,
+        "raw_output_hash": null,
+        "simulator_version": null
+      },
+      "source": {
+        "publisher": "Symthaea benchmark design",
+        "url": "https://github.com/Luminous-Dynamics/symthaea/issues/7869",
+        "source_type": "designed_adversarial_control"
+      },
+      "paired_scenarios": [
+        {
+          "scenario_id": "INDEPENDENT-REFERENCE",
+          "design": "Two distinct implementations with separately sourced reference data and inspectable provenance.",
+          "expected_checker_behavior": "Report dependency graph and state only the independence actually evidenced."
+        },
+        {
+          "scenario_id": "SHARED-COMMON-MODE",
+          "design": "Two distinct solvers reuse the same property correlation, parameter set or stale input file.",
+          "expected_checker_behavior": "Detect and report shared dependency; numerical agreement must not count as independent corroboration."
+        }
+      ],
+      "reference_outputs": {
+        "state": "CONTRACT_NOT_IMPLEMENTED",
+        "exact_simulator_outputs_frozen": false,
+        "output_digest": null
+      },
+      "freeze_blockers": [
+        "define a versioned dependency-manifest schema",
+        "construct positive and negative controls with known dependency overlap",
+        "check whether the checker detects transitive shared-data paths",
+        "prove that missing provenance is unresolved, not independent by default"
+      ],
+      "claim_ceiling": "This is an assurance benchmark; it does not establish chemical-model accuracy."
+    }
+  ],
+  "acceptance_targets": {
+    "frozen_case_provenance_coverage": {"target": 1.0, "unit": "fraction", "hard_gate": true},
+    "shared_dependency_declaration_coverage": {"target": 1.0, "unit": "fraction", "hard_gate": true},
+    "missing_or_skipped_results_counted_as_pass": {"target": 0, "unit": "count", "hard_gate": true},
+    "frozen_matched_condition_cases_before_advanced_flowsheet_optimization": {"target": 3, "unit": "cases", "hard_gate": true},
+    "aggregate_scores_may_mask_a_failed_hard_invariant": false,
+    "tolerance_policy": "Case-specific, preregistered and justified from reference precision, numerical error and the context of use; no universal tolerance."
+  }
+}
