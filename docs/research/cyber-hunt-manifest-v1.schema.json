@@ -23,7 +23,10 @@
       "const": "cyber-hunt-manifest-v1"
     },
     "generator_version": {
-      "const": "cyber-hunt-fixture-generator/0.1.0"
+      "enum": [
+        "cyber-hunt-fixture-generator/0.1.0",
+        "cyber-hunt-fixture-generator/0.2.0"
+      ]
     },
     "generator_source_commit": {
       "anyOf": [
@@ -43,7 +46,10 @@
       "const": "public-synthetic-smoke-v1"
     },
     "scenario_id": {
-      "const": "synthetic-identity-to-egress-v1"
+      "enum": [
+        "synthetic-identity-to-egress-v1",
+        "synthetic-artifact-lifecycle-v1"
+      ]
     },
     "seed": {
       "type": "integer",
