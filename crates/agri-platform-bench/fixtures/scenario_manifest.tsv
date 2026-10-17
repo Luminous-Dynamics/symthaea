@@ -1,5 +1,5 @@
 # AGRI-ROBOTICS-BENCH-V1
-# case_id	expected_status	rationale
+case_id	expected_status	rationale
 baseline-feasible	FEASIBLE	All required evidence verified and platform fits
 unsupported-task	REJECTED	Platform does not support the requested task
 incompatible-service-unit	REJECTED	Platform service unit differs from task unit
