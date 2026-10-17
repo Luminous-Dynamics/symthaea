@@ -107,11 +107,11 @@ fn append_binary_bundle_row(out: &mut String, fan_in: usize, seed: u64) {
     let bound_vectors: Vec<BinaryHV> = pairs.iter().map(|pair| pair.2).collect();
     let record = BinaryHV::bundle_safe(&bound_vectors);
     let query = record.bind(&pairs[0].0);
-    let target_score = query.similarity(&pairs[0].1) as f64;
+    let target_score = query.cosine_similarity(&pairs[0].1) as f64;
     let best_distractor = pairs
         .iter()
         .skip(1)
-        .map(|pair| query.similarity(&pair.1) as f64)
+        .map(|pair| query.cosine_similarity(&pair.1) as f64)
         .fold(f64::NEG_INFINITY, f64::max);
     let hit = fan_in == 1 || target_score > best_distractor;
     let best_distractor_field = if fan_in == 1 {
