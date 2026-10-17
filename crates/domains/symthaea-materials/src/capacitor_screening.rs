@@ -48,8 +48,12 @@ pub struct CapacitorScreeningRequirements {
     /// Optional minimum ratio of reported breakdown field to operating field.
     /// This is a screening threshold only, not a safe operating margin.
     pub min_breakdown_field_ratio: Option<f64>,
-    /// Optional maximum allowed record-level relative uncertainty. Missing uncertainty is not accepted when set.
-    pub max_relative_uncertainty: Option<f64>,
+    /// Optional maximum allowed relative-permittivity uncertainty; missing uncertainty is not accepted when set.
+    pub max_relative_permittivity_uncertainty: Option<f64>,
+    /// Optional maximum allowed loss-tangent uncertainty; missing uncertainty is not accepted when set.
+    pub max_relative_loss_tangent_uncertainty: Option<f64>,
+    /// Optional maximum allowed breakdown-strength uncertainty; missing uncertainty is not accepted when set.
+    pub max_relative_breakdown_strength_uncertainty: Option<f64>,
     /// Evidence classes permitted for this screening task. This is an exact allow-list, not an ordinal trust score.
     pub accepted_evidence_kinds: Vec<DielectricEvidenceKind>,
 }
@@ -126,13 +130,19 @@ impl CapacitorScreeningRequirements {
                 "minimum breakdown field ratio must be finite and non-negative",
             ));
         }
-        if self
-            .max_relative_uncertainty
-            .is_some_and(|value| !value.is_finite() || value < 0.0)
+        for uncertainty_limit in [
+            self.max_relative_permittivity_uncertainty,
+            self.max_relative_loss_tangent_uncertainty,
+            self.max_relative_breakdown_strength_uncertainty,
+        ]
+        .into_iter()
+        .flatten()
         {
-            return Err(CapacitorScreeningError::InvalidRequirements(
-                "maximum relative uncertainty must be finite and non-negative",
-            ));
+            if !uncertainty_limit.is_finite() || uncertainty_limit < 0.0 {
+                return Err(CapacitorScreeningError::InvalidRequirements(
+                    "property-specific uncertainty limits must be finite and non-negative",
+                ));
+            }
         }
         if self.accepted_evidence_kinds.is_empty() {
             return Err(CapacitorScreeningError::InvalidRequirements(
@@ -168,12 +178,22 @@ pub enum ScreeningLimitation {
     FieldOutsideCharacterization,
     /// Evidence class was not included in the application's allow-list.
     EvidenceClassNotAllowed,
-    /// An uncertainty limit was requested, but the record has no uncertainty value.
-    MissingUncertainty,
-    /// Record-level relative uncertainty exceeds the requested limit.
-    UncertaintyAboveLimit,
+    /// Permittivity uncertainty was required but not supplied.
+    MissingPermittivityUncertainty,
+    /// Permittivity uncertainty exceeds the requested limit.
+    PermittivityUncertaintyAboveLimit,
+    /// Loss-tangent uncertainty was required but not supplied.
+    MissingLossTangentUncertainty,
+    /// Loss-tangent uncertainty exceeds the requested limit.
+    LossTangentUncertaintyAboveLimit,
+    /// Breakdown-strength uncertainty was required but not supplied.
+    MissingBreakdownUncertainty,
+    /// Breakdown-strength uncertainty exceeds the requested limit.
+    BreakdownUncertaintyAboveLimit,
     /// A breakdown ratio was required but no referenced breakdown evidence is available.
     MissingBreakdownEvidence,
+    /// Breakdown evidence class was not included in the application's allow-list.
+    BreakdownEvidenceClassNotAllowed,
 }
 
 /// A declared idealized requirement that the candidate violates.
@@ -303,25 +323,48 @@ pub fn screen_capacitor_candidate(
         limitations.push(ScreeningLimitation::EvidenceClassNotAllowed);
     }
 
-    if let Some(max_uncertainty) = requirements.max_relative_uncertainty {
-        match material.relative_uncertainty {
-            None => limitations.push(ScreeningLimitation::MissingUncertainty),
-            Some(value) if value > max_uncertainty => {
-                limitations.push(ScreeningLimitation::UncertaintyAboveLimit)
+    if let Some(max_uncertainty) = requirements.max_relative_permittivity_uncertainty {
+        match material.permittivity_uncertainty.as_ref() {
+            None => limitations.push(ScreeningLimitation::MissingPermittivityUncertainty),
+            Some(value) if value.relative_uncertainty > max_uncertainty => {
+                limitations.push(ScreeningLimitation::PermittivityUncertaintyAboveLimit)
+            }
+            Some(_) => {}
+        }
+    }
+    if let Some(max_uncertainty) = requirements.max_relative_loss_tangent_uncertainty {
+        match material.loss_tangent_uncertainty.as_ref() {
+            None => limitations.push(ScreeningLimitation::MissingLossTangentUncertainty),
+            Some(value) if value.relative_uncertainty > max_uncertainty => {
+                limitations.push(ScreeningLimitation::LossTangentUncertaintyAboveLimit)
+            }
+            Some(_) => {}
+        }
+    }
+    if let Some(max_uncertainty) = requirements.max_relative_breakdown_strength_uncertainty {
+        match material.breakdown_strength_uncertainty.as_ref() {
+            None => limitations.push(ScreeningLimitation::MissingBreakdownUncertainty),
+            Some(value) if value.relative_uncertainty > max_uncertainty => {
+                limitations.push(ScreeningLimitation::BreakdownUncertaintyAboveLimit)
             }
             Some(_) => {}
         }
     }
 
-    if requirements.min_breakdown_field_ratio.is_some()
-        && (material.breakdown_strength_v_per_m.is_none()
-            || material.breakdown_reference.as_deref().is_none_or(str::is_empty))
-    {
-        limitations.push(ScreeningLimitation::MissingBreakdownEvidence);
+    if requirements.min_breakdown_field_ratio.is_some() {
+        match (
+            material.breakdown_strength_v_per_m,
+            material.breakdown_reference.as_deref(),
+            material.breakdown_evidence_kind,
+        ) {
+            (Some(_), Some(reference), Some(kind)) if !reference.trim().is_empty() => {
+                if !requirements.accepted_evidence_kinds.contains(&kind) {
+                    limitations.push(ScreeningLimitation::BreakdownEvidenceClassNotAllowed);
+                }
+            }
+            _ => limitations.push(ScreeningLimitation::MissingBreakdownEvidence),
+        }
     }
-
-    limitations.sort_by_key(|limitation| *limitation as u8);
-    limitations.dedup();
 
     if !limitations.is_empty() {
         return Ok(CapacitorScreeningReport {
@@ -426,7 +469,9 @@ mod tests {
             max_dielectric_loss_power_w: 0.01,
             min_ideal_energy_density_j_per_m3: Some(1.0e6),
             min_breakdown_field_ratio: Some(5.0),
-            max_relative_uncertainty: Some(0.1),
+            max_relative_permittivity_uncertainty: Some(0.1),
+            max_relative_loss_tangent_uncertainty: Some(0.1),
+            max_relative_breakdown_strength_uncertainty: Some(0.1),
             accepted_evidence_kinds: vec![DielectricEvidenceKind::Estimated],
         }
     }
@@ -480,14 +525,20 @@ mod tests {
     fn evidence_and_uncertainty_gates_fail_closed() {
         let mut req = requirements();
         req.accepted_evidence_kinds = vec![DielectricEvidenceKind::Experimental];
-        req.max_relative_uncertainty = Some(0.01);
+        req.max_relative_permittivity_uncertainty = Some(0.01);
+        req.max_relative_loss_tangent_uncertainty = Some(0.01);
+        req.max_relative_breakdown_strength_uncertainty = Some(0.01);
         let mut sample = material();
-        sample.relative_uncertainty = None;
+        sample.permittivity_uncertainty = None;
+        sample.loss_tangent_uncertainty = None;
         let report =
             screen_capacitor_candidate(&sample, &geometry(), &req, 10.0, 1.0).unwrap();
         assert_eq!(report.disposition, CapacitorScreeningDisposition::NotEvaluable);
         assert!(report.limitations.contains(&ScreeningLimitation::EvidenceClassNotAllowed));
-        assert!(report.limitations.contains(&ScreeningLimitation::MissingUncertainty));
+        assert!(report.limitations.contains(&ScreeningLimitation::BreakdownEvidenceClassNotAllowed));
+        assert!(report.limitations.contains(&ScreeningLimitation::MissingPermittivityUncertainty));
+        assert!(report.limitations.contains(&ScreeningLimitation::MissingLossTangentUncertainty));
+        assert!(report.limitations.contains(&ScreeningLimitation::BreakdownUncertaintyAboveLimit));
     }
 
     #[test]
