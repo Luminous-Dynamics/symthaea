@@ -15,6 +15,7 @@ use std::env;
 use symthaea_sensebench::{
     EvaluationSplit, ScenarioKind, causal_benchmark::run_causal_selection_benchmark, evaluate,
     generate_scenario, z_score_baseline, ScenarioManifest, GENERATOR_VERSION,
+    robustness_benchmark::run_model_misspecification_benchmark,
 };
 
 #[derive(Serialize)]
@@ -40,6 +41,15 @@ struct CausalRunReport {
     experiment_budget: usize,
     posterior_threshold: f64,
     summaries: Vec<symthaea_sensebench::causal_benchmark::SelectionPolicySummary>,
+}
+
+#[derive(Serialize)]
+struct RobustnessRunReport {
+    report_version: u16,
+    suite: &'static str,
+    generator_version: &'static str,
+    code_revision: Option<String>,
+    benchmark: symthaea_sensebench::robustness_benchmark::ModelMisspecificationBenchmarkReport,
 }
 
 fn main() {
@@ -83,6 +93,7 @@ fn run() -> Result<(), String> {
                      --seed N --samples N"
                 );
                 println!("sensebench --suite causal --trials N --budget N --seed N");
+                println!("sensebench --suite robustness");
                 println!("set SENSEBENCH_CODE_REVISION to the exact Git commit before running");
                 println!("--allow-unversioned is for exploratory runs only");
                 return Ok(());
@@ -120,8 +131,22 @@ fn run() -> Result<(), String> {
             .map_err(|error| format!("could not encode causal report: {error}"))?);
         return Ok(());
     }
+    if suite == "robustness" {
+        let benchmark = run_model_misspecification_benchmark()
+            .map_err(|error| error.to_string())?;
+        let report = RobustnessRunReport {
+            report_version: 1,
+            suite: "model_misspecification_regret",
+            generator_version: GENERATOR_VERSION,
+            code_revision: revision,
+            benchmark,
+        };
+        println!("{}", serde_json::to_string_pretty(&report)
+            .map_err(|error| format!("could not encode robustness report: {error}"))?);
+        return Ok(());
+    }
     if suite != "anomaly" {
-        return Err(format!("unknown suite: {suite}; expected anomaly or causal"));
+        return Err(format!("unknown suite: {suite}; expected anomaly, causal, or robustness"));
     }
 
     let scenarios: Vec<ScenarioKind> = if scenario_arg == "all" {
