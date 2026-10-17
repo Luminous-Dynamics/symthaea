@@ -39,6 +39,13 @@ A robust dominance claim requires the relevant no-worse condition on **all** met
 
 The potential-dominance check reverses the bounds to ask whether there exists a compatible assignment inside the box intervals. Its answer is strictly logical under the declared interval model. It does not estimate frequency, probability, confidence or risk.
 
+Every comparison also binds one shared `benchmark_case_id`, `task_id`,
+`wearer_profile_id`, `environment_profile_id`, task-protocol revision, and explicit
+operating conditions (speed, payload, grade and ambient temperature). Empty/malformed
+identity, non-finite conditions or negative speed/payload reject the request. This makes
+the context part of the versioned report rather than relying on an unexamined protocol
+label alone. These declarations still are not authenticated evidence.
+
 ### Required integrity rules
 
 - All 15 objective intervals appear exactly once per candidate.
