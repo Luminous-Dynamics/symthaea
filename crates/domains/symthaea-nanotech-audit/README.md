@@ -38,6 +38,7 @@ See the strict JSON Schema at [schema/made-run-provenance.schema.json](schema/ma
 - the exact upstream benchmark and policy revisions;
 - task, evaluation, source manifests and resolved configuration hashes;
 - explicit data-source revisions, license declarations and rights-status declarations;
+- a local snapshot artifact and SHA-256 for each declared data source, tied to the artifact list;
 - core episode/summary artifacts by relative path, SHA-256 and byte count;
 - oracle setup/proposal/retry request counts, cache hits, external-call counts, failures and declared cost units.
 
