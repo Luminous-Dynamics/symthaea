@@ -625,6 +625,8 @@ pub(crate) struct DecodedSample {
     pub(crate) source_library: String,
     /// Source-root-relative path: excludes absolute machine-specific roots.
     pub(crate) source_relative_path: String,
+    /// SHA-256 over the exact source WAV file bytes, not decoded PCM.
+    pub(crate) source_file_sha256: String,
     pub(crate) source_dynamic: f32,
 }
 
@@ -797,12 +799,14 @@ impl InstrumentBank {
             self.source_relative_directory.trim_end_matches('/'),
             source_filename
         );
+        let source_file_sha256 = sha256_file(&meta.path).ok()?;
         let decoded = Arc::new(DecodedSample {
             frames: mono,
             sample_rate: spec.sample_rate,
             midi: meta.midi,
             source_library: self.source_library.clone(),
             source_relative_path,
+            source_file_sha256,
             source_dynamic: meta.dynamic,
         });
         self.cache.lock().ok()?.insert(idx, decoded.clone());
@@ -3604,6 +3608,11 @@ mod tests {
         assert_eq!(sample.midi, 60);
         assert_eq!(sample.sample_rate, 22_050);
         assert_eq!(sample.source_dynamic, 1.0);
+        assert_eq!(
+            sample.source_file_sha256,
+            sha256_file(&sample_path).unwrap(),
+            "selected-sample digest binds exact source WAV bytes"
+        );
         std::fs::remove_dir_all(root).unwrap();
     }
 

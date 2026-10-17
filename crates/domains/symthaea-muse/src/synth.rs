@@ -171,6 +171,8 @@ pub struct SelectedSampleEvidence {
     pub source_library: String,
     /// Exact source-root-relative WAV path; no absolute machine-local root.
     pub source_relative_path: String,
+    /// SHA-256 over the exact source WAV file bytes, not decoded PCM.
+    pub source_file_sha256: String,
     pub source_root_midi: u8,
     pub source_sample_rate_hz: u32,
     /// Normalized dynamic layer inferred from the indexed source filename.
@@ -1352,6 +1354,7 @@ fn render_vcsl_note_with_evidence(
     Some(SelectedSampleEvidence {
         source_library: sample.source_library.clone(),
         source_relative_path: sample.source_relative_path.clone(),
+        source_file_sha256: sample.source_file_sha256.clone(),
         source_root_midi: sample.midi,
         source_sample_rate_hz: sample.sample_rate,
         source_dynamic: sample.source_dynamic,
