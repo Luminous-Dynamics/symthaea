@@ -480,6 +480,8 @@ pub enum PlantStepTimingErrorV1 {
     TimingAuthorityUnspecified,
     /// The bridge requires its own physical/device clock, not configured simulation dt.
     ConfiguredSimulationStepNotAuthorized,
+    /// Event-driven environments must use the event timing contract, never plant dt.
+    EventDrivenStepCannotUsePlantTiming,
     /// The bridge claims backend-owned timing but has not implemented that step method.
     BackendMeasuredTimingUnsupported,
     /// The backend timing evidence belongs to a different requested step.
@@ -916,6 +918,9 @@ pub trait EmbodimentBridge: Send + Sync {
                     return Err(PlantStepTimingErrorV1::MeasuredTimingRequiresExplicitBridge);
                 }
                 Ok(self.step(thought_hv, timing.dt_seconds, phi))
+            }
+            PlantStepAuthorityV1::EventDrivenExternal => {
+                Err(PlantStepTimingErrorV1::EventDrivenStepCannotUsePlantTiming)
             }
         }
     }
