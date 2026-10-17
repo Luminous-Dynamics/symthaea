@@ -1565,6 +1565,36 @@ mod tests {
     }
 
     #[test]
+    fn test_energy_rate_uses_actual_elapsed_time_for_irregular_cycle_cadence() {
+        let mut config = default_config();
+        config.enable_energy_budget = true;
+        config.energy_budget_joules_per_sec = Some(f64::MAX);
+
+        let mut mgr = SubstrateManager::new(&config);
+        mgr.tau_factor = 2.0;
+        let energy_per_cycle = mgr.energy_per_cycle;
+        let start = std::time::Instant::now();
+
+        mgr.tick_energy_at(&config, start);
+        mgr.tick_energy_at(&config, start + std::time::Duration::from_millis(250));
+        mgr.tick_energy_at(&config, start + std::time::Duration::from_millis(1_500));
+
+        let expected_watts = (2.0 * energy_per_cycle) / 1.5;
+        assert!(
+            (mgr.estimated_energy_rate_watts - expected_watts).abs() <= expected_watts.abs() * 1e-12,
+            "expected modeled rate {expected_watts:e} W over 1.5 s, got {:e} W",
+            mgr.estimated_energy_rate_watts
+        );
+        assert_eq!(mgr.energy_rate_window_seconds, 1.5);
+        assert_eq!(mgr.total_energy_spent, 3.0 * energy_per_cycle);
+        assert_eq!(
+            mgr.energy_rate_window_joules, energy_per_cycle,
+            "the cycle at the closing timestamp belongs to the next window"
+        );
+        assert!(mgr.consciousness_viable);
+    }
+
+    #[test]
     fn test_reversed_monotonic_energy_window_fails_closed() {
         let mut config = default_config();
         config.enable_energy_budget = true;
