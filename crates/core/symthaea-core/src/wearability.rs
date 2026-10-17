@@ -14,7 +14,7 @@ use serde::{Deserialize, Serialize};
 /// Current schema version for wearability input requests.
 pub const WEARABILITY_SCHEMA_VERSION: u16 = 1;
 /// Current schema version for decision receipts, independently versioned from inputs.
-pub const WEARABILITY_DECISION_SCHEMA_VERSION: u16 = 2;
+pub const WEARABILITY_DECISION_SCHEMA_VERSION: u16 = 3;
 
 fn default_schema_version() -> u16 {
     WEARABILITY_SCHEMA_VERSION
@@ -264,6 +264,135 @@ pub enum HygieneCompatibilityV1 {
     Unknown,
 }
 
+/// Input field whose declared source is recorded in an evidence-provenance receipt.
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Hash, Serialize, Deserialize)]
+#[serde(rename_all = "snake_case")]
+pub enum WearabilityEvidenceFieldV1 {
+    /// Required-fastening state.
+    FasteningEvidence,
+    /// Device/wearer profile match.
+    ProfileMatch,
+    /// Fit evidence status.
+    FitEvidence,
+    /// Relevant sensor consistency state.
+    SensorConsistency,
+    /// Pressure measurement channel status.
+    PressureSensor,
+    /// Shear measurement channel status.
+    ShearSensor,
+    /// User comfort report state.
+    UserComfortReport,
+    /// Task/profile suitability.
+    TaskCompatibility,
+    /// Movement-space clearance.
+    MovementClearance,
+    /// Wearer-reported thermal comfort.
+    ThermalComfort,
+    /// Declared profile duty-cycle state.
+    DutyCycle,
+    /// Task hygiene compatibility.
+    HygieneCompatibility,
+    /// Required support profile for donning.
+    WorkflowSupportRequirement,
+    /// Caregiver availability.
+    CaregiverAvailable,
+    /// User-requested disengagement.
+    UserRequestedDoff,
+    /// Pending motion-request state.
+    ActiveMotionRequest,
+    /// Prior session mode.
+    PriorSessionMode,
+    /// Current session mode.
+    CurrentSessionMode,
+    /// Configuration lineage.
+    ConfigurationLineage,
+    /// Task-energy estimate availability.
+    TaskEnergyEstimate,
+    /// Predicted reserve after task.
+    PredictedReserveAfterTask,
+    /// Declared energy-estimate confidence.
+    EstimateConfidence,
+    /// Whether a module changed during service.
+    ModuleChanged,
+    /// Calibration lineage after service.
+    CalibrationLineageAfterService,
+    /// Service diagnostic result.
+    DiagnosticResult,
+    /// Donning workflow timeout.
+    WorkflowTimeout,
+    /// Completion of the required critical step.
+    CriticalStepCompleted,
+    /// Interface migration sensor state.
+    InterfaceMigrationSensor,
+    /// Interface migration measurement value.
+    MeasuredMigrationValue,
+}
+
+/// Declared origin class for evidence metadata. The evaluator cannot authenticate it.
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, Deserialize)]
+#[serde(rename_all = "snake_case")]
+pub enum WearabilityEvidenceOriginV1 {
+    /// Caller-provided assertion or synthetic fixture value.
+    CallerAssertion,
+    /// Sensor observation, which needs a timestamp/timebase and calibration reference.
+    SensorObservation,
+    /// Independently acquired measurement, with a timestamp/timebase.
+    IndependentMeasurement,
+    /// Operator-entered annotation.
+    OperatorAnnotation,
+}
+
+/// Provenance metadata associated with one input field.
+///
+/// Identifiers and timestamps improve traceability but do not authenticate a
+/// sensor, establish calibration validity, or prove that a physical event occurred.
+#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
+#[serde(deny_unknown_fields)]
+pub struct WearabilityEvidenceProvenanceV1 {
+    /// Field in the input whose value this record describes.
+    pub field: WearabilityEvidenceFieldV1,
+    /// Declared origin class.
+    pub origin: WearabilityEvidenceOriginV1,
+    /// Non-empty identifier for the source record or declared assertion.
+    pub evidence_id: Option<String>,
+    /// Timestamp ticks in the declared timebase, if provided.
+    pub observed_at_ticks: Option<u64>,
+    /// Clock/timebase identifier, required for timed sensor/independent observations.
+    pub timebase_id: Option<String>,
+    /// Calibration/configuration reference, required for sensor observations.
+    pub calibration_reference: Option<String>,
+}
+
+/// Completeness of declared provenance for the fields present in an input.
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, Deserialize)]
+#[serde(rename_all = "snake_case")]
+pub enum WearabilityProvenanceStatusV1 {
+    /// Every present input field has one structurally valid provenance record.
+    CompleteForPresentInputs,
+    /// One or more present input fields have no provenance record.
+    MissingForPresentInputs,
+    /// Provenance is duplicated or structurally invalid.
+    Invalid,
+}
+
+/// Machine-readable reason that provenance is incomplete or malformed.
+#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
+#[serde(rename_all = "snake_case")]
+pub enum WearabilityProvenanceFindingV1 {
+    /// A present input field has no corresponding provenance record.
+    MissingProvenance { field: WearabilityEvidenceFieldV1 },
+    /// More than one provenance record describes the same field in schema v1.
+    DuplicateProvenance { field: WearabilityEvidenceFieldV1 },
+    /// Evidence ID is missing, empty, or has surrounding whitespace.
+    InvalidEvidenceId { field: WearabilityEvidenceFieldV1 },
+    /// Sensor/independent evidence has no observation timestamp.
+    ObservationTimestampMissing { field: WearabilityEvidenceFieldV1 },
+    /// Sensor/independent evidence has no clock/timebase identifier.
+    TimebaseMissing { field: WearabilityEvidenceFieldV1 },
+    /// Sensor evidence has no declared calibration/configuration reference.
+    SensorCalibrationReferenceMissing { field: WearabilityEvidenceFieldV1 },
+}
+
 /// Versioned input assertions used by the deterministic wearability evaluator.
 ///
 /// All fields are optional because different lifecycle stages require different
@@ -275,6 +404,8 @@ pub struct WearabilityInputV1 {
     /// Input schema version; defaults to version 1 for fixture compatibility.
     #[serde(default = "default_schema_version")]
     pub schema_version: u16,
+    /// Declared source metadata for populated input fields. Empty means provenance missing.
+    pub evidence_provenance: Vec<WearabilityEvidenceProvenanceV1>,
     /// Required-fastening evidence for fit/start checks.
     pub fastening_evidence: Option<FasteningEvidenceV1>,
     /// Wearer/device profile compatibility evidence.
@@ -340,6 +471,7 @@ impl Default for WearabilityInputV1 {
     fn default() -> Self {
         Self {
             schema_version: WEARABILITY_SCHEMA_VERSION,
+            evidence_provenance: Vec::new(),
             fastening_evidence: None,
             profile_match: None,
             fit_evidence: None,
@@ -498,8 +630,14 @@ pub struct WearabilityDecisionV1 {
     pub stage: WearabilityStageV1,
     /// Report-only disposition.
     pub disposition: WearabilityDispositionV1,
-    /// Ordered machine-readable reasons, using a stable evaluator-defined order.
+    /// Ordered machine-readable policy reasons, using a stable evaluator-defined order.
     pub findings: Vec<WearabilityFindingV1>,
+    /// Declared provenance copied into the decision receipt for audit/replay.
+    pub evidence_provenance: Vec<WearabilityEvidenceProvenanceV1>,
+    /// Provenance completeness for the populated input fields; not proof of truth.
+    pub provenance_status: WearabilityProvenanceStatusV1,
+    /// Stable, ordered reasons for missing or malformed provenance.
+    pub provenance_findings: Vec<WearabilityProvenanceFindingV1>,
 }
 
 /// Evaluate one lifecycle scenario using stable, explicit priority rules.
@@ -533,6 +671,7 @@ pub fn evaluate_wearability_request(
     };
 
     let findings = collect_wearability_findings(profile_id, stage, input, disposition);
+    let (provenance_status, provenance_findings) = validate_wearability_provenance(input);
 
     WearabilityDecisionV1 {
         schema_version: WEARABILITY_DECISION_SCHEMA_VERSION,
@@ -540,7 +679,99 @@ pub fn evaluate_wearability_request(
         stage,
         disposition,
         findings,
+        evidence_provenance: input.evidence_provenance.clone(),
+        provenance_status,
+        provenance_findings,
     }
+}
+
+fn validate_wearability_provenance(
+    input: &WearabilityInputV1,
+) -> (WearabilityProvenanceStatusV1, Vec<WearabilityProvenanceFindingV1>) {
+    use WearabilityEvidenceFieldV1 as Field;
+    use WearabilityEvidenceOriginV1 as Origin;
+    use WearabilityProvenanceFindingV1 as Finding;
+    use WearabilityProvenanceStatusV1 as Status;
+
+    let mut present_fields = Vec::new();
+    macro_rules! present {
+        ($field:ident) => {
+            if input.$field.is_some() {
+                present_fields.push(Field::$field);
+            }
+        };
+    }
+    present!(fastening_evidence);
+    present!(profile_match);
+    present!(fit_evidence);
+    present!(sensor_consistency);
+    present!(pressure_sensor);
+    present!(shear_sensor);
+    present!(user_comfort_report);
+    present!(task_compatibility);
+    present!(movement_clearance);
+    present!(thermal_comfort);
+    present!(duty_cycle);
+    present!(hygiene_compatibility);
+    present!(workflow_support_requirement);
+    present!(caregiver_available);
+    present!(user_requested_doff);
+    present!(active_motion_request);
+    present!(prior_session_mode);
+    present!(current_session_mode);
+    present!(configuration_lineage);
+    present!(task_energy_estimate);
+    present!(predicted_reserve_after_task);
+    present!(estimate_confidence);
+    present!(module_changed);
+    present!(calibration_lineage_after_service);
+    present!(diagnostic_result);
+    present!(workflow_timeout);
+    present!(critical_step_completed);
+    present!(interface_migration_sensor);
+    present!(measured_migration_value);
+
+    let mut findings = Vec::new();
+    for field in present_fields.iter().copied() {
+        if !input.evidence_provenance.iter().any(|entry| entry.field == field) {
+            findings.push(Finding::MissingProvenance { field });
+        }
+    }
+
+    let mut seen = HashSet::new();
+    for entry in &input.evidence_provenance {
+        if !seen.insert(entry.field) {
+            findings.push(Finding::DuplicateProvenance { field: entry.field });
+        }
+        if entry.evidence_id.as_deref().is_none_or(|id| id.trim().is_empty() || id.trim() != id) {
+            findings.push(Finding::InvalidEvidenceId { field: entry.field });
+        }
+        if matches!(entry.origin, Origin::SensorObservation | Origin::IndependentMeasurement)
+            && entry.observed_at_ticks.is_none()
+        {
+            findings.push(Finding::ObservationTimestampMissing { field: entry.field });
+        }
+        if matches!(entry.origin, Origin::SensorObservation | Origin::IndependentMeasurement)
+            && entry.timebase_id.as_deref().is_none_or(|id| id.trim().is_empty() || id.trim() != id)
+        {
+            findings.push(Finding::TimebaseMissing { field: entry.field });
+        }
+        if entry.origin == Origin::SensorObservation
+            && entry.calibration_reference.as_deref().is_none_or(|id| id.trim().is_empty() || id.trim() != id)
+        {
+            findings.push(Finding::SensorCalibrationReferenceMissing { field: entry.field });
+        }
+    }
+
+    let invalid = findings.iter().any(|finding| !matches!(finding, Finding::MissingProvenance { .. }));
+    let status = if invalid {
+        Status::Invalid
+    } else if !findings.is_empty() {
+        Status::MissingForPresentInputs
+    } else {
+        Status::CompleteForPresentInputs
+    };
+    (status, findings)
 }
 
 fn collect_wearability_findings(
