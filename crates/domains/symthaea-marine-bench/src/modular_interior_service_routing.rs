@@ -551,6 +551,57 @@ fn rect_for_anchor_owner_from_anchor(anchor: &RoutingAnchor) -> Option<String> {
         .then(|| format!("module:{}", anchor.instance_id.as_deref().unwrap_or_default()))
 }
 
+fn segment_intersects_obstacle(
+    rect: &Rect,
+    a: &GridPoint,
+    b: &GridPoint,
+    clearance_mm: i64,
+) -> bool {
+    let xmin = i128::from(rect.x_min) - i128::from(clearance_mm);
+    let xmax = i128::from(rect.x_max) + i128::from(clearance_mm);
+    let ymin = i128::from(rect.y_min) - i128::from(clearance_mm);
+    let ymax = i128::from(rect.y_max) + i128::from(clearance_mm);
+    let ax = i128::from(a.x_mm);
+    let ay = i128::from(a.y_mm);
+    let bx = i128::from(b.x_mm);
+    let by = i128::from(b.y_mm);
+    if ay == by {
+        ay >= ymin && ay < ymax && ax.max(bx) > xmin && ax.min(bx) < xmax
+    } else if ax == bx {
+        ax >= xmin && ax < xmax && ay.max(by) > ymin && ay.min(by) < ymax
+    } else {
+        // Routed and approach segments are required to be orthogonal.
+        true
+    }
+}
+
+fn segment_blocked_by_foreign_obstacle(
+    obstacles: &[Obstacle],
+    anchor: &RoutingAnchor,
+    a: &GridPoint,
+    b: &GridPoint,
+    clearance_mm: i64,
+) -> bool {
+    let own = rect_for_anchor_owner_from_anchor(anchor).unwrap_or_default();
+    obstacles.iter().any(|obstacle| {
+        obstacle.owner != own && segment_intersects_obstacle(&obstacle.rect, a, b, clearance_mm)
+    })
+}
+
+fn edge_blocked(
+    grid: &Grid,
+    obstacles: &[Obstacle],
+    clearance_mm: i64,
+    from: usize,
+    to: usize,
+) -> bool {
+    let Ok(a) = cell_to_point(grid, from) else { return true; };
+    let Ok(b) = cell_to_point(grid, to) else { return true; };
+    obstacles.iter().any(|obstacle| {
+        segment_intersects_obstacle(&obstacle.rect, &a, &b, clearance_mm)
+    })
+}
+
 fn anchor_approach_points(
     anchor: &RoutingAnchor,
     clearance_mm: i64,
@@ -660,16 +711,21 @@ fn grid_for_route(
         }))
     };
     let mut endpoint_blocked = false;
-    for point in &start_points {
-        // The port's own module is the only obstacle permitted inside its outward
-        // approach clearance. A different module or reserved area blocks the approach.
-        if point_is_blocked(&request.start, point)? {
-            endpoint_blocked = true;
+    for points in [(&request.start, &start_points), (&request.end, &end_points)] {
+        let (anchor, route_points) = points;
+        for point in route_points {
+            // The port's own module is the only obstacle permitted inside its outward
+            // approach clearance. A different module or reserved area blocks the approach.
+            if point_is_blocked(anchor, point)? {
+                endpoint_blocked = true;
+            }
         }
-    }
-    for point in &end_points {
-        if point_is_blocked(&request.end, point)? {
-            endpoint_blocked = true;
+        for segment in route_points.windows(2) {
+            if segment_blocked_by_foreign_obstacle(
+                &obstacles, anchor, &segment[0], &segment[1], request.clearance_mm,
+            ) {
+                endpoint_blocked = true;
+            }
         }
     }
 
@@ -788,6 +844,7 @@ fn search_grid(
     max_expanded: usize,
     initial_direction: u8,
     terminal_direction: u8,
+    obstacles: &[Obstacle],
 ) -> PathOutcome {
     if grid.blocked[start] || grid.blocked[goal] {
         return PathOutcome { disposition: RouteDisposition::EndpointBlocked, cells: Vec::new(), length_mm: None, bend_count: None, search_cost_mm: None, expanded_states: 0 };
@@ -838,7 +895,11 @@ fn search_grid(
         expanded += 1;
         for (next_cell, next_dir) in neighbor_cells(grid, cell) {
             let Some(next_cell) = next_cell else { continue; };
-            if grid.blocked[next_cell] { continue; }
+            if grid.blocked[next_cell]
+                || edge_blocked(grid, obstacles, request.clearance_mm, cell, next_cell)
+            {
+                continue;
+            }
             let move_cost = grid.pitch_mm.saturating_add(
                 if direction != 0 && direction != next_dir { request.bend_penalty_mm } else { 0 }
             );
@@ -899,12 +960,12 @@ pub fn route_services(
     let mut route_cells = BTreeMap::<String, BTreeSet<(String, usize)>>::new();
 
     for request in &requests {
-        let (grid, start_escape, end_escape, start_approach, end_approach, _obstacles, endpoint_blocked) =
+        let (grid, start_escape, end_escape, start_approach, end_approach, obstacles, endpoint_blocked) =
             grid_for_route(configuration, request, &limits)?;
         let mut path_outcome = if endpoint_blocked {
             PathOutcome { disposition: RouteDisposition::EndpointBlocked, cells: Vec::new(), length_mm: None, bend_count: None, search_cost_mm: None, expanded_states: 0 }
         } else {
-            search_grid(&grid, start_escape, end_escape, request, limits.max_expanded_states, anchor_axis(&request.start), anchor_axis(&request.end))
+            search_grid(&grid, start_escape, end_escape, request, limits.max_expanded_states, anchor_axis(&request.start), anchor_axis(&request.end), &obstacles)
         };
         let mut complete_cells = Vec::new();
         if path_outcome.disposition == RouteDisposition::Routed {
