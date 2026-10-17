@@ -10,9 +10,12 @@
 //! measured and traced by a separate validated system.
 
 use serde::{Deserialize, Serialize};
+use std::collections::HashSet;
 
-/// Current schema version for wearability inputs and decisions.
+/// Current schema version for wearability input requests.
 pub const WEARABILITY_SCHEMA_VERSION: u16 = 1;
+/// Current schema version for decision receipts, independently versioned from inputs.
+pub const WEARABILITY_DECISION_SCHEMA_VERSION: u16 = 3;
 
 fn default_schema_version() -> u16 {
     WEARABILITY_SCHEMA_VERSION
@@ -262,6 +265,137 @@ pub enum HygieneCompatibilityV1 {
     Unknown,
 }
 
+/// Input field whose declared source is recorded in an evidence-provenance receipt.
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Hash, Serialize, Deserialize)]
+#[serde(rename_all = "snake_case")]
+pub enum WearabilityEvidenceFieldV1 {
+    /// Required-fastening state.
+    FasteningEvidence,
+    /// Device/wearer profile match.
+    ProfileMatch,
+    /// Fit evidence status.
+    FitEvidence,
+    /// Relevant sensor consistency state.
+    SensorConsistency,
+    /// Pressure measurement channel status.
+    PressureSensor,
+    /// Shear measurement channel status.
+    ShearSensor,
+    /// User comfort report state.
+    UserComfortReport,
+    /// Task/profile suitability.
+    TaskCompatibility,
+    /// Movement-space clearance.
+    MovementClearance,
+    /// Wearer-reported thermal comfort.
+    ThermalComfort,
+    /// Declared profile duty-cycle state.
+    DutyCycle,
+    /// Task hygiene compatibility.
+    HygieneCompatibility,
+    /// Required support profile for donning.
+    WorkflowSupportRequirement,
+    /// Caregiver availability.
+    CaregiverAvailable,
+    /// Whether the wearer requested accessible assistance options.
+    UserRequestedHelp,
+    /// User-requested disengagement.
+    UserRequestedDoff,
+    /// Pending motion-request state.
+    ActiveMotionRequest,
+    /// Prior session mode.
+    PriorSessionMode,
+    /// Current session mode.
+    CurrentSessionMode,
+    /// Configuration lineage.
+    ConfigurationLineage,
+    /// Task-energy estimate availability.
+    TaskEnergyEstimate,
+    /// Predicted reserve after task.
+    PredictedReserveAfterTask,
+    /// Declared energy-estimate confidence.
+    EstimateConfidence,
+    /// Whether a module changed during service.
+    ModuleChanged,
+    /// Calibration lineage after service.
+    CalibrationLineageAfterService,
+    /// Service diagnostic result.
+    DiagnosticResult,
+    /// Donning workflow timeout.
+    WorkflowTimeout,
+    /// Completion of the required critical step.
+    CriticalStepCompleted,
+    /// Interface migration sensor state.
+    InterfaceMigrationSensor,
+    /// Interface migration measurement value.
+    MeasuredMigrationValue,
+}
+
+/// Declared origin class for evidence metadata. The evaluator cannot authenticate it.
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, Deserialize)]
+#[serde(rename_all = "snake_case")]
+pub enum WearabilityEvidenceOriginV1 {
+    /// Caller-provided assertion or synthetic fixture value.
+    CallerAssertion,
+    /// Sensor observation, which needs a timestamp/timebase and calibration reference.
+    SensorObservation,
+    /// Independently acquired measurement, with a timestamp/timebase.
+    IndependentMeasurement,
+    /// Operator-entered annotation.
+    OperatorAnnotation,
+}
+
+/// Provenance metadata associated with one input field.
+///
+/// Identifiers and timestamps improve traceability but do not authenticate a
+/// sensor, establish calibration validity, or prove that a physical event occurred.
+#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
+#[serde(deny_unknown_fields)]
+pub struct WearabilityEvidenceProvenanceV1 {
+    /// Field in the input whose value this record describes.
+    pub field: WearabilityEvidenceFieldV1,
+    /// Declared origin class.
+    pub origin: WearabilityEvidenceOriginV1,
+    /// Non-empty identifier for the source record or declared assertion.
+    pub evidence_id: Option<String>,
+    /// Timestamp ticks in the declared timebase, if provided.
+    pub observed_at_ticks: Option<u64>,
+    /// Clock/timebase identifier, required for timed sensor/independent observations.
+    pub timebase_id: Option<String>,
+    /// Calibration/configuration reference, required for sensor observations.
+    pub calibration_reference: Option<String>,
+}
+
+/// Completeness of declared provenance for the fields present in an input.
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, Deserialize)]
+#[serde(rename_all = "snake_case")]
+pub enum WearabilityProvenanceStatusV1 {
+    /// Every present input field has one structurally valid provenance record.
+    CompleteForPresentInputs,
+    /// One or more present input fields have no provenance record.
+    MissingForPresentInputs,
+    /// Provenance is duplicated or structurally invalid.
+    Invalid,
+}
+
+/// Machine-readable reason that provenance is incomplete or malformed.
+#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
+#[serde(rename_all = "snake_case")]
+pub enum WearabilityProvenanceFindingV1 {
+    /// A present input field has no corresponding provenance record.
+    MissingProvenance { field: WearabilityEvidenceFieldV1 },
+    /// More than one provenance record describes the same field in schema v1.
+    DuplicateProvenance { field: WearabilityEvidenceFieldV1 },
+    /// Evidence ID is missing, empty, or has surrounding whitespace.
+    InvalidEvidenceId { field: WearabilityEvidenceFieldV1 },
+    /// Sensor/independent evidence has no observation timestamp.
+    ObservationTimestampMissing { field: WearabilityEvidenceFieldV1 },
+    /// Sensor/independent evidence has no clock/timebase identifier.
+    TimebaseMissing { field: WearabilityEvidenceFieldV1 },
+    /// Sensor evidence has no declared calibration/configuration reference.
+    SensorCalibrationReferenceMissing { field: WearabilityEvidenceFieldV1 },
+}
+
 /// Versioned input assertions used by the deterministic wearability evaluator.
 ///
 /// All fields are optional because different lifecycle stages require different
@@ -273,6 +407,8 @@ pub struct WearabilityInputV1 {
     /// Input schema version; defaults to version 1 for fixture compatibility.
     #[serde(default = "default_schema_version")]
     pub schema_version: u16,
+    /// Declared source metadata for populated input fields. Empty means provenance missing.
+    pub evidence_provenance: Vec<WearabilityEvidenceProvenanceV1>,
     /// Required-fastening evidence for fit/start checks.
     pub fastening_evidence: Option<FasteningEvidenceV1>,
     /// Wearer/device profile compatibility evidence.
@@ -301,6 +437,8 @@ pub struct WearabilityInputV1 {
     pub workflow_support_requirement: Option<WorkflowSupportV1>,
     /// Whether the required caregiver is available.
     pub caregiver_available: Option<bool>,
+    /// Whether the wearer requested accessible help/options.
+    pub user_requested_help: Option<bool>,
     /// Explicit user request to remove/disengage.
     pub user_requested_doff: Option<bool>,
     /// Whether a motion request is currently pending.
@@ -338,6 +476,7 @@ impl Default for WearabilityInputV1 {
     fn default() -> Self {
         Self {
             schema_version: WEARABILITY_SCHEMA_VERSION,
+            evidence_provenance: Vec::new(),
             fastening_evidence: None,
             profile_match: None,
             fit_evidence: None,
@@ -352,6 +491,7 @@ impl Default for WearabilityInputV1 {
             hygiene_compatibility: None,
             workflow_support_requirement: None,
             caregiver_available: None,
+            user_requested_help: None,
             user_requested_doff: None,
             active_motion_request: None,
             prior_session_mode: None,
@@ -408,6 +548,84 @@ pub enum WearabilityDispositionV1 {
     InvalidInput,
 }
 
+/// Stable machine-readable reasons retained in a wearability decision receipt.
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, Deserialize)]
+#[serde(rename_all = "snake_case")]
+pub enum WearabilityFindingV1 {
+    /// Profile identifier is empty or contains surrounding whitespace.
+    InvalidProfileId,
+    /// Input schema version is unsupported.
+    UnsupportedSchemaVersion,
+    /// User explicitly requested disengagement/doff.
+    UserRequestedDoff,
+    /// Workflow requires a doff stage; that stage outranks ordinary motion planning.
+    DoffStageHasPriority,
+    /// A required fastening is explicitly incomplete.
+    RequiredFasteningIncomplete,
+    /// Required fastening evidence is missing or unknown.
+    RequiredFasteningEvidenceMissing,
+    /// Wearer/device profile was identified as incompatible.
+    ProfileMismatch,
+    /// Profile compatibility evidence is missing or unknown.
+    ProfileCompatibilityUnknown,
+    /// Fit evidence is stale.
+    FitEvidenceStale,
+    /// Fit evidence is missing, invalid, conflicted, or unavailable.
+    FitEvidenceNotCurrentOrUncertain,
+    /// Relevant sensors are unavailable or contradictory.
+    SensorEvidenceUncertain,
+    /// Required caregiver is unavailable for this workflow.
+    CaregiverUnavailable,
+    /// Wearer explicitly requested accessible assistance options.
+    UserRequestedHelp,
+    /// Donning timed out before the critical workflow step completed.
+    DonningTimedOutBeforeCriticalStep,
+    /// A critical donning step is incomplete.
+    CriticalDonningStepIncomplete,
+    /// Restart/configuration lineage requires explicit mode selection.
+    ExplicitModeSelectionRequired,
+    /// Energy reserve is below the profile-specific minimum.
+    EnergyReserveBelowProfileMinimum,
+    /// Energy estimate, reserve evidence, or confidence is unavailable/insufficient.
+    EnergyEstimateUncertain,
+    /// A module changed but calibration lineage is missing or invalid.
+    CalibrationLineageNotVerified,
+    /// Post-service diagnostic checks were not passed.
+    PostServiceDiagnosticsNotPassed,
+    /// Interface migration sensor reports conflict.
+    MigrationSensorConflicted,
+    /// Interface migration evidence is unavailable.
+    MigrationMeasurementUnavailable,
+    /// Interface migration value is non-finite.
+    MigrationMeasurementInvalid,
+    /// Task is outside the selected profile's scope.
+    TaskOutsideProfile,
+    /// Environment clearance conflicts with the profile.
+    MovementClearanceRestricted,
+    /// Task/environment compatibility is unknown.
+    TaskCompatibilityUnknown,
+    /// Wearer reported thermal discomfort.
+    ThermalDiscomfortReported,
+    /// Thermal comfort has not been assessed.
+    ThermalComfortUnknown,
+    /// Declared profile duty-cycle limit has been reached.
+    DutyCycleLimitReached,
+    /// Duty-cycle state or limit is unknown.
+    DutyCycleUnknown,
+    /// Task hygiene requirements conflict with the device/workflow.
+    HygieneWorkflowIncompatible,
+    /// Hygiene compatibility is unknown.
+    HygieneCompatibilityUnknown,
+    /// A simulated workflow is admitted under the declared fit/fastening evidence.
+    FitCheckAdmittedForSimulation,
+    /// Lifecycle task is admitted under current declared evidence.
+    TaskAdmittedForSimulation,
+    /// Declared module service is eligible for a separate review.
+    ServiceEligibleForReviewOnly,
+    /// The evaluator could not establish the evidence needed to decide.
+    RequiredEvidenceUnknown,
+}
+
 /// Deterministic decision receipt. This output is not a command or safety claim.
 #[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
 #[serde(deny_unknown_fields)]
@@ -420,6 +638,14 @@ pub struct WearabilityDecisionV1 {
     pub stage: WearabilityStageV1,
     /// Report-only disposition.
     pub disposition: WearabilityDispositionV1,
+    /// Ordered machine-readable policy reasons, using a stable evaluator-defined order.
+    pub findings: Vec<WearabilityFindingV1>,
+    /// Declared provenance copied into the decision receipt for audit/replay.
+    pub evidence_provenance: Vec<WearabilityEvidenceProvenanceV1>,
+    /// Provenance completeness for the populated input fields; not proof of truth.
+    pub provenance_status: WearabilityProvenanceStatusV1,
+    /// Stable, ordered reasons for missing or malformed provenance.
+    pub provenance_findings: Vec<WearabilityProvenanceFindingV1>,
 }
 
 /// Evaluate one lifecycle scenario using stable, explicit priority rules.
@@ -432,13 +658,14 @@ pub fn evaluate_wearability_request(
     stage: WearabilityStageV1,
     input: &WearabilityInputV1,
 ) -> WearabilityDecisionV1 {
-    let disposition = if profile_id.trim().is_empty()
+    let disposition = if input.user_requested_doff == Some(true) {
+        // Explicit disengagement intent remains visible even if other metadata is invalid.
+        WearabilityDispositionV1::DoffRequestPreemptsNewMotion
+    } else if profile_id.trim().is_empty()
         || profile_id.trim() != profile_id
         || input.schema_version != WEARABILITY_SCHEMA_VERSION
     {
         WearabilityDispositionV1::InvalidInput
-    } else if input.user_requested_doff == Some(true) {
-        WearabilityDispositionV1::DoffRequestPreemptsNewMotion
     } else {
         match stage {
             WearabilityStageV1::FitCheck => evaluate_fit_check(input),
@@ -451,12 +678,270 @@ pub fn evaluate_wearability_request(
         }
     };
 
+    let findings = collect_wearability_findings(profile_id, stage, input, disposition);
+    let (provenance_status, provenance_findings) = validate_wearability_provenance(input);
+
     WearabilityDecisionV1 {
-        schema_version: WEARABILITY_SCHEMA_VERSION,
+        schema_version: WEARABILITY_DECISION_SCHEMA_VERSION,
         profile_id: profile_id.to_owned(),
         stage,
         disposition,
+        findings,
+        evidence_provenance: input.evidence_provenance.clone(),
+        provenance_status,
+        provenance_findings,
     }
+}
+
+fn validate_wearability_provenance(
+    input: &WearabilityInputV1,
+) -> (WearabilityProvenanceStatusV1, Vec<WearabilityProvenanceFindingV1>) {
+    use WearabilityEvidenceFieldV1 as Field;
+    use WearabilityEvidenceOriginV1 as Origin;
+    use WearabilityProvenanceFindingV1 as Finding;
+    use WearabilityProvenanceStatusV1 as Status;
+
+    let mut present_fields = Vec::new();
+    macro_rules! present {
+        ($field:ident, $variant:ident) => {
+            if input.$field.is_some() {
+                present_fields.push(Field::$variant);
+            }
+        };
+    }
+    present!(fastening_evidence, FasteningEvidence);
+    present!(profile_match, ProfileMatch);
+    present!(fit_evidence, FitEvidence);
+    present!(sensor_consistency, SensorConsistency);
+    present!(pressure_sensor, PressureSensor);
+    present!(shear_sensor, ShearSensor);
+    present!(user_comfort_report, UserComfortReport);
+    present!(task_compatibility, TaskCompatibility);
+    present!(movement_clearance, MovementClearance);
+    present!(thermal_comfort, ThermalComfort);
+    present!(duty_cycle, DutyCycle);
+    present!(hygiene_compatibility, HygieneCompatibility);
+    present!(workflow_support_requirement, WorkflowSupportRequirement);
+    present!(caregiver_available, CaregiverAvailable);
+    present!(user_requested_help, UserRequestedHelp);
+    present!(user_requested_doff, UserRequestedDoff);
+    present!(active_motion_request, ActiveMotionRequest);
+    present!(prior_session_mode, PriorSessionMode);
+    present!(current_session_mode, CurrentSessionMode);
+    present!(configuration_lineage, ConfigurationLineage);
+    present!(task_energy_estimate, TaskEnergyEstimate);
+    present!(predicted_reserve_after_task, PredictedReserveAfterTask);
+    present!(estimate_confidence, EstimateConfidence);
+    present!(module_changed, ModuleChanged);
+    present!(calibration_lineage_after_service, CalibrationLineageAfterService);
+    present!(diagnostic_result, DiagnosticResult);
+    present!(workflow_timeout, WorkflowTimeout);
+    present!(critical_step_completed, CriticalStepCompleted);
+    present!(interface_migration_sensor, InterfaceMigrationSensor);
+    present!(measured_migration_value, MeasuredMigrationValue);
+
+    let mut findings = Vec::new();
+    for field in present_fields.iter().copied() {
+        if !input.evidence_provenance.iter().any(|entry| entry.field == field) {
+            findings.push(Finding::MissingProvenance { field });
+        }
+    }
+
+    let mut seen = HashSet::new();
+    for entry in &input.evidence_provenance {
+        if !seen.insert(entry.field) {
+            findings.push(Finding::DuplicateProvenance { field: entry.field });
+        }
+        if entry.evidence_id.as_deref().is_none_or(|id| id.trim().is_empty() || id.trim() != id) {
+            findings.push(Finding::InvalidEvidenceId { field: entry.field });
+        }
+        if matches!(entry.origin, Origin::SensorObservation | Origin::IndependentMeasurement)
+            && entry.observed_at_ticks.is_none()
+        {
+            findings.push(Finding::ObservationTimestampMissing { field: entry.field });
+        }
+        if matches!(entry.origin, Origin::SensorObservation | Origin::IndependentMeasurement)
+            && entry.timebase_id.as_deref().is_none_or(|id| id.trim().is_empty() || id.trim() != id)
+        {
+            findings.push(Finding::TimebaseMissing { field: entry.field });
+        }
+        if entry.origin == Origin::SensorObservation
+            && entry.calibration_reference.as_deref().is_none_or(|id| id.trim().is_empty() || id.trim() != id)
+        {
+            findings.push(Finding::SensorCalibrationReferenceMissing { field: entry.field });
+        }
+    }
+
+    let invalid = findings.iter().any(|finding| !matches!(finding, Finding::MissingProvenance { .. }));
+    let status = if invalid {
+        Status::Invalid
+    } else if !findings.is_empty() {
+        Status::MissingForPresentInputs
+    } else {
+        Status::CompleteForPresentInputs
+    };
+    (status, findings)
+}
+
+fn collect_wearability_findings(
+    profile_id: &str,
+    stage: WearabilityStageV1,
+    input: &WearabilityInputV1,
+    disposition: WearabilityDispositionV1,
+) -> Vec<WearabilityFindingV1> {
+    use WearabilityFindingV1 as F;
+    let mut findings = Vec::new();
+
+    // Finding order is deliberately fixed; do not sort by debug/string output.
+    if profile_id.trim().is_empty() || profile_id.trim() != profile_id {
+        findings.push(F::InvalidProfileId);
+    }
+    if input.schema_version != WEARABILITY_SCHEMA_VERSION {
+        findings.push(F::UnsupportedSchemaVersion);
+    }
+    if input.user_requested_doff == Some(true) {
+        findings.push(F::UserRequestedDoff);
+    }
+    if stage == WearabilityStageV1::Doff {
+        findings.push(F::DoffStageHasPriority);
+    }
+    if input.fastening_evidence == Some(FasteningEvidenceV1::Incomplete) {
+        findings.push(F::RequiredFasteningIncomplete);
+    } else if input.fastening_evidence.is_none()
+        && matches!(stage, WearabilityStageV1::FitCheck | WearabilityStageV1::Start)
+    {
+        findings.push(F::RequiredFasteningEvidenceMissing);
+    }
+    match input.profile_match {
+        Some(ProfileMatchV1::Mismatch) => findings.push(F::ProfileMismatch),
+        Some(ProfileMatchV1::Unknown) | None
+            if matches!(stage, WearabilityStageV1::FitCheck | WearabilityStageV1::Start) =>
+        {
+            findings.push(F::ProfileCompatibilityUnknown);
+        }
+        _ => {}
+    }
+    match input.fit_evidence {
+        Some(FitEvidenceV1::Stale) => findings.push(F::FitEvidenceStale),
+        Some(FitEvidenceV1::Conflicted | FitEvidenceV1::Unavailable | FitEvidenceV1::Invalid)
+        | None
+            if matches!(stage, WearabilityStageV1::FitCheck | WearabilityStageV1::Start | WearabilityStageV1::Perform) =>
+        {
+            findings.push(F::FitEvidenceNotCurrentOrUncertain);
+        }
+        _ => {}
+    }
+    if matches!(
+        input.sensor_consistency,
+        Some(SignalEvidenceV1::Conflicted | SignalEvidenceV1::Unavailable)
+    ) || matches!(
+        input.pressure_sensor,
+        Some(SignalEvidenceV1::Conflicted | SignalEvidenceV1::Unavailable)
+    ) || matches!(
+        input.shear_sensor,
+        Some(SignalEvidenceV1::Conflicted | SignalEvidenceV1::Unavailable)
+    ) {
+        findings.push(F::SensorEvidenceUncertain);
+    }
+    if input.workflow_support_requirement == Some(WorkflowSupportV1::CaregiverRequired)
+        && input.caregiver_available != Some(true)
+    {
+        findings.push(F::CaregiverUnavailable);
+    }
+    if input.workflow_timeout == Some(true) && input.critical_step_completed != Some(true) {
+        findings.push(F::DonningTimedOutBeforeCriticalStep);
+    }
+    if input.user_requested_help == Some(true) {
+        findings.push(F::UserRequestedHelp);
+    }
+    if stage == WearabilityStageV1::Don && input.critical_step_completed != Some(true) {
+        findings.push(F::CriticalDonningStepIncomplete);
+    }
+    if input.configuration_lineage == Some(ConfigurationLineageV1::RestartBoundary)
+        || input.configuration_lineage == Some(ConfigurationLineageV1::Unknown)
+        || input.current_session_mode == Some(WearabilityModeV1::Unset)
+        || (stage == WearabilityStageV1::Start && input.current_session_mode.is_none())
+    {
+        findings.push(F::ExplicitModeSelectionRequired);
+    }
+    if input.predicted_reserve_after_task == Some(EnergyReserveV1::BelowProfileMinimum) {
+        findings.push(F::EnergyReserveBelowProfileMinimum);
+    }
+    if matches!(
+        input.predicted_reserve_after_task,
+        Some(EnergyReserveV1::Unknown) | None
+    ) || input.task_energy_estimate != Some(SignalEvidenceV1::Available)
+        || input.estimate_confidence != Some(EstimateConfidenceV1::Adequate)
+    {
+        if stage == WearabilityStageV1::Prepare {
+            findings.push(F::EnergyEstimateUncertain);
+        }
+    }
+    if input.module_changed == Some(true)
+        && input.calibration_lineage_after_service
+            != Some(CalibrationLineageV1::VerifiedPreservedOrReestablished)
+    {
+        findings.push(F::CalibrationLineageNotVerified);
+    }
+    if input.module_changed == Some(true)
+        && input.diagnostic_result != Some(DiagnosticResultV1::PassDeclaredChecks)
+    {
+        findings.push(F::PostServiceDiagnosticsNotPassed);
+    }
+    if input.interface_migration_sensor == Some(SignalEvidenceV1::Conflicted) {
+        findings.push(F::MigrationSensorConflicted);
+    } else if input.interface_migration_sensor == Some(SignalEvidenceV1::Unavailable)
+        || (input.interface_migration_sensor.is_some() && input.measured_migration_value.is_none())
+    {
+        findings.push(F::MigrationMeasurementUnavailable);
+    }
+    if input.measured_migration_value.is_some_and(|value| !value.is_finite()) {
+        findings.push(F::MigrationMeasurementInvalid);
+    }
+    if input.task_compatibility == Some(TaskCompatibilityV1::Unsupported) {
+        findings.push(F::TaskOutsideProfile);
+    } else if input.task_compatibility == Some(TaskCompatibilityV1::Unknown) {
+        findings.push(F::TaskCompatibilityUnknown);
+    }
+    if input.movement_clearance == Some(MovementClearanceV1::Restricted) {
+        findings.push(F::MovementClearanceRestricted);
+    }
+    if input.thermal_comfort == Some(ThermalComfortV1::DiscomfortReported) {
+        findings.push(F::ThermalDiscomfortReported);
+    } else if input.thermal_comfort == Some(ThermalComfortV1::Unknown) {
+        findings.push(F::ThermalComfortUnknown);
+    }
+    if input.duty_cycle == Some(DutyCycleV1::LimitReached) {
+        findings.push(F::DutyCycleLimitReached);
+    } else if input.duty_cycle == Some(DutyCycleV1::Unknown) {
+        findings.push(F::DutyCycleUnknown);
+    }
+    if input.hygiene_compatibility == Some(HygieneCompatibilityV1::Incompatible) {
+        findings.push(F::HygieneWorkflowIncompatible);
+    } else if input.hygiene_compatibility == Some(HygieneCompatibilityV1::Unknown) {
+        findings.push(F::HygieneCompatibilityUnknown);
+    }
+
+    if findings.is_empty() {
+        match disposition {
+            WearabilityDispositionV1::ReadyForSimulation => {
+                if stage == WearabilityStageV1::FitCheck {
+                    findings.push(F::FitCheckAdmittedForSimulation);
+                } else {
+                    findings.push(F::TaskAdmittedForSimulation);
+                }
+            }
+            WearabilityDispositionV1::EligibleForReviewedReturnToService => {
+                findings.push(F::ServiceEligibleForReviewOnly);
+            }
+            WearabilityDispositionV1::DoffRequestPreemptsNewMotion => {
+                findings.push(F::DoffStageHasPriority);
+            }
+            _ => findings.push(F::RequiredEvidenceUnknown),
+        }
+    }
+
+    findings
 }
 
 fn evaluate_fit_check(input: &WearabilityInputV1) -> WearabilityDispositionV1 {
@@ -818,6 +1303,202 @@ mod tests {
             evaluate_wearability_request("profile-a", WearabilityStageV1::FitCheck, &input).disposition,
             WearabilityDispositionV1::InvalidInput
         );
+    }
+
+    #[test]
+    fn provenance_is_complete_only_when_each_present_field_has_a_record() {
+        let mut input = valid_fit();
+        input.evidence_provenance = vec![
+            WearabilityEvidenceProvenanceV1 {
+                field: WearabilityEvidenceFieldV1::FasteningEvidence,
+                origin: WearabilityEvidenceOriginV1::CallerAssertion,
+                evidence_id: Some("fixture-fastening".to_owned()),
+                observed_at_ticks: None,
+                timebase_id: None,
+                calibration_reference: None,
+            },
+            WearabilityEvidenceProvenanceV1 {
+                field: WearabilityEvidenceFieldV1::ProfileMatch,
+                origin: WearabilityEvidenceOriginV1::CallerAssertion,
+                evidence_id: Some("fixture-profile".to_owned()),
+                observed_at_ticks: None,
+                timebase_id: None,
+                calibration_reference: None,
+            },
+            WearabilityEvidenceProvenanceV1 {
+                field: WearabilityEvidenceFieldV1::FitEvidence,
+                origin: WearabilityEvidenceOriginV1::CallerAssertion,
+                evidence_id: Some("fixture-fit".to_owned()),
+                observed_at_ticks: None,
+                timebase_id: None,
+                calibration_reference: None,
+            },
+            WearabilityEvidenceProvenanceV1 {
+                field: WearabilityEvidenceFieldV1::SensorConsistency,
+                origin: WearabilityEvidenceOriginV1::CallerAssertion,
+                evidence_id: Some("fixture-sensor-consistency".to_owned()),
+                observed_at_ticks: None,
+                timebase_id: None,
+                calibration_reference: None,
+            },
+        ];
+
+        let result = evaluate_wearability_request("profile-a", WearabilityStageV1::FitCheck, &input);
+        assert_eq!(
+            result.provenance_status,
+            WearabilityProvenanceStatusV1::CompleteForPresentInputs
+        );
+        assert!(result.provenance_findings.is_empty());
+        assert_eq!(result.evidence_provenance, input.evidence_provenance);
+    }
+
+    #[test]
+    fn missing_provenance_is_distinct_from_policy_disposition() {
+        let input = valid_fit();
+        let result = evaluate_wearability_request("profile-a", WearabilityStageV1::FitCheck, &input);
+        assert_eq!(result.disposition, WearabilityDispositionV1::ReadyForSimulation);
+        assert_eq!(
+            result.provenance_status,
+            WearabilityProvenanceStatusV1::MissingForPresentInputs
+        );
+        assert_eq!(result.provenance_findings.len(), 4);
+        assert!(result.findings.contains(&WearabilityFindingV1::FitCheckAdmittedForSimulation));
+    }
+
+    #[test]
+    fn sensor_provenance_requires_timestamp_timebase_and_calibration_reference() {
+        let mut input = valid_fit();
+        input.pressure_sensor = Some(SignalEvidenceV1::Available);
+        input.evidence_provenance = vec![
+            WearabilityEvidenceProvenanceV1 {
+                field: WearabilityEvidenceFieldV1::FasteningEvidence,
+                origin: WearabilityEvidenceOriginV1::CallerAssertion,
+                evidence_id: Some("fastening".to_owned()),
+                observed_at_ticks: None,
+                timebase_id: None,
+                calibration_reference: None,
+            },
+            WearabilityEvidenceProvenanceV1 {
+                field: WearabilityEvidenceFieldV1::ProfileMatch,
+                origin: WearabilityEvidenceOriginV1::CallerAssertion,
+                evidence_id: Some("profile".to_owned()),
+                observed_at_ticks: None,
+                timebase_id: None,
+                calibration_reference: None,
+            },
+            WearabilityEvidenceProvenanceV1 {
+                field: WearabilityEvidenceFieldV1::FitEvidence,
+                origin: WearabilityEvidenceOriginV1::CallerAssertion,
+                evidence_id: Some("fit".to_owned()),
+                observed_at_ticks: None,
+                timebase_id: None,
+                calibration_reference: None,
+            },
+            WearabilityEvidenceProvenanceV1 {
+                field: WearabilityEvidenceFieldV1::SensorConsistency,
+                origin: WearabilityEvidenceOriginV1::CallerAssertion,
+                evidence_id: Some("sensor-consistency".to_owned()),
+                observed_at_ticks: None,
+                timebase_id: None,
+                calibration_reference: None,
+            },
+            WearabilityEvidenceProvenanceV1 {
+                field: WearabilityEvidenceFieldV1::PressureSensor,
+                origin: WearabilityEvidenceOriginV1::SensorObservation,
+                evidence_id: Some("pressure-observation".to_owned()),
+                observed_at_ticks: None,
+                timebase_id: None,
+                calibration_reference: None,
+            },
+        ];
+
+        let result = evaluate_wearability_request("profile-a", WearabilityStageV1::FitCheck, &input);
+        assert_eq!(result.provenance_status, WearabilityProvenanceStatusV1::Invalid);
+        assert!(result.provenance_findings.contains(
+            &WearabilityProvenanceFindingV1::ObservationTimestampMissing {
+                field: WearabilityEvidenceFieldV1::PressureSensor
+            }
+        ));
+        assert!(result.provenance_findings.contains(
+            &WearabilityProvenanceFindingV1::TimebaseMissing {
+                field: WearabilityEvidenceFieldV1::PressureSensor
+            }
+        ));
+        assert!(result.provenance_findings.contains(
+            &WearabilityProvenanceFindingV1::SensorCalibrationReferenceMissing {
+                field: WearabilityEvidenceFieldV1::PressureSensor
+            }
+        ));
+    }
+
+    #[test]
+    fn duplicate_provenance_for_one_field_is_invalid() {
+        let mut input = valid_fit();
+        input.evidence_provenance = vec![
+            WearabilityEvidenceProvenanceV1 {
+                field: WearabilityEvidenceFieldV1::FitEvidence,
+                origin: WearabilityEvidenceOriginV1::CallerAssertion,
+                evidence_id: Some("fit-assertion-a".to_owned()),
+                observed_at_ticks: None,
+                timebase_id: None,
+                calibration_reference: None,
+            },
+            WearabilityEvidenceProvenanceV1 {
+                field: WearabilityEvidenceFieldV1::FitEvidence,
+                origin: WearabilityEvidenceOriginV1::CallerAssertion,
+                evidence_id: Some("fit-assertion-b".to_owned()),
+                observed_at_ticks: None,
+                timebase_id: None,
+                calibration_reference: None,
+            },
+        ];
+        let result = evaluate_wearability_request("profile-a", WearabilityStageV1::FitCheck, &input);
+        assert_eq!(result.provenance_status, WearabilityProvenanceStatusV1::Invalid);
+        assert!(result.provenance_findings.contains(
+            &WearabilityProvenanceFindingV1::DuplicateProvenance {
+                field: WearabilityEvidenceFieldV1::FitEvidence
+            }
+        ));
+    }
+
+    #[test]
+    fn empty_evidence_id_is_invalid_even_for_caller_assertions() {
+        let mut input = valid_fit();
+        input.evidence_provenance = vec![WearabilityEvidenceProvenanceV1 {
+            field: WearabilityEvidenceFieldV1::FitEvidence,
+            origin: WearabilityEvidenceOriginV1::CallerAssertion,
+            evidence_id: Some(" ".to_owned()),
+            observed_at_ticks: None,
+            timebase_id: None,
+            calibration_reference: None,
+        }];
+        let result = evaluate_wearability_request("profile-a", WearabilityStageV1::FitCheck, &input);
+        assert_eq!(result.provenance_status, WearabilityProvenanceStatusV1::Invalid);
+        assert!(result.provenance_findings.contains(
+            &WearabilityProvenanceFindingV1::InvalidEvidenceId {
+                field: WearabilityEvidenceFieldV1::FitEvidence
+            }
+        ));
+    }
+
+    #[test]
+    fn explicit_doff_remains_highest_priority_with_invalid_other_metadata() {
+        let input = WearabilityInputV1 {
+            schema_version: WEARABILITY_SCHEMA_VERSION + 99,
+            user_requested_doff: Some(true),
+            ..Default::default()
+        };
+        let decision = evaluate_wearability_request(
+            "profile-a",
+            WearabilityStageV1::Perform,
+            &input,
+        );
+        assert_eq!(
+            decision.disposition,
+            WearabilityDispositionV1::DoffRequestPreemptsNewMotion
+        );
+        assert!(decision.findings.contains(&WearabilityFindingV1::UserRequestedDoff));
+        assert!(decision.findings.contains(&WearabilityFindingV1::UnsupportedSchemaVersion));
     }
 
     #[test]

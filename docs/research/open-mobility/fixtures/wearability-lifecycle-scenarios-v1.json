@@ -12,7 +12,29 @@
         "fastening_evidence": "verified",
         "profile_match": "verified",
         "fit_evidence": "current",
-        "sensor_consistency": "consistent"
+        "sensor_consistency": "consistent",
+        "evidence_provenance": [
+          {
+            "field": "fastening_evidence",
+            "origin": "caller_assertion",
+            "evidence_id": "synthetic:WRB-001-verified-self-don:fastening_evidence"
+          },
+          {
+            "field": "profile_match",
+            "origin": "caller_assertion",
+            "evidence_id": "synthetic:WRB-001-verified-self-don:profile_match"
+          },
+          {
+            "field": "fit_evidence",
+            "origin": "caller_assertion",
+            "evidence_id": "synthetic:WRB-001-verified-self-don:fit_evidence"
+          },
+          {
+            "field": "sensor_consistency",
+            "origin": "caller_assertion",
+            "evidence_id": "synthetic:WRB-001-verified-self-don:sensor_consistency"
+          }
+        ]
       },
       "expected_disposition": "ready_for_simulation",
       "required_receipts": [
@@ -31,7 +53,29 @@
         "fastening_evidence": "incomplete",
         "profile_match": "verified",
         "fit_evidence": "current",
-        "sensor_consistency": "consistent"
+        "sensor_consistency": "consistent",
+        "evidence_provenance": [
+          {
+            "field": "fastening_evidence",
+            "origin": "caller_assertion",
+            "evidence_id": "synthetic:WRB-002-missing-required-fastening:fastening_evidence"
+          },
+          {
+            "field": "profile_match",
+            "origin": "caller_assertion",
+            "evidence_id": "synthetic:WRB-002-missing-required-fastening:profile_match"
+          },
+          {
+            "field": "fit_evidence",
+            "origin": "caller_assertion",
+            "evidence_id": "synthetic:WRB-002-missing-required-fastening:fit_evidence"
+          },
+          {
+            "field": "sensor_consistency",
+            "origin": "caller_assertion",
+            "evidence_id": "synthetic:WRB-002-missing-required-fastening:sensor_consistency"
+          }
+        ]
       },
       "expected_disposition": "start_not_admitted",
       "required_receipts": [
@@ -49,7 +93,29 @@
         "fastening_evidence": "verified",
         "profile_match": "verified",
         "fit_evidence": "stale",
-        "sensor_consistency": "consistent"
+        "sensor_consistency": "consistent",
+        "evidence_provenance": [
+          {
+            "field": "fastening_evidence",
+            "origin": "caller_assertion",
+            "evidence_id": "synthetic:WRB-003-fit-evidence-stale-after-movement:fastening_evidence"
+          },
+          {
+            "field": "profile_match",
+            "origin": "caller_assertion",
+            "evidence_id": "synthetic:WRB-003-fit-evidence-stale-after-movement:profile_match"
+          },
+          {
+            "field": "fit_evidence",
+            "origin": "caller_assertion",
+            "evidence_id": "synthetic:WRB-003-fit-evidence-stale-after-movement:fit_evidence"
+          },
+          {
+            "field": "sensor_consistency",
+            "origin": "caller_assertion",
+            "evidence_id": "synthetic:WRB-003-fit-evidence-stale-after-movement:sensor_consistency"
+          }
+        ]
       },
       "expected_disposition": "fit_recheck_required",
       "required_receipts": [
@@ -67,7 +133,29 @@
         "pressure_sensor": "conflicted",
         "shear_sensor": "unavailable",
         "user_comfort_report": "not_collected",
-        "fit_evidence": "current"
+        "fit_evidence": "current",
+        "evidence_provenance": [
+          {
+            "field": "pressure_sensor",
+            "origin": "caller_assertion",
+            "evidence_id": "synthetic:WRB-004-sensor-conflict-not-a-comfort-pass:pressure_sensor"
+          },
+          {
+            "field": "shear_sensor",
+            "origin": "caller_assertion",
+            "evidence_id": "synthetic:WRB-004-sensor-conflict-not-a-comfort-pass:shear_sensor"
+          },
+          {
+            "field": "user_comfort_report",
+            "origin": "caller_assertion",
+            "evidence_id": "synthetic:WRB-004-sensor-conflict-not-a-comfort-pass:user_comfort_report"
+          },
+          {
+            "field": "fit_evidence",
+            "origin": "caller_assertion",
+            "evidence_id": "synthetic:WRB-004-sensor-conflict-not-a-comfort-pass:fit_evidence"
+          }
+        ]
       },
       "expected_disposition": "interface_state_unknown",
       "required_receipts": [
@@ -83,7 +171,19 @@
       "stage": "don",
       "input": {
         "workflow_support_requirement": "caregiver_required",
-        "caregiver_available": false
+        "caregiver_available": false,
+        "evidence_provenance": [
+          {
+            "field": "workflow_support_requirement",
+            "origin": "caller_assertion",
+            "evidence_id": "synthetic:WRB-005-caregiver-unavailable:workflow_support_requirement"
+          },
+          {
+            "field": "caregiver_available",
+            "origin": "caller_assertion",
+            "evidence_id": "synthetic:WRB-005-caregiver-unavailable:caregiver_available"
+          }
+        ]
       },
       "expected_disposition": "workflow_blocked_with_support_path",
       "required_receipts": [
@@ -99,7 +199,19 @@
       "stage": "perform",
       "input": {
         "user_requested_doff": true,
-        "active_motion_request": "present"
+        "active_motion_request": "present",
+        "evidence_provenance": [
+          {
+            "field": "user_requested_doff",
+            "origin": "caller_assertion",
+            "evidence_id": "synthetic:WRB-006-user-requests-doff:user_requested_doff"
+          },
+          {
+            "field": "active_motion_request",
+            "origin": "caller_assertion",
+            "evidence_id": "synthetic:WRB-006-user-requests-doff:active_motion_request"
+          }
+        ]
       },
       "expected_disposition": "doff_request_preempts_new_motion",
       "required_receipts": [
@@ -116,7 +228,24 @@
       "input": {
         "prior_session_mode": "training_resistive",
         "current_session_mode": "unset",
-        "configuration_lineage": "restart_boundary"
+        "configuration_lineage": "restart_boundary",
+        "evidence_provenance": [
+          {
+            "field": "prior_session_mode",
+            "origin": "caller_assertion",
+            "evidence_id": "synthetic:WRB-007-restart-clears-prior-training-mode:prior_session_mode"
+          },
+          {
+            "field": "current_session_mode",
+            "origin": "caller_assertion",
+            "evidence_id": "synthetic:WRB-007-restart-clears-prior-training-mode:current_session_mode"
+          },
+          {
+            "field": "configuration_lineage",
+            "origin": "caller_assertion",
+            "evidence_id": "synthetic:WRB-007-restart-clears-prior-training-mode:configuration_lineage"
+          }
+        ]
       },
       "expected_disposition": "explicit_mode_selection_required",
       "required_receipts": [
@@ -133,7 +262,24 @@
       "input": {
         "task_energy_estimate": "available",
         "predicted_reserve_after_task": "below_profile_minimum",
-        "estimate_confidence": "declared_low"
+        "estimate_confidence": "declared_low",
+        "evidence_provenance": [
+          {
+            "field": "task_energy_estimate",
+            "origin": "caller_assertion",
+            "evidence_id": "synthetic:WRB-008-insufficient-task-energy-reserve:task_energy_estimate"
+          },
+          {
+            "field": "predicted_reserve_after_task",
+            "origin": "caller_assertion",
+            "evidence_id": "synthetic:WRB-008-insufficient-task-energy-reserve:predicted_reserve_after_task"
+          },
+          {
+            "field": "estimate_confidence",
+            "origin": "caller_assertion",
+            "evidence_id": "synthetic:WRB-008-insufficient-task-energy-reserve:estimate_confidence"
+          }
+        ]
       },
       "expected_disposition": "task_plan_requires_review_or_fallback",
       "required_receipts": [
@@ -150,7 +296,19 @@
       "stage": "maintain",
       "input": {
         "module_changed": true,
-        "calibration_lineage_after_service": "missing"
+        "calibration_lineage_after_service": "missing",
+        "evidence_provenance": [
+          {
+            "field": "module_changed",
+            "origin": "caller_assertion",
+            "evidence_id": "synthetic:WRB-009-module-replacement-invalidates-calibration:module_changed"
+          },
+          {
+            "field": "calibration_lineage_after_service",
+            "origin": "caller_assertion",
+            "evidence_id": "synthetic:WRB-009-module-replacement-invalidates-calibration:calibration_lineage_after_service"
+          }
+        ]
       },
       "expected_disposition": "return_to_service_not_admitted",
       "required_receipts": [
@@ -168,7 +326,24 @@
       "input": {
         "module_changed": true,
         "calibration_lineage_after_service": "verified_preserved_or_reestablished",
-        "diagnostic_result": "pass_declared_checks"
+        "diagnostic_result": "pass_declared_checks",
+        "evidence_provenance": [
+          {
+            "field": "module_changed",
+            "origin": "caller_assertion",
+            "evidence_id": "synthetic:WRB-010-successful-noncritical-module-service:module_changed"
+          },
+          {
+            "field": "calibration_lineage_after_service",
+            "origin": "caller_assertion",
+            "evidence_id": "synthetic:WRB-010-successful-noncritical-module-service:calibration_lineage_after_service"
+          },
+          {
+            "field": "diagnostic_result",
+            "origin": "caller_assertion",
+            "evidence_id": "synthetic:WRB-010-successful-noncritical-module-service:diagnostic_result"
+          }
+        ]
       },
       "expected_disposition": "eligible_for_reviewed_return_to_service",
       "required_receipts": [
@@ -186,7 +361,24 @@
       "input": {
         "workflow_timeout": true,
         "user_requested_help": false,
-        "critical_step_completed": false
+        "critical_step_completed": false,
+        "evidence_provenance": [
+          {
+            "field": "workflow_timeout",
+            "origin": "caller_assertion",
+            "evidence_id": "synthetic:WRB-011-donning-timeout-preserves-user-agency:workflow_timeout"
+          },
+          {
+            "field": "user_requested_help",
+            "origin": "caller_assertion",
+            "evidence_id": "synthetic:WRB-011-donning-timeout-preserves-user-agency:user_requested_help"
+          },
+          {
+            "field": "critical_step_completed",
+            "origin": "caller_assertion",
+            "evidence_id": "synthetic:WRB-011-donning-timeout-preserves-user-agency:critical_step_completed"
+          }
+        ]
       },
       "expected_disposition": "remain_unready_and_offer_accessible_options",
       "required_receipts": [
@@ -204,7 +396,19 @@
       "input": {
         "interface_migration_sensor": "unavailable",
         "measured_migration_value": null,
-        "fit_evidence": "current"
+        "fit_evidence": "current",
+        "evidence_provenance": [
+          {
+            "field": "interface_migration_sensor",
+            "origin": "caller_assertion",
+            "evidence_id": "synthetic:WRB-012-sensor-data-missing-not-measured-zero:interface_migration_sensor"
+          },
+          {
+            "field": "fit_evidence",
+            "origin": "caller_assertion",
+            "evidence_id": "synthetic:WRB-012-sensor-data-missing-not-measured-zero:fit_evidence"
+          }
+        ]
       },
       "expected_disposition": "migration_metric_missing",
       "required_receipts": [
@@ -221,7 +425,24 @@
       "input": {
         "fit_evidence": "current",
         "task_compatibility": "unsupported",
-        "movement_clearance": "compatible"
+        "movement_clearance": "compatible",
+        "evidence_provenance": [
+          {
+            "field": "fit_evidence",
+            "origin": "caller_assertion",
+            "evidence_id": "synthetic:WRB-013-task-outside-profile:fit_evidence"
+          },
+          {
+            "field": "task_compatibility",
+            "origin": "caller_assertion",
+            "evidence_id": "synthetic:WRB-013-task-outside-profile:task_compatibility"
+          },
+          {
+            "field": "movement_clearance",
+            "origin": "caller_assertion",
+            "evidence_id": "synthetic:WRB-013-task-outside-profile:movement_clearance"
+          }
+        ]
       },
       "expected_disposition": "task_not_admitted_for_profile",
       "required_receipts": [
@@ -238,7 +459,24 @@
       "input": {
         "fit_evidence": "current",
         "task_compatibility": "supported",
-        "movement_clearance": "restricted"
+        "movement_clearance": "restricted",
+        "evidence_provenance": [
+          {
+            "field": "fit_evidence",
+            "origin": "caller_assertion",
+            "evidence_id": "synthetic:WRB-014-restricted-space:fit_evidence"
+          },
+          {
+            "field": "task_compatibility",
+            "origin": "caller_assertion",
+            "evidence_id": "synthetic:WRB-014-restricted-space:task_compatibility"
+          },
+          {
+            "field": "movement_clearance",
+            "origin": "caller_assertion",
+            "evidence_id": "synthetic:WRB-014-restricted-space:movement_clearance"
+          }
+        ]
       },
       "expected_disposition": "task_not_admitted_for_profile",
       "required_receipts": [
@@ -257,7 +495,34 @@
         "task_compatibility": "supported",
         "movement_clearance": "compatible",
         "thermal_comfort": "discomfort_reported",
-        "duty_cycle": "within_profile_limit"
+        "duty_cycle": "within_profile_limit",
+        "evidence_provenance": [
+          {
+            "field": "fit_evidence",
+            "origin": "caller_assertion",
+            "evidence_id": "synthetic:WRB-015-thermal-discomfort-reported:fit_evidence"
+          },
+          {
+            "field": "task_compatibility",
+            "origin": "caller_assertion",
+            "evidence_id": "synthetic:WRB-015-thermal-discomfort-reported:task_compatibility"
+          },
+          {
+            "field": "movement_clearance",
+            "origin": "caller_assertion",
+            "evidence_id": "synthetic:WRB-015-thermal-discomfort-reported:movement_clearance"
+          },
+          {
+            "field": "thermal_comfort",
+            "origin": "caller_assertion",
+            "evidence_id": "synthetic:WRB-015-thermal-discomfort-reported:thermal_comfort"
+          },
+          {
+            "field": "duty_cycle",
+            "origin": "caller_assertion",
+            "evidence_id": "synthetic:WRB-015-thermal-discomfort-reported:duty_cycle"
+          }
+        ]
       },
       "expected_disposition": "task_review_or_alternate_profile_required",
       "required_receipts": [
@@ -275,7 +540,29 @@
         "fit_evidence": "current",
         "task_compatibility": "supported",
         "movement_clearance": "compatible",
-        "duty_cycle": "limit_reached"
+        "duty_cycle": "limit_reached",
+        "evidence_provenance": [
+          {
+            "field": "fit_evidence",
+            "origin": "caller_assertion",
+            "evidence_id": "synthetic:WRB-016-duty-cycle-limit-reached:fit_evidence"
+          },
+          {
+            "field": "task_compatibility",
+            "origin": "caller_assertion",
+            "evidence_id": "synthetic:WRB-016-duty-cycle-limit-reached:task_compatibility"
+          },
+          {
+            "field": "movement_clearance",
+            "origin": "caller_assertion",
+            "evidence_id": "synthetic:WRB-016-duty-cycle-limit-reached:movement_clearance"
+          },
+          {
+            "field": "duty_cycle",
+            "origin": "caller_assertion",
+            "evidence_id": "synthetic:WRB-016-duty-cycle-limit-reached:duty_cycle"
+          }
+        ]
       },
       "expected_disposition": "task_review_or_alternate_profile_required",
       "required_receipts": [
@@ -292,7 +579,24 @@
       "input": {
         "fit_evidence": "current",
         "task_compatibility": "unknown",
-        "movement_clearance": "compatible"
+        "movement_clearance": "compatible",
+        "evidence_provenance": [
+          {
+            "field": "fit_evidence",
+            "origin": "caller_assertion",
+            "evidence_id": "synthetic:WRB-017-unknown-task-compatibility:fit_evidence"
+          },
+          {
+            "field": "task_compatibility",
+            "origin": "caller_assertion",
+            "evidence_id": "synthetic:WRB-017-unknown-task-compatibility:task_compatibility"
+          },
+          {
+            "field": "movement_clearance",
+            "origin": "caller_assertion",
+            "evidence_id": "synthetic:WRB-017-unknown-task-compatibility:movement_clearance"
+          }
+        ]
       },
       "expected_disposition": "task_review_or_alternate_profile_required",
       "required_receipts": [
@@ -310,7 +614,29 @@
         "fit_evidence": "current",
         "task_compatibility": "supported",
         "movement_clearance": "compatible",
-        "hygiene_compatibility": "incompatible"
+        "hygiene_compatibility": "incompatible",
+        "evidence_provenance": [
+          {
+            "field": "fit_evidence",
+            "origin": "caller_assertion",
+            "evidence_id": "synthetic:WRB-018-hygiene-context-incompatible:fit_evidence"
+          },
+          {
+            "field": "task_compatibility",
+            "origin": "caller_assertion",
+            "evidence_id": "synthetic:WRB-018-hygiene-context-incompatible:task_compatibility"
+          },
+          {
+            "field": "movement_clearance",
+            "origin": "caller_assertion",
+            "evidence_id": "synthetic:WRB-018-hygiene-context-incompatible:movement_clearance"
+          },
+          {
+            "field": "hygiene_compatibility",
+            "origin": "caller_assertion",
+            "evidence_id": "synthetic:WRB-018-hygiene-context-incompatible:hygiene_compatibility"
+          }
+        ]
       },
       "expected_disposition": "task_not_admitted_for_profile",
       "required_receipts": [
