@@ -537,7 +537,10 @@ mod tests {
         let plan = select_under_budget(&options, &ranking, 5).unwrap();
         let receipt = score_synthetic_plan(&options, &overlapping, &plan).unwrap();
 
-        assert_eq!(receipt.resolved_question_ids, vec!["ambient-noise", "false-alarm", "pipe-material"]);
+        assert_eq!(
+            receipt.resolved_question_ids,
+            vec!["ambient-noise", "false-alarm", "pipe-material"]
+        );
         assert_eq!(receipt.realized_decision_value_units, 57);
     }
 
