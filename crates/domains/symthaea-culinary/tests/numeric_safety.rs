@@ -62,6 +62,16 @@ fn nutrition_rejects_nan_and_negative_nutrient_quantities() {
             .any(|v| matches!(v, CulinaryViolation::InvalidNumericInput { field: "nutrition.sodium_mg", .. }))
     );
 
+    let overflow_profile = NutrientProfile {
+        protein_g: f64::MAX,
+        ..Default::default()
+    };
+    assert!(
+        validate_nutrition(&overflow_profile)
+            .iter()
+            .any(|v| matches!(v, CulinaryViolation::InvalidNumericInput { field: "nutrition.energy_kcal", .. }))
+    );
+
     let negative_profile = NutrientProfile {
         protein_g: -1.0,
         ..Default::default()
