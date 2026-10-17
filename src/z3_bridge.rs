@@ -69,6 +69,64 @@ impl std::fmt::Display for InductionProofResult {
     }
 }
 
+/// Result of checking concrete Ricci/metric component values against an Einstein-like relation.
+///
+/// This is numerical candidate evidence only. It is not a symbolic derivation,
+/// does not recompute the Ricci tensor from a symbolic metric, and does not
+/// prove an identity over a coordinate domain.
+#[derive(Debug, Clone, PartialEq)]
+pub struct EinsteinResidualReport {
+    pub dimension: usize,
+    /// Least-squares coefficient minimizing sum_ij (Ric_ij - k*g_ij)^2
+    /// in the supplied component basis. This is a numeric fit, not a
+    /// coordinate-invariant proof or a symbolic geometric derivation.
+    pub least_squares_k: f64,
+    pub tolerance: f64,
+    pub max_abs_residual: f64,
+    /// Number of tensor components included in the least-squares fit.
+    pub components_compared: usize,
+    pub component_residuals: Vec<f64>,
+    pub within_tolerance: bool,
+}
+
+/// Why a concrete Einstein-residual check could not produce a numeric report.
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub enum EinsteinResidualError {
+    ZeroDimension,
+    ComponentCountMismatch,
+    InvalidTolerance,
+    NonFiniteInput,
+    NoUsableMetricComponents,
+    NonFiniteArithmetic,
+}
+
+impl std::fmt::Display for EinsteinResidualError {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        match self {
+            Self::ZeroDimension => write!(
+                f,
+                "dimension must be positive and its square representable"
+            ),
+            Self::ComponentCountMismatch => write!(
+                f,
+                "Ricci and metric arrays must each contain dim*dim components"
+            ),
+            Self::InvalidTolerance => write!(f, "tolerance must be finite and nonnegative"),
+            Self::NonFiniteInput => write!(f, "Ricci and metric components must all be finite"),
+            Self::NoUsableMetricComponents => write!(
+                f,
+                "all metric components are zero, so a proportionality coefficient is undefined"
+            ),
+            Self::NonFiniteArithmetic => write!(
+                f,
+                "numeric ratio or residual was not representable as a finite value"
+            ),
+        }
+    }
+}
+
+impl std::error::Error for EinsteinResidualError {}
+
 #[derive(Debug, Clone)]
 pub enum VerificationResult {
     /// Formula is satisfiable; optional witness model string from Z3.
@@ -315,10 +373,118 @@ impl Z3Bridge {
         }
     }
 
-    /// Verify an Einstein condition check numerically.
+    /// Check a concrete numeric candidate for the componentwise relation Ric_ij ≈ k*g_ij.
     ///
-    /// Tests: Ric_ij ≈ k · g_ij for all i,j, where k = Ricci_scalar / dim.
-    /// Emits SMTLIB2 linear arithmetic assertions for each component.
+    /// The estimate of k is the arithmetic mean of Ric_ii/g_ii over nonzero
+    /// diagonal entries. This is deliberately a diagnostic approximation, not
+    /// the general tensor equation, and must not be described as a formal proof.
+    /// The method does not invoke Z3 because the supplied residuals are already
+    /// concrete numeric constants.
+    pub fn check_einstein_residual_numeric(
+        ricci_components: &[f64],
+        metric_components: &[f64],
+        dim: usize,
+        tolerance: f64,
+    ) -> Result<EinsteinResidualReport, EinsteinResidualError> {
+        if dim == 0 {
+            return Err(EinsteinResidualError::ZeroDimension);
+        }
+        let expected = dim
+            .checked_mul(dim)
+            .ok_or(EinsteinResidualError::ZeroDimension)?;
+        if ricci_components.len() != expected || metric_components.len() != expected {
+            return Err(EinsteinResidualError::ComponentCountMismatch);
+        }
+        if !tolerance.is_finite() || tolerance < 0.0 {
+            return Err(EinsteinResidualError::InvalidTolerance);
+        }
+        if ricci_components
+            .iter()
+            .chain(metric_components)
+            .any(|value| !value.is_finite())
+        {
+            return Err(EinsteinResidualError::NonFiniteInput);
+        }
+
+        // Fit k by least squares over every component:
+        // k = <Ric, g> / <g, g>, minimizing ||Ric - k*g||_F in this
+        // supplied component basis. Scale inputs before products so large
+        // finite components do not overflow merely during the dot products.
+        let ricci_scale = ricci_components
+            .iter()
+            .fold(0.0_f64, |maximum, value| maximum.max(value.abs()));
+        let metric_scale = metric_components
+            .iter()
+            .fold(0.0_f64, |maximum, value| maximum.max(value.abs()));
+        if metric_scale == 0.0 {
+            return Err(EinsteinResidualError::NoUsableMetricComponents);
+        }
+
+        let k = if ricci_scale == 0.0 {
+            0.0
+        } else {
+            let mut numerator_scaled = 0.0_f64;
+            let mut denominator_scaled = 0.0_f64;
+            for (&ric, &g) in ricci_components.iter().zip(metric_components.iter()) {
+                let scaled_ric = ric / ricci_scale;
+                let scaled_g = g / metric_scale;
+                numerator_scaled += scaled_ric * scaled_g;
+                denominator_scaled += scaled_g * scaled_g;
+            }
+            if !numerator_scaled.is_finite()
+                || !denominator_scaled.is_finite()
+                || denominator_scaled <= 0.0
+            {
+                return Err(EinsteinResidualError::NonFiniteArithmetic);
+            }
+            let scaled_ratio = numerator_scaled / denominator_scaled;
+            let scale_ratio = ricci_scale / metric_scale;
+            let coefficient = scaled_ratio * scale_ratio;
+            if !coefficient.is_finite() {
+                return Err(EinsteinResidualError::NonFiniteArithmetic);
+            }
+            coefficient
+        };
+
+        if !k.is_finite() {
+            return Err(EinsteinResidualError::NonFiniteArithmetic);
+        }
+
+        let mut component_residuals = Vec::with_capacity(expected);
+        for (&ric, &g) in ricci_components.iter().zip(metric_components.iter()) {
+            // Preserve the signed residual so independent checks can evaluate
+            // the least-squares normal equation; summarize its absolute maximum
+            // separately for the tolerance disposition.
+            let residual = ric - k * g;
+            if !residual.is_finite() {
+                return Err(EinsteinResidualError::NonFiniteArithmetic);
+            }
+            component_residuals.push(residual);
+        }
+        let max_abs_residual = component_residuals
+            .iter()
+            .map(|residual| residual.abs())
+            .fold(0.0_f64, f64::max);
+
+        Ok(EinsteinResidualReport {
+            dimension: dim,
+            least_squares_k: k,
+            tolerance,
+            max_abs_residual,
+            components_compared: expected,
+            component_residuals,
+            within_tolerance: max_abs_residual <= tolerance,
+        })
+    }
+
+    /// Compatibility adapter for the old result enum.
+    ///
+    /// This checks concrete numeric residuals only and does not establish a
+    /// formal or universal Einstein condition. New callers should prefer
+    /// check_einstein_residual_numeric so the measured residual and tolerance
+    /// remain explicit in the result type.
+    #[allow(clippy::unused_self)] // Receiver retained for compatibility; this path is solver-independent.
+    #[deprecated(note = "numeric residual check only; use check_einstein_residual_numeric; this is not a formal proof")]
     pub fn verify_einstein_condition(
         &self,
         ricci_components: &[f64],
@@ -326,76 +492,29 @@ impl Z3Bridge {
         dim: usize,
         tolerance: f64,
     ) -> VerificationResult {
-        if ricci_components.len() != dim * dim || metric_components.len() != dim * dim {
-            return VerificationResult::Unknown {
-                reason: format!(
-                    "expected {}×{} = {} components, got ricci={}, metric={}",
-                    dim,
-                    dim,
-                    dim * dim,
-                    ricci_components.len(),
-                    metric_components.len()
-                ),
-            };
-        }
-
-        // Compute k = trace(g^{-1} Ric) / dim  (simplified: use diagonal approximation)
-        let mut k_sum = 0.0_f64;
-        let mut diag_count = 0usize;
-        for i in 0..dim {
-            let g_ii = metric_components[i * dim + i];
-            let ric_ii = ricci_components[i * dim + i];
-            if g_ii.abs() > 1e-12 {
-                k_sum += ric_ii / g_ii;
-                diag_count += 1;
-            }
-        }
-        let k = if diag_count > 0 {
-            k_sum / diag_count as f64
-        } else {
-            0.0
-        };
-
-        // Build SMTLIB2 constraints: for each (i,j), |Ric_ij - k*g_ij| < tol
-        let mut assertions = Vec::new();
-        let mut residuals = Vec::new();
-        for i in 0..dim {
-            for j in 0..dim {
-                let ric = ricci_components[i * dim + j];
-                let g = metric_components[i * dim + j];
-                let residual = (ric - k * g).abs();
-                residuals.push(residual);
-                let smt = format!(
-                    "; Einstein residual at ({i},{j}): |{:.6} - {:.6}*{:.6}| = {:.12}\n\
-                     (assert (<= (- (abs {:.6}) 0.0) {:.12}))",
-                    ric, k, g, residual, residual, tolerance
-                );
-                assertions.push(smt);
-            }
-        }
-
-        let smt = format!(
-            "; Einstein condition verification (dim={dim}, k={k:.6})\n\
-             {}\n(check-sat)",
-            assertions.join("\n")
-        );
-
-        if let Some(output) = self.run_z3(&smt) {
-            parse_sat_result(&output)
-        } else {
-            let max_residual = residuals.iter().copied().fold(0.0_f64, f64::max);
-            if max_residual <= tolerance {
-                VerificationResult::Sat {
-                    witness: Some(format!("max_residual={max_residual:.2e}, k={k:.4}")),
-                }
-            } else {
-                VerificationResult::Unsat {
-                    core: Some(format!(
-                        "residuals={:?}, max_residual={max_residual:.2e} > tol={tolerance:.2e}",
-                        residuals
-                    )),
-                }
-            }
+        match Self::check_einstein_residual_numeric(
+            ricci_components,
+            metric_components,
+            dim,
+            tolerance,
+        ) {
+            Ok(report) if report.within_tolerance => VerificationResult::Sat {
+                witness: Some(format!(
+                    "NUMERIC_ONLY: max_residual={:.3e}, least_squares_k={:.6}, tolerance={:.3e}",
+                    report.max_abs_residual,
+                    report.least_squares_k,
+                    report.tolerance
+                )),
+            },
+            Ok(report) => VerificationResult::Unsat {
+                core: Some(format!(
+                    "NUMERIC_ONLY: max_residual={:.3e} > tolerance={:.3e}",
+                    report.max_abs_residual, report.tolerance
+                )),
+            },
+            Err(error) => VerificationResult::Unknown {
+                reason: format!("numeric Einstein-residual check unavailable: {error}"),
+            },
         }
     }
 
@@ -1199,39 +1318,112 @@ mod tests {
         assert!(matches!(result, VerificationResult::Unknown { .. }));
     }
 
-    // ── Einstein condition check ─────────────────────────────────────────────
+    // ── Explicitly numeric Einstein residual checks ───────────────────────────
 
     #[test]
-    fn test_verify_einstein_identity_metric() {
-        // Flat metric: Ric = 0, g = I_2, k = 0 → satisfied with tol 1e-6
-        let b = bridge();
-        let ricci = vec![0.0, 0.0, 0.0, 0.0];
-        let metric = vec![1.0, 0.0, 0.0, 1.0];
-        let result = b.verify_einstein_condition(&ricci, &metric, 2, 1e-6);
-        assert!(
-            matches!(result, VerificationResult::Sat { .. }),
-            "flat metric should satisfy Einstein: {result:?}"
+    fn test_einstein_numeric_residual_report_is_explicit() {
+        let ricci = [1.0, 0.0, 0.0, 1.0];
+        let metric = [1.0, 0.0, 0.0, 1.0];
+        let report = Z3Bridge::check_einstein_residual_numeric(&ricci, &metric, 2, 1e-6).unwrap();
+        assert_eq!(report.dimension, 2);
+        assert_eq!(report.least_squares_k, 1.0);
+        assert_eq!(report.components_compared, 2);
+        assert_eq!(report.max_abs_residual, 0.0);
+        assert!(report.within_tolerance);
+        assert_eq!(report.tolerance, 1e-6);
+    }
+
+    #[test]
+    fn test_einstein_numeric_residual_flat_metric_has_zero_defect() {
+        let report = Z3Bridge::check_einstein_residual_numeric(
+            &[0.0, 0.0, 0.0, 0.0],
+            &[1.0, 0.0, 0.0, 1.0],
+            2,
+            1e-6,
+        )
+        .unwrap();
+
+        assert_eq!(report.least_squares_k, 0.0);
+        assert_eq!(report.max_abs_residual, 0.0);
+        assert!(report.within_tolerance);
+    }
+
+    #[test]
+    fn test_einstein_numeric_residual_uses_all_component_least_squares_fit() {
+        // The diagonal ratios are 2 and 3; their arithmetic mean is 2.5, but the full-component least-squares coefficient is 302/101.
+        // The least-squares fit across all components is (2*1 + 30*10)/(1²+10²)
+        // = 302/101. Its residual is orthogonal to the metric under the
+        // component-space dot product, the normal-equation condition for the fit.
+        let ricci = [2.0, 0.0, 0.0, 30.0];
+        let metric = [1.0, 0.0, 0.0, 10.0];
+        let report =
+            Z3Bridge::check_einstein_residual_numeric(&ricci, &metric, 2, 1.0).unwrap();
+        assert!((report.least_squares_k - (302.0 / 101.0)).abs() < 1e-12);
+        assert_eq!(report.components_compared, 4);
+
+        let residual_dot_metric: f64 = report
+            .component_residuals
+            .iter()
+            .zip(metric.iter())
+            .map(|(residual, g)| residual * g)
+            .sum();
+        assert!(residual_dot_metric.abs() < 1e-12);
+        assert!(report.within_tolerance);
+    }
+
+    #[test]
+    fn test_einstein_numeric_residual_rejects_non_finite_derived_arithmetic() {
+        let report = Z3Bridge::check_einstein_residual_numeric(
+            &[f64::MAX, 0.0, 0.0, f64::MAX],
+            &[f64::MIN_POSITIVE, 0.0, 0.0, f64::MIN_POSITIVE],
+            2,
+            1.0,
+        );
+
+        assert_eq!(report, Err(EinsteinResidualError::NonFiniteArithmetic));
+    }
+
+    #[test]
+    fn test_einstein_numeric_residual_rejects_malformed_inputs() {
+        assert_eq!(
+            Z3Bridge::check_einstein_residual_numeric(
+                &[1.0, 2.0],
+                &[1.0, 0.0, 0.0, 1.0],
+                2,
+                0.01,
+            ),
+            Err(EinsteinResidualError::ComponentCountMismatch)
+        );
+        assert_eq!(
+            Z3Bridge::check_einstein_residual_numeric(
+                &[f64::NAN, 0.0, 0.0, 1.0],
+                &[1.0, 0.0, 0.0, 1.0],
+                2,
+                0.01,
+            ),
+            Err(EinsteinResidualError::NonFiniteInput)
+        );
+        assert_eq!(
+            Z3Bridge::check_einstein_residual_numeric(&[0.0], &[1.0], 1, -1.0),
+            Err(EinsteinResidualError::InvalidTolerance)
+        );
+        assert_eq!(
+            Z3Bridge::check_einstein_residual_numeric(&[0.0], &[0.0], 1, 1e-6),
+            Err(EinsteinResidualError::NoUsableMetricComponents)
+        );
+        assert_eq!(
+            Z3Bridge::check_einstein_residual_numeric(&[], &[], 0, 1e-6),
+            Err(EinsteinResidualError::ZeroDimension)
         );
     }
 
     #[test]
-    fn test_verify_einstein_wrong_dimensions() {
-        let b = bridge();
-        let result = b.verify_einstein_condition(&[1.0, 2.0], &[1.0, 0.0, 0.0, 1.0], 2, 0.01);
-        assert!(matches!(result, VerificationResult::Unknown { .. }));
-    }
-
-    #[test]
-    fn test_verify_einstein_sphere_approx() {
-        // S²: Ric = g (k=1 Einstein manifold), dim=2
-        let b = bridge();
-        let ricci = vec![1.0, 0.0, 0.0, 1.0];
-        let metric = vec![1.0, 0.0, 0.0, 1.0];
-        let result = b.verify_einstein_condition(&ricci, &metric, 2, 1e-6);
-        assert!(
-            matches!(result, VerificationResult::Sat { .. }),
-            "sphere approximation should satisfy Einstein: {result:?}"
-        );
+    fn test_einstein_numeric_residual_fails_outside_tolerance() {
+        let ricci = [1.0, 0.2, 0.0, 1.0];
+        let metric = [1.0, 0.0, 0.0, 1.0];
+        let report = Z3Bridge::check_einstein_residual_numeric(&ricci, &metric, 2, 0.01).unwrap();
+        assert!(!report.within_tolerance);
+        assert!((report.max_abs_residual - 0.2).abs() < 1e-12);
     }
 
     // ── CSP verification ─────────────────────────────────────────────────────
@@ -1322,7 +1514,7 @@ mod tests {
         assert!(!VerificationResult::Invalid.is_valid());
     }
 
-    // ── Verified Einstein Pipeline ──────────────────────────────────────────
+    // ── Numeric Einstein Residual Pipeline ──────────────────────────────────
 
     /// Formal induction proof: verify the triangular number formula T(n) = n(n+1)/2.
     ///
@@ -1350,13 +1542,12 @@ mod tests {
         );
     }
 
-    /// Integration test: einstein_search finds a candidate → z3_bridge verifies
-    /// the Einstein condition formally. This is the verified mathematical
-    /// discovery pipeline (Phase 8 of math/science plan).
+    /// Integration test: einstein_search finds a candidate and its concrete
+    /// Ricci/metric component values receive a numeric residual check. This test
+    /// does not prove the Einstein condition symbolically or over a domain.
     #[test]
-    fn test_verified_einstein_pipeline() {
+    fn test_numeric_einstein_residual_pipeline() {
         use symthaea_core::hdc::einstein_search::{EinsteinSearchConfig, search_einstein_metrics};
-        use symthaea_core::hdc::riemannian_geometry::MetricTensor;
 
         // Step 1: Search for Einstein metrics on S² (trivially the round sphere)
         let config = EinsteinSearchConfig {
@@ -1390,22 +1581,19 @@ mod tests {
             })
             .collect();
 
-        // Step 3: Verify Einstein condition via Z3 bridge
-        let bridge = Z3Bridge::new();
-        let verification = bridge.verify_einstein_condition(
+        // Step 3: Check concrete residuals. This is numeric candidate evidence,
+        // not an SMT/formal proof of a symbolic or universal geometric identity.
+        let report = Z3Bridge::check_einstein_residual_numeric(
             &ricci_flat,
             &metric_flat,
             metric.dim,
-            0.1, // relaxed tolerance for search result
-        );
+            0.1, // relaxed tolerance for search candidate
+        )
+        .expect("finite candidate should produce a numeric residual report");
 
-        // The round sphere should satisfy Einstein (Ric = kg)
         assert!(
-            matches!(
-                verification,
-                VerificationResult::Sat { .. } | VerificationResult::UsingFallback
-            ),
-            "Best candidate from S² search should satisfy Einstein condition: {verification:?}"
+            report.within_tolerance,
+            "S² search candidate exceeded numeric residual tolerance: {report:?}"
         );
     }
 
