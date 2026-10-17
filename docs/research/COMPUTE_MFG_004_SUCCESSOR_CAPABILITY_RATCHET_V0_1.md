@@ -140,3 +140,43 @@ The first experimentally useful HDC kernel should be more than XOR bind in isola
 For the same 16,384-bit input pair, compare declared lane profiles of 64, 128, 256, 512 and 16,384 bits (256, 128, 64, 32 and 1 transfers per vector, respectively). These counts are arithmetic consequences of widths, not measured performance. Freeze the exact input/output corpus and require integer distance equality in every profile. Then measure separately: vector comparisons/s, cycles/vector, p50/p95/p99 latency, sustained backpressured throughput, state/resource/timing reports, host transfers, system energy/comparison, and retrieval/task quality. Simulation cycles and synthesis estimates cannot satisfy the physical system-energy gate.
 
 This kernel also provides a useful falsification test: a wider lane may reduce transfer count but enlarge combinational logic or routing, while a narrow lane may improve implementation feasibility but lose throughput to per-beat and host/protocol overhead. No lane width should be selected as best before pinned synthesis and then physical-board measurement.
+## Dynamical HDC-LTC track: 16K–256K ContinuousHV, not just packed BinaryHV
+
+Symthaea's active dynamical architecture is the in-core `symthaea-core::hdc::hdc_ltc_unified` path. The 16,384-bit packed BinaryHV RTL is one exact operator experiment, not a substitute for the liquid system's float32 state, learned gates, effective time constants, and trajectory evolution.
+
+The repository's resolution-extension branch already defines exploratory 131,072- and 262,144-dimensional ContinuousHV operator evidence. The hardware successor program should therefore include a separate dynamical track at 16K, 32K, 64K, 128K and 256K. Do not promote >64K to a production default until the operator, transition, trajectory, resource and task-quality owners qualify it.
+
+Canonical owners to compose:
+- [#6560](https://github.com/Luminous-Dynamics/symthaea/issues/6560) / [#6561](https://github.com/Luminous-Dynamics/symthaea/issues/6561): state-continuous resolution transitions and trajectory matrix.
+- [#6596](https://github.com/Luminous-Dynamics/symthaea/pull/6596), [#6619](https://github.com/Luminous-Dynamics/symthaea/issues/6619), [#6630](https://github.com/Luminous-Dynamics/symthaea/pull/6630): 16K–256K ContinuousHV operator evidence and fail-closed dependencies.
+- [#6631](https://github.com/Luminous-Dynamics/symthaea/issues/6631): resource admissibility after trajectory qualification.
+- [#7374](https://github.com/Luminous-Dynamics/symthaea/issues/7374): bounded iterative time-step API and numerical validation.
+- [#3348](https://github.com/Luminous-Dynamics/symthaea/issues/3348): manifold-compressed liquid-dynamics controls.
+- [#7749](https://github.com/Luminous-Dynamics/symthaea/issues/7749): dynamical HDC-LTC hardware/software co-design matrix.
+
+### Resolution and reference sizes
+
+| ContinuousHV dimensions | One float32 vector | Status in current resolution contract |
+|---:|---:|---|
+| 16,384 | 64 KiB | Baseline tier |
+| 32,768 | 128 KiB | Baseline tier |
+| 65,536 | 256 KiB | Baseline tier |
+| 131,072 | 512 KiB | Exploratory |
+| 262,144 | 1 MiB | Exploratory |
+
+These are one-vector representation sizes, not full neuron/network working sets, cache traffic, measured energy or peak allocations. Multiply by the actual state/weight/gate/tau vector counts from the frozen active configuration, with checked arithmetic.
+
+### Dynamical work to benchmark
+
+- Fixed and irregular `dt`, ordinary evolution and long-horizon sequences.
+- Current fused/closed-form path versus the bounded iterative path, with a fine-step RK4 reference where applicable.
+- State, equilibrium, effective tau and gate distortion; per-step and accumulated trajectory divergence.
+- High-resolution reference versus direct low-dimensional evolution and explicit high→low/evolve/low→high transitions.
+- Online adaptation and snapshot/restore continuity; no hidden state reset on a resolution change.
+- Resident/temporary memory, bytes moved, allocations, per-update latency, p50/p95/p99, updates/s and system energy under the same boundary.
+
+### Architecture candidates
+
+Compare dense float32 evolution, SIMD/cache-tiled state update, dependency-valid streamed chunks, and manifold/low-rank alternatives with an explicit residual/novelty path. Event-driven skipping is permitted only when a qualified activity/dependency map proves skipped state cannot affect the required output. Keep approximate or analogue representations versioned separately from exact ContinuousHV execution. Do not assume that the static XOR/Hamming RTL path accelerates liquid dynamics.
+
+The acceptance unit is the **trajectory at fixed task quality and explicit resource/latency constraints**, not a single static similarity result. An operator-matrix PASS is a prerequisite, not trajectory qualification or measured performance advantage.
