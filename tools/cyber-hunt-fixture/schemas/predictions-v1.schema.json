@@ -1,0 +1,86 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://raw.githubusercontent.com/Luminous-Dynamics/symthaea/main/tools/cyber-hunt-fixture/schemas/predictions-v1.schema.json",
+  "title": "Synthetic cyber hunt prediction set v1",
+  "type": "object",
+  "additionalProperties": false,
+  "required": [
+    "schema_version",
+    "run_id",
+    "source_commit",
+    "solver_manifest_sha256",
+    "event_store_sha256",
+    "suspects",
+    "abstained_record_ids",
+    "non_claims"
+  ],
+  "properties": {
+    "schema_version": {
+      "const": "cyber-hunt-predictions-v1"
+    },
+    "run_id": {
+      "type": "string",
+      "minLength": 3,
+      "maxLength": 128
+    },
+    "source_commit": {
+      "type": "string",
+      "minLength": 1
+    },
+    "solver_manifest_sha256": {
+      "type": "string",
+      "pattern": "^[0-9a-f]{64}$"
+    },
+    "event_store_sha256": {
+      "type": "string",
+      "pattern": "^[0-9a-f]{64}$"
+    },
+    "suspects": {
+      "type": "array",
+      "items": {
+        "type": "object",
+        "additionalProperties": false,
+        "required": [
+          "record_id",
+          "evidence_refs",
+          "rationale"
+        ],
+        "properties": {
+          "record_id": {
+            "type": "string",
+            "pattern": "^evt-[0-9]{8}$"
+          },
+          "evidence_refs": {
+            "type": "array",
+            "minItems": 1,
+            "uniqueItems": true,
+            "items": {
+              "type": "string",
+              "pattern": "^evt-[0-9]{8}$"
+            }
+          },
+          "rationale": {
+            "type": "string",
+            "minLength": 8
+          }
+        }
+      }
+    },
+    "abstained_record_ids": {
+      "type": "array",
+      "uniqueItems": true,
+      "items": {
+        "type": "string",
+        "pattern": "^evt-[0-9]{8}$"
+      }
+    },
+    "non_claims": {
+      "type": "array",
+      "minItems": 1,
+      "items": {
+        "type": "string",
+        "minLength": 1
+      }
+    }
+  }
+}

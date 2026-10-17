@@ -1,0 +1,105 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://raw.githubusercontent.com/Luminous-Dynamics/symthaea/main/tools/cyber-hunt-fixture/schemas/query-receipt-v1.schema.json",
+  "title": "Synthetic cyber hunt query receipt v1",
+  "type": "object",
+  "additionalProperties": false,
+  "required": [
+    "schema_version",
+    "disposition",
+    "query_id",
+    "request_sha256",
+    "solver_manifest_sha256",
+    "event_store_sha256",
+    "source_commit",
+    "source_commit_pinned",
+    "rows_examined",
+    "rows_matched",
+    "rows_returned",
+    "row_bytes_returned",
+    "truncated",
+    "cumulative_queries",
+    "cumulative_rows_examined",
+    "cumulative_rows_returned",
+    "cumulative_bytes_returned",
+    "non_claims"
+  ],
+  "properties": {
+    "schema_version": {
+      "const": "cyber-hunt-query-receipt-v1"
+    },
+    "disposition": {
+      "const": "READ_ONLY_EVIDENCE_RESULTS_NOT_A_SECURITY_CONCLUSION"
+    },
+    "query_id": {
+      "type": "string",
+      "pattern": "^query-[0-9]{6}$"
+    },
+    "request_sha256": {
+      "type": "string",
+      "pattern": "^[0-9a-f]{64}$"
+    },
+    "solver_manifest_sha256": {
+      "type": "string",
+      "pattern": "^[0-9a-f]{64}$"
+    },
+    "event_store_sha256": {
+      "type": "string",
+      "pattern": "^[0-9a-f]{64}$"
+    },
+    "source_commit": {
+      "type": "string",
+      "minLength": 1
+    },
+    "source_commit_pinned": {
+      "type": "boolean"
+    },
+    "rows_examined": {
+      "type": "integer",
+      "minimum": 0
+    },
+    "rows_matched": {
+      "type": "integer",
+      "minimum": 0
+    },
+    "rows_returned": {
+      "type": "integer",
+      "minimum": 0
+    },
+    "row_bytes_returned": {
+      "type": "integer",
+      "minimum": 0
+    },
+    "truncated": {
+      "type": "boolean"
+    },
+    "cumulative_queries": {
+      "type": "integer",
+      "minimum": 1,
+      "maximum": 100
+    },
+    "cumulative_rows_examined": {
+      "type": "integer",
+      "minimum": 0,
+      "maximum": 1000000
+    },
+    "cumulative_rows_returned": {
+      "type": "integer",
+      "minimum": 0,
+      "maximum": 10000
+    },
+    "cumulative_bytes_returned": {
+      "type": "integer",
+      "minimum": 0,
+      "maximum": 8388608
+    },
+    "non_claims": {
+      "type": "array",
+      "minItems": 1,
+      "items": {
+        "type": "string",
+        "minLength": 1
+      }
+    }
+  }
+}

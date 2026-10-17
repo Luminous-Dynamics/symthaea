@@ -1,0 +1,66 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://raw.githubusercontent.com/Luminous-Dynamics/symthaea/main/tools/cyber-hunt-fixture/schemas/solver-manifest-v1.schema.json",
+  "title": "Synthetic cyber hunt solver-view manifest v1",
+  "type": "object",
+  "additionalProperties": false,
+  "required": [
+    "schema_version",
+    "generator_version",
+    "source_commit",
+    "source_commit_pinned",
+    "synthetic_only",
+    "seed",
+    "record_count",
+    "event_file",
+    "event_sha256",
+    "event_utf8_bytes",
+    "qualification_state",
+    "claim_ceiling"
+  ],
+  "properties": {
+    "schema_version": {
+      "const": "cyber-hunt-solver-manifest-v1"
+    },
+    "generator_version": {
+      "const": "cyber-hunt-fixture-v1"
+    },
+    "source_commit": {
+      "type": "string",
+      "minLength": 1
+    },
+    "source_commit_pinned": {
+      "type": "boolean"
+    },
+    "synthetic_only": {
+      "const": true
+    },
+    "seed": {
+      "type": "integer",
+      "minimum": 0
+    },
+    "record_count": {
+      "type": "integer",
+      "minimum": 500,
+      "maximum": 250000
+    },
+    "event_file": {
+      "const": "events.jsonl"
+    },
+    "event_sha256": {
+      "type": "string",
+      "pattern": "^[0-9a-f]{64}$"
+    },
+    "event_utf8_bytes": {
+      "type": "integer",
+      "minimum": 1
+    },
+    "qualification_state": {
+      "const": "UNSCORED"
+    },
+    "claim_ceiling": {
+      "type": "string",
+      "minLength": 1
+    }
+  }
+}
