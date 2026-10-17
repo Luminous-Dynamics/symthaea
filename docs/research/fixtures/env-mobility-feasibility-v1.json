@@ -1,0 +1,1466 @@
+{
+  "corpus_id": "env-mobility-feasibility-v1",
+  "schema_version": "env-mobility-case-v1",
+  "status": "synthetic_frozen_candidate",
+  "generated_on": "2026-10-17",
+  "source_class": "fully_synthetic_no_external_measurements",
+  "claim_ceiling": "Fixture semantics only. No flight, marine, environmental, cost, calibration, manufacturing, safety, or regulatory capability is established.",
+  "oracle_rule_order": [
+    "Reject known prohibited site/data use, exceeded ecological or operating envelope, invalid coordinate reference, insufficient energy reserve, unavailable recovery, incompatible payload, known absent local failsafe during communications partition, an estimated value claimed as measured, sensor timeout coerced to zero, and hardware/configuration evidence mismatch.",
+    "Abstain for unknown site/operating/permission evidence, stale/missing/failed calibration, ambiguous coordinates, uncertain/insufficient energy evidence where not known to be insufficient, unknown recovery or compatibility, unknown local failsafe, unestablished offline policy, unknown data rights, invalid/stale source data, unknown configuration match, or unknown reference quality.",
+    "Prefer a lower-complexity baseline only when its sufficiency is declared and all previous hard-feasibility/evidence gates are satisfied.",
+    "Permit degraded planning under communications partition only when a tested local failsafe and valid offline/store-and-forward policy are declared.",
+    "Otherwise admit only to the next declared review stage, never directly to physical execution."
+  ],
+  "disposition_vocabulary": [
+    "reject",
+    "abstain",
+    "prefer_baseline",
+    "admit_degraded",
+    "admit"
+  ],
+  "expected_outcomes_are_independent_test_labels": true,
+  "implementation_binding": "The future qualifier must derive dispositions from raw facts independently and must not trust expected_disposition or expected_reason_codes as its own answer.",
+  "cases": [
+    {
+      "case_id": "ENV-MOBILITY-WS-01",
+      "mission_family": "watershed_lake",
+      "platform_family": "usv",
+      "scenario": "nominal_surface_transect",
+      "facts": {
+        "site_authority": "permitted",
+        "ecological_constraint": "within_limit",
+        "environment_envelope": "within",
+        "sensor_calibration": "current",
+        "coordinate_reference": "known",
+        "energy_reserve": "sufficient",
+        "recovery_plan": "viable",
+        "payload_compatibility": "compatible",
+        "local_failsafe": "present_tested",
+        "communications": "available",
+        "offline_policy": "valid",
+        "data_rights": "permitted",
+        "observation_source": "measured",
+        "requested_claim": "measured",
+        "source_status": "valid",
+        "configuration_match": "exact",
+        "reference_quality": "adequate",
+        "baseline": "robot_needed"
+      },
+      "expected_disposition": "admit",
+      "expected_reason_codes": [
+        "ALL_DECLARED_SYNTHETIC_GATES_SATISFIED"
+      ]
+    },
+    {
+      "case_id": "ENV-MOBILITY-WS-02",
+      "mission_family": "watershed_lake",
+      "platform_family": "usv",
+      "scenario": "fixed_sensor_already_sufficient",
+      "facts": {
+        "site_authority": "permitted",
+        "ecological_constraint": "within_limit",
+        "environment_envelope": "within",
+        "sensor_calibration": "current",
+        "coordinate_reference": "known",
+        "energy_reserve": "sufficient",
+        "recovery_plan": "viable",
+        "payload_compatibility": "compatible",
+        "local_failsafe": "present_tested",
+        "communications": "available",
+        "offline_policy": "valid",
+        "data_rights": "permitted",
+        "observation_source": "measured",
+        "requested_claim": "measured",
+        "source_status": "valid",
+        "configuration_match": "exact",
+        "reference_quality": "adequate",
+        "baseline": "fixed_sensor_sufficient"
+      },
+      "expected_disposition": "prefer_baseline",
+      "expected_reason_codes": [
+        "LOWER_COMPLEXITY_BASELINE_SUFFICIENT"
+      ]
+    },
+    {
+      "case_id": "ENV-MOBILITY-WS-03",
+      "mission_family": "watershed_lake",
+      "platform_family": "usv",
+      "scenario": "sampling_in_prohibited_reserve",
+      "facts": {
+        "site_authority": "prohibited",
+        "ecological_constraint": "within_limit",
+        "environment_envelope": "within",
+        "sensor_calibration": "current",
+        "coordinate_reference": "known",
+        "energy_reserve": "sufficient",
+        "recovery_plan": "viable",
+        "payload_compatibility": "compatible",
+        "local_failsafe": "present_tested",
+        "communications": "available",
+        "offline_policy": "valid",
+        "data_rights": "permitted",
+        "observation_source": "measured",
+        "requested_claim": "measured",
+        "source_status": "valid",
+        "configuration_match": "exact",
+        "reference_quality": "adequate",
+        "baseline": "robot_needed"
+      },
+      "expected_disposition": "reject",
+      "expected_reason_codes": [
+        "SITE_PERMISSION_DENIED"
+      ]
+    },
+    {
+      "case_id": "ENV-MOBILITY-WS-04",
+      "mission_family": "watershed_lake",
+      "platform_family": "usv",
+      "scenario": "dissolved_oxygen_probe_calibration_stale",
+      "facts": {
+        "site_authority": "permitted",
+        "ecological_constraint": "within_limit",
+        "environment_envelope": "within",
+        "sensor_calibration": "stale",
+        "coordinate_reference": "known",
+        "energy_reserve": "sufficient",
+        "recovery_plan": "viable",
+        "payload_compatibility": "compatible",
+        "local_failsafe": "present_tested",
+        "communications": "available",
+        "offline_policy": "valid",
+        "data_rights": "permitted",
+        "observation_source": "measured",
+        "requested_claim": "measured",
+        "source_status": "valid",
+        "configuration_match": "exact",
+        "reference_quality": "adequate",
+        "baseline": "robot_needed"
+      },
+      "expected_disposition": "abstain",
+      "expected_reason_codes": [
+        "CALIBRATION_NOT_CURRENT"
+      ]
+    },
+    {
+      "case_id": "ENV-MOBILITY-WS-05",
+      "mission_family": "watershed_lake",
+      "platform_family": "usv",
+      "scenario": "current_outside_vehicle_envelope",
+      "facts": {
+        "site_authority": "permitted",
+        "ecological_constraint": "within_limit",
+        "environment_envelope": "outside",
+        "sensor_calibration": "current",
+        "coordinate_reference": "known",
+        "energy_reserve": "sufficient",
+        "recovery_plan": "viable",
+        "payload_compatibility": "compatible",
+        "local_failsafe": "present_tested",
+        "communications": "available",
+        "offline_policy": "valid",
+        "data_rights": "permitted",
+        "observation_source": "measured",
+        "requested_claim": "measured",
+        "source_status": "valid",
+        "configuration_match": "exact",
+        "reference_quality": "adequate",
+        "baseline": "robot_needed"
+      },
+      "expected_disposition": "reject",
+      "expected_reason_codes": [
+        "OUTSIDE_DECLARED_ENVELOPE"
+      ]
+    },
+    {
+      "case_id": "ENV-MOBILITY-WS-06",
+      "mission_family": "watershed_lake",
+      "platform_family": "usv",
+      "scenario": "battery_reserve_known_insufficient",
+      "facts": {
+        "site_authority": "permitted",
+        "ecological_constraint": "within_limit",
+        "environment_envelope": "within",
+        "sensor_calibration": "current",
+        "coordinate_reference": "known",
+        "energy_reserve": "insufficient",
+        "recovery_plan": "viable",
+        "payload_compatibility": "compatible",
+        "local_failsafe": "present_tested",
+        "communications": "available",
+        "offline_policy": "valid",
+        "data_rights": "permitted",
+        "observation_source": "measured",
+        "requested_claim": "measured",
+        "source_status": "valid",
+        "configuration_match": "exact",
+        "reference_quality": "adequate",
+        "baseline": "robot_needed"
+      },
+      "expected_disposition": "reject",
+      "expected_reason_codes": [
+        "ENERGY_RESERVE_INSUFFICIENT"
+      ]
+    },
+    {
+      "case_id": "ENV-MOBILITY-WS-07",
+      "mission_family": "watershed_lake",
+      "platform_family": "usv",
+      "scenario": "gnss_datum_ambiguous",
+      "facts": {
+        "site_authority": "permitted",
+        "ecological_constraint": "within_limit",
+        "environment_envelope": "within",
+        "sensor_calibration": "current",
+        "coordinate_reference": "ambiguous",
+        "energy_reserve": "sufficient",
+        "recovery_plan": "viable",
+        "payload_compatibility": "compatible",
+        "local_failsafe": "present_tested",
+        "communications": "available",
+        "offline_policy": "valid",
+        "data_rights": "permitted",
+        "observation_source": "measured",
+        "requested_claim": "measured",
+        "source_status": "valid",
+        "configuration_match": "exact",
+        "reference_quality": "adequate",
+        "baseline": "robot_needed"
+      },
+      "expected_disposition": "abstain",
+      "expected_reason_codes": [
+        "COORDINATE_REFERENCE_AMBIGUOUS"
+      ]
+    },
+    {
+      "case_id": "ENV-MOBILITY-WS-08",
+      "mission_family": "watershed_lake",
+      "platform_family": "usv",
+      "scenario": "network_partition_local_failsafe_valid",
+      "facts": {
+        "site_authority": "permitted",
+        "ecological_constraint": "within_limit",
+        "environment_envelope": "within",
+        "sensor_calibration": "current",
+        "coordinate_reference": "known",
+        "energy_reserve": "sufficient",
+        "recovery_plan": "viable",
+        "payload_compatibility": "compatible",
+        "local_failsafe": "present_tested",
+        "communications": "partition",
+        "offline_policy": "valid",
+        "data_rights": "permitted",
+        "observation_source": "measured",
+        "requested_claim": "measured",
+        "source_status": "valid",
+        "configuration_match": "exact",
+        "reference_quality": "adequate",
+        "baseline": "robot_needed"
+      },
+      "expected_disposition": "admit_degraded",
+      "expected_reason_codes": [
+        "STORE_AND_FORWARD_WITH_LOCAL_FAILSAFE"
+      ]
+    },
+    {
+      "case_id": "ENV-MOBILITY-CE-01",
+      "mission_family": "coast_estuary",
+      "platform_family": "auv",
+      "scenario": "nominal_subsurface_sample",
+      "facts": {
+        "site_authority": "permitted",
+        "ecological_constraint": "within_limit",
+        "environment_envelope": "within",
+        "sensor_calibration": "current",
+        "coordinate_reference": "known",
+        "energy_reserve": "sufficient",
+        "recovery_plan": "viable",
+        "payload_compatibility": "compatible",
+        "local_failsafe": "present_tested",
+        "communications": "available",
+        "offline_policy": "valid",
+        "data_rights": "permitted",
+        "observation_source": "measured",
+        "requested_claim": "measured",
+        "source_status": "valid",
+        "configuration_match": "exact",
+        "reference_quality": "adequate",
+        "baseline": "robot_needed"
+      },
+      "expected_disposition": "admit",
+      "expected_reason_codes": [
+        "ALL_DECLARED_SYNTHETIC_GATES_SATISFIED"
+      ]
+    },
+    {
+      "case_id": "ENV-MOBILITY-CE-02",
+      "mission_family": "coast_estuary",
+      "platform_family": "auv",
+      "scenario": "shoreline_sensor_array_sufficient",
+      "facts": {
+        "site_authority": "permitted",
+        "ecological_constraint": "within_limit",
+        "environment_envelope": "within",
+        "sensor_calibration": "current",
+        "coordinate_reference": "known",
+        "energy_reserve": "sufficient",
+        "recovery_plan": "viable",
+        "payload_compatibility": "compatible",
+        "local_failsafe": "present_tested",
+        "communications": "available",
+        "offline_policy": "valid",
+        "data_rights": "permitted",
+        "observation_source": "measured",
+        "requested_claim": "measured",
+        "source_status": "valid",
+        "configuration_match": "exact",
+        "reference_quality": "adequate",
+        "baseline": "fixed_sensor_sufficient"
+      },
+      "expected_disposition": "prefer_baseline",
+      "expected_reason_codes": [
+        "LOWER_COMPLEXITY_BASELINE_SUFFICIENT"
+      ]
+    },
+    {
+      "case_id": "ENV-MOBILITY-CE-03",
+      "mission_family": "coast_estuary",
+      "platform_family": "auv",
+      "scenario": "sensitive_area_permission_denied",
+      "facts": {
+        "site_authority": "prohibited",
+        "ecological_constraint": "within_limit",
+        "environment_envelope": "within",
+        "sensor_calibration": "current",
+        "coordinate_reference": "known",
+        "energy_reserve": "sufficient",
+        "recovery_plan": "viable",
+        "payload_compatibility": "compatible",
+        "local_failsafe": "present_tested",
+        "communications": "available",
+        "offline_policy": "valid",
+        "data_rights": "permitted",
+        "observation_source": "measured",
+        "requested_claim": "measured",
+        "source_status": "valid",
+        "configuration_match": "exact",
+        "reference_quality": "adequate",
+        "baseline": "robot_needed"
+      },
+      "expected_disposition": "reject",
+      "expected_reason_codes": [
+        "SITE_PERMISSION_DENIED"
+      ]
+    },
+    {
+      "case_id": "ENV-MOBILITY-CE-04",
+      "mission_family": "coast_estuary",
+      "platform_family": "auv",
+      "scenario": "optical_payload_calibration_missing",
+      "facts": {
+        "site_authority": "permitted",
+        "ecological_constraint": "within_limit",
+        "environment_envelope": "within",
+        "sensor_calibration": "missing",
+        "coordinate_reference": "known",
+        "energy_reserve": "sufficient",
+        "recovery_plan": "viable",
+        "payload_compatibility": "compatible",
+        "local_failsafe": "present_tested",
+        "communications": "available",
+        "offline_policy": "valid",
+        "data_rights": "permitted",
+        "observation_source": "measured",
+        "requested_claim": "measured",
+        "source_status": "valid",
+        "configuration_match": "exact",
+        "reference_quality": "adequate",
+        "baseline": "robot_needed"
+      },
+      "expected_disposition": "abstain",
+      "expected_reason_codes": [
+        "CALIBRATION_NOT_CURRENT"
+      ]
+    },
+    {
+      "case_id": "ENV-MOBILITY-CE-05",
+      "mission_family": "coast_estuary",
+      "platform_family": "auv",
+      "scenario": "depth_exceeds_declared_pressure_envelope",
+      "facts": {
+        "site_authority": "permitted",
+        "ecological_constraint": "within_limit",
+        "environment_envelope": "outside",
+        "sensor_calibration": "current",
+        "coordinate_reference": "known",
+        "energy_reserve": "sufficient",
+        "recovery_plan": "viable",
+        "payload_compatibility": "compatible",
+        "local_failsafe": "present_tested",
+        "communications": "available",
+        "offline_policy": "valid",
+        "data_rights": "permitted",
+        "observation_source": "measured",
+        "requested_claim": "measured",
+        "source_status": "valid",
+        "configuration_match": "exact",
+        "reference_quality": "adequate",
+        "baseline": "robot_needed"
+      },
+      "expected_disposition": "reject",
+      "expected_reason_codes": [
+        "OUTSIDE_DECLARED_ENVELOPE"
+      ]
+    },
+    {
+      "case_id": "ENV-MOBILITY-CE-06",
+      "mission_family": "coast_estuary",
+      "platform_family": "auv",
+      "scenario": "docking_station_unavailable",
+      "facts": {
+        "site_authority": "permitted",
+        "ecological_constraint": "within_limit",
+        "environment_envelope": "within",
+        "sensor_calibration": "current",
+        "coordinate_reference": "known",
+        "energy_reserve": "sufficient",
+        "recovery_plan": "unavailable",
+        "payload_compatibility": "compatible",
+        "local_failsafe": "present_tested",
+        "communications": "available",
+        "offline_policy": "valid",
+        "data_rights": "permitted",
+        "observation_source": "measured",
+        "requested_claim": "measured",
+        "source_status": "valid",
+        "configuration_match": "exact",
+        "reference_quality": "adequate",
+        "baseline": "robot_needed"
+      },
+      "expected_disposition": "reject",
+      "expected_reason_codes": [
+        "NO_VIABLE_RECOVERY"
+      ]
+    },
+    {
+      "case_id": "ENV-MOBILITY-CE-07",
+      "mission_family": "coast_estuary",
+      "platform_family": "auv",
+      "scenario": "estimated_concentration_claimed_measured",
+      "facts": {
+        "site_authority": "permitted",
+        "ecological_constraint": "within_limit",
+        "environment_envelope": "within",
+        "sensor_calibration": "current",
+        "coordinate_reference": "known",
+        "energy_reserve": "sufficient",
+        "recovery_plan": "viable",
+        "payload_compatibility": "compatible",
+        "local_failsafe": "present_tested",
+        "communications": "available",
+        "offline_policy": "valid",
+        "data_rights": "permitted",
+        "observation_source": "estimated",
+        "requested_claim": "measured",
+        "source_status": "valid",
+        "configuration_match": "exact",
+        "reference_quality": "adequate",
+        "baseline": "robot_needed"
+      },
+      "expected_disposition": "reject",
+      "expected_reason_codes": [
+        "ESTIMATE_LAUNDERED_AS_MEASUREMENT"
+      ]
+    },
+    {
+      "case_id": "ENV-MOBILITY-CE-08",
+      "mission_family": "coast_estuary",
+      "platform_family": "auv",
+      "scenario": "network_partition_no_offline_policy",
+      "facts": {
+        "site_authority": "permitted",
+        "ecological_constraint": "within_limit",
+        "environment_envelope": "within",
+        "sensor_calibration": "current",
+        "coordinate_reference": "known",
+        "energy_reserve": "sufficient",
+        "recovery_plan": "viable",
+        "payload_compatibility": "compatible",
+        "local_failsafe": "present_tested",
+        "communications": "partition",
+        "offline_policy": "missing",
+        "data_rights": "permitted",
+        "observation_source": "measured",
+        "requested_claim": "measured",
+        "source_status": "valid",
+        "configuration_match": "exact",
+        "reference_quality": "adequate",
+        "baseline": "robot_needed"
+      },
+      "expected_disposition": "abstain",
+      "expected_reason_codes": [
+        "OFFLINE_POLICY_NOT_ESTABLISHED"
+      ]
+    },
+    {
+      "case_id": "ENV-MOBILITY-AG-01",
+      "mission_family": "agriculture_catchment",
+      "platform_family": "multirotor",
+      "scenario": "nominal_drainage_mapping",
+      "facts": {
+        "site_authority": "permitted",
+        "ecological_constraint": "within_limit",
+        "environment_envelope": "within",
+        "sensor_calibration": "current",
+        "coordinate_reference": "known",
+        "energy_reserve": "sufficient",
+        "recovery_plan": "viable",
+        "payload_compatibility": "compatible",
+        "local_failsafe": "present_tested",
+        "communications": "available",
+        "offline_policy": "valid",
+        "data_rights": "permitted",
+        "observation_source": "measured",
+        "requested_claim": "measured",
+        "source_status": "valid",
+        "configuration_match": "exact",
+        "reference_quality": "adequate",
+        "baseline": "robot_needed"
+      },
+      "expected_disposition": "admit",
+      "expected_reason_codes": [
+        "ALL_DECLARED_SYNTHETIC_GATES_SATISFIED"
+      ]
+    },
+    {
+      "case_id": "ENV-MOBILITY-AG-02",
+      "mission_family": "agriculture_catchment",
+      "platform_family": "multirotor",
+      "scenario": "ground_station_and_satellite_sufficient",
+      "facts": {
+        "site_authority": "permitted",
+        "ecological_constraint": "within_limit",
+        "environment_envelope": "within",
+        "sensor_calibration": "current",
+        "coordinate_reference": "known",
+        "energy_reserve": "sufficient",
+        "recovery_plan": "viable",
+        "payload_compatibility": "compatible",
+        "local_failsafe": "present_tested",
+        "communications": "available",
+        "offline_policy": "valid",
+        "data_rights": "permitted",
+        "observation_source": "measured",
+        "requested_claim": "measured",
+        "source_status": "valid",
+        "configuration_match": "exact",
+        "reference_quality": "adequate",
+        "baseline": "fixed_sensor_sufficient"
+      },
+      "expected_disposition": "prefer_baseline",
+      "expected_reason_codes": [
+        "LOWER_COMPLEXITY_BASELINE_SUFFICIENT"
+      ]
+    },
+    {
+      "case_id": "ENV-MOBILITY-AG-03",
+      "mission_family": "agriculture_catchment",
+      "platform_family": "multirotor",
+      "scenario": "site_access_rights_unknown",
+      "facts": {
+        "site_authority": "unknown",
+        "ecological_constraint": "within_limit",
+        "environment_envelope": "within",
+        "sensor_calibration": "current",
+        "coordinate_reference": "known",
+        "energy_reserve": "sufficient",
+        "recovery_plan": "viable",
+        "payload_compatibility": "compatible",
+        "local_failsafe": "present_tested",
+        "communications": "available",
+        "offline_policy": "valid",
+        "data_rights": "permitted",
+        "observation_source": "measured",
+        "requested_claim": "measured",
+        "source_status": "valid",
+        "configuration_match": "exact",
+        "reference_quality": "adequate",
+        "baseline": "robot_needed"
+      },
+      "expected_disposition": "abstain",
+      "expected_reason_codes": [
+        "SITE_PERMISSION_UNKNOWN"
+      ]
+    },
+    {
+      "case_id": "ENV-MOBILITY-AG-04",
+      "mission_family": "agriculture_catchment",
+      "platform_family": "multirotor",
+      "scenario": "multispectral_camera_calibration_failed",
+      "facts": {
+        "site_authority": "permitted",
+        "ecological_constraint": "within_limit",
+        "environment_envelope": "within",
+        "sensor_calibration": "failed",
+        "coordinate_reference": "known",
+        "energy_reserve": "sufficient",
+        "recovery_plan": "viable",
+        "payload_compatibility": "compatible",
+        "local_failsafe": "present_tested",
+        "communications": "available",
+        "offline_policy": "valid",
+        "data_rights": "permitted",
+        "observation_source": "measured",
+        "requested_claim": "measured",
+        "source_status": "valid",
+        "configuration_match": "exact",
+        "reference_quality": "adequate",
+        "baseline": "robot_needed"
+      },
+      "expected_disposition": "abstain",
+      "expected_reason_codes": [
+        "CALIBRATION_NOT_CURRENT"
+      ]
+    },
+    {
+      "case_id": "ENV-MOBILITY-AG-05",
+      "mission_family": "agriculture_catchment",
+      "platform_family": "multirotor",
+      "scenario": "gusts_outside_declared_envelope",
+      "facts": {
+        "site_authority": "permitted",
+        "ecological_constraint": "within_limit",
+        "environment_envelope": "outside",
+        "sensor_calibration": "current",
+        "coordinate_reference": "known",
+        "energy_reserve": "sufficient",
+        "recovery_plan": "viable",
+        "payload_compatibility": "compatible",
+        "local_failsafe": "present_tested",
+        "communications": "available",
+        "offline_policy": "valid",
+        "data_rights": "permitted",
+        "observation_source": "measured",
+        "requested_claim": "measured",
+        "source_status": "valid",
+        "configuration_match": "exact",
+        "reference_quality": "adequate",
+        "baseline": "robot_needed"
+      },
+      "expected_disposition": "reject",
+      "expected_reason_codes": [
+        "OUTSIDE_DECLARED_ENVELOPE"
+      ]
+    },
+    {
+      "case_id": "ENV-MOBILITY-AG-06",
+      "mission_family": "agriculture_catchment",
+      "platform_family": "multirotor",
+      "scenario": "payload_mount_incompatible",
+      "facts": {
+        "site_authority": "permitted",
+        "ecological_constraint": "within_limit",
+        "environment_envelope": "within",
+        "sensor_calibration": "current",
+        "coordinate_reference": "known",
+        "energy_reserve": "sufficient",
+        "recovery_plan": "viable",
+        "payload_compatibility": "incompatible",
+        "local_failsafe": "present_tested",
+        "communications": "available",
+        "offline_policy": "valid",
+        "data_rights": "permitted",
+        "observation_source": "measured",
+        "requested_claim": "measured",
+        "source_status": "valid",
+        "configuration_match": "exact",
+        "reference_quality": "adequate",
+        "baseline": "robot_needed"
+      },
+      "expected_disposition": "reject",
+      "expected_reason_codes": [
+        "PAYLOAD_INCOMPATIBLE"
+      ]
+    },
+    {
+      "case_id": "ENV-MOBILITY-AG-07",
+      "mission_family": "agriculture_catchment",
+      "platform_family": "multirotor",
+      "scenario": "sensor_timeout_coerced_to_zero",
+      "facts": {
+        "site_authority": "permitted",
+        "ecological_constraint": "within_limit",
+        "environment_envelope": "within",
+        "sensor_calibration": "current",
+        "coordinate_reference": "known",
+        "energy_reserve": "sufficient",
+        "recovery_plan": "viable",
+        "payload_compatibility": "compatible",
+        "local_failsafe": "present_tested",
+        "communications": "available",
+        "offline_policy": "valid",
+        "data_rights": "permitted",
+        "observation_source": "measured",
+        "requested_claim": "measured",
+        "source_status": "timeout_as_zero",
+        "configuration_match": "exact",
+        "reference_quality": "adequate",
+        "baseline": "robot_needed"
+      },
+      "expected_disposition": "reject",
+      "expected_reason_codes": [
+        "SENSOR_TIMEOUT_COERCED_TO_ZERO"
+      ]
+    },
+    {
+      "case_id": "ENV-MOBILITY-AG-08",
+      "mission_family": "agriculture_catchment",
+      "platform_family": "multirotor",
+      "scenario": "network_partition_local_failsafe_valid",
+      "facts": {
+        "site_authority": "permitted",
+        "ecological_constraint": "within_limit",
+        "environment_envelope": "within",
+        "sensor_calibration": "current",
+        "coordinate_reference": "known",
+        "energy_reserve": "sufficient",
+        "recovery_plan": "viable",
+        "payload_compatibility": "compatible",
+        "local_failsafe": "present_tested",
+        "communications": "partition",
+        "offline_policy": "valid",
+        "data_rights": "permitted",
+        "observation_source": "measured",
+        "requested_claim": "measured",
+        "source_status": "valid",
+        "configuration_match": "exact",
+        "reference_quality": "adequate",
+        "baseline": "robot_needed"
+      },
+      "expected_disposition": "admit_degraded",
+      "expected_reason_codes": [
+        "STORE_AND_FORWARD_WITH_LOCAL_FAILSAFE"
+      ]
+    },
+    {
+      "case_id": "ENV-MOBILITY-DA-01",
+      "mission_family": "disaster_assessment",
+      "platform_family": "fixed_wing",
+      "scenario": "nominal_mapping_from_authorized_corridor",
+      "facts": {
+        "site_authority": "permitted",
+        "ecological_constraint": "within_limit",
+        "environment_envelope": "within",
+        "sensor_calibration": "current",
+        "coordinate_reference": "known",
+        "energy_reserve": "sufficient",
+        "recovery_plan": "viable",
+        "payload_compatibility": "compatible",
+        "local_failsafe": "present_tested",
+        "communications": "available",
+        "offline_policy": "valid",
+        "data_rights": "permitted",
+        "observation_source": "measured",
+        "requested_claim": "measured",
+        "source_status": "valid",
+        "configuration_match": "exact",
+        "reference_quality": "adequate",
+        "baseline": "robot_needed"
+      },
+      "expected_disposition": "admit",
+      "expected_reason_codes": [
+        "ALL_DECLARED_SYNTHETIC_GATES_SATISFIED"
+      ]
+    },
+    {
+      "case_id": "ENV-MOBILITY-DA-02",
+      "mission_family": "disaster_assessment",
+      "platform_family": "fixed_wing",
+      "scenario": "existing_imagery_meets_decision_need",
+      "facts": {
+        "site_authority": "permitted",
+        "ecological_constraint": "within_limit",
+        "environment_envelope": "within",
+        "sensor_calibration": "current",
+        "coordinate_reference": "known",
+        "energy_reserve": "sufficient",
+        "recovery_plan": "viable",
+        "payload_compatibility": "compatible",
+        "local_failsafe": "present_tested",
+        "communications": "available",
+        "offline_policy": "valid",
+        "data_rights": "permitted",
+        "observation_source": "measured",
+        "requested_claim": "measured",
+        "source_status": "valid",
+        "configuration_match": "exact",
+        "reference_quality": "adequate",
+        "baseline": "fixed_sensor_sufficient"
+      },
+      "expected_disposition": "prefer_baseline",
+      "expected_reason_codes": [
+        "LOWER_COMPLEXITY_BASELINE_SUFFICIENT"
+      ]
+    },
+    {
+      "case_id": "ENV-MOBILITY-DA-03",
+      "mission_family": "disaster_assessment",
+      "platform_family": "fixed_wing",
+      "scenario": "emergency_airspace_not_authorized",
+      "facts": {
+        "site_authority": "prohibited",
+        "ecological_constraint": "within_limit",
+        "environment_envelope": "within",
+        "sensor_calibration": "current",
+        "coordinate_reference": "known",
+        "energy_reserve": "sufficient",
+        "recovery_plan": "viable",
+        "payload_compatibility": "compatible",
+        "local_failsafe": "present_tested",
+        "communications": "available",
+        "offline_policy": "valid",
+        "data_rights": "permitted",
+        "observation_source": "measured",
+        "requested_claim": "measured",
+        "source_status": "valid",
+        "configuration_match": "exact",
+        "reference_quality": "adequate",
+        "baseline": "robot_needed"
+      },
+      "expected_disposition": "reject",
+      "expected_reason_codes": [
+        "SITE_PERMISSION_DENIED"
+      ]
+    },
+    {
+      "case_id": "ENV-MOBILITY-DA-04",
+      "mission_family": "disaster_assessment",
+      "platform_family": "fixed_wing",
+      "scenario": "camera_calibration_stale_after_repair",
+      "facts": {
+        "site_authority": "permitted",
+        "ecological_constraint": "within_limit",
+        "environment_envelope": "within",
+        "sensor_calibration": "stale",
+        "coordinate_reference": "known",
+        "energy_reserve": "sufficient",
+        "recovery_plan": "viable",
+        "payload_compatibility": "compatible",
+        "local_failsafe": "present_tested",
+        "communications": "available",
+        "offline_policy": "valid",
+        "data_rights": "permitted",
+        "observation_source": "measured",
+        "requested_claim": "measured",
+        "source_status": "valid",
+        "configuration_match": "exact",
+        "reference_quality": "adequate",
+        "baseline": "robot_needed"
+      },
+      "expected_disposition": "abstain",
+      "expected_reason_codes": [
+        "CALIBRATION_NOT_CURRENT"
+      ]
+    },
+    {
+      "case_id": "ENV-MOBILITY-DA-05",
+      "mission_family": "disaster_assessment",
+      "platform_family": "fixed_wing",
+      "scenario": "smoke_wind_and_visibility_outside_envelope",
+      "facts": {
+        "site_authority": "permitted",
+        "ecological_constraint": "within_limit",
+        "environment_envelope": "outside",
+        "sensor_calibration": "current",
+        "coordinate_reference": "known",
+        "energy_reserve": "sufficient",
+        "recovery_plan": "viable",
+        "payload_compatibility": "compatible",
+        "local_failsafe": "present_tested",
+        "communications": "available",
+        "offline_policy": "valid",
+        "data_rights": "permitted",
+        "observation_source": "measured",
+        "requested_claim": "measured",
+        "source_status": "valid",
+        "configuration_match": "exact",
+        "reference_quality": "adequate",
+        "baseline": "robot_needed"
+      },
+      "expected_disposition": "reject",
+      "expected_reason_codes": [
+        "OUTSIDE_DECLARED_ENVELOPE"
+      ]
+    },
+    {
+      "case_id": "ENV-MOBILITY-DA-06",
+      "mission_family": "disaster_assessment",
+      "platform_family": "fixed_wing",
+      "scenario": "no_safe_landing_or_recovery_corridor",
+      "facts": {
+        "site_authority": "permitted",
+        "ecological_constraint": "within_limit",
+        "environment_envelope": "within",
+        "sensor_calibration": "current",
+        "coordinate_reference": "known",
+        "energy_reserve": "sufficient",
+        "recovery_plan": "unavailable",
+        "payload_compatibility": "compatible",
+        "local_failsafe": "present_tested",
+        "communications": "available",
+        "offline_policy": "valid",
+        "data_rights": "permitted",
+        "observation_source": "measured",
+        "requested_claim": "measured",
+        "source_status": "valid",
+        "configuration_match": "exact",
+        "reference_quality": "adequate",
+        "baseline": "robot_needed"
+      },
+      "expected_disposition": "reject",
+      "expected_reason_codes": [
+        "NO_VIABLE_RECOVERY"
+      ]
+    },
+    {
+      "case_id": "ENV-MOBILITY-DA-07",
+      "mission_family": "disaster_assessment",
+      "platform_family": "fixed_wing",
+      "scenario": "hardware_revision_differs_from_evidence",
+      "facts": {
+        "site_authority": "permitted",
+        "ecological_constraint": "within_limit",
+        "environment_envelope": "within",
+        "sensor_calibration": "current",
+        "coordinate_reference": "known",
+        "energy_reserve": "sufficient",
+        "recovery_plan": "viable",
+        "payload_compatibility": "compatible",
+        "local_failsafe": "present_tested",
+        "communications": "available",
+        "offline_policy": "valid",
+        "data_rights": "permitted",
+        "observation_source": "measured",
+        "requested_claim": "measured",
+        "source_status": "valid",
+        "configuration_match": "mismatch",
+        "reference_quality": "adequate",
+        "baseline": "robot_needed"
+      },
+      "expected_disposition": "reject",
+      "expected_reason_codes": [
+        "CONFIGURATION_EVIDENCE_MISMATCH"
+      ]
+    },
+    {
+      "case_id": "ENV-MOBILITY-DA-08",
+      "mission_family": "disaster_assessment",
+      "platform_family": "fixed_wing",
+      "scenario": "network_partition_with_tested_local_abort",
+      "facts": {
+        "site_authority": "permitted",
+        "ecological_constraint": "within_limit",
+        "environment_envelope": "within",
+        "sensor_calibration": "current",
+        "coordinate_reference": "known",
+        "energy_reserve": "sufficient",
+        "recovery_plan": "viable",
+        "payload_compatibility": "compatible",
+        "local_failsafe": "present_tested",
+        "communications": "partition",
+        "offline_policy": "valid",
+        "data_rights": "permitted",
+        "observation_source": "measured",
+        "requested_claim": "measured",
+        "source_status": "valid",
+        "configuration_match": "exact",
+        "reference_quality": "adequate",
+        "baseline": "robot_needed"
+      },
+      "expected_disposition": "admit_degraded",
+      "expected_reason_codes": [
+        "STORE_AND_FORWARD_WITH_LOCAL_FAILSAFE"
+      ]
+    },
+    {
+      "case_id": "ENV-MOBILITY-BH-01",
+      "mission_family": "biodiversity_habitat",
+      "platform_family": "multirotor",
+      "scenario": "nominal_observation_outside_sensitive_core",
+      "facts": {
+        "site_authority": "permitted",
+        "ecological_constraint": "within_limit",
+        "environment_envelope": "within",
+        "sensor_calibration": "current",
+        "coordinate_reference": "known",
+        "energy_reserve": "sufficient",
+        "recovery_plan": "viable",
+        "payload_compatibility": "compatible",
+        "local_failsafe": "present_tested",
+        "communications": "available",
+        "offline_policy": "valid",
+        "data_rights": "permitted",
+        "observation_source": "measured",
+        "requested_claim": "measured",
+        "source_status": "valid",
+        "configuration_match": "exact",
+        "reference_quality": "adequate",
+        "baseline": "robot_needed"
+      },
+      "expected_disposition": "admit",
+      "expected_reason_codes": [
+        "ALL_DECLARED_SYNTHETIC_GATES_SATISFIED"
+      ]
+    },
+    {
+      "case_id": "ENV-MOBILITY-BH-02",
+      "mission_family": "biodiversity_habitat",
+      "platform_family": "multirotor",
+      "scenario": "fixed_camera_and_manual_observation_sufficient",
+      "facts": {
+        "site_authority": "permitted",
+        "ecological_constraint": "within_limit",
+        "environment_envelope": "within",
+        "sensor_calibration": "current",
+        "coordinate_reference": "known",
+        "energy_reserve": "sufficient",
+        "recovery_plan": "viable",
+        "payload_compatibility": "compatible",
+        "local_failsafe": "present_tested",
+        "communications": "available",
+        "offline_policy": "valid",
+        "data_rights": "permitted",
+        "observation_source": "measured",
+        "requested_claim": "measured",
+        "source_status": "valid",
+        "configuration_match": "exact",
+        "reference_quality": "adequate",
+        "baseline": "fixed_sensor_sufficient"
+      },
+      "expected_disposition": "prefer_baseline",
+      "expected_reason_codes": [
+        "LOWER_COMPLEXITY_BASELINE_SUFFICIENT"
+      ]
+    },
+    {
+      "case_id": "ENV-MOBILITY-BH-03",
+      "mission_family": "biodiversity_habitat",
+      "platform_family": "multirotor",
+      "scenario": "ecological_disturbance_limit_exceeded",
+      "facts": {
+        "site_authority": "permitted",
+        "ecological_constraint": "violated",
+        "environment_envelope": "within",
+        "sensor_calibration": "current",
+        "coordinate_reference": "known",
+        "energy_reserve": "sufficient",
+        "recovery_plan": "viable",
+        "payload_compatibility": "compatible",
+        "local_failsafe": "present_tested",
+        "communications": "available",
+        "offline_policy": "valid",
+        "data_rights": "permitted",
+        "observation_source": "measured",
+        "requested_claim": "measured",
+        "source_status": "valid",
+        "configuration_match": "exact",
+        "reference_quality": "adequate",
+        "baseline": "robot_needed"
+      },
+      "expected_disposition": "reject",
+      "expected_reason_codes": [
+        "ECOLOGICAL_LIMIT_EXCEEDED"
+      ]
+    },
+    {
+      "case_id": "ENV-MOBILITY-BH-04",
+      "mission_family": "biodiversity_habitat",
+      "platform_family": "multirotor",
+      "scenario": "species_sensor_calibration_missing",
+      "facts": {
+        "site_authority": "permitted",
+        "ecological_constraint": "within_limit",
+        "environment_envelope": "within",
+        "sensor_calibration": "missing",
+        "coordinate_reference": "known",
+        "energy_reserve": "sufficient",
+        "recovery_plan": "viable",
+        "payload_compatibility": "compatible",
+        "local_failsafe": "present_tested",
+        "communications": "available",
+        "offline_policy": "valid",
+        "data_rights": "permitted",
+        "observation_source": "measured",
+        "requested_claim": "measured",
+        "source_status": "valid",
+        "configuration_match": "exact",
+        "reference_quality": "adequate",
+        "baseline": "robot_needed"
+      },
+      "expected_disposition": "abstain",
+      "expected_reason_codes": [
+        "CALIBRATION_NOT_CURRENT"
+      ]
+    },
+    {
+      "case_id": "ENV-MOBILITY-BH-05",
+      "mission_family": "biodiversity_habitat",
+      "platform_family": "multirotor",
+      "scenario": "nesting_area_no_fly_boundary_violated",
+      "facts": {
+        "site_authority": "permitted",
+        "ecological_constraint": "within_limit",
+        "environment_envelope": "outside",
+        "sensor_calibration": "current",
+        "coordinate_reference": "known",
+        "energy_reserve": "sufficient",
+        "recovery_plan": "viable",
+        "payload_compatibility": "compatible",
+        "local_failsafe": "present_tested",
+        "communications": "available",
+        "offline_policy": "valid",
+        "data_rights": "permitted",
+        "observation_source": "measured",
+        "requested_claim": "measured",
+        "source_status": "valid",
+        "configuration_match": "exact",
+        "reference_quality": "adequate",
+        "baseline": "robot_needed"
+      },
+      "expected_disposition": "reject",
+      "expected_reason_codes": [
+        "OUTSIDE_DECLARED_ENVELOPE"
+      ]
+    },
+    {
+      "case_id": "ENV-MOBILITY-BH-06",
+      "mission_family": "biodiversity_habitat",
+      "platform_family": "multirotor",
+      "scenario": "sampling_energy_reserve_uncertain",
+      "facts": {
+        "site_authority": "permitted",
+        "ecological_constraint": "within_limit",
+        "environment_envelope": "within",
+        "sensor_calibration": "current",
+        "coordinate_reference": "known",
+        "energy_reserve": "uncertain",
+        "recovery_plan": "viable",
+        "payload_compatibility": "compatible",
+        "local_failsafe": "present_tested",
+        "communications": "available",
+        "offline_policy": "valid",
+        "data_rights": "permitted",
+        "observation_source": "measured",
+        "requested_claim": "measured",
+        "source_status": "valid",
+        "configuration_match": "exact",
+        "reference_quality": "adequate",
+        "baseline": "robot_needed"
+      },
+      "expected_disposition": "abstain",
+      "expected_reason_codes": [
+        "ENERGY_RESERVE_UNCERTAIN"
+      ]
+    },
+    {
+      "case_id": "ENV-MOBILITY-BH-07",
+      "mission_family": "biodiversity_habitat",
+      "platform_family": "multirotor",
+      "scenario": "sensitive_location_data_release_prohibited",
+      "facts": {
+        "site_authority": "permitted",
+        "ecological_constraint": "within_limit",
+        "environment_envelope": "within",
+        "sensor_calibration": "current",
+        "coordinate_reference": "known",
+        "energy_reserve": "sufficient",
+        "recovery_plan": "viable",
+        "payload_compatibility": "compatible",
+        "local_failsafe": "present_tested",
+        "communications": "available",
+        "offline_policy": "valid",
+        "data_rights": "prohibited",
+        "observation_source": "measured",
+        "requested_claim": "measured",
+        "source_status": "valid",
+        "configuration_match": "exact",
+        "reference_quality": "adequate",
+        "baseline": "robot_needed"
+      },
+      "expected_disposition": "reject",
+      "expected_reason_codes": [
+        "DATA_RIGHTS_PROHIBIT_CLAIM"
+      ]
+    },
+    {
+      "case_id": "ENV-MOBILITY-BH-08",
+      "mission_family": "biodiversity_habitat",
+      "platform_family": "multirotor",
+      "scenario": "communications_partition_local_failsafe_unknown",
+      "facts": {
+        "site_authority": "permitted",
+        "ecological_constraint": "within_limit",
+        "environment_envelope": "within",
+        "sensor_calibration": "current",
+        "coordinate_reference": "known",
+        "energy_reserve": "sufficient",
+        "recovery_plan": "viable",
+        "payload_compatibility": "compatible",
+        "local_failsafe": "unknown",
+        "communications": "partition",
+        "offline_policy": "valid",
+        "data_rights": "permitted",
+        "observation_source": "measured",
+        "requested_claim": "measured",
+        "source_status": "valid",
+        "configuration_match": "exact",
+        "reference_quality": "adequate",
+        "baseline": "robot_needed"
+      },
+      "expected_disposition": "abstain",
+      "expected_reason_codes": [
+        "LOCAL_FAILSAFE_UNVERIFIED"
+      ]
+    },
+    {
+      "case_id": "ENV-MOBILITY-RI-01",
+      "mission_family": "remote_infrastructure",
+      "platform_family": "rov",
+      "scenario": "nominal_tethered_inspection",
+      "facts": {
+        "site_authority": "permitted",
+        "ecological_constraint": "within_limit",
+        "environment_envelope": "within",
+        "sensor_calibration": "current",
+        "coordinate_reference": "known",
+        "energy_reserve": "sufficient",
+        "recovery_plan": "viable",
+        "payload_compatibility": "compatible",
+        "local_failsafe": "present_tested",
+        "communications": "available",
+        "offline_policy": "valid",
+        "data_rights": "permitted",
+        "observation_source": "measured",
+        "requested_claim": "measured",
+        "source_status": "valid",
+        "configuration_match": "exact",
+        "reference_quality": "adequate",
+        "baseline": "robot_needed"
+      },
+      "expected_disposition": "admit",
+      "expected_reason_codes": [
+        "ALL_DECLARED_SYNTHETIC_GATES_SATISFIED"
+      ]
+    },
+    {
+      "case_id": "ENV-MOBILITY-RI-02",
+      "mission_family": "remote_infrastructure",
+      "platform_family": "rov",
+      "scenario": "fixed_instrument_and_manual_visit_sufficient",
+      "facts": {
+        "site_authority": "permitted",
+        "ecological_constraint": "within_limit",
+        "environment_envelope": "within",
+        "sensor_calibration": "current",
+        "coordinate_reference": "known",
+        "energy_reserve": "sufficient",
+        "recovery_plan": "viable",
+        "payload_compatibility": "compatible",
+        "local_failsafe": "present_tested",
+        "communications": "available",
+        "offline_policy": "valid",
+        "data_rights": "permitted",
+        "observation_source": "measured",
+        "requested_claim": "measured",
+        "source_status": "valid",
+        "configuration_match": "exact",
+        "reference_quality": "adequate",
+        "baseline": "fixed_sensor_sufficient"
+      },
+      "expected_disposition": "prefer_baseline",
+      "expected_reason_codes": [
+        "LOWER_COMPLEXITY_BASELINE_SUFFICIENT"
+      ]
+    },
+    {
+      "case_id": "ENV-MOBILITY-RI-03",
+      "mission_family": "remote_infrastructure",
+      "platform_family": "rov",
+      "scenario": "asset_access_permission_prohibited",
+      "facts": {
+        "site_authority": "prohibited",
+        "ecological_constraint": "within_limit",
+        "environment_envelope": "within",
+        "sensor_calibration": "current",
+        "coordinate_reference": "known",
+        "energy_reserve": "sufficient",
+        "recovery_plan": "viable",
+        "payload_compatibility": "compatible",
+        "local_failsafe": "present_tested",
+        "communications": "available",
+        "offline_policy": "valid",
+        "data_rights": "permitted",
+        "observation_source": "measured",
+        "requested_claim": "measured",
+        "source_status": "valid",
+        "configuration_match": "exact",
+        "reference_quality": "adequate",
+        "baseline": "robot_needed"
+      },
+      "expected_disposition": "reject",
+      "expected_reason_codes": [
+        "SITE_PERMISSION_DENIED"
+      ]
+    },
+    {
+      "case_id": "ENV-MOBILITY-RI-04",
+      "mission_family": "remote_infrastructure",
+      "platform_family": "rov",
+      "scenario": "pressure_sensor_calibration_stale",
+      "facts": {
+        "site_authority": "permitted",
+        "ecological_constraint": "within_limit",
+        "environment_envelope": "within",
+        "sensor_calibration": "stale",
+        "coordinate_reference": "known",
+        "energy_reserve": "sufficient",
+        "recovery_plan": "viable",
+        "payload_compatibility": "compatible",
+        "local_failsafe": "present_tested",
+        "communications": "available",
+        "offline_policy": "valid",
+        "data_rights": "permitted",
+        "observation_source": "measured",
+        "requested_claim": "measured",
+        "source_status": "valid",
+        "configuration_match": "exact",
+        "reference_quality": "adequate",
+        "baseline": "robot_needed"
+      },
+      "expected_disposition": "abstain",
+      "expected_reason_codes": [
+        "CALIBRATION_NOT_CURRENT"
+      ]
+    },
+    {
+      "case_id": "ENV-MOBILITY-RI-05",
+      "mission_family": "remote_infrastructure",
+      "platform_family": "rov",
+      "scenario": "current_exceeds_declared_operating_envelope",
+      "facts": {
+        "site_authority": "permitted",
+        "ecological_constraint": "within_limit",
+        "environment_envelope": "outside",
+        "sensor_calibration": "current",
+        "coordinate_reference": "known",
+        "energy_reserve": "sufficient",
+        "recovery_plan": "viable",
+        "payload_compatibility": "compatible",
+        "local_failsafe": "present_tested",
+        "communications": "available",
+        "offline_policy": "valid",
+        "data_rights": "permitted",
+        "observation_source": "measured",
+        "requested_claim": "measured",
+        "source_status": "valid",
+        "configuration_match": "exact",
+        "reference_quality": "adequate",
+        "baseline": "robot_needed"
+      },
+      "expected_disposition": "reject",
+      "expected_reason_codes": [
+        "OUTSIDE_DECLARED_ENVELOPE"
+      ]
+    },
+    {
+      "case_id": "ENV-MOBILITY-RI-06",
+      "mission_family": "remote_infrastructure",
+      "platform_family": "rov",
+      "scenario": "tether_or_recovery_path_unavailable",
+      "facts": {
+        "site_authority": "permitted",
+        "ecological_constraint": "within_limit",
+        "environment_envelope": "within",
+        "sensor_calibration": "current",
+        "coordinate_reference": "known",
+        "energy_reserve": "sufficient",
+        "recovery_plan": "unavailable",
+        "payload_compatibility": "compatible",
+        "local_failsafe": "present_tested",
+        "communications": "available",
+        "offline_policy": "valid",
+        "data_rights": "permitted",
+        "observation_source": "measured",
+        "requested_claim": "measured",
+        "source_status": "valid",
+        "configuration_match": "exact",
+        "reference_quality": "adequate",
+        "baseline": "robot_needed"
+      },
+      "expected_disposition": "reject",
+      "expected_reason_codes": [
+        "NO_VIABLE_RECOVERY"
+      ]
+    },
+    {
+      "case_id": "ENV-MOBILITY-RI-07",
+      "mission_family": "remote_infrastructure",
+      "platform_family": "rov",
+      "scenario": "invalid_coordinate_datum_for_asset_record",
+      "facts": {
+        "site_authority": "permitted",
+        "ecological_constraint": "within_limit",
+        "environment_envelope": "within",
+        "sensor_calibration": "current",
+        "coordinate_reference": "invalid",
+        "energy_reserve": "sufficient",
+        "recovery_plan": "viable",
+        "payload_compatibility": "compatible",
+        "local_failsafe": "present_tested",
+        "communications": "available",
+        "offline_policy": "valid",
+        "data_rights": "permitted",
+        "observation_source": "measured",
+        "requested_claim": "measured",
+        "source_status": "valid",
+        "configuration_match": "exact",
+        "reference_quality": "adequate",
+        "baseline": "robot_needed"
+      },
+      "expected_disposition": "reject",
+      "expected_reason_codes": [
+        "INVALID_COORDINATE_REFERENCE"
+      ]
+    },
+    {
+      "case_id": "ENV-MOBILITY-RI-08",
+      "mission_family": "remote_infrastructure",
+      "platform_family": "rov",
+      "scenario": "network_partition_no_local_stop",
+      "facts": {
+        "site_authority": "permitted",
+        "ecological_constraint": "within_limit",
+        "environment_envelope": "within",
+        "sensor_calibration": "current",
+        "coordinate_reference": "known",
+        "energy_reserve": "sufficient",
+        "recovery_plan": "viable",
+        "payload_compatibility": "compatible",
+        "local_failsafe": "absent",
+        "communications": "partition",
+        "offline_policy": "missing",
+        "data_rights": "permitted",
+        "observation_source": "measured",
+        "requested_claim": "measured",
+        "source_status": "valid",
+        "configuration_match": "exact",
+        "reference_quality": "adequate",
+        "baseline": "robot_needed"
+      },
+      "expected_disposition": "reject",
+      "expected_reason_codes": [
+        "LOCAL_FAILSAFE_ABSENT"
+      ]
+    }
+  ]
+}
