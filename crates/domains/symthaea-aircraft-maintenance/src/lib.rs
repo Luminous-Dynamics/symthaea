@@ -1842,7 +1842,7 @@ mod tests {
             credential_reference: None,
         };
         assert_eq!(
-            transition_task(&mut card, TaskTransition::ReleaseToService, &actor),
+            transition_task(&mut card, TaskTransition::ReleaseToService, &current_documents, &actor),
             Err(TaskCardError::SoftwareCannotReleaseToService)
         );
     }
