@@ -8,7 +8,7 @@ use std::io::BufReader;
 use std::process::ExitCode;
 
 use symthaea_cosmology_bench::{
-    sha256_file, verify_sha256_digest, verify_sha256_file_against_manifest, ChainTable,
+    sha256_bytes, sha256_file, verify_sha256_digest, verify_sha256_file_against_manifest, ChainTable,
     CHAIN_AUDIT_PROTOCOL, CHAIN_AUDIT_VERSION,
 };
 
@@ -34,6 +34,21 @@ fn json_string(value: &str) -> String {
 
 fn json_string_array(values: &[String]) -> String {
     let items = values.iter().map(|value| json_string(value)).collect::<Vec<_>>();
+    format!("[{}]", items.join(", "))
+}
+
+fn json_input_artifacts(values: &[(String, String, u64)]) -> String {
+    let items = values
+        .iter()
+        .map(|(path, digest, size)| {
+            format!(
+                "{{\"path\": {}, \"sha256\": {}, \"size_bytes\": {}}}",
+                json_string(path),
+                json_string(digest),
+                size
+            )
+        })
+        .collect::<Vec<_>>();
     format!("[{}]", items.join(", "))
 }
 
@@ -100,11 +115,18 @@ fn run() -> Result<bool, String> {
     let requested_column = &args[1];
     let paths = &args[2..];
     let mut tables = Vec::with_capacity(paths.len());
+    let mut input_artifacts = Vec::with_capacity(paths.len());
     for path in paths {
-        let file = File::open(path).map_err(|error| format!("cannot open {path}: {error}"))?;
-        let table = ChainTable::parse(BufReader::new(file))
+        // Hash the exact byte buffer that is parsed, preventing a race where
+        // the file could change between parsing and a later hash operation.
+        let bytes = std::fs::read(path).map_err(|error| format!("cannot read {path}: {error}"))?;
+        let digest = sha256_bytes(&bytes);
+        let size_bytes = u64::try_from(bytes.len())
+            .map_err(|_| format!("input {path} is too large to describe in the audit manifest"))?;
+        let table = ChainTable::parse(std::io::Cursor::new(bytes.as_slice()))
             .map_err(|error| format!("{path}: {error}"))?;
         tables.push(table);
+        input_artifacts.push((path.to_string(), digest, size_bytes));
     }
     let chain = ChainTable::combine(tables).map_err(|error| error.to_string())?;
     let summary = chain.summarize(requested_column).map_err(|error| error.to_string())?;
@@ -115,6 +137,7 @@ fn run() -> Result<bool, String> {
     println!("  \"mode\": \"weighted_chain_summary\",");
     println!("  \"input_paths\": {},", json_string_array(paths));
     println!("  \"input_chain_count\": {},", paths.len());
+    println!("  \"input_artifacts\": {},", json_input_artifacts(&input_artifacts));
     println!("  \"selected_column\": {},", json_string(&summary.name));
     println!("  \"sample_rows\": {},", summary.sample_rows);
     println!("  \"positive_weight_rows\": {},", summary.positive_weight_rows);
