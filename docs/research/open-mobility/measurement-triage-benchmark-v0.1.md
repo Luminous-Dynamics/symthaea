@@ -81,6 +81,8 @@ These are proposed targets, not results or clinical standards.
 | Gate | Target |
 |---|---|
 | Decision-state distinction | 100% correct fixtures for robust dominance, established trade-off and additional-evidence-may-change-dominance |
+| Interval-width filter | Equal point-valued bounds are never proposed as a measurement target merely because their dimensions are not separated |  
+| Source metric integrity | 100% rejection of source receipts with missing, duplicate, non-finite, reversed, negative or invalid normalized metric intervals |  
 | Cell accounting | Every reported coverage set exactly matches named pairs × named metrics that belong to the source's decision-sensitive cells |
 | Trade-off protection | Zero proposals claim that interval narrowing alone will resolve an established definite trade-off |
 | Hard gates | 100% of blocked/unknown required prerequisites excluded from action frontier; unknown fails closed |
