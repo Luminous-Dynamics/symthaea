@@ -43,3 +43,13 @@ empty-verified-source-reference	BLOCKED	Verified evidence without a source refer
 invalid-operating-hours	BLOCKED	Annual operating hours outside valid bounds
 cross-currency-comparison	BLOCKED	Currency differs and no explicit conversion contract exists
 invalid-currency-code	BLOCKED	Currency code must be three uppercase letters
+broad-acre-tractor-treatment	FEASIBLE	Existing tractor with precision implement meets this synthetic field envelope
+orchard-canopy-gnss-denied-scouting	FEASIBLE	Narrow ground robot has declared GNSS-denied capability
+greenhouse-rail-harvest	FEASIBLE	Rail platform meets greenhouse harvest capacity and geometry
+nursery-gantry-handling	FEASIBLE	Gantry handles the declared plant-count service unit
+livestock-specific-monitoring	FEASIBLE	Task-specific platform meets the synthetic animal monitoring envelope
+packhouse-produce-transport	FEASIBLE	Indoor transport platform meets kg-per-day and aisle constraints
+fixed-sensor-water-monitoring	FEASIBLE	Non-mobile sensing workflow is a valid platform class
+aerial-field-survey	FEASIBLE	Aerial survey profile meets declared area coverage and navigation assumptions
+smallholder-mechanical-weeding	FEASIBLE	Modular ground robot meets a low-speed weeding task envelope
+agrivoltaic-access-rejects-wide-tractor	REJECTED	Wide tractor does not fit the specified agrivoltaic access corridor
