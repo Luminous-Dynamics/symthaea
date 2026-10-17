@@ -271,6 +271,396 @@ pub fn audit_run(run_dir: &Path) -> AuditReport {
     report
 }
 
+const PROVENANCE_MANIFEST_NAME: &str = "provenance-manifest.json";
+const PROVENANCE_SCHEMA_VERSION: &str = "made-run-provenance-v1";
+
+#[derive(Debug, Deserialize)]
+#[serde(deny_unknown_fields)]
+struct ProvenanceManifest {
+    schema_version: String,
+    run_id: String,
+    benchmark_id: String,
+    upstream_repository: String,
+    upstream_commit: String,
+    policy_revision: String,
+    task_contract_sha256: String,
+    evaluation_manifest_sha256: String,
+    source_manifest_sha256: String,
+    resolved_config_sha256: String,
+    data_sources: Vec<DataSourceDeclaration>,
+    oracle_accounting: OracleAccountingDeclaration,
+    artifacts: Vec<ArtifactDeclaration>,
+}
+
+#[derive(Debug, Deserialize)]
+#[serde(deny_unknown_fields)]
+struct DataSourceDeclaration {
+    source_id: String,
+    source_url: String,
+    revision: String,
+    license: String,
+    rights_status: String,
+}
+
+#[derive(Debug, Deserialize)]
+#[serde(deny_unknown_fields)]
+struct OracleAccountingDeclaration {
+    setup_requests: usize,
+    proposal_requests: usize,
+    retry_requests: usize,
+    cache_hits: usize,
+    external_calls: usize,
+    failed_external_calls: usize,
+    total_cost: f64,
+    cost_unit: String,
+}
+
+#[derive(Debug, Deserialize)]
+#[serde(deny_unknown_fields)]
+struct ArtifactDeclaration {
+    path: String,
+    sha256: String,
+    size_bytes: u64,
+}
+
+fn sum_proposal_requests(rows: &[Value]) -> Option<usize> {
+    rows.iter().try_fold(0usize, |total, row| {
+        let count = row
+            .as_object()?
+            .get("final/queries_used")?
+            .as_u64()?;
+        total.checked_add(usize::try_from(count).ok()?)
+    })
+}
+
+fn verify_provenance_manifest(
+    run_dir: &Path,
+    expected_proposal_requests: Option<usize>,
+    report: &mut AuditReport,
+) {
+    let manifest_path = run_dir.join(PROVENANCE_MANIFEST_NAME);
+    if !manifest_path.exists() {
+        report.provenance_manifest_status = "not_provided".to_owned();
+        return;
+    }
+
+    let raw = match fs::read(&manifest_path) {
+        Ok(raw) => raw,
+        Err(error) => {
+            report.provenance_manifest_status = "manifest_invalid".to_owned();
+            report.fail(
+                "provenance_manifest_unreadable",
+                format!("{}: {error}", manifest_path.display()),
+            );
+            return;
+        }
+    };
+    let manifest: ProvenanceManifest = match serde_json::from_slice(&raw) {
+        Ok(manifest) => manifest,
+        Err(error) => {
+            report.provenance_manifest_status = "manifest_invalid".to_owned();
+            report.fail(
+                "provenance_manifest_invalid_json_or_schema",
+                format!("{}: {error}", manifest_path.display()),
+            );
+            return;
+        }
+    };
+
+    let findings_before = report.findings.len();
+    if manifest.schema_version != PROVENANCE_SCHEMA_VERSION {
+        report.fail(
+            "provenance_schema_version_mismatch",
+            format!("expected {PROVENANCE_SCHEMA_VERSION}, found {}", manifest.schema_version),
+        );
+    }
+    for (field, value) in [
+        ("run_id", manifest.run_id.as_str()),
+        ("benchmark_id", manifest.benchmark_id.as_str()),
+        ("upstream_repository", manifest.upstream_repository.as_str()),
+        ("upstream_commit", manifest.upstream_commit.as_str()),
+        ("policy_revision", manifest.policy_revision.as_str()),
+    ] {
+        if value.trim().is_empty() {
+            report.fail("provenance_required_field_empty", format!("{field} must not be empty"));
+        }
+    }
+    for (field, value) in [
+        ("upstream_commit", manifest.upstream_commit.as_str()),
+        ("policy_revision", manifest.policy_revision.as_str()),
+    ] {
+        if !is_lower_hex(value, 40) {
+            report.fail(
+                "provenance_git_revision_invalid",
+                format!("{field} must be a 40-character lowercase hexadecimal Git revision"),
+            );
+        }
+    }
+    for (field, value) in [
+        ("task_contract_sha256", manifest.task_contract_sha256.as_str()),
+        ("evaluation_manifest_sha256", manifest.evaluation_manifest_sha256.as_str()),
+        ("source_manifest_sha256", manifest.source_manifest_sha256.as_str()),
+        ("resolved_config_sha256", manifest.resolved_config_sha256.as_str()),
+    ] {
+        if !is_lower_hex(value, 64) {
+            report.fail(
+                "provenance_digest_invalid",
+                format!("{field} must be a 64-character lowercase SHA-256 digest"),
+            );
+        }
+    }
+    if !manifest.upstream_repository.starts_with("https://") {
+        report.fail(
+            "provenance_repository_url_invalid",
+            "upstream_repository must be an HTTPS URL",
+        );
+    }
+    if manifest.data_sources.is_empty() {
+        report.fail("provenance_sources_missing", "at least one data/source declaration is required");
+    }
+    for (index, source) in manifest.data_sources.iter().enumerate() {
+        for (field, value) in [
+            ("source_id", source.source_id.as_str()),
+            ("source_url", source.source_url.as_str()),
+            ("revision", source.revision.as_str()),
+            ("license", source.license.as_str()),
+            ("rights_status", source.rights_status.as_str()),
+        ] {
+            if value.trim().is_empty() {
+                report.fail(
+                    "provenance_source_field_empty",
+                    format!("data_sources[{index}].{field} must not be empty"),
+                );
+            }
+        }
+        if !source.source_url.starts_with("https://") {
+            report.fail(
+                "provenance_source_url_invalid",
+                format!("data_sources[{index}].source_url must be an HTTPS URL"),
+            );
+        }
+        if !matches!(
+            source.rights_status.as_str(),
+            "verified" | "unknown" | "restricted" | "not_applicable"
+        ) {
+            report.fail(
+                "provenance_rights_status_invalid",
+                format!(
+                    "data_sources[{index}].rights_status must be verified, unknown, restricted, or not_applicable"
+                ),
+            );
+        }
+    }
+
+    let accounting = &manifest.oracle_accounting;
+    if accounting.cost_unit.trim().is_empty()
+        || !accounting.total_cost.is_finite()
+        || accounting.total_cost < 0.0
+    {
+        report.fail(
+            "oracle_accounting_invalid_cost",
+            "cost_unit must be non-empty and total_cost must be finite and non-negative",
+        );
+    }
+    let request_total = accounting
+        .setup_requests
+        .checked_add(accounting.proposal_requests)
+        .and_then(|value| value.checked_add(accounting.retry_requests));
+    match request_total {
+        Some(total) if accounting.cache_hits <= total => {
+            let expected_external = total - accounting.cache_hits;
+            if expected_external != accounting.external_calls {
+                report.fail(
+                    "oracle_accounting_external_call_mismatch",
+                    format!(
+                        "external_calls is {}, expected setup + proposal + retry requests - cache_hits = {expected_external}",
+                        accounting.external_calls
+                    ),
+                );
+            }
+            if accounting.failed_external_calls > accounting.external_calls {
+                report.fail(
+                    "oracle_accounting_failed_call_mismatch",
+                    "failed_external_calls cannot exceed external_calls",
+                );
+            }
+        }
+        Some(total) => report.fail(
+            "oracle_accounting_cache_hit_mismatch",
+            format!("cache_hits ({}) exceeds declared request count ({total})", accounting.cache_hits),
+        ),
+        None => report.fail("oracle_accounting_count_overflow", "oracle request counters overflow usize"),
+    }
+    match expected_proposal_requests {
+        Some(expected) if accounting.proposal_requests == expected => {
+            report.checked("provenance_proposal_requests_match_episode_queries");
+        }
+        Some(expected) => report.fail(
+            "oracle_accounting_proposal_count_mismatch",
+            format!(
+                "manifest declares {} proposal requests but episode metrics sum to {expected}",
+                accounting.proposal_requests
+            ),
+        ),
+        None => report.fail(
+            "oracle_accounting_proposal_count_unavailable",
+            "cannot reconcile proposal requests because episode query counts are missing or overflow",
+        ),
+    }
+
+    if manifest.artifacts.is_empty() {
+        report.fail("provenance_artifacts_missing", "artifact list must not be empty");
+    }
+    if manifest.artifacts.len() > 10_000 {
+        report.fail(
+            "provenance_artifact_limit_exceeded",
+            "artifact list exceeds the 10000-record safety limit",
+        );
+        report.provenance_manifest_status = "manifest_invalid".to_owned();
+        return;
+    }
+
+    let mut by_path: BTreeMap<String, &ArtifactDeclaration> = BTreeMap::new();
+    for artifact in &manifest.artifacts {
+        if artifact.path.trim().is_empty() {
+            report.fail("provenance_artifact_path_empty", "artifact paths must not be empty");
+            continue;
+        }
+        if by_path.insert(artifact.path.clone(), artifact).is_some() {
+            report.fail(
+                "provenance_artifact_path_duplicate",
+                format!("artifact path occurs more than once: {}", artifact.path),
+            );
+        }
+        if !is_lower_hex(&artifact.sha256, 64) {
+            report.fail(
+                "provenance_artifact_digest_invalid",
+                format!("{} has an invalid SHA-256 digest", artifact.path),
+            );
+            continue;
+        }
+        match hash_artifact(run_dir, &artifact.path) {
+            Ok((digest, size_bytes))
+                if digest == artifact.sha256 && size_bytes == artifact.size_bytes => {}
+            Ok((digest, size_bytes)) => report.fail(
+                "provenance_artifact_hash_mismatch",
+                format!(
+                    "{} declared sha256/bytes {}/{} but actual values are {}/{}",
+                    artifact.path, artifact.sha256, artifact.size_bytes, digest, size_bytes
+                ),
+            ),
+            Err(error) => report.fail(
+                "provenance_artifact_invalid_path_or_unreadable",
+                format!("{}: {error}", artifact.path),
+            ),
+        }
+    }
+
+    let mut required_paths = vec![
+        ".hydra/config.yaml".to_owned(),
+        "source-manifest.json".to_owned(),
+        "task-contract.json".to_owned(),
+        "evaluation-manifest.json".to_owned(),
+        "summary/episodes.json".to_owned(),
+        "summary/episodes.csv".to_owned(),
+        "summary/summary.json".to_owned(),
+    ];
+    let trajectory_dir = run_dir.join("trajectories");
+    if let Ok(entries) = fs::read_dir(&trajectory_dir) {
+        for entry in entries.flatten() {
+            let path = entry.path();
+            if path.is_file()
+                && path.file_name().and_then(|name| name.to_str()).is_some_and(|name| {
+                    name.starts_with("episode_") && name.ends_with(".json")
+                })
+            {
+                if let Ok(relative) = path.strip_prefix(run_dir) {
+                    required_paths.push(relative.to_string_lossy().replace('\\', "/"));
+                }
+            }
+        }
+    }
+    required_paths.sort();
+    required_paths.dedup();
+    for required in required_paths {
+        if !by_path.contains_key(&required) {
+            report.fail(
+                "provenance_required_artifact_missing",
+                format!("artifact manifest must include {required}"),
+            );
+        }
+    }
+
+    for (path, expected_digest) in [
+        ("source-manifest.json", manifest.source_manifest_sha256.as_str()),
+        ("task-contract.json", manifest.task_contract_sha256.as_str()),
+        ("evaluation-manifest.json", manifest.evaluation_manifest_sha256.as_str()),
+        (".hydra/config.yaml", manifest.resolved_config_sha256.as_str()),
+    ] {
+        if let Some(artifact) = by_path.get(path) {
+            if artifact.sha256 != expected_digest {
+                report.fail(
+                    "provenance_named_digest_mismatch",
+                    format!("{path} artifact digest does not match the digest declared in the manifest"),
+                );
+            }
+        }
+    }
+
+    if report.findings.len() == findings_before {
+        report.provenance_manifest_status = "manifest_consistent".to_owned();
+        report.checked("provenance_manifest_artifact_hashes_and_accounting_reconcile");
+    } else {
+        report.provenance_manifest_status = "manifest_invalid".to_owned();
+    }
+}
+
+fn is_lower_hex(value: &str, expected_len: usize) -> bool {
+    value.len() == expected_len
+        && value
+            .bytes()
+            .all(|byte| byte.is_ascii_digit() || (b'a'..=b'f').contains(&byte))
+}
+
+fn hash_artifact(run_dir: &Path, relative_path: &str) -> Result<(String, u64), String> {
+    let relative = Path::new(relative_path);
+    if relative.as_os_str().is_empty()
+        || relative
+            .components()
+            .any(|component| !matches!(component, Component::Normal(_)))
+    {
+        return Err("artifact path must be a non-empty relative path without dot or parent components".to_owned());
+    }
+    let root = run_dir
+        .canonicalize()
+        .map_err(|error| format!("cannot canonicalize run directory: {error}"))?;
+    let candidate = run_dir.join(relative);
+    let resolved = candidate
+        .canonicalize()
+        .map_err(|error| format!("cannot resolve artifact: {error}"))?;
+    if !resolved.starts_with(&root) {
+        return Err("artifact resolves outside the run directory".to_owned());
+    }
+    let metadata = fs::metadata(&resolved).map_err(|error| format!("cannot stat artifact: {error}"))?;
+    if !metadata.is_file() {
+        return Err("artifact must be a regular file".to_owned());
+    }
+
+    let mut file = File::open(&resolved).map_err(|error| format!("cannot open artifact: {error}"))?;
+    let mut hasher = Sha256::new();
+    let mut buffer = [0u8; 64 * 1024];
+    loop {
+        let read = file
+            .read(&mut buffer)
+            .map_err(|error| format!("cannot read artifact: {error}"))?;
+        if read == 0 {
+            break;
+        }
+        hasher.update(&buffer[..read]);
+    }
+    Ok((format!("{:x}", hasher.finalize()), metadata.len()))
+}
+
 fn read_json(path: &Path, report: &mut AuditReport) -> Option<Value> {
     match fs::read_to_string(path) {
         Ok(content) => match serde_json::from_str::<Value>(&content) {
