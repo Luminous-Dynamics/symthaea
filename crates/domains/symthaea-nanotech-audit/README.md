@@ -34,7 +34,7 @@ Without a sidecar, the auditor reports `provenance_manifest_status: "not_provide
 
 ## Provenance sidecar
 
-Schemas: [provenance sidecar](schema/made-run-provenance.schema.json) and [audit report](schema/audit-report.schema.json). The report schema is the machine-readable output contract. The sidecar binds an exported run to:
+Schemas: [provenance sidecar](schema/made-run-provenance.schema.json), [per-call oracle ledger record](schema/oracle-call-ledger-record.schema.json), and [audit report](schema/audit-report.schema.json). The report schema is the machine-readable output contract. The sidecar binds an exported run to:
 - the exact upstream benchmark and policy revisions;
 - task, evaluation, source manifests and resolved configuration hashes;
 - explicit data-source revisions, license declarations and rights-status declarations;
