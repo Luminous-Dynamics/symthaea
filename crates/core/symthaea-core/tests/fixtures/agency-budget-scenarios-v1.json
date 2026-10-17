@@ -1,0 +1,65 @@
+{
+  "schema_version": 1,
+  "scenarios": [
+    {
+      "id": "AGY-001-admit-proposal-inside-envelope",
+      "request": {
+        "schema_version": 1,
+        "candidate_ids": ["reach", "place", "rest"],
+        "user_intent_probabilities": [0.5, 0.3, 0.2],
+        "autonomy_preference_probabilities": [0.1, 0.8, 0.1],
+        "agency_budget": 0.25
+      },
+      "expected_status": "autonomy_proposal_admitted",
+      "expected_user_only_candidate_id": "reach",
+      "expected_unconstrained_autonomy_candidate_id": "place",
+      "expected_selected_candidate_id": "place",
+      "expected_selected_agency_loss_index": 0.2
+    },
+    {
+      "id": "AGY-002-constrain-proposal-to-feasible-alternative",
+      "request": {
+        "schema_version": 1,
+        "candidate_ids": ["reach", "place", "rest"],
+        "user_intent_probabilities": [0.6, 0.35, 0.05],
+        "autonomy_preference_probabilities": [0.05, 0.1, 0.85],
+        "agency_budget": 0.25
+      },
+      "expected_status": "autonomy_proposal_constrained",
+      "expected_user_only_candidate_id": "reach",
+      "expected_unconstrained_autonomy_candidate_id": "rest",
+      "expected_selected_candidate_id": "place",
+      "expected_selected_agency_loss_index": 0.25
+    },
+    {
+      "id": "AGY-003-zero-budget-preserves-top-intent",
+      "request": {
+        "schema_version": 1,
+        "candidate_ids": ["left", "right", "open-hand"],
+        "user_intent_probabilities": [0.4, 0.4, 0.2],
+        "autonomy_preference_probabilities": [0.1, 0.45, 0.45],
+        "agency_budget": 0.0
+      },
+      "expected_status": "autonomy_proposal_admitted",
+      "expected_user_only_candidate_id": "left",
+      "expected_unconstrained_autonomy_candidate_id": "right",
+      "expected_selected_candidate_id": "right",
+      "expected_selected_agency_loss_index": 0.0
+    },
+    {
+      "id": "AGY-004-full-budget-admits-unconstrained-proposal",
+      "request": {
+        "schema_version": 1,
+        "candidate_ids": ["reach", "place", "rest"],
+        "user_intent_probabilities": [0.6, 0.3, 0.1],
+        "autonomy_preference_probabilities": [0.05, 0.1, 0.85],
+        "agency_budget": 1.0
+      },
+      "expected_status": "autonomy_proposal_admitted",
+      "expected_user_only_candidate_id": "reach",
+      "expected_unconstrained_autonomy_candidate_id": "rest",
+      "expected_selected_candidate_id": "rest",
+      "expected_selected_agency_loss_index": 0.5
+    }
+  ]
+}
