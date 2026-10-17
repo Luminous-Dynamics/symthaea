@@ -107,7 +107,8 @@ fn run() -> Result<(), Box<dyn Error>> {
         0,
         0,
         corpus_fingerprint,
-    ));
+    )0,
+            );
 
     // Queries are drawn from the fixed corpus, so each exact query has a known
     // in-store exact match. The seed and chosen IDs are deterministic.
@@ -142,7 +143,8 @@ fn run() -> Result<(), Box<dyn Error>> {
         0,
         0,
         0,
-    ));
+    )0,
+            );
 
     // Each WriteBatch publishes one generation. Time each commit separately
     // rather than hiding durable-append cost inside corpus generation.
@@ -171,7 +173,8 @@ fn run() -> Result<(), Box<dyn Error>> {
             0,
             0,
             commit.generation_after,
-        ));
+        )0,
+            );
     }
 
     let sync_start = Instant::now();
@@ -188,7 +191,8 @@ fn run() -> Result<(), Box<dyn Error>> {
         0,
         0,
         store.header_generation(),
-    ));
+    )0,
+            );
 
     let content_checksum = store.content_checksum();
     if store.live_count() != config.vectors as u64 {
@@ -215,7 +219,8 @@ fn run() -> Result<(), Box<dyn Error>> {
         0,
         0,
         store.header_generation(),
-    ));
+    )0,
+            );
 
     // Compare exact ground truth and the explicitly approximate LSH API over
     // identical queries; never infer ANN quality from candidate count alone.
@@ -244,7 +249,8 @@ fn run() -> Result<(), Box<dyn Error>> {
             0,
             0,
             top_id,
-        ));
+        )0,
+            );
     }
 
     for (sample_index, ((query_id, query), exact_id)) in
@@ -301,7 +307,8 @@ fn run() -> Result<(), Box<dyn Error>> {
         0,
         0,
         reader.generation(),
-    ));
+    )0,
+            );
 
     // Pinned random ID reads. The logical-byte estimate is requested vector
     // payload only, not physical device bytes or pages fetched by the OS.
@@ -329,7 +336,8 @@ fn run() -> Result<(), Box<dyn Error>> {
             0,
             0,
             point_checksum,
-        ));
+        )0,
+            );
     }
 
     // Sequential whole-store iteration catches a distinct I/O shape from
@@ -365,7 +373,8 @@ fn run() -> Result<(), Box<dyn Error>> {
             0,
             0,
             sequential_checksum,
-        ));
+        )0,
+            );
     }
     drop(reader);
 
@@ -383,7 +392,8 @@ fn run() -> Result<(), Box<dyn Error>> {
         0,
         0,
         recovery_report.final_generation,
-    ));
+    )0,
+            );
     if recovered.live_count() != config.vectors as u64 {
         return Err(format!(
             "recovery-open live count mismatch: expected {}, got {}",
