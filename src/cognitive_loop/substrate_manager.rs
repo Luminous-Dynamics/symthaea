@@ -448,7 +448,7 @@ impl SubstrateManager {
             // instead of subtracting incomparable/reversed time values, then start anew.
             self.consciousness_viable = false;
             self.energy_rate_window_started_at = Some(now);
-            self.energy_rate_window_joules = speed_adjusted_energy;
+            self.energy_rate_window_joules = modeled_energy_joules;
             self.total_energy_spent = next_total_energy;
             self.estimated_energy_rate_watts = 0.0;
             self.energy_rate_window_seconds = 0.0;
