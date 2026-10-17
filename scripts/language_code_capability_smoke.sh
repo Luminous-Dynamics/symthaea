@@ -73,13 +73,13 @@ run_logged "trajectory_auditor_tests" \
     cargo test --locked --example language_code_capability_trajectory_audit
 run_logged "receipt_verifier_tests" \
     cargo test --locked --example language_code_capability_receipt_verify \
-    --features code_generation
+    --features receipt-verification
 run_logged "smoke_auditor_run" cargo run --locked --example language_code_capability_smoke
 run_logged "trajectory_auditor_run" \
     cargo run --locked --example language_code_capability_trajectory_audit
 run_logged "receipt_negative_controls" \
     cargo run --locked --example language_code_capability_receipt_verify \
-    --features code_generation
+    --features receipt-verification
 
 record "overall_status" "passed"
 echo "[language-code-capability] all local synthetic-auditor gates passed"
