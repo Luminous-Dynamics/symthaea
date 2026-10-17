@@ -45,6 +45,8 @@ Do not invent an accuracy threshold before the measurement task and selected ins
 
 The companion file **env-mobility-microfactory-routing-v1.json** is an explicit **planning fixture**, with illustrative durations and required skills/resources. It is not claimed to be directly consumable by the scheduler API until the schema is mapped against [FACTORY-OPS-001 #7677](https://github.com/Luminous-Dynamics/symthaea/issues/7677) / PR #7678.
 
+A separate effects-disabled fixture audit is now available in source as `cargo run -p xtask -- env-mobility-route-audit`, with route mutation tests under `cargo test -p xtask env_mobility_route`. It validates schema consistency, required worker/resource candidates, dependency cycles, mandatory operations and key test/manifest/acceptance ordering. It is **not** a scheduler run and it does not calculate makespan, worker assignment, bottleneck utilization, or real manufacturing throughput. Cargo/test status remains unverified until it is compiled and run on this exact revision.
+
 The target routing is:
 
 1. **Release design package** — verify requirement, CAD/drawing revisions, BOM, wiring table, firmware/configuration and calibration plan.
