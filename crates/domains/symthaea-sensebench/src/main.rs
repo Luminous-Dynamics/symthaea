@@ -61,6 +61,14 @@ struct BlindWorldRunReport {
     benchmark: symthaea_sensebench::blind_world_benchmark::BlindWorldBenchmarkReport,
 }
 
+#[derive(Serialize)]
+struct ScmGraphRunReport {
+    report_version: u16,
+    suite: &'static str,
+    code_revision: Option<String>,
+    benchmark: symthaea_sensebench::scm_graph_benchmark::ScmGraphBenchmarkReport,
+}
+
 fn main() {
     if let Err(message) = run() {
         eprintln!("{message}");
@@ -104,6 +112,7 @@ fn run() -> Result<(), String> {
                 println!("sensebench --suite causal --trials N --budget N --seed N");
                 println!("sensebench --suite robustness");
                 println!("sensebench --suite blind-worlds --trials 512 --budget 8 --seed 42");
+                println!("sensebench --suite scm-graph --trials 32 --budget 8 --seed 42");
                 println!("set SENSEBENCH_CODE_REVISION to the exact Git commit before running");
                 println!("--allow-unversioned is for exploratory runs only");
                 return Ok(());
@@ -169,9 +178,23 @@ fn run() -> Result<(), String> {
             .map_err(|error| format!("could not encode blind-world report: {error}"))?);
         return Ok(());
     }
+    if suite == "scm-graph" {
+        let benchmark = symthaea_sensebench::scm_graph_benchmark::run_scm_graph_benchmark(
+            trials, budget, seed, 0.95,
+        ).map_err(|error| error.to_string())?;
+        let report = ScmGraphRunReport {
+            report_version: 1,
+            suite: "scm_graph_recovery",
+            code_revision: revision,
+            benchmark,
+        };
+        println!("{}", serde_json::to_string_pretty(&report)
+            .map_err(|error| format!("could not encode SCM graph report: {error}"))?);
+        return Ok(());
+    }
     if suite != "anomaly" {
         return Err(format!(
-            "unknown suite: {suite}; expected anomaly, causal, robustness, or blind-worlds"
+            "unknown suite: {suite}; expected anomaly, causal, robustness, blind-worlds, or scm-graph"
         ));
     }
 
