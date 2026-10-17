@@ -25,6 +25,7 @@ pub const ROUTE_BUNDLE_VERSION: &str = "marine-interior-route-bundle-v1";
 pub const HARD_MAX_BUNDLE_ROUTES: usize = 8;
 pub const HARD_MAX_CANDIDATES_PER_ROUTE: usize = 64;
 pub const HARD_MAX_DEVIATION_PROBES_PER_ROUTE: usize = 4_096;
+pub const HARD_MAX_TOTAL_DEVIATION_PROBES: usize = 4_096;
 pub const HARD_MAX_BUNDLE_COMBINATIONS: usize = 1_000_000;
 
 #[derive(Clone, Debug, Deserialize, Serialize, PartialEq, Eq)]
@@ -34,6 +35,8 @@ pub struct RouteBundleLimits {
     pub max_candidates_per_route: usize,
     /// Maximum one-edge-ban probes performed for each requested service.
     pub max_deviation_probes_per_route: usize,
+    /// Aggregate edge-ban probes across the entire bundle, fairly divided by request count.
+    pub max_total_deviation_probes: usize,
     /// Maximum complete candidate combinations evaluated by bundle selection.
     pub max_bundle_combinations: usize,
 }
@@ -43,6 +46,7 @@ impl Default for RouteBundleLimits {
         Self {
             max_candidates_per_route: 8,
             max_deviation_probes_per_route: 256,
+            max_total_deviation_probes: 128,
             max_bundle_combinations: 10_000,
         }
     }
@@ -148,6 +152,7 @@ pub struct RouteBundleReportBody {
     pub bundle_limits: RouteBundleLimits,
     pub catalogs: Vec<RouteCandidateCatalog>,
     pub selection: Option<RouteBundleSelection>,
+    pub total_deviation_probes: usize,
     pub bundle_combinations_examined: usize,
     pub bundles_rejected_for_shared_route_cells: usize,
     /// Completeness applies only to Cartesian combinations of the emitted catalogs.
@@ -196,6 +201,14 @@ fn validate_limits(limits: &RouteBundleLimits) -> Result<(), RouteBundleError> {
         return Err(RouteBundleError::new(
             "INVALID_DEVIATION_PROBE_LIMIT",
             format!("max_deviation_probes_per_route must be in 1..={HARD_MAX_DEVIATION_PROBES_PER_ROUTE}"),
+        ));
+    }
+    if limits.max_total_deviation_probes == 0
+        || limits.max_total_deviation_probes > HARD_MAX_TOTAL_DEVIATION_PROBES
+    {
+        return Err(RouteBundleError::new(
+            "INVALID_TOTAL_DEVIATION_PROBE_LIMIT",
+            format!("max_total_deviation_probes must be in 1..={HARD_MAX_TOTAL_DEVIATION_PROBES}"),
         ));
     }
     if limits.max_bundle_combinations == 0
@@ -352,6 +365,8 @@ fn build_catalog(
     request: &ServiceRouteRequest,
     routing_limits: &RoutingLimits,
     bundle_limits: &RouteBundleLimits,
+    per_route_probe_limit: usize,
+    total_deviation_probes: &mut usize,
 ) -> Result<RouteCandidateCatalog, RouteBundleError> {
     let mut catalog = RouteCandidateCatalog {
         route_id: request.route_id.clone(),
@@ -411,10 +426,15 @@ fn build_catalog(
                 continue;
             }
             if catalog.probes.iter().filter(|probe| probe.banned_edge.is_some()).count()
-                >= bundle_limits.max_deviation_probes_per_route
+                >= per_route_probe_limit
             {
                 catalog.discovery_frontier_exhausted = false;
                 catalog.truncation_reason = Some("DEVIATION_PROBE_LIMIT".to_owned());
+                break 'catalog;
+            }
+            if *total_deviation_probes >= bundle_limits.max_total_deviation_probes {
+                catalog.discovery_frontier_exhausted = false;
+                catalog.truncation_reason = Some("TOTAL_DEVIATION_PROBE_LIMIT".to_owned());
                 break 'catalog;
             }
             if catalog.alternatives.len() >= bundle_limits.max_candidates_per_route {
@@ -425,6 +445,7 @@ fn build_catalog(
             let modified = edge_ban_configuration(configuration, request, &edge, probe_index)?;
             probe_index = probe_index.saturating_add(1);
             let modified_digest = digest(&modified)?;
+            *total_deviation_probes = total_deviation_probes.saturating_add(1);
             let alternative_report = route_services(&modified, &[request.clone()], routing_limits.clone())?;
             let Some(candidate) = alternative_report.body.routes.into_iter().next() else {
                 return Err(RouteBundleError::new("ALTERNATIVE_RESULT_MISSING", "edge-ban probe emitted no route result"));
@@ -685,8 +706,16 @@ pub fn optimize_route_bundle(
     let input_manifest_sha256 = input_manifest_sha256(&normalized_requests)?;
     let configuration_sha256 = digest(configuration)?;
     let mut catalogs = Vec::with_capacity(normalized_requests.len());
+    let per_route_probe_limit = bundle_limits.max_deviation_probes_per_route.min(
+        bundle_limits.max_total_deviation_probes.saturating_add(normalized_requests.len() - 1)
+            / normalized_requests.len(),
+    );
+    let mut total_deviation_probes = 0usize;
     for request in &normalized_requests {
-        catalogs.push(build_catalog(configuration, request, &routing_limits, &bundle_limits)?);
+        catalogs.push(build_catalog(
+            configuration, request, &routing_limits, &bundle_limits,
+            per_route_probe_limit, &mut total_deviation_probes,
+        )?);
     }
     let (best, examined, rejected, bundle_product_exhausted) =
         select_bundle(&catalogs, &normalized_requests, bundle_limits.max_bundle_combinations);
@@ -713,6 +742,7 @@ pub fn optimize_route_bundle(
         bundle_limits,
         catalogs,
         selection,
+        total_deviation_probes,
         bundle_combinations_examined: examined,
         bundles_rejected_for_shared_route_cells: rejected,
         bundle_catalog_product_exhausted: bundle_product_exhausted,
