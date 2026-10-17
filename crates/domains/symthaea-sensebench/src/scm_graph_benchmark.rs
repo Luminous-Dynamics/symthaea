@@ -75,7 +75,7 @@ pub enum ScmGraphPolicy {
     ModelWeightedExpectedInformationGain,
     WorstCaseRobust,
     DevelopmentFixedDesign,
-    UniformRandomIntervention,
+    UniformRandomAction,
     PassiveOnly,
     KnownMechanicsOracle,
     StructureBlindRandomGraph,
@@ -89,7 +89,7 @@ impl ScmGraphPolicy {
             Self::ModelWeightedExpectedInformationGain,
             Self::WorstCaseRobust,
             Self::DevelopmentFixedDesign,
-            Self::UniformRandomIntervention,
+            Self::UniformRandomAction,
             Self::PassiveOnly,
             Self::KnownMechanicsOracle,
             Self::StructureBlindRandomGraph,
@@ -100,6 +100,9 @@ impl ScmGraphPolicy {
 #[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
 pub struct ScmGraphPolicySummary {
     pub world_id: String,
+    /// Evaluator-side truth is emitted only in the final report, not supplied to policies.
+    pub truth_graph_id: String,
+    pub truth_edge_count: usize,
     pub family: ScmGraphFamily,
     pub held_out_family: bool,
     pub policy: ScmGraphPolicy,
@@ -577,7 +580,7 @@ fn choose_action(
         ScmGraphPolicy::WorstCaseRobust => rank_experiments_robust(posterior, scenarios)?
             .first().map(|score| score.candidate_id.clone()),
         ScmGraphPolicy::DevelopmentFixedDesign => Some(fixed_action_id.to_owned()),
-        ScmGraphPolicy::UniformRandomIntervention => {
+        ScmGraphPolicy::UniformRandomAction => {
             Some(nominal.candidates[rng.index(nominal.candidates.len())].id.clone())
         }
         ScmGraphPolicy::PassiveOnly => Some("observe".into()),
@@ -820,6 +823,8 @@ fn summarize_world(
 
     ScmGraphPolicySummary {
         world_id: world.id.clone(),
+        truth_graph_id: world.truth.id(),
+        truth_edge_count: world.truth.edge_count(),
         family: world.family,
         held_out_family: world.family.held_out(),
         policy,
