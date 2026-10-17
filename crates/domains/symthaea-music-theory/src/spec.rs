@@ -676,6 +676,26 @@ impl CompositionSpec {
                 overridden_section_roles.push(*role);
             }
         }
+        for (role, _) in &self.texture.section_accompaniment_overrides {
+            let available_in_form_pool = match role {
+                crate::form::SectionRole::A
+                | crate::form::SectionRole::B
+                | crate::form::SectionRole::ReturnA => self.form_pool.iter().any(|kind| {
+                    matches!(
+                        kind,
+                        FormKind::Ternary | FormKind::Rondo | FormKind::Variations
+                    )
+                }),
+                crate::form::SectionRole::C => {
+                    self.form_pool.contains(&FormKind::Rondo)
+                }
+            };
+            if !available_in_form_pool {
+                errors.push(format!(
+                    "section_accompaniment_overrides for role {role:?} cannot be realized by any section-producing form in form_pool"
+                ));
+            }
+        }
         if self.form_pool.is_empty() {
             errors.push("form_pool is empty".into());
         }
@@ -853,6 +873,21 @@ mod tests {
         assert!(
             errors.iter().any(|error| error.contains("section_accompaniment_overrides repeats section role B")),
             "duplicate section override must be rejected, got: {errors:?}"
+        );
+    }
+
+    #[test]
+    fn section_accompaniment_override_must_match_a_declared_form() {
+        let mut spec = Style::MinuetAndTrio.spec();
+        spec.form_pool = vec![FormKind::Fugue];
+        let errors = spec.validate().unwrap_err();
+        assert!(
+            errors.iter().any(|error| {
+                error.contains("section_accompaniment_overrides")
+                    && error.contains("role B")
+                    && error.contains("form_pool")
+            }),
+            "an unreachable section override must be rejected, got: {errors:?}"
         );
     }
 
