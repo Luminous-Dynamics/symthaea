@@ -12,7 +12,11 @@
 
 use std::collections::HashSet;
 use std::fmt;
-use std::io::BufRead;
+use std::fs::File;
+use std::io::{BufRead, Read};
+use std::path::Path;
+
+use sha2::{Digest, Sha256};
 
 pub const CHAIN_AUDIT_PROTOCOL: &str = "symthaea-cobaya-chain-audit";
 pub const CHAIN_AUDIT_VERSION: u16 = 1;
@@ -66,6 +70,7 @@ pub enum ChainAuditError {
     },
     ZeroTotalWeight,
     UnknownColumn(String),
+    InvalidSha256(String),
     NumericalOverflow,
 }
 
@@ -90,12 +95,58 @@ impl fmt::Display for ChainAuditError {
             Self::NegativeWeight { line } => write!(f, "line {line}: sample weight must be non-negative"),
             Self::ZeroTotalWeight => f.write_str("chain total weight must be finite and positive"),
             Self::UnknownColumn(name) => write!(f, "unknown chain column: {name}"),
+            Self::InvalidSha256(value) => write!(f, "invalid SHA-256 digest: {value:?}"),
             Self::NumericalOverflow => f.write_str("chain summary overflowed floating-point arithmetic"),
         }
     }
 }
 
 impl std::error::Error for ChainAuditError {}
+
+/// Stream a file and return its lowercase SHA-256 hex digest.
+pub fn sha256_file(path: impl AsRef<Path>) -> Result<String, ChainAuditError> {
+    let file = File::open(path.as_ref())
+        .map_err(|error| ChainAuditError::Io(error.to_string()))?;
+    let mut reader = std::io::BufReader::new(file);
+    let mut hasher = Sha256::new();
+    let mut buffer = [0u8; 64 * 1024];
+    loop {
+        let bytes_read = reader
+            .read(&mut buffer)
+            .map_err(|error| ChainAuditError::Io(error.to_string()))?;
+        if bytes_read == 0 {
+            break;
+        }
+        hasher.update(&buffer[..bytes_read]);
+    }
+    Ok(format!("{:x}", hasher.finalize()))
+}
+
+/// Compare actual and expected SHA-256 digests, accepting uppercase or
+/// lowercase hex but rejecting prefixes, whitespace, or malformed lengths.
+pub fn verify_sha256_digest(actual: &str, expected: &str) -> Result<bool, ChainAuditError> {
+    validate_sha256_hex(actual)?;
+    validate_sha256_hex(expected)?;
+    Ok(actual.eq_ignore_ascii_case(expected))
+}
+
+/// Verify a local file against a SHA-256 digest obtained from an external
+/// trusted manifest. A false result means bytes differ; malformed digests are
+/// errors. The caller chooses the local path; URLs are never fetched here.
+pub fn verify_sha256_file(
+    path: impl AsRef<Path>,
+    expected: &str,
+) -> Result<bool, ChainAuditError> {
+    let actual = sha256_file(path)?;
+    verify_sha256_digest(&actual, expected)
+}
+
+fn validate_sha256_hex(value: &str) -> Result<(), ChainAuditError> {
+    if value.len() != 64 || !value.bytes().all(|byte| byte.is_ascii_hexdigit()) {
+        return Err(ChainAuditError::InvalidSha256(value.to_string()));
+    }
+    Ok(())
+}
 
 impl ChainTable {
     /// Combine chain tables only when their full column order matches exactly.
@@ -337,6 +388,32 @@ mod tests {
 2 -12 69 0.32\n";
 
     #[test]
+    fn sha256_verifier_matches_known_vector_and_rejects_mutation() {
+        let path = std::env::temp_dir().join(format!(
+            "symthaea-cosmology-bench-sha256-{}.bin",
+            std::process::id()
+        ));
+        std::fs::write(&path, b"abc").unwrap();
+        let actual = sha256_file(&path).unwrap();
+        assert_eq!(
+            actual,
+            "ba7816bf8f01cfea414140de5dae2223b00361a396177a9cb410ff61f20015ad"
+        );
+        assert!(verify_sha256_file(&path, &actual).unwrap());
+        assert!(verify_sha256_digest(
+            &actual,
+            "BA7816BF8F01CFEA414140DE5DAE2223B00361A396177A9CB410FF61F20015AD"
+        ).is_err());
+        assert!(!verify_sha256_digest(
+            &actual,
+            "ca7816bf8f01cfea414140de5dae2223b00361a396177a9cb410ff61f20015ad"
+        ).unwrap());
+        assert!(verify_sha256_digest(&actual, "bad").is_err());
+        std::fs::remove_file(path).unwrap();
+    }
+
+    #[test]
+    fn weighted_summary_uses_named_columns_and_documented_quantiles() {    #[test]
     fn weighted_summary_uses_named_columns_and_documented_quantiles() {
         let chain = ChainTable::parse(Cursor::new(FIXTURE)).unwrap();
         let summary = chain.summarize("H0").unwrap();
