@@ -110,6 +110,9 @@ pub fn audit_run(run_dir: &Path) -> AuditReport {
     trajectory_files.sort_by_key(|(index, _)| *index);
     report.trajectory_files = trajectory_files.len();
     report.episode_rows = episode_rows.as_ref().map_or(0, Vec::len);
+    if episode_rows.as_ref().is_some_and(|rows| rows.is_empty()) {
+        report.fail("no_episode_rows", "an audit run must contain at least one completed episode");
+    }
 
     if let Some(rows) = episode_rows.as_ref() {
         if let Some(aggregate) = aggregate {
@@ -425,11 +428,14 @@ fn audit_csv(path: &Path, rows: &[Value], report: &mut AuditReport) {
 }
 
 fn audit_aggregate(rows: &[Value], aggregate_value: Option<&Value>, report: &mut AuditReport) {
-    let Some(aggregate) = aggregate_value
-        .and_then(Value::as_object)
-        .and_then(|object| object.get("summary"))
-        .and_then(Value::as_object)
-    else {
+    let Some(aggregate_object) = aggregate_value.and_then(Value::as_object) else {
+        return;
+    };
+    let Some(aggregate) = aggregate_object.get("summary").and_then(Value::as_object) else {
+        report.fail(
+            "aggregate_summary_missing",
+            "summary.json must contain a summary object",
+        );
         return;
     };
 
@@ -677,6 +683,20 @@ mod tests {
             .findings
             .iter()
             .any(|finding| finding.code == "query_count_mismatch"));
+    }
+
+    #[test]
+    fn rejects_an_empty_episode_set() {
+        let fixture = Fixture::new();
+        fs::write(
+            fixture.0.join("summary/episodes.json"),
+            serde_json::to_vec_pretty(&json!([])).unwrap(),
+        )
+        .unwrap();
+
+        let report = audit_run(&fixture.0);
+        assert_eq!(report.status, "fail");
+        assert!(report.findings.iter().any(|finding| finding.code == "no_episode_rows"));
     }
 
     #[test]
