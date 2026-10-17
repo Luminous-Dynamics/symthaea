@@ -23,7 +23,6 @@ struct Suspect {
 struct PredictionSet {
     schema_version: String,
     run_id: String,
-    source_commit: String,
     solver_manifest_sha256: String,
     event_store_sha256: String,
     suspects: Vec<Suspect>,
@@ -156,7 +155,6 @@ fn evaluate_prediction_bytes(
     if prediction_set.schema_version != PREDICTIONS_VERSION
         || prediction_set.run_id.trim().len() < 3
         || prediction_set.run_id.len() > 128
-        || prediction_set.source_commit != manifest.source_commit
         || prediction_set.solver_manifest_sha256 != sha256(&solver_manifest_bytes)
         || prediction_set.event_store_sha256 != sha256(&event_bytes)
         || prediction_set.non_claims.is_empty()
@@ -392,7 +390,6 @@ mod tests {
         PredictionSet {
             schema_version: PREDICTIONS_VERSION.to_string(),
             run_id: "evaluator-test-run-001".to_string(),
-            source_commit: manifest.source_commit.clone(),
             solver_manifest_sha256: sha256(&solver_manifest_bytes),
             event_store_sha256: sha256(&event_bytes),
             suspects,
