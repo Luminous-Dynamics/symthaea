@@ -517,7 +517,7 @@ impl Z3Bridge {
             least_squares_k: k,
             tolerance,
             max_abs_residual,
-            components_compared,
+            components_compared: expected,
             component_residuals,
             within_tolerance: max_abs_residual <= tolerance,
         })
@@ -546,7 +546,7 @@ impl Z3Bridge {
         ) {
             Ok(report) if report.within_tolerance => VerificationResult::Sat {
                 witness: Some(format!(
-                    "NUMERIC_ONLY: max_residual={:.3e}, estimated_k={:.6}, tolerance={:.3e}",
+                    "NUMERIC_ONLY: max_residual={:.3e}, least_squares_k={:.6}, tolerance={:.3e}",
                     report.max_abs_residual,
                     report.least_squares_k,
                     report.tolerance
@@ -1425,7 +1425,7 @@ mod tests {
 
     #[test]
     fn test_einstein_numeric_residual_uses_all_component_least_squares_fit() {
-        // The diagonal ratios are 2 and 3, so their arithmetic mean is 2.5.
+        // The diagonal ratios are 2 and 3; their arithmetic mean is 2.5, but the full-component least-squares coefficient is 302/101.
         // The least-squares fit across all components is (2*1 + 30*10)/(1²+10²)
         // = 302/101. Its residual is orthogonal to the metric under the
         // component-space dot product, the normal-equation condition for the fit.
