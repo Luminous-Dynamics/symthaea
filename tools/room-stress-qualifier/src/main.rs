@@ -23,6 +23,8 @@ const EMBEDDED_BENCHMARK: &str = include_str!(
 const EMBEDDED_SCHEMA: &str = include_str!(
     "../../../docs/research/spatial-design/ROOM_IMAGINATION_STRESS_BENCHMARK_V0_1.schema.json"
 );
+const EMBEDDED_CARGO_MANIFEST: &str = include_str!("../Cargo.toml");
+const EMBEDDED_VALIDATOR_SOURCE: &str = include_str!("main.rs");
 const CLAIM_CEILING: &str = concat!(
     "Manifest/schema and semantic integrity only. This receipt does not qualify geometry, ",
     "simulations, accessibility, comfort, safety, buildability, code compliance, ",
@@ -64,13 +66,17 @@ fn receipt_value(
     summary: &ValidationSummary,
     benchmark_text: &str,
     schema_text: &str,
+    cargo_manifest_text: &str,
+    validator_source_text: &str,
 ) -> Value {
     serde_json::json!({
         "receipt_version": "room-stress-manifest-receipt-v0.1",
         "status": "valid_manifest",
         "validator": {
             "name": "room-stress-qualifier",
-            "version": env!("CARGO_PKG_VERSION")
+            "version": env!("CARGO_PKG_VERSION"),
+            "source_sha256": sha256_hex(validator_source_text),
+            "cargo_manifest_sha256": sha256_hex(cargo_manifest_text)
         },
         "inputs": {
             "benchmark_sha256": sha256_hex(benchmark_text),
@@ -246,7 +252,13 @@ fn run(args: &[String]) -> Result<(), String> {
 
     let summary = validate_documents(&benchmark_text, &schema_text)?;
     if json_mode {
-        let receipt = receipt_value(&summary, &benchmark_text, &schema_text);
+        let receipt = receipt_value(
+            &summary,
+            &benchmark_text,
+            &schema_text,
+            EMBEDDED_CARGO_MANIFEST,
+            EMBEDDED_VALIDATOR_SOURCE,
+        );
         let rendered = serde_json::to_string_pretty(&receipt)
             .map_err(|error| format!("could not serialize receipt: {error}"))?;
         println!("{rendered}");
@@ -346,6 +358,14 @@ mod tests {
     }
 
     #[test]
+    fn blank_required_item_is_rejected() {
+        let (mut benchmark, schema) = fixture_values();
+        benchmark["cases"][0]["known_facts"] = Value::Array(vec![Value::String("  ".into())]);
+        let error = validate_values(benchmark, schema).unwrap_err();
+        assert!(error.contains("non-empty strings"));
+    }
+
+    #[test]
     fn wrong_declared_count_is_rejected() {
         let (mut benchmark, schema) = fixture_values();
         benchmark["count"] = Value::from(29);
@@ -355,14 +375,26 @@ mod tests {
     #[test]
     fn receipt_binds_exact_input_bytes_and_states_claim_ceiling() {
         let summary = validate_documents(EMBEDDED_BENCHMARK, EMBEDDED_SCHEMA).unwrap();
-        let receipt = receipt_value(&summary, EMBEDDED_BENCHMARK, EMBEDDED_SCHEMA);
+        let receipt = receipt_value(
+            &summary,
+            EMBEDDED_BENCHMARK,
+            EMBEDDED_SCHEMA,
+            EMBEDDED_CARGO_MANIFEST,
+            EMBEDDED_VALIDATOR_SOURCE,
+        );
         assert_eq!(receipt["status"], "valid_manifest");
         assert_eq!(receipt["inputs"]["benchmark_sha256"].as_str().unwrap().len(), 64);
         assert_eq!(receipt["inputs"]["schema_sha256"].as_str().unwrap().len(), 64);
         assert!(receipt["claim_ceiling"].as_str().unwrap().contains("does not qualify geometry"));
         assert_eq!(
             receipt,
-            receipt_value(&summary, EMBEDDED_BENCHMARK, EMBEDDED_SCHEMA),
+            receipt_value(
+                &summary,
+                EMBEDDED_BENCHMARK,
+                EMBEDDED_SCHEMA,
+                EMBEDDED_CARGO_MANIFEST,
+                EMBEDDED_VALIDATOR_SOURCE,
+            ),
             "the receipt must be deterministic for identical input bytes"
         );
     }
