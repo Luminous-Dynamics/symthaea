@@ -119,21 +119,22 @@ fn validate_receipt(
         return Err("functional_claim_without_tests".to_owned());
     }
 
-    if let Some(payload) = receipt.get("result_payload") {
-        let payload_status = payload.get("status").and_then(Value::as_str).unwrap_or("");
-        let serialized = serde_json::to_vec(payload)
-            .map_err(|_| "result_payload_digest_or_status_mismatch".to_owned())?;
-        let recomputed_digest = sha256_hex(&serialized);
-        let declared = receipt
-            .get("declared_result_sha256")
-            .and_then(Value::as_str)
-            .unwrap_or("");
-        if payload_status != status
-            || !is_lower_hex(declared, 64)
-            || recomputed_digest != declared
-        {
-            return Err("result_payload_digest_or_status_mismatch".to_owned());
-        }
+    let payload = receipt
+        .get("result_payload")
+        .ok_or_else(|| "missing_result_payload".to_owned())?;
+    let payload_status = payload.get("status").and_then(Value::as_str).unwrap_or("");
+    let serialized = serde_json::to_vec(payload)
+        .map_err(|_| "result_payload_digest_or_status_mismatch".to_owned())?;
+    let recomputed_digest = sha256_hex(&serialized);
+    let declared_result = receipt
+        .get("declared_result_sha256")
+        .and_then(Value::as_str)
+        .ok_or_else(|| "missing_result_payload_digest".to_owned())?;
+    if payload_status != status
+        || !is_lower_hex(declared_result, 64)
+        || recomputed_digest != declared_result
+    {
+        return Err("result_payload_digest_or_status_mismatch".to_owned());
     }
 
     let run_id = nonempty_string(receipt, "run_id")
@@ -162,21 +163,7 @@ fn validate_receipt(
             return Err("passed_receipt_without_tests_or_compile_only_policy".to_owned());
         }
 
-        let payload = receipt
-            .get("result_payload")
-            .ok_or_else(|| "missing_result_payload".to_owned())?;
-        let declared_result = receipt
-            .get("declared_result_sha256")
-            .and_then(Value::as_str)
-            .ok_or_else(|| "missing_result_payload_digest".to_owned())?;
-        let payload_bytes = serde_json::to_vec(payload)
-            .map_err(|_| "result_payload_digest_or_status_mismatch".to_owned())?;
-        if !is_lower_hex(declared_result, 64)
-            || sha256_hex(&payload_bytes) != declared_result
-            || payload.get("status").and_then(Value::as_str) != Some(status)
-        {
-            return Err("result_payload_digest_or_status_mismatch".to_owned());
-        }
+
     }
 
     // Every receipt status must bind the actual artifact bytes. A failed or
@@ -511,6 +498,18 @@ mod tests {
         assert_eq!(
             validate_receipt(&receipt, Some(&"a".repeat(40)), Some(different_bytes)),
             Err("artifact_digest_mismatch".to_owned())
+        );
+    }
+
+    #[test]
+    fn failed_receipt_still_requires_result_payload() {
+        let mut receipt = valid_receipt();
+        receipt["status"] = json!("failed");
+        receipt.as_object_mut().unwrap().remove("result_payload");
+        receipt.as_object_mut().unwrap().remove("declared_result_sha256");
+        assert_eq!(
+            validate_receipt(&receipt, None, None),
+            Err("missing_result_payload".to_owned())
         );
     }
 
