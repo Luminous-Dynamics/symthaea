@@ -19,6 +19,19 @@ The Rust workspace discovers this crate through the existing `crates/domains/*` 
 cargo test -p symthaea-aircraft-energy
 ```
 
+
+## Mass-coupled battery sizing
+
+`mass_coupled_sizing` adds a bounded orchestration layer for a mass-sensitive, candidate-specific mission model. Rather than reusing the same power trace while changing battery mass, it asks the supplied `MassSensitiveMissionModel` for new phase demands at each gross mass, sizes the pack from the upper declared power bounds for energy, continuous power, and peak power, updates the installed system mass, and iterates toward mass closure.
+
+Run the crate's complete suite with:
+
+```sh
+cargo test -p symthaea-aircraft-energy
+```
+
+The current module contains synthetic tests, not a real aircraft mission model. The adapter must be supplied with validated candidate-specific geometry, aero/propulsion data, route, environment, source revisions, uncertainty and limitations. The coordinator does not invent performance maps or calculate center of gravity, aerodynamic loads, structural strength, thermal transients, or flight-control behavior. `ConvergedWithinModel` means only that the supplied model and the declared arithmetic reached the requested mass tolerance; it is not a flight-feasibility or airworthiness claim. See [the mass-coupled sizing contract](../../../docs/aircraft/MASS_COUPLED_BATTERY_SIZING_2026-10-17.md).
+
 ## Model contract
 
 `BatteryPackSpec::to_envelope` computes this screening approximation:
