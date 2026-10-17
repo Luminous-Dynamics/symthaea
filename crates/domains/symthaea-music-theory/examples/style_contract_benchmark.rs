@@ -524,6 +524,7 @@ fn main() {
     // styles under the SAME seed and intent. This is a structural diagnostic,
     // not a perceptual classifier or a quality score.
     let mut within_seed_distances = vec![Vec::<f64>::new(); style_count];
+    let mut within_layer_distances = vec![Vec::<f64>::new(); LAYERS.len()];
     for style_index in 0..style_count {
         for intent_index in 0..INTENTS.len() {
             for seed_left in 0..SEEDS.len() {
@@ -532,6 +533,16 @@ fn main() {
                     let right_config = seed_right * INTENTS.len() + intent_index;
                     let left_sample = &samples[style_index * config_count + left_config];
                     let right_sample = &samples[style_index * config_count + right_config];
+                    let layer_values =
+                        layer_dists(&left_sample.structural, &right_sample.structural);
+                    for (layer_index, (distance, (_, _, length))) in
+                        layer_values.iter().zip(LAYERS.iter()).enumerate()
+                    {
+                        if *length > 0 {
+                            within_layer_distances[layer_index]
+                                .push(distance / (*length as f64).sqrt());
+                        }
+                    }
                     within_seed_distances[style_index].push(layer_balanced_distance(
                         &left_sample.structural,
                         &right_sample.structural,
@@ -542,15 +553,28 @@ fn main() {
     }
 
     let mut between_style_distances = Vec::<f64>::new();
+    let mut between_layer_distances = vec![Vec::<f64>::new(); LAYERS.len()];
     let mut between_style_by_style = vec![Vec::<f64>::new(); style_count];
     let mut style_pair_rows = Vec::new();
     let mut style_pairs_above_seed_variation = 0usize;
     for left in 0..style_count {
         for right in (left + 1)..style_count {
             let mut matched_distances = Vec::with_capacity(config_count);
+            let mut matched_layer_distances = vec![Vec::<f64>::new(); LAYERS.len()];
             for config_index in 0..config_count {
                 let left_sample = &samples[left * config_count + config_index];
                 let right_sample = &samples[right * config_count + config_index];
+                let layer_values =
+                    layer_dists(&left_sample.structural, &right_sample.structural);
+                for (layer_index, (layer_distance, (_, _, length))) in
+                    layer_values.iter().zip(LAYERS.iter()).enumerate()
+                {
+                    if *length > 0 {
+                        let normalized = layer_distance / (*length as f64).sqrt();
+                        matched_layer_distances[layer_index].push(normalized);
+                        between_layer_distances[layer_index].push(normalized);
+                    }
+                }
                 let distance = layer_balanced_distance(
                     &left_sample.structural,
                     &right_sample.structural,
@@ -572,6 +596,30 @@ fn main() {
             if above_seed_variation {
                 style_pairs_above_seed_variation += 1;
             }
+            let per_layer_diagnostics = LAYERS
+                .iter()
+                .enumerate()
+                .map(|(layer_index, (layer_name, _, layer_length))| {
+                    let between = mean(&matched_layer_distances[layer_index]);
+                    let within_a = mean(&within_layer_distances[layer_index]);
+                    // Keep the two within-style baselines visible; their average
+                    // provides context without hiding style-specific variability.
+                    let margin_a = between - within_a;
+                    let ratio_a = if within_a > 1e-9 {
+                        json!(between / within_a)
+                    } else {
+                        Value::Null
+                    };
+                    json!({
+                        "layer": layer_name,
+                        "dimensions": layer_length,
+                        "mean_matched_between_style_rms": between,
+                        "mean_within_style_seed_rms_global_baseline": within_a,
+                        "between_minus_global_within_margin": margin_a,
+                        "between_to_global_within_ratio": ratio_a
+                    })
+                })
+                .collect::<Vec<_>>();
             between_style_by_style[left].push(mean_between);
             between_style_by_style[right].push(mean_between);
             style_pair_rows.push(json!({
@@ -583,6 +631,7 @@ fn main() {
                 "between_minus_within_margin": margin,
                 "between_to_within_ratio": ratio,
                 "between_exceeds_mean_seed_variation": above_seed_variation,
+                "per_layer_diagnostics": per_layer_diagnostics,
                 "matched_config_count": config_count
             }));
         }
@@ -596,6 +645,26 @@ fn main() {
     } else {
         Value::Null
     };
+    let per_layer_separation = LAYERS
+        .iter()
+        .enumerate()
+        .map(|(layer_index, (layer_name, _, layer_length))| {
+            let within = mean(&within_layer_distances[layer_index]);
+            let between = mean(&between_layer_distances[layer_index]);
+            json!({
+                "layer": layer_name,
+                "dimensions": layer_length,
+                "mean_within_style_seed_rms": within,
+                "mean_matched_between_style_rms": between,
+                "between_minus_within_margin": between - within,
+                "between_to_within_ratio": if within > 1e-9 {
+                    json!(between / within)
+                } else {
+                    Value::Null
+                }
+            })
+        })
+        .collect::<Vec<_>>();
     style_pair_rows.sort_by(|a, b| {
         let ar = a["between_minus_within_margin"].as_f64().unwrap_or(0.0);
         let br = b["between_minus_within_margin"].as_f64().unwrap_or(0.0);
@@ -730,7 +799,7 @@ fn main() {
     let source_commit = std::env::var("GIT_COMMIT").ok();
     let validator_self_test = validator_mutation_audit();
     let report = json!({
-        "schema_version": 3,
+        "schema_version": 4,
         "engine_version": MUSIC_THEORY_ENGINE_VERSION,
         "provenance": {
             "git_commit": source_commit,
@@ -798,6 +867,7 @@ fn main() {
             "global_between_to_within_distance_ratio": global_style_separation_ratio,
             "style_pairs_above_both_seed_variation_baselines": style_pairs_above_seed_variation,
             "style_pair_count": style_pair_rows.len(),
+            "per_layer_separation": per_layer_separation,
             "per_style_pair": style_pair_rows,
             "is_qualification_gate": false,
             "interpretation": "diagnostic only; structural Euclidean distances are neither human recognition nor cultural authenticity, and aggregate separation may hide individual style confusions"
