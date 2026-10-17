@@ -6,13 +6,21 @@ deterministic validator benchmark. The runner lives at
 
 ## Run
 
-From a clean checkout of the Symthaea repository:
+From a clean checkout of the Symthaea repository, set `EXPECTED_HEAD` to the
+**independently known full commit SHA being evaluated** (for CI, use the event's
+trusted commit SHA; for local review, use the SHA supplied by the PR/revision
+being audited). Do not derive the expected SHA from the checkout being tested,
+because that makes the identity comparison tautological.
 
 ```bash
+EXPECTED_HEAD=<full-commit-sha-under-review>
 cargo run -p symthaea-culinary --example culinary_validation_receipt -- \
-  --expected-head "$(git rev-parse HEAD)" \
+  --expected-head "$EXPECTED_HEAD" \
   --output target/culinary-validation-receipt.json
 ```
+
+Without `--expected-head`, or if the expected SHA differs from `HEAD`, the
+runner returns `not_comparable` and exits non-zero.
 
 The command records its exact git commit, checks the requested head if supplied,
 requires a clean checkout, hashes the raw JSON bytes with SHA-256, executes each
@@ -31,8 +39,8 @@ inferring success from process logs alone.
 - `incomplete`: a required fixture is absent, duplicated, malformed, or not
   attempted; no partial run can pass.
 - `not_comparable`: the manifest digest/version differs from the pin, the
-  commit cannot be identified, the working tree is dirty, or an optional
-  `--expected-head` does not match the checkout.
+  commit cannot be identified, the working tree is dirty, `--expected-head`
+  is absent, or the expected SHA does not match the checkout.
 
 A GitHub Actions queue, an empty checks response, or a green unrelated commit
 is not evidence that this corpus passed. Bind any claimed result to the commit
