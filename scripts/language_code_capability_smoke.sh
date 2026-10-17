@@ -18,6 +18,12 @@ for required in cargo rustc sha256sum; do
     fi
 done
 
+git_head="$(git rev-parse HEAD 2>/dev/null || true)"
+if [[ ! "$git_head" =~ ^[0-9a-f]{40}$ ]]; then
+    echo "[language-code-capability] refusing to run without an exact Git HEAD" >&2
+    exit 2
+fi
+
 OUT_DIR="${LANGUAGE_CODE_CAPABILITY_OUT_DIR:-target/language-code-capability/smoke}"
 mkdir -p "$OUT_DIR"
 MANIFEST="$OUT_DIR/run-manifest.txt"
@@ -27,7 +33,6 @@ record() {
     printf '%s=%s\n' "$1" "$2" >> "$MANIFEST"
 }
 
-git_head="$(git rev-parse HEAD 2>/dev/null || printf 'unknown')"
 record "schema_version" "language-code-capability-local-run-v1"
 record "git_head" "$git_head"
 record "cargo_version" "$(cargo --version)"
