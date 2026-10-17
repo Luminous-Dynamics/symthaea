@@ -9,6 +9,10 @@ description = "Fail-closed structural and artifact-integrity checks for open aud
 name = "audio-evidence-check"
 path = "src/main.rs"
 
+[[bin]]
+name = "hifi-benchmark-check"
+path = "src/benchmark_main.rs"
+
 [dependencies]
 chrono = { workspace = true }
 hex = { workspace = true }
