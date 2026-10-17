@@ -994,7 +994,17 @@ fn standard_deviation(values: &[f64]) -> Option<f64> {
 }
 
 fn median(values: &[f64]) -> Option<f64> {
-    quantile(values, 0.50)
+    if values.is_empty() {
+        return None;
+    }
+    let mut sorted = values.to_vec();
+    sorted.sort_by(f64::total_cmp);
+    let middle = sorted.len() / 2;
+    if sorted.len().is_multiple_of(2) {
+        Some((sorted[middle - 1] + sorted[middle]) / 2.0)
+    } else {
+        sorted.get(middle).copied()
+    }
 }
 
 fn quantile_abs(values: &[f64], quantile: f64) -> Option<f64> {
@@ -1178,6 +1188,8 @@ mod tests {
     #[test]
     fn metrics_handle_empty_and_constant_sequences() {
         assert_eq!(median(&[]), None);
+        assert_eq!(median(&[1.0, 3.0]), Some(2.0));
+        assert_eq!(median(&[1.0, 2.0, 3.0]), Some(2.0));
         assert_eq!(mean(&[]), None);
         assert_eq!(lag1_autocorrelation(&[0.0, 0.0, 0.0]), None);
         assert_eq!(lag1_autocorrelation(&[0.0, 1.0]), None);
@@ -1238,7 +1250,7 @@ mod tests {
         );
         assert_eq!(
             kick.median_performer_median_abs_sixteenth_grid_residual_beats,
-            Some(0.01)
+            Some(0.05)
         );
         assert!(
             (kick.mean_performer_velocity_mean_0_to_127.unwrap() - 55.0).abs() < 1e-12
