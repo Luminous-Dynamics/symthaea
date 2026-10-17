@@ -749,6 +749,7 @@ impl Style {
                     ornament_rate: 0.0,
                     blue_note_rate: 0.0,
                     use_procedural_foundry: false,
+                    ..MelodicDna::default()
                 },
                 meter_pool: vec![],
                 mode_pool: vec![],
