@@ -36,6 +36,8 @@ pub struct CandidateMassProperties {
     pub fixed_vehicle_mass_kg: f64,
     pub energy_system_installed_mass_kg: f64,
     pub propulsion_installed_mass_kg: f64,
+    /// Fuel, coolant, or other consumables not already counted above.
+    pub consumables_mass_kg: f64,
     pub payload_mass_kg: f64,
     pub maximum_takeoff_mass_limit_kg: f64,
     /// x/y/z in a declared vehicle datum, in metres.
@@ -48,6 +50,7 @@ impl CandidateMassProperties {
         let total = self.fixed_vehicle_mass_kg
             + self.energy_system_installed_mass_kg
             + self.propulsion_installed_mass_kg
+            + self.consumables_mass_kg
             + self.payload_mass_kg;
         total.is_finite().then_some(total)
     }
@@ -323,6 +326,7 @@ fn validate_mass_properties(
         mass.propulsion_installed_mass_kg,
         findings,
     );
+    validate_nonnegative("mass.consumables_mass_kg", mass.consumables_mass_kg, findings);
     validate_nonnegative("mass.payload_mass_kg", mass.payload_mass_kg, findings);
     validate_positive(
         "mass.maximum_takeoff_mass_limit_kg",
@@ -473,6 +477,7 @@ mod tests {
                 fixed_vehicle_mass_kg: 600.0,
                 energy_system_installed_mass_kg: 50.0,
                 propulsion_installed_mass_kg: 40.0,
+                consumables_mass_kg: 0.0,
                 payload_mass_kg: 160.0,
                 maximum_takeoff_mass_limit_kg: 900.0,
                 center_of_gravity_m: [1.2, 0.0, 0.3],
