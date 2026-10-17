@@ -3,6 +3,7 @@
 //
 // Exact digital BinaryHV bind primitive.
 // This is a combinational semantic reference, not a performance claim.
+`timescale 1ns/1ps
 `default_nettype none
 
 module hdc_bind_xor #(
