@@ -1,0 +1,81 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "urn:luminous-dynamics:symthaea:nanotech-audit-report:v1",
+  "title": "Symthaea Nanotechnology Audit report",
+  "description": "Artifact-integrity report. artifact_integrity_pass must not be interpreted as a scientific benchmark pass.",
+  "type": "object",
+  "additionalProperties": false,
+  "required": [
+    "status",
+    "run_dir",
+    "trajectory_files",
+    "episode_rows",
+    "findings",
+    "checks_completed",
+    "provenance_manifest_status",
+    "scope_ceiling"
+  ],
+  "properties": {
+    "status": {
+      "enum": [
+        "fail",
+        "artifact_integrity_pass"
+      ]
+    },
+    "run_dir": {
+      "type": "string",
+      "minLength": 1
+    },
+    "trajectory_files": {
+      "type": "integer",
+      "minimum": 0
+    },
+    "episode_rows": {
+      "type": "integer",
+      "minimum": 0
+    },
+    "findings": {
+      "type": "array",
+      "items": {
+        "type": "object",
+        "additionalProperties": false,
+        "required": [
+          "code",
+          "detail"
+        ],
+        "properties": {
+          "code": {
+            "type": "string",
+            "minLength": 1
+          },
+          "detail": {
+            "type": "string",
+            "minLength": 1
+          }
+        }
+      }
+    },
+    "checks_completed": {
+      "type": "array",
+      "items": {
+        "type": "string",
+        "minLength": 1
+      }
+    },
+    "provenance_manifest_status": {
+      "enum": [
+        "not_provided",
+        "manifest_consistent",
+        "manifest_invalid"
+      ]
+    },
+    "scope_ceiling": {
+      "type": "array",
+      "minItems": 1,
+      "items": {
+        "type": "string",
+        "minLength": 1
+      }
+    }
+  }
+}
