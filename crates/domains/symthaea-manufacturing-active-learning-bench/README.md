@@ -90,3 +90,22 @@ The evaluator is in its own Rust source module and recomputes outcomes without c
 ## Initial acceptance tests
 
 Unit tests cover deterministic manifests and replay, all 30 scenario/policy combinations, feasibility gating, budget compliance, missing measurements, altered receipt data, falsified cost/conformity claims, blocked-candidate injection, proxy/reference discrepancy and factor-design rank. Tests have been authored but must be run against an exact commit before any pass is claimed.
+
+## Household appliance active-diagnostics adapter (synthetic)
+
+The appliance fan adapter in `src/appliance_adapter.rs` and its integration fixture are a domain consumer of the **same finite-hypothesis EIG / decision-value kernel above**. They do not implement a second entropy, posterior, or expected decision-value scorer.
+
+Fixture: `fixtures/appliance_fan_active_diagnostics_v0_1.json`  
+Integration tests: `tests/appliance_active_diagnostics.rs`
+
+The scenario starts from a four-hypothesis tabletop DC-fan fault set (`bearing_wear`, `impeller_obstruction`, `motor_drive_fault`, `sensor_fault`) with visible integer-PPM observation likelihoods for RPM, airflow, and vibration checks. The repair/inspection utility table and test costs are explicitly synthetic. A registered fixture demonstrates that, under the same probability model and cost profile, EIG-per-cost prefers `rpm_check` while expected decision-value-per-cost prefers `airflow_check`. This is an illustration of objective choice, not evidence that airflow testing is better for a real fan.
+
+The adapter adds only two kinds of domain policy:
+
+- hard abstention for tripped/unknown protection or missing, stale, conflicting, and invalid-unit observations;
+- an explicit `NoDecisionValue` result when the shared kernel finds no expected decision improvement, while preserving the full ranking receipt.
+
+Unavailable, blocked, or unknown-feasibility tests remain rejected by the shared `Feasibility` gate. A posterior update reuses the same kernel's chained evidence receipt and posterior-state digest. The adapter has no sensor driver, network command, actuation, safe-to-operate verdict, or product-safety authority.
+
+Cross-project trackers: [Symtropy APPLIANCE-QUAL-001 #1805](https://github.com/Luminous-Dynamics/symtropy/issues/1805), [Symthaea APPLIANCE-DIAG-001 #7819](https://github.com/Luminous-Dynamics/symthaea/issues/7819), and [APPLIANCE-DIAG-002 #7837](https://github.com/Luminous-Dynamics/symthaea/issues/7837).
+

@@ -1,0 +1,299 @@
+{
+  "fixture_id": "APPLIANCE-FAN-ACTIVE-DIAGNOSTICS-001",
+  "status": "synthetic_mathematical_fixture_only",
+  "source_policy": "Reuse the finite-hypothesis EIG/EVSI kernel. Do not implement a second probability or decision-value scorer.",
+  "source_appliance_trace": {
+    "repo": "Luminous-Dynamics/symthaea",
+    "branch": "research/appliance-active-diagnostics-v0-1",
+    "path": "fixtures/diagnostics/appliance_active_diagnostic_corpus_v0_1.json",
+    "trace_id": "ADT-001",
+    "mapping": "hypotheses and categorical likelihoods are copied exactly into integer parts-per-million; measurement costs are separately declared in this fixture's relative cost profile.",
+    "sha256": "7626557b8a3da4c8c4f1e253fcf3a7d309d8041ef27304a493a21debb8779aa4"
+  },
+  "cost_profile": {
+    "id": "fan-test-relative-cost-v0.1",
+    "units": "relative benchmark cost units; not currency, seconds, or measured physical cost",
+    "values": {
+      "rpm_check": 10,
+      "airflow_check": 8,
+      "vibration_check": 16
+    }
+  },
+  "model": {
+    "schema_version": 1,
+    "model_id": "APPLIANCE-FAN-ACTIVE-DIAGNOSTICS",
+    "model_version": "0.1.0",
+    "prior": [
+      {
+        "hypothesis_id": "bearing_wear",
+        "probability_ppm": 250000
+      },
+      {
+        "hypothesis_id": "impeller_obstruction",
+        "probability_ppm": 250000
+      },
+      {
+        "hypothesis_id": "motor_drive_fault",
+        "probability_ppm": 250000
+      },
+      {
+        "hypothesis_id": "sensor_fault",
+        "probability_ppm": 250000
+      }
+    ],
+    "actions": [
+      {
+        "action_id": "rpm_check",
+        "feasibility": "Feasible",
+        "cost_units": 10,
+        "measurement_model_id": "fan-rpm-test-v0.1",
+        "likelihood_by_hypothesis": [
+          {
+            "hypothesis_id": "bearing_wear",
+            "outcomes": [
+              {
+                "outcome_id": "low",
+                "probability_ppm": 850000
+              },
+              {
+                "outcome_id": "normal",
+                "probability_ppm": 150000
+              }
+            ]
+          },
+          {
+            "hypothesis_id": "impeller_obstruction",
+            "outcomes": [
+              {
+                "outcome_id": "low",
+                "probability_ppm": 150000
+              },
+              {
+                "outcome_id": "normal",
+                "probability_ppm": 850000
+              }
+            ]
+          },
+          {
+            "hypothesis_id": "motor_drive_fault",
+            "outcomes": [
+              {
+                "outcome_id": "low",
+                "probability_ppm": 900000
+              },
+              {
+                "outcome_id": "normal",
+                "probability_ppm": 100000
+              }
+            ]
+          },
+          {
+            "hypothesis_id": "sensor_fault",
+            "outcomes": [
+              {
+                "outcome_id": "low",
+                "probability_ppm": 200000
+              },
+              {
+                "outcome_id": "normal",
+                "probability_ppm": 800000
+              }
+            ]
+          }
+        ]
+      },
+      {
+        "action_id": "airflow_check",
+        "feasibility": "Feasible",
+        "cost_units": 8,
+        "measurement_model_id": "fan-airflow-test-v0.1",
+        "likelihood_by_hypothesis": [
+          {
+            "hypothesis_id": "bearing_wear",
+            "outcomes": [
+              {
+                "outcome_id": "low",
+                "probability_ppm": 350000
+              },
+              {
+                "outcome_id": "normal",
+                "probability_ppm": 650000
+              }
+            ]
+          },
+          {
+            "hypothesis_id": "impeller_obstruction",
+            "outcomes": [
+              {
+                "outcome_id": "low",
+                "probability_ppm": 950000
+              },
+              {
+                "outcome_id": "normal",
+                "probability_ppm": 50000
+              }
+            ]
+          },
+          {
+            "hypothesis_id": "motor_drive_fault",
+            "outcomes": [
+              {
+                "outcome_id": "low",
+                "probability_ppm": 700000
+              },
+              {
+                "outcome_id": "normal",
+                "probability_ppm": 300000
+              }
+            ]
+          },
+          {
+            "hypothesis_id": "sensor_fault",
+            "outcomes": [
+              {
+                "outcome_id": "low",
+                "probability_ppm": 250000
+              },
+              {
+                "outcome_id": "normal",
+                "probability_ppm": 750000
+              }
+            ]
+          }
+        ]
+      },
+      {
+        "action_id": "vibration_check",
+        "feasibility": "Feasible",
+        "cost_units": 16,
+        "measurement_model_id": "fan-vibration-test-v0.1",
+        "likelihood_by_hypothesis": [
+          {
+            "hypothesis_id": "bearing_wear",
+            "outcomes": [
+              {
+                "outcome_id": "high",
+                "probability_ppm": 900000
+              },
+              {
+                "outcome_id": "normal",
+                "probability_ppm": 100000
+              }
+            ]
+          },
+          {
+            "hypothesis_id": "impeller_obstruction",
+            "outcomes": [
+              {
+                "outcome_id": "high",
+                "probability_ppm": 150000
+              },
+              {
+                "outcome_id": "normal",
+                "probability_ppm": 850000
+              }
+            ]
+          },
+          {
+            "hypothesis_id": "motor_drive_fault",
+            "outcomes": [
+              {
+                "outcome_id": "high",
+                "probability_ppm": 650000
+              },
+              {
+                "outcome_id": "normal",
+                "probability_ppm": 350000
+              }
+            ]
+          },
+          {
+            "hypothesis_id": "sensor_fault",
+            "outcomes": [
+              {
+                "outcome_id": "high",
+                "probability_ppm": 100000
+              },
+              {
+                "outcome_id": "normal",
+                "probability_ppm": 900000
+              }
+            ]
+          }
+        ]
+      }
+    ],
+    "decisions": [
+      {
+        "decision_id": "replace_cartridge",
+        "utility_by_hypothesis": [
+          {
+            "hypothesis_id": "bearing_wear",
+            "utility_milli": -14000
+          },
+          {
+            "hypothesis_id": "impeller_obstruction",
+            "utility_milli": -8000
+          },
+          {
+            "hypothesis_id": "motor_drive_fault",
+            "utility_milli": -1000
+          },
+          {
+            "hypothesis_id": "sensor_fault",
+            "utility_milli": -8000
+          }
+        ]
+      },
+      {
+        "decision_id": "clear_obstruction",
+        "utility_by_hypothesis": [
+          {
+            "hypothesis_id": "bearing_wear",
+            "utility_milli": -5000
+          },
+          {
+            "hypothesis_id": "impeller_obstruction",
+            "utility_milli": -17000
+          },
+          {
+            "hypothesis_id": "motor_drive_fault",
+            "utility_milli": -7000
+          },
+          {
+            "hypothesis_id": "sensor_fault",
+            "utility_milli": -4000
+          }
+        ]
+      },
+      {
+        "decision_id": "replace_sensor",
+        "utility_by_hypothesis": [
+          {
+            "hypothesis_id": "bearing_wear",
+            "utility_milli": -5000
+          },
+          {
+            "hypothesis_id": "impeller_obstruction",
+            "utility_milli": -20000
+          },
+          {
+            "hypothesis_id": "motor_drive_fault",
+            "utility_milli": -12000
+          },
+          {
+            "hypothesis_id": "sensor_fault",
+            "utility_milli": -16000
+          }
+        ]
+      }
+    ]
+  },
+  "shared_kernel": {
+    "repository": "Luminous-Dynamics/symthaea",
+    "pull_request": 7695,
+    "branch": "feat/mfg-posterior-eig-v1",
+    "source_path": "crates/domains/symthaea-manufacturing-active-learning-bench/src/acquisition.rs",
+    "reuse_contract": "FiniteHypothesisModel, expected_information_gain, rank_feasible_actions, DecisionValuePerCost"
+  }
+}
