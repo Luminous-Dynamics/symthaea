@@ -1090,7 +1090,9 @@ mod tests {
     #[test]
     fn altered_pairwise_receipt_is_rejected_after_recomputation() {
         let mut source = source_report(false);
-        source.pairwise_assessments[0].additional_evidence_may_change_dominance = false;
+        source.pairwise_assessments[0]
+            .not_separated_dimensions
+            .retain(|metric| *metric != ArchitectureMetricV1::EnergyWhPerTask);
         assert!(triage_measurement_actions(
             &source,
             &[],
