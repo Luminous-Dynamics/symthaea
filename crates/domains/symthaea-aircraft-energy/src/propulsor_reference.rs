@@ -199,7 +199,7 @@ pub fn ideal_axial_actuator_disk(
         || useful_thrust_power_w < 0.0
         || !disk_loading_n_m2.is_finite()
         || disk_loading_n_m2 <= 0.0
-        || ideal_propulsive_efficiency.is_some_and(|eta| !eta.is_finite() || eta <= 0.0 || eta >= 1.0)
+        || ideal_propulsive_efficiency.is_some_and(|eta| !eta.is_finite() || eta <= 0.0 || eta > 1.0)
     {
         return Err(StaticActuatorDiskError::DerivedValueOutOfRange);
     }
@@ -388,6 +388,27 @@ mod tests {
         assert!((result.ideal_air_power_w - (400_000.0 / 7.0)).abs() < 1e-8);
         assert_eq!(result.useful_thrust_power_w, 50_000.0);
         assert!((result.ideal_propulsive_efficiency.unwrap() - 0.875).abs() < 1e-12);
+    }
+
+    #[test]
+    fn high_speed_induced_velocity_avoids_catastrophic_cancellation() {
+        let result = ideal_axial_actuator_disk(AxialActuatorDiskInput {
+            thrust_n: 1_000.0,
+            air_density_kg_m3: 1.225,
+            disk_area_m2: 1.0,
+            forward_speed_m_s: 1.0e12,
+        })
+        .unwrap();
+
+        // The induced velocity is still positive and approximately T/(2 rho A V).
+        let asymptotic_induced_velocity =
+            1_000.0 / (2.0 * 1.225 * 1.0 * 1.0e12);
+        assert!(result.induced_velocity_m_s > 0.0);
+        assert!((result.induced_velocity_m_s / asymptotic_induced_velocity - 1.0).abs() < 1e-6);
+        assert!(result.ideal_air_power_w.is_finite());
+        // At extreme ratios f64 may round an efficiency infinitesimally below
+        // one to exactly one; that is representational rounding, not zero loss.
+        assert!(result.ideal_propulsive_efficiency.unwrap() <= 1.0);
     }
 
     #[test]
