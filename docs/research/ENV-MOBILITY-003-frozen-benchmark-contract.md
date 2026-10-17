@@ -49,9 +49,11 @@ cargo run -p xtask -- env-mobility-route-audit
 cargo test -p xtask env_mobility_route
 cargo run -p xtask -- env-mobility-make-buy
 cargo test -p xtask env_mobility_economics
+cargo run -p xtask -- env-mobility-sourcing-audit
+cargo test -p xtask env_mobility_sourcing
 ```
 
-The corpus qualifier emits deterministic JSON with raw SHA-256 digests of the exact corpus byte streams, per-case decisions, disposition counts, mismatches and protected-gate false accepts. The route audit independently checks the synthetic manufacturing-routing fixture's schema, candidate worker skills/resources, dependency DAG, mandatory operation set, calibration/manifest/inspection order, and mutation list. It **does not schedule the route** or establish shift feasibility/throughput. Neither command is a pass claim until compilation and exact-head tests are observed.
+The corpus qualifier emits deterministic JSON with raw SHA-256 digests of the exact corpus byte streams, per-case decisions, disposition counts, mismatches and protected-gate false accepts. The route audit independently checks the synthetic manufacturing-routing fixture's schema, candidate worker skills/resources, dependency DAG, mandatory operation set, calibration/manifest/inspection order, and mutation list. It **does not schedule the route** or establish shift feasibility/throughput. The make/buy and sourcing audits preserve missing evidence, qualification state and evidence class rather than converting unknown costs to zero or claiming catalog listings are quotes. The sourcing audit also checks profile arithmetic and keeps BMP280 (temperature/pressure) separate from BME280 (temperature/humidity/pressure). No command is a pass claim until compilation and exact-head tests are observed.
 
 The first Rust implementation should compose existing owners rather than create another universal robotics, manufacturing, or scheduling engine.
 
