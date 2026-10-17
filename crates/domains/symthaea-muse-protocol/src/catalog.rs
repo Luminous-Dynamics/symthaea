@@ -1257,7 +1257,8 @@ mod tests {
     }
 
     #[test]
-    fn new_structural_styles_are_mapped_to_their_matching_composer_routes() {
+    fn new_composer_styles_are_mapped_to_their_matching_routes() {
+        assert_eq!(catalog_entry(12).unwrap().composer_style, Some("Sarabande"));
         assert_eq!(catalog_entry(18).unwrap().composer_style, Some("Rondo"));
         assert_eq!(
             catalog_entry(19).unwrap().composer_style,
