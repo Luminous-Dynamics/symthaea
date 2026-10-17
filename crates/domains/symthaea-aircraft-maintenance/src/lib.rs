@@ -162,6 +162,8 @@ pub struct AircraftApplicability {
 #[derive(Debug, Clone, PartialEq)]
 pub struct MaintenanceTaskCard {
     pub schema_version: u16,
+    /// Digest of the canonical, revision-bound task-card artifact.
+    pub card_sha256: String,
     pub task_id: String,
     pub revision: u32,
     pub state: TaskState,
@@ -277,6 +279,7 @@ pub struct RecordedEvidence {
 pub struct MaintenanceWorkRecord {
     pub task_id: String,
     pub task_revision: u32,
+    pub task_card_sha256: String,
     pub aircraft_serial_number: String,
     pub aircraft_configuration_sha256: String,
     pub controlling_manual_sha256: String,
@@ -375,6 +378,7 @@ pub fn validate_task_card_static(
         errors.push(TaskCardError::InvalidSchemaVersion);
     }
     nonempty("task_id", &card.task_id, &mut errors);
+    digest("card_sha256", &card.card_sha256, &mut errors);
     if card.revision == 0 {
         errors.push(TaskCardError::EmptyField {
             field: "revision".into(),
@@ -413,6 +417,19 @@ pub fn validate_task_card_static(
             });
         }
     }
+
+    for training in &card.authority.required_training_ids {
+        nonempty("authority.required_training_ids", training, &mut errors);
+    }
+    unique_strings(
+        "authority.required_training_ids",
+        &card.authority.required_training_ids,
+        &mut errors,
+    );
+    for prerequisite in &card.prerequisites {
+        nonempty("prerequisites", prerequisite, &mut errors);
+    }
+    unique_strings("prerequisites", &card.prerequisites, &mut errors);
 
     for (index, tool) in card.tools.iter().enumerate() {
         nonempty(&format!("tools[{index}].tool_id"), &tool.tool_id, &mut errors);
@@ -457,10 +474,15 @@ pub fn validate_task_card_static(
             &step.required_evidence_fields,
             &mut errors,
         );
-        if !card.supporting_sources.iter().any(|source| {
-            source.document_id == step.source_document_id
-        }) && card.controlling_manual.document_id != step.source_document_id
-        {
+        let step_source_matches = if card.controlling_manual.document_id == step.source_document_id {
+            card.controlling_manual.source_section == step.source_section
+        } else {
+            card.supporting_sources.iter().any(|source| {
+                source.document_id == step.source_document_id
+                    && source.source_section == step.source_section
+            })
+        };
+        if !step_source_matches {
             errors.push(TaskCardError::StaleOrMissingSource {
                 document_id: step.source_document_id.clone(),
             });
@@ -488,10 +510,15 @@ pub fn validate_task_card_static(
                 id: check.criterion_id.clone(),
             });
         }
-        if !card.supporting_sources.iter().any(|source| {
-            source.document_id == check.source_document_id
-        }) && card.controlling_manual.document_id != check.source_document_id
-        {
+        let criterion_source_matches = if card.controlling_manual.document_id == check.source_document_id {
+            card.controlling_manual.source_section == check.source_section
+        } else {
+            card.supporting_sources.iter().any(|source| {
+                source.document_id == check.source_document_id
+                    && source.source_section == check.source_section
+            })
+        };
+        if !criterion_source_matches {
             errors.push(TaskCardError::StaleOrMissingSource {
                 document_id: check.source_document_id.clone(),
             });
@@ -692,6 +719,9 @@ pub fn validate_work_record(
     }
     if record.task_revision != card.revision {
         errors.push(TaskCardError::RecordIdentityMismatch { field: "task_revision".into() });
+    }
+    if !same_digest(&record.task_card_sha256, &card.card_sha256) {
+        errors.push(TaskCardError::RecordIdentityMismatch { field: "task_card_sha256".into() });
     }
     if record.aircraft_serial_number != aircraft.serial_number
         || !card.applicability.serial_numbers.iter().any(|serial| serial == &record.aircraft_serial_number)
@@ -1084,6 +1114,7 @@ mod tests {
         let supporting = doc("test-data", "rev-1", 'c');
         MaintenanceTaskCard {
             schema_version: TASK_CARD_SCHEMA_VERSION,
+            card_sha256: digest('8'),
             task_id: "SYNTHETIC-NO-REAL-PROCEDURE".into(),
             revision: 1,
             state: TaskState::ReadyToPerform,
@@ -1207,6 +1238,7 @@ mod tests {
         MaintenanceWorkRecord {
             task_id: card.task_id.clone(),
             task_revision: card.revision,
+            task_card_sha256: card.card_sha256.clone(),
             aircraft_serial_number: "SERIAL-001".into(),
             aircraft_configuration_sha256: card.applicability.configuration_sha256.clone(),
             controlling_manual_sha256: card.controlling_manual.sha256.clone(),
