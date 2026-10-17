@@ -7,7 +7,6 @@
   "required": [
     "schema_version",
     "run_id",
-    "source_commit",
     "solver_manifest_sha256",
     "event_store_sha256",
     "suspects",
@@ -22,10 +21,6 @@
       "type": "string",
       "minLength": 3,
       "maxLength": 128
-    },
-    "source_commit": {
-      "type": "string",
-      "minLength": 1
     },
     "solver_manifest_sha256": {
       "type": "string",
