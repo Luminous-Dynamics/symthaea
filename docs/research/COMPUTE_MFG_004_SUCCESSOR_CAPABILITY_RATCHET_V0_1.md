@@ -194,3 +194,14 @@ Required controls are full-width dynamics; random projection at a matched local 
 Report the task-quality vs local-state-width Pareto frontier, reconstruction error, temporal prediction/control quality, trajectory/tau/gate error, byte traffic, resident and peak temporary memory, projection/lift overhead, and p50/p95/p99 latency. Include cases where compressed dynamics loses so the gate can reject it. High-dimensional semantics may still be needed for binding/retrieval even when local temporal evolution can use fewer coordinates.
 
 External motivation—not a transferable result: a June 2026 Nature Machine Intelligence study on a dual-memory-pathway spiking architecture reports co-design of a compact slow state with a fast event-driven pathway and over 4× throughput / over 5× energy-efficiency improvements in post-layout simulation. It is a different spiking architecture, and those hardware figures are simulation-derived; it supports testing fast/slow separation and locality, not a claim about Symthaea or a reason to force LTC/CfC into spiking semantics ([paper](https://www.nature.com/articles/s42256-026-01255-3)).
+
+## Dynamical HDC-LTC trajectory preregistration (v0.1)
+
+A dedicated, machine-readable protocol and companion document now define candidate gates for the active ContinuousHV dynamical path. The protocol is explicitly **not executed** and its thresholds are proposed targets to freeze before collecting candidate results.
+
+- Protocol JSON: `crates/domains/symthaea-capability-closure/fixtures/dynamical-hdc-ltc-trajectory-protocol-v0.1.json`
+- Method: `docs/research/DYNAMICAL_HDC_LTC_TRAJECTORY_PROTOCOL_V0_1.md`
+- It keeps numerical integration fidelity, compressed-dynamics task preservation, and end-to-end system improvement as independent gates.
+- Initial targets include trajectory NRMSE <= 1e-3 for a refinement-checked numerical reference, <=1 percentage-point classification loss / <=2% control-return loss for compression, and either >=2x end-to-end throughput or >=30% lower measured system energy, with p95/p99 latency regression <=5%.
+- The measurement plan calls for at least 5 data seeds, 30 independent measurement blocks/configuration, 1,000 timed invocations/block, and a declared whole-system boundary.
+- These are starting acceptance targets, not universal constants, and no target is claimed to have been achieved. No default above 64K is promoted by representability alone.
