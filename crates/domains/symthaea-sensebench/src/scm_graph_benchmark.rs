@@ -699,7 +699,6 @@ fn generate_worlds(seed: u64) -> Vec<ScmWorld> {
                 // Parameters are drawn from a disjoint stream, independently of
                 // the number/pattern of random draws used to choose the topology.
                 let parameter_seed = seed
-                    ^ (family_index as u64).wrapping_mul(0xD1B5_4A32_D192_ED03)
                     ^ (graph_variant_index as u64).wrapping_mul(0x94D0_49BB_1331_11EB)
                     ^ (regime_index as u64).wrapping_mul(0x9E37_79B9_7F4A_7C15)
                     ^ 0x4D45_4348_414E_4953;
@@ -1718,6 +1717,20 @@ mod tests {
                     );
                 }
                 assert!(paired.iter().all(|world| world.truth == paired[0].truth));
+            }
+        }
+
+        for graph_variant_index in 0..WORLD_VARIANTS_PER_FAMILY {
+            for regime in ScmMechanismRegime::all() {
+                let paired: Vec<&ScmWorld> = worlds.iter()
+                    .filter(|world| {
+                        world.graph_variant_index == graph_variant_index
+                            && world.mechanism_regime == regime
+                    })
+                    .collect();
+                assert_eq!(paired.len(), ScmGraphFamily::all().len());
+                assert!(paired.iter()
+                    .all(|world| world.parameters == paired[0].parameters));
             }
         }
 
