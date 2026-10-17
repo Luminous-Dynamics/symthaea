@@ -13,6 +13,7 @@ use sha2::{Digest, Sha256};
 use std::collections::{BTreeMap, BTreeSet};
 use std::fs;
 use std::path::Path;
+use serde_json::Value;
 
 const BOOTSTRAP_REPLICATES: usize = 2_000;
 const MIN_GROUPS_FOR_INTERVAL: usize = 10;
@@ -24,6 +25,7 @@ const MAX_RESULTS_ROWS: usize = 1_000_000;
 struct SamplingManifest {
     schema_version: String,
     run_id: String,
+    policy_revision_sha256: String,
     sampled_windows: Vec<SampledWindow>,
 }
 
@@ -34,6 +36,30 @@ struct SampledWindow {
     trajectory_id: String,
     stratum_id: String,
     inclusion_probability: f64,
+}
+
+#[derive(Debug, Deserialize)]
+#[serde(deny_unknown_fields)]
+struct DecisionRecord {
+    schema_version: String,
+    run_id: String,
+    trajectory_id: String,
+    parent_group_id: String,
+    window_id: String,
+    sequence: u64,
+    decision_step: u64,
+    max_observed_step: u64,
+    action: String,
+    future_data_read: bool,
+    heldout_label_read: bool,
+    observed_state_sha256: String,
+    available_inputs_manifest_sha256: String,
+    policy_revision_sha256: String,
+    trigger_reason: String,
+    risk_score: Value,
+    reference_request_id: Value,
+    policy_cost: f64,
+    policy_cost_unit: String,
 }
 
 #[derive(Debug, Deserialize)]
@@ -60,11 +86,14 @@ struct AuditResult {
 struct SufficientStats {
     weight_total: f64,
     weight_query: f64,
+    weight_intervention: f64,
     weight_evaluated: f64,
     weight_severe: f64,
     weight_severe_query: f64,
+    weight_severe_intervention: f64,
     weight_nonsevere: f64,
     weight_nonsevere_query: f64,
+    weight_nonsevere_intervention: f64,
     weight_integrity_known: f64,
     weight_integrity_failure: f64,
     weighted_reference_cost: f64,
@@ -74,17 +103,20 @@ impl SufficientStats {
     fn add(&mut self, other: Self) {
         self.weight_total += other.weight_total;
         self.weight_query += other.weight_query;
+        self.weight_intervention += other.weight_intervention;
         self.weight_evaluated += other.weight_evaluated;
         self.weight_severe += other.weight_severe;
         self.weight_severe_query += other.weight_severe_query;
+        self.weight_severe_intervention += other.weight_severe_intervention;
         self.weight_nonsevere += other.weight_nonsevere;
         self.weight_nonsevere_query += other.weight_nonsevere_query;
+        self.weight_nonsevere_intervention += other.weight_nonsevere_intervention;
         self.weight_integrity_known += other.weight_integrity_known;
         self.weight_integrity_failure += other.weight_integrity_failure;
         self.weighted_reference_cost += other.weighted_reference_cost;
     }
 
-    fn from_row(row: &AuditResult) -> Self {
+    fn from_row(row: &AuditResult, intervention: bool) -> Self {
         let weight = 1.0 / row.inclusion_probability;
         let evaluated = row.reference_status == "evaluated";
         let severe = row.severe_event == Some(true);
@@ -95,6 +127,7 @@ impl SufficientStats {
         Self {
             weight_total: weight,
             weight_query: if row.policy_triggered_reference { weight } else { 0.0 },
+            weight_intervention: if intervention { weight } else { 0.0 },
             weight_evaluated: if evaluated { weight } else { 0.0 },
             weight_severe: if evaluated && severe { weight } else { 0.0 },
             weight_severe_query: if evaluated && severe && row.policy_triggered_reference {
@@ -102,8 +135,18 @@ impl SufficientStats {
             } else {
                 0.0
             },
+            weight_severe_intervention: if evaluated && severe && intervention {
+                weight
+            } else {
+                0.0
+            },
             weight_nonsevere: if evaluated && nonsevere { weight } else { 0.0 },
             weight_nonsevere_query: if evaluated && nonsevere && row.policy_triggered_reference {
+                weight
+            } else {
+                0.0
+            },
+            weight_nonsevere_intervention: if evaluated && nonsevere && intervention {
                 weight
             } else {
                 0.0
@@ -118,10 +161,14 @@ impl SufficientStats {
 #[derive(Debug, Clone, Copy)]
 enum Metric {
     QueryFraction,
+    InterventionFraction,
     ReferenceOutcomeCoverage,
-    SevereEventRecall,
-    FalseAlarmRate,
-    FalseAlarmBurden,
+    SevereEventInterventionRecall,
+    SevereEventQueryRecall,
+    FalseInterventionRate,
+    FalseQueryRate,
+    InterventionFalseAlarmBurden,
+    QueryFalseAlarmBurden,
     PhysicalIntegrityFailureRate,
 }
 
@@ -129,10 +176,23 @@ impl Metric {
     fn value(self, stats: &SufficientStats) -> Option<f64> {
         let (numerator, denominator) = match self {
             Self::QueryFraction => (stats.weight_query, stats.weight_total),
+            Self::InterventionFraction => (stats.weight_intervention, stats.weight_total),
             Self::ReferenceOutcomeCoverage => (stats.weight_evaluated, stats.weight_total),
-            Self::SevereEventRecall => (stats.weight_severe_query, stats.weight_severe),
-            Self::FalseAlarmRate => (stats.weight_nonsevere_query, stats.weight_nonsevere),
-            Self::FalseAlarmBurden => (stats.weight_nonsevere_query, stats.weight_total),
+            Self::SevereEventInterventionRecall => (
+                stats.weight_severe_intervention,
+                stats.weight_severe,
+            ),
+            Self::SevereEventQueryRecall => (stats.weight_severe_query, stats.weight_severe),
+            Self::FalseInterventionRate => (
+                stats.weight_nonsevere_intervention,
+                stats.weight_nonsevere,
+            ),
+            Self::FalseQueryRate => (stats.weight_nonsevere_query, stats.weight_nonsevere),
+            Self::InterventionFalseAlarmBurden => (
+                stats.weight_nonsevere_intervention,
+                stats.weight_total,
+            ),
+            Self::QueryFalseAlarmBurden => (stats.weight_nonsevere_query, stats.weight_total),
             Self::PhysicalIntegrityFailureRate => (
                 stats.weight_integrity_failure,
                 stats.weight_integrity_known,
@@ -161,15 +221,24 @@ struct ScoreReport {
     reference_unavailable_windows: usize,
     independent_parent_groups: usize,
     independent_trajectories: usize,
+    policy_decision_count: usize,
+    policy_reference_query_count: usize,
+    policy_intervention_count: usize,
     weighted_estimated_population_windows: f64,
+    observed_policy_cost: f64,
+    policy_cost_unit: String,
     observed_audit_reference_cost: f64,
     horvitz_thompson_estimated_population_audit_reference_cost: f64,
     audit_cost_unit: String,
     reference_outcome_coverage: MetricEstimate,
     policy_reference_query_fraction: MetricEstimate,
-    severe_event_recall_on_evaluated_references: MetricEstimate,
-    false_alarm_rate_among_evaluated_nonsevere_windows: MetricEstimate,
-    known_label_false_alarm_burden_per_estimated_population_window: MetricEstimate,
+    policy_intervention_fraction: MetricEstimate,
+    severe_event_intervention_recall_on_evaluated_references: MetricEstimate,
+    severe_event_reference_query_recall_on_evaluated_references: MetricEstimate,
+    false_intervention_rate_among_evaluated_nonsevere_windows: MetricEstimate,
+    false_reference_query_rate_among_evaluated_nonsevere_windows: MetricEstimate,
+    known_label_intervention_false_alarm_burden_per_estimated_population_window: MetricEstimate,
+    known_label_reference_query_false_alarm_burden_per_estimated_population_window: MetricEstimate,
     physical_integrity_failure_rate_on_evaluated_references: MetricEstimate,
     interval_method: String,
     warnings: Vec<String>,
