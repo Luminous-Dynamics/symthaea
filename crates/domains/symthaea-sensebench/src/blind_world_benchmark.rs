@@ -276,7 +276,7 @@ fn calibrate_model_adequacy_thresholds(
     policies: &[BlindWorldPolicy],
 ) -> Result<Vec<ModelAdequacyThreshold>, BlindWorldBenchmarkError> {
     let mut thresholds = Vec::with_capacity(policies.len());
-    for (policy_index, policy) in policies.iter().copied().enumerate() {
+    for policy in policies.iter().copied() {
         let mut calibration_scores = Vec::with_capacity(
             trials_per_scenario.saturating_mul(model_scenarios.len()),
         );
@@ -316,7 +316,6 @@ fn calibrate_model_adequacy_thresholds(
             independent_calibration_trials: calibration_scores.len(),
             calibration_source: "declared_model_scenarios_independent_seed".into(),
         });
-        let _ = policy_index;
     }
     Ok(thresholds)
 }
@@ -627,7 +626,7 @@ fn summarize_world_policy(
         .filter(|trial| trial.mean_prequential_predictive_nll > adequacy_threshold)
         .count();
     let accepted = count.saturating_sub(alarms);
-    let accepted_null_trials: Vec<&&TrialResult> = null_truth_trials.iter()
+    let accepted_null_trials: Vec<&TrialResult> = null_truth_trials.iter()
         .filter(|trial| trial.mean_prequential_predictive_nll <= adequacy_threshold)
         .collect();
     let accepted_false_claims = accepted_null_trials.iter()
