@@ -29,6 +29,24 @@ This fixes the baseline model family to the base ΛCDM model and uses the combin
 
 Do not treat the existence of these outputs as evidence that this repository has parsed, validated, or reproduced them.
 
+### Published checksums for the frozen baseline
+
+The official SHA-256 manifest currently lists the following exact entries for this target. The manifest file itself remains the authoritative source; these examples are duplicated here for human review and parser fixtures, not substituted for the manifest check.
+
+| Relative path | SHA-256 |
+|---|---|
+| `cobaya/base/desi-bao-all/chain.1.txt` | `fde589a17a4ca0fd58371b61290ada939dd672484cb3d523adacb8565a340ced` |
+| `cobaya/base/desi-bao-all/chain.2.txt` | `b6ce2202c5fd11049a0de5c277b017e91aa9fbc9c25d6fdce1d166e7f0ef72b7` |
+| `cobaya/base/desi-bao-all/chain.3.txt` | `fb0f68fbcd6e8704f7b7e785fcddf1efad23a32fc2c5a9fb2cc7d971e15fb697` |
+| `cobaya/base/desi-bao-all/chain.4.txt` | `ea1b353e6a6ca61172c540746f31df30c3d2db8a848936f9db654548b37605d2` |
+| `cobaya/base/desi-bao-all/chain.input.yaml` | `7340b09f14eb23cc6ccda2fd633ed47b7dcceea36e24ad3fcd05be63b2fd9f56` |
+| `cobaya/base/desi-bao-all/chain.updated.yaml` | `20bb21e67d2e734a8a7ebd250fc99c26acbd811424898389a9d83005c87695d3` |
+| `cobaya/base/desi-bao-all/chain.margestats` | `7c869b6928ef91134674551165d8a6528af7e4f210f54e2632d5bf8c0bdebb89` |
+| `cobaya/base/desi-bao-all/chain.checkpoint` | `79d61a30d42a9ff2a8f053af63eeafd4f14f52c0a3ece303cd570e69af5bf85c` |
+| `cobaya/base/desi-bao-all/chain.covmat` | `849bc1475199dd8aa59c5cdeeb83d1043c7c90bfce461ee38d7546d35d0dec5d` |
+
+Source: [official DESI DR2 SHA-256 manifest](https://data.desi.lbl.gov/public/papers/y3/bao-cosmo-params/dr2_vac_dr2_bao-cosmo-params_v1.0.sha256sum), retrieved 17 October 2026.
+
 ## Gate D0 — source integrity and acquisition
 
 1. Download the exact desi-bao-all files needed for the benchmark.
@@ -88,7 +106,16 @@ This gate is an inference reproduction, not necessarily independent reanalysis o
 
 ## Planned implementation boundary
 
-Symthaea should first provide the cosmological background equations and validated analytic reference tests. An initial dependency-light chain reader/auditor now exists in crates/domains/symthaea-cosmology-bench. It includes a streaming SHA-256 verifier, a JSON CLI mode for artifact checksum verification, multi-chain parsing with strict identical-header checks, and synthetic parser/summary negative controls. It remains uncompiled and has not processed the real DESI files in this environment. Before D0/D1 can pass, use it against checksum-verified product files and compare its conventions with the official metadata. It must not claim to implement a Boltzmann solver or a full cosmological likelihood.
+Symthaea should first provide the cosmological background equations and validated analytic reference tests. An initial dependency-light chain reader/auditor now exists in crates/domains/symthaea-cosmology-bench. It includes streaming SHA-256 verification against an exact relative-path entry in a downloaded SHA-256SUMS-style manifest, a JSON CLI mode, multi-chain parsing with strict identical-header checks, and synthetic parser/summary negative controls. Example checksum command:
+
+```sh
+cargo run -p symthaea-cosmology-bench --bin symthaea-cosmology-chain-audit -- \
+  --verify-manifest data/bao-cosmo-params/dr2_vac_dr2_bao-cosmo-params_v1.0.sha256sum \
+  cobaya/base/desi-bao-all/chain.1.txt \
+  data/bao-cosmo-params/cobaya/base/desi-bao-all/chain.1.txt
+```
+
+The tool and tests remain uncompiled in this environment, and it has not processed the real DESI files here. Before D0/D1 can pass, run it against downloaded artifacts and compare its summary conventions with official metadata. It must not claim to implement a Boltzmann solver or a full cosmological likelihood.
 
 Mycelix-DeSci should store the exact input hashes, output summary, settings, benchmark status, comparison tolerance, and independent reproduction attestation. Symtropy is not required for this chain-audit milestone; its role begins with validated dynamical simulations, not posterior-file parsing.
 
