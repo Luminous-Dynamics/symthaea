@@ -11,8 +11,10 @@
 
 use serde::{Deserialize, Serialize};
 
-/// Current schema version for wearability inputs and decisions.
+/// Current schema version for wearability input requests.
 pub const WEARABILITY_SCHEMA_VERSION: u16 = 1;
+/// Current schema version for decision receipts, independently versioned from inputs.
+pub const WEARABILITY_DECISION_SCHEMA_VERSION: u16 = 2;
 
 fn default_schema_version() -> u16 {
     WEARABILITY_SCHEMA_VERSION
@@ -533,7 +535,7 @@ pub fn evaluate_wearability_request(
     let findings = collect_wearability_findings(profile_id, stage, input, disposition);
 
     WearabilityDecisionV1 {
-        schema_version: WEARABILITY_SCHEMA_VERSION,
+        schema_version: WEARABILITY_DECISION_SCHEMA_VERSION,
         profile_id: profile_id.to_owned(),
         stage,
         disposition,
