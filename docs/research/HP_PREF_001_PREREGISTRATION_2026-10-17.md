@@ -9,7 +9,7 @@
 
 **Primary question:** For a new listener and unseen music excerpts, does a listener-adaptive headphone profile predict pairwise preference better than a fixed population profile?
 
-The primary estimand is the held-out predictive loss difference between the preregistered personalized model and the strongest frozen non-personalized baseline, over a declared participant/excerpt test distribution. Positive benefit means lower held-out loss for the personalized model. This is a predictive study; it does not by itself prove that adapting a profile improves long-term enjoyment, hearing health or preference for all users.
+The primary estimand is the held-out predictive loss difference between the preregistered personalized model and the strongest frozen non-personalized baseline, over a declared participant/excerpt test distribution. Positive benefit means lower held-out loss for the personalized model. **Provisional engineering ambition:** at least a 10% relative reduction in pairwise log loss, with a listener-clustered uncertainty interval supporting improvement and no material degradation in probability calibration. A separate pilot/power simulation must justify and freeze the final practical-effect threshold before confirmatory collection; it may revise this 10% ambition before—not after—confirmatory labels are inspected. This is a predictive study; it does not by itself prove that adapting a profile improves long-term enjoyment, hearing health or preference for all users.
 
 ## 2. Hypotheses
 
