@@ -179,6 +179,11 @@ impl std::fmt::Display for CulinaryViolation {
 
 impl std::error::Error for CulinaryViolation {}
 
+/// Broad input-envelope guard for food-core trajectories. This is a numeric/domain
+/// sanity bound (not a recipe setpoint or a food-safety limit) chosen well above
+/// ordinary culinary process temperatures so astronomical finite floats cannot pass.
+const MAX_THERMAL_TRAJECTORY_TEMP_C: f64 = 1_000.0;
+
 /// Reject invalid numerical states before using them in physical calculations.
 fn validate_thermal_trajectory(
     trajectory: &ThermalTrajectory,
@@ -210,6 +215,16 @@ fn validate_thermal_trajectory(
         return Err(CulinaryViolation::InvalidNumericInput {
             field,
             requirement: "temperatures cannot be below absolute zero (-273.15 °C)",
+        });
+    }
+    if trajectory
+        .points
+        .iter()
+        .any(|(_, temp)| *temp > MAX_THERMAL_TRAJECTORY_TEMP_C)
+    {
+        return Err(CulinaryViolation::InvalidNumericInput {
+            field,
+            requirement: "food-core trajectory temperature exceeds the 1000 °C input sanity envelope",
         });
     }
     if trajectory.points.windows(2).any(|w| w[1].0 < w[0].0) {
