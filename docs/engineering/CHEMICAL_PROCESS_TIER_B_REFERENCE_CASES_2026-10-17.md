@@ -154,7 +154,7 @@ cargo run -p symthaea-engineering --example chemical_process_tier_b_registry_val
   --registry docs/engineering/fixtures/CHEMICAL_PROCESS_TIER_B_CANDIDATES_V1.json
 ```
 
-The validator has eight authored unit tests and checks schema/status vocabulary, source URLs, unique IDs, freeze blockers, non-gold hint labels and hard acceptance gates. It enforces cross-field rules: `NOT_RUN` cannot contain execution artifacts; `PASS` requires an actual declared run, simulator version and raw-output digest; and exact output freezing additionally requires a valid output digest, a complete structured freeze receipt and an explicitly empty blocker list. The receipt checks input-artifact SHA-256 values, stdout/stderr/raw-output digests (including agreement with the run record), a versioned independent checker returning PASS, a complete shared-dependency audit, and case-specific acceptance rules frozen before evaluation. Skipped or reference-unavailable candidates cannot be promoted to frozen gold outputs.
+The validator has eleven authored unit tests and checks schema/status vocabulary, source URLs, unique IDs, freeze blockers, non-gold hint labels and hard acceptance gates. It enforces cross-field rules: `NOT_RUN` cannot contain execution artifacts; `PASS` requires an actual declared run, simulator version and raw-output digest; and exact output freezing additionally requires a valid output digest, a complete structured freeze receipt and an explicitly empty blocker list. The receipt checks input-artifact SHA-256 values, stdout/stderr/raw-output digests (including agreement with the run record), a versioned independent checker returning PASS, and case-specific acceptance rules frozen before evaluation. The dependency audit now records separate digest sets for each model, derives the overlap itself, requires the declared shared set to equal that intersection, and rejects an independent-corroboration claim if any data dependency is shared. Shared data may be recorded honestly, but cannot be presented as independent evidence. Skipped or reference-unavailable candidates cannot be promoted to frozen gold outputs.
 
 Six integration tests check the current registry, including the analytical-only 150 kg/s mixer invariant. These tests, like the eight validator unit tests, are authored but not run here. This is a **registry integrity check**, not a simulator runner. It cannot establish that an output is numerically correct, that the provenance is truthful, or that a physical model is valid. The Rust tests and CLI are authored but have not been executed in this environment; no compilation or passing test run is claimed.
 
@@ -176,10 +176,10 @@ A user-readable tutorial screenshot, a copied approximate number or a successful
 
 A separate benchmark should intentionally vary the *evidence dependency graph* while keeping a prediction comparison superficially the same:
 
-- Case A: solver 1 and solver 2 use distinct implementations and independently sourced reference data.
+- Case A: solver 1 and solver 2 use distinct implementations and disjoint declared evidence-data dependencies.
 - Case B: solver 1 and solver 2 have different solvers but consume the same property package/correlation or an identical stale data file.
 
-The checker must report that Case B has a shared evidence dependency; numerical agreement does not establish independent corroboration. Use input hashes and dependency manifests rather than labels such as `independent=true`.
+The freeze receipt requires separate SHA-256 dependency manifests for both sides. The Rust checker computes the intersection and checks that the receipt's declared shared set matches it exactly. If the computed intersection is nonempty, `independent_corroboration_claimed=true` is rejected. Shared dependencies need not invalidate every reproducibility result, but they lower the claim ceiling: a replay can be reproducible without providing independent corroboration. This check can detect only dependencies that the manifest actually declares; it does not prove that an operator's manifest is complete or truthful.
 
 ## Initial benchmarks and proposed targets
 
