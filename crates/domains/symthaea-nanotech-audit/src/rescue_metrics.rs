@@ -17,6 +17,7 @@ use std::path::Path;
 
 const BOOTSTRAP_REPLICATES: usize = 2_000;
 const MIN_GROUPS_FOR_INTERVAL: usize = 10;
+const MIN_CLUSTERS_PER_STRATUM_FOR_INTERVAL: usize = 2;
 const REQUIRED_VALID_BOOTSTRAP_FRACTION: f64 = 0.90;
 const MAX_RESULTS_BYTES: u64 = 256 * 1024 * 1024;
 const MAX_RESULTS_ROWS: usize = 1_000_000;
@@ -438,7 +439,10 @@ fn estimate(
         .values()
         .map(|stratum| stratum.values().copied().collect::<Vec<_>>())
         .collect::<Vec<_>>();
-    if strata.iter().any(Vec::is_empty) {
+    if strata
+        .iter()
+        .any(|stratum_groups| stratum_groups.len() < MIN_CLUSTERS_PER_STRATUM_FOR_INTERVAL)
+    {
         return report;
     }
     let mut rng = DeterministicRng(seed);
@@ -748,7 +752,10 @@ pub fn score_run(run_dir: &Path) -> Result<String, String> {
         .filter_map(|group| group.severe_event_intervention_recall)
         .min_by(f64::total_cmp);
 
-    let bootstrap_groups = if parent_spans_strata {
+    let stratum_with_too_few_clusters = groups_by_stratum.values().any(|stratum| {
+        stratum.len() < MIN_CLUSTERS_PER_STRATUM_FOR_INTERVAL
+    });
+    let bootstrap_groups = if parent_spans_strata || stratum_with_too_few_clusters {
         None
     } else {
         Some(&groups_by_stratum)
@@ -759,6 +766,11 @@ pub fn score_run(run_dir: &Path) -> Result<String, String> {
         warnings.push(
             "One or more parent systems span multiple sampling strata; the simple stratified cluster bootstrap is not appropriate for this crossed design, so confidence intervals are withheld. Use a preregistered design-based or multiway-cluster variance method.".to_owned()
         );
+    }
+    if stratum_with_too_few_clusters {
+        warnings.push(format!(
+            "At least one stratum has fewer than {MIN_CLUSTERS_PER_STRATUM_FOR_INTERVAL} represented parent clusters; stratified cluster-bootstrap intervals are withheld because within-stratum variability is insufficiently represented."
+        ));
     }
     if parent_groups_with_observed_integrity_breach > 0 {
         warnings.push(format!(
@@ -897,7 +909,7 @@ pub fn score_run(run_dir: &Path) -> Result<String, String> {
             "Design-weighted physical-integrity failure rate among outcomes with a known physical-integrity label; conditional if any labels are missing.",
         ),
         interval_method: format!(
-            "Approximate percentile bootstrap resampling parent_group_id clusters with replacement within each declared sampling stratum, preserving the number of sampled clusters per stratum; {BOOTSTRAP_REPLICATES} deterministic replicates. A 95% interval is emitted only with at least {MIN_GROUPS_FOR_INTERVAL} parent groups, no parent crossing strata, and at least {:.0}% valid replicates. This is not an exact design-based finite-population variance estimator.",
+            "Approximate percentile bootstrap resampling parent_group_id clusters with replacement within each declared sampling stratum, preserving the number of sampled clusters per stratum; {BOOTSTRAP_REPLICATES} deterministic replicates. A 95% interval is emitted only with at least {MIN_GROUPS_FOR_INTERVAL} parent groups, at least {MIN_CLUSTERS_PER_STRATUM_FOR_INTERVAL} clusters per stratum, no parent crossing strata, and at least {:.0}% valid replicates. This is not an exact design-based finite-population variance estimator.",
             REQUIRED_VALID_BOOTSTRAP_FRACTION * 100.0
         ),
         warnings,
