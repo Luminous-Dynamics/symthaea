@@ -1,0 +1,226 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "urn:luminous-dynamics:symthaea:catamaran-design-space-receipt:v1",
+  "title": "Symthaea catamaran design-space receipt v1",
+  "description": "Deterministic geometry candidate grid. Consumers must verify candidate_count equals candidates length and recompute candidate_manifest_sha256 over the canonical serialized ordered candidates. This receipt is not a hydrodynamic or safety prediction.",
+  "type": "object",
+  "additionalProperties": false,
+  "required": [
+    "design_space_version",
+    "spec",
+    "candidate_count",
+    "candidate_manifest_sha256",
+    "candidates",
+    "limitations"
+  ],
+  "properties": {
+    "design_space_version": {
+      "const": "catamaran-grid-v1"
+    },
+    "spec": {
+      "$ref": "#/$defs/spec"
+    },
+    "candidate_count": {
+      "type": "integer",
+      "minimum": 1
+    },
+    "candidate_manifest_sha256": {
+      "$ref": "#/$defs/sha256"
+    },
+    "candidates": {
+      "type": "array",
+      "minItems": 1,
+      "items": {
+        "$ref": "#/$defs/candidate"
+      }
+    },
+    "limitations": {
+      "type": "array",
+      "minItems": 1,
+      "items": {
+        "type": "string",
+        "minLength": 1
+      }
+    }
+  },
+  "$defs": {
+    "sha256": {
+      "type": "string",
+      "pattern": "^[a-f0-9]{64}$"
+    },
+    "positive_axis": {
+      "type": "array",
+      "minItems": 1,
+      "items": {
+        "type": "number",
+        "exclusiveMinimum": 0
+      }
+    },
+    "nonnegative_axis": {
+      "type": "array",
+      "minItems": 1,
+      "items": {
+        "type": "number",
+        "minimum": 0
+      }
+    },
+    "spec": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "length_waterline_m",
+        "hull_spacing_over_lwl",
+        "demihull_beam_over_lwl",
+        "draft_over_lwl",
+        "wet_deck_clearance_over_draft",
+        "froude_numbers",
+        "max_candidates"
+      ],
+      "properties": {
+        "length_waterline_m": {
+          "type": "number",
+          "exclusiveMinimum": 0
+        },
+        "hull_spacing_over_lwl": {
+          "$ref": "#/$defs/positive_axis"
+        },
+        "demihull_beam_over_lwl": {
+          "$ref": "#/$defs/positive_axis"
+        },
+        "draft_over_lwl": {
+          "$ref": "#/$defs/positive_axis"
+        },
+        "wet_deck_clearance_over_draft": {
+          "$ref": "#/$defs/positive_axis"
+        },
+        "froude_numbers": {
+          "$ref": "#/$defs/nonnegative_axis"
+        },
+        "max_candidates": {
+          "type": "integer",
+          "minimum": 1
+        }
+      }
+    },
+    "dimensionless_geometry": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "overall_beam_over_lwl",
+        "demihull_beam_over_lwl",
+        "hull_spacing_over_lwl",
+        "demihull_slenderness_lwl_over_beam",
+        "draft_over_lwl",
+        "wet_deck_clearance_over_draft",
+        "wet_deck_clearance_over_lwl"
+      ],
+      "properties": {
+        "overall_beam_over_lwl": {
+          "type": "number",
+          "exclusiveMinimum": 0
+        },
+        "demihull_beam_over_lwl": {
+          "type": "number",
+          "exclusiveMinimum": 0
+        },
+        "hull_spacing_over_lwl": {
+          "type": "number",
+          "exclusiveMinimum": 0
+        },
+        "demihull_slenderness_lwl_over_beam": {
+          "type": "number",
+          "exclusiveMinimum": 0
+        },
+        "draft_over_lwl": {
+          "type": "number",
+          "exclusiveMinimum": 0
+        },
+        "wet_deck_clearance_over_draft": {
+          "type": "number",
+          "exclusiveMinimum": 0
+        },
+        "wet_deck_clearance_over_lwl": {
+          "type": "number",
+          "exclusiveMinimum": 0
+        }
+      }
+    },
+    "candidate": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "candidate_id",
+        "length_waterline_m",
+        "hull_spacing_over_lwl",
+        "demihull_beam_over_lwl",
+        "draft_over_lwl",
+        "wet_deck_clearance_over_draft",
+        "froude_number",
+        "hull_spacing_m",
+        "demihull_beam_m",
+        "overall_beam_m",
+        "draft_m",
+        "wet_deck_clearance_m",
+        "speed_m_s",
+        "ratios"
+      ],
+      "properties": {
+        "candidate_id": {
+          "type": "string",
+          "pattern": "^cat-grid-[0-9]{8}$"
+        },
+        "length_waterline_m": {
+          "type": "number",
+          "exclusiveMinimum": 0
+        },
+        "hull_spacing_over_lwl": {
+          "type": "number",
+          "exclusiveMinimum": 0
+        },
+        "demihull_beam_over_lwl": {
+          "type": "number",
+          "exclusiveMinimum": 0
+        },
+        "draft_over_lwl": {
+          "type": "number",
+          "exclusiveMinimum": 0
+        },
+        "wet_deck_clearance_over_draft": {
+          "type": "number",
+          "exclusiveMinimum": 0
+        },
+        "froude_number": {
+          "type": "number",
+          "minimum": 0
+        },
+        "hull_spacing_m": {
+          "type": "number",
+          "exclusiveMinimum": 0
+        },
+        "demihull_beam_m": {
+          "type": "number",
+          "exclusiveMinimum": 0
+        },
+        "overall_beam_m": {
+          "type": "number",
+          "exclusiveMinimum": 0
+        },
+        "draft_m": {
+          "type": "number",
+          "exclusiveMinimum": 0
+        },
+        "wet_deck_clearance_m": {
+          "type": "number",
+          "exclusiveMinimum": 0
+        },
+        "speed_m_s": {
+          "type": "number",
+          "minimum": 0
+        },
+        "ratios": {
+          "$ref": "#/$defs/dimensionless_geometry"
+        }
+      }
+    }
+  }
+}
