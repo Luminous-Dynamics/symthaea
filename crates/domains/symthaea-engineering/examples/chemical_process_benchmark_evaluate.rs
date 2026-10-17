@@ -22,6 +22,15 @@ const ALLOWED_DISPOSITIONS: &[&str] = &[
     "OUT_OF_DOMAIN",
 ];
 
+const ALLOWED_CLASSES: &[&str] = &[
+    "positive-control",
+    "negative-control",
+    "metamorphic",
+    "analytic-reference",
+    "uncertainty-control",
+    "tamper-control",
+];
+
 const USAGE: &str = "Usage: chemical_process_benchmark_evaluate --corpus <path> --results <path> --expected-head <git-commit-sha>";
 
 struct Args {
@@ -93,6 +102,14 @@ fn evaluate(corpus: &Value, results: &Value, expected_head: &str) -> Value {
     if benchmark_id.is_empty() || corpus_version.is_empty() {
         global_errors.push("corpus is missing benchmark_id or corpus_version".to_owned());
     }
+
+    let canonical_dispositions = ALLOWED_DISPOSITIONS
+        .iter()
+        .map(|item| (*item).to_owned())
+        .collect::<BTreeSet<_>>();
+    if strings(corpus, "allowed_dispositions").as_ref() != Some(&canonical_dispositions) {
+        global_errors.push("corpus allowed_dispositions is missing or differs from the frozen vocabulary".to_owned());
+    }
     if text(results, "benchmark_id") != Some(benchmark_id) {
         global_errors.push("results benchmark_id does not match corpus".to_owned());
     }
@@ -114,6 +131,38 @@ fn evaluate(corpus: &Value, results: &Value, expected_head: &str) -> Value {
             return report(corpus, expected_head, reported_head, global_errors, Vec::new(), 0);
         }
     };
+    if expected_cases.is_empty() {
+        global_errors.push("corpus case list must not be empty".to_owned());
+    }
+    let mut expected_id_counts = BTreeMap::<String, usize>::new();
+    for case in expected_cases {
+        let Some(id) = text(case, "id") else {
+            global_errors.push("corpus case is missing an id".to_owned());
+            continue;
+        };
+        if id.trim().is_empty() {
+            global_errors.push("corpus case has an empty id".to_owned());
+        }
+        let count = expected_id_counts.entry(id.to_owned()).or_default();
+        *count += 1;
+        if *count > 1 {
+            global_errors.push(format!("duplicate corpus case id {id:?}"));
+        }
+        let class = text(case, "class").unwrap_or_default();
+        if !ALLOWED_CLASSES.contains(&class) {
+            global_errors.push(format!("corpus case {id:?} has unknown class {class:?}"));
+        }
+        if case.get("fixture").and_then(Value::as_object).is_none() {
+            global_errors.push(format!("corpus case {id:?} has a missing or malformed fixture"));
+        }
+        if strings(case, "required_findings").map_or(true, |items| items.is_empty()) {
+            global_errors.push(format!("corpus case {id:?} has missing or empty required_findings"));
+        }
+        if strings(case, "prohibited_promotions").map_or(true, |items| items.is_empty()) {
+            global_errors.push(format!("corpus case {id:?} has missing or empty prohibited_promotions"));
+        }
+    }
+
     let observed_cases = match results.get("cases").and_then(Value::as_array) {
         Some(cases) => cases,
         None => {
@@ -195,7 +244,13 @@ fn evaluate(corpus: &Value, results: &Value, expected_head: &str) -> Value {
             errors.push("observed disposition does not match frozen expectation".to_owned());
         }
 
-        let required = strings(expected, "required_findings").unwrap_or_default();
+        let required = match strings(expected, "required_findings") {
+            Some(findings) if !findings.is_empty() => findings,
+            _ => {
+                errors.push("corpus required_findings missing, malformed, or empty".to_owned());
+                BTreeSet::new()
+            }
+        };
         let observed_findings = match strings(actual, "observed_findings") {
             Some(findings) => findings,
             None => {
@@ -211,7 +266,13 @@ fn evaluate(corpus: &Value, results: &Value, expected_head: &str) -> Value {
             errors.push("one or more required findings are missing".to_owned());
         }
 
-        let prohibited = strings(expected, "prohibited_promotions").unwrap_or_default();
+        let prohibited = match strings(expected, "prohibited_promotions") {
+            Some(promotions) if !promotions.is_empty() => promotions,
+            _ => {
+                errors.push("corpus prohibited_promotions missing, malformed, or empty".to_owned());
+                BTreeSet::new()
+            }
+        };
         let observed_promotions = match strings(actual, "observed_promotions") {
             Some(promotions) => promotions,
             None => {
@@ -409,18 +470,23 @@ mod tests {
         json!({
             "benchmark_id": "TEST-BENCH",
             "corpus_version": "1.0.0",
+            "allowed_dispositions": ALLOWED_DISPOSITIONS,
             "cases": [
                 {
                     "id": "CASE-1",
+                    "class": "positive-control",
                     "expected_disposition": "ACCEPTED_WITHIN_SCOPE",
                     "required_findings": ["balance_checked"],
-                    "prohibited_promotions": ["plant_qualified"]
+                    "prohibited_promotions": ["plant_qualified"],
+                    "fixture": { "kind": "synthetic" }
                 },
                 {
                     "id": "CASE-2",
+                    "class": "negative-control",
                     "expected_disposition": "BLOCKED",
                     "required_findings": ["missing_utility_found"],
-                    "prohibited_promotions": ["production_capability_complete"]
+                    "prohibited_promotions": ["production_capability_complete"],
+                    "fixture": { "kind": "synthetic" }
                 }
             ]
         })
@@ -541,6 +607,7 @@ mod tests {
         json!({
             "benchmark_id": "ANALYTIC-TEST",
             "corpus_version": "1.0.0",
+            "allowed_dispositions": ALLOWED_DISPOSITIONS,
             "residual_profile": { "target_max": 1e-8 },
             "cases": [{
                 "id": "RECYCLE-1",
@@ -550,7 +617,7 @@ mod tests {
                     "solution_matches_analytic_reference",
                     "residual_within_frozen_tolerance"
                 ],
-                "prohibited_promotions": [],
+                "prohibited_promotions": ["plant_build_authorized"],
                 "fixture": {
                     "equation": "x = fresh + recycle_fraction*x",
                     "fresh": 1.0,
