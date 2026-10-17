@@ -1,4 +1,4 @@
-# SenseBench Blind-World Protocol v0.1
+# SenseBench Blind-World Protocol v0.2
 
 **Status:** implementation added to the `feat/symthaea-sense-observation-envelope` branch; Rust tests are authored but have not been executed in the current environment.
 
@@ -32,6 +32,9 @@ Per world and policy, JSON reports:
 
 - multiclass Brier score and its trial-level 95% normal-approximation interval;
 - multiclass log loss and its trial-level 95% normal-approximation interval;
+- prequential predictive log loss: the negative log probability of each observed outcome under the current posterior and declared model ensemble, scored before the posterior update;
+- a per-policy model-adequacy cutoff set at the 99th empirical percentile of independent-seed simulations generated from the declared likelihood scenarios;
+- model-adequacy alarm rate and Wilson interval, fraction of trials retained after the claim gate, and null-world causal-claim rate both before and after gating;
 - top-hypothesis accuracy with a Wilson interval;
 - threshold-reaching fraction with a Wilson interval;
 - mean experiments and synthetic cost spent;
@@ -42,7 +45,7 @@ Per world and policy, JSON reports:
 - realized posterior entropy reduction per cost (can be negative);
 - unsupported positive causal-claim rate when the true hypothesis is the no-direct-cause hypothesis, with a Wilson interval.
 
-An individual realized entropy reduction may be negative. It is not clamped to make a policy look better. Acquisition regret is a local, myopic per-selection comparison against the best currently affordable candidate under the hidden world; it does not compare globally optimal multi-step experiment plans. The reported realized quantity measures entropy change under the benchmark's declared posterior update rule after outcomes sampled from the hidden-world distribution; it is not proof of true-world posterior calibration.
+An individual realized entropy reduction may be negative. It is not clamped to make a policy look better. Acquisition regret is a local, myopic per-selection comparison against the best currently affordable candidate under the hidden world; it does not compare globally optimal multi-step experiment plans. The reported realized quantity measures entropy change under the benchmark's declared posterior update rule after outcomes sampled from the hidden-world distribution; it is not proof of true-world posterior calibration. The adequacy gate is a post-trial claim filter: when a trial's mean prequential predictive loss exceeds its policy-specific cutoff, the result is treated as a reason to abstain from a causal claim. The cutoff is calibrated on independent seeds using the declared two-model ensemble, never the held-out evaluation-world tables. It is a fixture-specific diagnostic, not a universal or formally guaranteed goodness-of-fit test. Report both suppressed false claims and retained-claim coverage; a gate that rejects everything is not considered successful.
 
 ## Reproduction
 
@@ -62,9 +65,15 @@ Use the exact commit SHA for every recorded report. Do not attribute a report to
 
 - It does not prove causal discovery in real systems or validated physical measurement.
 - The likelihood tables are synthetic and source-visible.
-- Trial-level intervals quantify Monte Carlo uncertainty conditional on each parameterized world. The 24 worlds are variants of six hand-authored templates, not a random sample of all causal graph topologies; they do not establish broad generalization.
+- Trial-level intervals quantify Monte Carlo uncertainty conditional on each parameterized world. The 24 worlds are variants of six hand-authored templates, not a random sample of all causal graph topologies; they do not establish broad generalization. The 99th-percentile adequacy cutoff is calibrated from finite synthetic simulations and must be re-qualified when the candidate library, policy, budget, posterior threshold, or generator changes.
 - A model-weighted or worst-case policy may fail to outperform a competent fixed design. Preserve such a result.
 - Deterministic seeds and report manifests improve replayability; they do not establish independent data custody or prevent source-level leakage.
+
+## Model-adequacy / abstention gate
+
+This version adds a prequential model-fit diagnostic. Before each Bayesian posterior update, compute the observed outcome's probability under the current hypothesis posterior, marginalized over the declared likelihood-model ensemble; accumulate the negative log probability across the trial. For each policy, calibrate a cutoff using a disjoint deterministic seed stream and outcomes generated from each declared model scenario. Use the empirical 99th percentile of these mean trial losses. The evaluation-world outcomes are never used to set the cutoff.
+
+An alarm means **the observed trajectory is surprising under this declared ensemble**, not that the current hypotheses are certainly false. Conversely, no alarm does not prove model adequacy. The system should abstain from a causal claim on alarm, retain the evidence, and report the lost coverage. Future work should use sequentially valid tests/e-values and independent calibration data rather than treating this simple quantile rule as a formal guarantee.
 
 ## Next qualification gates
 
