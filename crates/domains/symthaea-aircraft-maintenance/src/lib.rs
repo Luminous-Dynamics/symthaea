@@ -918,6 +918,9 @@ pub fn release_task_to_service(
         return Err(vec![TaskCardError::SoftwareCannotReleaseToService]);
     }
     let mut errors = Vec::new();
+    if let Err(static_errors) = validate_task_card_static(card) {
+        errors.extend(static_errors);
+    }
     if card.state != TaskState::ReviewPending {
         errors.push(TaskCardError::WrongTaskState {
             expected: TaskState::ReviewPending,
@@ -935,8 +938,31 @@ pub fn release_task_to_service(
     if !actor.credential_reference.as_ref().is_some_and(valid_document_shape) {
         errors.push(TaskCardError::MissingReleaseCredential);
     }
-    if !card.authority.review_is_verified() {
-        errors.push(TaskCardError::AuthorityReviewUnresolved);
+    match &card.authority.review {
+        AuthorityReview::Unresolved => errors.push(TaskCardError::AuthorityReviewUnresolved),
+        AuthorityReview::Verified {
+            jurisdiction,
+            certification_basis,
+            permission_source,
+            reviewer_id,
+            reviewed_on,
+            scope_statement,
+        } => {
+            if jurisdiction != &card.authority.jurisdiction
+                || certification_basis != &card.authority.certification_basis
+                || reviewer_id.trim().is_empty()
+                || scope_statement.trim().is_empty()
+                || !valid_iso_date(reviewed_on)
+            {
+                errors.push(TaskCardError::AuthorityReviewMismatch);
+            }
+            validate_document("authority.review.permission_source", permission_source, &mut errors);
+            if !document_is_current(permission_source, current_documents) {
+                errors.push(TaskCardError::StaleOrMissingSource {
+                    document_id: permission_source.document_id.clone(),
+                });
+            }
+        }
     }
     for source in std::iter::once(&card.controlling_manual)
         .chain(card.supporting_sources.iter())
