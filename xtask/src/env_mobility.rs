@@ -934,7 +934,12 @@ mod tests {
             context
         )
         .is_err());
-        assert!(validate_component_criticality("invented_component", "routine_replaceable", context).is_err());
+        assert!(validate_component_criticality(
+            "invented_component",
+            "routine_replaceable",
+            context
+        )
+        .is_err());
     }
 
     #[test]
