@@ -14,6 +14,7 @@
 //! - [`inventory`]: economic order quantity (EOQ) + total cost.
 //! - [`queue`]: M/M/1 queue metrics (ρ, L, Lq, W, Wq).
 //! - [`graph`]: Dijkstra single-source shortest paths.
+ //! - `aircraft_ownership`: annual ownership-cost decomposition with dispatch and completed-passenger-kilometre metrics.
 //!
 //! ## Example
 //!
@@ -23,6 +24,7 @@
 //! assert!((MM1 { arrival_rate: 2.0, service_rate: 3.0 }.avg_in_system() - 2.0).abs() < 1e-12);
 //! ```
 
+pub mod aircraft_ownership;
 pub mod graph;
 pub mod inventory;
 pub mod queue;
