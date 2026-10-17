@@ -107,6 +107,8 @@ pub enum ExperimentSelectionError {
     OptionCostUnitMismatch,
     DuplicateOptionId,
     ZeroEstimatedCost,
+    RankingOptionPoolMismatch,
+    InvalidRankingPermutation,
 }
 
 impl fmt::Display for ExperimentSelectionError {
@@ -123,6 +125,12 @@ impl fmt::Display for ExperimentSelectionError {
             Self::OptionCostUnitMismatch => "experiment option uses a different cost unit",
             Self::DuplicateOptionId => "experiment option identifiers must be unique",
             Self::ZeroEstimatedCost => "estimated experiment cost must be greater than zero",
+            Self::RankingOptionPoolMismatch => {
+                "ranking does not match this exact input option pool and order"
+            }
+            Self::InvalidRankingPermutation => {
+                "ranking indices must be a permutation of the input option indices"
+            }
         };
         f.write_str(message)
     }
@@ -138,9 +146,29 @@ impl std::error::Error for ExperimentSelectionError {}
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub struct ExperimentRanking {
     pub option_indices: Vec<usize>,
+    /// Snapshot of option IDs in original input order; guards index reuse.
+    pub input_option_ids: Vec<String>,
     pub policy: ExperimentSelectionPolicy,
     pub evaluation_profile_id: String,
     pub cost_unit_id: String,
+}
+
+/// Budget-constrained plan produced from one ranking.
+///
+/// Selected/skipped IDs, the profile, policy, cost unit and estimated costs form
+/// an auditable planning receipt. This plan is not an authorization to execute
+/// a physical measurement or hardware change.
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub struct BudgetedExperimentPlan {
+    pub selected_option_indices: Vec<usize>,
+    pub selected_option_ids: Vec<String>,
+    pub skipped_option_ids: Vec<String>,
+    pub policy: ExperimentSelectionPolicy,
+    pub evaluation_profile_id: String,
+    pub cost_unit_id: String,
+    pub budget_units: u64,
+    pub estimated_cost_units: u64,
+    pub unused_budget_units: u64,
 }
 
 /// Rank pre-screened experiment options using one explicit baseline policy.
@@ -202,9 +230,74 @@ pub fn rank_experiments(
 
     Ok(ExperimentRanking {
         option_indices: indices,
+        input_option_ids: options.iter().map(|option| option.id.clone()).collect(),
         policy,
         evaluation_profile_id: evaluation_profile_id.to_owned(),
         cost_unit_id: cost_unit_id.to_owned(),
+    })
+}
+
+/// Build a deterministic, budget-feasible plan from a ranking.
+///
+/// Options that do not fit the remaining budget are skipped, not treated as
+/// terminal, so a cheaper later option can still be selected. The caller must
+/// enforce the same budget semantics when executing or benchmarking the plan.
+/// The ranking is accepted only for the exact option-ID sequence that created it.
+pub fn select_under_budget(
+    options: &[ExperimentOption],
+    ranking: &ExperimentRanking,
+    budget_units: u64,
+) -> Result<BudgetedExperimentPlan, ExperimentSelectionError> {
+    validate_options(
+        options,
+        &ranking.evaluation_profile_id,
+        &ranking.cost_unit_id,
+    )?;
+    let input_option_ids: Vec<_> = options.iter().map(|option| option.id.clone()).collect();
+    if input_option_ids != ranking.input_option_ids {
+        return Err(ExperimentSelectionError::RankingOptionPoolMismatch);
+    }
+    if ranking.option_indices.len() != options.len() {
+        return Err(ExperimentSelectionError::InvalidRankingPermutation);
+    }
+
+    let mut seen = vec![false; options.len()];
+    for &index in &ranking.option_indices {
+        if index >= options.len() || seen[index] {
+            return Err(ExperimentSelectionError::InvalidRankingPermutation);
+        }
+        seen[index] = true;
+    }
+    if seen.iter().any(|value| !value) {
+        return Err(ExperimentSelectionError::InvalidRankingPermutation);
+    }
+
+    let mut selected_option_indices = Vec::new();
+    let mut selected_option_ids = Vec::new();
+    let mut skipped_option_ids = Vec::new();
+    let mut remaining_budget = budget_units;
+
+    for &index in &ranking.option_indices {
+        let option = &options[index];
+        if option.estimated_cost_units <= remaining_budget {
+            remaining_budget -= option.estimated_cost_units;
+            selected_option_indices.push(index);
+            selected_option_ids.push(option.id.clone());
+        } else {
+            skipped_option_ids.push(option.id.clone());
+        }
+    }
+
+    Ok(BudgetedExperimentPlan {
+        selected_option_indices,
+        selected_option_ids,
+        skipped_option_ids,
+        policy: ranking.policy,
+        evaluation_profile_id: ranking.evaluation_profile_id.clone(),
+        cost_unit_id: ranking.cost_unit_id.clone(),
+        budget_units,
+        estimated_cost_units: budget_units - remaining_budget,
+        unused_budget_units: remaining_budget,
     })
 }
 
@@ -355,6 +448,10 @@ mod tests {
         assert_eq!(first.option_indices.len(), options.len());
         let unique: HashSet<_> = first.option_indices.iter().copied().collect();
         assert_eq!(unique.len(), options.len());
+        assert_eq!(
+            first.input_option_ids,
+            options.iter().map(|option| option.id.clone()).collect::<Vec<_>>()
+        );
     }
 
     #[test]
@@ -382,6 +479,63 @@ mod tests {
         assert!(ranking.option_indices.is_empty());
         assert_eq!(ranking.evaluation_profile_id, PROFILE);
         assert_eq!(ranking.cost_unit_id, COST_UNIT);
+    }
+
+
+    #[test]
+    fn budgeted_plan_never_exceeds_budget_and_skips_unaffordable_options() {
+        let options = options();
+        let ranking = rank_experiments(
+            &options,
+            PROFILE,
+            COST_UNIT,
+            ExperimentSelectionPolicy::CheapestFirst,
+        )
+        .unwrap();
+        let plan = select_under_budget(&options, &ranking, 22).unwrap();
+
+        assert_eq!(plan.selected_option_ids, vec!["analytic-b", "simulation-c"]);
+        assert_eq!(plan.skipped_option_ids, vec!["physical-d", "physical-a"]);
+        assert_eq!(plan.estimated_cost_units, 22);
+        assert_eq!(plan.unused_budget_units, 0);
+        assert!(plan.estimated_cost_units <= plan.budget_units);
+    }
+
+    #[test]
+    fn budgeted_plan_checks_exact_option_pool_and_order() {
+        let options = options();
+        let ranking = rank_experiments(
+            &options,
+            PROFILE,
+            COST_UNIT,
+            ExperimentSelectionPolicy::CheapestFirst,
+        )
+        .unwrap();
+        let mut reordered = options.clone();
+        reordered.reverse();
+
+        assert_eq!(
+            select_under_budget(&reordered, &ranking, 100),
+            Err(ExperimentSelectionError::RankingOptionPoolMismatch)
+        );
+    }
+
+    #[test]
+    fn budgeted_plan_rejects_mutated_non_permutation_rankings() {
+        let options = options();
+        let mut ranking = rank_experiments(
+            &options,
+            PROFILE,
+            COST_UNIT,
+            ExperimentSelectionPolicy::CheapestFirst,
+        )
+        .unwrap();
+        ranking.option_indices[1] = ranking.option_indices[0];
+
+        assert_eq!(
+            select_under_budget(&options, &ranking, 100),
+            Err(ExperimentSelectionError::InvalidRankingPermutation)
+        );
     }
 
     #[test]
