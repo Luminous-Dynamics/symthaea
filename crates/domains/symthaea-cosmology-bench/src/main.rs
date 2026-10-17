@@ -161,3 +161,32 @@ fn main() -> ExitCode {
         }
     }
 }
+
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    #[test]
+    fn input_artifact_json_binds_path_digest_and_byte_size() {
+        let artifacts = vec![(
+            "chain.1.txt".to_string(),
+            "ba7816bf8f01cfea414140de5dae2223b00361a396177a9cb410ff61f20015ad".to_string(),
+            3,
+        )];
+        assert_eq!(
+            json_input_artifacts(&artifacts),
+            "[{\"path\": \"chain.1.txt\", \"sha256\": \"ba7816bf8f01cfea414140de5dae2223b00361a396177a9cb410ff61f20015ad\", \"size_bytes\": 3}]"
+        );
+    }
+
+    #[test]
+    fn input_artifact_json_escapes_untrusted_paths() {
+        let artifacts = vec![(
+            "chain\\n1.txt".to_string(),
+            "ba7816bf8f01cfea414140de5dae2223b00361a396177a9cb410ff61f20015ad".to_string(),
+            3,
+        )];
+        assert!(json_input_artifacts(&artifacts).contains("chain\\\\n1.txt"));
+    }
+}
