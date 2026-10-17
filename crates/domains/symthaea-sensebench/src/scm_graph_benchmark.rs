@@ -24,7 +24,7 @@ const WORLD_VARIANTS_PER_FAMILY: usize = 4;
 const MECHANISM_REGIME_COUNT: usize = 4;
 const MAX_TRIALS_PER_WORLD: usize = 10_000;
 const MAX_MEASUREMENT_BUDGET: usize = 64;
-const GENERATOR_VERSION: &str = "sensebench-scm-graphs-0.4.0";
+const GENERATOR_VERSION: &str = "sensebench-scm-graphs-0.5.0";
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, Deserialize)]
 #[serde(rename_all = "snake_case")]
@@ -160,6 +160,10 @@ pub struct ScmGraphPolicySummary {
     /// Number of pairwise absent/undirected/forward/reverse mark disagreements.
     pub mean_cpdag_mark_distance: f64,
     pub cpdag_mark_distance_ci95: [f64; 2],
+    /// PC baseline only: mean number of edge marks changed by valid-catalogue projection.
+    pub pc_raw_to_projected_mark_changes_mean: Option<f64>,
+    /// PC baseline only: fraction of trials where projection changes at least one mark.
+    pub pc_projection_changed_trial_rate: Option<f64>,
     pub markov_equivalence_class_recovery_rate: f64,
     pub markov_equivalence_class_recovery_wilson_ci95: [f64; 2],
     /// Claim coverage using posterior mass summed over a Markov equivalence class.
@@ -594,7 +598,7 @@ fn g_squared_ci_statistic(
 fn pc_observational_cpdag(
     observations: &[usize],
     classes: &MarkovClassCatalog,
-) -> (Vec<EdgeMark>, usize) {
+) -> (Vec<EdgeMark>, usize, usize) {
     if observations.is_empty() {
         let marks = vec![EdgeMark::Undirected; UNORDERED_PAIRS.len()];
         return project_to_valid_cpdag(&marks, classes);
@@ -684,7 +688,7 @@ fn pc_observational_cpdag(
 fn project_to_valid_cpdag(
     raw_marks: &[EdgeMark],
     classes: &MarkovClassCatalog,
-) -> (Vec<EdgeMark>, usize) {
+) -> (Vec<EdgeMark>, usize, usize) {
     let mut best_class_index = 0usize;
     let mut best_distance = f64::INFINITY;
     for (class_index, candidate_marks) in classes.cpdag_marks.iter().enumerate() {
@@ -694,7 +698,11 @@ fn project_to_valid_cpdag(
             best_class_index = class_index;
         }
     }
-    (classes.cpdag_marks[best_class_index].clone(), best_class_index)
+    let projected = classes.cpdag_marks[best_class_index].clone();
+    let changed_marks = raw_marks.iter().zip(&projected)
+        .filter(|(raw, projected)| raw != projected)
+        .count();
+    (projected, best_class_index, changed_marks)
 }
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
@@ -747,6 +755,7 @@ struct TrialResult {
     cpdag_skeleton_f1: f64,
     compelled_direction_f1: f64,
     cpdag_mark_distance: f64,
+    pc_projection_mark_changes: Option<usize>,
     markov_equivalence_class_correct: bool,
     cpdag_claim_accepted: bool,
     false_cpdag_claim: bool,
@@ -1272,21 +1281,23 @@ fn simulate_trial(
         }
     }
 
-    let pc_class_index = if policy == ScmGraphPolicy::PcObservationalBaseline {
-        let (_, class_index) = pc_observational_cpdag(&observed_states, classes);
-        // The PC baseline submits a CPDAG rather than claiming one fully oriented
-        // DAG. Represent its class as a uniform distribution over member DAGs so
-        // posterior-scored fields do not falsely retain the original uniform prior.
-        posterior.iter_mut().for_each(|hypothesis| hypothesis.probability = 0.0);
-        let members = &classes.members[class_index];
-        let member_probability = 1.0 / members.len() as f64;
-        for member in members {
-            posterior[*member].probability = member_probability;
-        }
-        Some(class_index)
-    } else {
-        None
-    };
+    let (pc_class_index, pc_projection_mark_changes) =
+        if policy == ScmGraphPolicy::PcObservationalBaseline {
+            let (_, class_index, projection_mark_changes) =
+                pc_observational_cpdag(&observed_states, classes);
+            // The PC baseline submits a CPDAG rather than claiming one fully oriented
+            // DAG. Represent its class as a uniform distribution over member DAGs so
+            // posterior-scored fields do not falsely retain the original uniform prior.
+            posterior.iter_mut().for_each(|hypothesis| hypothesis.probability = 0.0);
+            let members = &classes.members[class_index];
+            let member_probability = 1.0 / members.len() as f64;
+            for member in members {
+                posterior[*member].probability = member_probability;
+            }
+            (Some(class_index), Some(projection_mark_changes))
+        } else {
+            (None, None)
+        };
 
     let map_index = if policy == ScmGraphPolicy::StructureBlindRandomGraph {
         selection_rng.index(graphs.len())
@@ -1336,6 +1347,7 @@ fn simulate_trial(
         cpdag_skeleton_f1,
         compelled_direction_f1,
         cpdag_mark_distance,
+        pc_projection_mark_changes,
         markov_equivalence_class_correct: markov_class_correct,
         cpdag_claim_accepted,
         false_cpdag_claim,
@@ -1399,6 +1411,12 @@ fn summarize_world(
     let compelled_direction: Vec<f64> = trials.iter()
         .map(|trial| trial.compelled_direction_f1).collect();
     let cpdag_distance: Vec<f64> = trials.iter().map(|trial| trial.cpdag_mark_distance).collect();
+    let pc_projection_changes: Vec<f64> = trials.iter()
+        .filter_map(|trial| trial.pc_projection_mark_changes.map(|count| count as f64))
+        .collect();
+    let pc_projection_changed_trials = trials.iter()
+        .filter(|trial| trial.pc_projection_mark_changes.is_some_and(|count| count > 0))
+        .count();
     let cpdag_correct = trials.iter()
         .filter(|trial| trial.markov_equivalence_class_correct).count();
     let cpdag_claims = trials.iter().filter(|trial| trial.cpdag_claim_accepted).count();
@@ -1445,6 +1463,10 @@ fn summarize_world(
         compelled_direction_f1_ci95: mean_ci95(&compelled_direction, 0.0, 1.0),
         mean_cpdag_mark_distance: mean(&cpdag_distance),
         cpdag_mark_distance_ci95: mean_ci95(&cpdag_distance, 0.0, (NODE_COUNT * (NODE_COUNT - 1) / 2) as f64),
+        pc_raw_to_projected_mark_changes_mean: (!pc_projection_changes.is_empty())
+            .then(|| mean(&pc_projection_changes)),
+        pc_projection_changed_trial_rate: (!pc_projection_changes.is_empty())
+            .then_some(pc_projection_changed_trials as f64 / pc_projection_changes.len() as f64),
         markov_equivalence_class_recovery_rate: cpdag_correct as f64 / count as f64,
         markov_equivalence_class_recovery_wilson_ci95: wilson_ci95(cpdag_correct, count),
         cpdag_claim_coverage: cpdag_claims as f64 / count as f64,
@@ -1938,7 +1960,9 @@ mod tests {
         for (first, second) in UNORDERED_PAIRS {
             assert!(g_squared_ci_statistic(&independent, first, second, None) < 1.0e-10);
         }
-        let (empty_marks, empty_class) = pc_observational_cpdag(&independent, &classes);
+        let (empty_marks, empty_class, empty_projection_changes) =
+            pc_observational_cpdag(&independent, &classes);
+        assert_eq!(empty_projection_changes, 0);
         assert_eq!(empty_marks, vec![EdgeMark::Absent; UNORDERED_PAIRS.len()]);
         assert_eq!(
             empty_marks,
@@ -1970,13 +1994,31 @@ mod tests {
                 > PC_G2_CRITICAL_DF1_95,
             "parent and collider child should be dependent"
         );
-        let (collider_marks, collider_class) =
+        let (collider_marks, collider_class, collider_projection_changes) =
             pc_observational_cpdag(&collider_observations, &classes);
+        assert_eq!(collider_projection_changes, 0);
         assert_eq!(
             collider_marks,
             vec![EdgeMark::Forward, EdgeMark::Absent, EdgeMark::Reverse]
         );
         assert_eq!(collider_marks, classes.cpdag_marks[collider_class]);
+    }
+
+    #[test]
+    fn cpdag_projection_audit_counts_raw_mark_changes() {
+        let catalogue = all_dags();
+        let classes = build_markov_class_catalog(&catalogue);
+
+        // A complete triangle has no unshielded collider, so the valid CPDAG
+        // leaves its three edges undirected. Three directed marks are therefore
+        // a useful known-answer fixture for the corrective projection step.
+        let raw_cycle_marks = vec![EdgeMark::Forward; UNORDERED_PAIRS.len()];
+        let (projected, class_index, changed_marks) =
+            project_to_valid_cpdag(&raw_cycle_marks, &classes);
+        assert_eq!(projected, classes.cpdag_marks[class_index]);
+        assert_eq!(changed_marks, raw_cycle_marks.iter().zip(&projected)
+            .filter(|(raw, projected)| raw != projected).count());
+        assert!(changed_marks > 0);
     }
 
     #[test]
