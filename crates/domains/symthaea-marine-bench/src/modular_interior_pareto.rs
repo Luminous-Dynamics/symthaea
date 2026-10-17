@@ -479,7 +479,8 @@ pub fn rank_candidates(
         let receipt_valid = verify_validation_receipt(
             &submission.configuration,
             &submission.validation_receipt,
-        );
+        ) && validate_configuration(&submission.configuration)
+            .is_ok_and(|recomputed| recomputed == submission.validation_receipt);
         if !receipt_valid {
             blockers.insert("validation receipt is invalid or does not bind this exact configuration".to_owned());
         } else {
@@ -617,18 +618,10 @@ pub fn verify_pareto_report(
     submissions: &[CandidateSubmission],
     report: &ParetoReport,
 ) -> bool {
-    if submissions.iter().any(|submission| !verify_validation_receipt(
-        &submission.configuration,
-        &submission.validation_receipt,
-    )) {
+    let Ok(recomputed) = rank_candidates(submissions.to_vec()) else {
         return false;
-    }
-    let Ok(fingerprints) = input_fingerprints(submissions) else { return false; };
-    let Ok(input_digest) = digest(&fingerprints) else { return false; };
-    let Ok(report_digest) = digest(&report.body) else { return false; };
-    report.body.analyzer_version == PARETO_ANALYZER_VERSION
-        && report.body.input_manifest_sha256 == input_digest
-        && report.report_sha256 == report_digest
+    };
+    recomputed == *report
 }
 
 #[cfg(test)]
@@ -852,6 +845,24 @@ mod tests {
         let different_basis = submission("different-basis", base, vec![other_basis]);
         let report = rank_candidates(vec![kg, pounds, different_basis]).expect("report serializes");
         assert_eq!(report.body.groups.len(), 3);
+    }
+
+
+    #[test]
+    fn recalculated_hash_cannot_turn_a_failed_receipt_into_a_candidate() {
+        let configuration = live();
+        let mut candidate = submission("forged", configuration, vec![
+            objective("mass", 100.0, "kg", ObjectiveDirection::Minimize),
+        ]);
+        candidate.validation_receipt.body.overall_disposition = "candidate_only".to_owned();
+        candidate.validation_receipt.body.findings.clear();
+        let bytes = serde_json::to_vec(&candidate.validation_receipt.body)
+            .expect("tampered body serializes");
+        candidate.validation_receipt.receipt_sha256 = sha256_hex(&bytes);
+        assert!(verify_validation_receipt(&candidate.configuration, &candidate.validation_receipt));
+        let report = rank_candidates(vec![candidate]).expect("report serializes");
+        assert!(report.body.groups.is_empty());
+        assert_eq!(report.body.candidates[0].eligibility, CandidateEligibility::Rejected);
     }
 
     #[test]
