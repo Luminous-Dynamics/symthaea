@@ -777,6 +777,56 @@ impl ExpansionHistory {
         Self::validate_redshift(z)?;
         Ok(self.transverse_comoving_distance_mpc(z, intervals)? / (1.0 + z))
     }
+
+    /// Cosmological lookback time from redshift z to the present [Gyr].
+    ///
+    /// Integrates dt = dz / ((1 + z) H(z)) using composite Simpson
+    /// integration. H0 is in km s^-1 Mpc^-1, so the dimensionless integral is
+    /// multiplied by the conversion 977.7922216807892 / H0 to obtain Gyr.
+    /// This calculates lookback time, not the total age of the universe; the
+    /// radiation-free default is not intended for precision early-universe work.
+    pub fn lookback_time_gyr(
+        &self,
+        z: f64,
+        intervals: usize,
+    ) -> Result<f64, ExpansionHistoryError> {
+        self.validate()?;
+        Self::validate_redshift(z)?;
+        if intervals < 2 || intervals > 1_000_000 || intervals % 2 != 0 {
+            return Err(ExpansionHistoryError::InvalidIntegrationIntervals);
+        }
+        if z == 0.0 {
+            return Ok(0.0);
+        }
+
+        const HUBBLE_TIME_CONVERSION_GYR: f64 = 977.792_221_680_789_2;
+        let step = z / intervals as f64;
+        let integrand = |redshift: f64| -> Result<f64, ExpansionHistoryError> {
+            let e2 = self.e_squared_unchecked(redshift);
+            if !e2.is_finite() || e2 <= 0.0 {
+                return Err(ExpansionHistoryError::NonPhysicalExpansionRate);
+            }
+            let value = 1.0 / ((1.0 + redshift) * e2.sqrt());
+            if value.is_finite() {
+                Ok(value)
+            } else {
+                Err(ExpansionHistoryError::NumericalOverflow)
+            }
+        };
+
+        let mut sum = integrand(0.0)? + integrand(z)?;
+        for i in 1..intervals {
+            let weight = if i % 2 == 0 { 2.0 } else { 4.0 };
+            sum += weight * integrand(step * i as f64)?;
+        }
+        let lookback_gyr =
+            (HUBBLE_TIME_CONVERSION_GYR / self.h0_km_s_mpc) * step * sum / 3.0;
+        if lookback_gyr.is_finite() && lookback_gyr >= 0.0 {
+            Ok(lookback_gyr)
+        } else {
+            Err(ExpansionHistoryError::NumericalOverflow)
+        }
+    }
 }
 
 #[cfg(test)]
@@ -832,6 +882,37 @@ mod expansion_history_tests {
         let expected = C_KM_S / 70.0 * z;
         let actual = model.line_of_sight_comoving_distance_mpc(z, 128).unwrap();
         assert!((actual - expected).abs() < 1e-10);
+    }
+
+    #[test]
+    fn lookback_time_matches_einstein_de_sitter_analytic_solution() {
+        let model = einstein_de_sitter();
+        let z = 1.0;
+        let hubble_time_gyr = 977.792_221_680_789_2 / 70.0;
+        let expected =
+            (2.0 / 3.0) * hubble_time_gyr * (1.0 - (1.0 + z).powf(-1.5));
+        let actual = model.lookback_time_gyr(z, 4096).unwrap();
+        assert!(
+            (actual - expected).abs() / expected < 1e-9,
+            "expected {expected}, got {actual}"
+        );
+        assert_eq!(model.lookback_time_gyr(0.0, 128).unwrap(), 0.0);
+    }
+
+    #[test]
+    fn de_sitter_lookback_time_matches_logarithmic_solution() {
+        let model = ExpansionHistory {
+            h0_km_s_mpc: 70.0,
+            omega_r: 0.0,
+            omega_m: 0.0,
+            omega_k: 0.0,
+            omega_de: 1.0,
+            w0: -1.0,
+        };
+        let z: f64 = 2.0;
+        let expected = (977.792_221_680_789_2 / 70.0) * (1.0 + z).ln();
+        let actual = model.lookback_time_gyr(z, 1024).unwrap();
+        assert!((actual - expected).abs() < 1e-9);
     }
 
     #[test]
