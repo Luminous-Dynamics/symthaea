@@ -987,7 +987,10 @@
           "end_to_end_system_energy_where_measurable"
         ],
         "external_inspiration": "S11 describes a different spiking architecture; its post-layout-simulation results motivate hypotheses only and are not Symthaea benchmark data."
-      }
+      },
+      "trajectory_protocol_version": "0.1.0",
+      "trajectory_protocol_fixture": "crates/domains/symthaea-capability-closure/fixtures/dynamical-hdc-ltc-trajectory-protocol-v0.1.json",
+      "trajectory_protocol_document": "docs/research/DYNAMICAL_HDC_LTC_TRAJECTORY_PROTOCOL_V0_1.md"
     }
   },
   "classification_labels": [
