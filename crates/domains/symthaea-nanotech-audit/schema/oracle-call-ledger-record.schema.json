@@ -1,0 +1,163 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "urn:luminous-dynamics:symthaea:oracle-call-ledger-record:v1",
+  "title": "Per-attempt oracle call record",
+  "description": "One JSON object per line in oracle-call-ledger.jsonl. Receipts must be separate hashed artifacts in the provenance manifest.",
+  "type": "object",
+  "additionalProperties": false,
+  "required": [
+    "sequence",
+    "stage",
+    "status",
+    "receipt_path",
+    "receipt_sha256",
+    "cost",
+    "cache_hit",
+    "external_invocation"
+  ],
+  "properties": {
+    "sequence": {
+      "type": "integer",
+      "minimum": 1
+    },
+    "stage": {
+      "enum": [
+        "setup",
+        "proposal",
+        "retry"
+      ]
+    },
+    "status": {
+      "enum": [
+        "evaluated",
+        "invalid_candidate",
+        "oracle_failed",
+        "timeout"
+      ]
+    },
+    "candidate_id": {
+      "type": [
+        "string",
+        "null"
+      ],
+      "minLength": 1,
+      "maxLength": 256,
+      "description": "Required by verifier for proposal-stage records; setup and retry records may use null."
+    },
+    "receipt_path": {
+      "type": "string",
+      "minLength": 1,
+      "maxLength": 1024,
+      "description": "Relative path to a raw response or durable failure receipt included in the artifact manifest."
+    },
+    "receipt_sha256": {
+      "type": "string",
+      "pattern": "^[a-f0-9]{64}$"
+    },
+    "cost": {
+      "type": "number",
+      "minimum": 0,
+      "maximum": 1000000000000
+    },
+    "cache_hit": {
+      "type": "boolean"
+    },
+    "external_invocation": {
+      "type": "boolean"
+    }
+  },
+  "allOf": [
+    {
+      "if": {
+        "properties": {
+          "stage": {
+            "const": "proposal"
+          }
+        },
+        "required": [
+          "stage"
+        ]
+      },
+      "then": {
+        "required": [
+          "candidate_id"
+        ],
+        "properties": {
+          "candidate_id": {
+            "type": "string",
+            "minLength": 1
+          }
+        }
+      }
+    },
+    {
+      "if": {
+        "properties": {
+          "cache_hit": {
+            "const": true
+          }
+        },
+        "required": [
+          "cache_hit"
+        ]
+      },
+      "then": {
+        "properties": {
+          "external_invocation": {
+            "const": false
+          }
+        }
+      }
+    },
+    {
+      "if": {
+        "properties": {
+          "status": {
+            "const": "invalid_candidate"
+          }
+        },
+        "required": [
+          "status"
+        ]
+      },
+      "then": {
+        "properties": {
+          "stage": {
+            "const": "proposal"
+          },
+          "cache_hit": {
+            "const": false
+          },
+          "external_invocation": {
+            "const": false
+          }
+        }
+      }
+    },
+    {
+      "if": {
+        "properties": {
+          "status": {
+            "enum": [
+              "oracle_failed",
+              "timeout"
+            ]
+          }
+        },
+        "required": [
+          "status"
+        ]
+      },
+      "then": {
+        "properties": {
+          "cache_hit": {
+            "const": false
+          },
+          "external_invocation": {
+            "const": true
+          }
+        }
+      }
+    }
+  ]
+}
