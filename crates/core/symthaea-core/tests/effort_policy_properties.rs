@@ -20,7 +20,6 @@ struct ScenarioCorpus {
 }
 
 #[derive(Deserialize)]
-#[serde(deny_unknown_fields)]
 struct ScenarioSeed {
     id: String,
     request: EffortRequestV1,
