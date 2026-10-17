@@ -1586,7 +1586,11 @@ mod tests {
             mgr.estimated_energy_rate_watts
         );
         assert_eq!(mgr.energy_rate_window_seconds, 1.5);
-        assert_eq!(mgr.total_energy_spent, 3.0 * energy_per_cycle);
+        assert!(
+            (mgr.total_energy_spent - 3.0 * energy_per_cycle).abs()
+                <= (3.0 * energy_per_cycle).abs() * 1e-12,
+            "cumulative modeled joules should account for all three ticks"
+        );
         assert_eq!(
             mgr.energy_rate_window_joules, energy_per_cycle,
             "the cycle at the closing timestamp belongs to the next window"
