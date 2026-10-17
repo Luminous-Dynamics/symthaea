@@ -403,7 +403,7 @@ mod tests {
         assert!(verify_sha256_digest(
             &actual,
             "BA7816BF8F01CFEA414140DE5DAE2223B00361A396177A9CB410FF61F20015AD"
-        ).is_err());
+        ).unwrap());
         assert!(!verify_sha256_digest(
             &actual,
             "ca7816bf8f01cfea414140de5dae2223b00361a396177a9cb410ff61f20015ad"
