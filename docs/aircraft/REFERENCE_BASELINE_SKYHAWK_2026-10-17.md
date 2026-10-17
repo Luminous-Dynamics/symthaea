@@ -47,7 +47,22 @@ The table transcribes metric values published on the Cessna/Textron Aviation Sky
 
 **Sources:** Cessna/Textron Aviation, [Cessna Skyhawk — specifications](https://cessna.txtav.com/en/piston/cessna-skyhawk) and [official Skyhawk product card (PDF)](https://cessna.txtav.com/-/media/cessna/files/product-cards/piston/skyhawk_product_card.pdf) (accessed 2026-10-17). The product card states that performance figures assume standard conditions and zero wind, field performance assumes a level, hard-surface, dry runway, and maximum range is based on a ferry mission with one pilot at 45% power with IFR reserves. The manufacturer's values may change between page revisions; this card preserves the review date, not a claim that the figures are a controlled engineering dataset.
 
-## 3. Critical interpretation boundaries
+## 3. Derived arithmetic-only reference metrics
+
+These ratios are reproducible arithmetic from the rounded manufacturer-published values above; they are **not additional manufacturer claims** and are not an aerodynamic or performance model.
+
+| Metric | Calculation | Approximate value | Permitted interpretation |
+|---|---|---:|---|
+| Geometric aspect ratio | wingspan² / wing area = 11.00² / 16.17 | 7.483 | Geometry-derived reference ratio only |
+| Wing loading at published MTOW | 1,157 kg / 16.17 m² | 71.55 kg/m² | Gross loading ratio; not lift curve or stall prediction |
+| Weight loading at published MTOW | 1,157 kg × 9.80665 m/s² / 16.17 m² | 701.69 N/m² | Same loading with standard gravity |
+| Engine nameplate power per MTOW | 134,000 W / 1,157 kg | 115.82 W/kg | Rated engine power divided by maximum takeoff mass; not bus power or phase-specific shaft power |
+| MTOW minus basic empty weight | 1,157 − 762 | 395 kg | Arithmetical margin that matches the page's rounded maximum-payload value; not a component mass breakdown |
+| Ramp weight minus basic empty weight | 1,160 − 762 | 398 kg | Arithmetical margin that matches rounded useful load; ramp and takeoff limits are different |
+
+Reference constants and formula choices must remain in the fixture manifest. Do not use any one of these ratios as a target for the Roadster concept without defining a compatible configuration and mission.
+
+## 4. Critical interpretation boundaries
 
 ### Mass definitions cannot be mixed
 
