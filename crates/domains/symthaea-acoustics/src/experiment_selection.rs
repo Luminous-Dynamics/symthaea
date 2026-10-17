@@ -517,6 +517,26 @@ mod tests {
         );
     }
 
+
+    #[test]
+    fn budgeted_plan_rejects_changed_estimates_even_when_ids_match() {
+        let options = options();
+        let ranking = rank_experiments(
+            &options,
+            PROFILE,
+            COST_UNIT,
+            ExperimentSelectionPolicy::CheapestFirst,
+        )
+        .unwrap();
+        let mut changed = options.clone();
+        changed[0].estimated_cost_units += 1;
+
+        assert_eq!(
+            select_under_budget(&changed, &ranking, 100),
+            Err(ExperimentSelectionError::RankingOptionPoolMismatch)
+        );
+    }
+
     #[test]
     fn budgeted_plan_rejects_mutated_non_permutation_rankings() {
         let options = options();
