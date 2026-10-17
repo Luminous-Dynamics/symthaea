@@ -1,0 +1,492 @@
+{
+  "schema_version": "0.1.0",
+  "corpus_id": "APPLIANCE-DECISION-VALUE-001",
+  "status": "synthetic_decision_model_only",
+  "base_corpus_path": "fixtures/diagnostics/appliance_active_diagnostic_corpus_v0_1.json",
+  "base_corpus_sha256": "7626557b8a3da4c8c4f1e253fcf3a7d309d8041ef27304a493a21debb8779aa4",
+  "claim_ceiling": "synthetic_expected_decision_value_only",
+  "cases": [
+    {
+      "case_id": "DVAL-001",
+      "base_trace_id": "ADT-001",
+      "decision_model": {
+        "loss_unit": "synthetic_decision_loss_units",
+        "actions": [
+          {
+            "action_id": "replace_cartridge",
+            "eligibility": "eligible",
+            "losses": [
+              {
+                "hypothesis_id": "bearing_wear",
+                "loss_units": 0
+              },
+              {
+                "hypothesis_id": "impeller_obstruction",
+                "loss_units": 3
+              },
+              {
+                "hypothesis_id": "motor_drive_fault",
+                "loss_units": 1
+              },
+              {
+                "hypothesis_id": "sensor_fault",
+                "loss_units": 5
+              }
+            ]
+          },
+          {
+            "action_id": "clear_obstruction",
+            "eligibility": "eligible",
+            "losses": [
+              {
+                "hypothesis_id": "bearing_wear",
+                "loss_units": 3
+              },
+              {
+                "hypothesis_id": "impeller_obstruction",
+                "loss_units": 0
+              },
+              {
+                "hypothesis_id": "motor_drive_fault",
+                "loss_units": 3
+              },
+              {
+                "hypothesis_id": "sensor_fault",
+                "loss_units": 5
+              }
+            ]
+          },
+          {
+            "action_id": "replace_sensor",
+            "eligibility": "eligible",
+            "losses": [
+              {
+                "hypothesis_id": "bearing_wear",
+                "loss_units": 8
+              },
+              {
+                "hypothesis_id": "impeller_obstruction",
+                "loss_units": 3
+              },
+              {
+                "hypothesis_id": "motor_drive_fault",
+                "loss_units": 3
+              },
+              {
+                "hypothesis_id": "sensor_fault",
+                "loss_units": 0
+              }
+            ]
+          }
+        ]
+      },
+      "measurement_costs": [
+        {
+          "measurement_id": "rpm_check",
+          "loss_units": 0.5
+        },
+        {
+          "measurement_id": "airflow_check",
+          "loss_units": 0.5
+        },
+        {
+          "measurement_id": "vibration_check",
+          "loss_units": 0.5
+        }
+      ]
+    },
+    {
+      "case_id": "DVAL-002",
+      "base_trace_id": "ADT-001",
+      "decision_model": {
+        "loss_unit": "synthetic_decision_loss_units",
+        "actions": [
+          {
+            "action_id": "replace_cartridge",
+            "eligibility": "eligible",
+            "losses": [
+              {
+                "hypothesis_id": "bearing_wear",
+                "loss_units": 0
+              },
+              {
+                "hypothesis_id": "impeller_obstruction",
+                "loss_units": 3
+              },
+              {
+                "hypothesis_id": "motor_drive_fault",
+                "loss_units": 1
+              },
+              {
+                "hypothesis_id": "sensor_fault",
+                "loss_units": 5
+              }
+            ]
+          },
+          {
+            "action_id": "clear_obstruction",
+            "eligibility": "eligible",
+            "losses": [
+              {
+                "hypothesis_id": "bearing_wear",
+                "loss_units": 3
+              },
+              {
+                "hypothesis_id": "impeller_obstruction",
+                "loss_units": 0
+              },
+              {
+                "hypothesis_id": "motor_drive_fault",
+                "loss_units": 3
+              },
+              {
+                "hypothesis_id": "sensor_fault",
+                "loss_units": 5
+              }
+            ]
+          },
+          {
+            "action_id": "replace_sensor",
+            "eligibility": "eligible",
+            "losses": [
+              {
+                "hypothesis_id": "bearing_wear",
+                "loss_units": 8
+              },
+              {
+                "hypothesis_id": "impeller_obstruction",
+                "loss_units": 3
+              },
+              {
+                "hypothesis_id": "motor_drive_fault",
+                "loss_units": 3
+              },
+              {
+                "hypothesis_id": "sensor_fault",
+                "loss_units": 0
+              }
+            ]
+          }
+        ]
+      },
+      "measurement_costs": [
+        {
+          "measurement_id": "rpm_check",
+          "loss_units": 2
+        },
+        {
+          "measurement_id": "airflow_check",
+          "loss_units": 2
+        },
+        {
+          "measurement_id": "vibration_check",
+          "loss_units": 2
+        }
+      ]
+    },
+    {
+      "case_id": "DVAL-003",
+      "base_trace_id": "ADT-004",
+      "decision_model": {
+        "loss_unit": "synthetic_decision_loss_units",
+        "actions": [
+          {
+            "action_id": "replace_cartridge",
+            "eligibility": "eligible",
+            "losses": [
+              {
+                "hypothesis_id": "bearing_wear",
+                "loss_units": 0
+              },
+              {
+                "hypothesis_id": "impeller_obstruction",
+                "loss_units": 3
+              },
+              {
+                "hypothesis_id": "motor_drive_fault",
+                "loss_units": 1
+              },
+              {
+                "hypothesis_id": "sensor_fault",
+                "loss_units": 5
+              }
+            ]
+          }
+        ]
+      },
+      "measurement_costs": [
+        {
+          "measurement_id": "rpm_check",
+          "loss_units": 0.5
+        },
+        {
+          "measurement_id": "airflow_check",
+          "loss_units": 0.5
+        },
+        {
+          "measurement_id": "vibration_check",
+          "loss_units": 0.5
+        }
+      ]
+    },
+    {
+      "case_id": "DVAL-004",
+      "base_trace_id": "ADT-006",
+      "decision_model": {
+        "loss_unit": "synthetic_decision_loss_units",
+        "actions": [
+          {
+            "action_id": "replace_cartridge",
+            "eligibility": "eligible",
+            "losses": [
+              {
+                "hypothesis_id": "bearing_wear",
+                "loss_units": 0
+              },
+              {
+                "hypothesis_id": "impeller_obstruction",
+                "loss_units": 3
+              },
+              {
+                "hypothesis_id": "motor_drive_fault",
+                "loss_units": 1
+              },
+              {
+                "hypothesis_id": "sensor_fault",
+                "loss_units": 5
+              }
+            ]
+          }
+        ]
+      },
+      "measurement_costs": [
+        {
+          "measurement_id": "rpm_check",
+          "loss_units": 0.5
+        },
+        {
+          "measurement_id": "airflow_check",
+          "loss_units": 0.5
+        },
+        {
+          "measurement_id": "vibration_check",
+          "loss_units": 0.5
+        }
+      ]
+    },
+    {
+      "case_id": "DVAL-005",
+      "base_trace_id": "ADT-011",
+      "decision_model": {
+        "loss_unit": "synthetic_decision_loss_units",
+        "actions": [
+          {
+            "action_id": "replace_cartridge",
+            "eligibility": "eligible",
+            "losses": [
+              {
+                "hypothesis_id": "bearing_wear",
+                "loss_units": 0
+              },
+              {
+                "hypothesis_id": "impeller_obstruction",
+                "loss_units": 3
+              },
+              {
+                "hypothesis_id": "motor_drive_fault",
+                "loss_units": 1
+              },
+              {
+                "hypothesis_id": "sensor_fault",
+                "loss_units": 5
+              }
+            ]
+          }
+        ]
+      },
+      "measurement_costs": [
+        {
+          "measurement_id": "rpm_check",
+          "loss_units": 0.5
+        }
+      ]
+    },
+    {
+      "case_id": "DVAL-006",
+      "base_trace_id": "ADT-003",
+      "decision_model": {
+        "loss_unit": "synthetic_decision_loss_units",
+        "actions": [
+          {
+            "action_id": "repair_a",
+            "eligibility": "eligible",
+            "losses": [
+              {
+                "hypothesis_id": "bearing_wear",
+                "loss_units": 0
+              },
+              {
+                "hypothesis_id": "impeller_obstruction",
+                "loss_units": 10
+              }
+            ]
+          },
+          {
+            "action_id": "repair_b",
+            "eligibility": "eligible",
+            "losses": [
+              {
+                "hypothesis_id": "bearing_wear",
+                "loss_units": 10
+              },
+              {
+                "hypothesis_id": "impeller_obstruction",
+                "loss_units": 0
+              }
+            ]
+          }
+        ]
+      },
+      "measurement_costs": [
+        {
+          "measurement_id": "a_rpm_check",
+          "loss_units": 0.5
+        },
+        {
+          "measurement_id": "b_airflow_check",
+          "loss_units": 0.5
+        }
+      ]
+    },
+    {
+      "case_id": "DVAL-007",
+      "base_trace_id": "ADT-001",
+      "decision_model": {
+        "loss_unit": "synthetic_decision_loss_units",
+        "actions": [
+          {
+            "action_id": "replace_cartridge",
+            "eligibility": "eligible",
+            "losses": [
+              {
+                "hypothesis_id": "bearing_wear",
+                "loss_units": 0
+              },
+              {
+                "hypothesis_id": "impeller_obstruction",
+                "loss_units": 3
+              },
+              {
+                "hypothesis_id": "motor_drive_fault",
+                "loss_units": 1
+              }
+            ]
+          },
+          {
+            "action_id": "clear_obstruction",
+            "eligibility": "eligible",
+            "losses": [
+              {
+                "hypothesis_id": "bearing_wear",
+                "loss_units": 3
+              },
+              {
+                "hypothesis_id": "impeller_obstruction",
+                "loss_units": 0
+              },
+              {
+                "hypothesis_id": "motor_drive_fault",
+                "loss_units": 3
+              },
+              {
+                "hypothesis_id": "sensor_fault",
+                "loss_units": 5
+              }
+            ]
+          }
+        ]
+      },
+      "measurement_costs": [
+        {
+          "measurement_id": "rpm_check",
+          "loss_units": 0.5
+        },
+        {
+          "measurement_id": "airflow_check",
+          "loss_units": 0.5
+        },
+        {
+          "measurement_id": "vibration_check",
+          "loss_units": 0.5
+        }
+      ]
+    },
+    {
+      "case_id": "DVAL-008",
+      "base_trace_id": "ADT-001",
+      "decision_model": {
+        "loss_unit": "synthetic_decision_loss_units",
+        "actions": [
+          {
+            "action_id": "replace_cartridge",
+            "eligibility": "requires_qualified_person",
+            "losses": [
+              {
+                "hypothesis_id": "bearing_wear",
+                "loss_units": 0
+              },
+              {
+                "hypothesis_id": "impeller_obstruction",
+                "loss_units": 3
+              },
+              {
+                "hypothesis_id": "motor_drive_fault",
+                "loss_units": 1
+              },
+              {
+                "hypothesis_id": "sensor_fault",
+                "loss_units": 5
+              }
+            ]
+          },
+          {
+            "action_id": "clear_obstruction",
+            "eligibility": "prohibited",
+            "losses": [
+              {
+                "hypothesis_id": "bearing_wear",
+                "loss_units": 3
+              },
+              {
+                "hypothesis_id": "impeller_obstruction",
+                "loss_units": 0
+              },
+              {
+                "hypothesis_id": "motor_drive_fault",
+                "loss_units": 3
+              },
+              {
+                "hypothesis_id": "sensor_fault",
+                "loss_units": 5
+              }
+            ]
+          }
+        ]
+      },
+      "measurement_costs": [
+        {
+          "measurement_id": "rpm_check",
+          "loss_units": 0.5
+        },
+        {
+          "measurement_id": "airflow_check",
+          "loss_units": 0.5
+        },
+        {
+          "measurement_id": "vibration_check",
+          "loss_units": 0.5
+        }
+      ]
+    }
+  ]
+}
