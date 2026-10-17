@@ -115,6 +115,32 @@ fn approximate_tutorial_hints_are_labeled_non_gold() {
 }
 
 #[test]
+fn mixer_mass_sum_is_an_analytic_invariant_not_a_simulator_result() {
+    let root = registry();
+    let mixer = root["candidates"]
+        .as_array()
+        .unwrap()
+        .iter()
+        .find(|candidate| candidate["case_id"].as_str() == Some("CHEM-B-TB-001"))
+        .expect("water mixer candidate must exist");
+    let invariants = mixer["analytic_invariants"]
+        .as_array()
+        .expect("mixer analytical invariants must be present");
+    let mass_sum = invariants
+        .iter()
+        .find(|invariant| invariant["id"].as_str() == Some("MASS-FLOW-SUM"))
+        .expect("exact mass-flow sum invariant must exist");
+    assert_eq!(mass_sum["expected"]["value"].as_f64(), Some(150.0));
+    assert_eq!(mass_sum["expected"]["unit"].as_str(), Some("kg/s"));
+    assert_eq!(mass_sum["status"].as_str(), Some("FROZEN_ANALYTIC_INVARIANT"));
+    assert_eq!(
+        mixer["reference_outputs"]["exact_simulator_outputs_frozen"].as_bool(),
+        Some(false),
+        "the analytic mass sum must not imply simulator state variables are frozen"
+    );
+}
+
+#[test]
 fn assurance_targets_remain_hard_gates() {
     let root = registry();
     let targets = &root["acceptance_targets"];
