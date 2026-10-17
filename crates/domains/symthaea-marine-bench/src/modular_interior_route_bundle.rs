@@ -377,6 +377,20 @@ fn make_alternative(
     })
 }
 
+fn routing_limits_with_remaining(
+    base: &RoutingLimits,
+    used_states: usize,
+    total_limit: usize,
+) -> Option<RoutingLimits> {
+    let remaining = total_limit.checked_sub(used_states)?;
+    if remaining == 0 {
+        return None;
+    }
+    let mut effective = base.clone();
+    effective.max_expanded_states = effective.max_expanded_states.min(remaining);
+    (effective.max_expanded_states > 0).then_some(effective)
+}
+
 fn build_catalog(
     configuration: &Configuration,
     request: &ServiceRouteRequest,
@@ -384,6 +398,7 @@ fn build_catalog(
     bundle_limits: &RouteBundleLimits,
     per_route_probe_limit: usize,
     total_deviation_probes: &mut usize,
+    total_expanded_states: &mut usize,
 ) -> Result<RouteCandidateCatalog, RouteBundleError> {
     let mut catalog = RouteCandidateCatalog {
         route_id: request.route_id.clone(),
@@ -392,17 +407,37 @@ fn build_catalog(
         discovery_frontier_exhausted: true,
         truncation_reason: None,
     };
+    let Some(base_routing_limits) = routing_limits_with_remaining(
+        routing_limits, *total_expanded_states, bundle_limits.max_total_expanded_states,
+    ) else {
+        catalog.probes.push(AlternativeProbe {
+            banned_edge: None,
+            probe_configuration_sha256: None,
+            max_expanded_states_used: None,
+            expanded_states: None,
+            route_disposition: None,
+            decision: "total_expanded_state_budget_exhausted_before_base_search".to_owned(),
+        });
+        catalog.discovery_frontier_exhausted = false;
+        catalog.truncation_reason = Some("TOTAL_EXPANDED_STATE_LIMIT".to_owned());
+        return Ok(catalog);
+    };
     let base_report: ServiceRoutingReport =
-        route_services(configuration, &[request.clone()], routing_limits.clone())?;
+        route_services(configuration, &[request.clone()], base_routing_limits.clone())?;
     let base = base_report.body.routes.into_iter().next().ok_or_else(|| {
         RouteBundleError::new("BASE_ROUTE_RESULT_MISSING", "single-route router emitted no result")
     })?;
+    let base_expanded_states = base.expanded_states;
+    let base_max_expanded_states = base_routing_limits.max_expanded_states;
+    *total_expanded_states = (*total_expanded_states).saturating_add(base_expanded_states);
     if base.disposition != RouteDisposition::Routed {
         let inconclusive = base.disposition == RouteDisposition::SearchBudgetExceeded
             || base.disposition == RouteDisposition::InvalidGeneratedPath;
         catalog.probes.push(AlternativeProbe {
             banned_edge: None,
             probe_configuration_sha256: Some(base_report.body.configuration_sha256),
+            max_expanded_states_used: Some(base_max_expanded_states),
+            expanded_states: Some(base_expanded_states),
             route_disposition: Some(format!("{:?}", base.disposition)),
             decision: "base_route_unavailable".to_owned(),
         });
@@ -416,6 +451,8 @@ fn build_catalog(
         catalog.probes.push(AlternativeProbe {
             banned_edge: None,
             probe_configuration_sha256: Some(base_report.body.configuration_sha256),
+            max_expanded_states_used: Some(base_max_expanded_states),
+            expanded_states: Some(base_expanded_states),
             route_disposition: Some(format!("{:?}", base.disposition)),
             decision: "geometry_audit_failed".to_owned(),
         });
@@ -427,6 +464,8 @@ fn build_catalog(
     catalog.probes.push(AlternativeProbe {
         banned_edge: None,
         probe_configuration_sha256: Some(base_report.body.configuration_sha256),
+        max_expanded_states_used: Some(base_max_expanded_states),
+        expanded_states: Some(base_expanded_states),
         route_disposition: Some(format!("{:?}", base.disposition)),
         decision: "base_candidate".to_owned(),
     });
@@ -459,18 +498,38 @@ fn build_catalog(
                 catalog.truncation_reason = Some("CANDIDATE_LIMIT".to_owned());
                 break 'catalog;
             }
+            let Some(probe_routing_limits) = routing_limits_with_remaining(
+                routing_limits, *total_expanded_states, bundle_limits.max_total_expanded_states,
+            ) else {
+                catalog.probes.push(AlternativeProbe {
+                    banned_edge: Some(edge),
+                    probe_configuration_sha256: None,
+                    max_expanded_states_used: None,
+                    expanded_states: None,
+                    route_disposition: None,
+                    decision: "total_expanded_state_budget_exhausted_before_probe".to_owned(),
+                });
+                catalog.discovery_frontier_exhausted = false;
+                catalog.truncation_reason = Some("TOTAL_EXPANDED_STATE_LIMIT".to_owned());
+                break 'catalog;
+            };
             let modified = edge_ban_configuration(configuration, request, &edge, probe_index)?;
             probe_index = probe_index.saturating_add(1);
             let modified_digest = digest(&modified)?;
             *total_deviation_probes = (*total_deviation_probes).saturating_add(1);
-            let alternative_report = route_services(&modified, &[request.clone()], routing_limits.clone())?;
+            let alternative_report = route_services(&modified, &[request.clone()], probe_routing_limits.clone())?;
             let Some(candidate) = alternative_report.body.routes.into_iter().next() else {
                 return Err(RouteBundleError::new("ALTERNATIVE_RESULT_MISSING", "edge-ban probe emitted no route result"));
             };
+            let probe_expanded_states = candidate.expanded_states;
+            let probe_max_expanded_states = probe_routing_limits.max_expanded_states;
+            *total_expanded_states = (*total_expanded_states).saturating_add(probe_expanded_states);
             if candidate.disposition == RouteDisposition::SearchBudgetExceeded {
                 catalog.probes.push(AlternativeProbe {
                     banned_edge: Some(edge),
                     probe_configuration_sha256: Some(modified_digest),
+                    max_expanded_states_used: Some(probe_max_expanded_states),
+                    expanded_states: Some(probe_expanded_states),
                     route_disposition: Some(format!("{:?}", candidate.disposition)),
                     decision: "search_budget_exceeded".to_owned(),
                 });
@@ -483,6 +542,8 @@ fn build_catalog(
                 catalog.probes.push(AlternativeProbe {
                     banned_edge: Some(edge),
                     probe_configuration_sha256: Some(modified_digest),
+                    max_expanded_states_used: Some(probe_max_expanded_states),
+                    expanded_states: Some(probe_expanded_states),
                     route_disposition: Some(format!("{:?}", candidate.disposition)),
                     decision: if inconclusive {
                         "invalid_generated_path".to_owned()
@@ -501,6 +562,8 @@ fn build_catalog(
                 catalog.probes.push(AlternativeProbe {
                     banned_edge: Some(edge),
                     probe_configuration_sha256: Some(modified_digest),
+                    max_expanded_states_used: Some(probe_max_expanded_states),
+                    expanded_states: Some(probe_expanded_states),
                     route_disposition: Some(format!("{:?}", candidate.disposition)),
                     decision: "geometry_audit_failed".to_owned(),
                 });
@@ -512,6 +575,8 @@ fn build_catalog(
                 catalog.probes.push(AlternativeProbe {
                     banned_edge: Some(edge),
                     probe_configuration_sha256: Some(modified_digest),
+                    max_expanded_states_used: Some(probe_max_expanded_states),
+                    expanded_states: Some(probe_expanded_states),
                     route_disposition: Some(format!("{:?}", candidate.disposition)),
                     decision: "duplicate_path".to_owned(),
                 });
@@ -522,6 +587,8 @@ fn build_catalog(
             catalog.probes.push(AlternativeProbe {
                 banned_edge: Some(edge),
                 probe_configuration_sha256: Some(modified_digest),
+                max_expanded_states_used: Some(probe_max_expanded_states),
+                expanded_states: Some(probe_expanded_states),
                 route_disposition: Some("Routed".to_owned()),
                 decision: "new_candidate".to_owned(),
             });
@@ -728,10 +795,11 @@ pub fn optimize_route_bundle(
             / normalized_requests.len(),
     );
     let mut total_deviation_probes = 0usize;
+    let mut total_expanded_states = 0usize;
     for request in &normalized_requests {
         catalogs.push(build_catalog(
             configuration, request, &routing_limits, &bundle_limits,
-            per_route_probe_limit, &mut total_deviation_probes,
+            per_route_probe_limit, &mut total_deviation_probes, &mut total_expanded_states,
         )?);
     }
     let (best, examined, rejected, bundle_product_exhausted) =
@@ -760,6 +828,7 @@ pub fn optimize_route_bundle(
         catalogs,
         selection,
         total_deviation_probes,
+        total_expanded_states,
         bundle_combinations_examined: examined,
         bundles_rejected_for_shared_route_cells: rejected,
         bundle_catalog_product_exhausted: bundle_product_exhausted,
