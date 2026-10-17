@@ -411,7 +411,7 @@ impl CampaignFamily {
             "artifact-provenance" => Ok(Self::ArtifactProvenance),
             "cloud-data-movement" => Ok(Self::CloudDataMovement),
             _ => Err(format!(
-                "unsupported --family {value}; expected identity-to-egress or artifact-provenance"
+                "unsupported --family {value}; expected identity-to-egress, artifact-provenance, or cloud-data-movement"
             )),
         }
     }
@@ -1318,7 +1318,7 @@ mod tests {
     }
 
     #[test]
-    fn schemas_declare_current_generator_version_and_both_scenario_ids() {
+    fn schemas_declare_current_generator_version_and_all_scenario_ids() {
         let root = Path::new(env!("CARGO_MANIFEST_DIR")).join("../..");
         let manifest_schema: serde_json::Value = serde_json::from_slice(
             &fs::read(root.join("docs/research/cyber-hunt-manifest-v1.schema.json"))
@@ -1369,6 +1369,59 @@ mod tests {
             .expect("default generator should remain compatible");
         assert_eq!(default.event_store, compatibility.event_store);
         assert_eq!(default.truth, compatibility.truth);
+    }
+
+    #[test]
+    fn every_family_preserves_cross_cutting_truth_and_digest_invariants() {
+        let scenarios = [
+            (CampaignFamily::IdentityToEgress, 9_usize),
+            (CampaignFamily::ArtifactProvenance, 6_usize),
+            (CampaignFamily::CloudDataMovement, 6_usize),
+        ];
+        for (family, expected_positive_count) in scenarios {
+            for seed in [0_u64, 1_u64, 2026_u64] {
+                let dataset = generate_dataset_for_family(128, seed, family)
+                    .expect("each family should generate across fixed seed controls");
+                assert_eq!(dataset.manifest.record_count, 128);
+                assert_eq!(dataset.truth.event_count, 128);
+                assert_eq!(dataset.truth.event_store_sha256, digest(&dataset.event_store));
+
+                let events: Vec<EventRecord> = std::str::from_utf8(&dataset.event_store)
+                    .expect("event store should be UTF-8")
+                    .lines()
+                    .map(|line| serde_json::from_str(line).expect("event should deserialize"))
+                    .collect();
+                let event_ids: BTreeSet<String> = events.iter()
+                    .map(|event| event.event_id.clone())
+                    .collect();
+                let label_ids: BTreeSet<String> = dataset.truth.labels.iter()
+                    .map(|label| label.event_id.clone())
+                    .collect();
+                let positive_ids: BTreeSet<String> = dataset.truth.labels.iter()
+                    .filter(|label| label.label == "positive")
+                    .map(|label| label.event_id.clone())
+                    .collect();
+
+                assert_eq!(events.len(), 128);
+                assert_eq!(event_ids.len(), 128, "event IDs must be unique");
+                assert_eq!(label_ids, event_ids, "truth must label every event exactly once");
+                assert_eq!(positive_ids.len(), expected_positive_count);
+                assert!(dataset.truth.labels.iter().all(|label|
+                    label.label == "positive" || label.label == "negative"
+                ));
+                for relation in &dataset.truth.expected_relations {
+                    assert!(positive_ids.contains(&relation.from_event_id),
+                        "relation source must refer to a positive event");
+                    assert!(positive_ids.contains(&relation.to_event_id),
+                        "relation target must refer to a positive event");
+                }
+                assert!(events.iter().all(|event| event.synthetic));
+                assert!(events.iter().all(|event|
+                    !event.details.contains_key("ground_truth") &&
+                    !event.details.contains_key("label")
+                ));
+            }
+        }
     }
 
     #[test]
