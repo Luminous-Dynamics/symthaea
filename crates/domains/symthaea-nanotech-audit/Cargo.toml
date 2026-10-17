@@ -18,3 +18,7 @@ path = "src/main.rs"
 [[bin]]
 name = "nano-rescue-score"
 path = "src/bin/nano-rescue-score.rs"
+
+[[bin]]
+name = "nano-risk-bound"
+path = "src/bin/nano-risk-bound.rs"
