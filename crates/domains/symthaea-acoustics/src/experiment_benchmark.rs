@@ -684,7 +684,6 @@ mod tests {
         assert_eq!(
             score_synthetic_plan(&changed, &case, &plan),
             Err(SyntheticBenchmarkError::PlanSpendMismatch)
-                .or(Err(SyntheticBenchmarkError::PlanOptionPartitionMismatch))
         );
     }
 
