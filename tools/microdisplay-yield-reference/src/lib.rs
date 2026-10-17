@@ -272,6 +272,16 @@ mod tests {
             serde_json::from_str(CORPUS).expect("checked-in yield corpus JSON must parse");
         let schema: Value =
             serde_json::from_str(SCHEMA).expect("checked-in yield schema JSON must parse");
+        let validator = jsonschema::draft202012::new(&schema)
+            .expect("checked-in yield schema must compile as Draft 2020-12");
+        let schema_errors: Vec<String> = validator
+            .iter_errors(&corpus)
+            .map(|error| error.to_string())
+            .collect();
+        assert!(
+            schema_errors.is_empty(),
+            "microdisplay corpus does not satisfy its schema: {schema_errors:#?}"
+        );
         assert_eq!(corpus["corpus_id"].as_str(), Some("MICRODISP-YIELD-CORPUS-001"));
         assert_eq!(corpus["status"].as_str(), Some("UNQUALIFIED"));
         assert_eq!(schema["$schema"].as_str(), Some("https://json-schema.org/draft/2020-12/schema"));
