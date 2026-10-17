@@ -202,6 +202,59 @@ fn mean(values: &[f64]) -> f64 {
     }
 }
 
+/// Linearly interpolated quantile over an already sorted finite sample.
+fn quantile_sorted(values: &[f64], quantile: f64) -> Option<f64> {
+    if values.is_empty() {
+        return None;
+    }
+    let position = quantile.clamp(0.0, 1.0) * (values.len() - 1) as f64;
+    let lower = position.floor() as usize;
+    let upper = position.ceil() as usize;
+    let fraction = position - lower as f64;
+    Some(values[lower] + (values[upper] - values[lower]) * fraction)
+}
+
+/// A distribution summary keeps central tendency and tails visible together.
+/// Non-finite values are excluded from statistics but explicitly counted.
+fn distribution_summary(values: &[f64]) -> Value {
+    let mut finite = values
+        .iter()
+        .copied()
+        .filter(|value| value.is_finite())
+        .collect::<Vec<_>>();
+    let non_finite_count = values.len() - finite.len();
+    finite.sort_by(f64::total_cmp);
+    if finite.is_empty() {
+        return json!({
+            "sample_count": values.len(),
+            "finite_count": 0,
+            "non_finite_count": non_finite_count,
+            "mean": Value::Null,
+            "min": Value::Null,
+            "p10": Value::Null,
+            "p25": Value::Null,
+            "median": Value::Null,
+            "p75": Value::Null,
+            "p90": Value::Null,
+            "max": Value::Null
+        });
+    }
+
+    json!({
+        "sample_count": values.len(),
+        "finite_count": finite.len(),
+        "non_finite_count": non_finite_count,
+        "mean": mean(&finite),
+        "min": finite.first().copied(),
+        "p10": quantile_sorted(&finite, 0.10),
+        "p25": quantile_sorted(&finite, 0.25),
+        "median": quantile_sorted(&finite, 0.50),
+        "p75": quantile_sorted(&finite, 0.75),
+        "p90": quantile_sorted(&finite, 0.90),
+        "max": finite.last().copied()
+    })
+}
+
 /// Equalizes the contribution of the 11 named fingerprint layers by comparing
 /// each layer's RMS feature difference, rather than letting long layers
 /// dominate simply because they contain more dimensions. This is still a
@@ -629,8 +682,14 @@ fn main() {
                         "layer": layer_name,
                         "dimensions": layer_length,
                         "mean_matched_between_style_rms": between,
+                        "matched_between_style_rms_distribution":
+                            distribution_summary(&matched_layer_distances[layer_index]),
                         "mean_within_style_seed_rms_a": within_a,
+                        "within_style_seed_rms_distribution_a":
+                            distribution_summary(&within_layer_distances_by_style[left][layer_index]),
                         "mean_within_style_seed_rms_b": within_b,
+                        "within_style_seed_rms_distribution_b":
+                            distribution_summary(&within_layer_distances_by_style[right][layer_index]),
                         "between_minus_within_margin_a": between - within_a,
                         "between_minus_within_margin_b": between - within_b,
                         "between_minus_mean_within_pair_margin": between - within_pair_mean,
@@ -646,8 +705,11 @@ fn main() {
                 "style_a": counters[left].style_name,
                 "style_b": counters[right].style_name,
                 "mean_matched_between_style_layer_balanced_distance": mean_between,
+                "matched_between_style_distance_distribution": distribution_summary(&matched_distances),
                 "mean_seed_conditioned_within_style_layer_balanced_distance_a": left_within,
+                "within_style_seed_distance_distribution_a": distribution_summary(&within_seed_distances[left]),
                 "mean_seed_conditioned_within_style_layer_balanced_distance_b": right_within,
+                "within_style_seed_distance_distribution_b": distribution_summary(&within_seed_distances[right]),
                 "between_minus_within_margin": margin,
                 "between_to_within_ratio": ratio,
                 "between_exceeds_mean_seed_variation": above_seed_variation,
@@ -675,7 +737,11 @@ fn main() {
                 "layer": layer_name,
                 "dimensions": layer_length,
                 "mean_within_style_seed_rms": within,
+                "within_style_seed_rms_distribution":
+                    distribution_summary(&within_layer_distances[layer_index]),
                 "mean_matched_between_style_rms": between,
+                "matched_between_style_rms_distribution":
+                    distribution_summary(&between_layer_distances[layer_index]),
                 "between_minus_within_margin": between - within,
                 "between_to_within_ratio": if within > 1e-9 {
                     json!(between / within)
@@ -741,8 +807,12 @@ fn main() {
             "seed_diversity_test_seeds": SEEDS.len(),
             "mean_nearest_cross_style_structural_distance":
                 mean(&nearest_distances[index]),
+            "nearest_cross_style_structural_distance_distribution":
+                distribution_summary(&nearest_distances[index]),
             "mean_seed_conditioned_within_style_layer_balanced_distance":
                 mean(&within_seed_distances[index]),
+            "within_style_seed_distance_distribution":
+                distribution_summary(&within_seed_distances[index]),
             "mean_matched_between_style_layer_balanced_distance":
                 mean(&between_style_by_style[index]),
             "between_to_within_seed_variation_ratio": {
@@ -819,7 +889,7 @@ fn main() {
     let source_commit = std::env::var("GIT_COMMIT").ok();
     let validator_self_test = validator_mutation_audit();
     let report = json!({
-        "schema_version": 4,
+        "schema_version": 5,
         "engine_version": MUSIC_THEORY_ENGINE_VERSION,
         "provenance": {
             "git_commit": source_commit,
@@ -882,8 +952,10 @@ fn main() {
             "distance_metric": "layer-balanced RMS over the 11 named structural-fingerprint layers; each layer contributes equally regardless of dimensionality",
             "within_style_seed_comparison_count": all_within_seed_distances.len(),
             "mean_seed_conditioned_within_style_layer_balanced_distance": mean_within_seed_distance,
+            "within_style_distance_distribution": distribution_summary(&all_within_seed_distances),
             "matched_between_style_comparison_count": between_style_distances.len(),
             "mean_matched_between_style_layer_balanced_distance": mean_between_style_distance,
+            "between_style_distance_distribution": distribution_summary(&between_style_distances),
             "global_between_to_within_distance_ratio": global_style_separation_ratio,
             "style_pairs_above_both_seed_variation_baselines": style_pairs_above_seed_variation,
             "style_pair_count": style_pair_rows.len(),
@@ -952,6 +1024,37 @@ mod tests {
         let unique: HashSet<String> =
             Style::ALL.iter().map(|style| format!("{style:?}")).collect();
         assert_eq!(unique.len(), Style::ALL.len());
+    }
+
+    #[test]
+    fn quantile_interpolation_is_stable_at_boundaries_and_between_samples() {
+        let sorted = [0.0, 10.0, 20.0, 30.0];
+        assert_eq!(quantile_sorted(&sorted, 0.0), Some(0.0));
+        assert_eq!(quantile_sorted(&sorted, 0.5), Some(15.0));
+        assert_eq!(quantile_sorted(&sorted, 0.9), Some(27.0));
+        assert_eq!(quantile_sorted(&sorted, 1.0), Some(30.0));
+        assert_eq!(quantile_sorted(&[], 0.5), None);
+    }
+
+    #[test]
+    fn distribution_summary_exposes_tails_and_counts_non_finite_values() {
+        let summary = distribution_summary(&[1.0, 1.0, 1.0, 1_000.0, f64::NAN]);
+        assert_eq!(summary["sample_count"].as_u64(), Some(5));
+        assert_eq!(summary["finite_count"].as_u64(), Some(4));
+        assert_eq!(summary["non_finite_count"].as_u64(), Some(1));
+        assert_eq!(summary["median"].as_f64(), Some(1.0));
+        assert_eq!(summary["max"].as_f64(), Some(1_000.0));
+        assert!(summary["p90"].as_f64().unwrap_or(0.0) > 1.0);
+        assert!(summary["mean"].as_f64().unwrap_or(0.0) > 100.0);
+    }
+
+    #[test]
+    fn empty_distribution_reports_null_statistics_instead_of_fabricating_zeroes() {
+        let summary = distribution_summary(&[]);
+        assert_eq!(summary["sample_count"].as_u64(), Some(0));
+        assert_eq!(summary["finite_count"].as_u64(), Some(0));
+        assert!(summary["median"].is_null());
+        assert!(summary["mean"].is_null());
     }
 
     #[test]
