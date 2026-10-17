@@ -569,7 +569,7 @@ impl std::fmt::Display for ExpansionHistoryError {
             Self::InvalidRedshift => "redshift must be finite and >= 0",
             Self::InvalidIntegrationIntervals => "Simpson integration requires an even interval count in 2..=1_000_000",
             Self::InvalidIntegrationTolerance => "adaptive integration tolerances must be finite and positive",
-            Self::InvalidIntegrationDepth => "adaptive integration depth must be in 1..=30",
+            Self::InvalidIntegrationDepth => "adaptive integration depth must be in 1..=20",
             Self::IntegrationDidNotConverge => "adaptive Simpson integration did not meet its tolerance before the depth limit",
             Self::NonPhysicalExpansionRate => "the model produced a non-positive or non-finite H(z)^2",
             Self::NumericalOverflow => "the requested cosmology calculation overflowed",
@@ -1186,10 +1186,11 @@ fn validate_adaptive_options(
         || absolute_tolerance <= 0.0
         || !relative_tolerance.is_finite()
         || relative_tolerance <= 0.0
+        || relative_tolerance >= 1.0
     {
         return Err(ExpansionHistoryError::InvalidIntegrationTolerance);
     }
-    if !(1..=30).contains(&max_depth) {
+    if !(1..=20).contains(&max_depth) {
         return Err(ExpansionHistoryError::InvalidIntegrationDepth);
     }
     Ok(())
@@ -1270,6 +1271,9 @@ where
     }
     let error_estimate = (refined - whole).abs() / 15.0;
     let tolerance = absolute_tolerance + relative_tolerance * refined.abs();
+    if !error_estimate.is_finite() || !tolerance.is_finite() {
+        return Err(ExpansionHistoryError::NumericalOverflow);
+    }
     if error_estimate <= tolerance {
         let corrected = refined + (refined - whole) / 15.0;
         if corrected.is_finite() {
