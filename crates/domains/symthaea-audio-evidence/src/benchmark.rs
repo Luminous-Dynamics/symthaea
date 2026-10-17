@@ -336,6 +336,7 @@ mod tests {
             "dimension": "product_revision_id",
             "disjoint_from_roles": ["train", "validation", "calibration"]
         }));
+        assert!(validate_split_manifest(&manifest).is_ok(), "clean product holdout should pass");
         manifest["observations"][5]["product_revision_id"] = serde_json::json!("headphone-h1-rev1");
         let error = validate_split_manifest(&manifest).expect_err("product leakage must fail");
         assert!(error.contains("group leakage: dimension product_revision_id"));
@@ -354,6 +355,7 @@ mod tests {
             "dimension": "fixture_id",
             "disjoint_from_roles": ["train", "validation", "calibration"]
         }));
+        assert!(validate_split_manifest(&manifest).is_ok(), "clean fixture transfer should pass");
         manifest["observations"][5]["fixture_id"] = serde_json::json!("fixture-a");
         let error = validate_split_manifest(&manifest).expect_err("fixture leakage must fail");
         assert!(error.contains("group leakage: dimension fixture_id"));
