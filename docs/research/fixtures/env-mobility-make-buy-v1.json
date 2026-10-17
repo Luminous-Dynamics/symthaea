@@ -1,0 +1,392 @@
+{
+  "model_id": "env-mobility-make-buy-v1",
+  "schema_version": "env-mobility-make-buy-case-v1",
+  "status": "synthetic_frozen_candidate",
+  "currency": "USD",
+  "source_class": "synthetic_arithmetic_test_data_only",
+  "generated_on": "2026-10-17",
+  "claim_ceiling": "No supplier quotes, local wages, machine prices, manufacturing costs, or real make/buy decisions are evidenced by these synthetic cases.",
+  "formula_contract": {
+    "annual_fixed_cost": "capex_upfront * CRF(annual_discount_rate, capital_life_years) + sum(annual_fixed_costs)",
+    "crf": "if rate == 0 then 1 / life; otherwise rate * (1 + rate)^life / ((1 + rate)^life - 1)",
+    "variable_cost_per_attempt": "sum(variable_cost_per_attempt_components); any missing component makes cost evidence incomplete, never zero",
+    "variable_cost_per_accepted_unit": "variable_cost_per_attempt / yield_fraction",
+    "total_annual_cost_per_accepted_unit": "annual_fixed_cost / demand_good_units_per_year + variable_cost_per_accepted_unit",
+    "break_even_demand": "(buy_annual_fixed_cost - make_annual_fixed_cost) / (make_variable_cost_per_good - buy_variable_cost_per_good); report a positive break-even only when result > 0",
+    "eligibility_gate": "cost comparison cannot select an alternative whose qualification_status is not qualified_for_profile",
+    "expected_decisions_are_independent_test_labels": true
+  },
+  "cases": [
+    {
+      "case_id": "MAKEBUY-LOW-05",
+      "description": "Low annual demand: supplier route should retain its fixed-cost advantage.",
+      "demand_good_units_per_year": 5,
+      "make": {
+        "qualification_status": "qualified_for_profile",
+        "capex_upfront": 300,
+        "capital_life_years": 3,
+        "annual_discount_rate": 0.1,
+        "annual_fixed_costs": {
+          "maintenance": 20,
+          "site_support": 10,
+          "calibration_qualification": 0,
+          "training": 0,
+          "supplier_setup_or_tooling": 0
+        },
+        "variable_cost_per_attempt_components": {
+          "unit_material_or_quote": 2.5,
+          "direct_labor": 8,
+          "energy_consumables": 1,
+          "logistics": 0,
+          "variable_inspection": 0.5,
+          "expected_rework_scrap": 0
+        },
+        "yield_fraction": 0.9,
+        "evidence_status": "synthetic_complete"
+      },
+      "buy": {
+        "qualification_status": "qualified_for_profile",
+        "capex_upfront": 0,
+        "capital_life_years": 3,
+        "annual_discount_rate": 0.1,
+        "annual_fixed_costs": {
+          "maintenance": 0,
+          "site_support": 0,
+          "calibration_qualification": 0,
+          "training": 0,
+          "supplier_setup_or_tooling": 0
+        },
+        "variable_cost_per_attempt_components": {
+          "unit_material_or_quote": 18,
+          "direct_labor": 0,
+          "energy_consumables": 0,
+          "logistics": 4,
+          "variable_inspection": 1,
+          "expected_rework_scrap": 1
+        },
+        "yield_fraction": 0.98,
+        "evidence_status": "synthetic_complete"
+      },
+      "expected_decision": "prefer_buy_lower_annual_cost",
+      "expected_break_even_class": "positive"
+    },
+    {
+      "case_id": "MAKEBUY-BASE-25",
+      "description": "Higher demand: synthetic local process variable savings can amortize the equipment's fixed cost.",
+      "demand_good_units_per_year": 25,
+      "make": {
+        "qualification_status": "qualified_for_profile",
+        "capex_upfront": 300,
+        "capital_life_years": 3,
+        "annual_discount_rate": 0.1,
+        "annual_fixed_costs": {
+          "maintenance": 20,
+          "site_support": 10,
+          "calibration_qualification": 0,
+          "training": 0,
+          "supplier_setup_or_tooling": 0
+        },
+        "variable_cost_per_attempt_components": {
+          "unit_material_or_quote": 2.5,
+          "direct_labor": 8,
+          "energy_consumables": 1,
+          "logistics": 0,
+          "variable_inspection": 0.5,
+          "expected_rework_scrap": 0
+        },
+        "yield_fraction": 0.9,
+        "evidence_status": "synthetic_complete"
+      },
+      "buy": {
+        "qualification_status": "qualified_for_profile",
+        "capex_upfront": 0,
+        "capital_life_years": 3,
+        "annual_discount_rate": 0.1,
+        "annual_fixed_costs": {
+          "maintenance": 0,
+          "site_support": 0,
+          "calibration_qualification": 0,
+          "training": 0,
+          "supplier_setup_or_tooling": 0
+        },
+        "variable_cost_per_attempt_components": {
+          "unit_material_or_quote": 18,
+          "direct_labor": 0,
+          "energy_consumables": 0,
+          "logistics": 4,
+          "variable_inspection": 1,
+          "expected_rework_scrap": 1
+        },
+        "yield_fraction": 0.98,
+        "evidence_status": "synthetic_complete"
+      },
+      "expected_decision": "prefer_make_lower_annual_cost",
+      "expected_break_even_class": "positive"
+    },
+    {
+      "case_id": "MAKEBUY-LOW-YIELD-15",
+      "description": "Lower accepted yield can reverse a nominal local-production advantage at moderate demand.",
+      "demand_good_units_per_year": 15,
+      "make": {
+        "qualification_status": "qualified_for_profile",
+        "capex_upfront": 300,
+        "capital_life_years": 3,
+        "annual_discount_rate": 0.1,
+        "annual_fixed_costs": {
+          "maintenance": 20,
+          "site_support": 10,
+          "calibration_qualification": 0,
+          "training": 0,
+          "supplier_setup_or_tooling": 0
+        },
+        "variable_cost_per_attempt_components": {
+          "unit_material_or_quote": 2.5,
+          "direct_labor": 8,
+          "energy_consumables": 1,
+          "logistics": 0,
+          "variable_inspection": 0.5,
+          "expected_rework_scrap": 0
+        },
+        "yield_fraction": 0.65,
+        "evidence_status": "synthetic_complete"
+      },
+      "buy": {
+        "qualification_status": "qualified_for_profile",
+        "capex_upfront": 0,
+        "capital_life_years": 3,
+        "annual_discount_rate": 0.1,
+        "annual_fixed_costs": {
+          "maintenance": 0,
+          "site_support": 0,
+          "calibration_qualification": 0,
+          "training": 0,
+          "supplier_setup_or_tooling": 0
+        },
+        "variable_cost_per_attempt_components": {
+          "unit_material_or_quote": 18,
+          "direct_labor": 0,
+          "energy_consumables": 0,
+          "logistics": 4,
+          "variable_inspection": 1,
+          "expected_rework_scrap": 1
+        },
+        "yield_fraction": 0.98,
+        "evidence_status": "synthetic_complete"
+      },
+      "expected_decision": "prefer_buy_lower_annual_cost",
+      "expected_break_even_class": "positive"
+    },
+    {
+      "case_id": "MAKEBUY-LOW-YIELD-30",
+      "description": "Same low-yield process at higher demand: the fixed-cost amortization can dominate in this synthetic example.",
+      "demand_good_units_per_year": 30,
+      "make": {
+        "qualification_status": "qualified_for_profile",
+        "capex_upfront": 300,
+        "capital_life_years": 3,
+        "annual_discount_rate": 0.1,
+        "annual_fixed_costs": {
+          "maintenance": 20,
+          "site_support": 10,
+          "calibration_qualification": 0,
+          "training": 0,
+          "supplier_setup_or_tooling": 0
+        },
+        "variable_cost_per_attempt_components": {
+          "unit_material_or_quote": 2.5,
+          "direct_labor": 8,
+          "energy_consumables": 1,
+          "logistics": 0,
+          "variable_inspection": 0.5,
+          "expected_rework_scrap": 0
+        },
+        "yield_fraction": 0.65,
+        "evidence_status": "synthetic_complete"
+      },
+      "buy": {
+        "qualification_status": "qualified_for_profile",
+        "capex_upfront": 0,
+        "capital_life_years": 3,
+        "annual_discount_rate": 0.1,
+        "annual_fixed_costs": {
+          "maintenance": 0,
+          "site_support": 0,
+          "calibration_qualification": 0,
+          "training": 0,
+          "supplier_setup_or_tooling": 0
+        },
+        "variable_cost_per_attempt_components": {
+          "unit_material_or_quote": 18,
+          "direct_labor": 0,
+          "energy_consumables": 0,
+          "logistics": 4,
+          "variable_inspection": 1,
+          "expected_rework_scrap": 1
+        },
+        "yield_fraction": 0.98,
+        "evidence_status": "synthetic_complete"
+      },
+      "expected_decision": "prefer_make_lower_annual_cost",
+      "expected_break_even_class": "positive"
+    },
+    {
+      "case_id": "MAKEBUY-UNQUALIFIED",
+      "description": "The unqualified local route has a lower modeled cost but cannot replace the qualified supplier.",
+      "demand_good_units_per_year": 25,
+      "make": {
+        "qualification_status": "not_qualified",
+        "capex_upfront": 300,
+        "capital_life_years": 3,
+        "annual_discount_rate": 0.1,
+        "annual_fixed_costs": {
+          "maintenance": 20,
+          "site_support": 10,
+          "calibration_qualification": 0,
+          "training": 0,
+          "supplier_setup_or_tooling": 0
+        },
+        "variable_cost_per_attempt_components": {
+          "unit_material_or_quote": 2.5,
+          "direct_labor": 8,
+          "energy_consumables": 1,
+          "logistics": 0,
+          "variable_inspection": 0.5,
+          "expected_rework_scrap": 0
+        },
+        "yield_fraction": 0.9,
+        "evidence_status": "synthetic_complete"
+      },
+      "buy": {
+        "qualification_status": "qualified_for_profile",
+        "capex_upfront": 0,
+        "capital_life_years": 3,
+        "annual_discount_rate": 0.1,
+        "annual_fixed_costs": {
+          "maintenance": 0,
+          "site_support": 0,
+          "calibration_qualification": 0,
+          "training": 0,
+          "supplier_setup_or_tooling": 0
+        },
+        "variable_cost_per_attempt_components": {
+          "unit_material_or_quote": 18,
+          "direct_labor": 0,
+          "energy_consumables": 0,
+          "logistics": 4,
+          "variable_inspection": 1,
+          "expected_rework_scrap": 1
+        },
+        "yield_fraction": 0.98,
+        "evidence_status": "synthetic_complete"
+      },
+      "expected_decision": "prefer_buy_qualified_even_if_make_cheaper",
+      "expected_break_even_class": "positive"
+    },
+    {
+      "case_id": "MAKEBUY-MISSING-QUOTE",
+      "description": "A missing supplier quote must not be replaced with zero, even if another option has numbers.",
+      "demand_good_units_per_year": 25,
+      "make": {
+        "qualification_status": "qualified_for_profile",
+        "capex_upfront": 300,
+        "capital_life_years": 3,
+        "annual_discount_rate": 0.1,
+        "annual_fixed_costs": {
+          "maintenance": 20,
+          "site_support": 10,
+          "calibration_qualification": 0,
+          "training": 0,
+          "supplier_setup_or_tooling": 0
+        },
+        "variable_cost_per_attempt_components": {
+          "unit_material_or_quote": 2.5,
+          "direct_labor": 8,
+          "energy_consumables": 1,
+          "logistics": 0,
+          "variable_inspection": 0.5,
+          "expected_rework_scrap": 0
+        },
+        "yield_fraction": 0.9,
+        "evidence_status": "synthetic_complete"
+      },
+      "buy": {
+        "qualification_status": "qualified_for_profile",
+        "capex_upfront": 0,
+        "capital_life_years": 3,
+        "annual_discount_rate": 0.1,
+        "annual_fixed_costs": {
+          "maintenance": 0,
+          "site_support": 0,
+          "calibration_qualification": 0,
+          "training": 0,
+          "supplier_setup_or_tooling": 0
+        },
+        "variable_cost_per_attempt_components": {
+          "unit_material_or_quote": null,
+          "direct_labor": 0,
+          "energy_consumables": 0,
+          "logistics": 4,
+          "variable_inspection": 1,
+          "expected_rework_scrap": 1
+        },
+        "yield_fraction": 0.98,
+        "evidence_status": "missing_supplier_quote"
+      },
+      "expected_decision": "abstain_missing_cost_evidence",
+      "expected_break_even_class": "not_computable"
+    },
+    {
+      "case_id": "MAKEBUY-NO-POSITIVE-CROSSING",
+      "description": "In-house variable cost is higher and has no fixed-cost advantage; there is no positive demand where it wins.",
+      "demand_good_units_per_year": 25,
+      "make": {
+        "qualification_status": "qualified_for_profile",
+        "capex_upfront": 0,
+        "capital_life_years": 3,
+        "annual_discount_rate": 0.1,
+        "annual_fixed_costs": {
+          "maintenance": 0,
+          "site_support": 0,
+          "calibration_qualification": 0,
+          "training": 0,
+          "supplier_setup_or_tooling": 0
+        },
+        "variable_cost_per_attempt_components": {
+          "unit_material_or_quote": 28,
+          "direct_labor": 0,
+          "energy_consumables": 0,
+          "logistics": 0,
+          "variable_inspection": 0,
+          "expected_rework_scrap": 0
+        },
+        "yield_fraction": 0.95,
+        "evidence_status": "synthetic_complete"
+      },
+      "buy": {
+        "qualification_status": "qualified_for_profile",
+        "capex_upfront": 0,
+        "capital_life_years": 3,
+        "annual_discount_rate": 0.1,
+        "annual_fixed_costs": {
+          "maintenance": 0,
+          "site_support": 0,
+          "calibration_qualification": 0,
+          "training": 0,
+          "supplier_setup_or_tooling": 0
+        },
+        "variable_cost_per_attempt_components": {
+          "unit_material_or_quote": 18,
+          "direct_labor": 0,
+          "energy_consumables": 0,
+          "logistics": 4,
+          "variable_inspection": 1,
+          "expected_rework_scrap": 1
+        },
+        "yield_fraction": 0.98,
+        "evidence_status": "synthetic_complete"
+      },
+      "expected_decision": "prefer_buy_lower_annual_cost",
+      "expected_break_even_class": "none"
+    }
+  ]
+}
