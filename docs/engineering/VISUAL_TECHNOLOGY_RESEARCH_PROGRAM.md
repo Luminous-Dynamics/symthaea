@@ -208,3 +208,8 @@ The following are useful starting points, not blanket endorsements of any method
 - No external data reuse until rights and source identity are checked.
 - No physical validation from screenshots, synthetic cases, source code review, model confidence or queue status.
 - Preserve failures, negative results and regressions. Report per-dimension outcomes; do not collapse uncertainty or dissent into a single score.
+
+## Task-conditioned visual utility per joule
+
+[VIS-ENERGY-001 #7878](https://github.com/Luminous-Dynamics/symthaea/issues/7878) adds a protocol for measuring energy per successful visual task without trading away mandatory optical/perceptual quality floors. It reuses the 32-case conventional-display workload rather than adding a competing corpus. The new [VISUAL_UTILITY_PER_JOULE_PROTOCOL.md](VISUAL_UTILITY_PER_JOULE_PROTOCOL.md) specifies matched-condition fixed/adaptive comparisons, separate display/rendering/system energy, raw power traces, uncertainty, p95/p99 latency, task success, an independent ratio verifier, and explicit negative controls for telemetry gaps, profile mismatch, calibration drift, denominator manipulation, and hidden quality regression. Proposed starting targets (10% energy reduction, at most 1 percentage-point task-success drop, at most 5% p95 latency regression) are hypotheses to preregister—not measurements or universal standards. The primary result is the quality-constrained Pareto frontier; a single utility-per-joule ratio cannot mask floor violations.
+
