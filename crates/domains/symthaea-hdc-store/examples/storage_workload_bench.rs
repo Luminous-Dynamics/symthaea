@@ -149,6 +149,15 @@ fn run() -> Result<(), Box<dyn Error>> {
     }) {
         return Err("--csv and --store must name different paths".into());
     }
+    if let Some(csv) = config.csv_path.as_ref() {
+        let meta_path = csv.with_extension("meta.txt");
+        if csv.exists() || meta_path.exists() {
+            return Err(format!(
+                "benchmark output already exists; choose new --csv and metadata paths: {}",
+                csv.display()
+            ).into());
+        }
+    }
 
     let store_config = StoreConfig {
         initial_capacity: config.vectors as u64,
@@ -497,7 +506,7 @@ fn run() -> Result<(), Box<dyn Error>> {
         fs::write(&path, csv.as_bytes())?;
         let meta_path = path.with_extension("meta.txt");
         let metadata = format!(
-            "benchmark=storage_workload_bench\nsource_sha={}\nrustc_version={}\nhost_os={}\nhost_arch={}\nhost_profile={}\nstorage_profile={}\nstore_path={}\nvectors={}\nqueries={}\nbatch_size={}\nseed={}\ncorpus_fingerprint_fnv1a64_noncryptographic={:016x}\nlogical_vector_payload_bytes={}\nstore_file_bytes_including_preallocation_and_metadata={}\ncontent_checksum={:?}\ngeneration={}\nlive_count={}\ntombstones={}\napprox_top1_recall={}/{}\nexact_fallbacks={}/{}\nphysical_media_bytes=not_measured\nenergy=not_measured\nos_page_cache_coldness=not_controlled\n",
+            "benchmark=storage_workload_bench\nsource_sha={}\nrustc_version={}\nhost_os={}\nhost_arch={}\nhost_profile={}\nstorage_profile={}\nstore_path={}\nvectors={}\nqueries={}\nbatch_size={}\nseed={}\nlsh_bands={}\nlsh_rows={}\ncorpus_fingerprint_fnv1a64_noncryptographic={:016x}\nlogical_vector_payload_bytes={}\nstore_file_bytes_including_preallocation_and_metadata={}\ncontent_checksum={:?}\ngeneration={}\nlive_count={}\ntombstones={}\napprox_top1_recall={}/{}\nexact_fallbacks={}/{}\nphysical_media_bytes=not_measured\nenergy=not_measured\nos_page_cache_coldness=not_controlled\n",
             env::var("SYMTHAEA_SOURCE_SHA").unwrap_or_else(|_| "not-injected".to_string()),
             env::var("RUSTC_VERSION").unwrap_or_else(|_| "not-injected".to_string()),
             env::consts::OS,
@@ -509,6 +518,8 @@ fn run() -> Result<(), Box<dyn Error>> {
             config.queries,
             config.batch_size,
             config.seed,
+            store_config.lsh_bands,
+            store_config.lsh_rows,
             corpus_fingerprint,
             corpus_bytes,
             store_file_bytes,
