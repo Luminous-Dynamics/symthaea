@@ -85,7 +85,7 @@ For each candidate, the software evaluates all declared metric directions. Candi
 
 Draft [PR #7882](https://github.com/Luminous-Dynamics/symthaea/pull/7882) adds a report-only Rust evaluator in `symthaea-core::architecture_pareto`. It validates mass denominators/distribution, rejects missing required numeric fields, reports each candidate's Pareto status and dominators, and has no scalar aggregate score. The v1 synthetic fixture has five illustrative candidates: four deliberately non-dominated architectures with different trade-offs and one dominated overbuilt candidate.
 
-Ten unit tests and three public-API integration tests are authored. They have **not been executed** in this environment; test counts are not passes. The fixture is synthetic, not a measurement campaign or product recommendation.
+Eleven unit tests and three public-API integration tests are authored. They have **not been executed** in this environment; test counts are not passes. The fixture is synthetic, not a measurement campaign or product recommendation.
 
 ## 7. Proposed benchmark gates
 
