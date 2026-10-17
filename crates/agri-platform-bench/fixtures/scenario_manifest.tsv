@@ -19,6 +19,9 @@ missing-task-evidence	BLOCKED	Task evidence is missing
 stale-geometry-evidence	BLOCKED	Site geometry evidence is stale
 conflicting-terrain-evidence	BLOCKED	Terrain evidence conflicts
 missing-navigation-evidence	BLOCKED	Navigation evidence is missing
+platform-capability-estimated	PROVISIONAL	Candidate capability envelope is estimated
+platform-capability-missing	BLOCKED	Candidate capability evidence is missing
+navigation-capability-estimated	PROVISIONAL	Candidate navigation capability is estimated
 estimated-safety-evidence	PROVISIONAL	Safety evidence is estimated, not verified
 estimated-cost-evidence	PROVISIONAL	Cost model evidence is estimated
 estimated-serviceability-evidence	PROVISIONAL	Serviceability evidence is estimated
@@ -38,3 +41,5 @@ stale-cost-evidence	BLOCKED	Stale cost evidence blocks economic ranking
 conflicting-serviceability-evidence	BLOCKED	Conflicting repair evidence blocks qualification
 empty-verified-source-reference	BLOCKED	Verified evidence without a source reference is invalid
 invalid-operating-hours	BLOCKED	Annual operating hours outside valid bounds
+cross-currency-comparison	BLOCKED	Currency differs and no explicit conversion contract exists
+invalid-currency-code	BLOCKED	Currency code must be three uppercase letters
