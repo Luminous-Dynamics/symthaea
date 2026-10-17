@@ -308,6 +308,36 @@ fn run() -> Result<(), Box<dyn Error>> {
         ));
     }
 
+    // Compare the mutable in-memory ID hash map with the read-only reader's
+    // sorted-ID mapping below. This separates lookup policy from vector I/O.
+    let mut mutable_point_rng = config.seed ^ 0xA076_1D64_78BD_642F;
+    let mut mutable_point_checksum = 0_u64;
+    for sample_index in 0..config.queries {
+        let index = (next_rng(&mut mutable_point_rng) % config.vectors as u64) as usize;
+        let id = index as u64 + 1;
+        let start = Instant::now();
+        let hv = store.get(id).ok_or_else(|| format!("missing mutable point-read ID {id}"))?;
+        let observed_byte = black_box(hv.0[index % BYTES_PER_BINARY_HV as usize]);
+        let elapsed = start.elapsed();
+        mutable_point_checksum = mutable_point_checksum
+            .rotate_left(7)
+            .wrapping_add(id)
+            .wrapping_add(observed_byte as u64);
+        samples.push(sample(
+            "mutable_random_point_read",
+            sample_index,
+            elapsed.as_nanos(),
+            1,
+            BYTES_PER_BINARY_HV,
+            1,
+            0,
+            0,
+            0,
+            0,
+            mutable_point_checksum,
+        ));
+    }
+
     let store_file_bytes = fs::metadata(&store_path)?.len();
     let generation = store.header_generation();
     let live_count = store.live_count();
