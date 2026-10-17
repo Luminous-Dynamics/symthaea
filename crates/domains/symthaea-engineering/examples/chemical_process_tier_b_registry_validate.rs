@@ -784,6 +784,56 @@ mod tests {
     }
 
     #[test]
+    fn transitive_common_ancestor_blocks_independence_even_when_leaf_hashes_differ() {
+        let mut value = frozen_receipt_registry();
+        let audit = &mut value["candidates"][0]["reference_outputs"]["freeze_receipt"]["shared_dependency_audit"];
+        let common = "sha256:ffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffff";
+        audit["lineage_nodes"][0]["derived_from"] = json!([common]);
+        audit["lineage_nodes"][1]["derived_from"] = json!([common]);
+        audit["lineage_nodes"].as_array_mut().unwrap().push(json!({
+            "artifact": "common-upstream-property-source",
+            "sha256": common,
+            "derived_from": []
+        }));
+        // Direct model outputs have different digests. The shared source is only visible transitively.
+        audit["shared_dependency_digests"] = json!([common]);
+        audit["independent_corroboration_claimed"] = json!(false);
+        assert!(
+            validate_registry(&value).is_empty(),
+            "transitive shared source should be accepted when disclosed without an independence claim: {:?}",
+            validate_registry(&value)
+        );
+
+        audit["independent_corroboration_claimed"] = json!(true);
+        assert!(
+            validate_registry(&value).iter().any(|error| error.contains("transitive source-data dependencies overlap")),
+            "a shared transitive ancestor must block independent corroboration"
+        );
+    }
+
+    #[test]
+    fn broken_lineage_graphs_fail_closed_on_missing_parent_and_cycle() {
+        let mut missing_parent = frozen_receipt_registry();
+        missing_parent["candidates"][0]["reference_outputs"]["freeze_receipt"]["shared_dependency_audit"]["lineage_nodes"][0]["derived_from"] =
+            json!(["sha256:ffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffff"]);
+        assert!(
+            validate_registry(&missing_parent).iter().any(|error| error.contains("derives from missing lineage node")),
+            "missing parent digest must not be interpreted as independence"
+        );
+
+        let mut cyclic = frozen_receipt_registry();
+        let node_a = "sha256:dddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddd";
+        let node_b = "sha256:eeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeee";
+        let audit = &mut cyclic["candidates"][0]["reference_outputs"]["freeze_receipt"]["shared_dependency_audit"];
+        audit["lineage_nodes"][0]["derived_from"] = json!([node_b]);
+        audit["lineage_nodes"][1]["derived_from"] = json!([node_a]);
+        assert!(
+            validate_registry(&cyclic).iter().any(|error| error.contains("lineage graph contains a cycle")),
+            "cyclic lineage graph must fail closed"
+        );
+    }
+
+    #[test]
     fn shared_data_may_be_recorded_but_not_claimed_as_independent() {
         let mut value = frozen_receipt_registry();
         let audit = &mut value["candidates"][0]["reference_outputs"]["freeze_receipt"]["shared_dependency_audit"];
