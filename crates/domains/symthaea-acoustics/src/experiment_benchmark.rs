@@ -134,6 +134,7 @@ pub enum SyntheticBenchmarkError {
     DuplicateSkippedOption,
     UnknownPlannedOption,
     PlanOptionPartitionMismatch,
+    PlanOptionPoolMismatch,
     PlanIndexIdMismatch,
     PlanSpendMismatch,
     PlanBudgetAccountingMismatch,
@@ -174,6 +175,9 @@ impl fmt::Display for SyntheticBenchmarkError {
             Self::PlanOptionPartitionMismatch => {
                 "selected and skipped options must partition the complete option pool"
             }
+            Self::PlanOptionPoolMismatch => {
+                "scoring options differ from the exact pool used to create the plan"
+            }
             Self::PlanIndexIdMismatch => "plan indices and selected identifiers disagree",
             Self::PlanSpendMismatch => "plan spend differs from selected option costs",
             Self::PlanBudgetAccountingMismatch => {
@@ -208,6 +212,9 @@ pub fn run_synthetic_benchmark(
     policy: ExperimentSelectionPolicy,
 ) -> Result<SyntheticBenchmarkReceipt, SyntheticBenchmarkError> {
     validate_case_contract(case)?;
+    let option_map = validate_options(options, case)?;
+    let question_map = validate_questions(&case.questions)?;
+    validate_outcomes(&case.outcomes, &option_map, &question_map)?;
     let ranking = rank_experiments(
         options,
         &case.evaluation_profile_id,
@@ -233,6 +240,9 @@ pub fn score_synthetic_plan(
         || plan.cost_unit_id != case.cost_unit_id
     {
         return Err(SyntheticBenchmarkError::OptionContractMismatch);
+    }
+    if options != plan.input_option_snapshot.as_slice() {
+        return Err(SyntheticBenchmarkError::PlanOptionPoolMismatch);
     }
 
     let option_map = validate_options(options, case)?;
@@ -661,9 +671,7 @@ mod tests {
                 9,
                 ExperimentSelectionPolicy::CheapestFirst,
             ),
-            Err(SyntheticBenchmarkError::Selection(
-                ExperimentSelectionError::ZeroEstimatedCost
-            ))
+            Err(SyntheticBenchmarkError::ZeroEstimatedCost)
         );
     }
 
@@ -683,7 +691,7 @@ mod tests {
 
         assert_eq!(
             score_synthetic_plan(&changed, &case, &plan),
-            Err(SyntheticBenchmarkError::PlanSpendMismatch)
+            Err(SyntheticBenchmarkError::PlanOptionPoolMismatch)
         );
     }
 
