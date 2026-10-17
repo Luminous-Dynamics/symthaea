@@ -1154,6 +1154,10 @@ pub struct CycleMetadata {
     /// Number of actuators in the active embodiment platform.
     #[serde(default)]
     pub embodiment_num_actuators: u32,
+    /// Validated plant-time evidence for the embodiment step accepted this cycle.
+    /// None when no authorized step occurred or timing evidence was rejected.
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub plant_step_timing: Option<symthaea_core::embodiment::PlantStepTimingV1>,
 
     // ── Radio/Spectrum Manager Telemetry ───────────────────────────────────
     /// Network health: 0=AllUp, 1=LocalDown, 2=MetroOnly, 3=Blackout.
