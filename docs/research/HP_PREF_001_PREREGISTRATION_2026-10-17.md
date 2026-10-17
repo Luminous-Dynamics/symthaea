@@ -4,6 +4,7 @@
 **Tracker:** [HP-PREF-001 #7889](https://github.com/Luminous-Dynamics/symthaea/issues/7889).  
 **Research parent:** [HIFI-RESEARCH-001 #7888](https://github.com/Luminous-Dynamics/symthaea/issues/7888).  
 **Evidence record:** use the [Open Audio Evidence Contract](OPEN_AUDIO_EVIDENCE_CONTRACT_2026-10-17.md) for physical captures and the versioned schema at [audio-evidence-manifest.schema.json](../../schemas/audio-evidence-manifest.schema.json).
+**Split integrity:** use the [Open Hi-Fi Benchmark Protocol](HIFI_BENCHMARK_PROTOCOL_2026-10-17.md); the grouped split checker guards against declared listener, excerpt, product-revision, fixture and session leakage but does not validate model quality.
 
 ## 1. Research question and estimand
 
