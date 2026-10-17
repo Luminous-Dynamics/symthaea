@@ -17,10 +17,17 @@ use std::path::Path;
 const EXPECTED_SCHEMA_VERSION: &str = "room-imagination-stress-benchmark-v0.1";
 const EXPECTED_CASE_COUNT: usize = 30;
 
-const EMBEDDED_BENCHMARK: &str =
-    include_str!("../../../docs/research/spatial-design/ROOM_IMAGINATION_STRESS_BENCHMARK_V0_1.json");
-const EMBEDDED_SCHEMA: &str =
-    include_str!("../../../docs/research/spatial-design/ROOM_IMAGINATION_STRESS_BENCHMARK_V0_1.schema.json");
+const EMBEDDED_BENCHMARK: &str = include_str!(
+    "../../../docs/research/spatial-design/ROOM_IMAGINATION_STRESS_BENCHMARK_V0_1.json"
+);
+const EMBEDDED_SCHEMA: &str = include_str!(
+    "../../../docs/research/spatial-design/ROOM_IMAGINATION_STRESS_BENCHMARK_V0_1.schema.json"
+);
+const CLAIM_CEILING: &str = concat!(
+    "Manifest/schema and semantic integrity only. This receipt does not qualify geometry, ",
+    "simulations, accessibility, comfort, safety, buildability, code compliance, ",
+    "professional approval, or human outcomes."
+);
 
 #[derive(Debug, PartialEq, Eq)]
 struct ValidationSummary {
@@ -40,7 +47,9 @@ impl ValidationSummary {
             println!("  {risk}: {count}");
         }
         println!();
-        println!("Claim ceiling: manifest/schema integrity only; no geometry or building qualification.");
+        println!(
+            "Claim ceiling: manifest/schema integrity only; no geometry or building qualification."
+        );
     }
 }
 
@@ -73,7 +82,7 @@ fn receipt_value(
             "distinct_family_count": summary.family_count,
             "risk_counts": &summary.risk_counts
         },
-        "claim_ceiling": "Manifest/schema and semantic integrity only. This receipt does not qualify geometry, simulations, accessibility, comfort, safety, buildability, code compliance, professional approval, or human outcomes."
+        "claim_ceiling": CLAIM_CEILING
     })
 }
 
@@ -81,7 +90,10 @@ fn parse_json(label: &str, input: &str) -> Result<Value, String> {
     serde_json::from_str(input).map_err(|error| format!("{label} is not valid JSON: {error}"))
 }
 
-fn validate_documents(benchmark_text: &str, schema_text: &str) -> Result<ValidationSummary, String> {
+fn validate_documents(
+    benchmark_text: &str,
+    schema_text: &str,
+) -> Result<ValidationSummary, String> {
     let benchmark = parse_json("benchmark", benchmark_text)?;
     let schema = parse_json("schema", schema_text)?;
     validate_values(benchmark, schema)
