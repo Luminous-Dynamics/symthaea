@@ -253,6 +253,8 @@ fn random_arm_mean(
         let mut order = (0..all_candidates.len()).collect::<Vec<_>>();
         rng.shuffle(&mut order);
         let mut covariance = identity();
+        let mut first_tolerance_call = None;
+
         for (step_index, candidate_index) in order.into_iter().take(max_budget).enumerate() {
             covariance = update_covariance(
                 &covariance,
@@ -262,9 +264,16 @@ fn random_arm_mean(
             let target_variance = target_variance(&covariance, qoi_direction);
             qoi_sums[step_index] += target_variance;
             trace_sums[step_index] += trace(&covariance);
-            if target_tolerance_calls.is_empty() && target_variance <= TARGET_QOI_VARIANCE_TOLERANCE {
-                target_tolerance_calls.push(step_index + 1);
+
+            if first_tolerance_call.is_none()
+                && target_variance <= TARGET_QOI_VARIANCE_TOLERANCE
+            {
+                first_tolerance_call = Some(step_index + 1);
             }
+        }
+
+        if let Some(calls) = first_tolerance_call {
+            target_tolerance_calls.push(calls);
         }
     }
 
@@ -277,27 +286,21 @@ fn random_arm_mean(
         })
         .collect();
 
-    let calls_to_target_variance_tolerance = steps
-        .iter()
-        .find(|step| step.target_qoi_posterior_variance <= TARGET_QOI_VARIANCE_TOLERANCE)
-        .map(|step| step.budget_used);
-    let calls_to_target_variance_tolerance = target_tolerance_calls
-        .iter()
-        .map(|calls| *calls as f64)
-        .sum::<f64>()
-        / trials as f64;
     let fraction_reaching_target_variance_tolerance_within_budget =
         target_tolerance_calls.len() as f64 / trials as f64;
-    AcquisitionArm {
-        arm: "uniform_random_average".to_owned(),
-        mean_calls_to_target_variance_tolerance_among_successes: if target_tolerance_calls.is_empty() {
+    let mean_calls_to_target_variance_tolerance_among_successes =
+        if target_tolerance_calls.is_empty() {
             None
         } else {
             Some(
                 target_tolerance_calls.iter().map(|calls| *calls as f64).sum::<f64>()
                     / target_tolerance_calls.len() as f64,
             )
-        },
+        };
+
+    AcquisitionArm {
+        arm: "uniform_random_average".to_owned(),
+        mean_calls_to_target_variance_tolerance_among_successes,
         fraction_reaching_target_variance_tolerance_within_budget,
         steps,
     }
