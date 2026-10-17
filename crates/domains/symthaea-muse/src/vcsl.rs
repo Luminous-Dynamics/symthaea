@@ -3294,7 +3294,7 @@ mod tests {
         let first = capability_inventory(&vcsl_root, &vsco2_root, None).unwrap();
         let second = capability_inventory(&vcsl_root, &vsco2_root, None).unwrap();
 
-        assert_eq!(first.instrument_count, 42);
+        assert_eq!(first.instrument_count, 46);
         assert!(!first.indexed_sample_content_hashing_enabled);
         let guitar = first
             .instruments
