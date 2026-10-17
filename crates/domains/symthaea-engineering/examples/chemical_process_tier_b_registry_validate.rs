@@ -587,8 +587,7 @@ mod tests {
         );
     }
 
-    #[test]
-    fn complete_frozen_receipt_is_allowed_only_with_run_evidence() {
+    fn frozen_receipt_registry() -> Value {
         let mut value = registry();
         let candidate = &mut value["candidates"][0];
         candidate["freeze_state"] = json!("FROZEN");
@@ -627,8 +626,14 @@ mod tests {
             "shared_dependency_audit": {
                 "complete": true,
                 "independence_assessed": true,
-                "dependency_digests": ["sha256:cccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccc"],
-                "shared_dependency_digests": []
+                "model_a_dependency_digests": [
+                    "sha256:dddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddd"
+                ],
+                "model_b_dependency_digests": [
+                    "sha256:eeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeee"
+                ],
+                "shared_dependency_digests": [],
+                "independent_corroboration_claimed": true
             },
             "preregistered_case_specific_tolerance_and_rationale": {
                 "frozen_before_candidate_evaluation": true,
@@ -640,10 +645,64 @@ mod tests {
             },
             "claim_ceiling": "only matched-context water-mixer reference reproducibility"
         });
+        value
+    }
+
+    #[test]
+    fn complete_frozen_receipt_is_allowed_only_with_run_evidence() {
+        let value = frozen_receipt_registry();
         assert!(
             validate_registry(&value).is_empty(),
             "complete frozen receipt should satisfy registry structure: {:?}",
             validate_registry(&value)
+        );
+    }
+
+    #[test]
+    fn shared_dependency_intersection_is_recomputed_not_trusted() {
+        let mut value = frozen_receipt_registry();
+        let audit = &mut value["candidates"][0]["reference_outputs"]["freeze_receipt"]["shared_dependency_audit"];
+        audit["model_b_dependency_digests"][0] =
+            json!("sha256:dddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddd");
+        // A caller falsely reports an empty intersection despite identical digest sets.
+        audit["shared_dependency_digests"] = json!([]);
+        let errors = validate_registry(&value);
+        assert!(
+            errors.iter().any(|error| error.contains("do not equal the computed intersection")),
+            "the checker must derive overlap from both declared manifests"
+        );
+    }
+
+    #[test]
+    fn shared_data_may_be_recorded_but_not_claimed_as_independent() {
+        let mut value = frozen_receipt_registry();
+        let audit = &mut value["candidates"][0]["reference_outputs"]["freeze_receipt"]["shared_dependency_audit"];
+        audit["model_b_dependency_digests"][0] =
+            json!("sha256:dddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddd");
+        audit["shared_dependency_digests"] = json!([
+            "sha256:dddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddd"
+        ]);
+        audit["independent_corroboration_claimed"] = json!(false);
+        assert!(
+            validate_registry(&value).is_empty(),
+            "shared dependencies are admissible only when explicitly declared and not promoted: {:?}",
+            validate_registry(&value)
+        );
+    }
+
+    #[test]
+    fn shared_data_cannot_be_promoted_to_independent_corroboration() {
+        let mut value = frozen_receipt_registry();
+        let audit = &mut value["candidates"][0]["reference_outputs"]["freeze_receipt"]["shared_dependency_audit"];
+        audit["model_b_dependency_digests"][0] =
+            json!("sha256:dddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddd");
+        audit["shared_dependency_digests"] = json!([
+            "sha256:dddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddd"
+        ]);
+        audit["independent_corroboration_claimed"] = json!(true);
+        assert!(
+            validate_registry(&value).iter().any(|error| error.contains("cannot be claimed")),
+            "nonempty computed overlap must veto the independence claim"
         );
     }
 
