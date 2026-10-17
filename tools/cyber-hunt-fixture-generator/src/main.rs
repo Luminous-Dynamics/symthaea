@@ -607,12 +607,18 @@ mod tests {
                 .collect();
             let hosts: BTreeSet<String> = positives.iter().map(|event| event.host_id.clone()).collect();
             let principals: BTreeSet<String> = positives.iter().map(|event| event.principal_id.clone()).collect();
+            let source_ips: BTreeSet<String> = positives.iter()
+                .filter_map(|event| event.details.get("source_address").cloned())
+                .collect();
+            let destination_ips: BTreeSet<String> = positives.iter()
+                .filter_map(|event| event.details.get("destination_address").cloned())
+                .collect();
             let start = positives.iter().map(|event| event.event_time_ms).min().expect("attack start");
-            (hosts, principals, start, positives.len())
+            (hosts, principals, source_ips, destination_ips, start, positives.len())
         };
 
-        let (hosts_a, principals_a, start_a, count_a) = positive_signature(&a);
-        let (hosts_b, principals_b, start_b, count_b) = positive_signature(&b);
+        let (hosts_a, principals_a, source_ips_a, destination_ips_a, start_a, count_a) = positive_signature(&a);
+        let (hosts_b, principals_b, source_ips_b, destination_ips_b, start_b, count_b) = positive_signature(&b);
         assert_eq!(count_a, ATTACK_EVENT_COUNT);
         assert_eq!(count_b, ATTACK_EVENT_COUNT);
         assert_eq!(hosts_a.len(), 1, "all planted attack events share one case-local host");
@@ -621,6 +627,12 @@ mod tests {
         assert_eq!(principals_b.len(), 1, "all planted attack events share one case-local principal");
         assert_ne!(hosts_a, hosts_b, "the planted host identity should be seed-dependent");
         assert_ne!(principals_a, principals_b, "the planted principal should be seed-dependent");
+        assert_eq!(source_ips_a.len(), 1, "authentication evidence shares one synthetic source IP");
+        assert_eq!(source_ips_b.len(), 1, "authentication evidence shares one synthetic source IP");
+        assert_eq!(destination_ips_a.len(), 1, "egress evidence shares one synthetic destination IP");
+        assert_eq!(destination_ips_b.len(), 1, "egress evidence shares one synthetic destination IP");
+        assert_ne!(source_ips_a, source_ips_b, "the planted source IP should be seed-dependent");
+        assert_ne!(destination_ips_a, destination_ips_b, "the planted destination IP should be seed-dependent");
         assert_ne!(start_a, start_b, "the planted campaign time should be seed-dependent");
     }
 
