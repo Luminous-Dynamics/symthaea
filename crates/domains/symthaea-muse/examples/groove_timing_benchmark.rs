@@ -617,7 +617,7 @@ fn extract_drum_hits(smf: &Smf<'_>, bpm: f64) -> Result<Vec<DrumHit>, String> {
     if !bpm.is_finite() || bpm <= 0.0 {
         return Err("BPM must be finite and positive".to_owned());
     }
-    let ppq = match smf.header.timing {
+    let ppq = match &smf.header.timing {
         Timing::Metrical(value) => f64::from(value.as_int()),
         _ => return Err("SMPTE-based MIDI timing is unsupported".to_owned()),
     };
