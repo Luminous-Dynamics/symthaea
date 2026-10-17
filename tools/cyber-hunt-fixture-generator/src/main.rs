@@ -451,9 +451,11 @@ fn generate_artifact_provenance_dataset(record_count: usize, seed: u64) -> Resul
     let build_principal = "svc-build";
     let source_commit = format!("commit-{:012x}", rng.next_u64() & 0x0000_ffff_ffff_ffff);
     let build_id = format!("build-{:08x}", rng.next_u64() as u32);
-    let artifact_digest = format!("sha256:{:064x}", rng.next_u64());
-    let mismatched_subject_digest = format!("sha256:{:064x}", rng.next_u64());
-    let benign_digest = format!("sha256:{:064x}", rng.next_u64());
+    // Derive stable full-length SHA-256 identifiers from explicit synthetic byte strings;
+    // do not left-pad 64-bit PRNG output and call it a digest.
+    let artifact_digest = format!("sha256:{}", digest(format!("synthetic-artifact-bytes|{seed}|primary").as_bytes()));
+    let mismatched_subject_digest = format!("sha256:{}", digest(format!("synthetic-artifact-bytes|{seed}|attestation-subject").as_bytes()));
+    let benign_digest = format!("sha256:{}", digest(format!("synthetic-artifact-bytes|{seed}|benign").as_bytes()));
     let benign_commit = format!("commit-{:012x}", rng.next_u64() & 0x0000_ffff_ffff_ffff);
     let benign_build = format!("build-{:08x}", rng.next_u64() as u32);
 
@@ -893,8 +895,24 @@ mod tests {
             "artifact_promotion",
             "deployment",
         ] {
-            assert!(positive_events.iter().any(|event| event.event_type == expected_type));
+            assert!(
+                positive_events.iter().any(|event| event.event_type == expected_type),
+                "positive chain must contain {expected_type}"
+            );
+            assert!(
+                events.iter().any(|event| event.event_type == expected_type
+                    && !positive_ids.contains(&event.event_id)),
+                "benign chain must contain a lookalike {expected_type}"
+            );
         }
+        let replay = generate_artifact_provenance_dataset(1_000, 2026)
+            .expect("identical seed should replay");
+        assert_eq!(dataset.event_store, replay.event_store);
+        assert_eq!(dataset.manifest, replay.manifest);
+        assert_eq!(dataset.truth, replay.truth);
+        let different_seed = generate_artifact_provenance_dataset(1_000, 2027)
+            .expect("different seed should generate");
+        assert_ne!(dataset.manifest.event_store_sha256, different_seed.manifest.event_store_sha256);
 
         let benign_deployments: Vec<&EventRecord> = events.iter()
             .filter(|event| event.event_type == "deployment"
