@@ -37,8 +37,8 @@ Required fields:
 - SHA-256 digest of the canonical candidate configuration manifest.
 - Model run ID, model version, source revision, and digest for the model artifact.
 - Separate, versioned references for aerodynamic data, propulsion/rotor maps, energy-system assumptions and thermal/derating data, where used.
-- Each external data reference includes a locator, source revision/version, digest, retrieval date, units, reference conditions, applicability domain, uncertainty and limitations.
-- The candidate configuration, energy-system envelope, route, and mission-family manifest digests must match their bound artifact digests as well as the model run's input digests.
+- Each artifact reference includes a locator, revision, digest, retrieval date, units, reference conditions, applicability domain, uncertainty description, and limitations. If a field does not apply to source code or a synthetic fixture, record an explicit not-applicable reason; do not leave it blank.
+- Candidate configuration, energy-system envelope, route, mission family, mass properties and environment each have declared digests. Each must match its corresponding source artifact digest and the model run's declared input digest. The manifest producer must canonicalize and calculate these digests; the validator only checks syntax and declared equality bindings.
 - Solver settings, convergence/error metadata, and assumptions needed to reproduce the output.
 
 A digest establishes identity, not truth. A hash that cannot be resolved to a source artifact is insufficient. Missing provenance is indeterminate; never fill it with an undocumented default.
