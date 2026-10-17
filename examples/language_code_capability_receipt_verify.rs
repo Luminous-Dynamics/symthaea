@@ -348,7 +348,9 @@ fn main() {
     if !args.is_empty() && args[0] == "--receipt" {
         match verify_external_receipt(&args) {
             Ok((report, accepted)) => {
-                println!("{}", serde_json::to_string_pretty(&report).unwrap_or_else(|_| "{}".into()));
+                let rendered =
+                    serde_json::to_string_pretty(&report).unwrap_or_else(|_| "{}".into());
+                println!("{rendered}");
                 if !accepted {
                     process::exit(2);
                 }
@@ -421,7 +423,7 @@ mod tests {
         let pinned_source = "a".repeat(40);
         let receipt = valid_receipt();
         assert_eq!(
-            validate_receipt(&receipt, Some(&pinned_source), None),
+            validate_receipt(&receipt, Some(pinned_source.as_str()), None),
             Ok(())
         );
     }
@@ -457,11 +459,24 @@ mod tests {
     }
 
     #[test]
+    fn rejects_artifact_path_traversal_before_filesystem_access() {
+        assert_eq!(
+            resolve_artifact_under_root(Path::new("."), "../Cargo.toml"),
+            Err("artifact_path_must_be_relative_and_cannot_traverse".to_owned())
+        );
+        assert_eq!(
+            resolve_artifact_under_root(Path::new("."), "/etc/passwd"),
+            Err("artifact_path_must_be_relative_and_cannot_traverse".to_owned())
+        );
+    }
+
+    #[test]
     fn rejects_receipt_for_an_unexpected_source_revision() {
         let mut receipt = valid_receipt();
         receipt["source_sha"] = json!("c".repeat(40));
+        let pinned_source = "a".repeat(40);
         assert_eq!(
-            validate_receipt(&receipt, Some(&"a".repeat(40)), None),
+            validate_receipt(&receipt, Some(pinned_source.as_str()), None),
             Err("source_revision_mismatch".to_owned())
         );
     }
