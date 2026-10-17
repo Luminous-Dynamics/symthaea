@@ -1314,7 +1314,7 @@ mod tests {
     fn dag_catalogue_contains_all_twenty_five_three_node_dags() {
         let graphs = all_dags();
         assert_eq!(graphs.len(), 25);
-        assert_eq!(build_markov_class_catalog(&graphs).members.len(), 14);
+        assert_eq!(build_markov_class_catalog(&graphs).members.len(), 11);
         assert!(graphs.iter().all(|graph| is_acyclic(graph.edge_mask)));
         assert_eq!(
             graphs.iter().map(|graph| graph.edge_mask).collect::<std::collections::BTreeSet<_>>().len(),
@@ -1475,7 +1475,7 @@ mod tests {
         assert_eq!(a.world_count, 28);
         assert_eq!(a.held_out_world_count, 20);
         assert_eq!(a.candidate_dag_count, 25);
-        assert_eq!(a.markov_equivalence_class_count, 14);
+        assert_eq!(a.markov_equivalence_class_count, 11);
         assert_eq!(a.worlds.len(), 28 * ScmGraphPolicy::all().len());
         assert_eq!(a.held_out_policy_aggregates.len(), ScmGraphPolicy::all().len());
     }
