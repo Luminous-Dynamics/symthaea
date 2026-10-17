@@ -139,6 +139,7 @@ These are **prospective engineering goals**, not current results. First collect 
 
 - [MIREX 2026 Symbolic Music Generation](https://www.music-ir.org/mirex/wiki/2026%3ASymbolic_Music_Generation) uses blind subjective evaluation for prompt coherence, creativity, structuredness and overall musicality; these are useful separate dimensions for our protocol.
 - [MIREX 2026 CMI-RewardBench results](https://music-ir.org/mirex/wiki/2026%3AMusic_Evaluation_via_CMI-RewardBench_Results) compare automatic reward models against human pairwise preference. They demonstrate a practical evaluator benchmark, but its scores are not directly comparable to Melothaea's proposed style-recognition or composition targets.
+- [Recent advances in music generation: methods, evaluation, and challenges](https://doi.org/10.1007/s10462-026-11582-x) reviews persistent long-range structure, controllability and evaluation gaps. It supports keeping structural diagnostics, causal control tests, and human evaluation as separate result dimensions.
 - [A Survey on Evaluation Metrics for Music Generation](https://arxiv.org/abs/2509.00051) highlights limitations in objective-metric/human-perception alignment, cross-cultural bias and standardization.
 - [Benchmarking Music Generation Models and Metrics via Human Preference Studies](https://arxiv.org/abs/2506.19085) reports a large human-preference study (12 systems, 6,000 generated songs, 15,000 pairwise comparisons, 2,500 participants). This gives a scale reference—not a minimum viable requirement for our first controlled panel.
 
