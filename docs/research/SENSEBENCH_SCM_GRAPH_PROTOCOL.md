@@ -1,4 +1,4 @@
-# SenseBench SCM Graph Recovery Protocol v0.1
+# SenseBench SCM Graph Recovery Protocol v0.3
 
 **Status:** implementation committed to the public `feat/symthaea-sense-observation-envelope` branch; authored Rust tests have not been executed in the present environment.
 
