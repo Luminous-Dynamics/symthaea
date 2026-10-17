@@ -165,3 +165,9 @@ required-features = ["theory"]
 [[example]]
 name = "rhythm_gate_calibration"
 required-features = ["theory"]
+
+# Read-only Groove MIDI Dataset profile plus reproducible Melothaea drum corpus.
+# No external audio/model dependency; accepts the official MIDI-only GMD package.
+[[example]]
+name = "groove_timing_benchmark"
+required-features = ["theory"]
