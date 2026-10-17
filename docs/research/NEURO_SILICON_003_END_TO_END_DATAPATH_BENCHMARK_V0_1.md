@@ -53,6 +53,17 @@ frozen query/input
 
 Use the existing Rust `BinaryHV` definition and canonical source-bound fixture generator. Do not write a second HDC algebra to simplify hardware tests. The result contract must define deterministic tie-breaking by stable item ID. If a supported production retrieval path is not yet callable from a benchmark, declare that missing adapter and begin with a source-bound synthetic workload; label its findings as synthetic.
 
+### Separate build-time work from query-time work
+
+The evaluation has two linked workloads, not one blended timing number:
+
+1. **Index/store construction:** source ingestion or fixture loading, canonical encoding, binding/bundling where applicable, and memory-index construction. Report wall time, items/s, peak resident memory, bytes written, and deterministic index/manifest digests.
+2. **Query serving:** query encoding, memory placement/transfers, scan or indexed retrieval, scoring/ranking, and returned result. Report cold-start latency, warm-resident latency, p50/p95/p99, throughput, query count, and exact/relevance quality.
+
+Report total lifecycle cost and amortization separately for declared query volumes (for example 1, 100, 10,000 queries per built store); never hide build or reload cost inside a pre-warmed result. The current host example is only the query-serving scan slice: its output deliberately remains `incomplete` until the production encoding/index build, device movement and relevant end-to-end task boundary are accounted for.
+
+For dynamic/multi-step workloads, prefer a frozen input trace and replay the same decisions/queries across profiles. This follows the useful principle in MLCommons' 2026 end-to-end RAG benchmark: it has separate database ingestion and scored multi-hop QnA pipelines, fixed replay inputs to control run-to-run variation, and system-level opportunities such as model placement, co-residency, batching and memory placement. Symthaea should adapt this methodology to HDC and not claim MLPerf compliance.
+
 **First milestone:** a runnable host-only baseline and receipt validator, useful without RTL CI or a physical board. It must not claim an accelerator result. Existing semantic and differential gates remain prerequisites for adding corresponding hardware profiles.
 
 ### Comparison profiles
@@ -183,6 +194,7 @@ Work on stages A/B while upstream workflows are queued. Do not alter `--locked`,
 
 - Huang et al., [“Hyperdimensional in-memory computing with analogue memristive crossbar arrays,” *Nature Communications* 17, 9162 (2026)](https://www.nature.com/articles/s41467-026-76067-5), published 28 July 2026. The study demonstrates HDC language identification on a memristive system-on-chip and discusses peripheral/ADC costs and hardware-aware encoding. It makes locality/co-design worth testing; it does **not** establish an advantage for Symthaea's workload or device.
 - [MLPerf Tiny](https://mlcommons.org/benchmarks/inference-tiny/) and [MLPerf Edge](https://mlcommons.org/benchmarks/inference-edge/) provide useful principles: frozen task/quality targets, explicit latency scenarios, and careful energy methodology. This protocol reuses those principles without claiming MLPerf compliance.
+- MLCommons, [“Introducing the MLPerf End-to-End RAG Inference Benchmark” (26 August 2026)](https://mlcommons.org/2026/08/endtoend-inference/), separates one-time vector-database ingestion from end-to-end multi-hop query answering and identifies placement, co-residency, batching, memory placement and system-level KPIs as optimization surfaces. Adopt that measurement principle for HDC without transplanting the RAG workload or implying MLPerf qualification.
 - Existing Symthaea dependencies and evidence contracts are linked above. This document adds no new HDC semantics or silicon/fabrication claims.
 
 ## 10. Non-goals
