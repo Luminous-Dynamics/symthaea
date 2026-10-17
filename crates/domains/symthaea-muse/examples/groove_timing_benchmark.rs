@@ -307,7 +307,10 @@ fn run() -> Result<(), Box<dyn Error>> {
         result_scope: "descriptive_profile_only_not_quality_qualified",
         quality_qualified: false,
         dataset: "Groove MIDI Dataset; metadata and MIDI only; local user-supplied copy",
-        generated_method: "compose_styled + export_performance_midi; existing production realization path; new phrase curve is not applied",
+        generated_method: concat!(
+            "compose_styled + export_performance_midi; existing production realization path; ",
+            "new phrase curve is not applied",
+        ),
         selected_split: args.split,
         metadata_sha256,
         source_rows_selected: source_files.len(),
@@ -523,12 +526,12 @@ fn selected_dataset_rows(
     limit: Option<usize>,
 ) -> Result<Vec<DatasetRow>, Box<dyn Error>> {
     let mut lines = csv_text.lines();
-    let header_line = lines.next().ok_or_else(|| {
-        io::Error::new(io::ErrorKind::InvalidData, "info.csv is empty")
-    })?;
+    let header_line = lines
+        .next()
+        .ok_or_else(|| io::Error::new(io::ErrorKind::InvalidData, "info.csv is empty"))?;
     let header_line = header_line.trim_start_matches('\u{feff}');
     let header = parse_csv_record(header_line)
-    .ok_or_else(|| io::Error::new(io::ErrorKind::InvalidData, "info.csv header is malformed"))?;
+        .ok_or_else(|| io::Error::new(io::ErrorKind::InvalidData, "info.csv header is malformed"))?;
     let columns: BTreeMap<String, usize> = header
         .iter()
         .enumerate()
