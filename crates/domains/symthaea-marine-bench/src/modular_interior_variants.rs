@@ -490,8 +490,9 @@ pub fn generate_drop_in_variants(
             variant.replacement.revision,
             replacement_sha256
         );
-        let candidate_suffix = digest(&seed)?[..16].to_owned();
-        let candidate_id = format!("modvar-{candidate_suffix}");
+        let candidate_digest = digest(&seed)?;
+        let candidate_suffix = candidate_digest[..48].to_owned();
+        let candidate_id = format!("modvar-{candidate_digest}");
 
         if preflight_disposition != PreflightDisposition::DropInCompatible {
             output.push(GeneratedVariant {
