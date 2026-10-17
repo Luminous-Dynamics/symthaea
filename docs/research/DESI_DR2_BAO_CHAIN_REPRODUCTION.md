@@ -88,7 +88,7 @@ This gate is an inference reproduction, not necessarily independent reanalysis o
 
 ## Planned implementation boundary
 
-Symthaea should first provide the cosmological background equations and validated analytic reference tests. The DESI chain reader/auditor should be a separate benchmark component with minimal dependencies and deterministic output. It must not claim to implement a Boltzmann solver or a full cosmological likelihood.
+Symthaea should first provide the cosmological background equations and validated analytic reference tests. An initial dependency-light chain reader/auditor now exists in crates/domains/symthaea-cosmology-bench, with synthetic parser/summary negative controls and a JSON CLI. It remains uncompiled and has not processed the real DESI files in this environment. Before D0/D1 can pass, use it against checksum-verified product files and compare its conventions with the official metadata. It must not claim to implement a Boltzmann solver or a full cosmological likelihood.
 
 Mycelix-DeSci should store the exact input hashes, output summary, settings, benchmark status, comparison tolerance, and independent reproduction attestation. Symtropy is not required for this chain-audit milestone; its role begins with validated dynamical simulations, not posterior-file parsing.
 
