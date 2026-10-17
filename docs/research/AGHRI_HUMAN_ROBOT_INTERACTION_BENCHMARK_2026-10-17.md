@@ -78,8 +78,8 @@ A source-repository license does not override the dataset license. A metadata co
 ## 5. Run-manifest contract
 
 The companion files in this directory provide:
-- `schemas/aghri-run-manifest.v1.schema.json`: strict JSON Schema for provenance and run metadata;
-- `examples/aghri-run-manifest.template.json`: metadata-only, unqualified template.
+- `docs/research/aghri-run-manifest.v1.schema.json`: strict JSON Schema for provenance and run metadata;
+- `docs/research/aghri-run-manifest.template.json`: metadata-only, unqualified template.
 
 Every real run must bind:
 - dataset DOI/version/license/attribution and acquisition status;
@@ -142,6 +142,15 @@ Next:
 4. add deterministic stale-topic/latency/occlusion replay controls;
 5. only then design a machine-specific physical safety test plan with qualified reviewers.
 
-## 9. Explicit nonclaims
+
+## 10. Operational economics are part of the benchmark
+
+A 2026 open-access study modeled autonomous field-robot costs using empirical data from 61 maize fields in northwestern Germany. It reported average modeled total cost of €73/ha, fieldwork costs of €60/ha, and greater dispersion in logistics cost than fieldwork cost. Field size explained 58% of total-cost variance in that dataset, route distance 11%, and access points 1%. These results are context-specific, but they demonstrate why price-per-robot or detector accuracy cannot stand in for farm-level adoption economics.
+
+Reference: *Structural cost modeling and sensitivity analysis of autonomous field robot operations*, Smart Agricultural Technology 13 (March 2026), https://doi.org/10.1016/j.atech.2026.101913 (open-access article page: https://www.sciencedirect.com/science/article/pii/S2772375526001371).
+
+For later platform comparisons, report cost per completed task / treated hectare / marketable kilogram including setup, transport between plots, charging, supervision, missed missions, recovery, parts, maintenance, seasonal utilization and repair delays. Use local field geometry and route access rather than transferring the German maize cost numbers to a Southern African farm. Model low/base/high utilization and disruptions; publish the measured-data boundary and uncertainty.
+
+## 11. Explicit nonclaims
 
 This adapter does not establish that any robot is safe, that AGHRI covers all agricultural settings, or that UK benchmark performance transfers to Southern Africa. It does not establish crop yield, food safety, return on investment, ISO compliance or stop-function qualification, and it grants no physical actuation authority.
