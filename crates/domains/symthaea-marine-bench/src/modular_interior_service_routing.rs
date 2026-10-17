@@ -837,6 +837,47 @@ fn neighbor_cells(grid: &Grid, cell: usize) -> [(Option<usize>, u8); 4] {
     ]
 }
 
+
+fn shared_service_terminal(
+    a: &ServiceRouteRequest,
+    b: &ServiceRouteRequest,
+) -> Option<(String, i64, i64)> {
+    let a_anchors = [&a.start, &a.end];
+    let b_anchors = [&b.start, &b.end];
+    for aa in a_anchors {
+        if aa.kind != AnchorKind::PlatformService { continue; }
+        for bb in b_anchors {
+            if bb.kind == AnchorKind::PlatformService
+                && aa.service_id == bb.service_id
+                && aa.deck_id == bb.deck_id
+                && aa.position_mm.x_mm == bb.position_mm.x_mm
+                && aa.position_mm.y_mm == bb.position_mm.y_mm
+                && aa.position_mm.z_mm == bb.position_mm.z_mm
+            {
+                return Some((aa.deck_id.clone(), aa.position_mm.x_mm, aa.position_mm.y_mm));
+            }
+        }
+    }
+    None
+}
+
+fn paths_have_unapproved_overlap(
+    a: &ServiceRouteResult,
+    b: &ServiceRouteResult,
+    a_request: &ServiceRouteRequest,
+    b_request: &ServiceRouteRequest,
+) -> bool {
+    if a_request.start.deck_id != b_request.start.deck_id {
+        return false;
+    }
+    let shared_terminal = shared_service_terminal(a_request, b_request);
+    a.path.iter().filter(|point| b.path.contains(point)).any(|point| {
+        shared_terminal.as_ref().is_none_or(|(deck, x, y)| {
+            deck != &a_request.start.deck_id || *x != point.x_mm || *y != point.y_mm
+        })
+    })
+}
+
 fn anchor_axis(anchor: &RoutingAnchor) -> u8 {
     match anchor.side {
         Some(AnchorSide::East | AnchorSide::West) => 1,
@@ -966,7 +1007,6 @@ pub fn route_services(
     let (requests, input_manifest_sha256) = normalize_requests(configuration, input_requests, &limits)?;
     let configuration_sha256 = digest(configuration).map_err(serialization_error)?;
     let mut results = Vec::with_capacity(requests.len());
-    let mut route_cells = BTreeMap::<String, BTreeSet<(String, usize)>>::new();
 
     for request in &requests {
         let (grid, start_escape, end_escape, start_approach, end_approach, obstacles, endpoint_blocked) =
@@ -999,9 +1039,6 @@ pub fn route_services(
         for cell in &complete_cells {
             path.push(cell_to_point(&grid, *cell)?);
         }
-        let cell_keys: BTreeSet<(String, usize)> = complete_cells.iter()
-            .map(|cell| (request.start.deck_id.clone(), *cell)).collect();
-        route_cells.insert(request.route_id.clone(), cell_keys);
         results.push(ServiceRouteResult {
             route_id: request.route_id.clone(),
             connection_id: request.connection_id.clone(),
@@ -1024,6 +1061,8 @@ pub fn route_services(
         });
     }
 
+    let request_by_id: BTreeMap<&str, &ServiceRouteRequest> = requests.iter()
+        .map(|request| (request.route_id.as_str(), request)).collect();
     let mut conflict_map = BTreeMap::<String, BTreeSet<String>>::new();
     for i in 0..results.len() {
         for j in (i + 1)..results.len() {
@@ -1032,9 +1071,9 @@ pub fn route_services(
             if a.disposition != RouteDisposition::Routed || b.disposition != RouteDisposition::Routed {
                 continue;
             }
-            let Some(a_cells) = route_cells.get(&a.route_id) else { continue; };
-            let Some(b_cells) = route_cells.get(&b.route_id) else { continue; };
-            if !a_cells.is_disjoint(b_cells) {
+            let Some(a_request) = request_by_id.get(a.route_id.as_str()) else { continue; };
+            let Some(b_request) = request_by_id.get(b.route_id.as_str()) else { continue; };
+            if paths_have_unapproved_overlap(a, b, a_request, b_request) {
                 conflict_map.entry(a.route_id.clone()).or_default().insert(b.route_id.clone());
                 conflict_map.entry(b.route_id.clone()).or_default().insert(a.route_id.clone());
             }
@@ -1257,13 +1296,12 @@ pub fn verify_service_routing_report(
             let b = &report.body.routes[j];
             let Some(a_request) = request_by_id.get(a.route_id.as_str()) else { return false; };
             let Some(b_request) = request_by_id.get(b.route_id.as_str()) else { return false; };
-            if a_request.start.deck_id != b_request.start.deck_id
-                || a.disposition != RouteDisposition::Routed
+            if a.disposition != RouteDisposition::Routed
                 || b.disposition != RouteDisposition::Routed
             {
                 continue;
             }
-            if a.path.iter().any(|point| b.path.contains(point)) {
+            if paths_have_unapproved_overlap(a, b, a_request, b_request) {
                 expected_conflicts.entry(a.route_id.clone()).or_default().insert(b.route_id.clone());
                 expected_conflicts.entry(b.route_id.clone()).or_default().insert(a.route_id.clone());
             }
@@ -1457,6 +1495,26 @@ mod tests {
     }
 
     #[test]
+    fn identical_declared_service_terminal_is_not_itself_a_route_conflict() {
+        let baseline = live();
+        let cabin_route = request_for(
+            "COMMON-TERMINAL-CABIN", "CONN-CABIN-01-AC_IN",
+            module_anchor("CABIN-01", "AC_IN", 2800, 1800),
+            service_anchor("AC-BUS", 4700, 1800),
+        );
+        let wetroom_route = request_for(
+            "COMMON-TERMINAL-WETROOM", "CONN-WETROOM-01-AC_IN",
+            module_anchor("WETROOM-01", "AC_IN", 4600, 1800),
+            service_anchor("AC-BUS", 4700, 1800),
+        );
+        let report = route_services(&baseline, &[cabin_route.clone(), wetroom_route.clone()], limits()).unwrap();
+        assert!(report.body.routes.iter().all(|route| route.conflicts_with_route_ids.is_empty()));
+        assert!(verify_service_routing_report(
+            &baseline, &[cabin_route, wetroom_route], &limits(), &report
+        ));
+    }
+
+    #[test]
     fn duplicate_routes_for_connection_are_rejected() {
         let baseline = live();
         let first = request_for(
@@ -1568,7 +1626,9 @@ mod tests {
                     let wetroom_route = request_for(
                         "ROUTE-WETROOM", "CONN-WETROOM-01-AC_IN",
                         module_anchor("WETROOM-01", "AC_IN", 4600, 1800),
-                        service_anchor("AC-BUS", 4700, 1800),
+                        // Same service ID, but a different explicit tap point. The
+                        // routes should share a path segment, not just a common terminal.
+                        service_anchor("AC-BUS", 4700, 1600),
                     );
                     let report = route_services(&baseline, &[cabin_route, wetroom_route], limits()).unwrap();
                     assert_eq!(report.body.routes.len(), 2);
