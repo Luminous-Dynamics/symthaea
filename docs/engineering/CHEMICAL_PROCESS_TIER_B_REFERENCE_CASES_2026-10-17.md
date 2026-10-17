@@ -129,7 +129,7 @@ Do not compare Cantera reactor dynamics against a DWSIM steady-state unit operat
 
 ## Machine-readable candidate registry
 
-The candidate set is also recorded in [`CHEMICAL_PROCESS_TIER_B_CANDIDATES_V1.json`](fixtures/CHEMICAL_PROCESS_TIER_B_CANDIDATES_V1.json). The registry stores case IDs, source URLs, input conditions, analytical invariants, tutorial-only hints, freeze blockers, claim ceilings and hard-gated acceptance targets.
+The candidate set is also recorded in [`CHEMICAL_PROCESS_TIER_B_CANDIDATES_V1.json`](fixtures/CHEMICAL_PROCESS_TIER_B_CANDIDATES_V1.json). The registry stores case IDs, source URLs, input conditions, analytical invariants, tutorial-only hints, freeze blockers, claim ceilings and hard-gated acceptance targets. The benchmark targets and evaluation ladder are specified in [`CHEMICAL_PROCESS_BENCHMARK_SCORECARD_V1.md`](CHEMICAL_PROCESS_BENCHMARK_SCORECARD_V1.md).
 
 Registry invariants:
 - All five candidates explicitly report `NOT_RUN`; the file does not imply DWSIM or Cantera was executed.
