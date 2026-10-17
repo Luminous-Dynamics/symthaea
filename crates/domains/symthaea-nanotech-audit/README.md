@@ -60,6 +60,25 @@ total_cost = sum(per-record cost)
 
 A locally rejected candidate is still a proposal attempt and has selector/validation cost, but must have neither an external invocation nor a cache hit. An evaluated request must be either a cache hit or an external invocation; an oracle failure or timeout must record an external invocation. Each record must identify a receipt artifact whose bytes are separately hash-verified. The ledger is still a declared run artifact; this verifier does not attest that an upstream oracle or service emitted the ledger or that the stated cost unit reflects an invoice or measured compute resource. Reconcile with source-system logs, signed receipts or billing/resource records before total-cost claims.
 
+## NANO-013: online rescue-controller contract
+
+The optional NANO-013 contract is audited automatically when a run contains all six files under `rescue-controller/`:
+
+- `decision-ledger.jsonl`: one strict record per policy decision, with action, policy revision, input/state digests, per-decision cost, and explicit future-data/held-out-label leakage flags.
+- `eligible-window-frame.jsonl`: frozen frame used to define the probability-sampling population.
+- `preregistration-receipt.json`: binds the run, exact policy revision, frame digest, sampling method, seed commitment and pre-run/blinding declarations.
+- `audit-sampling-manifest.json`: declares a simple or stratified random sample, stratum population/sample counts and per-window inclusion probabilities.
+- `sampling-seed-reveal.json`: post-run seed disclosure checked against the precommitted digest.
+- `blinded-audit-results.jsonl`: independent reference outcomes with policy-query status, reference failures, and an explicit assertion that labels were not revealed to the policy.
+
+The verifier checks raw file digests, unique frame/sample/window identifiers, count identities, per-stratum inclusion probabilities, sampled-window membership and group identity, sequence continuity per trajectory, allowed actions, future-step/held-out-label leakage flags, cost-unit consistency, reference-status/label consistency, and each evaluation result's binding to the exact raw sampling-manifest bytes. Unsafe paths and symlinks fail closed. It records the operational decision-cost unit separately from the evaluation-audit cost unit.
+
+Schemas: [decision record](schema/nano-rescue-decision.schema.json), [eligible-frame row](schema/nano-rescue-frame-record.schema.json), [preregistration receipt](schema/nano-rescue-preregistration.schema.json), [seed reveal](schema/nano-rescue-seed-reveal.schema.json), [audit-sampling manifest](schema/nano-rescue-audit-sampling.schema.json), and [blinded audit outcome](schema/nano-rescue-audit-result.schema.json).
+
+The synthetic fixture lives at `fixtures/nano-rescue-valid/rescue-controller/`. It intentionally contains a sampled severe event where the policy chose `continue` instead of requesting reference. The structural audit may pass that bundle: this means only that the declared records reconcile. It is explicitly **not** a policy-performance pass. Unit tests also mutate the decision ledger to declare future-data access and mutate the manifest bytes to confirm fail-closed detection.
+
+A local manifest's own claim that it was frozen before the run is not independent proof of timestamp or blinding. Obtain a trusted signed/timestamped preregistration receipt and reference-provider evidence for real campaigns. A stratified estimate must apply the recorded inclusion probabilities; this integrity auditor validates the sampling contract but does not yet compute weighted recall, physical fidelity, survival estimates or confidence intervals. Those remain a separately preregistered evaluator responsibility.
+
 ## Explicit claim ceiling
 
 An `artifact_integrity_pass` is **not** a scientific benchmark pass. The verifier does not prove:
