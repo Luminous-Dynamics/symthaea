@@ -41,7 +41,7 @@ jobs:
           for size in 1000 10000 100000; do
             out="$RUNNER_TEMP/cyber-hunt-$size"
             cargo run --manifest-path tools/cyber-hunt-fixture/Cargo.toml -- --records "$size" --seed 42 --out-dir "$out" > "$RUNNER_TEMP/report-$size.json"
-            jq -e --argjson count "$size" --arg commit "$SOURCE_COMMIT" '.verification.disposition == "STRUCTURAL_PASS_NOT_CAPABILITY_PASS" and .verification.source_commit_pinned == true and .verification.source_commit == $commit and .manifest.synthetic_only == true and .manifest.qualification_state == "UNSCORED" and .manifest.source_commit == $commit and .manifest.actual_record_count == $count and .manifest.files["solver/events.jsonl"].record_count == $count and .manifest.files["solver/manifest.json"].record_count == 1 and .manifest.files["evaluator/oracle.json"].record_count == $count and .solver_manifest.record_count == $count and .solver_manifest.source_commit_pinned == true' "$RUNNER_TEMP/report-$size.json"
+            jq -e --argjson count "$size" --arg commit "$SOURCE_COMMIT" '.verification.disposition == "STRUCTURAL_PASS_NOT_CAPABILITY_PASS" and .verification.source_commit_pinned == true and .verification.source_commit == $commit and .manifest.synthetic_only == true and .manifest.qualification_state == "UNSCORED" and .manifest.source_commit == $commit and .manifest.actual_record_count == $count and .manifest.files["solver/events.jsonl"].record_count == $count and .manifest.files["solver/manifest.json"].record_count == 1 and .manifest.files["evaluator/oracle.json"].record_count == $count and .solver_manifest.record_count == $count and ((.solver_manifest | has("source_commit")) == false) and ((.solver_manifest | has("source_commit_pinned")) == false) and ((.solver_manifest | has("seed")) == false)' "$RUNNER_TEMP/report-$size.json"
           done
 
       - name: Run read-only query against solver-only mount
@@ -51,18 +51,15 @@ jobs:
           jq -s -e 'length == 1 and .[0].ok == true and .[0].response.receipt.disposition == "READ_ONLY_EVIDENCE_RESULTS_NOT_A_SECURITY_CONCLUSION" and .[0].response.receipt.rows_examined == 10000 and .[0].response.receipt.rows_returned == 4 and ([.[0].response.records[].fields.change_ticket | select(. != null)] | length) == 2' "$RUNNER_TEMP/query-receipt.jsonl"
 
       - name: Score an explicit zero-alert evaluator plumbing baseline
-        env:
-          SOURCE_COMMIT: ${{ github.event.pull_request.head.sha || github.sha }}
         run: |
           set -euo pipefail
           dataset="$RUNNER_TEMP/cyber-hunt-10000"
           manifest="$dataset/manifest.json"
           solver_sha="$(jq -r '.files["solver/manifest.json"].sha256' "$manifest")"
           event_sha="$(jq -r '.files["solver/events.jsonl"].sha256' "$manifest")"
-          jq -n --arg commit "$SOURCE_COMMIT" --arg solver_sha "$solver_sha" --arg event_sha "$event_sha" '{
+          jq -n --arg solver_sha "$solver_sha" --arg event_sha "$event_sha" '{
             schema_version: "cyber-hunt-predictions-v1",
             run_id: "ci-zero-alert-plumbing",
-            source_commit: $commit,
             solver_manifest_sha256: $solver_sha,
             event_store_sha256: $event_sha,
             suspects: [],
