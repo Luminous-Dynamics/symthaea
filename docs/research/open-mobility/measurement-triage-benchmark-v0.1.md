@@ -61,7 +61,7 @@ For a given source comparison:
 6. Among eligible actions that cover at least one cell, action A dominates action B only if A's covered-cell set is a superset of B's and A's conservative upper cost bound is no greater, with strict improvement in coverage or cost.
 7. Return every non-dominated action, not one scalar winner. Actions that cover different cells stay available even when their coverage counts are equal.
 
-The receipt binds the canonical serialized source comparison using BLAKE3. A digest establishes content identity of the supplied structure, not sensor authenticity, valid calibration, consent, truth or authorization.
+The receipt binds the canonical serialized source comparison using BLAKE3. Before triage, it reconstructs the interval request from the echoed candidate metric intervals and shared context, invokes the existing robustness evaluator, and rejects if the recomputed candidate frontier or pairwise comparisons differ. A digest establishes content identity of the supplied structure, not sensor authenticity, valid calibration, consent, truth or authorization.
 
 ## 6. Required report outputs
 
@@ -89,7 +89,8 @@ These are proposed targets, not results or clinical standards.
 | Protocol/context | 100% rejection of stale protocol and unknown/duplicate candidates |
 | Pareto action set | Exact agreement with hand-calculated coverage-set/cost dominance fixtures, preserving actions with different coverage |
 | Determinism | Byte-identical report for 100 repeated evaluations of the same source report and action catalog |
-| Provenance | Source report schema and canonical content digest present in every successful receipt |
+| Provenance | Source report schema and canonical content digest present in every successful receipt |  
+| Receipt recomputation | 100% rejection when echoed metrics do not reproduce the candidate frontier and pairwise dominance receipts |
 | No invented EIG | No probability or expected-utility number generated from interval width or cell count alone |
 | Claim ceiling | No code path authorizes or executes actions or promotes synthetic output into physical/clinical evidence |
 
