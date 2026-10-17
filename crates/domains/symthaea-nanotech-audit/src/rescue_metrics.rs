@@ -1,0 +1,554 @@
+// Copyright (C) 2024-2026 Tristan Stoltz / Luminous Dynamics
+// SPDX-License-Identifier: AGPL-3.0-or-later
+
+//! Design-weighted scoring for the NANO-013 policy-blind probability sample.
+//!
+//! The input must first pass the structural audit. This scorer independently checks the
+//! sample/result identity and digest bindings it relies on. It does not attest that the
+//! reference provider is truthful, the receipt was externally timestamped, costs were billed,
+//! or the benchmark is scientifically representative.
+
+use serde::{Deserialize, Serialize};
+use sha2::{Digest, Sha256};
+use std::collections::{BTreeMap, BTreeSet};
+use std::fs;
+use std::path::{Path, PathBuf};
+
+const BOOTSTRAP_REPLICATES: usize = 2_000;
+const MIN_GROUPS_FOR_INTERVAL: usize = 10;
+const REQUIRED_VALID_BOOTSTRAP_FRACTION: f64 = 0.90;
+const MAX_RESULTS_BYTES: u64 = 256 * 1024 * 1024;
+const MAX_RESULTS_ROWS: usize = 1_000_000;
+
+#[derive(Debug, Deserialize)]
+struct SamplingManifest {
+    schema_version: String,
+    run_id: String,
+    sampled_windows: Vec<SampledWindow>,
+}
+
+#[derive(Debug, Deserialize)]
+struct SampledWindow {
+    window_id: String,
+    parent_group_id: String,
+    trajectory_id: String,
+    stratum_id: String,
+    inclusion_probability: f64,
+}
+
+#[derive(Debug, Deserialize)]
+#[serde(deny_unknown_fields)]
+struct AuditResult {
+    schema_version: String,
+    run_id: String,
+    sampling_manifest_sha256: String,
+    window_id: String,
+    parent_group_id: String,
+    trajectory_id: String,
+    stratum_id: String,
+    inclusion_probability: f64,
+    reference_status: String,
+    severe_event: Option<bool>,
+    physical_integrity_pass: Option<bool>,
+    policy_triggered_reference: bool,
+    labels_revealed_to_policy: bool,
+    audit_reference_cost: f64,
+    audit_cost_unit: String,
+}
+
+#[derive(Debug, Clone, Copy, Default, Serialize)]
+struct SufficientStats {
+    weight_total: f64,
+    weight_query: f64,
+    weight_evaluated: f64,
+    weight_severe: f64,
+    weight_severe_query: f64,
+    weight_nonsevere: f64,
+    weight_nonsevere_query: f64,
+    weight_integrity_known: f64,
+    weight_integrity_failure: f64,
+    weighted_reference_cost: f64,
+}
+
+impl SufficientStats {
+    fn add(&mut self, other: Self) {
+        self.weight_total += other.weight_total;
+        self.weight_query += other.weight_query;
+        self.weight_evaluated += other.weight_evaluated;
+        self.weight_severe += other.weight_severe;
+        self.weight_severe_query += other.weight_severe_query;
+        self.weight_nonsevere += other.weight_nonsevere;
+        self.weight_nonsevere_query += other.weight_nonsevere_query;
+        self.weight_integrity_known += other.weight_integrity_known;
+        self.weight_integrity_failure += other.weight_integrity_failure;
+        self.weighted_reference_cost += other.weighted_reference_cost;
+    }
+
+    fn from_row(row: &AuditResult) -> Self {
+        let weight = 1.0 / row.inclusion_probability;
+        let evaluated = row.reference_status == "evaluated";
+        let severe = row.severe_event == Some(true);
+        let nonsevere = row.severe_event == Some(false);
+        let integrity_known = row.physical_integrity_pass.is_some();
+        let integrity_failure = row.physical_integrity_pass == Some(false);
+
+        Self {
+            weight_total: weight,
+            weight_query: if row.policy_triggered_reference { weight } else { 0.0 },
+            weight_evaluated: if evaluated { weight } else { 0.0 },
+            weight_severe: if evaluated && severe { weight } else { 0.0 },
+            weight_severe_query: if evaluated && severe && row.policy_triggered_reference {
+                weight
+            } else {
+                0.0
+            },
+            weight_nonsevere: if evaluated && nonsevere { weight } else { 0.0 },
+            weight_nonsevere_query: if evaluated && nonsevere && row.policy_triggered_reference {
+                weight
+            } else {
+                0.0
+            },
+            weight_integrity_known: if integrity_known { weight } else { 0.0 },
+            weight_integrity_failure: if integrity_failure { weight } else { 0.0 },
+            weighted_reference_cost: weight * row.audit_reference_cost,
+        }
+    }
+}
+
+#[derive(Debug, Clone, Copy)]
+enum Metric {
+    QueryFraction,
+    ReferenceOutcomeCoverage,
+    SevereEventRecall,
+    FalseAlarmRate,
+    FalseAlarmBurden,
+    PhysicalIntegrityFailureRate,
+}
+
+impl Metric {
+    fn value(self, stats: &SufficientStats) -> Option<f64> {
+        let (numerator, denominator) = match self {
+            Self::QueryFraction => (stats.weight_query, stats.weight_total),
+            Self::ReferenceOutcomeCoverage => (stats.weight_evaluated, stats.weight_total),
+            Self::SevereEventRecall => (stats.weight_severe_query, stats.weight_severe),
+            Self::FalseAlarmRate => (stats.weight_nonsevere_query, stats.weight_nonsevere),
+            Self::FalseAlarmBurden => (stats.weight_nonsevere_query, stats.weight_total),
+            Self::PhysicalIntegrityFailureRate => (
+                stats.weight_integrity_failure,
+                stats.weight_integrity_known,
+            ),
+        };
+        (denominator > 0.0).then_some(numerator / denominator)
+    }
+}
+
+#[derive(Debug, Serialize)]
+struct MetricEstimate {
+    estimate: Option<f64>,
+    cluster_bootstrap_95_ci: Option<[f64; 2]>,
+    valid_bootstrap_replicates: usize,
+    interpretation: String,
+}
+
+#[derive(Debug, Serialize)]
+struct ScoreReport {
+    schema_version: &'static str,
+    run_id: String,
+    sampling_manifest_sha256: String,
+    sampled_windows: usize,
+    evaluated_reference_windows: usize,
+    reference_failed_windows: usize,
+    reference_unavailable_windows: usize,
+    independent_parent_groups: usize,
+    independent_trajectories: usize,
+    weighted_estimated_population_windows: f64,
+    observed_audit_reference_cost: f64,
+    horvitz_thompson_estimated_population_audit_reference_cost: f64,
+    audit_cost_unit: String,
+    reference_outcome_coverage: MetricEstimate,
+    policy_reference_query_fraction: MetricEstimate,
+    severe_event_recall_on_evaluated_references: MetricEstimate,
+    false_alarm_rate_among_evaluated_nonsevere_windows: MetricEstimate,
+    known_label_false_alarm_burden_per_estimated_population_window: MetricEstimate,
+    physical_integrity_failure_rate_on_evaluated_references: MetricEstimate,
+    interval_method: String,
+    warnings: Vec<String>,
+}
+
+#[derive(Debug, Default)]
+struct DeterministicRng(u64);
+
+impl DeterministicRng {
+    fn next(&mut self) -> u64 {
+        if self.0 == 0 {
+            self.0 = 0x9e37_79b9_7f4a_7c15;
+        }
+        let mut x = self.0;
+        x ^= x << 13;
+        x ^= x >> 7;
+        x ^= x << 17;
+        self.0 = x;
+        x
+    }
+
+    fn index(&mut self, upper: usize) -> usize {
+        (self.next() % upper as u64) as usize
+    }
+}
+
+fn read_regular_file(path: &Path) -> Result<Vec<u8>, String> {
+    let metadata = fs::symlink_metadata(path)
+        .map_err(|error| format!("{}: {error}", path.display()))?;
+    if !metadata.file_type().is_file() || metadata.file_type().is_symlink() {
+        return Err(format!("{} is not a regular, non-symlink file", path.display()));
+    }
+    if metadata.len() > MAX_RESULTS_BYTES {
+        return Err(format!("{} exceeds the {}-byte limit", path.display(), MAX_RESULTS_BYTES));
+    }
+    fs::read(path).map_err(|error| format!("{}: {error}", path.display()))
+}
+
+fn sha256_hex(bytes: &[u8]) -> String {
+    format!("{:x}", Sha256::digest(bytes))
+}
+
+fn close_probability(left: f64, right: f64) -> bool {
+    left.is_finite() && right.is_finite() && (left - right).abs() <= 1.0e-12
+}
+
+fn parse_results(bytes: &[u8]) -> Result<Vec<AuditResult>, String> {
+    let text = std::str::from_utf8(bytes).map_err(|error| format!("results are not UTF-8: {error}"))?;
+    let mut rows = Vec::new();
+    for (index, line) in text.lines().enumerate() {
+        if line.trim().is_empty() {
+            return Err(format!("blank JSONL record at line {}", index + 1));
+        }
+        if rows.len() >= MAX_RESULTS_ROWS {
+            return Err(format!("result rows exceed the {MAX_RESULTS_ROWS}-row limit"));
+        }
+        let row: AuditResult = serde_json::from_str(line)
+            .map_err(|error| format!("invalid audit result at line {}: {error}", index + 1))?;
+        rows.push(row);
+    }
+    if rows.is_empty() {
+        return Err("blinded audit results contain no records".to_owned());
+    }
+    Ok(rows)
+}
+
+fn estimate(
+    metric: Metric,
+    groups: &BTreeMap<String, SufficientStats>,
+    total: &SufficientStats,
+    seed: u64,
+    interpretation: &str,
+) -> MetricEstimate {
+    let point = metric.value(total);
+    let mut report = MetricEstimate {
+        estimate: point,
+        cluster_bootstrap_95_ci: None,
+        valid_bootstrap_replicates: 0,
+        interpretation: interpretation.to_owned(),
+    };
+    if groups.len() < MIN_GROUPS_FOR_INTERVAL {
+        return report;
+    }
+
+    let group_values = groups.values().copied().collect::<Vec<_>>();
+    let mut rng = DeterministicRng(seed);
+    let mut values = Vec::with_capacity(BOOTSTRAP_REPLICATES);
+    for _ in 0..BOOTSTRAP_REPLICATES {
+        let mut replicate = SufficientStats::default();
+        for _ in 0..group_values.len() {
+            replicate.add(group_values[rng.index(group_values.len())]);
+        }
+        if let Some(value) = metric.value(&replicate) {
+            if value.is_finite() {
+                values.push(value);
+            }
+        }
+    }
+    report.valid_bootstrap_replicates = values.len();
+    if values.len() as f64 >= BOOTSTRAP_REPLICATES as f64 * REQUIRED_VALID_BOOTSTRAP_FRACTION {
+        values.sort_by(f64::total_cmp);
+        let low = ((values.len() - 1) as f64 * 0.025).floor() as usize;
+        let high = ((values.len() - 1) as f64 * 0.975).ceil() as usize;
+        report.cluster_bootstrap_95_ci = Some([values[low], values[high]]);
+    }
+    report
+}
+
+/// Score the independently sampled NANO-013 outcome records in a run directory.
+pub fn score_run(run_dir: &Path) -> Result<String, String> {
+    let root = run_dir.join("rescue-controller");
+    let manifest_path = root.join("audit-sampling-manifest.json");
+    let results_path = root.join("blinded-audit-results.jsonl");
+    let manifest_bytes = read_regular_file(&manifest_path)?;
+    let manifest_digest = sha256_hex(&manifest_bytes);
+    let manifest: SamplingManifest = serde_json::from_slice(&manifest_bytes)
+        .map_err(|error| format!("invalid sampling manifest JSON: {error}"))?;
+    if manifest.schema_version != "nano-rescue-audit-sampling-v1" {
+        return Err("unsupported sampling manifest schema_version".to_owned());
+    }
+    if manifest.run_id.trim().is_empty() || manifest.sampled_windows.is_empty() {
+        return Err("sampling manifest must declare a run_id and non-empty sample".to_owned());
+    }
+
+    let mut sample_by_id = BTreeMap::new();
+    for sample in &manifest.sampled_windows {
+        if sample.window_id.trim().is_empty()
+            || sample.parent_group_id.trim().is_empty()
+            || sample.trajectory_id.trim().is_empty()
+            || sample.stratum_id.trim().is_empty()
+            || !sample.inclusion_probability.is_finite()
+            || sample.inclusion_probability <= 0.0
+            || sample.inclusion_probability > 1.0
+        {
+            return Err(format!("invalid sampled-window identity/probability: {}", sample.window_id));
+        }
+        if sample_by_id.insert(sample.window_id.as_str(), sample).is_some() {
+            return Err(format!("duplicate sampled window in manifest: {}", sample.window_id));
+        }
+    }
+
+    let results_bytes = read_regular_file(&results_path)?;
+    let rows = parse_results(&results_bytes)?;
+    if rows.len() != manifest.sampled_windows.len() {
+        return Err(format!(
+            "sample/result cardinality mismatch: {} manifest windows, {} result records",
+            manifest.sampled_windows.len(),
+            rows.len()
+        ));
+    }
+    let result_digest_binding = manifest_digest.clone();
+    let mut seen = BTreeSet::new();
+    let mut groups = BTreeMap::<String, SufficientStats>::new();
+    let mut trajectories = BTreeSet::new();
+    let mut evaluated = 0usize;
+    let mut failed = 0usize;
+    let mut unavailable = 0usize;
+    let mut observed_cost = 0.0;
+    let mut cost_unit: Option<String> = None;
+    let mut total = SufficientStats::default();
+
+    for row in &rows {
+        if row.schema_version != "nano-rescue-audit-result-v1"
+            || row.run_id != manifest.run_id
+            || row.sampling_manifest_sha256 != result_digest_binding
+        {
+            return Err(format!("result {} has mismatched schema, run, or manifest digest", row.window_id));
+        }
+        if row.labels_revealed_to_policy {
+            return Err(format!("result {} declares label leakage to policy", row.window_id));
+        }
+        if !seen.insert(row.window_id.as_str()) {
+            return Err(format!("duplicate result window: {}", row.window_id));
+        }
+        let sample = sample_by_id
+            .get(row.window_id.as_str())
+            .ok_or_else(|| format!("result window {} is absent from sampling manifest", row.window_id))?;
+        if row.parent_group_id != sample.parent_group_id
+            || row.trajectory_id != sample.trajectory_id
+            || row.stratum_id != sample.stratum_id
+            || !close_probability(row.inclusion_probability, sample.inclusion_probability)
+        {
+            return Err(format!("result {} does not match sampled identity/probability", row.window_id));
+        }
+        if !row.inclusion_probability.is_finite()
+            || row.inclusion_probability <= 0.0
+            || row.inclusion_probability > 1.0
+        {
+            return Err(format!("invalid inclusion probability for {}", row.window_id));
+        }
+        if !row.audit_reference_cost.is_finite()
+            || row.audit_reference_cost < 0.0
+            || row.audit_cost_unit.trim().is_empty()
+        {
+            return Err(format!("invalid audit reference cost/unit for {}", row.window_id));
+        }
+        match &cost_unit {
+            Some(unit) if unit != &row.audit_cost_unit => {
+                return Err("audit reference costs use mixed units".to_owned());
+            }
+            None => cost_unit = Some(row.audit_cost_unit.clone()),
+            _ => {}
+        }
+        match row.reference_status.as_str() {
+            "evaluated" if row.severe_event.is_some() && row.physical_integrity_pass.is_some() => {
+                evaluated += 1;
+            }
+            "reference_failed" if row.severe_event.is_none() && row.physical_integrity_pass.is_none() => {
+                failed += 1;
+            }
+            "reference_unavailable" if row.severe_event.is_none() && row.physical_integrity_pass.is_none() => {
+                unavailable += 1;
+            }
+            _ => {
+                return Err(format!("reference status/outcome labels disagree for {}", row.window_id));
+            }
+        }
+        trajectories.insert(row.trajectory_id.clone());
+        observed_cost += row.audit_reference_cost;
+        let row_stats = SufficientStats::from_row(row);
+        total.add(row_stats);
+        groups.entry(row.parent_group_id.clone()).or_default().add(row_stats);
+    }
+
+    if seen.len() != sample_by_id.len() {
+        return Err("one or more preregistered sample windows have no outcome record".to_owned());
+    }
+    let mut warnings = Vec::new();
+    if groups.len() < MIN_GROUPS_FOR_INTERVAL {
+        warnings.push(format!(
+            "Only {} independent parent groups are represented; cluster-bootstrap intervals are withheld until at least {} groups are available.",
+            groups.len(),
+            MIN_GROUPS_FOR_INTERVAL
+        ));
+    }
+    if failed + unavailable > 0 {
+        warnings.push(
+            "Some sampled windows lack reference labels. Recall and physical-integrity estimates are conditional on successful reference outcomes; known-label false-alarm burden is not a complete-population estimate. Do not silently treat missing outcomes as safe.".to_owned()
+        );
+    }
+    if groups.len() < 20 {
+        warnings.push(
+            "Fewer than 20 independent parent groups: even when an interval is emitted, tail-risk and worst-group estimates may be unstable.".to_owned()
+        );
+    }
+
+    let report = ScoreReport {
+        schema_version: "nano-rescue-score-v1",
+        run_id: manifest.run_id,
+        sampling_manifest_sha256: manifest_digest,
+        sampled_windows: rows.len(),
+        evaluated_reference_windows: evaluated,
+        reference_failed_windows: failed,
+        reference_unavailable_windows: unavailable,
+        independent_parent_groups: groups.len(),
+        independent_trajectories: trajectories.len(),
+        weighted_estimated_population_windows: total.weight_total,
+        observed_audit_reference_cost: observed_cost,
+        horvitz_thompson_estimated_population_audit_reference_cost: total.weighted_reference_cost,
+        audit_cost_unit: cost_unit.unwrap_or_else(|| "unknown".to_owned()),
+        reference_outcome_coverage: estimate(
+            Metric::ReferenceOutcomeCoverage,
+            &groups,
+            &total,
+            0x8ad1_ee31_15ca_77a1,
+            "Horvitz-Thompson weighted evaluated-outcome share of the eligible-window population.",
+        ),
+        policy_reference_query_fraction: estimate(
+            Metric::QueryFraction,
+            &groups,
+            &total,
+            0xa904_2d31_99c7_10ef,
+            "Design-weighted fraction of eligible windows for which the policy requested a reference; independent of whether the evaluator reference later succeeded.",
+        ),
+        severe_event_recall_on_evaluated_references: estimate(
+            Metric::SevereEventRecall,
+            &groups,
+            &total,
+            0x17d3_5a2c_91b4_06ef,
+            "Design-weighted recall among successfully evaluated reference outcomes only; not a population recall estimate when any reference labels are missing.",
+        ),
+        false_alarm_rate_among_evaluated_nonsevere_windows: estimate(
+            Metric::FalseAlarmRate,
+            &groups,
+            &total,
+            0x36c8_21af_73d9_450b,
+            "Design-weighted false-alarm rate among successfully evaluated non-severe windows only; conditional on observed reference labels.",
+        ),
+        known_label_false_alarm_burden_per_estimated_population_window: estimate(
+            Metric::FalseAlarmBurden,
+            &groups,
+            &total,
+            0xc0f1_25b8_794e_631d,
+            "Known-label false alarms divided by estimated eligible-window population. With missing reference labels this is a lower bound, not the total false-alarm burden.",
+        ),
+        physical_integrity_failure_rate_on_evaluated_references: estimate(
+            Metric::PhysicalIntegrityFailureRate,
+            &groups,
+            &total,
+            0x5e20_4f7a_d193_86bc,
+            "Design-weighted physical-integrity failure rate among outcomes with a known physical-integrity label; conditional if any labels are missing.",
+        ),
+        interval_method: format!(
+            "Approximate percentile bootstrap resampling independent parent_group_id clusters with replacement; {BOOTSTRAP_REPLICATES} deterministic replicates. A 95% interval is emitted only with at least {MIN_GROUPS_FOR_INTERVAL} parent groups and at least {:.0}% valid replicates. This is not an exact design-based finite-population variance estimator.",
+            REQUIRED_VALID_BOOTSTRAP_FRACTION * 100.0
+        ),
+        warnings,
+    };
+    serde_json::to_string_pretty(&report).map_err(|error| format!("serialize score report: {error}"))
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    fn row(
+        window: &str,
+        parent: &str,
+        pi: f64,
+        status: &str,
+        severe: Option<bool>,
+        trigger: bool,
+    ) -> AuditResult {
+        AuditResult {
+            schema_version: "nano-rescue-audit-result-v1".to_owned(),
+            run_id: "test".to_owned(),
+            sampling_manifest_sha256: "a".repeat(64),
+            window_id: window.to_owned(),
+            parent_group_id: parent.to_owned(),
+            trajectory_id: format!("trajectory-{parent}"),
+            stratum_id: "family".to_owned(),
+            inclusion_probability: pi,
+            reference_status: status.to_owned(),
+            severe_event: severe,
+            physical_integrity_pass: severe.map(|is_severe| !is_severe),
+            policy_triggered_reference: trigger,
+            labels_revealed_to_policy: false,
+            audit_reference_cost: 1.0,
+            audit_cost_unit: "USD".to_owned(),
+        }
+    }
+
+    #[test]
+    fn design_weights_change_the_recall_estimate() {
+        let severe_high_weight = row("a", "parent-a", 0.1, "evaluated", Some(true), true);
+        let severe_low_weight = row("b", "parent-b", 0.5, "evaluated", Some(true), false);
+        let mut stats = SufficientStats::default();
+        stats.add(SufficientStats::from_row(&severe_high_weight));
+        stats.add(SufficientStats::from_row(&severe_low_weight));
+        let recall = Metric::SevereEventRecall.value(&stats).unwrap();
+        assert!((recall - (10.0 / 12.0)).abs() < 1.0e-12);
+    }
+
+    #[test]
+    fn missing_reference_labels_are_not_counted_as_negative_events() {
+        let evaluated = row("a", "parent-a", 0.5, "evaluated", Some(true), true);
+        let missing = row("b", "parent-b", 0.5, "reference_failed", None, false);
+        let mut stats = SufficientStats::default();
+        stats.add(SufficientStats::from_row(&evaluated));
+        stats.add(SufficientStats::from_row(&missing));
+        assert!((Metric::ReferenceOutcomeCoverage.value(&stats).unwrap() - 0.5).abs() < 1.0e-12);
+        assert_eq!(Metric::SevereEventRecall.value(&stats), Some(1.0));
+        assert_eq!(Metric::FalseAlarmRate.value(&stats), None);
+    }
+
+    #[test]
+    fn intervals_are_withheld_for_too_few_independent_groups() {
+        let row = row("a", "parent-a", 0.5, "evaluated", Some(true), true);
+        let mut groups = BTreeMap::new();
+        groups.insert("parent-a".to_owned(), SufficientStats::from_row(&row));
+        let total = *groups.values().next().unwrap();
+        let result = estimate(
+            Metric::SevereEventRecall,
+            &groups,
+            &total,
+            1234,
+            "test",
+        );
+        assert_eq!(result.cluster_bootstrap_95_ci, None);
+        assert_eq!(result.valid_bootstrap_replicates, 0);
+    }
+}
