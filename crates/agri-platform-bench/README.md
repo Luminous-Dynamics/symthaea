@@ -57,6 +57,22 @@ Targets for this research tranche:
 
 External dataset availability is not permission to ingest or redistribute its data. Any future data addition must pin provenance, rights, scope, units, geography/time coverage, and the exact referenced artifacts.
 
+## Safety and evaluation references (reviewed 2026-10-17)
+
+The next qualification layer should use the current agricultural autonomy safety guidance as a design input, not claim compliance by citation alone:
+
+- ISO 18497-1:2024, machine design principles and residual-risk/safe-work information for partially automated, semi-autonomous and autonomous agricultural machinery: https://www.iso.org/standard/82684.html
+- ISO 18497-4:2024, verification methods and validation principles for such machinery: https://www.iso.org/standard/82688.html
+- Almtireen & Ryalat, *Robotics in Precision Agriculture: Task-, Platform-, and Evaluation-Oriented Review* (2026): https://www.mdpi.com/2218-6581/15/4/81
+- Polanía et al., *Control System for the Navigation of the Agricultural Robots: A Review* (2026): https://onlinelibrary.wiley.com/doi/10.1002/rob.70199
+- Barros et al., *Agrivoltaic Systems: Systematic Review and Meta-Analysis Relating to Energy, Soil, and Crop Parameters* (2026): https://www.annualreviews.org/content/journals/10.1146/annurev-environ-121224-073319
+
+The 2026 field-robotics review explicitly separates lab, greenhouse, single-season open-field and multi-season/multi-site evaluation. It also highlights task-specific throughput/quality metrics, uptime, failure recovery and near-miss/human-proximity reporting. Therefore a result from one setting must not be compared as equivalent to a result from another without protocol/domain alignment. A navigation tracking-error target such as 5 cm may be useful for some tasks, but is not a universal acceptance target: tolerances must derive from tool geometry, crop damage, site and risk.
+
+The 2026 agrivoltaics meta-analysis includes 66 studies and reports heterogeneous configurations and crop outcomes. Use crop output and energy output together with site-specific LER, water/microclimate, machinery access, ecology and whole-life cost; do not assume panel density or yield in a different climate transfers to a local site.
+
+A standards reference does not establish legal compliance, safety certification, or readiness. A real-machine safety case must be reviewed by appropriately qualified agricultural machinery and functional-safety specialists, with South African legal requirements assessed before any field operation.
+
 ## Cross-stack ownership
 
 This crate is a small, independent screening/benchmark surface. It composes with, but does not replace:
