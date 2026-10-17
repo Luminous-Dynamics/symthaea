@@ -10,7 +10,7 @@ The accompanying research contract identifies the official DESI DR2 BAO ΛCDM + 
 - https://data.desi.lbl.gov/public/papers/y3/bao-cosmo-params/dr2_vac_dr2_bao-cosmo-params_v1.0.sha256sum
 - https://data.desi.lbl.gov/public/papers/y3/bao-cosmo-params/cobaya/base/desi-bao-all/
 
-The official audit mode requires the checksum manifest and explicit relative-path/local-file mappings. Each file is hashed and compared against the exact manifest entry before the very same in-memory bytes are parsed. If one digest mismatches, no weighted summary is emitted. All chain headers must match exactly before samples are combined. The separately named `--summary-unverified` mode exists for synthetic/local exploration only and labels every input as not checksum-verified.
+The official audit mode requires the checksum manifest and explicit relative-path/local-file mappings. Each file is hashed and compared against the exact manifest entry before the very same in-memory bytes are parsed. If one digest mismatches, no weighted summary is emitted. All chain headers must match exactly before samples are combined. Duplicate manifest-relative paths and duplicate local files (including aliases resolving to the same file) are rejected to prevent accidental double-counting. The separately named `--summary-unverified` mode exists for synthetic/local exploration only and labels every input as not checksum-verified.
 
 Verify one downloaded artifact separately, when needed for intake triage:
 
