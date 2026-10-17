@@ -184,7 +184,43 @@ Use one policy/evidence interface across lanes where possible, but keep distinct
 
 At the time this version was authored, **no one task above is declared rights-cleared and experimentally qualified by this protocol**. Treat that as a concrete admission blocker, not permission to silently choose whichever public files happen to be downloadable. The immediate deliverable is a source/rights decision record plus a reproducible baseline package; no real scientific improvement can be claimed until one lane clears admission.
 
-## 14. Interoperability with MADE (ICML 2026)
+## 14. Candidate benchmark: experiment-grounded nanophotonic inverse design
+
+This is a **separate measured-photonics lane**, not a proxy for atomistic nanocrystal chemistry or material stability. It offers a useful paradigm shift because the outcome can be tied to fabricated geometries and measured spectra rather than treating simulator scores as reality.
+
+The [MOCLIP Nature Communications paper](https://www.nature.com/articles/s41467-026-76714-x), published 19 August 2026, reports a silicon-on-glass metasurface dataset with 466,537 unique measured geometry–spectrum pairs, 42 design degrees of freedom, inverse-design throughput around (2\times10^5) target spectra/s on GPU, and source-reported latent optimization accuracy above 95%. Its public repository offers a 10,000-sample subset. These are **source-reported reference numbers**, not independently reproduced Symthaea results. The paper also reports fabrication and hyperspectral measurement; a benchmark should exploit that empirical link instead of scoring only generated spectra.
+
+### Task contract and controls
+
+**Input:** a target spectral amplitude profile and allowed geometry/fabrication constraints.
+
+**Decision:** return a ranked, deduplicated list of geometries plus uncertainty, expected constraint/yield risk, and the reason each candidate is selected.
+
+**Outcome:** the candidate's measured spectrum, deviations from target by wavelength/polarization, hard fabrication constraint results, and actual per-candidate fabrication/metrology cost.
+
+Mandatory comparators are: direct nearest-neighbor/library search, the published MOCLIP method where rights permit, a simple diversity-aware selector, an uncertainty-aware selector, a constrained Bayesian/latent-space optimizer if the exact task supports it, and random valid geometries. Every method must use the same candidate pool, initial information, feature availability, constraints, and defined evaluation budget. A training-free retrieval baseline is important: a larger model is not a discovery advance if it only matches a library lookup at more total cost.
+
+### Evaluation protocol
+
+1. **Historical reproduction:** pin exact code/checkpoint/data artifacts, split, preprocessing, wavelength/polarization channels, normalization, and the publication's exact Top-k and MSE formulas. Reconstruct reported metrics before adding new ones.
+2. **Leakage-resistant generalization:** retain a random held-out split only for comparability, then add group-held-out tests by wafer/substrate, geometry family, fabrication batch, or target-spectrum family. Keep replicas of the same geometry and near-duplicates in the same partition. Freeze exact grouping before training or candidate selection.
+3. **Fabrication-robust inverse design:** perturb design variables within measured process tolerances and report feasible-yield curves, lower-tail spectral quality, hard-constraint violation rates, and risk-sensitive quality (e.g. worst-decile quality). The tolerance model must come from source/facility process evidence, not arbitrary noise injected only to improve a robustness score.
+4. **Calibrated abstention:** on independent group holdouts, evaluate whether predicted spectral-error intervals cover measurements at their declared levels, and let the policy abstain when uncertainty or fabrication yield is insufficient. Measure coverage, interval width, selective-risk curves and failure-detection recall.
+5. **Prospective measurement:** select candidates before measurements exist; preserve candidate IDs, model/policy revision, expected outcome, all rejected candidates, and call receipts. Fabricate/measure under randomized order and include controls and replicates. Report measured success per *all-in* resource budget, including failed fabrication, unsuccessful candidates, repeats, retries, and metrology.
+
+### Proposed benchmark targets (design goals, not achieved results)
+
+- **Baseline gate:** reproduce the published metrics from pinned eligible artifacts with the published formulas and disclose the full random/group-held-out gap. Do not require an arbitrary tolerance until the upstream evaluation and measurement noise are exactly specified.
+- **Generalization gate:** report separate performance for each held-out group and each major geometry/fabrication regime; no score averaged across groups may hide a catastrophic subgroup failure.
+- **Calibration gate:** as a first target, nominal 90% spectral-error intervals should achieve 85–95% empirical coverage on genuinely held-out groups, with interval width and selective-risk curves reported. Coverage alone is insufficient if intervals are uninformatively wide.
+- **Budget-efficiency gate:** against the strongest eligible baseline, seek either at least **+10 percentage points** prospective measured-hit rate at equal fabrication/metrology budget, or at least **20% lower all-in cost** at matched measured hit-rate/regret, without increased hard-constraint violations. Preregister the spectral objective and hit threshold.
+- **Robustness gate:** report nominal and tolerance-perturbed feasible yield separately; a proposed initial target is at least 90% feasibility over the empirically justified tolerance distribution. Treat this as a target to review with process engineers, not a universal physical constant.
+
+### Current admission status
+
+This is a candidate task card only. The MOCLIP code repository's MIT license does **not** by itself establish the terms for the measured data, checkpoint weights, or derived artifacts. Do not download, redistribute, or treat the model/data as rights-cleared until those exact terms and attribution requirements are resolved. See [NANO-004](https://github.com/Luminous-Dynamics/symthaea/issues/7531). The 10k subset can support a retrospective harness only after its archive/data terms are verified; prospective measurement requires an authorized facility and independent measured outcomes. Until then, implement the schemas and synthetic negative controls, but do not make a scientific-performance claim.
+
+## 15. Interoperability with MADE (ICML 2026)
 
 Before inventing a new closed-loop benchmark stack, evaluate [MADE: Benchmark Environments for Closed-Loop Materials Discovery](https://proceedings.mlr.press/v306/malik26a.html) and its [official implementation](https://github.com/diffractivelabs/MADE). MADE models discovery as an iterative campaign under a constrained oracle budget, using convex-hull stability tasks and interchangeable generators, filters, scorers, planners and oracles. Its release lists AF, EF, AUDC and mSUN as discovery metrics and provides per-episode trajectories, summaries, configs and logs. The ICML 2026 paper reports that adaptive planning becomes more important as the search space grows.
 
@@ -210,7 +246,7 @@ A preliminary read of the upstream release identifies specific items that the in
 
 These points are an audit checklist derived from source inspection, not a claim that MADE is invalid. Preserve the official results and names when reproducing the paper, and publish any corrected or extended metric as a separately named metric.
 
-## 15. Research references
+## 16. Research references
 
 - Usman et al. (2026), *Benchmarking Machine-Learning Interatomic Potentials for Dynamical Stability in Inorganic Semiconductor Nanocrystals: A CdSe Case Study*, preprint: https://arxiv.org/abs/2609.15299
 - Xu et al. (2026), *Benchmarking universal machine learning interatomic potentials for supported nanoparticles: decoupling energy accuracy from structural exploration*, npj Computational Materials 12, 189: https://www.nature.com/articles/s41524-026-02043-8
