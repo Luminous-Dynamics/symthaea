@@ -1,0 +1,63 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "title": "Symthaea synthetic cyber hunt event v1",
+  "type": "object",
+  "additionalProperties": false,
+  "required": [
+    "schema_version",
+    "event_id",
+    "event_time_ms",
+    "ingest_time_ms",
+    "host_id",
+    "principal_id",
+    "source",
+    "event_type",
+    "outcome",
+    "details",
+    "synthetic"
+  ],
+  "properties": {
+    "schema_version": {
+      "const": "cyber-hunt-event-v1"
+    },
+    "event_id": {
+      "type": "string",
+      "pattern": "^evt-[0-9a-f]{16}$"
+    },
+    "event_time_ms": {
+      "type": "integer"
+    },
+    "ingest_time_ms": {
+      "type": "integer"
+    },
+    "host_id": {
+      "type": "string",
+      "minLength": 3
+    },
+    "principal_id": {
+      "type": "string",
+      "minLength": 1
+    },
+    "source": {
+      "type": "string",
+      "minLength": 2
+    },
+    "event_type": {
+      "type": "string",
+      "minLength": 2
+    },
+    "outcome": {
+      "type": "string",
+      "minLength": 1
+    },
+    "details": {
+      "type": "object",
+      "additionalProperties": {
+        "type": "string"
+      }
+    },
+    "synthetic": {
+      "const": true
+    }
+  }
+}
