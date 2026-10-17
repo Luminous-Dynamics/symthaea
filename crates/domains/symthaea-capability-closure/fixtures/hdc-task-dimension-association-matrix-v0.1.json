@@ -1,0 +1,679 @@
+{
+  "schema": "luminous.symthaea.hdc_task_dimension_association_matrix",
+  "version": "0.1.0",
+  "status": "literature_grounded_hypotheses_not_symthaea_measurements",
+  "targets_are_results": false,
+  "selection_principle": "Choose encoding geometry and association structure for the task first; then select the smallest dimension that passes predeclared held-out quality/reliability constraints. Keep semantic width and local dynamical width separate.",
+  "dimension_policy": {
+    "static_default_coarse_sweep": [
+      1024,
+      2048,
+      4096,
+      8192,
+      16384
+    ],
+    "capacity_sensitive_extension": [
+      32768,
+      65536
+    ],
+    "exploratory_continuous_dynamics": [
+      131072,
+      262144
+    ],
+    "rule": "Do not spend 128K/256K effort across every static task by default. Expand only when the smaller sweep fails a declared criterion or the workload is a specific continuous-dynamics experiment."
+  },
+  "representation_families": [
+    {
+      "id": "bsc_binary",
+      "type": "packed binary",
+      "best_first_hypothesis": [
+        "exact XOR binding",
+        "compact associative keys",
+        "robust Hamming cleanup"
+      ],
+      "caveat": "Bundling majority introduces retrieval interference; record fan-in and full-index false-positive rate."
+    },
+    {
+      "id": "map_bipolar",
+      "type": "bipolar {-1,+1}",
+      "best_first_hypothesis": [
+        "prototype classification",
+        "role-filler composition",
+        "similarity retrieval"
+      ],
+      "caveat": "Compare majority / normalized bundling and classifier variants; storage and operations differ from packed binary."
+    },
+    {
+      "id": "continuous_f32",
+      "type": "continuous float32",
+      "best_first_hypothesis": [
+        "graded numeric attributes",
+        "continuous state",
+        "LTC/CfC dynamics",
+        "temporal prediction/control"
+      ],
+      "caveat": "4 bytes per coordinate per vector; report network working set, temporaries and movement, not just vector bytes."
+    },
+    {
+      "id": "fahrr_complex",
+      "type": "complex-valued",
+      "best_first_hypothesis": [
+        "research-only comparison for phase-rich associations"
+      ],
+      "caveat": "Not an assumption about the active Symthaea path; include only with a justified task and equal-boundary baseline."
+    }
+  ],
+  "tasks": [
+    {
+      "id": "symbolic_key_value",
+      "task": "Symbolic facts, attribute lookup, compositional records",
+      "associations": [
+        "role_filler_binding",
+        "key_value_record",
+        "bundle_fields"
+      ],
+      "first_representation_arms": [
+        "bsc_binary",
+        "map_bipolar"
+      ],
+      "dimensions": [
+        1024,
+        2048,
+        4096,
+        8192,
+        16384,
+        32768
+      ],
+      "variables": [
+        "records_in_index",
+        "fields_per_record",
+        "bundle_fan_in",
+        "distractor_density"
+      ],
+      "primary_metrics": [
+        "field_retrieval_accuracy",
+        "false_positive_rate_at_full_index_size",
+        "recall_at_1",
+        "p95_lookup_latency",
+        "bytes_per_record"
+      ],
+      "decision_rule": "Choose smallest width satisfying field-retrieval and corpus-scale false-match constraints.",
+      "capacity_curve_example": "crates/core/symthaea-core/examples/association_capacity_curves.rs"
+    },
+    {
+      "id": "tabular_few_shot",
+      "task": "Tabular classification and few-shot generalization",
+      "associations": [
+        "key_value_encoding",
+        "correlated_numeric_level_vectors",
+        "random_projection_control"
+      ],
+      "first_representation_arms": [
+        "map_bipolar",
+        "bsc_binary"
+      ],
+      "dimensions": [
+        1024,
+        2048,
+        4096,
+        8192,
+        16384,
+        32768
+      ],
+      "variables": [
+        "level_correlation_length",
+        "training_samples_per_class",
+        "number_of_classes",
+        "prototype_update_rule"
+      ],
+      "primary_metrics": [
+        "held_out_accuracy",
+        "macro_f1",
+        "calibration_error",
+        "few_shot_learning_curve",
+        "training_and_inference_cost"
+      ],
+      "baselines": [
+        "linear_svm",
+        "lda",
+        "ridge_or_logistic_classifier"
+      ],
+      "decision_rule": "Select width and code geometry on validation splits only; report the cost-quality frontier."
+    },
+    {
+      "id": "attribute_factorization",
+      "task": "Object/scene retrieval and recovery of bound attributes",
+      "associations": [
+        "object_location_time_size_binding",
+        "correlated_level_codebooks",
+        "iterative_factorization_control"
+      ],
+      "first_representation_arms": [
+        "map_bipolar",
+        "continuous_f32"
+      ],
+      "dimensions": [
+        2048,
+        4096,
+        8192,
+        16384,
+        32768
+      ],
+      "variables": [
+        "numeric_code_correlation_length",
+        "factor_codebook_size",
+        "factor_count",
+        "factor_noise"
+      ],
+      "primary_metrics": [
+        "exact_factor_recovery",
+        "attribute_error",
+        "spurious_solution_rate",
+        "iterations_to_converge"
+      ],
+      "decision_rule": "Jointly tune width and code correlation; higher dimensionality does not automatically resolve highly correlated factors."
+    },
+    {
+      "id": "associative_cleanup",
+      "task": "Noisy associative cleanup and nearest-neighbour recall",
+      "associations": [
+        "cleanup_memory",
+        "similarity_search",
+        "keyed_association_retrieval"
+      ],
+      "first_representation_arms": [
+        "bsc_binary",
+        "map_bipolar"
+      ],
+      "dimensions": [
+        2048,
+        4096,
+        8192,
+        16384,
+        32768,
+        65536
+      ],
+      "variables": [
+        "index_size",
+        "bit_flip_rate",
+        "bundle_fan_in",
+        "distractor_similarity"
+      ],
+      "primary_metrics": [
+        "recall_at_1",
+        "recall_at_k",
+        "false_accept_rate",
+        "corruption_robustness_curve",
+        "queries_per_second",
+        "index_bytes"
+      ],
+      "decision_rule": "Measure errors at the intended production index size, not only on a small vocabulary.",
+      "capacity_curve_example": "crates/core/symthaea-core/examples/association_capacity_curves.rs"
+    },
+    {
+      "id": "ordered_sequence",
+      "task": "Ordered events, n-grams, short text, and sequence similarity",
+      "associations": [
+        "positional_permutation",
+        "ngram_binding",
+        "bundled_sequence",
+        "binding_sequence"
+      ],
+      "first_representation_arms": [
+        "bsc_binary",
+        "map_bipolar"
+      ],
+      "dimensions": [
+        2048,
+        4096,
+        8192,
+        16384,
+        32768
+      ],
+      "variables": [
+        "sequence_length",
+        "ngram_order",
+        "insertion_deletion_substitution_noise",
+        "order_sensitive_vs_unordered_controls"
+      ],
+      "primary_metrics": [
+        "sequence_retrieval_accuracy",
+        "ranking_quality",
+        "edit_noise_robustness",
+        "order_sensitivity",
+        "encoding_latency"
+      ],
+      "decision_rule": "Compare association scheme and sequence length before assuming that a larger D solves order interference."
+    },
+    {
+      "id": "sensor_classification",
+      "task": "Sensor/activity/EMG/speech-feature classification",
+      "associations": [
+        "correlated_scalar_levels",
+        "key_value_features",
+        "random_projection",
+        "optional_temporal_encoding"
+      ],
+      "first_representation_arms": [
+        "bsc_binary",
+        "map_bipolar"
+      ],
+      "dimensions": [
+        1024,
+        2048,
+        4096,
+        8192,
+        16384,
+        32768
+      ],
+      "variables": [
+        "subject_or_session_split",
+        "sampling_irregularity",
+        "drift",
+        "window_length"
+      ],
+      "primary_metrics": [
+        "subject_held_out_accuracy",
+        "macro_f1",
+        "early_classification_quality",
+        "latency",
+        "drift_recovery"
+      ],
+      "decision_rule": "Benchmark static features separately from temporal-order and continuous-state variants."
+    },
+    {
+      "id": "continuous_dynamics",
+      "task": "Irregularly sampled prediction, temporal association, and control",
+      "associations": [
+        "continuous_state_evolution",
+        "LTC_CfC",
+        "semantic_to_local_dynamical_projection"
+      ],
+      "first_representation_arms": [
+        "continuous_f32"
+      ],
+      "semantic_dimensions": [
+        16384,
+        32768,
+        65536,
+        131072,
+        262144
+      ],
+      "local_dynamical_dimensions": [
+        1024,
+        4096,
+        16384,
+        32768
+      ],
+      "variables": [
+        "dt_schedule",
+        "tau_gate_parameters",
+        "projection_family",
+        "input_discontinuities",
+        "long_horizon_disturbance"
+      ],
+      "primary_metrics": [
+        "trajectory_error_vs_refinement_checked_reference",
+        "tau_gate_equilibrium_distortion",
+        "held_out_forecast_or_control_quality",
+        "p95_p99_latency",
+        "resident_and_temporary_bytes",
+        "bytes_moved",
+        "system_energy"
+      ],
+      "decision_rule": "Keep 128K/256K exploratory; promote a profile only after operator, trajectory, task-quality and resource/cost gates pass."
+    },
+    {
+      "id": "robotics_edge_world",
+      "task": "Robotics and edge-world state with low-latency actions",
+      "associations": [
+        "keyed_object_relationships",
+        "spatial_level_codes",
+        "separate_motion_state"
+      ],
+      "first_representation_arms": [
+        "bsc_binary",
+        "map_bipolar",
+        "continuous_f32"
+      ],
+      "semantic_dimensions": [
+        8192,
+        16384,
+        32768,
+        65536
+      ],
+      "local_dynamical_dimensions": [
+        1024,
+        4096,
+        16384
+      ],
+      "variables": [
+        "scene_complexity",
+        "object_relation_count",
+        "control_period",
+        "sensor_dropout"
+      ],
+      "primary_metrics": [
+        "task_success",
+        "state_estimation_error",
+        "deadline_miss_rate",
+        "safety_constraint_violations",
+        "worst_case_latency",
+        "memory"
+      ],
+      "decision_rule": "Separate retrieval/composition from control-state evolution and measure task outcomes end to end."
+    },
+    {
+      "id": "relational_graph",
+      "task": "Relational graphs, multi-hop lookup, hierarchical reasoning",
+      "associations": [
+        "edge_role_binding",
+        "path_composition",
+        "hierarchical_or_segmented_memory",
+        "flat_bundle_control"
+      ],
+      "first_representation_arms": [
+        "bsc_binary",
+        "map_bipolar"
+      ],
+      "dimensions": [
+        4096,
+        8192,
+        16384,
+        32768,
+        65536
+      ],
+      "variables": [
+        "hop_depth",
+        "branching_factor",
+        "graph_size",
+        "distractor_paths"
+      ],
+      "primary_metrics": [
+        "exact_path_recovery",
+        "invalid_path_rejection",
+        "query_cost_vs_depth",
+        "memory_growth",
+        "error_accumulation"
+      ],
+      "decision_rule": "Test whether hierarchy/segmentation reduces accumulated interference more cheaply than increasing width."
+    },
+    {
+      "id": "online_adaptation",
+      "task": "Online adaptation under distribution drift",
+      "associations": [
+        "prototype_updates",
+        "regenerative_learning",
+        "continuous_state_only_if_temporal"
+      ],
+      "first_representation_arms": [
+        "bsc_binary",
+        "map_bipolar"
+      ],
+      "dimensions": [
+        1024,
+        4096,
+        8192,
+        16384,
+        32768
+      ],
+      "variables": [
+        "drift_rate",
+        "update_budget",
+        "old_task_revisit_rate",
+        "memory_budget"
+      ],
+      "primary_metrics": [
+        "samples_to_recover",
+        "retained_old_task_accuracy",
+        "forgetting",
+        "update_latency",
+        "memory_growth"
+      ],
+      "decision_rule": "Measure new-task adaptation and old-task retention together; dimension alone is not a continual-learning strategy."
+    },
+    {
+      "id": "approximate_hardware",
+      "task": "Quantized/analogue/in-memory hardware path",
+      "associations": [
+        "versioned_equivalent_of_a_qualified_kernel",
+        "declared_quantization_or_device_noise"
+      ],
+      "first_representation_arms": [
+        "bsc_binary",
+        "map_bipolar",
+        "continuous_f32"
+      ],
+      "dimensions": [
+        "hardware_feasible_matched_sweep"
+      ],
+      "variables": [
+        "precision",
+        "write_verify_policy",
+        "array_tiling",
+        "host_device_transfer",
+        "read_noise"
+      ],
+      "primary_metrics": [
+        "task_quality_delta",
+        "error_distribution",
+        "kernel_to_system_speedup",
+        "whole_system_energy",
+        "write_verify_cost",
+        "reproducibility"
+      ],
+      "decision_rule": "Never merge approximate/in-memory results into the exact-digital comparison without separate precision and system-boundary accounting."
+    }
+  ],
+  "cross_cutting_variables": [
+    "representation_type",
+    "dimension",
+    "association_encoding",
+    "codebook_correlation_length",
+    "training_algorithm",
+    "corpus_or_index_size",
+    "bundle_fan_in",
+    "noise_and_corruption",
+    "sequence_length_or_graph_depth",
+    "precision_and_hardware",
+    "measurement_boundary"
+  ],
+  "validation_rules": [
+    "Treat dimensions and association schemes as independent experimental factors.",
+    "Select D and encoding hyperparameters on training/validation splits, never the final test set.",
+    "Use chronological or subject/session-held-out splits for temporal and sensor tasks.",
+    "Report exact versus approximate precision tracks separately.",
+    "Record negative controls and losing configurations.",
+    "Unknown matrix cells are not passes.",
+    "Select the smallest dimension that meets predeclared quality, reliability, latency and memory constraints.",
+    "A dimension or representation recommendation is task-specific and versioned."
+  ],
+  "literature": [
+    {
+      "id": "L1",
+      "title": "Classification using hyperdimensional computing: a review with comparative analysis",
+      "year": 2025,
+      "url": "https://doi.org/10.1007/s10462-025-11181-2",
+      "observation": "Evaluates seven familiar HDC datasets plus 121 UCI datasets; key-value encodings perform strongly on tabular data and random projection can reduce encoding time.",
+      "boundary": "Does not establish the optimal Symthaea dimension or dynamical representation."
+    },
+    {
+      "id": "L2",
+      "title": "Optimal hyperdimensional representation for learning and cognitive computation",
+      "year": 2026,
+      "url": "https://doi.org/10.3389/frai.2026.1690492",
+      "observation": "Studies how dimension and code correlation trade off classification, retrieval and factorization; motivates a separate correlation-geometry sweep.",
+      "boundary": "Controlled synthetic/MNIST analysis, not a universal production ranking."
+    },
+    {
+      "id": "L3",
+      "title": "Hyperdimensional computing: a framework for stochastic computation and symbolic AI",
+      "year": 2024,
+      "url": "https://doi.org/10.1186/s40537-024-01010-8",
+      "observation": "Reviews role-filler binding, bundling, permutation, key-value records, sequence encodings and associative memory.",
+      "boundary": "General methods survey; task choices still require target-workload evaluation."
+    },
+    {
+      "id": "L4",
+      "title": "Liquid Time-constant Networks",
+      "year": 2021,
+      "url": "https://doi.org/10.1609/aaai.v35i9.16936",
+      "observation": "Grounds liquid networks in time-continuous recurrent dynamics with varying time constants and time-series prediction.",
+      "boundary": "Not evidence that every high-dimensional semantic component must be numerically evolved."
+    }
+  ],
+  "capacity_curve_experiment": {
+    "status": "source_added_not_executed",
+    "tracking_issue": "https://github.com/Luminous-Dynamics/symthaea/issues/7772",
+    "example": "crates/core/symthaea-core/examples/association_capacity_curves.rs",
+    "dimensions_continuous_bipolar_f32": [
+      1024,
+      2048,
+      4096,
+      8192,
+      16384,
+      32768,
+      65536
+    ],
+    "binary_bsc_dimension": 16384,
+    "odd_bundle_fan_in": [
+      1,
+      3,
+      7,
+      15,
+      31,
+      63
+    ],
+    "deterministic_seeds": 12,
+    "unrelated_pairs_per_seed_and_dimension": 32,
+    "raw_outputs": [
+      "target_similarity",
+      "best_distractor_similarity",
+      "margin",
+      "top1_hit",
+      "unrelated_pair_similarity"
+    ],
+    "interpretation_limits": [
+      "This is an authored executable, not an executed benchmark result.",
+      "Bipolar-valued ContinuousHV f32 is a binding/unbinding control; not native uniform[-1,1] ContinuousHV and not dynamical LTC/CfC qualification.",
+      "Small negative-pair samples cannot demonstrate extreme rare-event false-positive rates.",
+      "Choose thresholds on calibration data and use held-out evaluation; include number of comparisons made by the intended query pattern."
+    ],
+    "multiplicity_rule": "For per-comparison false-match probability p and M comparisons, use conservative union bound P(any false match) <= min(1, M*p). A single query over N records uses M=N; all unordered pairs use M=N*(N-1)/2.",
+    "sample_limit": {
+      "negative_pairs_per_dimension_representation": 384,
+      "zero_event_one_sided_95_percent_upper_bound_under_iid_fixed_threshold": "1 - 0.05^(1/n), approximately 3/n; for n=384 approximately 0.78%",
+      "implication": "Smoke-level distribution characterization only; threshold calibration and final held-out false-positive evaluation need separate samples. This sample cannot support extreme-tail guarantees."
+    },
+    "architecture_hypotheses": [
+      "Two-stage retrieval: HDC shortlist K candidates from N, then separately measure a verifier; include shortlist misses and false candidates in end-to-end metrics.",
+      "Segmented/hierarchical memory to lower candidate comparisons rather than increasing D by default.",
+      "For all-pairs tasks, count N*(N-1)/2 comparisons in risk calculations."
+    ],
+    "paired_width_design": {
+      "status": "added_source_level_control_not_runtime_verified",
+      "seed_identity_excludes_dimension": true,
+      "prefix_stability_runtime_guard": true,
+      "checked_widths": [
+        1024,
+        4096,
+        16384
+      ],
+      "reason": "Paired common prefixes isolate effect of adding coordinates from a change in codebook samples."
+    },
+    "score_comparability": {
+      "binary_bundle_retrieval_metric": "BinaryHV::cosine_similarity [-1,1]",
+      "binary_negative_pair_metric": "BinaryHV::cosine_similarity [-1,1]",
+      "continuous_bipolar_retrieval_metric": "ContinuousHV::similarity cosine [-1,1]",
+      "purpose": "Place raw target/distractor scores and margins on a comparable bipolar similarity scale.",
+      "caveat": "Comparable score scale does not imply identical representation algebra or noise distributions."
+    }
+  },
+  "progressive_precision_routing": {
+    "tracking_issue": "https://github.com/Luminous-Dynamics/symthaea/issues/7778",
+    "status": "executable_scaffold_added_not_executed",
+    "width_schedule": [
+      1024,
+      2048,
+      4096,
+      8192,
+      16384
+    ],
+    "baseline": "exhaustive highest-width reference on identical item IDs, queries, and held-out split",
+    "shortlist_k": [
+      1,
+      4,
+      8,
+      16,
+      32
+    ],
+    "candidate_gates": {
+      "prefix_coordinates_exactly_equal": true,
+      "held_out_recall_at_k_reference_minimum": 0.999,
+      "relevant_target_recall_loss_percentage_points_max": 0.1,
+      "compared_coordinates_reduction_minimum": 2,
+      "p95_p99_latency_or_task_deadline_regression_allowed": false
+    },
+    "metrics": [
+      "recall_at_k_vs_exhaustive_reference",
+      "relevant_target_recall",
+      "final_top1_agreement",
+      "false_acceptance_and_abstention_rate",
+      "mean_dimensions_evaluated_per_query",
+      "compared_coordinates_and_bytes_moved",
+      "p50_p95_p99_latency",
+      "index_storage_and_update_cost",
+      "energy_when_measurable",
+      "coverage_versus_error_curve"
+    ],
+    "controls": [
+      "unrelated_records",
+      "known_shared_fact_counts",
+      "correlated_near_duplicate_distractors",
+      "missing_properties",
+      "query_noise",
+      "non_nested_or_dimension_independent_negative_control"
+    ],
+    "rules": [
+      "Calibrate thresholds on a calibration split, freeze, then evaluate on distinct held-out data.",
+      "Low-D shortlist recall is a hard gate because the verifier cannot recover discarded candidates.",
+      "Support explicit abstain/refine decisions for ambiguous margins.",
+      "Count stored refinement data and index update cost; prefix sharing is not free.",
+      "All threshold targets are proposals and not measured results."
+    ],
+    "example": "crates/core/symthaea-core/examples/progressive_retrieval_reference.rs",
+    "command": "cargo run --release --example progressive_retrieval_reference -p symthaea-core -- /tmp/progressive-retrieval.csv 12345",
+    "initial_corpus": {
+      "records": 512,
+      "queries": 64,
+      "properties_per_record": 8,
+      "values_per_property": 32,
+      "observed_query_property_counts": [
+        1,
+        2,
+        4,
+        6
+      ],
+      "max_reference_dimension": 16384,
+      "corpus_seed_is_cli_parameter": true,
+      "full_width_reference_stays_resident": true,
+      "storage_note": "The experiment compares coordinate-evaluation work, not persistent index-memory savings. Full 16K records remain resident for both modes."
+    },
+    "implemented_metrics": [
+      "reference_top1_preserved_in_low_width_shortlist",
+      "reference_topk_overlap_fraction",
+      "exact_matching_records_in_shortlist",
+      "exact_match_shortlist_recall",
+      "false_shortlist_candidates_under_exact_observed_property_match",
+      "reference_top1_margin",
+      "coordinate_evaluations_staged_vs_exhaustive",
+      "full_index_vector_bytes"
+    ],
+    "remaining_work": [
+      "Run with multiple independent corpus seeds and calculate uncertainty intervals.",
+      "Add held-out correlated/near-duplicate and query-corruption controls.",
+      "Separate threshold calibration and final evaluation for an adaptive continue/refine/abstain policy.",
+      "Verify Rust formatting, compilation and runtime output on an equipped host."
+    ]
+  }
+}

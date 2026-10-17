@@ -1,0 +1,1009 @@
+{
+  "schema_version": "compute-successor-capability-ratchet-v0.1",
+  "status": "E0 synthetic decision fixtures; every numerical value is invented for testing contract behavior and is not measured hardware data",
+  "tracking": {
+    "symthaea_issue": "https://github.com/Luminous-Dynamics/symthaea/issues/7698",
+    "computer_projection_pr": "https://github.com/Luminous-Dynamics/symthaea/pull/7682",
+    "capability_envelope_owner": "https://github.com/Luminous-Dynamics/symthaea/issues/5782",
+    "capability_frontier_owner": "https://github.com/Luminous-Dynamics/symthaea/issues/5783",
+    "blocker_feedback_owner": "https://github.com/Luminous-Dynamics/symthaea/issues/6228",
+    "workload_baseline_owner": "https://github.com/Luminous-Dynamics/symthaea/issues/5805",
+    "hdc_rtl_owner": "https://github.com/Luminous-Dynamics/symthaea/issues/5808",
+    "rtl_to_mpw_owner": "https://github.com/Luminous-Dynamics/symthaea/issues/5800"
+  },
+  "thesis": "A successor counts as better only on a declared, evidence-qualified objective while preserving every hard-required predecessor capability. There is no universal scalar successor score. Replication, exact design correctness, measured workload improvement, local manufacture, and semiconductor fab closure are distinct claims.",
+  "target_path": [
+    {
+      "id": "G0",
+      "name": "Conventional compute baseline",
+      "evidence_claim": "Frozen software workload and reference output only."
+    },
+    {
+      "id": "G1",
+      "name": "Reproduction-capable cell",
+      "evidence_claim": "C4/C5 only when physical host-assisted and host-removal tests have witnessed receipts; C5 alone does not prove more compute performance."
+    },
+    {
+      "id": "G2",
+      "name": "Better testing / repair / tooling",
+      "evidence_claim": "Specific new inspection, programming, repair or calibration route demonstrated under a declared profile."
+    },
+    {
+      "id": "G3",
+      "name": "Exact HDC RTL accelerator",
+      "evidence_claim": "Reference/RTL exact semantic agreement and admitted formal-property evidence; no performance claim from simulation alone."
+    },
+    {
+      "id": "G4",
+      "name": "FPGA-observed accelerator",
+      "evidence_claim": "Target implementation and physical board observed; end-to-end measured gain compared with the frozen conventional baseline."
+    },
+    {
+      "id": "G5",
+      "name": "External ASIC design/submission",
+      "evidence_claim": "Version-pinned physical design and submission receipts; still not fabricated silicon."
+    },
+    {
+      "id": "G6",
+      "name": "Packaged/tested successor",
+      "evidence_claim": "Fabrication receipt, package/test records and system integration evidence; fabrication remains external unless separate evidence establishes local fab closure."
+    }
+  ],
+  "evidence_order": [
+    "baseline_source_and_input_frozen",
+    "rtl_source_frozen",
+    "exact_reference_equivalence",
+    "formal_properties_qualified",
+    "synthesis_report",
+    "target_implementation_report",
+    "physical_fpga_observation",
+    "end_to_end_measurement",
+    "physical_design_signoff",
+    "external_submission_receipt",
+    "fabrication_receipt",
+    "package_test_observation",
+    "board_integration_observation",
+    "successor_envelope_comparison"
+  ],
+  "candidate_gate_contract": {
+    "hard_requirements": [
+      "All protected predecessor capabilities remain available under the successor profile, or any trade-off is explicitly declared and not promoted as an unconditional improvement.",
+      "Exact operations must match the frozen BinaryHV software oracle unless a separate approximation profile is versioned and task-level behavior is evaluated.",
+      "Performance comparisons use the same pinned workload/input and include host/device transfer, preprocessing, batching and output conversion when those are part of deployment.",
+      "A metric may be used only if its evidence tier supports the claim; simulation, synthesis estimates, FPGA board measurements and packaged-device measurements are distinct.",
+      "Unknown, stale or conflicting evidence remains unresolved and cannot be imputed as true.",
+      "Independent dimensions remain separate; do not collapse throughput, latency, energy, accuracy, robustness, repairability, import dependence or tool renewal into one weighted score."
+    ],
+    "proposed_first_hdc_win_gate": {
+      "label": "proposed; freeze before physical candidate measurements",
+      "correctness": "zero unexplained mismatches on every preregistered exact HDC fixture",
+      "measurable_alternative": "at least 2x end-to-end throughput OR at least 30% lower measured system energy for the same declared workload and equivalent output",
+      "guardrails": [
+        "No protected latency, thermal, area/resource, correctness or task-utility constraint is violated.",
+        "Include device transfer, setup, batching and host-side overhead in end-to-end metrics.",
+        "Measure system energy at the same explicit boundary; FPGA tool power estimates alone do not qualify as measured system energy.",
+        "If neither alternative gate is met, report no demonstrated advantage; do not tune metrics after observing candidate results."
+      ]
+    },
+    "claim_rules": [
+      "C5 reproduction is a useful capability gain but not a compute-performance improvement.",
+      "RTL equivalence is a correctness gate, not an accelerator advantage.",
+      "FPGA synthesis/resource reports are not physical power or speed measurements.",
+      "GDS generation or external MPW submission is not proof that a die was fabricated.",
+      "Externally fabricated and packaged silicon is not locally closed semiconductor manufacturing.",
+      "An extra capability does not compensate automatically for regression of a hard-required capability."
+    ]
+  },
+  "comparison_fields": {
+    "identity": [
+      "profile_id",
+      "generation_id",
+      "source_sha",
+      "toolchain_id",
+      "input_corpus_sha",
+      "hardware_revision"
+    ],
+    "evidence": [
+      "admitted_evidence_stages",
+      "evidence_currentness",
+      "unresolved_items",
+      "independent_reviewer_receipt"
+    ],
+    "capabilities": [
+      "new_capabilities",
+      "lost_capabilities",
+      "preserved_required_capabilities",
+      "blocked_targets",
+      "external_dependencies"
+    ],
+    "performance": [
+      "workload_id",
+      "exact_output_match",
+      "task_utility",
+      "operations_per_second",
+      "latency_p50_ms",
+      "latency_p95_ms",
+      "latency_p99_ms",
+      "system_joules_per_10000_ops",
+      "peak_memory_bytes",
+      "fpga_lut",
+      "fpga_ff",
+      "fpga_bram",
+      "fpga_dsp",
+      "max_temperature_c"
+    ],
+    "reproduction": [
+      "accepted_builds",
+      "attempted_builds",
+      "rework_count",
+      "scrap_count",
+      "human_intervention_count",
+      "offline_rebuild_result",
+      "maintenance_and_calibration_renewal_status"
+    ]
+  },
+  "fixtures": [
+    {
+      "id": "RAT00_identical_clone_only",
+      "intent": "Distinguish reproduction capability from successor capability gain.",
+      "baseline": {
+        "generation_id": "G0",
+        "capabilities": [
+          "computer_operational",
+          "compute_module_import_dependent"
+        ],
+        "protected": [
+          "computer_operational"
+        ],
+        "metrics": {
+          "operations_per_second": 1000,
+          "latency_p99_ms": 12,
+          "system_joules_per_10000_ops": 40,
+          "task_utility": 1
+        }
+      },
+      "candidate": {
+        "generation_id": "G1",
+        "capabilities": [
+          "computer_operational",
+          "compute_module_import_dependent",
+          "computer_reproduction_C5"
+        ],
+        "newly_demonstrated": [
+          "computer_reproduction_C5"
+        ],
+        "lost": [],
+        "admitted_evidence_stages": [
+          "host_removal_physical_receipt"
+        ],
+        "metrics": {
+          "operations_per_second": 1000,
+          "latency_p99_ms": 12,
+          "system_joules_per_10000_ops": 40,
+          "task_utility": 1
+        }
+      },
+      "expected": {
+        "claim": "reproduction_gain_only",
+        "promote_as_better_compute": false,
+        "reason": "The cell can reproduce a computer, but no computing/workload metric improved."
+      }
+    },
+    {
+      "id": "RAT01_qualified_test_fixture_gain",
+      "intent": "A new, qualified test fixture improves product acceptance capability without claiming faster compute.",
+      "baseline": {
+        "generation_id": "G1",
+        "capabilities": [
+          "computer_assembly",
+          "basic_boot_test"
+        ],
+        "protected": [
+          "computer_assembly",
+          "basic_boot_test"
+        ],
+        "metrics": {}
+      },
+      "candidate": {
+        "generation_id": "G2",
+        "capabilities": [
+          "computer_assembly",
+          "basic_boot_test",
+          "board_electrical_test",
+          "revision_bound_test_receipt"
+        ],
+        "newly_demonstrated": [
+          "board_electrical_test",
+          "revision_bound_test_receipt"
+        ],
+        "lost": [],
+        "admitted_evidence_stages": [
+          "fixture_identity_frozen",
+          "calibration_current",
+          "independent_test_repeated"
+        ],
+        "metrics": {}
+      },
+      "expected": {
+        "claim": "accepted_capability_gain",
+        "promote_as_better_compute": false,
+        "reason": "Testing/reproducibility improved; no compute-performance claim follows."
+      }
+    },
+    {
+      "id": "RAT02_exact_RTL_no_performance_evidence",
+      "intent": "Exact HDC RTL is qualified for semantics but no hardware performance result exists.",
+      "baseline": {
+        "generation_id": "G2",
+        "capabilities": [
+          "hdc_software_oracle"
+        ],
+        "protected": [
+          "hdc_software_oracle"
+        ],
+        "metrics": {
+          "operations_per_second": 5000,
+          "latency_p99_ms": 5,
+          "system_joules_per_10000_ops": 60,
+          "task_utility": 1
+        }
+      },
+      "candidate": {
+        "generation_id": "G3",
+        "capabilities": [
+          "hdc_software_oracle",
+          "hdc_rtl_simulation_equivalent"
+        ],
+        "newly_demonstrated": [
+          "hdc_rtl_simulation_equivalent"
+        ],
+        "lost": [],
+        "admitted_evidence_stages": [
+          "baseline_source_and_input_frozen",
+          "rtl_source_frozen",
+          "exact_reference_equivalence",
+          "formal_properties_qualified"
+        ],
+        "metrics": {}
+      },
+      "expected": {
+        "claim": "design_correctness_only",
+        "promote_as_better_compute": false,
+        "reason": "Equivalence is necessary but is not physical FPGA observation or measured system advantage."
+      }
+    },
+    {
+      "id": "RAT03_kernel_faster_end_to_end_slower",
+      "intent": "Negative control for an accelerator whose data transfer/setup dominates.",
+      "baseline": {
+        "generation_id": "G2",
+        "capabilities": [
+          "hdc_software_oracle"
+        ],
+        "protected": [
+          "hdc_software_oracle"
+        ],
+        "metrics": {
+          "operations_per_second": 1000,
+          "latency_p99_ms": 10,
+          "system_joules_per_10000_ops": 50,
+          "task_utility": 1
+        }
+      },
+      "candidate": {
+        "generation_id": "G4",
+        "capabilities": [
+          "hdc_software_oracle",
+          "hdc_fpga_board_observed"
+        ],
+        "newly_demonstrated": [
+          "hdc_fpga_board_observed"
+        ],
+        "lost": [],
+        "admitted_evidence_stages": [
+          "physical_fpga_observation",
+          "end_to_end_measurement"
+        ],
+        "metrics": {
+          "kernel_operations_per_second": 4000,
+          "operations_per_second": 700,
+          "latency_p99_ms": 14,
+          "system_joules_per_10000_ops": 65,
+          "task_utility": 1,
+          "exact_output_match": true
+        }
+      },
+      "expected": {
+        "claim": "no_system_level_acceleration_advantage",
+        "promote_as_better_compute": false,
+        "reason": "Kernel throughput improves but the end-to-end deployed workload regresses throughput, latency and energy."
+      }
+    },
+    {
+      "id": "RAT04_measured_end_to_end_HDC_win",
+      "intent": "Synthetic positive control for the proposed win gate; numbers are not empirical.",
+      "baseline": {
+        "generation_id": "G2",
+        "capabilities": [
+          "hdc_software_oracle"
+        ],
+        "protected": [
+          "hdc_software_oracle"
+        ],
+        "metrics": {
+          "operations_per_second": 1000,
+          "latency_p99_ms": 10,
+          "system_joules_per_10000_ops": 50,
+          "task_utility": 1
+        }
+      },
+      "candidate": {
+        "generation_id": "G4",
+        "capabilities": [
+          "hdc_software_oracle",
+          "hdc_fpga_board_observed"
+        ],
+        "newly_demonstrated": [
+          "hdc_fpga_board_observed"
+        ],
+        "lost": [],
+        "admitted_evidence_stages": [
+          "baseline_source_and_input_frozen",
+          "rtl_source_frozen",
+          "exact_reference_equivalence",
+          "formal_properties_qualified",
+          "synthesis_report",
+          "target_implementation_report",
+          "physical_fpga_observation",
+          "end_to_end_measurement"
+        ],
+        "metrics": {
+          "operations_per_second": 2200,
+          "latency_p99_ms": 9,
+          "system_joules_per_10000_ops": 34,
+          "task_utility": 1,
+          "exact_output_match": true,
+          "hard_constraints_pass": true
+        }
+      },
+      "expected": {
+        "claim": "measured_workload_advantage",
+        "promote_as_better_compute": true,
+        "reason": "The synthetic candidate reaches the ≥2x throughput gate and reduces energy while preserving exact output and hard constraints; physical result required in reality."
+      }
+    },
+    {
+      "id": "RAT05_throughput_gain_breaks_hard_constraint",
+      "intent": "A large throughput gain must not mask a protected tail-latency regression.",
+      "baseline": {
+        "generation_id": "G2",
+        "capabilities": [
+          "hdc_software_oracle",
+          "robotics_latency_profile"
+        ],
+        "protected": [
+          "hdc_software_oracle",
+          "robotics_latency_profile"
+        ],
+        "metrics": {
+          "operations_per_second": 1000,
+          "latency_p99_ms": 10,
+          "system_joules_per_10000_ops": 50,
+          "task_utility": 1
+        }
+      },
+      "candidate": {
+        "generation_id": "G4",
+        "capabilities": [
+          "hdc_software_oracle",
+          "robotics_latency_profile"
+        ],
+        "newly_demonstrated": [
+          "hdc_fpga_board_observed"
+        ],
+        "lost": [],
+        "admitted_evidence_stages": [
+          "physical_fpga_observation",
+          "end_to_end_measurement"
+        ],
+        "metrics": {
+          "operations_per_second": 3000,
+          "latency_p99_ms": 19,
+          "system_joules_per_10000_ops": 48,
+          "task_utility": 1,
+          "exact_output_match": true,
+          "hard_constraints_pass": false
+        }
+      },
+      "expected": {
+        "claim": "reject_or_conditional_pareto_only",
+        "promote_as_better_compute": false,
+        "reason": "Throughput gain violates the protected latency profile."
+      }
+    },
+    {
+      "id": "RAT06_synthesis_estimate_masquerades_as_measured_energy",
+      "intent": "Synthesis timing/resources or estimated power cannot satisfy measured system-energy gate.",
+      "baseline": {
+        "generation_id": "G2",
+        "capabilities": [
+          "hdc_software_oracle"
+        ],
+        "protected": [
+          "hdc_software_oracle"
+        ],
+        "metrics": {
+          "operations_per_second": 1000,
+          "latency_p99_ms": 10,
+          "system_joules_per_10000_ops": 50,
+          "task_utility": 1
+        }
+      },
+      "candidate": {
+        "generation_id": "G4",
+        "capabilities": [
+          "hdc_software_oracle",
+          "hdc_synthesis_qualified"
+        ],
+        "newly_demonstrated": [
+          "hdc_synthesis_qualified"
+        ],
+        "lost": [],
+        "admitted_evidence_stages": [
+          "synthesis_report"
+        ],
+        "metrics": {
+          "estimated_power_w": 2,
+          "estimated_clock_mhz": 150,
+          "exact_output_match": null
+        }
+      },
+      "expected": {
+        "claim": "projected_only",
+        "promote_as_better_compute": false,
+        "reason": "No physical FPGA observation or system-level measurement exists."
+      }
+    },
+    {
+      "id": "RAT07_GDS_and_MPWs_submission_not_silicon",
+      "intent": "Separate external physical design/submission capability from fabricated hardware.",
+      "baseline": {
+        "generation_id": "G4",
+        "capabilities": [
+          "fpga_hdc_accelerator"
+        ],
+        "protected": [
+          "hdc_semantics"
+        ],
+        "metrics": {}
+      },
+      "candidate": {
+        "generation_id": "G5",
+        "capabilities": [
+          "fpga_hdc_accelerator",
+          "asic_physical_design_candidate",
+          "external_MPW_submission_receipt"
+        ],
+        "newly_demonstrated": [
+          "asic_physical_design_candidate",
+          "external_MPW_submission_receipt"
+        ],
+        "lost": [],
+        "admitted_evidence_stages": [
+          "physical_design_signoff",
+          "external_submission_receipt"
+        ],
+        "metrics": {}
+      },
+      "expected": {
+        "claim": "external_design_submission_only",
+        "promote_as_better_compute": false,
+        "reason": "A GDS/layout and shuttle submission do not prove a die was fabricated, packaged, tested or integrated."
+      }
+    },
+    {
+      "id": "RAT08_external_silicon_package_tested",
+      "intent": "Recognize actual external silicon evidence while keeping local-fab closure separate.",
+      "baseline": {
+        "generation_id": "G4",
+        "capabilities": [
+          "fpga_hdc_accelerator"
+        ],
+        "protected": [
+          "hdc_semantics"
+        ],
+        "metrics": {}
+      },
+      "candidate": {
+        "generation_id": "G6",
+        "capabilities": [
+          "fpga_hdc_accelerator",
+          "externally_fabricated_die",
+          "package_test_observed",
+          "board_integration_observed"
+        ],
+        "newly_demonstrated": [
+          "externally_fabricated_die",
+          "package_test_observed",
+          "board_integration_observed"
+        ],
+        "lost": [],
+        "admitted_evidence_stages": [
+          "fabrication_receipt",
+          "package_test_observation",
+          "board_integration_observation"
+        ],
+        "external_dependencies": [
+          "foundry_service",
+          "package_test_service"
+        ],
+        "metrics": {}
+      },
+      "expected": {
+        "claim": "externally_fabricated_hardware_evidence",
+        "promote_as_better_compute": "only_if_workload_gate_also_passes",
+        "reason": "Hardware existence/qualification is distinct from local manufacturing independence and from workload performance advantage."
+      }
+    },
+    {
+      "id": "RAT09_stale_metrology_blocks_capability_gain",
+      "intent": "A stale required measurement reference must leave the successor acceptance unresolved.",
+      "baseline": {
+        "generation_id": "G1",
+        "capabilities": [
+          "board_assembly"
+        ],
+        "protected": [
+          "board_assembly"
+        ],
+        "metrics": {}
+      },
+      "candidate": {
+        "generation_id": "G2",
+        "capabilities": [
+          "board_assembly",
+          "board_test_fixture"
+        ],
+        "newly_demonstrated": [
+          "board_test_fixture"
+        ],
+        "lost": [],
+        "admitted_evidence_stages": [
+          "fixture_identity_frozen",
+          "independent_test_repeated"
+        ],
+        "evidence_currentness": {
+          "calibration": "stale"
+        },
+        "metrics": {}
+      },
+      "expected": {
+        "claim": "unresolved",
+        "promote_as_better_compute": false,
+        "reason": "Physical assembly may occur, but the required test capability cannot be qualified with stale calibration evidence."
+      }
+    },
+    {
+      "id": "RAT10_successor_loses_critical_predecessor_capability",
+      "intent": "A successor must not silently lose a protected predecessor function.",
+      "baseline": {
+        "generation_id": "G2",
+        "capabilities": [
+          "controller_compute",
+          "offline_recovery",
+          "computer_repair"
+        ],
+        "protected": [
+          "controller_compute",
+          "offline_recovery",
+          "computer_repair"
+        ],
+        "metrics": {}
+      },
+      "candidate": {
+        "generation_id": "G3",
+        "capabilities": [
+          "controller_compute",
+          "computer_repair",
+          "hdc_fpga_accelerator"
+        ],
+        "newly_demonstrated": [
+          "hdc_fpga_accelerator"
+        ],
+        "lost": [
+          "offline_recovery"
+        ],
+        "admitted_evidence_stages": [
+          "physical_fpga_observation"
+        ],
+        "metrics": {}
+      },
+      "expected": {
+        "claim": "reject_or_conditional_pareto_only",
+        "promote_as_better_compute": false,
+        "reason": "The accelerator gain does not compensate for loss of protected offline recovery."
+      }
+    },
+    {
+      "id": "RAT11_unknown_dependency_cannot_be_promoted",
+      "intent": "Unknown inventory or toolchain state is unresolved, not a successful import-independent capability.",
+      "baseline": {
+        "generation_id": "G2",
+        "capabilities": [
+          "hdc_software_oracle"
+        ],
+        "protected": [
+          "hdc_software_oracle"
+        ],
+        "metrics": {}
+      },
+      "candidate": {
+        "generation_id": "G3",
+        "capabilities": [
+          "hdc_software_oracle",
+          "hdc_rtl_simulation_equivalent"
+        ],
+        "newly_demonstrated": [
+          "hdc_rtl_simulation_equivalent"
+        ],
+        "lost": [],
+        "unresolved_items": [
+          "fpga_toolchain_version",
+          "programming_interface_inventory"
+        ],
+        "admitted_evidence_stages": [
+          "rtl_source_frozen",
+          "exact_reference_equivalence"
+        ],
+        "metrics": {}
+      },
+      "expected": {
+        "claim": "unresolved",
+        "promote_as_better_compute": false,
+        "reason": "Missing evidence about required tools and programming interfaces blocks successor qualification."
+      }
+    },
+    {
+      "id": "RAT12_reproducible_build_without_physical_observation",
+      "intent": "A reproducible software/RTL build advances evidence quality but not physical hardware claims.",
+      "baseline": {
+        "generation_id": "G2",
+        "capabilities": [
+          "pinned_software_build"
+        ],
+        "protected": [
+          "pinned_software_build"
+        ],
+        "metrics": {}
+      },
+      "candidate": {
+        "generation_id": "G3",
+        "capabilities": [
+          "pinned_software_build",
+          "reproducible_RTL_artifact"
+        ],
+        "newly_demonstrated": [
+          "reproducible_RTL_artifact"
+        ],
+        "lost": [],
+        "admitted_evidence_stages": [
+          "baseline_source_and_input_frozen",
+          "rtl_source_frozen",
+          "exact_reference_equivalence"
+        ],
+        "metrics": {
+          "source_and_artifact_hashes_match": true,
+          "physical_fpga_observation": false
+        }
+      },
+      "expected": {
+        "claim": "reproducible_design_artifact_only",
+        "promote_as_better_compute": false,
+        "reason": "Reproducible source/artifacts do not imply FPGA observation, silicon fabrication, or performance improvement."
+      }
+    }
+  ],
+  "invariants": [
+    "Candidate and baseline must use the same workload identity, source/input fixtures and declared measurement boundary for any performance comparison.",
+    "A clone/copy count increase is not a compute-performance delta.",
+    "Exact HDC algebra and any approximate mapping are different profiles; no silent conversion.",
+    "A candidate with unresolved required evidence cannot be promoted.",
+    "A protected predecessor capability loss rejects unconditional promotion even if another metric improves.",
+    "A measured performance win requires end-to-end device/host costs and equivalent task output.",
+    "Physical FPGA result, external foundry submission, fabricated die, package test, and local die-fabrication closure are different evidence claims.",
+    "No scalar weighted successor score; expose independent metrics and Pareto/conditional-Pareto status through canonical CIV-BOOT-004 semantics.",
+    "Capability-envelope comparisons reuse CIV-BOOT-003 semantics; this corpus does not define a second envelope engine.",
+    "All current fixtures are synthetic E0 checks; none is real accelerator or manufacturing evidence."
+  ],
+  "sources": [
+    {
+      "id": "S1",
+      "title": "NEURO-SILICON-001A: conventional HDC/CfC baseline owner",
+      "url": "https://github.com/Luminous-Dynamics/symthaea/issues/5805",
+      "use": "Canonical Symthaea workload and conventional-baseline contract."
+    },
+    {
+      "id": "S2",
+      "title": "NEURO-SILICON-001B: exact HDC RTL semantic owner",
+      "url": "https://github.com/Luminous-Dynamics/symthaea/issues/5808",
+      "use": "Exact 16,384-bit BinaryHV algebra and RTL correctness boundary."
+    },
+    {
+      "id": "S3",
+      "title": "COMPUTE-MFG-001E: FPGA-to-MPW evidence bridge",
+      "url": "https://github.com/Luminous-Dynamics/symthaea/issues/5800",
+      "use": "Design, simulation, FPGA observation, external design/submission, fabrication/package/test claim boundaries."
+    },
+    {
+      "id": "S4",
+      "title": "CIV-BOOT-003: capability-envelope renewal",
+      "url": "https://github.com/Luminous-Dynamics/symthaea/issues/5782",
+      "use": "Cross-generation preserved/degraded/insufficient/unresolved profile comparisons."
+    },
+    {
+      "id": "S5",
+      "title": "CIV-BOOT-004: capability-frontier/Pareto planning",
+      "url": "https://github.com/Luminous-Dynamics/symthaea/issues/5783",
+      "use": "Independent objectives and Pareto rather than universal weighted scores."
+    },
+    {
+      "id": "S6",
+      "title": "LibreLane",
+      "url": "https://github.com/librelane/librelane",
+      "use": "Maintained, reproducible/traceable RTL-to-GDS implementation flow reference."
+    },
+    {
+      "id": "S7",
+      "title": "NIST: Innovations in advanced processes and systems for semiconductor manufacturing (2026)",
+      "url": "https://doi.org/10.1016/j.cirp.2026.04.115",
+      "use": "Current research perspective on ecosystem, process control, in-line metrology, advanced packaging and manufacturing systems."
+    },
+    {
+      "id": "S8",
+      "title": "NASA Technology Readiness Levels",
+      "url": "https://www.nasa.gov/directorates/somd/space-communications-navigation-program/technology-readiness-levels/",
+      "use": "Reminder to distinguish conceptual formulation, breadboard validation, prototype demonstration and operational evidence."
+    },
+    {
+      "id": "S9",
+      "title": "Hyperdimensional in-memory computing with analogue memristive crossbar arrays (Nature Communications, 2026)",
+      "url": "https://www.nature.com/articles/s41467-026-76067-5",
+      "use": "External research motivation for a separately versioned approximate/in-memory HDC track; published outcomes are not Symthaea measurements and must not populate synthetic fixtures as project evidence."
+    },
+    {
+      "id": "S10",
+      "title": "CT-LNN: FPGA-Based Accelerator for Continuous-Time Liquid Neural Networks (IEEE TCSI, 2026)",
+      "url": "https://doi.org/10.1109/TCSI.2026.3704401",
+      "use": "External motivation for evaluating continuous-time state update and hardware/dataflow jointly; this is not a Symthaea performance baseline or a transferable numerical result."
+    },
+    {
+      "id": "S11",
+      "title": "Algorithm–hardware co-design of neuromorphic networks with dual memory pathways (Nature Machine Intelligence, 2026)",
+      "url": "https://www.nature.com/articles/s42256-026-01255-3",
+      "use": "External architectural motivation for compact slow-state plus fast/event-driven pathway co-design. The paper's reported throughput/energy figures are post-layout simulations for a different spiking architecture, not Symthaea measurements."
+    }
+  ],
+  "benchmark_methodology": {
+    "as_of": "2026-10-17",
+    "status": "design guidance derived from external references; not Symthaea result data",
+    "external_reference_ids": [
+      "S8",
+      "S9"
+    ],
+    "comparison_tracks": [
+      {
+        "id": "exact_digital",
+        "acceptance": "bit-identical output against the pinned canonical BinaryHV software oracle for every required fixture",
+        "permitted_claim": "exact semantic equivalence at the tested profile only",
+        "disallowed_inference": "no automatic inference of speed, lower energy, FPGA operation, or ASIC qualification"
+      },
+      {
+        "id": "approximate_or_in_memory",
+        "acceptance": "representation/version frozen; preregistered task-quality floor and robustness criteria; device variation, drift/noise, calibration age and repeatability measured",
+        "permitted_claim": "only task-level and hardware properties directly measured for this representation/profile",
+        "disallowed_inference": "must not inherit an exact-digital PASS; never silently mix with exact BinaryHV results"
+      }
+    ],
+    "dimension_sweep_bits": [
+      1024,
+      4096,
+      16384
+    ],
+    "preregistration": {
+      "freeze_before_measurement": [
+        "source_revision_and_toolchain",
+        "workload_id_and_input_corpus_hash",
+        "data_split_and_seed",
+        "preprocessing_and_postprocessing",
+        "exactness_or_approximation_profile",
+        "task_quality_floor",
+        "measurement_boundary",
+        "latency_and_thermal_hard_constraints",
+        "primary_objective_and_promotion_threshold"
+      ],
+      "current_project_hypothesis": "at least 2x end-to-end throughput OR at least 30% lower measured system energy, with equivalent output and every protected hard constraint preserved",
+      "threshold_note": "project-specific hypothesis only; not an MLPerf rule or universal scientific standard"
+    },
+    "measurement_boundaries": {
+      "report_separately": [
+        "core_only",
+        "end_to_end_deployed_path"
+      ],
+      "include_end_to_end_when_part_of_deployment": [
+        "encoding",
+        "preprocessing",
+        "host_device_transfer_or_DMA",
+        "setup_and_batching",
+        "memory_movement",
+        "output_conversion",
+        "ADC_DAC_and_peripheral_overhead",
+        "program_write_verify_cost",
+        "calibration_and_update_cost"
+      ],
+      "policy": "energy or latency values from different measurement boundaries are not directly comparable; only the preregistered end-to-end boundary may satisfy the system-advantage gate"
+    },
+    "dimensions_to_report_independently": [
+      "exact_output_or_task_quality",
+      "throughput",
+      "latency_p50_p95_p99",
+      "system_energy_at_declared_boundary",
+      "memory_and_data_movement",
+      "FPGA_or_device_resources",
+      "thermal_and_timing_constraints",
+      "device_variation_and_robustness",
+      "calibration_age_and_renewal",
+      "repairability_and_reproducibility",
+      "external_dependencies",
+      "capability_gain_and_protected_regressions",
+      "evidence_maturity_and_unresolved_items"
+    ],
+    "synthetic_fixture_policy": "All 13 RAT fixtures remain invented examples for contract testing. External published numbers are source context only and must never be treated as Symthaea measurements.",
+    "first_kernel": {
+      "id": "exact_streaming_hamming_distance",
+      "motivation": "Hamming distance composes XOR, per-lane population count and accumulation into a retrieval/similarity primitive; XOR alone is too trivial to represent a useful system advantage.",
+      "vector_dimension_bits": 16384,
+      "lane_profile_transfers_per_vector": {
+        "64": 256,
+        "128": 128,
+        "256": 64,
+        "512": 32,
+        "16384": 1
+      },
+      "correctness_gate": "Exact integer distance equality against the pinned canonical Rust BinaryHV::hamming_distance output for every required fixture.",
+      "measurements_to_keep_separate": [
+        "simulated_cycles_per_vector",
+        "synthesized_resources_and_timing_estimates",
+        "physical_FPGA_vector_comparisons_per_second",
+        "p50_p95_p99_latency",
+        "sustained_throughput_under_backpressure",
+        "end_to_end_system_energy_per_comparison",
+        "host_transfer_and_protocol_overhead",
+        "retrieval_or_task_quality",
+        "thermal_and_reliability_constraints"
+      ],
+      "decision_rule": "Do not select a best lane width until pinned synthesis and then physical-board measurements; width alone does not prove the best throughput/resource/energy tradeoff.",
+      "evidence_status": "prototype only; no compile, simulator, synthesis or physical measurement PASS claimed"
+    },
+    "dynamical_hdc_ltc": {
+      "tracking_issue": "https://github.com/Luminous-Dynamics/symthaea/issues/7749",
+      "active_implementation": "symthaea-core::hdc::hdc_ltc_unified",
+      "representation": "continuous_f32",
+      "resolution_dimensions": [
+        16384,
+        32768,
+        65536,
+        131072,
+        262144
+      ],
+      "tier_status": {
+        "16384": "baseline",
+        "32768": "baseline",
+        "65536": "baseline",
+        "131072": "exploratory",
+        "262144": "exploratory"
+      },
+      "bytes_per_f32_vector": {
+        "16384": 65536,
+        "32768": 131072,
+        "65536": 262144,
+        "131072": 524288,
+        "262144": 1048576
+      },
+      "cost_note": "Per-vector representation sizes only. Actual working set is configuration-dependent (state, weights, gates, tau modulation, layers/neurons and temporaries) and must use checked arithmetic; these values are not cache traffic or measured energy.",
+      "canonical_owners": {
+        "resolution_transition": "https://github.com/Luminous-Dynamics/symthaea/issues/6560",
+        "trajectory_matrix": "https://github.com/Luminous-Dynamics/symthaea/issues/6561",
+        "operator_evidence": "https://github.com/Luminous-Dynamics/symthaea/pull/6596",
+        "trajectory_dependency_gate": "https://github.com/Luminous-Dynamics/symthaea/pull/6630",
+        "resource_gate": "https://github.com/Luminous-Dynamics/symthaea/issues/6631",
+        "timestep_budget": "https://github.com/Luminous-Dynamics/symthaea/issues/7374",
+        "manifold_compression": "https://github.com/Luminous-Dynamics/symthaea/issues/3348"
+      },
+      "required_arms": [
+        "active_scalar_or_simd_continuous_hdc_ltc",
+        "fused_closed_form_evolution",
+        "bounded_iterative_evolution_against_fine_step_rk4_reference",
+        "dense_f32_state_update",
+        "simd_cache_tiled_state_update",
+        "streamed_chunked_update_only_if_dependencies_allow",
+        "manifold_compression_with_residual_novelty_path",
+        "approximate_or_analogue_profile_as_separately_versioned"
+      ],
+      "required_metrics": [
+        "per_step_state_error",
+        "mean_and_terminal_trajectory_divergence",
+        "effective_tau_gate_equilibrium_distortion",
+        "fixed_and_irregular_dt_behavior",
+        "long_horizon_boundedness_and_recovery",
+        "task_quality_on_held_out_sequences",
+        "p50_p95_p99_latency",
+        "updates_per_second",
+        "resident_and_peak_temporary_bytes",
+        "allocations_and_bytes_moved",
+        "cache_or_bandwidth_counters_when_available",
+        "system_energy_at_declared_boundary",
+        "snapshot_and_online_adaptation_continuity"
+      ],
+      "promotion_rule": "Operator evidence is only a precondition. Resolution or hardware profiles advance only after trajectory fidelity, resource admissibility, task quality and measured cost are qualified on the same frozen source/config/workload. No default >64K promotion follows from representability alone.",
+      "semantic_vs_dynamical_width": {
+        "status": "hypothesis for controlled experiment; not a production design decision",
+        "semantic_space_dimensions": [
+          16384,
+          32768,
+          65536,
+          131072,
+          262144
+        ],
+        "candidate_local_dynamical_dimensions": [
+          1024,
+          4096,
+          16384,
+          32768
+        ],
+        "canonical_owner": "https://github.com/Luminous-Dynamics/symthaea/issues/3348",
+        "control_arms": [
+          "full_width_dynamics",
+          "random_projection_at_matched_local_width",
+          "deterministic_orthogonal_or_nested_projection_where_applicable",
+          "manifold_projection_with_explicit_residual_novelty_path"
+        ],
+        "later_arm": "learned_task_specific_projection_only_after_nonlearned_controls",
+        "hard_rules": [
+          "High-dimensional semantic representation and local dynamical state dimension are separate declarations.",
+          "No full-width recurrent work may be hidden in a benchmark claiming compressed dynamics.",
+          "Residual/novelty path may not silently move the full source vector every step.",
+          "Static similarity preservation does not establish trajectory preservation.",
+          "Compression must preserve declared task quality and satisfy trajectory, tau/gate, stability, resource and measurement gates."
+        ],
+        "metrics": [
+          "task_quality_vs_local_state_width_frontier",
+          "reconstruction_error",
+          "temporal_prediction_or_control_quality",
+          "trajectory_tau_gate_error",
+          "bytes_moved",
+          "resident_and_peak_temporary_bytes",
+          "projection_and_lift_overhead",
+          "p50_p95_p99_latency",
+          "end_to_end_system_energy_where_measurable"
+        ],
+        "external_inspiration": "S11 describes a different spiking architecture; its post-layout-simulation results motivate hypotheses only and are not Symthaea benchmark data."
+      },
+      "trajectory_protocol_version": "0.1.0",
+      "trajectory_protocol_fixture": "crates/domains/symthaea-capability-closure/fixtures/dynamical-hdc-ltc-trajectory-protocol-v0.1.json",
+      "trajectory_protocol_document": "docs/research/DYNAMICAL_HDC_LTC_TRAJECTORY_PROTOCOL_V0_1.md"
+    }
+  },
+  "classification_labels": [
+    "reproduction_gain_only",
+    "accepted_capability_gain",
+    "design_correctness_only",
+    "measured_workload_advantage",
+    "external_design_submission_only",
+    "externally_fabricated_hardware_evidence",
+    "no_system_level_acceleration_advantage",
+    "projected_only",
+    "reproducible_design_artifact_only",
+    "unresolved",
+    "reject_or_conditional_pareto_only"
+  ]
+}
