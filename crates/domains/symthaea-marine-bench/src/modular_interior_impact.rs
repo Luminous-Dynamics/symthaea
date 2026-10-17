@@ -587,4 +587,33 @@ mod tests {
         assert!(domains(&report).contains(&"mission_intent_review"));
     }
 
+
+    #[test]
+    fn platform_envelope_change_invalidates_all_spatial_dependencies() {
+        let before = live();
+        let mut after = before.clone();
+        after.platform.interior_bounds_mm.length_mm += 500;
+        let report = analyze_configuration_change(&before, &after).expect("diff serializes");
+        assert!(report.body.changes.iter().any(|change| change.section == "platform"));
+        assert!(domains(&report).contains(&"layout_geometry"));
+        assert!(domains(&report).contains(&"service_routing"));
+        assert!(domains(&report).contains(&"mass_and_centre_of_gravity"));
+        assert!(domains(&report).contains(&"accessibility_and_egress"));
+    }
+
+    #[test]
+    fn evidence_and_safety_changes_trigger_explicit_review_domains() {
+        let before = live();
+        let mut after = before.clone();
+        after.assumptions[0].statement.push_str(" Revised assumption.");
+        after.provenance[0].scope.push_str(" Changed source scope.");
+        after.safety_gates.iter_mut().find(|gate| gate.category == "fire_safety")
+            .expect("fire gate exists").notes.push_str(" Re-review required.");
+        let report = analyze_configuration_change(&before, &after).expect("diff serializes");
+        assert!(domains(&report).contains(&"assumption_validity"));
+        assert!(domains(&report).contains(&"evidence_provenance_review"));
+        assert!(domains(&report).contains(&"safety_evidence_review"));
+        assert!(domains(&report).contains(&"evidence_applicability"));
+    }
+
 }
