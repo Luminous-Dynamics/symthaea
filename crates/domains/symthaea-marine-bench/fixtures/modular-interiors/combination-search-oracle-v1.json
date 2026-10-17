@@ -1,0 +1,52 @@
+{
+  "schema_version": "1.0.0",
+  "claim_ceiling": "Synthetic contract oracle only. It verifies enumeration and interaction reporting, not real-vessel safety or physical performance.",
+  "cases": [
+    {
+      "case_id": "CARDINALITY-FIRST-TWO-TARGETS-001",
+      "input_variant_ids": [
+        "SLEEP-V2",
+        "STORAGE-V2"
+      ],
+      "expected_candidate_count": 3,
+      "expected_search_complete": true,
+      "expected_candidate_sets": [
+        [
+          "STORAGE-V2"
+        ],
+        [
+          "SLEEP-V2"
+        ],
+        [
+          "STORAGE-V2",
+          "SLEEP-V2"
+        ]
+      ],
+      "expected_pair_interaction_findings": []
+    },
+    {
+      "case_id": "COMBINED-AC-SERVICE-OVERLOAD-002",
+      "input_variant_ids": [
+        "GALLEY-HIGH-LOAD",
+        "WORKSPACE-HIGH-LOAD"
+      ],
+      "expected_candidate_count": 3,
+      "expected_search_complete": true,
+      "expected_candidate_sets": [
+        [
+          "GALLEY-HIGH-LOAD"
+        ],
+        [
+          "WORKSPACE-HIGH-LOAD"
+        ],
+        [
+          "GALLEY-HIGH-LOAD",
+          "WORKSPACE-HIGH-LOAD"
+        ]
+      ],
+      "expected_pair_interaction_findings": [
+        "SERVICE_CAPACITY_EXCEEDED|AC-BUS"
+      ]
+    }
+  ]
+}
