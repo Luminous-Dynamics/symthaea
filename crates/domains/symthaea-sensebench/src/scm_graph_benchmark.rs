@@ -24,7 +24,7 @@ const WORLD_VARIANTS_PER_FAMILY: usize = 4;
 const MECHANISM_REGIME_COUNT: usize = 4;
 const MAX_TRIALS_PER_WORLD: usize = 10_000;
 const MAX_MEASUREMENT_BUDGET: usize = 64;
-const GENERATOR_VERSION: &str = "sensebench-scm-graphs-0.2.0";
+const GENERATOR_VERSION: &str = "sensebench-scm-graphs-0.3.0";
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, Deserialize)]
 #[serde(rename_all = "snake_case")]
@@ -221,6 +221,58 @@ pub struct ScmGraphPolicyAggregate {
 }
 
 #[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
+pub enum ScmGraphShiftSplit {
+    AnyHeldOut,
+    TopologyShiftOnly,
+    MechanismShiftOnly,
+    JointShift,
+}
+
+impl ScmGraphShiftSplit {
+    fn all() -> [Self; 4] {
+        [
+            Self::AnyHeldOut,
+            Self::TopologyShiftOnly,
+            Self::MechanismShiftOnly,
+            Self::JointShift,
+        ]
+    }
+
+    fn includes(self, row: &ScmGraphPolicySummary) -> bool {
+        match self {
+            Self::AnyHeldOut => row.held_out_world,
+            Self::TopologyShiftOnly => row.held_out_family && !row.mechanism_regime.held_out(),
+            Self::MechanismShiftOnly => !row.held_out_family && row.mechanism_regime.held_out(),
+            Self::JointShift => row.held_out_family && row.mechanism_regime.held_out(),
+        }
+    }
+}
+
+#[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
+pub struct ScmGraphFactorizedShiftAggregate {
+    pub policy: ScmGraphPolicy,
+    pub split: ScmGraphShiftSplit,
+    pub world_rows: usize,
+    pub topology_instances: usize,
+    pub mean_skeleton_f1: f64,
+    pub skeleton_f1_topology_instance_ci95: [f64; 2],
+    pub mean_directed_edge_f1: f64,
+    pub directed_edge_f1_topology_instance_ci95: [f64; 2],
+    pub mean_cpdag_skeleton_f1: f64,
+    pub cpdag_skeleton_f1_topology_instance_ci95: [f64; 2],
+    pub mean_structural_hamming_distance: f64,
+    pub shd_topology_instance_ci95: [f64; 2],
+    pub mean_exact_graph_recovery_rate: f64,
+    pub mean_markov_equivalence_class_recovery_rate: f64,
+    pub mean_full_graph_claim_coverage: f64,
+    pub mean_false_full_graph_claim_rate: f64,
+    pub mean_cpdag_claim_coverage: f64,
+    pub mean_false_cpdag_claim_rate: f64,
+    pub worst_topology_directed_edge_f1: f64,
+    pub worst_topology_shd: f64,
+}
+
+#[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
 pub struct ScmGraphBenchmarkReport {
     pub schema_version: u16,
     pub generator_version: String,
@@ -240,6 +292,7 @@ pub struct ScmGraphBenchmarkReport {
     pub fixed_design_action_id: String,
     pub worlds: Vec<ScmGraphPolicySummary>,
     pub held_out_policy_aggregates: Vec<ScmGraphPolicyAggregate>,
+    pub factorized_shift_aggregates: Vec<ScmGraphFactorizedShiftAggregate>,
     pub interpretation_boundary: String,
 }
 
@@ -1223,6 +1276,65 @@ fn topology_instance_means(
     }).collect()
 }
 
+fn aggregate_factorized_shifts(
+    summaries: &[ScmGraphPolicySummary],
+    policies: &[ScmGraphPolicy],
+) -> Vec<ScmGraphFactorizedShiftAggregate> {
+    let mut aggregates = Vec::with_capacity(policies.len() * ScmGraphShiftSplit::all().len());
+    for policy in policies.iter().copied() {
+        let policy_rows: Vec<&ScmGraphPolicySummary> = summaries.iter()
+            .filter(|row| row.policy == policy)
+            .collect();
+        for split in ScmGraphShiftSplit::all() {
+            let rows: Vec<&ScmGraphPolicySummary> = policy_rows.iter()
+                .copied()
+                .filter(|row| split.includes(row))
+                .collect();
+            let skeleton = topology_instance_means(&rows, |row| row.mean_skeleton_f1);
+            let directed = topology_instance_means(&rows, |row| row.mean_directed_edge_f1);
+            let cpdag_skeleton = topology_instance_means(&rows, |row| row.mean_cpdag_skeleton_f1);
+            let shd = topology_instance_means(&rows, |row| row.mean_structural_hamming_distance);
+            let exact = topology_instance_means(&rows, |row| row.exact_graph_recovery_rate);
+            let class_recovery = topology_instance_means(
+                &rows, |row| row.markov_equivalence_class_recovery_rate,
+            );
+            let graph_coverage = topology_instance_means(&rows, |row| row.graph_claim_coverage);
+            let graph_false_claims = topology_instance_means(
+                &rows, |row| row.false_graph_claim_rate_all_trials,
+            );
+            let cpdag_coverage = topology_instance_means(&rows, |row| row.cpdag_claim_coverage);
+            let cpdag_false_claims = topology_instance_means(
+                &rows, |row| row.false_cpdag_claim_rate_all_trials,
+            );
+            aggregates.push(ScmGraphFactorizedShiftAggregate {
+                policy,
+                split,
+                world_rows: rows.len(),
+                topology_instances: skeleton.len(),
+                mean_skeleton_f1: mean(&skeleton),
+                skeleton_f1_topology_instance_ci95: mean_ci95(&skeleton, 0.0, 1.0),
+                mean_directed_edge_f1: mean(&directed),
+                directed_edge_f1_topology_instance_ci95: mean_ci95(&directed, 0.0, 1.0),
+                mean_cpdag_skeleton_f1: mean(&cpdag_skeleton),
+                cpdag_skeleton_f1_topology_instance_ci95: mean_ci95(&cpdag_skeleton, 0.0, 1.0),
+                mean_structural_hamming_distance: mean(&shd),
+                shd_topology_instance_ci95: mean_ci95(
+                    &shd, 0.0, (NODE_COUNT * (NODE_COUNT - 1) / 2) as f64,
+                ),
+                mean_exact_graph_recovery_rate: mean(&exact),
+                mean_markov_equivalence_class_recovery_rate: mean(&class_recovery),
+                mean_full_graph_claim_coverage: mean(&graph_coverage),
+                mean_false_full_graph_claim_rate: mean(&graph_false_claims),
+                mean_cpdag_claim_coverage: mean(&cpdag_coverage),
+                mean_false_cpdag_claim_rate: mean(&cpdag_false_claims),
+                worst_topology_directed_edge_f1: directed.iter().copied().fold(1.0, f64::min),
+                worst_topology_shd: shd.iter().copied().fold(0.0, f64::max),
+            });
+        }
+    }
+    aggregates
+}
+
 fn aggregate_held_out(
     summaries: &[ScmGraphPolicySummary],
     policies: &[ScmGraphPolicy],
@@ -1344,7 +1456,7 @@ pub fn run_scm_graph_benchmark(
     }
 
     Ok(ScmGraphBenchmarkReport {
-        schema_version: 2,
+        schema_version: 3,
         generator_version: GENERATOR_VERSION.into(),
         seed,
         trials_per_world,
@@ -1362,6 +1474,7 @@ pub fn run_scm_graph_benchmark(
             .map(|scenario| scenario.scenario_id.clone()).collect(),
         fixed_design_action_id: fixed_action_id,
         held_out_policy_aggregates: aggregate_held_out(&summaries, &policies),
+        factorized_shift_aggregates: aggregate_factorized_shifts(&summaries, &policies),
         worlds: summaries,
         interpretation_boundary: concat!(
             "Synthetic software benchmark only. The candidate set enumerates all labeled DAGs ",
@@ -1624,8 +1737,8 @@ mod tests {
         let b = run_scm_graph_benchmark(3, 4, 123, 0.95).unwrap();
         assert_eq!(a, b);
         assert_eq!(serde_json::to_vec(&a).unwrap(), serde_json::to_vec(&b).unwrap());
-        assert_eq!(a.schema_version, 2);
-        assert_eq!(a.generator_version, "sensebench-scm-graphs-0.2.0");
+        assert_eq!(a.schema_version, 3);
+        assert_eq!(a.generator_version, "sensebench-scm-graphs-0.3.0");
         assert_eq!(a.world_count, 112);
         assert_eq!(a.development_world_count, 16);
         assert_eq!(a.held_out_world_count, 96);
@@ -1634,6 +1747,10 @@ mod tests {
         assert_eq!(a.markov_equivalence_class_count, 11);
         assert_eq!(a.worlds.len(), 112 * ScmGraphPolicy::all().len());
         assert_eq!(a.held_out_policy_aggregates.len(), ScmGraphPolicy::all().len());
+        assert_eq!(
+            a.factorized_shift_aggregates.len(),
+            ScmGraphPolicy::all().len() * ScmGraphShiftSplit::all().len()
+        );
     }
 
     #[test]
@@ -1662,6 +1779,7 @@ mod tests {
         }
         for aggregate in &report.held_out_policy_aggregates {
             assert_eq!(aggregate.held_out_worlds, 96);
+            assert_eq!(aggregate.held_out_topology_instances, 28);
             assert!((0.0..=1.0).contains(&aggregate.mean_held_out_directed_edge_f1));
             assert!((0.0..=1.0).contains(&aggregate.mean_held_out_cpdag_skeleton_f1));
             assert!((0.0..=1.0).contains(&aggregate.mean_held_out_compelled_direction_f1));
