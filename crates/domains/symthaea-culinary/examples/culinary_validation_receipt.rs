@@ -25,7 +25,7 @@ use symthaea_culinary::validate::{CulinaryViolation, validate};
 const SCHEMA_VERSION: &str = "1.0.0";
 const BENCHMARK_ID: &str = "CULINARY-VALIDATOR-CORPUS";
 const BENCHMARK_VERSION: &str = "1.0.0";
-const EXPECTED_MANIFEST_SHA256: &str = "PENDING_MANIFEST_SHA256";
+const EXPECTED_MANIFEST_SHA256: &str = "236a67bb3e91a7422fbbc27841bfda013c54ac29e85a0ef71cd303ade978483a";
 
 const REQUIRED_CASE_IDS: &[&str] = &[
     "EMULSION-VALID-INTERIOR-001",
