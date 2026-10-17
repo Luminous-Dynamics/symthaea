@@ -115,9 +115,9 @@ pub fn validate_against_oracle(
         ));
     }
 
-    let expected: BTreeMap<&str, &ExpectedOutcome> = outcomes
+    let expected: BTreeMap<String, &ExpectedOutcome> = outcomes
         .iter()
-        .map(|outcome| (outcome.id.as_str(), outcome))
+        .map(|outcome| (outcome.id.clone(), outcome))
         .collect();
     if expected.len() != outcomes.len() {
         return Err("duplicate outcome identifiers".to_string());
