@@ -873,6 +873,7 @@ pub fn release_task_to_service(
     card: &MaintenanceTaskCard,
     aircraft: &AircraftIdentity,
     record: &MaintenanceWorkRecord,
+    current_documents: &[CurrentDocument],
     actor: &ActorEvidence,
 ) -> Result<TaskState, Vec<TaskCardError>> {
     if actor.kind == ActorKind::SoftwareChecker {
@@ -898,6 +899,23 @@ pub fn release_task_to_service(
     }
     if !card.authority.review_is_verified() {
         errors.push(TaskCardError::AuthorityReviewUnresolved);
+    }
+    for source in std::iter::once(&card.controlling_manual)
+        .chain(card.supporting_sources.iter())
+        .chain(card.parts.iter().map(|part| &part.source))
+    {
+        if !document_is_current(source, current_documents) {
+            errors.push(TaskCardError::StaleOrMissingSource {
+                document_id: source.document_id.clone(),
+            });
+        }
+    }
+    if let AuthorityReview::Verified { permission_source, .. } = &card.authority.review {
+        if !document_is_current(permission_source, current_documents) {
+            errors.push(TaskCardError::StaleOrMissingSource {
+                document_id: permission_source.document_id.clone(),
+            });
+        }
     }
     if let Err(record_errors) = validate_work_record(card, aircraft, record) {
         errors.extend(record_errors);
@@ -1301,7 +1319,7 @@ mod tests {
             credential_reference: Some(doc("credential-fixture", "rev-1", '3')),
         };
         assert_eq!(
-            release_task_to_service(&card, &context.aircraft, &record, &signer),
+            release_task_to_service(&card, &context.aircraft, &record, &context.current_documents, &signer),
             Ok(TaskState::Released)
         );
     }
@@ -1321,9 +1339,40 @@ mod tests {
             credential_reference: None,
         };
         assert_eq!(
-            release_task_to_service(&card, &context.aircraft, &record, &checker),
+            release_task_to_service(&card, &context.aircraft, &record, &context.current_documents, &checker),
             Err(vec![TaskCardError::SoftwareCannotReleaseToService])
         );
+    }
+
+    #[test]
+    fn superseded_source_blocks_return_to_service() {
+        let mut card = card();
+        card.state = TaskState::ReviewPending;
+        let context = context(&card);
+        let record = work_record(&card);
+        let signer = ActorEvidence {
+            actor_id: "authorized-signer-fixture".into(),
+            kind: ActorKind::HumanReturnToServiceSigner,
+            role: Some(card.authority.return_to_service_role),
+            jurisdiction: card.authority.jurisdiction.clone(),
+            certification_basis: card.authority.certification_basis.clone(),
+            credential_reference: Some(doc("credential-fixture", "rev-1", '3')),
+        };
+        let current_without_manual: Vec<CurrentDocument> = context.current_documents
+            .iter()
+            .filter(|source| source.reference.document_id != card.controlling_manual.document_id)
+            .cloned()
+            .collect();
+        let result = release_task_to_service(
+            &card,
+            &context.aircraft,
+            &record,
+            &current_without_manual,
+            &signer,
+        ).unwrap_err();
+        assert!(result.contains(&TaskCardError::StaleOrMissingSource {
+            document_id: card.controlling_manual.document_id.clone()
+        }));
     }
 
     #[test]
