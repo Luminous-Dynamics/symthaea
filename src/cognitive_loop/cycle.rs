@@ -38,6 +38,7 @@ impl CognitiveLoopService {
     pub fn cycle(&mut self, input: &str) -> CycleResult {
         let cycle_start = Instant::now();
         self.stats.total_cycles += 1;
+        self.sensorimotor.plant_step_timing_this_cycle = None;
         self.substrate_manager.tick_energy(&self.config);
         // Feed substrate energy data to ThermodynamicManager
         self.thermodynamic_mgr.set_energy(
@@ -407,6 +408,10 @@ impl CognitiveLoopService {
                                 })
                         }
                     };
+
+                    if let Ok((_result, timing)) = &timed_step {
+                        self.sensorimotor.plant_step_timing_this_cycle = Some(timing.clone());
+                    }
 
                     match timed_step {
                         Ok((result, timing)) if result.success => {
