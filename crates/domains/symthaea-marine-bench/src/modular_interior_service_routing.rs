@@ -1652,14 +1652,15 @@ mod tests {
             clearance_rule: "keep_clear".to_owned(),
             evidence_status: "design_assumption".to_owned(),
         });
-        let request = request_for(
+        let mut request = request_for(
             "SUBGRID-WALL-ROUTE",
             "CONN-CABIN-01-AC_IN",
             module_anchor("CABIN-01", "AC_IN", 2800, 1800),
             service_anchor("AC-BUS", 4700, 1800),
         );
-        // Neither grid endpoint at X=2800 nor X=2900 is in this narrow raw wall,
-        // but the 100 mm edge crosses it; clearance inflation also blocks its corridor.
+        request.clearance_mm = 0;
+        // Neither endpoint at X=2800 nor X=2900 is in the 20 mm wall;
+        // only the connecting 100 mm segment crosses it.
         let report = route_services(&baseline, &[request], limits()).unwrap();
         assert_eq!(report.body.routes[0].disposition, RouteDisposition::EndpointBlocked);
     }
