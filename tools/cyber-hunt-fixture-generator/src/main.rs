@@ -1638,6 +1638,107 @@ mod tests {
     }
 
     #[test]
+    fn cross_domain_trust_chain_checks_identity_build_attestation_and_cloud_scope() {
+        let dataset = generate_cross_domain_trust_chain_dataset(1_000, 2026)
+            .expect("cross-domain trust-chain dataset should generate");
+        let events: Vec<EventRecord> = std::str::from_utf8(&dataset.event_store)
+            .expect("JSONL should be UTF-8")
+            .lines()
+            .map(|line| serde_json::from_str(line).expect("event should deserialize"))
+            .collect();
+        let positive_ids: BTreeSet<String> = dataset.truth.labels.iter()
+            .filter(|label| label.label == "positive")
+            .map(|label| label.event_id.clone())
+            .collect();
+        let positive_events: Vec<&EventRecord> = events.iter()
+            .filter(|event| positive_ids.contains(&event.event_id))
+            .collect();
+
+        assert_eq!(dataset.manifest.scenario_id, "synthetic-cross-domain-trust-chain-v1");
+        assert_eq!(positive_events.len(), 12);
+        assert_eq!(dataset.truth.expected_relations.len(), 11);
+        assert_eq!(
+            dataset.truth.labels.iter().filter(|label| label.label == "negative").count(),
+            988
+        );
+
+        let find_positive = |event_type: &str| -> &EventRecord {
+            positive_events.iter().copied()
+                .find(|event| event.event_type == event_type)
+                .unwrap_or_else(|| panic!("positive event {event_type} should exist"))
+        };
+        let checkout = find_positive("commit_checkout");
+        let build = find_positive("build_job");
+        let publish = find_positive("artifact_publish");
+        let attestation = find_positive("provenance_attestation");
+        let promotion = find_positive("artifact_promotion");
+        let deployment = find_positive("deployment");
+        let role = find_positive("role_assignment");
+        let token = find_positive("token_issue");
+        let storage = find_positive("storage_list");
+        let transfer = find_positive("data_transfer");
+
+        assert_eq!(checkout.details.get("commit_id"), build.details.get("source_commit_id"));
+        assert_eq!(build.details.get("source_commit_id"), publish.details.get("source_commit_id"));
+        assert_ne!(publish.details.get("artifact_digest"), attestation.details.get("subject_digest"));
+        assert_eq!(publish.details.get("artifact_digest"), promotion.details.get("artifact_digest"));
+        assert_eq!(attestation.details.get("subject_digest"), promotion.details.get("attestation_subject_digest"));
+        assert_eq!(promotion.details.get("artifact_digest"), deployment.details.get("artifact_digest"));
+        assert_eq!(role.details.get("approval_state").map(String::as_str), Some("missing"));
+        assert_eq!(role.details.get("scope"), token.details.get("effective_scope"));
+        assert_ne!(token.details.get("effective_scope"), storage.details.get("resource_scope"));
+        assert_eq!(transfer.details.get("destination_profile").map(String::as_str), Some("unapproved_external"));
+
+        let positive_principal = checkout.details.get("principal_object_id").expect("pipeline principal");
+        for event in &positive_events {
+            assert_eq!(
+                event.details.get("principal_object_id"),
+                Some(positive_principal),
+                "the cross-domain chain must preserve principal lineage across {}",
+                event.event_type
+            );
+        }
+
+        let benign_checkout = events.iter().find(|event| event.event_type == "commit_checkout"
+            && !positive_ids.contains(&event.event_id)
+            && event.details.get("review_state").map(String::as_str) == Some("approved"))
+            .expect("approved benign checkout should exist");
+        let benign_principal = benign_checkout.details.get("principal_object_id")
+            .expect("benign principal lineage");
+        let benign_publish = events.iter().find(|event| event.event_type == "artifact_publish"
+            && event.details.get("principal_object_id") == Some(benign_principal))
+            .expect("benign artifact should exist");
+        let benign_attestation = events.iter().find(|event| event.event_type == "provenance_attestation"
+            && event.details.get("principal_object_id") == Some(benign_principal))
+            .expect("benign attestation should exist");
+        let benign_promotion = events.iter().find(|event| event.event_type == "artifact_promotion"
+            && event.details.get("principal_object_id") == Some(benign_principal))
+            .expect("benign promotion should exist");
+        let benign_role = events.iter().find(|event| event.event_type == "role_assignment"
+            && event.details.get("principal_object_id") == Some(benign_principal))
+            .expect("benign role assignment should exist");
+        let benign_token = events.iter().find(|event| event.event_type == "token_issue"
+            && event.details.get("principal_object_id") == Some(benign_principal))
+            .expect("benign token should exist");
+        let benign_storage = events.iter().find(|event| event.event_type == "storage_list"
+            && event.details.get("principal_object_id") == Some(benign_principal))
+            .expect("benign storage access should exist");
+        assert_eq!(benign_publish.details.get("artifact_digest"), benign_attestation.details.get("subject_digest"));
+        assert_eq!(benign_publish.details.get("artifact_digest"), benign_promotion.details.get("artifact_digest"));
+        assert_eq!(benign_role.details.get("approval_state").map(String::as_str), Some("approved"));
+        assert_eq!(benign_role.details.get("scope"), benign_token.details.get("effective_scope"));
+        assert_eq!(benign_token.details.get("effective_scope"), benign_storage.details.get("resource_scope"));
+
+        let replay = generate_cross_domain_trust_chain_dataset(1_000, 2026)
+            .expect("same seed should replay");
+        assert_eq!(dataset.event_store, replay.event_store);
+        assert_eq!(dataset.truth, replay.truth);
+        let other_seed = generate_cross_domain_trust_chain_dataset(1_000, 2027)
+            .expect("other seed should generate");
+        assert_ne!(dataset.manifest.event_store_sha256, other_seed.manifest.event_store_sha256);
+    }
+
+    #[test]
     fn cloud_data_movement_family_masks_event_type_and_checks_scope_authority() {
         let dataset = generate_cloud_data_movement_dataset(1_000, 2026)
             .expect("cloud data movement dataset should generate");
@@ -1738,7 +1839,7 @@ mod tests {
             .as_array().expect("manifest schema should enumerate scenario IDs");
         let truth_ids = truth_schema["properties"]["scenario_id"]["enum"]
             .as_array().expect("truth schema should enumerate scenario IDs");
-        for scenario_id in [SCENARIO_ID, "synthetic-artifact-lifecycle-v1", "synthetic-cloud-data-movement-v1"] {
+        for scenario_id in [SCENARIO_ID, "synthetic-artifact-lifecycle-v1", "synthetic-cloud-data-movement-v1", "synthetic-cross-domain-trust-chain-v1"] {
             assert!(manifest_ids.iter().any(|v| v.as_str() == Some(scenario_id)));
             assert!(truth_ids.iter().any(|v| v.as_str() == Some(scenario_id)));
         }
@@ -1758,10 +1859,17 @@ mod tests {
             CampaignFamily::parse("cloud-data-movement").expect("cloud family should parse"),
             CampaignFamily::CloudDataMovement
         );
+        assert_eq!(
+            CampaignFamily::parse("cross-domain-trust-chain").expect("cross-domain family should parse"),
+            CampaignFamily::CrossDomainTrustChain
+        );
         assert!(CampaignFamily::parse("invented-family").is_err());
         let cloud = generate_dataset_for_family(128, 2026, CampaignFamily::CloudDataMovement)
             .expect("cloud data movement family should generate");
         assert_eq!(cloud.manifest.scenario_id, "synthetic-cloud-data-movement-v1");
+        let cross_domain = generate_dataset_for_family(128, 2026, CampaignFamily::CrossDomainTrustChain)
+            .expect("cross-domain family should generate");
+        assert_eq!(cross_domain.manifest.scenario_id, "synthetic-cross-domain-trust-chain-v1");
         let default = generate_dataset_for_family(128, 2026, CampaignFamily::IdentityToEgress)
             .expect("identity family should generate");
         let compatibility = generate_dataset(128, 2026)
@@ -1776,6 +1884,7 @@ mod tests {
             (CampaignFamily::IdentityToEgress, 9_usize),
             (CampaignFamily::ArtifactProvenance, 6_usize),
             (CampaignFamily::CloudDataMovement, 6_usize),
+            (CampaignFamily::CrossDomainTrustChain, 12_usize),
         ];
         for (family, expected_positive_count) in scenarios {
             for seed in [0_u64, 1_u64, 2026_u64] {
