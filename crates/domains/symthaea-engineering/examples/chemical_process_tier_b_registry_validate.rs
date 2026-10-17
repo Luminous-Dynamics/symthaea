@@ -508,7 +508,7 @@ mod tests {
         value["candidates"][0]["execution"]["raw_output_hash"] =
             json!("sha256:aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa");
         let errors = validate_registry(&value);
-        assert!(errors.iter().any(|error| error.contains("NOT_RUN may not claim raw output bytes")));
+        assert!(errors.iter().any(|error| error.contains("NOT_RUN requires raw_output_hash=null")));
     }
 
     #[test]
