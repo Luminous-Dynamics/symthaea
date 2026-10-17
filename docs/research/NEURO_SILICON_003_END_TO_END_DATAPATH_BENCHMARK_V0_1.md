@@ -151,6 +151,23 @@ Missing metrics are absent—not zero. A successful schema parse verifies only r
 
 ## 8. Staged execution without runner dependency
 
+### Runnable software-only first slice
+
+The initial retrieval baseline is implemented in `crates/domains/symthaea-silicon/examples/hdc_retrieval_host_benchmark.rs`. It uses the canonical `BinaryHV::random` and `BinaryHV::hamming_distance` APIs, fixes the data-generation recipe, hashes generated store/query material, writes raw per-query and per-batch observations, emits a schema-shaped receipt, and preflights artifact hashes plus status/claim invariants.
+
+From a clean checkout at the repository root:
+
+```sh
+cargo test --locked -p symthaea-silicon --example hdc_retrieval_host_benchmark
+cargo run --locked -p symthaea-silicon --example hdc_retrieval_host_benchmark
+cargo run --locked -p symthaea-silicon --example hdc_retrieval_host_benchmark -- --store-size 256 --batch-size 16 --repetitions 30 --warmup 5
+cargo run --locked -p symthaea-silicon --example hdc_retrieval_host_benchmark -- --validate-receipt target/neuro-silicon-003/receipt.json
+```
+
+The default run writes `input_manifest.json`, `expected_results.json`, `raw_observations.json`, and `receipt.json` under `target/neuro-silicon-003/`. Override hardware and clock/power identity using `SYTHAEA_BENCH_HARDWARE` and `SYTHAEA_BENCH_CLOCK_POWER_PROFILE`; unspecified identity stays explicitly unknown/not captured.
+
+A correct run intentionally reports `incomplete`: it measures host-resident retrieval against synthetic known targets, not production encoding, external transfers, GPU/FPGA execution, or energy. A result mismatch reports `fail`. The built-in preflight verifies SHA-256 and key claim/status invariants; it is not a substitute for an independent JSON Schema validator or for independently reproducing benchmark measurements. A successful preflight proves receipt consistency only.
+
 | Stage | Deliverable | Claim ceiling |
 |---|---|---|
 | A | Freeze workload/manifest; implement host-only oracle baseline + receipt validator | Software baseline only |
