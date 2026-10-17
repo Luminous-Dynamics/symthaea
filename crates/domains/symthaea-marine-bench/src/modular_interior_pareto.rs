@@ -794,7 +794,7 @@ mod tests {
     #[test]
     fn hand_calculated_pareto_frontier_excludes_dominated_candidate() {
         let base = evidence_complete_test_config(live(), "-TEST");
-        let mut a_quality = objective("quality", 0.7, "ratio", ObjectiveDirection::Maximize);
+        let mut a_quality = objective("quality", 0.9, "ratio", ObjectiveDirection::Maximize);
         a_quality.comparison_basis = "TEST-ORACLE-ONLY".to_owned();
         let a = submission("A", base.clone(), vec![
             objective("mass", 100.0, "kg", ObjectiveDirection::Minimize),
