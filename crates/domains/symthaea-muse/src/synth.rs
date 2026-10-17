@@ -161,10 +161,34 @@ pub struct SampleStyleRenderReceipt {
     pub rendered_path: &'static str,
 }
 
-/// Audio plus deterministic receipts for every requested voice/style.
+/// Per-note account of the selected renderer and the sample-selection outcome.
+///
+/// A sample-bank path means a compatible sample was picked and rendered; it does
+/// not by itself prove that the sample is perceptually faithful to the named model.
+#[derive(Debug, Clone)]
+pub struct InstrumentRenderReceipt {
+    pub voice_index: usize,
+    pub note_index: usize,
+    pub instrument: Option<Instrument>,
+    pub frequency_hz: f32,
+    pub velocity: f32,
+    pub duration_secs: f32,
+    pub selected_render_path: &'static str,
+    /// Why a sample was used, unavailable, or bypassed in favor of synthesis.
+    pub sample_attempt_status: &'static str,
+}
+
+/// Audio and per-note render-path evidence from the legacy arrangement policy.
+pub struct InstrumentEvidenceRender {
+    pub audio: AudioData,
+    pub note_receipts: Vec<InstrumentRenderReceipt>,
+}
+
+/// Audio plus deterministic receipts for every requested style and note path.
 pub struct StyledArrangementRender {
     pub audio: AudioData,
     pub style_receipts: Vec<SampleStyleRenderReceipt>,
+    pub instrument_receipts: Vec<InstrumentRenderReceipt>,
 }
 
 /// Render with the legacy policy. No request means no style receipts, and the
@@ -185,6 +209,30 @@ pub fn render_arrangement(
         &std::collections::HashMap::new(),
     )
     .audio
+}
+
+/// Render using the existing selection policy and return one selected-renderer
+/// receipt for each note. This makes sample selection and procedural fallback
+/// observable to qualification tools.
+pub fn render_arrangement_with_evidence(
+    arrangement: &Arrangement,
+    sample_rate: u32,
+    total_samples: usize,
+    state: &MusicalState,
+    config: &MuseConfig,
+) -> InstrumentEvidenceRender {
+    let rendered = render_arrangement_internal(
+        arrangement,
+        sample_rate,
+        total_samples,
+        state,
+        config,
+        &std::collections::HashMap::new(),
+    );
+    InstrumentEvidenceRender {
+        audio: rendered.audio,
+        note_receipts: rendered.instrument_receipts,
+    }
 }
 
 /// Render with explicit named sample-style overrides keyed by stable voice index.
@@ -217,6 +265,7 @@ fn render_arrangement_internal(
     styles_by_voice_index: &std::collections::HashMap<usize, String>,
 ) -> StyledArrangementRender {
     let mut style_receipts = Vec::new();
+    let mut instrument_receipts = Vec::new();
     for (&voice_index, style_name) in styles_by_voice_index {
         if voice_index >= arrangement.voices.len() {
             style_receipts.push(SampleStyleRenderReceipt {
@@ -337,6 +386,15 @@ fn render_arrangement_internal(
                     .unwrap_or(false);
             let mut style_decision: Option<&'static str> = None;
             let mut rendered_path = "additive_synthesis";
+            let mut sample_attempt_status = if voice.instrument.is_some() {
+                "sample_library_not_loaded"
+            } else {
+                "no_instrument_identity_legacy_path"
+            };
+            #[cfg(target_arch = "wasm32")]
+            if voice.instrument.is_some() {
+                sample_attempt_status = "sample_library_unavailable_on_target";
+            }
             if let Some(style_name) = requested_style {
                 if let Some(instrument) = voice.instrument {
                     #[cfg(not(target_arch = "wasm32"))]
@@ -381,6 +439,16 @@ fn render_arrangement_internal(
                                                 decision: "style_selected",
                                                 rendered_path: "named_sample_style",
                                             });
+                                            instrument_receipts.push(InstrumentRenderReceipt {
+                                                voice_index,
+                                                note_index: ni,
+                                                instrument: Some(instrument),
+                                                frequency_hz: note.frequency,
+                                                velocity: note.velocity,
+                                                duration_secs: note.duration,
+                                                selected_render_path: "named_sample_style",
+                                                sample_attempt_status: "named_style_sample_rendered",
+                                            });
                                             continue;
                                         } else {
                                             style_decision =
@@ -407,6 +475,7 @@ fn render_arrangement_internal(
                 // or unmapped → the synthesis paths below, unchanged.
                 #[cfg(not(target_arch = "wasm32"))]
                 if let Some(lib) = crate::vcsl::library() {
+                    sample_attempt_status = "instrument_sample_bank_not_loaded";
                     // Articulation-aware: notes short enough to be PLAYED
                     // short use the real staccato/spiccato bank when the
                     // library ships one — a truncated sustain never sounds
@@ -437,9 +506,14 @@ fn render_arrangement_internal(
                         );
                         if done {
                             rendered_path = "default_short_articulation_sample";
+                            sample_attempt_status = "sample_bank_rendered";
+                        } else {
+                            sample_attempt_status =
+                                "instrument_short_articulation_pitch_velocity_unavailable";
                         }
                     }
                     if !done && let Some(bank) = lib.bank(instrument) {
+                        sample_attempt_status = "instrument_sample_pitch_velocity_unavailable";
                         done = render_vcsl_note(
                             &mut bl,
                             &mut br,
@@ -454,9 +528,20 @@ fn render_arrangement_internal(
                         );
                         if done {
                             rendered_path = "default_sustain_sample";
+                            sample_attempt_status = "sample_bank_rendered";
                         }
                     }
                     if done {
+                        instrument_receipts.push(InstrumentRenderReceipt {
+                            voice_index,
+                            note_index: ni,
+                            instrument: Some(instrument),
+                            frequency_hz: note.frequency,
+                            velocity: note.velocity,
+                            duration_secs: note.duration,
+                            selected_render_path: rendered_path,
+                            sample_attempt_status,
+                        });
                         if let (Some(style_name), Some(decision)) =
                             (requested_style, style_decision)
                         {
@@ -484,6 +569,16 @@ fn render_arrangement_internal(
                         instrument,
                     );
                     rendered_path = "karplus_strong";
+                    instrument_receipts.push(InstrumentRenderReceipt {
+                        voice_index,
+                        note_index: ni,
+                        instrument: Some(instrument),
+                        frequency_hz: note.frequency,
+                        velocity: note.velocity,
+                        duration_secs: note.duration,
+                        selected_render_path: rendered_path,
+                        sample_attempt_status,
+                    });
                     if let (Some(style_name), Some(decision)) =
                         (requested_style, style_decision)
                     {
@@ -510,6 +605,16 @@ fn render_arrangement_internal(
                         instrument,
                     );
                     rendered_path = "frequency_modulation";
+                    instrument_receipts.push(InstrumentRenderReceipt {
+                        voice_index,
+                        note_index: ni,
+                        instrument: Some(instrument),
+                        frequency_hz: note.frequency,
+                        velocity: note.velocity,
+                        duration_secs: note.duration,
+                        selected_render_path: rendered_path,
+                        sample_attempt_status,
+                    });
                     if let (Some(style_name), Some(decision)) =
                         (requested_style, style_decision)
                     {
@@ -525,6 +630,10 @@ fn render_arrangement_internal(
                     continue;
                 }
             }
+            if voice.instrument.is_none() {
+                rendered_path = "legacy_mood_additive";
+            }
+
             // Per-NOTE timbre: velocity shapes the spectrum (ff is brighter,
             // not just louder), piano gets stretched partials, sustained
             // instruments keep their brightness, and the instrument's attack
@@ -607,6 +716,16 @@ fn render_arrangement_internal(
                     rendered_path,
                 });
             }
+            instrument_receipts.push(InstrumentRenderReceipt {
+                voice_index,
+                note_index: ni,
+                instrument: voice.instrument,
+                frequency_hz: note.frequency,
+                velocity: note.velocity,
+                duration_secs: note.duration,
+                selected_render_path: rendered_path,
+                sample_attempt_status,
+            });
         }
     }
     if config.noise_mix > 0.0 {
@@ -697,9 +816,15 @@ fn render_arrangement_internal(
             })
             .then_with(|| a.requested_style.cmp(&b.requested_style))
     });
+    instrument_receipts.sort_by(|a, b| {
+        a.voice_index
+            .cmp(&b.voice_index)
+            .then_with(|| a.note_index.cmp(&b.note_index))
+    });
     StyledArrangementRender {
         audio,
         style_receipts,
+        instrument_receipts,
     }
 }
 
@@ -1503,6 +1628,91 @@ mod tests {
                 "{instrument:?}: render appears silent (peak={peak})"
             );
         }
+    }
+
+    #[test]
+    fn instrument_evidence_reports_the_selected_procedural_renderer() {
+        for (instrument, expected_path) in [
+            (Instrument::Ocarina, "additive_synthesis"),
+            (Instrument::Harmonica, "additive_synthesis"),
+            (Instrument::DanTranh, "karplus_strong"),
+        ] {
+            let arrangement = Arrangement {
+                voices: vec![Voice {
+                    role: VoiceRole::Lead,
+                    notes: vec![Note {
+                        frequency: 440.0,
+                        start_time: 0.0,
+                        duration: 0.08,
+                        velocity: 0.7,
+                    }],
+                    pitch_range: (220.0, 880.0),
+                    volume: 1.0,
+                    pan: 0.0,
+                    instrument: Some(instrument),
+                }],
+            };
+            let rendered = render_arrangement_with_evidence(
+                &arrangement,
+                22_050,
+                4_410,
+                &MusicalState::default(),
+                &MuseConfig {
+                    sample_rate: 22_050,
+                    output_format: OutputFormat::StereoF32,
+                    ..MuseConfig::default()
+                },
+            );
+            assert_eq!(rendered.note_receipts.len(), 1, "{instrument:?}");
+            let receipt = &rendered.note_receipts[0];
+            assert_eq!(receipt.voice_index, 0);
+            assert_eq!(receipt.note_index, 0);
+            assert_eq!(receipt.instrument, Some(instrument));
+            assert_eq!(receipt.frequency_hz, 440.0);
+            assert_eq!(receipt.selected_render_path, expected_path);
+            assert!(
+                receipt.sample_attempt_status == "sample_library_not_loaded"
+                    || receipt.sample_attempt_status == "instrument_sample_bank_not_loaded",
+                "{instrument:?}: unexpected sample fallback status {}",
+                receipt.sample_attempt_status
+            );
+        }
+
+        let legacy_arrangement = Arrangement {
+            voices: vec![Voice {
+                role: VoiceRole::Lead,
+                notes: vec![Note {
+                    frequency: 440.0,
+                    start_time: 0.0,
+                    duration: 0.08,
+                    velocity: 0.7,
+                }],
+                pitch_range: (220.0, 880.0),
+                volume: 1.0,
+                pan: 0.0,
+                instrument: None,
+            }],
+        };
+        let legacy = render_arrangement_with_evidence(
+            &legacy_arrangement,
+            22_050,
+            4_410,
+            &MusicalState::default(),
+            &MuseConfig {
+                sample_rate: 22_050,
+                output_format: OutputFormat::StereoF32,
+                ..MuseConfig::default()
+            },
+        );
+        assert_eq!(legacy.note_receipts.len(), 1);
+        assert_eq!(
+            legacy.note_receipts[0].selected_render_path,
+            "legacy_mood_additive"
+        );
+        assert_eq!(
+            legacy.note_receipts[0].sample_attempt_status,
+            "no_instrument_identity_legacy_path"
+        );
     }
 
     #[test]

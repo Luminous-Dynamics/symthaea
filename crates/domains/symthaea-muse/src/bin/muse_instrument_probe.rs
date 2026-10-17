@@ -2,19 +2,17 @@
 // SPDX-License-Identifier: AGPL-3.0-or-later
 //! Deterministic instrument signal-health probe for Melothaea.
 //!
-//! This measures whether the existing arrangement renderer produced finite,
-//! non-silent audio for a small common pitch/velocity grid. It does NOT prove
-//! that the requested sample source was selected, that the pitch is accurate,
-//! or that the timbre is perceptually faithful. The legacy renderer API does
-//! not expose a complete per-note render-path receipt yet; the report says so
-//! explicitly instead of manufacturing evidence.
+//! This measures whether the arrangement renderer produced finite, non-silent
+//! audio for a small common pitch/velocity grid and records the path selected
+//! by the renderer's own dispatch logic. It does NOT prove pitch accuracy or
+//! perceptual fidelity of the timbre/source.
 
 use serde::Serialize;
 use sha2::{Digest, Sha256};
 use std::io::{self, Write};
 use std::process::ExitCode;
 use symthaea_muse::instruments::Instrument;
-use symthaea_muse::synth::render_arrangement;
+use symthaea_muse::synth::render_arrangement_with_evidence;
 use symthaea_muse::voice::{Arrangement, Voice, VoiceRole};
 use symthaea_muse::{AudioData, MuseConfig, MusicalState, Note, OutputFormat, ReverbConfig};
 
@@ -98,6 +96,9 @@ struct ProbeReport {
     cases_with_non_finite_samples: usize,
     cases_near_silent: usize,
     cases_with_repeat_hash_mismatch: usize,
+    cases_with_missing_receipts: usize,
+    cases_with_mismatched_receipts: usize,
+    cases_with_render_path_mismatch: usize,
     evidence_boundary: &'static str,
     cases: Vec<ProbeCase>,
 }
@@ -107,7 +108,6 @@ struct ProbeCase {
     instrument: String,
     gm_program_0_based: u8,
     declared_procedural_family: &'static str,
-    selected_render_path_evidence: &'static str,
     frequency_hz: f32,
     velocity: f32,
     frames: usize,
@@ -120,6 +120,13 @@ struct ProbeCase {
     output_sha256: String,
     repeated_hashes: Vec<String>,
     repeat_hashes_match: bool,
+    selected_render_path: String,
+    sample_attempt_status: String,
+    repeated_render_paths: Vec<String>,
+    repeated_sample_attempt_statuses: Vec<String>,
+    receipt_matches_request: bool,
+    repeated_receipt_matches_request: Vec<bool>,
+    render_path_repeats_match: bool,
     outcome: &'static str,
 }
 
@@ -178,16 +185,41 @@ fn run() -> Result<(), String> {
                 };
 
                 let mut hashes = Vec::with_capacity(options.repeats);
+                let mut selected_paths = Vec::with_capacity(options.repeats);
+                let mut sample_statuses = Vec::with_capacity(options.repeats);
+                let mut receipt_matches = Vec::with_capacity(options.repeats);
                 let mut first_metrics = None;
                 for _ in 0..options.repeats {
-                    let audio = render_arrangement(
+                    let rendered = render_arrangement_with_evidence(
                         &arrangement,
                         options.sample_rate,
                         total_frames,
                         &MusicalState::default(),
                         &config,
                     );
-                    let (samples, frames) = flatten_audio(audio);
+                    let receipt = rendered.note_receipts.first();
+                    let matches_request = receipt.is_some_and(|item| {
+                        item.voice_index == 0
+                            && item.note_index == 0
+                            && item.instrument == Some(*instrument)
+                            && item.frequency_hz == frequency_hz
+                            && item.velocity == velocity
+                            && item.duration_secs == duration_secs
+                    });
+                    receipt_matches.push(matches_request);
+                    selected_paths.push(
+                        receipt
+                            .map(|item| item.selected_render_path)
+                            .unwrap_or("missing_render_receipt")
+                            .to_string(),
+                    );
+                    sample_statuses.push(
+                        receipt
+                            .map(|item| item.sample_attempt_status)
+                            .unwrap_or("missing_render_receipt")
+                            .to_string(),
+                    );
+                    let (samples, frames) = flatten_audio(rendered.audio);
                     let hash = audio_sha256(&samples);
                     if first_metrics.is_none() {
                         first_metrics = Some(measure_signal(&samples, frames));
@@ -197,8 +229,27 @@ fn run() -> Result<(), String> {
                 let metrics = first_metrics
                     .ok_or_else(|| "internal error: no render repetitions".to_string())?;
                 let repeat_hashes_match = hashes.windows(2).all(|pair| pair[0] == pair[1]);
+                let receipt_matches_request = receipt_matches.first().copied().unwrap_or(false);
+                let render_path_repeats_match =
+                    selected_paths.windows(2).all(|pair| pair[0] == pair[1])
+                        && sample_statuses.windows(2).all(|pair| pair[0] == pair[1])
+                        && receipt_matches.iter().all(|matches| *matches);
+                let selected_render_path = selected_paths
+                    .first()
+                    .cloned()
+                    .unwrap_or_else(|| "missing_render_receipt".to_string());
+                let sample_attempt_status = sample_statuses
+                    .first()
+                    .cloned()
+                    .unwrap_or_else(|| "missing_render_receipt".to_string());
                 let outcome = if metrics.non_finite_count > 0 {
                     "non_finite_output"
+                } else if selected_render_path == "missing_render_receipt" {
+                    "missing_render_receipt"
+                } else if !receipt_matches_request {
+                    "render_receipt_mismatch"
+                } else if !render_path_repeats_match {
+                    "render_path_mismatch"
                 } else if metrics.peak < 1.0e-5 {
                     "near_silent_output"
                 } else if !repeat_hashes_match {
@@ -210,9 +261,6 @@ fn run() -> Result<(), String> {
                     instrument: format!("{instrument:?}"),
                     gm_program_0_based: instrument.gm_program(),
                     declared_procedural_family: procedural_family(*instrument),
-                    // render_arrangement returns audio only. It does not expose
-                    // whether local samples or a procedural fallback won.
-                    selected_render_path_evidence: "not_exposed_by_legacy_render_api",
                     frequency_hz,
                     velocity,
                     frames: metrics.frames,
@@ -225,6 +273,13 @@ fn run() -> Result<(), String> {
                     output_sha256: hashes.first().cloned().unwrap_or_default(),
                     repeated_hashes: hashes,
                     repeat_hashes_match,
+                    selected_render_path,
+                    sample_attempt_status,
+                    repeated_render_paths: selected_paths,
+                    repeated_sample_attempt_statuses: sample_statuses,
+                    receipt_matches_request,
+                    repeated_receipt_matches_request: receipt_matches,
+                    render_path_repeats_match,
                     outcome,
                 });
             }
@@ -254,7 +309,19 @@ fn run() -> Result<(), String> {
             .iter()
             .filter(|case| !case.repeat_hashes_match)
             .count(),
-        evidence_boundary: "signal health and same-process repeat determinism only; not pitch accuracy, source selection, instrument fidelity, or human preference",
+        cases_with_missing_receipts: cases
+            .iter()
+            .filter(|case| case.selected_render_path == "missing_render_receipt")
+            .count(),
+        cases_with_mismatched_receipts: cases
+            .iter()
+            .filter(|case| !case.receipt_matches_request)
+            .count(),
+        cases_with_render_path_mismatch: cases
+            .iter()
+            .filter(|case| !case.render_path_repeats_match)
+            .count(),
+        evidence_boundary: "signal health, selected render-path receipt, and same-process repeat determinism only; not pitch accuracy, instrument fidelity, or human preference",
         cases,
     };
 
@@ -447,6 +514,7 @@ fn print_help() {
            --repeats N            Exact rerenders, 1..5 (default: 2)\n\
            -h, --help             Show this help\n\
          JSON is written to stdout. Redirect it to a file if a local report is desired.\n\
+         Per-note render-path receipts are included; they do not prove perceptual fidelity.\n\
          The pitch grid (220/440/880 Hz) is a common smoke grid, not a declared range test."
     );
 }
