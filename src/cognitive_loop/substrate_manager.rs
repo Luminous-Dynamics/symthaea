@@ -1137,6 +1137,37 @@ mod tests {
     }
 
     #[test]
+    fn test_substrate_tau_sign_and_reference_values_are_explicit() {
+        let cases = [
+            (SubstrateType::PhotonicProcessor, 1.5_f32, "photonic faster than silicon"),
+            (SubstrateType::SiliconDigital, 1.333_333_4_f32, "silicon faster than biological"),
+            (SubstrateType::BiologicalNeurons, 1.0_f32, "biological reference"),
+            (SubstrateType::BiochemicalComputer, 0.833_333_3_f32, "biochemical slower than biological"),
+        ];
+        let mut observed = Vec::new();
+
+        for (substrate, expected, label) in cases {
+            let mut config = default_config();
+            config.enable_substrate_speed_modulation = true;
+            config.substrate_type = substrate;
+            let manager = SubstrateManager::new(&config);
+
+            assert!(
+                (manager.tau_factor - expected).abs() < 0.01,
+                "{label}: expected tau near {expected}, observed {}",
+                manager.tau_factor
+            );
+            observed.push((substrate, manager.tau_factor));
+        }
+
+        // operation_speed() is seconds per operation: smaller means faster.
+        // Therefore faster substrates yield larger factors under the current formula.
+        assert!(observed[0].1 > observed[1].1);
+        assert!(observed[1].1 > observed[2].1);
+        assert!(observed[2].1 > observed[3].1);
+    }
+
+    #[test]
     fn test_biological_tau_equals_one() {
         let mut config = default_config();
         config.enable_substrate_speed_modulation = true;
