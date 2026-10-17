@@ -21,6 +21,8 @@ use std::collections::BTreeMap;
 /// brief can allow one dominant pitch. The window ratio measures onset coverage,
 /// not sustained-note coverage.
 #[derive(Debug, Clone, PartialEq)]
+const MAX_WINDOW_COUNT: usize = 4096;
+
 pub struct CreativeIntentContractV1 {
     pub min_note_count: usize,
     pub min_distinct_pitches: usize,
@@ -36,6 +38,7 @@ impl CreativeIntentContractV1 {
         self.min_note_count > 0
             && self.min_distinct_pitches > 0
             && self.window_count > 0
+            && self.window_count <= MAX_WINDOW_COUNT
             && self.min_pitch_range_semitones.is_finite()
             && self.min_pitch_range_semitones >= 0.0
             && self.min_active_window_ratio.is_finite()
@@ -130,6 +133,8 @@ pub fn audit_candidate(
             && note.start_time < duration_secs
             && note.duration.is_finite()
             && note.duration > 0.0
+            && (note.start_time + note.duration).is_finite()
+            && note.start_time + note.duration > note.start_time
             && note.velocity.is_finite()
             && (0.0..=1.0).contains(&note.velocity);
         let midi_pitch = if fields_valid {
@@ -338,6 +343,45 @@ mod tests {
         assert!(audit.violations.contains(&CreativeContractViolation::InvalidNote {
             index: 0
         }));
+    }
+
+    #[test]
+    fn excessive_window_count_is_rejected_before_allocation() {
+        let contract = CreativeIntentContractV1 {
+            min_note_count: 1,
+            min_distinct_pitches: 1,
+            min_pitch_range_semitones: 0.0,
+            min_active_window_ratio: 0.0,
+            max_dominant_pitch_share: 1.0,
+            window_count: usize::MAX,
+        };
+
+        let audit = audit_candidate(&[note(440.0, 0.0)], 1.0, &contract);
+        assert_eq!(
+            audit.violations,
+            vec![CreativeContractViolation::InvalidContract]
+        );
+    }
+
+    #[test]
+    fn duration_overflow_is_rejected_as_invalid_note() {
+        let notes = [Note {
+            frequency: 440.0,
+            start_time: f32::MAX / 2.0,
+            duration: f32::MAX,
+            velocity: 0.8,
+        }];
+
+        let audit = audit_candidate(&notes, f32::MAX, &CreativeIntentContractV1 {
+            min_note_count: 1,
+            min_distinct_pitches: 1,
+            min_pitch_range_semitones: 0.0,
+            min_active_window_ratio: 0.0,
+            max_dominant_pitch_share: 1.0,
+            window_count: 4,
+        });
+        assert!(!audit.accepted);
+        assert!(audit.violations.contains(&CreativeContractViolation::InvalidNote { index: 0 }));
     }
 
     #[test]
