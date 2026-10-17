@@ -65,3 +65,14 @@ This change establishes a schema, two synthetic examples and a benchmark protoco
 ## Executable validator semantics
 
 The Rust module in this implementation slice checks the typed manifest for physical envelope and reserved-region conflicts, blocked service-clearance envelopes, module/revision references, port connection direction/media/profile consistency, declared service capacity, and mass/CG availability. Its receipt digest binds a deterministic serde serialization of the typed input and a separate serialized receipt body. This is an integrity/checking receipt, not a cryptographic signature or source-authenticity claim. The sample capacities and mass properties remain synthetic assumptions; they intentionally keep the overall disposition indeterminate.
+
+## Local replay
+
+From the repository root, after the Rust toolchain is available:
+
+```sh
+cargo test -p symthaea-marine-bench modular_interior
+cargo run -p symthaea-marine-bench --example modular_interior_validator
+```
+
+The example prints the complete receipt for both fixture configurations and exits non-zero if the bookkeeping checks reject either configuration. The expected fixture outcome is still `indeterminate`, since service/weight values are synthetic assumptions, physical routing is unknown, connector profiles are provisional, and safety gates are not assessed. A successful command would demonstrate only that the Rust validator ran on these manifests—not vessel feasibility or approval. These commands have not been executed in the current editing environment.
