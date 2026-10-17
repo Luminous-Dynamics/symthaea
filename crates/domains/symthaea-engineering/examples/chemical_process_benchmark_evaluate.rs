@@ -181,7 +181,7 @@ fn mixer_balance_oracle(fixture: &Value, tolerance: f64) -> Result<Value, String
         "oracle": "nonreactive_mixer_component_balance_v1",
         "derived_disposition": if all_closed { "ACCEPTED_WITHIN_SCOPE" } else { "BLOCKED" },
         "components": component_report,
-        "passed": all_closed
+        "balance_closed": all_closed
     }))
 }
 
@@ -585,7 +585,7 @@ fn evaluate(corpus: &Value, results: &Value, expected_head: &str) -> Value {
                                 .to_owned()
                         ),
                     }
-                    if oracle.get("passed").and_then(Value::as_bool) != Some(true)
+                    if oracle.get("balance_closed").and_then(Value::as_bool) != Some(true)
                         && expected_disposition == "ACCEPTED_WITHIN_SCOPE"
                     {
                         errors.push("unclosed mixer balance cannot be accepted".to_owned());
@@ -601,9 +601,10 @@ fn evaluate(corpus: &Value, results: &Value, expected_head: &str) -> Value {
                 .get("residual_profile")
                 .and_then(|profile| numeric_field(profile, "target_max"))
                 .unwrap_or(f64::NAN);
+            let empty_numeric_values = Value::Null;
             let observed_numeric_values = actual
                 .get("observed_numeric_values")
-                .unwrap_or(&Value::Null);
+                .unwrap_or(&empty_numeric_values);
             match expected.get("fixture").ok_or_else(|| "fixture missing".to_owned())
                 .and_then(|fixture| unit_conversion_oracle(fixture, observed_numeric_values, tolerance)) {
                 Ok(oracle) => {
@@ -926,4 +927,232 @@ mod tests {
         assert_eq!(output["passed"], false);
         assert_eq!(output["cases"][0]["computed_numeric_checks"]["passed"], false);
     }
+
+    fn single_numeric_case(
+        id: &str,
+        class: &str,
+        disposition: &str,
+        fixture: Value,
+        required_findings: &[&str],
+        prohibited_promotions: &[&str],
+    ) -> Value {
+        json!({
+            "benchmark_id": "NUMERIC-ORACLE-TEST",
+            "corpus_version": "1.0.0",
+            "allowed_dispositions": ALLOWED_DISPOSITIONS,
+            "residual_profile": { "target_max": 1e-8 },
+            "cases": [{
+                "id": id,
+                "class": class,
+                "expected_disposition": disposition,
+                "required_findings": required_findings,
+                "prohibited_promotions": prohibited_promotions,
+                "fixture": fixture
+            }]
+        })
+    }
+
+    fn numeric_result(
+        id: &str,
+        disposition: &str,
+        findings: &[&str],
+        values: Value,
+    ) -> Value {
+        json!({
+            "benchmark_id": "NUMERIC-ORACLE-TEST",
+            "corpus_version": "1.0.0",
+            "evaluated_head": HEAD,
+            "cases": [{
+                "id": id,
+                "observed_disposition": disposition,
+                "observed_findings": findings,
+                "observed_promotions": [],
+                "observed_numeric_values": values
+            }]
+        })
+    }
+
+    #[test]
+    fn mixer_oracle_accepts_balanced_component_flow() {
+        let fixture = json!({
+            "unit": "mixer",
+            "reaction": false,
+            "inlets": [
+                {"component": "A", "flow": 2.0, "unit": "mol/s"},
+                {"component": "A", "flow": 3.0, "unit": "mol/s"}
+            ],
+            "outlets": [
+                {"component": "A", "flow": 5.0, "unit": "mol/s"}
+            ]
+        });
+        let corpus = single_numeric_case(
+            "CHEM-PROC-001",
+            "positive-control",
+            "ACCEPTED_WITHIN_SCOPE",
+            fixture,
+            &["component_balance_closed"],
+            &["process_safety_qualified"],
+        );
+        let results = numeric_result(
+            "CHEM-PROC-001",
+            "ACCEPTED_WITHIN_SCOPE",
+            &["component_balance_closed"],
+            json!({"component_balance_residuals": {"A": 0.0}}),
+        );
+        let output = evaluate(&corpus, &results, HEAD);
+        assert_eq!(output["passed"], true);
+        assert_eq!(
+            output["cases"][0]["computed_numeric_checks"]["components"]["A"]["raw_residual"],
+            0.0
+        );
+        assert_eq!(
+            output["cases"][0]["computed_numeric_checks"]["balance_closed"],
+            true
+        );
+    }
+
+    #[test]
+    fn mixer_oracle_requires_imbalance_to_remain_blocked() {
+        let fixture = json!({
+            "unit": "mixer",
+            "reaction": false,
+            "unexplained_sink": false,
+            "inlets": [{"component": "A", "flow": 2.0, "unit": "mol/s"}],
+            "outlets": [{"component": "A", "flow": 1.0, "unit": "mol/s"}]
+        });
+        let corpus = single_numeric_case(
+            "CHEM-PROC-002",
+            "negative-control",
+            "BLOCKED",
+            fixture,
+            &["component_balance_residual_nonzero"],
+            &["balance_closed"],
+        );
+        let results = numeric_result(
+            "CHEM-PROC-002",
+            "BLOCKED",
+            &["component_balance_residual_nonzero"],
+            json!({"component_balance_residuals": {"A": 1.0}}),
+        );
+        let output = evaluate(&corpus, &results, HEAD);
+        assert_eq!(output["passed"], true);
+        assert_eq!(
+            output["cases"][0]["computed_numeric_checks"]["derived_disposition"],
+            "BLOCKED"
+        );
+        assert_eq!(
+            output["cases"][0]["computed_numeric_checks"]["components"]["A"]["raw_residual"],
+            1.0
+        );
+        assert_eq!(
+            output["cases"][0]["computed_numeric_checks"]["balance_closed"],
+            false
+        );
+    }
+
+    #[test]
+    fn mixer_oracle_rejects_a_claimed_zero_residual_when_streams_do_not_balance() {
+        let fixture = json!({
+            "unit": "mixer",
+            "reaction": false,
+            "inlets": [{"component": "A", "flow": 2.0, "unit": "mol/s"}],
+            "outlets": [{"component": "A", "flow": 1.0, "unit": "mol/s"}]
+        });
+        let corpus = single_numeric_case(
+            "CHEM-PROC-002",
+            "negative-control",
+            "BLOCKED",
+            fixture,
+            &["component_balance_residual_nonzero"],
+            &["balance_closed"],
+        );
+        let results = numeric_result(
+            "CHEM-PROC-002",
+            "BLOCKED",
+            &["component_balance_residual_nonzero"],
+            json!({"component_balance_residuals": {"A": 0.0}}),
+        );
+        let output = evaluate(&corpus, &results, HEAD);
+        assert_eq!(output["passed"], false);
+        assert!(
+            output["cases"][0]["errors"]
+                .as_array()
+                .unwrap()
+                .iter()
+                .any(|error| error.as_str().unwrap().contains("independent oracle"))
+        );
+    }
+
+    #[test]
+    fn unit_conversion_oracle_accepts_explicit_equivalent_representation() {
+        let fixture = json!({
+            "conversion_kind": "volume_flow",
+            "from_value": 1.0,
+            "from_unit": "m^3/s",
+            "to_value": 1000.0,
+            "to_unit": "L/s",
+            "conversion_factor": 1000.0,
+            "conversion_factor_ref": "synthetic-unit-conversion-v1",
+            "conversion_rule": "to_value = from_value * conversion_factor"
+        });
+        let corpus = single_numeric_case(
+            "CHEM-PROC-004",
+            "metamorphic",
+            "ACCEPTED_WITHIN_SCOPE",
+            fixture,
+            &["normalized_result_equivalent_within_frozen_tolerance"],
+            &["unit_conversion_inferred_without_evidence"],
+        );
+        let results = numeric_result(
+            "CHEM-PROC-004",
+            "ACCEPTED_WITHIN_SCOPE",
+            &["normalized_result_equivalent_within_frozen_tolerance"],
+            json!({"converted_value": 1000.0}),
+        );
+        let output = evaluate(&corpus, &results, HEAD);
+        assert_eq!(output["passed"], true);
+        assert_eq!(
+            output["cases"][0]["computed_numeric_checks"]["observed_conversion_valid"],
+            true
+        );
+        assert_eq!(
+            output["cases"][0]["computed_numeric_checks"]["fixture_reference_normalized_residual"],
+            0.0
+        );
+    }
+
+    #[test]
+    fn unit_conversion_oracle_rejects_wrong_conversion_result() {
+        let fixture = json!({
+            "conversion_kind": "volume_flow",
+            "from_value": 1.0,
+            "from_unit": "m^3/s",
+            "to_value": 1000.0,
+            "to_unit": "L/s",
+            "conversion_factor": 1000.0,
+            "conversion_factor_ref": "synthetic-unit-conversion-v1",
+            "conversion_rule": "to_value = from_value * conversion_factor"
+        });
+        let corpus = single_numeric_case(
+            "CHEM-PROC-004",
+            "metamorphic",
+            "ACCEPTED_WITHIN_SCOPE",
+            fixture,
+            &["normalized_result_equivalent_within_frozen_tolerance"],
+            &["unit_conversion_inferred_without_evidence"],
+        );
+        let results = numeric_result(
+            "CHEM-PROC-004",
+            "ACCEPTED_WITHIN_SCOPE",
+            &["normalized_result_equivalent_within_frozen_tolerance"],
+            json!({"converted_value": 900.0}),
+        );
+        let output = evaluate(&corpus, &results, HEAD);
+        assert_eq!(output["passed"], false);
+        assert_eq!(
+            output["cases"][0]["computed_numeric_checks"]["observed_conversion_valid"],
+            false
+        );
+    }
+
 }
