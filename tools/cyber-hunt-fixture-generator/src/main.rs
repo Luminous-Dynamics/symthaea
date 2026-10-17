@@ -692,6 +692,28 @@ mod tests {
     }
 
     #[test]
+    fn event_store_sorts_by_ingestion_but_preserves_source_time_inversions() {
+        let dataset = generate_dataset(1_000, 2026).expect("dataset should generate");
+        let events: Vec<EventRecord> = std::str::from_utf8(&dataset.event_store)
+            .expect("JSONL should be UTF-8")
+            .lines()
+            .map(|line| serde_json::from_str(line).expect("event record should deserialize"))
+            .collect();
+
+        assert!(events.windows(2).all(|pair| {
+            (pair[0].ingest_time_ms, &pair[0].event_id)
+                <= (pair[1].ingest_time_ms, &pair[1].event_id)
+        }), "event rows must be sorted by ingestion time with deterministic ID tie-breaking");
+        assert!(events.iter().any(|event| event.event_time_ms != event.ingest_time_ms),
+            "source time and ingestion time must remain separate fields");
+        let source_time_inversions = events.windows(2)
+            .filter(|pair| pair[0].event_time_ms > pair[1].event_time_ms)
+            .count();
+        assert!(source_time_inversions > 0,
+            "the fixture must include out-of-order source times after ingestion-time sorting");
+    }
+
+    #[test]
     fn all_truth_labels_reference_unique_existing_event_ids() {
         let dataset = generate_dataset(1_000, 2026).expect("dataset should generate");
         let events: Vec<EventRecord> = std::str::from_utf8(&dataset.event_store)
