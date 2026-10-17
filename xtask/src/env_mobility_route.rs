@@ -29,7 +29,7 @@ pub struct RouteAudit {
     pub critical_gate_order_valid: bool,
 }
 
-fn object(value: &Value, context: &str) -> Result<&serde_json::Map<String, Value>> {
+fn object<'a>(value: &'a Value, context: &str) -> Result<&'a serde_json::Map<String, Value>> {
     value.as_object().with_context(|| format!("{context}: expected object"))
 }
 
