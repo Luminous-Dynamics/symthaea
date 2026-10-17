@@ -270,8 +270,11 @@ fn is_acyclic(edge_mask: u8) -> bool {
     for pivot in 0..NODE_COUNT {
         for source in 0..NODE_COUNT {
             for target in 0..NODE_COUNT {
-                reachability[source][target] |=
+                let reachable_via_pivot =
                     reachability[source][pivot] && reachability[pivot][target];
+                if reachable_via_pivot {
+                    reachability[source][target] = true;
+                }
             }
         }
     }
@@ -1121,10 +1124,6 @@ mod tests {
             assert!((0.0..=3.0).contains(&row.mean_structural_hamming_distance));
             assert!((0.0..=1.0).contains(&row.graph_claim_coverage));
             assert!((0.0..=1.0).contains(&row.false_graph_claim_rate_all_trials));
-            assert_eq!(
-                row.graph_claim_coverage + (1.0 - row.graph_claim_coverage),
-                1.0
-            );
             if row.family == ScmGraphFamily::NullGraphNegativeControl {
                 assert!(row.mean_structural_hamming_distance >= 0.0);
             }
