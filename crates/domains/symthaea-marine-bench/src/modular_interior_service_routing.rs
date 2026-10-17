@@ -546,35 +546,6 @@ fn contains(rect: &Rect, x: i64, y: i64, clearance_mm: i64) -> bool {
         && y < i128::from(rect.y_max) + i128::from(clearance_mm)
 }
 
-fn rect_for_anchor_owner(
-    configuration: &Configuration,
-    anchor: &RoutingAnchor,
-) -> Result<Option<(String, Rect)>, RoutingError> {
-    if anchor.kind != AnchorKind::ModulePort {
-        return Ok(None);
-    }
-    let instance = anchor.instance_id.as_deref().expect("shape checked");
-    let (deck, rect) = module_bounds(configuration, instance)?;
-    Ok(Some((format!("module:{instance}"), {
-        let _ = deck;
-        rect
-    })))
-}
-
-fn point_blocked_by_foreign_obstacle(
-    obstacles: &[Obstacle],
-    anchor: &RoutingAnchor,
-    clearance_mm: i64,
-) -> Result<bool, RoutingError> {
-    let own = match rect_for_anchor_owner_from_anchor(anchor) {
-        Some(owner) => owner,
-        None => String::new(),
-    };
-    Ok(obstacles.iter().any(|obstacle| {
-        obstacle.owner != own && contains(&obstacle.rect, anchor.position_mm.x_mm, anchor.position_mm.y_mm, clearance_mm)
-    }))
-}
-
 fn rect_for_anchor_owner_from_anchor(anchor: &RoutingAnchor) -> Option<String> {
     (anchor.kind == AnchorKind::ModulePort)
         .then(|| format!("module:{}", anchor.instance_id.as_deref().unwrap_or_default()))
@@ -873,7 +844,7 @@ fn search_grid(
             );
             let next_cost = cost.saturating_add(move_cost);
             let next_state = next_cell * 3 + usize::from(next_dir);
-            let next_bends = bends[state].saturating_add(usize::from(direction != 0 && direction != next_dir));
+            let next_bends = bends[state].saturating_add(if direction != 0 && direction != next_dir { 1 } else { 0 });
             if next_cost < distances[next_state]
                 || (next_cost == distances[next_state] && next_bends < bends[next_state])
             {
@@ -891,7 +862,7 @@ fn search_grid(
     let terminal_bend = terminal_direction != 0
         && state % 3 != 0
         && (state % 3) as u8 != terminal_direction;
-    let final_bends = bends[state].saturating_add(usize::from(terminal_bend));
+    let final_bends = bends[state].saturating_add(if terminal_bend { 1 } else { 0 });
     let mut cells = Vec::new();
     loop {
         cells.push(state / 3);
@@ -1210,4 +1181,5 @@ mod tests {
                 other => panic!("unknown routing oracle case: {other}"),
             }
         }
-    }}
+    }
+}
