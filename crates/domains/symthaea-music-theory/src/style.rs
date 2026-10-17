@@ -320,22 +320,20 @@ impl Style {
     /// `contrapuntal_foundry.rs`'s compatible-styles list).
     ///
     /// `AfroCuban`/`Minimalism`/`HindustaniInspired` are the three
-    /// "flagship" styles [`crate::grammar::compose_with_grammar_plan`]
-    /// routes to dedicated new engines
-    /// ([`crate::groove_cycle`]/[`crate::process_grammar`]/
-    /// [`crate::modal_arc`]) instead of the shared period pipeline — a real
-    /// behavior upgrade for those three, not just a label. Every other
-    /// style maps to a family whose `compose_with_grammar_plan` arm falls
-    /// through to the existing [`crate::composer::compose_with_spec_and_form`]
-    /// pipeline, so this mapping is behavior-preserving for all 25 other
-    /// styles. `RenaissancePolyphony` is contrapuntal in spirit (equal-voice
-    /// imitative entries) but is deliberately NOT mapped to
-    /// `GrammarFamily::Contrapuntal` — that arm's dispatch is hardcoded to
-    /// `crate::fugue::realize_fugue`, so mapping it there would silently
-    /// reroute Renaissance's own realizer through the fugue engine. Giving
+    /// "flagship" styles routed to dedicated groove-cycle, process-additive,
+    /// and modal-arc engines. `Fugue` also routes to its dedicated contrapuntal
+    /// realizer. The remaining styles enter the composition pipeline, where
+    /// `CompositionSpec::form_pool` may still select a dedicated structural
+    /// form such as Sonata, Opera, Passacaglia, Erosion, or Lineage.
+    ///
+    /// `RenaissancePolyphony` is contrapuntal in spirit (equal-voice imitative
+    /// entries) but is deliberately NOT mapped to `GrammarFamily::Contrapuntal`
+    /// — that arm's dispatch is hardcoded to the fugue realizer, so mapping it
+    /// there would silently reroute Renaissance's own realizer. Giving
     /// Renaissance (and Sonata/ProgFolk, similarly parked under
-    /// `Developmental`) their own dedicated dispatch arms is real follow-up
-    /// work, not attempted here.
+    /// `Developmental`) their own dedicated grammar dispatch arms is still
+    /// follow-up work; their existing structural composition paths remain
+    /// distinct from the grammar-family dispatcher.
     pub fn grammar_family(self) -> crate::grammar::GrammarFamily {
         use crate::grammar::GrammarFamily::*;
         match self {
@@ -426,10 +424,9 @@ impl Style {
         // but neither pins a mode and neither shows arousal dead, so
         // valence+arousal remain live.
         const NO_ENERGY_BARS: &[&str] = &["valence", "arousal"];
-        // Passacaglia/RenaissancePolyphony: energy+bars dead (bypass
-        // pipeline) AND valence+arousal dead (pinned mode forecloses both
-        // of their usual levers) — none of the four axes measurably affect
-        // these two styles' composition-level output.
+        // Ground-form presets and RenaissancePolyphony: energy+bars dead
+        // (bypass pipeline) AND valence+arousal dead (pinned mode forecloses
+        // both usual levers). These styles' four advertised axes are inert.
         const NONE_LIVE: &[&str] = &[];
         // Mode-pinned styles where only valence is dead (arousal/energy/
         // bars all still go through the shared period pipeline normally).
@@ -3062,8 +3059,10 @@ mod tests {
         // (`FormKind::uses_progression_pipeline`) never consumes
         // `CompositionSpec::progression` at all: fugue, passacaglia, sonata,
         // renaissance, opera and prog-suite each build their own harmony
-        // internally. For those styles the progression field is INERT — its
-        // value cannot affect a single composed note.
+        // internally. This list also includes Erosion and Lineage, which use
+        // the dedicated ground-form engine inherited from Passacaglia. For
+        // these styles the progression field is INERT — it cannot affect a
+        // composed note.
         //
         // Measured 2026-07-30. This matters because the field still holds a
         // plausible-looking value (`Fugue => Archetype([1, 4, 5, 1])`), so a
@@ -3442,16 +3441,28 @@ mod tests {
     }
 
     #[test]
-    fn only_waltz_uses_a_non_four_meter() {
-        for s in ALL_STYLES {
-            let expected = if s == Style::Waltz { 3 } else { 4 };
-            assert_eq!(s.meter(), expected, "{s:?}");
+    fn every_style_uses_its_declared_meter() {
+        for style in Style::ALL {
+            let expected = match style {
+                Style::Waltz
+                | Style::Lullaby
+                | Style::Passacaglia
+                | Style::BaroqueSuite
+                | Style::Erosion
+                | Style::Lineage
+                | Style::Sarabande => 3,
+                Style::Celtic => 6,
+                Style::Flamenco => 12,
+                _ => 4,
+            };
+            assert_eq!(style.meter(), expected, "{style:?}");
+            assert_eq!(style.spec().meter, expected, "{style:?} spec meter");
         }
     }
 
     #[test]
     fn every_style_every_arousal_tier_motif_sums_to_the_style_meter() {
-        for s in ALL_STYLES {
+        for s in Style::ALL {
             let meter_beats = s.meter() as f64;
             for arousal in [0.1_f32, 0.5, 0.9] {
                 for seed in 0..4 {
@@ -3482,7 +3493,7 @@ mod tests {
 
     #[test]
     fn progression_length_always_matches_requested_bars() {
-        for s in ALL_STYLES {
+        for s in Style::ALL {
             for bars in [1, 3, 4, 7, 8, 11] {
                 let p = s.progression(bars, 42);
                 assert_eq!(p.len(), bars, "{s:?} bars={bars}");
@@ -3524,14 +3535,14 @@ mod tests {
 
     #[test]
     fn progression_is_deterministic() {
-        for s in ALL_STYLES {
+        for s in Style::ALL {
             assert_eq!(s.progression(6, 7), s.progression(6, 7));
         }
     }
 
     #[test]
     fn tempo_is_within_the_declared_range() {
-        for s in ALL_STYLES {
+        for s in Style::ALL {
             let (lo, hi) = s.tempo_range();
             assert_eq!(s.tempo(0.0), lo);
             assert_eq!(s.tempo(1.0), hi);
