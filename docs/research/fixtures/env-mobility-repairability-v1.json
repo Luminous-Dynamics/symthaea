@@ -14,7 +14,7 @@
     "hold_for_evidence"
   ],
   "rule_order": [
-    "Quarantine known failed component qualification; unapproved substitutions; failed post-repair/calibration checks; unresolved recurring faults; unknown history for safety-relevant or pressure-boundary parts; and unqualified battery or pressure-boundary fabrication.",
+    "Quarantine known failed component qualification; unapproved substitutions; failed post-repair/calibration checks; failed repairs reintroduced without acceptance checks; unresolved recurring faults; unknown history for safety-relevant or pressure-boundary parts; and unqualified battery or pressure-boundary fabrication.",
     "If a declared field-replaceable component requires destructive access, return redesign_for_serviceability unless a higher-priority quarantine condition exists. Serviceability target and safety criticality are separate fields.",
     "Return not_locally_reproducible when local_fabrication is requested but preferred editable source files are unavailable; this is a manufacturing-closure result, not a blanket judgement that a commercially supplied qualified part is unsafe.",
     "Hold for retest when required configuration records are stale or required post-repair checks are incomplete; hold for evidence when substitution/compatibility status is unknown.",
@@ -50,7 +50,7 @@
       "case_id": "ENV-MFG-AA-02",
       "component_family": "airframe_arm",
       "criticality_profile": "routine_replaceable",
-      "scenario": "arm_replaced_but_configuration_not_updated",
+      "scenario": "failed_arm_repair_reintroduced_without_acceptance",
       "facts": {
         "intent": "repair",
         "source_format": "editable",
@@ -61,13 +61,13 @@
         "routine_tools": "within_profile",
         "post_repair_check": "complete",
         "calibration": "current",
-        "configuration_record": "stale",
-        "fault_history": "resolved",
+        "configuration_record": "updated_exact",
+        "fault_history": "failed_repair_reintroduced",
         "serviceability_target": "field_replaceable"
       },
-      "expected_disposition": "hold_for_retest",
+      "expected_disposition": "quarantine",
       "expected_reason_codes": [
-        "CONFIGURATION_RECORD_STALE"
+        "FAILED_REPAIR_REINTRODUCED_WITHOUT_RECHECK"
       ]
     },
     {
