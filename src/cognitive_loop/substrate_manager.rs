@@ -444,12 +444,13 @@ impl SubstrateManager {
         };
 
         let Some(elapsed) = now.checked_duration_since(window_started_at) else {
-            // An earlier monotonic timestamp invalidates this window. Latch non-viable
-            // instead of subtracting incomparable/reversed time values, then start anew.
+            // Reversed monotonic evidence invalidates the observation. Latch non-viable
+            // and discard the partial window; do not account the current sample because
+            // its relationship to that invalid interval cannot be established.
             self.consciousness_viable = false;
-            self.energy_rate_window_started_at = Some(now);
-            self.energy_rate_window_joules = modeled_energy_joules;
-            self.total_energy_spent = next_total_energy;
+            self.last_energy_spent = 0.0;
+            self.energy_rate_window_started_at = None;
+            self.energy_rate_window_joules = 0.0;
             self.estimated_energy_rate_watts = 0.0;
             self.energy_rate_window_seconds = 0.0;
             return;
@@ -1616,6 +1617,10 @@ mod tests {
         );
         assert_eq!(mgr.estimated_energy_rate_watts, 0.0);
         assert_eq!(mgr.energy_rate_window_seconds, 0.0);
+        assert_eq!(mgr.total_energy_spent, 0.0, "sample tied to reversed timing must not be accounted");
+        assert_eq!(mgr.energy_rate_window_joules, 0.0);
+        assert_eq!(mgr.energy_rate_window_started_at, None);
+        assert_eq!(mgr.last_energy_spent, 0.0);
     }
 
     #[test]
