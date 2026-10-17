@@ -595,54 +595,6 @@ pub fn assess(
     }
 }
 
-fn dominates(a: &PerformanceMetrics, b: &PerformanceMetrics) -> bool {
-    let no_worse = a.annualized_total_cost_cents <= b.annualized_total_cost_cents
-        && a.annual_supervision_minutes <= b.annual_supervision_minutes
-        && a.annual_maintenance_minutes <= b.annual_maintenance_minutes
-        && a.repair_lead_days <= b.repair_lead_days;
-    let strictly_better = a.annualized_total_cost_cents < b.annualized_total_cost_cents
-        || a.annual_supervision_minutes < b.annual_supervision_minutes
-        || a.annual_maintenance_minutes < b.annual_maintenance_minutes
-        || a.repair_lead_days < b.repair_lead_days;
-    no_worse && strictly_better
-}
-
-/// Return the non-dominated, fully feasible candidates in stable ID order.
-///
-/// No weighted sum is used. A trade-off between cost, human supervision,
-/// maintenance, and repair lead time stays visible on the Pareto frontier.
-/// Provisional, blocked, and rejected candidates are never promoted.
-pub fn pareto_frontier(assessments: &[Assessment]) -> Vec<String> {
-    let mut frontier = Vec::new();
-
-    for (index, candidate) in assessments.iter().enumerate() {
-        if candidate.status != AssessmentStatus::Feasible {
-            continue;
-        }
-        let Some(candidate_metrics) = candidate.metrics.as_ref() else {
-            continue;
-        };
-
-        let is_dominated = assessments.iter().enumerate().any(|(other_index, other)| {
-            if index == other_index || other.status != AssessmentStatus::Feasible {
-                return false;
-            }
-            other
-                .metrics
-                .as_ref()
-                .is_some_and(|other_metrics| dominates(other_metrics, candidate_metrics))
-        });
-
-        if !is_dominated {
-            frontier.push(candidate.candidate_id.clone());
-        }
-    }
-
-    frontier.sort();
-    frontier.dedup();
-    frontier
-}
-
 #[cfg(test)]
 mod tests {
     use super::*;
@@ -1222,37 +1174,6 @@ mod tests {
     }
 
     #[test]
-    fn frontier_preserves_tradeoffs_and_excludes_nonqualified_candidates() {
-        let metrics = |cost, supervision, maintenance, repair| PerformanceMetrics {
-            annualized_total_cost_cents: cost,
-            annual_supervision_minutes: supervision,
-            annual_maintenance_minutes: maintenance,
-            repair_lead_days: repair,
-        };
-        let assessment = |id: &str, status, m| Assessment {
-            candidate_id: id.into(),
-            status,
-            blockers: Vec::new(),
-            uncertain_domains: Vec::new(),
-            metrics: Some(m),
-        };
-        let candidates = vec![
-            assessment("low-cost-high-supervision", AssessmentStatus::Feasible, metrics(200, 1_000, 100, 5)),
-            assessment("balanced-robot", AssessmentStatus::Feasible, metrics(500, 400, 50, 2)),
-            assessment("dominated-robot", AssessmentStatus::Feasible, metrics(800, 900, 80, 4)),
-            assessment("uncertain-option", AssessmentStatus::Provisional, metrics(100, 1, 1, 1)),
-            assessment("blocked-option", AssessmentStatus::Blocked, metrics(10, 1, 1, 1)),
-        ];
-        assert_eq!(
-            pareto_frontier(&candidates),
-            vec![
-                "balanced-robot".to_string(),
-                "low-cost-high-supervision".to_string()
-            ]
-        );
-    }
-
-    #[test]
     fn annualized_cost_rounds_capital_up_and_keeps_units_explicit() {
         let scenario = baseline_scenario();
         let platform = baseline_platform();
@@ -1264,24 +1185,5 @@ mod tests {
         assert_eq!(metrics.annual_maintenance_minutes, 60);
     }
 
-    #[test]
-    fn same_metrics_yield_stable_sorted_frontier() {
-        let m = PerformanceMetrics {
-            annualized_total_cost_cents: 100,
-            annual_supervision_minutes: 100,
-            annual_maintenance_minutes: 10,
-            repair_lead_days: 2,
-        };
-        let make = |id: &str| Assessment {
-            candidate_id: id.into(),
-            status: AssessmentStatus::Feasible,
-            blockers: Vec::new(),
-            uncertain_domains: Vec::new(),
-            metrics: Some(m.clone()),
-        };
-        assert_eq!(
-            pareto_frontier(&[make("zeta"), make("alpha")]),
-            vec!["alpha".to_string(), "zeta".to_string()]
-        );
-    }
+
 }
