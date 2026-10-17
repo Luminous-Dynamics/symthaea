@@ -22,6 +22,8 @@ jobs:
       - uses: dtolnay/rust-toolchain@stable
         with:
           components: clippy
+      - name: Verify retained synthetic evidence fixture digest
+        run: sha256sum -c crates/agri-platform-bench/fixtures/synthetic_evidence_source.v1.sha256
       - name: Independently verify frozen manifest
         run: cargo run --manifest-path crates/agri-platform-bench/Cargo.toml --bin verify-manifest
       - name: Run frozen corpus and unit tests
