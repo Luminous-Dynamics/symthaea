@@ -525,15 +525,18 @@ mod tests {
             dataset_version: Some("synthetic-v1".to_string()),
             permittivity_uncertainty: Some(crate::dielectric::PropertyUncertainty {
                 relative_uncertainty: 0.05,
-                method_reference: "synthetic uncertainty fixture".to_string(),
+                semantics: crate::dielectric::PropertyUncertaintySemantics::HardRelativeBound,
+                method_reference: "synthetic uncertainty fixture (hard relative bound)".to_string(),
             }),
             loss_tangent_uncertainty: Some(crate::dielectric::PropertyUncertainty {
                 relative_uncertainty: 0.05,
-                method_reference: "synthetic uncertainty fixture".to_string(),
+                semantics: crate::dielectric::PropertyUncertaintySemantics::HardRelativeBound,
+                method_reference: "synthetic uncertainty fixture (hard relative bound)".to_string(),
             }),
             breakdown_strength_uncertainty: Some(crate::dielectric::PropertyUncertainty {
                 relative_uncertainty: 0.05,
-                method_reference: "synthetic uncertainty fixture".to_string(),
+                semantics: crate::dielectric::PropertyUncertaintySemantics::HardRelativeBound,
+                method_reference: "synthetic uncertainty fixture (hard relative bound)".to_string(),
             }),
         }
     }
