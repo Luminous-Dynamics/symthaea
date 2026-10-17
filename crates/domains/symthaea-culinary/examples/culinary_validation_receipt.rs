@@ -511,19 +511,19 @@ fn run_case(fixture: &Fixture) -> CaseResult {
 fn make_spec(fixture: &Fixture) -> Result<CulinarySpec, String> {
     let input = &fixture.input;
     let spec = match fixture.family.as_str() {
-        "emulsion" => CulinarySpec::new(&fixture.id).with_emulsion(Emulsion {
+        "emulsion" => CulinarySpec::new(fixture.id.clone()).with_emulsion(Emulsion {
             dispersed_phase_fraction: number(input, "dispersed_phase_fraction")?,
         }),
-        "hydration" => CulinarySpec::new(&fixture.id).with_hydration(Hydration {
+        "hydration" => CulinarySpec::new(fixture.id.clone()).with_hydration(Hydration {
             dough: parse_dough(string(input, "dough")?)?,
             flour_g: number(input, "flour_g")?,
             water_g: number(input, "water_g")?,
         }),
-        "dairy" => CulinarySpec::new(&fixture.id).with_dairy(DairyAcidification {
+        "dairy" => CulinarySpec::new(fixture.id.clone()).with_dairy(DairyAcidification {
             ph: number(input, "ph")?,
             should_curdle: boolean(input, "should_curdle")?,
         }),
-        "nutrition" => CulinarySpec::new(&fixture.id).with_nutrition(NutrientProfile {
+        "nutrition" => CulinarySpec::new(fixture.id.clone()).with_nutrition(NutrientProfile {
             protein_g: number(input, "protein_g")?,
             carb_g: number(input, "carb_g")?,
             fat_g: number(input, "fat_g")?,
@@ -531,19 +531,19 @@ fn make_spec(fixture: &Fixture) -> Result<CulinarySpec, String> {
             sodium_mg: number(input, "sodium_mg")?,
             added_sugar_g: number(input, "added_sugar_g")?,
         }),
-        "coagulation" => CulinarySpec::new(&fixture.id).with_coagulation(Coagulation {
+        "coagulation" => CulinarySpec::new(fixture.id.clone()).with_coagulation(Coagulation {
             protein: parse_protein(string(input, "protein")?)?,
             trajectory: trajectory(input)?,
         }),
-        "candy" => CulinarySpec::new(&fixture.id).with_candy(Candy {
+        "candy" => CulinarySpec::new(fixture.id.clone()).with_candy(Candy {
             stage: parse_sugar_stage(string(input, "stage")?)?,
             trajectory: trajectory(input)?,
         }),
-        "frying" => CulinarySpec::new(&fixture.id).with_frying(FryingFat {
+        "frying" => CulinarySpec::new(fixture.id.clone()).with_frying(FryingFat {
             fat: parse_fat(string(input, "fat")?)?,
             trajectory: trajectory(input)?,
         }),
-        "pasteurization" => CulinarySpec::new(&fixture.id).with_pasteurization(Pasteurization {
+        "pasteurization" => CulinarySpec::new(fixture.id.clone()).with_pasteurization(Pasteurization {
             pathogen: parse_pathogen(string(input, "pathogen")?)?,
             trajectory: trajectory(input)?,
             required_log_reduction: optional_number(input, "required_log_reduction")?,
@@ -701,7 +701,7 @@ fn platform() -> Platform {
 
 fn write_receipt(receipt: &Receipt, output_path: Option<&Path>) -> io::Result<()> {
     let serialized = serde_json::to_string_pretty(receipt)
-        .map_err(io::Error::other)?;
+        .map_err(|error| io::Error::new(io::ErrorKind::InvalidData, error))?;
     if let Some(path) = output_path {
         fs::write(path, format!("{serialized}\n"))
     } else {
