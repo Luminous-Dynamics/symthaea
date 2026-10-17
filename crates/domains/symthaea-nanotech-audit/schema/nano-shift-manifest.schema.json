@@ -197,6 +197,34 @@
                 }
               }
             }
+          },
+          {
+            "if": {
+              "properties": {
+                "shift_kind": {
+                  "const": "single_factor"
+                }
+              },
+              "required": [
+                "shift_kind"
+              ]
+            },
+            "then": {
+              "properties": {
+                "shift_family": {
+                  "not": {
+                    "const": "compounded"
+                  }
+                },
+                "severity": {
+                  "enum": [
+                    "mild",
+                    "moderate",
+                    "severe"
+                  ]
+                }
+              }
+            }
           }
         ]
       }
