@@ -4,8 +4,8 @@
 // Exactness/protocol bench for streaming Hamming distance.
 // Reference count is independently accumulated bit-by-bit in the testbench;
 // canonical Rust oracle differential remains a separate required gate.
-\`timescale 1ns/1ps
-\`default_nettype none
+`timescale 1ns/1ps
+`default_nettype none
 
 module hdc_hamming_stream_case #(
     parameter integer LANE_WIDTH = 256
@@ -311,4 +311,4 @@ module hdc_hamming_stream_tb;
     end
 endmodule
 
-\`default_nettype wire
+`default_nettype wire
