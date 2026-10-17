@@ -205,6 +205,71 @@ impl ConditionedDielectricObservation {
     }
 }
 
+/// Assemble a paired screening record from condition-matched scalar observations.
+///
+/// The current screen requires permittivity and loss tangent to share exact
+/// temperature, frequency, field, evidence class, source, and dataset-version
+/// metadata. Mismatches return an error instead of silently mixing observations.
+/// An optional breakdown observation may come from another source/protocol;
+/// its own conditions and provenance are preserved separately.
+pub fn pair_conditioned_dielectric_observations(
+    permittivity: &ConditionedDielectricObservation,
+    loss_tangent: &ConditionedDielectricObservation,
+    breakdown: Option<&ConditionedDielectricObservation>,
+) -> Result<DielectricPropertyRecord, DielectricValidationError> {
+    permittivity.validate()?;
+    loss_tangent.validate()?;
+
+    if permittivity.property != DielectricObservationProperty::RelativePermittivity
+        || loss_tangent.property != DielectricObservationProperty::LossTangent
+    {
+        return Err(DielectricValidationError::IncompatibleObservations);
+    }
+    if permittivity.material_id != loss_tangent.material_id
+        || permittivity.test_temperature_k != loss_tangent.test_temperature_k
+        || permittivity.test_frequency_hz != loss_tangent.test_frequency_hz
+        || permittivity.test_field_v_per_m != loss_tangent.test_field_v_per_m
+        || permittivity.evidence_kind != loss_tangent.evidence_kind
+        || permittivity.source_reference != loss_tangent.source_reference
+        || permittivity.dataset_version != loss_tangent.dataset_version
+    {
+        return Err(DielectricValidationError::IncompatibleObservations);
+    }
+
+    if let Some(observation) = breakdown {
+        observation.validate()?;
+        if observation.property != DielectricObservationProperty::BreakdownStrength
+            || observation.material_id != permittivity.material_id
+        {
+            return Err(DielectricValidationError::IncompatibleObservations);
+        }
+    }
+
+    let record = DielectricPropertyRecord {
+        material_id: permittivity.material_id.clone(),
+        relative_permittivity: permittivity.value,
+        loss_tangent: loss_tangent.value,
+        test_temperature_k: permittivity.test_temperature_k,
+        test_frequency_hz: permittivity.test_frequency_hz.ok_or(
+            DielectricValidationError::MissingObservationFrequency,
+        )?,
+        test_field_v_per_m: permittivity.test_field_v_per_m,
+        breakdown_strength_v_per_m: breakdown.map(|observation| observation.value),
+        breakdown_reference: breakdown.map(|observation| observation.source_reference.clone()),
+        breakdown_test_temperature_k: breakdown.map(|observation| observation.test_temperature_k),
+        breakdown_test_kind: breakdown.and_then(|observation| observation.breakdown_test_kind),
+        breakdown_evidence_kind: breakdown.map(|observation| observation.evidence_kind),
+        evidence_kind: permittivity.evidence_kind,
+        source_reference: permittivity.source_reference.clone(),
+        dataset_version: permittivity.dataset_version.clone(),
+        permittivity_uncertainty: permittivity.uncertainty.clone(),
+        loss_tangent_uncertainty: loss_tangent.uncertainty.clone(),
+        breakdown_strength_uncertainty: breakdown.and_then(|observation| observation.uncertainty.clone()),
+    };
+    record.validate()?;
+    Ok(record)
+}
+
 /// Dielectric properties measured or calculated at one explicitly recorded point.
 ///
 /// The permittivity and loss tangent share the record's characterization
@@ -575,6 +640,8 @@ pub enum DielectricValidationError {
     UnexpectedObservationFrequency,
     /// A permittivity/loss-tangent observation cannot carry a breakdown-test protocol.
     UnexpectedBreakdownTestKind,
+    /// Paired observations disagree in material, conditions, evidence class, or provenance.
+    IncompatibleObservations,
     /// A reported breakdown value must carry an evidence class.
     MissingBreakdownEvidenceKind,
     /// Breakdown characterization temperature must be finite and above absolute zero.
@@ -621,6 +688,7 @@ impl fmt::Display for DielectricValidationError {
             Self::MissingObservationFrequency => "permittivity/loss-tangent observation requires a test frequency",
             Self::UnexpectedObservationFrequency => "breakdown observation must not carry a dielectric test frequency",
             Self::UnexpectedBreakdownTestKind => "permittivity/loss-tangent observation cannot carry a breakdown protocol",
+            Self::IncompatibleObservations => "dielectric observations are incompatible for pairing; preserve them as separate records",
             Self::MissingBreakdownEvidenceKind => "breakdown strength requires an evidence class",
             Self::InvalidBreakdownTestTemperature => "breakdown test temperature must be finite and above zero kelvin",
             Self::MissingBreakdownTestKind => "breakdown strength requires a test protocol kind",
