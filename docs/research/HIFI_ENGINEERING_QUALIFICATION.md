@@ -101,14 +101,14 @@ Never compress this scorecard to one undifferentiated leaderboard number.
 ## Immediate next work, in order
 
 1. Execute the focused Rust tests introduced with the numeric acceptance fix on the exact PR head; inspect source and test output independently of CI queue status.
-2. Add a standalone, independent test executable/oracle for the validation predicate; hand-author expected classifications rather than calling production helpers.
+2. Extend the independent, hand-authored 14-case oracle with mutation testing and additional domain-specific manufactured-solution fixtures; expected classifications must remain independent of production helpers.
 3. Extend the contract from numeric acceptance to typed applicability, units, ground-truth provenance and claim boundaries by composing with SE-VV/ETK owners.
 4. Add a small manufactured-solution corpus to one existing solver bridge before broadening solver count.
 5. Implement decision-sensitive multifidelity selection through #7803 and the relevant domain owners only after the measurement/discrepancy reports have independently qualified.
 
 ## Verification status
 
-The focused source change and test declarations are on a dedicated public-repository branch. Rust execution is **not claimed** in this environment: neither `cargo` nor `rustc` is installed in the available shell, and queued CI jobs are not passes. No engineering capability, solver, physical result, reliability figure or safety certification is claimed by this document.
+The focused source change, eight unit-test declarations, and a separately located 14-case integration oracle with hand-authored expected outcomes are on a dedicated public-repository branch. Rust execution is **not claimed** in this environment: neither `cargo` nor `rustc` is installed in the available shell, and queued CI jobs are not passes. No engineering capability, solver, physical result, reliability figure or safety certification is claimed by this document.
 
 ## References
 
