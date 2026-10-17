@@ -50,6 +50,9 @@ impl InstrumentKey {
             | Instrument::StringEnsemble => Self::Strings,
             Instrument::Flute
             | Instrument::Ney
+            | Instrument::Recorder
+            | Instrument::Ocarina
+            | Instrument::Harmonica
             | Instrument::Clarinet
             | Instrument::Trumpet
             | Instrument::Saxophone
@@ -64,7 +67,8 @@ impl InstrumentKey {
             | Instrument::UprightBass
             | Instrument::Mandolin
             | Instrument::Banjo
-            | Instrument::ElectricBass => Self::Plucked,
+            | Instrument::ElectricBass
+            | Instrument::DanTranh => Self::Plucked,
             Instrument::ElectricPiano
             | Instrument::Bell
             | Instrument::Marimba
