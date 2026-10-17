@@ -91,6 +91,8 @@ pub enum EffortFindingV1 {
     TrainingProfileNotEligible,
     /// An increase was requested without fresh effort evidence.
     ResistanceIncreaseRequiresFreshEvidence,
+    /// A stop request conflicts with a nonzero resistive request.
+    StopConflictsWithResistance,
     /// A recovery request conflicts with ongoing resistance.
     RecoveryConflictsWithResistance,
     /// A request for more assistance conflicts with ongoing resistance.
@@ -256,7 +258,12 @@ pub fn evaluate_effort_request(request: &EffortRequestV1) -> EffortDecisionV1 {
         }
     }
 
-    if (request.user_requested_recovery || request.user_requested_stop)
+    if request.user_requested_stop
+        && (request.requested_resistance > 0.0 || request.resistance_increase_requested)
+    {
+        findings.push(EffortFindingV1::StopConflictsWithResistance);
+    }
+    if request.user_requested_recovery
         && (request.requested_resistance > 0.0 || request.resistance_increase_requested)
     {
         findings.push(EffortFindingV1::RecoveryConflictsWithResistance);
