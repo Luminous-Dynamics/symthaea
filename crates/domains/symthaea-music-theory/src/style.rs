@@ -252,6 +252,17 @@ pub enum Style {
     /// figuration/velocity arc reused for a long melodic evolution, grace
     /// ornaments as the melody's real language. Sitar's engine debut.
     HindustaniInspired,
+    /// A refrain-centered form: A returns between two structurally distinct episodes.
+    /// Uses the existing five-section Rondo realizer, not merely a tempo/mood label.
+    Rondo,
+    /// Theme followed by surface transformations over the remembered harmonic skeleton.
+    /// Uses the existing duration-preserving variations realizer.
+    ThemeAndVariations,
+    /// Ground bass that progressively erodes; the dedicated ground-form engine chooses
+    /// an ending from the intent/seed while the upper material persists.
+    Erosion,
+    /// A ground lineage whose successive cycles are explicit transformations of their parent.
+    Lineage,
 }
 
 impl Style {
@@ -262,7 +273,7 @@ impl Style {
     /// exhaustiveness tests) should iterate this rather than hand-listing
     /// variants, which is exactly the drift risk `grammar_family`'s own doc
     /// comment below warns against for `HOME_STYLES`-style duplication.
-    pub const ALL: [Style; 29] = [
+    pub const ALL: [Style; 33] = [
         Style::Classical,
         Style::Waltz,
         Style::Folk,
@@ -292,6 +303,10 @@ impl Style {
         Style::Opera,
         Style::IrishTraditional,
         Style::HindustaniInspired,
+        Style::Rondo,
+        Style::ThemeAndVariations,
+        Style::Erosion,
+        Style::Lineage,
     ];
 
     /// The compositional grammar family this style specializes — the single
@@ -330,9 +345,11 @@ impl Style {
             | Style::ModalFolk
             | Style::Impressionism
             | Style::SacredChoral
-            | Style::BaroqueSuite => PeriodSentence,
+            | Style::BaroqueSuite
+            | Style::Rondo
+            | Style::ThemeAndVariations => PeriodSentence,
             Style::Fugue => Contrapuntal,
-            Style::Passacaglia => GroundVariation,
+            Style::Passacaglia | Style::Erosion | Style::Lineage => GroundVariation,
             Style::Tango
             | Style::Celtic
             | Style::Flamenco
@@ -413,7 +430,10 @@ impl Style {
         const NO_VALENCE: &[&str] = &["arousal", "energy", "bars"];
         match self {
             Style::Fugue | Style::ProgFolk | Style::Sonata | Style::Opera => NO_ENERGY_BARS,
-            Style::Passacaglia | Style::RenaissancePolyphony => NONE_LIVE,
+            Style::Passacaglia
+            | Style::Erosion
+            | Style::Lineage
+            | Style::RenaissancePolyphony => NONE_LIVE,
             Style::ModalFolk
             | Style::Tango
             | Style::Celtic
@@ -432,7 +452,12 @@ impl Style {
     /// differ from 4/4.
     pub fn meter(self) -> u8 {
         match self {
-            Style::Waltz | Style::Lullaby | Style::Passacaglia | Style::BaroqueSuite => 3,
+            Style::Waltz
+            | Style::Lullaby
+            | Style::Passacaglia
+            | Style::Erosion
+            | Style::Lineage
+            | Style::BaroqueSuite => 3,
             Style::Celtic => 6,    // the jig's 3+3 lilt
             Style::Flamenco => 12, // the compás's 3+3+2+2+2 cycle
             _ => 4,
@@ -471,6 +496,10 @@ impl Style {
             Style::Opera => (66.0, 112.0),
             Style::IrishTraditional => (112.0, 148.0),
             Style::HindustaniInspired => (56.0, 92.0),
+            Style::Rondo => (84.0, 144.0),
+            Style::ThemeAndVariations => (64.0, 126.0),
+            Style::Erosion => (46.0, 76.0),
+            Style::Lineage => (58.0, 92.0),
         }
     }
 
@@ -2743,6 +2772,38 @@ impl Style {
                     t
                 },
             },
+            Style::Rondo => {
+                let mut spec = Style::Classical.spec();
+                spec.name = "Rondo".into();
+                spec.tempo_range = (84.0, 144.0);
+                spec.form_pool = vec![FormKind::Rondo];
+                spec.accompaniment_pool = vec![A::Alberti, A::Arpeggio];
+                spec.development = DevelopmentDna::Sequential;
+                spec
+            }
+            Style::ThemeAndVariations => {
+                let mut spec = Style::Classical.spec();
+                spec.name = "ThemeAndVariations".into();
+                spec.tempo_range = (64.0, 126.0);
+                spec.form_pool = vec![FormKind::Variations];
+                spec.accompaniment_pool = vec![A::Block, A::Arpeggio];
+                spec.development = DevelopmentDna::Figural;
+                spec
+            }
+            Style::Erosion => {
+                let mut spec = Style::Passacaglia.spec();
+                spec.name = "Erosion".into();
+                spec.tempo_range = (46.0, 76.0);
+                spec.form_pool = vec![FormKind::Erosion];
+                spec
+            }
+            Style::Lineage => {
+                let mut spec = Style::Passacaglia.spec();
+                spec.name = "Lineage".into();
+                spec.tempo_range = (58.0, 92.0);
+                spec.form_pool = vec![FormKind::Lineage];
+                spec
+            }
         }
     }
 }
@@ -2948,13 +3009,15 @@ mod tests {
         // reader naturally assumes it is the fugue's harmony. It is not, and
         // "converting" any of these to a grammar palette would be pure theatre
         // — the decorative-wiring pattern this codebase keeps having to catch.
-        const KNOWN_DEAD: [Style; 6] = [
+        const KNOWN_DEAD: [Style; 8] = [
             Style::Fugue,
             Style::Passacaglia,
             Style::ProgFolk,
             Style::Sonata,
             Style::RenaissancePolyphony,
             Style::Opera,
+            Style::Erosion,
+            Style::Lineage,
         ];
         let dead: Vec<Style> = Style::ALL
             .iter()
@@ -3066,7 +3129,7 @@ mod tests {
 
     #[test]
     fn styles_without_their_own_melodic_dna_may_only_decrease() {
-        const KNOWN_EMPTY_MELODIC_DNA: usize = 14;
+        const KNOWN_EMPTY_MELODIC_DNA: usize = 16;
         let empty: Vec<String> = Style::ALL
             .iter()
             .filter(|s| {
@@ -3100,6 +3163,32 @@ mod tests {
         Style::Cinematic,
         Style::Playful,
     ];
+
+    #[test]
+    fn dedicated_form_styles_select_their_named_structure() {
+        use crate::spec::FormKind;
+
+        let expected = [
+            (Style::Rondo, FormKind::Rondo),
+            (Style::ThemeAndVariations, FormKind::Variations),
+            (Style::Erosion, FormKind::Erosion),
+            (Style::Lineage, FormKind::Lineage),
+        ];
+
+        for (style, form) in expected {
+            let spec = style.spec();
+            assert_eq!(
+                spec.form_kind(0),
+                form,
+                "{style:?} must always select its declared form"
+            );
+            assert_eq!(
+                spec.form_pool,
+                vec![form],
+                "{style:?} must not silently fall back to a generic form pool"
+            );
+        }
+    }
 
     #[test]
     fn classical_is_the_default() {
@@ -3153,6 +3242,10 @@ mod tests {
             Style::Opera,
             Style::IrishTraditional,
             Style::HindustaniInspired,
+            Style::Rondo,
+            Style::ThemeAndVariations,
+            Style::Erosion,
+            Style::Lineage,
         ] {
             let spec = style.spec();
             spec.validate()
@@ -3426,8 +3519,13 @@ mod tests {
                 "{style:?} should have energy+bars dead"
             );
         }
-        // Bypass-grammar styles that ALSO pin a mode: all four axes dead.
-        for style in [Style::Passacaglia, Style::RenaissancePolyphony] {
+        // Ground-form styles that pin their modal identity and own their structure.
+        for style in [
+            Style::Passacaglia,
+            Style::Erosion,
+            Style::Lineage,
+            Style::RenaissancePolyphony,
+        ] {
             assert_eq!(
                 style.supported_intent_axes(),
                 &[] as &[&str],
