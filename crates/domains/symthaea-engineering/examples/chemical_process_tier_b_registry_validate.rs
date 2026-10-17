@@ -296,7 +296,8 @@ fn validate_registry(registry: &Value) -> Vec<String> {
         if let Some(hints) = candidate.get("source_hints_not_gold") {
             if let Some(hints) = hints.as_array() {
                 for (index, hint) in hints.iter().enumerate() {
-                    if !nonempty_text(hint, "use") {
+                    let hint_use = text(hint, "use").unwrap_or_default();
+                    if !matches!(hint_use, "sanity_hint_only" | "broad_sanity_bound_only") {
                         errors.push(format!("{id}: source hint {index} lacks an explicit non-gold use"));
                     }
                     if !nonempty_text(hint, "qualifier") {
