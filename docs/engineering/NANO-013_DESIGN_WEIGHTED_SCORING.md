@@ -44,9 +44,9 @@ Pooled averages must never override a preregistered group-level hard gate. In th
 
 ## Uncertainty
 
-The scorer forms an approximate percentile interval by resampling complete **parent_group_id** clusters with replacement, preserving all sampled windows within each selected parent. It uses a deterministic seed per metric for reproducibility. It withholds an interval below 10 represented parent groups, and also withholds it when fewer than 90% of bootstrap replicates have a defined estimate. Fewer than 20 independent parent groups triggers an additional warning.
+The scorer now resamples **parent_group_id** clusters with replacement *within each declared sampling stratum*, preserving the number of sampled clusters in each stratum and all sampled windows within a selected parent. It uses a deterministic seed per metric for reproducibility. It withholds intervals below 10 represented parent groups, when fewer than 90% of bootstrap replicates have a defined estimate, or when a parent system appears in multiple strata and this simple bootstrap is not appropriate for the crossed design. Fewer than 20 independent parent groups triggers an additional warning.
 
-This is an approximate cluster bootstrap—not an exact variance estimator for every stratified finite-population design, not a guarantee under arbitrary dependence, and not a substitute for a prospectively justified sample-size/power plan. The independent unit must actually be the declared parent-system cluster; assigning many correlated windows separate IDs does not create independence.
+This remains an approximate, stratified cluster bootstrap—not an exact variance estimator for every stratified finite-population design, not a guarantee under arbitrary dependence, and not a substitute for a prospectively justified sample-size/power plan. The independent unit must actually be the declared parent-system cluster; assigning many correlated windows separate IDs does not create independence. If the actual sampling process selects windows within clusters or uses additional stages, the evaluator must use and validate a design-consistent variance estimator before making a formal safety-risk claim.
 
 ## Synthetic and promotion gates
 
