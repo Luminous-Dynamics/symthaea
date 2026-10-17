@@ -12,7 +12,7 @@ cargo run --manifest-path tools/room-stress-qualifier/Cargo.toml -- --json
 
 The default paths point to the checked-in benchmark and schema relative to the repository root. To validate alternate files, pass both paths, optionally after `--json`. Invalid input exits nonzero.
 
-In JSON mode the tool emits a deterministic, content-addressed receipt with the SHA-256 digests of the exact benchmark and schema bytes, the validator version, the case/family/risk counts and an explicit claim ceiling. The receipt proves only that this validator accepted those manifest inputs; it is not a signed attestation and does not qualify spatial geometry or building performance.
+In JSON mode the tool emits a deterministic, content-addressed receipt with SHA-256 digests of the exact benchmark and schema bytes, the validator source and Cargo manifest, the validator version, the case/family/risk counts and an explicit claim ceiling. The receipt proves only that this validator accepted those manifest inputs; it is not a signed attestation and does not qualify spatial geometry or building performance.
 
 ## What this does — and does not — prove
 
