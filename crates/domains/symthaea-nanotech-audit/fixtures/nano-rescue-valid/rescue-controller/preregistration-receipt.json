@@ -1,6 +1,7 @@
 {
   "schema_version": "nano-rescue-preregistration-v1",
   "run_id": "nano-013-synthetic-run-001",
+  "audit_sampling_manifest_sha256": "c736dc24663e1488b035c25773b566277ad99aec93023295f143b037e991906c",
   "policy_revision_sha256": "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
   "sampling_frame_sha256": "3e4fe27162b44df7141d2f00e7b3bcd22974c85e096c44c3c8c052d8ebedc891",
   "seed_commitment_sha256": "8a9e69d54a8383458a6dd411df717779ed9a8e78de981b2781e3a3fb8e3c455d",
