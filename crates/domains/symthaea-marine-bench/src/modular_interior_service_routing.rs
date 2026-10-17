@@ -1471,6 +1471,53 @@ mod tests {
     }
 
     #[test]
+    fn independent_geometry_audit_rejects_tampered_polyline() {
+        let baseline = live();
+        let request = request_for(
+            "GEOMETRY-AUDIT-ROUTE",
+            "CONN-CABIN-01-AC_IN",
+            module_anchor("CABIN-01", "AC_IN", 2800, 1800),
+            service_anchor("AC-BUS", 4700, 1800),
+        );
+        let report = route_services(&baseline, &[request.clone()], limits()).unwrap();
+        let result = &report.body.routes[0];
+        assert!(verify_service_route_geometry(&baseline, &request, 100, result));
+
+        let mut tampered = serde_json::from_value::<ServiceRouteResult>(
+            serde_json::to_value(result).unwrap()
+        ).unwrap();
+        tampered.path[5].x_mm = tampered.path[5].x_mm.saturating_add(100);
+        assert!(!verify_service_route_geometry(&baseline, &request, 100, &tampered));
+    }
+
+    #[test]
+    fn thin_obstacle_between_grid_nodes_blocks_the_crossing_segment() {
+        let mut baseline = live();
+        baseline.reserved_regions.push(crate::modular_interior::ReservedRegion {
+            region_id: "SYNTHETIC-SUBGRID-WALL".to_owned(),
+            deck_id: "MAIN".to_owned(),
+            bounds_mm: crate::modular_interior::BoundsMm {
+                x_min_mm: 2840, x_max_mm: 2860,
+                y_min_mm: 1700, y_max_mm: 1900,
+                z_min_mm: 0, z_max_mm: 2400,
+            },
+            purpose: "sub-grid-edge-crossing-control".to_owned(),
+            clearance_rule: "keep_clear".to_owned(),
+            evidence_status: "design_assumption".to_owned(),
+        });
+        let request = request_for(
+            "SUBGRID-WALL-ROUTE",
+            "CONN-CABIN-01-AC_IN",
+            module_anchor("CABIN-01", "AC_IN", 2800, 1800),
+            service_anchor("AC-BUS", 4700, 1800),
+        );
+        // Neither grid endpoint at X=2800 nor X=2900 is in this narrow raw wall,
+        // but the 100 mm edge crosses it; clearance inflation also blocks its corridor.
+        let report = route_services(&baseline, &[request], limits()).unwrap();
+        assert_eq!(report.body.routes[0].disposition, RouteDisposition::EndpointBlocked);
+    }
+
+    #[test]
     fn open_grid_matches_hand_calculated_manhattan_cost_oracle() {
         let grid = Grid {
             x_min_mm: 0,
