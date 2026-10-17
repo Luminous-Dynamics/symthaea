@@ -288,7 +288,79 @@ For each shift family and severity, report static energy/force/stress error dist
 
 The auditor/evaluator must reject: a single independence key shared between train and test; sample IDs duplicated across splits; missing or malformed source/shift digests; shift-severity labels shuffled after outcomes are viewed; and a policy that improves pooled metrics but materially degrades the predeclared worst group. Keep the official benchmark metrics intact; report shift metrics as separately named extensions.
 
-## 10. Decision record template
+## 10. Prospective rescue-controller benchmark: maximize trustworthy simulation, not snapshot accuracy
+
+**Tracking:** [NANO-013 — prospective trajectory rescue and safe simulation time](https://github.com/Luminous-Dynamics/symthaea/issues/7777).
+
+This extension makes the benchmark an **online decision problem**. At each eligible decision window, a frozen policy decides whether the current simulation may continue, should run more conservatively, should abstain/stop, or should spend a declared reference calculation before resuming. The objective is not the number of frames emitted or a lower static MAE; it is the amount of *reference-validated useful trajectory* produced under a fixed all-in budget, while keeping every material group within physical-integrity limits.
+
+The motivation is now supported by a specific counterexample class: a September 2026 preprint benchmarking ML interatomic potentials on a passivated CdSe nanocrystal reports that force-MAE ranking did not predict 1 ns dynamical robustness in the tested setting, and uncertainty-guided augmentation stabilized one model after 34 extra configurations while other models did not stabilize within their stated augmentation budgets. This is a single-system preprint result, not an independent replication or a Symthaea result: https://arxiv.org/abs/2609.15299. Recent work on flexible uncertainty calibration also motivates evaluating uncertainty on shifted atomistic distributions rather than assuming that model spread is already a calibrated probability: https://www.nature.com/articles/s41524-026-02080-3.
+
+### Preregistered action space
+
+Each policy may select only from actions declared before lockbox evaluation:
+
+1. **Continue** at the declared integration settings.
+2. **Conservative continuation**: checkpoint and/or reduce the timestep under a frozen rule. Any restart/replay cost must be counted.
+3. **Abstain/stop**: end this trajectory attempt and report the lost opportunity. Policy stops are not automatically physical failures, but neither are they allowed to disappear from the denominator.
+4. **Request reference**: evaluate a predeclared snapshot/window using the admitted task-matched reference method, then continue only according to a frozen update/resume rule. Count successful, failed, retried, and rejected reference calls.
+
+The policy receives only information that would have existed at that time: prior coordinates/observables, its own predictions and uncertainty, past reference returns, elapsed cost, and frozen metadata. It may not read future frames, held-out labels, post hoc failure annotations, test-group identity that would not be operationally available, or an evaluation-only oracle flag. The final test lockbox cannot tune trigger thresholds or retraining schedules.
+
+### Matched-budget comparison arms
+
+Include at least:
+
+- fixed continuation/termination rules with no adaptive triage;
+- random query/review at the same actual reference-call budget;
+- uncertainty-only trigger;
+- novelty-only trigger using a separately declared descriptor/HDC score;
+- calibrated uncertainty + out-of-domain/shift diagnostics + all-in cost-aware decision;
+- reference-at-every-eligible-window diagnostic, to establish the expensive reference ceiling rather than to compete as a low-cost policy;
+- oracle-event trigger only as a labelled diagnostic upper bound, never as an eligible deployable arm.
+
+A policy combining signals must include ablations so that each component's value is separately measurable. Match the evaluation budget and initial conditions across arms. Freeze model/data exposure, policy, thresholds, checkpoint logic, stopping rule, reference settings, and analysis before unblinding.
+
+### Primary and safety endpoints
+
+Report as separate endpoints rather than collapsing them into a weighted score:
+
+- **Useful simulated time per all-in budget**: reference-validated trajectory time before the declared horizon or first adjudicated physical/numerical failure, divided by the complete declared resource cost. Define the numerator for each scientific task before running; a merely finite trajectory is not necessarily useful.
+- **Fixed-horizon survival**: fraction of independent attempts still eligible and physically credible at each preregistered horizon, with group-aware uncertainty.
+- **Time and cause of first failure**: retain numerical divergence, unphysical structure, invalid chemistry/passivation, wrong reference-disagreed transition, solver/runtime failure, and other predeclared causes separately.
+- **Intervention value**: additional validated time saved by a warning or conservative action; fraction of true severe events detected before the deadline; warning lead time in windows and physical time; missed-event rate; false alarms per 100 eligible windows; number and cost of unnecessary stops/checkpoints.
+- **Reference efficiency**: validated time per successful reference call and per *all attempted* reference calls; also report wall-clock, CPU/GPU time, memory, and energy where measured. Do not combine unlike currencies into a single cost number without an explicit conversion policy.
+- **Physical observables**: comparison of only the task-relevant structural, dynamical, thermodynamic, or transition observables against the admitted reference. Good numerical survival is not a substitute for physical fidelity.
+- **Worst-group harm**: paired candidate-minus-baseline results for every frozen material/system group, plus the minimum group effect and group-clustered intervals. A pooled win cannot compensate for a hard-gate failure in one group.
+
+### Event accounting and censoring rules
+
+Every started trajectory attempt remains in the ledger. Record the first terminal event and timestamp, including valid horizon completion, physical/numerical failure, policy stop, reference-unavailable stop, infrastructure failure, and administrative censoring. Keep administrative censoring distinct from policy stop and from a verified physical failure. Use a competing-event/time-to-event analysis appropriate to the frozen design; do not estimate survival by deleting trajectories that failed early, and do not count a deliberately stopped trajectory as successful past its stop time. A run that crashes before the first scheduled snapshot is still a failed attempt with cost.
+
+All-in cost must include reference setup and retries, failed/invalid reference jobs, policy inference/selection overhead, acquisition and training, cache semantics, checkpoint storage, rollback/rerun time, and unsuccessful candidate attempts. Report the source of each cost and whether it is directly measured, externally billed, or only an estimate. A hash-bound self-reported ledger proves internal consistency, not external compute billing.
+
+### Provisional promotion targets (targets, not results)
+
+1. **Efficiency:** at least 20% more reference-validated useful simulation time per all-in reference/compute budget than the strongest eligible baseline, with a preregistered group-aware interval supporting improvement.
+2. **Early warning:** recall at least 90% of the preregistered severe-event class while querying/reviewing at most 20% of eligible windows. Publish false alarms, lead time, missed events, and subgroup rates alongside recall.
+3. **Safety non-inferiority:** the fixed-horizon survival and physical-integrity gates must not worsen beyond a task-specific margin fixed from reference repeatability and domain-owner review before held-out outcomes. Any material group breaching a hard physical gate blocks promotion regardless of the pooled gain.
+4. **Calibration under shift:** retain the provisional nominal-90% interval target of 85–95% empirical coverage on independent groups, show interval width, and report conditional/worst-group coverage; no calibration claim is inferred from HDC novelty or ensemble spread alone.
+5. **Independent transfer:** reproduce the direction of the efficiency/safety result on at least two independent material/system families, including a preregistered out-of-distribution group, before making cross-family claims.
+
+These are provisional go/no-go targets, not universal physical constants. The required number of independent parent systems/replicas must follow a preflight power/precision plan; thousands of correlated windows from one parent nanocrystal do not substitute for independent material groups.
+
+### Required negative controls
+
+- Shuffle the risk score while preserving its marginal distribution; the resulting policy must not retain apparent event-detection advantage.
+- Delay the trigger beyond the event onset; warning lead-time benefit must disappear.
+- Compare with a matched-budget random trigger and fixed policy.
+- Mutate or omit a charged reference-call ledger entry while updating declared hashes; the independent accounting check must still detect counter/cost inconsistency from the attempt records.
+- Include a candidate that improves pooled mean but breaches a frozen worst-group physical gate; it must not be promoted.
+- Retain failed and inconclusive attempts and predefine how missing reference labels affect eligibility; do not silently remove the most difficult windows.
+
+This protocol qualifies a controller only after baseline reproduction, artifact/provenance audit, exact-head tests, and task-matched scientific validation. It does not qualify the current Symthaea molecular AIMD implementation for nanocrystal dynamics, and it authorizes no physical experiment.
+
+## 11. Decision record template
 
 Each run review should end with a durable decision:
 
