@@ -2069,6 +2069,42 @@ mod tests {
     }
 
     #[test]
+    fn rejects_single_factor_group_with_multiple_shift_axes() {
+        let fixture = Fixture::new();
+        fixture.write_provenance_manifest();
+        fixture.write_shift_manifest(false);
+
+        let shift_path = fixture.0.join("shift-manifest.json");
+        let mut shift: Value =
+            serde_json::from_str(&fs::read_to_string(&shift_path).expect("read shift")).unwrap();
+        shift["shift_groups"][1]["shift_axes"] =
+            json!(["physical_regime", "label_distribution"]);
+        fs::write(&shift_path, serde_json::to_vec_pretty(&shift).unwrap()).unwrap();
+
+        let (shift_sha256, shift_size_bytes) =
+            hash_artifact(&fixture.0, "shift-manifest.json").expect("rehash shift manifest");
+        let provenance_path = fixture.0.join(PROVENANCE_MANIFEST_NAME);
+        let mut provenance: Value =
+            serde_json::from_str(&fs::read_to_string(&provenance_path).expect("read provenance"))
+                .unwrap();
+        provenance["shift_manifest_sha256"] = json!(shift_sha256);
+        for artifact in provenance["artifacts"].as_array_mut().unwrap() {
+            if artifact["path"] == "shift-manifest.json" {
+                artifact["sha256"] = json!(shift_sha256);
+                artifact["size_bytes"] = json!(shift_size_bytes);
+            }
+        }
+        fs::write(&provenance_path, serde_json::to_vec_pretty(&provenance).unwrap()).unwrap();
+
+        let report = audit_run(&fixture.0);
+        assert_eq!(report.status, "fail");
+        assert!(report
+            .findings
+            .iter()
+            .any(|finding| finding.code == "shift_manifest_axis_kind_mismatch"));
+    }
+
+    #[test]
     fn rejects_in_distribution_group_with_nonbaseline_severity() {
         let fixture = Fixture::new();
         fixture.write_provenance_manifest();
