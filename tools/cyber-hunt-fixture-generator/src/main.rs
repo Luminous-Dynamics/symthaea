@@ -1172,6 +1172,7 @@ fn generate_cross_domain_trust_chain_dataset(record_count: usize, seed: u64) -> 
     let benign_count = 3_000 + rng.below(2_000);
     let benign_bytes = 700_000_000_u64 + rng.below(1_500_000_000);
     let benign_scope = "tenant-alpha/backup";
+    let benign_request_id = format!("req-{:012x}", rng.next_u64() & 0x0000_ffff_ffff_ffff);
 
     let benign_ids = vec![
         push_event(&mut events, &mut rng, &mut used_ids, base + 5_000, &benign_host, benign_principal,
