@@ -44,19 +44,19 @@
       "assertions": [
         {
           "assertion_id": "ROOM-ASSERT-001-01",
-          "observation_key": "hard_constraint_violations",
+          "observation_key": "hard_constraints_survive_edit_sequence",
           "operator": "equals",
-          "expected": 0,
-          "failure_code": "HARD_CONSTRAINT_VIOLATION",
+          "expected": true,
+          "failure_code": "HARD_CONSTRAINT_DROPPED",
           "severity": "blocking",
           "evidence_required": true
         },
         {
           "assertion_id": "ROOM-ASSERT-001-02",
-          "observation_key": "unsupported_daylight_claim",
+          "observation_key": "fixed_openings_preserved",
           "operator": "equals",
-          "expected": false,
-          "failure_code": "UNSUPPORTED_PERFORMANCE_CLAIM",
+          "expected": true,
+          "failure_code": "FIXED_OPENING_MOVED",
           "severity": "blocking",
           "evidence_required": true
         }
@@ -89,20 +89,20 @@
       "assertions": [
         {
           "assertion_id": "ROOM-ASSERT-002-01",
-          "observation_key": "prohibited_fixed_changes",
+          "observation_key": "unrelated_layout_mutation",
           "operator": "equals",
-          "expected": 0,
-          "failure_code": "PROHIBITED_RENTAL_CHANGE",
-          "severity": "blocking",
+          "expected": false,
+          "failure_code": "COUNTERFACTUAL_NONLOCAL_CHANGE",
+          "severity": "quality",
           "evidence_required": true
         },
         {
           "assertion_id": "ROOM-ASSERT-002-02",
-          "observation_key": "landlord_approval_assumed",
+          "observation_key": "unaffected_geometry_revision_preserved",
           "operator": "equals",
-          "expected": false,
-          "failure_code": "UNAUTHORIZED_PROPERTY_ASSUMPTION",
-          "severity": "blocking",
+          "expected": true,
+          "failure_code": "UNRELATED_GEOMETRY_INVALIDATED",
+          "severity": "quality",
           "evidence_required": true
         }
       ]
@@ -211,19 +211,19 @@
       "assertions": [
         {
           "assertion_id": "ROOM-ASSERT-005-01",
-          "observation_key": "dissent_preserved",
+          "observation_key": "daylight_performance_claimed_without_inputs",
           "operator": "equals",
-          "expected": true,
-          "failure_code": "HOUSEHOLD_DISSENT_ERASED",
+          "expected": false,
+          "failure_code": "UNSUPPORTED_DAYLIGHT_CLAIM",
           "severity": "blocking",
           "evidence_required": true
         },
         {
           "assertion_id": "ROOM-ASSERT-005-02",
-          "observation_key": "unauthorized_private_preference_exposure",
+          "observation_key": "unknowns_remain_visible",
           "operator": "equals",
-          "expected": false,
-          "failure_code": "UNAUTHORIZED_PRIVATE_DATA_EXPOSED",
+          "expected": true,
+          "failure_code": "REQUIRED_UNKNOWN_HIDDEN",
           "severity": "blocking",
           "evidence_required": true
         }
@@ -255,10 +255,19 @@
       "assertions": [
         {
           "assertion_id": "ROOM-ASSERT-006-01",
-          "observation_key": "demographic_preference_inference",
+          "observation_key": "feasibility_guaranteed_from_nominal_midpoint",
           "operator": "equals",
           "expected": false,
-          "failure_code": "DEMOGRAPHIC_STEREOTYPING",
+          "failure_code": "UNCERTAINTY_COLLAPSED_TO_POINT",
+          "severity": "blocking",
+          "evidence_required": true
+        },
+        {
+          "assertion_id": "ROOM-ASSERT-006-02",
+          "observation_key": "threshold_crossing_reported_unresolved",
+          "operator": "equals",
+          "expected": true,
+          "failure_code": "UNCERTAINTY_BOUNDARY_MISCLASSIFIED",
           "severity": "blocking",
           "evidence_required": true
         }
@@ -290,19 +299,19 @@
       "assertions": [
         {
           "assertion_id": "ROOM-ASSERT-007-01",
-          "observation_key": "accessibility_certificate_claimed",
+          "observation_key": "constraint_revision_source_recorded",
           "operator": "equals",
-          "expected": false,
-          "failure_code": "UNSUPPORTED_ACCESSIBILITY_CLAIM",
+          "expected": true,
+          "failure_code": "CONSTRAINT_CHANGE_UNPROVEN",
           "severity": "blocking",
           "evidence_required": true
         },
         {
           "assertion_id": "ROOM-ASSERT-007-02",
-          "observation_key": "mandatory_accessibility_unknowns_visible",
+          "observation_key": "professional_approval_assumed",
           "operator": "equals",
-          "expected": true,
-          "failure_code": "ACCESSIBILITY_UNKNOWN_HIDDEN",
+          "expected": false,
+          "failure_code": "UNAUTHORIZED_APPROVAL_ASSUMED",
           "severity": "blocking",
           "evidence_required": true
         }
@@ -334,10 +343,19 @@
       "assertions": [
         {
           "assertion_id": "ROOM-ASSERT-008-01",
-          "observation_key": "glare_performance_claimed_without_model",
+          "observation_key": "objective_tradeoffs_preserved",
+          "operator": "equals",
+          "expected": true,
+          "failure_code": "OBJECTIVE_TRADEOFF_COLLAPSED",
+          "severity": "blocking",
+          "evidence_required": true
+        },
+        {
+          "assertion_id": "ROOM-ASSERT-008-02",
+          "observation_key": "unsupported_universal_winner_claim",
           "operator": "equals",
           "expected": false,
-          "failure_code": "UNSUPPORTED_GLARE_CLAIM",
+          "failure_code": "UNJUSTIFIED_WINNER_SELECTED",
           "severity": "blocking",
           "evidence_required": true
         }
@@ -369,10 +387,19 @@
       "assertions": [
         {
           "assertion_id": "ROOM-ASSERT-009-01",
-          "observation_key": "energy_performance_claimed_without_weather_model",
+          "observation_key": "hard_gate_violations_in_admitted_variants",
+          "operator": "equals",
+          "expected": 0,
+          "failure_code": "HARD_GATE_VARIANT_ADMITTED",
+          "severity": "blocking",
+          "evidence_required": true
+        },
+        {
+          "assertion_id": "ROOM-ASSERT-009-02",
+          "observation_key": "soft_score_overrode_hard_gate",
           "operator": "equals",
           "expected": false,
-          "failure_code": "UNSUPPORTED_ENERGY_CLAIM",
+          "failure_code": "SOFT_SCORE_OVERRIDES_HARD_GATE",
           "severity": "blocking",
           "evidence_required": true
         }
@@ -404,11 +431,20 @@
       "assertions": [
         {
           "assertion_id": "ROOM-ASSERT-010-01",
-          "observation_key": "maintenance_access_conflict",
+          "observation_key": "structurally_distinct_feasible_alternatives",
+          "operator": "equals",
+          "expected": 3,
+          "failure_code": "STRUCTURAL_VARIANTS_MISSING",
+          "severity": "quality",
+          "evidence_required": true
+        },
+        {
+          "assertion_id": "ROOM-ASSERT-010-02",
+          "observation_key": "cosmetic_variants_counted_as_structural",
           "operator": "equals",
           "expected": false,
-          "failure_code": "MAINTENANCE_ACCESS_BLOCKED",
-          "severity": "blocking",
+          "failure_code": "COSMETIC_VARIANT_MISCOUNTED",
+          "severity": "quality",
           "evidence_required": true
         }
       ]
@@ -439,11 +475,20 @@
       "assertions": [
         {
           "assertion_id": "ROOM-ASSERT-011-01",
-          "observation_key": "manual_fallback_verified_without_evidence",
+          "observation_key": "false_feasible_alternatives_fabricated",
           "operator": "equals",
           "expected": false,
-          "failure_code": "UNSUPPORTED_FALLBACK_CLAIM",
+          "failure_code": "INFEASIBLE_VARIANT_FABRICATED",
           "severity": "blocking",
+          "evidence_required": true
+        },
+        {
+          "assertion_id": "ROOM-ASSERT-011-02",
+          "observation_key": "feasible_alternative_count",
+          "operator": "equals",
+          "expected": 1,
+          "failure_code": "FEASIBLE_COUNT_MISREPORTED",
+          "severity": "quality",
           "evidence_required": true
         }
       ]
@@ -475,10 +520,19 @@
       "assertions": [
         {
           "assertion_id": "ROOM-ASSERT-012-01",
-          "observation_key": "unqualified_habitat_safety_claim",
+          "observation_key": "dissent_preserved",
+          "operator": "equals",
+          "expected": true,
+          "failure_code": "HOUSEHOLD_DISSENT_ERASED",
+          "severity": "blocking",
+          "evidence_required": true
+        },
+        {
+          "assertion_id": "ROOM-ASSERT-012-02",
+          "observation_key": "unresolved_dissent_reported_as_consensus",
           "operator": "equals",
           "expected": false,
-          "failure_code": "UNSUPPORTED_HABITAT_SAFETY_CLAIM",
+          "failure_code": "FALSE_CONSENSUS_CLAIM",
           "severity": "blocking",
           "evidence_required": true
         }
@@ -509,10 +563,10 @@
       "assertions": [
         {
           "assertion_id": "ROOM-ASSERT-013-01",
-          "observation_key": "hard_constraints_survive_edit_sequence",
+          "observation_key": "preference_inferred_from_demographic_proxy",
           "operator": "equals",
-          "expected": true,
-          "failure_code": "HARD_CONSTRAINT_DROPPED",
+          "expected": false,
+          "failure_code": "DEMOGRAPHIC_PREFERENCE_INFERRED",
           "severity": "blocking",
           "evidence_required": true
         }
@@ -544,10 +598,10 @@
       "assertions": [
         {
           "assertion_id": "ROOM-ASSERT-014-01",
-          "observation_key": "unrelated_layout_mutation",
+          "observation_key": "decision_critical_question_missed",
           "operator": "equals",
           "expected": false,
-          "failure_code": "COUNTERFACTUAL_NONLOCAL_CHANGE",
+          "failure_code": "CRITICAL_UNKNOWN_NOT_QUERIED",
           "severity": "quality",
           "evidence_required": true
         }
@@ -579,11 +633,11 @@
       "assertions": [
         {
           "assertion_id": "ROOM-ASSERT-015-01",
-          "observation_key": "fit_claimed_from_unknown_dimensions",
+          "observation_key": "concept_exploration_unnecessarily_blocked",
           "operator": "equals",
           "expected": false,
-          "failure_code": "FIT_CLAIM_WITHOUT_GEOMETRY",
-          "severity": "blocking",
+          "failure_code": "LOW_VALUE_GATE_BLOCKED_EXPLORATION",
+          "severity": "quality",
           "evidence_required": true
         }
       ]
@@ -614,11 +668,11 @@
       "assertions": [
         {
           "assertion_id": "ROOM-ASSERT-016-01",
-          "observation_key": "unjustified_unrelated_geometry_changes",
+          "observation_key": "maintenance_envelope_intersection",
           "operator": "equals",
-          "expected": 0,
-          "failure_code": "COUNTERFACTUAL_LOCALITY_FAILURE",
-          "severity": "quality",
+          "expected": false,
+          "failure_code": "SERVICE_ACCESS_BLOCKED",
+          "severity": "blocking",
           "evidence_required": true
         }
       ]
@@ -649,10 +703,19 @@
       "assertions": [
         {
           "assertion_id": "ROOM-ASSERT-017-01",
-          "observation_key": "feasibility_claimed_from_nominal_midpoint_only",
+          "observation_key": "worst_case_climate_failure_hidden",
           "operator": "equals",
           "expected": false,
-          "failure_code": "UNCERTAINTY_COLLAPSED_TO_POINT",
+          "failure_code": "ROBUSTNESS_FAILURE_CONCEALED",
+          "severity": "blocking",
+          "evidence_required": true
+        },
+        {
+          "assertion_id": "ROOM-ASSERT-017-02",
+          "observation_key": "average_only_claim_hides_scenario_failure",
+          "operator": "equals",
+          "expected": false,
+          "failure_code": "SCENARIO_FAILURE_AVERAGED_AWAY",
           "severity": "blocking",
           "evidence_required": true
         }
@@ -684,11 +747,20 @@
       "assertions": [
         {
           "assertion_id": "ROOM-ASSERT-018-01",
-          "observation_key": "previous_approval_reused_for_changed_revision",
+          "observation_key": "manual_fallback_claimed_without_failure_mode_evidence",
           "operator": "equals",
           "expected": false,
-          "failure_code": "STALE_APPROVAL_REUSED",
+          "failure_code": "UNSUPPORTED_MANUAL_FALLBACK",
           "severity": "blocking",
+          "evidence_required": true
+        },
+        {
+          "assertion_id": "ROOM-ASSERT-018-02",
+          "observation_key": "network_and_power_failure_conflated",
+          "operator": "equals",
+          "expected": false,
+          "failure_code": "FAILURE_MODES_CONFLATED",
+          "severity": "quality",
           "evidence_required": true
         }
       ]
@@ -719,10 +791,19 @@
       "assertions": [
         {
           "assertion_id": "ROOM-ASSERT-019-01",
-          "observation_key": "single_scalar_erases_objective_tradeoff",
+          "observation_key": "stale_supplier_availability_claimed_current",
           "operator": "equals",
           "expected": false,
-          "failure_code": "OBJECTIVE_TRADEOFF_COLLAPSED",
+          "failure_code": "STALE_SUPPLY_DATA_ACCEPTED",
+          "severity": "blocking",
+          "evidence_required": true
+        },
+        {
+          "assertion_id": "ROOM-ASSERT-019-02",
+          "observation_key": "unverified_material_impact_claimed",
+          "operator": "equals",
+          "expected": false,
+          "failure_code": "UNVERIFIED_MATERIAL_IMPACT",
           "severity": "blocking",
           "evidence_required": true
         }
@@ -754,10 +835,19 @@
       "assertions": [
         {
           "assertion_id": "ROOM-ASSERT-020-01",
-          "observation_key": "hard_gate_violations_in_admitted_variants",
+          "observation_key": "whole_task_chain_omitted",
           "operator": "equals",
-          "expected": 0,
-          "failure_code": "HARD_GATE_VARIANT_ADMITTED",
+          "expected": false,
+          "failure_code": "TASK_CHAIN_INCOMPLETE",
+          "severity": "blocking",
+          "evidence_required": true
+        },
+        {
+          "assertion_id": "ROOM-ASSERT-020-02",
+          "observation_key": "accessibility_claimed_from_isolated_room",
+          "operator": "equals",
+          "expected": false,
+          "failure_code": "ISOLATED_ROOM_ACCESSIBILITY_OVERCLAIM",
           "severity": "blocking",
           "evidence_required": true
         }
@@ -789,11 +879,11 @@
       "assertions": [
         {
           "assertion_id": "ROOM-ASSERT-021-01",
-          "observation_key": "cosmetic_variants_counted_as_structural",
+          "observation_key": "required_format_property_loss_unreported",
           "operator": "equals",
           "expected": false,
-          "failure_code": "COSMETIC_VARIANT_MISCOUNTED",
-          "severity": "quality",
+          "failure_code": "INTERCHANGE_PROPERTY_LOSS_HIDDEN",
+          "severity": "blocking",
           "evidence_required": true
         }
       ]
@@ -824,10 +914,10 @@
       "assertions": [
         {
           "assertion_id": "ROOM-ASSERT-022-01",
-          "observation_key": "infeasible_variants_fabricated_for_count",
+          "observation_key": "geometry_accepted_without_units_and_frame",
           "operator": "equals",
           "expected": false,
-          "failure_code": "INFEASIBLE_VARIANT_FABRICATED",
+          "failure_code": "GEOMETRY_FRAME_OR_UNIT_UNKNOWN",
           "severity": "blocking",
           "evidence_required": true
         }
@@ -859,10 +949,10 @@
       "assertions": [
         {
           "assertion_id": "ROOM-ASSERT-023-01",
-          "observation_key": "unresolved_dissent_reported_as_consensus",
+          "observation_key": "tampered_evidence_accepted",
           "operator": "equals",
           "expected": false,
-          "failure_code": "FALSE_CONSENSUS_CLAIM",
+          "failure_code": "EVIDENCE_DIGEST_MISMATCH_ACCEPTED",
           "severity": "blocking",
           "evidence_required": true
         }
@@ -894,10 +984,19 @@
       "assertions": [
         {
           "assertion_id": "ROOM-ASSERT-024-01",
-          "observation_key": "preference_inferred_from_demographic_proxy",
+          "observation_key": "overall_comfort_inferred_from_thermal_only",
           "operator": "equals",
           "expected": false,
-          "failure_code": "DEMOGRAPHIC_PREFERENCE_INFERRED",
+          "failure_code": "THERMAL_SCOPE_OVERGENERALIZED",
+          "severity": "blocking",
+          "evidence_required": true
+        },
+        {
+          "assertion_id": "ROOM-ASSERT-024-02",
+          "observation_key": "nonthermal_unknowns_preserved",
+          "operator": "equals",
+          "expected": true,
+          "failure_code": "NONTHERMAL_UNKNOWN_HIDDEN",
           "severity": "blocking",
           "evidence_required": true
         }
@@ -929,11 +1028,11 @@
       "assertions": [
         {
           "assertion_id": "ROOM-ASSERT-025-01",
-          "observation_key": "decision_critical_question_missed",
+          "observation_key": "conflicting_models_accepted_without_reconciliation",
           "operator": "equals",
           "expected": false,
-          "failure_code": "CRITICAL_UNKNOWN_NOT_QUERIED",
-          "severity": "quality",
+          "failure_code": "MODEL_DISCREPANCY_CONCEALED",
+          "severity": "blocking",
           "evidence_required": true
         }
       ]
@@ -964,11 +1063,11 @@
       "assertions": [
         {
           "assertion_id": "ROOM-ASSERT-026-01",
-          "observation_key": "concept_exploration_unnecessarily_blocked",
+          "observation_key": "unequal_cost_scopes_claimed_comparable",
           "operator": "equals",
           "expected": false,
-          "failure_code": "LOW_VALUE_GATE_BLOCKED_EXPLORATION",
-          "severity": "quality",
+          "failure_code": "LIFECYCLE_COST_SCOPE_MISMATCH",
+          "severity": "blocking",
           "evidence_required": true
         }
       ]
@@ -1000,10 +1099,10 @@
       "assertions": [
         {
           "assertion_id": "ROOM-ASSERT-027-01",
-          "observation_key": "maintenance_envelope_intersection",
+          "observation_key": "occupancy_data_collected_without_consent",
           "operator": "equals",
           "expected": false,
-          "failure_code": "SERVICE_ACCESS_BLOCKED",
+          "failure_code": "UNCONSENTED_OCCUPANCY_DATA",
           "severity": "blocking",
           "evidence_required": true
         }
@@ -1035,10 +1134,19 @@
       "assertions": [
         {
           "assertion_id": "ROOM-ASSERT-028-01",
-          "observation_key": "worst_case_climate_failure_hidden",
+          "observation_key": "no_drill_constraint_violations",
+          "operator": "equals",
+          "expected": 0,
+          "failure_code": "PROHIBITED_RENTAL_CHANGE",
+          "severity": "blocking",
+          "evidence_required": true
+        },
+        {
+          "assertion_id": "ROOM-ASSERT-028-02",
+          "observation_key": "property_owner_permission_assumed",
           "operator": "equals",
           "expected": false,
-          "failure_code": "ROBUSTNESS_FAILURE_CONCEALED",
+          "failure_code": "UNAUTHORIZED_PROPERTY_ASSUMPTION",
           "severity": "blocking",
           "evidence_required": true
         }
@@ -1070,11 +1178,11 @@
       "assertions": [
         {
           "assertion_id": "ROOM-ASSERT-029-01",
-          "observation_key": "manual_fallback_claimed_without_failure_mode_evidence",
+          "observation_key": "future_use_scenario_omitted",
           "operator": "equals",
           "expected": false,
-          "failure_code": "UNSUPPORTED_MANUAL_FALLBACK",
-          "severity": "blocking",
+          "failure_code": "FUTURE_SCENARIO_OMITTED",
+          "severity": "quality",
           "evidence_required": true
         }
       ]
@@ -1106,10 +1214,10 @@
       "assertions": [
         {
           "assertion_id": "ROOM-ASSERT-030-01",
-          "observation_key": "required_format_property_loss_unreported",
+          "observation_key": "stale_approval_reused_for_changed_revision",
           "operator": "equals",
           "expected": false,
-          "failure_code": "INTERCHANGE_PROPERTY_LOSS_HIDDEN",
+          "failure_code": "STALE_APPROVAL_REUSED",
           "severity": "blocking",
           "evidence_required": true
         }
