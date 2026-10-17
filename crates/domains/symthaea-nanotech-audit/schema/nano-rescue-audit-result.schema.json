@@ -1,0 +1,30 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "urn:luminous-dynamics:symthaea:nano-rescue-audit-result:v1",
+  "title": "NANO-013 independent audit result",
+  "description": "One JSON object per line, written by an evaluation lane separate from controller policy decisions. Audit labels must not be revealed to the policy during the evaluated run.",
+  "type": "object",
+  "additionalProperties": false,
+  "required": ["schema_version", "run_id", "sampling_manifest_sha256", "window_id", "parent_group_id", "trajectory_id", "stratum_id", "inclusion_probability", "reference_status", "severe_event", "physical_integrity_pass", "policy_triggered_reference", "labels_revealed_to_policy", "audit_reference_cost", "audit_cost_unit"],
+  "properties": {
+    "schema_version": {"const": "nano-rescue-audit-result-v1"},
+    "run_id": {"type": "string", "minLength": 1, "maxLength": 256},
+    "sampling_manifest_sha256": {"type": "string", "pattern": "^[a-f0-9]{64}$"},
+    "window_id": {"type": "string", "minLength": 1, "maxLength": 256},
+    "parent_group_id": {"type": "string", "minLength": 1, "maxLength": 256},
+    "trajectory_id": {"type": "string", "minLength": 1, "maxLength": 256},
+    "stratum_id": {"type": "string", "minLength": 1, "maxLength": 256},
+    "inclusion_probability": {"type": "number", "exclusiveMinimum": 0, "maximum": 1},
+    "reference_status": {"enum": ["evaluated", "reference_failed", "reference_unavailable"]},
+    "severe_event": {"type": ["boolean", "null"]},
+    "physical_integrity_pass": {"type": ["boolean", "null"]},
+    "policy_triggered_reference": {"type": "boolean"},
+    "labels_revealed_to_policy": {"const": false},
+    "audit_reference_cost": {"type": "number", "minimum": 0, "maximum": 1000000000000},
+    "audit_cost_unit": {"type": "string", "minLength": 1, "maxLength": 64}
+  },
+  "allOf": [
+    {"if": {"properties": {"reference_status": {"const": "evaluated"}}, "required": ["reference_status"]}, "then": {"properties": {"severe_event": {"type": "boolean"}, "physical_integrity_pass": {"type": "boolean"}}}},
+    {"if": {"properties": {"reference_status": {"enum": ["reference_failed", "reference_unavailable"]}}, "required": ["reference_status"]}, "then": {"properties": {"severe_event": {"type": "null"}, "physical_integrity_pass": {"type": "null"}}}}
+  ]
+}
