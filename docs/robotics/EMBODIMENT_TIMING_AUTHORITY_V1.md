@@ -43,7 +43,9 @@ An implementation that has not declared its timing semantics is refused before s
 3. A measured-time return with configured-simulation source, a mismatched step index, missing domain/epoch, reversed interval, or inconsistent duration is rejected.
 4. For a valid measured interval, reported dt must equal the source timestamp difference and retain its clock domain/epoch.
 5. Changing cognitive substrate/tau while holding the plant profile, initial state, seed and applied command trace constant leaves plant model-time advancement exactly invariant.
-6. For each bridge, record authority kind, source of timing evidence, supported modes, simulator/hardware profile, and negative-control result in a versioned receipt.
+6. Serialized `CycleMetadata.plant_step_timing` round-trips the accepted record without rewriting source/domain/epoch/duration and omits the field when no authorized timing record was accepted.
+7. A feature-gated cognitive-loop integration test runs biological and photonic cognitive substrates with the same seed/input trace and simulator config, confirms tau differs, and verifies both per-cycle timing records retain identical configured dt and step indices. The test does not claim identical trajectories when cognition produces different commands.
+8. For each bridge, record authority kind, source of timing evidence, supported modes, simulator/hardware profile, and negative-control result in a versioned receipt.
 
 ## Migration rule
 
