@@ -70,6 +70,9 @@ pub mod core;
 /// Shared embodiment types: MotorSafetyLevel, EmbodimentBridge trait, telemetry.
 #[allow(missing_docs)]
 pub mod embodiment;
+/// Report-only agency-budget selection for high-level shared-autonomy research.
+#[allow(missing_docs)]
+pub mod agency_budget;
 /// Report-only, simulation-scoped effort-policy validation for assistive mobility.
 #[allow(missing_docs)]
 pub mod effort_policy;
