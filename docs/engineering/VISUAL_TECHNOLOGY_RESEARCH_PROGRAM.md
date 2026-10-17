@@ -71,6 +71,8 @@ Model geometry, surface shape, lens/focus limits, brightness falloff and ambient
 
 Model optical distortion, modulation transfer function (MTF), pixels per degree, field of view, eye box, eye relief, brightness, frame timing, motion-to-photon latency, reprojection artifacts and gaze uncertainty. Test gaze-contingent/foveated rendering as a compute-allocation strategy, not as an automatic win. Report peripheral quality failures, tracking dropouts and worst-case frame time. Use OpenXR interfaces where available rather than inventing a competing runtime.
 
+Do not conflate panel resolution, recommended render extent, nominal binocular/per-eye field of view, and usable/perceived field of view. Meta's developer guidance updated 25 September 2026 gives Meta VR Glasses a nominal 70° × 66° straight-ahead FOV while identifying 58° × 54° as a p90 perceived target in its device simulation workflow; fit, eye position and gaze reduce usable view. Use these as one dated test profile—not universal VR constants—and make device/runtime eye projection data authoritative over hard-coded pixel geometry. Test center and edge content, both eyes, fit/eye-relief sensitivity, and simulator-versus-through-the-lens discrepancy. Source: https://developers.meta.com/vr/essentials/field-of-view/
+
 ### VIS-LF — light-field displays
 
 Evaluate spatial and angular resolution jointly, with viewing zones, view continuity, crosstalk and depth/viewpoint behavior. Report the resolution tradeoff explicitly; do not compare devices using only panel pixel count or a single center view.
@@ -82,6 +84,16 @@ Start with a validated wave-propagation model and established reference algorith
 ### VIS-MFG — display materials and physical architectures
 
 Build an evidence matrix for OLED, LCD/local dimming, micro-LED, silicon microdisplays, waveguides, meta-optics and candidate spatial-light-modulator architectures. Compare brightness/efficiency, contrast, form factor, thermal requirements, yield, repairability, materials and supply-chain dependencies. For micro-LED, include transfer/inspection yield, defect class, repair rate and calibration cost; do not assume that a high theoretical emitter efficiency implies an economically manufacturable display.
+
+### VIS-CIL — camera-in-the-loop optical calibration
+
+The largest risk in inverse optical design is optimizing an inaccurate model. Use a closed loop: predict output → produce a safe pattern → capture calibrated measurements → quantify model discrepancy → update bounded parameters → test a held-out pattern/session. The camera/instrument is not automatically ground truth; its response, exposure, color pipeline, lens, geometry and calibration must be specified.
+
+Start with low-power, non-laser projector/display patterns. Freeze camera exposure, focus and white balance; prefer raw or linearized captures; preserve distance, angle, ambient light and device mode. Split calibration and holdout by capture session, scene or surface—not random pixels from the same frame. Compare the uncalibrated model, a conventional calibration baseline and Symthaea-selected corrections. Record residual maps and uncertainty, not merely average image similarity.
+
+Proposed gate: target at least 20% lower held-out model residual than the calibrated classical baseline on a preregistered target set, while preventing more than 5% degradation on any preregistered critical metric. These are research targets; they require a measured baseline and suitable equipment. Missing calibration/raw captures remain NOT_EVALUATED.
+
+Tracked in [VIS-CIL-001 #7833](https://github.com/Luminous-Dynamics/symthaea/issues/7833). A relevant 2026 Optica conference contribution reports camera-in-the-loop calibration of a phase-only SLM and experimental speckle reduction; reproduce its protocol and equipment constraints before claiming comparability: https://opg.optica.org/abstract.cfm?uri=DH-2026-Tu1A.3.
 
 ## Benchmark contract
 
@@ -166,7 +178,8 @@ The following are useful starting points, not blanket endorsements of any method
 4. Liu et al. (2025), [Propagation-adaptive 4K computer-generated holography](https://www.nature.com/articles/s41467-025-62997-z). Relevant to propagation-distance flexibility and reconstruction quality.
 5. [Real-Time Rendering Framework for Holography](https://doi.org/10.1111/cgf.70058) (Computer Graphics Forum, 2025). Relevant to real-time CGH and foveation-oriented computation.
 6. Hong et al. (published online 2025; journal issue 2026), [Assembly and integration of micro-LED displays: a review of transfer methods targeting near-perfect yield](https://doi.org/10.1088/2631-7990/ae25a8). Highlights transfer/assembly yield as a commercialization bottleneck.
-7. [Quantifying spatial and angular resolution of light field 3D displays](https://trepo.tuni.fi/bitstream/handle/10024/213976/LFResolutionMeasurement_JSTSP_final.pdf?sequence=-1). Useful for test methodology beyond nominal panel resolution.
+7. Reichelt, Zimmermann, Brenner & Haist (2026), [Camera-in-the-Loop Optimization for High-Fidelity Far-Field Holography with SLMs](https://opg.optica.org/abstract.cfm?uri=DH-2026-Tu1A.3). Useful for camera-in-loop calibration and speckle suppression; system-specific results must be reproduced before transfer claims.
+8. [Quantifying spatial and angular resolution of light field 3D displays](https://trepo.tuni.fi/bitstream/handle/10024/213976/LFResolutionMeasurement_JSTSP_final.pdf?sequence=-1). Useful for test methodology beyond nominal panel resolution.
 
 ## Explicit exclusions
 
