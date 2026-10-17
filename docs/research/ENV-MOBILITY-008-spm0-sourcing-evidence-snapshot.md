@@ -20,24 +20,28 @@ The following are public catalog listings discovered on 2026-10-17. Inventory/pr
 | ESP32-C3 controller board | Make Electronics ESP32-C3 SuperMini 4 MB – Soldered, SKU 3ME3079 | R89 | 16 in stock (Durban stock shown) | ESP32-C3, USB-C and 3.3 V system; confirm exact header and board revision at order time. |
 | Alternative controller board | Make Electronics ESP32-C3 Dev Board – CH340, SKU 3ME3029 | R115 | 10 in stock (Durban stock shown) | Larger 46 × 29.5 mm class board with Micro-USB, I²C and through-hole-friendly 2.54 mm pin pitch; costs R26 more than the SuperMini listing. |
 | Alternative sensor source | DigiKey South Africa, bare Bosch BME280 IC | R64.55 each at quantity 1 (listing) | 0 in stock; lead-time notice shown | Not equivalent to the R159 assembled breakout: requires PCB, assembly, passives and manufacturing/test capability. Listed as a future sourcing option, not a cheaper drop-in. |
+| Lower-measurand alternative | Communica, GY-BMP280-3.3 pressure module | R13 incl. VAT | In stock shown; 2–5 working-day South Africa delivery stated | BMP280 profile is temperature + pressure only; it does not supply the BME280's humidity measurement. Component authenticity/revision and actual errors must be checked. Not an equivalent substitute if relative humidity is required. |
 
 ### Source links
 - [Make Electronics — BME280 3-in-1 Sensor Module Type 1, SKU 0ME1655](https://make.net.za/product/bme280-3-in-1-sensor-module-type1/)
 - [Make Electronics — ESP32-C3 SuperMini 4 MB – Soldered, SKU 3ME3079](https://make.net.za/product/3me3079/)
 - [Make Electronics — ESP32-C3 Dev Board – CH340, SKU 3ME3029](https://make.net.za/product/esp32-c3-dev-board-ch340/)
 - [DigiKey South Africa — Bosch BME280 bare component](https://www.digikey.co.za/en/products/detail/bosch-sensortec/BME280/828-1063-1-ND/6136314)
+- [Communica — GY-BMP280-3.3 pressure module](https://www.communica.co.za/products/hkd-baromtrc-sensr-bmp280-3-3)
+- [Make Electronics — USB-C data/power cable, 25 cm](https://make.net.za/product/4me2515/)
 
 The Make Electronics pages show the listed prices as VAT-inclusive and inventory at its Durban location. The snapshot treats those as catalog claims only; the stock status was not verified through checkout or a written supplier quote. The DigiKey bare part listing is explicitly not a comparable completed sensor module and showed no stock at the time of discovery.
 
-## 3. Minimal priced electronics subtotal
+## 3. Minimal priced electronics subtotals and mission-first variants
 
-A preliminary controller-plus-breakout pair gives this catalog-only arithmetic:
+Two initial *candidate profiles* show why the mission's measurands must be frozen before fixing a BOM:
 
-- ESP32-C3 SuperMini board: R89
-- BME280 breakout: R159
-- **Listed electronics subtotal: R248 including displayed VAT**
+- **Pressure + temperature profile:** ESP32-C3 SuperMini board R89 + Communica GY-BMP280-3.3 listing R13 = **R102 displayed electronics subtotal including VAT**.
+- **Temperature + relative humidity + pressure profile:** ESP32-C3 SuperMini board R89 + BME280 breakout R159 = **R248 displayed electronics subtotal including VAT**.
 
-This excludes shipping to the intended build site, headers/crimp terminals, keyed harness, enclosure, adapter, fixture/material, power source, bench time, failed/reworked parts, reference instrument, calibration service, taxes not already included, maintenance and any product qualification. It is not a total unit cost or a purchasing recommendation.
+These are current catalog arithmetic snapshots only. The R13 pressure board's true component identity and metrology performance are not independently established; verify the delivered article before using it in a data-quality claim. It is *not* a substitute for the BME280 when humidity matters. The cheaper profile is only appropriate if the declared scientific question does not require humidity.
+
+The ESP32-C3 SuperMini's listed R89 board and the sensor prices exclude shipping to the intended build site, headers/crimp terminals, keyed harness, enclosure, adapter, fixture/material, power source, bench time, failed/reworked parts, reference instrument, calibration service, taxes not already included, maintenance and any product qualification. A programming cable is a reusable bench tool, not automatically one cable per sensor unit. These amounts are not total unit costs or purchase recommendations.
 
 For a serviceable article, compare the R89 SuperMini with the R115 larger controller board against the same exact mounting/harness/test requirement. The lower sticker price may lose if it causes more assembly time, fragile connections or slower repair. A connector-specific cable/adapter and a non-destructive removable mounting interface remain required design decisions, not free parts.
 
@@ -56,7 +60,7 @@ The prototype need not immediately buy an accredited calibration service for eve
 
 ## 5. Local factory implications
 
-At this stage, buy standard sensor/controller modules and locally fabricate or outsource only the non-structural mounting adapter and assembly/check fixtures. Do not invest in a custom PCB, CNC machine or automated assembly cell for a single module. First compare:
+At this stage, buy standard sensor/controller modules and locally fabricate or outsource only the non-structural mounting adapter and assembly/check fixtures. Choose the sensor profile by the mission's minimum required measurands; do not bundle humidity into every unit without a measurement requirement. Do not invest in a custom PCB, CNC machine or automated assembly cell for a single module. First compare:
 - purchase of preassembled boards vs bare IC + a qualified PCB assembly route;
 - supplier-made adapter vs an appropriate local print/CNC service;
 - hand-built wiring vs a standardized, testable removable harness;
