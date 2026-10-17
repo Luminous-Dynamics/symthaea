@@ -340,11 +340,12 @@ fn build_receipt(args: &Args, started: Instant) -> (Receipt, u8) {
         .difference(&required)
         .map(|id| (*id).to_owned())
         .collect();
-    let duplicates: Vec<String> = id_counts
+    let mut duplicates: Vec<String> = id_counts
         .iter()
         .filter(|(_, count)| **count > 1)
         .map(|(id, _)| (*id).to_owned())
         .collect();
+    duplicates.sort();
 
     if !missing.is_empty() {
         issues.push(format!("required fixture IDs are missing: {}", missing.join(", ")));
@@ -440,7 +441,7 @@ fn identify_checkout() -> CommitContext {
 }
 
 fn checkout_not_comparable(commit: &CommitContext, head_matches: &Option<bool>) -> bool {
-    commit.sha.is_none() || commit.clean != Some(true) || *head_matches == Some(false)
+    commit.sha.is_none() || commit.clean != Some(true) || *head_matches != Some(true)
 }
 
 fn add_checkout_issues(
@@ -454,8 +455,15 @@ fn add_checkout_issues(
     if commit.clean != Some(true) {
         issues.push("working tree is dirty or its state could not be determined".to_owned());
     }
-    if *head_matches == Some(false) {
-        issues.push("current commit SHA does not match --expected-head".to_owned());
+    match head_matches {
+        None => issues.push(
+            "--expected-head is required; an unpinned checkout cannot produce a comparable pass"
+                .to_owned(),
+        ),
+        Some(false) => {
+            issues.push("current commit SHA does not match --expected-head".to_owned());
+        }
+        Some(true) => {}
     }
 }
 
