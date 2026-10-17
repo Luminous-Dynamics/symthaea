@@ -2,7 +2,7 @@
 
 The NANO-013 scorer estimates weighted rates from a stratified probability sample of eligible trajectory windows. Those rates and its approximate parent-cluster bootstrap are useful diagnostics, but they do not automatically produce a valid upper confidence bound on catastrophic risk.
 
-This work adds an exact one-sided Clopper–Pearson upper bound for a narrower, explicit model: one binary outcome per independent, identically distributed unit, all units observed at the same exposure horizon, and equal-probability sampling. The exact binomial method is documented by NIST: https://www.itl.nist.gov/div898/handbook/prc/section2/prc241.htm.
+This implements the narrow IID-binomial slice of [NANO-016 #7822](https://github.com/Luminous-Dynamics/symthaea/issues/7822), rather than pretending to solve every rare-event design. It adds an exact one-sided Clopper–Pearson upper bound for a narrower, explicit model: one binary outcome per independent, identically distributed unit, all units observed at the same exposure horizon, and equal-probability sampling. The exact binomial method is documented by NIST: https://www.itl.nist.gov/div898/handbook/prc/section2/prc241.htm.
 
 ## Run the illustrative utility
 
