@@ -7,8 +7,9 @@
 use serde::Deserialize;
 use std::collections::HashSet;
 use symthaea_core::wearability::{
-    evaluate_wearability_request, WearabilityDispositionV1, WearabilityFindingV1,
-    WearabilityInputV1, WearabilityStageV1,
+    evaluate_wearability_request, WearabilityDecisionV1, WearabilityDispositionV1,
+    WearabilityFindingV1, WearabilityInputV1, WearabilityStageV1,
+    WEARABILITY_DECISION_SCHEMA_VERSION,
 };
 
 #[derive(Debug, Deserialize)]
@@ -131,6 +132,24 @@ fn known_scenarios_emit_specific_machine_readable_reasons() {
         .expect("positive control exists");
     let ready = evaluate_wearability_request(&valid.profile, valid.stage, &valid.input);
     assert!(ready.findings.contains(&WearabilityFindingV1::FitCheckAdmittedForSimulation));
+}
+
+#[test]
+fn decision_receipt_schema_is_versioned_independently_from_input_schema() {
+    let input = WearabilityInputV1 {
+        fit_evidence: Some(symthaea_core::wearability::FitEvidenceV1::Current),
+        ..Default::default()
+    };
+    let decision = evaluate_wearability_request("profile-a", WearabilityStageV1::Perform, &input);
+    let serialized = serde_json::to_value(&decision).expect("decision serializes");
+    assert_eq!(decision.schema_version, WEARABILITY_DECISION_SCHEMA_VERSION);
+    assert_eq!(
+        serialized["schema_version"],
+        serde_json::json!(WEARABILITY_DECISION_SCHEMA_VERSION)
+    );
+    // This type-level annotation prevents an accidental accidental removal of findings.
+    fn assert_decision_type(_: &WearabilityDecisionV1) {}
+    assert_decision_type(&decision);
 }
 
 #[test]
