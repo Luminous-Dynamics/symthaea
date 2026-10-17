@@ -209,10 +209,12 @@ pub struct MissionFamilyCandidate {
 /// different per-candidate power traces, allowing a validated upstream
 /// vehicle model to account for changes in aircraft mass and configuration.
 ///
-/// Candidates must share one non-empty family identifier and the same power
-/// metric shape (continuous and/or peak classes present). Outputs remain
-/// fail-closed for invalid/missing inputs, and only arithmetic-screen-feasible
-/// candidates can enter the Pareto frontier.
+/// Candidates must share one non-empty family identifier and valid matching
+/// family SHA-256 digest, plus the same ordered phase IDs/duty classes. Phase
+/// durations and powers may vary by candidate because the upstream model may
+/// recompute the load trace. Outputs remain fail-closed for invalid/missing
+/// inputs, and only arithmetic-screen-feasible candidates can enter the
+/// Pareto frontier.
 pub fn compare_candidate_specific_missions(
     candidates: &[MissionFamilyCandidate],
 ) -> Result<ScenarioSweepReport, SweepInputError> {
@@ -489,6 +491,21 @@ mod tests {
         assert_eq!(report.pareto_front_ids, vec!["heavy", "light"]);
         assert_ne!(report.rows[0].result.required_mission_energy_wh,
                    report.rows[1].result.required_mission_energy_wh);
+    }
+
+    #[test]
+    fn candidate_specific_missions_reject_invalid_family_digest() {
+        let mut candidates = vec![
+            family_candidate("first", "mission-a", "same-use-case", 500.0, 1_200.0, 100.0),
+            family_candidate("second", "mission-b", "same-use-case", 500.0, 1_200.0, 110.0),
+        ];
+        candidates[0].mission_family_sha256 = "not-a-sha256".into();
+        assert_eq!(
+            compare_candidate_specific_missions(&candidates),
+            Err(SweepInputError::InvalidMissionFamilyDigest {
+                candidate_id: "first".into()
+            })
+        );
     }
 
     #[test]
