@@ -10,10 +10,13 @@ Pure std, zero dependencies, no symthaea-core link.
 - wavelength / frequency — λ = c/f.
 - combine_decibels — incoherent SPL sum.
 - doppler_frequency — observed frequency under relative motion.
-- response_curve — validated response curves, log-frequency interpolation, band summaries and target deviation.
+- response_curve — validated response curves, log-frequency interpolation, band
+  summaries and target deviation.
 - pareto — deterministic unweighted Pareto-front extraction for point estimates.
-- robust_pareto — conservative Pareto-front extraction from objective intervals under one declared profile.
-- experiment_selection — deterministic baselines and budgeted plans for already-eligible design × fidelity experiments.
+- robust_pareto — conservative Pareto-front extraction from objective intervals
+  under one declared profile.
+- experiment_selection — deterministic baselines and budgeted plans for already
+  eligible design × fidelity experiments.
 
 ## Multi-objective acoustic design
 
@@ -36,12 +39,12 @@ evaluation profile; they are not probabilities and do not promise a measurement
 will resolve a question. Each option must identify its evaluation profile and
 common cost unit; mismatches fail closed.
 
-The ranker returns a full option-order and profile metadata. Budget planning
-consumes that ranking only when the entire option snapshot is unchanged; this
+The ranker returns a full option order and profile metadata. Budget planning
+consumes that ranking only when the entire option snapshot is unchanged, which
 prevents stale indices being reused after costs, fidelity or relevance estimates
-change. The budget planner skips options that do not fit the remaining budget
-so a cheaper later option can still be selected. It returns selected and skipped
-IDs, estimated spend, remaining budget, profile, unit and policy as a replayable
+change. The planner skips options that do not fit the remaining budget so a
+cheaper later option can still be selected. It returns selected and skipped IDs,
+estimated spend, remaining budget, profile, unit and policy as a replayable
 planning receipt. This receipt is not authorization to execute physical tests.
 
 These utilities analyze derived inputs; they do not ingest raw measurements,
