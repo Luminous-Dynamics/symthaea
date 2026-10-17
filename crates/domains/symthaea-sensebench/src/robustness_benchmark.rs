@@ -46,9 +46,12 @@ pub struct WorldPolicyResult {
     /// None for the analytically averaged uniform-random baseline.
     pub selected_candidate_id: Option<String>,
     pub oracle_candidate_id: String,
-    pub selected_true_information_gain_per_cost: f64,
-    pub oracle_true_information_gain_per_cost: f64,
-    /// Non-negative regret versus the best candidate under this evaluator world.
+    /// Expected information gain per cost under evaluator-only hidden-world likelihoods.
+    /// This is not an observed or realized gain from sampled outcomes.
+    pub selected_hidden_world_expected_information_gain_per_cost: f64,
+    /// Expected information gain per cost for the evaluator's oracle candidate.
+    pub oracle_hidden_world_expected_information_gain_per_cost: f64,
+    /// Regret in expected information gain per cost versus the evaluator-world oracle.
     pub regret_bits_per_cost: f64,
 }
 
@@ -198,8 +201,8 @@ pub fn run_model_misspecification_benchmark(
                 policy,
                 selected_candidate_id: selected,
                 oracle_candidate_id: oracle_id.clone(),
-                selected_true_information_gain_per_cost: selected_score,
-                oracle_true_information_gain_per_cost: oracle_score,
+                selected_hidden_world_expected_information_gain_per_cost: selected_score,
+                oracle_hidden_world_expected_information_gain_per_cost: oracle_score,
                 regret_bits_per_cost: (oracle_score - selected_score).max(0.0),
             });
         }
@@ -392,8 +395,8 @@ mod tests {
             RobustnessPolicy::WorstCaseRobust,
         );
         assert!(
-            correctly_specified.selected_true_information_gain_per_cost
-                >= correctly_specified.oracle_true_information_gain_per_cost * 0.90,
+            correctly_specified.selected_hidden_world_expected_information_gain_per_cost
+                >= correctly_specified.oracle_hidden_world_expected_information_gain_per_cost * 0.90,
             "robust gain loss on the correctly specified control must be <= 10%",
         );
         assert!(
@@ -450,8 +453,8 @@ mod tests {
             RobustnessPolicy::UniformRandomExpectation,
         );
         assert_eq!(row.selected_candidate_id, None);
-        assert!(row.selected_true_information_gain_per_cost > 0.0);
-        assert!(row.selected_true_information_gain_per_cost
-            < row.oracle_true_information_gain_per_cost);
+        assert!(row.selected_hidden_world_expected_information_gain_per_cost > 0.0);
+        assert!(row.selected_hidden_world_expected_information_gain_per_cost
+            < row.oracle_hidden_world_expected_information_gain_per_cost);
     }
 }
