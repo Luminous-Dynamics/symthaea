@@ -559,6 +559,16 @@
       "Small negative-pair samples cannot demonstrate extreme rare-event false-positive rates.",
       "Choose thresholds on calibration data and use held-out evaluation; include number of comparisons made by the intended query pattern."
     ],
-    "multiplicity_rule": "For per-comparison false-match probability p and M comparisons, use conservative union bound P(any false match) <= min(1, M*p). A single query over N records uses M=N; all unordered pairs use M=N*(N-1)/2."
+    "multiplicity_rule": "For per-comparison false-match probability p and M comparisons, use conservative union bound P(any false match) <= min(1, M*p). A single query over N records uses M=N; all unordered pairs use M=N*(N-1)/2.",
+    "sample_limit": {
+      "negative_pairs_per_dimension_representation": 384,
+      "zero_event_one_sided_95_percent_upper_bound_under_iid_fixed_threshold": "1 - 0.05^(1/n), approximately 3/n; for n=384 approximately 0.78%",
+      "implication": "Smoke-level distribution characterization only; threshold calibration and final held-out false-positive evaluation need separate samples. This sample cannot support extreme-tail guarantees."
+    },
+    "architecture_hypotheses": [
+      "Two-stage retrieval: HDC shortlist K candidates from N, then separately measure a verifier; include shortlist misses and false candidates in end-to-end metrics.",
+      "Segmented/hierarchical memory to lower candidate comparisons rather than increasing D by default.",
+      "For all-pairs tasks, count N*(N-1)/2 comparisons in risk calculations."
+    ]
   }
 }
