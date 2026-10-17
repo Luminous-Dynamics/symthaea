@@ -617,6 +617,7 @@ impl Style {
         };
         // Durations as (num, den) beats: q = (1,1), h = (2,1), e = (1,2).
         let texture = |drums: DrumPolicy| TextureSpec {
+            section_accompaniment_overrides: vec![],
             thin_departure: true,
             counter_melody: true,
             climax_grace: true,
@@ -2916,6 +2917,10 @@ impl Style {
                 texture: {
                     let mut t = texture(DrumPolicy::None);
                     t.harmonic_sequence = true;
+                    t.section_accompaniment_overrides = vec![(
+                        crate::form::SectionRole::B,
+                        A::Arpeggio,
+                    )];
                     t
                 },
             },
