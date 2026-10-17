@@ -233,6 +233,9 @@ impl ChainTable {
         if tables.is_empty() {
             return Err(ChainAuditError::MissingSamples);
         }
+        for table in &tables {
+            validate_table(table)?;
+        }
         let mut combined = tables.remove(0);
         for table in tables {
             if table.columns != combined.columns {
@@ -240,16 +243,7 @@ impl ChainTable {
             }
             combined.rows.extend(table.rows);
         }
-        if combined.rows.is_empty() {
-            return Err(ChainAuditError::MissingSamples);
-        }
-        let total_weight = combined.rows.iter().map(|row| row[0]).sum::<f64>();
-        if !total_weight.is_finite() {
-            return Err(ChainAuditError::NumericalOverflow);
-        }
-        if total_weight <= 0.0 {
-            return Err(ChainAuditError::ZeroTotalWeight);
-        }
+        validate_table(&combined)?;
         Ok(combined)
     }
 
@@ -330,6 +324,7 @@ impl ChainTable {
     /// The reported weight ESS is (sum weights)^2 / sum(weights^2). It accounts
     /// for unequal sample weights only and is not autocorrelation-corrected.
     pub fn summarize(&self, name: &str) -> Result<WeightedColumnSummary, ChainAuditError> {
+        validate_table(self)?;
         let column_index = self
             .columns
             .iter()
@@ -425,6 +420,42 @@ fn validate_header(columns: &[String]) -> Result<(), ChainAuditError> {
         if !unique.insert(column.as_str()) {
             return Err(ChainAuditError::DuplicateColumn(column.clone()));
         }
+    }
+    Ok(())
+}
+
+fn validate_table(table: &ChainTable) -> Result<(), ChainAuditError> {
+    validate_header(&table.columns)?;
+    if table.rows.is_empty() {
+        return Err(ChainAuditError::MissingSamples);
+    }
+    let mut total_weight = 0.0;
+    for (row_index, row) in table.rows.iter().enumerate() {
+        if row.len() != table.columns.len() {
+            return Err(ChainAuditError::WrongColumnCount {
+                line: row_index + 1,
+                expected: table.columns.len(),
+                actual: row.len(),
+            });
+        }
+        for (column_index, value) in row.iter().enumerate() {
+            if !value.is_finite() {
+                return Err(ChainAuditError::NonFiniteValue {
+                    line: row_index + 1,
+                    column: table.columns[column_index].clone(),
+                });
+            }
+            if column_index == 0 && *value < 0.0 {
+                return Err(ChainAuditError::NegativeWeight { line: row_index + 1 });
+            }
+        }
+        total_weight += row[0];
+    }
+    if !total_weight.is_finite() {
+        return Err(ChainAuditError::NumericalOverflow);
+    }
+    if total_weight <= 0.0 {
+        return Err(ChainAuditError::ZeroTotalWeight);
     }
     Ok(())
 }
@@ -580,6 +611,29 @@ mod tests {
     }
 
     #[test]
+    fn constructed_tables_cannot_bypass_validation() {
+        let valid = ChainTable::parse(Cursor::new(FIXTURE)).unwrap();
+        let mut malformed = valid.clone();
+        malformed.rows[0].pop();
+        assert!(matches!(
+            malformed.summarize("H0"),
+            Err(ChainAuditError::WrongColumnCount { .. })
+        ));
+        assert!(matches!(
+            ChainTable::combine(vec![malformed, valid.clone()]),
+            Err(ChainAuditError::WrongColumnCount { .. })
+        ));
+
+        let mut non_finite = valid;
+        non_finite.rows[0][2] = f64::INFINITY;
+        assert!(matches!(
+            non_finite.summarize("H0"),
+            Err(ChainAuditError::NonFiniteValue { .. })
+        ));
+    }
+
+    #[test]
+    fn malformed_rows_are_rejected_instead_of_skipped() {    #[test]
     fn malformed_rows_are_rejected_instead_of_skipped() {
         let fixture = "# weight minuslogpost H0\n1 -10 67\n2 -11\n";
         assert!(matches!(
