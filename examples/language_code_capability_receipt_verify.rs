@@ -107,7 +107,10 @@ fn validate_receipt(
         .get("tests_executed")
         .and_then(Value::as_u64)
         .unwrap_or(0);
-    let compile_only_policy = nonempty_string(receipt, "compile_only_policy");
+    let compile_only_policy = receipt
+        .get("compile_only_policy")
+        .and_then(Value::as_str)
+        .filter(|policy| *policy == "compile_only");
     if status == "passed"
         && receipt.get("claim").and_then(Value::as_str) == Some("functional_correctness")
         && tests_executed == 0
