@@ -516,6 +516,26 @@ mod tests {
 }
 
 
+/// Common BAO distance observables at a single redshift.
+///
+/// Distances are reported in units of the supplied sound horizon r_d. This
+/// structure is a background-geometry calculation only: it does not compute
+/// the sound horizon from recombination physics or evaluate a survey likelihood.
+#[derive(Debug, Clone, Copy, PartialEq)]
+pub struct BaoDistanceObservables {
+    /// Redshift at which the observables are evaluated.
+    pub redshift: f64,
+    /// Sound horizon at the drag epoch, supplied by the caller [Mpc].
+    pub sound_horizon_mpc: f64,
+    /// Transverse comoving distance divided by r_d: D_M(z) / r_d.
+    pub dm_over_rd: f64,
+    /// Hubble distance divided by r_d: c / (H(z) r_d).
+    pub dh_over_rd: f64,
+    /// Volume-averaged BAO distance divided by r_d:
+    /// D_V(z) / r_d = [z D_M(z)^2 D_H(z)]^(1/3) / r_d.
+    pub dv_over_rd: f64,
+}
+
 /// Parameters for the homogeneous expansion history of an FLRW cosmology.
 ///
 /// Density parameters use their conventional present-day normalization:
@@ -555,6 +575,7 @@ pub enum ExpansionHistoryError {
     InvalidIntegrationTolerance,
     InvalidIntegrationDepth,
     IntegrationDidNotConverge,
+    InvalidSoundHorizon,
     NonPhysicalExpansionRate,
     NumericalOverflow,
 }
@@ -571,6 +592,7 @@ impl std::fmt::Display for ExpansionHistoryError {
             Self::InvalidIntegrationTolerance => "absolute tolerance must be positive; relative tolerance must be finite and in (0, 1)",
             Self::InvalidIntegrationDepth => "adaptive integration depth must be in 1..=20",
             Self::IntegrationDidNotConverge => "adaptive Simpson integration did not meet its tolerance before the depth limit",
+            Self::InvalidSoundHorizon => "sound horizon r_d must be finite and positive",
             Self::NonPhysicalExpansionRate => "the model produced a non-positive or non-finite H(z)^2",
             Self::NumericalOverflow => "the requested cosmology calculation overflowed",
         };
@@ -823,6 +845,48 @@ impl ExpansionHistory {
     ) -> Result<f64, ExpansionHistoryError> {
         Self::validate_redshift(z)?;
         Ok(self.transverse_comoving_distance_mpc(z, intervals)? / (1.0 + z))
+    }
+
+    /// Standard BAO distance observables at redshift z.
+    ///
+    /// The sound horizon r_d is supplied in Mpc. It is not inferred or
+    /// computed here: a precision DESI likelihood must model or calibrate r_d
+    /// consistently with its early-universe assumptions.
+    pub fn bao_distance_observables(
+        &self,
+        z: f64,
+        sound_horizon_mpc: f64,
+        intervals: usize,
+    ) -> Result<BaoDistanceObservables, ExpansionHistoryError> {
+        Self::validate_redshift(z)?;
+        if !sound_horizon_mpc.is_finite() || sound_horizon_mpc <= 0.0 {
+            return Err(ExpansionHistoryError::InvalidSoundHorizon);
+        }
+
+        const C_KM_S: f64 = 299_792.458;
+        let transverse_distance = self.transverse_comoving_distance_mpc(z, intervals)?;
+        let hubble_rate = self.hubble_km_s_mpc(z)?;
+        let hubble_distance = C_KM_S / hubble_rate;
+        let volume_distance = (z * transverse_distance * transverse_distance * hubble_distance)
+            .cbrt();
+
+        let dm_over_rd = transverse_distance / sound_horizon_mpc;
+        let dh_over_rd = hubble_distance / sound_horizon_mpc;
+        let dv_over_rd = volume_distance / sound_horizon_mpc;
+        if [dm_over_rd, dh_over_rd, dv_over_rd]
+            .iter()
+            .all(|value| value.is_finite() && *value >= 0.0)
+        {
+            Ok(BaoDistanceObservables {
+                redshift: z,
+                sound_horizon_mpc,
+                dm_over_rd,
+                dh_over_rd,
+                dv_over_rd,
+            })
+        } else {
+            Err(ExpansionHistoryError::NumericalOverflow)
+        }
     }
 
     /// Adaptive cosmological lookback time from redshift z to the present [Gyr].
@@ -1080,6 +1144,45 @@ mod expansion_history_tests {
     }
 
 
+
+    #[test]
+    fn bao_distance_observables_match_flat_de_sitter_analytic_limit() {
+        let model = ExpansionHistory {
+            h0_km_s_mpc: 70.0,
+            omega_r: 0.0,
+            omega_m: 0.0,
+            omega_k: 0.0,
+            omega_de: 1.0,
+            w0: -1.0,
+        };
+        let z: f64 = 1.0;
+        let rd = 150.0;
+        let hubble_distance = C_KM_S / 70.0;
+        let transverse_distance = hubble_distance * z;
+        let expected_dv = (z * transverse_distance.powi(2) * hubble_distance).cbrt();
+        let actual = model.bao_distance_observables(z, rd, 128).unwrap();
+        assert!((actual.dm_over_rd - transverse_distance / rd).abs() < 1e-12);
+        assert!((actual.dh_over_rd - hubble_distance / rd).abs() < 1e-12);
+        assert!((actual.dv_over_rd - expected_dv / rd).abs() < 1e-12);
+        assert_eq!(actual.sound_horizon_mpc, rd);
+    }
+
+    #[test]
+    fn bao_observables_reject_invalid_sound_horizon_and_bad_inputs() {
+        let model = ExpansionHistory::flat_lcdm_approx();
+        assert_eq!(
+            model.bao_distance_observables(1.0, 0.0, 128),
+            Err(ExpansionHistoryError::InvalidSoundHorizon)
+        );
+        assert_eq!(
+            model.bao_distance_observables(1.0, f64::NAN, 128),
+            Err(ExpansionHistoryError::InvalidSoundHorizon)
+        );
+        assert_eq!(
+            model.bao_distance_observables(-0.1, 150.0, 128),
+            Err(ExpansionHistoryError::InvalidRedshift)
+        );
+    }
 
     #[test]
     fn adaptive_integrals_match_analytic_matter_and_radiation_limits() {
