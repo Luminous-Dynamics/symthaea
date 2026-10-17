@@ -917,6 +917,34 @@ mod tests {
     }
 
 
+
+    #[test]
+    fn synthetic_bundle_scores_queries_interventions_and_worst_group_separately() {
+        let report = score_run(
+            &Path::new(env!("CARGO_MANIFEST_DIR"))
+                .join("fixtures")
+                .join("nano-rescue-valid"),
+        )
+        .expect("structurally valid synthetic NANO-013 bundle should be scoreable");
+        let value: serde_json::Value =
+            serde_json::from_str(&report).expect("score report must be valid JSON");
+
+        assert_eq!(value["policy_decision_count"], 4);
+        assert_eq!(value["policy_reference_query_count"], 1);
+        assert_eq!(value["policy_intervention_count"], 1);
+        assert_eq!(value["policy_reference_query_fraction"]["estimate"], 0.5);
+        assert_eq!(value["policy_intervention_fraction"]["estimate"], 0.5);
+        assert_eq!(
+            value["severe_event_intervention_recall_on_evaluated_references"]["estimate"],
+            0.0
+        );
+        assert_eq!(
+            value["parent_groups_with_observed_integrity_breach"],
+            1
+        );
+        // A well-formed contract still scores the deliberate policy miss; integrity is not performance.
+    }
+
     #[test]
     fn parent_group_report_preserves_localized_breach_hidden_by_pooling() {
         let severe = row("bad", "parent-bad", 0.5, "evaluated", Some(true), false);
