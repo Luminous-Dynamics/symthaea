@@ -18106,6 +18106,16 @@ name = "symthaea-acoustics"
 version = "0.1.0"
 
 [[package]]
+name = "symthaea-audio-evidence"
+version = "0.1.0"
+dependencies = [
+ "chrono",
+ "hex",
+ "serde_json",
+ "sha2 0.10.9",
+]
+
+[[package]]
 name = "symthaea-aesthetic"
 version = "0.1.0"
 dependencies = [
