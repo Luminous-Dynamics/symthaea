@@ -472,6 +472,8 @@ fn run() -> Result<(), Box<dyn Error>> {
     println!("host_os={}, host_arch={}", env::consts::OS, env::consts::ARCH);
     println!("source_sha={}", env::var("SYMTHAEA_SOURCE_SHA").unwrap_or_else(|_| "not-injected".to_string()));
     println!("rustc_version={}", env::var("RUSTC_VERSION").unwrap_or_else(|_| "not-injected".to_string()));
+    println!("host_profile={}", env::var("HOST_PROFILE").unwrap_or_else(|_| "not-injected".to_string()));
+    println!("storage_profile={}", env::var("STORAGE_PROFILE").unwrap_or_else(|_| "not-injected".to_string()));
     println!("store_path={}", store_path.display());
     println!("lsh_bands={}, lsh_rows={}", store_config.lsh_bands, store_config.lsh_rows);
     println!("corpus_fingerprint_fnv1a64_noncryptographic={corpus_fingerprint:016x}");
@@ -495,11 +497,13 @@ fn run() -> Result<(), Box<dyn Error>> {
         fs::write(&path, csv.as_bytes())?;
         let meta_path = path.with_extension("meta.txt");
         let metadata = format!(
-            "benchmark=storage_workload_bench\nsource_sha={}\nrustc_version={}\nhost_os={}\nhost_arch={}\nstore_path={}\nvectors={}\nqueries={}\nbatch_size={}\nseed={}\ncorpus_fingerprint_fnv1a64_noncryptographic={:016x}\nlogical_vector_payload_bytes={}\nstore_file_bytes_including_preallocation_and_metadata={}\ncontent_checksum={:?}\ngeneration={}\nlive_count={}\ntombstones={}\napprox_top1_recall={}/{}\nexact_fallbacks={}/{}\nphysical_media_bytes=not_measured\nenergy=not_measured\nos_page_cache_coldness=not_controlled\n",
+            "benchmark=storage_workload_bench\nsource_sha={}\nrustc_version={}\nhost_os={}\nhost_arch={}\nhost_profile={}\nstorage_profile={}\nstore_path={}\nvectors={}\nqueries={}\nbatch_size={}\nseed={}\ncorpus_fingerprint_fnv1a64_noncryptographic={:016x}\nlogical_vector_payload_bytes={}\nstore_file_bytes_including_preallocation_and_metadata={}\ncontent_checksum={:?}\ngeneration={}\nlive_count={}\ntombstones={}\napprox_top1_recall={}/{}\nexact_fallbacks={}/{}\nphysical_media_bytes=not_measured\nenergy=not_measured\nos_page_cache_coldness=not_controlled\n",
             env::var("SYMTHAEA_SOURCE_SHA").unwrap_or_else(|_| "not-injected".to_string()),
             env::var("RUSTC_VERSION").unwrap_or_else(|_| "not-injected".to_string()),
             env::consts::OS,
             env::consts::ARCH,
+            env::var("HOST_PROFILE").unwrap_or_else(|_| "not-injected".to_string()),
+            env::var("STORAGE_PROFILE").unwrap_or_else(|_| "not-injected".to_string()),
             store_path.display(),
             config.vectors,
             config.queries,
