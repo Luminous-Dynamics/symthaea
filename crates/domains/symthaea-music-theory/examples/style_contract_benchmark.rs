@@ -314,7 +314,7 @@ fn transposition_shape_signature(score: &Score) -> Vec<(String, Duration, Durati
 /// be visible rather than silently conflated with ordinary diversity.
 fn transposition_audit(style: Style) -> Value {
     let mut invariant_pairs = 0usize;
-    let mut exact_score_changed_pairs = 0usize;
+    let mut exact_event_stream_changed_pairs = 0usize;
     let mut structural_distances = Vec::new();
     let mut total_pairs = 0usize;
 
@@ -334,7 +334,7 @@ fn transposition_audit(style: Style) -> Value {
                 invariant_pairs += 1;
             }
             if exact_fingerprint(&c_output.score) != exact_fingerprint(&g_output.score) {
-                exact_score_changed_pairs += 1;
+                exact_event_stream_changed_pairs += 1;
             }
             let c_structure =
                 structural_fingerprint(&c_output.score, c_output.form.as_ref());
@@ -354,7 +354,7 @@ fn transposition_audit(style: Style) -> Value {
         } else {
             invariant_pairs as f64 / total_pairs as f64
         },
-        "exact_score_changed": exact_score_changed_pairs,
+        "exact_event_stream_changed": exact_event_stream_changed_pairs,
         "mean_structural_distance": mean(&structural_distances),
         "interpretation": "diagnostic only; deviations can reveal tonic sensitivity, register effects, or grammar branches and must be reviewed before setting a universal gate"
     })
@@ -578,7 +578,7 @@ fn main() {
         .sum();
     let transposition_exact_changed_pairs: u64 = transposition_audits
         .iter()
-        .map(|audit| audit["exact_score_changed"].as_u64().unwrap_or(0))
+        .map(|audit| audit["exact_event_stream_changed"].as_u64().unwrap_or(0))
         .sum();
     let transposition_mean_distances: Vec<f64> = transposition_audits
         .iter()
@@ -679,7 +679,7 @@ fn main() {
             } else {
                 transposition_invariant_pairs as f64 / transposition_pair_count as f64
             },
-            "exact_score_changed": transposition_exact_changed_pairs,
+            "exact_event_stream_changed": transposition_exact_changed_pairs,
             "mean_structural_distance_across_styles":
                 mean(&transposition_mean_distances),
             "is_qualification_gate": false,
