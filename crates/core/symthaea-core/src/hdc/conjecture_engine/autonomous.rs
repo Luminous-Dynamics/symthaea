@@ -2087,6 +2087,7 @@ mod holdout_validation_tests {
         assert!(result.max_lie_derivative_variance > result.threshold);
         assert_eq!(result.candidate_expression_digest.len(), 64);
         assert_eq!(result.discovery_config_digest.len(), 64);
+        assert_eq!(result.discovery_initial_conditions_digest.len(), 64);
         assert_eq!(result.holdout_initial_conditions_digest.len(), 64);
         assert_eq!(result.validation_profile_digest.len(), 64);
         assert_eq!(result.receipt_digest.len(), 64);
@@ -2122,6 +2123,7 @@ mod holdout_validation_tests {
         assert!(!result.passed);
         assert_eq!(result.trajectories_checked, 0);
         assert_eq!(result.failure, Some(AutonomousHoldoutFailure::DiscoveryAndHoldoutSeedsEqual));
+        assert_eq!(result.discovery_initial_conditions_digest.len(), 64);
         assert_eq!(result.holdout_initial_conditions_digest.len(), 64);
     }
 
@@ -2163,6 +2165,20 @@ mod holdout_validation_tests {
             201,
             1e-8,
         );
+        let changed_discovery_config = discovery_config(101);
+        let changed_discovery_seed = validate_invariant_holdout(
+            harmonic_rhs,
+            "harmonic-oscillator-v1",
+            &candidate,
+            &[1.0, 0.2],
+            &["x", "v"],
+            &changed_discovery_config,
+            1.0,
+            0.02,
+            4,
+            200,
+            1e-8,
+        );
 
         assert_eq!(first, repeat);
         assert_ne!(first.receipt_digest, changed_threshold.receipt_digest);
@@ -2172,6 +2188,11 @@ mod holdout_validation_tests {
             changed_seed.holdout_initial_conditions_digest
         );
         assert_ne!(first.receipt_digest, changed_seed.receipt_digest);
+        assert_ne!(
+            first.discovery_initial_conditions_digest,
+            changed_discovery_seed.discovery_initial_conditions_digest
+        );
+        assert_ne!(first.receipt_digest, changed_discovery_seed.receipt_digest);
         assert_eq!(first.candidate_expression, format!("{candidate}"));
         assert!(first.discovery_config_snapshot.contains("mutation_rate_bits="));
         assert_eq!(first.discovery_seed, config.seed);
