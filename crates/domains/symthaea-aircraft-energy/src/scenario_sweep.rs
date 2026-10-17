@@ -38,6 +38,7 @@ pub enum SweepInputError {
     InvalidMissionFamilyId { id: String },
     MissionFamilyMismatch { candidate_id: String, expected: String, actual: String },
     MissionMetricShapeMismatch { candidate_id: String },
+    ReservePolicyMismatch { candidate_id: String },
 }
 
 /// Results for alternative energy-system envelopes evaluated on one identical mission.
@@ -88,6 +89,10 @@ pub fn compare_systems_on_mission(
             });
         }
     }
+
+    validate_common_reserve_policy(candidates.iter().map(|candidate| {
+        (candidate.id.as_str(), &candidate.system)
+    }))?;
 
     let mut rows: Vec<ScenarioRow> = candidates
         .iter()
@@ -242,6 +247,10 @@ pub fn compare_candidate_specific_missions(
         }
     }
 
+    validate_common_reserve_policy(candidates.iter().map(|candidate| {
+        (candidate.id.as_str(), &candidate.system)
+    }))?;
+
     let mut rows: Vec<ScenarioRow> = candidates
         .iter()
         .map(|candidate| ScenarioRow {
@@ -296,6 +305,35 @@ fn mission_metric_shape(mission: &MissionProfile) -> (bool, bool) {
         segment.duty_class == Some(super::DutyClass::Peak)
     });
     (has_continuous, has_peak)
+}
+
+fn validate_common_reserve_policy<'a>(
+    candidates: impl Iterator<Item = (&'a str, &'a EnergySystemEnvelope)>,
+) -> Result<(), SweepInputError> {
+    let mut expected: Option<f64> = None;
+    for (candidate_id, system) in candidates {
+        let Some(reserve) = system.reserve_fraction else {
+            continue;
+        };
+        if !reserve.is_finite() || !(0.0..1.0).contains(&reserve) {
+            // Leave invalid/missing candidates in the report as indeterminate;
+            // they cannot enter the Pareto frontier.
+            continue;
+        }
+        match expected {
+            None => expected = Some(reserve),
+            Some(reference)
+                if (reference - reserve).abs()
+                    > 1.0e-9 * reference.abs().max(reserve.abs()).max(1.0) =>
+            {
+                return Err(SweepInputError::ReservePolicyMismatch {
+                    candidate_id: candidate_id.to_owned(),
+                });
+            }
+            _ => {}
+        }
+    }
+    Ok(())
 }
 
 #[cfg(test)]
@@ -429,6 +467,19 @@ mod tests {
     }
 
     #[test]
+    fn candidate_specific_missions_reject_different_reserve_policies() {
+        let mut candidates = vec![
+            family_candidate("first", "mission-a", "same-use-case", 500.0, 1_200.0, 100.0),
+            family_candidate("second", "mission-b", "same-use-case", 500.0, 1_200.0, 110.0),
+        ];
+        candidates[1].system.reserve_fraction = Some(0.2);
+        assert_eq!(
+            compare_candidate_specific_missions(&candidates),
+            Err(SweepInputError::ReservePolicyMismatch { candidate_id: "second".into() })
+        );
+    }
+
+    #[test]
     fn candidate_specific_missions_reject_different_use_case_families() {
         let candidates = vec![
             family_candidate("first", "mission-a", "same-use-case", 500.0, 1_200.0, 100.0),
@@ -457,6 +508,19 @@ mod tests {
         );
     }
 
+
+    #[test]
+    fn different_reserve_policies_cannot_share_one_pareto_frontier() {
+        let mut alpha = candidate("alpha", 100.0, 1_500.0, 600.0, 1_200.0, 30.0);
+        let beta = candidate("beta", 110.0, 1_600.0, 620.0, 1_220.0, 30.0);
+        alpha.system.reserve_fraction = Some(0.1);
+        let mut beta = beta;
+        beta.system.reserve_fraction = Some(0.2);
+        assert_eq!(
+            compare_systems_on_mission(&mission(), &[alpha, beta]),
+            Err(SweepInputError::ReservePolicyMismatch { candidate_id: "beta".into() })
+        );
+    }
 
     #[test]
     fn duplicate_ids_are_rejected() {
