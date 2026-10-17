@@ -20,6 +20,19 @@ pub struct PowerSample {
     pub power_watts: f64,
 }
 
+/// Closed interval for an energy measurement, expressed in joules.
+///
+/// Endpoints must conservatively cover the measurand under an explicitly
+/// documented uncertainty method. This type does not claim that the interval
+/// is a confidence interval or probability distribution.
+#[derive(Clone, Copy, Debug, PartialEq)]
+pub struct EnergyInterval {
+    /// Lowest allowed energy value in joules.
+    pub lower_joules: f64,
+    /// Highest allowed energy value in joules.
+    pub upper_joules: f64,
+}
+
 /// Invalid trace, denominator, or comparison inputs.
 #[derive(Clone, Copy, Debug, PartialEq, Eq)]
 pub enum EnergyError {
@@ -47,6 +60,10 @@ pub enum EnergyError {
     ZeroTrials,
     /// Successful tasks cannot exceed the total number of trials.
     SuccessesExceedTrials,
+    /// An uncertainty interval has invalid, reversed, or negative endpoints.
+    InvalidEnergyInterval,
+    /// The lower baseline energy bound must be strictly positive.
+    BaselineIntervalIncludesZero,
 }
 
 impl fmt::Display for EnergyError {
@@ -73,6 +90,12 @@ impl fmt::Display for EnergyError {
             Self::ZeroTrials => formatter.write_str("task-success rate needs at least one trial"),
             Self::SuccessesExceedTrials => {
                 formatter.write_str("successful tasks cannot exceed the number of trials")
+            }
+            Self::InvalidEnergyInterval => {
+                formatter.write_str("energy interval must be finite, nonnegative, and ordered")
+            }
+            Self::BaselineIntervalIncludesZero => {
+                formatter.write_str("baseline energy interval lower bound must be positive")
             }
         }
     }
@@ -183,6 +206,45 @@ pub fn energy_saving_percent(
         return Err(EnergyError::NonFiniteResult);
     }
     Ok(result)
+}
+
+/// Computes a conservative interval for percentage energy saving.
+///
+/// For baseline energy B in [B_low, B_high] and treatment energy T in
+/// [T_low, T_high], returns [100 * (1 - T_high / B_low),
+/// 100 * (1 - T_low / B_high)]. The result is interval arithmetic, not a
+/// confidence interval. It makes no independence assumption and may be
+/// conservative when measurements share correlated uncertainty sources.
+/// A positive lower baseline bound is required for a finite meaningful ratio.
+pub fn conservative_energy_saving_interval_percent(
+    baseline: EnergyInterval,
+    treatment: EnergyInterval,
+) -> Result<EnergyInterval, EnergyError> {
+    for interval in [baseline, treatment] {
+        if !interval.lower_joules.is_finite() || !interval.upper_joules.is_finite() {
+            return Err(EnergyError::InvalidEnergyInterval);
+        }
+        if interval.lower_joules < 0.0
+            || interval.upper_joules < interval.lower_joules
+        {
+            return Err(EnergyError::InvalidEnergyInterval);
+        }
+    }
+    if baseline.lower_joules == 0.0 {
+        return Err(EnergyError::BaselineIntervalIncludesZero);
+    }
+
+    let lower = 100.0 * (1.0 - treatment.upper_joules / baseline.lower_joules);
+    let upper = 100.0 * (1.0 - treatment.lower_joules / baseline.upper_joules);
+
+    if !lower.is_finite() || !upper.is_finite() || lower > upper {
+        return Err(EnergyError::NonFiniteResult);
+    }
+
+    Ok(EnergyInterval {
+        lower_joules: lower,
+        upper_joules: upper,
+    })
 }
 
 /// Returns a task-success point estimate. Statistical uncertainty is out of scope.
@@ -353,6 +415,89 @@ mod tests {
             energy_saving_percent(f64::NAN, 10.0),
             Err(EnergyError::NonFiniteResult)
         );
+    }
+
+    #[test]
+    fn conservative_saving_interval_refuses_to_promote_uncertain_threshold_crossing() {
+        let baseline = EnergyInterval {
+            lower_joules: 98.0,
+            upper_joules: 102.0,
+        };
+        let treatment = EnergyInterval {
+            lower_joules: 88.0,
+            upper_joules: 92.0,
+        };
+        let interval = conservative_energy_saving_interval_percent(baseline, treatment)
+            .expect("valid energy intervals");
+
+        close(interval.lower_joules, 100.0 * (1.0 - 92.0 / 98.0), 1e-12);
+        close(interval.upper_joules, 100.0 * (1.0 - 88.0 / 102.0), 1e-12);
+        assert!(interval.lower_joules < 10.0);
+        assert!(interval.upper_joules > 10.0);
+    }
+
+    #[test]
+    fn conservative_saving_interval_rejects_invalid_intervals_and_zero_baseline_bound() {
+        let valid = EnergyInterval {
+            lower_joules: 90.0,
+            upper_joules: 100.0,
+        };
+        assert_eq!(
+            conservative_energy_saving_interval_percent(
+                EnergyInterval {
+                    lower_joules: 0.0,
+                    upper_joules: 1.0,
+                },
+                valid,
+            ),
+            Err(EnergyError::BaselineIntervalIncludesZero)
+        );
+        assert_eq!(
+            conservative_energy_saving_interval_percent(
+                EnergyInterval {
+                    lower_joules: 10.0,
+                    upper_joules: 9.0,
+                },
+                valid,
+            ),
+            Err(EnergyError::InvalidEnergyInterval)
+        );
+        assert_eq!(
+            conservative_energy_saving_interval_percent(
+                EnergyInterval {
+                    lower_joules: f64::NAN,
+                    upper_joules: 11.0,
+                },
+                valid,
+            ),
+            Err(EnergyError::InvalidEnergyInterval)
+        );
+        assert_eq!(
+            conservative_energy_saving_interval_percent(
+                valid,
+                EnergyInterval {
+                    lower_joules: -1.0,
+                    upper_joules: 2.0,
+                },
+            ),
+            Err(EnergyError::InvalidEnergyInterval)
+        );
+    }
+
+    #[test]
+    fn conservative_saving_interval_supports_regression_values() {
+        let baseline = EnergyInterval {
+            lower_joules: 99.0,
+            upper_joules: 101.0,
+        };
+        let treatment = EnergyInterval {
+            lower_joules: 109.0,
+            upper_joules: 111.0,
+        };
+        let interval = conservative_energy_saving_interval_percent(baseline, treatment)
+            .expect("valid energy intervals");
+        assert!(interval.lower_joules < 0.0);
+        assert!(interval.upper_joules < 0.0);
     }
 
     #[test]
