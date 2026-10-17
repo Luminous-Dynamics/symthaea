@@ -113,6 +113,8 @@ Include the purchase/financing/depreciation assumptions, fuel or electrical ener
 
 Show results across several utilization scenarios, not one favorable annual-hours number. Include sensitivities to fuel prices, labor rates, battery/engine life, parts lead time, insurance, and aircraft age. Compare completed missions and payload, not only hours flown.
 
+An initial executable model is being added in [AIRFAMILY-002 #7753](https://github.com/Luminous-Dynamics/symthaea/issues/7753) / [PR #7754](https://github.com/Luminous-Dynamics/symthaea/pull/7754): it separates fixed cash cost, variable cost per flown hour, capital annualization, owner labor, reserve contributions, downtime and completed-service denominators. It requires explicit assumptions and a shared mission-contract digest; it deliberately uses no default aircraft prices. The code currently has 13 synthetic test declarations, not executed results. See the [ownership-cost scenario model specification](https://github.com/Luminous-Dynamics/symthaea/blob/feat/aircraft-ownership-cost-model-2026-10-17/docs/aircraft/OWNERSHIP_COST_SCENARIO_MODEL_2026-10-17.md).
+
 ## 6. Cabin delight is an engineering requirement
 
 Make aircraft ownership pleasant in small, repeatable ways:
