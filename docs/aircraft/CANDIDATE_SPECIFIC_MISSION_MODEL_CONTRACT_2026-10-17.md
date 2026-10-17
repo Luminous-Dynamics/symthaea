@@ -38,6 +38,7 @@ Required fields:
 - Model run ID, model version, source revision, and digest for the model artifact.
 - Separate, versioned references for aerodynamic data, propulsion/rotor maps, energy-system assumptions and thermal/derating data, where used.
 - Each external data reference includes a locator, source revision/version, digest, retrieval date, units, reference conditions, applicability domain, uncertainty and limitations.
+- The candidate configuration, energy-system envelope, route, and mission-family manifest digests must match their bound artifact digests as well as the model run's input digests.
 - Solver settings, convergence/error metadata, and assumptions needed to reproduce the output.
 
 A digest establishes identity, not truth. A hash that cannot be resolved to a source artifact is insufficient. Missing provenance is indeterminate; never fill it with an undocumented default.
@@ -79,7 +80,10 @@ For each phase, preserve:
 - Required bus power in watts and energy in watt-hours.
 - Continuous/peak classification and cumulative peak-duration accounting.
 - Environmental conditions, candidate-configuration digest and source-data/model versions.
-- Uncertainty intervals, sensitivity, solver status, validity-domain checks and limitations.
+- Lower/upper power uncertainty bounds that contain the nominal power value, together with an explicit uncertainty method; do not call a bound a confidence interval without a justified method.
+- Sensitivity, solver status, validity-domain checks and limitations.
+
+The validated output must preserve the original provenance-bearing manifest, phase uncertainty intervals, candidate-specific MissionProfile and recomputable nominal energy total. Do not strip the evidence manifest before producing a comparison report.
 
 Energy must be recomputable from recorded phase values with unit-consistent arithmetic. Do not silently combine bus power with shaft power or gross thermal output. Conversion/propulsive losses and thermal derating must be located in an explicit boundary so they are counted exactly once.
 
