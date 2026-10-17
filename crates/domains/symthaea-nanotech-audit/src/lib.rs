@@ -298,6 +298,10 @@ struct ProvenanceManifest {
     resolved_config_sha256: String,
     oracle_call_ledger_path: String,
     oracle_call_ledger_sha256: String,
+    #[serde(default)]
+    shift_manifest_path: Option<String>,
+    #[serde(default)]
+    shift_manifest_sha256: Option<String>,
     data_sources: Vec<DataSourceDeclaration>,
     oracle_accounting: OracleAccountingDeclaration,
     artifacts: Vec<ArtifactDeclaration>,
@@ -349,6 +353,35 @@ struct OracleCallRecord {
     cost: f64,
     cache_hit: bool,
     external_invocation: bool,
+}
+
+const SHIFT_MANIFEST_SCHEMA_VERSION: &str = "nano-shift-manifest-v1";
+const MAX_SHIFT_MANIFEST_BYTES: u64 = 32 * 1024 * 1024;
+const MAX_SHIFT_GROUPS: usize = 10_000;
+
+#[derive(Debug, Deserialize)]
+#[serde(deny_unknown_fields)]
+struct ShiftManifest {
+    schema_version: String,
+    benchmark_id: String,
+    task_contract_sha256: String,
+    split_policy: String,
+    shift_groups: Vec<ShiftGroupDeclaration>,
+}
+
+#[derive(Debug, Deserialize)]
+#[serde(deny_unknown_fields)]
+struct ShiftGroupDeclaration {
+    group_id: String,
+    shift_family: String,
+    severity: String,
+    split: String,
+    physical_rationale: String,
+    severity_definition: String,
+    source_artifact_path: String,
+    source_artifact_sha256: String,
+    independence_keys: Vec<String>,
+    sample_ids: Vec<String>,
 }
 
 const MAX_ORACLE_CALL_LEDGER_BYTES: u64 = 64 * 1024 * 1024;
@@ -710,6 +743,7 @@ fn verify_provenance_manifest(
     }
 
     verify_oracle_call_ledger(run_dir, &manifest, &by_path, expected_proposal_requests, report);
+    verify_optional_shift_manifest(run_dir, &manifest, &by_path, report);
 
     if report.findings.len() == findings_before {
         report.provenance_manifest_status = "manifest_consistent".to_owned();
