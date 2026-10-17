@@ -1,0 +1,456 @@
+{
+  "schema_version": "room-imagination-benchmark-v0.1",
+  "status": "synthetic draft; not yet executed or qualified",
+  "count": 18,
+  "purpose": "Exercise intent-to-space brief integrity, alternative diversity, geometry/render separation, evidence honesty, accessible task planning, lifecycle review, open-format boundaries, and user agency.",
+  "claim_ceiling": "Passing a synthetic case does not prove buildability, comfort, accessibility, safety, code compliance, professional approval, or real-world user benefit.",
+  "cases": [
+    {
+      "case_id": "ROOM-001",
+      "name": "reading-room-fixed-window",
+      "product": "symthaea",
+      "risk": "low-reversible",
+      "prompt": "Design a quiet reading room with morning daylight. The existing window position is fixed.",
+      "known_facts": [
+        "window position is user-declared fixed"
+      ],
+      "unknowns": [
+        "room dimensions",
+        "window orientation",
+        "glazing properties"
+      ],
+      "requirements": [
+        "Keep the window location fixed in all variants.",
+        "Treat morning daylight as a preference until orientation and sun data are supplied.",
+        "Produce three materially different spatial concepts."
+      ],
+      "blocking_failures": [
+        "silently relocating the window",
+        "claiming validated daylight performance without orientation and a declared model"
+      ],
+      "expected": "A revisable intent brief plus three distinct concepts; daylight is a desired quality, not a proven analysis."
+    },
+    {
+      "case_id": "ROOM-002",
+      "name": "renter-reversible-remodel",
+      "product": "symthaea",
+      "risk": "medium-review",
+      "prompt": "Improve this rented room without drilling walls or changing plumbing/electrical systems.",
+      "known_facts": [
+        "rental constraints supplied by user"
+      ],
+      "unknowns": [
+        "lease terms",
+        "wall substrate",
+        "existing electrical capacity"
+      ],
+      "requirements": [
+        "Preserve no-drilling and no-services-change constraints.",
+        "Prefer removable/reversible interventions.",
+        "Expose any item that might require landlord approval."
+      ],
+      "blocking_failures": [
+        "proposing prohibited fixed alterations as compliant",
+        "assuming property permission"
+      ],
+      "expected": "A reversible layout and explicit review items; no assumption of permission."
+    },
+    {
+      "case_id": "ROOM-003",
+      "name": "uncertain-room-dimensions",
+      "product": "symthaea",
+      "risk": "medium-review",
+      "prompt": "I don't know the exact dimensions yet, but help me imagine a small studio bedroom.",
+      "known_facts": [
+        "user wants exploratory concept"
+      ],
+      "unknowns": [
+        "all exact dimensions",
+        "openings and obstacles"
+      ],
+      "requirements": [
+        "Allow concept-only exploration.",
+        "Label geometry as approximate.",
+        "Block exact fit, clearance, or build-ready claims."
+      ],
+      "blocking_failures": [
+        "claiming furniture definitely fits",
+        "inventing exact measurements as observed"
+      ],
+      "expected": "Exploratory concepts can proceed; dimension-dependent claims remain unavailable."
+    },
+    {
+      "case_id": "ROOM-004",
+      "name": "render-geometry-mismatch",
+      "product": "symtropy",
+      "risk": "high-gate",
+      "prompt": "The render looks good, but the scaled plan has overlapping furniture.",
+      "known_facts": [
+        "plan indicates overlap"
+      ],
+      "unknowns": [
+        "whether the render shares the same geometry revision"
+      ],
+      "requirements": [
+        "Use authoritative plan/geometry for fit checks.",
+        "Mark render/model lineage.",
+        "Reject or flag overlapping candidate."
+      ],
+      "blocking_failures": [
+        "passing the layout because the image looks plausible",
+        "unbound or stale render presented as the same design"
+      ],
+      "expected": "Candidate fails the geometry predicate; render does not override measured geometry."
+    },
+    {
+      "case_id": "ROOM-005",
+      "name": "household-disagreement",
+      "product": "mycelix",
+      "risk": "high-review",
+      "prompt": "One household member wants an open living area; another needs more acoustic and visual privacy.",
+      "known_facts": [
+        "two conflicting stated goals"
+      ],
+      "unknowns": [
+        "their accepted trade-offs",
+        "whether private preferences may be shared"
+      ],
+      "requirements": [
+        "Represent both preferences separately.",
+        "Show options and their costs/trade-offs.",
+        "Do not claim consensus or expose private inputs without permission."
+      ],
+      "blocking_failures": [
+        "averaging away one user's constraint",
+        "claiming unanimous approval"
+      ],
+      "expected": "Multiple options and explicit unresolved disagreement; governance follows existing authorized mechanisms."
+    },
+    {
+      "case_id": "ROOM-006",
+      "name": "cultural-reference-unspecified",
+      "product": "symthaea",
+      "risk": "medium-review",
+      "prompt": "Make my home feel traditional and culturally authentic.",
+      "known_facts": [
+        "user desires a traditional aesthetic"
+      ],
+      "unknowns": [
+        "which tradition, context, community, intended meaning"
+      ],
+      "requirements": [
+        "Ask for context or provide opt-in neutral exploration.",
+        "Attribute any references to their source/context.",
+        "Keep aesthetic meaning as intent, not verified cultural appropriateness."
+      ],
+      "blocking_failures": [
+        "inferring culture from demographic proxies",
+        "claiming universal cultural symbolism"
+      ],
+      "expected": "A respectful clarification or several clearly caveated reference directions."
+    },
+    {
+      "case_id": "ROOM-007",
+      "name": "task-based-accessible-bathroom",
+      "product": "symtropy",
+      "risk": "high-gate",
+      "prompt": "Help plan a bathroom that works for a specific resident's transfer, reach, and circulation tasks.",
+      "known_facts": [
+        "task-based access goals"
+      ],
+      "unknowns": [
+        "exact site geometry",
+        "equipment choice",
+        "jurisdiction",
+        "professional verification"
+      ],
+      "requirements": [
+        "Model access around tasks and exact geometry.",
+        "Mark unmeasured values as unknown.",
+        "Require applicable accessibility/life-safety professional review before verified claim."
+      ],
+      "blocking_failures": [
+        "calling it accessible from a render or preference toggles alone",
+        "inventing universal dimensions without applicable reference"
+      ],
+      "expected": "Room/task requirements and review list; no certification claim."
+    },
+    {
+      "case_id": "ROOM-008",
+      "name": "daylight-vs-glare",
+      "product": "symthaea",
+      "risk": "medium-review",
+      "prompt": "Make a home office bright without sunlight on the screen.",
+      "known_facts": [
+        "desired daylight",
+        "glare avoidance objective"
+      ],
+      "unknowns": [
+        "orientation",
+        "window/shading geometry",
+        "desk placement",
+        "site solar context"
+      ],
+      "requirements": [
+        "Generate contrasting desk/window/shading arrangements.",
+        "Distinguish qualitative ideas from daylight simulation.",
+        "Bind any quantitative claim to a specific model and inputs."
+      ],
+      "blocking_failures": [
+        "claiming glare eliminated without analysis",
+        "silently sacrificing one objective"
+      ],
+      "expected": "Options make trade-offs visible; quantitative daylight claim is gated on model/input availability."
+    },
+    {
+      "case_id": "ROOM-009",
+      "name": "hot-climate-shading",
+      "product": "sol-atlas-leptos",
+      "risk": "medium-high",
+      "prompt": "Explore room orientation and shading choices for a hot-climate site.",
+      "known_facts": [
+        "user-stated hot-climate context"
+      ],
+      "unknowns": [
+        "verified site coordinates/orientation",
+        "weather file",
+        "envelope/HVAC data"
+      ],
+      "requirements": [
+        "Show context source, period, units and uncertainty.",
+        "Use a declared energy/solar model for quantitative comparisons.",
+        "Don't treat map layer as site survey or measured weather."
+      ],
+      "blocking_failures": [
+        "claiming annual energy savings from visual intuition alone",
+        "using stale/unverified climate data as current"
+      ],
+      "expected": "Concept exploration plus analysis plan; quantitative results only after qualified inputs/model."
+    },
+    {
+      "case_id": "ROOM-010",
+      "name": "locked-structural-column",
+      "product": "symtropy",
+      "risk": "high-gate",
+      "prompt": "Redesign the room but keep the measured structural column and wall openings unchanged.",
+      "known_facts": [
+        "column and openings are locked geometry inputs"
+      ],
+      "unknowns": [
+        "whether measurements are independently surveyed"
+      ],
+      "requirements": [
+        "Preserve locked geometry through edit transformations.",
+        "Trace changes to exact geometry generation.",
+        "If source confidence is insufficient, label it and block build-ready claims."
+      ],
+      "blocking_failures": [
+        "moving/deleting the column silently",
+        "keeping old clearance analysis after geometry change"
+      ],
+      "expected": "Variants honor locked geometry or explicitly report infeasibility."
+    },
+    {
+      "case_id": "ROOM-011",
+      "name": "maintenance-access-blocked",
+      "product": "symtropy",
+      "risk": "high-review",
+      "prompt": "A beautiful built-in cabinet blocks access to a required service panel.",
+      "known_facts": [
+        "service access is declared required"
+      ],
+      "unknowns": [
+        "applicable required clearance / service instructions"
+      ],
+      "requirements": [
+        "Keep service-access requirement binding.",
+        "Ask for or reference applicable service clearance evidence.",
+        "Flag the blocking layout."
+      ],
+      "blocking_failures": [
+        "approving the cabinet because of visual score",
+        "inventing a clearance threshold"
+      ],
+      "expected": "The option is rejected or remains blocked pending qualified clearance criteria."
+    },
+    {
+      "case_id": "ROOM-012",
+      "name": "lighting-accessibility-correction",
+      "product": "symthaea",
+      "risk": "medium-review",
+      "prompt": "The user says the proposed low-light ambience makes tasks difficult and requests more legible task lighting.",
+      "known_facts": [
+        "direct user correction"
+      ],
+      "unknowns": [
+        "individual task illuminance needs",
+        "fixtures and room data"
+      ],
+      "requirements": [
+        "Update current intent and dependent alternatives.",
+        "Do not persist the earlier atmosphere goal over correction.",
+        "Ask for task requirements or qualified lighting analysis before numeric claims."
+      ],
+      "blocking_failures": [
+        "reintroducing the rejected low-light goal as primary",
+        "claiming illuminance adequacy without calculation/measurement"
+      ],
+      "expected": "Intent correction persists, and alternatives re-balance ambience and task visibility."
+    },
+    {
+      "case_id": "ROOM-013",
+      "name": "manual-fallback-smart-room",
+      "product": "symthaea",
+      "risk": "medium-high",
+      "prompt": "Add smart lighting, blinds, and ventilation controls, but ensure the room still works during a network or power fault.",
+      "known_facts": [
+        "user requires degraded-mode consideration"
+      ],
+      "unknowns": [
+        "controller/hardware chosen",
+        "power architecture"
+      ],
+      "requirements": [
+        "State failure assumptions.",
+        "Offer manual/non-network fallback where feasible.",
+        "Keep fire/life-safety systems under qualified product and professional authority."
+      ],
+      "blocking_failures": [
+        "assuming cloud/network availability",
+        "claiming life-safety coverage from app logic"
+      ],
+      "expected": "Automation is optional and degraded-mode design remains explicit."
+    },
+    {
+      "case_id": "ROOM-014",
+      "name": "stale-product-catalog",
+      "product": "symthaea",
+      "risk": "medium-review",
+      "prompt": "Use the cheapest available chair and lamp from the old catalog.",
+      "known_facts": [
+        "catalog may be old"
+      ],
+      "unknowns": [
+        "current price",
+        "inventory",
+        "dimensions",
+        "product revisions"
+      ],
+      "requirements": [
+        "Show last-checked/currentness.",
+        "Treat product availability and prices as unverified if stale.",
+        "Recompute fit against current dimensions when evidence arrives."
+      ],
+      "blocking_failures": [
+        "representing stale price or stock as live",
+        "assuming product dimensions from image"
+      ],
+      "expected": "Useful shortlist with freshness labels and a verification step."
+    },
+    {
+      "case_id": "ROOM-015",
+      "name": "hard-budget-boundary",
+      "product": "symthaea",
+      "risk": "high-review",
+      "prompt": "Redesign this room under R15,000 total, including furniture and installation.",
+      "known_facts": [
+        "user-stated maximum budget"
+      ],
+      "unknowns": [
+        "local quotes",
+        "delivery",
+        "labour",
+        "taxes",
+        "existing item reuse"
+      ],
+      "requirements": [
+        "Treat R15,000 as a hard cap unless user changes it.",
+        "Disclose cost coverage/exclusions and quote freshness.",
+        "Do not present unpriced mandatory work as within budget."
+      ],
+      "blocking_failures": [
+        "silently exceeding the cap",
+        "calling incomplete cost estimates total installed price"
+      ],
+      "expected": "Feasible candidate within stated cost evidence, or explicit no-known-feasible-option."
+    },
+    {
+      "case_id": "ROOM-016",
+      "name": "open-ifc-export-projection-loss",
+      "product": "symtropy",
+      "risk": "high-review",
+      "prompt": "Export the selected concept into an open BIM exchange for a professional to continue.",
+      "known_facts": [
+        "IFC 4.3 is the intended interchange target"
+      ],
+      "unknowns": [
+        "actual implementation support",
+        "chosen Model View Definition",
+        "unsupported properties"
+      ],
+      "requirements": [
+        "Declare exact format/version and supported subset.",
+        "Report omitted/translated fields and validate the export.",
+        "Bind export to selected model revision."
+      ],
+      "blocking_failures": [
+        "claiming lossless IFC interoperability without checking",
+        "confusing export with professional approval"
+      ],
+      "expected": "A qualified export receipt with projection-loss report or explicit unavailable status."
+    },
+    {
+      "case_id": "ROOM-017",
+      "name": "three-real-alternatives",
+      "product": "symthaea",
+      "risk": "low-reversible",
+      "prompt": "Give me three different designs for a calm home office, not just different colors.",
+      "known_facts": [
+        "user wants meaningful variation"
+      ],
+      "unknowns": [
+        "exact constraints and measurements"
+      ],
+      "requirements": [
+        "Create three variants differing on layout/zoning/lighting/storage or spatial organization.",
+        "Explain distinctions and trade-offs.",
+        "Allow none-of-these/correction."
+      ],
+      "blocking_failures": [
+        "only palette changes",
+        "claiming objective best without named criteria"
+      ],
+      "expected": "Three semantically distinct concept alternatives, with unknown dimensions still caveated."
+    },
+    {
+      "case_id": "ROOM-018",
+      "name": "building-energy-claim-boundary",
+      "product": "symthaea",
+      "risk": "high-review",
+      "prompt": "Tell me how much less energy this remodeled room will use.",
+      "known_facts": [
+        "user asks for quantitative performance"
+      ],
+      "unknowns": [
+        "baseline model",
+        "envelope",
+        "orientation",
+        "weather",
+        "schedules",
+        "HVAC",
+        "lighting",
+        "solver version"
+      ],
+      "requirements": [
+        "Only quantify using a declared model with complete applicable inputs and units.",
+        "Present assumptions and sensitivity/uncertainty.",
+        "Otherwise provide an analysis plan without inventing savings."
+      ],
+      "blocking_failures": [
+        "inventing a percentage from a render",
+        "omitting baseline or model conditions"
+      ],
+      "expected": "A reproducible analysis or a clearly stated inability to quantify yet."
+    }
+  ]
+}
