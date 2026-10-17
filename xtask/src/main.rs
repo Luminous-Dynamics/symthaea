@@ -4,6 +4,7 @@ use std::path::PathBuf;
 mod crate_status;
 mod duplicate_scan;
 mod env_mobility;
+mod env_mobility_route;
 mod manifest;
 mod rhn_sweep;
 
@@ -65,6 +66,8 @@ enum Commands {
     },
     /// Independently qualify the frozen synthetic survey-feasibility and repairability corpora.
     EnvMobilityQualify,
+    /// Audit the synthetic microfactory routing fixture without scheduling or executing production work.
+    EnvMobilityRouteAudit,
     GenerateManifest {
         #[arg(long, default_value = ".")]
         root: PathBuf,
@@ -120,6 +123,10 @@ fn main() -> anyhow::Result<()> {
                     report.protected_gate_false_accepts
                 );
             }
+        }
+        Commands::EnvMobilityRouteAudit => {
+            let report = env_mobility_route::run()?;
+            println!("{}", serde_json::to_string_pretty(&report)?);
         }
         Commands::GenerateManifest { root } => {
             let files = vec!["Cargo.toml", "src/lib.rs", "symthaea-core/Cargo.toml"];
