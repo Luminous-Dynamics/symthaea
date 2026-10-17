@@ -38,7 +38,8 @@ Required fields:
 - Model run ID, model version, source revision, and digest for the model artifact.
 - Separate, versioned references for aerodynamic data, propulsion/rotor maps, energy-system assumptions and thermal/derating data, where used.
 - Each artifact reference includes a locator, revision, digest, retrieval date, units, reference conditions, applicability domain, uncertainty description, and limitations. If a field does not apply to source code or a synthetic fixture, record an explicit not-applicable reason; do not leave it blank.
-- Candidate configuration, energy-system envelope, route, mission family, mass properties and environment each have declared digests. Each must match its corresponding source artifact digest and the model run's declared input digest. The manifest producer must canonicalize and calculate these digests; the validator only checks syntax and declared equality bindings.
+- Candidate configuration, energy-system envelope, route, mission family, mass properties, environment, and phase-demand output each have declared digests. Each must match its corresponding source artifact digest and the model run's declared input/output digest. The phase-demand digest must cover an explicitly ordered canonical representation of every phase ID, duration, nominal power, duty class, uncertainty interval, and uncertainty method.
+- The manifest producer must canonicalize and calculate these digests; the Rust validator checks syntax and declared equality bindings only. It does not hash the Rust structs or prove that a referenced artifact resolves to the bytes claimed.
 - Solver settings, convergence/error metadata, and assumptions needed to reproduce the output.
 
 A digest establishes identity, not truth. A hash that cannot be resolved to a source artifact is insufficient. Missing provenance is indeterminate; never fill it with an undocumented default.
