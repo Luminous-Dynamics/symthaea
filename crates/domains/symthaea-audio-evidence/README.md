@@ -39,7 +39,7 @@ cargo run -p symthaea-audio-evidence --bin hifi-benchmark-check -- schemas/examp
 
 The checked-in example is explicitly synthetic. The validator rejects missing identity fields, duplicate sample IDs, unknown roles, absent split policy and declared test-group overlap. It allows calibration/test listener overlap when the manifest intentionally permits personalization. It does **not** evaluate predictions, establish that a study is unbiased, or prove audio quality.
 
-See [HIFI_BENCHMARK_PROTOCOL_2026-10-17.md](../../../../docs/research/HIFI_BENCHMARK_PROTOCOL_2026-10-17.md) for benchmark regimes, metrics, negative controls and the decision rule.
+See [HIFI_BENCHMARK_PROTOCOL_2026-10-17.md](../../../docs/research/HIFI_BENCHMARK_PROTOCOL_2026-10-17.md) for benchmark regimes, metrics, negative controls and the decision rule.
 
 ## Tests
 
