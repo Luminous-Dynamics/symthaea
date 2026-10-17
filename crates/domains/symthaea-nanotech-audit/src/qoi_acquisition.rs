@@ -51,6 +51,7 @@ pub struct QoiAcquisitionReport {
     pub candidate_count: usize,
     pub reference_call_budget: usize,
     pub random_baseline_trials: usize,
+    pub random_seed: u64,
     pub arms: Vec<AcquisitionArm>,
     pub claim_ceiling: String,
 }
@@ -344,6 +345,7 @@ pub fn run_qoi_acquisition_benchmark(
         candidate_count: candidates.len(),
         reference_call_budget: budget,
         random_baseline_trials: random_trials,
+        random_seed,
         arms: vec![qoi_greedy, generic_greedy, random],
         claim_ceiling: "This is a mathematical known-truth benchmark for acquisition logic only. Its features and noise model are synthetic; it is not an atomistic potential, not a materials result, and not evidence of Symthaea performance on real QoIs. The random baseline is averaged over the declared deterministic trial count. Real promotion requires independent material-family data, reference-cost accounting, calibrated uncertainty and preregistered downstream QoI gates.".to_owned(),
     })
