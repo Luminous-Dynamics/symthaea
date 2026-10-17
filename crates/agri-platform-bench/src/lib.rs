@@ -780,7 +780,10 @@ mod tests {
                 let record = scenario.evidence.iter_mut().find(|r| r.domain == EvidenceDomain::CostModel).unwrap();
                 record.artifact_sha256 = Some("bad-digest".into());
             }
-            Mutation::DuplicateEvidenceDomain => scenario.evidence.push(scenario.evidence[0].clone()),
+            Mutation::DuplicateEvidenceDomain => {
+                let duplicate = scenario.evidence[0].clone();
+                scenario.evidence.push(duplicate);
+            },
             Mutation::MissingEvidenceDomain => scenario.evidence.retain(|r| r.domain != EvidenceDomain::TaskDefinition),
             Mutation::ArithmeticOverflow => {
                 platform.operating_cost_cents_per_hour = u64::MAX;
