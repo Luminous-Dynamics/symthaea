@@ -106,7 +106,10 @@ struct EngineeringProfileV1 {
     stability_margin: f64,
 }
 
-fn finding(path: impl Into<String>, reason: impl Into<String>) -> PreferenceDriftFixtureFindingV1 {
+fn finding(
+    path: impl Into<String>,
+    reason: impl Into<String>,
+) -> PreferenceDriftFixtureFindingV1 {
     PreferenceDriftFixtureFindingV1 {
         path: path.into(),
         reason: reason.into(),
@@ -137,7 +140,9 @@ fn read_profiles(
             .map(str::trim)
             .filter(|value| !value.is_empty())
             .map(str::to_owned)
-            .ok_or_else(|| vec![finding(format!("{path}.candidate_id"), "missing candidate ID")])?;
+            .ok_or_else(|| {
+                vec![finding(format!("{path}.candidate_id"), "missing candidate ID")]
+            })?;
         let profile = candidate
             .get("synthetic_engineering_profile")
             .ok_or_else(|| vec![finding(
@@ -359,7 +364,11 @@ fn score_selections(
                 let acceptable = oracle
                     .get("acceptable_candidate_ids")
                     .and_then(Value::as_array)
-                    .is_some_and(|items| items.iter().any(|item| item.as_str() == Some(candidate_id.as_str())));
+                    .is_some_and(|items| {
+                        items
+                            .iter()
+                            .any(|item| item.as_str() == Some(candidate_id.as_str()))
+                    });
                 if acceptable {
                     score.acceptable_selection_count += 1;
                 } else {
@@ -382,7 +391,8 @@ fn score_selections(
                 .is_some_and(|observations| {
                     observations.iter().any(|observation| {
                         observation.get("task_id").and_then(Value::as_str) != task_id
-                            || observation.get("context_id").and_then(Value::as_str) != context_id
+                            || observation.get("context_id").and_then(Value::as_str)
+                                != context_id
                     })
                 });
             if has_mismatch {
@@ -450,7 +460,11 @@ pub fn evaluate_preference_selection_baselines(
         seed,
         fixed_weight_score,
         seeded_random_score,
-        claim_ceiling: "Synthetic fixed-weight/random behavior only; no real preference, safety, clinical, or deployment claim.".to_owned(),
+        claim_ceiling: concat!(
+            "Synthetic fixed-weight/random behavior only; no real preference, safety, ",
+            "clinical, or deployment claim."
+        )
+        .to_owned(),
     })
 }
 
@@ -588,7 +602,9 @@ pub fn evaluate_seeded_random_seed_sweep(
         seed_count,
         scenario_count_per_seed: scenarios.len(),
         ranking_scenarios_per_seed: ranking_scenarios_per_seed.unwrap_or_default(),
-        ranked_selection_opportunities: ranking_scenarios_per_seed.unwrap_or_default() * seed_count,
+        ranked_selection_opportunities: ranking_scenarios_per_seed
+            .unwrap_or_default()
+            * seed_count,
         acceptable_selection_count: acceptable_total,
         unacceptable_selection_count: unacceptable_total,
         selection_without_ranking_count: no_ranking_total,
@@ -597,7 +613,11 @@ pub fn evaluate_seeded_random_seed_sweep(
         min_acceptable_per_seed: min_acceptable,
         max_acceptable_per_seed: max_acceptable,
         per_seed,
-        claim_ceiling: "Finite seed-sensitivity diagnostic on one fixed synthetic corpus; not independent-scenario generalization or human preference accuracy.".to_owned(),
+        claim_ceiling: concat!(
+            "Finite seed-sensitivity diagnostic on one fixed synthetic corpus; ",
+            "not independent-scenario generalization or human preference accuracy."
+        )
+        .to_owned(),
     })
 }
 
