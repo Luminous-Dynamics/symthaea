@@ -1316,7 +1316,7 @@
         "target_species": "synthetic-livestock-target",
         "life_stage": "synthetic-life-stage-01",
         "intended_use": "feed_screen",
-        "requested_claim": "nutrition_feasibility",
+        "requested_claim": "animal_outcome",
         "scenario_digest": "sha256:synthetic-scenario-a"
       },
       "candidate": {
