@@ -64,12 +64,35 @@ fn timestamp_looks_rfc3339(value: &str) -> bool {
     {
         return false;
     }
-    if bytes.last() == Some(&b'Z') {
+    for (start, end) in [(0, 4), (5, 7), (8, 10), (11, 13), (14, 16), (17, 19)] {
+        if !bytes[start..end].iter().all(|byte| byte.is_ascii_digit()) {
+            return false;
+        }
+    }
+
+    let timezone_start = if bytes.last() == Some(&b'Z') {
+        bytes.len() - 1
+    } else {
+        if bytes.len() < 25 {
+            return false;
+        }
+        let start = bytes.len() - 6;
+        if !matches!(bytes[start], b'+' | b'-')
+            || !bytes[start + 1..start + 3].iter().all(|byte| byte.is_ascii_digit())
+            || bytes[start + 3] != b':'
+            || !bytes[start + 4..start + 6].iter().all(|byte| byte.is_ascii_digit())
+        {
+            return false;
+        }
+        start
+    };
+
+    if timezone_start == 19 {
         return true;
     }
-    bytes.len() >= 25
-        && matches!(bytes.get(bytes.len() - 6).copied(), Some(b'+' | b'-'))
-        && bytes.get(bytes.len() - 3) == Some(&b':')
+    bytes.get(19) == Some(&b'.')
+        && timezone_start > 20
+        && bytes[20..timezone_start].iter().all(|byte| byte.is_ascii_digit())
 }
 
 fn validate_evidence<'a>(
