@@ -463,6 +463,12 @@ fn validate_manifest(manifest: &SourceManifest) -> Result<()> {
                 artifact.relative_path, artifact.source_doi, source_object.source_doi
             )));
         }
+        if source_object.source_revision != artifact.artifact_revision {
+            return Err(AdapterError::Validation(format!(
+                "artifact {:?} revision {:?} does not match declared source object revision {:?}",
+                artifact.relative_path, artifact.artifact_revision, source_object.source_revision
+            )));
+        }
         if !source_object.terms_reviewed || !source_object.local_use_authorized {
             return Err(AdapterError::Validation(format!(
                 "artifact {:?} is blocked by source-object reuse permissions",
@@ -542,6 +548,14 @@ fn validate_records(
             (object.source_doi.clone(), object.terms_reviewed && object.local_use_authorized),
         ))
         .collect();
+    let declared_artifact_objects: BTreeSet<&str> = manifest.artifacts.iter()
+        .map(|artifact| artifact.source_object_id.as_str())
+        .collect();
+    if !manifest.reuse_policy.artifact_terms_reviewed || !manifest.reuse_policy.local_use_authorized {
+        return Err(AdapterError::Validation(
+            "record validation requires manifest-level source terms and local-use authorization".into(),
+        ));
+    }
 
     let target_group = manifest.challenge_context.target_parent_specimen_id.as_str();
     let mut record_ids = BTreeSet::new();
@@ -596,6 +610,12 @@ fn validate_records(
             return Err(AdapterError::Validation(format!(
                 "record {:?} cannot be evaluated until source-object terms and local-use permission are reviewed",
                 record.record_id
+            )));
+        }
+        if !declared_artifact_objects.contains(record.source_object_id.as_str()) {
+            return Err(AdapterError::Validation(format!(
+                "record {:?} source object {:?} has no declared artifact digest in the manifest",
+                record.record_id, record.source_object_id
             )));
         }
 
@@ -835,7 +855,7 @@ fn manifest_receipt(
 fn run(args: &[String]) -> Result<AuditReceipt> {
     if args.len() < 3 {
         return Err(AdapterError::Validation(
-            "usage: metal-measurement-bench <validate-manifest|verify-artifacts|validate-records> <manifest.json> [artifact-dir|observations.json]".into(),
+            "usage: metal-measurement-bench validate-manifest MANIFEST.json | verify-artifacts MANIFEST.json ARTIFACT_DIR | validate-records MANIFEST.json OBSERVATIONS.json ARTIFACT_DIR".into(),
         ));
     }
     let operation = args[1].as_str();
@@ -868,14 +888,18 @@ fn run(args: &[String]) -> Result<AuditReceipt> {
             ))
         }
         "validate-records" => {
-            if args.len() != 4 {
-                return Err(AdapterError::Validation("validate-records requires an observation JSON path".into()));
+            if args.len() != 5 {
+                return Err(AdapterError::Validation(
+                    "validate-records requires an observation JSON path and an artifact directory".into(),
+                ));
             }
             let (observations, observation_bytes): (ObservationSet, Vec<u8>) =
                 read_json(Path::new(&args[3]))?;
+            verify_artifacts(&manifest, Path::new(&args[4]))?;
             let groups = validate_records(&manifest, &observations)?;
             Ok(manifest_receipt(
-                "validate-records", "RECORD_CONTRACT_AND_OUTCOME_GROUP_SPLIT_VALID",
+                "validate-records",
+                "RECORD_CONTRACT_SPLIT_AND_SOURCE_BYTES_VALID",
                 &manifest_bytes, Some(sha256_hex(&observation_bytes)), manifest.artifacts.len(),
                 observations.records.len(), groups,
             ))
