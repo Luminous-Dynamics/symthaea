@@ -100,6 +100,8 @@ The initial fixture should be implemented as deterministic contract tests. Propo
 - **0** evaluation-oracle fields reach policy features, model fitting, active query ranking, or calibration.
 - **0** synthetic preference records are reported as actual wearer input or clinical evidence.
 - Same canonical fixture + same policy revision/parameters produces byte-identical replay artifacts.
+- Reordering an eligible-candidate list or the same set of preference observations must not change the normalized decision receipt; ordering is not preference evidence.
+- The standalone episode replay API fails closed when freshness metadata is missing or invalid; only fixture-level validation is not enough.
 - The benchmark fails closed on unknown schema versions, duplicate scenario/observation IDs, unknown candidate references, impossible budget values, malformed preference pairs, and split leakage.
 
 A blanket “always abstain” implementation does **not** pass: positive controls with matching, conflict-free, context-relevant feedback must support an admissible useful recommendation, while hard constraints remain in force.
