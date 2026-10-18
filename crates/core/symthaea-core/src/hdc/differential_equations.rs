@@ -802,7 +802,17 @@ impl DifferentialEquationsEngine {
         y0: &[f64],
         tol: f64,
     ) -> Result<RK45Result, RK45Error> {
-        const MAX_ATTEMPTS: usize = 100_000;
+        Self::try_solve_rk45_with_budget(system, t0, t_end, y0, tol, 100_000)
+    }
+
+    fn try_solve_rk45_with_budget(
+        system: &ODESystem,
+        t0: f64,
+        t_end: f64,
+        y0: &[f64],
+        tol: f64,
+        max_attempts: usize,
+    ) -> Result<RK45Result, RK45Error> {
         const MAX_STEP_GROWTH: f64 = 5.0;
         const MIN_STEP_GROWTH: f64 = 0.2;
         const MAX_STEP_SHRINK: f64 = 0.1;
@@ -916,9 +926,9 @@ impl DifferentialEquationsEngine {
 
         let mut attempts = 0usize;
         while t < t_end {
-            if attempts >= MAX_ATTEMPTS {
+            if attempts >= max_attempts {
                 return Err(RK45Error::new(
-                    RK45ErrorKind::StepBudgetExceeded { max_attempts: MAX_ATTEMPTS },
+                    RK45ErrorKind::StepBudgetExceeded { max_attempts },
                     t, &y, accepted_steps, rejected_steps, error_estimate
                 ));
             }
@@ -1792,6 +1802,118 @@ mod tests {
             final_y,
             expected
         );
+    }
+
+    #[test]
+    fn test_rk45_zero_duration_is_identity() {
+        fn decay(_t: f64, y: &[f64]) -> Vec<f64> {
+            vec![-y[0]]
+        }
+        let system = ODESystem { f: decay, dim: 1 };
+        let result =
+            DifferentialEquationsEngine::try_solve_rk45(&system, 2.0, 2.0, &[3.0], 1e-8)
+                .expect("zero-duration integration is the identity map");
+        assert!(result.converged);
+        assert_eq!(result.steps_taken, 0);
+        assert_eq!(result.rejected_steps, 0);
+        assert_eq!(result.y_final, vec![3.0]);
+        assert_eq!(result.error_estimate, 0.0);
+    }
+
+    #[test]
+    fn test_rk45_invalid_inputs_are_typed_failures() {
+        fn decay(_t: f64, y: &[f64]) -> Vec<f64> {
+            vec![-y[0]]
+        }
+        let system = ODESystem { f: decay, dim: 1 };
+        assert!(matches!(
+            DifferentialEquationsEngine::try_solve_rk45(&system, 1.0, 0.0, &[1.0], 1e-8),
+            Err(RK45Error { kind: RK45ErrorKind::InvalidTimeSpan, .. })
+        ));
+        assert!(matches!(
+            DifferentialEquationsEngine::try_solve_rk45(&system, 0.0, 1.0, &[1.0], f64::NAN),
+            Err(RK45Error { kind: RK45ErrorKind::InvalidTolerance, .. })
+        ));
+        assert!(matches!(
+            DifferentialEquationsEngine::try_solve_rk45(&system, 0.0, 1.0, &[], 1e-8),
+            Err(RK45Error {
+                kind: RK45ErrorKind::DimensionMismatch { expected: 1, actual: 0 },
+                ..
+            })
+        ));
+        assert!(matches!(
+            DifferentialEquationsEngine::try_solve_rk45(&system, 0.0, 1.0, &[f64::INFINITY], 1e-8),
+            Err(RK45Error { kind: RK45ErrorKind::NonFiniteInitialState { index: 0 }, .. })
+        ));
+        let empty_system = ODESystem { f: decay, dim: 0 };
+        assert!(matches!(
+            DifferentialEquationsEngine::try_solve_rk45(&empty_system, 0.0, 1.0, &[], 1e-8),
+            Err(RK45Error { kind: RK45ErrorKind::EmptySystem, .. })
+        ));
+    }
+
+    #[test]
+    fn test_rk45_rhs_shape_and_finiteness_are_checked() {
+        fn short_rhs(_t: f64, _y: &[f64]) -> Vec<f64> {
+            Vec::new()
+        }
+        fn non_finite_rhs(_t: f64, _y: &[f64]) -> Vec<f64> {
+            vec![f64::NAN]
+        }
+        let short_system = ODESystem { f: short_rhs, dim: 1 };
+        assert!(matches!(
+            DifferentialEquationsEngine::try_solve_rk45(&short_system, 0.0, 1.0, &[1.0], 1e-8),
+            Err(RK45Error {
+                kind: RK45ErrorKind::RhsDimensionMismatch {
+                    stage: "k1",
+                    expected: 1,
+                    actual: 0
+                },
+                ..
+            })
+        ));
+        let non_finite_system = ODESystem { f: non_finite_rhs, dim: 1 };
+        assert!(matches!(
+            DifferentialEquationsEngine::try_solve_rk45(
+                &non_finite_system, 0.0, 1.0, &[1.0], 1e-8
+            ),
+            Err(RK45Error {
+                kind: RK45ErrorKind::NonFiniteRhs { stage: "k1", index: 0 },
+                ..
+            })
+        ));
+    }
+
+    #[test]
+    fn test_rk45_rejection_consumes_shared_attempt_budget() {
+        // The deliberately discontinuous RHS forces an oversized first trial
+        // to be rejected. A private one-attempt budget verifies that rejected
+        // work counts toward termination without running 100k iterations.
+        fn discontinuous(t: f64, _y: &[f64]) -> Vec<f64> {
+            vec![if t == 0.0 { 0.0 } else { 1.0e6 }]
+        }
+        let system = ODESystem { f: discontinuous, dim: 1 };
+        let error = DifferentialEquationsEngine::try_solve_rk45_with_budget(
+            &system, 0.0, 1.0, &[0.0], 1e-12, 1,
+        )
+        .expect_err("oversized first trial must be rejected, then hit attempt budget");
+        assert!(matches!(
+            error.kind,
+            RK45ErrorKind::StepBudgetExceeded { max_attempts: 1 }
+        ));
+        assert_eq!(error.accepted_steps, 0);
+        assert_eq!(error.rejected_steps, 1);
+    }
+
+    #[test]
+    fn test_rk45_legacy_wrapper_marks_invalid_solve_not_converged() {
+        fn decay(_t: f64, y: &[f64]) -> Vec<f64> {
+            vec![-y[0]]
+        }
+        let system = ODESystem { f: decay, dim: 1 };
+        let result = DifferentialEquationsEngine::solve_rk45(&system, 0.0, 1.0, &[1.0], 0.0);
+        assert!(!result.converged);
+        assert_eq!(result.y_final, vec![1.0]);
     }
 
     // ── Stiff ODE validation tests ──────────────────────────────────────
