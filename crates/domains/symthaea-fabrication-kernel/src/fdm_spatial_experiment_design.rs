@@ -85,7 +85,7 @@ impl SamplingStrategy {
         }
     }
 
-    pub fn all() -> [Self; 4] {
+    pub fn all() -> [Self; 5] {
         [
             Self::FixedStratified,
             Self::FarthestPoint,
@@ -168,11 +168,11 @@ fn position(x_tick: u32, y_tick: u32) -> NormalizedPosition {
     NormalizedPosition { x: tick(x_tick), y: tick(y_tick) }
 }
 
-fn same_position(left: NormalizedPosition, right: NormalizedPosition) -> bool {
+pub(crate) fn same_position(left: NormalizedPosition, right: NormalizedPosition) -> bool {
     left.x == right.x && left.y == right.y
 }
 
-fn initial_positions() -> Vec<NormalizedPosition> {
+pub(crate) fn initial_positions() -> Vec<NormalizedPosition> {
     vec![
         position(1, 1),
         position(9, 1),
@@ -182,7 +182,7 @@ fn initial_positions() -> Vec<NormalizedPosition> {
     ]
 }
 
-fn candidate_positions() -> Vec<NormalizedPosition> {
+pub(crate) fn candidate_positions() -> Vec<NormalizedPosition> {
     let mut candidates = Vec::with_capacity(81 - INITIAL_OBSERVATION_COUNT);
     for y in MEASURED_GRID_TICKS {
         for x in MEASURED_GRID_TICKS {
@@ -195,7 +195,7 @@ fn candidate_positions() -> Vec<NormalizedPosition> {
     candidates
 }
 
-fn fixed_stratified_priority() -> Vec<NormalizedPosition> {
+pub(crate) fn fixed_stratified_priority() -> Vec<NormalizedPosition> {
     let mut result = Vec::with_capacity(8);
     for y in [3, 5, 7] {
         for x in [3, 5, 7] {
@@ -208,7 +208,7 @@ fn fixed_stratified_priority() -> Vec<NormalizedPosition> {
     result
 }
 
-fn distance(left: NormalizedPosition, right: NormalizedPosition) -> f64 {
+pub(crate) fn distance(left: NormalizedPosition, right: NormalizedPosition) -> f64 {
     let dx = left.x - right.x;
     let dy = left.y - right.y;
     (dx * dx + dy * dy).sqrt()
@@ -222,7 +222,7 @@ fn min_observation_distance(candidate: NormalizedPosition, observations: &[Spati
         .unwrap_or(f64::INFINITY)
 }
 
-fn predict_nearest(observations: &[SpatialDesignObservation], target: NormalizedPosition) -> Option<f64> {
+pub(crate) fn predict_nearest(observations: &[SpatialDesignObservation], target: NormalizedPosition) -> Option<f64> {
     observations.iter().min_by(|left, right| {
         distance(left.position, target)
             .total_cmp(&distance(right.position, target))
@@ -230,7 +230,7 @@ fn predict_nearest(observations: &[SpatialDesignObservation], target: Normalized
     }).map(|observation| observation.measured_error_mm)
 }
 
-fn predict_idw(observations: &[SpatialDesignObservation], target: NormalizedPosition) -> Option<f64> {
+pub(crate) fn predict_idw(observations: &[SpatialDesignObservation], target: NormalizedPosition) -> Option<f64> {
     let mut ranked: Vec<(&SpatialDesignObservation, f64)> = observations
         .iter()
         .map(|observation| (observation, distance(observation.position, target)))
@@ -323,7 +323,7 @@ pub fn choose_next_location(
     }
 }
 
-fn latent_surface(surface: SyntheticSpatialSurface, p: NormalizedPosition) -> f64 {
+pub(crate) fn latent_surface(surface: SyntheticSpatialSurface, p: NormalizedPosition) -> f64 {
     let x = p.x - 0.5;
     let y = p.y - 0.5;
     match surface {
@@ -366,7 +366,7 @@ fn deterministic_noise(seed: u64, p: NormalizedPosition) -> f64 {
     2.0 * unit - 1.0
 }
 
-fn measure(surface: SyntheticSpatialSurface, position: NormalizedPosition, seed: u64) -> f64 {
+pub(crate) fn measure(surface: SyntheticSpatialSurface, position: NormalizedPosition, seed: u64) -> f64 {
     let noise_scale = match surface {
         SyntheticSpatialSurface::HeteroskedasticNoise => {
             if position.x >= 0.55 { 0.035 } else { 0.003 }
@@ -561,6 +561,13 @@ pub fn run_spatial_design_arm(
 #[cfg(test)]
 mod tests {
     use super::*;
+
+    #[test]
+    fn strategy_list_matches_all_declared_sampling_arms() {
+        assert_eq!(SamplingStrategy::all().len(), 5);
+        assert_eq!(SamplingStrategy::all()[0], SamplingStrategy::FixedStratified);
+        assert_eq!(SamplingStrategy::all()[4], SamplingStrategy::SeededRandom);
+    }
 
     #[test]
     fn complete_panel_has_equal_budgets_and_distinct_report_digests() {
