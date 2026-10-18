@@ -899,7 +899,7 @@ mod tests {
             ],
         };
         let groups = validate_records(&value, &observations).unwrap();
-        assert_eq!(groups, vec!["AMB2022-718-AMMT-B7-P4"]);
+        assert_eq!(groups, vec![String::from("AMB2022-718-AMMT-B7-P4")]);
     }
 
     #[test]
