@@ -60,6 +60,7 @@ enum SelectionPolicy {
     SeededRandom,
     MaximinCoverage,
     ModelDisagreement,
+    CoverageGuardedDisagreement,
 }
 
 impl SelectionPolicy {
@@ -68,6 +69,7 @@ impl SelectionPolicy {
         Self::SeededRandom,
         Self::MaximinCoverage,
         Self::ModelDisagreement,
+        Self::CoverageGuardedDisagreement,
     ];
 
     fn name(self) -> &'static str {
@@ -76,6 +78,7 @@ impl SelectionPolicy {
             Self::SeededRandom => "seeded_random",
             Self::MaximinCoverage => "maximin_coverage",
             Self::ModelDisagreement => "model_disagreement",
+            Self::CoverageGuardedDisagreement => "coverage_guarded_disagreement",
         }
     }
 }
@@ -87,6 +90,7 @@ struct Trial {
     seed: u64,
     experiment_budget: usize,
     observation_count: usize,
+    selected_grid_indices: Vec<usize>,
     held_out_point_count: usize,
     mean_absolute_error: f64,
     root_mean_square_error: f64,
@@ -198,6 +202,62 @@ fn already_sampled(observations: &[(usize, f64)], index: usize) -> bool {
     observations.iter().any(|(seen, _)| *seen == index)
 }
 
+fn maximin_candidate(observations: &[(usize, f64)]) -> usize {
+    let mut best_index = None;
+    let mut best_distance = 0_usize;
+    for candidate in 0..=GRID_STEPS {
+        if already_sampled(observations, candidate) {
+            continue;
+        }
+        let distance = observations
+            .iter()
+            .map(|(seen, _)| seen.abs_diff(candidate))
+            .min()
+            .unwrap_or(0);
+        if best_index.is_none() || distance > best_distance {
+            best_index = Some(candidate);
+            best_distance = distance;
+        }
+    }
+    best_index.expect("candidate grid has unsampled points")
+}
+
+fn minimum_spacing(budget: usize) -> usize {
+    (GRID_STEPS / (budget - 1) / 2).max(1)
+}
+
+fn disagreement_candidate(
+    observations: &[(usize, f64)],
+    minimum_distance: Option<usize>,
+) -> usize {
+    let mut best_index = None;
+    let mut best_disagreement = f64::NEG_INFINITY;
+    for candidate in 0..=GRID_STEPS {
+        if already_sampled(observations, candidate) {
+            continue;
+        }
+        let nearest_distance = observations
+            .iter()
+            .map(|(seen, _)| seen.abs_diff(candidate))
+            .min()
+            .unwrap_or(0);
+        if minimum_distance.is_some_and(|floor| nearest_distance < floor) {
+            continue;
+        }
+
+        let x = candidate as f64 / GRID_STEPS as f64;
+        let global = global_linear_prediction(observations, x);
+        let local = piecewise_linear_prediction(observations, candidate);
+        let disagreement = (global - local).abs();
+        if best_index.is_none() || disagreement > best_disagreement {
+            best_index = Some(candidate);
+            best_disagreement = disagreement;
+        }
+    }
+
+    best_index.unwrap_or_else(|| maximin_candidate(observations))
+}
+
 fn select_next(
     policy: SelectionPolicy,
     observations: &[(usize, f64)],
@@ -222,42 +282,10 @@ fn select_next(
                 counter = counter.wrapping_add(1);
             }
         }
-        SelectionPolicy::MaximinCoverage => {
-            let mut best_index = None;
-            let mut best_distance = 0_usize;
-            for candidate in 0..=GRID_STEPS {
-                if already_sampled(observations, candidate) {
-                    continue;
-                }
-                let distance = observations
-                    .iter()
-                    .map(|(seen, _)| seen.abs_diff(candidate))
-                    .min()
-                    .unwrap_or(0);
-                if best_index.is_none() || distance > best_distance {
-                    best_index = Some(candidate);
-                    best_distance = distance;
-                }
-            }
-            best_index.expect("candidate grid has unsampled points")
-        }
-        SelectionPolicy::ModelDisagreement => {
-            let mut best_index = None;
-            let mut best_disagreement = f64::NEG_INFINITY;
-            for candidate in 0..=GRID_STEPS {
-                if already_sampled(observations, candidate) {
-                    continue;
-                }
-                let x = candidate as f64 / GRID_STEPS as f64;
-                let global = global_linear_prediction(observations, x);
-                let local = piecewise_linear_prediction(observations, candidate);
-                let disagreement = (global - local).abs();
-                if best_index.is_none() || disagreement > best_disagreement {
-                    best_index = Some(candidate);
-                    best_disagreement = disagreement;
-                }
-            }
-            best_index.expect("candidate grid has unsampled points")
+        SelectionPolicy::MaximinCoverage => maximin_candidate(observations),
+        SelectionPolicy::ModelDisagreement => disagreement_candidate(observations, None),
+        SelectionPolicy::CoverageGuardedDisagreement => {
+            disagreement_candidate(observations, Some(minimum_spacing(budget)))
         }
     }
 }
@@ -338,6 +366,7 @@ fn trial(surface: SurfaceFamily, policy: SelectionPolicy, seed: u64, budget: usi
         seed,
         experiment_budget: budget,
         observation_count: observations.len(),
+        selected_grid_indices: observations.iter().map(|(index, _)| *index).collect(),
         held_out_point_count,
         mean_absolute_error,
         root_mean_square_error,
@@ -518,6 +547,19 @@ mod tests {
             assert!(indices.contains(&(GRID_STEPS / 2)));
             assert!(indices.contains(&GRID_STEPS));
         }
+    }
+
+    #[test]
+    fn coverage_guard_prevents_tightly_clustered_disagreement_samples() {
+        let observations = select_observations(
+            SurfaceFamily::Smooth,
+            SelectionPolicy::CoverageGuardedDisagreement,
+            41,
+            11,
+        );
+        let indices = observations.iter().map(|(index, _)| *index).collect::<Vec<_>>();
+        let minimum = minimum_spacing(11);
+        assert!(indices.windows(2).all(|pair| pair[1] - pair[0] >= minimum));
     }
 
     #[test]
