@@ -89,7 +89,8 @@ pub struct ODEResult {
     pub method: ODEMethod,
     /// Total number of steps taken.
     pub steps: usize,
-    /// Consciousness measure (convergence quality).
+    /// Legacy/domain-specific score. This is not a numerical error bound,
+    /// convergence certificate, or independently validated accuracy metric.
     pub phi: f64,
     /// HDC encoding of the final state.
     pub encoding: BinaryHV,
