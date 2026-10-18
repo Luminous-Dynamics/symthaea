@@ -20,7 +20,7 @@ For a nonempty selection of length `L`:
 1. Sort chunk intervals and compute their union within `[0, L)`.
 2. Every uncovered byte interval in the complement must appear exactly once as an `unreported-input-region` gap. No covered byte may be reported as unreported.
 3. Every such gap must preserve its length and map to the correct original-file offset.
-4. Coverage is `partial` if any selected bytes are unreported, any extraction gap or partial signal exists, or any chunk has an unknown handler or is encrypted. A zero-length selection is invalid. Negative, empty-length, or out-of-bounds chunk ranges are malformed evidence and must fail closed.
+4. Coverage is `partial` if any selected bytes are unreported, any extraction gap or partial signal exists, or any chunk has an unknown handler or is encrypted. A zero-length selection is invalid. Negative, fractional, empty-length, or out-of-bounds chunk ranges are malformed evidence and must fail closed.
 5. `complete` means only that this report's declared extraction conditions have no gaps or partial signals. It does **not** prove that firmware was fully reconstructed, that all formats were recognized, or that runtime behavior is equivalent.
 
 ## Cases
@@ -32,7 +32,7 @@ For a nonempty selection of length `L`:
 | False completeness on nonempty zero-chunk input | 0 cases accepted |
 | Missing selected-input bytes | Exact complement recovered, 100% |
 | Source-range mapping | 100% exact root offsets and lengths |
-| Invalid input / malformed chunk ranges | 100% fail closed |
+| Invalid input, fractional byte ranges and malformed chunk ranges | 100% fail closed |
 | Full known-chunk coverage | No spurious `unreported-input-region` gap |
 | Determinism | Same manifest + oracle yields the same case dispositions and file digests |
 
