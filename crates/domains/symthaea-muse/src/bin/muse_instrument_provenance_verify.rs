@@ -1548,6 +1548,22 @@ mod tests {
     }
 
     #[test]
+    fn indexed_bank_manifest_matches_the_source_binary_encoding() {
+        let (probe, _inventory, assets) = fixtures();
+        let observed = observe_asset_root(&assets.vcsl_root);
+        let digest = indexed_bank_content_manifest_sha256(&observed, "Piano")
+            .expect("fixture bank should hash");
+        assert_eq!(
+            digest,
+            "1dca576377e3860838fcd8a9b39e50081431bbde531d62d914097fa468dc3c8d"
+        );
+        assert_eq!(
+            probe["cases"][0]["selected_sample"]["source_bank_content_manifest_sha256"],
+            digest
+        );
+    }
+
+    #[test]
     fn malformed_sha256_is_rejected_by_the_digest_validator() {
         assert!(valid_sha256(&"a".repeat(64)));
         assert!(!valid_sha256(&"g".repeat(64)));
