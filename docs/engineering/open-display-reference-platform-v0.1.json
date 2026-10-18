@@ -98,7 +98,79 @@
       "datasheet_or_interface_source": null,
       "license_status": "OPEN_VERIFIED",
       "lifecycle_check_date": null,
-      "substitute_policy": "Use common fasteners and printable/machinable parts where the measured tolerance permits."
+      "substitute_policy": "Use common fasteners and printable/machinable parts where the measured tolerance permits.",
+      "design_parameters": [
+        {
+          "name": "plate_width_mm",
+          "value": 80,
+          "unit": "mm",
+          "status": "EXAMPLE_ONLY",
+          "notes": "Matches current native CAD default; not fit-validated."
+        },
+        {
+          "name": "plate_height_mm",
+          "value": 80,
+          "unit": "mm",
+          "status": "EXAMPLE_ONLY",
+          "notes": "Matches current native CAD default; not fit-validated."
+        },
+        {
+          "name": "plate_thickness_mm",
+          "value": 5,
+          "unit": "mm",
+          "status": "EXAMPLE_ONLY",
+          "notes": "Matches current native CAD default; structural suitability not evaluated."
+        },
+        {
+          "name": "sensor_aperture_d_mm",
+          "value": 20,
+          "unit": "mm",
+          "status": "EXAMPLE_ONLY",
+          "notes": "Datum aperture only; not an optical acceptance aperture."
+        },
+        {
+          "name": "mount_hole_d_mm",
+          "value": 3.4,
+          "unit": "mm",
+          "status": "EXAMPLE_ONLY",
+          "notes": "Nominal M3 clearance; fastener choice not reviewed."
+        },
+        {
+          "name": "mount_pitch_x_mm",
+          "value": 25,
+          "unit": "mm",
+          "status": "EXAMPLE_ONLY",
+          "notes": "Placeholder mounting grid; actual sensor PCB is not selected."
+        },
+        {
+          "name": "mount_pitch_z_mm",
+          "value": 25,
+          "unit": "mm",
+          "status": "EXAMPLE_ONLY",
+          "notes": "Placeholder mounting grid; actual sensor PCB is not selected."
+        },
+        {
+          "name": "bracket_slot_width_mm",
+          "value": 5.5,
+          "unit": "mm",
+          "status": "EXAMPLE_ONLY",
+          "notes": "Nominal M5 clearance; bracket is not selected."
+        },
+        {
+          "name": "bracket_slot_length_mm",
+          "value": 18,
+          "unit": "mm",
+          "status": "EXAMPLE_ONLY",
+          "notes": "Placeholder adjustment length; fit not reviewed."
+        },
+        {
+          "name": "bracket_slot_x_mm",
+          "value": 28.5,
+          "unit": "mm",
+          "status": "EXAMPLE_ONLY",
+          "notes": "Placeholder slot offset; fit not reviewed."
+        }
+      ]
     },
     {
       "id": "ODRH-POWER-001",
