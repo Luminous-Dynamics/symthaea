@@ -79,3 +79,27 @@ Unknown outcomes never count as separators. Different signal IDs or units do not
 - Every pair that lacks a verified structural separator remains visibly unresolved or indistinguishable until explicitly reviewed.
 - Sensor recommendations name the fault pair separated and are evaluated against fixed mass, power, cost, bandwidth, calibration, independence, and compute assumptions.
 - Full minimum-sensor-set and common-mode cut-set analysis continues to belong to the existing decision-specific PIE-009N diagnosability/sensor-cut oracle (#2032); this module intentionally does not implement another generic cut-set algorithm.
+
+
+## Follow-on: temporal diagnosability and prediction confidence
+
+The temporal analyzer extends the static pairwise signature preflight with optional time-indexed predictions per observed signal. Each sample is relative to the fault injection and contains a categorical value plus a declared confidence in integer PPM. This is a declared model-prediction confidence, not a calibrated empirical probability unless a separate calibration study establishes that interpretation.
+
+The policy freezes a maximum observation horizon, the latest acceptable response step, and a minimum confidence threshold. The analyzer reports the earliest qualifying divergence and distinguishing signal IDs, or one of:
+- `LateDivergence`: a valid separation exists but only after the response deadline;
+- `IndistinguishableThroughHorizon`: complete, sufficiently confident sampled signatures match throughout the declared horizon;
+- `NotDemonstrated`: missing/unknown values, low-confidence predictions, nonmatching sample offsets, or incomparable signal mappings prevent a supported conclusion.
+
+Only the same signal ID, same unit, and same relative sample offset can be compared. Unknown, empty, missing-confidence, or below-threshold samples never count as separation. Reports bind the exact model/source identity. No real elapsed time is inferred from simulator step counts.
+
+### Temporal benchmark additions (proposed)
+
+- 100% of unordered critical pairs receive a temporal disposition for the frozen horizon.
+- Zero low-confidence or unknown samples are counted as separators.
+- Zero late divergences are reported as timely.
+- Report per-pair earliest separation steps and aggregate minimum/median/p95 only when actual scenario outputs support those summaries.
+- Evaluate sensitivity across frozen confidence thresholds and horizon/deadline changes; all changed policies produce distinct report identities.
+- Keep physical sensor calibration, empirical fault-detection probability, false-alarm rate, and real-time/onboard performance outside this structural model until measured evidence exists.
+
+
+The known-answer input corpus is versioned at `crates/domains/symthaea-orbital/fixtures/space_fdir_mbse_001/temporal_diagnosability_cases.json`. It contains eight synthetic cases for early separation, late separation, below-threshold confidence, unknown outcome/confidence, complete equal traces, nonmatching sample offsets, horizon truncation, and same-name incompatible units. A Rust regression consumes the corpus and checks each expected disposition and any declared first-separation step; a separate source-side JavaScript replay was also used as a sanity check. Neither constitutes a Rust compilation/test pass until the exact branch is built and tests execute.

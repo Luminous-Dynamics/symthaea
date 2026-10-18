@@ -1,0 +1,209 @@
+{
+  "schema_version": "0.1",
+  "description": "Synthetic known-answer cases for temporal fault-signature preflight; relative steps, not seconds.",
+  "default_policy": {
+    "horizon_steps": 5,
+    "response_deadline_steps": 2,
+    "min_prediction_confidence_ppm": 900000
+  },
+  "default_signal": {
+    "id": "ground_link_available",
+    "unit": "boolean"
+  },
+  "cases": [
+    {
+      "case_id": "earliest-separation-within-deadline",
+      "left_samples": [
+        {
+          "step_offset": 0,
+          "value": "available",
+          "prediction_confidence_ppm": 990000
+        },
+        {
+          "step_offset": 2,
+          "value": "unavailable",
+          "prediction_confidence_ppm": 990000
+        }
+      ],
+      "right_samples": [
+        {
+          "step_offset": 0,
+          "value": "available",
+          "prediction_confidence_ppm": 990000
+        },
+        {
+          "step_offset": 2,
+          "value": "available",
+          "prediction_confidence_ppm": 990000
+        }
+      ],
+      "expected_disposition": "timely_distinguishable",
+      "expected_step": 2
+    },
+    {
+      "case_id": "first-separation-after-deadline",
+      "left_samples": [
+        {
+          "step_offset": 0,
+          "value": "available",
+          "prediction_confidence_ppm": 990000
+        },
+        {
+          "step_offset": 4,
+          "value": "unavailable",
+          "prediction_confidence_ppm": 990000
+        }
+      ],
+      "right_samples": [
+        {
+          "step_offset": 0,
+          "value": "available",
+          "prediction_confidence_ppm": 990000
+        },
+        {
+          "step_offset": 4,
+          "value": "available",
+          "prediction_confidence_ppm": 990000
+        }
+      ],
+      "expected_disposition": "late_divergence",
+      "expected_step": 4
+    },
+    {
+      "case_id": "different-values-but-low-confidence",
+      "left_samples": [
+        {
+          "step_offset": 1,
+          "value": "failed",
+          "prediction_confidence_ppm": 899999
+        }
+      ],
+      "right_samples": [
+        {
+          "step_offset": 1,
+          "value": "passed",
+          "prediction_confidence_ppm": 990000
+        }
+      ],
+      "expected_disposition": "not_demonstrated_below_confidence"
+    },
+    {
+      "case_id": "unknown-value-and-missing-confidence",
+      "left_samples": [
+        {
+          "step_offset": 1,
+          "value": null,
+          "prediction_confidence_ppm": 990000
+        }
+      ],
+      "right_samples": [
+        {
+          "step_offset": 1,
+          "value": "passed",
+          "prediction_confidence_ppm": null
+        }
+      ],
+      "expected_disposition": "not_demonstrated_missing_outcome_or_confidence"
+    },
+    {
+      "case_id": "complete-equal-high-confidence-traces",
+      "left_samples": [
+        {
+          "step_offset": 0,
+          "value": "available",
+          "prediction_confidence_ppm": 990000
+        },
+        {
+          "step_offset": 3,
+          "value": "available",
+          "prediction_confidence_ppm": 990000
+        }
+      ],
+      "right_samples": [
+        {
+          "step_offset": 0,
+          "value": "available",
+          "prediction_confidence_ppm": 990000
+        },
+        {
+          "step_offset": 3,
+          "value": "available",
+          "prediction_confidence_ppm": 990000
+        }
+      ],
+      "expected_disposition": "indistinguishable_through_horizon",
+      "expected_step": null
+    },
+    {
+      "case_id": "nonmatching-sample-offsets",
+      "left_samples": [
+        {
+          "step_offset": 1,
+          "value": "failed",
+          "prediction_confidence_ppm": 990000
+        }
+      ],
+      "right_samples": [
+        {
+          "step_offset": 2,
+          "value": "passed",
+          "prediction_confidence_ppm": 990000
+        }
+      ],
+      "expected_disposition": "not_demonstrated_no_shared_sample_offsets"
+    },
+    {
+      "case_id": "divergence-outside-declared-horizon",
+      "policy": {
+        "horizon_steps": 3,
+        "response_deadline_steps": 2,
+        "min_prediction_confidence_ppm": 900000
+      },
+      "left_samples": [
+        {
+          "step_offset": 0,
+          "value": "available",
+          "prediction_confidence_ppm": 990000
+        },
+        {
+          "step_offset": 4,
+          "value": "unavailable",
+          "prediction_confidence_ppm": 990000
+        }
+      ],
+      "right_samples": [
+        {
+          "step_offset": 0,
+          "value": "available",
+          "prediction_confidence_ppm": 990000
+        },
+        {
+          "step_offset": 4,
+          "value": "available",
+          "prediction_confidence_ppm": 990000
+        }
+      ],
+      "expected_disposition": "indistinguishable_through_horizon"
+    },
+    {
+      "case_id": "same-name-incompatible-units",
+      "left_unit": "boolean",
+      "right_unit": "status_code",
+      "left_samples": [
+        {
+          "step_offset": 1,
+          "value": "failed",
+          "prediction_confidence_ppm": 990000
+        }
+      ],
+      "right_samples": [
+        {
+          "step_offset": 1,
+          "value": "passed",
+          "prediction_confidence_ppm": 990000
+        }
+      ],
+      "expected_disposition": "not_demonstrated_no_comparable_signals"
+    }
+  ]
+}
