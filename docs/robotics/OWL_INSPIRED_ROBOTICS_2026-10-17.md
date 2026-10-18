@@ -245,7 +245,7 @@ This is a planner arithmetic primitive, not an autonomous controller. Predicted 
 
 ### DCASE 2026 evaluation context
 
-The challenge completed on 15 June 2026 and official results were published on 1 July 2026. Task 3's best reported audio-only result was Macro mAP 0.1080 and Macro Pearson r 0.3962; the top reported audiovisual submission had Macro mAP 0.0131 and Pearson r 0.4002. This shows why audiovisual fusion is a hypothesis to test, not an assumed improvement. See the official ranking and metric definition: https://dcase.community/challenge2026/task-semantic-acoustic-imaging-for-sound-event-localization-and-detection-from-spatial-audio-and-audiovisual-scenes-results.
+The challenge completed on 15 June 2026 and official results were published on 1 July 2026. Task 3's best reported audio-only result was Macro mAP 0.1080 and Macro Pearson r 0.3962; the top reported audiovisual submission had Macro mAP 0.0131 and Pearson r 0.4002. The two tracks are evaluated separately with different systems, so these numbers are not a controlled audio-versus-audiovisual ablation and cannot establish that one modality regime is intrinsically better. They reinforce the need to evaluate fusion on matched scenes, labels, and system budgets rather than assume an improvement. See the official ranking and metric definition: https://dcase.community/challenge2026/task-semantic-acoustic-imaging-for-sound-event-localization-and-detection-from-spatial-audio-and-audiovisual-scenes-results.
 
 ## Related work
 
