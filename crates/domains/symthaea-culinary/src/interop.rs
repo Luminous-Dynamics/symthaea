@@ -429,6 +429,12 @@ fn semantic_violations(bundle: &Value) -> Vec<String> {
 
     // Recompute every scenario frontier from the candidate objective vectors.
     // Do not trust the frontier booleans authored by the producer.
+    // Count order is ranked, frontier, dominated, incomplete.
+    let mut expected_rank_instability: BTreeMap<String, [usize; 4]> = candidate_ids
+        .iter()
+        .map(|id| (id.clone(), [0usize; 4]))
+        .collect();
+
     for scenario_id in &expected_scenario_ids {
         let eligible: Vec<(&str, ObjectiveValues)> = candidates
             .iter()
@@ -462,6 +468,44 @@ fn semantic_violations(bundle: &Value) -> Vec<String> {
             if declared_frontier != Some(expected) {
                 errors.push(format!(
                     "{id}: frontier claim in scenario {scenario_id} differs from independently recomputed frontier"
+                ));
+            }
+
+            if candidate.get("gate_disposition").and_then(Value::as_str) == Some("feasible") {
+                let counts = expected_rank_instability
+                    .entry(id.to_owned())
+                    .or_insert([0usize; 4]);
+                if result.and_then(complete_objectives).is_some() {
+                    counts[0] += 1;
+                    if expected {
+                        counts[1] += 1;
+                    } else {
+                        counts[2] += 1;
+                    }
+                } else {
+                    counts[3] += 1;
+                }
+            }
+        }
+    }
+
+    for candidate in candidates {
+        let id = candidate.get("candidate_id").and_then(Value::as_str).unwrap_or("");
+        let expected = expected_rank_instability.get(id).copied().unwrap_or([0; 4]);
+        let reported = candidate.get("rank_instability").and_then(Value::as_object);
+        let Some(reported) = reported else {
+            errors.push(format!("{id}: rank_instability summary is missing"));
+            continue;
+        };
+        for (field, expected_count) in [
+            ("ranked_scenarios", expected[0]),
+            ("frontier_scenarios", expected[1]),
+            ("dominated_scenarios", expected[2]),
+            ("incomplete_scenarios", expected[3]),
+        ] {
+            if reported.get(field).and_then(Value::as_u64) != Some(expected_count as u64) {
+                errors.push(format!(
+                    "{id}: rank_instability.{field} does not match independently recomputed count"
                 ));
             }
         }
