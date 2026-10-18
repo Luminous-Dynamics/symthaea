@@ -74,6 +74,8 @@ Each arrow needs its own evidence contract. If pedigree, genotype, license, or p
 
 A second, separate design shift is to optimize **decision quality rather than prediction score alone**. CF-014 compares candidate recommendations against a declared baseline using decision regret under held-out environment/price scenarios, with hard constraints and sensitivity to utility assumptions. A slightly less accurate yield predictor may still make better planting or resource-allocation choices; conversely, a model with low average error can be harmful when errors cluster around high-cost extremes. Begin with synthetic and retrospective replay, then require local cost data and prospective evaluation before asserting economic benefit.
 
+A third long-horizon research direction is **cold-start transfer to underrepresented crops**. A shared representation of plant physiology, environment response, phenotype measurement, and management context could reduce the amount of trial data needed for an underutilized crop—but transfer can also create negative transfer when traits or measurement methods are not comparable. CF-015 therefore remains blocked until at least three crop domains have compatible, harmonized observations; it requires species/cultivar/site-year holdouts and an explicit target-crop-only baseline. The goal is to help data-sparse local crops, not to treat their lack of records as evidence that they are inferior.
+
 ## System boundaries
 
 - **Symthaea:** evidence-aware reasoning, candidate generation, uncertainty handling, multi-objective ranking, experiment selection, and recommendation receipts.
