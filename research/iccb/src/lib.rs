@@ -38,6 +38,7 @@ pub struct DecisionOption {
     pub id: String,
     /// Integer minor currency units; no floating-point arithmetic for money.
     pub expected_net_cash_minor: i64,
+    pub reported_valuation_change_minor: i64,
     pub required_capital_minor: i64,
     pub available_liquidity_after_minor: i64,
     /// A scenario-defined unit (e.g. extra service capacity); not a monetary value.
@@ -78,6 +79,7 @@ pub enum RejectionReason {
 #[derive(Clone, Debug, PartialEq, Eq)]
 pub struct OutcomeVector {
     pub expected_net_cash_minor: i64,
+    pub reported_valuation_change_minor: i64,
     pub available_liquidity_after_minor: i64,
     pub productive_capacity_delta: i64,
     pub maintenance_backlog_delta_minor: i64,
@@ -153,6 +155,7 @@ impl CandidateScenario {
                 rejection_reasons,
                 outcomes: OutcomeVector {
                     expected_net_cash_minor: option.expected_net_cash_minor,
+                    reported_valuation_change_minor: option.reported_valuation_change_minor,
                     available_liquidity_after_minor: option.available_liquidity_after_minor,
                     productive_capacity_delta: option.productive_capacity_delta,
                     maintenance_backlog_delta_minor: option.maintenance_backlog_delta_minor,
@@ -197,6 +200,7 @@ mod tests {
         DecisionOption {
             id: id.to_owned(),
             expected_net_cash_minor: 4_000,
+            reported_valuation_change_minor: 0,
             required_capital_minor: 5_000,
             available_liquidity_after_minor: 2_000,
             productive_capacity_delta: 10,
@@ -307,6 +311,20 @@ mod tests {
         assert!(evaluated
             .rejection_reasons
             .contains(&RejectionReason::LiquidityFloorBreached));
+    }
+
+    #[test]
+    fn reported_valuation_change_is_not_productive_capacity_or_cash_flow() {
+        let mut boom = option("valuation-only-boom");
+        boom.expected_net_cash_minor = 1_000;
+        boom.reported_valuation_change_minor = 900_000;
+        boom.productive_capacity_delta = 0;
+
+        let result = scenario(vec![boom]).evaluate();
+        let metrics = &result.evaluated_options[0].outcomes;
+        assert_eq!(metrics.reported_valuation_change_minor, 900_000);
+        assert_eq!(metrics.expected_net_cash_minor, 1_000);
+        assert_eq!(metrics.productive_capacity_delta, 0);
     }
 
     #[test]
