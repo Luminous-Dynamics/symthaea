@@ -315,10 +315,7 @@ fn evaluate_scenario(scenario: &Scenario, mass_tolerance_ppm: u64) -> ScenarioRe
         + u128::from(flow.process_loss_mass_g);
     let input_mass = u128::from(flow.input_mass_g);
     let difference = output_mass.abs_diff(input_mass);
-    if input_mass == 0
-        || difference * 1_000_000
-            > input_mass * u128::from(mass_tolerance_ppm)
-    {
+    if input_mass == 0 || difference * 1_000_000 > input_mass * u128::from(mass_tolerance_ppm) {
         reasons.insert("MASS_BALANCE_MISMATCH".to_owned());
     }
     if flow.claimed_clean_offcut_recovery_g > flow.clean_offcut_mass_g {
@@ -375,8 +372,7 @@ fn evaluate_scenario(scenario: &Scenario, mass_tolerance_ppm: u64) -> ScenarioRe
     } else {
         Disposition::Reject
     };
-    let expected_reason_codes: Vec<_> =
-        scenario.expected_reason_codes.iter().cloned().collect();
+    let expected_reason_codes: Vec<_> = scenario.expected_reason_codes.iter().cloned().collect();
     let actual_reason_codes: Vec<_> = reasons.into_iter().collect();
     let expected_control_matched = scenario.expected_disposition == actual_disposition
         && expected_reason_codes == actual_reason_codes;
@@ -394,8 +390,7 @@ fn evaluate_scenario(scenario: &Scenario, mass_tolerance_ppm: u64) -> ScenarioRe
 fn source_commit_from_args(args: &[String]) -> Check<String> {
     if args.len() != 4 || args[2] != "--source-commit" {
         return Err(
-            "usage: metal-stock-part-bench <corpus.json> --source-commit <40-hex-sha>"
-                .to_owned(),
+            "usage: metal-stock-part-bench <corpus.json> --source-commit <40-hex-sha>".to_owned(),
         );
     }
     let source_commit = args[3].to_ascii_lowercase();
@@ -502,11 +497,9 @@ mod tests {
         let mut corpus = fixture();
         corpus.scenarios[0].flow.chips_mass_g += 50;
         let result = evaluate_scenario(&corpus.scenarios[0], corpus.mass_tolerance_ppm);
-        assert!(
-            result
-                .actual_reason_codes
-                .contains(&"MASS_BALANCE_MISMATCH".to_owned())
-        );
+        assert!(result
+            .actual_reason_codes
+            .contains(&"MASS_BALANCE_MISMATCH".to_owned()));
     }
 
     #[test]
@@ -515,20 +508,17 @@ mod tests {
         corpus.scenarios[0].stock.feedstock_kind = FeedstockKind::MixedScrap;
         corpus.scenarios[0].stock.material_identity = IdentityState::Unresolved;
         let result = evaluate_scenario(&corpus.scenarios[0], corpus.mass_tolerance_ppm);
-        assert!(
-            result
-                .actual_reason_codes
-                .contains(&"FEEDSTOCK_IDENTITY_UNRESOLVED".to_owned())
-        );
+        assert!(result
+            .actual_reason_codes
+            .contains(&"FEEDSTOCK_IDENTITY_UNRESOLVED".to_owned()));
     }
 
     #[test]
     fn unknown_json_fields_fail_closed() {
-        let raw = include_str!("../../../docs/tech/metal-stock-part-corpus-v0.1.json")
-            .replace(
-                "\"suite_id\":",
-                "\"unexpected_authority\": true,\n  \"suite_id\":",
-            );
+        let raw = include_str!("../../../docs/tech/metal-stock-part-corpus-v0.1.json").replace(
+            "\"suite_id\":",
+            "\"unexpected_authority\": true,\n  \"suite_id\":",
+        );
         assert!(serde_json::from_str::<Corpus>(&raw).is_err());
     }
 
@@ -537,10 +527,8 @@ mod tests {
         let mut corpus = fixture();
         corpus.scenarios[0].inspection.source = MeasurementSource::SimulationOnly;
         let result = evaluate_scenario(&corpus.scenarios[0], corpus.mass_tolerance_ppm);
-        assert!(
-            result
-                .actual_reason_codes
-                .contains(&"PHYSICAL_INSPECTION_MISSING".to_owned())
-        );
+        assert!(result
+            .actual_reason_codes
+            .contains(&"PHYSICAL_INSPECTION_MISSING".to_owned()));
     }
 }
