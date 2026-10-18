@@ -44,9 +44,12 @@ pub enum FailureCriticality {
 pub struct FailureMode {
     pub id: String,
     pub component_id: String,
+    pub interface_id: String,
     pub description: String,
     pub criticality: FailureCriticality,
     pub requirement_refs: Vec<String>,
+    pub assumption_refs: Vec<String>,
+    pub telemetry_label_semantics: Option<String>,
     pub injection: Option<InjectionSpec>,
     pub observable_signals: Vec<ObservableSignal>,
     pub monitor: Option<MonitorContract>,
@@ -80,6 +83,7 @@ pub struct ObservableSignal {
 #[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
 pub struct MonitorContract {
     pub id: String,
+    pub required_alarm: String,
     /// Maximum permitted simulator steps between injection and required alarm.
     pub response_deadline_steps: usize,
     /// Nominal or confounding conditions that must not trigger this monitor.
@@ -97,6 +101,8 @@ pub struct MitigationConstraint {
 #[serde(rename_all = "snake_case")]
 pub enum CoverageGap {
     MissingRequirementTrace,
+    MissingEventAssumptionRef,
+    MissingTelemetryLabelSemantics,
     MissingInjection,
     MissingObservableSignal,
     MissingMonitorContract,
@@ -113,6 +119,11 @@ pub struct FaultScenario {
     pub id: String,
     pub failure_mode_id: String,
     pub source_design_revision: String,
+    pub source_design_sha256: String,
+    pub component_id: String,
+    pub interface_id: String,
+    pub event_assumption_refs: Vec<String>,
+    pub telemetry_label_semantics: Option<String>,
     pub injection: InjectionSpec,
     pub expected_signal_ids: Vec<String>,
     pub monitor_id: String,
@@ -137,6 +148,7 @@ pub struct FaultCampaignManifest {
     pub model_id: String,
     pub model_revision: String,
     pub source_design_revision: String,
+    pub source_design_sha256: String,
     pub obligations: Vec<FaultObligation>,
     /// Contains representable injections even when other evidence obligations
     /// remain open; consumers must inspect obligations before claiming coverage.
@@ -235,7 +247,15 @@ impl MissionFaultModel {
         for mode in &self.failure_modes {
             require_nonblank(&mode.id, "failure_mode.id")?;
             require_nonblank(&mode.component_id, "failure_mode.component_id")?;
+            require_nonblank(&mode.interface_id, "failure_mode.interface_id")?;
             require_nonblank(&mode.description, "failure_mode.description")?;
+            if let Some(monitor) = &mode.monitor {
+                require_nonblank(&monitor.id, "monitor.id")?;
+                require_nonblank(&monitor.required_alarm, "monitor.required_alarm")?;
+            }
+            if let Some(mitigation) = &mode.mitigation {
+                require_nonblank(&mitigation.id, "mitigation.id")?;
+            }
 
             if !mode_ids.insert(mode.id.as_str()) {
                 return Err(MissionFaultModelError::DuplicateFailureModeId(
@@ -323,6 +343,11 @@ impl MissionFaultModel {
                     id: format!("{}::{}", self.model_id, mode.id),
                     failure_mode_id: mode.id.clone(),
                     source_design_revision: self.source_design.revision.clone(),
+                    source_design_sha256: self.source_design.sha256.clone(),
+                    component_id: mode.component_id.clone(),
+                    interface_id: mode.interface_id.clone(),
+                    event_assumption_refs: mode.assumption_refs.clone(),
+                    telemetry_label_semantics: mode.telemetry_label_semantics.clone(),
                     injection: injection.clone(),
                     expected_signal_ids: mode
                         .observable_signals
@@ -378,6 +403,7 @@ impl MissionFaultModel {
             model_id: self.model_id.clone(),
             model_revision: self.model_revision.clone(),
             source_design_revision: self.source_design.revision.clone(),
+            source_design_sha256: self.source_design.sha256.clone(),
             obligations,
             schedule,
         })
@@ -403,6 +429,16 @@ fn coverage_gaps(mode: &FailureMode) -> Vec<CoverageGap> {
 
     if !has_reference(&mode.requirement_refs) {
         gaps.push(CoverageGap::MissingRequirementTrace);
+    }
+    if !has_reference(&mode.assumption_refs) {
+        gaps.push(CoverageGap::MissingEventAssumptionRef);
+    }
+    if mode
+        .telemetry_label_semantics
+        .as_ref()
+        .is_none_or(|label| label.trim().is_empty())
+    {
+        gaps.push(CoverageGap::MissingTelemetryLabelSemantics);
     }
     if mode.injection.is_none() {
         gaps.push(CoverageGap::MissingInjection);
@@ -456,9 +492,12 @@ mod tests {
             failure_modes: vec![FailureMode {
                 id: "FM-COMM-001".to_owned(),
                 component_id: "comms_transceiver".to_owned(),
+                interface_id: "ground_comm_link".to_owned(),
                 description: "Synthetic total radio-link blackout".to_owned(),
                 criticality: FailureCriticality::Critical,
                 requirement_refs: vec!["REQ-COMM-001".to_owned()],
+                assumption_refs: vec!["ASSUMP-COMM-UPLINK-AVAILABLE-AT-START".to_owned()],
+                telemetry_label_semantics: Some("communication_link_unavailable".to_owned()),
                 injection: Some(InjectionSpec::CommunicationBlackout {
                     at_step: 4,
                     duration_steps: 3,
@@ -471,6 +510,7 @@ mod tests {
                 }],
                 monitor: Some(MonitorContract {
                     id: "MON-COMM-001".to_owned(),
+                    required_alarm: "COMM_LINK_UNAVAILABLE".to_owned(),
                     response_deadline_steps: 1,
                     false_alarm_controls: vec![
                         "nominal_link_available".to_owned(),
@@ -529,7 +569,7 @@ mod tests {
         model.failure_modes[0].observable_signals.clear();
 
         let manifest = model.compile_campaign().expect("model remains structurally valid");
-        assert!(manifest.schedule.perturbations.len() == 1);
+        assert_eq!(manifest.schedule.perturbations.len(), 1);
         assert!(manifest.obligations[0]
             .gaps
             .contains(&CoverageGap::MissingObservableSignal));
