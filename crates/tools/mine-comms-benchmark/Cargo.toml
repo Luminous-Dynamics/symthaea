@@ -1,0 +1,17 @@
+[package]
+name = "mine-comms-benchmark"
+version = "0.1.0"
+edition = "2024"
+publish = false
+description = "Dependency-free deterministic routing and message-receipt contract tests for underground mine communications"
+
+# Isolate this small tool from the parent Bevy/Cognitive workspace.
+[workspace]
+resolver = "2"
+
+[lib]
+path = "src/lib.rs"
+
+[[bin]]
+name = "mine-comms-benchmark"
+path = "src/main.rs"
