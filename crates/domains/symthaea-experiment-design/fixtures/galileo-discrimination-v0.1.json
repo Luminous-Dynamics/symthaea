@@ -1,0 +1,54 @@
+{
+  "schema_version": "physics-experiment-design-v0.1",
+  "target": "Discriminate ideal constant acceleration from constant velocity after a matched two-second observation",
+  "hypothesis_ids": [
+    "constant_acceleration",
+    "constant_velocity"
+  ],
+  "experiments": [
+    {
+      "experiment_id": "matched_at_two_seconds",
+      "cost_units": 1.0,
+      "duration_hours": 0.05,
+      "observables": [
+        {
+          "observable_id": "displacement_m",
+          "predictions": [
+            {
+              "hypothesis_id": "constant_acceleration",
+              "mean": 9.80665,
+              "standard_uncertainty": 0.05
+            },
+            {
+              "hypothesis_id": "constant_velocity",
+              "mean": 9.80665,
+              "standard_uncertainty": 0.05
+            }
+          ]
+        }
+      ]
+    },
+    {
+      "experiment_id": "observe_at_four_seconds",
+      "cost_units": 3.0,
+      "duration_hours": 0.2,
+      "observables": [
+        {
+          "observable_id": "displacement_m",
+          "predictions": [
+            {
+              "hypothesis_id": "constant_acceleration",
+              "mean": 39.2266,
+              "standard_uncertainty": 0.2
+            },
+            {
+              "hypothesis_id": "constant_velocity",
+              "mean": 19.6133,
+              "standard_uncertainty": 0.2
+            }
+          ]
+        }
+      ]
+    }
+  ]
+}
