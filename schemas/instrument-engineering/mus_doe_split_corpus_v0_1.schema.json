@@ -217,55 +217,7 @@
           "type": "boolean"
         }
       },
-      "allOf": [
-        {
-          "if": {
-            "properties": {
-              "policy": {
-                "const": "seeded_random"
-              }
-            },
-            "required": [
-              "policy"
-            ]
-          },
-          "then": {
-            "properties": {
-              "random_seed": {
-                "type": "integer",
-                "minimum": 0,
-                "maximum": 4294967295
-              }
-            }
-          }
-        },
-        {
-          "if": {
-            "properties": {
-              "policy": {
-                "const": "cost_aware_information_gain"
-              }
-            },
-            "required": [
-              "policy"
-            ]
-          },
-          "then": {
-            "properties": {
-              "data_partitions_consumed": {
-                "not": {
-                  "contains": {
-                    "const": "locked_test"
-                  }
-                }
-              },
-              "locked_test_outcomes_used": {
-                "const": false
-              }
-            }
-          }
-        }
-      ]
+      "allOf": []
     },
     "case": {
       "type": "object",
