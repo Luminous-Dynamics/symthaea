@@ -34,6 +34,7 @@ pub mod execution_guard;
 pub mod fdm_benchmark;
 pub mod fdm_spatial_benchmark;
 pub mod fdm_spatial_uncertainty;
+pub mod fdm_spatial_experiment_design;
 pub mod export;
 pub mod fault_injection;
 pub mod gateway_consensus;
