@@ -1,3 +1,6 @@
+use iccb_evaluator::decision_receipt::{
+    DecisionRunContext, create_decision_receipt, sha256_hex, verify_decision_receipt,
+};
 use iccb_evaluator::{
     CandidateScenario, DecisionOption, EvidenceClaim, EvidenceState, Mandate,
     cash_maximizing_feasible_baseline, pareto_frontier,
@@ -71,6 +74,47 @@ fn main() {
     };
 
     let receipt = scenario.evaluate();
+
+    // A receipt is issued only when this process has a pinned producer commit.
+    // The demo manifest is synthetic and is not a real asset-evidence packet.
+    if let Ok(producer_commit) = std::env::var("GITHUB_SHA") {
+        let manifest_bytes = b"synthetic-manifest".to_vec();
+        let routing = UncertaintyAssessmentRef {
+            scenario_id: scenario.id.clone(),
+            producer_version: "synthetic-demo-producer-v1".into(),
+            source_manifest_digest: format!("sha256:{}", sha256_hex(&manifest_bytes)),
+            evidence_kind: UncertaintyEvidenceKind::OutOfDomain {
+                reason: "demo-only constraint evaluation; no qualified economic model".into(),
+            },
+        }
+        .route()
+        .expect("synthetic demo uncertainty route should be valid");
+        let context = DecisionRunContext {
+            producer_commit,
+            evaluator_version: env!("CARGO_PKG_VERSION").into(),
+            input_manifest_bytes: manifest_bytes,
+            routing,
+            claim_ceiling:
+                "synthetic constraint evaluation only; not a forecast or authorization".into(),
+        };
+        match create_decision_receipt(&context, &scenario) {
+            Ok(decision_receipt) => match verify_decision_receipt(&context, &scenario, &decision_receipt) {
+                Ok(()) => println!(
+                    "Synthetic decision receipt: schema={}, input={}, scenario={}, output={}, receipt={}",
+                    decision_receipt.schema_version,
+                    decision_receipt.input_manifest_sha256,
+                    decision_receipt.scenario_sha256,
+                    decision_receipt.output_sha256,
+                    decision_receipt.receipt_sha256,
+                ),
+                Err(error) => eprintln!("Synthetic decision receipt replay failed: {error:?}"),
+            },
+            Err(error) => eprintln!("Synthetic decision receipt rejected: {error:?}"),
+        }
+    } else {
+        println!("Decision receipt demo skipped: GITHUB_SHA is unavailable; producer pin fails closed.");
+    }
+
     let baseline = cash_maximizing_feasible_baseline(&receipt.evaluated_options);
     let frontier = pareto_frontier(&receipt.evaluated_options);
 
