@@ -119,7 +119,9 @@ fn validate_contract(manifest_text: &str, schema_text: &str) -> Vec<String> {
                 errors.push(format!("duplicate global component ID: {component_id}"));
             }
             if component.get("evidence_status").and_then(Value::as_str) != Some("UNQUALIFIED") {
-                errors.push(format!("component {component_id} cannot self-promote evidence status"));
+                errors.push(format!(
+                    "component {component_id} cannot self-promote evidence status"
+                ));
             }
             let component_sources: Vec<&str> = component
                 .get("reference_source_ids")
@@ -131,7 +133,9 @@ fn validate_contract(manifest_text: &str, schema_text: &str) -> Vec<String> {
             if component_sources.is_empty()
                 || component_sources.iter().any(|source_id| !sources.contains(*source_id))
             {
-                errors.push(format!("component {component_id} has empty or unresolved source references"));
+                errors.push(format!(
+                    "component {component_id} has empty or unresolved source references"
+                ));
             }
             let owners: Vec<&str> = component
                 .get("process_semantics_owners")
@@ -172,7 +176,9 @@ fn validate_contract(manifest_text: &str, schema_text: &str) -> Vec<String> {
             if stage
                 .get("process_semantics_owner")
                 .and_then(Value::as_str)
-                .map_or(true, |value| !value.starts_with("https://github.com/Luminous-Dynamics/symthaea/issues/"))
+                .map_or(true, |value| {
+                    !value.starts_with("https://github.com/Luminous-Dynamics/symthaea/issues/")
+                })
             {
                 errors.push(format!("stage {stage_id} lacks a canonical process-semantics owner"));
             }
@@ -268,7 +274,8 @@ fn rejects_promoted_component_status_and_unresolved_component_source() {
     let mut unresolved: Value = serde_json::from_str(MANIFEST_TEXT).expect("fixture manifest JSON");
     unresolved["routes"][0]["component_interfaces"][0]["reference_source_ids"][0] =
         Value::String("SRC-NOT-DEFINED".to_owned());
-    let unresolved_text = serde_json::to_string(&unresolved).expect("unresolved fixture serializes");
+    let unresolved_text = serde_json::to_string(&unresolved)
+        .expect("unresolved fixture serializes");
     assert!(!validate_contract(&unresolved_text, SCHEMA_TEXT).is_empty());
 }
 
