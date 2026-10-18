@@ -254,6 +254,7 @@ fn semantic_violations(bundle: &Value) -> Vec<String> {
             .unwrap_or("");
         let mut has_failed_gate = false;
         let mut has_unknown_gate = false;
+        let mut gate_keys = BTreeSet::new();
         if let Some(gates) = candidate.get("gate_evidence").and_then(Value::as_array) {
             if gates.is_empty() {
                 errors.push(format!("{id}: at least one hard-gate evidence row is required"));
@@ -262,6 +263,9 @@ fn semantic_violations(bundle: &Value) -> Vec<String> {
                 let key = gate.get("key").and_then(Value::as_str).unwrap_or("");
                 let status = gate.get("status").and_then(Value::as_str).unwrap_or("");
                 let refs = gate.get("evidence_refs").and_then(Value::as_array);
+                if key.trim().is_empty() || !gate_keys.insert(key.to_owned()) {
+                    errors.push(format!("{id}: gate key is empty or duplicated: {key}"));
+                }
                 match status {
                     "fail" => {
                         has_failed_gate = true;
@@ -348,6 +352,23 @@ fn semantic_violations(bundle: &Value) -> Vec<String> {
                     }
                     let value_is_number = value.is_some_and(Value::is_number);
                     let value_is_null = value.is_some_and(Value::is_null);
+                    let known_status = matches!(
+                        status,
+                        "observed"
+                            | "derived"
+                            | "estimated"
+                            | "simulated"
+                            | "synthetic"
+                            | "missing"
+                            | "stale"
+                            | "conflicted"
+                            | "disputed"
+                            | "suppressed"
+                    );
+                    if !known_status {
+                        scenario_metrics_complete = false;
+                        errors.push(format!("{id}: objective {key} has unknown evidence status {status}"));
+                    }
                     let non_rankable_status = matches!(
                         status,
                         "missing" | "stale" | "conflicted" | "disputed" | "suppressed"
