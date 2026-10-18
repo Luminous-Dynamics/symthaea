@@ -147,3 +147,19 @@ fn exact_match_requires_explicit_assessment_of_fortification_and_brand_identity(
     let errors = violations(&value);
     assert!(errors.iter().any(|error| error.contains("hard-block identity attribute \"fortification\"")));
 }
+
+#[test]
+fn qualified_approximation_cannot_hide_an_unknown_taxon() {
+    let mut value = fixture();
+    value["use_scope"] = serde_json::json!("recipe_substitution");
+    value["outcome"] = serde_json::json!("qualified_approximation");
+    value["candidate_record"]["identity"]["taxon_id"] = Value::Null;
+    value["attribute_checks"][0]["candidate_value"] = Value::Null;
+    value["attribute_checks"][0]["relation"] = serde_json::json!("unknown");
+    value["deviations"] = serde_json::json!([{
+        "attribute_id":"taxon_id",
+        "reason":"Taxon is unknown and cannot support this approximation."
+    }]);
+    let errors = violations(&value);
+    assert!(errors.iter().any(|error| error.contains("cannot leave required identity attributes unknown/different")));
+}
