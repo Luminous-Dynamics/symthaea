@@ -1,0 +1,134 @@
+{
+  "dataset_id": "PUBLISHED-SA-ELECTRIC-MOTORCYCLE-VALIDATION-SUMMARY-001",
+  "schema_version": "0.1.0",
+  "created_date": "2026-10-18",
+  "status": "source_transcription_summary_not_raw_data",
+  "evidence_class": "SourceReported",
+  "purpose": "Freeze source-reported validation summary values for benchmark design. This file is not the authors' raw telemetry, the authors' simulation, or an independent replication.",
+  "references": [
+    {
+      "id": "ADAMS-BOTHA-BOOYSEN-2026-WEVJ-17-2-90",
+      "title": "A Validated Physics-Based Powertrain Model for an Electric Motorcycle in Sub-Saharan Africa",
+      "publication_date": "2026-02-10",
+      "doi": "10.3390/wevj1702090",
+      "url": "https://doi.org/10.3390/wevj1702090",
+      "vehicle": "Roam Air electric motorcycle",
+      "location": "Nairobi, Kenya",
+      "methods": [
+        "measured drive cycles",
+        "elevation-derived gradient",
+        "motor and inverter efficiency maps from dynamometer measurements"
+      ],
+      "limitations_reported": [
+        "grade estimation from GPS/elevation introduces bias",
+        "energy result is not a full wall-plug-to-wheel model",
+        "battery thermal/electrochemical model remains future work"
+      ],
+      "trips": [
+        {
+          "trip_id": "T1",
+          "scenario": "city",
+          "duration": "1:55:19",
+          "distance_km": 61.7,
+          "average_speed_kmh": 32.6,
+          "simulated_wh_per_km": 41.8,
+          "measured_wh_per_km": 41.5,
+          "published_error_percent": 0.7
+        },
+        {
+          "trip_id": "T2",
+          "scenario": "highway",
+          "duration": "0:44:57",
+          "distance_km": 44.8,
+          "average_speed_kmh": 60.5,
+          "simulated_wh_per_km": 55.4,
+          "measured_wh_per_km": 51.7,
+          "published_error_percent": 7.2
+        },
+        {
+          "trip_id": "T3",
+          "scenario": "city",
+          "duration": "1:30:35",
+          "distance_km": 56.5,
+          "average_speed_kmh": 37.2,
+          "simulated_wh_per_km": 40.3,
+          "measured_wh_per_km": 38.4,
+          "published_error_percent": 4.9
+        },
+        {
+          "trip_id": "T4",
+          "scenario": "city",
+          "duration": "1:57:11",
+          "distance_km": 75.5,
+          "average_speed_kmh": 39.1,
+          "simulated_wh_per_km": 33.6,
+          "measured_wh_per_km": 30.2,
+          "published_error_percent": 11.3
+        },
+        {
+          "trip_id": "T5",
+          "scenario": "highway",
+          "duration": "0:50:37",
+          "distance_km": 52.9,
+          "average_speed_kmh": 62.1,
+          "simulated_wh_per_km": 45.7,
+          "measured_wh_per_km": 44.6,
+          "published_error_percent": 2.5
+        },
+        {
+          "trip_id": "T6",
+          "scenario": "highway",
+          "duration": "0:28:30",
+          "distance_km": 28.9,
+          "average_speed_kmh": 62.8,
+          "simulated_wh_per_km": 45.9,
+          "measured_wh_per_km": 45.7,
+          "published_error_percent": 0.4
+        }
+      ]
+    },
+    {
+      "id": "ADAMS-BOTHA-BOOYSEN-2026-WEVJ-17-8-432",
+      "title": "A Validated Full-Powertrain Digital Twin of an Electric Motorcycle Developed for Sub-Saharan African Conditions",
+      "publication_date": "2026-08-20",
+      "doi": "10.3390/wevj1708432",
+      "url": "https://doi.org/10.3390/wevj1708432",
+      "vehicle": "Roam Air electric motorcycle",
+      "location": "Stellenbosch, South Africa",
+      "methods": [
+        "pack-level Hybrid Pulse Power Characterisation tests",
+        "controller and motor models",
+        "regenerative braking characterization",
+        "coasting/coast-down characterization",
+        "six measured drive cycles"
+      ],
+      "published_validation_summary": {
+        "drive_cycle_count": 6,
+        "battery_power_pearson_r_min": 0.905,
+        "battery_power_pearson_r_max": 0.981,
+        "motor_speed_pearson_r_min": 0.912,
+        "motor_speed_pearson_r_max": 0.996,
+        "five_trip_energy_error_min_percent": -1.05,
+        "five_trip_energy_error_max_percent": 2.71,
+        "short_downhill_high_transient_trip_id": "T4",
+        "short_downhill_high_transient_trip_error_percent": 10.65
+      },
+      "limitations_reported": [
+        "mechanical braking not included in validation dataset/model",
+        "auxiliary power consumption not included",
+        "battery temperature and ageing effects omitted",
+        "wind speed estimated rather than directly measured",
+        "short downhill/high throttle-transient trip produced higher percentage error",
+        "transfer to other powertrain configurations not yet validated"
+      ],
+      "data_note": "This summary is transcribed from the published article. It does not contain raw timestamped telemetry, component maps, calibration files, or model source required to independently reproduce the digital twin."
+    }
+  ],
+  "benchmark_design_implications": [
+    "Treat source-reported summary metrics as reference metadata, not benchmark input traces.",
+    "Do not claim replication until raw data and component parameters are available with appropriate reuse rights.",
+    "Retain the short downhill/high-transient outlier; pair relative percentage error with absolute Wh and Wh/km error.",
+    "Expand held-out coverage across payload, road grade, surface, posture, wind, battery state-of-charge, temperature, and mechanical braking.",
+    "Use an independent implementation only as a cross-check, not as replacement for the published model or physical validation."
+  ]
+}
