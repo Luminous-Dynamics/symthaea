@@ -38,7 +38,7 @@ Do not tune thresholds after observing the holdout. Pre-register the observable,
 
 ## New files and command
 
-- xtask/src/two_wheeler_validation_scorecard.rs: pair validation, residual metrics, physical-holdout eligibility, eligible-only summary, six unit tests authored.
+- xtask/src/two_wheeler_validation_scorecard.rs: pair validation, residual metrics, physical-holdout eligibility, eligible-only summary, seven unit tests authored.
 - docs/research/data/two_wheeler_validation_scorecard_v0_1.json: 11 synthetic cases, four positive controls and seven negative controls.
 - xtask two-wheeler-validation-scorecard: recomputes the frozen expected cases and prints a report.
 
