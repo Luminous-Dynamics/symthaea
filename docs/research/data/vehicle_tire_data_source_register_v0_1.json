@@ -1,0 +1,186 @@
+{
+  "manifest_id": "vehicle_tire_data_source_register_v0_1",
+  "schema_version": "0.1.0",
+  "review_date": "2026-10-18",
+  "status": "literature_and_rights_triage_not_binary_ingestion",
+  "claim_ceiling": "This register catalogs candidate inputs and their reported rights. It is not proof a dataset has been downloaded, independently verified, or validated for a vehicle model.",
+  "sources": [
+    {
+      "source_id": "ROAM_AIR_POWERTRAIN_2026_01",
+      "title": "A Validated Physics-Based Powertrain Model for an Electric Motorcycle in Sub-Saharan Africa",
+      "uri": "https://doi.org/10.3390/wevj17020090",
+      "vehicle_scope": "Roam Air electric motorcycle; six Nairobi real-world trips",
+      "data_available": "Published model description, trip-level validation summary, experimentally derived motor/inverter efficiency-map methodology",
+      "rights_status": "underlying_raw_data_available_on_request; request separate written permission and derivative/redistribution scope",
+      "evidence_class": "Source",
+      "readiness": "P0_request",
+      "useful_for": [
+        "motor/inverter map structure",
+        "drive-cycle schema",
+        "parameter identification plan",
+        "African urban and highway use cases"
+      ],
+      "limitations": [
+        "paper says data are available on request",
+        "paper license must not be assumed to license Roam-owned raw data",
+        "published figures are not raw measured maps"
+      ],
+      "next_action": "Request raw telemetry, motor/inverter maps, battery data, calibration, coast-down/braking protocols, and permission to share derived model parameters."
+    },
+    {
+      "source_id": "ROAM_AIR_POWERTRAIN_2026_02",
+      "title": "A Validated Full-Powertrain Digital Twin of an Electric Motorcycle Developed for Sub-Saharan African Conditions",
+      "uri": "https://doi.org/10.3390/wevj1708432",
+      "vehicle_scope": "Roam Air electric motorcycle; six Stellenbosch validation trips",
+      "data_available": "Battery-terminal voltage/power, motor-speed validation description, experimentally characterized battery/motor/controller/longitudinal subsystems",
+      "rights_status": "underlying_raw_data_available_on_request; request separate written permission and derivative/redistribution scope",
+      "evidence_class": "Source",
+      "readiness": "P0_request",
+      "useful_for": [
+        "battery HPPC and equivalent-circuit identification",
+        "regenerative torque and controller behavior",
+        "coast-down drag/rolling-resistance measurements",
+        "outlier cases"
+      ],
+      "limitations": [
+        "paper reports energy within 2.71% on five of six cycles and 10.65% on one short downhill/high-throttle-transient trip",
+        "mechanical braking and auxiliary consumption are out of stated scope; thermal behavior not modeled"
+      ],
+      "next_action": "Request raw six-cycle telemetry/maps, calibration and test metadata, and written rights for raw or derived artifacts."
+    },
+    {
+      "source_id": "MOTO_NINJA400_NAVARRA_2026",
+      "title": "Kawasaki Ninja 400 SSP300 World Class Setup — Circuito de Navarra raw telemetry",
+      "uri": "https://zenodo.org/records/22755547",
+      "vehicle_scope": "2018 Kawasaki Ninja 400 race-prepared motorcycle; one rider/machine",
+      "data_available": "Raw CAN telemetry and decoded CSV for lean, front brake pressure, wheel speeds, suspension travel, throttle/traction states and GPS; about 5.2 logged hours reported",
+      "rights_status": "public_download_license_not_displayed; do not ingest, transform or redistribute until explicit license or written permission",
+      "evidence_class": "InstrumentedPhysical",
+      "readiness": "P0_rights_request",
+      "useful_for": [
+        "sensor synchronization",
+        "wheel-speed/lean/braking/suspension signal processing",
+        "track-level dynamics with documented conditions"
+      ],
+      "limitations": [
+        "single rider/machine; no direct tire-force test rig data or electric component maps",
+        "known issues include no wall-clock reference, front brake pressure saturation, GPS outlier and zero-byte file"
+      ],
+      "next_action": "Ask for explicit CC BY 4.0 or suitable commercial research/redistribution grant, plus tire and surface metadata."
+    },
+    {
+      "source_id": "MOTO_NINJA400_CARTAGENA_2026",
+      "title": "Kawasaki Ninja 400 SSP300 — Cartagena wet and dry telemetry days",
+      "uri": "https://zenodo.org/records/23034519",
+      "vehicle_scope": "2018 Kawasaki Ninja 400 race-prepared motorcycle; one rider/machine",
+      "data_available": "Raw telemetry, decoded CSV and integrity manifests; 30,867 records / 3,089.8 seconds reported, including a reported wet/rain-tire day and a dry day",
+      "rights_status": "public_download_license_not_displayed; do not ingest, transform or redistribute until explicit license or written permission",
+      "evidence_class": "InstrumentedPhysical",
+      "readiness": "P0_rights_request",
+      "useful_for": [
+        "wet/dry acquisition-metadata handling",
+        "brake pressure, wheel-speed, lean, throttle and suspension dynamics"
+      ],
+      "limitations": [
+        "calendar date/weather are external depositor metadata",
+        "single rider/machine; brake saturation/outliers documented; not an electric-powertrain or direct tire-force data set"
+      ],
+      "next_action": "Ask for explicit data license, commercial use/derivative permissions, sensor calibration and tire/surface details."
+    },
+    {
+      "source_id": "AALTO_INTELLIGENT_TIRE_STRAIN",
+      "title": "Data of publication: Development and experimental validation of a real-time analytical model for different intelligent tyre concepts",
+      "uri": "https://doi.org/10.21950/RQCDMS",
+      "vehicle_scope": "Tire test bench data; not motorcycle-specific",
+      "data_available": "Two Excel files with raw tire strain signals at different low/high speeds and vertical loads; slip angle 0 degrees",
+      "rights_status": "CC-BY-4.0 stated in Aalto research portal",
+      "evidence_class": "InstrumentedPhysical",
+      "readiness": "rights_clear_upstream_download_not_verified_in_this_session",
+      "useful_for": [
+        "tire strain response",
+        "load/speed dependence",
+        "sensor processing and model-residual methodology"
+      ],
+      "limitations": [
+        "zero slip-angle data do not characterize cornering grip, force maps, wet grip, braking or wear",
+        "download host denied this session's retrieval; no local binary copy is claimed"
+      ],
+      "next_action": "Retrieve files from the DOI portal, capture hashes/metadata and attribution, and validate schema before use."
+    },
+    {
+      "source_id": "PASSENGER_TIRE_TPMS_CC_BY",
+      "title": "Multi-scenario tire monitoring dataset with synchronized pressure, temperature, and speed measurements",
+      "uri": "https://github.com/kerzeyc/tire-monitoring-dataset",
+      "vehicle_scope": "Passenger-car 205/55 R16 tires; not motorcycle tires",
+      "data_available": "CSV listed as 210,128 samples; pressure, temperature, speed and anomaly labels; controlled gradual-deflation and natural-leak segments",
+      "rights_status": "CC-BY-4.0 explicitly stated by upstream repository",
+      "evidence_class": "FieldObserved",
+      "readiness": "rights_clear_upstream_download_not_verified_in_this_session",
+      "useful_for": [
+        "pressure/temperature anomaly detection",
+        "telemetry ingestion and segment-level split discipline",
+        "tire-health monitoring prototype"
+      ],
+      "limitations": [
+        "not tire-force, grip, puncture, compound, tread-wear or motorcycle data",
+        "upstream citation currently says it will be updated; preserve author attribution and license"
+      ],
+      "next_action": "Retrieve upstream CSV, verify hash/column schema and license file, retain original unchanged, and create attributed transformed data only."
+    },
+    {
+      "source_id": "MOTORCYCLE_SIMULATION_DARUS",
+      "title": "Simulation Data from Motorcycle Sensors in Operational and Crash Scenarios",
+      "uri": "https://doi.org/10.18419/DARUS-3301",
+      "vehicle_scope": "High-fidelity motorcycle operational/crash simulation",
+      "data_available": "Positions, velocities, accelerations, forces and contact-sensor signals; about 558 MB reported",
+      "rights_status": "CC-BY-4.0 stated in repository",
+      "evidence_class": "Simulated",
+      "readiness": "rights_clear_upstream_license_review_before_mirroring",
+      "useful_for": [
+        "simulation pipeline and sensor failure controls",
+        "scenario format and sensor-model stress tests"
+      ],
+      "limitations": [
+        "simulation only; no physical validation, tire-friction characterization or powertrain map",
+        "large dataset; do not mirror whole deposit without need"
+      ],
+      "next_action": "Use a representative subset only if needed, with exact DOI, simulation label and content hash."
+    },
+    {
+      "source_id": "EPA_ALPHA_EMOTOR_MAPS",
+      "title": "US EPA complete eMotor ALPHA map packages",
+      "uri": "https://www.epa.gov/vehicle-and-fuel-emissions-testing/combining-data-complete-emotor-alpha-maps",
+      "vehicle_scope": "Passenger-car/hybrid components and generic IPM EDU; not motorcycle-specific",
+      "data_available": "Downloadable efficiency/loss/ratio packages for Bolt, Prius MG1/MG2, Hyundai Sonata and a generic IPM example",
+      "rights_status": "official_download_available; inspect package-level source/license/provenance before republishing or deriving redistributable files",
+      "evidence_class": "Source",
+      "readiness": "conditional_proxy",
+      "useful_for": [
+        "component-map schema and energy-accounting tests",
+        "demonstrate efficiency-map interpolation and energy-boundary discipline"
+      ],
+      "limitations": [
+        "different power class and operating envelope; proxy only",
+        "not a Roam Air/motorcycle map or validation substitute"
+      ],
+      "next_action": "Download one small package, inspect included source/license files and hashes, and record exact component identity and permitted use."
+    },
+    {
+      "source_id": "MOTORCYCLE_RIDER_TRAJECTORY_NC_ND",
+      "title": "Real Track Experiment Dataset for Motorcycle Rider Behavior and Trajectory Reconstruction",
+      "uri": "https://doi.org/10.1016/j.dib.2024.111026",
+      "vehicle_scope": "Honda CBF1000 with trajectory/rider sensor instrumentation",
+      "data_available": "Location/attitude and redundant sensor data from track measurements",
+      "rights_status": "reported CC-BY-NC-ND-4.0; excluded from commercial derivative/redistribution pipeline unless additional permission",
+      "evidence_class": "InstrumentedPhysical",
+      "readiness": "exclude_pending_primary_license_check",
+      "useful_for": [
+        "literature and protocol discovery only pending rights review"
+      ],
+      "limitations": [
+        "not powertrain maps; reported non-commercial/no-derivatives license is unsuitable for unrestricted commercial engineering reuse"
+      ],
+      "next_action": "Do not incorporate into derivative/product datasets unless rights holder grants suitable permission."
+    }
+  ]
+}
