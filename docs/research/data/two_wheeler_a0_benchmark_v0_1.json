@@ -1,0 +1,375 @@
+{
+  "manifest_id": "TWO-WHEELER-A0-SYNTHETIC-CONTRACT-001",
+  "schema_version": "0.1.0",
+  "created_date": "2026-10-18",
+  "status": "frozen_expected_cases_not_yet_executed",
+  "evidence_class": "Synthetic",
+  "scope": {
+    "vehicle_profile": "A0_conventional_commuter_bicycle",
+    "real_vehicle_configuration": false,
+    "purpose": "Exercise evidence, configuration, applicability, model-scope, repair, cost-accounting and factory-schedule boundary decisions before connecting to runtime owners.",
+    "not_in_scope": [
+      "physical frame or fork qualification",
+      "real braking or handling qualification",
+      "roadworthiness or type approval",
+      "measured manufacturing yield or cost savings",
+      "fleet reliability",
+      "permission to operate"
+    ]
+  },
+  "execution": {
+    "runner_connected": false,
+    "executed": false,
+    "independent_verifier_connected": false,
+    "result": null,
+    "note": "Expected decisions are authored oracle fixtures, not test results. The consumer and independent verifier must be implemented and run before any pass claim."
+  },
+  "decision_vocabulary": [
+    "ACCEPT_SYNTHETIC_CANDIDATE_ONLY",
+    "BLOCK",
+    "INDETERMINATE",
+    "INCOMPLETE_ECONOMICS",
+    "REJECT_CLAIM"
+  ],
+  "cases": [
+    {
+      "scenario_id": "A0-POS-001",
+      "class": "positive_control",
+      "title": "Complete declared synthetic candidate",
+      "facts": {
+        "configuration_id": "A0-CFG-SYN-001",
+        "required_input_fields_present": true,
+        "units_consistent": true,
+        "evidence_configuration_matches": true,
+        "model_scope": "declared_synthetic_screening_scope",
+        "requested_claim": "candidate_screening_only"
+      },
+      "expected_decision": "ACCEPT_SYNTHETIC_CANDIDATE_ONLY",
+      "expected_reasons": [
+        "synthetic inputs are internally complete and consistent",
+        "no physical or regulatory claim requested or emitted"
+      ],
+      "must_not_claim": [
+        "structural qualification",
+        "braking qualification",
+        "roadworthiness",
+        "manufacturing readiness"
+      ]
+    },
+    {
+      "scenario_id": "A0-NEG-001",
+      "class": "negative_control",
+      "title": "Required frame/fork fatigue evidence missing",
+      "facts": {
+        "configuration_id": "A0-CFG-SYN-002",
+        "required_input_fields_present": true,
+        "required_evidence": [
+          "frame_fatigue",
+          "fork_test"
+        ],
+        "present_evidence": [],
+        "requested_claim": "structural_qualification"
+      },
+      "expected_decision": "BLOCK",
+      "expected_reasons": [
+        "required evidence is absent",
+        "simulation or optimization cannot substitute for required physical testing"
+      ],
+      "must_not_claim": [
+        "structural_qualification"
+      ]
+    },
+    {
+      "scenario_id": "A0-NEG-002",
+      "class": "negative_control",
+      "title": "Evidence is bound to a prior configuration",
+      "facts": {
+        "configuration_id": "A0-CFG-SYN-003B",
+        "evidence_configuration_id": "A0-CFG-SYN-003A",
+        "change": "frame_geometry_revision",
+        "requested_claim": "reuse_prior_structural_evidence"
+      },
+      "expected_decision": "BLOCK",
+      "expected_reasons": [
+        "configuration identity mismatch",
+        "applicability of the prior evidence is unestablished"
+      ],
+      "must_not_claim": [
+        "current_configuration_qualified"
+      ]
+    },
+    {
+      "scenario_id": "A0-NEG-003",
+      "class": "negative_control",
+      "title": "General bicycle standard silently applied to a specialized cargo profile",
+      "facts": {
+        "vehicle_profile": "cargo_bicycle",
+        "evidence_profile": "general_city_trekking_bicycle",
+        "applicability_review": "missing",
+        "requested_claim": "standard_conformity"
+      },
+      "expected_decision": "BLOCK",
+      "expected_reasons": [
+        "vehicle-class applicability has not been established",
+        "specialized class must not inherit the general profile by label similarity"
+      ],
+      "must_not_claim": [
+        "standard_conformity"
+      ]
+    },
+    {
+      "scenario_id": "A0-NEG-004",
+      "class": "negative_control",
+      "title": "Dimensionally incompatible physical quantities",
+      "facts": {
+        "requirement_quantity": "braking_force",
+        "requirement_unit": "N",
+        "observed_quantity": "mass",
+        "observed_unit": "kg",
+        "explicit_conversion_model": false
+      },
+      "expected_decision": "BLOCK",
+      "expected_reasons": [
+        "physical quantity mismatch",
+        "unit labels alone cannot make unlike quantities comparable"
+      ],
+      "must_not_claim": [
+        "requirement_satisfied"
+      ]
+    },
+    {
+      "scenario_id": "A0-NEG-005",
+      "class": "negative_control",
+      "title": "Candidate evaluated outside validated model envelope",
+      "facts": {
+        "model_scope": "urban_duty_cycle_only",
+        "requested_environment": "rough_terrain_high_payload",
+        "out_of_domain_policy": "unspecified",
+        "requested_claim": "robust_design_pass"
+      },
+      "expected_decision": "INDETERMINATE",
+      "expected_reasons": [
+        "requested environment exceeds declared model scope",
+        "no extrapolation policy or validation evidence is declared"
+      ],
+      "must_not_claim": [
+        "robust_design_pass"
+      ]
+    },
+    {
+      "scenario_id": "A0-NEG-006",
+      "class": "negative_control",
+      "title": "One successful stop is promoted to braking qualification",
+      "facts": {
+        "evidence_class": "InstrumentedPhysical",
+        "observation": "single_successful_stop",
+        "required_test_matrix_complete": false,
+        "requested_claim": "braking_qualification"
+      },
+      "expected_decision": "REJECT_CLAIM",
+      "expected_reasons": [
+        "single observation does not satisfy the declared test protocol",
+        "repeatability, applicability and required conditions remain unproven"
+      ],
+      "must_not_claim": [
+        "braking_qualification"
+      ]
+    },
+    {
+      "scenario_id": "A0-NEG-007",
+      "class": "negative_control",
+      "title": "E-bike electrical evidence reused for a revised battery system",
+      "facts": {
+        "vehicle_profile": "pedal_assist_ebike",
+        "battery_configuration_id": "BATTERY-SYN-B",
+        "electrical_evidence_configuration_id": "BATTERY-SYN-A",
+        "requested_claim": "current_electrical_system_qualified"
+      },
+      "expected_decision": "BLOCK",
+      "expected_reasons": [
+        "battery/system configuration differs from evidence subject",
+        "electrical qualification is separate from bicycle mechanical evidence"
+      ],
+      "must_not_claim": [
+        "current_electrical_system_qualified"
+      ]
+    },
+    {
+      "scenario_id": "A0-NEG-008",
+      "class": "negative_control",
+      "title": "Missing material or supplier price silently becomes zero",
+      "facts": {
+        "cost_item": "critical_bearing_supply",
+        "price": null,
+        "missingness_reason": "no_verified_quote",
+        "imputed_value": 0,
+        "requested_claim": "complete_lifecycle_cost_comparison"
+      },
+      "expected_decision": "INCOMPLETE_ECONOMICS",
+      "expected_reasons": [
+        "unknown price is not zero",
+        "cost comparison must report missing dependency and sensitivity"
+      ],
+      "must_not_claim": [
+        "complete_lifecycle_cost_comparison"
+      ]
+    },
+    {
+      "scenario_id": "A0-NEG-009",
+      "class": "negative_control",
+      "title": "Factory schedule assigns a resource twice",
+      "facts": {
+        "resource_id": "WELD_FIXTURE_SYN_1",
+        "operation_a_interval": [
+          0,
+          10
+        ],
+        "operation_b_interval": [
+          5,
+          12
+        ],
+        "resource_capacity": 1,
+        "requested_claim": "valid_schedule"
+      },
+      "expected_decision": "BLOCK",
+      "expected_reasons": [
+        "exclusive resource has overlapping assignments",
+        "schedule must be rejected by independent verification"
+      ],
+      "must_not_claim": [
+        "valid_schedule"
+      ]
+    },
+    {
+      "scenario_id": "A0-NEG-010",
+      "class": "negative_control",
+      "title": "Schedule omits required metrology/inspection",
+      "facts": {
+        "inspection_required": true,
+        "inspection_operation_present": false,
+        "requested_claim": "conforming_unit_route"
+      },
+      "expected_decision": "BLOCK",
+      "expected_reasons": [
+        "mandatory inspection is absent",
+        "throughput or makespan cannot override mandatory acceptance steps"
+      ],
+      "must_not_claim": [
+        "conforming_unit_route"
+      ]
+    },
+    {
+      "scenario_id": "A0-NEG-011",
+      "class": "negative_control",
+      "title": "Candidate cost omits scrap and rework",
+      "facts": {
+        "candidate_cost_includes_scrap": false,
+        "candidate_cost_includes_rework": false,
+        "baseline_cost_includes_scrap": true,
+        "baseline_cost_includes_rework": true,
+        "requested_claim": "lower_cost_per_conforming_unit"
+      },
+      "expected_decision": "INCOMPLETE_ECONOMICS",
+      "expected_reasons": [
+        "candidate and baseline accounting boundaries differ",
+        "yield-adjusted cost per accepted unit cannot be fairly compared"
+      ],
+      "must_not_claim": [
+        "lower_cost_per_conforming_unit"
+      ]
+    },
+    {
+      "scenario_id": "A0-NEG-012",
+      "class": "negative_control",
+      "title": "Repair is marked complete without post-repair verification",
+      "facts": {
+        "repair_task_status": "performed",
+        "required_post_repair_verification": true,
+        "post_repair_evidence_present": false,
+        "requested_claim": "returned_to_qualified_service"
+      },
+      "expected_decision": "BLOCK",
+      "expected_reasons": [
+        "task performed is distinct from successful verification",
+        "current service qualification remains unresolved"
+      ],
+      "must_not_claim": [
+        "returned_to_qualified_service"
+      ]
+    },
+    {
+      "scenario_id": "A0-NEG-013",
+      "class": "negative_control",
+      "title": "Synthetic evidence is promoted to physical or regulatory evidence",
+      "facts": {
+        "source_evidence_class": "Synthetic",
+        "requested_output_evidence_class": "RegulatoryReceipt",
+        "external_authority_receipt_present": false,
+        "requested_claim": "approved_for_operation"
+      },
+      "expected_decision": "REJECT_CLAIM",
+      "expected_reasons": [
+        "evidence class cannot be upgraded by serialization or model output",
+        "external approval must be supplied by the competent authority"
+      ],
+      "must_not_claim": [
+        "approved_for_operation"
+      ]
+    },
+    {
+      "scenario_id": "A0-NEG-014",
+      "class": "negative_control",
+      "title": "A validation sample is reused for model fitting and reported as held-out validation",
+      "facts": {
+        "sample_id": "PHYSICAL-SYN-HOLDOUT-01",
+        "used_for_model_fitting": true,
+        "reported_as_held_out": true,
+        "requested_claim": "independent_model_validation"
+      },
+      "expected_decision": "REJECT_CLAIM",
+      "expected_reasons": [
+        "evaluation leakage invalidates the independent holdout claim"
+      ],
+      "must_not_claim": [
+        "independent_model_validation"
+      ]
+    },
+    {
+      "scenario_id": "A0-NEG-015",
+      "class": "negative_control",
+      "title": "One prototype success is promoted to fleet reliability",
+      "facts": {
+        "prototype_count": 1,
+        "observed_service_duration": "unspecified",
+        "failure_observation_plan": "missing",
+        "requested_claim": "fleet_reliability"
+      },
+      "expected_decision": "REJECT_CLAIM",
+      "expected_reasons": [
+        "one success does not establish fleet or lifetime reliability",
+        "exposure, censoring and failure definitions are absent"
+      ],
+      "must_not_claim": [
+        "fleet_reliability"
+      ]
+    },
+    {
+      "scenario_id": "A0-NEG-016",
+      "class": "negative_control",
+      "title": "A scalar aggregate hides a violated safety gate",
+      "facts": {
+        "aggregate_score": 0.97,
+        "hard_safety_gate": "failed",
+        "requested_claim": "overall_design_pass"
+      },
+      "expected_decision": "BLOCK",
+      "expected_reasons": [
+        "hard constraints are non-compensatory",
+        "high aggregate score cannot offset a failed safety requirement"
+      ],
+      "must_not_claim": [
+        "overall_design_pass"
+      ]
+    }
+  ]
+}
