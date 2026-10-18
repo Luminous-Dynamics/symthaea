@@ -11,6 +11,8 @@ on:
       - "docs/engineering/OPEN_DISPLAY_REFERENCE_HARDWARE.md"
       - "docs/engineering/open-display-reference-platform-v0.1.json"
       - "docs/engineering/open-display-reference-platform.schema.json"
+      - "docs/engineering/display-measurement-run-template-v0.1.json"
+      - "docs/engineering/display-measurement-run.schema.json"
       - ".github/workflows/open-display-platform-verify.yml"
   push:
     branches: ["main"]
@@ -22,6 +24,8 @@ on:
       - "docs/engineering/OPEN_DISPLAY_REFERENCE_HARDWARE.md"
       - "docs/engineering/open-display-reference-platform-v0.1.json"
       - "docs/engineering/open-display-reference-platform.schema.json"
+      - "docs/engineering/display-measurement-run-template-v0.1.json"
+      - "docs/engineering/display-measurement-run.schema.json"
       - ".github/workflows/open-display-platform-verify.yml"
   workflow_dispatch:
 
