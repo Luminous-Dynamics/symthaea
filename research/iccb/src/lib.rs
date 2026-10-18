@@ -29,9 +29,14 @@ impl EvidenceClaim {
     /// A claim is usable only when its state, source, and validity window qualify.
     pub fn is_usable(&self, evaluation_day: u32) -> bool {
         self.state == EvidenceState::Qualified
-            && self.source_id.as_ref().is_some_and(|source| !source.trim().is_empty())
+            && self
+                .source_id
+                .as_ref()
+                .is_some_and(|source| !source.trim().is_empty())
             && self.observed_day.is_some_and(|day| day <= evaluation_day)
-            && self.valid_through_day.is_some_and(|day| day >= evaluation_day)
+            && self
+                .valid_through_day
+                .is_some_and(|day| day >= evaluation_day)
     }
 }
 
@@ -136,8 +141,7 @@ impl CandidateScenario {
                     || option
                         .evidence
                         .iter()
-                        .any(|claim| !claim.is_usable(self.mandate.evaluation_day))
-                )
+                        .any(|claim| !claim.is_usable(self.mandate.evaluation_day)))
             {
                 rejection_reasons.push(RejectionReason::RequiredEvidenceMissingOrUnusable);
             }
@@ -233,9 +237,11 @@ mod tests {
         let evaluated = &result.evaluated_options[0];
 
         assert!(!evaluated.accepted);
-        assert!(evaluated
-            .rejection_reasons
-            .contains(&RejectionReason::Unauthorized));
+        assert!(
+            evaluated
+                .rejection_reasons
+                .contains(&RejectionReason::Unauthorized)
+        );
     }
 
     #[test]
@@ -245,9 +251,11 @@ mod tests {
         let evaluated = &scenario(vec![stale]).evaluate().evaluated_options[0];
 
         assert!(!evaluated.accepted);
-        assert!(evaluated
-            .rejection_reasons
-            .contains(&RejectionReason::RequiredEvidenceMissingOrUnusable));
+        assert!(
+            evaluated
+                .rejection_reasons
+                .contains(&RejectionReason::RequiredEvidenceMissingOrUnusable)
+        );
     }
 
     #[test]
@@ -282,7 +290,9 @@ mod tests {
         let result = scenario(vec![investment]).evaluate();
 
         assert_eq!(
-            result.evaluated_options[0].outcomes.critical_dependency_count,
+            result.evaluated_options[0]
+                .outcomes
+                .critical_dependency_count,
             1
         );
     }
@@ -294,9 +304,11 @@ mod tests {
         let evaluated = &scenario(vec![deferred]).evaluate().evaluated_options[0];
 
         assert!(!evaluated.accepted);
-        assert!(evaluated
-            .rejection_reasons
-            .contains(&RejectionReason::MaintenanceLimitExceeded));
+        assert!(
+            evaluated
+                .rejection_reasons
+                .contains(&RejectionReason::MaintenanceLimitExceeded)
+        );
     }
 
     #[test]
@@ -307,12 +319,16 @@ mod tests {
         let evaluated = &scenario(vec![over_budget]).evaluate().evaluated_options[0];
 
         assert!(!evaluated.accepted);
-        assert!(evaluated
-            .rejection_reasons
-            .contains(&RejectionReason::BudgetExceeded));
-        assert!(evaluated
-            .rejection_reasons
-            .contains(&RejectionReason::LiquidityFloorBreached));
+        assert!(
+            evaluated
+                .rejection_reasons
+                .contains(&RejectionReason::BudgetExceeded)
+        );
+        assert!(
+            evaluated
+                .rejection_reasons
+                .contains(&RejectionReason::LiquidityFloorBreached)
+        );
     }
 
     #[test]
