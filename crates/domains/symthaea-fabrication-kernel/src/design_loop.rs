@@ -251,6 +251,7 @@ pub struct DesignLoopOutput {
     pub safety_level: DesignLoopSafetyLevel,
     pub prediction_similarities: Vec<(f32, f32)>,
     /// True only after an explicit reference has been installed.
+    #[serde(default)]
     pub reference_calibrated: bool,
 }
 
