@@ -173,6 +173,12 @@ pub struct SelectedSampleEvidence {
     pub source_relative_path: String,
     /// SHA-256 over the exact source WAV file bytes, not decoded PCM.
     pub source_file_sha256: String,
+    /// Optional manifest of all indexed WAVs in the selected mapped sample bank.
+    /// Present only when SYMTHAEA_MUSE_HASH_SOURCE_BANK_MANIFEST=1 was set before
+    /// the source bank's first sample decode.
+    pub source_bank_content_manifest_sha256: Option<String>,
+    /// "not_requested", "hashed", or "hash_failed".
+    pub source_bank_manifest_status: &'static str,
     pub source_root_midi: u8,
     pub source_sample_rate_hz: u32,
     /// Normalized dynamic layer inferred from the indexed source filename.
@@ -1355,6 +1361,8 @@ fn render_vcsl_note_with_evidence(
         source_library: sample.source_library.clone(),
         source_relative_path: sample.source_relative_path.clone(),
         source_file_sha256: sample.source_file_sha256.clone(),
+        source_bank_content_manifest_sha256: sample.source_bank_content_manifest_sha256.clone(),
+        source_bank_manifest_status: sample.source_bank_manifest_status,
         source_root_midi: sample.midi,
         source_sample_rate_hz: sample.sample_rate,
         source_dynamic: sample.source_dynamic,
