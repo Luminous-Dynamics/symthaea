@@ -21,6 +21,7 @@
 //! separate treatment.
 
 pub mod active_sensing;
+pub mod robust_active_sensing;
 pub mod hybrid_evidence;
 pub mod spatial_likelihood;
 

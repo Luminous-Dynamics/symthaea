@@ -247,6 +247,32 @@ This is a planner arithmetic primitive, not an autonomous controller. Predicted 
 
 The challenge completed on 15 June 2026 and official results were published on 1 July 2026. Task 3's best reported audio-only result was Macro mAP 0.1080 and Macro Pearson r 0.3962; the top reported audiovisual submission had Macro mAP 0.0131 and Pearson r 0.4002. The two tracks are evaluated separately with different systems, so these numbers are not a controlled audio-versus-audiovisual ablation and cannot establish that one modality regime is intrinsically better. They reinforce the need to evaluate fusion on matched scenes, labels, and system budgets rather than assume an improvement. See the official ranking and metric definition: https://dcase.community/challenge2026/task-semantic-acoustic-imaging-for-sound-event-localization-and-detection-from-spatial-audio-and-audiovisual-scenes-results.
 
+## OWL-005: choose actions that survive plausible model failure
+
+A nominal information-gain planner can overvalue a movement that is excellent under one observation model and useless when a channel drifts, reverberation rises or vehicle self-noise contaminates the measurement. The next research shift is to make robustness explicit rather than hide it inside a single nominal score.
+
+### Robust planner primitive
+
+The new module, `robust_active_sensing`, evaluates every candidate action under the same finite set of declared observation-model scenarios. It ranks actions by **worst-case expected information gain** across those scenarios; the arithmetic mean is only a tie-breaker, followed by lower energy, lower latency and lexical action ID. All actions must be scored against the same unique scenario-ID set, so a candidate cannot appear robust by omitting difficult scenarios.
+
+This is conservative only with respect to the supplied scenario set. It is not a distributionally robust guarantee against arbitrary unknown conditions. Likelihood tables still require held-out calibration, and the safety flag must come from a separately validated checker.
+
+### Research basis
+
+- Information-driven audio-visual source localization provides the OWL-004 active-perception precedent: https://doi.org/10.1371/journal.pone.0137057
+- DCASE 2026 Task 2 explicitly targets noise and domain shift; its results include large differences across source and target acoustic conditions: https://dcase.community/challenge2026/task-first-shot-unsupervised-anomalous-sound-detection-for-machine-condition-monitoring-results
+- DCASE 2026 Task 3 reconstructs dense semantic acoustic maps from only four audio channels at evaluation despite richer development recordings, a useful information-loss robustness test: https://dcase.community/challenge2026/task-semantic-acoustic-imaging-for-sound-event-localization-and-detection-from-spatial-audio-and-audiovisual-scenes
+
+### Proposed acceptance tests and benchmarks
+
+- **Nominal-optimal trap:** action A is perfect in a nominal room but yields zero information under a declared microphone fault; action B provides moderate information in every scenario. The robust planner should choose B.
+- **Scenario integrity:** each action must share the same scenario-ID set. Missing, duplicate or malformed definitions fail closed.
+- **Robustness–conservatism frontier:** report worst-case, mean and nominal information gain, energy, latency, no-action rate and realized localization error. A gain in worst-case score must not hide a material collapse in nominal performance.
+- **Held-out stressors:** altered room response, lower SNR, channel delay/gain drift, dropped microphone, moving-array pose uncertainty and propulsion self-noise.
+- **Baselines:** current single-model planner, robust worst-case planner, fixed head, random feasible action and conservative no-move policy.
+- **Proposed target:** reduce worst-decile localization error by at least 20% versus the nominal planner on a locked stress suite, while keeping median nominal error within 5% and staying inside declared energy/latency budgets. If both bounds cannot be met, report the trade-off rather than claim victory.
+- **Real-data route:** evaluate locked LOCATA source/array trajectories and use the DCASE 2026 domain-shift / dense-map protocols where applicable. Report failures, abstentions and missing observations.
+
 ## Related work
 
 - OWL-001 issue: https://github.com/Luminous-Dynamics/symthaea/issues/7912
