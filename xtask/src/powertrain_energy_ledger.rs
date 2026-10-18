@@ -287,7 +287,7 @@ fn evaluate_case(facts: &Value) -> (String, Vec<String>) {
         );
     }
     if claim == "well_to_wheel_efficiency"
-        && boolean(facts, "upstream_stages_included") != Some(true)
+        && boolean(facts, "upstream_stages_included") == Some(false)
     {
         return (
             "BLOCK".into(),
