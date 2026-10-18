@@ -48,7 +48,10 @@ struct AuditReport {
 }
 
 fn sha256(bytes: &[u8]) -> String {
-    Sha256::digest(bytes).iter().map(|b| format!("{b:02x}")).collect()
+    Sha256::digest(bytes)
+        .iter()
+        .map(|b| format!("{b:02x}"))
+        .collect()
 }
 
 fn str_at<'a>(v: &'a Value, key: &str) -> &'a str {
@@ -56,8 +59,14 @@ fn str_at<'a>(v: &'a Value, key: &str) -> &'a str {
 }
 
 fn strings_at(v: &Value, key: &str) -> Vec<String> {
-    v.get(key).and_then(Value::as_array)
-        .map(|xs| xs.iter().filter_map(Value::as_str).map(str::to_owned).collect())
+    v.get(key)
+        .and_then(Value::as_array)
+        .map(|xs| {
+            xs.iter()
+                .filter_map(Value::as_str)
+                .map(str::to_owned)
+                .collect()
+        })
         .unwrap_or_default()
 }
 
@@ -73,7 +82,10 @@ fn actual_group_faults(case: &Value) -> BTreeSet<String> {
     map_axis_to_fault.insert("build_batch_id", "build_batch_cross_partition");
     map_axis_to_fault.insert("builder_id", "builder_cross_partition");
     map_axis_to_fault.insert("environment_id", "environment_cross_partition");
-    map_axis_to_fault.insert("measurement_session_id", "measurement_session_cross_partition");
+    map_axis_to_fault.insert(
+        "measurement_session_id",
+        "measurement_session_cross_partition",
+    );
     map_axis_to_fault.insert("material_lot_id", "material_lot_cross_partition");
 
     for axis in axes {
@@ -83,14 +95,21 @@ fn actual_group_faults(case: &Value) -> BTreeSet<String> {
         let mut partitions_by_group: BTreeMap<String, BTreeSet<String>> = BTreeMap::new();
         for observation in observations {
             let partition = str_at(observation, "partition").to_owned();
-            let group_id = observation.get("group_ids")
+            let group_id = observation
+                .get("group_ids")
                 .and_then(|g| g.get(axis.as_str()))
                 .and_then(Value::as_str);
             if let Some(group_id) = group_id {
-                partitions_by_group.entry(group_id.to_owned()).or_default().insert(partition);
+                partitions_by_group
+                    .entry(group_id.to_owned())
+                    .or_default()
+                    .insert(partition);
             }
         }
-        if partitions_by_group.values().any(|partitions| partitions.len() > 1) {
+        if partitions_by_group
+            .values()
+            .any(|partitions| partitions.len() > 1)
+        {
             faults.insert((*fault_name).to_owned());
         }
     }
@@ -99,22 +118,40 @@ fn actual_group_faults(case: &Value) -> BTreeSet<String> {
 
 fn actual_policy_faults(case: &Value) -> BTreeSet<String> {
     let mut faults = actual_group_faults(case);
-    let Some(selection) = case.get("selection") else { return faults };
+    let Some(selection) = case.get("selection") else {
+        return faults;
+    };
 
     let consumed_test = strings_at(selection, "data_partitions_consumed")
-        .iter().any(|p| p == "locked_test");
-    if selection.get("locked_test_outcomes_used").and_then(Value::as_bool) == Some(true) || consumed_test {
+        .iter()
+        .any(|p| p == "locked_test");
+    if selection
+        .get("locked_test_outcomes_used")
+        .and_then(Value::as_bool)
+        == Some(true)
+        || consumed_test
+    {
         faults.insert("locked_test_outcome_used".to_owned());
     }
-    if selection.get("selected_candidates_admissible").and_then(Value::as_bool) == Some(false) {
+    if selection
+        .get("selected_candidates_admissible")
+        .and_then(Value::as_bool)
+        == Some(false)
+    {
         faults.insert("inadmissible_experiment_selected".to_owned());
     }
     if str_at(selection, "policy") == "seeded_random"
-        && !selection.get("random_seed").is_some_and(|seed| !seed.is_null())
+        && !selection
+            .get("random_seed")
+            .is_some_and(|seed| !seed.is_null())
     {
         faults.insert("random_seed_missing".to_owned());
     }
-    if selection.get("posthoc_policy_change").and_then(Value::as_bool) == Some(true) {
+    if selection
+        .get("posthoc_policy_change")
+        .and_then(Value::as_bool)
+        == Some(true)
+    {
         faults.insert("posthoc_policy_change".to_owned());
     }
     faults
@@ -142,7 +179,10 @@ fn disposition_for_faults(faults: &BTreeSet<String>) -> &'static str {
 fn semantic_findings(corpus: &Value) -> (Vec<String>, Vec<CaseResult>) {
     let mut findings = Vec::new();
     let Some(cases) = corpus.get("cases").and_then(Value::as_array) else {
-        return (vec!["$.cases: missing or not an array".to_owned()], Vec::new());
+        return (
+            vec!["$.cases: missing or not an array".to_owned()],
+            Vec::new(),
+        );
     };
 
     let mut seen_ids = BTreeSet::new();
@@ -158,14 +198,22 @@ fn semantic_findings(corpus: &Value) -> (Vec<String>, Vec<CaseResult>) {
 
         let case_type = str_at(case, "case_type");
         let fault_entries = strings_at(case, "fault_modes");
-        let declared: BTreeSet<String> = fault_entries.iter()
-            .filter(|fault| fault.as_str() != "none").cloned().collect();
+        let declared: BTreeSet<String> = fault_entries
+            .iter()
+            .filter(|fault| fault.as_str() != "none")
+            .cloned()
+            .collect();
         seen_fault_coverage.extend(declared.iter().cloned());
-        let active_entry_count = fault_entries.iter().filter(|fault| fault.as_str() != "none").count();
+        let active_entry_count = fault_entries
+            .iter()
+            .filter(|fault| fault.as_str() != "none")
+            .count();
         if declared.len() != active_entry_count
             || (fault_entries.iter().any(|fault| fault == "none") && fault_entries.len() != 1)
         {
-            findings.push(format!("{path}.fault_modes: duplicate or conflicting fault declaration"));
+            findings.push(format!(
+                "{path}.fault_modes: duplicate or conflicting fault declaration"
+            ));
         }
 
         let actual = actual_policy_faults(case);
@@ -183,14 +231,20 @@ fn semantic_findings(corpus: &Value) -> (Vec<String>, Vec<CaseResult>) {
 
         if case_type == "positive_control" {
             if !actual.is_empty() || expected_disposition != "VALID_SYNTHETIC_SPLIT" {
-                findings.push(format!("{path}: positive control must be a valid split with no policy faults"));
+                findings.push(format!(
+                    "{path}: positive control must be a valid split with no policy faults"
+                ));
             }
         } else if case_type == "negative_control" {
             if declared.len() != 1 {
-                findings.push(format!("{path}: each negative control must isolate exactly one fault"));
+                findings.push(format!(
+                    "{path}: each negative control must isolate exactly one fault"
+                ));
             }
             if actual.is_empty() {
-                findings.push(format!("{path}: negative control declares no effective policy violation"));
+                findings.push(format!(
+                    "{path}: negative control declares no effective policy violation"
+                ));
             }
             if expected_disposition == "VALID_SYNTHETIC_SPLIT" {
                 findings.push(format!("{path}: negative control cannot be marked valid"));
@@ -207,7 +261,9 @@ fn semantic_findings(corpus: &Value) -> (Vec<String>, Vec<CaseResult>) {
 
     let expected: BTreeSet<String> = REQUIRED_FAULTS.iter().map(|s| (*s).to_owned()).collect();
     for missing in expected.difference(&seen_fault_coverage) {
-        findings.push(format!("$.cases: missing negative-control coverage for '{missing}'"));
+        findings.push(format!(
+            "$.cases: missing negative-control coverage for '{missing}'"
+        ));
     }
     for extra in seen_fault_coverage.difference(&expected) {
         findings.push(format!("$.cases: unrecognized fault mode '{extra}'"));
@@ -230,24 +286,39 @@ fn audit(schema_path: &PathBuf, corpus_path: &PathBuf) -> Result<AuditReport, St
         .map_err(|e| format!("schema meta-validation failed: {e}"))?;
     let validator = jsonschema::validator_for(&schema)
         .map_err(|e| format!("schema compilation failed: {e}"))?;
-    let mut findings = validator.iter_errors(&corpus)
+    let mut findings = validator
+        .iter_errors(&corpus)
         .map(|e| format!("schema validation at {}: {e}", e.instance_path()))
         .collect::<Vec<_>>();
     let (semantic, case_results) = semantic_findings(&corpus);
     findings.extend(semantic);
 
-    let cases = corpus.get("cases").and_then(Value::as_array).cloned().unwrap_or_default();
+    let cases = corpus
+        .get("cases")
+        .and_then(Value::as_array)
+        .cloned()
+        .unwrap_or_default();
     Ok(AuditReport {
         report_version: "mus-doe-audit-report/0.1",
         tool_version: env!("CARGO_PKG_VERSION"),
         schema_draft: "https://json-schema.org/draft/2020-12/schema",
-        report_status: if findings.is_empty() { "CONSISTENT_SYNTHETIC_POLICY_ONLY" } else { "REJECTED" },
+        report_status: if findings.is_empty() {
+            "CONSISTENT_SYNTHETIC_POLICY_ONLY"
+        } else {
+            "REJECTED"
+        },
         claim_ceiling: "SYNTHETIC_SPLIT_AND_SELECTION_POLICY_INTEGRITY_ONLY",
         schema_sha256: sha256(&schema_bytes),
         corpus_sha256: sha256(&corpus_bytes),
         case_count: cases.len(),
-        positive_control_count: cases.iter().filter(|c| str_at(c, "case_type") == "positive_control").count(),
-        negative_control_count: cases.iter().filter(|c| str_at(c, "case_type") == "negative_control").count(),
+        positive_control_count: cases
+            .iter()
+            .filter(|c| str_at(c, "case_type") == "positive_control")
+            .count(),
+        negative_control_count: cases
+            .iter()
+            .filter(|c| str_at(c, "case_type") == "negative_control")
+            .count(),
         findings,
         case_results,
     })
@@ -262,7 +333,9 @@ fn parse_args() -> Result<(PathBuf, PathBuf), String> {
             "--schema" => schema = args.next().ok_or("--schema requires a path")?.into(),
             "--corpus" => corpus = args.next().ok_or("--corpus requires a path")?.into(),
             "--help" | "-h" => {
-                println!("mus-doe-audit [--schema PATH] [--corpus PATH]\nAudits the MUS-DOE synthetic split/selection-policy corpus.");
+                println!(
+                    "mus-doe-audit [--schema PATH] [--corpus PATH]\nAudits the MUS-DOE synthetic split/selection-policy corpus."
+                );
                 std::process::exit(0);
             }
             other => return Err(format!("unknown argument: {other}")),
@@ -287,8 +360,18 @@ fn main() -> ExitCode {
         }
     };
     let rejected = !report.findings.is_empty();
-    println!("{}", serde_json::to_string_pretty(&report).unwrap_or_else(|_| json!({"report_status":"REJECTED","findings":["report serialization failed"]}).to_string()));
-    if rejected { ExitCode::from(1) } else { ExitCode::SUCCESS }
+    println!(
+        "{}",
+        serde_json::to_string_pretty(&report).unwrap_or_else(|_| {
+            json!({"report_status":"REJECTED","findings":["report serialization failed"]})
+                .to_string()
+        })
+    );
+    if rejected {
+        ExitCode::from(1)
+    } else {
+        ExitCode::SUCCESS
+    }
 }
 
 #[cfg(test)]
@@ -296,7 +379,10 @@ mod tests {
     use super::*;
 
     fn corpus() -> Value {
-        serde_json::from_str(include_str!("../../../fixtures/instrument-engineering/mus_doe_split_corpus_v0_1.json")).expect("corpus parses")
+        serde_json::from_str(include_str!(
+            "../../../fixtures/instrument-engineering/mus_doe_split_corpus_v0_1.json"
+        ))
+        .expect("corpus parses")
     }
 
     #[test]
@@ -310,7 +396,12 @@ mod tests {
         let mut data = corpus();
         let first = data["cases"][0].clone();
         data["cases"].as_array_mut().unwrap().push(first);
-        assert!(semantic_findings(&data).0.iter().any(|f| f.contains("duplicate identity")));
+        assert!(
+            semantic_findings(&data)
+                .0
+                .iter()
+                .any(|f| f.contains("duplicate identity"))
+        );
     }
 
     #[test]
@@ -320,7 +411,10 @@ mod tests {
             ("build_batch_id", "build_batch_cross_partition"),
             ("builder_id", "builder_cross_partition"),
             ("environment_id", "environment_cross_partition"),
-            ("measurement_session_id", "measurement_session_cross_partition"),
+            (
+                "measurement_session_id",
+                "measurement_session_cross_partition",
+            ),
             ("material_lot_id", "material_lot_cross_partition"),
         ];
         for (axis, expected_fault) in axes {
@@ -343,7 +437,12 @@ mod tests {
         let mut data = corpus();
         data["cases"][0]["selection"]["data_partitions_consumed"] = json!(["fit", "locked_test"]);
         data["cases"][0]["selection"]["locked_test_outcomes_used"] = json!(false);
-        assert!(semantic_findings(&data).0.iter().any(|f| f.contains("locked_test_outcome_used")));
+        assert!(
+            semantic_findings(&data)
+                .0
+                .iter()
+                .any(|f| f.contains("locked_test_outcome_used"))
+        );
     }
 
     #[test]
@@ -351,27 +450,47 @@ mod tests {
         let mut data = corpus();
         data["cases"][0]["selection"]["policy"] = json!("seeded_random");
         data["cases"][0]["selection"]["random_seed"] = Value::Null;
-        assert!(semantic_findings(&data).0.iter().any(|f| f.contains("random_seed_missing")));
+        assert!(
+            semantic_findings(&data)
+                .0
+                .iter()
+                .any(|f| f.contains("random_seed_missing"))
+        );
     }
 
     #[test]
     fn inadmissible_selected_candidate_is_rejected() {
         let mut data = corpus();
         data["cases"][0]["selection"]["selected_candidates_admissible"] = json!(false);
-        assert!(semantic_findings(&data).0.iter().any(|f| f.contains("inadmissible_experiment_selected")));
+        assert!(
+            semantic_findings(&data)
+                .0
+                .iter()
+                .any(|f| f.contains("inadmissible_experiment_selected"))
+        );
     }
 
     #[test]
     fn posthoc_policy_change_is_rejected() {
         let mut data = corpus();
         data["cases"][0]["selection"]["posthoc_policy_change"] = json!(true);
-        assert!(semantic_findings(&data).0.iter().any(|f| f.contains("posthoc_policy_change")));
+        assert!(
+            semantic_findings(&data)
+                .0
+                .iter()
+                .any(|f| f.contains("posthoc_policy_change"))
+        );
     }
 
     #[test]
     fn declared_fault_without_matching_evidence_is_rejected() {
         let mut data = corpus();
         data["cases"][0]["fault_modes"] = json!(["physical_unit_cross_partition"]);
-        assert!(semantic_findings(&data).0.iter().any(|f| f.contains("differs from computed")));
+        assert!(
+            semantic_findings(&data)
+                .0
+                .iter()
+                .any(|f| f.contains("differs from computed"))
+        );
     }
 }
