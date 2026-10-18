@@ -8,6 +8,8 @@ Symtropy's Physics Experiment Atlas supplies deterministic experiment/simulation
 
 - Symtropy or a separately reviewed physics model supplies predictions for each candidate hypothesis and observable.
 - Measurement/model uncertainty and relative resource cost are explicit inputs; neither is invented from Symthaea's subjective confidence.
+- Every observable carries a unit. Each hypothesis prediction carries a canonical model descriptor + SHA-256 digest and a separately digested uncertainty descriptor.
+- The planner recomputes descriptor digests and rejects mismatches before scoring.
 - This crate validates the design contract and ranks candidates using a prior-free, maximin standardized-separation heuristic.
 - The simulation or laboratory produces observations later. An independent scorer compares those observations to frozen predictions.
 
@@ -29,10 +31,13 @@ The strict physics-experiment-design-v0.1 input includes:
 - a target question;
 - at least two uniquely named rival hypotheses;
 - candidate experiments with unique IDs, positive relative cost units and non-negative duration;
-- at least one observable per candidate;
-- exactly one finite predicted mean and positive finite predictive standard uncertainty for every hypothesis/observable pair.
+- at least one observable per candidate, with a non-empty unit;
+- exactly one finite predicted mean and positive finite predictive standard uncertainty for every hypothesis/observable pair;
+- a non-empty model descriptor and uncertainty descriptor per prediction, each carrying a lowercase 64-character SHA-256 digest matching the exact descriptor UTF-8 bytes.
 
-Missing hypotheses, duplicate IDs, unknown hypotheses, empty prediction sets, invalid uncertainty, non-finite scores, and invalid resource costs fail closed with typed errors. Unknown JSON fields are rejected to surface schema drift instead of silently ignoring it.
+Missing hypotheses, duplicate IDs, unknown hypotheses, empty prediction sets, missing units, altered descriptors with stale digests, invalid uncertainty, non-finite scores, and invalid resource costs fail closed with typed errors. Unknown JSON fields are rejected to surface schema drift instead of silently ignoring it.
+
+The digests verify only that the supplied descriptor text matches its fingerprint. They do **not** attest that an executable produced the prediction, that the source code matches the descriptor, or that the uncertainty is calibrated. Those claims require higher-level evidence receipts containing source revision, run configuration, input/output digests and calibration provenance.
 
 The output is a deterministic ranked JSON receipt. It identifies the hypothesis pair that is hardest to distinguish for each candidate, reports standardized separation, cost-adjusted score and measurement count, and discloses limitations. Input-order changes should not alter scores or ranking.
 
@@ -60,7 +65,7 @@ This is **not** Bayesian expected information gain, a Bayes factor, a posterior 
 
 | Gate | Benchmark | Proposed acceptance |
 |---|---|---|
-| Contract integrity | missing/duplicate hypotheses and observations; wrong schema; NaN/infinite mean or uncertainty; zero cost | 100% of malformed fixtures rejected |
+| Contract integrity | missing/duplicate hypotheses and observations; wrong schema; missing unit; altered model/uncertainty descriptor without digest update; NaN/infinite mean or uncertainty; zero cost | 100% of malformed fixtures rejected |
 | Determinism | same input repeated; permutations of candidate and prediction order | exact same rank, metrics and hypothesis pair |
 | Discriminating power | toy rival models equal at one control value and different at another | select the non-degenerate intervention; identical predictions score exactly zero |
 | Robustness | increase predictive uncertainty, change relative cost, and make the hardest pair overlap | score must fall or not improve spuriously; ranking recomputed from declared inputs |
@@ -75,6 +80,10 @@ This is **not** Bayesian expected information gain, a Bayes factor, a posterior 
 4. Execute candidates in Symtropy's physical-state engine; preserve raw generated/recorded data independently of the scene.
 5. Compare candidate ranking and predictions to the held-out oracle. Record negative results, resource use and regressions.
 6. Add covariance-aware discrimination and a true likelihood/EIG option only with validated distributions, not by relabeling this heuristic.
+
+## Shared Galileo handoff fixture
+
+The JSON input in `fixtures/galileo-discrimination-v0.1.json` is deliberately also stored in Symtropy at `tools/physics-experiment-atlas/fixtures/galileo-discrimination-v0.1.json`. It is a transport fixture, not generated observation data. Both copies identify the same model equations and uncertainty assumptions using SHA-256 digests of canonical descriptor strings. The digest check catches accidental descriptor edits that were not accompanied by a digest update, but it is not proof that code executed the described equation.
 
 ## Relationship to existing experiment design
 
