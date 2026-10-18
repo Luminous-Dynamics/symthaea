@@ -1040,6 +1040,7 @@ mod tests {
         "missing-metric-fails-closed",
         "evidence-digest-mismatch-fails-closed",
         "profile-tier-cannot-exceed-synthetic",
+        "missing-evidence-fails-closed",
     ];
 
     fn profile() -> EvaluationProfile {
@@ -1247,6 +1248,9 @@ mod tests {
         let mut candidates = standard_candidates();
         candidates[2].evidence[0].status = EvidenceStatus::Stale;
         candidates[3].evidence[0].status = EvidenceStatus::Contradictory;
+        let mut unverified = candidate("design-unverified", 0.95, 9.0, 100.0);
+        unverified.evidence[0].status = EvidenceStatus::Unverified;
+        candidates.push(unverified);
         let receipt = evaluate_candidates(&p, &candidates).unwrap();
         assert!(matches!(decision(&receipt, "design-a"), CandidateDecision::Rejected { reasons, .. }
             if reasons.contains(&CandidateRejectionReason::EvidenceStale(
@@ -1254,6 +1258,10 @@ mod tests {
             ))));
         assert!(matches!(decision(&receipt, "design-b"), CandidateDecision::Rejected { reasons, .. }
             if reasons.contains(&CandidateRejectionReason::EvidenceContradictory(
+                "q0-fixture-corpus".into()
+            ))));
+        assert!(matches!(decision(&receipt, "design-unverified"), CandidateDecision::Rejected { reasons, .. }
+            if reasons.contains(&CandidateRejectionReason::EvidenceUnverified(
                 "q0-fixture-corpus".into()
             ))));
     }
@@ -1283,6 +1291,12 @@ mod tests {
             front(&second, "design-b")
         );
         assert_eq!(second.claim_ceiling, EvidenceTier::SyntheticSimulation);
+
+        let mut invalid_confidence = standard_candidates();
+        invalid_confidence[2].internal_confidence = Some(f64::NAN);
+        let receipt = evaluate_candidates(&p, &invalid_confidence).unwrap();
+        assert!(matches!(decision(&receipt, "design-a"), CandidateDecision::Rejected { reasons, .. }
+            if reasons.contains(&CandidateRejectionReason::InvalidConfidence)));
     }
 
     #[test]
@@ -1311,6 +1325,14 @@ mod tests {
         assert!(receipt.decisions.iter().all(|item| {
             matches!(item, CandidateDecision::EvaluatedOnly { .. })
         }));
+
+        // A held-out candidate cannot leak into a training-selection profile.
+        let selection_profile = profile();
+        let mut selection_candidates = standard_candidates();
+        selection_candidates[2].data_split = DataSplit::HeldOut;
+        let selection = evaluate_candidates(&selection_profile, &selection_candidates).unwrap();
+        assert!(matches!(decision(&selection, "design-a"), CandidateDecision::Rejected { reasons, .. }
+            if reasons.contains(&CandidateRejectionReason::SplitMismatch)));
     }
 
     #[test]
@@ -1360,6 +1382,18 @@ mod tests {
     }
 
     #[test]
+    fn required_evidence_cannot_be_omitted() {
+        let p = profile();
+        let mut candidates = standard_candidates();
+        candidates[2].evidence.clear();
+        let receipt = evaluate_candidates(&p, &candidates).unwrap();
+        assert!(matches!(decision(&receipt, "design-a"), CandidateDecision::Rejected { reasons, .. }
+            if reasons.contains(&CandidateRejectionReason::MissingEvidence(
+                "q0-fixture-corpus".into()
+            ))));
+    }
+
+    #[test]
     fn profile_requires_baseline_and_each_ablation_to_be_admitted() {
         let p = profile();
         let candidates = vec![
@@ -1370,6 +1404,14 @@ mod tests {
         assert_eq!(receipt.status, ReceiptStatus::Blocked);
         assert!(receipt.blocking_reasons.contains(&BlockingReason::MissingAblation(
             "ablation-naive-heuristic".into()
+        )));
+
+        let mut inadmissible_baseline = standard_candidates();
+        inadmissible_baseline[0].hard_constraints[0].satisfied = false;
+        let receipt = evaluate_candidates(&p, &inadmissible_baseline).unwrap();
+        assert_eq!(receipt.status, ReceiptStatus::Blocked);
+        assert!(receipt.blocking_reasons.contains(&BlockingReason::BaselineRejected(
+            "baseline-simple-tree".into()
         )));
     }
 
