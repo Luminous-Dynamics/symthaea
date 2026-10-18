@@ -73,7 +73,7 @@
       "expected_stages": {
         "envelope_integrity": "PASS",
         "subject_binding": "FAIL",
-        "signature": "FAIL"
+        "signature": "NOT_EVALUATED"
       },
       "hard_gate": true,
       "scientific_status": "UNCHANGED_FROM_SUBJECT",
@@ -365,8 +365,7 @@
       "expected_outcome": "AUTHENTIC_ENDORSEMENT",
       "expected_stages": {
         "signature": "PASS",
-        "signer_lifecycle": "PASS",
-        "scientific_status": "NOT_RUN"
+        "signer_lifecycle": "PASS"
       },
       "hard_gate": true,
       "scientific_status": "NOT_RUN",
