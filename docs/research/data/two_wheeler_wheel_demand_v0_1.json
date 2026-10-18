@@ -404,6 +404,30 @@
       ],
       "scenario_id": "WD-NEG-004",
       "class": "negative_control"
+    },
+    {
+      "scenario_id": "WD-NEG-005",
+      "class": "negative_control",
+      "title": "Negative vertical grade boundary is outside model scope",
+      "input": {
+        "mass_kg": 180,
+        "rotating_equivalent_mass_kg": 0,
+        "speed_mps": 5,
+        "acceleration_mps2": 0,
+        "grade_rad": -1.5707963267948966,
+        "rolling_resistance_coefficient": 0.015,
+        "air_density_kg_m3": 1.225,
+        "drag_area_m2": 0.6,
+        "wind_speed_mps": 0
+      },
+      "expected_status": "REJECT_INPUT",
+      "expected_error": "grade_out_of_domain",
+      "evidence_class": "Synthetic",
+      "absolute_tolerance": 0.0001,
+      "relative_tolerance": 0.000001,
+      "must_not_claim": [
+        "physical_vehicle_performance"
+      ]
     }
   ]
 }
