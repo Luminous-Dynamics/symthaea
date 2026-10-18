@@ -108,9 +108,10 @@ pub fn available() -> Option<(PathBuf, PathBuf)> {
 ///
 /// FluidSynth's default gain (0.2) leaves our deliberately-soft velocities
 /// whisper-quiet, so the render runs at gain 0.8 and the PCM then goes through
-/// [`master_wav`] — the same BS.1770-4 chain and the same
-/// [`crate::auto_master::MasteringConfig`] the native path uses, so the two
-/// renderers are post-processed identically.
+/// [`master_wav`] — the same BS.1770-4 mastering algorithm used by the native
+/// path. This compatibility wrapper passes the default config; composition
+/// paths should use [`render_midi_to_wav_with_mastering`] and supply the
+/// dialect-derived config also used by native realization.
 pub fn render_midi_to_wav(
     midi_path: &Path,
     sample_rate: u32,
@@ -203,9 +204,9 @@ pub fn render_midi_to_wav_with_mastering(
 /// while FluidSynth output got none of it. Every one of `auto_master`'s
 /// listening-tuned defaults was inert on the renderer an A/B test had chosen.
 ///
-/// Both paths now run the same chain with the same `MasteringConfig::default()`,
-/// so a FluidSynth-vs-native comparison measures the renderers rather than the
-/// mastering.
+/// The mastering algorithm is shared with the native path. Controlled
+/// renderer comparisons must pass the same explicit `MasteringConfig` to both
+/// arms; the convenience wrapper intentionally retains the historical default.
 ///
 /// CORRECTION (2026-07-30). An earlier version of this comment claimed the
 /// original A/B listening test was confounded by the native arm being
