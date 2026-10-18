@@ -1065,9 +1065,9 @@ fn source_terms_checkout_matches(
         return false;
     };
     let observed = inspect_upstream_checkout(root_path, policy.expected_remote);
+    let mut matches = true;
+
     if string_field(entry, "source_revision_status") != Some(observed.status) {
-        // A claimed clean checkout that no longer has the recorded state is an
-        // inconsistency; other non-clean states remain incomplete evidence.
         if string_field(entry, "source_revision_status") == Some("clean_upstream_checkout") {
             push_error(
                 findings,
@@ -1081,7 +1081,7 @@ fn source_terms_checkout_matches(
                 format!("{label} checkout status is {}", observed.status),
             );
         }
-        return false;
+        matches = false;
     }
     if bool_field(entry, "upstream_origin_matches_expected") != Some(observed.origin_matches_expected) {
         push_error(
@@ -1089,15 +1089,15 @@ fn source_terms_checkout_matches(
             "source_checkout_origin_status_mismatch",
             format!("{label} reported origin-match status differs from the actual Git remote"),
         );
-        return false;
+        matches = false;
     }
-    if observed.origin_matches_expected != true {
+    if !observed.origin_matches_expected {
         push_incomplete(
             findings,
             "source_checkout_origin_unverified",
             format!("{label} Git origin does not match the expected upstream repository"),
         );
-        return false;
+        matches = false;
     }
     if bool_field(entry, "source_checkout_clean") != observed.clean {
         push_error(
@@ -1105,7 +1105,7 @@ fn source_terms_checkout_matches(
             "source_checkout_clean_status_mismatch",
             format!("{label} reported clean-worktree status differs from actual Git status"),
         );
-        return false;
+        matches = false;
     }
     if observed.clean != Some(true) {
         push_incomplete(
@@ -1113,33 +1113,38 @@ fn source_terms_checkout_matches(
             "source_checkout_dirty_or_unknown",
             format!("{label} upstream checkout is dirty or its status could not be read"),
         );
-        return false;
+        matches = false;
     }
-    let Some(reported_revision) = string_field(entry, "upstream_revision") else {
-        push_incomplete(
-            findings,
-            "source_checkout_revision_missing",
-            format!("{label} has no upstream commit revision"),
-        );
-        return false;
-    };
-    if !valid_git_revision(reported_revision) {
-        push_error(
-            findings,
-            "source_checkout_revision_invalid",
-            format!("{label} upstream revision is not a valid Git object ID"),
-        );
-        return false;
+
+    match string_field(entry, "upstream_revision") {
+        Some(reported_revision) if !valid_git_revision(reported_revision) => {
+            push_error(
+                findings,
+                "source_checkout_revision_invalid",
+                format!("{label} upstream revision is not a valid Git object ID"),
+            );
+            matches = false;
+        }
+        Some(reported_revision) => {
+            if observed.upstream_revision.as_deref() != Some(reported_revision) {
+                push_error(
+                    findings,
+                    "source_checkout_revision_mismatch",
+                    format!("{label} upstream commit differs from the revision recorded in the matrix"),
+                );
+                matches = false;
+            }
+        }
+        None => {
+            push_incomplete(
+                findings,
+                "source_checkout_revision_missing",
+                format!("{label} has no upstream commit revision"),
+            );
+            matches = false;
+        }
     }
-    if observed.upstream_revision.as_deref() != Some(reported_revision) {
-        push_error(
-            findings,
-            "source_checkout_revision_mismatch",
-            format!("{label} upstream commit differs from the revision recorded in the matrix"),
-        );
-        return false;
-    }
-    true
+    matches
 }
 
 fn hash_relative_source_document(root: &Path, relative_path: &str) -> Result<String, String> {
