@@ -42,6 +42,7 @@ The current public API accepts one scalar tolerance and uses the existing `tol *
 - A non-finite derivative is rejected at the first stage.
 - A deliberately discontinuous RHS forces rejection with a private one-attempt budget; the test verifies that a rejected attempt consumes the budget and cannot loop forever.
 - The compatibility wrapper must mark a failed call as `converged = false`.
+- On a smooth known-answer exponential problem over `[0, 10]`, a tighter tolerance (`1e-10`) must reduce measured global relative error versus a loose tolerance (`1e-2`) and consume more accepted steps. This is one fixed regression anchor, not proof of monotonic behavior on every problem.
 
 These regression tests are authored and committed, but remain unexecuted by the authoring environment.
 
