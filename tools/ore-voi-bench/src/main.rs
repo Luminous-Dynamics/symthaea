@@ -1,10 +1,6 @@
 use serde::{Deserialize, Serialize};
 use sha2::{Digest, Sha256};
-use std::{
-    collections::BTreeSet,
-    env, fs,
-    process::ExitCode,
-};
+use std::{collections::BTreeSet, env, fs, process::ExitCode};
 
 const VERSION: &str = "0.1.0";
 const EXPECTED_SCENARIOS: usize = 8;
@@ -126,10 +122,7 @@ fn estimated_net_value(action: &MeasurementAction) -> i64 {
     action.estimated_gross_decision_gain_units - i64::from(action.cost_units)
 }
 
-fn choose_fixed_order(
-    budget_units: u32,
-    actions: &[MeasurementAction],
-) -> Option<String> {
+fn choose_fixed_order(budget_units: u32, actions: &[MeasurementAction]) -> Option<String> {
     let mut candidates = eligible_actions(budget_units, actions);
     candidates.sort_by(|a, b| {
         a.fixed_priority
@@ -139,10 +132,7 @@ fn choose_fixed_order(
     candidates.first().map(|action| action.action_id.clone())
 }
 
-fn choose_uncertainty_first(
-    budget_units: u32,
-    actions: &[MeasurementAction],
-) -> Option<String> {
+fn choose_uncertainty_first(budget_units: u32, actions: &[MeasurementAction]) -> Option<String> {
     let mut candidates = eligible_actions(budget_units, actions);
     candidates.sort_by(|a, b| {
         b.uncertainty_reduction_units
@@ -153,10 +143,7 @@ fn choose_uncertainty_first(
     candidates.first().map(|action| action.action_id.clone())
 }
 
-fn choose_decision_aware(
-    budget_units: u32,
-    actions: &[MeasurementAction],
-) -> Option<String> {
+fn choose_decision_aware(budget_units: u32, actions: &[MeasurementAction]) -> Option<String> {
     let mut candidates = eligible_actions(budget_units, actions);
     candidates.sort_by(|a, b| {
         estimated_net_value(b)
@@ -226,7 +213,12 @@ fn validate_expected_action(
             .actions
             .iter()
             .find(|action| action.action_id == *action_id)
-            .ok_or_else(|| format!("{}: expected {} references unknown action", scenario.scenario_id, label))?;
+            .ok_or_else(|| {
+                format!(
+                    "{}: expected {} references unknown action",
+                    scenario.scenario_id, label
+                )
+            })?;
         if !action.available || action.cost_units > scenario.budget_units {
             return Err(format!(
                 "{}: expected {} action is blocked or over budget",
@@ -241,7 +233,8 @@ fn validate_corpus(corpus: &Corpus) -> Check<()> {
     if corpus.suite_id != "ORE-VOI-001" || corpus.suite_version != VERSION {
         return Err("unexpected suite identity or version".to_owned());
     }
-    if corpus.evidence_class != "synthetic_contract" || corpus.scenarios.len() != EXPECTED_SCENARIOS {
+    if corpus.evidence_class != "synthetic_contract" || corpus.scenarios.len() != EXPECTED_SCENARIOS
+    {
         return Err("unexpected evidence class or scenario count".to_owned());
     }
     if corpus.claim_ceiling.trim().is_empty() {
@@ -260,7 +253,10 @@ fn validate_corpus(corpus: &Corpus) -> Check<()> {
         let mut action_ids = BTreeSet::new();
         for action in &scenario.actions {
             if action.action_id.trim().is_empty() || !action_ids.insert(&action.action_id) {
-                return Err(format!("{}: action IDs must be non-empty and unique", scenario.scenario_id));
+                return Err(format!(
+                    "{}: action IDs must be non-empty and unique",
+                    scenario.scenario_id
+                ));
             }
             if action.cost_units == 0 {
                 return Err(format!("{}: test costs must be positive", action.action_id));
@@ -268,32 +264,58 @@ fn validate_corpus(corpus: &Corpus) -> Check<()> {
             if action.estimated_gross_decision_gain_units < 0
                 || action.estimated_gross_decision_gain_units > MAX_GAIN_UNITS
             {
-                return Err(format!("{}: estimated gain is outside the supported range", action.action_id));
+                return Err(format!(
+                    "{}: estimated gain is outside the supported range",
+                    action.action_id
+                ));
             }
             if action.available != (action.availability_reason == "available") {
-                return Err(format!("{}: availability and reason disagree", action.action_id));
+                return Err(format!(
+                    "{}: availability and reason disagree",
+                    action.action_id
+                ));
             }
             if !action.available && action.availability_reason.trim().is_empty() {
-                return Err(format!("{}: blocked action requires a reason", action.action_id));
+                return Err(format!(
+                    "{}: blocked action requires a reason",
+                    action.action_id
+                ));
             }
         }
 
         let mut realized_ids = BTreeSet::new();
         for gain in &scenario.evaluation_only.realized_gross_decision_gain_units {
             if !action_ids.contains(&gain.action_id) || !realized_ids.insert(&gain.action_id) {
-                return Err(format!("{}: evaluation keys must be known and unique", scenario.scenario_id));
+                return Err(format!(
+                    "{}: evaluation keys must be known and unique",
+                    scenario.scenario_id
+                ));
             }
             if gain.gross_gain_units < 0 || gain.gross_gain_units > MAX_GAIN_UNITS {
-                return Err(format!("{}: realized gain is outside the supported range", gain.action_id));
+                return Err(format!(
+                    "{}: realized gain is outside the supported range",
+                    gain.action_id
+                ));
             }
         }
         if realized_ids != action_ids {
-            return Err(format!("{}: evaluator must provide one gain per action", scenario.scenario_id));
+            return Err(format!(
+                "{}: evaluator must provide one gain per action",
+                scenario.scenario_id
+            ));
         }
 
         validate_expected_action(scenario, &scenario.expected.fixed_order_action_id, "fixed")?;
-        validate_expected_action(scenario, &scenario.expected.uncertainty_first_action_id, "uncertainty")?;
-        validate_expected_action(scenario, &scenario.expected.decision_aware_action_id, "decision-aware")?;
+        validate_expected_action(
+            scenario,
+            &scenario.expected.uncertainty_first_action_id,
+            "uncertainty",
+        )?;
+        validate_expected_action(
+            scenario,
+            &scenario.expected.decision_aware_action_id,
+            "decision-aware",
+        )?;
         validate_expected_action(scenario, &scenario.expected.oracle_action_id, "oracle")?;
     }
 
@@ -402,21 +424,41 @@ fn run() -> Check<ExitCode> {
         .iter()
         .filter(|result| result.expected_control_matched)
         .count();
-    let blocked_action_selections = scenarios.iter().map(|result| result.blocked_action_selections).sum();
-    let budget_violations = scenarios.iter().map(|result| result.budget_violations).sum();
-    let total_fixed_order_regret_units = scenarios.iter().map(|result| result.fixed_order_regret_units).sum();
-    let total_uncertainty_first_regret_units =
-        scenarios.iter().map(|result| result.uncertainty_first_regret_units).sum();
-    let total_decision_aware_regret_units =
-        scenarios.iter().map(|result| result.decision_aware_regret_units).sum();
-    let total_oracle_net_value_units =
-        scenarios.iter().map(|result| result.oracle_realized_net_value_units).sum();
+    let blocked_action_selections = scenarios
+        .iter()
+        .map(|result| result.blocked_action_selections)
+        .sum();
+    let budget_violations = scenarios
+        .iter()
+        .map(|result| result.budget_violations)
+        .sum();
+    let total_fixed_order_regret_units = scenarios
+        .iter()
+        .map(|result| result.fixed_order_regret_units)
+        .sum();
+    let total_uncertainty_first_regret_units = scenarios
+        .iter()
+        .map(|result| result.uncertainty_first_regret_units)
+        .sum();
+    let total_decision_aware_regret_units = scenarios
+        .iter()
+        .map(|result| result.decision_aware_regret_units)
+        .sum();
+    let total_oracle_net_value_units = scenarios
+        .iter()
+        .map(|result| result.oracle_realized_net_value_units)
+        .sum();
     let all_controls_matched = expected_controls_matched == corpus.scenarios.len()
         && blocked_action_selections == 0
         && budget_violations == 0;
 
     let receipt = Receipt {
-        result: if all_controls_matched { "validated" } else { "control_mismatch" }.to_owned(),
+        result: if all_controls_matched {
+            "validated"
+        } else {
+            "control_mismatch"
+        }
+        .to_owned(),
         suite_id: corpus.suite_id,
         suite_version: corpus.suite_version,
         validator_version: VERSION.to_owned(),
@@ -437,7 +479,11 @@ fn run() -> Check<ExitCode> {
         serde_json::to_string_pretty(&receipt)
             .map_err(|error| format!("cannot serialize receipt: {error}"))?
     );
-    Ok(if all_controls_matched { ExitCode::SUCCESS } else { ExitCode::from(2) })
+    Ok(if all_controls_matched {
+        ExitCode::SUCCESS
+    } else {
+        ExitCode::from(2)
+    })
 }
 
 fn main() -> ExitCode {
@@ -455,18 +501,23 @@ mod tests {
     use super::*;
 
     fn corpus() -> Corpus {
-        serde_json::from_str(include_str!("../../../docs/tech/ore-voi-benchmark-corpus-v0.1.json"))
-            .expect("frozen synthetic corpus must deserialize")
+        serde_json::from_str(include_str!(
+            "../../../docs/tech/ore-voi-benchmark-corpus-v0.1.json"
+        ))
+        .expect("frozen synthetic corpus must deserialize")
     }
 
     #[test]
     fn frozen_corpus_matches_all_known_answers() {
         let fixture = corpus();
         validate_corpus(&fixture).expect("corpus metadata must be valid");
-        let results: Vec<ScenarioReceipt> = fixture.scenarios.iter().map(evaluate_scenario).collect();
+        let results: Vec<ScenarioReceipt> =
+            fixture.scenarios.iter().map(evaluate_scenario).collect();
         assert_eq!(EXPECTED_SCENARIOS, results.len());
         assert!(results.iter().all(|result| result.expected_control_matched));
-        assert!(results.iter().all(|result| result.blocked_action_selections == 0));
+        assert!(results
+            .iter()
+            .all(|result| result.blocked_action_selections == 0));
         assert!(results.iter().all(|result| result.budget_violations == 0));
     }
 
@@ -497,8 +548,14 @@ mod tests {
             .find(|scenario| scenario.scenario_id == "ESTIMATOR_MISCALIBRATION_MUST_REMAIN_VISIBLE")
             .expect("miscalibration scenario exists");
         let result = evaluate_scenario(scenario);
-        assert_eq!(Some("OVERCONFIDENT_ASSAY".to_owned()), result.decision_aware_action_id);
-        assert_eq!(Some("ROBUST_RECOVERY_TEST".to_owned()), result.oracle_action_id);
+        assert_eq!(
+            Some("OVERCONFIDENT_ASSAY".to_owned()),
+            result.decision_aware_action_id
+        );
+        assert_eq!(
+            Some("ROBUST_RECOVERY_TEST".to_owned()),
+            result.oracle_action_id
+        );
         assert_eq!(19, result.decision_aware_regret_units);
     }
 
@@ -514,9 +571,15 @@ mod tests {
             choose_fixed_order(scenario.budget_units, &scenario.actions),
             choose_uncertainty_first(scenario.budget_units, &scenario.actions),
             choose_decision_aware(scenario.budget_units, &scenario.actions),
-            choose_oracle(scenario.budget_units, &scenario.actions, &scenario.evaluation_only),
+            choose_oracle(
+                scenario.budget_units,
+                &scenario.actions,
+                &scenario.evaluation_only,
+            ),
         ];
-        assert!(choices.iter().all(|choice| choice.as_deref() != Some("UNQUALIFIED_IDENTITY_CHECK")));
+        assert!(choices
+            .iter()
+            .all(|choice| choice.as_deref() != Some("UNQUALIFIED_IDENTITY_CHECK")));
     }
 
     #[test]
@@ -527,14 +590,27 @@ mod tests {
             .iter()
             .find(|scenario| scenario.scenario_id == "NO_POSITIVE_NET_DECISION_VALUE")
             .expect("no-value scenario exists");
-        assert_eq!(None, choose_decision_aware(scenario.budget_units, &scenario.actions));
-        assert_eq!(None, choose_oracle(scenario.budget_units, &scenario.actions, &scenario.evaluation_only));
+        assert_eq!(
+            None,
+            choose_decision_aware(scenario.budget_units, &scenario.actions)
+        );
+        assert_eq!(
+            None,
+            choose_oracle(
+                scenario.budget_units,
+                &scenario.actions,
+                &scenario.evaluation_only
+            )
+        );
     }
 
     #[test]
     fn unknown_json_fields_fail_closed() {
-        let raw = include_str!("../../../docs/tech/ore-voi-benchmark-corpus-v0.1.json")
-            .replacen("\"suite_id\":", "\"unexpected_authority\":true,\"suite_id\":", 1);
+        let raw = include_str!("../../../docs/tech/ore-voi-benchmark-corpus-v0.1.json").replacen(
+            "\"suite_id\":",
+            "\"unexpected_authority\":true,\"suite_id\":",
+            1,
+        );
         assert!(serde_json::from_str::<Corpus>(&raw).is_err());
     }
 }
