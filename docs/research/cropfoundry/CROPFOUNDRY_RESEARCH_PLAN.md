@@ -137,3 +137,20 @@ The milestone is complete only when (a) a versioned, rights-aware dataset invent
 - FAOSTAT, [Food and agriculture statistics](https://www.fao.org/faostat/).
 
 Links were reviewed for this proposal on 2026-10-18. Dataset availability, access terms, and current tool versions must be rechecked at ingestion time.
+
+## Coordination with existing Luminous Dynamics work
+
+CropFoundry is an evaluation/evidence umbrella. It must extend these active workstreams rather than create parallel crop, trial, provenance, or simulation authorities:
+
+- [Symthaea #5967 — agriculture and food-system infrastructure engineering](https://github.com/Luminous-Dynamics/symthaea/issues/5967): owns supported agricultural/food infrastructure classes and explicitly does not confer agronomic or food-safety authority.
+- [Symthaea #6213 — hydroponic controlled-environment analysis profile](https://github.com/Luminous-Dynamics/symthaea/issues/6213): reuse the existing Agribot + read-only AnalysisRequest/AnalysisArtifact path; do not reinterpret soil-state channels as nutrient-solution evidence.
+- [Symthaea #7441 — evidence-bounded strawberry-picking benchmark](https://github.com/Luminous-Dynamics/symthaea/issues/7441) and [Symtropy #1605 — deterministic harvest scene](https://github.com/Luminous-Dynamics/symtropy/issues/1605): use these for robotics/manipulation. Geometry simulation is not fruit-damage, food-quality, or crop-yield evidence.
+- [Symthaea #7828 — agricultural HRI dataset benchmark](https://github.com/Luminous-Dynamics/symthaea/issues/7828): reuse its distinct perception/temporal/runtime/safety boundaries; recorded-data evaluation is not physical machine qualification.
+- [Mycelix #3303 — ProductiveLoopV1 evidence contract](https://github.com/Luminous-Dynamics/mycelix/issues/3303), [#3309 — lettuce/DWC research profile](https://github.com/Luminous-Dynamics/mycelix/issues/3309), [#3311 — cultivar admission profile](https://github.com/Luminous-Dynamics/mycelix/issues/3311), and [#3317 — admission-boundary validator](https://github.com/Luminous-Dynamics/mycelix/issues/3317): reuse these for useful-output events, cultivar/source distinctions, and hydroponic evidence boundaries. Supplier claims, cultivar admission, and harvested mass remain separate from measured crop performance, edibility, safety, or marketability.
+- [Mycelix #5001 — neighborhood producer cooperative vertical slice](https://github.com/Luminous-Dynamics/mycelix/issues/5001) and [Sol-Atlas #105 — privacy-preserving neighborhood food network](https://github.com/Luminous-Dynamics/sol-atlas-leptos/issues/105): reuse existing product/lot/provenance and spatial projection domains.
+- [Sol-Atlas #107 — Johannesburg/Highveld food resilience profile](https://github.com/Luminous-Dynamics/sol-atlas-leptos/issues/107): consume its source/scale/rights gates and local environmental profile; do not produce a competing crop-suitability or current-season forecast.
+
+The initial tomato + local leafy-crop proposal is a **data-discovery plan**, not a frozen cultivar selection. The existing lettuce/DWC profile is a separate controlled-environment test lane. Do not force all lanes into one scoring model or claim any lane has demonstrated performance until its own data and evaluation gates are passed.
+
+The first coordination milestone should be to crosswalk these contracts to the benchmark IDs in the JSON, identify missing fields/tests, and assign one canonical owner per entity. Do not duplicate ProductiveLoop, farm/household identity, seed-lot identity, environmental source manifests, robot scene profiles, or safety authorities.
+
