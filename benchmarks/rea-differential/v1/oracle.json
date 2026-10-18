@@ -1,0 +1,216 @@
+{
+  "schema_version": "symthaea.rea-differential-oracle.v1",
+  "benchmark_id": "ENG-REA-002",
+  "scope": "Public development known-answer corpus. The oracle is intentionally inspectable and MUST NOT be presented as blind/held-out generalization evidence.",
+  "behavior_rule": "pulse_ticks = floor(pulse_width_microseconds / timer_tick_us); ACCEPT iff pulse_ticks >= compiled threshold.",
+  "build_invariants": {
+    "RDB-001": {
+      "different_binary_sha256_required": true,
+      "same_source_and_threshold": true,
+      "output_equivalence_required": true,
+      "note": "Capture compiler path/version and exact argv. Byte identity is expected to differ because debug information is included in one profile and stripped from the other; verify this when executed, do not infer it from flags."
+    },
+    "RDB-002": {
+      "different_binary_sha256_required": true,
+      "expected_behavior_difference": true
+    },
+    "RDB-003": {
+      "same_binary_sha256_across_traces": true,
+      "expected_behavior_difference_from_input_trace": true
+    },
+    "RDB-004": {
+      "same_binary_sha256_across_configs": true,
+      "expected_behavior_difference_from_timer_profile": true
+    }
+  },
+  "expected_cases": {
+    "RDB-001": {
+      "pulse_width_microseconds": [
+        8000,
+        11000,
+        12000,
+        13000,
+        19000,
+        20000
+      ],
+      "expected_outputs_by_profile": {
+        "threshold12_o0_debug": [
+          "REJECT",
+          "REJECT",
+          "ACCEPT",
+          "ACCEPT",
+          "ACCEPT",
+          "ACCEPT"
+        ],
+        "threshold12_o2_stripped": [
+          "REJECT",
+          "REJECT",
+          "ACCEPT",
+          "ACCEPT",
+          "ACCEPT",
+          "ACCEPT"
+        ]
+      },
+      "expected_diagnosis": "behavior_preserving_rebuild",
+      "accepted_evidence": [
+        "compiler_profile_identity",
+        "binary_sha256",
+        "matched_test_vector_outputs"
+      ]
+    },
+    "RDB-002": {
+      "pulse_width_microseconds": [
+        8000,
+        11000,
+        12000,
+        13000,
+        19000,
+        20000
+      ],
+      "expected_outputs_by_profile": {
+        "threshold12_o0_debug": [
+          "REJECT",
+          "REJECT",
+          "ACCEPT",
+          "ACCEPT",
+          "ACCEPT",
+          "ACCEPT"
+        ],
+        "threshold20_o0_debug": [
+          "REJECT",
+          "REJECT",
+          "REJECT",
+          "REJECT",
+          "REJECT",
+          "ACCEPT"
+        ]
+      },
+      "expected_diagnosis": "firmware_threshold_change",
+      "expected_divergent_pulse_width_microseconds": [
+        12000,
+        13000,
+        19000
+      ]
+    },
+    "RDB-003": {
+      "pulse_width_microseconds_by_trace": {
+        "trace_a_pulse_width_microseconds": [
+          8000,
+          11000,
+          12000,
+          13000
+        ],
+        "trace_b_pulse_width_microseconds": [
+          8000,
+          9000,
+          10000,
+          11000
+        ]
+      },
+      "expected_outputs_by_trace": {
+        "trace_a_pulse_width_microseconds": [
+          "REJECT",
+          "REJECT",
+          "ACCEPT",
+          "ACCEPT"
+        ],
+        "trace_b_pulse_width_microseconds": [
+          "REJECT",
+          "REJECT",
+          "REJECT",
+          "REJECT"
+        ]
+      },
+      "expected_diagnosis": "trace_changed_firmware_unchanged"
+    },
+    "RDB-004": {
+      "pulse_width_microseconds": 12000,
+      "expected_outputs_by_timer_tick_us": {
+        "1000": "ACCEPT",
+        "2000": "REJECT"
+      },
+      "expected_diagnosis": "configuration_changed_firmware_unchanged"
+    },
+    "RDB-005": {
+      "observed_pulse_width_microseconds": 16000,
+      "initial_observation": {
+        "H1": {
+          "profile": "threshold20_o0_debug",
+          "timer_tick_us": 1000,
+          "pulse_ticks": 16,
+          "output": "REJECT"
+        },
+        "H2": {
+          "profile": "threshold12_o0_debug",
+          "timer_tick_us": 2000,
+          "pulse_ticks": 8,
+          "output": "REJECT"
+        }
+      },
+      "expected_diagnosis_before_followup": "abstain_cause_unidentified",
+      "proposed_discriminating_pulse_width_microseconds": 22000,
+      "expected_followup": {
+        "H1": {
+          "pulse_ticks": 22,
+          "output": "ACCEPT"
+        },
+        "H2": {
+          "pulse_ticks": 11,
+          "output": "REJECT"
+        }
+      },
+      "expected_diagnosis_after_followup": "distinguish_firmware_threshold_from_timer_configuration"
+    },
+    "RDB-006": {
+      "observed_pair": {
+        "baseline": {
+          "profile": "threshold12_o0_debug",
+          "pulse_width_microseconds": 13000,
+          "output": "ACCEPT"
+        },
+        "changed": {
+          "profile": "threshold20_o0_debug",
+          "pulse_width_microseconds": 10000,
+          "output": "REJECT"
+        }
+      },
+      "expected_diagnosis_from_observed_pair_only": "abstain_firmware_and_trace_are_confounded",
+      "proposed_factorial_controls": [
+        {
+          "profile": "threshold12_o0_debug",
+          "pulse_width_microseconds": 10000,
+          "expected_output": "REJECT"
+        },
+        {
+          "profile": "threshold20_o0_debug",
+          "pulse_width_microseconds": 13000,
+          "expected_output": "REJECT"
+        }
+      ],
+      "expected_diagnosis_after_factorial_controls": "both_firmware_threshold_and_trace_affect_outcome"
+    }
+  },
+  "invalid_input_controls": {
+    "-1": {
+      "expected_exit_code": 65,
+      "expected_stdout": "",
+      "expected_stderr_contains": "non-negative decimal integer"
+    },
+    "abc": {
+      "expected_exit_code": 65,
+      "expected_stdout": "",
+      "expected_stderr_contains": "non-negative decimal integer"
+    },
+    "": {
+      "expected_exit_code": 65,
+      "expected_stdout": "",
+      "expected_stderr_contains": "non-negative decimal integer"
+    }
+  },
+  "claim_limits": [
+    "All expected outputs are derived from the declared synthetic threshold function.",
+    "The corpus demonstrates test-harness semantics only, not a real MCU architecture, REA provider qualification, or field-fault diagnosis.",
+    "A behavior-preserving rebuild case is valid only after independent execution confirms the actual compiled artifact hashes differ and its outputs match.",
+    "The public oracle makes these cases development regressions, not a blind leaderboard."
+  ]
+}
