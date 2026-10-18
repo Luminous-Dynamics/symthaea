@@ -19,6 +19,7 @@ Symthaea is not just software - it's a research platform exploring fundamental q
 | [Validation Studies](#validation-studies) | Empirical validation approaches |
 | [Publications](#publications) | Papers and manuscripts |
 | [Research Roadmap](#research-roadmap) | Future research directions |
+| [Underground Communications](MINE_COMMUNICATIONS_BENCHMARK_V0_1.md) | Fail-safe multi-layer mine communication benchmark |
 
 ---
 
