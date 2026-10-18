@@ -384,6 +384,25 @@
       "coverage": "complete",
       "partial_signals": [],
       "extraction_gaps": []
+    },
+    {
+      "id": "RCG-016",
+      "description": "Fractional offsets or lengths are not byte ranges and must not be accepted as evidence.",
+      "selection_offset": 0,
+      "selection_length": 16,
+      "chunks": [
+        {
+          "range": {
+            "offset": 0.5,
+            "length": 15.5
+          },
+          "handler": "container",
+          "encrypted": false
+        }
+      ],
+      "coverage": "complete",
+      "partial_signals": [],
+      "extraction_gaps": []
     }
   ]
 }
