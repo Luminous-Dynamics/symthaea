@@ -534,12 +534,12 @@ pub fn compare_paired_trials(
         elapsed_delta += c.elapsed_seconds - b.elapsed_seconds;
         cost_delta += c.estimated_cost_usd - b.estimated_cost_usd;
         safety_delta += c.safety_events as i64 - b.safety_events as i64;
-        timeout_delta += i64::from(c.failure_class == FailureClass::Timeout) - i64::from(b.failure_class == FailureClass::Timeout);
-        thermal_stop_delta += i64::from(c.failure_class == FailureClass::ThermalStop) - i64::from(b.failure_class == FailureClass::ThermalStop);
-        server_error_delta += i64::from(c.failure_class == FailureClass::ServerError) - i64::from(b.failure_class == FailureClass::ServerError);
-        invalid_action_delta += i64::from(c.failure_class == FailureClass::InvalidAction) - i64::from(b.failure_class == FailureClass::InvalidAction);
-        safety_stop_delta += i64::from(c.failure_class == FailureClass::SafetyStop) - i64::from(b.failure_class == FailureClass::SafetyStop);
-        other_failure_delta += i64::from(c.failure_class == FailureClass::Other) - i64::from(b.failure_class == FailureClass::Other);
+        timeout_delta += (i64::from(c.failure_class == FailureClass::Timeout) as i64) - (i64::from(b.failure_class == FailureClass::Timeout) as i64);
+        thermal_stop_delta += (i64::from(c.failure_class == FailureClass::ThermalStop) as i64) - (i64::from(b.failure_class == FailureClass::ThermalStop) as i64);
+        server_error_delta += (i64::from(c.failure_class == FailureClass::ServerError) as i64) - (i64::from(b.failure_class == FailureClass::ServerError) as i64);
+        invalid_action_delta += (i64::from(c.failure_class == FailureClass::InvalidAction) as i64) - (i64::from(b.failure_class == FailureClass::InvalidAction) as i64);
+        safety_stop_delta += (i64::from(c.failure_class == FailureClass::SafetyStop) as i64) - (i64::from(b.failure_class == FailureClass::SafetyStop) as i64);
+        other_failure_delta += (i64::from(c.failure_class == FailureClass::Other) as i64) - (i64::from(b.failure_class == FailureClass::Other) as i64);
         if let (Some(bp), Some(cp)) = (b.progress, c.progress) {
             per_task_deltas.entry(key.0.clone()).or_default().push(cp - bp);
             scored_pairs += 1;
