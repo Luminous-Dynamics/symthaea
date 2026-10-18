@@ -890,24 +890,42 @@ fn verify_source_terms_evidence(
             .collect();
         match matching.as_slice() {
             [entry] => {
-                if verify_one_source_terms_entry(entry, source_terms_policy(source_library).unwrap(), label, root, findings) {
-                    audit.roots_verified += 1;
+                let policy = source_terms_policy(source_library).unwrap();
+                let declarations_match =
+                    source_terms_declarations_match(entry, policy, label, findings);
+                let license_matches = source_terms_document_matches(
+                    entry,
+                    "license_document_relative_path",
+                    "license_document_sha256",
+                    "license_document_status",
+                    "LICENSE",
+                    root,
+                    label,
+                    findings,
+                );
+                let readme_matches = source_terms_document_matches(
+                    entry,
+                    "readme_document_relative_path",
+                    "readme_document_sha256",
+                    "readme_document_status",
+                    policy.readme_relative_path,
+                    root,
+                    label,
+                    findings,
+                );
+                let checkout_matches =
+                    source_terms_checkout_matches(entry, policy, label, root, findings);
+                if license_matches {
                     audit.license_documents_verified += 1;
+                }
+                if readme_matches {
                     audit.readme_documents_verified += 1;
+                }
+                if checkout_matches {
                     audit.clean_upstream_checkouts_verified += 1;
-                } else {
-                    // Count independently verified document hashes even when another
-                    // lineage dimension (for example, upstream checkout identity) is incomplete.
-                    if source_terms_document_matches(entry, "license_document_relative_path", "license_document_sha256", "license_document_status", "LICENSE", root, label, findings) {
-                        audit.license_documents_verified += 1;
-                    }
-                    let policy = source_terms_policy(source_library).unwrap();
-                    if source_terms_document_matches(entry, "readme_document_relative_path", "readme_document_sha256", "readme_document_status", policy.readme_relative_path, root, label, findings) {
-                        audit.readme_documents_verified += 1;
-                    }
-                    if source_terms_checkout_matches(entry, policy, label, root, findings) {
-                        audit.clean_upstream_checkouts_verified += 1;
-                    }
+                }
+                if declarations_match && license_matches && readme_matches && checkout_matches {
+                    audit.roots_verified += 1;
                 }
             }
             [] => push_incomplete(
@@ -936,14 +954,13 @@ fn verify_source_terms_evidence(
     audit
 }
 
-fn verify_one_source_terms_entry(
+fn source_terms_declarations_match(
     entry: &Value,
     policy: SourceTermsPolicy,
     label: &str,
-    root: &RootObservation,
     findings: &mut Vec<Finding>,
 ) -> bool {
-    let declaration_matches =
+    let declarations_match =
         string_field(entry, "upstream_repository_url") == Some(policy.upstream_repository_url)
             && string_field(entry, "declared_license_spdx") == Some(policy.declared_license_spdx)
             && string_field(entry, "license_document_relative_path") == Some("LICENSE")
@@ -951,36 +968,14 @@ fn verify_one_source_terms_entry(
             && string_field(entry, "upstream_readme_request") == Some(policy.upstream_readme_request)
             && string_field(entry, "license_declaration_boundary")
                 .is_some_and(|value| value.contains("not a legal opinion"));
-    if !declaration_matches {
+    if !declarations_match {
         push_error(
             findings,
             "source_terms_declaration_mismatch",
             format!("{label} source-terms declaration differs from the verifier's explicit policy"),
         );
     }
-
-    let license_matches = source_terms_document_matches(
-        entry,
-        "license_document_relative_path",
-        "license_document_sha256",
-        "license_document_status",
-        "LICENSE",
-        root,
-        label,
-        findings,
-    );
-    let readme_matches = source_terms_document_matches(
-        entry,
-        "readme_document_relative_path",
-        "readme_document_sha256",
-        "readme_document_status",
-        policy.readme_relative_path,
-        root,
-        label,
-        findings,
-    );
-    let checkout_matches = source_terms_checkout_matches(entry, policy, label, root, findings);
-    declaration_matches && license_matches && readme_matches && checkout_matches
+    declarations_match
 }
 
 fn source_terms_document_matches(
