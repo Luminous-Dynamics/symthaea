@@ -197,3 +197,7 @@ The existing **examples/robotics_benchmark_suite.rs** is a platform timing/stabi
 - XPolicyLab reference adapter: https://github.com/XPolicyLab/XPolicyLab/tree/main/policy/demo_policy
 - Symthaea robotics bridge: ../src/embodiment/robotics_bridge.rs
 - Symthaea existing platform microbenchmark: ../examples/robotics_benchmark_suite.rs
+
+## Shift robustness extension
+
+See [ROBODOJO_SHIFT_STRESS_TESTS.md](ROBODOJO_SHIFT_STRESS_TESTS.md) for the next-stage protocol: task-preserving versus semantic-breaking shifts, a preregistered condition/seed/digest manifest, layered simulator/physical campaigns, and proposed—not measured—go/no-go targets. The standalone harness implements the `--shift-audit` command to reject incomplete/unmatched manifests and report paired deltas by shift family, severity, and exact perturbation-spec digest.
