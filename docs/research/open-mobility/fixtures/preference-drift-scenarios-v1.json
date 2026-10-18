@@ -1,13 +1,13 @@
 {
-  "schema_version": 2,
+  "schema_version": 1,
   "benchmark_id": "open-mobility-preference-shift",
-  "fixture_version": "0.2.0",
+  "fixture_version": "0.1.0",
   "evidence_class": "synthetic_contract_fixture",
   "generation": {
     "method": "hand_authored_deterministic",
     "random_generator_used": false,
     "empirical_data_used": false,
-    "note": "Hand-authored synthetic contract corpus. current_step and preference_max_age_steps bound the freshness of explicit preference records; not a statistically powered benchmark."
+    "note": "This small corpus tests replay semantics and negative controls. It is not a statistically powered benchmark or a model-performance result."
   },
   "claim_ceiling": "Only deterministic software behavior on these synthetic records may be claimed. The fixture does not establish real wearer preference, exosuit efficacy, safety, comfort, clinical benefit, or readiness for physical deployment.",
   "metric_separation": {
@@ -126,9 +126,7 @@
         "do_not_infer_preference_from_engineering_metrics",
         "do_not_overstate_pairwise_feedback_as_full_cardinal_utility"
       ],
-      "current_context_id": "level-rested",
-      "current_step": 2,
-      "preference_max_age_steps": 2
+      "current_context_id": "level-rested"
     },
     {
       "scenario_id": "DEV-WALK-002",
@@ -187,9 +185,7 @@
         "support_wearer_heterogeneity",
         "do_not_assume_one_preference_profile_for_all_wearers"
       ],
-      "current_context_id": "level-rested",
-      "current_step": 2,
-      "preference_max_age_steps": 2
+      "current_context_id": "level-rested"
     },
     {
       "scenario_id": "HOLD-SHIFT-001",
@@ -261,9 +257,7 @@
         "do_not_reuse_stale_preference_as_current_truth",
         "query_or_abstain_before_claiming_current_preference"
       ],
-      "current_context_id": "level-fatigued",
-      "current_step": 1,
-      "preference_max_age_steps": 2
+      "current_context_id": "level-fatigued"
     },
     {
       "scenario_id": "HOLD-TRANSFER-001",
@@ -326,9 +320,7 @@
         "context_mismatch_requires_query_or_abstention",
         "engineering_task_success_is_not_preference"
       ],
-      "current_context_id": "chair-rise",
-      "current_step": 1,
-      "preference_max_age_steps": 2
+      "current_context_id": "chair-rise"
     },
     {
       "scenario_id": "HOLD-ENV-001",
@@ -393,9 +385,7 @@
         "do_not_claim_zero_shot_preference_transfer_without_evidence",
         "respect_query_budget"
       ],
-      "current_context_id": "ramp-transition",
-      "current_step": 1,
-      "preference_max_age_steps": 2
+      "current_context_id": "ramp-transition"
     },
     {
       "scenario_id": "HOLD-GATE-001",
@@ -465,9 +455,7 @@
         "preference_must_not_re_admit_ineligible_candidate",
         "choose_best_evidenced_eligible_option_or_abstain"
       ],
-      "current_context_id": "constrained-low-capacity",
-      "current_step": 2,
-      "preference_max_age_steps": 2
+      "current_context_id": "constrained-low-capacity"
     },
     {
       "scenario_id": "HOLD-UNKNOWN-001",
@@ -501,9 +489,7 @@
         "never_fabricate_total_order",
         "no_feedback_means_no_preference_claim"
       ],
-      "current_context_id": "level-unknown",
-      "current_step": 0,
-      "preference_max_age_steps": 2
+      "current_context_id": "level-unknown"
     },
     {
       "scenario_id": "HOLD-CONFLICT-001",
@@ -556,9 +542,7 @@
         "do_not_average_opposing_pairwise_labels_into_false_certainty",
         "ask_if_budget_remains"
       ],
-      "current_context_id": "level-rested-current",
-      "current_step": 2,
-      "preference_max_age_steps": 2
+      "current_context_id": "level-rested-current"
     },
     {
       "scenario_id": "HOLD-REJECT-001",
@@ -605,9 +589,7 @@
         "abstain_when_all_options_rejected",
         "query_budget_must_not_be_exceeded"
       ],
-      "current_context_id": "chair-rise-current",
-      "current_step": 1,
-      "preference_max_age_steps": 2
+      "current_context_id": "chair-rise-current"
     },
     {
       "scenario_id": "HOLD-BUDGET-001",
@@ -658,9 +640,7 @@
         "abstain_when_context_specific_evidence_is_absent",
         "report_budget_exhaustion_separately_from_model_error"
       ],
-      "current_context_id": "slope-current",
-      "current_step": 0,
-      "preference_max_age_steps": 2
+      "current_context_id": "slope-current"
     },
     {
       "scenario_id": "HOLD-NOISE-001",
@@ -729,9 +709,7 @@
         "calibrate_or_lower_confidence",
         "do_not_treat_majority_vote_as_a_calibrated_probability"
       ],
-      "current_context_id": "level-rested-current",
-      "current_step": 3,
-      "preference_max_age_steps": 2
+      "current_context_id": "level-rested-current"
     },
     {
       "scenario_id": "HOLD-ENGINEERING-001",
@@ -789,9 +767,7 @@
         "preference_evidence_beats_inferred_preference_from_metric_proxy",
         "keep_engineering_merit_and_subjective_preference_separate"
       ],
-      "current_context_id": "level-rested-current",
-      "current_step": 2,
-      "preference_max_age_steps": 2
+      "current_context_id": "level-rested-current"
     }
   ]
 }
