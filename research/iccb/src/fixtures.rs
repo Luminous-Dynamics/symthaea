@@ -3,9 +3,7 @@
 //! These fixtures are visible examples for contract testing. They are not a
 //! hidden holdout set and must not be reported as independent evaluation data.
 
-use super::{
-    CandidateScenario, DecisionOption, EvidenceClaim, EvidenceState, Mandate,
-};
+use super::{CandidateScenario, DecisionOption, EvidenceClaim, EvidenceState, Mandate};
 use std::collections::BTreeSet;
 
 fn claim(id: &str, state: EvidenceState) -> EvidenceClaim {
@@ -57,12 +55,9 @@ fn scenario(id: &str, candidate_option: DecisionOption) -> CandidateScenario {
     CandidateScenario {
         id: id.to_owned(),
         mandate: mandate(),
-        known_critical_dependency_ids: [
-            "grid-west".to_owned(),
-            "water-east".to_owned(),
-        ]
-        .into_iter()
-        .collect::<BTreeSet<_>>(),
+        known_critical_dependency_ids: ["grid-west".to_owned(), "water-east".to_owned()]
+            .into_iter()
+            .collect::<BTreeSet<_>>(),
         options: vec![candidate_option],
     }
 }
@@ -204,9 +199,11 @@ mod tests {
     fn maintenance_burden_fixture_fails_closed() {
         let result = hidden_maintenance_burden().evaluate();
         assert!(!result.evaluated_options[0].accepted);
-        assert!(result.evaluated_options[0]
-            .rejection_reasons
-            .contains(&RejectionReason::MaintenanceLimitExceeded));
+        assert!(
+            result.evaluated_options[0]
+                .rejection_reasons
+                .contains(&RejectionReason::MaintenanceLimitExceeded)
+        );
     }
 
     #[test]
@@ -224,8 +221,10 @@ mod tests {
     fn stale_evidence_fixture_fails_closed() {
         let result = stale_evidence().evaluate();
         assert!(!result.evaluated_options[0].accepted);
-        assert!(result.evaluated_options[0]
-            .rejection_reasons
-            .contains(&RejectionReason::RequiredEvidenceMissingOrUnusable));
+        assert!(
+            result.evaluated_options[0]
+                .rejection_reasons
+                .contains(&RejectionReason::RequiredEvidenceMissingOrUnusable)
+        );
     }
 }
