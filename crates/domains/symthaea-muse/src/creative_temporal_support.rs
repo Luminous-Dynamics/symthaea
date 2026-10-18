@@ -83,12 +83,10 @@ pub fn measure_temporal_support(
         let end = (start + f64::from(note.duration)).min(total);
         intervals.push((start, end));
 
-        let onset_window =
-            ((start / total) * window_count_f64).floor() as usize;
+        let onset_window = ((start / total) * window_count_f64).floor() as usize;
         onset_windows[onset_window.min(window_count - 1)] = true;
 
-        let first_window = ((start / total) * window_count_f64)
-            .floor() as usize;
+        let first_window = ((start / total) * window_count_f64).floor() as usize;
         let first_window = first_window.min(window_count - 1);
         let end_scaled = (end / total) * window_count_f64;
         let end_exclusive = if end >= total {
@@ -111,7 +109,9 @@ pub fn measure_temporal_support(
         sustain_windows.iter().filter(|active| **active).count() as f64 / window_count_f64;
 
     intervals.sort_by(|left, right| {
-        left.0.total_cmp(&right.0).then_with(|| left.1.total_cmp(&right.1))
+        left.0
+            .total_cmp(&right.0)
+            .then_with(|| left.1.total_cmp(&right.1))
     });
     let mut merged: Vec<(f64, f64)> = Vec::with_capacity(intervals.len());
     for (start, end) in intervals {
@@ -132,8 +132,7 @@ pub fn measure_temporal_support(
         occupied_secs += (end - start).max(0.0);
         cursor = cursor.max(*end);
     }
-    maximum_silent_gap_secs =
-        maximum_silent_gap_secs.max((total - cursor).max(0.0));
+    maximum_silent_gap_secs = maximum_silent_gap_secs.max((total - cursor).max(0.0));
 
     Ok(CreativeTemporalSupportV1 {
         onset_window_coverage_ratio: onset_window_coverage_ratio as f32,
@@ -170,9 +169,7 @@ mod tests {
 
     #[test]
     fn staccato_onsets_can_cover_every_window_without_occupying_most_time() {
-        let notes: Vec<Note> = (0..8)
-            .map(|index| note(index as f32 * 0.5, 0.1))
-            .collect();
+        let notes: Vec<Note> = (0..8).map(|index| note(index as f32 * 0.5, 0.1)).collect();
         let result = measure_temporal_support(&notes, 4.0, 8).unwrap();
 
         assert_eq!(result.onset_window_coverage_ratio, 1.0);
@@ -210,10 +207,13 @@ mod tests {
 
     #[test]
     fn malformed_notes_fail_closed_with_their_index() {
-        let error = measure_temporal_support(&[note(0.0, 0.2), note(0.5, f32::NAN)], 1.0, 4)
-            .unwrap_err();
+        let error =
+            measure_temporal_support(&[note(0.0, 0.2), note(0.5, f32::NAN)], 1.0, 4).unwrap_err();
 
-        assert_eq!(error, CreativeTemporalSupportError::InvalidNote { index: 1 });
+        assert_eq!(
+            error,
+            CreativeTemporalSupportError::InvalidNote { index: 1 }
+        );
     }
 
     #[test]
@@ -244,10 +244,19 @@ mod tests {
         let duplicate =
             measure_temporal_support(&[note(0.25, 0.5), note(0.25, 0.5)], 1.0, 4).unwrap();
 
-        assert_eq!(single.onset_window_coverage_ratio, duplicate.onset_window_coverage_ratio);
-        assert_eq!(single.sustain_window_coverage_ratio, duplicate.sustain_window_coverage_ratio);
+        assert_eq!(
+            single.onset_window_coverage_ratio,
+            duplicate.onset_window_coverage_ratio
+        );
+        assert_eq!(
+            single.sustain_window_coverage_ratio,
+            duplicate.sustain_window_coverage_ratio
+        );
         assert_eq!(single.occupied_time_ratio, duplicate.occupied_time_ratio);
-        assert_eq!(single.maximum_silent_gap_secs, duplicate.maximum_silent_gap_secs);
+        assert_eq!(
+            single.maximum_silent_gap_secs,
+            duplicate.maximum_silent_gap_secs
+        );
         assert_eq!(duplicate.note_count, single.note_count + 1);
     }
 }
