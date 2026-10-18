@@ -10,7 +10,7 @@ A reproducible audio run needs to keep these claims distinct:
 
 1. **Asset-byte integrity:** the WAVs found under a local root match a deterministic content manifest.
 2. **Indexed-bank integrity:** the files accepted by the current pitch indexer match the selected-bank content manifest.
-3. **Source lineage:** the supplied directory is the root of a clean Git checkout whose origin matches the expected upstream repository; the exact Git revision is recorded.
+3. **Source checkout identity:** the supplied directory is the root of a Git checkout whose origin URL matches the expected repository; its exact local HEAD, worktree state, and license/readme hashes are recorded. This is not proof that HEAD has been published to or signed by the upstream maintainers.
 4. **License/readme evidence:** the exact local `LICENSE` and source README bytes are hashed and kept with the reports.
 5. **Terms interpretation:** the published SPDX-style license declaration and any upstream credit/use request are separate fields for human review.
 
@@ -36,11 +36,11 @@ The `melothaea.instrument-capability-matrix.v4` report adds `source_terms_eviden
 - source library identifier and expected upstream repository URL;
 - declared license identifier and a boundary statement explaining that it is an upstream declaration, not a legal determination;
 - relative paths, exact SHA-256 hashes, and explicit statuses for `LICENSE` and the source README;
-- the upstream Git revision observed from the supplied root;
-- whether the checkout origin matches the expected repository, whether the working tree is clean, and a status explaining why source lineage is or is not established;
+- the local source-checkout HEAD observed from the supplied root (field `source_checkout_revision`);
+- whether the origin URL matches the expected repository, whether the working tree is clean, and a status explaining the evidence state (`source_checkout_status`);
 - a separate upstream README credit/use request.
 
-The source Git revision is distinct from `SYMTHAEA_SOURCE_REV`, which identifies the Melothaea/Symthaea code revision. The tool reports a sample-root revision as `clean_upstream_checkout` only when Git identifies the supplied directory itself as the repository root, its `origin` URL normalizes to the expected upstream, a valid HEAD revision is available, and `git status --porcelain --untracked-files=all` is empty. A subdirectory, archive, dirty checkout, incorrect origin, missing Git installation, or unavailable status remains explicitly non-clean/incomplete.
+The sample-root's `source_checkout_revision` is distinct from `SYMTHAEA_SOURCE_REV`, which identifies the Melothaea/Symthaea code revision. The tool reports `source_checkout_status=clean_expected_origin_checkout` only when Git identifies the supplied directory itself as the repository root, its `origin` URL normalizes to the expected repository, a valid local HEAD revision is available, and `git status --porcelain --untracked-files=all` is empty. A subdirectory, archive, dirty checkout, incorrect origin, missing Git installation, or unavailable status remains explicitly non-clean/incomplete.
 
 The tool hashes source term documents directly from the supplied root and omits absolute local paths. It does not fetch or update assets over the network, and it does not modify the source checkout.
 
@@ -49,11 +49,11 @@ The tool hashes source term documents directly from the supplied root and omits 
 | Gate | Proposed target |
 |---|---|
 | Document evidence | 100% of qualification-grade source roots have exact local `LICENSE` and README digests, each matching an independent verifier recomputation |
-| Source lineage | 100% of qualification-grade roots identify a valid upstream commit, exact expected Git origin, and clean checkout |
+| Source checkout identity | 100% of qualification-grade roots record a valid local HEAD, exact expected Git origin, and clean checkout |
 | Terms transparency | 100% of roots expose license-document status and upstream README request separately; zero silent fallback to assumed terms |
 | Negative controls | Missing or modified license/readme, dirty working tree, wrong origin, non-root subdirectory and missing Git metadata cannot return a full source-provenance pass |
 | Audit completeness | Every rendered sample report can be retained with the source revision, root manifest, indexed-bank digest, exact selected-file digest, and source-terms verification findings |
 
 ## Limits
 
-A hash of a license file does not itself explain the license, and a Git remote string is not proof of remote ownership. The source revision/origin/clean-tree checks are local evidence, not a signed attestation. Stronger future work should issue and verify an authenticated source/build attestation that binds the sample archive, terms documents, renderer binary and final report to trusted subjects. Human/legal review is still needed for ambiguous or conflicting source materials.
+A hash of a license file does not itself explain the license, and a Git remote string is not proof of remote ownership. The reported HEAD is the local checkout revision; the verifier does not prove that this commit exists on the official remote or was signed by its maintainers. The revision/origin/clean-tree checks are local evidence, not a signed attestation. Stronger future work should issue and verify an authenticated source/build attestation that binds the sample archive, terms documents, renderer binary and final report to trusted subjects. Human/legal review is still needed for ambiguous or conflicting source materials.
