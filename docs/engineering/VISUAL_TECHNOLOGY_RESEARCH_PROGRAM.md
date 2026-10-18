@@ -231,3 +231,5 @@ The v0.1 manifest and Draft 2020-12 schema define four **UNQUALIFIED** route fam
 
 The benchmark optimizes cost/resource use per **final calibrated-good module**, not local transfer yield. It preserves first-pass versus post-repair yield, inspection coverage/escape, throughput/WIP, calibration and reliability evidence separately. These plans are not executable process recipes and do not establish equipment capability or physical yield.
 
+The manufacturing economics reference also implements typed batch/accounting identity and a Pareto route comparison with exact match on target profile, protocol, currency, accounting boundary and evidence class, plus evidence-bundle and uncertainty-method identities. A route cannot dominate another if it fails mandatory floors; cheaper but higher-energy or lower-yield alternatives remain incomparable. Synthetic near-perfect-transfer vs repair-capable route tests illustrate this principle without claiming a real process result.
+
