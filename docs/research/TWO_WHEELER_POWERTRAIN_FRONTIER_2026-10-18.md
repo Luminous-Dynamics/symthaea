@@ -98,7 +98,7 @@ For every mission, freeze payload, vehicle utility, route/speed trace, environme
 
 ### Common wheel-demand calculation — first executable slice
 
-The initial pointwise Rust screening kernel now lives in [`two_wheeler_wheel_demand.rs`](../../xtask/src/two_wheeler_wheel_demand.rs), with [13 synthetic oracle cases](data/two_wheeler_wheel_demand_v0_1.json). The full contract and limitations are in [TWO-WHEELER-WHEEL-DEMAND-001](TWO_WHEELER_WHEEL_DEMAND_BENCHMARK_2026-10-18.md). It computes signed wheel-force demand from:
+The pointwise Rust screening kernel lives in [`two_wheeler_wheel_demand.rs`](../../xtask/src/two_wheeler_wheel_demand.rs), with [13 synthetic oracle cases](data/two_wheeler_wheel_demand_v0_1.json). A separate [trace-energy integrator](../../xtask/src/two_wheeler_trace_energy.rs) now integrates signed wheel work and distance with [six synthetic trace cases](data/two_wheeler_trace_energy_v0_1.json). The full contract and limitations are in [TWO-WHEELER-WHEEL-DEMAND-001](TWO_WHEELER_WHEEL_DEMAND_BENCHMARK_2026-10-18.md). The pointwise kernel computes signed wheel-force demand from:
 
 ```text
 F_inertial = (mass + rotating_equivalent_mass) * acceleration
@@ -110,7 +110,7 @@ F_wheel    = F_inertial + F_rolling + F_grade + F_aero
 P_wheel    = F_wheel * ground_speed
 ```
 
-Positive wheel power is traction demand. Negative wheel power is overrun/braking opportunity only; it is not credited as battery-regenerated energy. The v0.1 kernel is instantaneous: it does **not** integrate drive-cycle energy and does not predict battery power or vehicle efficiency. It is a shared demand input, not a competing full-powertrain digital twin.
+Positive wheel power is traction demand. Negative wheel power is overrun/braking opportunity only; it is not credited as battery-regenerated energy. The pointwise v0.1 kernel is instantaneous; the trace utility integrates its signed mechanical wheel power using a piecewise-linear interpolation and explicit zero crossing. Neither utility predicts battery power, fuel energy or conversion efficiency. They provide a shared road-demand input, not a competing full-powertrain digital twin. The source-reported validation summaries are frozen at [`published_sa_electric_motorcycle_validation_summary_v0_1.json`](data/published_sa_electric_motorcycle_validation_summary_v0_1.json); these summaries are not raw telemetry or reproduction evidence.
 
 ### Recent validation evidence that should set the bar
 
