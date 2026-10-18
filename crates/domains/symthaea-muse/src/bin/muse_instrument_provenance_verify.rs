@@ -1273,6 +1273,26 @@ mod tests {
     }
 
     #[test]
+    fn tampered_source_bytes_are_rejected_by_root_and_selected_file_digests() {
+        let (probe, inventory, assets) = fixtures();
+        std::fs::write(&assets.sample_wav, b"tampered-WAV-content-for-provenance-test")
+            .expect("tampered source should be written");
+        let report = test_report(&probe, &inventory, &assets);
+        assert_eq!(report.verdict, "inconsistent");
+        assert!(report.findings.iter().any(|finding| finding.code == "root_manifest_content_mismatch"));
+        assert!(report.findings.iter().any(|finding| finding.code == "selected_sample_file_digest_mismatch"));
+    }
+
+    #[test]
+    fn path_traversal_in_a_selected_sample_receipt_is_rejected() {
+        let (mut probe, inventory, assets) = fixtures();
+        probe["cases"][0]["selected_sample"]["source_relative_path"] = json!("../outside.wav");
+        let report = test_report(&probe, &inventory, &assets);
+        assert_eq!(report.verdict, "inconsistent");
+        assert!(report.findings.iter().any(|finding| finding.code == "selected_sample_path_unsafe"));
+    }
+
+    #[test]
     fn report_digest_covers_the_exact_json_bytes_that_were_parsed() {
         let nonce = std::time::SystemTime::now()
             .duration_since(std::time::UNIX_EPOCH)
