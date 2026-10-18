@@ -89,7 +89,7 @@ For each physical specimen, bind its position and orientation to a declared mach
 
 ### Consequences for this protocol
 
-1. Keep the geometry/artifact identity, process recipe, observed machine behavior and measurement system as separate versioned identities.
+1. Keep geometry/artifact identity, process recipe, canonical machine profile, observed machine behavior and measurement system as separate versioned identities; reuse the machine-profile owner for build bounds rather than maintaining a parallel envelope model.
 2. Score the measurement system itself: repeatability, reproducibility where feasible, bias against a reference, resolution, uncertainty and missingness.
 3. Preserve both signed error (to reveal systematic bias) and absolute error (to measure magnitude); do not let positive and negative deviations cancel in one aggregate.
 4. Separate model training, adaptive discovery and held-out confirmation by run/profile/material-lot identity. Randomly splitting individual measurements from the same print across train and test is not sufficient evidence of generalization.
@@ -118,7 +118,9 @@ Each run manifest must bind, or explicitly mark unavailable:
 
 - Benchmark protocol version and exact source revision.
 - Artifact source and mesh digest, units, mesh validation result, orientation, placement, and slicer project digest.
-- Machine identity at the strongest verified level; kinematics; build volume; motion system; frame/toolhead changes; nozzle diameter and wear state.
+- Machine identity at the strongest verified level; kinematics; motion system; frame/toolhead changes; nozzle diameter and wear state.
+- Bind the exact canonical `MachineProfile` used by the fabrication-kernel validator. Build-volume bounds should be taken from that profile, not duplicated into a competing envelope schema. Keep a digest of the embedded profile and treat it as identity, not a signature or proof of trusted origin.
+- Spatial samples should bind their declared frame and nominal position/orientation to that same profile. An origin-in-bounds check is only a precondition; it does not prove the whole specimen fits or clearances are collision-free.
 - Firmware release and configuration digest; controller and relevant motion settings.
 - Slicer release, profile digest, relevant process settings, and generated G-code digest.
 - Material family, manufacturer, product, lot/spool identity where available, declared diameter, storage/conditioning history, and known uncertainty.
