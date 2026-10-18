@@ -240,17 +240,17 @@ fn validate_semantics(manifest: &Value, schema: &Value) -> Vec<String> {
             None => errors.push(format!("reference_sources[{index}].id must be a string")),
         }
 
-        if let Some(url) = source.get("url").and_then(Value::as_str) {
-            if !url.starts_with("https://") {
-                errors.push(format!("reference_sources[{index}].url must use HTTPS"));
-            }
+        if let Some(url) = source.get("url").and_then(Value::as_str)
+            && !url.starts_with("https://")
+        {
+            errors.push(format!("reference_sources[{index}].url must use HTTPS"));
         }
     }
 
-    if let Some(owner_issue) = manifest.get("owner_issue").and_then(Value::as_str) {
-        if !owner_issue.starts_with("https://github.com/Luminous-Dynamics/symthaea/issues/") {
-            errors.push("owner_issue must remain a canonical Symthaea issue URL".to_owned());
-        }
+    if let Some(owner_issue) = manifest.get("owner_issue").and_then(Value::as_str)
+        && !owner_issue.starts_with("https://github.com/Luminous-Dynamics/symthaea/issues/")
+    {
+        errors.push("owner_issue must remain a canonical Symthaea issue URL".to_owned());
     }
 
     let schema_reference_ids: BTreeSet<String> = schema
