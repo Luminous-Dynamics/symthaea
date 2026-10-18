@@ -329,55 +329,12 @@ fn verify_reports(
             "inventory must be produced with --hash-root-wav-contents".into(),
         );
     }
-    for (field, label) in [("vcsl_root", "VCSL"), ("vsco2_root", "VSCO2-CE")] {
-        let Some(root) = inventory.get(field) else {
-            push_incomplete(
-                &mut findings,
-                "root_evidence_missing",
-                format!("{label} root evidence is missing"),
-            );
-            continue;
-        };
-        match root.get("root_present").and_then(Value::as_bool) {
-            Some(true) => {
-                let status = string_field(root, "content_manifest_status");
-                let digest = string_field(root, "content_manifest_sha256");
-                if status == Some("hashed") && digest.is_some_and(valid_sha256) {
-                    root_content_manifests_verified += 1;
-                } else if status == Some("hashed") && digest.is_some_and(|value| !valid_sha256(value)) {
-                    push_error(
-                        &mut findings,
-                        "root_manifest_digest_invalid",
-                        format!("{label} root claims hashed content but digest is malformed"),
-                    );
-                } else {
-                    push_incomplete(
-                        &mut findings,
-                        "root_manifest_incomplete",
-                        format!("{label} root is present but has no complete content manifest"),
-                    );
-                }
-            }
-            Some(false)
-                if string_field(root, "content_manifest_status") == Some("root_missing")
-                    && root.get("content_manifest_sha256").is_none_or(Value::is_null) =>
-            {
-                push_incomplete(
-                    &mut findings,
-                    "asset_root_missing",
-                    format!("{label} asset root is absent; no source bytes can be attested for it"),
-                );
-            }
-            Some(false) => push_error(
-                &mut findings,
-                "root_presence_status_conflict",
-                format!("{label} root is marked absent but does not carry an explicit root_missing status"),
-            ),
-            None => push_incomplete(
-                &mut findings,
-                "root_presence_unknown",
-                format!("{label} root evidence has no root_present boolean"),
-            ),
+    for (field, label, observed) in [
+        ("vcsl_root", "VCSL", vcsl_root_observation),
+        ("vsco2_root", "VSCO2-CE", vsco2_root_observation),
+    ] {
+        if verify_root_evidence(inventory.get(field), label, observed, &mut findings) {
+            root_content_manifests_verified += 1;
         }
     }
 
@@ -510,6 +467,16 @@ fn verify_reports(
                 "source_location_incomplete",
                 format!("{case_label} selected source lacks its library or root-relative path"),
             );
+        } else if verify_selected_sample_file(
+            sample,
+            source_library.unwrap(),
+            relative_path.unwrap(),
+            vcsl_root_observation,
+            vsco2_root_observation,
+            &case_label,
+            &mut findings,
+        ) {
+            selected_samples_with_matching_actual_file_digest += 1;
         }
 
         if probe_bank_hashing == Some(true) {
@@ -620,11 +587,14 @@ fn verify_reports(
         renderer_binary_file_size_bytes,
         renderer_binary_file_name_matches_report,
         renderer_binary_identity_verified,
+        vcsl_root_content_manifest_sha256: vcsl_root_observation.content_manifest_sha256.clone(),
+        vsco2_root_content_manifest_sha256: vsco2_root_observation.content_manifest_sha256.clone(),
         root_content_manifests_verified,
         selected_samples_total,
         selected_samples_with_valid_file_digest,
         selected_samples_with_valid_bank_digest,
         selected_samples_with_matching_inventory_bank_digest,
+        selected_samples_with_matching_actual_file_digest,
         cases_total,
         error_count,
         incomplete_count,
