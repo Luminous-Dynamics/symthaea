@@ -27,7 +27,10 @@
         "evidence_class": "Synthetic",
         "split": "HOLDOUT",
         "measurement_protocol_id": "synthetic-protocol",
-        "calibration_receipt_id": null
+        "calibration_receipt_id": null,
+        "observed_source_record_id": "SYNTHETIC_PLACEHOLDER",
+        "source_rights_receipt_id": "SYNTHETIC_PLACEHOLDER",
+        "split_manifest_id": "SYNTHETIC_PLACEHOLDER"
       },
       "expected_status": "SCORE",
       "expected_error": null,
@@ -70,7 +73,10 @@
         "evidence_class": "Synthetic",
         "split": "HOLDOUT",
         "measurement_protocol_id": "synthetic-protocol",
-        "calibration_receipt_id": null
+        "calibration_receipt_id": null,
+        "observed_source_record_id": "SYNTHETIC_PLACEHOLDER",
+        "source_rights_receipt_id": "SYNTHETIC_PLACEHOLDER",
+        "split_manifest_id": "SYNTHETIC_PLACEHOLDER"
       },
       "expected_status": "SCORE",
       "expected_error": null,
@@ -113,7 +119,10 @@
         "evidence_class": "Synthetic",
         "split": "HOLDOUT",
         "measurement_protocol_id": "synthetic-protocol",
-        "calibration_receipt_id": null
+        "calibration_receipt_id": null,
+        "observed_source_record_id": "SYNTHETIC_PLACEHOLDER",
+        "source_rights_receipt_id": "SYNTHETIC_PLACEHOLDER",
+        "split_manifest_id": "SYNTHETIC_PLACEHOLDER"
       },
       "expected_status": "SCORE",
       "expected_error": null,
@@ -156,7 +165,10 @@
         "evidence_class": "Synthetic",
         "split": "HOLDOUT",
         "measurement_protocol_id": "synthetic-protocol",
-        "calibration_receipt_id": null
+        "calibration_receipt_id": null,
+        "observed_source_record_id": "SYNTHETIC_PLACEHOLDER",
+        "source_rights_receipt_id": "SYNTHETIC_PLACEHOLDER",
+        "split_manifest_id": "SYNTHETIC_PLACEHOLDER"
       },
       "expected_status": "SCORE",
       "expected_error": null,
@@ -199,7 +211,10 @@
         "evidence_class": "Synthetic",
         "split": "HOLDOUT",
         "measurement_protocol_id": "synthetic-protocol",
-        "calibration_receipt_id": null
+        "calibration_receipt_id": null,
+        "observed_source_record_id": "SYNTHETIC_PLACEHOLDER",
+        "source_rights_receipt_id": "SYNTHETIC_PLACEHOLDER",
+        "split_manifest_id": "SYNTHETIC_PLACEHOLDER"
       },
       "expected_status": "REJECT_INPUT",
       "expected_error": "cycle_mismatch",
@@ -232,7 +247,10 @@
         "evidence_class": "Synthetic",
         "split": "HOLDOUT",
         "measurement_protocol_id": "synthetic-protocol",
-        "calibration_receipt_id": null
+        "calibration_receipt_id": null,
+        "observed_source_record_id": "SYNTHETIC_PLACEHOLDER",
+        "source_rights_receipt_id": "SYNTHETIC_PLACEHOLDER",
+        "split_manifest_id": "SYNTHETIC_PLACEHOLDER"
       },
       "expected_status": "REJECT_INPUT",
       "expected_error": "configuration_mismatch",
@@ -265,7 +283,10 @@
         "evidence_class": "Synthetic",
         "split": "HOLDOUT",
         "measurement_protocol_id": "synthetic-protocol",
-        "calibration_receipt_id": null
+        "calibration_receipt_id": null,
+        "observed_source_record_id": "SYNTHETIC_PLACEHOLDER",
+        "source_rights_receipt_id": "SYNTHETIC_PLACEHOLDER",
+        "split_manifest_id": "SYNTHETIC_PLACEHOLDER"
       },
       "expected_status": "REJECT_INPUT",
       "expected_error": "mission_mismatch",
@@ -298,7 +319,10 @@
         "evidence_class": "Synthetic",
         "split": "HOLDOUT",
         "measurement_protocol_id": "synthetic-protocol",
-        "calibration_receipt_id": null
+        "calibration_receipt_id": null,
+        "observed_source_record_id": "SYNTHETIC_PLACEHOLDER",
+        "source_rights_receipt_id": "SYNTHETIC_PLACEHOLDER",
+        "split_manifest_id": "SYNTHETIC_PLACEHOLDER"
       },
       "expected_status": "REJECT_INPUT",
       "expected_error": "energy_boundary_mismatch",
@@ -331,7 +355,10 @@
         "evidence_class": "Synthetic",
         "split": "HOLDOUT",
         "measurement_protocol_id": "synthetic-protocol",
-        "calibration_receipt_id": null
+        "calibration_receipt_id": null,
+        "observed_source_record_id": "SYNTHETIC_PLACEHOLDER",
+        "source_rights_receipt_id": "SYNTHETIC_PLACEHOLDER",
+        "split_manifest_id": "SYNTHETIC_PLACEHOLDER"
       },
       "expected_status": "REJECT_INPUT",
       "expected_error": "trace_mismatch",
@@ -364,7 +391,10 @@
         "evidence_class": "Synthetic",
         "split": "HOLDOUT",
         "measurement_protocol_id": "synthetic-protocol",
-        "calibration_receipt_id": null
+        "calibration_receipt_id": null,
+        "observed_source_record_id": "SYNTHETIC_PLACEHOLDER",
+        "source_rights_receipt_id": "SYNTHETIC_PLACEHOLDER",
+        "split_manifest_id": "SYNTHETIC_PLACEHOLDER"
       },
       "expected_status": "REJECT_INPUT",
       "expected_error": "invalid_distance",
@@ -397,7 +427,10 @@
         "evidence_class": "Synthetic",
         "split": "HOLDOUT",
         "measurement_protocol_id": "synthetic-protocol",
-        "calibration_receipt_id": null
+        "calibration_receipt_id": null,
+        "observed_source_record_id": "SYNTHETIC_PLACEHOLDER",
+        "source_rights_receipt_id": "SYNTHETIC_PLACEHOLDER",
+        "split_manifest_id": "SYNTHETIC_PLACEHOLDER"
       },
       "expected_status": "REJECT_INPUT",
       "expected_error": "invalid_energy",
