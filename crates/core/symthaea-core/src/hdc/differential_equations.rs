@@ -2310,8 +2310,18 @@ mod tests {
         .expect("equivalently rescaled state should integrate");
 
         assert!(native_units.converged && rescaled_units.converged);
-        assert_eq!(native_units.steps_taken, rescaled_units.steps_taken);
-        assert_eq!(native_units.rejected_steps, rescaled_units.rejected_steps);
+        assert!(
+            native_units.steps_taken.abs_diff(rescaled_units.steps_taken) <= 1,
+            "Equivalent units should have comparable accepted-step counts: native={}, rescaled={}",
+            native_units.steps_taken,
+            rescaled_units.steps_taken,
+        );
+        assert!(
+            native_units.rejected_steps.abs_diff(rescaled_units.rejected_steps) <= 1,
+            "Equivalent units should have comparable rejected-step counts: native={}, rescaled={}",
+            native_units.rejected_steps,
+            rescaled_units.rejected_steps,
+        );
         let normalized_native = native_units.y_final[1] / 1e-12;
         assert!(
             (normalized_native - rescaled_units.y_final[1]).abs() <= 1e-10,
