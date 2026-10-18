@@ -34,7 +34,8 @@ A DOI, a public PDR record or a source link is not itself a license grant.
 ## Record contract
 
 Every observation carries:
-- unique record ID, declared source DOI and exact upstream source-field identity;
+- unique record ID, declared source DOI, source-object ID, upstream row ID and exact source-field identity;
+- a source-object entry in the manifest and a declared artifact digest for that object;
 - consistent variable identity/raw unit for each repeated source field and a consistent normalized unit for each normalized variable;
 - specimen ID and parent/lineage group ID;
 - variable ID, raw value and raw unit;
@@ -48,7 +49,7 @@ Unknown metadata must remain explicit. The validator rejects placeholder IDs suc
 
 ## Benchmark protocol and proposed gates
 
-The first stage is data integrity—not model competition.
+The first stage is data integrity—not model competition. CLI record validation must verify artifact bytes before accepting observation rows; the contract preserves row IDs, while a future raw-file parser must additionally prove each declared row/field is actually present in the exact hashed artifact.
 
 **Source integrity**
 - 100% of declared local artifacts match byte count and SHA-256.
