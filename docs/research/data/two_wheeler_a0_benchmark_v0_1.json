@@ -18,11 +18,12 @@
     ]
   },
   "execution": {
-    "runner_connected": false,
+    "runner_connected": true,
     "executed": false,
-    "independent_verifier_connected": false,
+    "independent_verifier_connected": true,
     "result": null,
-    "note": "Expected decisions are authored oracle fixtures, not test results. The consumer and independent verifier must be implemented and run before any pass claim."
+    "command": "cargo run -p xtask -- two-wheeler-benchmark --input docs/research/data/two_wheeler_a0_benchmark_v0_1.json",
+    "note": "The Rust xtask verifier and unit tests are authored in the PR, but this source has not been compiled or executed in the current environment. No pass is claimed."
   },
   "decision_vocabulary": [
     "ACCEPT_SYNTHETIC_CANDIDATE_ONLY",
