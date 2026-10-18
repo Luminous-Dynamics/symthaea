@@ -58,13 +58,13 @@ The new Rust module, **src/listener_response.rs**, defines a versioned ListenerR
 - listener-selected intent and optional activity/familiarity;
 - separate self-reported pre-state, during checkpoints, post-state, and perceived musical affect;
 - optional enjoyment and goal-attainment ratings;
-- explicit consent-protocol version;
+- explicit consent confirmation and consent-protocol version;
 - bounded, finite self-report scales and strictly increasing relative playback checkpoint times;
 - incomplete reports remain representable so coverage and response propensity can be measured.
 
 Scales in v1 are valence [-1, 1], arousal/tension/energy [0, 1], enjoyment 1–7, goal attainment 1–7, and familiarity 1–5. These are engineering encodings, not an exhaustive theory of human experience. UI wording and anchors require comprehension piloting across participants and languages. Affect values are self-reports; no camera, microphone, or physiological signal is part of this schema.
 
-A ShiftTowardTarget intent requires an explicitly listener-defined target. The record does not infer what that target should be. Missing dimensions remain missing; validation never silently imputes them.
+The schema rejects unknown schema versions and records without confirmed consent. A ShiftTowardTarget intent requires an explicitly listener-defined target. The record does not infer what that target should be. Missing dimensions remain missing; validation never silently imputes them.
 
 ## Evaluation tracks
 
