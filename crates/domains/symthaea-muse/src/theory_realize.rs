@@ -1633,12 +1633,12 @@ fn realize_core(
         mix_drums(frames, &drums, sample_rate, state);
     }
 
-    // Master the final mix: corrective 3-band EQ + loudness-normalize to
-    // -14 LUFS (streaming standard) + brick-wall limit. `auto_master` is
-    // real, tested BS.1770 mastering code (`auto_master.rs`) that already
-    // existed in this crate but was never called from ANY generation
-    // path before this -- render_arrangement's own normalization/limiter
-    // is a simpler RMS-target pass, not a real mastering chain.
+    // Master the final mix with the shared BS.1770 loudness pipeline,
+    // corrective three-band EQ, section leveling, and brick-wall limiter.
+    // The configured loudness target currently defaults to -16 LUFS for this
+    // engine's dynamic chamber material; it is not a universal streaming
+    // standard. The selected performance dialect chooses the spectral-balance
+    // hypothesis, while loudness and limiter targets remain invariant.
     if let AudioData::StereoF32(frames) = &mut audio {
         let mastering = crate::auto_master::MasteringConfig::for_dialect(dialect);
         crate::auto_master::auto_master(frames, sample_rate, &mastering);
