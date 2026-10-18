@@ -1,0 +1,217 @@
+{
+  "manifest_version": "musical-instrument-benchmark-corpus/0.1",
+  "corpus_id": "MUS-ENG-001",
+  "status": "PROPOSED_SYNTHETIC_FIXTURES_NOT_QUALIFIED",
+  "evidence_note": "Every case is a synthetic policy fixture; this corpus contains no physical measurements or qualified hardware.",
+  "cases": [
+    {
+      "case_id": "SYN-001",
+      "case_type": "synthetic_baseline",
+      "instrument_family": "shared_fixture",
+      "candidate_claim": "digital_contract_integrity",
+      "available_evidence": [
+        "requirements",
+        "design_manifest",
+        "bom",
+        "license_manifest"
+      ],
+      "missing_evidence": [
+        "calibration_record",
+        "raw_measurement",
+        "as_built_manifest"
+      ],
+      "faults": [
+        "none"
+      ],
+      "expected_disposition": "CONSISTENT_UNQUALIFIED",
+      "expected_reason": "Digital package structure is the only claim under test; no physical-performance qualification is available.",
+      "evidence_ceiling": "schema_only"
+    },
+    {
+      "case_id": "POS-001",
+      "case_type": "positive_control",
+      "instrument_family": "hybrid",
+      "candidate_claim": "numerical_prediction",
+      "available_evidence": [
+        "requirements",
+        "design_manifest",
+        "model_report",
+        "numerical_solver_receipt"
+      ],
+      "missing_evidence": [
+        "calibration_record",
+        "raw_measurement",
+        "as_built_manifest"
+      ],
+      "faults": [
+        "none"
+      ],
+      "expected_disposition": "CONSISTENT_UNQUALIFIED",
+      "expected_reason": "Prediction remains labeled as numerical and does not claim a physical result.",
+      "evidence_ceiling": "model_only"
+    },
+    {
+      "case_id": "NEG-001",
+      "case_type": "negative_control",
+      "instrument_family": "electronic_instrument",
+      "candidate_claim": "physical_measurement",
+      "available_evidence": [
+        "requirements",
+        "design_manifest",
+        "model_report",
+        "numerical_solver_receipt"
+      ],
+      "missing_evidence": [
+        "calibration_record",
+        "raw_measurement"
+      ],
+      "faults": [
+        "simulation_promoted_to_measurement"
+      ],
+      "expected_disposition": "REJECT_CLAIM",
+      "expected_reason": "No calibrated physical observation is supplied; simulation cannot satisfy a physical-measurement claim.",
+      "evidence_ceiling": "physical_claim_rejected"
+    },
+    {
+      "case_id": "NEG-002",
+      "case_type": "negative_control",
+      "instrument_family": "acoustic_resonator",
+      "candidate_claim": "physical_measurement",
+      "available_evidence": [
+        "requirements",
+        "design_manifest",
+        "calibration_record",
+        "raw_measurement"
+      ],
+      "missing_evidence": [],
+      "faults": [
+        "expired_calibration"
+      ],
+      "expected_disposition": "REJECT_CLAIM",
+      "expected_reason": "The measurement claim is not accepted when its required calibration evidence is expired.",
+      "evidence_ceiling": "physical_claim_rejected"
+    },
+    {
+      "case_id": "NEG-003",
+      "case_type": "negative_control",
+      "instrument_family": "plucked_string",
+      "candidate_claim": "release_readiness",
+      "available_evidence": [
+        "requirements",
+        "design_manifest",
+        "bom",
+        "as_built_manifest",
+        "license_manifest"
+      ],
+      "missing_evidence": [],
+      "faults": [
+        "unbound_as_built_substitution"
+      ],
+      "expected_disposition": "REJECT_CLAIM",
+      "expected_reason": "The actual substituted part is not bound to the as-built configuration and approved BOM policy.",
+      "evidence_ceiling": "none"
+    },
+    {
+      "case_id": "NEG-004",
+      "case_type": "negative_control",
+      "instrument_family": "hybrid",
+      "candidate_claim": "release_readiness",
+      "available_evidence": [
+        "requirements",
+        "design_manifest",
+        "bom",
+        "as_built_manifest"
+      ],
+      "missing_evidence": [
+        "license_manifest"
+      ],
+      "faults": [
+        "unresolved_asset_rights"
+      ],
+      "expected_disposition": "BLOCK_RELEASE",
+      "expected_reason": "Unresolved redistribution rights for required sound or design assets block release readiness.",
+      "evidence_ceiling": "release_blocked"
+    },
+    {
+      "case_id": "NEG-005",
+      "case_type": "negative_control",
+      "instrument_family": "percussion",
+      "candidate_claim": "physical_measurement",
+      "available_evidence": [
+        "requirements",
+        "design_manifest",
+        "calibration_record",
+        "raw_measurement"
+      ],
+      "missing_evidence": [],
+      "faults": [
+        "stale_design_revision"
+      ],
+      "expected_disposition": "REJECT_CLAIM",
+      "expected_reason": "The observation references a different design revision than the candidate being qualified.",
+      "evidence_ceiling": "physical_claim_rejected"
+    },
+    {
+      "case_id": "NEG-006",
+      "case_type": "negative_control",
+      "instrument_family": "controller",
+      "candidate_claim": "reproducibility_claim",
+      "available_evidence": [
+        "requirements",
+        "design_manifest",
+        "repeated_trials"
+      ],
+      "missing_evidence": [
+        "complete_trial_denominator"
+      ],
+      "faults": [
+        "cherry_picked_trials"
+      ],
+      "expected_disposition": "REJECT_CLAIM",
+      "expected_reason": "A reproducibility claim is invalid when failures and the full trial denominator are omitted.",
+      "evidence_ceiling": "none"
+    },
+    {
+      "case_id": "NEG-007",
+      "case_type": "negative_control",
+      "instrument_family": "electronic_instrument",
+      "candidate_claim": "repair_success",
+      "available_evidence": [
+        "requirements",
+        "design_manifest",
+        "bom",
+        "as_built_manifest"
+      ],
+      "missing_evidence": [
+        "post_repair_test"
+      ],
+      "faults": [
+        "missing_post_repair_test"
+      ],
+      "expected_disposition": "REJECT_CLAIM",
+      "expected_reason": "A repair event without a post-repair functional test cannot establish restored capability.",
+      "evidence_ceiling": "repair_claim_rejected"
+    },
+    {
+      "case_id": "NEG-008",
+      "case_type": "negative_control",
+      "instrument_family": "shared_fixture",
+      "candidate_claim": "human_perceptual_claim",
+      "available_evidence": [
+        "requirements",
+        "design_manifest",
+        "raw_measurement"
+      ],
+      "missing_evidence": [
+        "human_study_protocol",
+        "human_study_results"
+      ],
+      "faults": [
+        "human_claim_without_protocol"
+      ],
+      "expected_disposition": "REJECT_CLAIM",
+      "expected_reason": "Objective measurements cannot stand in for a documented human-perceptual study.",
+      "evidence_ceiling": "human_claim_rejected"
+    }
+  ]
+}
