@@ -780,7 +780,7 @@ mod tests {
             "muse-provenance-report-{}-{nonce}.json",
             std::process::id()
         ));
-        let bytes = br#"{ "schema_version": "fixture", "value": 7 }\n"#;
+        let bytes = br#"{ "schema_version": "fixture", "value": 7 }"#;
         std::fs::write(&path, bytes).expect("fixture should be written");
         let (value, digest) = read_json_with_sha256(&path).expect("fixture should parse and hash");
         assert_eq!(value["value"], 7);
