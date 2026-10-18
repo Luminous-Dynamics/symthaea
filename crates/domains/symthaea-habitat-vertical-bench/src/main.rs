@@ -48,9 +48,19 @@ fn main() {
                 process::exit(1);
             }
         };
+        let mass_case_id = value
+            .get("synthetic_material_balance_cases")
+            .and_then(serde_json::Value::as_array)
+            .and_then(|cases| cases.first())
+            .and_then(|case| case.get("case_id"))
+            .and_then(serde_json::Value::as_str);
+        let Some(mass_case_id) = mass_case_id else {
+            eprintln!("no valid material-balance case was found after structural pass");
+            process::exit(1);
+        };
         let mass = match symthaea_habitat_vertical_bench::accounting::calculate_material_balance(
             &value,
-            "MASS-BALANCE-ARITHMETIC-01",
+            mass_case_id,
         ) {
             Ok(report) => report,
             Err(error) => {
