@@ -43,6 +43,18 @@ where U95_total is the expanded uncertainty at the project's frozen coverage con
 
 If this capability gate cannot be met, report INSTRUMENT_CAPABILITY_INADEQUATE or NOT_EVALUATED; do not soften the quality floor, suppress the uncertainty, or claim the candidate passed.
 
+### Minimum uncertainty-budget record
+
+For the declared measurand, separate the relevant contributors instead of assigning an unsupported global error percentage. Typical terms include reference-instrument calibration, sensor repeatability, remount/geometry variation, spectral/temporal response mismatch, sampling/integration, drift/temperature, DUT variation, and analysis/reducer sensitivity. Include only terms relevant to the measurand, but justify omissions.
+
+If a first-order uncertainty model is appropriate, document sensitivity coefficients and the covariance terms:
+
+`u_c² = Σᵢ(cᵢuᵢ)² + 2Σᵢ<ⱼ Cov(cᵢXᵢ, cⱼXⱼ)`
+
+Then document the method that maps combined standard uncertainty `u_c` to the expanded interval `U = k u_c`, including its coverage convention, coverage factor, distribution/degrees-of-freedom assumptions, and any nonlinear/Monte Carlo treatment. Do not assume all contributions are independent merely because they come from different rows in a spreadsheet. If no defensible combined-uncertainty calculation exists yet, the decision-capability result remains NOT_EVALUATED.
+
+The formula and `U95_total <= MDE/3` are a local gate design; they do not certify an instrument, establish traceability, or replace an applicable IDMS method.
+
 ## 4. Repetition and reproducibility design
 
 Separate these sources of variation and record which ones have actually been tested:
