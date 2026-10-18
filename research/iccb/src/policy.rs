@@ -48,9 +48,7 @@ pub enum CapitalPolicy {
 
 #[derive(Clone, Copy, Debug, PartialEq, Eq)]
 pub enum PolicyInfeasibility {
-    NegativeBudgetOrCommitment,
     CommitmentExceedsBudget,
-    CommitmentArithmeticOverflow,
 }
 
 #[derive(Clone, Copy, Debug, PartialEq, Eq)]
@@ -132,8 +130,14 @@ impl CapitalPolicyScenario {
             .find(|assessment| assessment.policy == CapitalPolicy::CommitFullNow)
             .and_then(|assessment| assessment.expected_npv_minor);
 
-        let improvement_vs_one_shot_minor = one_shot_value
-            .map(|value| best_value.saturating_sub(value));
+        let improvement_vs_one_shot_minor = match one_shot_value {
+            Some(value) => Some(
+                best_value
+                    .checked_sub(value)
+                    .ok_or(PolicyInputError::ExpectedValueOverflow)?,
+            ),
+            None => None,
+        };
 
         Ok(PolicyComparison {
             scenario_id: self.id.clone(),
