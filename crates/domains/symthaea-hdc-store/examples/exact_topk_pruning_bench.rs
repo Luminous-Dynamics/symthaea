@@ -451,7 +451,9 @@ fn make_corpus_vector(
         }
         CorpusKind::Mixed => {
             if id % 4 == 0 {
-                let cluster = (id.wrapping_sub(1) % 4) as usize;
+                // The every-fourth-vector stream must rotate across all four
+                // centers; (id - 1) % 4 would always select center 3 here.
+                let cluster = (id / 4).wrapping_sub(1) as usize % centers.len();
                 let radius = 16 + ((id as usize * 13) % 65);
                 perturb(&centers[cluster], seed.wrapping_add(id), radius)
             } else {
