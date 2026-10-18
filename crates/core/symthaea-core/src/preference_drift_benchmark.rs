@@ -1287,8 +1287,12 @@ mod tests {
             }
         }
         let context_blind_winner = eligible.iter().find(|candidate| {
-            eligible.iter().filter(|other| *other != *candidate).all(|other| {
-                task_only_pairs.contains(&(candidate.clone(), other.clone()))
+            let candidate_id = candidate.as_str();
+            eligible.iter().filter(|other| other.as_str() != candidate_id).all(|other| {
+                task_only_pairs.contains(&(
+                    candidate_id.to_owned(),
+                    other.as_str().to_owned(),
+                ))
             })
         });
         assert_eq!(context_blind_winner.map(String::as_str), Some("flex"));
