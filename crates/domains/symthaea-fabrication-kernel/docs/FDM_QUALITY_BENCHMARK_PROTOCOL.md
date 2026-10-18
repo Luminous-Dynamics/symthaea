@@ -79,6 +79,14 @@ The current evidence supports a measurement-first, uncertainty-aware benchmark r
 - **Calibrated prediction, not just high accuracy:** a 2025 FFF modeling paper reports calibrated prediction intervals and multi-objective optimization across PLA, ABS, PETG and TPU using a hybrid synthetic/literature-anchored dataset. Its reported results motivate uncertainty calibration and material-specific profiles, but do not establish cross-printer transfer or the performance of this repository. Require held-out profiles/lots and physical confirmatory runs before transfer claims. [Aquisman Asare et al., *Measurement* (2025), DOI 10.1016/j.measurement.2025.119350](https://www.sciencedirect.com/science/article/abs/pii/S0263224125027095).
 - **Digital-twin credibility:** NIST's 2026 manufacturing digital-twin workshop summary identifies interoperability, verification/validation/uncertainty quantification (VVUQ), cybersecurity and workforce readiness as persistent priorities. A visually convincing twin is not evidence of model validity. [NIST, *Digital Twins Workshops Summary Report*, published July 21, 2026](https://www.nist.gov/publications/digital-twins-workshops-summary-report).
 
+### Spatial capability is a hypothesis to test
+
+A single global printer profile may conceal variation by build location, orientation, axis, motion regime, or thermal history. ISO/ASTM 52902:2023 treats test artifact position/orientation and measurement uncertainty as part of meaningful capability characterization. ASTM's published scope describes the need to consider build-platform coverage and repeatability for a complete machine-performance study. These ideas motivate the separate [FDM-SPATIAL-001 workstream](https://github.com/Luminous-Dynamics/symthaea/issues/7998).
+
+A research example is Edoimioya, Chou and Okwudire, “Vibration Compensation of Delta 3D Printer with Position-varying Dynamics using Filtered B-Splines” ([arXiv:2209.06791](https://arxiv.org/abs/2209.06791)), which studies position-varying dynamics and reports simulation and physical experiments for a delta-printer context. This result does not imply the same compensation applies to CoreXY, Cartesian or other machine designs. It makes spatial dependence a testable hypothesis, not a universal assumption.
+
+For each physical specimen, bind its position and orientation to a declared machine coordinate frame. For a multi-position campaign, stratify results by location and orientation; do not let a strong overall mean hide localized critical failures. Predictions between measured locations remain estimates and must include a validated applicability domain and uncertainty. A spatial correction is a proposal until independently tested; the benchmark must not silently modify live G-code.
+
 ### Consequences for this protocol
 
 1. Keep the geometry/artifact identity, process recipe, observed machine behavior and measurement system as separate versioned identities.
