@@ -1465,6 +1465,20 @@ mod tests {
     }
 
     #[test]
+    fn same_forged_bank_digest_in_both_reports_is_rejected_against_disk() {
+        let (mut probe, mut inventory, assets) = fixtures();
+        let forged_digest = json!("9".repeat(64));
+        probe["cases"][0]["selected_sample"]["source_bank_content_manifest_sha256"] =
+            forged_digest.clone();
+        inventory["instruments"][0]["sustained_samples"]
+            ["indexed_sample_content_manifest_sha256"] = forged_digest;
+        let report = test_report(&probe, &inventory, &assets);
+        assert_eq!(report.verdict, "inconsistent");
+        assert!(report.findings.iter().any(|finding| finding.code == "selected_bank_actual_digest_mismatch"));
+        assert!(report.findings.iter().any(|finding| finding.code == "inventory_bank_actual_digest_mismatch"));
+    }
+
+    #[test]
     fn different_source_revisions_are_rejected() {
         let (probe, mut inventory, assets) = fixtures();
         inventory["source_revision"] = json!("1".repeat(40));
@@ -1502,6 +1516,8 @@ mod tests {
         assert_eq!(report.verdict, "inconsistent");
         assert!(report.findings.iter().any(|finding| finding.code == "root_manifest_content_mismatch"));
         assert!(report.findings.iter().any(|finding| finding.code == "selected_sample_file_digest_mismatch"));
+        assert!(report.findings.iter().any(|finding| finding.code == "selected_bank_actual_digest_mismatch"));
+        assert!(report.findings.iter().any(|finding| finding.code == "inventory_bank_actual_digest_mismatch"));
     }
 
     #[test]
