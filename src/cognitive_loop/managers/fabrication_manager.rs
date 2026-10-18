@@ -869,6 +869,44 @@ mod tests {
     }
 
     #[test]
+    fn uncalibrated_twin_is_not_reported_as_a_defect_prediction() {
+        let mut mgr = FabricationManager::default();
+        let reading = ManufacturingReading {
+            tolerance: 0.95,
+            surface_quality: 0.9,
+            throughput: 0.8,
+            energy_cost: 0.3,
+        };
+
+        let before = mgr.telemetry();
+        assert!(!before.manufacturing_reference_calibrated);
+        assert!(!before.design_loop_reference_calibrated);
+
+        mgr.inject_event(FabricationEvent {
+            kind: FabricationEventKind::TwinReading {
+                reading: reading.clone(),
+            },
+            timestamp_secs: 1,
+        });
+        let _output = mgr.process(&default_snapshot());
+        let uncalibrated = mgr.telemetry();
+        assert_eq!(uncalibrated.recommended_action, "CalibrationRequired");
+        assert_eq!(uncalibrated.defect_prediction, 0.0);
+        assert_eq!(uncalibrated.defect_confidence, 0.0);
+
+        mgr.set_manufacturing_reference(&reading);
+        mgr.set_design_loop_reference(&DesignLoopReading {
+            design_intent: 0.95,
+            manufactured_state: 0.92,
+            tolerance_error: 0.05,
+            quality_confidence: 0.9,
+        });
+        let calibrated = mgr.telemetry();
+        assert!(calibrated.manufacturing_reference_calibrated);
+        assert!(calibrated.design_loop_reference_calibrated);
+    }
+
+    #[test]
     fn test_twin_reading_updates_fe() {
         let mut mgr = FabricationManager::default();
         mgr.inject_event(FabricationEvent {
