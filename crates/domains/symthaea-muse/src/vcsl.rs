@@ -3656,9 +3656,10 @@ mod tests {
             "selected-sample digest binds exact source WAV bytes"
         );
         assert_eq!(sample.source_bank_manifest_status, "hashed");
+        let expected_manifest = indexed_sample_content_manifest_sha256(&bank).unwrap();
         assert_eq!(
             sample.source_bank_content_manifest_sha256.as_deref(),
-            Some(indexed_sample_content_manifest_sha256(&bank).unwrap().as_str()),
+            Some(expected_manifest.as_str()),
             "selected-sample receipt carries the same digest as the indexed-bank inventory"
         );
         let (no_digest, no_digest_status) = bank.content_manifest_evidence(false);
