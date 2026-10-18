@@ -44,6 +44,7 @@ pub mod palate;
 pub mod pareto;
 pub mod robust_pareto;
 pub mod presets;
+pub mod regionalization;
 pub mod reaction;
 pub mod rng;
 pub mod spec;
