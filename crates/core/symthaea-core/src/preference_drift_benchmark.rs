@@ -699,7 +699,9 @@ pub struct PreferenceReplayAssessmentV1 {
     pub recommended_candidate_id: Option<String>,
     /// Eligible candidates after the scenario's upstream hard-gate filter.
     pub eligible_candidate_ids: Vec<String>,
-    /// Number of observations matching both exact current task and context.
+    /// Number of observations this baseline actually used for its decision.
+    pub used_observation_count: usize,
+    /// Number of observations matching both exact current task and context, regardless of baseline.
     pub context_matched_observation_count: usize,
     /// Number of observations not applicable to the current task/context.
     pub stale_or_mismatched_observation_count: usize,
@@ -716,6 +718,13 @@ pub struct PreferenceReplayAssessmentV1 {
 /// inspect the evaluation-only oracle or infer preferences from engineering metrics.
 pub fn replay_preference_episode(
     scenario: &Value,
+) -> Result<PreferenceReplayAssessmentV1, Vec<PreferenceDriftFixtureFindingV1>> {
+    replay_preference_episode_with_context_mode(scenario, true)
+}
+
+fn replay_preference_episode_with_context_mode(
+    scenario: &Value,
+    require_context_match: bool,
 ) -> Result<PreferenceReplayAssessmentV1, Vec<PreferenceDriftFixtureFindingV1>> {
     let mut findings = Vec::new();
     let scenario_id = nonempty_string(scenario, "scenario_id");
@@ -781,17 +790,22 @@ pub fn replay_preference_episode(
     let task_id = task_id.unwrap_or_default();
     let current_context_id = current_context_id.unwrap_or_default();
     let mut matched = Vec::new();
+    let mut context_matched_count = 0usize;
     let mut mismatched_count = 0usize;
 
     for observation in observations {
         let observation_task = nonempty_string(observation, "task_id");
         let observation_context = nonempty_string(observation, "context_id");
-        if observation_task.as_deref() == Some(task_id.as_str())
-            && observation_context.as_deref() == Some(current_context_id.as_str())
-        {
-            matched.push(observation);
+        let task_matches = observation_task.as_deref() == Some(task_id.as_str());
+        let context_matches =
+            observation_context.as_deref() == Some(current_context_id.as_str());
+        if task_matches && context_matches {
+            context_matched_count += 1;
         } else {
             mismatched_count += 1;
+        }
+        if task_matches && (!require_context_match || context_matches) {
+            matched.push(observation);
         }
     }
 
@@ -802,7 +816,8 @@ pub fn replay_preference_episode(
         reason,
         recommended_candidate_id,
         eligible_candidate_ids: eligible.clone(),
-        context_matched_observation_count: matched.len(),
+        used_observation_count: matched.len(),
+        context_matched_observation_count: context_matched_count,
         stale_or_mismatched_observation_count: mismatched_count,
         remaining_query_budget: remaining_budget,
     };
