@@ -66,6 +66,7 @@ pub struct ParticipantClusterComparison {
     /// Absent below MIN_PARTICIPANTS_FOR_BOOTSTRAP eligible participants.
     pub bootstrap_confidence_interval_95: Option<[f64; 2]>,
     pub bootstrap_replicates: usize,
+    pub minimum_participants_for_bootstrap: usize,
     pub bootstrap_seed: u64,
 }
 
@@ -430,6 +431,7 @@ fn participant_cluster_comparison(
         participants_improved_fraction: improved_fraction,
         bootstrap_confidence_interval_95: confidence_interval,
         bootstrap_replicates,
+        minimum_participants_for_bootstrap: MIN_PARTICIPANTS_FOR_BOOTSTRAP,
         bootstrap_seed: seed,
     }
 }
@@ -716,6 +718,10 @@ mod tests {
         assert_eq!(no_change.participants_improved_fraction, Some(1.0));
         assert!(no_change.bootstrap_confidence_interval_95.unwrap()[0] > 0.0);
         assert_eq!(no_change.bootstrap_replicates, PARTICIPANT_BOOTSTRAP_REPLICATES);
+        assert_eq!(
+            no_change.minimum_participants_for_bootstrap,
+            MIN_PARTICIPANTS_FOR_BOOTSTRAP
+        );
         let population = valence
             .participant_cluster_comparisons
             .iter()
@@ -771,6 +777,10 @@ mod tests {
         assert_eq!(result.participants, 3);
         assert_eq!(result.bootstrap_confidence_interval_95, None);
         assert_eq!(result.bootstrap_replicates, 0);
+        assert_eq!(
+            result.minimum_participants_for_bootstrap,
+            MIN_PARTICIPANTS_FOR_BOOTSTRAP
+        );
         assert!((result.mean_participant_mae_improvement.unwrap() - 0.2).abs() < 1e-9);
     }
 
