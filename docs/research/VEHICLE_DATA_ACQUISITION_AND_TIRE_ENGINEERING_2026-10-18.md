@@ -37,6 +37,10 @@ Request:
 
 The reported results are prior evidence, not our results. The full-powertrain paper reports battery-power correlation 0.905–0.981, motor-speed correlation 0.912–0.996 and energy within 2.71% for five of six trips; the short downhill/high-throttle-transient trip has a 10.65% relative error. Its stated scope excludes mechanical braking inputs and auxiliary consumption and does not model thermal behavior. Don't claim our model reproduces the paper without licensed raw data and exact maps.
 
+### Other vehicle classes: NLR Fleet DNA / FleetREDI
+
+The official Fleet DNA page documents **974 days from 94 delivery vans** and **553 days from 36 delivery trucks**, with additional school-bus/transit-bus vocations. It is a high-value route for real-world delivery and fleet duty cycles, but the public summary does not itself establish that the full raw files can be redistributed. Before importing traces, request the exact data package, field dictionary, source rights and license from `fleetdna@nlr.gov`. Treat its data as vehicle-mission evidence—not as an electric motor efficiency map or a substitute for South African motorcycle data. Source: https://www.nlr.gov/transportation/fleettest-fleet-dna.html.
+
 ### Andrei García Cuadra / Universidad Politécnica de Madrid
 
 Ask for a suitable explicit license or written grant for the Navarra and Cartagena deposits, including commercial research, derived features/model training if necessary, and redistribution of benchmark slices. Ask for sensor calibration, tire identification/pressure/wear, road-surface/water-depth metadata, acquisition-date confirmation and known data defects. Until then, these are public discovery links, not cleared project inputs.
