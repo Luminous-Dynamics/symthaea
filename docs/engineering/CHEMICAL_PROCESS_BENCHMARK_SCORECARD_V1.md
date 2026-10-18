@@ -44,7 +44,7 @@ For any proposed frozen simulator output, the receipt must explicitly state:
 - **Validation basis:** analytic invariant, numerical comparator, empirical observations, or a clearly described combination.
 - **Claim ceiling:** the strongest conclusion supported by that evidence—not a marketing summary.
 
-A nonempty prose ceiling alone is too easy to overread. Registry v1.1.0 makes the structured context/domain/exclusions/basis mandatory in the frozen receipt. Registry v1.2.0 also binds the parsed receipt value to a domain-separated SHA-256 content digest using a repository-local canonical JSON form, so a stale digest detects post-freeze field mutation. This canonical form is not claimed to be RFC 8785/JCS compliant. The digest is unauthenticated: an editor who can rewrite the receipt and digest can recompute both. A future attestation must anchor the digest to a trusted signer identity; signatures establish origin/integrity under a trust policy, not scientific truth.
+A nonempty prose ceiling alone is too easy to overread. Registry v1.1.0 makes the structured context/domain/exclusions/basis mandatory in the frozen receipt. Registry v1.2.0 binds the parsed receipt value to a domain-separated SHA-256 content digest using a repository-local canonical JSON form. Registry v1.3.0 adds a second envelope digest over registry schema identity and the full candidate record (case identity, source, configuration, invariants/hints, run status/version/output hashes, claim ceiling, receipt and its digest), excluding only the envelope digest field itself. This catches receipt mutation as well as partial edits or transplanting evidence to another case. This canonical form is not claimed to be RFC 8785/JCS compliant. The digest is unauthenticated: an editor who can rewrite the receipt and digest can recompute both. A future attestation must anchor the digest to a trusted signer identity; signatures establish origin/integrity under a trust policy, not scientific truth.
 
 ## Benchmark targets
 
@@ -57,6 +57,7 @@ All targets below are goals. Only the structural controls already encoded in the
 | Frozen receipts with all required provenance/context fields | **100%** | Hard |
 | Seeded changes to a frozen receipt without digest update are detected | **100%** | Hard |
 | Digest policy drift from the compiled implementation is rejected | **100%** | Hard |
+| Mutations to candidate identity, configuration, run metadata or output digest invalidate the frozen envelope | **100%** | Hard |
 | Planted transitive shared-dependency challenge detected | **100%** of seeded cases | Hard |
 | Malformed lineage graph challenge detected | **100%** of seeded cases | Hard |
 | Analytic material/element/energy invariant escape | **0** for registered negative controls | Hard |
