@@ -482,7 +482,8 @@ mod tests {
 
     #[test]
     fn extreme_allocations_respect_bounds_and_sum_to_one() {
-        let report = scenario().evaluate().unwrap();
+        let input = scenario();
+        let report = input.evaluate().unwrap();
         for action in &report.action_envelopes {
             for allocation in [
                 &action.worst_case_probability_allocation,
@@ -495,13 +496,18 @@ mod tests {
                         .sum::<u64>(),
                     TOTAL_BPS
                 );
+                assert_eq!(
+                    allocation.len(),
+                    input.state_probability_bounds.len()
+                );
                 for entry in allocation {
-                    let bound = report
-                        .action_envelopes
+                    let bound = input
+                        .state_probability_bounds
                         .iter()
-                        .flat_map(|_| Vec::<StateProbabilityBound>::new())
-                        .find(|bound| bound.state_id == entry.state_id);
-                    assert!(bound.is_none());
+                        .find(|bound| bound.state_id == entry.state_id)
+                        .expect("allocation must reference a known state");
+                    assert!(entry.probability_bps >= bound.lower_bps);
+                    assert!(entry.probability_bps <= bound.upper_bps);
                 }
             }
         }
