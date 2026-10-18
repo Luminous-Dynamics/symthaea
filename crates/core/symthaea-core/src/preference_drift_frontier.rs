@@ -595,7 +595,7 @@ fn score_frontier_point(
             point.recommendation_without_ranking_count += 1;
         }
 
-        match assessment.final_action {
+        match &assessment.final_action {
             PreferenceReplayActionV1::Abstain => {
                 point.abstention_count += 1;
                 family_score.abstention_count += 1;
