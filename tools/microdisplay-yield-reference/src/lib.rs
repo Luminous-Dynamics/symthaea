@@ -299,7 +299,10 @@ mod tests {
         );
         assert_eq!(schema["properties"]["cases"]["minItems"].as_u64(), Some(20));
         assert_eq!(schema["properties"]["cases"]["maxItems"].as_u64(), Some(20));
-        assert_eq!(schema["properties"]["cases"]["items"]["properties"]["id"]["pattern"].as_str(), Some("^MICLED-[A-Z0-9-]+$"));
+        assert_eq!(
+            schema["properties"]["cases"]["items"]["properties"]["id"]["pattern"].as_str(),
+            Some("^MICLED-[A-Z0-9-]+$")
+        );
 
         let cases = corpus["cases"]
             .as_array()
