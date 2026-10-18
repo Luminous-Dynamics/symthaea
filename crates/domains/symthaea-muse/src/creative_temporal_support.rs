@@ -227,4 +227,27 @@ mod tests {
             Err(CreativeTemporalSupportError::InvalidWindowCount)
         );
     }
+
+    #[test]
+    fn reversing_note_order_preserves_temporal_measurements() {
+        let mut notes = vec![note(0.0, 0.25), note(0.2, 0.5), note(0.8, 0.1)];
+        let forward = measure_temporal_support(&notes, 1.0, 8).unwrap();
+        notes.reverse();
+        let reversed = measure_temporal_support(&notes, 1.0, 8).unwrap();
+
+        assert_eq!(forward, reversed);
+    }
+
+    #[test]
+    fn duplicate_note_does_not_inflate_union_occupancy() {
+        let single = measure_temporal_support(&[note(0.25, 0.5)], 1.0, 4).unwrap();
+        let duplicate =
+            measure_temporal_support(&[note(0.25, 0.5), note(0.25, 0.5)], 1.0, 4).unwrap();
+
+        assert_eq!(single.onset_window_coverage_ratio, duplicate.onset_window_coverage_ratio);
+        assert_eq!(single.sustain_window_coverage_ratio, duplicate.sustain_window_coverage_ratio);
+        assert_eq!(single.occupied_time_ratio, duplicate.occupied_time_ratio);
+        assert_eq!(single.maximum_silent_gap_secs, duplicate.maximum_silent_gap_secs);
+        assert_eq!(duplicate.note_count, single.note_count + 1);
+    }
 }
