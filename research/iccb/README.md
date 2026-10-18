@@ -11,7 +11,7 @@ cargo test --manifest-path research/iccb/Cargo.toml
 cargo run --manifest-path research/iccb/Cargo.toml
 ~~~
 
-The prototype intentionally has no third-party dependencies. Its manifest defines a nested workspace boundary so it can be tested separately from Symthaea's larger workspace while its data contracts stabilize.
+The prototype is isolated from Symthaea's larger workspace. Its only third-party dependency is RustCrypto sha2 for SHA-256 receipts; avoiding a home-grown cryptographic implementation is preferable to maintaining an unreviewed hash algorithm.
 
 ## What is implemented
 
@@ -94,10 +94,20 @@ The staged-capital protocol is described in [REVERSIBILITY_AND_STAGED_CAPITAL.md
 
 The buyer-side falsification plan is in [BUYER_WORKFLOW_VALIDATION.md](BUYER_WORKFLOW_VALIDATION.md). It recommends testing one asset-heavy operating-company capital-planning workflow rather than positioning ICCB as a replacement for incumbent family-office reporting or accounting products. No customer interviews or paid-pilot commitments are claimed.
 
+## Deterministic decision receipts and replay
+
+The new `decision_receipt.rs` module creates a versioned receipt that binds the source-manifest digest, canonical scenario digest, canonical evaluator-output digest, producer commit, evaluator version, uncertainty route, evidence reference, claim ceiling and explicit limitation. SHA-256 is provided by RustCrypto `sha2`, not a locally handwritten cryptographic implementation.
+
+The receipt uses a length-prefixed binary encoding tagged with `iccb-canonical-binary-v1`. Its scenario canonicalizer sorts options and evidence claims by stable IDs, and sorts/deduplicates dependency IDs because this evaluator only counts distinct dependency IDs. Duplicate option and evidence IDs fail closed. Output options and rejection reasons are canonicalized before hashing. The source manifest is **not** canonicalized by this module: the caller must supply the exact manifest bytes in the encoding it declares, and the receipt hashes those exact bytes. The source manifest digest referenced by the uncertainty router must match that computed digest.
+
+`verify_decision_receipt` re-evaluates the provided scenario with this evaluator and compares every receipt field. This is replay using the current implementation, not yet an independent second implementation. An independent verifier should implement the published versioned encoding separately. Digest equality proves byte identity under the declared encoding, not the truth of the sources, the physical validity of a model, or authority to execute a decision. The receipt is not a spending, transfer, engineering approval or execution authorization.
+
+Synthetic unit tests cover the published SHA-256 test vector for `abc`, repeat-run equality, stale receipt rejection after manifest or scenario mutation, option/dependency-order invariance, duplicate IDs, route/manifest digest mismatch and malformed pinned metadata. The current exact-head format, compile, tests and demo are still required before treating this code as verified.
+
 ## Next steps
 
 1. Run cargo test and cargo fmt against this exact head; fix any compiler, formatting or contract issues.
 2. Implement a simple spreadsheet-equivalent baseline over the public fixtures.
 3. Move larger fixture definitions into versioned data files and separate candidate-visible observations from a separately controlled holdout evaluator.
-4. Introduce deterministic run receipts, manifest/configuration hashes and replay.
+4. Build an independent cross-implementation verifier and freeze a canonical golden receipt with expected digests.
 5. Add adversarial fixtures and compare per-dimension outcomes against simple baselines, then extend only where results justify it.
