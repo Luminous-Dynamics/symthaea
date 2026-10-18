@@ -1,0 +1,35 @@
+name: MUS-ENG instrument benchmark audit
+
+on:
+  pull_request:
+    paths:
+      - "tools/mus-eng-audit/**"
+      - "schemas/instrument-engineering/mus_eng_corpus_v0_1.schema.json"
+      - "fixtures/instrument-engineering/mus_eng_corpus_v0_1.json"
+      - ".github/workflows/mus-eng-audit.yml"
+  push:
+    branches: [main]
+    paths:
+      - "tools/mus-eng-audit/**"
+      - "schemas/instrument-engineering/mus_eng_corpus_v0_1.schema.json"
+      - "fixtures/instrument-engineering/mus_eng_corpus_v0_1.json"
+      - ".github/workflows/mus-eng-audit.yml"
+
+permissions:
+  contents: read
+
+jobs:
+  audit:
+    name: MUS-ENG schema, policy tests and fixture audit
+    runs-on: ubuntu-latest
+    steps:
+      - name: Check out repository
+        uses: actions/checkout@v4
+      - name: Install stable Rust
+        uses: dtolnay/rust-toolchain@stable
+      - name: Check formatting
+        run: cargo fmt --manifest-path tools/mus-eng-audit/Cargo.toml -- --check
+      - name: Run auditor unit tests
+        run: cargo test --manifest-path tools/mus-eng-audit/Cargo.toml
+      - name: Audit synthetic corpus
+        run: cargo run --manifest-path tools/mus-eng-audit/Cargo.toml -- --schema schemas/instrument-engineering/mus_eng_corpus_v0_1.schema.json --corpus fixtures/instrument-engineering/mus_eng_corpus_v0_1.json
