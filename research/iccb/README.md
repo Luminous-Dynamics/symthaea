@@ -16,9 +16,10 @@ The prototype intentionally has no third-party dependencies. Its manifest define
 ## What is implemented
 
 - Candidate-facing synthetic structs for evidence claims, decision options, mandate constraints and scenarios.
+- Five named, stable-ID public development fixtures: productive expansion, asset-price-only boom, hidden maintenance burden, critical-dependency overlap, and stale evidence.
 - Evidence usability checks for explicit source, observation time, validity window and qualification state.
 - Hard gates for budget, liquidity, maintenance burden and delegated authority.
-- Critical dependency overlap surfaced as its own dimension.
+- Reported valuation change, expected net cash, productive-capacity delta, maintenance burden and critical dependency overlap are separate dimensions.
 - An outcome vector that keeps net cash, liquidity, productive capacity, maintenance burden and dependency exposure separate.
 - Unit tests for negative controls, stale/expired/missing-source evidence, repeated dependency IDs, constraints and deterministic equality.
 - A demo in which the higher-cash option fails the maintenance gate while a lower-cash, higher-capacity option passes.
@@ -37,8 +38,8 @@ The buyer-side falsification plan is in [BUYER_WORKFLOW_VALIDATION.md](BUYER_WOR
 
 ## Next steps
 
-1. Run cargo test and fix any compiler or contract issues.
-2. Add versioned synthetic fixtures and a simple spreadsheet-equivalent baseline.
-3. Separate candidate-visible observations from a separately controlled holdout evaluator.
+1. Run cargo test and cargo fmt against this exact head; fix any compiler, formatting or contract issues.
+2. Implement a simple spreadsheet-equivalent baseline over the public fixtures.
+3. Move larger fixture definitions into versioned data files and separate candidate-visible observations from a separately controlled holdout evaluator.
 4. Introduce deterministic run receipts, manifest/configuration hashes and replay.
-5. Add adversarial fixtures and score per-dimension outcomes against baseline, then extend only where results justify it.
+5. Add adversarial fixtures and compare per-dimension outcomes against simple baselines, then extend only where results justify it.
