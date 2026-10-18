@@ -63,11 +63,12 @@ struct Case {
     class: String,
     title: String,
     pair: Pair,
-    expected_status: String,
+    expected_status: Option<String>,
     expected_error: Option<String>,
     expected_output: Option<ScoreMetrics>,
     absolute_tolerance: Option<f64>,
     relative_tolerance: Option<f64>,
+    #[serde(default)]
     must_not_claim: Vec<String>,
 }
 
@@ -76,9 +77,9 @@ struct CaseResult {
     scenario_id: String,
     class: String,
     title: String,
-    expected_status: String,
+    expected_status: Option<String>,
     computed_status: String,
-    decision_matches: bool,
+    decision_matches: Option<bool>,
     expected_error: Option<String>,
     computed_error: Option<String>,
     expected_output: Option<ScoreMetrics>,
@@ -105,12 +106,14 @@ struct Report {
     manifest_id: String,
     manifest_sha256: String,
     evidence_class: String,
+    mode: String,
     case_count: usize,
+    expected_decisions_checked: usize,
     matched_cases: usize,
     mismatched_cases: usize,
     scoreable_pairs: usize,
     validation_eligible_pairs: usize,
-    fixture_conformance_pass: bool,
+    fixture_conformance_pass: Option<bool>,
     eligible_summary: EligibleSummary,
     claim_ceiling: String,
     cases: Vec<CaseResult>,
@@ -239,14 +242,19 @@ fn compare_metrics(expected: &ScoreMetrics, actual: &ScoreMetrics, abs_tol: f64,
 }
 
 fn validate_manifest(manifest: &Manifest) -> Result<()> {
+    let fixture_mode = manifest.status == "frozen_expected_cases_not_yet_executed";
+    let measured_mode = manifest.status == "measured_dataset";
+    if !fixture_mode && !measured_mode {
+        bail!("unsupported scorecard mode: {}", manifest.status);
+    }
     if manifest.schema_version != "0.1.0" {
         bail!("unsupported validation-scorecard schema: {}", manifest.schema_version);
     }
-    if manifest.status != "frozen_expected_cases_not_yet_executed" {
-        bail!("unexpected fixture status: {}", manifest.status);
-    }
-    if manifest.evidence_class != "Synthetic" {
+    if fixture_mode && manifest.evidence_class != "Synthetic" {
         bail!("oracle fixture must remain Synthetic evidence");
+    }
+    if measured_mode && !PHYSICAL_EVIDENCE.contains(&manifest.evidence_class.as_str()) {
+        bail!("measured_dataset mode requires InstrumentedPhysical or FieldObserved evidence");
     }
     if manifest.metric_contract != "matched_cycle_energy_per_distance_v0_1" {
         bail!("unsupported metric contract: {}", manifest.metric_contract);
@@ -254,6 +262,7 @@ fn validate_manifest(manifest: &Manifest) -> Result<()> {
     if manifest.cases.is_empty() {
         bail!("validation scorecard contains no cases");
     }
+
     let mut ids = BTreeSet::new();
     let mut positive_controls = 0usize;
     let mut negative_controls = 0usize;
@@ -261,42 +270,59 @@ fn validate_manifest(manifest: &Manifest) -> Result<()> {
         if case.scenario_id.trim().is_empty() || !ids.insert(case.scenario_id.as_str()) {
             bail!("empty or duplicate scenario ID: {}", case.scenario_id);
         }
-        match case.class.as_str() {
-            "positive_control" => positive_controls += 1,
-            "negative_control" => negative_controls += 1,
-            other => bail!("unknown case class {other} in {}", case.scenario_id),
+        if case.class.trim().is_empty() {
+            bail!("case {} has an empty class", case.scenario_id);
         }
-        if case.must_not_claim.is_empty() {
-            bail!("case {} lacks a claim ceiling", case.scenario_id);
-        }
-        if !ALLOWED_STATUS.contains(&case.expected_status.as_str()) {
-            bail!("unknown expected status in {}", case.scenario_id);
-        }
-        match case.expected_status.as_str() {
-            "SCORE" => {
-                if case.expected_output.is_none() || case.expected_error.is_some() {
-                    bail!("scored case {} needs expected metrics and no error", case.scenario_id);
-                }
-                if case.absolute_tolerance.is_none_or(|v| !v.is_finite() || v < 0.0)
-                    || case.relative_tolerance.is_none_or(|v| !v.is_finite() || v < 0.0)
-                {
-                    bail!("scored case {} needs finite comparison tolerances", case.scenario_id);
-                }
+        if fixture_mode {
+            match case.class.as_str() {
+                "positive_control" => positive_controls += 1,
+                "negative_control" => negative_controls += 1,
+                other => bail!("unknown fixture case class {other} in {}", case.scenario_id),
             }
-            "REJECT_INPUT" => {
-                if case.expected_error.is_none() || case.expected_output.is_some() {
-                    bail!("rejected case {} needs an error and no metrics", case.scenario_id);
-                }
+            if case.must_not_claim.is_empty() {
+                bail!("fixture case {} lacks a claim ceiling", case.scenario_id);
             }
-            _ => unreachable!("expected status validated above"),
+            let status = case.expected_status.as_deref().unwrap_or("");
+            if !ALLOWED_STATUS.contains(&status) {
+                bail!("unknown or missing expected status in {}", case.scenario_id);
+            }
+            match status {
+                "SCORE" => {
+                    if case.expected_output.is_none() || case.expected_error.is_some() {
+                        bail!("scored case {} needs expected metrics and no error", case.scenario_id);
+                    }
+                    if case.absolute_tolerance.is_none_or(|v| !v.is_finite() || v < 0.0)
+                        || case.relative_tolerance.is_none_or(|v| !v.is_finite() || v < 0.0)
+                    {
+                        bail!("scored case {} needs finite comparison tolerances", case.scenario_id);
+                    }
+                }
+                "REJECT_INPUT" => {
+                    if case.expected_error.is_none() || case.expected_output.is_some() {
+                        bail!("rejected case {} needs an error and no metrics", case.scenario_id);
+                    }
+                }
+                _ => unreachable!("expected status validated above"),
+            }
+        } else {
+            if case.expected_status.is_some()
+                || case.expected_error.is_some()
+                || case.expected_output.is_some()
+                || case.absolute_tolerance.is_some()
+                || case.relative_tolerance.is_some()
+            {
+                bail!("measured row {} must not carry frozen oracle expectations", case.scenario_id);
+            }
+            if case.pair.evidence_class != manifest.evidence_class {
+                bail!("evidence-class mismatch in measured row {}", case.scenario_id);
+            }
         }
     }
-    if positive_controls == 0 || negative_controls == 0 {
-        bail!("scorecard requires positive and negative controls");
+    if fixture_mode && (positive_controls == 0 || negative_controls == 0) {
+        bail!("scorecard fixture requires positive and negative controls");
     }
     Ok(())
 }
-
 fn nearest_rank(sorted: &[f64], p: f64) -> Option<f64> {
     if sorted.is_empty() {
         return None;
@@ -339,11 +365,12 @@ fn summarize_eligible(rows: &[(String, ScoreMetrics)]) -> EligibleSummary {
 
 pub fn run(input_path: &Path, output_path: Option<&Path>) -> Result<()> {
     let raw = fs::read(input_path)
-        .with_context(|| format!("reading validation scorecard fixture {}", input_path.display()))?;
+        .with_context(|| format!("reading validation scorecard {}", input_path.display()))?;
     let manifest_sha256 = format!("{:x}", Sha256::digest(&raw));
     let manifest: Manifest = serde_json::from_slice(&raw)
-        .with_context(|| format!("parsing validation scorecard fixture {}", input_path.display()))?;
+        .with_context(|| format!("parsing validation scorecard {}", input_path.display()))?;
     validate_manifest(&manifest)?;
+    let fixture_mode = manifest.status == "frozen_expected_cases_not_yet_executed";
 
     let mut results = Vec::with_capacity(manifest.cases.len());
     let mut eligible_rows = Vec::new();
@@ -357,11 +384,15 @@ pub fn run(input_path: &Path, output_path: Option<&Path>) -> Result<()> {
                     compare_metrics(
                         reference,
                         &computed,
-                        case.absolute_tolerance.expect("tolerance checked"),
-                        case.relative_tolerance.expect("tolerance checked"),
+                        case.absolute_tolerance.unwrap_or(0.0),
+                        case.relative_tolerance.unwrap_or(0.0),
                     )
                 });
-                let decision_matches = case.expected_status == "SCORE" && numeric_match;
+                let decision_matches = if fixture_mode {
+                    Some(case.expected_status.as_deref() == Some("SCORE") && numeric_match)
+                } else {
+                    None
+                };
                 let reasons = eligibility_reasons(&case.pair);
                 let eligible = reasons.is_empty();
                 if eligible {
@@ -384,8 +415,12 @@ pub fn run(input_path: &Path, output_path: Option<&Path>) -> Result<()> {
                 });
             }
             Err(error) => {
-                let decision_matches = case.expected_status == "REJECT_INPUT"
-                    && case.expected_error.as_deref() == Some(error);
+                let decision_matches = if fixture_mode {
+                    Some(case.expected_status.as_deref() == Some("REJECT_INPUT")
+                        && case.expected_error.as_deref() == Some(error))
+                } else {
+                    None
+                };
                 results.push(CaseResult {
                     scenario_id: case.scenario_id.clone(),
                     class: case.class.clone(),
@@ -404,22 +439,26 @@ pub fn run(input_path: &Path, output_path: Option<&Path>) -> Result<()> {
             }
         }
     }
-    let matched_cases = results.iter().filter(|r| r.decision_matches).count();
-    let mismatched_cases = results.len() - matched_cases;
+
+    let expected_decisions_checked = results.iter().filter(|result| result.decision_matches.is_some()).count();
+    let matched_cases = results.iter().filter(|result| result.decision_matches == Some(true)).count();
+    let mismatched_cases = results.iter().filter(|result| result.decision_matches == Some(false)).count();
     let validation_eligible_pairs = eligible_rows.len();
     let report = Report {
         report_version: "0.1.0".into(),
         manifest_id: manifest.manifest_id,
         manifest_sha256,
         evidence_class: manifest.evidence_class,
+        mode: manifest.status,
         case_count: results.len(),
+        expected_decisions_checked,
         matched_cases,
         mismatched_cases,
         scoreable_pairs,
         validation_eligible_pairs,
-        fixture_conformance_pass: mismatched_cases == 0,
+        fixture_conformance_pass: fixture_mode.then_some(mismatched_cases == 0),
         eligible_summary: summarize_eligible(&eligible_rows),
-        claim_ceiling: "Synthetic fixtures test matched-pair arithmetic and eligibility rules only. Validation metrics apply only to physically measured, independently held-out, identity-matched pairs. No vehicle qualification, safety, roadworthiness or regulatory claim.".into(),
+        claim_ceiling: "Fixture mode proves synthetic contract conformance only. measured_dataset mode summarizes only physically measured, independently held-out, identity-matched pairs. Neither mode certifies vehicle safety, roadworthiness or regulatory compliance.".into(),
         cases: results,
     };
     let encoded = serde_json::to_string_pretty(&report)?;
@@ -432,12 +471,11 @@ pub fn run(input_path: &Path, output_path: Option<&Path>) -> Result<()> {
             .with_context(|| format!("writing scorecard report {}", path.display()))?;
     }
     println!("{encoded}");
-    if mismatched_cases != 0 {
-        bail!("validation scorecard oracle mismatch: {mismatched_cases} of {} cases differ", report.case_count);
+    if fixture_mode && mismatched_cases != 0 {
+        bail!("validation scorecard oracle mismatch: {mismatched_cases} of {expected_decisions_checked} cases differ");
     }
     Ok(())
 }
-
 #[cfg(test)]
 mod tests {
     use super::*;
@@ -456,7 +494,7 @@ mod tests {
         for case in &manifest.cases {
             match validate_pair(&case.pair) {
                 Ok(()) => {
-                    assert_eq!(case.expected_status, "SCORE", "{}", case.scenario_id);
+                    assert_eq!(case.expected_status.as_deref(), Some("SCORE"), "{}", case.scenario_id);
                     assert!(compare_metrics(
                         case.expected_output.as_ref().expect("expected output"),
                         &score(&case.pair),
@@ -465,7 +503,7 @@ mod tests {
                     ), "{}", case.scenario_id);
                 }
                 Err(error) => {
-                    assert_eq!(case.expected_status, "REJECT_INPUT", "{}", case.scenario_id);
+                    assert_eq!(case.expected_status.as_deref(), Some("REJECT_INPUT"), "{}", case.scenario_id);
                     assert_eq!(case.expected_error.as_deref(), Some(error), "{}", case.scenario_id);
                 }
             }
@@ -492,6 +530,25 @@ mod tests {
         assert!(eligibility_reasons(&pair).contains(&"missing_calibration_receipt".into()));
         pair.calibration_receipt_id = Some("calibration-receipt-123".into());
         assert!(eligibility_reasons(&pair).is_empty());
+    }
+
+    #[test]
+    fn measured_dataset_mode_accepts_physical_manifest_without_oracle_expectations() {
+        let mut manifest = manifest();
+        manifest.status = "measured_dataset".into();
+        manifest.evidence_class = "InstrumentedPhysical".into();
+        for case in &mut manifest.cases {
+            case.class = "measurement".into();
+            case.pair.evidence_class = "InstrumentedPhysical".into();
+            case.pair.calibration_receipt_id = Some("test-calibration-receipt".into());
+            case.expected_status = None;
+            case.expected_error = None;
+            case.expected_output = None;
+            case.absolute_tolerance = None;
+            case.relative_tolerance = None;
+            case.must_not_claim.clear();
+        }
+        validate_manifest(&manifest).expect("measured-dataset mode is structurally valid");
     }
 
     #[test]
