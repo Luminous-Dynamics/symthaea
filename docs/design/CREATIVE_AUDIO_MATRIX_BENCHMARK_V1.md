@@ -8,7 +8,7 @@ From the repository checkout:
 
     cargo run -p symthaea-muse --example creative_audio_matrix -- <expected-git-sha>
 
-The optional SHA is an assertion, not free-form provenance metadata. The program resolves git rev-parse HEAD from the crate directory, records the actual revision, and exits non-zero if the supplied expected revision differs.
+The optional SHA is an assertion, not free-form provenance metadata. The program resolves git rev-parse HEAD from the crate directory, records the actual revision, captures rustc version and host OS/architecture, hashes the serialized cognitive state and renderer configuration, and exits non-zero if the supplied expected revision differs. It also fails closed if tracked or untracked working-tree changes exist, so HEAD alone cannot misrepresent a dirty checkout.
 
 ## Matrix
 
