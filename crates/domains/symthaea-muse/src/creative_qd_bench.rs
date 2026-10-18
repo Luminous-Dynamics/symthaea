@@ -478,6 +478,22 @@ mod tests {
         } else {
             panic!("valid ambient fixture should have temporal support metrics");
         }
+
+        let dense_drone = ambient
+            .candidates
+            .iter()
+            .find(|candidate| candidate.candidate_id == "dense-drone")
+            .unwrap();
+        if let CreativeTemporalSupportOutcomeV1::Measured { metrics } =
+            &dense_drone.temporal_support
+        {
+            assert_eq!(metrics.onset_window_coverage_ratio, 1.0);
+            assert_eq!(metrics.sustain_window_coverage_ratio, 1.0);
+            assert!((metrics.occupied_time_ratio - 0.8).abs() < 1.0e-6);
+            assert!((metrics.maximum_silent_gap_secs - 0.05).abs() < 1.0e-6);
+        } else {
+            panic!("valid dense-drone fixture should have temporal support metrics");
+        }
     }
 
     #[test]
