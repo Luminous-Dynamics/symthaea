@@ -107,7 +107,7 @@ jobs:
           test "$actual_source_sha" = "$expected_source_sha"
 
           expected_tool_version="$(jq -r '.tool.version' "$receipt")"
-          actual_tool_version="$(openscad --version | sed -n 's/^OpenSCAD version //p')"
+          actual_tool_version="$(openscad --version 2>&1 | sed -n 's/^OpenSCAD version //p')"
           test "$actual_tool_version" = "$expected_tool_version"
 
           check_triangle_count() {
