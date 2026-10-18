@@ -64,13 +64,14 @@ fn timestamps_are_required_for_evidence_as_known_at_a_time() {
 }
 
 #[test]
-fn a_qualified_claim_requires_qualified_factor_statuses() {
+fn synthetic_source_locators_cannot_be_relabelled_qualified() {
     let mut value = fixture();
     value["claim_status"] = json!("qualified");
     value["input"]["evidence_status"] = json!("qualified");
     value["steps"][0]["evidence_status"] = json!("qualified");
     value["steps"][1]["evidence_status"] = json!("qualified");
-    assert!(validate_food_quantity_conversion_v1(&value).is_ok());
+    let errors = validate_food_quantity_conversion_v1(&value).unwrap_err();
+    assert!(errors.iter().any(|error| error.contains("source_ref is synthetic")));
 }
 
 #[test]
