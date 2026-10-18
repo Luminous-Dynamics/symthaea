@@ -74,7 +74,8 @@
         "authorization_gate",
         "availability",
         "evidence_kind",
-        "cost"
+        "cost",
+        "nutrition_evidence_state"
       ],
       "properties": {
         "candidate_id": {
@@ -243,6 +244,15 @@
             "estimated",
             "synthetic",
             "simulated"
+          ]
+        },
+        "nutrition_evidence_state": {
+          "enum": [
+            "complete",
+            "partial",
+            "missing_required",
+            "not_assessed",
+            "not_applicable"
           ]
         }
       },
