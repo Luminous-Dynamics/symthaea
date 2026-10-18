@@ -17,13 +17,12 @@ Validate an alternate fixture by passing its path:
 cargo run -p symthaea-habitat-vertical-bench --bin validate-habitat-vertical -- path/to/fixture.json
 ```
 
-The default fixture is embedded at compile time from `docs/research/fixtures/habitat-vertical-v0.1.json`. A successful run means only that the fixture parses and meets the structural invariants implemented here. The CLI explicitly states that the negative controls are declared but not executed by this binary.
+The default fixture is embedded at compile time from `docs/research/fixtures/habitat-vertical-v0.1.json`. A successful run means only that the fixture parses and meets the structural and synthetic arithmetic invariants implemented here. The CLI prints the synthetic cost ratio and mass-balance known answers; negative controls are declared and only the mutations covered by unit tests are executed.
 
 ## Checks
 
 - delivered-cost known-answer arithmetic across 12 mandatory cost categories, positive accepted-unit denominators, exact currency matching, checked integer summation, and exact-ratio comparison without floating-point pass/fail rounding;
 - single-stream material-balance accounting with explicit units/boundary, checked integer totals, required residual matching, tolerance enforcement, closure ratio and accepted-mass yield;
-
 - required schema/program/evidence identity and synthetic-only claim ceiling;
 - unique IDs for supplier, lot, resource, operation, target, metric, disruption, negative-control, owner and factory-zone records;
 - every material lot's supplier reference resolves;
@@ -36,6 +35,10 @@ The default fixture is embedded at compile time from `docs/research/fixtures/hab
 - complete negative-control and disruption descriptions;
 - proposed target status and the delivered-cost ratio range;
 - synthetic-only physical-measurement, factory-commissioning, human-evaluation and replication states.
+
+## Tests and verification status
+
+The source currently contains 31 authored Rust unit tests. They have not been compiled or executed in the current environment; do not describe them as passing. Run the commands above against the exact branch head before treating the qualifier as an executed test result.
 
 ## Deliberate limits
 
