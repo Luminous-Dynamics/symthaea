@@ -24,9 +24,9 @@ pub enum CreativeTemporalSupportError {
 pub struct CreativeTemporalSupportV1 {
     /// Fraction of equal-duration windows containing at least one note onset.
     pub onset_window_coverage_ratio: f32,
-    /// Fraction of windows overlapped by at least one sounding note interval.
+    /// Fraction of windows overlapped by at least one non-zero-velocity note interval.
     pub sustain_window_coverage_ratio: f32,
-    /// Fraction of total duration covered by the union of sounding note intervals.
+    /// Fraction of clip duration covered by the union of non-zero-velocity note intervals.
     pub occupied_time_ratio: f32,
     /// Longest silent interval, including silence at the beginning or end.
     pub maximum_silent_gap_secs: f32,
