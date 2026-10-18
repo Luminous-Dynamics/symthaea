@@ -126,6 +126,8 @@ pub struct FabricationTelemetry {
     pub mrp_work_order_count: u32,
     pub defect_prediction: f32,
     pub defect_confidence: f32,
+    /// True only when the current defect score has a valid prediction source.
+    pub defect_prediction_available: bool,
 }
 
 // ═══════════════════════════════════════════════════════════════════════════════
@@ -159,9 +161,10 @@ pub struct FabricationManager {
     mrp_feasible: bool,
     mrp_shortages_count: u32,
     mrp_work_order_count: u32,
-    // Defect prediction snapshot.
+    // Defect prediction snapshot; zero values are not a substitute for availability.
     defect_prediction: f32,
     defect_confidence: f32,
+    defect_prediction_available: bool,
     // Optional Cincinnati monitor for simulation mode.
     monitor: Option<CincinnatiMonitor>,
 }
@@ -194,6 +197,7 @@ impl Default for FabricationManager {
             mrp_work_order_count: 0,
             defect_prediction: 0.0,
             defect_confidence: 0.0,
+            defect_prediction_available: false,
             monitor: None,
         }
     }
@@ -267,9 +271,20 @@ impl FabricationManager {
     }
 
     /// Update defect prediction snapshot (called from DefectPredictor output).
+    ///
+    /// Non-finite inputs invalidate the snapshot instead of being clamped into
+    /// apparently usable values. Availability is separate from the numeric score:
+    /// `0.0` can be a valid prediction and does not itself mean "unavailable".
     pub fn inject_defect_prediction(&mut self, quality: f32, confidence: f32) {
-        self.defect_prediction = quality.clamp(0.0, 1.0);
-        self.defect_confidence = confidence.clamp(0.0, 1.0);
+        if quality.is_finite() && confidence.is_finite() {
+            self.defect_prediction = quality.clamp(0.0, 1.0);
+            self.defect_confidence = confidence.clamp(0.0, 1.0);
+            self.defect_prediction_available = true;
+        } else {
+            self.defect_prediction = 0.0;
+            self.defect_confidence = 0.0;
+            self.defect_prediction_available = false;
+        }
     }
 
     /// Enable simulation mode with Cincinnati monitoring.
@@ -306,6 +321,7 @@ impl FabricationManager {
             mrp_work_order_count: self.mrp_work_order_count,
             defect_prediction: self.defect_prediction,
             defect_confidence: self.defect_confidence,
+            defect_prediction_available: self.defect_prediction_available,
         }
     }
 
@@ -502,6 +518,7 @@ impl FabricationManager {
         if !twin_out.reference_calibrated {
             self.defect_prediction = 0.0;
             self.defect_confidence = 0.0;
+            self.defect_prediction_available = false;
             return;
         }
 
@@ -511,6 +528,12 @@ impl FabricationManager {
         let confidence_estimate = (1.0 - self.anomaly_ema).clamp(0.0, 1.0);
         self.defect_prediction = 1.0 - quality_estimate;
         self.defect_confidence = confidence_estimate;
+        self.defect_prediction_available =
+            self.defect_prediction.is_finite() && self.defect_confidence.is_finite();
+        if !self.defect_prediction_available {
+            self.defect_prediction = 0.0;
+            self.defect_confidence = 0.0;
+        }
     }
 
     fn process_design_loop_reading(&mut self, reading: &DesignLoopReading) {
@@ -893,6 +916,7 @@ mod tests {
         assert_eq!(uncalibrated.recommended_action, "CalibrationRequired");
         assert_eq!(uncalibrated.defect_prediction, 0.0);
         assert_eq!(uncalibrated.defect_confidence, 0.0);
+        assert!(!uncalibrated.defect_prediction_available);
 
         mgr.set_manufacturing_reference(&reading);
         mgr.set_design_loop_reference(&DesignLoopReading {
@@ -904,6 +928,21 @@ mod tests {
         let calibrated = mgr.telemetry();
         assert!(calibrated.manufacturing_reference_calibrated);
         assert!(calibrated.design_loop_reference_calibrated);
+    }
+
+    #[test]
+    fn non_finite_external_defect_prediction_is_unavailable() {
+        let mut mgr = FabricationManager::default();
+        mgr.inject_defect_prediction(f32::NAN, 0.8);
+        let t = mgr.telemetry();
+        assert!(!t.defect_prediction_available);
+        assert_eq!(t.defect_prediction, 0.0);
+        assert_eq!(t.defect_confidence, 0.0);
+
+        mgr.inject_defect_prediction(0.0, 0.0);
+        let valid_zero = mgr.telemetry();
+        assert!(valid_zero.defect_prediction_available);
+        assert_eq!(valid_zero.defect_prediction, 0.0);
     }
 
     #[test]
@@ -939,6 +978,7 @@ mod tests {
             "defect_confidence should be 0.72, got {}",
             t.defect_confidence
         );
+        assert!(t.defect_prediction_available);
     }
 
     #[test]
