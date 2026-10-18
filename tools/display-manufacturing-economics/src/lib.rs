@@ -732,7 +732,8 @@ mod tests {
             Err(ManufacturingMetricError::InvalidRouteCandidate)
         );
 
-        let mut missing_uncertainty = route_candidate("missing-uncertainty", 10.0, 20.0, 100.0, 0.90);
+        let mut missing_uncertainty =
+            route_candidate("missing-uncertainty", 10.0, 20.0, 100.0, 0.90);
         missing_uncertainty.uncertainty_method_digest.clear();
         assert_eq!(
             route_pareto_dominates(&missing_uncertainty, &a),
