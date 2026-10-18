@@ -359,44 +359,46 @@ mod tests {
 
     #[test]
     fn expected_value_gate_replans_when_predicted_gain_exceeds_cost() {
-        assert_eq!(
-            intervention_policy().decide(0.3, 0.8, 0),
-            Ok(InterventionDecision::RequestReplan {
-                expected_benefit: 40.0,
-                replans_remaining: 2,
-            })
-        );
+        match intervention_policy().decide(0.3, 0.8, 0).unwrap() {
+            InterventionDecision::RequestReplan { expected_benefit, replans_remaining } => {
+                assert!((expected_benefit - 40.0).abs() < 1e-9);
+                assert_eq!(replans_remaining, 2);
+            }
+            other => panic!("expected replan request, got {other:?}"),
+        }
     }
 
     #[test]
     fn expected_value_gate_continues_when_replanning_is_not_worth_its_cost() {
-        assert_eq!(
-            intervention_policy().decide(0.8, 0.82, 0),
-            Ok(InterventionDecision::Continue { expected_benefit: -8.0 })
-        );
+        match intervention_policy().decide(0.8, 0.82, 0).unwrap() {
+            InterventionDecision::Continue { expected_benefit } => {
+                assert!((expected_benefit + 8.0).abs() < 1e-9);
+            }
+            other => panic!("expected continue, got {other:?}"),
+        }
     }
 
     #[test]
     fn low_confidence_with_no_replan_budget_stops_for_review() {
-        assert_eq!(
-            intervention_policy().decide(0.2, 0.9, 2),
-            Ok(InterventionDecision::StopAndEscalate {
-                expected_benefit: 60.0,
-                reason: EscalationReason::ReplanBudgetExhausted,
-            })
-        );
+        match intervention_policy().decide(0.2, 0.9, 2).unwrap() {
+            InterventionDecision::StopAndEscalate { expected_benefit, reason } => {
+                assert!((expected_benefit - 60.0).abs() < 1e-9);
+                assert_eq!(reason, EscalationReason::ReplanBudgetExhausted);
+            }
+            other => panic!("expected stop/escalate, got {other:?}"),
+        }
     }
 
     #[test]
     fn low_confidence_stops_when_replan_has_insufficient_expected_benefit() {
         let policy = InterventionPolicy::new(100.0, 50.0, 5.0, 0.6, 2).unwrap();
-        assert_eq!(
-            policy.decide(0.3, 0.7, 0),
-            Ok(InterventionDecision::StopAndEscalate {
-                expected_benefit: -10.0,
-                reason: EscalationReason::ConfidenceBelowContinueThreshold,
-            })
-        );
+        match policy.decide(0.3, 0.7, 0).unwrap() {
+            InterventionDecision::StopAndEscalate { expected_benefit, reason } => {
+                assert!((expected_benefit + 10.0).abs() < 1e-9);
+                assert_eq!(reason, EscalationReason::ConfidenceBelowContinueThreshold);
+            }
+            other => panic!("expected stop/escalate, got {other:?}"),
+        }
     }
 
     #[test]
