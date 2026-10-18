@@ -17,9 +17,9 @@ command -v sha256sum >/dev/null 2>&1 || fail "required command unavailable: sha2
 [ -f "$CASES" ] || fail "missing cases.json"
 [ -f "$ORACLE" ] || fail "missing oracle.json"
 
-jq -e '.schema_version == "symthaea.rea-coverage-manifest.v1" and .benchmark_id == "ENG-REA-003" and (.cases | length) == 14' "$CASES" >/dev/null ||
+jq -e '.schema_version == "symthaea.rea-coverage-manifest.v1" and .benchmark_id == "ENG-REA-003" and (.cases | length) == 15' "$CASES" >/dev/null ||
     fail "invalid case manifest or unexpected case count"
-jq -e '.schema_version == "symthaea.rea-coverage-oracle.v1" and .benchmark_id == "ENG-REA-003" and (.expected_dispositions | length) == 14' "$ORACLE" >/dev/null ||
+jq -e '.schema_version == "symthaea.rea-coverage-oracle.v1" and .benchmark_id == "ENG-REA-003" and (.expected_dispositions | length) == 15' "$ORACLE" >/dev/null ||
     fail "invalid oracle schema or unexpected case count"
 case_ids=$(jq -er '[.cases[].id] | sort | join(",")' "$CASES")
 oracle_ids=$(jq -er '.expected_dispositions | keys | sort | join(",")' "$ORACLE")
