@@ -1352,7 +1352,7 @@
         "scenario_digest": "sha256:synthetic-scenario-a"
       },
       "expected": {
-        "disposition": "blocked",
+        "disposition": "invalid_evidence",
         "reason_codes": [
           "INVALID_COST_BASIS"
         ],
