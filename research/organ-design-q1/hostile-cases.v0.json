@@ -84,6 +84,11 @@
       "id": "profile-tier-cannot-exceed-synthetic",
       "threat": "A profile attempts to configure Q1 as physical, tissue-specific, or translational evidence.",
       "expected": "profile rejected; Q1 remains synthetic-only"
+    },
+    {
+      "id": "missing-evidence-fails-closed",
+      "threat": "A candidate omits a source required by its evaluation profile.",
+      "expected": "candidate rejected with missing_evidence"
     }
   ]
 }
