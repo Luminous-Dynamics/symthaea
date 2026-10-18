@@ -83,6 +83,58 @@ impl Default for MasteringConfig {
     }
 }
 
+impl MasteringConfig {
+    /// Return a conservative mastering hypothesis for a performance dialect.
+    ///
+    /// All profiles retain the same integrated-loudness target, limiter ceiling,
+    /// and section-leveling behavior. Only broad three-band balance targets and
+    /// EQ correction ceilings vary. These are controlled starting points for
+    /// evaluation, not claims that every recording in a tradition should sound
+    /// alike. ClassicalRubato is the exact historical default.
+    #[cfg(feature = "theory")]
+    pub fn for_dialect(dialect: crate::theory_realize::PerformanceDialect) -> Self {
+        use crate::theory_realize::PerformanceDialect as D;
+
+        let mut config = Self::default();
+        match dialect {
+            D::ClassicalRubato => {}
+            // A restrained low-end emphasis and softer high-band correction:
+            // a hypothesis for groove-led material, not a genre rule.
+            D::DanceLocked => {
+                config.target_low_ratio = 0.32;
+                config.target_mid_ratio = 0.45;
+                config.target_high_ratio = 0.23;
+                config.eq_max_correction_db = 4.5;
+                config.eq_max_high_boost_db = 1.0;
+            }
+            // Preserve more of the native spectrum on sustained/process music;
+            // the tighter correction ceiling avoids mastering the process away.
+            D::ProcessExact => {
+                config.target_low_ratio = 0.28;
+                config.target_mid_ratio = 0.43;
+                config.target_high_ratio = 0.29;
+                config.eq_max_correction_db = 3.5;
+                config.eq_max_high_boost_db = 1.0;
+            }
+            D::FolkLift => {
+                config.target_low_ratio = 0.30;
+                config.target_mid_ratio = 0.44;
+                config.target_high_ratio = 0.26;
+                config.eq_max_correction_db = 4.5;
+                config.eq_max_high_boost_db = 1.25;
+            }
+            D::JazzLaidBack => {
+                config.target_low_ratio = 0.29;
+                config.target_mid_ratio = 0.47;
+                config.target_high_ratio = 0.24;
+                config.eq_max_correction_db = 4.0;
+                config.eq_max_high_boost_db = 0.9;
+            }
+        }
+        config
+    }
+}
+
 /// Mastering result report.
 #[derive(Debug, Clone)]
 pub struct MasteringResult {
