@@ -202,7 +202,7 @@ These hashes and receipts are integrity evidence rather than a signature or auth
 
 ### P2b — Cross-report provenance verifier
 
-The new `muse_instrument_provenance_verify` CLI cross-checks the run-level executable digest, source revision, root manifests, selected WAV hashes, and each selected sample's bank manifest against the matching instrument/library/relative-directory entry in the capability matrix. The matrix schema v3 includes detailed additional-style bank evidence so those selected banks can be checked too.
+The new `muse_instrument_provenance_verify` CLI cross-checks the run-level executable digest against a separately supplied binary file, plus source revision, root manifests, selected WAV hashes, and each selected sample's bank manifest against the matching instrument/library/relative-directory entry in the capability matrix. It streams and hashes the exact JSON bytes consumed by the parser so a report digest cannot silently refer to a different on-disk version. The matrix schema v3 includes detailed additional-style bank evidence so those selected banks can be checked too. The executable path is supplied as a command-line argument but is not written into the report.
 
 Generate both inputs from a clean source checkout and preserve the outputs outside the checkout, so report generation itself does not make the recorded source revision ambiguous:
 
@@ -212,11 +212,11 @@ REV="$(git rev-parse HEAD)"
 OUT="$(mktemp -d "${TMPDIR:-/tmp}/melothaea-provenance.XXXXXX")"
 SYMTHAEA_SOURCE_REV="$REV" cargo run -p symthaea-muse --bin muse_instrument_qualification -- --hash-indexed-samples --hash-root-wav-contents > "$OUT/mel-instrument-capability-matrix.json"
 SYMTHAEA_SOURCE_REV="$REV" SYMTHAEA_MUSE_HASH_SOURCE_BANK_MANIFEST=1 cargo run -p symthaea-muse --bin muse_instrument_probe -- --instrument recorder > "$OUT/recorder-probe.json"
-cargo run -p symthaea-muse --bin muse_instrument_provenance_verify -- --probe "$OUT/recorder-probe.json" --inventory "$OUT/mel-instrument-capability-matrix.json" > "$OUT/provenance-verification.json"
+cargo run -p symthaea-muse --bin muse_instrument_provenance_verify -- --probe "$OUT/recorder-probe.json" --inventory "$OUT/mel-instrument-capability-matrix.json" --renderer-binary target/debug/muse_instrument_probe > "$OUT/provenance-verification.json"
 printf 'Evidence reports retained in %s\n' "$OUT"
 ```
 
-The verifier streams SHA-256 over both input-report files and writes a JSON report with their digests, pass/incomplete/error counts, and mismatch findings. Exit code 0 means `consistent`; exit 1 means provenance is incomplete or inconsistent; exit 2 means the command or an input file could not be processed. An absent asset root, disabled hashing, schema mismatch, missing selected-bank mapping, or malformed digest cannot silently pass. The verifier's result proves only report consistency: it does not authenticate the claimed source revision, verify the build that produced the executable, validate licensing, or qualify audio quality. Run it for each probe report and keep the two source reports plus verification JSON together.
+The verifier streams SHA-256 over both input-report files and the supplied renderer executable, compares executable digest, basename, and byte length against the probe report, and writes a JSON report with those artifact digests plus pass/incomplete/error counts and mismatch findings. Adjust the `--renderer-binary` path to the exact executable file used for the probe if the build uses a non-default Cargo target directory. Exit code 0 means `consistent`; exit 1 means provenance is incomplete or inconsistent; exit 2 means the command or an input file could not be processed. An absent asset root, disabled hashing, schema mismatch, missing selected-bank mapping, or malformed digest cannot silently pass. The verifier's result proves only report consistency: it does not authenticate the claimed source revision, verify the build that produced the executable, validate licensing, or qualify audio quality. Run it for each probe report and keep the two source reports plus verification JSON together.
 
 Then add instrument-specific range, pitch-accuracy, and gesture tests. Keep a per-note evidence record linking requested instrument, selected renderer, selected source sample, signal checks, and exact asset/renderer digests. Do not collapse these fields into a pooled “instrument score.”
 
