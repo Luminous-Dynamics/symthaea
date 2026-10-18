@@ -7,9 +7,6 @@
 //! independent financial/engineering model or proof of source truth.
 
 use iccb_evaluator::decision_receipt::{DecisionReceipt, DecisionRunContext};
-
-const SUPPORTED_RECEIPT_SCHEMA: &str = "iccb-decision-receipt-v1";
-const SUPPORTED_CANONICALIZATION_VERSION: &str = "iccb-canonical-binary-v1";
 use iccb_evaluator::uncertainty_contract::{
     CompatibleAnalysisRoute, UncertaintyEvidenceKind,
 };
@@ -19,6 +16,9 @@ use iccb_evaluator::{
 use sha2::{Digest, Sha256};
 use std::collections::BTreeSet;
 use std::fmt::Write as _;
+
+const SUPPORTED_RECEIPT_SCHEMA: &str = "iccb-decision-receipt-v1";
+const SUPPORTED_CANONICALIZATION_VERSION: &str = "iccb-canonical-binary-v1";
 
 #[derive(Clone, Copy, Debug, PartialEq, Eq)]
 pub enum ReceiptVerificationError {
