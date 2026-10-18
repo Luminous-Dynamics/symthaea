@@ -40,6 +40,12 @@ A second isolated package, [`research/iccb-evaluator-harness/`](../iccb-evaluato
 
 This is a **code/data-flow boundary, not a sandbox**; source-code access to the scorer is compatible with benchmark transparency, but any actual held-out truth data must remain evaluator-controlled and must not be serialized into candidate-visible requests or artifacts. The public tests in the harness are examples, not a hidden benchmark.
 
+## Cross-project physical-asset integration
+
+Sol-Atlas owns the shared-resource, water/energy service, time-conservation and independent allocation-oracle work. ICCB should consume those versioned, evidence-qualified assessments rather than build a second water or resource allocator. See [ICCB-002](https://github.com/Luminous-Dynamics/symthaea/issues/8002) and the linked Sol-Atlas work: [#116](https://github.com/Luminous-Dynamics/sol-atlas-leptos/pull/116), [#152](https://github.com/Luminous-Dynamics/sol-atlas-leptos/issues/152), [#153](https://github.com/Luminous-Dynamics/sol-atlas-leptos/issues/153), [#155](https://github.com/Luminous-Dynamics/sol-atlas-leptos/issues/155), and [#131](https://github.com/Luminous-Dynamics/sol-atlas-leptos/issues/131).
+
+The adapter contract is not implemented and no cross-project integration is claimed. The boundary must preserve scenario digests, units, time scope, capacity bounds, uncertainty, protected-service floors and indeterminate states.
+
 ## Staged commitments and reversibility
 
 The staged-capital protocol is described in [REVERSIBILITY_AND_STAGED_CAPITAL.md](REVERSIBILITY_AND_STAGED_CAPITAL.md). The `staging.rs` module is a fail-closed tranche authorization gate, **not** a real-options valuation model. It makes required evidence, milestone satisfaction, delegated authority, and cumulative commitment limits explicit. The prototype also reports a cash-maximizing feasible baseline and a Pareto frontier without compressing outcomes into one score.
