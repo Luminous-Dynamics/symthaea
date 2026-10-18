@@ -268,8 +268,11 @@ fn choose_fixed_weight(
         )])?;
         let utility = fixed_weight_utility(candidate, *profile, task_id, candidate_id)
             .map_err(|error| vec![error])?;
-        // Preserve the first eligible candidate on exact ties; tie-breaking is deterministic.
-        if selected.as_ref().is_none_or(|(_, best)| utility > *best) {
+        // Candidate-array order is not evidence. Use lexical ID order on exact utility ties.
+        let should_replace = selected.as_ref().is_none_or(|(best_id, best)| {
+            utility > *best || (utility == *best && candidate_id < best_id.as_str())
+        });
+        if should_replace {
             selected = Some((candidate_id.to_owned(), utility));
         }
     }
@@ -321,8 +324,12 @@ fn choose_seeded_random(
             format!("$.scenarios[{scenario_id}].eligible_candidate_ids"),
             "candidate IDs must be strings",
         )])?;
-    let selected_candidate_id =
-        seeded_index(seed, scenario_id, ids.len()).and_then(|index| ids.get(index).cloned());
+    // Hash the scenario/seed pair, then index a canonical candidate order rather than
+    // the serialized eligible-list order.
+    let mut canonical_ids = ids;
+    canonical_ids.sort_unstable();
+    let selected_candidate_id = seeded_index(seed, scenario_id, canonical_ids.len())
+        .and_then(|index| canonical_ids.get(index).cloned());
 
     Ok(PreferenceSelectionBaselineAssessmentV1 {
         scenario_id: scenario_id.to_owned(),
@@ -654,6 +661,41 @@ mod tests {
         let first = evaluate_preference_selection_baselines(FIXTURE, 12345).unwrap();
         let second = evaluate_preference_selection_baselines(FIXTURE, 12345).unwrap();
         assert_eq!(first.seeded_random_score, second.seeded_random_score);
+    }
+
+    #[test]
+    fn candidate_order_permutation_does_not_change_baseline_selections() {
+        let original = evaluate_preference_selection_baselines(FIXTURE, 20261018).unwrap();
+        let mut root: Value = serde_json::from_str(FIXTURE).unwrap();
+        for scenario in root["scenarios"].as_array_mut().unwrap() {
+            scenario["eligible_candidate_ids"]
+                .as_array_mut()
+                .unwrap()
+                .reverse();
+            scenario["preference_observations"]
+                .as_array_mut()
+                .unwrap()
+                .reverse();
+        }
+        let permuted_json = serde_json::to_string(&root).unwrap();
+        let permuted = evaluate_preference_selection_baselines(&permuted_json, 20261018).unwrap();
+
+        for (before, after) in original
+            .fixed_weight_score
+            .assessments
+            .iter()
+            .zip(&permuted.fixed_weight_score.assessments)
+        {
+            assert_eq!(before.selected_candidate_id, after.selected_candidate_id);
+        }
+        for (before, after) in original
+            .seeded_random_score
+            .assessments
+            .iter()
+            .zip(&permuted.seeded_random_score.assessments)
+        {
+            assert_eq!(before.selected_candidate_id, after.selected_candidate_id);
+        }
     }
 
     #[test]
