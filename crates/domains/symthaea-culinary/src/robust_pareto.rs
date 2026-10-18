@@ -16,7 +16,7 @@ use crate::pareto::{
     ObjectiveMetric, ParetoError, ParetoReport, RankingDisposition,
 };
 use serde::{Deserialize, Serialize};
-use std::collections::{BTreeMap, BTreeSet};
+use std::collections::BTreeSet;
 use std::fmt;
 
 #[derive(Clone, Debug, PartialEq, Eq, Serialize, Deserialize)]
@@ -268,11 +268,6 @@ pub fn evaluate_robust_frontier(
         });
     }
 
-    let candidate_lookup: BTreeMap<&str, &ScenarioCandidate> = sorted_candidates
-        .iter()
-        .map(|candidate| (candidate.id.as_str(), candidate))
-        .collect();
-
     let mut assessments = Vec::with_capacity(sorted_candidates.len());
     for candidate in &sorted_candidates {
         let mut frontier_in = Vec::new();
@@ -336,8 +331,8 @@ pub fn evaluate_robust_frontier(
             if !assessments[right_index].robustly_rankable {
                 continue;
             }
-            let left = candidate_lookup[sorted_candidates[left_index].id.as_str()];
-            let right = candidate_lookup[sorted_candidates[right_index].id.as_str()];
+            let left = &sorted_candidates[left_index];
+            let right = &sorted_candidates[right_index];
 
             if robustly_dominates(left, right, &sorted_scenarios) {
                 assessments[left_index]
