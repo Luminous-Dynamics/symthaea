@@ -664,6 +664,36 @@ pub fn verify_cost_budget_report(report: &CostBudgetReport) -> Result<(), CostBu
     {
         return Err(CostBudgetError::InvalidTrace("summary metrics do not recompute from the trace and cost ledger".to_owned()));
     }
+
+    let complete_budget = report.observations.len()
+        == INITIAL_OBSERVATION_COUNT + ADDITIONAL_OBSERVATION_BUDGET;
+    let expected_stop = if complete_budget {
+        CostBudgetStopReason::ObservationCapReached
+    } else if report.strategy == CostBudgetStrategy::FixedStratified {
+        let taken: Vec<_> = report.observations.iter()
+            .map(|item| item.observation.position).collect();
+        match fixed_stratified_priority().into_iter()
+            .find(|candidate| !taken.iter().any(|position| same_position(*position, *candidate)))
+        {
+            Some(next_position) => {
+                let last = report.observations.last()
+                    .ok_or_else(|| CostBudgetError::InvalidTrace("empty observation trace".to_owned()))?
+                    .observation.position;
+                let next_cost = incremental_cost(last, next_position, &report.cost_schedule, false).total;
+                if next_cost > report.cost_schedule.budget_units - cumulative + EPSILON {
+                    CostBudgetStopReason::FixedPlanNextPointUnaffordable
+                } else {
+                    return Err(CostBudgetError::InvalidTrace("fixed plan stopped despite an affordable next point".to_owned()));
+                }
+            }
+            None => CostBudgetStopReason::CandidatePoolExhausted,
+        }
+    } else {
+        CostBudgetStopReason::BudgetConstraintReached
+    };
+    if report.stop_reason != expected_stop {
+        return Err(CostBudgetError::InvalidTrace("stopping reason does not match the trace and budget".to_owned()));
+    }
     if report.report_digest_sha256 != report_digest(report)? {
         return Err(CostBudgetError::InvalidTrace("report digest mismatch".to_owned()));
     }
@@ -757,6 +787,19 @@ mod tests {
         ).unwrap();
         digest_tampered.metrics.spent_budget_units += 0.01;
         assert!(verify_cost_budget_report(&digest_tampered).is_err());
+    }
+
+    #[test]
+    fn verifier_rejects_a_falsely_claimed_stopping_reason_even_with_recomputed_digest() {
+        let mut report = run_cost_budget_arm(
+            SyntheticSpatialSurface::SmoothQuadratic,
+            CostBudgetStrategy::FarthestPoint,
+            5,
+            SyntheticCostSchedule::demo(20.0),
+        ).unwrap();
+        report.stop_reason = CostBudgetStopReason::ObservationCapReached;
+        report.report_digest_sha256 = report_digest(&report).unwrap();
+        assert!(verify_cost_budget_report(&report).is_err());
     }
 
     #[test]
