@@ -73,15 +73,22 @@ A digest establishes byte identity relative to the bytes that were hashed; it do
 
 ## Smallest credible pilot
 
-Do not begin by creating another general-purpose reverse-engineering framework. Prove whether the existing provider can supply useful, portable evidence to the engineering workflow.
+**Reuse REA's existing firmware integration lane instead of inventing a competing fixture suite.** The upstream repository already includes:
 
-1. Pin a Linux x64 optional REA tool profile and record actual version/executable identities.
-2. Generate a small synthetic fixture containing known compressed/archive regions and a source-derived ELF child. Keep the source and an independently generated manifest as the oracle.
-3. Run region inspection and extraction on the fixture, export the canonical upstream Evidence, and record the raw outputs. Verify each expected byte range and extracted SHA-256 against the independent manifest.
+- `scripts/fixtures/firmware/generate.mjs` and `generate.py` for a source-derived host ELF inside a deterministic gzip/USTAR firmware-like image.
+- An independent `oracle.json` containing expected image hash/size, gzip offset/length, and fixture-file hashes/sizes.
+- `scripts/verify/firmware/analysis.mjs`, which asserts real-provider behavior across CLI and MCP, expected region offsets and file hashes, selected-range extraction, explicit unknown-chunk gaps, depth limits, optional ext4 extraction/missing-extractor behavior, and a separately selected Ghidra handoff.
+- Documented entry points `npm run fixtures:firmware` and `npm run verify:firmware` in the [upstream firmware guide](https://github.com/morluto/rea/blob/main/docs/firmware-analysis.md).
+
+That is a stronger starting point than a second locally designed fixture because its verifier already defines an independent oracle and actual-provider checks. Do not label the lane passed merely because the code exists: it requires execution against an exact, recorded REA revision and the listed toolchain.
+
+1. Pin the canonical REA commit/release and record hashes for the checkout, generated fixture manifest, source image, configured Binwalk/Unblob executables, and relevant runtime/configuration. REA's recorded executable digest/version should be preserved; a version banner alone is not full source-build provenance.
+2. Run upstream fixture generation and its real-provider verifier in a documented Linux x64 environment. Capture stdout/stderr, exit codes, tool availability, oracle, and raw Evidence records. The optional ext4 and Ghidra lanes require their own prerequisites and must be reported independently.
+3. Compare normalized CLI and MCP results using the existing upstream invariants. Verify input bytes unchanged, all expected file digests, selected ranges, and explicit partial/gap semantics. Report every unavailable lane rather than silently counting it as a pass.
 4. Import a saved Evidence record through a deliberately narrow Rust parser/schema boundary. If no stable fixture contract exists, stop at artifact archival and report the mismatch instead of inventing a schema.
-5. Add negative controls before generalizing: malformed input, unknown/encrypted chunk, missing extractor, truncated/oversized report, depth/output-budget exhaustion, unsupported child architecture, and changed input/tool/config identity.
-6. Only after this passes, run a separate known-answer logic-capture lane using sigrok-cli. Keep recorded-file analysis distinct from live device acquisition.
-7. Use the resulting evidence on a held-out diagnosis task and compare the agent with and without the REA evidence.
+5. Add Symthaea-specific negative controls beyond the upstream lane where not already covered: corrupt/truncated Evidence envelope, mismatched source digest, changed selected range, changed tool executable identity/configuration, unsupported child architecture, missing/unknown producer schema, and attempted promotion of partial evidence. Keep existing upstream unknown-chunk, missing-extractor, and depth-limit tests as controls rather than duplicating them without a demonstrated gap.
+6. Only after file-evidence interoperability passes, run a separate known-answer recorded-signal lane using sigrok-cli. Keep recorded-file analysis distinct from live device acquisition.
+7. Build a held-out diagnosis evaluation only after the import boundary is stable. Compare a baseline engineer/agent using the task description alone against the same baseline receiving REA evidence, using blinded case labels and independently adjudicated answers.
 
 ## Benchmark protocol
 
@@ -94,6 +101,9 @@ Do not begin by creating another general-purpose reverse-engineering framework. 
 | Coverage honesty | 100% of known injected extraction gaps remain visible as partial/unknown; never infer absence from an unobserved region | Gap injection and report round-trip tests |
 | Reproducibility | Same pinned toolchain, input bytes and parameters reproduce normalized semantic evidence; volatile timing/path fields are excluded or modeled explicitly | Repeat runs plus documented canonicalization |
 | Diagnosis benefit | On held-out labeled cases, improve correct fault localization or time-to-first-correct hypothesis without increasing unsupported assertions | Blind baseline comparison, adjudicated labels and evidence citations |
+| Incremental value of REA | On the same held-out cases, REA evidence improves top-1 root-cause localization and/or reduces median diagnosis effort over the no-REA baseline; report both, do not collapse into a single score | Paired cases, randomized run order, frozen prompts/tools, case-level outcomes and adjudication |
+| Abstention calibration | At least 95% correct abstention on cases whose available artifacts do not distinguish the injected causes; report coverage-versus-error curve | Deliberately ambiguous cases, known answerability labels, explicit unknowns |
+| Evidence traceability | 100% of accepted causal claims cite a specific observed record or test; unsupported causal leaps separately counted | Claim-to-evidence ledger reviewed against each ground-truth case |
 
 These targets apply only to the defined synthetic fixture set. They do not generalize to unknown vendor firmware. Before reporting model capability improvements, publish the number and diversity of held-out cases, baseline definition, abstention/error rates and the full confusion matrix. A benchmark pass would demonstrate fixture-level compatibility, not firmware safety or board qualification.
 
@@ -116,4 +126,4 @@ Each arrow should be a typed, auditable mapping with explicit unknowns, not a la
 
 ## Verification status
 
-This file records public-document research and a proposed fixture design. No REA provider, Binwalk, Unblob, Ghidra or sigrok executable was run as part of this documentation change. No hardware was accessed. Provider support, compatibility and all benchmark results remain unverified until the pilot is executed.
+This file records public-document research and a reuse plan grounded in REA's existing generated fixture/oracle and real-provider verifier. No REA provider, Binwalk, Unblob, Ghidra or sigrok executable was run as part of this documentation change. No hardware was accessed. The existence of upstream verification code is not a test result; provider support in the Symthaea workflow, compatibility and all benchmark results remain unverified until the exact pinned pilot is executed.
