@@ -196,6 +196,239 @@ pub fn validate_measurement_run_str(
     })
 }
 
+fn approximately_equal(actual: f64, expected: f64) -> bool {
+    actual.is_finite()
+        && expected.is_finite()
+        && (actual - expected).abs()
+            <= 1e-12_f64.max(actual.abs().max(expected.abs()) * 1e-9)
+}
+
+/// Checks nested uncertainty-budget provenance and, for a linearized budget,
+/// independently recomputes propagated uncertainty from standard components
+/// and covariance contributions already projected into the measurand's units.
+fn validate_uncertainty_budget(
+    observation: &Value,
+    observation_id: &str,
+    observation_status: &str,
+) -> Vec<String> {
+    let mut errors = Vec::new();
+    let Some(budget) = observation.get("uncertainty_budget") else {
+        return vec![format!(
+            "observation {observation_id} has no uncertainty budget record"
+        )];
+    };
+
+    let budget_status = budget
+        .get("status")
+        .and_then(Value::as_str)
+        .unwrap_or("INVALID");
+    let method = budget
+        .get("method")
+        .and_then(Value::as_str)
+        .unwrap_or("INVALID");
+    let terms = budget
+        .get("terms")
+        .and_then(Value::as_array)
+        .map(Vec::as_slice)
+        .unwrap_or(&[]);
+    let covariance_terms = budget
+        .get("covariance_terms")
+        .and_then(Value::as_array)
+        .map(Vec::as_slice)
+        .unwrap_or(&[]);
+
+    validate_unique_ids(terms, "uncertainty component", &mut errors);
+
+    let term_ids: BTreeSet<String> = terms
+        .iter()
+        .filter_map(|term| term.get("term_id").and_then(Value::as_str))
+        .map(str::to_owned)
+        .collect();
+    let mut covariance_pairs = BTreeSet::new();
+    for covariance in covariance_terms {
+        let first = covariance
+            .get("term_a_id")
+            .and_then(Value::as_str)
+            .unwrap_or("<missing>");
+        let second = covariance
+            .get("term_b_id")
+            .and_then(Value::as_str)
+            .unwrap_or("<missing>");
+        if first == second {
+            errors.push(format!(
+                "uncertainty budget for {observation_id} cannot declare self-covariance for {first}"
+            ));
+        }
+        for component_id in [first, second] {
+            if !term_ids.contains(component_id) {
+                errors.push(format!(
+                    "uncertainty budget for {observation_id} references unknown component {component_id}"
+                ));
+            }
+        }
+        let pair = if first <= second {
+            (first.to_owned(), second.to_owned())
+        } else {
+            (second.to_owned(), first.to_owned())
+        };
+        if !covariance_pairs.insert(pair) {
+            errors.push(format!(
+                "uncertainty budget for {observation_id} repeats a covariance pair"
+            ));
+        }
+    }
+
+    if observation_status == "NOT_EVALUATED" {
+        if budget_status != "NOT_EVALUATED"
+            || method != "NOT_EVALUATED"
+            || !terms.is_empty()
+            || !covariance_terms.is_empty()
+            || !budget
+                .get("combined_standard_uncertainty")
+                .is_some_and(Value::is_null)
+            || !budget.get("coverage_factor").is_some_and(Value::is_null)
+            || !budget
+                .get("expanded_uncertainty")
+                .is_some_and(Value::is_null)
+        {
+            errors.push(format!(
+                "NOT_EVALUATED observation {observation_id} must carry an empty, NOT_EVALUATED uncertainty budget"
+            ));
+        }
+        return errors;
+    }
+
+    let expected_budget_status = match observation_status {
+        "MEASURED_UNQUALIFIED" => "CALCULATED_UNREVIEWED",
+        "INDEPENDENTLY_REVIEWED" => "INDEPENDENTLY_REVIEWED",
+        _ => "INVALID",
+    };
+    if budget_status != expected_budget_status {
+        errors.push(format!(
+            "uncertainty budget for {observation_id} has status {budget_status} inconsistent with observation status {observation_status}"
+        ));
+    }
+    if method == "NOT_EVALUATED" {
+        errors.push(format!(
+            "measured observation {observation_id} cannot use a NOT_EVALUATED uncertainty method"
+        ));
+    }
+    if terms.is_empty() {
+        errors.push(format!(
+            "measured observation {observation_id} needs at least one uncertainty component"
+        ));
+    }
+
+    let budget_expanded = budget
+        .get("expanded_uncertainty")
+        .and_then(Value::as_f64);
+    let top_level_expanded = observation
+        .get("expanded_uncertainty")
+        .and_then(Value::as_f64);
+    if budget_expanded.is_none_or(|value| !value.is_finite() || value < 0.0) {
+        errors.push(format!(
+            "uncertainty budget for {observation_id} needs a finite nonnegative expanded uncertainty"
+        ));
+    }
+    if let (Some(budget_value), Some(top_level_value)) =
+        (budget_expanded, top_level_expanded)
+    {
+        if !approximately_equal(budget_value, top_level_value) {
+            errors.push(format!(
+                "uncertainty budget expanded uncertainty disagrees with observation {observation_id}"
+            ));
+        }
+    }
+
+    if method == "LINEARIZED_COVARIANCE" {
+        let combined = budget
+            .get("combined_standard_uncertainty")
+            .and_then(Value::as_f64);
+        let coverage = budget.get("coverage_factor").and_then(Value::as_f64);
+        if combined.is_none_or(|value| !value.is_finite() || value < 0.0) {
+            errors.push(format!(
+                "linearized uncertainty budget for {observation_id} needs finite nonnegative combined standard uncertainty"
+            ));
+        }
+        if coverage.is_none_or(|value| !value.is_finite() || value <= 0.0) {
+            errors.push(format!(
+                "linearized uncertainty budget for {observation_id} needs a finite positive coverage factor"
+            ));
+        }
+
+        let mut variance = 0.0_f64;
+        for term in terms {
+            let term_id = term
+                .get("term_id")
+                .and_then(Value::as_str)
+                .unwrap_or("<missing>");
+            let standard = term.get("standard_uncertainty").and_then(Value::as_f64);
+            let sensitivity = term
+                .get("sensitivity_coefficient")
+                .and_then(Value::as_f64);
+            match (standard, sensitivity) {
+                (Some(u), Some(coefficient))
+                    if u.is_finite() && u >= 0.0 && coefficient.is_finite() =>
+                {
+                    let propagated = u * coefficient;
+                    variance += propagated * propagated;
+                    if !variance.is_finite() {
+                        errors.push(format!(
+                            "uncertainty variance overflow for component {term_id} in {observation_id}"
+                        ));
+                    }
+                }
+                _ => errors.push(format!(
+                    "uncertainty component {term_id} has invalid standard uncertainty or sensitivity coefficient"
+                )),
+            }
+        }
+        for covariance in covariance_terms {
+            if let Some(value) = covariance
+                .get("covariance_contribution")
+                .and_then(Value::as_f64)
+            {
+                variance += 2.0 * value;
+            } else {
+                errors.push(format!(
+                    "uncertainty covariance contribution for {observation_id} is not numeric"
+                ));
+            }
+        }
+
+        if !variance.is_finite() || variance < 0.0 {
+            errors.push(format!(
+                "linearized uncertainty budget for {observation_id} has negative or non-finite total variance"
+            ));
+        } else {
+            let expected_combined = variance.sqrt();
+            if let Some(reported_combined) = combined {
+                if !approximately_equal(reported_combined, expected_combined) {
+                    errors.push(format!(
+                        "reported combined standard uncertainty for {observation_id} disagrees with recomputed covariance budget"
+                    ));
+                }
+            }
+            if let Some(coverage_factor) = coverage {
+                let expected_expanded = coverage_factor * expected_combined;
+                if let Some(reported_expanded) = budget_expanded {
+                    if !approximately_equal(reported_expanded, expected_expanded) {
+                        errors.push(format!(
+                            "reported expanded uncertainty for {observation_id} disagrees with coverage factor times combined uncertainty"
+                        ));
+                    }
+                }
+            }
+        }
+    } else if !covariance_terms.is_empty() {
+        errors.push(format!(
+            "uncertainty method {method} for {observation_id} cannot attach linearized covariance terms"
+        ));
+    }
+
+    errors
+}
+
 fn validate_measurement_run_semantics(record: &Value) -> Vec<String> {
     let mut errors = Vec::new();
     let record_state = record
@@ -302,6 +535,12 @@ fn validate_measurement_run_semantics(record: &Value) -> Vec<String> {
             .flatten()
             .filter_map(Value::as_str)
             .collect();
+
+        errors.extend(validate_uncertainty_budget(
+            observation,
+            observation_id,
+            status,
+        ));
 
         for id in &used_instruments {
             if !instrument_ids.contains(*id) {
