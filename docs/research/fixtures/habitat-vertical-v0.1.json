@@ -258,6 +258,16 @@
       "skills_required": [
         "packaging"
       ]
+    },
+    {
+      "resource_id": "SYN-RECEIVE-01",
+      "resource_class": "receiving_and_identity_check_station",
+      "capability_profile": "SYN-RECEIVE-PROFILE-A",
+      "qualification": "synthetic_only",
+      "available": true,
+      "skills_required": [
+        "receiving"
+      ]
     }
   ],
   "synthetic_process_graph": [
@@ -273,7 +283,7 @@
       "required_skills": [
         "receiving"
       ],
-      "required_resource": "SYN-INSPECT-01",
+      "required_resource": "SYN-RECEIVE-01",
       "duration_seconds": 300,
       "output_state": "received_lots_pending_disposition"
     },
