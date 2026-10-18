@@ -36,6 +36,7 @@ pub mod autopoiesis;
 pub mod care;
 pub mod consent;
 pub mod evidence_ledger;
+pub mod farm_advice;
 pub mod harmonics;
 pub mod meta_cognition;
 pub mod ontology;
@@ -52,6 +53,11 @@ pub use accountability::{
 pub use authority_envelope::{
     AuthorityEnvelopeError, AuthorityEnvelopePolicy, AuthorityRestrictionReason,
     RelationalAuthorityAssessment, RelationalAuthorityEnvelope, RelationalAuthorityInput,
+};
+pub use farm_advice::{
+    AdviceEvidenceKind, AdviceEpisodeId, AdvicePremise, AdviceReviewState, FarmAdviceContext,
+    FarmAdviceError, FarmAdviceProfile, FarmOperation, FarmerAdviceDisposition, FarmerObjective,
+    ObjectiveSource, UsefulWindow,
 };
 pub use autopoiesis::{AutopoieticMonitor, OperationalClosure, SelfProductionMetrics};
 pub use care::{
