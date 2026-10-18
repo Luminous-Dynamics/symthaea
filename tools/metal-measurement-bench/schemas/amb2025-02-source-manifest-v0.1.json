@@ -44,5 +44,6 @@
     "repository_bundling_authorized": false,
     "status_note": "Metadata/link only. Dataset bytes are intentionally not copied into this repository until artifact-specific terms, attribution, and local-use permissions are reviewed."
   },
-  "artifacts": []
+  "artifacts": [],
+  "source_objects": []
 }
