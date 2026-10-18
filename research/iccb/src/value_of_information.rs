@@ -67,7 +67,7 @@ pub struct SignalDecision {
     pub chosen_action_id: String,
     /// Exact probability numerator over 100,000,000 (basis-points squared).
     pub signal_probability_numerator_bp2: u64,
-    pub conditional_expected_value_numerator: i128,
+    pub joint_weighted_payoff_numerator: i128,
 }
 
 #[derive(Clone, Debug, PartialEq, Eq)]
@@ -404,11 +404,11 @@ mod tests {
         let report = perfect_signal_scenario(20).evaluate().unwrap();
         assert_eq!(report.baseline_action_id, "avoid");
         assert_eq!(report.baseline_expected_value_minor, 0);
-        assert_eq!(report.expected_value_with_signal_minor, 100);
-        assert_eq!(report.gross_evsi_minor, 100);
-        assert_eq!(report.net_evsi_minor, 80);
-        assert_eq!(report.perfect_information_expected_value_minor, 100);
-        assert_eq!(report.evpi_minor, 100);
+        assert_eq!(report.expected_value_with_signal_minor, 50);
+        assert_eq!(report.gross_evsi_minor, 50);
+        assert_eq!(report.net_evsi_minor, 30);
+        assert_eq!(report.perfect_information_expected_value_minor, 50);
+        assert_eq!(report.evpi_minor, 50);
         assert!(report.worthwhile_at_declared_cost);
         assert_eq!(report.decisions_by_signal.len(), 2);
     }
@@ -416,8 +416,8 @@ mod tests {
     #[test]
     fn information_cost_can_exceed_gross_value() {
         let report = perfect_signal_scenario(101).evaluate().unwrap();
-        assert_eq!(report.gross_evsi_minor, 100);
-        assert_eq!(report.net_evsi_minor, -1);
+        assert_eq!(report.gross_evsi_minor, 50);
+        assert_eq!(report.net_evsi_minor, -51);
         assert!(!report.worthwhile_at_declared_cost);
     }
 
