@@ -1,0 +1,190 @@
+{
+  "schema_version": "symthaea.rea-differential-manifest.v1",
+  "benchmark_id": "ENG-REA-002",
+  "corpus_status": "public-development-known-answer",
+  "claims_ceiling": "Synthetic host-built fixture behavior only; not MCU, vendor-firmware, circuit, or physical-device qualification.",
+  "fixture_source": "fixtures/debounce_fixture.c",
+  "build_profiles": [
+    {
+      "id": "threshold12_o0_debug",
+      "args": [
+        "-std=c11",
+        "-O0",
+        "-g",
+        "-DDEBOUNCE_THRESHOLD_TICKS=12"
+      ]
+    },
+    {
+      "id": "threshold12_o2_stripped",
+      "args": [
+        "-std=c11",
+        "-O2",
+        "-s",
+        "-DDEBOUNCE_THRESHOLD_TICKS=12"
+      ]
+    },
+    {
+      "id": "threshold20_o0_debug",
+      "args": [
+        "-std=c11",
+        "-O0",
+        "-g",
+        "-DDEBOUNCE_THRESHOLD_TICKS=20"
+      ]
+    },
+    {
+      "id": "threshold20_o2_stripped",
+      "args": [
+        "-std=c11",
+        "-O2",
+        "-s",
+        "-DDEBOUNCE_THRESHOLD_TICKS=20"
+      ]
+    }
+  ],
+  "common_semantics": {
+    "source_model": "Synthetic digital pulse debounce gate",
+    "input_unit": "pulse_width_microseconds",
+    "configuration_field": "timer_tick_us",
+    "conversion_rule": "pulse_ticks = floor(pulse_width_microseconds / timer_tick_us)",
+    "output_contract": "ACCEPT iff pulse_ticks >= compiled DEBOUNCE_THRESHOLD_TICKS; otherwise REJECT",
+    "physical_claim": false
+  },
+  "cases": [
+    {
+      "id": "RDB-001",
+      "family": "build-noise",
+      "kind": "behavior-preserving-rebuild",
+      "profiles": [
+        "threshold12_o0_debug",
+        "threshold12_o2_stripped"
+      ],
+      "config": {
+        "timer_tick_us": 1000
+      },
+      "pulse_width_microseconds": [
+        8000,
+        11000,
+        12000,
+        13000,
+        19000,
+        20000
+      ],
+      "required_reasoning": "Distinct binary digests are not by themselves proof of behavioral change; compare known-answer outputs."
+    },
+    {
+      "id": "RDB-002",
+      "family": "semantic-firmware-change",
+      "kind": "threshold-regression",
+      "profiles": [
+        "threshold12_o0_debug",
+        "threshold20_o0_debug"
+      ],
+      "config": {
+        "timer_tick_us": 1000
+      },
+      "pulse_width_microseconds": [
+        8000,
+        11000,
+        12000,
+        13000,
+        19000,
+        20000
+      ],
+      "required_reasoning": "Localize the response change to the changed threshold profile, citing artifact/build evidence and vectors where outcomes diverge."
+    },
+    {
+      "id": "RDB-003",
+      "family": "external-trace-change",
+      "kind": "trace-only-disturbance",
+      "profile": "threshold12_o0_debug",
+      "config": {
+        "timer_tick_us": 1000
+      },
+      "traces": {
+        "trace_a_pulse_width_microseconds": [
+          8000,
+          11000,
+          12000,
+          13000
+        ],
+        "trace_b_pulse_width_microseconds": [
+          8000,
+          9000,
+          10000,
+          11000
+        ]
+      },
+      "required_reasoning": "The exact same firmware artifact sees different inputs. Do not attribute output differences to a firmware change."
+    },
+    {
+      "id": "RDB-004",
+      "family": "external-configuration-change",
+      "kind": "timer-configuration-mismatch",
+      "profile": "threshold12_o0_debug",
+      "pulse_width_microseconds": [
+        12000
+      ],
+      "configs": [
+        {
+          "timer_tick_us": 1000
+        },
+        {
+          "timer_tick_us": 2000
+        }
+      ],
+      "required_reasoning": "The firmware digest remains unchanged. A changed timer scale changes the converted tick count and can explain the output difference."
+    },
+    {
+      "id": "RDB-005",
+      "family": "ambiguous-cause",
+      "kind": "indistinguishable-current-observation",
+      "hypotheses": [
+        {
+          "id": "H1",
+          "profile": "threshold20_o0_debug",
+          "timer_tick_us": 1000
+        },
+        {
+          "id": "H2",
+          "profile": "threshold12_o0_debug",
+          "timer_tick_us": 2000
+        }
+      ],
+      "observed_pulse_width_microseconds": [
+        16000
+      ],
+      "proposed_discriminating_pulse_width_microseconds": 22000,
+      "required_reasoning": "At 16000 us both hypotheses predict REJECT; abstain on attribution, then select the 22000 us known-width test whose predicted outcomes differ."
+    },
+    {
+      "id": "RDB-006",
+      "family": "confounded-intervention",
+      "kind": "firmware-and-trace-changed-together",
+      "config": {
+        "timer_tick_us": 1000
+      },
+      "observed_pair": [
+        {
+          "profile": "threshold12_o0_debug",
+          "pulse_width_microseconds": 13000
+        },
+        {
+          "profile": "threshold20_o0_debug",
+          "pulse_width_microseconds": 10000
+        }
+      ],
+      "proposed_factorial_controls": [
+        {
+          "profile": "threshold12_o0_debug",
+          "pulse_width_microseconds": 10000
+        },
+        {
+          "profile": "threshold20_o0_debug",
+          "pulse_width_microseconds": 13000
+        }
+      ],
+      "required_reasoning": "The before/after diagonal confounds firmware and input trace. Request both cross-over controls before assigning separate causal contributions."
+    }
+  ]
+}
