@@ -155,8 +155,8 @@ fn main() {
     };
     println!("Native arm: {native_mode}");
     println!(
-        "Both arms run auto_master with MasteringConfig::default() \
-         (target {} LUFS, ceiling {} dB).\n",
+        "Both arms use the same dialect-aware mastering profile per piece; all profiles share \
+         target {} LUFS and ceiling {} dB, while broad EQ targets vary as experimental hypotheses.\n",
         auto_master::MasteringConfig::default().target_lufs,
         auto_master::MasteringConfig::default().limiter_ceiling_db
     );
@@ -203,11 +203,18 @@ fn main() {
             eprintln!("{style:?}/{seed}: MIDI export failed; skipping");
             continue;
         }
+        let dialect = symthaea_muse::theory_realize::dialect_for_spec(&spec);
         let color = fluid_render::room_for_dialect(
             fluid_render::RenderColor::from_state(&state),
-            symthaea_muse::theory_realize::dialect_for_spec(&spec),
+            dialect,
         );
-        let Some(wav) = fluid_render::render_midi_to_wav(&mid, SR, Some(color)) else {
+        let mastering = auto_master::MasteringConfig::for_dialect(dialect);
+        let Some(wav) = fluid_render::render_midi_to_wav_with_mastering(
+            &mid,
+            SR,
+            Some(color),
+            &mastering,
+        ) else {
             eprintln!("{style:?}/{seed}: FluidSynth render failed; skipping");
             continue;
         };
