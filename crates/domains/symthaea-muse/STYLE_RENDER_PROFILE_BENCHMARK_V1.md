@@ -79,7 +79,10 @@ Targets for the first pilot (proposed, not existing results):
 
 - **Style identity:** at least 70% correct pairwise identification for each
   preselected contrasting pair, with a 95% interval reported and a minimum of
-  30 independent ratings per pair; publish misses as well as hits.
+  30 independent ratings per pair for the *pilot*; publish misses as well as hits.
+  Treat 30 as a pilot floor, not as a powered confirmatory sample size. Preregister
+  a power/sample-size plan before a confirmatory study, and cluster uncertainty by
+  listener if the same listener contributes multiple ratings.
 - **Profile benefit:** the profile must improve its preregistered listener-rated
   fit or preference over the neutral profile without reducing audio-quality
   ratings. If not, revert or revise the profile; objective spectral movement is
