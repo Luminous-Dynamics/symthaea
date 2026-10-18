@@ -221,7 +221,7 @@ impl SimpleOrbitalSimulator {
                     if next_velocity_km_s.iter().any(|value| !value.is_finite()) {
                         // The normal physics step has completed, but this
                         // invalid exogenous state change itself is not applied.
-                        return Err(PerturbationError::NonFiniteImpactDeltaV {
+                        return Err(PerturbationError::NonFinitePostImpactVelocity {
                             at_step: *at_step,
                         });
                     }
@@ -770,6 +770,43 @@ mod tests {
         assert_eq!(
             sim.step_with_perturbations(&OrbitalCommand::zero(), 0.01, 0, &bad_duration),
             Err(PerturbationError::ZeroDurationBlackout { at_step: 0 })
+        );
+        assert_eq!(sim.state().position_km, before_position);
+
+        let non_finite_impact = PerturbationSchedule {
+            perturbations: vec![OrbitalPerturbation::DebrisImpact {
+                delta_v_m_s: [f64::NAN, 0.0, 0.0],
+                at_step: 0,
+            }],
+        };
+        assert_eq!(
+            sim.step_with_perturbations(
+                &OrbitalCommand::zero(),
+                0.01,
+                0,
+                &non_finite_impact
+            ),
+            Err(PerturbationError::NonFiniteImpactDeltaV { at_step: 0 })
+        );
+        assert_eq!(sim.state().position_km, before_position);
+
+        let overflowing_blackout = PerturbationSchedule {
+            perturbations: vec![OrbitalPerturbation::CommBlackout {
+                duration: 1,
+                at_step: usize::MAX,
+            }],
+        };
+        assert_eq!(
+            sim.step_with_perturbations(
+                &OrbitalCommand::zero(),
+                0.01,
+                0,
+                &overflowing_blackout
+            ),
+            Err(PerturbationError::BlackoutEndOverflow {
+                at_step: usize::MAX,
+                duration: 1,
+            })
         );
         assert_eq!(sim.state().position_km, before_position);
 

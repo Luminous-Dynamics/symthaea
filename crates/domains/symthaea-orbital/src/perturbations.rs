@@ -114,6 +114,7 @@ pub enum PerturbationError {
         actual_step: usize,
     },
     NonFiniteImpactDeltaV { at_step: usize },
+    NonFinitePostImpactVelocity { at_step: usize },
     ZeroDurationBlackout { at_step: usize },
     BlackoutEndOverflow { at_step: usize, duration: usize },
     UnsupportedSolarFlare { at_step: usize },
@@ -138,6 +139,10 @@ impl std::fmt::Display for PerturbationError {
             Self::NonFiniteImpactDeltaV { at_step } => {
                 write!(f, "non-finite impact delta-v at step {at_step}")
             }
+            Self::NonFinitePostImpactVelocity { at_step } => write!(
+                f,
+                "impact at step {at_step} would create a non-finite spacecraft velocity"
+            ),
             Self::ZeroDurationBlackout { at_step } => {
                 write!(f, "communications blackout at step {at_step} has zero duration")
             }

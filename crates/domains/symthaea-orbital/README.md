@@ -2,8 +2,11 @@
 
 On-orbit servicing arm platform (`EmbodimentBridge` impl), now with real
 propagated orbital dynamics. ~1,100 LOC (arm) + ~1,000 LOC (orbit +
-scenarios + trajectory planning), 69 tests (verified via
-`cargo test -p symthaea-orbital --lib`).
+scenarios + trajectory planning). The pre-campaign mainline README recorded
+69 library tests; this branch adds six orbital fault-campaign tests plus
+additional invalid-input assertions. The changed crate has not yet been
+compiled or run on this branch, so its test status must be re-established
+with `cargo test -p symthaea-orbital --lib` at the exact commit.
 
 Part of the Symthaea robotics platform roster. Identity decision (Phase 0 of
 `symthaea/SPACE_AUTOMATION_PLAN_2026-07-06.md`, confirmed in Phase 1): this
