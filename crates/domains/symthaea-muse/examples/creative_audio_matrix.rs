@@ -59,6 +59,11 @@ struct AudioMatrixReceipt {
     schema_version: u32,
     source_revision: String,
     expected_source_revision: Option<String>,
+    worktree_clean: bool,
+    rustc_version: Option<String>,
+    host_os: &'static str,
+    host_arch: &'static str,
+    state_sha256: String,
     renderer: &'static str,
     seed: u64,
     duration_secs: f32,
@@ -87,6 +92,31 @@ fn git_revision() -> Result<String, Box<dyn Error>> {
         return Err("git rev-parse HEAD returned a malformed revision".into());
     }
     Ok(revision)
+}
+
+fn git_worktree_clean() -> Result<bool, Box<dyn Error>> {
+    let output = Command::new("git")
+        .current_dir(env!("CARGO_MANIFEST_DIR"))
+        .args(["status", "--porcelain", "--untracked-files=all"])
+        .output()?;
+    if !output.status.success() {
+        return Err(format!(
+            "git status failed: {}",
+            String::from_utf8_lossy(&output.stderr).trim()
+        )
+        .into());
+    }
+    Ok(output.stdout.is_empty())
+}
+
+fn rustc_version() -> Option<String> {
+    let output = Command::new("rustc").arg("--version").output().ok()?;
+    if !output.status.success() {
+        return None;
+    }
+    String::from_utf8(output.stdout)
+        .ok()
+        .map(|value| value.trim().to_owned())
 }
 
 fn hex_sha256(bytes: &[u8]) -> String {
@@ -140,14 +170,26 @@ fn notes_sha256(notes: &[Note]) -> String {
 fn main() -> Result<(), Box<dyn Error>> {
     let expected_source_revision = std::env::args().nth(1);
     let source_revision = git_revision()?;
+    let worktree_clean = git_worktree_clean()?;
+    let compiler_version = rustc_version();
     let state = MusicalState {
         consciousness_level: 0.8,
         arousal: 0.35,
         ..MusicalState::default()
     };
+    let state_sha256 = hex_sha256(&serde_json::to_vec(&state)?);
     let audit_config = CreativeAudioAuditConfigV1::default();
     let mut cases = Vec::new();
     let mut expectation_mismatches = Vec::new();
+
+    if !worktree_clean {
+        expectation_mismatches.push(
+            "source checkout is dirty (tracked or untracked changes exist)".to_owned(),
+        );
+    }
+    if compiler_version.is_none() {
+        expectation_mismatches.push("rustc --version could not be recorded".to_owned());
+    }
 
     if let Some(expected) = expected_source_revision.as_deref() {
         if expected.to_ascii_lowercase() != source_revision {
@@ -242,6 +284,11 @@ fn main() -> Result<(), Box<dyn Error>> {
         schema_version: 1,
         source_revision,
         expected_source_revision,
+        worktree_clean,
+        rustc_version: compiler_version,
+        host_os: std::env::consts::OS,
+        host_arch: std::env::consts::ARCH,
+        state_sha256,
         renderer: "symthaea_muse::compose -> synth::render_arrangement",
         seed: SEED,
         duration_secs: DURATION_SECS,
