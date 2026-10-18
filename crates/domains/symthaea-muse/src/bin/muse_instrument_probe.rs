@@ -180,9 +180,9 @@ fn run() -> Result<(), String> {
     let cases_expected =
         options.instruments.len() * pitch_cells.len() * VELOCITY_GRID.len();
     let render_attempts = cases_expected.saturating_mul(options.repeats);
-    if render_attempts > 20_000 {
+    if render_attempts > 2_000 {
         return Err(format!(
-            "requested sweep creates {render_attempts} render attempts; choose one instrument, reduce repeats, or narrow --midi-range (limit: 20000 render attempts)"
+            "requested sweep creates {render_attempts} render attempts; choose one instrument, reduce repeats, or narrow --midi-range (limit: 2000 render attempts)"
         ));
     }
     let duration_secs = options.note_ms as f32 / 1_000.0;
