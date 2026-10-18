@@ -35,7 +35,7 @@
     "fetched_upstream_content_characters": 7808266,
     "reconstructed_content_characters": 7808266,
     "exact_upstream_content_match": true,
-    "sha256": "not_yet_recorded; the Rust tire-monitoring-intake command emits reconstructed_csv_sha256"
+    "sha256": "534715c2a8bcbd734b80040ef160e656203c5512dab292dcaabd7e5c349fc9d6"
   },
   "source_side_quality_scan": {
     "method": "CSV field parsing and source-side per-row arithmetic; Rust command not yet executed",
@@ -86,6 +86,8 @@
     "concatenated_content_exactly_matched_upstream_blob_text": true,
     "upstream_git_blob_sha1_recomputed_locally": false,
     "rust_command_compiled_or_run": false,
-    "physical_vehicle_test": false
+    "physical_vehicle_test": false,
+    "source_sha256_computed_from_ordered_shards": true,
+    "source_sha256_match_is_pinned_in_rust_intake": false
   }
 }
