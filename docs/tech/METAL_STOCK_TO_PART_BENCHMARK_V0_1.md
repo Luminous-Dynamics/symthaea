@@ -39,8 +39,8 @@ A weighted score cannot compensate for a failed material-identity, process-capab
 - **Qualified secondary feedstock:** custody reference, explicit clear contamination state and requalification reference are required. Mixed or unknown scrap cannot silently satisfy a strict alloy route.
 - **Process route:** separate planned and executed operations; bind the input lot and input state to the stock; require process-run evidence; check declared machine capabilities; carry the output material state.
 - **Part requirement:** exact target alloy, material state and requirement reference.
-- **Mass ledger:** reconcile input mass against finished part, clean offcuts, chips, mixed scrap and residue under the declared tolerance. Keep stream classes separate; claimed clean-offcut recovery cannot exceed the clean-offcut stream.
-- **Inspection:** physical measurement source, identified method, measurement record and current calibration state. Simulation cannot replace inspection; out-of-tolerance dimensions fail.
+- **Mass ledger:** reconcile input mass against finished part, clean offcuts, chips, mixed scrap, residue and explicit process loss under the declared tolerance. The frozen synthetic ledger uses exact mass closure (zero ppm tolerance). Keep stream classes separate; claimed clean-offcut recovery cannot exceed the clean-offcut stream.
+- **Inspection:** physical measurement source, identified method, measurement record and current calibration state with a calibration-record reference, and measurement uncertainty. Simulation cannot replace inspection; uncertainty that crosses the remaining tolerance margin blocks conformance.
 - **Repair/remanufacture:** require an explicit repair-scope reference and fresh final inspection.
 - **Receipt:** bind exact corpus bytes (SHA-256) and a 40-character source commit. Unknown JSON fields, malformed scenario identity and duplicate IDs fail closed.
 
@@ -48,7 +48,7 @@ The scope is a synthetic fabrication/machine-shop cell. It does not model an int
 
 ## Frozen known-answer corpus
 
-The 20 scenarios contain two positive controls and eighteen negative controls:
+The 24 scenarios contain three positive controls and twenty-one negative controls:
 
 1. Exact virgin stock → conforming machined part.
 2. Mixed scrap offered for exact-grade use.
@@ -70,6 +70,10 @@ The 20 scenarios contain two positive controls and eighteen negative controls:
 18. Repair/remanufacture without a declared scope.
 19. Missing inspection record.
 20. Unknown feedstock class.
+21. Required operation executed but absent from the planned route.
+22. Current calibration claimed without a calibration-record reference.
+23. Measurement uncertainty missing.
+24. Nominal dimension within tolerance but uncertainty exceeds the remaining tolerance margin.
 
 A control matches only when both disposition and the complete reason-code set match. An optimizer timeout or an unsupported process route must be handled as blocked/indeterminate by any future planner, never as a successful route.
 
