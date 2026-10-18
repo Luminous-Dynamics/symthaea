@@ -84,6 +84,8 @@ Evaluate microbial biomass, precision-fermentation ingredients, cultivated muscl
 
 Possible products should be judged separately: pet-food ingredients, human-food ingredients, structured cuts and hybrid mince do not share a single definition of success.
 
+Recent process-scale-up work makes full-cycle accounting a priority before a cell-growth digital twin. A June 2026 full-process cultivated-meat model highlights media preparation/sterilization, cooling, cleaning-in-place, and cell expansion as significant modeled burdens; a June 2026 CFD review discusses hydrodynamic scale gaps and insufficient biological validation. These are model-design warnings, not a validated industrial recipe or proof of commercial economics ([Frontiers in Nutrition, 2026](https://doi.org/10.3389/fnut.2026.1844185); [Bioresource Technology, 2026](https://doi.org/10.1016/j.biortech.2026.134418)). The linked Symtropy follow-on is [BIOPROC-CLOSURE-001 #2027](https://github.com/Luminous-Dynamics/symtropy/issues/2027), which specifies a synthetic-first mass, utility, recovery, and turnaround benchmark.
+
 ## Benchmark contract
 
 Every benchmark run must be bound to a versioned scenario and emit machine-readable receipts. A run is `pass`, `fail`, `incomplete`, or `not_comparable`; queued, missing, stale, or wrong-head checks never count as pass.
@@ -182,13 +184,14 @@ Every negative case needs a stable ID, input fixture, expected disposition, inva
 
 ## Implementation sequence — runners are not a research dependency
 
-1. **R0 — contract review:** review the project boundaries and non-compensatory gates before expanding implementation.
-2. **R1 — synthetic contract artifacts drafted:** this PR includes [a corpus-level JSON Schema](bioprotein/fixtures/bioprotein-gate-corpus-schema-v1.json), [a per-case JSON Schema](bioprotein/fixtures/bioprotein-gate-schema-v1.json), and a [29-case synthetic gate corpus](bioprotein/fixtures/bioprotein-gate-corpus-v1.json). These fixtures cover permission/freshness, species/identity matching, nutrient basis/unknowns, safety/authorization, availability, scenario alignment and evidence-kind misuse. They are design artifacts; no runtime evaluator has validated them yet.
-3. **R2 — validate independently:** check JSON parsing/schema conformance and implement a separate small oracle for the declared gate semantics. The oracle must not import the production evaluator's own decision function.
-4. **R3 — compose, don't duplicate:** add a read-only candidate profile adapter on top of the existing nutrition source registry and Symtropy accounting contracts; do not create a second calculator.
-5. **R4 — receipts and adversarial tests:** bind exact repository commit, source/scenario manifest digest, fixture counts, expected/actual dispositions and run status. Add permutation/replay invariance and malformed-data cases.
-6. **R5 — evidence-backed expansion:** add public or permission-cleared ingredient data; publish source rights and held-out evaluation design before measuring model skill.
-7. **R6 — partner-led experiments:** only design a lab/pilot study after modeling identifies a decision-sensitive uncertainty and qualified collaborators review safety, ethics, sample size and stopping criteria.
+1. **R0 — contract review:** define project boundaries and non-compensatory gates.
+2. **R1 — synthetic contract artifacts:** the PR includes [a corpus-level JSON Schema](bioprotein/fixtures/bioprotein-gate-corpus-schema-v1.json), [a per-case JSON Schema](bioprotein/fixtures/bioprotein-gate-schema-v1.json), and a [29-case synthetic gate corpus](bioprotein/fixtures/bioprotein-gate-corpus-v1.json). It distinguishes missing required nutrition evidence from an unknown gate, and modeled animal outcomes from observed outcomes.
+3. **R2 — executable oracle drafted:** [BIOPROTEIN-002 #8063](https://github.com/Luminous-Dynamics/symthaea/issues/8063) now has a Rust-native crate at `crates/domains/symthaea-bioprotein-oracle`, with typed fail-closed dispositions, corpus validation, SHA-256 input receipts, exact-HEAD comparison, a CLI, and adversarial unit tests. Source has been authored but its Rust tests have not been executed in this work session; CI status `skipped` is not a pass.
+4. **R3 — verify independently:** parse/schema conformance, compile, run tests and Clippy on an exact local HEAD; preserve logs/receipt. The independent in-session semantic spot-check matched all 29 fixture dispositions and reason codes, but is not a substitute for running the Rust code.
+5. **R4 — compose, don't duplicate:** add a read-only candidate profile adapter on top of the existing nutrition source registry and Symtropy accounting contracts; do not create a second calculator.
+6. **R5 — process closure:** pursue Symtropy [BIOPROC-CLOSURE-001 #2027](https://github.com/Luminous-Dynamics/symtropy/issues/2027), which composes full-cycle resource and recovery accounting before any scale-up or economic claim.
+7. **R6 — evidence-backed expansion:** add real ingredient/process data only when rights, units, provenance and target match are established; freeze held-out evaluation design before model-skill claims.
+8. **R7 — partner-led experiments:** design lab/pilot studies only after modeling identifies a decision-sensitive uncertainty and qualified collaborators review safety, ethics, sample size and stopping criteria.
 
 
 ## Evidence references
