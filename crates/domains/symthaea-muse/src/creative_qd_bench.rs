@@ -542,6 +542,17 @@ mod tests {
                 .find(|item| item.intent_id == before_intent.intent_id)
                 .unwrap();
             assert_eq!(before_intent.archive, after_intent.archive);
+            let before_support: BTreeMap<&str, &CreativeTemporalSupportOutcomeV1> = before_intent
+                .candidates
+                .iter()
+                .map(|candidate| (candidate.candidate_id.as_str(), &candidate.temporal_support))
+                .collect();
+            let after_support: BTreeMap<&str, &CreativeTemporalSupportOutcomeV1> = after_intent
+                .candidates
+                .iter()
+                .map(|candidate| (candidate.candidate_id.as_str(), &candidate.temporal_support))
+                .collect();
+            assert_eq!(before_support, after_support);
         }
     }
 
