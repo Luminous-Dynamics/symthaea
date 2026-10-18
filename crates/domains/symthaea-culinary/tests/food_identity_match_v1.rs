@@ -91,6 +91,14 @@ fn approximate_identity_is_not_allowed_for_allergen_screening() {
     let mut value = fixture();
     value["use_scope"] = serde_json::json!("allergen_screening");
     value["outcome"] = serde_json::json!("qualified_approximation");
+    value["query_record"]["identity"]["cultivar"] = serde_json::json!("cultivar:a");
+    value["candidate_record"]["identity"]["cultivar"] = serde_json::json!("cultivar:b");
+    value["attribute_checks"].as_array_mut().unwrap().push(serde_json::json!({
+        "attribute_id":"cultivar",
+        "query_value":"cultivar:a",
+        "candidate_value":"cultivar:b",
+        "relation":"different"
+    }));
     value["deviations"] = serde_json::json!([{
         "attribute_id":"cultivar",
         "reason":"Synthetic mismatch."
@@ -189,4 +197,17 @@ fn branded_product_cannot_claim_exact_identity_without_brand_id() {
     value["attribute_checks"][4]["candidate_value"] = serde_json::json!("branded_product");
     let errors = violations(&value);
     assert!(errors.iter().any(|error| error.contains("requires a known brand_id")));
+}
+
+#[test]
+fn approximation_cannot_invent_a_deviation_without_an_attribute_conflict() {
+    let mut value = fixture();
+    value["use_scope"] = serde_json::json!("recipe_substitution");
+    value["outcome"] = serde_json::json!("qualified_approximation");
+    value["deviations"] = serde_json::json!([{
+        "attribute_id":"cultivar",
+        "reason":"Claimed cultivar difference is not present in the attribute assessment."
+    }]);
+    let errors = violations(&value);
+    assert!(errors.iter().any(|error| error.contains("has no matching different/unknown attribute relation")));
 }
