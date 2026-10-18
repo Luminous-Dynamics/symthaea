@@ -665,6 +665,33 @@ mod tests {
     }
 
     #[test]
+    fn validation_corpus_digest_is_preserved_and_changes_receipt() {
+        let scenario = scenario();
+        let mut context = context(b"canonical-manifest-v1", &scenario.id);
+        context.uncertainty_assessment.evidence_kind =
+            UncertaintyEvidenceKind::PointProbabilityDistribution {
+                qualification_receipt_id: "qualification-01".into(),
+                validation_corpus_digest: sha256_hex(b"validation-corpus-v1"),
+            };
+        let receipt = create_decision_receipt(&context, &scenario).unwrap();
+        assert_eq!(
+            receipt.uncertainty_evidence_kind,
+            context.uncertainty_assessment.evidence_kind
+        );
+
+        let mut changed_context = context.clone();
+        changed_context.uncertainty_assessment.evidence_kind =
+            UncertaintyEvidenceKind::PointProbabilityDistribution {
+                qualification_receipt_id: "qualification-01".into(),
+                validation_corpus_digest: sha256_hex(b"validation-corpus-v2"),
+            };
+        assert_eq!(
+            verify_decision_receipt(&changed_context, &scenario, &receipt),
+            Err(DecisionReceiptError::ReceiptMismatch)
+        );
+    }
+
+    #[test]
     fn upstream_producer_version_mutation_invalidates_old_receipt() {
         let scenario = scenario();
         let original_context = context(b"canonical-manifest-v1", &scenario.id);
