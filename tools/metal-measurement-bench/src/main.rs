@@ -930,16 +930,7 @@ mod tests {
                 role: "upstream microstructure".into(),
                 url: "https://doi.org/10.18434/mds2-2767".into(),
             }],
-            source_objects: vec![SourceObject {
-                id: "amb2025-02-targets".into(),
-                source_doi: "10.18434/mds2-3735".into(),
-                source_url: "https://data.nist.gov/od/id/mds2-3735".into(),
-                source_revision: "fixture-object-v1".into(),
-                accessed_on: "2026-10-18".into(),
-                terms_url: "https://data.nist.gov/od/id/mds2-3735".into(),
-                terms_reviewed: true,
-                local_use_authorized: true,
-            }],
+            source_objects: Vec::new(),
             challenge_context: ChallengeContext {
                 material: "IN718".into(),
                 process: "PBF-LB".into(),
@@ -960,6 +951,38 @@ mod tests {
             },
             artifacts: Vec::new(),
         }
+    }
+
+    fn record_manifest() -> SourceManifest {
+        let mut value = manifest();
+        value.reuse_policy.artifact_terms_reviewed = true;
+        value.reuse_policy.local_use_authorized = true;
+        value.source_objects.push(SourceObject {
+            id: "amb2025-02-targets".into(),
+            source_doi: "10.18434/mds2-3735".into(),
+            source_url: "https://data.nist.gov/od/id/mds2-3735".into(),
+            source_revision: "fixture-object-v1".into(),
+            accessed_on: "2026-10-18".into(),
+            terms_url: "https://data.nist.gov/od/id/mds2-3735".into(),
+            terms_reviewed: true,
+            local_use_authorized: true,
+        });
+        value.artifacts.push(SourceArtifact {
+            relative_path: "fixture.csv".into(),
+            source_object_id: "amb2025-02-targets".into(),
+            source_doi: "10.18434/mds2-3735".into(),
+            artifact_revision: "fixture-object-v1".into(),
+            accessed_on: "2026-10-18".into(),
+            source_url: "https://data.nist.gov/od/id/mds2-3735".into(),
+            terms_url: "https://data.nist.gov/od/id/mds2-3735".into(),
+            terms_reviewed: true,
+            local_use_authorized: true,
+            repository_bundling_authorized: false,
+            sha256: "a".repeat(64),
+            size_bytes: 1,
+            media_type: "text/csv".into(),
+        });
+        value
     }
 
     fn record(
@@ -1023,10 +1046,7 @@ mod tests {
 
     #[test]
     fn metadata_only_manifest_is_valid_without_claiming_data_verification() {
-        let mut value = manifest();
-        value.source_objects.clear();
-        value.reuse_policy.artifact_terms_reviewed = false;
-        value.reuse_policy.local_use_authorized = false;
+        let value = manifest();
         validate_manifest(&value).unwrap();
         assert!(value.artifacts.is_empty());
         assert!(value.source_objects.is_empty());
@@ -1102,7 +1122,7 @@ mod tests {
 
     #[test]
     fn rejects_target_lineage_in_calibration_outcomes() {
-        let value = manifest();
+        let value = record_manifest();
         let observations = ObservationSet {
             schema_version: "0.1.0".into(),
             records: vec![
@@ -1115,7 +1135,7 @@ mod tests {
 
     #[test]
     fn accepts_disjoint_calibration_and_held_out_outcome_groups() {
-        let value = manifest();
+        let value = record_manifest();
         let observations = ObservationSet {
             schema_version: "0.1.0".into(),
             records: vec![
@@ -1130,7 +1150,7 @@ mod tests {
 
     #[test]
     fn rejects_normalization_without_preserved_source_and_conversion_note() {
-        let value = manifest();
+        let value = record_manifest();
         let mut row = record("target", "AMB2022-718-AMMT-B7-P4", "aggregate-target", RecordRole::TargetOutcome, Split::HeldOut, "yield_strength", 920.0);
         row.normalized_value = Some(0.92);
         row.normalized_unit = Some("GPa".into());
@@ -1140,7 +1160,7 @@ mod tests {
 
     #[test]
     fn rejects_unknown_source_doi() {
-        let value = manifest();
+        let value = record_manifest();
         let mut row = record("target", "AMB2022-718-AMMT-B7-P4", "aggregate-target", RecordRole::TargetOutcome, Split::HeldOut, "yield_strength", 920.0);
         row.source_doi = "10.0000/not-declared".into();
         let observations = ObservationSet { schema_version: "0.1.0".into(), records: vec![row] };
@@ -1149,7 +1169,7 @@ mod tests {
 
     #[test]
     fn rejects_duplicate_record_ids() {
-        let value = manifest();
+        let value = record_manifest();
         let row1 = record("dup", "AMB2022-718-AMMT-B7-P4", "aggregate-target", RecordRole::TargetOutcome, Split::HeldOut, "yield_strength", 920.0);
         let row2 = record("dup", "AMB2022-718-AMMT-B7-P4", "aggregate-target", RecordRole::TargetOutcome, Split::HeldOut, "ultimate_strength", 1100.0);
         let observations = ObservationSet { schema_version: "0.1.0".into(), records: vec![row1, row2] };
@@ -1158,7 +1178,7 @@ mod tests {
 
     #[test]
     fn rejects_unknown_censoring_without_explanation() {
-        let value = manifest();
+        let value = record_manifest();
         let mut row = record("target", "AMB2022-718-AMMT-B7-P4", "aggregate-target", RecordRole::TargetOutcome, Split::HeldOut, "yield_strength", 920.0);
         row.censoring = Censoring::Unknown;
         let observations = ObservationSet { schema_version: "0.1.0".into(), records: vec![row] };
@@ -1167,7 +1187,7 @@ mod tests {
 
     #[test]
     fn preserves_left_right_and_interval_censoring_without_fake_point_values() {
-        let value = manifest();
+        let value = record_manifest();
         let mut left = record("left", "lineage-left", "spec-left", RecordRole::Predictor, Split::Calibration, "porosity", 0.0);
         left.raw_value = None;
         left.censoring = Censoring::LeftCensored;
@@ -1192,7 +1212,7 @@ mod tests {
 
     #[test]
     fn rejects_censoring_bounds_that_conflict_with_state() {
-        let value = manifest();
+        let value = record_manifest();
         let mut row = record("target", "AMB2022-718-AMMT-B7-P4", "aggregate-target", RecordRole::TargetOutcome, Split::HeldOut, "yield_strength", 920.0);
         row.censoring = Censoring::IntervalCensored;
         row.censor_lower_bound = Some(950.0);
@@ -1203,7 +1223,7 @@ mod tests {
 
     #[test]
     fn rejects_source_field_with_inconsistent_raw_units_or_identity() {
-        let value = manifest();
+        let value = record_manifest();
         let one = record("r1", "cal-group", "spec-1", RecordRole::Predictor, Split::Calibration, "process_energy", 20.0);
         let mut two = record("r2", "AMB2022-718-AMMT-B7-P4", "aggregate-target", RecordRole::TargetOutcome, Split::HeldOut, "yield_strength", 920.0);
         two.source_field = "process_energy".into();
@@ -1214,7 +1234,7 @@ mod tests {
 
     #[test]
     fn rejects_inconsistent_normalized_units_for_same_variable() {
-        let value = manifest();
+        let value = record_manifest();
         let mut first = record("target-1", "AMB2022-718-AMMT-B7-P4", "aggregate-target", RecordRole::TargetOutcome, Split::HeldOut, "yield_strength", 920.0);
         first.normalized_value = Some(0.92);
         first.normalized_unit = Some("GPa".into());
@@ -1262,7 +1282,7 @@ mod tests {
     }
     #[test]
     fn raw_value_and_unit_survive_normalization() {
-        let value = manifest();
+        let value = record_manifest();
         let mut row = record("target", "AMB2022-718-AMMT-B7-P4", "aggregate-target", RecordRole::TargetOutcome, Split::HeldOut, "yield_strength", 920.0);
         row.normalized_value = Some(0.92);
         row.normalized_unit = Some("GPa".into());
