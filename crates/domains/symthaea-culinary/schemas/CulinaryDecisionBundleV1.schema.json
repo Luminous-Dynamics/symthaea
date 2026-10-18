@@ -405,7 +405,8 @@
                           "stale",
                           "conflicted",
                           "disputed",
-                          "suppressed"
+                          "suppressed",
+                          "synthetic"
                         ]
                       },
                       "value": {
