@@ -180,6 +180,14 @@ After establishing a measured baseline, investigate either >=10% lower cost per 
 
 The review shortlist, including the limitations of archived ColorHug2 hardware, the candidate PGenerator+ software, and power-measurement instrument requirements, is in [OPEN_DISPLAY_HARDWARE_REUSE_CANDIDATES.md](OPEN_DISPLAY_HARDWARE_REUSE_CANDIDATES.md).
 
+## 9A. First native CAD artifact
+
+A parameterized OpenSCAD sensor-interface plate now exists at [hardware/open-display-reference/cad/odrh_sensor_interface_plate.scad](../../hardware/open-display-reference/cad/odrh_sensor_interface_plate.scad), with scope/nonclaims in [hardware/open-display-reference/README.md](../../hardware/open-display-reference/README.md). It has a configurable optical-axis aperture, four-hole mounting grid and two bracket slots, plus parameter assertions.
+
+It is a geometry prototype only: actual sensor dimensions, bracket compatibility, fasteners, fit, material/process tolerance, strength, optical aperture requirements and physical usefulness remain unvalidated. Do not call this a complete metrology stand or purchase-ready design. CAD rendering/export was not performed in the current workspace.
+
+The next calibration protocol is [ODRH-MET-001 #8049](https://github.com/Luminous-Dynamics/symthaea/issues/8049) and [DISPLAY_METROLOGY_REPRODUCIBILITY_PROTOCOL.md](DISPLAY_METROLOGY_REPRODUCIBILITY_PROTOCOL.md). It uses the applicable current IDMS method as a starting point and introduces a project-level uncertainty-vs-decision-effect gate; it does not replace the standard.
+
 ## 10. Ownership
 
 - **Symthaea:** architecture constraints, test selection, uncertainty/receipt contracts, cost/yield accounting, Pareto comparison, and independent validation logic.
