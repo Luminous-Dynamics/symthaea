@@ -129,6 +129,10 @@ impl CognitiveLoopService {
             let ft = self.fabrication_manager.telemetry();
             metadata.fabrication_manufacturing_fe = ft.manufacturing_free_energy;
             metadata.fabrication_design_loop_fe = ft.design_loop_free_energy;
+            metadata.fabrication_manufacturing_reference_calibrated =
+                ft.manufacturing_reference_calibrated;
+            metadata.fabrication_design_loop_reference_calibrated =
+                ft.design_loop_reference_calibrated;
             metadata.fabrication_safety_level = ft.safety_level;
             metadata.fabrication_anomaly_count = ft.anomaly_count;
             metadata.fabrication_anomaly_ema = ft.anomaly_ema;
