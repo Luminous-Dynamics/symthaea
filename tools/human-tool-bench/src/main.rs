@@ -18,7 +18,8 @@ const CONTRACT_SHA256: &str =
 const CONTRACT_PREIMAGE: &str = concat!(
     "HUMAN-TOOL-CONTRACT-v0.1\n",
     "arms=A0,A1,A2\n",
-    "success=verified_restoration AND function_gate=pass AND safety_gate=pass AND distinct_function_safety_receipts\n",
+    "success=verified_restoration AND function_gate=pass AND safety_gate=pass AND ",
+    "distinct_function_safety_receipts\n",
     "unknown_cost=null_never_zero\n",
     "critical_fault_safe_to_operate=forbidden\n",
     "recurrence_claim=verified_restoration AND positive_follow_up_use_exposure_hours\n",
