@@ -163,8 +163,12 @@ fn write_v2(path: &Path, n: usize, seed: u64) -> Result<Ranges, Box<dyn Error>> 
     }
     out.flush()?;
     out.get_ref().sync_all()?;
+    let final_metadata_end = DATA
+        .checked_add((n - 1).checked_mul(V2_STRIDE).ok_or("v2 metadata offset overflow")?)
+        .and_then(|value| value.checked_add(META_BYTES_READ))
+        .ok_or("v2 metadata offset overflow")?;
     Ok(Ranges {
-        meta: (DATA, DATA + n * V2_STRIDE),
+        meta: (DATA, final_metadata_end),
         payload: (DATA + V2_HV_OFFSET, DATA + n * V2_STRIDE),
     })
 }
