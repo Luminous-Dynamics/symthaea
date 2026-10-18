@@ -54,6 +54,7 @@ struct Ranges { meta: (usize, usize), payload: (usize, usize) }
 struct Sample {
     layout: &'static str,
     round: usize,
+    vectors: usize,
     elapsed_ns: u128,
     file_bytes: u64,
     page_size: usize,
@@ -78,7 +79,7 @@ fn run() -> Result<(), Box<dyn Error>> {
     let c = parse_args()?;
     if c.vectors == 0 || c.vectors > MAX_VECTORS { return Err(format!("--vectors must be in 1..={MAX_VECTORS}").into()); }
     if c.rounds == 0 || c.rounds > 10_000 { return Err("--rounds must be in 1..=10000".into()); }
-    let page = page_size();
+    let (page, page_source) = page_size();
     if page == 0 { return Err("invalid OS page size".into()); }
 
     let stamp = SystemTime::now().duration_since(UNIX_EPOCH)?.as_nanos();
@@ -117,7 +118,7 @@ fn run() -> Result<(), Box<dyn Error>> {
 
     println!("synthetic_metadata_scan=true; production_format_changed=false");
     println!("vectors={},rounds_per_layout={},seed={}", c.vectors, c.rounds, c.seed);
-    println!("os={},arch={},page_size_bytes={page}", env::consts::OS, env::consts::ARCH);
+    println!("os={},arch={},page_size_bytes={page},page_size_source={page_source}", env::consts::OS, env::consts::ARCH);
     println!("v2_file_bytes={v2_bytes},soa_file_bytes={soa_bytes}");
     println!("metadata_bytes_read_per_scan={}", c.vectors * META_BYTES_READ);
     println!("metadata_checksum={:016x}", expected.unwrap_or(0));
@@ -211,7 +212,7 @@ fn measure(layout: &'static str, round: usize, path: &Path, ranges: &Ranges, n: 
         _ => (None,None),
     };
     Ok(Sample {
-        layout, round, elapsed_ns, file_bytes: file.metadata()?.len(), page_size: page, advice_rc,
+        layout, round, vectors: n, elapsed_ns, file_bytes: file.metadata()?.len(), page_size: page, advice_rc,
         minor, major,
         meta_resident_before: before_res.as_deref().map(|v| resident_in(v,ranges.meta,page)),
         meta_resident_after: after_res.as_deref().map(|v| resident_in(v,ranges.meta,page)),
@@ -254,15 +255,15 @@ fn align_up(n: usize, a: usize) -> Result<usize, Box<dyn Error>> {
     let r = n % a;
     if r == 0 { Ok(n) } else { n.checked_add(a-r).ok_or_else(|| "alignment overflow".into()) }
 }
-fn page_size() -> usize {
+fn page_size() -> (usize, &'static str) {
     #[cfg(target_os = "linux")]
     {
         unsafe extern "C" { fn getpagesize() -> i32; }
         // SAFETY: getpagesize has no arguments.
         let n = unsafe { getpagesize() };
-        if n > 0 { return n as usize; }
+        if n > 0 { return (n as usize, "getpagesize"); }
     }
-    4096
+    (4096, "fallback_4096_assumed")
 }
 fn faults() -> Option<Faults> {
     #[cfg(target_os = "linux")]
@@ -315,10 +316,10 @@ fn mean(values: impl Iterator<Item=u64>) -> String {
     if v.is_empty(){"unavailable".into()}else{format!("{:.3}",v.iter().sum::<u64>() as f64/v.len() as f64)}
 }
 fn render_csv(rows:&[Sample])->String {
-    let mut s=String::from("layout,round,elapsed_ns,file_bytes,page_size_bytes,eviction_hint_rc,minor_fault_delta,major_fault_delta,metadata_resident_pages_before,metadata_resident_pages_after,payload_resident_pages_before,payload_resident_pages_after,metadata_checksum_fnv1a64\n");
+    let mut s=String::from("layout,round,elapsed_ns,vectors,logical_metadata_bytes_read,file_bytes,page_size_bytes,eviction_hint_rc,minor_fault_delta,major_fault_delta,metadata_resident_pages_before,metadata_resident_pages_after,payload_resident_pages_before,payload_resident_pages_after,metadata_checksum_fnv1a64\n");
     for r in rows {
-        s.push_str(&format!("{},{},{},{},{},{},{},{},{},{},{},{},{:016x}\n",
-            r.layout,r.round,r.elapsed_ns,r.file_bytes,r.page_size,show(r.advice_rc),show(r.minor),show(r.major),
+        s.push_str(&format!("{},{},{},{},{},{},{},{},{},{},{},{},{},{},{:016x}\n",
+            r.layout,r.round,r.elapsed_ns,r.vectors,r.vectors * META_BYTES_READ,r.file_bytes,r.page_size,show(r.advice_rc),show(r.minor),show(r.major),
             show(r.meta_resident_before),show(r.meta_resident_after),show(r.payload_resident_before),show(r.payload_resident_after),r.checksum));
     }
     s
