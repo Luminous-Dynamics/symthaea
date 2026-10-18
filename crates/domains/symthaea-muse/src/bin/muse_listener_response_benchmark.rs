@@ -264,8 +264,12 @@ fn run(options: Options) -> Result<String, String> {
     };
 
     let split = TemporalHoldoutSplit {
-        training_through_sequence: options.training_through_sequence.ok_or("--training-through is required")?,
-        testing_from_sequence: options.testing_from_sequence.ok_or("--testing-from is required")?,
+        training_through_sequence: options
+            .training_through_sequence
+            .ok_or("--training-through is required")?,
+        testing_from_sequence: options
+            .testing_from_sequence
+            .ok_or("--testing-from is required")?,
     };
     let report = evaluate_temporal_holdout(&records, split, prior_strength)
         .map_err(|issues| {
@@ -280,9 +284,15 @@ fn run(options: Options) -> Result<String, String> {
         source_sha256: source_digest(&raw_bytes),
         source_records: records.len(),
         evidence_boundary: if options.demo {
-            "Synthetic demonstration only; placeholder audio identities are not hashes of audio bytes and are not human-listener evidence."
+            concat!(
+                "Synthetic demonstration only; placeholder audio identities are not hashes ",
+                "of audio bytes and are not human-listener evidence."
+            )
         } else {
-            "Hash identifies the exact input JSONL bytes only; record audio hashes must separately identify the audio bytes actually presented."
+            concat!(
+                "Hash identifies the exact input JSONL bytes only; record audio hashes must ",
+                "separately identify the audio bytes actually presented."
+            )
         },
         report,
     };
@@ -350,7 +360,12 @@ mod tests {
     #[test]
     fn missing_required_flags_are_rejected() {
         assert!(parse_options(Vec::<String>::new()).is_err());
-        assert!(parse_options(["--demo".to_owned(), "--input".to_owned(), "x".to_owned()]).is_err());
+        assert!(parse_options([
+            "--demo".to_owned(),
+            "--input".to_owned(),
+            "x".to_owned(),
+        ])
+        .is_err());
     }
 
     #[test]
