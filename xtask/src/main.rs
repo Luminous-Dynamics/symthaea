@@ -62,6 +62,14 @@ enum Commands {
         #[arg(long)]
         out: PathBuf,
     },
+    /// Validate the vendored CC BY 4.0 tire-monitoring CSV shards; no tire performance is qualified.
+    TireMonitoringIntake {
+        #[arg(long, default_value = "data/third_party/tire-monitoring-dataset")]
+        input_dir: PathBuf,
+        /// Optional path for a JSON report; otherwise report to stdout.
+        #[arg(long)]
+        out: Option<PathBuf>,
+    },
     GenerateManifest {
         #[arg(long, default_value = ".")]
         root: PathBuf,
@@ -105,6 +113,15 @@ fn main() -> anyhow::Result<()> {
         }
         Commands::RhnFinalize { input, out } => {
             rhn_sweep::run_finalize(input, out)?;
+        }
+        Commands::TireMonitoringIntake { input_dir, out } => {
+            let root = PathBuf::from(env!("CARGO_MANIFEST_DIR"))
+                .parent()
+                .expect("xtask lives one level below the workspace root")
+                .to_path_buf();
+            let input_dir = if input_dir.is_absolute() { input_dir } else { root.join(input_dir) };
+            let out = out.map(|path| if path.is_absolute() { path } else { root.join(path) });
+            tire_monitoring_intake::run(&input_dir, out.as_deref())?;
         }
         Commands::GenerateManifest { root } => {
             let files = vec!["Cargo.toml", "src/lib.rs", "symthaea-core/Cargo.toml"];
