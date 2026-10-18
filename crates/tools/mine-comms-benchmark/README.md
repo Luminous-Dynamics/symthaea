@@ -31,3 +31,8 @@ The next protocol design should evaluate standards-based store-carry-forward (IE
 The harness does not simulate electromagnetic propagation, stochastic packet loss, routing contention/medium access, receiver-acknowledgement airtime, general multi-hop queues, physical radio energy, mine safety or regulatory permissibility. Link quality, latency and energy are supplied synthetic measurements. The next increment should add frozen traces and reproducible fault schedules, then calibrate against instrumented link measurements. HDC/CfC is not presumed better; it must beat simpler policies on held-out scenarios.
 
 See [the MINE-COMMS-001 specification](../../../docs/research/MINE_COMMUNICATIONS_BENCHMARK_V0_1.md) and [issue #8010](https://github.com/Luminous-Dynamics/symthaea/issues/8010).
+
+
+## Physical TTE characterization
+
+[MINE-TTE-CHAR-001 #8047](https://github.com/Luminous-Dynamics/symthaea/issues/8047) defines calibrated bench measurements and held-out physical validation to replace purely synthetic channel assumptions. It is a research/test protocol, not permission to operate unapproved transmitters in a mine.
