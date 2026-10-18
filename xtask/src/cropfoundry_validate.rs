@@ -402,7 +402,7 @@ mod tests {
     fn current_source_manifest_keeps_every_source_non_trainable() {
         let fixture: Value = serde_json::from_str(SOURCE_FIXTURE).unwrap();
         let count = validate_source_manifest(&fixture).unwrap();
-        assert_eq!(count, 9);
+        assert_eq!(count, 11);
         assert!(
             fixture["sources"]
                 .as_array()
