@@ -133,6 +133,8 @@ pub enum ImplicitEulerErrorKind {
     InvalidStepCount { requested: usize, max_allowed: usize },
     InvalidNewtonIterationBudget { requested: usize, max_allowed: usize },
     SystemTooLargeForDenseNewton { dimension: usize, max_dimension: usize },
+    StateScaleDimensionMismatch { expected: usize, actual: usize },
+    InvalidStateScale { index: usize },
     NonFiniteInitialState { index: usize },
     NonFiniteIntermediateState { stage: &'static str, index: usize },
     RhsDimensionMismatch { stage: &'static str, expected: usize, actual: usize },
@@ -180,6 +182,8 @@ impl ImplicitEulerError {
                 | ImplicitEulerErrorKind::InvalidStepCount { .. }
                 | ImplicitEulerErrorKind::InvalidNewtonIterationBudget { .. }
                 | ImplicitEulerErrorKind::SystemTooLargeForDenseNewton { .. }
+                | ImplicitEulerErrorKind::StateScaleDimensionMismatch { .. }
+                | ImplicitEulerErrorKind::InvalidStateScale { .. }
                 | ImplicitEulerErrorKind::NonFiniteInitialState { .. }
         ) || (matches!(&kind, ImplicitEulerErrorKind::InvalidTimeSpan)
             && steps_completed == 0
@@ -1232,6 +1236,23 @@ impl DifferentialEquationsEngine {
         n_steps: usize,
         newton_iters: usize,
     ) -> Result<ImplicitEulerSolveReport, ImplicitEulerError> {
+        let state_scales = vec![1.0; system.dim];
+        Self::try_solve_implicit_euler_with_state_scales(
+            system, t0, t_end, y0, n_steps, newton_iters, &state_scales,
+        )
+    }
+
+    /// Internal full-Newton solve with explicit characteristic state scales
+    /// for finite-difference perturbations.
+    fn try_solve_implicit_euler_with_state_scales(
+        system: &ODESystem,
+        t0: f64,
+        t_end: f64,
+        y0: &[f64],
+        n_steps: usize,
+        newton_iters: usize,
+        state_scales: &[f64],
+    ) -> Result<ImplicitEulerSolveReport, ImplicitEulerError> {
         let mut y = y0.to_vec();
         let mut rhs_evaluations = 0usize;
         let mut total_corrections = 0usize;
@@ -1248,6 +1269,22 @@ impl DifferentialEquationsEngine {
                 ImplicitEulerErrorKind::DimensionMismatch {
                     expected: system.dim, actual: y0.len(),
                 }, t0, &y, 0, 0, 0, 0.0
+            ));
+        }
+        if state_scales.len() != system.dim {
+            return Err(ImplicitEulerError::new(
+                ImplicitEulerErrorKind::StateScaleDimensionMismatch {
+                    expected: system.dim, actual: state_scales.len(),
+                }, t0, &y, 0, 0, 0, 0.0
+            ));
+        }
+        if let Some(index) = state_scales
+            .iter()
+            .position(|value| !value.is_finite() || *value <= 0.0)
+        {
+            return Err(ImplicitEulerError::new(
+                ImplicitEulerErrorKind::InvalidStateScale { index },
+                t0, &y, 0, 0, 0, 0.0
             ));
         }
         if !t0.is_finite() || !t_end.is_finite() || t_end < t0 {
@@ -1428,7 +1465,9 @@ impl DifferentialEquationsEngine {
                 let mut jacobian = vec![0.0_f64; matrix_len];
                 for column in 0..dimension {
                     let original = y_next[column];
-                    let delta = f64::EPSILON.sqrt() * original.abs().max(1.0);
+                    let perturbation_scale = original.abs().max(state_scales[column]);
+                    let raw_delta = f64::EPSILON.sqrt() * perturbation_scale;
+                    let delta = if raw_delta > 0.0 { raw_delta } else { perturbation_scale };
                     let mut perturbed = original + delta;
                     let mut signed_delta = delta;
                     if !perturbed.is_finite() || perturbed == original {
@@ -1695,7 +1734,9 @@ impl DifferentialEquationsEngine {
                 ));
             }
 
-            let full = Self::try_solve_implicit_euler(system, t, trial_end, &y, 1, newton_iters);
+            let full = Self::try_solve_implicit_euler_with_state_scales(
+                system, t, trial_end, &y, 1, newton_iters, absolute_tolerances
+            );
             let full_state = match full {
                 Ok(report) => {
                     max_newton_residual = max_newton_residual.max(report.max_normalized_residual);
@@ -1733,7 +1774,9 @@ impl DifferentialEquationsEngine {
                 }
             };
 
-            let first_half = Self::try_solve_implicit_euler(system, t, midpoint, &y, 1, newton_iters);
+            let first_half = Self::try_solve_implicit_euler_with_state_scales(
+                system, t, midpoint, &y, 1, newton_iters, absolute_tolerances
+            );
             let midpoint_state = match first_half {
                 Ok(report) => {
                     max_newton_residual = max_newton_residual.max(report.max_normalized_residual);
@@ -1771,8 +1814,8 @@ impl DifferentialEquationsEngine {
                 }
             };
 
-            let second_half = Self::try_solve_implicit_euler(
-                system, midpoint, trial_end, &midpoint_state, 1, newton_iters
+            let second_half = Self::try_solve_implicit_euler_with_state_scales(
+                system, midpoint, trial_end, &midpoint_state, 1, newton_iters, absolute_tolerances
             );
             let fine_state = match second_half {
                 Ok(report) => {
