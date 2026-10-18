@@ -44,6 +44,8 @@ pub struct ScenarioObjective {
 #[derive(Clone, Debug, PartialEq, Serialize, Deserialize)]
 pub struct CandidateScenarioMetrics {
     pub scenario_id: String,
+    /// Must equal the digest registered for this scenario; prevents accidental scenario drift.
+    pub scenario_digest: String,
     pub objectives: Vec<ScenarioObjective>,
 }
 
@@ -196,6 +198,18 @@ pub fn evaluate_robust_frontier(
             if !found_scenarios.insert(metrics.scenario_id.clone()) {
                 return Err(invalid(format!(
                     "candidate {} has duplicate metrics for scenario {}",
+                    candidate.id, metrics.scenario_id
+                )));
+            }
+            let expected_digest = sorted_scenarios
+                .iter()
+                .find(|scenario| scenario.id == metrics.scenario_id)
+                .expect("scenario ID was checked above")
+                .digest
+                .as_str();
+            if metrics.scenario_digest != expected_digest {
+                return Err(invalid(format!(
+                    "candidate {} metrics for scenario {} use a different scenario digest",
                     candidate.id, metrics.scenario_id
                 )));
             }
@@ -535,6 +549,7 @@ mod tests {
             scenario_metrics: vec![
                 CandidateScenarioMetrics {
                     scenario_id: "observed_basket".to_owned(),
+                    scenario_digest: "sha256:observed-basket-v1".to_owned(),
                     objectives: vec![ScenarioObjective {
                         key: "cost_per_serving".to_owned(),
                         direction: ObjectiveDirection::Minimize,
@@ -545,6 +560,7 @@ mod tests {
                 },
                 CandidateScenarioMetrics {
                     scenario_id: "seasonal_price_shock".to_owned(),
+                    scenario_digest: "sha256:seasonal-shock-v1".to_owned(),
                     objectives: vec![ScenarioObjective {
                         key: "cost_per_serving".to_owned(),
                         direction: ObjectiveDirection::Minimize,
@@ -664,6 +680,18 @@ mod tests {
         .unwrap();
 
         assert_eq!(forward, reverse);
+    }
+
+    #[test]
+    fn scenario_metrics_must_bind_to_the_registered_joint_assumptions() {
+        let mut mislabelled = candidate("mislabelled", Some(5.0), Some(5.0));
+        mislabelled.scenario_metrics[1].scenario_digest =
+            "sha256:observed-basket-v1".to_owned();
+
+        assert!(matches!(
+            evaluate_robust_frontier(&scenarios(), &[mislabelled]),
+            Err(RobustParetoError::InvalidInput(_))
+        ));
     }
 
     #[test]
