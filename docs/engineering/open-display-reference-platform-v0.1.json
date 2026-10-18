@@ -353,6 +353,12 @@
       "title": "PGenerator+ display pattern generator",
       "url": "https://github.com/BigShoots/PGenerator-Plus",
       "purpose": "Active third-party reference for HDMI SDR/HDR pattern generation and meter-driven validation; verify its dependency, language, supported hardware, licenses and output behavior before choosing interop."
+    },
+    {
+      "id": "SRC-ICDM-IDMS-V13",
+      "title": "International Committee for Display Metrology — IDMS",
+      "url": "https://www.sid.org/Standards/ICDM/ICDM",
+      "purpose": "Use the applicable current IDMS display measurement method as the standards-aligned starting point; report edition and adaptations, without reproducing or replacing the standard."
     }
   ]
 }
