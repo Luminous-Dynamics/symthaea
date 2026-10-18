@@ -407,6 +407,22 @@ mod tests {
     }
 
     #[test]
+    fn latency_budget_selects_a_less_informative_feasible_action() {
+        let partial = [&[0.8, 0.2][..], &[0.2, 0.8][..]];
+        let actions = [
+            action("slow_perfect", &PERFECT, 0.1, 2.0, true),
+            action("fast_partial", &partial, 0.5, 0.1, true),
+        ];
+        let plan = plan_active_sensing(&HALF_PRIOR, &actions, budget(1.0, 1.0)).unwrap();
+        assert_eq!(
+            plan.action_scores[plan.selected_action_index.unwrap()].action_id,
+            "fast_partial"
+        );
+        assert!(!plan.action_scores[0].within_budgets);
+        assert!(plan.action_scores[1].within_budgets);
+    }
+
+    #[test]
     fn unsafe_action_never_selected_even_if_perfect() {
         let actions = [action("unsafe_turn", &PERFECT, 0.1, 0.1, false)];
         let plan = plan_active_sensing(&HALF_PRIOR, &actions, budget(1.0, 1.0)).unwrap();
