@@ -20,6 +20,8 @@ enum AdapterError {
     },
     #[error("JSON error: {0}")]
     Json(#[from] serde_json::Error),
+    #[error("CSV error: {0}")]
+    Csv(#[from] csv::Error),
     #[error("validation failed: {0}")]
     Validation(String),
 }
@@ -173,6 +175,24 @@ enum Censoring {
 }
 
 #[derive(Debug, Clone, Serialize)]
+struct CsvColumnInventory {
+    source_header: String,
+    column_index_zero_based: usize,
+    nonempty_cells: usize,
+    empty_cells: usize,
+}
+
+#[derive(Debug, Clone, Serialize)]
+struct CsvInventory {
+    artifact_relative_path: String,
+    artifact_sha256: String,
+    data_row_count: usize,
+    columns: Vec<CsvColumnInventory>,
+    row_identity_note: &'static str,
+    claim_ceiling: &'static str,
+}
+
+#[derive(Debug, Clone, Serialize)]
 struct AuditReceipt {
     receipt_schema_version: &'static str,
     adapter_version: &'static str,
@@ -184,6 +204,8 @@ struct AuditReceipt {
     artifact_count: usize,
     record_count: usize,
     held_out_outcome_groups: Vec<String>,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    csv_inventory: Option<CsvInventory>,
     claim_ceiling: &'static str,
 }
 
@@ -208,6 +230,77 @@ fn sha256_hex(bytes: &[u8]) -> String {
         let _ = write!(&mut out, "{byte:02x}");
     }
     out
+}
+
+fn inspect_csv_bytes(bytes: &[u8], relative_path: &str) -> Result<CsvInventory> {
+    let mut reader = csv::ReaderBuilder::new()
+        .has_headers(true)
+        .flexible(false)
+        .from_reader(bytes);
+
+    let headers = reader.headers()?.clone();
+    if headers.is_empty() {
+        return Err(AdapterError::Validation(
+            "CSV must contain a non-empty header row".into(),
+        ));
+    }
+
+    let mut seen_headers = BTreeSet::new();
+    for header in headers.iter() {
+        let normalized = header.trim().to_lowercase();
+        if normalized.is_empty() {
+            return Err(AdapterError::Validation(
+                "CSV header names must not be blank".into(),
+            ));
+        }
+        if !seen_headers.insert(normalized.clone()) {
+            return Err(AdapterError::Validation(format!(
+                "CSV contains duplicate or whitespace/case-colliding header {header:?}"
+            )));
+        }
+    }
+
+    let mut columns: Vec<CsvColumnInventory> = headers
+        .iter()
+        .enumerate()
+        .map(|(index, header)| CsvColumnInventory {
+            source_header: header.to_string(),
+            column_index_zero_based: index,
+            nonempty_cells: 0,
+            empty_cells: 0,
+        })
+        .collect();
+
+    let mut data_row_count = 0usize;
+    for row in reader.records() {
+        let row = row?;
+        data_row_count = data_row_count.checked_add(1).ok_or_else(|| {
+            AdapterError::Validation("CSV row count overflow".into())
+        })?;
+        for (index, cell) in row.iter().enumerate() {
+            let column = columns.get_mut(index).ok_or_else(|| {
+                AdapterError::Validation("CSV row has more cells than the header".into())
+            })?;
+            if cell.trim().is_empty() {
+                column.empty_cells = column.empty_cells.checked_add(1).ok_or_else(|| {
+                    AdapterError::Validation("CSV empty-cell count overflow".into())
+                })?;
+            } else {
+                column.nonempty_cells = column.nonempty_cells.checked_add(1).ok_or_else(|| {
+                    AdapterError::Validation("CSV nonempty-cell count overflow".into())
+                })?;
+            }
+        }
+    }
+
+    Ok(CsvInventory {
+        artifact_relative_path: relative_path.to_string(),
+        artifact_sha256: sha256_hex(bytes),
+        data_row_count,
+        columns,
+        row_identity_note: "rows are reported as parsed-record counts only; data-row ordinal is not an upstream row identifier",
+        claim_ceiling: "CSV byte/shape inventory only; no semantic field mapping or model-accuracy claim",
+    })
 }
 
 fn nonblank(value: &str) -> bool {
@@ -932,6 +1025,7 @@ fn manifest_receipt(
         artifact_count,
         record_count,
         held_out_outcome_groups: groups,
+        csv_inventory: None,
         claim_ceiling: "source/contract integrity only; not evidence of model accuracy or physical qualification",
     }
 }
@@ -939,7 +1033,7 @@ fn manifest_receipt(
 fn run(args: &[String]) -> Result<AuditReceipt> {
     if args.len() < 3 {
         return Err(AdapterError::Validation(
-            "usage: metal-measurement-bench validate-manifest MANIFEST.json | verify-artifacts MANIFEST.json ARTIFACT_DIR | validate-records MANIFEST.json OBSERVATIONS.json ARTIFACT_DIR".into(),
+            "usage: metal-measurement-bench validate-manifest MANIFEST.json | verify-artifacts MANIFEST.json ARTIFACT_DIR | inspect-csv MANIFEST.json ARTIFACT_DIR RELATIVE_CSV_PATH | validate-records MANIFEST.json OBSERVATIONS.json ARTIFACT_DIR".into(),
         ));
     }
     let operation = args[1].as_str();
@@ -970,6 +1064,59 @@ fn run(args: &[String]) -> Result<AuditReceipt> {
                 "verify-artifacts", "ARTIFACT_BYTES_AND_DIGESTS_VERIFIED",
                 &manifest_bytes, None, manifest.artifacts.len(), 0, Vec::new(),
             ))
+        }
+        "inspect-csv" => {
+            if args.len() != 5 {
+                return Err(AdapterError::Validation(
+                    "inspect-csv requires an artifact directory and a manifest-declared relative CSV path".into(),
+                ));
+            }
+            let relative_path = safe_relative_path(&args[4])?;
+            let relative_string = relative_path.to_string_lossy().to_string();
+            if !relative_string.to_lowercase().ends_with(".csv") {
+                return Err(AdapterError::Validation(
+                    "inspect-csv accepts only a .csv artifact path".into(),
+                ));
+            }
+            let artifact = manifest.artifacts.iter()
+                .find(|artifact| artifact.relative_path == relative_string)
+                .ok_or_else(|| AdapterError::Validation(format!(
+                    "CSV path {:?} is not declared by the manifest", relative_string
+                )))?;
+
+            let root = Path::new(&args[3]);
+            verify_artifacts(&manifest, root)?;
+            let canonical_root = fs::canonicalize(root).map_err(|error| io_error(root, error))?;
+            let requested_path = canonical_root.join(&relative_path);
+            let canonical_path = fs::canonicalize(&requested_path)
+                .map_err(|error| io_error(&requested_path, error))?;
+            if !canonical_path.starts_with(&canonical_root) || !canonical_path.is_file() {
+                return Err(AdapterError::Validation(format!(
+                    "CSV artifact {:?} is outside the verified root or is not a regular file",
+                    relative_string
+                )));
+            }
+
+            // Parse the exact byte buffer after rechecking it, rather than reopening
+            // the file in the CSV reader after verification (avoids a verify/read TOCTOU).
+            let bytes = fs::read(&canonical_path).map_err(|error| io_error(&canonical_path, error))?;
+            if bytes.len() as u64 != artifact.size_bytes || sha256_hex(&bytes) != artifact.sha256 {
+                return Err(AdapterError::Validation(format!(
+                    "CSV artifact {:?} changed after initial verification", relative_string
+                )));
+            }
+            let inventory = inspect_csv_bytes(&bytes, &relative_string)?;
+            let mut receipt = manifest_receipt(
+                "inspect-csv",
+                "CSV_SHAPE_INVENTORIED_NOT_SEMANTICALLY_MAPPED",
+                &manifest_bytes,
+                Some(sha256_hex(&bytes)),
+                manifest.artifacts.len(),
+                inventory.data_row_count,
+                Vec::new(),
+            );
+            receipt.csv_inventory = Some(inventory);
+            Ok(receipt)
         }
         "validate-records" => {
             if args.len() != 5 {
@@ -1119,6 +1266,47 @@ mod tests {
             censoring: Censoring::Uncensored,
             metadata_note: None,
         }
+    }
+
+    #[test]
+    fn csv_inventory_counts_rows_and_empty_cells_without_inferencing_units() {
+        let input = b"specimen,stress MPa,note\r\nA,950,\"necked, early\"\r\nB,, ok \r\nC,1020,\r\n";
+        let inventory = inspect_csv_bytes(input, "synthetic-fixture.csv").unwrap();
+        assert_eq!(inventory.data_row_count, 3);
+        assert_eq!(inventory.artifact_sha256, sha256_hex(input));
+        assert_eq!(inventory.columns.len(), 3);
+        assert_eq!(inventory.columns[0].source_header, "specimen");
+        assert_eq!(inventory.columns[0].nonempty_cells, 3);
+        assert_eq!(inventory.columns[1].empty_cells, 1);
+        assert_eq!(inventory.columns[1].nonempty_cells, 2);
+        assert_eq!(inventory.columns[2].empty_cells, 2);
+        assert!(inventory.row_identity_note.contains("not an upstream row identifier"));
+        assert!(inventory.claim_ceiling.contains("no semantic field mapping"));
+    }
+
+    #[test]
+    fn csv_inventory_rejects_blank_and_case_or_whitespace_colliding_headers() {
+        for input in [
+            &b",value\n1,2\n"[..],
+            &b"value, value \n1,2\n"[..],
+            &b"ID,id\na,b\n"[..],
+        ] {
+            assert!(inspect_csv_bytes(input, "fixture.csv").is_err());
+        }
+    }
+
+    #[test]
+    fn csv_inventory_rejects_inconsistent_record_width() {
+        let input = b"id,value\na,1\nb,2,unexpected\n";
+        assert!(inspect_csv_bytes(input, "fixture.csv").is_err());
+    }
+
+    #[test]
+    fn csv_inventory_handles_quoted_newlines_as_one_record() {
+        let input = b"id,note\n1,\"line one\nline two\"\n2,ok\n";
+        let inventory = inspect_csv_bytes(input, "fixture.csv").unwrap();
+        assert_eq!(inventory.data_row_count, 2);
+        assert_eq!(inventory.columns[1].nonempty_cells, 2);
     }
 
     #[test]
