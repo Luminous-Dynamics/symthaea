@@ -330,11 +330,9 @@ fn validate_measurement_run_semantics(record: &Value) -> Vec<String> {
                     .get("decision_capability")
                     .and_then(Value::as_str)
                     != Some("NOT_EVALUATED")
-                || !used_instruments.is_empty()
-                || !raw_ids.is_empty()
             {
                 errors.push(format!(
-                    "NOT_EVALUATED observation {observation_id} cannot contain a value, uncertainty, instrument, or raw-artifact claim"
+                    "NOT_EVALUATED observation {observation_id} cannot claim a derived value, uncertainty, MDE, or decision capability"
                 ));
             }
             continue;
@@ -478,7 +476,7 @@ fn validate_measurement_run_semantics(record: &Value) -> Vec<String> {
             if physical_state != "INDEPENDENTLY_REVIEWED"
                 || acquired_at.is_none()
                 || measured_count == 0
-                || independently_reviewed_count == 0
+                || independently_reviewed_count != measured_count
                 || record.get("review").is_none_or(Value::is_null)
             {
                 errors.push(
@@ -824,6 +822,72 @@ mod tests {
         assert!(errors
             .iter()
             .any(|error| error.contains("claims CAPABLE despite uncertainty")));
+    }
+
+    #[test]
+    fn not_evaluated_observation_can_retain_raw_evidence_without_derived_claim() {
+        let mut record = parse_run();
+        record["record_state"] = Value::String("ACQUIRED_UNQUALIFIED".to_owned());
+        record["physical_validation"] = Value::String("MEASURED_UNQUALIFIED".to_owned());
+        record["acquired_at"] = Value::String("2026-10-18T10:00:00Z".to_owned());
+        record["instruments"] = serde_json::json!([
+            {
+                "instrument_id":"ODRH-RUN-INS-POWER-001",
+                "instrument_class":"POWER_METER",
+                "manufacturer":"Example",
+                "model":"Synthetic reference meter",
+                "serial_or_stable_id":"TEST-POWER-001",
+                "calibration_state":"VALID",
+                "calibration_record_digest":"aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
+                "calibration_valid_through":"2026-12-31",
+                "supported_measurands":["task-window input energy"]
+            },
+            {
+                "instrument_id":"ODRH-RUN-INS-CAMERA-001",
+                "instrument_class":"CAMERA",
+                "manufacturer":"Example",
+                "model":"Uncalibrated camera",
+                "serial_or_stable_id":"TEST-CAMERA-001",
+                "calibration_state":"UNKNOWN",
+                "calibration_record_digest":null,
+                "calibration_valid_through":null,
+                "supported_measurands":["relative image response"]
+            }
+        ]);
+        record["raw_artifacts"] = serde_json::json!([
+            {
+                "artifact_id":"ODRH-ART-POWER-001",
+                "sha256":"bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb",
+                "media_type":"text/csv",
+                "storage_uri":"https://example.invalid/power.csv",
+                "byte_length":100,
+                "role":"POWER_TRACE"
+            },
+            {
+                "artifact_id":"ODRH-ART-CAMERA-001",
+                "sha256":"cccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccc",
+                "media_type":"image/png",
+                "storage_uri":"https://example.invalid/camera.png",
+                "byte_length":200,
+                "role":"OPTICAL_TRACE"
+            }
+        ]);
+        record["observations"][0]["status"] = Value::String("MEASURED_UNQUALIFIED".to_owned());
+        record["observations"][0]["value"] = serde_json::json!(10.0);
+        record["observations"][0]["expanded_uncertainty"] = serde_json::json!(0.5);
+        record["observations"][0]["minimum_decision_effect"] = serde_json::json!(3.0);
+        record["observations"][0]["decision_capability"] = Value::String("CAPABLE".to_owned());
+        record["observations"][0]["instrument_ids"] = serde_json::json!(["ODRH-RUN-INS-POWER-001"]);
+        record["observations"][0]["raw_artifact_ids"] = serde_json::json!(["ODRH-ART-POWER-001"]);
+        record["observations"][1]["instrument_ids"] =
+            serde_json::json!(["ODRH-RUN-INS-CAMERA-001"]);
+        record["observations"][1]["raw_artifact_ids"] =
+            serde_json::json!(["ODRH-ART-CAMERA-001"]);
+
+        let report = validate_measurement_run_str(&encoded(&record), RUN_SCHEMA_TEXT)
+            .expect("unsupported metric may retain raw evidence without claiming a result");
+        assert_eq!(report.record_state, "ACQUIRED_UNQUALIFIED");
+        assert_eq!(report.raw_artifact_count, 2);
     }
 
     #[test]
