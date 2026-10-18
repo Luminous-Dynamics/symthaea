@@ -102,7 +102,7 @@ Synthetic channel models begin at evidence class E0. A model matched to measured
 
 ## 6. Required metrics
 
-Every metric declares unit, numerator/denominator, measurement window, topology/fault stratum, source, uncertainty and missing-data rules.
+Every metric declares unit, numerator/denominator, measurement window, topology/fault stratum, source, uncertainty and missing-data rules. The current one-hop airtime model separately records configured bitrate, frame overhead, transmit airtime, queue wait, attempt outcomes, propagation delay and receiver-arrival time.
 
 - **Delivery:** PDR by message class; successful authenticated acknowledgements; undelivered/expired messages; duplicate/replay acceptance; false healthy-link reports.
 - **Time:** time-to-detect link loss; time from backbone failure to first SOS sent, received and acknowledged; p50/p95/p99 latency and outage duration.
@@ -114,6 +114,18 @@ Every metric declares unit, numerator/denominator, measurement window, topology/
 - **Robustness:** outcomes across topology, depth, material electrical properties, moisture, antenna coupling/orientation, machinery noise, changing geometry and traffic load.
 
 Do not collapse these into one score. A throughput gain cannot compensate for reduced distress delivery, stale locations, hidden outage states or an unsafe power envelope.
+
+## 6.1 Executable airtime model: current boundary
+
+The Rust crate now includes a one-channel serialized airtime queue alongside graph route selection, message receipts and the packet-count queue planner. It consumes explicit payload bytes, framing-overhead bytes, bitrate in bit/s, propagation delay, maximum attempts, and a deterministic per-attempt receiver-outcome trace. It reports frame airtime, queue wait, failed attempts, receiver arrival, expiry and total airtime.
+
+This is a deterministic contract harness, not a general radio simulator:
+- It uses a single strict-priority sender and processes a message's bounded retry budget before moving to the next message.
+- It has no contention, CSMA/TDMA arbitration, stochastic loss model, backoff, receiver ACK airtime, full-duplex behavior, channel interference, or shared-medium interactions between separate routes.
+- Each supplied attempt boolean is an injected outcome, not a probability estimate or evidence of a physical link's packet-delivery rate.
+- Queue order and modeled airtime are not proof of real-world latency or mine-wide emergency-message performance.
+
+Next model increment should add a reproducible airtime trace with a declared medium-access policy and ACK budget, then compare it against measured instrumented-link traces before adding multi-hop queueing or learned route prediction.
 
 ## 7. Initial acceptance targets (laboratory hypotheses)
 
