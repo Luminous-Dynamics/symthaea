@@ -730,7 +730,7 @@ fn estimate_pitch_yin(
     let target = f64::from(target_hz);
     let min_frequency = (target * 0.5).max(20.0);
     let max_frequency = (target * 2.0).min(f64::from(sample_rate) * 0.24);
-    if max_frequency <= min_frequency {
+    if max_frequency <= min_frequency || target < min_frequency || target > max_frequency {
         return unavailable("target_outside_pitch_analysis_band");
     }
     let min_lag = (f64::from(sample_rate) / max_frequency).floor().max(2.0) as usize;
@@ -1090,6 +1090,25 @@ mod tests {
             })
             .collect();
         let result = estimate_pitch_yin(&samples, sample_rate, 2, 100, 12_000.0);
+        assert_eq!(result.status, "target_outside_pitch_analysis_band");
+        assert!(result.estimated_pitch_hz.is_none());
+        assert!(result.error_cents.is_none());
+    }
+
+    #[test]
+    fn yin_rejects_target_above_sample_rate_capped_search_band() {
+        let sample_rate = 8_000_u32;
+        let frames = sample_rate as usize / 10;
+        let samples: Vec<f32> = (0..frames)
+            .flat_map(|index| {
+                let sample = (2.0 * std::f64::consts::PI * 2_000.0 * index as f64
+                    / sample_rate as f64)
+                    .sin() as f32
+                    * 0.5;
+                [sample, sample]
+            })
+            .collect();
+        let result = estimate_pitch_yin(&samples, sample_rate, 2, 100, 2_000.0);
         assert_eq!(result.status, "target_outside_pitch_analysis_band");
         assert!(result.estimated_pitch_hz.is_none());
         assert!(result.error_cents.is_none());
