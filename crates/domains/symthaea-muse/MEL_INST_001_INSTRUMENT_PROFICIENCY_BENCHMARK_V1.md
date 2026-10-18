@@ -218,7 +218,7 @@ cargo run -p symthaea-muse --bin muse_instrument_provenance_verify -- --probe "$
 printf 'Evidence reports retained in %s\n' "$OUT"
 ```
 
-Before trusting a local result, run the verifier's regressions (including same-size byte-tamper and parent-path negative controls):
+Before trusting a local result, run the verifier's regressions (including source-byte tampering, identical forged bank digests in both reports, and parent-path traversal negative controls):
 
 ```sh
 cargo test -p symthaea-muse --bin muse_instrument_provenance_verify
