@@ -324,6 +324,26 @@ mod cli_tests {
             .join("synthetic_trials.tsv")
     }
 
+    fn forecast_fixture_path() -> std::path::PathBuf {
+        Path::new(env!("CARGO_MANIFEST_DIR"))
+            .join("examples")
+            .join("synthetic_forecasts.tsv")
+    }
+
+    #[test]
+    fn synthetic_forecasts_produce_calibration_and_risk_coverage_metrics() {
+        let rows = read_forecasts(forecast_fixture_path()).expect("synthetic forecasts must parse");
+        assert_eq!(rows.len(), 12);
+        let summaries = summarize_calibration(&rows, 10, 0.8).expect("forecasts must summarize");
+        assert_eq!(summaries.len(), 4);
+        assert!(summaries.iter().all(|row| row.total_trials == 3));
+        assert!(summaries.iter().all(|row| row.valid_runs == 2));
+        assert!(summaries.iter().all(|row| row.risk_coverage.len() == 3));
+        assert!(summaries.iter().all(|row| row.brier_score.is_finite()));
+        assert!(summaries.iter().all(|row| row.log_loss.is_finite()));
+        assert!(summaries.iter().all(|row| row.expected_calibration_error.is_finite()));
+    }
+
     #[test]
     fn synthetic_rc_fixture_parses_and_summarizes() {
         let records = read_trials(fixture_path()).expect("synthetic fixture must parse");
