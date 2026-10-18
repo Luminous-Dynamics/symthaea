@@ -303,6 +303,26 @@
       "proposed_target": "On a pinned time-series dataset with interpretable timestamps and units, aim for at least 10% lower predeclared horizon-weighted error than a frozen-model baseline while meeting predeclared interval-calibration and missing-data thresholds. Compare against simple persistence/seasonal baselines, preserve model/data version lineage, and test sensor dropout/drift. This is a retrospective methodology target, not field-impact evidence.",
       "split_protocol": "Use prequential/chronological evaluation: at prediction time t, only observations available by t may update state or parameters. Hold out complete future windows, audit event-time versus receive-time, prevent same-period harvest/outcome leakage, and replay stale, duplicated, missing and drifted sensor observations. Report each forecast horizon and each environment separately.",
       "status": "not_evaluable_until_time_series_metadata_pinned"
+    },
+    {
+      "id": "CF-020",
+      "category": "multimodal_stress_detection",
+      "name": "Cross-modal pre-symptomatic plant stress detection",
+      "question": "Do time-aligned thermal, multispectral or hyperspectral, fluorescence, visible imagery, and microclimate signals improve detection of independently confirmed water or heat stress before visible symptoms, relative to RGB-only and simple sensor baselines?",
+      "primary_metric": "Lead time before independently confirmed stress, precision-recall AUC, sensitivity at a preregistered false-alert budget per plant-day, Brier score or calibration error, and performance stratified by crop/site/season",
+      "proposed_target": "On a pinned paired dataset, target at least one valid observation interval of median warning lead over the best unimodal baseline at the same preregistered false-alert budget, while preserving calibrated uncertainty and reporting confidence intervals. This is a provisional research target, not an achieved result; do not promise 24-hour lead time unless collection cadence supports it.",
+      "split_protocol": "Keep all frames and repeated observations from a plant/plot together; hold out complete site-season or greenhouse blocks for transfer claims. Preserve acquisition time, solar conditions, sensor calibration and environmental covariates. Define stress ground truth independently of the candidate sensor channels, preregister event windows and exclusions, and compare against RGB-only, thermal-only, simple threshold, and persistence baselines. Audit near-duplicate frames and temporal leakage.",
+      "status": "not_evaluable_until_paired_stress_sensor_data_pinned"
+    },
+    {
+      "id": "CF-021",
+      "category": "sensor_calibration_transfer",
+      "name": "Low-cost crop-sensor calibration and cross-site transfer",
+      "question": "Can a low-cost sensor stack preserve actionable measurement quality and decision reliability relative to a calibrated reference stack across devices, sites, seasons, and drift conditions while reducing total deployment cost?",
+      "primary_metric": "Reference-relative MAE/RMSE and bias for each physical quantity, prediction-interval coverage, calibration error, drift/missingness robustness, decision regret under the same constraints, and total cost of ownership per monitored plot-season",
+      "proposed_target": "On a preregistered device/site holdout, target 85–95% empirical coverage for nominal 90% uncertainty intervals, decision loss within 5% of the reference-sensor workflow, and at least 30% lower three-year total cost of ownership. Report failure cases, recalibration frequency and labor; treat these as provisional engineering targets, not universal standards.",
+      "split_protocol": "Pair low-cost measurements with calibrated reference instruments over overlapping environmental ranges. Separate device identity and site/season across held-out partitions; include temperature, humidity, illumination, dust/wetness, sensor aging, missing readings, and recalibration events. Never infer a physical unit from numeric magnitude alone. Compare against an uncalibrated low-cost baseline and reference-instrument ceiling; include labor, maintenance, replacement, connectivity and power in total cost.",
+      "status": "not_evaluable_until_calibration_reference_and_site_metadata_pinned"
     }
   ],
   "first_milestone_exit_criteria": [
