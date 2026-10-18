@@ -164,6 +164,24 @@ The crate is dependency-free at runtime and has a focused pinned-Rust workflow. 
 
 All values are arithmetic over caller-supplied, same-batch counts/costs under a declared accounting boundary. The physical completeness of those inputs remains an evidence/measurement question.
 
+
+## 7B. Route Pareto comparison and accounting identity
+
+The economics reference now provides a quality-constrained Pareto comparison rather than a weighted route score. Each candidate is supplied as conservative metric bounds under a pinned target-module profile and comparison protocol:
+
+- upper cost per calibrated-good module, in a named three-letter currency;
+- upper energy per calibrated-good module in joules;
+- upper cycle time per calibrated-good module in seconds;
+- lower final calibrated-good yield as a fraction;
+- explicit optical, reliability and minimum-yield floor dispositions;
+- evidence completeness and evidence class.
+
+Two candidates may be compared only when target-profile identity, comparison-protocol identity, currency, accounting-boundary identity and evidence class match. Otherwise the result is incomparable and the reference rejects the comparison. Every candidate must already satisfy hard quality/reliability/yield/evidence gates; a low-cost candidate that fails a mandatory floor is rejected before dominance is evaluated.
+
+Candidate A dominates B only if A is no worse in every declared dimension (cost, energy, cycle-time upper bounds and final-good-yield lower bound), and strictly better in at least one. If one route is cheaper but consumes more energy or has lower final yield, the routes remain on the Pareto frontier; the benchmark does not invent weights to name a universal winner. The supplied values are bounds over an externally declared uncertainty method. The helper does not derive uncertainty or turn synthetic scenario evidence into physical qualification.
+
+A cost ledger now has an optional higher-level identity wrapper with batch/lot ID, currency, accounting-boundary ID, target-module profile digest, comparison-protocol digest and evidence class. The accounting boundary must state which labor/equipment/facility, energy, inspection, repair, packaging and scrap items are included. All categories must be in the same currency and batch scope; conversion is out of scope. A zero final-good denominator has undefined cost per good unit, never zero cost.
+
 ## 8. Adversarial controls
 
 At minimum, verify rejection or downgrade when:
