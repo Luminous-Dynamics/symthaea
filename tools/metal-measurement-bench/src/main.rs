@@ -535,11 +535,11 @@ fn validate_records(
         return Err(AdapterError::Validation("observation set must not be empty".into()));
     }
 
-    let mut declared_dois = BTreeSet::new();
-    declared_dois.insert(manifest.dataset.doi.as_str());
+    let mut declared_dois: BTreeSet<String> = BTreeSet::new();
+    declared_dois.insert(manifest.dataset.doi.clone());
     for source in &manifest.related_sources {
         if !source.doi.starts_with("not_applicable_") {
-            declared_dois.insert(source.doi.as_str());
+            declared_dois.insert(source.doi.clone());
         }
     }
     let declared_objects: BTreeMap<String, (String, bool)> = manifest.source_objects.iter()
@@ -548,8 +548,8 @@ fn validate_records(
             (object.source_doi.clone(), object.terms_reviewed && object.local_use_authorized),
         ))
         .collect();
-    let declared_artifact_objects: BTreeSet<&str> = manifest.artifacts.iter()
-        .map(|artifact| artifact.source_object_id.as_str())
+    let declared_artifact_objects: BTreeSet<String> = manifest.artifacts.iter()
+        .map(|artifact| artifact.source_object_id.clone())
         .collect();
     if !manifest.reuse_policy.artifact_terms_reviewed || !manifest.reuse_policy.local_use_authorized {
         return Err(AdapterError::Validation(
@@ -558,7 +558,7 @@ fn validate_records(
     }
 
     let target_group = manifest.challenge_context.target_parent_specimen_id.as_str();
-    let mut record_ids = BTreeSet::new();
+    let mut record_ids: BTreeSet<String> = BTreeSet::new();
     let mut source_field_contracts: BTreeMap<(String, String), (String, String)> = BTreeMap::new();
     let mut normalized_units: BTreeMap<String, String> = BTreeMap::new();
     let mut calibration_outcome_groups = BTreeSet::new();
@@ -584,12 +584,12 @@ fn validate_records(
                 )));
             }
         }
-        if !record_ids.insert(record.record_id.as_str()) {
+        if !record_ids.insert(record.record_id.clone()) {
             return Err(AdapterError::Validation(format!(
                 "duplicate record_id {:?}", record.record_id
             )));
         }
-        if !declared_dois.contains(record.source_doi.as_str()) {
+        if !declared_dois.contains(&record.source_doi) {
             return Err(AdapterError::Validation(format!(
                 "record {:?} references undeclared source DOI {:?}",
                 record.record_id, record.source_doi
@@ -606,13 +606,13 @@ fn validate_records(
                 record.record_id, record.source_doi, record.source_object_id, object_doi
             )));
         }
-        if !object_authorized {
+        if !*object_authorized {
             return Err(AdapterError::Validation(format!(
                 "record {:?} cannot be evaluated until source-object terms and local-use permission are reviewed",
                 record.record_id
             )));
         }
-        if !declared_artifact_objects.contains(record.source_object_id.as_str()) {
+        if !declared_artifact_objects.contains(&record.source_object_id) {
             return Err(AdapterError::Validation(format!(
                 "record {:?} source object {:?} has no declared artifact digest in the manifest",
                 record.record_id, record.source_object_id
@@ -1048,6 +1048,17 @@ mod tests {
         for state in ["uncensored", "left_censored", "right_censored", "interval_censored"] {
             assert!(record["allOf"].as_array().unwrap().iter().any(|condition| condition["if"]["properties"]["censoring"]["const"] == state),
                 "schema has no explicit bounds condition for {state}");
+        }
+    }
+
+    #[test]
+    fn committed_manifest_schema_requires_source_object_registry() {
+        let schema: serde_json::Value = serde_json::from_str(include_str!("../schemas/measurement-manifest-v0.1.schema.json")).unwrap();
+        let required = schema["required"].as_array().unwrap();
+        assert!(required.iter().any(|value| value == "source_objects"));
+        let object_required = schema["properties"]["source_objects"]["items"]["required"].as_array().unwrap();
+        for field in ["id", "source_doi", "source_url", "source_revision", "accessed_on", "terms_url", "terms_reviewed", "local_use_authorized"] {
+            assert!(object_required.iter().any(|value| value == field), "source object schema does not require {field}");
         }
     }
 
