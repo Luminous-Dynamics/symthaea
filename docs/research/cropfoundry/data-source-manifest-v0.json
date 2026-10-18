@@ -234,7 +234,7 @@
         "yield-related variables",
         "CSV record"
       ],
-      "observed_metadata": "Zenodo record identifies CC BY 4.0 and describes 2,666 rows and 40 columns. The related GitHub mirror README describes 2,664 records and 44 columns and its GitHub license badge differs from the README's CC BY claim. Use the canonical Zenodo artifact only for initial discovery; resolve artifact version and metadata discrepancy with file-level inspection before pinning.",
+      "observed_metadata": "Canonical Zenodo v1 record states CC BY 4.0, 2,666 rows × 40 columns, 135 plants, 27 treatment combinations and 20 weekly sessions. It lists MD5 432b5ff9f552d79e2fccae9a5f6a095b for the 303 kB CSV. The public GitHub mirror README says 2,664 records × 44 columns and CC BY 4.0, while the mirror LICENSE file is CC0 1.0; therefore do not mix the mirror with the canonical Zenodo version. The row/column discrepancy and the record's reference to missing associated documentation require resolving the exact artifact and schema before scoring. Presence of 27 treatment combinations does not itself establish randomization, blocking, or causal identification.",
       "license_status": "verified_cc-by-4.0_from_zenodo_record",
       "access_status": "public_open_record_artifact_not_downloaded",
       "ingestion_status": "quarantined",
@@ -244,7 +244,8 @@
       ],
       "training_authorized": false,
       "content_sha256": null,
-      "next_gate": "Review exact Zenodo artifact, compute its SHA-256, inspect columns/units/plant/treatment/time identifiers, reconcile the published row/column discrepancy, assess missingness and leakage groups, and keep geographic transfer to South Africa out of scope."
+      "next_gate": "Acquire only the canonical Zenodo artifact after confirming its CC BY 4.0 record and intended reuse; record retrieval time, exact file identity and locally computed SHA-256. Resolve whether the record's '2,666 rows' includes the header, reconcile the mirror's 2,664×44 variant without merging it, obtain source-backed column units/definitions and missing/anomaly processing documentation, identify plant/date/treatment/grouping semantics, verify experimental allocation/blocking before any causal analysis, and keep training_authorized false until explicit review.",
+      "initial_intended_role": "Local schema audit; plant-disjoint and forward-in-time split design; descriptive QA and baseline feasibility only after field/unit/missingness metadata review. Do not treat as genotype/pedigree evidence or as a causally identifiable treatment experiment until allocation/design documentation is acquired and reviewed. It provides no validation for South African geographic transfer."
     },
     {
       "id": "DS-011",
