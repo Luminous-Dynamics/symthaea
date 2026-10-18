@@ -9,6 +9,7 @@
 use serde::{Deserialize, Serialize};
 use serde_json::Value;
 use sha2::{Digest, Sha256};
+use std::collections::HashSet;
 use std::fs::File;
 use std::io::{self, Read, Write};
 use std::path::{Path, PathBuf};
@@ -28,6 +29,7 @@ struct RootObservation {
     canonical_path: Option<PathBuf>,
     content_manifest_sha256: Option<String>,
     wav_file_count: Option<usize>,
+    wav_relative_paths: Option<HashSet<String>>,
     error: Option<String>,
 }
 
@@ -768,6 +770,26 @@ fn verify_selected_sample_file(
         );
         return false;
     }
+    if relative.extension().and_then(|extension| extension.to_str()) != Some("wav") {
+        push_error(
+            findings,
+            "selected_sample_not_wav",
+            format!("{case_label} selected source does not use the exact lowercase .wav extension"),
+        );
+        return false;
+    }
+    if !root
+        .wav_relative_paths
+        .as_ref()
+        .is_some_and(|paths| paths.contains(relative_path))
+    {
+        push_error(
+            findings,
+            "selected_sample_not_in_root_manifest",
+            format!("{case_label} selected source was not discovered by the supplied root manifest walker"),
+        );
+        return false;
+    }
     let joined = root_path.join(relative);
     let resolved = match std::fs::canonicalize(&joined) {
         Ok(path) => path,
@@ -834,6 +856,7 @@ fn observe_asset_root(path: &Path) -> RootObservation {
                 canonical_path: None,
                 content_manifest_sha256: None,
                 wav_file_count: None,
+                wav_relative_paths: None,
                 error: Some("supplied asset root is not a directory".into()),
             };
         }
@@ -842,6 +865,7 @@ fn observe_asset_root(path: &Path) -> RootObservation {
                 canonical_path: None,
                 content_manifest_sha256: None,
                 wav_file_count: None,
+                wav_relative_paths: None,
                 error: Some(error.to_string()),
             };
         }
@@ -861,12 +885,14 @@ fn observe_asset_root(path: &Path) -> RootObservation {
             canonical_path: Some(canonical_path),
             content_manifest_sha256: Some(digest),
             wav_file_count: Some(entries.len()),
+            wav_relative_paths: Some(entries.iter().map(|(path, _)| path.clone()).collect()),
             error: None,
         },
         Err(error) => RootObservation {
             canonical_path: Some(canonical_path),
             content_manifest_sha256: None,
             wav_file_count: Some(entries.len()),
+            wav_relative_paths: Some(entries.iter().map(|(path, _)| path.clone()).collect()),
             error: Some(error.to_string()),
         },
     }
