@@ -221,11 +221,12 @@ The following are useful starting points, not blanket endorsements of any method
 
 [VIS-MFG-001 #8012](https://github.com/Luminous-Dynamics/symthaea/issues/8012) opens a display-specific manufacturing-route slice while reusing canonical [MFG-PROC-000 #5686](https://github.com/Luminous-Dynamics/symthaea/issues/5686), [SEMI-PROC-001 #5888](https://github.com/Luminous-Dynamics/symthaea/issues/5888), and [SEMI-QUAL-001 #5892](https://github.com/Luminous-Dynamics/symthaea/issues/5892). The route profiles do not add a second process-flow engine or a new yield ontology.
 
-The v0.1 manifest and Draft 2020-12 schema define four **UNQUALIFIED** route families across 41 stages: transfer-based Micro-LED on active backplane, OLED-on-silicon (OLEDoS), TFT-LCD, and AR light-engine/waveguide assembly. Every stage binds a process-semantics owner, intended state transition, evidence/inspection gate and known failure modes. Explicit predecessor groups model multi-input joins and conditional repair/optical-stack branches; the route is a graph, not a misleading flat checklist.
+The v0.1 manifest and Draft 2020-12 schema define four **UNQUALIFIED** route families across 41 stages and 23 component-interface contracts: transfer-based Micro-LED on active backplane, OLED-on-silicon (OLEDoS), TFT-LCD, and AR light-engine/waveguide assembly. Every stage binds a process-semantics owner, intended state transition, evidence/inspection gate and known failure modes. Explicit predecessor groups model multi-input joins and conditional repair/optical-stack branches; component contracts bind incoming acceptance, interface characteristics and failure modes to existing owners. The route is a graph, not a misleading flat checklist.
 
 - Manifest: [display-manufacturing-route-profiles-v0.1.json](display-manufacturing-route-profiles-v0.1.json)
 - Schema: [display-manufacturing-route-profiles.schema.json](display-manufacturing-route-profiles.schema.json)
 - Protocol and targets: [DISPLAY_MANUFACTURING_ROUTE_PROTOCOL.md](DISPLAY_MANUFACTURING_ROUTE_PROTOCOL.md)
+- Executable route economics: [display-manufacturing-economics](../../tools/display-manufacturing-economics/src/lib.rs), with a separate pinned-Rust workflow.
 - Executable schema/semantic/mutation tests: [display_manufacturing_route_contract.rs](../../tools/visual-display-corpus-verify/tests/display_manufacturing_route_contract.rs)
 
 The benchmark optimizes cost/resource use per **final calibrated-good module**, not local transfer yield. It preserves first-pass versus post-repair yield, inspection coverage/escape, throughput/WIP, calibration and reliability evidence separately. These plans are not executable process recipes and do not establish equipment capability or physical yield.
