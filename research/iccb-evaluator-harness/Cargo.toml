@@ -7,6 +7,7 @@ description = "Evaluator-side scoring contracts for ICCB; separate from the cand
 
 [dependencies]
 iccb-evaluator = { path = "../iccb" }
+sha2 = "0.10"
 
 # Isolate this harness from Symthaea's main workspace.
 [workspace]
