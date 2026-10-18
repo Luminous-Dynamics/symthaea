@@ -1,10 +1,6 @@
 use serde::{Deserialize, Serialize};
 use sha2::{Digest, Sha256};
-use std::{
-    collections::BTreeSet,
-    env, fs,
-    process::ExitCode,
-};
+use std::{collections::BTreeSet, env, fs, process::ExitCode};
 
 const VERSION: &str = "0.1.0";
 type Check<T> = Result<T, String>;
@@ -214,8 +210,13 @@ fn evaluate_scenario(scenario: &Scenario) -> ScenarioReceipt {
     if !nonempty(&profile.source_record_id) {
         reasons.insert("SOURCE_PROVENANCE_MISSING".to_owned());
     }
-    if matches!(profile.source_kind, SourceKind::PublicReference | SourceKind::MeasuredSource)
-        && !profile.source_license_ref.as_ref().is_some_and(|value| nonempty(value))
+    if matches!(
+        profile.source_kind,
+        SourceKind::PublicReference | SourceKind::MeasuredSource
+    ) && !profile
+        .source_license_ref
+        .as_ref()
+        .is_some_and(|value| nonempty(value))
     {
         reasons.insert("DATA_LICENSE_UNRESOLVED".to_owned());
     }
@@ -231,7 +232,10 @@ fn evaluate_scenario(scenario: &Scenario) -> ScenarioReceipt {
 
     match profile.profile_level {
         ProfileLevel::Specimen
-            if !profile.specimen_id.as_ref().is_some_and(|value| nonempty(value)) =>
+            if !profile
+                .specimen_id
+                .as_ref()
+                .is_some_and(|value| nonempty(value)) =>
         {
             reasons.insert("SPECIMEN_ID_MISSING".to_owned());
         }
@@ -241,8 +245,14 @@ fn evaluate_scenario(scenario: &Scenario) -> ScenarioReceipt {
         _ => {}
     }
 
-    if matches!(query.purpose, QueryPurpose::LotSelection | QueryPurpose::StructuralUse) {
-        if !matches!(profile.profile_level, ProfileLevel::Lot | ProfileLevel::Specimen) {
+    if matches!(
+        query.purpose,
+        QueryPurpose::LotSelection | QueryPurpose::StructuralUse
+    ) {
+        if !matches!(
+            profile.profile_level,
+            ProfileLevel::Lot | ProfileLevel::Specimen
+        ) {
             reasons.insert("EVIDENCE_SCOPE_MISMATCH".to_owned());
         }
         if !profile.lot_id.as_ref().is_some_and(|value| nonempty(value)) {
@@ -263,13 +273,18 @@ fn evaluate_scenario(scenario: &Scenario) -> ScenarioReceipt {
             EvidenceLevel::SampleMeasured
                 | EvidenceLevel::LotMeasured
                 | EvidenceLevel::QualifiedDesignValue
-        ) && !property.measurement_record_id.as_ref().is_some_and(|value| nonempty(value))
+        ) && !property
+            .measurement_record_id
+            .as_ref()
+            .is_some_and(|value| nonempty(value))
         {
             reasons.insert("PROPERTY_MEASUREMENT_REFERENCE_MISSING".to_owned());
         }
     }
 
-    let selected = profile.properties.iter()
+    let selected = profile
+        .properties
+        .iter()
         .find(|property| property.property_id == query.required_property_id);
     let mut selected_id = None;
     let mut selected_level = None;
@@ -294,7 +309,10 @@ fn evaluate_scenario(scenario: &Scenario) -> ScenarioReceipt {
                 reasons.insert("PROPERTY_DIRECTION_MISMATCH".to_owned());
             }
 
-            if matches!(property.evidence_level, EvidenceLevel::Unknown | EvidenceLevel::Assumed) {
+            if matches!(
+                property.evidence_level,
+                EvidenceLevel::Unknown | EvidenceLevel::Assumed
+            ) {
                 reasons.insert("PROPERTY_EVIDENCE_UNRESOLVED".to_owned());
             }
             if query.purpose == QueryPurpose::LotSelection
@@ -362,7 +380,8 @@ fn validate_corpus(corpus: &Corpus, corpus_sha256: String, source_commit: String
         scenarios.push(evaluate_scenario(scenario));
     }
 
-    let expected_controls_matched = scenarios.iter()
+    let expected_controls_matched = scenarios
+        .iter()
         .filter(|scenario| scenario.expected_control_matched)
         .count();
     let all_controls_matched = !duplicate_id
@@ -374,7 +393,11 @@ fn validate_corpus(corpus: &Corpus, corpus_sha256: String, source_commit: String
         && nonempty(&corpus.claim_ceiling);
 
     Receipt {
-        result: if all_controls_matched { "validated" } else { "contract_mismatch" },
+        result: if all_controls_matched {
+            "validated"
+        } else {
+            "contract_mismatch"
+        },
         validator_version: VERSION,
         suite_id: corpus.suite_id.clone(),
         suite_version: corpus.suite_version.clone(),
@@ -398,7 +421,9 @@ fn run() -> Check<()> {
     }
     let source_commit = args[2].to_ascii_lowercase();
     if source_commit.len() != 40
-        || !source_commit.chars().all(|character| character.is_ascii_hexdigit())
+        || !source_commit
+            .chars()
+            .all(|character| character.is_ascii_hexdigit())
     {
         return Err("--source-commit must be exactly 40 hexadecimal characters".to_owned());
     }
@@ -457,9 +482,11 @@ mod tests {
         let scenario = &mut corpus.scenarios[0];
         scenario.profile.taxon_resolution = TaxonResolution::Ambiguous;
         let result = evaluate_scenario(scenario);
-        assert!(result
-            .actual_reason_codes
-            .contains(&"TAXON_IDENTITY_UNRESOLVED".to_owned()));
+        assert!(
+            result
+                .actual_reason_codes
+                .contains(&"TAXON_IDENTITY_UNRESOLVED".to_owned())
+        );
     }
 
     #[test]
@@ -468,7 +495,11 @@ mod tests {
         let scenario = &mut corpus.scenarios[0];
         scenario.query.purpose = QueryPurpose::LotSelection;
         let result = evaluate_scenario(scenario);
-        assert!(result.actual_reason_codes.contains(&"EVIDENCE_SCOPE_MISMATCH".to_owned()));
+        assert!(
+            result
+                .actual_reason_codes
+                .contains(&"EVIDENCE_SCOPE_MISMATCH".to_owned())
+        );
     }
 
     #[test]
@@ -477,7 +508,11 @@ mod tests {
         let scenario = &mut corpus.scenarios[3];
         scenario.profile.properties[0].direction = GrainDirection::Radial;
         let result = evaluate_scenario(scenario);
-        assert!(result.actual_reason_codes.contains(&"PROPERTY_DIRECTION_MISMATCH".to_owned()));
+        assert!(
+            result
+                .actual_reason_codes
+                .contains(&"PROPERTY_DIRECTION_MISMATCH".to_owned())
+        );
     }
 
     #[test]
@@ -485,8 +520,16 @@ mod tests {
         let mut corpus = corpus();
         let scenario = &mut corpus.scenarios[1];
         let result = evaluate_scenario(scenario);
-        assert!(result.actual_reason_codes.contains(&"STRUCTURAL_VALUE_NOT_QUALIFIED".to_owned()));
-        assert!(result.actual_reason_codes.contains(&"TAXON_IDENTITY_UNRESOLVED".to_owned()));
+        assert!(
+            result
+                .actual_reason_codes
+                .contains(&"STRUCTURAL_VALUE_NOT_QUALIFIED".to_owned())
+        );
+        assert!(
+            result
+                .actual_reason_codes
+                .contains(&"TAXON_IDENTITY_UNRESOLVED".to_owned())
+        );
     }
 
     #[test]
@@ -494,6 +537,10 @@ mod tests {
         let mut corpus = corpus();
         let scenario = &mut corpus.scenarios[4];
         let result = evaluate_scenario(scenario);
-        assert!(result.actual_reason_codes.contains(&"PROPERTY_CONDITION_MISMATCH".to_owned()));
+        assert!(
+            result
+                .actual_reason_codes
+                .contains(&"PROPERTY_CONDITION_MISMATCH".to_owned())
+        );
     }
 }
