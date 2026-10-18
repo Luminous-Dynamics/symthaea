@@ -79,22 +79,20 @@ fn main() {
     // The demo manifest is synthetic and is not a real asset-evidence packet.
     if let Ok(producer_commit) = std::env::var("GITHUB_SHA") {
         let manifest_bytes = b"synthetic-manifest".to_vec();
-        let routing = UncertaintyAssessmentRef {
+        let uncertainty_assessment = UncertaintyAssessmentRef {
             scenario_id: scenario.id.clone(),
             producer_version: "synthetic-demo-producer-v1".into(),
             source_manifest_digest: format!("sha256:{}", sha256_hex(&manifest_bytes)),
             evidence_kind: UncertaintyEvidenceKind::OutOfDomain {
                 reason: "demo-only constraint evaluation; no qualified economic model".into(),
             },
-        }
-        .route()
-        .expect("synthetic demo uncertainty route should be valid");
+        };
         let context = DecisionRunContext {
             producer_commit,
             evaluator_version: env!("CARGO_PKG_VERSION").into(),
             input_manifest_encoding_version: "utf8-synthetic-demo-v1".into(),
             input_manifest_bytes: manifest_bytes,
-            routing,
+            uncertainty_assessment,
             claim_ceiling:
                 "synthetic constraint evaluation only; not a forecast or authorization".into(),
         };
