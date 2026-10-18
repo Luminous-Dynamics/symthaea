@@ -155,7 +155,7 @@ Do not commit large licensed assets or checkpoints. Keep experiment scripts and 
 
 ## New research slice: calibrated event-triggered replanning
 
-A threshold on raw prediction error is an initial contract test, not yet a trustworthy decision policy. Add a separate full-completion probability forecast emitted before the outcome is known, then evaluate its calibration and its ability to rank failures. The standalone crate now implements Brier score, log loss, fixed-bin expected calibration error, high-confidence failure rate, and a confidence-ranked risk/coverage curve, with operationally invalid attempts counted as failures for end-to-end completion. The calibration CLI takes probabilities from a separate pre-trial forecast file and joins them to the trial ledger by task/variant/trial identity; the forecast file cannot override the outcome label, and missing, extra, or duplicate identities are rejected.
+A threshold on raw prediction error is an initial contract test, not yet a trustworthy decision policy. Add a separate full-completion probability forecast emitted before the outcome is known, then evaluate its calibration and its ability to rank failures. The standalone crate now implements Brier score, log loss, fixed-bin expected calibration error, high-confidence failure rate, and a confidence-ranked risk/coverage curve, with operationally invalid attempts counted as failures for end-to-end completion. It also includes a pure expected-value intervention primitive that compares predicted benefit to estimated intervention cost, respects a replan budget, and stops for review below a declared continue threshold. The calibration CLI takes probabilities from a separate pre-trial forecast file and joins them to the trial ledger by task/variant/trial identity; the forecast file cannot override the outcome label, and missing, extra, or duplicate identities are rejected.
 
 Use an explicit baseline/control ladder:
 
@@ -173,7 +173,7 @@ The rationale is supported by two useful external observations: Robocurve's RCI 
 
 ## Immediate runnable work
 
-A dependency-free nested Rust crate now lives at **experiments/robodojo-contract/**. Its 28 library tests cover episode identity/reset, state dimensions and finiteness, step ordering, stale action rejection, action dimensions and range checks, prediction-error replanning, latched stops, configuration rejection, deterministic trace behavior, and trial statistics. The binary adds four CLI tests for trial parsing/comparison, probability calibration, and rejecting missing or duplicate forecast-to-trial identities. A small executable exercises accepted action → replan request → latched stop.
+A dependency-free nested Rust crate now lives at **experiments/robodojo-contract/**. Its 35 library tests cover episode identity/reset, state dimensions and finiteness, step ordering, stale action rejection, action dimensions and range checks, prediction-error replanning, latched stops, configuration rejection, deterministic trace behavior, and trial statistics. The binary adds four CLI tests for trial parsing/comparison, probability calibration, and rejecting missing or duplicate forecast-to-trial identities. A small executable exercises accepted action → replan request → latched stop.
 
 Run locally with:
 
