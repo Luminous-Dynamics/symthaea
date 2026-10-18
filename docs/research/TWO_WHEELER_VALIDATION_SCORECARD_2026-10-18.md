@@ -30,7 +30,7 @@ When measured energy is zero, relative percentage error is undefined and emitted
 
 ## Evidence eligibility is separate from arithmetic
 
-A fixture pair can be scored for test purposes without being eligible as validation evidence. An eligible validation pair additionally requires a physical evidence class (InstrumentedPhysical or FieldObserved), a HOLDOUT split, a non-empty measurement-protocol identity, and a calibration receipt for instrumented measurements. Identity digests bind labels/bytes; they do not prove source authenticity, correct sensors, or independent custody.
+A fixture pair can be scored for test purposes without being eligible as validation evidence. An eligible validation pair additionally requires a physical evidence class (InstrumentedPhysical or FieldObserved), a HOLDOUT split, non-empty measurement-protocol, source-record, source-rights-receipt and split-manifest identities, and a calibration receipt for instrumented measurements. The reserved SYNTHETIC_PLACEHOLDER value always disqualifies a row. Identity digests bind labels/bytes; they do not prove source authenticity, correct sensors, legal rights, or independent custody. The receipts must be independently audited; their presence in JSON is not proof that they are valid.
 
 The summary aggregates **only eligible pairs** and reports count, mean absolute Wh/km error, median absolute error, nearest-rank P90, maximum error plus its cycle ID, and signed mean bias. A zero-eligible-pair result emits null metrics; it does not produce a vacuous pass. Keep every per-cycle residual beside any summary: means and correlations can obscure a short-trip outlier.
 
