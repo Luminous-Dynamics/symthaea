@@ -44,6 +44,9 @@ struct CsvAuditReceipt {
     source_uri: String,
     input_file_name: String,
     content_sha256: String,
+    expected_sha256: Option<String>,
+    digest_matches_expected: Option<bool>,
+    artifact_identity_verified: bool,
     byte_length: usize,
     delimiter: char,
     header_field_count: usize,
@@ -97,6 +100,7 @@ fn audit_csv_bytes(
     source_uri: &str,
     input_file_name: &str,
     expected_data_records: Option<usize>,
+    expected_sha256: Option<&str>,
 ) -> Result<CsvAuditReceipt> {
     if bytes.is_empty() {
         return Err(anyhow!("CSV input is empty"));
@@ -110,6 +114,11 @@ fn audit_csv_bytes(
         return Err(anyhow!(
             "source_uri must be the canonical record {EXPECTED_SOURCE_URI}"
         ));
+    }
+    if let Some(expected) = expected_sha256 {
+        if expected.len() != 64 || !expected.bytes().all(|byte| byte.is_ascii_hexdigit()) {
+            return Err(anyhow!("expected SHA-256 must be exactly 64 hexadecimal characters"));
+        }
     }
 
     let mut reader = ReaderBuilder::new()
@@ -263,6 +272,9 @@ fn audit_csv_bytes(
 
     let digest = Sha256::digest(bytes);
     let content_sha256 = format!("{digest:x}");
+    let digest_matches_expected =
+        expected_sha256.map(|expected| expected.eq_ignore_ascii_case(&content_sha256));
+    let artifact_identity_verified = digest_matches_expected == Some(true);
     let record_count_matches_expectation =
         expected_data_records.map(|expected| expected == data_record_count);
 
@@ -273,6 +285,9 @@ fn audit_csv_bytes(
         source_uri: source_uri.to_owned(),
         input_file_name: input_file_name.to_owned(),
         content_sha256,
+        expected_sha256: expected_sha256.map(str::to_ascii_lowercase),
+        digest_matches_expected,
+        artifact_identity_verified,
         byte_length: bytes.len(),
         delimiter: delimiter as char,
         header_field_count: headers.len(),
@@ -305,6 +320,7 @@ pub fn run(
     source_uri: String,
     delimiter: char,
     expected_data_records: Option<usize>,
+    expected_sha256: Option<String>,
     out: Option<PathBuf>,
 ) -> Result<()> {
     if !delimiter.is_ascii() {
@@ -324,6 +340,7 @@ pub fn run(
         &source_uri,
         &file_name,
         expected_data_records,
+        expected_sha256.as_deref(),
     )?;
     let mut failures = Vec::new();
     if !receipt.duplicate_header_names.is_empty() {
@@ -347,6 +364,11 @@ pub fn run(
             receipt.data_record_count,
             receipt.expected_data_records.unwrap_or_default()
         ));
+    }
+    if receipt.digest_matches_expected == Some(false) {
+        failures.push(
+            "local file SHA-256 does not match the independently supplied expected digest".to_owned(),
+        );
     }
 
     let rendered = serde_json::to_string_pretty(&receipt)?;
@@ -384,6 +406,7 @@ mod tests {
             SOURCE_URI,
             "synthetic-fixture.csv",
             expected,
+            None,
         )
         .unwrap()
     }
@@ -467,7 +490,58 @@ mod tests {
 
     #[test]
     fn empty_csv_is_rejected() {
-        let result = audit_csv_bytes(b"", b';', SOURCE_ID, SOURCE_URI, "empty.csv", None);
+        let result = audit_csv_bytes(b"", b';', SOURCE_ID, SOURCE_URI, "empty.csv", None, None);
+        assert!(result.is_err());
+    }
+
+    #[test]
+    fn expected_sha256_verifies_exact_local_bytes() {
+        let input = "Date;Plant;Treatment\n01/01/2024;P1;T1\n";
+        let expected = format!("{:x}", Sha256::digest(input.as_bytes()));
+        let receipt = audit_csv_bytes(
+            input.as_bytes(),
+            b';',
+            SOURCE_ID,
+            SOURCE_URI,
+            "digest.csv",
+            None,
+            Some(&expected),
+        )
+        .unwrap();
+        assert_eq!(receipt.digest_matches_expected, Some(true));
+        assert!(receipt.artifact_identity_verified);
+    }
+
+    #[test]
+    fn mismatched_expected_sha256_does_not_verify_artifact() {
+        let input = "Date;Plant;Treatment\n01/01/2024;P1;T1\n";
+        let expected = "a".repeat(64);
+        let receipt = audit_csv_bytes(
+            input.as_bytes(),
+            b';',
+            SOURCE_ID,
+            SOURCE_URI,
+            "digest-mismatch.csv",
+            None,
+            Some(&expected),
+        )
+        .unwrap();
+        assert_eq!(receipt.digest_matches_expected, Some(false));
+        assert!(!receipt.artifact_identity_verified);
+    }
+
+    #[test]
+    fn malformed_expected_sha256_is_rejected() {
+        let input = "Date;Plant;Treatment\n01/01/2024;P1;T1\n";
+        let result = audit_csv_bytes(
+            input.as_bytes(),
+            b';',
+            SOURCE_ID,
+            SOURCE_URI,
+            "bad-digest.csv",
+            None,
+            Some("not-a-digest"),
+        );
         assert!(result.is_err());
     }
 
@@ -481,6 +555,7 @@ mod tests {
             SOURCE_URI,
             "wrong-source.csv",
             None,
+            None,
         );
         assert!(result.is_err());
 
@@ -490,6 +565,7 @@ mod tests {
             SOURCE_ID,
             "https://example.invalid/other-source",
             "wrong-uri.csv",
+            None,
             None,
         );
         assert!(wrong_uri.is_err());
