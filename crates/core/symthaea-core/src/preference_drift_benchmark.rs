@@ -764,6 +764,10 @@ fn replay_preference_episode_with_context_mode(
     let scenario_id = nonempty_string(scenario, "scenario_id");
     let task_id = nonempty_string(scenario, "task_id");
     let current_context_id = nonempty_string(scenario, "current_context_id");
+    let current_step = scenario.get("current_step").and_then(Value::as_u64);
+    let max_age_steps = scenario
+        .get("preference_max_age_steps")
+        .and_then(Value::as_u64);
     if scenario_id.is_none() {
         finding(&mut findings, "$.scenario_id", "missing scenario ID");
     }
@@ -777,8 +781,22 @@ fn replay_preference_episode_with_context_mode(
             "missing current context ID",
         );
     }
+    if current_step.is_none() {
+        finding(
+            &mut findings,
+            "$.current_step",
+            "current step is missing or invalid",
+        );
+    }
+    if max_age_steps.is_none() {
+        finding(
+            &mut findings,
+            "$.preference_max_age_steps",
+            "preference freshness horizon is missing or invalid",
+        );
+    }
 
-    let eligible = match string_array(scenario, "eligible_candidate_ids") {
+    let mut eligible = match string_array(scenario, "eligible_candidate_ids") {
         Some(ids) => ids,
         None => {
             finding(
@@ -790,6 +808,8 @@ fn replay_preference_episode_with_context_mode(
         }
     };
     record_unique_strings(&eligible, "$.eligible_candidate_ids", &mut findings);
+    // Candidate order is not evidence; canonicalize it so equivalent inputs yield equivalent receipts.
+    eligible.sort();
 
     let total_budget = scenario.get("query_budget_total").and_then(Value::as_u64);
     let consumed_budget = scenario.get("queries_already_used").and_then(Value::as_u64);
@@ -823,21 +843,8 @@ fn replay_preference_episode_with_context_mode(
 
     let task_id = task_id.unwrap_or_default();
     let current_context_id = current_context_id.unwrap_or_default();
-    // Legacy single-episode callers may omit freshness fields; fixture v2 requires them.
-    let current_step = scenario
-        .get("current_step")
-        .and_then(Value::as_u64)
-        .unwrap_or_else(|| {
-            observations
-                .iter()
-                .filter_map(|observation| observation.get("step").and_then(Value::as_u64))
-                .max()
-                .unwrap_or_default()
-        });
-    let max_age_steps = scenario
-        .get("preference_max_age_steps")
-        .and_then(Value::as_u64)
-        .unwrap_or(u64::MAX);
+    let current_step = current_step.unwrap_or_default();
+    let max_age_steps = max_age_steps.unwrap_or_default();
     let mut matched = Vec::new();
     let mut context_matched_count = 0usize;
     let mut expired_count = 0usize;
@@ -1477,6 +1484,48 @@ mod tests {
         assert!(findings.iter().any(|item| {
             item.path == "$.scenarios[0].preference_observations[0].step"
                 && item.reason.contains("later than current_step")
+        }));
+    }
+
+    #[test]
+    fn equivalent_candidate_and_observation_orders_produce_identical_receipts() {
+        let fixture = parse_fixture();
+        let original_scenario = scenario_by_id(&fixture, "DEV-WALK-001");
+        let expected = replay_preference_episode(original_scenario).unwrap();
+
+        let mut reordered = original_scenario.clone();
+        reordered["eligible_candidate_ids"]
+            .as_array_mut()
+            .expect("eligible-candidate array")
+            .reverse();
+        reordered["preference_observations"]
+            .as_array_mut()
+            .expect("preference-observation array")
+            .reverse();
+
+        let actual = replay_preference_episode(&reordered).unwrap();
+        assert_eq!(actual, expected);
+    }
+
+    #[test]
+    fn standalone_replay_rejects_missing_freshness_metadata() {
+        let fixture = parse_fixture();
+        let mut missing_step = scenario_by_id(&fixture, "DEV-WALK-001").clone();
+        missing_step.as_object_mut().unwrap().remove("current_step");
+        let step_findings = replay_preference_episode(&missing_step).unwrap_err();
+        assert!(step_findings.iter().any(|item| {
+            item.path == "$.current_step" && item.reason.contains("missing or invalid")
+        }));
+
+        let mut missing_horizon = scenario_by_id(&fixture, "DEV-WALK-001").clone();
+        missing_horizon
+            .as_object_mut()
+            .unwrap()
+            .remove("preference_max_age_steps");
+        let horizon_findings = replay_preference_episode(&missing_horizon).unwrap_err();
+        assert!(horizon_findings.iter().any(|item| {
+            item.path == "$.preference_max_age_steps"
+                && item.reason.contains("missing or invalid")
         }));
     }
 
