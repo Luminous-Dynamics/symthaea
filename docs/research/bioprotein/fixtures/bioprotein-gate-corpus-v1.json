@@ -762,7 +762,7 @@
         },
         "lca_state": "not_requested",
         "scenario_digest": "sha256:synthetic-scenario-a",
-        "nutrition_evidence_state": "not_assessed",
+        "nutrition_evidence_state": "complete",
         "outcome_evidence_state": "not_requested"
       },
       "expected": {
