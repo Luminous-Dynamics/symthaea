@@ -179,7 +179,7 @@ pub fn audit_creative_audio(
         }
         let window_sample_count = (end - start) * channel_count;
         let window_rms = (window_square_sum / window_sample_count as f64).sqrt();
-        if window_rms >= f64::from(config.active_window_rms_floor) {
+        if window_rms > 0.0 && window_rms >= f64::from(config.active_window_rms_floor) {
             active_window_count += 1;
         }
     }
@@ -374,6 +374,34 @@ mod tests {
 
         assert_eq!(report.evaluated_window_count, 2);
         assert_eq!(report.active_window_coverage_ratio, 0.5);
+    }
+
+    #[test]
+    fn audits_audio_from_the_real_muse_renderer() {
+        let notes = [crate::Note {
+            frequency: 440.0,
+            start_time: 0.05,
+            duration: 0.7,
+            velocity: 0.7,
+        }];
+        let rendered = crate::render_notes(
+            &notes,
+            44_100,
+            44_100,
+            &crate::MusicalState::default(),
+        );
+        let report = audit_creative_audio(
+            &rendered,
+            44_100,
+            CreativeAudioAuditConfigV1::default(),
+        )
+        .unwrap();
+
+        assert_eq!(report.non_finite_sample_count, 0);
+        assert_eq!(report.out_of_range_sample_count, 0);
+        assert!(!report.effectively_silent);
+        assert!(report.sample_rms > 1.0e-4);
+        assert!(report.active_window_coverage_ratio > 0.0);
     }
 
     #[test]
