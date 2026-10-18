@@ -26,7 +26,7 @@ cargo fmt --manifest-path research/organ-design-q1/Cargo.toml -- --check
 cargo test --manifest-path research/organ-design-q1/Cargo.toml
 ```
 
-The public Rust API is in `src/lib.rs`. `hostile-cases.v0.json` names twelve adversarial cases; the Rust test module checks the fixture catalog and separately executes matching typed cases. The canonical identity function creates deterministic, length-prefixed UTF-8 material from the profile, exact candidate fields, admitted evidence digests, and outcome decisions. A runner can SHA-256 the material to produce a digest; the crate intentionally avoids a runtime hashing dependency.
+The public Rust API is in `src/lib.rs`. `hostile-cases.v0.json` names sixteen adversarial cases; the Rust test module checks the fixture catalog and separately executes matching typed cases. The canonical identity function creates deterministic, length-prefixed UTF-8 material from the profile, exact candidate fields, admitted evidence digests, and outcome decisions. A runner can SHA-256 the material to produce a digest; the crate intentionally avoids a runtime hashing dependency.
 
 ## Input contract
 
