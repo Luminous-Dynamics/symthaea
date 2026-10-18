@@ -868,6 +868,28 @@ mod tests {
     }
 
     #[test]
+    fn committed_observation_schema_binds_units_and_censoring_contract() {
+        let schema: serde_json::Value = serde_json::from_str(include_str!("../schemas/observation-set-v0.1.schema.json")).unwrap();
+        let record = &schema["properties"]["records"]["items"];
+        assert_eq!(record["properties"]["raw_unit"]["type"], "string");
+        for field in ["source_field", "raw_unit", "censor_lower_bound", "censor_upper_bound"] {
+            assert!(record["properties"].get(field).is_some(), "missing schema field {field}");
+        }
+        for state in ["uncensored", "left_censored", "right_censored", "interval_censored"] {
+            assert!(record["allOf"].as_array().unwrap().iter().any(|condition| condition["if"]["properties"]["censoring"]["const"] == state),
+                "schema has no explicit bounds condition for {state}");
+        }
+    }
+
+    #[test]
+    fn committed_manifest_schema_requires_per_artifact_rights_evidence() {
+        let schema: serde_json::Value = serde_json::from_str(include_str!("../schemas/measurement-manifest-v0.1.schema.json")).unwrap();
+        let required = schema["properties"]["artifacts"]["items"]["required"].as_array().unwrap();
+        for field in ["source_object_id", "artifact_revision", "accessed_on", "terms_url", "terms_reviewed", "local_use_authorized", "repository_bundling_authorized", "sha256", "size_bytes"] {
+            assert!(required.iter().any(|value| value == field), "artifact schema does not require {field}");
+        }
+    }
+    #[test]
     fn committed_amb2025_profile_deserializes_and_validates() {
         let raw = include_str!("../schemas/amb2025-02-source-manifest-v0.1.json");
         let profile: SourceManifest = serde_json::from_str(raw).unwrap();
