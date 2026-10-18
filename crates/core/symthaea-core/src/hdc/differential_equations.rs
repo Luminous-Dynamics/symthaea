@@ -1271,6 +1271,35 @@ impl DifferentialEquationsEngine {
         )
     }
 
+    /// Solve backward Euler using a caller-supplied analytical RHS Jacobian.
+    ///
+    /// The callback returns the row-major flattened matrix df_i/dy_j with
+    /// exactly `system.dim * system.dim` finite entries. Supplying this
+    /// callback avoids the `system.dim` extra RHS evaluations normally needed
+    /// to construct a finite-difference Jacobian at each Newton iteration.
+    /// RHS and Jacobian callback evaluations are reported separately.
+    pub fn try_solve_implicit_euler_with_jacobian(
+        system: &ODESystem,
+        jacobian: ODEJacobian,
+        t0: f64,
+        t_end: f64,
+        y0: &[f64],
+        n_steps: usize,
+        newton_iters: usize,
+    ) -> Result<ImplicitEulerSolveReport, ImplicitEulerError> {
+        let state_scales = vec![1.0; system.dim];
+        Self::try_solve_implicit_euler_with_jacobian_and_state_scales(
+            system,
+            t0,
+            t_end,
+            y0,
+            n_steps,
+            newton_iters,
+            &state_scales,
+            Some(jacobian),
+        )
+    }
+
     /// Internal full-Newton solve with explicit characteristic state scales
     /// for finite-difference perturbations and normalized residual checks.
     fn try_solve_implicit_euler_with_state_scales(
@@ -1281,6 +1310,58 @@ impl DifferentialEquationsEngine {
         n_steps: usize,
         newton_iters: usize,
         state_scales: &[f64],
+    ) -> Result<ImplicitEulerSolveReport, ImplicitEulerError> {
+        Self::try_solve_implicit_euler_with_jacobian_and_state_scales(
+            system, t0, t_end, y0, n_steps, newton_iters, state_scales, None,
+        )
+    }
+
+    /// Call the full-Newton core and attach accurate Jacobian-callback work to
+    /// both success and failure receipts.
+    fn try_solve_implicit_euler_with_jacobian_and_state_scales(
+        system: &ODESystem,
+        t0: f64,
+        t_end: f64,
+        y0: &[f64],
+        n_steps: usize,
+        newton_iters: usize,
+        state_scales: &[f64],
+        jacobian: Option<ODEJacobian>,
+    ) -> Result<ImplicitEulerSolveReport, ImplicitEulerError> {
+        let mut jacobian_evaluations = 0usize;
+        let result = Self::try_solve_implicit_euler_with_state_scales_core(
+            system,
+            t0,
+            t_end,
+            y0,
+            n_steps,
+            newton_iters,
+            state_scales,
+            jacobian,
+            &mut jacobian_evaluations,
+        );
+        match result {
+            Ok(mut report) => {
+                report.jacobian_evaluations = jacobian_evaluations;
+                Ok(report)
+            }
+            Err(mut error) => {
+                error.jacobian_evaluations = jacobian_evaluations;
+                Err(error)
+            }
+        }
+    }
+
+    fn try_solve_implicit_euler_with_state_scales_core(
+        system: &ODESystem,
+        t0: f64,
+        t_end: f64,
+        y0: &[f64],
+        n_steps: usize,
+        newton_iters: usize,
+        state_scales: &[f64],
+        jacobian: Option<ODEJacobian>,
+        jacobian_evaluations: &mut usize,
     ) -> Result<ImplicitEulerSolveReport, ImplicitEulerError> {
         let mut y = y0.to_vec();
         let mut rhs_evaluations = 0usize;
