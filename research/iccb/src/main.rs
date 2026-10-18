@@ -5,7 +5,7 @@ use iccb_evaluator::{
     robust_decision::{RobustDecisionScenario, RobustPayoff, StateProbabilityBound},
     staging::TrancheRequest,
     value_of_information::{
-        DecisionPayoff, SignalOutcome, InformationState, SignalLikelihood,
+        DecisionPayoff, InformationState, SignalLikelihood, SignalOutcome,
         ValueOfInformationScenario,
     },
 };
