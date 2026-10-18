@@ -263,6 +263,16 @@
       "proposed_target": "Only after at least three crops have comparable, harmonized traits, aim for at least 10% error reduction versus a target-crop-only baseline in predeclared few-shot regimes, without a material worst-crop regression. Report negative transfer explicitly; never imply universal biological transfer.",
       "split_protocol": "Use whole-species/cultivar and site-year holdouts matched to the intended transfer claim; prevent shared cultivar, parent-family, planting-cycle, or near-duplicate image leakage. Compare within-crop, target-only few-shot, and shared-transfer baselines. Report each target crop and the applicability domain.",
       "status": "not_evaluable_until_multi_crop_harmonized_data"
+    },
+    {
+      "id": "CF-016",
+      "category": "agroecological_portfolio",
+      "name": "Multi-crop portfolio and rotation resilience",
+      "question": "Can a crop portfolio, intercropping arrangement, or multi-season rotation meet more locally defined nutrition and market-supply needs with lower tail-risk than a monoculture under matched land, water, labor, and cost constraints?",
+      "primary_metric": "nutritional-basket shortfall risk (including a predeclared tail-risk measure), total marketable edible output per area and season, land-equivalent ratio where valid, resource budgets, yield variability across seasons, and net margin; reported as a metric vector",
+      "proposed_target": "On a rights-cleared retrospective dataset or explicitly synthetic scenario set, aim for at least 20% relative reduction in a predeclared severe-shortfall tail-risk measure versus an explicit monoculture/rotation baseline under matched constraints, without violating hard resource or locally defined nutrition constraints. Report per-crop regressions and Pareto trade-offs. Simulation is not field-impact evidence.",
+      "split_protocol": "Freeze target basket, objective definitions, baseline, land/water/labor/cost budgets, price window, weather scenarios, and constraints before scoring. Hold out whole site-years or scenario families. Preserve crop-component yields and interaction terms; do not infer intercropping benefit from comparing unrelated crops or from land-equivalent ratio alone. Field claims require replicated multi-season local evaluation.",
+      "status": "not_evaluable_until_interaction_data"
     }
   ],
   "first_milestone_exit_criteria": [
