@@ -233,7 +233,7 @@ fn validate_measurement_run_semantics(record: &Value) -> Vec<String> {
     validate_unique_ids(instruments, "run instrument", &mut errors);
     validate_unique_ids(observations, "run observation", &mut errors);
     validate_unique_ids(artifacts, "raw artifact", &mut errors);
-    validate_unique_ids(exclusions, "observation exclusion", &mut errors);
+    validate_unique_field(exclusions, "observation exclusion", "exclusion_id", &mut errors);
 
     let instrument_ids: BTreeSet<String> = instruments
         .iter()
@@ -697,10 +697,19 @@ fn validate_semantics(manifest: &Value) -> Vec<String> {
 }
 
 fn validate_unique_ids(records: &[Value], category: &str, errors: &mut Vec<String>) {
+    validate_unique_field(records, category, "id", errors);
+}
+
+fn validate_unique_field(
+    records: &[Value],
+    category: &str,
+    field: &str,
+    errors: &mut Vec<String>,
+) {
     let mut seen = BTreeSet::new();
     for record in records {
         let id = record
-            .get("id")
+            .get(field)
             .and_then(Value::as_str)
             .unwrap_or("<missing>");
         if !seen.insert(id.to_owned()) {
@@ -826,6 +835,31 @@ mod tests {
             .expect_err("duplicate observation identities must fail")
             .iter()
             .any(|error| error.contains("duplicate run observation ID")));
+    }
+
+    #[test]
+    fn run_record_rejects_duplicate_exclusion_ids() {
+        let mut record = parse_run();
+        record["exclusions"] = serde_json::json!([
+            {
+                "exclusion_id": "ODRH-EXCL-001",
+                "observation_id": "ODRH-OBS-POWER-001",
+                "reason": "synthetic negative control",
+                "authority": "test fixture"
+            },
+            {
+                "exclusion_id": "ODRH-EXCL-001",
+                "observation_id": "ODRH-OBS-LUMINANCE-001",
+                "reason": "synthetic duplicate identifier",
+                "authority": "test fixture"
+            }
+        ]);
+        assert!(
+            validate_measurement_run_str(&encoded(&record), RUN_SCHEMA_TEXT)
+                .expect_err("duplicate exclusion identifiers must fail")
+                .iter()
+                .any(|error| error.contains("duplicate observation exclusion ID"))
+        );
     }
 
     #[test]
