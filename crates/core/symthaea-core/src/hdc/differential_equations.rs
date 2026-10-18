@@ -1770,6 +1770,44 @@ impl DifferentialEquationsEngine {
         max_attempts: usize,
         newton_iters: usize,
     ) -> Result<AdaptiveImplicitEulerReport, AdaptiveImplicitEulerError> {
+        Self::try_solve_implicit_euler_adaptive_core(
+            system, t0, t_end, y0, absolute_tolerances, relative_tolerance,
+            initial_step, max_attempts, newton_iters, None,
+        )
+    }
+
+    /// Adaptive step-doubling integration with a caller-supplied analytical Jacobian.
+    /// The callback contract matches the fixed-step analytical-Jacobian API.
+    pub fn try_solve_implicit_euler_adaptive_with_jacobian(
+        system: &ODESystem,
+        jacobian: ODEJacobian,
+        t0: f64,
+        t_end: f64,
+        y0: &[f64],
+        absolute_tolerances: &[f64],
+        relative_tolerance: f64,
+        initial_step: f64,
+        max_attempts: usize,
+        newton_iters: usize,
+    ) -> Result<AdaptiveImplicitEulerReport, AdaptiveImplicitEulerError> {
+        Self::try_solve_implicit_euler_adaptive_core(
+            system, t0, t_end, y0, absolute_tolerances, relative_tolerance,
+            initial_step, max_attempts, newton_iters, Some(jacobian),
+        )
+    }
+
+    fn try_solve_implicit_euler_adaptive_core(
+        system: &ODESystem,
+        t0: f64,
+        t_end: f64,
+        y0: &[f64],
+        absolute_tolerances: &[f64],
+        relative_tolerance: f64,
+        initial_step: f64,
+        max_attempts: usize,
+        newton_iters: usize,
+        jacobian: Option<ODEJacobian>,
+    ) -> Result<AdaptiveImplicitEulerReport, AdaptiveImplicitEulerError> {
         let mut y = y0.to_vec();
         let mut t = t0;
         let mut accepted_steps = 0usize;
@@ -1902,8 +1940,8 @@ impl DifferentialEquationsEngine {
                 ));
             }
 
-            let full = Self::try_solve_implicit_euler_with_state_scales(
-                system, t, trial_end, &y, 1, newton_iters, absolute_tolerances
+            let full = Self::try_solve_implicit_euler_with_jacobian_and_state_scales(
+                system, t, trial_end, &y, 1, newton_iters, absolute_tolerances, jacobian
             );
             let full_state = match full {
                 Ok(report) => {
@@ -1942,8 +1980,8 @@ impl DifferentialEquationsEngine {
                 }
             };
 
-            let first_half = Self::try_solve_implicit_euler_with_state_scales(
-                system, t, midpoint, &y, 1, newton_iters, absolute_tolerances
+            let first_half = Self::try_solve_implicit_euler_with_jacobian_and_state_scales(
+                system, t, midpoint, &y, 1, newton_iters, absolute_tolerances, jacobian
             );
             let midpoint_state = match first_half {
                 Ok(report) => {
@@ -1982,8 +2020,8 @@ impl DifferentialEquationsEngine {
                 }
             };
 
-            let second_half = Self::try_solve_implicit_euler_with_state_scales(
-                system, midpoint, trial_end, &midpoint_state, 1, newton_iters, absolute_tolerances
+            let second_half = Self::try_solve_implicit_euler_with_jacobian_and_state_scales(
+                system, midpoint, trial_end, &midpoint_state, 1, newton_iters, absolute_tolerances, jacobian
             );
             let fine_state = match second_half {
                 Ok(report) => {
