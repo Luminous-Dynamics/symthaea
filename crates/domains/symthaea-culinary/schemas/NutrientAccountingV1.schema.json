@@ -1,0 +1,271 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://luminousdynamics.io/schemas/NutrientAccountingV1.schema.json",
+  "title": "NutrientAccountingV1",
+  "description": "Source-versioned recipe nutrient arithmetic. Schema validity does not authenticate source evidence or establish empirical accuracy.",
+  "type": "object",
+  "additionalProperties": false,
+  "required": [
+    "schema_version",
+    "calculation_id",
+    "claim_status",
+    "process_id",
+    "ingredients",
+    "nutrient_retention",
+    "final_food_mass_g",
+    "final_mass_evidence",
+    "expected_outputs",
+    "rationale"
+  ],
+  "properties": {
+    "schema_version": {
+      "const": "1.0.0"
+    },
+    "calculation_id": {
+      "type": "string",
+      "minLength": 1
+    },
+    "claim_status": {
+      "enum": [
+        "calculation_only",
+        "review_required",
+        "qualified"
+      ]
+    },
+    "process_id": {
+      "type": "string",
+      "minLength": 1
+    },
+    "ingredients": {
+      "type": "array",
+      "minItems": 1,
+      "items": {
+        "$ref": "#/$defs/ingredient"
+      }
+    },
+    "nutrient_retention": {
+      "type": "array",
+      "items": {
+        "$ref": "#/$defs/retention"
+      }
+    },
+    "final_food_mass_g": {
+      "$ref": "#/$defs/interval"
+    },
+    "final_mass_evidence": {
+      "$ref": "#/$defs/evidence"
+    },
+    "expected_outputs": {
+      "type": "array",
+      "minItems": 1,
+      "items": {
+        "$ref": "#/$defs/nutrientOutput"
+      }
+    },
+    "rationale": {
+      "type": "string",
+      "minLength": 1
+    }
+  },
+  "$defs": {
+    "evidence": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "source_ref",
+        "source_version",
+        "known_at",
+        "evidence_status"
+      ],
+      "properties": {
+        "source_ref": {
+          "type": "string",
+          "minLength": 1
+        },
+        "source_version": {
+          "type": "string",
+          "minLength": 1
+        },
+        "known_at": {
+          "type": "string",
+          "format": "date-time"
+        },
+        "evidence_status": {
+          "enum": [
+            "synthetic",
+            "unreviewed",
+            "reviewed",
+            "qualified"
+          ]
+        }
+      },
+      "allOf": [
+        {
+          "if": {
+            "properties": {
+              "evidence_status": {
+                "const": "qualified"
+              },
+              "source_ref": {
+                "pattern": "^urn:synthetic:"
+              }
+            },
+            "required": [
+              "evidence_status",
+              "source_ref"
+            ]
+          },
+          "then": false
+        }
+      ]
+    },
+    "interval": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "value",
+        "lower",
+        "upper"
+      ],
+      "properties": {
+        "value": {
+          "type": "number",
+          "minimum": 0
+        },
+        "lower": {
+          "type": "number",
+          "minimum": 0
+        },
+        "upper": {
+          "type": "number",
+          "minimum": 0
+        }
+      }
+    },
+    "ingredient": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "ingredient_id",
+        "edible_mass_g",
+        "mass_evidence",
+        "composition_basis",
+        "composition_source",
+        "nutrients"
+      ],
+      "properties": {
+        "ingredient_id": {
+          "type": "string",
+          "minLength": 1
+        },
+        "edible_mass_g": {
+          "$ref": "#/$defs/interval"
+        },
+        "mass_evidence": {
+          "$ref": "#/$defs/evidence"
+        },
+        "composition_basis": {
+          "const": "per_100g_edible"
+        },
+        "composition_source": {
+          "$ref": "#/$defs/evidence"
+        },
+        "nutrients": {
+          "type": "array",
+          "minItems": 1,
+          "items": {
+            "$ref": "#/$defs/nutrientInput"
+          }
+        }
+      }
+    },
+    "nutrientInput": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "nutrient_id",
+        "unit",
+        "per_100g"
+      ],
+      "properties": {
+        "nutrient_id": {
+          "type": "string",
+          "minLength": 1
+        },
+        "unit": {
+          "type": "string",
+          "minLength": 1
+        },
+        "per_100g": {
+          "$ref": "#/$defs/interval"
+        }
+      }
+    },
+    "retention": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "ingredient_id",
+        "nutrient_id",
+        "value",
+        "lower",
+        "upper",
+        "evidence"
+      ],
+      "properties": {
+        "ingredient_id": {
+          "type": "string",
+          "minLength": 1
+        },
+        "nutrient_id": {
+          "type": "string",
+          "minLength": 1
+        },
+        "value": {
+          "type": "number",
+          "minimum": 0,
+          "maximum": 1
+        },
+        "lower": {
+          "type": "number",
+          "minimum": 0,
+          "maximum": 1
+        },
+        "upper": {
+          "type": "number",
+          "minimum": 0,
+          "maximum": 1
+        },
+        "evidence": {
+          "$ref": "#/$defs/evidence"
+        }
+      }
+    },
+    "nutrientOutput": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "nutrient_id",
+        "unit",
+        "retained_total",
+        "per_100g_final"
+      ],
+      "properties": {
+        "nutrient_id": {
+          "type": "string",
+          "minLength": 1
+        },
+        "unit": {
+          "type": "string",
+          "minLength": 1
+        },
+        "retained_total": {
+          "$ref": "#/$defs/interval"
+        },
+        "per_100g_final": {
+          "$ref": "#/$defs/interval"
+        }
+      }
+    }
+  }
+}
