@@ -1,0 +1,55 @@
+{
+  "schema_version": "symthaea.rea-differential-run-receipt.v1",
+  "benchmark_id": "ENG-REA-002",
+  "run": {
+    "status": "PASS",
+    "executed_at": "2026-10-18T19:34:52+02:00",
+    "execution_class": "local_host",
+    "tested_branch_head": "b1a3c72cf73bdd1a0e0a24bc8fd0357705fa2a20",
+    "command": "benchmarks/rea-differential/v1/verify.sh",
+    "exact_blob_identity_checked": true,
+    "exact_blob_identity_note": "Local test copies were checked with git hash-object against the GitHub file blob object IDs of the source, manifest, oracle and verifier on the tested branch before execution. The verifier was executed from a temporary mirror because this environment has no local checkout of the repository.",
+    "exit_code": 0
+  },
+  "environment": {
+    "os": "Debian GNU/Linux 13",
+    "kernel": "Linux 6.18.55 x86_64 GNU/Linux",
+    "compiler_executable": "/usr/bin/x86_64-linux-gnu-gcc-14",
+    "compiler_version_banner": "cc (Debian 14.2.0-19) 14.2.0",
+    "compiler_executable_sha256": "a23ecab8ff08f09ad8c80602c2c5df7f49e09c25905cb8975902e101bf72635f",
+    "jq_version": "jq-1.7",
+    "jq_executable_sha256": "5e1dcc8c21b9362013a1f30acb24c69a128cbd5238364b88803f4c60cd9376dd"
+  },
+  "tested_input_blob_ids": {
+    "benchmarks/rea-differential/v1/cases.json": "860f5702703d5bc3f0b02ad48785796af0cdffe9",
+    "benchmarks/rea-differential/v1/oracle.json": "71f3a0ccda488b84576eb27c49b031c2478ddc39",
+    "benchmarks/rea-differential/v1/fixtures/debounce_fixture.c": "b1bf8a6d800130da6d273e50e654af0b21d3b8bd",
+    "benchmarks/rea-differential/v1/verify.sh": "e7f2c205bb224f44da5e1f6d0365f5ae2612f857"
+  },
+  "generated_artifact_sha256": {
+    "threshold12_o0_debug": "354546ed87cd1c72313b57feceb707404de06a83a0c584a3248304496abaa394",
+    "threshold12_o2_stripped": "3b3378410b240fe2d3a829f242bf718e08ade46edcabd8d1efcbf3bd7e04e588",
+    "threshold20_o0_debug": "682a9f165b4f3309f812621adce1b68c2d1018063480fa4b77d478a535940fd2",
+    "threshold20_o2_stripped": "db5ba3d8b137af032c04609f4902bd0f1acb76bc7c551d57335cf2eee6ac1b67"
+  },
+  "results": {
+    "manifest_and_oracle_schema": "PASS",
+    "manifest_oracle_case_id_parity": "PASS",
+    "strict_c11_compile_with_wall_wextra_werror_pedantic": "PASS",
+    "rdb_001_build_bytes_differ_but_outputs_match": "PASS",
+    "rdb_002_threshold_mutation_behavior_diverges_as_declared": "PASS",
+    "rdb_003_trace_only_change_keeps_firmware_identity_fixed": "PASS",
+    "rdb_004_timer_configuration_change_alters_result_with_same_binary": "PASS",
+    "rdb_005_initial_observation_ambiguous_and_22ms_test_discriminates": "PASS",
+    "rdb_006_before_after_pair_confounded_and_cross_over_controls_match": "PASS",
+    "invalid_input_negative_one_rejected_with_exit_65_no_stdout": "PASS",
+    "invalid_input_alphabetic_rejected_with_exit_65_no_stdout": "PASS",
+    "invalid_input_empty_rejected_with_exit_65_no_stdout": "PASS"
+  },
+  "scope_limits": [
+    "This result qualifies the six synthetic host-fixture contracts only.",
+    "No REA provider, Binwalk, Unblob, Ghidra, emulator or physical device was used.",
+    "This does not demonstrate Symthaea diagnosis accuracy, root-cause generalization, microcontroller compatibility, or hardware qualification.",
+    "The public oracle is known-answer development coverage, not a blind or held-out generalization benchmark."
+  ]
+}
