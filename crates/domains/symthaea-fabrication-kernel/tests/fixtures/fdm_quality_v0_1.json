@@ -10,9 +10,9 @@
       "expected_feature_disposition": "conforming"
     },
     {
-      "case_id": "interval_touches_inclusive_upper_bound",
-      "value_mm": 10.09,
-      "uncertainty_mm": 0.01,
+      "case_id": "zero_uncertainty_at_inclusive_upper_bound",
+      "value_mm": 10.1,
+      "uncertainty_mm": 0.0,
       "expected_geometry_disposition": "conforming",
       "expected_feature_disposition": "conforming"
     },
