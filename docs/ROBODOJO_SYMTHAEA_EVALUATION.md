@@ -139,7 +139,7 @@ Write one machine-readable record per episode, plus an aggregate summary. Preser
 - task identifier, capability dimension, embodiment, action mode, and seed;
 - environment/runtime/software versions and available hardware identifiers;
 - baseline/variant/ablation label and exact configuration digest;
-- success outcome, termination/failure reason, elapsed simulated time, action count, and recovery count where defined;
+- success outcome, termination reason, explicit failure class (timeout, thermal stop, server error, invalid action, safety stop, other), elapsed simulated time, action count, and recovery count where defined;
 - policy latency p50/p95, deadline misses, resource measurements, and safety events when available;
 - output artifact paths and SHA-256 hashes.
 
@@ -173,7 +173,7 @@ The rationale is supported by two useful external observations: Robocurve's RCI 
 
 ## Immediate runnable work
 
-A dependency-free nested Rust crate now lives at **experiments/robodojo-contract/**. Its 25 library tests cover episode identity/reset, state dimensions and finiteness, step ordering, stale action rejection, action dimensions and range checks, prediction-error replanning, latched stops, configuration rejection, deterministic trace behavior, and trial statistics. The binary adds three CLI tests for parsing and comparing the synthetic TSV fixture. A small executable exercises accepted action → replan request → latched stop.
+A dependency-free nested Rust crate now lives at **experiments/robodojo-contract/**. Its 28 library tests cover episode identity/reset, state dimensions and finiteness, step ordering, stale action rejection, action dimensions and range checks, prediction-error replanning, latched stops, configuration rejection, deterministic trace behavior, and trial statistics. The binary adds three CLI tests for parsing and comparing the synthetic TSV fixture. A small executable exercises accepted action → replan request → latched stop.
 
 Run locally with:
 
