@@ -1,7 +1,7 @@
 # Chemical Process Benchmark Scorecard and Verification Ladder
 
 **Status:** Research protocol and proposed targets; target values below are not measured results.  
-**Date:** 2026-10-17  
+**Date:** 2026-10-18  
 **Parent:** [CHEM-BENCH-002 #7869](https://github.com/Luminous-Dynamics/symthaea/issues/7869) and [Tier-B registry PR #7872](https://github.com/Luminous-Dynamics/symthaea/pull/7872).  
 **Scope:** Public Symthaea benchmark design. No plant operation, safety, product-quality, or physical qualification claim.
 
@@ -44,7 +44,7 @@ For any proposed frozen simulator output, the receipt must explicitly state:
 - **Validation basis:** analytic invariant, numerical comparator, empirical observations, or a clearly described combination.
 - **Claim ceiling:** the strongest conclusion supported by that evidence—not a marketing summary.
 
-A nonempty prose ceiling alone is too easy to overread. Registry v1.1.0 makes the structured context/domain/exclusions/basis mandatory in the frozen receipt. This is still a declaration checked for completeness, not proof that the declared domain is true or exhaustive. A future authenticated attestation must bind the canonical receipt bytes and signer identity; signatures establish origin/integrity under a trust policy, not scientific truth.
+A nonempty prose ceiling alone is too easy to overread. Registry v1.1.0 makes the structured context/domain/exclusions/basis mandatory in the frozen receipt. Registry v1.2.0 also binds the parsed receipt value to a domain-separated SHA-256 content digest using a repository-local canonical JSON form, so a stale digest detects post-freeze field mutation. This canonical form is not claimed to be RFC 8785/JCS compliant. The digest is unauthenticated: an editor who can rewrite the receipt and digest can recompute both. A future attestation must anchor the digest to a trusted signer identity; signatures establish origin/integrity under a trust policy, not scientific truth.
 
 ## Benchmark targets
 
@@ -55,6 +55,7 @@ All targets below are goals. Only the structural controls already encoded in the
 | Negative-control false accepts | **0** | Hard |
 | NOT_RUN / SKIPPED / REFERENCE_UNAVAILABLE / OUT_OF_DOMAIN promoted to PASS | **0** | Hard |
 | Frozen receipts with all required provenance/context fields | **100%** | Hard |
+| Seeded changes to a frozen receipt without digest update are detected | **100%** | Hard |
 | Planted transitive shared-dependency challenge detected | **100%** of seeded cases | Hard |
 | Malformed lineage graph challenge detected | **100%** of seeded cases | Hard |
 | Analytic material/element/energy invariant escape | **0** for registered negative controls | Hard |
