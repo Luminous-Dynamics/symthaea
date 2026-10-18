@@ -11,7 +11,9 @@
 
 use serde::Serialize;
 use sha2::{Digest, Sha256};
-use std::io::{self, Write};
+use std::fs::File;
+use std::io::{self, Read, Write};
+use std::path::Path;
 use std::process::ExitCode;
 use symthaea_muse::instruments::Instrument;
 use symthaea_muse::synth::{
@@ -86,11 +88,27 @@ struct Options {
     calibrate_pitch_estimator: bool,
 }
 
+#[derive(Debug)]
+struct RunProvenance {
+    source_revision: Option<String>,
+    source_revision_status: &'static str,
+    renderer_binary_name: Option<String>,
+    renderer_binary_sha256: Option<String>,
+    renderer_binary_size_bytes: Option<u64>,
+    renderer_binary_identity_status: &'static str,
+}
+
 #[derive(Debug, Serialize)]
 struct ProbeReport {
     schema_version: &'static str,
     benchmark: &'static str,
     code_revision: &'static str,
+    source_revision: Option<String>,
+    source_revision_status: &'static str,
+    renderer_binary_name: Option<String>,
+    renderer_binary_sha256: Option<String>,
+    renderer_binary_size_bytes: Option<u64>,
+    renderer_binary_identity_status: &'static str,
     sample_rate_hz: u32,
     note_duration_ms: u64,
     tail_duration_ms: u64,
@@ -174,6 +192,12 @@ struct PitchCalibrationReport {
     schema_version: &'static str,
     benchmark: &'static str,
     code_revision: &'static str,
+    source_revision: Option<String>,
+    source_revision_status: &'static str,
+    renderer_binary_name: Option<String>,
+    renderer_binary_sha256: Option<String>,
+    renderer_binary_size_bytes: Option<u64>,
+    renderer_binary_identity_status: &'static str,
     sample_rate_hz: u32,
     note_duration_ms: u64,
     midi_range: (u8, u8),
@@ -216,11 +240,12 @@ fn main() -> ExitCode {
 
 fn run() -> Result<(), String> {
     let options = parse_args()?;
+    let provenance = collect_run_provenance();
     let source_bank_manifest_hashing_enabled =
         std::env::var("SYMTHAEA_MUSE_HASH_SOURCE_BANK_MANIFEST")
             .is_ok_and(|value| value == "1");
     if options.calibrate_pitch_estimator {
-        return run_pitch_estimator_calibration(&options);
+        return run_pitch_estimator_calibration(&options, &provenance);
     }
     let pitch_cells = build_pitch_cells(options.midi_range);
     let cases_expected =
@@ -415,9 +440,15 @@ fn run() -> Result<(), String> {
         .filter(|group| !group.rms_is_monotonic_non_decreasing)
         .count();
     let report = ProbeReport {
-        schema_version: "melothaea.instrument-probe.v3",
+        schema_version: "melothaea.instrument-probe.v4",
         benchmark: "MEL-INST-PROBE-001",
         code_revision: option_env!("MEL_INSTRUMENT_PROBE_REV").unwrap_or("not_embedded"),
+        source_revision: provenance.source_revision.clone(),
+        source_revision_status: provenance.source_revision_status,
+        renderer_binary_name: provenance.renderer_binary_name.clone(),
+        renderer_binary_sha256: provenance.renderer_binary_sha256.clone(),
+        renderer_binary_size_bytes: provenance.renderer_binary_size_bytes,
+        renderer_binary_identity_status: provenance.renderer_binary_identity_status,
         sample_rate_hz: options.sample_rate,
         note_duration_ms: options.note_ms,
         tail_duration_ms: options.tail_ms,
@@ -484,7 +515,10 @@ fn run() -> Result<(), String> {
     Ok(())
 }
 
-fn run_pitch_estimator_calibration(options: &Options) -> Result<(), String> {
+fn run_pitch_estimator_calibration(
+    options: &Options,
+    provenance: &RunProvenance,
+) -> Result<(), String> {
     // The current estimator has a quadratic difference-function loop. Keep this
     // self-calibration deliberately bounded and repeatable instead of accepting
     // large settings that can accidentally turn a diagnostic into a long run.
@@ -547,9 +581,15 @@ fn run_pitch_estimator_calibration(options: &Options) -> Result<(), String> {
         .filter(|case| case.status == "periodic_estimate_available")
         .count();
     let report = PitchCalibrationReport {
-        schema_version: "melothaea.pitch-estimator-calibration.v1",
+        schema_version: "melothaea.pitch-estimator-calibration.v2",
         benchmark: "MEL-PITCH-CAL-001",
         code_revision: option_env!("MEL_INSTRUMENT_PROBE_REV").unwrap_or("not_embedded"),
+        source_revision: provenance.source_revision.clone(),
+        source_revision_status: provenance.source_revision_status,
+        renderer_binary_name: provenance.renderer_binary_name.clone(),
+        renderer_binary_sha256: provenance.renderer_binary_sha256.clone(),
+        renderer_binary_size_bytes: provenance.renderer_binary_size_bytes,
+        renderer_binary_identity_status: provenance.renderer_binary_identity_status,
         sample_rate_hz: options.sample_rate,
         note_duration_ms: options.note_ms,
         midi_range: (minimum_midi, maximum_midi),
@@ -664,6 +704,79 @@ fn measure_signal(samples: &[f32], frames: usize) -> SignalMetrics {
         dc_mean,
         clipped_count,
     }
+}
+
+fn collect_run_provenance() -> RunProvenance {
+    let (source_revision, source_revision_status) =
+        if let Some(value) = std::env::var("SYMTHAEA_SOURCE_REV")
+            .ok()
+            .filter(|value| !value.trim().is_empty())
+        {
+            (Some(value.trim().to_owned()), "runtime_symthaea_source_rev")
+        } else if let Some(value) = std::env::var("GITHUB_SHA")
+            .ok()
+            .filter(|value| !value.trim().is_empty())
+        {
+            (Some(value.trim().to_owned()), "runtime_github_sha")
+        } else if let Some(value) =
+            option_env!("MEL_INSTRUMENT_PROBE_REV").filter(|value| !value.trim().is_empty())
+        {
+            (Some(value.trim().to_owned()), "compile_time_embedded")
+        } else {
+            (None, "unavailable")
+        };
+
+    // Do not serialize the absolute executable path: it can disclose usernames,
+    // workspace layout, or asset-root details. The byte digest and basename are
+    // sufficient for identifying the file that was opened for hashing.
+    let (renderer_binary_name, renderer_binary_sha256, renderer_binary_size_bytes,
+        renderer_binary_identity_status) = match std::env::current_exe() {
+        Ok(path) => {
+            let name = path.file_name().map(|value| value.to_string_lossy().into_owned());
+            match file_sha256(&path) {
+                Ok((digest, size_bytes)) => (name, Some(digest), Some(size_bytes), "hashed"),
+                Err(_) => (name, None, None, "hash_failed"),
+            }
+        }
+        Err(_) => (None, None, None, "unavailable"),
+    };
+
+    RunProvenance {
+        source_revision,
+        source_revision_status,
+        renderer_binary_name,
+        renderer_binary_sha256,
+        renderer_binary_size_bytes,
+        renderer_binary_identity_status,
+    }
+}
+
+fn file_sha256(path: &Path) -> io::Result<(String, u64)> {
+    let mut file = File::open(path)?;
+    let expected_size = file.metadata()?.len();
+    let mut hasher = Sha256::new();
+    let mut buffer = [0_u8; 64 * 1024];
+    let mut bytes_read = 0_u64;
+
+    loop {
+        let count = file.read(&mut buffer)?;
+        if count == 0 {
+            break;
+        }
+        bytes_read = bytes_read
+            .checked_add(count as u64)
+            .ok_or_else(|| io::Error::new(io::ErrorKind::InvalidData, "file length overflow while hashing"))?;
+        hasher.update(&buffer[..count]);
+    }
+
+    if bytes_read != expected_size {
+        return Err(io::Error::new(
+            io::ErrorKind::InvalidData,
+            "file size changed while hashing",
+        ));
+    }
+
+    Ok((format!("{:x}", hasher.finalize()), bytes_read))
 }
 
 fn audio_sha256(samples: &[f32]) -> String {
@@ -1232,6 +1345,34 @@ mod tests {
         assert_eq!(percentile(&[1.0, 2.0, 3.0], 0.5), Some(2.0));
         assert_eq!(percentile(&[1.0, 2.0, 3.0, 4.0], 0.5), Some(3.0));
         assert_eq!(percentile(&[1.0, 2.0, 3.0, 4.0], 0.95), Some(4.0));
+    }
+
+    #[test]
+    fn file_sha256_binds_exact_bytes_and_reports_size() {
+        use std::time::{SystemTime, UNIX_EPOCH};
+
+        let nonce = SystemTime::now()
+            .duration_since(UNIX_EPOCH)
+            .unwrap_or_default()
+            .as_nanos();
+        let path = std::env::temp_dir().join(format!(
+            "muse-renderer-provenance-{}-{nonce}.bin",
+            std::process::id()
+        ));
+        std::fs::write(&path, b"binary-bytes-A").expect("fixture should be written");
+        let (first_hash, first_size) = file_sha256(&path).expect("fixture should hash");
+        let (repeated_hash, repeated_size) = file_sha256(&path).expect("fixture should re-hash");
+        assert_eq!(first_hash, repeated_hash);
+        assert_eq!(first_size, repeated_size);
+        assert_eq!(first_size, b"binary-bytes-A".len() as u64);
+
+        // Equal-length replacement must change the content digest while keeping
+        // the byte-count invariant unchanged.
+        std::fs::write(&path, b"binary-bytes-B").expect("replacement should be written");
+        let (changed_hash, changed_size) = file_sha256(&path).expect("replacement should hash");
+        assert_ne!(first_hash, changed_hash);
+        assert_eq!(first_size, changed_size);
+        std::fs::remove_file(&path).expect("fixture should be removed");
     }
 
     #[test]
