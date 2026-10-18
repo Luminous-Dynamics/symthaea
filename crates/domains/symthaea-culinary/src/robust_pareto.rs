@@ -524,12 +524,12 @@ mod tests {
         vec![
             ScenarioSpec {
                 id: "observed_basket".to_owned(),
-                digest: "sha256:observed-basket-v1".to_owned(),
+                digest: "scenario:observed-basket:v1".to_owned(),
                 is_baseline: true,
             },
             ScenarioSpec {
                 id: "seasonal_price_shock".to_owned(),
-                digest: "sha256:seasonal-shock-v1".to_owned(),
+                digest: "scenario:seasonal-price-shock:v1".to_owned(),
                 is_baseline: false,
             },
         ]
@@ -549,7 +549,7 @@ mod tests {
             scenario_metrics: vec![
                 CandidateScenarioMetrics {
                     scenario_id: "observed_basket".to_owned(),
-                    scenario_digest: "sha256:observed-basket-v1".to_owned(),
+                    scenario_digest: "scenario:observed-basket:v1".to_owned(),
                     objectives: vec![ScenarioObjective {
                         key: "cost_per_serving".to_owned(),
                         direction: ObjectiveDirection::Minimize,
@@ -560,7 +560,7 @@ mod tests {
                 },
                 CandidateScenarioMetrics {
                     scenario_id: "seasonal_price_shock".to_owned(),
-                    scenario_digest: "sha256:seasonal-shock-v1".to_owned(),
+                    scenario_digest: "scenario:seasonal-price-shock:v1".to_owned(),
                     objectives: vec![ScenarioObjective {
                         key: "cost_per_serving".to_owned(),
                         direction: ObjectiveDirection::Minimize,
@@ -686,7 +686,7 @@ mod tests {
     fn scenario_metrics_must_bind_to_the_registered_joint_assumptions() {
         let mut mislabelled = candidate("mislabelled", Some(5.0), Some(5.0));
         mislabelled.scenario_metrics[1].scenario_digest =
-            "sha256:observed-basket-v1".to_owned();
+            "scenario:observed-basket:v1".to_owned();
 
         assert!(matches!(
             evaluate_robust_frontier(&scenarios(), &[mislabelled]),
