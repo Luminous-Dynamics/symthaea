@@ -584,7 +584,6 @@ mod tests {
     }
 
     #[test]
-    fn manifest_file_verification_uses_the_named_entry() {    #[test]
     fn manifest_file_verification_uses_the_named_entry() {
         let directory = std::env::temp_dir().join(format!(
             "symthaea-cosmology-manifest-{}",
@@ -612,8 +611,6 @@ mod tests {
     }
 
     #[test]
-    fn weighted_summary_uses_named_columns_and_documented_quantiles() {    #[test]
-    fn weighted_summary_uses_named_columns_and_documented_quantiles() {    #[test]
     fn weighted_summary_uses_named_columns_and_documented_quantiles() {
         let chain = ChainTable::parse(Cursor::new(FIXTURE)).unwrap();
         let summary = chain.summarize("H0").unwrap();
@@ -672,7 +669,6 @@ mod tests {
     }
 
     #[test]
-    fn malformed_rows_are_rejected_instead_of_skipped() {    #[test]
     fn malformed_rows_are_rejected_instead_of_skipped() {
         let fixture = "# weight minuslogpost H0\n1 -10 67\n2 -11\n";
         assert!(matches!(
