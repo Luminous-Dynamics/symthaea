@@ -43,6 +43,18 @@ Physical layer design, antenna construction, electrical permissibility, installe
 
 **Interpretation:** TTE is a credible emergency-overlay research direction, not magic broadband through arbitrary rock. Use measured test corridors to learn coverage and rates. Do not transfer performance numbers across rock, depth, antenna, moisture, geometry or power assumptions.
 
+### Literature-inspired workload profiles (not product guarantees)
+
+The 2024 TTE review describes a set of previously reported magnetic-induction configurations with approximate service modes of 10 bit/s text-only, 100 bit/s text/data, 500 bit/s voice messaging and 2,500 bit/s real-time voice. It also summarizes reported field tests reaching depths up to 600 m and horizontal distances up to 1,500 m under particular antenna, site and frequency-band conditions (reported as 3–8 kHz). These figures are **literature-specific examples**, not a promise for a new design, an assurance of simultaneous range and rate, or a universal mine operating envelope. Source: [Ngwenyama & Webber-Youngman (2024), section 3](https://link.springer.com/article/10.1007/s42461-024-01056-5).
+
+Use them only to define test traffic profiles and questions:
+- At 10 bit/s, can a short SOS packet plus framing/authentication overhead fit within the declared time and energy budget?
+- At 100 bit/s, can compact status/location uncertainty records be sent without overflowing the queue?
+- At 500 bit/s, what latency and duty cycle apply to a voice-message service?
+- At 2,500 bit/s, what additional link, antenna, power and safety assumptions are required, and are those assumptions actually supported by a measured installation?
+
+Before comparing profiles, define whether rates are application payload or raw physical bitrate, include framing/retries/duplex overhead, and report successful payload goodput separately. The current Rust kernel does **not** simulate bitrates or airtime yet; these are inputs for the next harness increment, not results of the current CLI.
+
 ## 4. Frozen comparators
 
 | ID | Comparator | Purpose |

@@ -20,6 +20,7 @@ cargo run --offline --manifest-path crates/tools/mine-comms-benchmark/Cargo.toml
 - Message expiry is evaluated against modelled arrival time.
 - Unauthenticated-origin distress can still be received and acknowledged, but its origin remains explicitly unverified.
 - Each receipt carries a typed lifecycle trace; missing routes and unacknowledged reception are distinct outcomes.
+- The CLI prints synthetic comparisons for nominal routing, backbone severance, local-relay loss, stale TTE observations, a missing acknowledgement path and an expired message.
 
 ## Claim ceiling and next step
 
