@@ -233,6 +233,9 @@ impl PredictiveMonitor {
     ///
     /// Clones the neuron, evolves it forward by `hours_ahead` hours, then
     /// decodes the resulting state vector back to telemetry values.
+    ///
+    /// Returns None when history is empty or the requested horizon is invalid
+    /// or exceeds the iterative solver's explicit substep budget.
     pub fn predict_ltc(&mut self, hours_ahead: f64) -> Option<SystemTelemetry> {
         if self.history.is_empty() {
             return None;
@@ -844,6 +847,21 @@ mod tests {
             "Decoded memory should be in range, got {}",
             decoded.memory_used_pct
         );
+    }
+
+    #[test]
+    fn test_ltc_prediction_rejects_invalid_or_over_budget_horizons() {
+        let mut monitor = PredictiveMonitor::with_defaults();
+        for _ in 0..2 {
+            monitor.ingest(sample_telemetry(50.0, 40.0, 50_000, 0));
+        }
+
+        for horizon in [f64::NAN, f64::INFINITY, f64::NEG_INFINITY, -1.0, 1.0e9] {
+            assert!(
+                monitor.predict_ltc(horizon).is_none(),
+                "invalid or over-budget horizon {horizon} must be rejected"
+            );
+        }
     }
 
     #[test]
