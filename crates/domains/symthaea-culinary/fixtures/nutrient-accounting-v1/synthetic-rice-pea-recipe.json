@@ -69,39 +69,6 @@
         }
       ],
       "composition_state": "raw"
-    },
-    {
-      "ingredient_id": "water",
-      "edible_mass_g": {
-        "value": 150,
-        "lower": 145,
-        "upper": 155
-      },
-      "mass_evidence": {
-        "source_ref": "urn:synthetic:mass:water",
-        "source_version": "illustrative-v1",
-        "known_at": "2026-10-18T00:00:00Z",
-        "evidence_status": "synthetic"
-      },
-      "composition_basis": "per_100g_edible",
-      "composition_source": {
-        "source_ref": "urn:synthetic:composition:water",
-        "source_version": "illustrative-v1",
-        "known_at": "2026-10-18T00:00:00Z",
-        "evidence_status": "synthetic"
-      },
-      "nutrients": [
-        {
-          "nutrient_id": "protein",
-          "unit": "g",
-          "per_100g": {
-            "value": 0,
-            "lower": 0,
-            "upper": 0
-          }
-        }
-      ],
-      "composition_state": "added"
     }
   ],
   "nutrient_retention": [
@@ -136,22 +103,6 @@
       "process_id": "synthetic-boil-with-water-v1",
       "input_state": "raw",
       "output_state": "cooked"
-    },
-    {
-      "ingredient_id": "water",
-      "nutrient_id": "protein",
-      "value": 1,
-      "lower": 1,
-      "upper": 1,
-      "evidence": {
-        "source_ref": "urn:synthetic:retention:water-protein",
-        "source_version": "illustrative-v1",
-        "known_at": "2026-10-18T00:00:00Z",
-        "evidence_status": "synthetic"
-      },
-      "process_id": "synthetic-boil-with-water-v1",
-      "input_state": "added",
-      "output_state": "cooked"
     }
   ],
   "final_food_mass_g": {
@@ -181,6 +132,6 @@
       }
     }
   ],
-  "rationale": "Synthetic arithmetic fixture only. Ingredient nutrient concentrations and all empirical retention factors are illustrative; the fixture is not nutrition advice, composition data, or a recipe recommendation. Finished mass is a separately source-pinned measurement, not inferred by rescaling nutrient amounts.",
+  "rationale": "Synthetic arithmetic fixture only. Ingredient nutrient concentrations and all empirical retention factors are illustrative; the fixture is not nutrition advice, composition data, or a recipe recommendation. Water used as a cooking medium is not counted as an ingredient nutrient source here; final prepared mass is independently measured and source-pinned.",
   "final_food_state": "cooked"
 }
