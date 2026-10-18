@@ -65,7 +65,9 @@ OPTIONS:\n\
   --help                   Print this help\n\
 \n\
 Records in the interval (training-through, testing-from) are embargoed. No\n\
-session may cross training, embargo, or test partitions. The JSON report binds\nthe exact source JSONL bytes with SHA-256. --demo uses synthetic placeholder\naudio identities, not rendered audio and not human-subject evidence."
+session may cross training, embargo, or test partitions. The JSON report binds\n\
+the exact source JSONL bytes with SHA-256. --demo uses synthetic placeholder\n\
+audio identities, not rendered audio and not human-subject evidence."
 }
 
 fn parse_options(args: impl IntoIterator<Item = String>) -> Result<Option<Options>, String> {
