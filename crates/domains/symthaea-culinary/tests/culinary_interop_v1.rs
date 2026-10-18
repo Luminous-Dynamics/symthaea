@@ -20,9 +20,137 @@ const SIMULATED_AS_OBSERVED: &str =
     include_str!("../fixtures/culinary-decision-bundle-v1/semantic-rejects-simulation-relabelled-observation.json");
 const UNKNOWN_GATE_ON_FRONTIER: &str =
     include_str!("../fixtures/culinary-decision-bundle-v1/semantic-rejects-unknown-gate-on-frontier.json");
+const FALSE_SCENARIO_FRONTIER: &str =
+    include_str!("../fixtures/culinary-decision-bundle-v1/semantic-rejects-false-scenario-frontier.json");
+const FALSE_ROBUST_DOMINANCE: &str =
+    include_str!("../fixtures/culinary-decision-bundle-v1/semantic-rejects-false-robust-dominance.json");
 
 fn parse_fixture(raw: &str) -> Value {
     serde_json::from_str(raw).expect("fixture is valid JSON")
+}
+
+type ObjectiveValues = BTreeMap<String, (String, String, f64)>;
+
+fn complete_objectives(result: &Value) -> Option<ObjectiveValues> {
+    let objectives = result.get("objectives")?.as_array()?;
+    if objectives.is_empty() {
+        return None;
+    }
+
+    let mut values = ObjectiveValues::new();
+    for objective in objectives {
+        let key = objective.get("key")?.as_str()?;
+        let direction = objective.get("direction")?.as_str()?;
+        let unit = objective.get("unit")?.as_str()?;
+        let status = objective.get("status")?.as_str()?;
+        if !matches!(status, "observed" | "derived" | "estimated" | "simulated" | "synthetic") {
+            return None;
+        }
+        if !matches!(direction, "minimize" | "maximize") {
+            return None;
+        }
+        let value = objective.get("value")?.as_f64()?;
+        if !value.is_finite() {
+            return None;
+        }
+        if objective.get("evidence_refs")?.as_array()?.is_empty() {
+            return None;
+        }
+        if values
+            .insert(key.to_owned(), (direction.to_owned(), unit.to_owned(), value))
+            .is_some()
+        {
+            return None;
+        }
+    }
+    Some(values)
+}
+
+fn dominates(left: &ObjectiveValues, right: &ObjectiveValues) -> bool {
+    if left.len() != right.len() || left.keys().ne(right.keys()) {
+        return false;
+    }
+    let mut strictly_better = false;
+    for (key, (direction, unit, left_value)) in left {
+        let Some((right_direction, right_unit, right_value)) = right.get(key) else {
+            return false;
+        };
+        if direction != right_direction || unit != right_unit {
+            return false;
+        }
+        let (no_worse, better) = match direction.as_str() {
+            "minimize" => (left_value <= right_value, left_value < right_value),
+            "maximize" => (left_value >= right_value, left_value > right_value),
+            _ => return false,
+        };
+        if !no_worse {
+            return false;
+        }
+        strictly_better |= better;
+    }
+    strictly_better
+}
+
+fn robustly_dominates(
+    left_by_scenario: &BTreeMap<String, ObjectiveValues>,
+    right_by_scenario: &BTreeMap<String, ObjectiveValues>,
+) -> bool {
+    if left_by_scenario.len() != right_by_scenario.len()
+        || left_by_scenario.keys().ne(right_by_scenario.keys())
+    {
+        return false;
+    }
+
+    let mut strictly_better_somewhere = false;
+    for (scenario_id, left) in left_by_scenario {
+        let Some(right) = right_by_scenario.get(scenario_id) else {
+            return false;
+        };
+        if left.len() != right.len() || left.keys().ne(right.keys()) {
+            return false;
+        }
+        for (key, (direction, unit, left_value)) in left {
+            let Some((right_direction, right_unit, right_value)) = right.get(key) else {
+                return false;
+            };
+            if direction != right_direction || unit != right_unit {
+                return false;
+            }
+            let (no_worse, better) = match direction.as_str() {
+                "minimize" => (left_value <= right_value, left_value < right_value),
+                "maximize" => (left_value >= right_value, left_value > right_value),
+                _ => return false,
+            };
+            if !no_worse {
+                return false;
+            }
+            strictly_better_somewhere |= better;
+        }
+    }
+    strictly_better_somewhere
+}
+
+fn scenario_result<'a>(candidate: &'a Value, scenario_id: &str) -> Option<&'a Value> {
+    candidate
+        .get("scenario_results")?
+        .as_array()?
+        .iter()
+        .find(|result| result.get("scenario_id").and_then(Value::as_str) == Some(scenario_id))
+}
+
+fn candidate_scenario_values(
+    candidate: &Value,
+    scenario_ids: &BTreeSet<String>,
+) -> Option<BTreeMap<String, ObjectiveValues>> {
+    if candidate.get("gate_disposition")?.as_str()? != "feasible" {
+        return None;
+    }
+    let mut values_by_scenario = BTreeMap::new();
+    for scenario_id in scenario_ids {
+        let result = scenario_result(candidate, scenario_id)?;
+        values_by_scenario.insert(scenario_id.clone(), complete_objectives(result)?);
+    }
+    Some(values_by_scenario)
 }
 
 /// Return semantic violations that an independent bundle consumer must reject.
@@ -77,7 +205,6 @@ fn semantic_violations(bundle: &Value) -> Vec<String> {
             .collect();
     };
     let mut candidate_ids = BTreeSet::new();
-    let mut robust_frontier_calculated = BTreeSet::new();
     let objective_definitions = bundle
         .get("objective_definitions")
         .and_then(Value::as_array)
@@ -284,14 +411,6 @@ fn semantic_violations(bundle: &Value) -> Vec<String> {
         if robustly_rankable != (all_scenarios_rankable && all_metrics_complete) {
             errors.push(format!("{id}: robustly_rankable conflicts with gate/scenario completeness"));
         }
-        if robustly_rankable
-            && candidate
-                .get("robust_dominated_by")
-                .and_then(Value::as_array)
-                .is_some_and(Vec::is_empty)
-        {
-            robust_frontier_calculated.insert(id.to_owned());
-        }
     }
 
     let candidate_by_id: BTreeMap<String, &Value> = candidates
@@ -303,38 +422,149 @@ fn semantic_violations(bundle: &Value) -> Vec<String> {
             ))
         })
         .collect();
-    for candidate in candidates {
-        let id = candidate.get("candidate_id").and_then(Value::as_str).unwrap_or("");
-        for (field, reciprocal_field) in [
-            ("robust_dominates", "robust_dominated_by"),
-            ("robust_dominated_by", "robust_dominates"),
-        ] {
-            let related = candidate.get(field).and_then(Value::as_array);
-            if let Some(related) = related {
-                for related_id in related.iter().filter_map(Value::as_str) {
-                    if related_id == id {
-                        errors.push(format!("{id}: robust dominance relation cannot reference itself"));
-                        continue;
-                    }
-                    let Some(other) = candidate_by_id.get(related_id) else {
-                        errors.push(format!("{id}: robust relation references unknown candidate {related_id}"));
-                        continue;
-                    };
-                    if other.get("robustly_rankable").and_then(Value::as_bool) != Some(true) {
-                        errors.push(format!("{id}: robust relation references non-rankable candidate {related_id}"));
-                    }
-                    let reciprocal_contains_id = other
-                        .get(reciprocal_field)
-                        .and_then(Value::as_array)
-                        .is_some_and(|values| values.iter().any(|value| value.as_str() == Some(id)));
-                    if !reciprocal_contains_id {
-                        errors.push(format!("{id}: robust relation with {related_id} is not reciprocal"));
-                    }
+    let expected_scenario_ids: BTreeSet<String> =
+        scenario_digest_by_id.keys().cloned().collect();
+
+    // Recompute every scenario frontier from the candidate objective vectors.
+    // Do not trust the frontier booleans authored by the producer.
+    for scenario_id in &expected_scenario_ids {
+        let eligible: Vec<(&str, ObjectiveValues)> = candidates
+            .iter()
+            .filter_map(|candidate| {
+                if candidate.get("gate_disposition").and_then(Value::as_str) != Some("feasible") {
+                    return None;
                 }
+                let id = candidate.get("candidate_id")?.as_str()?;
+                let result = scenario_result(candidate, scenario_id)?;
+                Some((id, complete_objectives(result)?))
+            })
+            .collect();
+
+        let mut expected_frontier = BTreeSet::new();
+        for (candidate_id, candidate_values) in &eligible {
+            let is_dominated = eligible.iter().any(|(other_id, other_values)| {
+                other_id != candidate_id && dominates(other_values, candidate_values)
+            });
+            if !is_dominated {
+                expected_frontier.insert((*candidate_id).to_owned());
+            }
+        }
+
+        for candidate in candidates {
+            let id = candidate.get("candidate_id").and_then(Value::as_str).unwrap_or("");
+            let result = scenario_result(candidate, scenario_id);
+            let declared_frontier = result
+                .and_then(|value| value.get("frontier"))
+                .and_then(Value::as_bool);
+            let expected = expected_frontier.contains(id);
+            if declared_frontier != Some(expected) {
+                errors.push(format!(
+                    "{id}: frontier claim in scenario {scenario_id} differs from independently recomputed frontier"
+                ));
             }
         }
     }
 
+    // Independently recompute robust dominance over all scenarios; mere reciprocal
+    // claims are insufficient if both candidates can reverse order under a shock.
+    let values_by_candidate: BTreeMap<String, Option<BTreeMap<String, ObjectiveValues>>> =
+        candidates
+            .iter()
+            .filter_map(|candidate| {
+                let id = candidate.get("candidate_id")?.as_str()?.to_owned();
+                Some((
+                    id,
+                    candidate_scenario_values(candidate, &expected_scenario_ids),
+                ))
+            })
+            .collect();
+    let mut expected_dominates: BTreeMap<String, BTreeSet<String>> = candidate_ids
+        .iter()
+        .map(|id| (id.clone(), BTreeSet::new()))
+        .collect();
+    let mut expected_dominated_by: BTreeMap<String, BTreeSet<String>> = candidate_ids
+        .iter()
+        .map(|id| (id.clone(), BTreeSet::new()))
+        .collect();
+
+    let eligible_ids: Vec<String> = values_by_candidate
+        .iter()
+        .filter_map(|(id, values)| values.as_ref().map(|_| id.clone()))
+        .collect();
+
+    for left_index in 0..eligible_ids.len() {
+        for right_index in (left_index + 1)..eligible_ids.len() {
+            let left_id = &eligible_ids[left_index];
+            let right_id = &eligible_ids[right_index];
+            let left_values = values_by_candidate[left_id].as_ref().unwrap();
+            let right_values = values_by_candidate[right_id].as_ref().unwrap();
+
+            if robustly_dominates(left_values, right_values) {
+                expected_dominates
+                    .get_mut(left_id)
+                    .unwrap()
+                    .insert(right_id.clone());
+                expected_dominated_by
+                    .get_mut(right_id)
+                    .unwrap()
+                    .insert(left_id.clone());
+            } else if robustly_dominates(right_values, left_values) {
+                expected_dominates
+                    .get_mut(right_id)
+                    .unwrap()
+                    .insert(left_id.clone());
+                expected_dominated_by
+                    .get_mut(left_id)
+                    .unwrap()
+                    .insert(right_id.clone());
+            }
+        }
+    }
+
+    for (candidate_id, candidate) in &candidate_by_id {
+        for (field, expected) in [
+            (
+                "robust_dominates",
+                expected_dominates.get(candidate_id).cloned().unwrap_or_default(),
+            ),
+            (
+                "robust_dominated_by",
+                expected_dominated_by.get(candidate_id).cloned().unwrap_or_default(),
+            ),
+        ] {
+            let declared: BTreeSet<String> = candidate
+                .get(field)
+                .and_then(Value::as_array)
+                .into_iter()
+                .flatten()
+                .filter_map(Value::as_str)
+                .map(str::to_owned)
+                .collect();
+            if declared.len()
+                != candidate
+                    .get(field)
+                    .and_then(Value::as_array)
+                    .map_or(0, Vec::len)
+            {
+                errors.push(format!("{candidate_id}: {field} contains duplicate or invalid entries"));
+            }
+            if declared != expected {
+                errors.push(format!(
+                    "{candidate_id}: {field} differs from independently recomputed robust dominance"
+                ));
+            }
+        }
+    }
+
+    let expected_robust_frontier: BTreeSet<String> = eligible_ids
+        .iter()
+        .filter(|id| {
+            expected_dominated_by
+                .get(*id)
+                .is_some_and(BTreeSet::is_empty)
+        })
+        .cloned()
+        .collect();
     let declared_robust_frontier: BTreeSet<String> = bundle
         .get("robust_frontier_ids")
         .and_then(Value::as_array)
@@ -343,8 +573,10 @@ fn semantic_violations(bundle: &Value) -> Vec<String> {
         .filter_map(Value::as_str)
         .map(str::to_owned)
         .collect();
-    if declared_robust_frontier != robust_frontier_calculated {
-        errors.push("robust_frontier_ids do not match complete, non-robustly-dominated candidates".to_owned());
+    if declared_robust_frontier != expected_robust_frontier {
+        errors.push(
+            "robust_frontier_ids differ from independently recomputed robust frontier".to_owned(),
+        );
     }
 
     errors
