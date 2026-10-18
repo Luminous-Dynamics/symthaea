@@ -20,6 +20,7 @@ No single scalar should replace this vector. Cross-architecture comparisons are 
 - Qiao et al. (May 2026) study laser repair bonding in a specific panel-level Micro-LED stack, using coupled thermo-mechanical modeling and experiments. [DOI 10.1016/j.mssp.2026.110452](https://doi.org/10.1016/j.mssp.2026.110452). Their setup-specific parameter window must not be copied as a universal recipe or imported process qualification.
 - The OLEDoS review describes the CMOS backplane/frontplane split, OLED stack formation, encapsulation, inspection, dicing and mounting. [DOI 10.1016/j.nxnano.2025.100132](https://doi.org/10.1016/j.nxnano.2025.100132)
 - Hu et al. report a full-color nanoimprint-fabricated waveguide with high uniformity in one prototype. [DOI 10.1002/sdtp.18177](https://doi.org/10.1002/sdtp.18177). This supports including replication/grating uniformity as a measurement axis; it does not establish general production yield.
+- Chen et al. (published 21 September 2026) review nanoimprint lithography for scalable photonic/electronic nanomanufacturing and describe the manufacturing-critical variables as mold/template fidelity and wear, resist filling, residual-layer thickness, demolding damage, overlay and defect mitigation. They explicitly describe NIL as complementary to, not a universal replacement for, projection lithography. [DOI 10.1186/s11671-026-04870-6](https://doi.org/10.1186/s11671-026-04870-6).
 - A survey of LCD mura detection treats defects across array, cell and module manufacturing stages, supporting stage-specific metrology rather than final-only inspection. [Crystals, 2021](https://www.mdpi.com/2073-4352/11/12/1444)
 
 The machine-readable profiles reference these papers only as route context. Literature describes candidate operations and known challenges; it is not a local recipe, equipment-capability profile, or proof that a transformation occurred.
@@ -37,6 +38,24 @@ The current data-only corpus has four route families:
 4. **AR light engine + waveguide** — light-engine acceptance, waveguide blank, route-specific grating fabrication, grating metrology, optional coatings/layers, optomechanical alignment, angle-resolved optical metrology, calibration and final reliability/disposition.
 
 This is a representative first slice, not an exhaustive list of display technologies. LCOS, OLED projection, other micro-OLED stacks, DLP/LCOS projectors, direct-view OLED and alternative waveguide/combiner routes can become separate profiles when specific process ownership and evidence need justify them. Conditional steps must stay conditional; the corpus does not imply all routes share the same stack.
+
+## 3B. Nanoimprint/grating manufacturability controls
+
+The AR-waveguide route now distinguishes thermal NIL, UV NIL, step-and-flash/jet-and-flash NIL, roll-to-roll NIL (only where substrate and architecture permit it), and lithography/etch as separate route variants. These variants are not interchangeable defaults. Select them against the exact substrate, grating geometry, area, overlay demand, downstream transfer/etch stack, production rate and master/tool maintenance model.
+
+For a nanoimprint-based grating, the master and every replica are distinct identified subjects. At minimum preserve:
+
+- master revision/digest, template inspection, use-cycle/wear state and maintenance history;
+- resist/material lot and profile identity, with compatibility to substrate and downstream transfer;
+- replicated feature geometry/fidelity across the declared field, not only a center point;
+- residual-layer thickness and variation, overlay/registration, fill completeness and demolding damage;
+- defect-map coverage and the false-accept/false-reject behavior of the inspection method;
+- cycle time/throughput, template maintenance/replacement cost and yield by master age/usage stratum;
+- optical consequences after transfer, coating, assembly and calibration: angle-/wavelength-resolved efficiency, uniformity, distortion, ghosting/crosstalk and usable eye-box/FOV under the declared convention.
+
+The core economic question is not “does NIL make sub-10 nm features?” It is whether the exact route reliably replicates the *functional optical surface* at the required area, uniformity and lifetime at lower cost per final calibrated-good module. Sub-10 nm nominal mold resolution does not guarantee a qualified grating, acceptable residual layer, defect-free replication or correct full-module optical performance.
+
+Do not copy a published NIL temperature/pressure/cure setting into a process route. It remains the responsibility of a separately qualified material/tool/profile owner to specify permitted process windows. This route contract records inputs, measurements and output conditions, not process execution parameters.
 
 ## 3A. Component-interface contracts
 
