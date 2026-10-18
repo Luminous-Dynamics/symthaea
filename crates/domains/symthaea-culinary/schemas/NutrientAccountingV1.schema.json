@@ -15,7 +15,8 @@
     "final_food_mass_g",
     "final_mass_evidence",
     "expected_outputs",
-    "rationale"
+    "rationale",
+    "final_food_state"
   ],
   "properties": {
     "schema_version": {
@@ -63,6 +64,10 @@
       }
     },
     "rationale": {
+      "type": "string",
+      "minLength": 1
+    },
+    "final_food_state": {
       "type": "string",
       "minLength": 1
     }
@@ -151,7 +156,8 @@
         "mass_evidence",
         "composition_basis",
         "composition_source",
-        "nutrients"
+        "nutrients",
+        "composition_state"
       ],
       "properties": {
         "ingredient_id": {
@@ -176,6 +182,10 @@
           "items": {
             "$ref": "#/$defs/nutrientInput"
           }
+        },
+        "composition_state": {
+          "type": "string",
+          "minLength": 1
         }
       }
     },
@@ -210,7 +220,10 @@
         "value",
         "lower",
         "upper",
-        "evidence"
+        "evidence",
+        "process_id",
+        "input_state",
+        "output_state"
       ],
       "properties": {
         "ingredient_id": {
@@ -238,6 +251,18 @@
         },
         "evidence": {
           "$ref": "#/$defs/evidence"
+        },
+        "process_id": {
+          "type": "string",
+          "minLength": 1
+        },
+        "input_state": {
+          "type": "string",
+          "minLength": 1
+        },
+        "output_state": {
+          "type": "string",
+          "minLength": 1
         }
       }
     },
