@@ -297,6 +297,9 @@ pub fn run(
     expected_data_records: Option<usize>,
     out: Option<PathBuf>,
 ) -> Result<()> {
+    if !delimiter.is_ascii() {
+        return Err(anyhow!("CSV delimiter must be a single ASCII character"));
+    }
     let bytes = fs::read(&input)
         .with_context(|| format!("cannot read local CSV {}", input.display()))?;
     let file_name = input
