@@ -87,13 +87,13 @@ fn expected_outcomes_and_stage_statuses_are_from_declared_enums() {
         .as_array()
         .expect("accepted_outcomes must be an array")
         .iter()
-        .map(|value| value.as_str().expect("outcome must be a string"))
+        .map(|value| value.as_str().expect("outcome must be a string").to_owned())
         .collect::<BTreeSet<_>>();
     let statuses = root["stage_statuses"]
         .as_array()
         .expect("stage_statuses must be an array")
         .iter()
-        .map(|value| value.as_str().expect("stage status must be a string"))
+        .map(|value| value.as_str().expect("stage status must be a string").to_owned())
         .collect::<BTreeSet<_>>();
 
     for entry in root["cases"].as_array().unwrap() {
