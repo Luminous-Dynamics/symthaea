@@ -2205,7 +2205,10 @@ fn probe_fluidsynth_programs(
     })
 }
 
-fn asset_root_evidence(root: &Path) -> std::io::Result<AssetRootEvidenceV1> {
+fn asset_root_evidence(
+    root: &Path,
+    hash_root_wav_contents: bool,
+) -> std::io::Result<AssetRootEvidenceV1> {
     let metadata = match std::fs::metadata(root) {
         Ok(metadata) => metadata,
         Err(error) if error.kind() == std::io::ErrorKind::NotFound => {
@@ -2213,6 +2216,12 @@ fn asset_root_evidence(root: &Path) -> std::io::Result<AssetRootEvidenceV1> {
                 root_present: false,
                 wav_file_count: 0,
                 path_size_manifest_sha256: None,
+                content_manifest_sha256: None,
+                content_manifest_status: if hash_root_wav_contents {
+                    "root_missing"
+                } else {
+                    "not_requested"
+                },
             });
         }
         Err(error) => return Err(error),
@@ -2237,11 +2246,68 @@ fn asset_root_evidence(root: &Path) -> std::io::Result<AssetRootEvidenceV1> {
         hasher.update(size_bytes.to_le_bytes());
     }
     let digest = hasher.finalize();
+    let content_manifest_sha256 = if hash_root_wav_contents {
+        Some(asset_root_content_manifest_sha256(root, &entries)?)
+    } else {
+        None
+    };
     Ok(AssetRootEvidenceV1 {
         root_present: true,
         wav_file_count: entries.len(),
         path_size_manifest_sha256: Some(hex_digest(&digest[..])),
+        content_manifest_status: if hash_root_wav_contents { "hashed" } else { "not_requested" },
+        content_manifest_sha256,
     })
+}
+
+/// Hash every WAV discovered by collect_wav_manifest, including files whose
+/// names are rejected by the pitch-sample indexer. Records are sorted and
+/// length-prefixed; each exact file is streamed to bound memory use.
+fn asset_root_content_manifest_sha256(
+    root: &Path,
+    entries: &[(String, u64)],
+) -> std::io::Result<String> {
+    use std::io::Read as _;
+
+    let mut manifest = Sha256::new();
+    manifest.update(b"muse-asset-root-content-manifest-v1\\0");
+    let mut buffer = [0u8; 64 * 1024];
+
+    for (relative_path, expected_size) in entries {
+        manifest.update((relative_path.len() as u64).to_le_bytes());
+        manifest.update(relative_path.as_bytes());
+        manifest.update(expected_size.to_le_bytes());
+
+        let mut file = std::fs::File::open(root.join(relative_path))?;
+        let metadata_size = file.metadata()?.len();
+        if metadata_size != *expected_size {
+            return Err(std::io::Error::new(
+                std::io::ErrorKind::InvalidData,
+                format!("asset changed size before root hashing: {relative_path}"),
+            ));
+        }
+        let mut bytes_read = 0u64;
+        let mut file_hasher = Sha256::new();
+        loop {
+            let count = file.read(&mut buffer)?;
+            if count == 0 {
+                break;
+            }
+            bytes_read += count as u64;
+            file_hasher.update(&buffer[..count]);
+        }
+        if bytes_read != *expected_size {
+            return Err(std::io::Error::new(
+                std::io::ErrorKind::InvalidData,
+                format!("asset changed size during root hashing: {relative_path}"),
+            ));
+        }
+        let file_digest = file_hasher.finalize();
+        manifest.update(&file_digest[..]);
+    }
+
+    let digest = manifest.finalize();
+    Ok(hex_digest(&digest[..]))
 }
 
 fn collect_wav_manifest(
