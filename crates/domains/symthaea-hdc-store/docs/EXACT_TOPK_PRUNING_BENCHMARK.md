@@ -30,12 +30,13 @@ This is exact candidate pruning, not approximate retrieval. The integer ranking 
 - **random:** independent deterministic BinaryHV vectors and independent queries. A critical negative control; random distances concentrate around half the 16,384-bit space, so pruning may not save much work.
 - **clustered:** vectors are deterministic small Hamming perturbations around four fixed centers, with queries at those centers.
 - **mixed:** a mix of clustered vectors and random distractors, queried at cluster centers.
+- **tie-heavy:** deliberately repeated payload patterns plus repeated Hamming radii, so duplicate vectors and equal-distance top-k boundaries exercise the ID tie-break.
 
 These synthetic modes are diagnostic, not a claim to represent the deployment distribution. Add captured or privacy-safe real traces before making product decisions.
 
 ## Measurements
 
-The raw CSV records each query/round/algorithm, elapsed time, corpus size, k, number of payload bytes **algorithmically examined**, vectors pruned and a checksum of exact results. The summary reports queries/s and p50/p95/p99 per-query latency.
+The raw CSV records each query/round/algorithm, elapsed time, corpus size, k, number of payload bytes **algorithmically examined**, vectors pruned and a checksum of exact results. The summary reports queries/s and p50/p95/p99 per-query latency. Before timed samples, every corpus also checks k=0 and k=N against the canonical reader for the bounded-heap and all early-abandon chunk sizes.
 
 - Algorithmic bytes examined count only corpus payload bytes touched by the candidate loop. They are not memory-controller traffic, page faults or physical SSD/NAND reads.
 - The canonical reference searches are run before timings, so this first comparison measures repeated/warm mapped-store behavior; cache state is not controlled.
@@ -49,7 +50,7 @@ Faiss's binary flat index uses exhaustive Hamming distance with popcount, and do
 
 ## Proposed gates (not achieved)
 
-- 100% ordered top-k ID and exact f32 score-bit agreement with the canonical oracle for random, clustered and mixed workloads; include duplicate vectors, equal-distance ties, k=0 and k=N.
+- 100% ordered top-k ID and exact f32 score-bit agreement with the canonical oracle for random, clustered, mixed and tie-heavy workloads. The harness explicitly prevalidates k=0 and k=N; library promotion should add persistent unit/property fixtures for duplicate vectors and equal-distance boundary ties.
 - Bounded heap maintains no more than k score candidates per query.
 - At k=10, target at least 1.5x exact queries/s on at least one named workload/host without more than 5% regressions for small k. This is a falsifiable target, not a forecast.
 - Early abandonment must reduce algorithmic payload bytes substantially on clustered/mixed corpora and is expected to deliver much less on the random control. If not, retain full distance.
