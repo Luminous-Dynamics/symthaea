@@ -149,21 +149,35 @@ impl Display for PlanError {
                 write!(f, "experiment {experiment_id} repeats observable {observable_id}")
             }
             Self::PredictionCountMismatch {
-                experiment_id, observable_id, expected, actual,
+                experiment_id,
+                observable_id,
+                expected,
+                actual,
             } => write!(
                 f,
                 "experiment {experiment_id}, observable {observable_id}: expected {expected} predictions, found {actual}"
             ),
-            Self::UnknownHypothesis { experiment_id, observable_id, hypothesis_id } => write!(
+            Self::UnknownHypothesis {
+                experiment_id,
+                observable_id,
+                hypothesis_id,
+            } => write!(
                 f,
                 "experiment {experiment_id}, observable {observable_id}: unknown hypothesis {hypothesis_id}"
             ),
-            Self::DuplicatePrediction { experiment_id, observable_id, hypothesis_id } => write!(
+            Self::DuplicatePrediction {
+                experiment_id,
+                observable_id,
+                hypothesis_id,
+            } => write!(
                 f,
                 "experiment {experiment_id}, observable {observable_id}: duplicate prediction for {hypothesis_id}"
             ),
             Self::InvalidPrediction {
-                experiment_id, observable_id, hypothesis_id, reason,
+                experiment_id,
+                observable_id,
+                hypothesis_id,
+                reason,
             } => write!(
                 f,
                 "experiment {experiment_id}, observable {observable_id}, hypothesis {hypothesis_id}: invalid prediction ({reason})"
