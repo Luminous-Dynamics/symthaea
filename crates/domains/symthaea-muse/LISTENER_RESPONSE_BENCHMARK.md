@@ -134,11 +134,17 @@ The 10% relative MAE target is a proposed engineering hurdle, not a published st
 
 ## Deterministic temporal baseline evaluator
 
-The Rust module src/listener_response_benchmark.rs provides an evaluator for a global temporal cutoff. It reports MAE for four predictors of self-reported pre/post change: no change, a training-only population mean change, a listener-history mean change, and a population/personal shrinkage baseline. The personal estimate only uses prior sessions from that listener; another presentation in the same session is never treated as personal history. The report exposes scored counts, personal-history coverage, the training prior, and an embargoed interval between training and test windows.
+The Rust module src/listener_response_benchmark.rs (report schema v2) provides an evaluator for a global temporal cutoff. It reports MAE for four predictors of self-reported pre/post change: no change, a training-only population mean change, a listener-history mean change, and a population/personal shrinkage baseline. The personal estimate only uses prior sessions from that listener; another presentation in the same session is never treated as personal history. The report exposes scored counts, personal-history coverage, the training prior, and an embargoed interval between training and test windows.
 
 Each record includes collection_sequence, a monotonic study-local ordinal assigned at collection. It is not a wall-clock time. The evaluator rejects duplicate sequences/episode IDs, unsupported schema versions, unconfirmed consent, malformed record fields, reversed participant session order, any listener session that crosses training/embargo/test partitions, invalid cutoffs, and empty train/test partitions. Records between cutoffs are embargoed. Missing outcomes remain excluded from channel MAE and are reported separately.
 
 This is a deterministic baseline evaluator, not a learned model and not a causal estimator. It asks whether added personalization beats simple baselines on later observations; it cannot establish that music caused the reported change.
+
+### Participant-aware uncertainty
+
+Benchmark v2 adds two matched comparisons: personal-history prediction versus no-change, and personal-history prediction versus the population-delta prior. For each comparison, calculate per-participant MAE improvement on the same eligible future test episodes, then report the mean and median participant effect, fraction of participants improved, number of participants, and matched episode count. A reproducible percentile bootstrap resamples participants (not episodes) with 2,000 replicates and a fixed, recorded seed.
+
+To avoid presenting a highly unstable interval as if it were confirmatory, the runner withholds the bootstrap interval when fewer than ten eligible participants contribute. Ten is only an initial display gate for exploratory analysis, not a claim that ten participants provide adequate statistical power. A scientific superiority claim still requires prospective power analysis, preregistration, adequate independent participants, and a confirmatory design. The mean over episodes and equal-participant-weighted effect are deliberately both reported: one answers typical-episode performance, the other prevents frequent listeners from dominating the listener-level result.
 
 ## Additional methodological finding
 
@@ -165,7 +171,7 @@ cargo run -p symthaea-muse --bin muse_listener_response_benchmark -- \
   --output report.json
 \`\`\`
 
-The interval between the training and testing cutoffs is embargoed. A whole participant-session must fit within one partition. The report includes training, embargo and test counts; a source digest; channel-wise MAE for baseline predictors; personal-history coverage; and matched-subset baseline errors so a personal predictor is compared with the baselines on the same test episodes. The demo uses synthetic placeholder audio identities and is explicitly tagged as synthetic; it is never human-listener evidence.
+The interval between the training and testing cutoffs is embargoed. A whole participant-session must fit within one partition. The report includes training, embargo and test counts; a source digest; channel-wise MAE for baseline predictors; personal-history coverage; matched-subset baseline errors; and participant-clustered improvement estimates with fixed-seed bootstrap intervals when the minimum participant threshold is met. The demo uses synthetic placeholder audio identities and is explicitly tagged as synthetic; it is never human-listener evidence.
 
 The output records the source JSONL SHA-256, runner version, and compile-time runner revision when the build environment provides GIT_COMMIT_SHA or GITHUB_SHA. If the revision is emitted as "unbound-at-build-time", the artifact is not fully source-revision-bound; use a build environment that sets GIT_COMMIT_SHA to the checked-out commit. The input digest identifies the exact JSONL bytes but does not prove that the underlying participant consent, media rights, or audio-byte claims are valid.
 
@@ -179,15 +185,19 @@ A credible benchmark should use existing open work without pretending every data
 |---|---|---|---|
 | Perceived-affect baseline | MERGE audio/lyrics dataset (Zenodo record 13939205; 3,554 audio clips, 2,568 lyric records, with balanced and bimodal subsets) | Audio-only, lyrics-only and fused prediction of music's perceived valence/arousal | Static labels are not measurements of a person's pre/post state change. Check rights for each audio/lyric item before redistribution. |
 | Personalized judgments | TROMPA-MER (181 participants, 4,721 annotations, 1,161 excerpts) | Personalization of perceived and induced emotion annotations, familiarity/preferences, and active-learning strategies | Its annotations do not replace a prospective, paired pre/post listening-response study. Extracted features/models may need to be obtained from the authors; the project describes the dataset as publicly viewable. |
+| Emotion-aware recommendation baseline | EmoMusicLJ / EmoMusicLJ-small and the published heterogeneity-aware deep Bayesian network (HDBN) | Compare top-K recommendation against a strong model that represents emotion and preference heterogeneity both across and within users | Interaction-based recommendation metrics do not prove that music caused an affective change. Reproduce its task and splits rather than comparing HR/NDCG directly with MLRB pre/post MAE. |
 | Domain-specific retrieval | CalmSet, subject to its own data/license and governance review | Graded relevance for an affective music retrieval task in its target domain | Does not represent the general population and must not be used to claim universal effects. |
 | Optional physiological research track | FEEL: AfNIRS–EEG benchmark (34 participants, 38 affective music clips) | External study of subject-dependent, cross-subject, and cross-music emotion recognition | Different task; multimodal fusion did not consistently outperform single modalities across scenarios. Not required for MLRB v1; any physiological data use needs separate privacy/ethics review. |
 | Personalized response change | MLRB self-report records collected under a consented protocol | Whether prior-session data predicts a listener's reported pre/post change in a future session | Observational change is not a causal music effect. Causal claims require randomized/counterbalanced interventions. |
+
+For the recommendation sub-track, include the published HDBN approach as a serious comparator rather than relying on popularity or a weak collaborative-filtering baseline alone. HDBN explicitly models emotion heterogeneity across users, emotional variation within a user, preference heterogeneity across users, and preference variation within a user. The model and its datasets are published, making a reproduction-oriented comparison appropriate. This is a ranking baseline only; its HR/Precision/NDCG/MRR results cannot stand in for post-listening response or causal benefit.
 
 MERGE supplies dataset-provided splits, but MLRB must still create and record its own splits aligned to the intended question. Never assume an ordinary 70/15/15 random split is adequate for longitudinal personalization. Do not mirror third-party audio, lyrics, profile data, or derived personal records until their individual licenses and permitted uses are confirmed.
 
 Sources:
 - MERGE dataset record and available subsets: https://zenodo.org/records/13939205
 - TROMPA-MER study, annotations and data availability: https://doi.org/10.1007/s10844-022-00746-0
+- Heterogeneity-aware Deep Bayesian Network for emotion-aware recommendation (ACM TOIS, 2025): https://doi.org/10.1145/3733233
 - CalmSet dataset / intended-use description: https://github.com/Sensify-Lab/CalmSet
 - FEEL: AfNIRS–EEG Emotion Dataset and Benchmark Library (2026): https://doi.org/10.1109/TAFFC.2026.3733456
 
