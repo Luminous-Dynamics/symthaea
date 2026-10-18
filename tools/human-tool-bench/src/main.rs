@@ -130,10 +130,13 @@ fn audit(root: &Value, input_sha256: &str) -> Result<Value, String> {
         }
         let currency = string_field(episode, "currency", &where_)?;
         if currency != root_currency {
-            return Err(format!(concat!(
-                "{}.currency differs from root currency; ",
-                "convert only under an explicit frozen conversion policy"
-            ), where_));
+            return Err(format!(
+                concat!(
+                    "{}.currency differs from root currency; ",
+                    "convert only under an explicit frozen conversion policy"
+                ),
+                where_
+            ));
         }
         if currency.len() != 3 || !currency.bytes().all(|byte| byte.is_ascii_uppercase()) {
             return Err(format!("{where_}.currency must be a three-letter uppercase currency code"));
@@ -161,10 +164,13 @@ fn audit(root: &Value, input_sha256: &str) -> Result<Value, String> {
             }
         }
         if started && observation_refs.is_empty() {
-            return Err(format!(concat!(
-                "{}: every started attempt must reference at least one observation ",
-                "or explicit missing-data record"
-            ), where_));
+            return Err(format!(
+                concat!(
+                    "{}: every started attempt must reference at least one observation ",
+                    "or explicit missing-data record"
+                ),
+                where_
+            ));
         }
         if !started && !observation_refs.is_empty() {
             return Err(format!("{where_}: not-started records cannot claim observed evidence"));
@@ -235,10 +241,14 @@ fn audit(root: &Value, input_sha256: &str) -> Result<Value, String> {
                 ));
             }
             if !observation_ids.contains(reference) {
-                return Err(format!(concat!(
-                    "{}: advisory reference {:?} is not present in the ",
-                    "episode's observation_refs"
-                ), where_, reference));
+                return Err(format!(
+                    concat!(
+                        "{}: advisory reference {:?} is not present in the ",
+                        "episode's observation_refs"
+                    ),
+                    where_,
+                    reference
+                ));
             }
         }
         if arm == "A2" {
@@ -251,10 +261,13 @@ fn audit(root: &Value, input_sha256: &str) -> Result<Value, String> {
                 return Err(format!("{where_}.advisory_reason cannot be empty"));
             }
             if advisory_evidence_refs.is_empty() {
-                return Err(format!(concat!(
-                    "{}: every A2 advisory must cite an observation or ",
-                    "explicit missing/contradiction record"
-                ), where_));
+                return Err(format!(
+                    concat!(
+                        "{}: every A2 advisory must cite an observation or ",
+                        "explicit missing/contradiction record"
+                    ),
+                    where_
+                ));
             }
         } else {
             let profile = episode
@@ -309,7 +322,8 @@ fn audit(root: &Value, input_sha256: &str) -> Result<Value, String> {
                 concat!(
                     "{}: cost_status must agree with total_cost_minor_units; ",
                     "unknown is null, never imputed as zero"
-                )
+                ),
+                where_
             ));
         }
         let function_receipt = nullable_string(episode, "function_receipt_id", &where_)?;
