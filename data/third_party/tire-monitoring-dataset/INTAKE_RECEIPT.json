@@ -88,6 +88,6 @@
     "rust_command_compiled_or_run": false,
     "physical_vehicle_test": false,
     "source_sha256_computed_from_ordered_shards": true,
-    "source_sha256_match_is_pinned_in_rust_intake": false
+    "source_sha256_match_is_pinned_in_rust_intake": true
   }
 }
