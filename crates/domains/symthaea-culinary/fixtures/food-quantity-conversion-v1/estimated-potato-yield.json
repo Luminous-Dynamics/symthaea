@@ -1,0 +1,80 @@
+{
+  "schema_version": "1.0.0",
+  "conversion_id": "synthetic-potato-trim-boil-v1",
+  "quantity_kind": "food_quantity",
+  "claim_status": "calculation_only",
+  "input": {
+    "amount": 250.0,
+    "lower": 250.0,
+    "upper": 250.0,
+    "unit": "g",
+    "basis": "as_purchased",
+    "food_state": "raw",
+    "source_ref": "urn:synthetic:food-batch:potato-001",
+    "source_version": "fixture-v1",
+    "known_at": "2026-10-18T00:00:00Z",
+    "evidence_status": "synthetic"
+  },
+  "steps": [
+    {
+      "step_id": "trim-edible-fraction",
+      "kind": "edible_fraction",
+      "input_unit": "g",
+      "output_unit": "g",
+      "input_basis": "as_purchased",
+      "output_basis": "edible_portion",
+      "input_state": "raw",
+      "output_state": "raw",
+      "factor": 0.82,
+      "factor_lower": 0.80,
+      "factor_upper": 0.84,
+      "source_ref": "urn:synthetic:factor:edible-fraction",
+      "source_version": "illustrative-v1",
+      "known_at": "2026-10-18T00:00:00Z",
+      "evidence_status": "synthetic"
+    },
+    {
+      "step_id": "boil-mass-yield",
+      "kind": "process_yield",
+      "input_unit": "g",
+      "output_unit": "g",
+      "input_basis": "edible_portion",
+      "output_basis": "edible_portion",
+      "input_state": "raw",
+      "output_state": "boiled",
+      "factor": 0.91,
+      "factor_lower": 0.88,
+      "factor_upper": 0.94,
+      "source_ref": "urn:synthetic:factor:boiled-yield",
+      "source_version": "illustrative-v1",
+      "known_at": "2026-10-18T00:00:00Z",
+      "evidence_status": "synthetic"
+    },
+    {
+      "step_id": "grams-to-kilograms",
+      "kind": "unit_scale",
+      "input_unit": "g",
+      "output_unit": "kg",
+      "input_basis": "edible_portion",
+      "output_basis": "edible_portion",
+      "input_state": "boiled",
+      "output_state": "boiled",
+      "factor": 0.001,
+      "factor_lower": 0.001,
+      "factor_upper": 0.001,
+      "source_ref": "urn:symthaea:unit-table:si-v1",
+      "source_version": "si-v1",
+      "known_at": "2026-10-18T00:00:00Z",
+      "evidence_status": "qualified"
+    }
+  ],
+  "expected_output": {
+    "amount": 0.18655,
+    "lower": 0.176,
+    "upper": 0.1974,
+    "unit": "kg",
+    "basis": "edible_portion",
+    "food_state": "boiled"
+  },
+  "rationale": "Synthetic protocol demonstration only. The factors are deliberately illustrative and must not be used as potato yield recommendations or nutrition data. Lower/upper bounds are propagated conservatively across the declared positive factors."
+}

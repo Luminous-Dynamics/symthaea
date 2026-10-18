@@ -36,6 +36,7 @@ pub mod balance;
 pub mod data;
 pub mod dynamics;
 pub mod flavor_network;
+pub mod food_conversion;
 pub mod food_matching;
 pub mod ingredient;
 pub mod interop;
