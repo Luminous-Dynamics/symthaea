@@ -45,6 +45,13 @@ pub struct FdmBenchmarkManifest {
     pub build_position_mm: [f64; 3],
     /// Nominal specimen orientation in the declared frame, degrees.
     pub build_orientation_deg: [f64; 3],
+    /// Declared build envelope for specimen-origin coordinates in the same frame.
+    /// This bounds the origin only; it does not prove the full specimen fits.
+    pub build_envelope_min_mm: [f64; 3],
+    pub build_envelope_max_mm: [f64; 3],
+    /// Reference to the machine-profile record supplying these bounds.
+    /// Presence is checked here; source authenticity is an external trust decision.
+    pub build_envelope_ref: String,
     pub phase: BenchmarkPhase,
     pub evidence_class: EvidenceClass,
     /// SHA-256 hex digests are identities, not signatures or safety approvals.
@@ -169,6 +176,26 @@ impl FdmBenchmarkManifest {
         }
         if self.build_orientation_deg.iter().any(|value| !value.is_finite()) {
             issues.push("build orientation must contain only finite angles".to_owned());
+        }
+        let envelope_valid = (0..3).all(|axis| {
+            self.build_envelope_min_mm[axis].is_finite()
+                && self.build_envelope_max_mm[axis].is_finite()
+                && self.build_envelope_min_mm[axis] < self.build_envelope_max_mm[axis]
+        });
+        if !envelope_valid {
+            issues.push(
+                "build envelope bounds must be finite with min < max on every axis".to_owned(),
+            );
+        } else if self.build_position_mm.iter().enumerate().any(|(axis, position)| {
+            *position < self.build_envelope_min_mm[axis]
+                || *position > self.build_envelope_max_mm[axis]
+        }) {
+            issues.push(
+                "specimen origin is outside the declared build envelope".to_owned(),
+            );
+        }
+        if self.build_envelope_ref.trim().is_empty() {
+            issues.push("build envelope reference is empty".to_owned());
         }
         for (name, value) in [
             ("protocol_digest", self.protocol_digest.as_str()),
@@ -451,6 +478,9 @@ mod tests {
             build_frame_id: "machine_base_frame".to_owned(),
             build_position_mm: [100.0, 100.0, 0.0],
             build_orientation_deg: [0.0, 0.0, 0.0],
+            build_envelope_min_mm: [0.0, 0.0, 0.0],
+            build_envelope_max_mm: [220.0, 220.0, 250.0],
+            build_envelope_ref: "machine-profile:envelope-v1".to_owned(),
             phase,
             evidence_class,
             protocol_digest: digest('a'),
@@ -591,6 +621,43 @@ mod tests {
         let result = evaluate_fdm_case(&input);
         assert_eq!(result.disposition, GeometryDisposition::NotEvaluable);
         assert!(result.issues.iter().any(|issue| issue.contains("build position")));
+    }
+
+
+    #[test]
+    fn specimen_origin_outside_declared_build_envelope_blocks_evaluation() {
+        let mut input = case(EvidenceClass::Synthetic, Some(10.0), Some(0.0));
+        input.manifest.build_position_mm[0] = 220.001;
+        let result = evaluate_fdm_case(&input);
+        assert_eq!(result.disposition, GeometryDisposition::NotEvaluable);
+        assert!(result.issues.iter().any(|issue| issue.contains("outside the declared build envelope")));
+    }
+
+    #[test]
+    fn invalid_build_envelope_blocks_evaluation() {
+        let mut input = case(EvidenceClass::Synthetic, Some(10.0), Some(0.0));
+        input.manifest.build_envelope_min_mm[1] = 220.0;
+        input.manifest.build_envelope_max_mm[1] = 220.0;
+        let result = evaluate_fdm_case(&input);
+        assert_eq!(result.disposition, GeometryDisposition::NotEvaluable);
+        assert!(result.issues.iter().any(|issue| issue.contains("build envelope bounds")));
+    }
+
+    #[test]
+    fn specimen_origin_on_inclusive_build_envelope_boundary_is_accepted() {
+        let mut input = case(EvidenceClass::Synthetic, Some(10.0), Some(0.0));
+        input.manifest.build_position_mm = [220.0, 220.0, 250.0];
+        let result = evaluate_fdm_case(&input);
+        assert_eq!(result.disposition, GeometryDisposition::Conforming);
+    }
+
+    #[test]
+    fn missing_build_envelope_source_reference_blocks_evaluation() {
+        let mut input = case(EvidenceClass::Synthetic, Some(10.0), Some(0.0));
+        input.manifest.build_envelope_ref.clear();
+        let result = evaluate_fdm_case(&input);
+        assert_eq!(result.disposition, GeometryDisposition::NotEvaluable);
+        assert!(result.issues.iter().any(|issue| issue.contains("build envelope reference is empty")));
     }
 
     #[test]
