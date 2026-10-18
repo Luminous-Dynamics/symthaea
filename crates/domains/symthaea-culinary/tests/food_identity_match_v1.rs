@@ -169,7 +169,7 @@ fn qualified_approximation_cannot_hide_an_unknown_taxon() {
         "reason":"Taxon is unknown and cannot support this approximation."
     }]);
     let errors = violations(&value);
-    assert!(errors.iter().any(|error| error.contains("cannot leave required identity attributes unknown/different")));
+    assert!(errors.iter().any(|error| error.contains("cannot leave required identity attributes unknown/not-applicable")));
 }
 
 #[test]
@@ -210,4 +210,30 @@ fn approximation_cannot_invent_a_deviation_without_an_attribute_conflict() {
     }]);
     let errors = violations(&value);
     assert!(errors.iter().any(|error| error.contains("has no matching different/unknown attribute relation")));
+}
+
+#[test]
+fn known_taxon_mismatch_can_be_a_recipe_substitution_but_not_a_nutrition_proxy() {
+    let mut substitution = fixture();
+    substitution["use_scope"] = serde_json::json!("recipe_substitution");
+    substitution["outcome"] = serde_json::json!("qualified_approximation");
+    substitution["candidate_record"]["identity"]["taxon_id"] =
+        serde_json::json!("taxon:solanum-lycopersicum");
+    substitution["attribute_checks"][0]["candidate_value"] =
+        serde_json::json!("taxon:solanum-lycopersicum");
+    substitution["attribute_checks"][0]["relation"] = serde_json::json!("different");
+    substitution["deviations"] = serde_json::json!([{
+        "attribute_id":"taxon_id",
+        "reason":"Synthetic recipe substitution example; it is not asserted to be nutritionally equivalent."
+    }]);
+    substitution["rationale"] = serde_json::json!(
+        "Synthetic recipe substitution only; this is not a claim of food or nutrient identity."
+    );
+    assert!(validate_food_identity_match_v1(&substitution).is_ok());
+
+    substitution["use_scope"] = serde_json::json!("nutrition_estimation");
+    let errors = violations(&substitution);
+    assert!(errors.iter().any(|error| {
+        error.contains("cannot silently use hard-block identity differences as a nutrient proxy")
+    }));
 }
