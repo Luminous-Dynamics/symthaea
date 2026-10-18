@@ -149,6 +149,15 @@ The accompanying machine-readable fixture is synthetic protocol data, not operat
 
 Every case has a required disposition and invariant in the JSON fixture. A qualifier must preserve unresolved states such as not-evaluable, blocked and synthetic-only instead of coercing uncertainty to pass.
 
+## Synthetic arithmetic known answers now included
+
+The fixture includes explicit arithmetic-control data so the first qualifier tests more than graph shape:
+
+- **Delivered cost:** 12 mandatory categories, reference total 250,000 synthetic minor units across 10 accepted units, candidate total 210,000 across 10 accepted units. The exact candidate/reference unit-cost ratio is 8,400 basis points (84%), which deliberately does **not** meet the proposed 8,000-basis-point (80%) target. The values are arbitrary test inputs, not actual currencies, market prices, quotes, or savings.
+- **Material balance:** a single synthetic stream has 10,000,000 mg input; 8,500,000 mg accepted output; 700,000 mg scrap; 500,000 mg rework/WIP; 300,000 mg process residue; and zero unaccounted mass. Closure is 10,000 basis points (100%), with accepted-mass yield 8,500 basis points (85%). This is an arithmetic known answer, not a measured material flow or real textile yield.
+
+The Rust benchmark crate uses checked integer arithmetic, rejects missing/duplicate cost categories and invalid accepted-unit denominators, requires matching currencies, compares cost ratios by exact integer cross-multiplication, and rejects incomplete or inconsistent mass balances. These functions validate only the synthetic fixture's arithmetic; they do not audit observed books, establish a real factory material balance, or execute the full negative-control corpus. The unit tests are authored but remain unexecuted until a Rust toolchain run is available.
+
 ## 8. Interoperability research anchors
 
 Treat standards as external reference models/test-method sources, not as internal identity authority or automatic certification:
