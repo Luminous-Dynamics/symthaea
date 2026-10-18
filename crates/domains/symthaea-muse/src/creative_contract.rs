@@ -189,7 +189,8 @@ pub fn audit_candidate(
             && (note.start_time + note.duration).is_finite()
             && note.start_time + note.duration > note.start_time
             && note.velocity.is_finite()
-            && (0.0..=1.0).contains(&note.velocity);
+            && note.velocity > 0.0
+            && note.velocity <= 1.0;
         let midi_pitch = if fields_valid {
             69.0 + 12.0 * (note.frequency / 440.0).log2()
         } else {
@@ -399,6 +400,25 @@ mod tests {
         assert!(audit.violations.contains(&CreativeContractViolation::InvalidNote {
             index: 0
         }));
+    }
+
+    #[test]
+    fn zero_velocity_silent_events_cannot_satisfy_a_creative_contract() {
+        let mut silent = note(440.0, 0.0);
+        silent.velocity = 0.0;
+        let contract = CreativeIntentContractV1 {
+            min_note_count: 1,
+            min_distinct_pitches: 1,
+            min_pitch_range_semitones: 0.0,
+            min_active_window_ratio: 0.0,
+            max_dominant_pitch_share: 1.0,
+            window_count: 4,
+        };
+
+        let audit = audit_candidate(&[silent], 1.0, &contract);
+        assert!(!audit.accepted);
+        assert_eq!(audit.valid_note_count, 0);
+        assert!(audit.violations.contains(&CreativeContractViolation::InvalidNote { index: 0 }));
     }
 
     #[test]
