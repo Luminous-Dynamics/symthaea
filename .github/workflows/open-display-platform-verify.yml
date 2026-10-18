@@ -49,6 +49,63 @@ jobs:
           rustc --version --verbose
           cargo --version
 
+      - name: Install OpenSCAD for native CAD validation
+        run: |
+          sudo apt-get update
+          sudo apt-get install --no-install-recommends -y openscad
+          openscad --version
+
+      - name: Export default and alternate sensor-plate geometry
+        shell: bash
+        run: |
+          set -euo pipefail
+          cad="hardware/open-display-reference/cad/odrh_sensor_interface_plate.scad"
+          openscad -o "$RUNNER_TEMP/odrh-default.stl" "$cad"
+          openscad -D 'plate_width_mm=100' -D 'plate_height_mm=60' \\
+            -o "$RUNNER_TEMP/odrh-alternate.stl" "$cad"
+          echo "Default STL SHA-256:"
+          sha256sum "$RUNNER_TEMP/odrh-default.stl"
+          echo "Alternate STL SHA-256:"
+          sha256sum "$RUNNER_TEMP/odrh-alternate.stl"
+
+      - name: Check exported mesh bounds and parameter rejection
+        shell: bash
+        run: |
+          set -euo pipefail
+          check_bounds() {
+            local file="$1" expected_x="$2" expected_y="$3" expected_z="$4"
+            awk -v ex="$expected_x" -v ey="$expected_y" -v ez="$expected_z" '
+              function abs(x) { return x < 0 ? -x : x }
+              $1 == "vertex" {
+                x = $2 + 0; y = $3 + 0; z = $4 + 0
+                if (!seen) {
+                  minx=maxx=x; miny=maxy=y; minz=maxz=z; seen=1
+                }
+                if (x < minx) minx=x; if (x > maxx) maxx=x
+                if (y < miny) miny=y; if (y > maxy) maxy=y
+                if (z < minz) minz=z; if (z > maxz) maxz=z
+              }
+              END {
+                if (!seen) { print "STL contains no vertices"; exit 2 }
+                dx=maxx-minx; dy=maxy-miny; dz=maxz-minz
+                printf "Observed extents: %.3f x %.3f x %.3f mm\\n", dx, dy, dz
+                if (abs(dx-ex) > 0.02 || abs(dy-ey) > 0.02 || abs(dz-ez) > 0.02) exit 1
+              }
+            ' "$file"
+          }
+          check_bounds "$RUNNER_TEMP/odrh-default.stl" 80 5 80
+          check_bounds "$RUNNER_TEMP/odrh-alternate.stl" 100 5 60
+
+          cad="hardware/open-display-reference/cad/odrh_sensor_interface_plate.scad"
+          if openscad -D 'sensor_aperture_d_mm=100' \\
+            -o "$RUNNER_TEMP/odrh-invalid.stl" "$cad" \\
+            > "$RUNNER_TEMP/odrh-invalid.log" 2>&1; then
+            echo "Oversized aperture override unexpectedly rendered"
+            exit 1
+          fi
+          grep -F "Sensor aperture overlaps the diagonal mounting-hole envelope" \\
+            "$RUNNER_TEMP/odrh-invalid.log"
+
       - name: Check formatting
         run: cargo fmt --manifest-path tools/open-display-platform-verify/Cargo.toml -- --check
 
