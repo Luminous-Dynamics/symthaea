@@ -341,6 +341,9 @@ fn validate_context(
     if context.input_manifest_encoding_version.trim().is_empty() {
         return Err(DecisionReceiptError::MissingInputManifestEncodingVersion);
     }
+    if context.uncertainty_assessment.producer_version.trim().is_empty() {
+        return Err(DecisionReceiptError::MissingUpstreamProducerVersion);
+    }
     if context.claim_ceiling.trim().is_empty() {
         return Err(DecisionReceiptError::MissingClaimCeiling);
     }
