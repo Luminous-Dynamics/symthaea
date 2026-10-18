@@ -277,7 +277,8 @@
           "scenario_results",
           "robustly_rankable",
           "robust_dominates",
-          "robust_dominated_by"
+          "robust_dominated_by",
+          "rank_instability"
         ],
         "properties": {
           "candidate_id": {
