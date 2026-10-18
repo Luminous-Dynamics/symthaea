@@ -530,7 +530,7 @@ fn validate_registry(registry: &Value) -> Vec<String> {
     for (field, expected) in [
         ("field", "reference_outputs.freeze_receipt_sha256"),
         ("algorithm", "SHA-256"),
-        ("domain_separator", "symthaea:chemical-process-tier-b-freeze-receipt:v1\\n"),
+        ("domain_separator", "symthaea:chemical-process-tier-b-freeze-receipt:v1\n"),
         ("canonicalization", "Symthaea repository-local canonical JSON v1: object keys sorted lexicographically; array order preserved; strings serialized by serde_json; numbers emitted by serde_json::Number::to_string()."),
         ("digest_scope", "The freeze_receipt JSON value only; the sibling freeze_receipt_sha256 field is excluded."),
         ("security_boundary", "Detects stale or accidental receipt mutation. It is not a signature, does not authenticate an author, and does not prove scientific claims true; an actor able to rewrite both receipt and digest can recompute the pair.")
