@@ -196,6 +196,30 @@ fn validate_semantics(manifest: &Value) -> Vec<String> {
                     "specification-only module {id} cannot be QUALIFIED"
                 ));
             }
+
+            if let Some(parameters) = module.get("design_parameters").and_then(Value::as_array) {
+                let mut parameter_names = BTreeSet::new();
+                for parameter in parameters {
+                    let name = parameter
+                        .get("name")
+                        .and_then(Value::as_str)
+                        .unwrap_or("<missing>");
+                    if !parameter_names.insert(name.to_owned()) {
+                        errors.push(format!(
+                            "module design parameter name must be unique: {name}"
+                        ));
+                    }
+                    if manifest.get("status").and_then(Value::as_str)
+                        == Some("SPECIFICATION_ONLY")
+                        && parameter.get("status").and_then(Value::as_str)
+                            != Some("EXAMPLE_ONLY")
+                    {
+                        errors.push(format!(
+                            "specification-only design parameter {name} must remain EXAMPLE_ONLY"
+                        ));
+                    }
+                }
+            }
         }
 
         if let Some(channels) = channels {
@@ -316,6 +340,8 @@ mod tests {
         include_str!("../../../docs/engineering/open-display-reference-platform-v0.1.json");
     const SCHEMA_TEXT: &str =
         include_str!("../../../docs/engineering/open-display-reference-platform.schema.json");
+    const CAD_SOURCE: &str =
+        include_str!("../../../hardware/open-display-reference/cad/odrh_sensor_interface_plate.scad");
 
     fn parse_manifest() -> Value {
         serde_json::from_str(MANIFEST_TEXT).expect("fixture manifest must parse")
@@ -323,6 +349,54 @@ mod tests {
 
     fn encoded(value: &Value) -> String {
         serde_json::to_string(value).expect("mutated fixture must serialize")
+    }
+
+    #[test]
+    fn fixture_manifest_parameters_match_native_cad_defaults() {
+        let manifest = parse_manifest();
+        let fixture = manifest["modules"]
+            .as_array()
+            .expect("modules must be an array")
+            .iter()
+            .find(|module| module.get("id").and_then(Value::as_str) == Some("ODRH-FIXTURE-001"))
+            .expect("fixture module must exist");
+        let parameters = fixture["design_parameters"]
+            .as_array()
+            .expect("fixture design parameters must be an array");
+
+        assert_eq!(parameters.len(), 10);
+        for parameter in parameters {
+            let name = parameter["name"]
+                .as_str()
+                .expect("parameter name must be a string");
+            let value = parameter["value"]
+                .as_f64()
+                .expect("parameter value must be numeric");
+            assert_eq!(
+                parameter["status"].as_str(),
+                Some("EXAMPLE_ONLY"),
+                "CAD parameter {name} cannot be promoted by the specification manifest"
+            );
+
+            let prefix = format!("{name} =");
+            let line = CAD_SOURCE
+                .lines()
+                .map(str::trim)
+                .find(|line| line.starts_with(&prefix))
+                .unwrap_or_else(|| panic!("CAD source is missing parameter {name}"));
+            let source_value = line
+                .split_once('=')
+                .expect("CAD parameter line must contain an assignment")
+                .1
+                .trim()
+                .trim_end_matches(';')
+                .parse::<f64>()
+                .unwrap_or_else(|_| panic!("CAD parameter {name} must have a literal default"));
+            assert_eq!(
+                value, source_value,
+                "manifest default for {name} differs from native CAD source"
+            );
+        }
     }
 
     #[test]
