@@ -13,7 +13,8 @@
     "input_manifest",
     "scenarios",
     "objective_definitions",
-    "candidate_results"
+    "candidate_results",
+    "robust_frontier_ids"
   ],
   "properties": {
     "schema_version": {
@@ -273,7 +274,10 @@
           "gate_disposition",
           "ranking_disposition",
           "gate_evidence",
-          "scenario_results"
+          "scenario_results",
+          "robustly_rankable",
+          "robust_dominates",
+          "robust_dominated_by"
         ],
         "properties": {
           "candidate_id": {
@@ -488,6 +492,25 @@
                 "minimum": 0
               }
             }
+          },
+          "robustly_rankable": {
+            "type": "boolean"
+          },
+          "robust_dominates": {
+            "type": "array",
+            "items": {
+              "type": "string",
+              "minLength": 1
+            },
+            "uniqueItems": true
+          },
+          "robust_dominated_by": {
+            "type": "array",
+            "items": {
+              "type": "string",
+              "minLength": 1
+            },
+            "uniqueItems": true
           }
         }
       }
@@ -497,6 +520,14 @@
       "items": {
         "type": "string"
       }
+    },
+    "robust_frontier_ids": {
+      "type": "array",
+      "items": {
+        "type": "string",
+        "minLength": 1
+      },
+      "uniqueItems": true
     }
   }
 }
