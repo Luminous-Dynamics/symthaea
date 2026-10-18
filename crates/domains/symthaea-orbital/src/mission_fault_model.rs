@@ -192,7 +192,7 @@ impl FaultDiagnosabilityReport {
         self.findings
             .iter()
             .filter(|finding| {
-                !matches!(finding.disposition, FaultPairDisposition::Distinguishable { .. })
+                !matches!(&finding.disposition, FaultPairDisposition::Distinguishable { .. })
             })
             .count()
     }
@@ -203,7 +203,7 @@ impl FaultDiagnosabilityReport {
         self.critical_failure_mode_ids.len() >= 2
             && !self.findings.is_empty()
             && self.findings.iter().all(|finding| {
-                matches!(finding.disposition, FaultPairDisposition::Distinguishable { .. })
+                matches!(&finding.disposition, FaultPairDisposition::Distinguishable { .. })
             })
     }
 }
@@ -832,6 +832,134 @@ mod tests {
         let manifest = model.compile_campaign().expect("fixture model compiles");
         assert!(manifest.critical_coverage_closed());
         assert_eq!(manifest.source_design_sha256, model.source_design.sha256);
+    }
+
+
+    fn second_critical_mode() -> FailureMode {
+        let mut mode = valid_model().failure_modes.remove(0);
+        mode.id = "FM-COMM-002".to_owned();
+        mode.component_id = "antenna_subsystem".to_owned();
+        mode.interface_id = "ground_comm_link".to_owned();
+        mode.description = "Synthetic competing link-loss hypothesis".to_owned();
+        mode
+    }
+
+    #[test]
+    fn pair_report_flags_identical_complete_critical_signatures() {
+        let mut model = valid_model();
+        model.failure_modes.push(second_critical_mode());
+
+        let report = model
+            .analyze_critical_fault_signatures()
+            .expect("valid model should yield a structural pair report");
+        assert_eq!(report.critical_pair_denominator(), 1);
+        assert_eq!(report.unresolved_or_indistinguishable_pair_count(), 1);
+        assert!(!report.all_critical_pairs_distinguishable());
+        assert!(matches!(
+            &report.findings[0].disposition,
+            FaultPairDisposition::Indistinguishable { identical_signal_ids }
+                if identical_signal_ids == &vec!["ground_link_available".to_owned()]
+        ));
+    }
+
+    #[test]
+    fn one_explicit_independent_outcome_separates_competing_modes() {
+        let mut model = valid_model();
+        let mut second = second_critical_mode();
+        model.failure_modes[0].observable_signals.push(ObservableSignal {
+            id: "radio_self_test".to_owned(),
+            unit: "categorical".to_owned(),
+            expected_fault_effect: "radio self-test result".to_owned(),
+            signature_value: Some("failed".to_owned()),
+        });
+        second.observable_signals.push(ObservableSignal {
+            id: "radio_self_test".to_owned(),
+            unit: "categorical".to_owned(),
+            expected_fault_effect: "radio self-test result".to_owned(),
+            signature_value: Some("passed".to_owned()),
+        });
+        model.failure_modes.push(second);
+
+        let report = model
+            .analyze_critical_fault_signatures()
+            .expect("both signatures are structurally well formed");
+        assert!(report.all_critical_pairs_distinguishable());
+        assert_eq!(report.unresolved_or_indistinguishable_pair_count(), 0);
+        assert!(matches!(
+            &report.findings[0].disposition,
+            FaultPairDisposition::Distinguishable { separating_signal_ids }
+                if separating_signal_ids == &vec!["radio_self_test".to_owned()]
+        ));
+    }
+
+    #[test]
+    fn unknown_signature_outcome_never_creates_distinguishability() {
+        let mut model = valid_model();
+        let mut second = second_critical_mode();
+        model.failure_modes[0].observable_signals.push(ObservableSignal {
+            id: "radio_self_test".to_owned(),
+            unit: "categorical".to_owned(),
+            expected_fault_effect: "radio self-test result".to_owned(),
+            signature_value: Some("failed".to_owned()),
+        });
+        second.observable_signals.push(ObservableSignal {
+            id: "radio_self_test".to_owned(),
+            unit: "categorical".to_owned(),
+            expected_fault_effect: "radio self-test result".to_owned(),
+            signature_value: None,
+        });
+        model.failure_modes.push(second);
+
+        let report = model
+            .analyze_critical_fault_signatures()
+            .expect("unknown means incomplete evidence, not malformed input");
+        assert!(!report.all_critical_pairs_distinguishable());
+        assert!(matches!(
+            &report.findings[0].disposition,
+            FaultPairDisposition::NotDemonstrated {
+                reason: FaultPairIndeterminacy::MissingCanonicalOutcome,
+                ..
+            }
+        ));
+        let manifest = model.compile_campaign().expect("unknown outcome is a coverage gap");
+        assert!(manifest.obligations[1]
+            .gaps
+            .contains(&CoverageGap::MissingCanonicalSignalOutcome));
+    }
+
+    #[test]
+    fn incompatible_signal_units_do_not_count_as_a_distinguishing_channel() {
+        let mut model = valid_model();
+        let mut second = second_critical_mode();
+        model.failure_modes[0].observable_signals[0].signature_value =
+            Some("unavailable".to_owned());
+        second.observable_signals[0].unit = "status_code".to_owned();
+        second.observable_signals[0].signature_value = Some("available".to_owned());
+        model.failure_modes.push(second);
+
+        let report = model
+            .analyze_critical_fault_signatures()
+            .expect("different declared units are handled conservatively");
+        assert!(!report.all_critical_pairs_distinguishable());
+        assert!(matches!(
+            &report.findings[0].disposition,
+            FaultPairDisposition::NotDemonstrated {
+                reason: FaultPairIndeterminacy::NoComparableSignals,
+                ..
+            }
+        ));
+    }
+
+    #[test]
+    fn pair_reports_are_deterministic_and_bind_the_source_revision() {
+        let mut model = valid_model();
+        model.failure_modes.push(second_critical_mode());
+
+        let first = model.analyze_critical_fault_signatures().expect("first analysis");
+        let second = model.analyze_critical_fault_signatures().expect("second analysis");
+        assert_eq!(first, second);
+        assert_eq!(first.source_design_sha256, model.source_design.sha256);
+        assert_eq!(first.source_design_revision, model.source_design.revision);
     }
 
     #[test]
