@@ -57,7 +57,7 @@ Compare on identical scenarios, candidate feasibility, initial observations, and
 2. **Single-objective selection:** show each objective's result or a preregistered rotation, rather than selecting the best-performing objective post hoc.
 3. **Pareto + explicit query/abstention:** preserve all feasible candidates not robustly dominated; use context-matched preference observations and query or abstain when evidence cannot resolve a context-specific choice.
 4. **Seeded-random eligible selection:** reproducible, seed-controlled selection from the declared eligible set, with no preference or metric ranking.
-5. **Context-blind preference replay:** an ablation that ignores task/context/freshness matching while receiving the same available observations.
+5. **Context-blind preference replay:** an ablation that ignores context matching while preserving task identity and the same freshness horizon.
 6. **Context-aware explicit-feedback replay:** the conservative policy that requires fresh, task- and context-matched ordinal evidence, then queries or abstains under uncertainty.
 
 The frozen fixed-weight engineering comparator uses task success (0.40), stability margin (0.20), normalized wearer-borne mass (0.15), normalized energy per task (0.10), and movement freedom (0.15). Its weights and scales are constants, not fitted to evaluation-oracle labels. It is an engineering-metric proxy, not a model of subjective preference.
