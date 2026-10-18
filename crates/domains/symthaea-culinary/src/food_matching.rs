@@ -49,6 +49,20 @@ fn identity_record_errors(record: &Value, label: &str, errors: &mut Vec<String>)
         }
         _ => errors.push(format!("{label}.names must be a non-empty array")),
     }
+    let identity = record.get("identity").unwrap_or(&Value::Null);
+    if !identity.is_object() {
+        errors.push(format!("{label}.identity must be an object"));
+        return;
+    }
+    for attribute in [
+        "taxon_id", "food_part", "processing_state", "preparation_state",
+        "product_kind", "edible_basis", "preservation", "brand_id",
+        "fortification", "cultivar", "origin_region"
+    ] {
+        if value_string_or_null(identity.get(attribute)).is_none() {
+            errors.push(format!("{label}.identity.{attribute} must be a string or null"));
+        }
+    }
 }
 
 fn value_string_or_null(value: Option<&Value>) -> Option<Option<&str>> {
@@ -131,6 +145,20 @@ pub fn validate_food_identity_match_v1(assessment: &Value) -> Result<(), Vec<Str
         }
         if !relation_is_consistent(check) {
             errors.push(format!("attribute check {attribute_id:?} has an inconsistent relation/value pair"));
+        }
+        if ![
+            "taxon_id", "food_part", "processing_state", "preparation_state",
+            "product_kind", "edible_basis", "preservation", "brand_id",
+            "fortification", "cultivar", "origin_region"
+        ].contains(&attribute_id) {
+            errors.push(format!("unsupported attribute_id {attribute_id:?}"));
+        }
+        let query_identity_value = value_string_or_null(query.get("identity").and_then(|v| v.get(attribute_id)));
+        let candidate_identity_value = value_string_or_null(candidate.get("identity").and_then(|v| v.get(attribute_id)));
+        let query_check_value = value_string_or_null(check.get("query_value"));
+        let candidate_check_value = value_string_or_null(check.get("candidate_value"));
+        if query_identity_value != query_check_value || candidate_identity_value != candidate_check_value {
+            errors.push(format!("attribute check {attribute_id:?} does not match the referenced record identity fields"));
         }
         if let Some(relation) = non_empty(check, "relation") {
             relation_by_attribute.insert(attribute_id.to_owned(), relation.to_owned());
