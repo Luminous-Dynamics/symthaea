@@ -293,6 +293,13 @@ pub fn validate_preference_drift_fixture(
                 "missing non-empty current context",
             );
         }
+        if nonempty_string(scenario, "current_context_id").is_none() {
+            finding(
+                &mut findings,
+                format!("{path}.current_context_id"),
+                "missing non-empty current context ID",
+            );
+        }
 
         let split = scenario.get("split").and_then(Value::as_str);
         match split {
@@ -631,6 +638,260 @@ pub fn validate_preference_drift_fixture(
         held_out_scenario_count: held_out_count,
         observation_count,
     })
+}
+
+/// Action emitted by the context-matched pairwise-feedback replay baseline.
+#[derive(Debug, Clone, PartialEq, Eq, serde::Serialize, serde::Deserialize)]
+#[serde(rename_all = "snake_case")]
+pub enum PreferenceReplayActionV1 {
+    /// One eligible candidate directly beats every other eligible candidate in applicable feedback.
+    Recommend,
+    /// Current-context preference evidence is incomplete or contradictory; budget remains.
+    Query,
+    /// A decision cannot be supported, and no query budget remains.
+    Abstain,
+    /// The explicit current-context feedback rejects every eligible candidate.
+    RejectAll,
+    /// No candidate is technically eligible under the supplied scenario.
+    NoFeasibleCandidate,
+}
+
+/// Why the replay baseline emitted its action.
+#[derive(Debug, Clone, PartialEq, Eq, serde::Serialize, serde::Deserialize)]
+#[serde(rename_all = "snake_case")]
+pub enum PreferenceReplayReasonV1 {
+    /// A unique candidate beats every other eligible candidate under exact-context explicit feedback.
+    UniqueExplicitPairwiseWinner,
+    /// Explicit current-context feedback rejects all eligible candidates.
+    ExplicitRejectAll,
+    /// The scenario has no eligible candidate.
+    NoEligibleCandidates,
+    /// No observations match both the current task and current context.
+    NoContextMatchedPreferenceEvidence,
+    /// Observations exist, but the evidence does not compare a unique winner to every eligible option.
+    InsufficientPairwiseCoverage,
+    /// Current-context feedback contains both directions for the same pair.
+    ContradictoryFeedback,
+}
+
+/// Report-only output of a simple context-matched preference baseline.
+///
+/// This intentionally does not read `evaluation_oracle`, engineering scores, latent states, or
+/// sensor data. A recommendation requires explicit current-task/current-context pairwise feedback
+/// against every other eligible candidate; a model proxy or stale observation cannot fill a gap.
+#[derive(Debug, Clone, PartialEq, Eq, serde::Serialize, serde::Deserialize)]
+#[serde(deny_unknown_fields)]
+pub struct PreferenceReplayAssessmentV1 {
+    /// Scenario identity.
+    pub scenario_id: String,
+    /// Baseline action.
+    pub action: PreferenceReplayActionV1,
+    /// Evidence-driven reason for the action.
+    pub reason: PreferenceReplayReasonV1,
+    /// Candidate selected only when `action` is `recommend`.
+    pub recommended_candidate_id: Option<String>,
+    /// Eligible candidates after the scenario's upstream hard-gate filter.
+    pub eligible_candidate_ids: Vec<String>,
+    /// Number of observations matching both exact current task and context.
+    pub context_matched_observation_count: usize,
+    /// Number of observations not applicable to the current task/context.
+    pub stale_or_mismatched_observation_count: usize,
+    /// Additional explicit feedback queries still allowed in this scenario.
+    pub remaining_query_budget: u64,
+}
+
+/// Replay a conservative baseline using explicit, context-matched ordinal observations only.
+///
+/// This is not a learned preference model. It recommends only when a single eligible candidate
+/// has explicit pairwise support against every other eligible candidate. Contradictory feedback,
+/// missing comparisons, context/task drift, and absent observations yield a query if permitted,
+/// otherwise abstention. A current-context reject-all record is preserved. The function does not
+/// inspect the evaluation-only oracle or infer preferences from engineering metrics.
+pub fn replay_preference_episode(
+    scenario: &Value,
+) -> Result<PreferenceReplayAssessmentV1, Vec<PreferenceDriftFixtureFindingV1>> {
+    let mut findings = Vec::new();
+    let scenario_id = nonempty_string(scenario, "scenario_id");
+    let task_id = nonempty_string(scenario, "task_id");
+    let current_context_id = nonempty_string(scenario, "current_context_id");
+    if scenario_id.is_none() {
+        finding(&mut findings, "$.scenario_id", "missing scenario ID");
+    }
+    if task_id.is_none() {
+        finding(&mut findings, "$.task_id", "missing task ID");
+    }
+    if current_context_id.is_none() {
+        finding(
+            &mut findings,
+            "$.current_context_id",
+            "missing current context ID",
+        );
+    }
+
+    let eligible = match string_array(scenario, "eligible_candidate_ids") {
+        Some(ids) => ids,
+        None => {
+            finding(
+                &mut findings,
+                "$.eligible_candidate_ids",
+                "missing or malformed eligible-candidate array",
+            );
+            Vec::new()
+        }
+    };
+    record_unique_strings(&eligible, "$.eligible_candidate_ids", &mut findings);
+
+    let total_budget = scenario.get("query_budget_total").and_then(Value::as_u64);
+    let consumed_budget = scenario.get("queries_already_used").and_then(Value::as_u64);
+    let remaining_budget = match (total_budget, consumed_budget) {
+        (Some(total), Some(consumed)) if consumed <= total => total - consumed,
+        _ => {
+            finding(
+                &mut findings,
+                "$.query_budget_total",
+                "invalid query budget or consumed queries exceed total",
+            );
+            0
+        }
+    };
+
+    let observations = match scenario
+        .get("preference_observations")
+        .and_then(Value::as_array)
+    {
+        Some(items) => items,
+        None => {
+            finding(
+                &mut findings,
+                "$.preference_observations",
+                "missing or malformed preference-observation array",
+            );
+            &Vec::new()
+        }
+    };
+    if !findings.is_empty() {
+        return Err(findings);
+    }
+
+    let task_id = task_id.unwrap_or_default();
+    let current_context_id = current_context_id.unwrap_or_default();
+    let mut matched = Vec::new();
+    let mut mismatched_count = 0usize;
+
+    for observation in observations {
+        let observation_task = nonempty_string(observation, "task_id");
+        let observation_context = nonempty_string(observation, "context_id");
+        if observation_task.as_deref() == Some(task_id.as_str())
+            && observation_context.as_deref() == Some(current_context_id.as_str())
+        {
+            matched.push(observation);
+        } else {
+            mismatched_count += 1;
+        }
+    }
+
+    let scenario_id = scenario_id.unwrap_or_default();
+    let build = |action, reason, recommended_candidate_id| PreferenceReplayAssessmentV1 {
+        scenario_id: scenario_id.clone(),
+        action,
+        reason,
+        recommended_candidate_id,
+        eligible_candidate_ids: eligible.clone(),
+        context_matched_observation_count: matched.len(),
+        stale_or_mismatched_observation_count: mismatched_count,
+        remaining_query_budget: remaining_budget,
+    };
+
+    if eligible.is_empty() {
+        return Ok(build(
+            PreferenceReplayActionV1::NoFeasibleCandidate,
+            PreferenceReplayReasonV1::NoEligibleCandidates,
+            None,
+        ));
+    }
+
+    let eligible_set: HashSet<&str> = eligible.iter().map(String::as_str).collect();
+    for observation in &matched {
+        if let Some(rejected) = string_array(observation, "rejected_candidate_ids") {
+            let rejected_set: HashSet<&str> = rejected.iter().map(String::as_str).collect();
+            if eligible_set.iter().all(|candidate| rejected_set.contains(candidate)) {
+                return Ok(build(
+                    PreferenceReplayActionV1::RejectAll,
+                    PreferenceReplayReasonV1::ExplicitRejectAll,
+                    None,
+                ));
+            }
+        }
+    }
+
+    let mut directed_pairs = HashSet::<(String, String)>::new();
+    let mut malformed_current_observation = false;
+    for observation in &matched {
+        let preferred = nonempty_string(observation, "preferred_candidate_id");
+        let rejected = nonempty_string(observation, "rejected_candidate_id");
+        match (preferred, rejected) {
+            (Some(winner), Some(loser)) if winner != loser => {
+                if eligible_set.contains(winner.as_str())
+                    && eligible_set.contains(loser.as_str())
+                {
+                    directed_pairs.insert((winner, loser));
+                }
+            }
+            (None, None) if string_array(observation, "rejected_candidate_ids").is_some() => {}
+            _ => malformed_current_observation = true,
+        }
+    }
+
+    if malformed_current_observation {
+        return Err(vec![PreferenceDriftFixtureFindingV1 {
+            path: "$.preference_observations".to_owned(),
+            reason: "malformed current-context preference observation".to_owned(),
+        }]);
+    }
+
+    let has_conflict = directed_pairs
+        .iter()
+        .any(|(winner, loser)| directed_pairs.contains(&(loser.clone(), winner.clone())));
+    if has_conflict {
+        let action = if remaining_budget > 0 {
+            PreferenceReplayActionV1::Query
+        } else {
+            PreferenceReplayActionV1::Abstain
+        };
+        return Ok(build(action, PreferenceReplayReasonV1::ContradictoryFeedback, None));
+    }
+
+    let winner_candidates: Vec<String> = eligible
+        .iter()
+        .filter(|candidate| {
+            eligible
+                .iter()
+                .filter(|other| *other != *candidate)
+                .all(|other| directed_pairs.contains(&(candidate.clone(), other.clone())))
+        })
+        .cloned()
+        .collect();
+
+    if winner_candidates.len() == 1 && eligible.len() > 1 {
+        let candidate = winner_candidates.into_iter().next();
+        return Ok(build(
+            PreferenceReplayActionV1::Recommend,
+            PreferenceReplayReasonV1::UniqueExplicitPairwiseWinner,
+            candidate,
+        ));
+    }
+
+    let reason = if matched.is_empty() {
+        PreferenceReplayReasonV1::NoContextMatchedPreferenceEvidence
+    } else {
+        PreferenceReplayReasonV1::InsufficientPairwiseCoverage
+    };
+    let action = if remaining_budget > 0 {
+        PreferenceReplayActionV1::Query
+    } else {
+        PreferenceReplayActionV1::Abstain
+    };
+    Ok(build(action, reason, None))
 }
 
 #[cfg(test)]
