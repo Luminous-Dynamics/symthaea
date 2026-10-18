@@ -1,7 +1,7 @@
 # Tier-B Chemical Process Reference Cases: Candidate Inventory and Freeze Protocol
 
 **Status:** Candidate-reference inventory; reference outputs are not yet frozen and no simulator run is claimed.  
-**Date:** 2026-10-17  
+**Date:** 2026-10-18  
 **Parent work:** [CHEM-BENCH-002 #7869](https://github.com/Luminous-Dynamics/symthaea/issues/7869) and [Tier-A benchmark PR #7794](https://github.com/Luminous-Dynamics/symthaea/pull/7794).  
 **Repository baseline inspected for this document:** `main@1fd1cfe8311253dbd98fbe1cf881167245c6c56e`.  
 **Scope:** Public documentation and reference-case selection only. No hazardous synthesis recipes, plant-control sequences, or physical operating authority.
@@ -139,7 +139,7 @@ Registry invariants:
 - A paired common-mode challenge makes dependency independence testable rather than a self-declared Boolean.
 - Missing outputs, skipped runs, and reference unavailability cannot count as PASS.
 
-This registry has been read back from the branch and structurally checked for parseability, unique IDs, source references, valid result statuses, explicit freeze blockers and non-frozen simulator outputs. Those are registry-integrity checks—not scientific validation or a simulator run.
+This registry has been read back from the branch and structurally checked for parseability, unique IDs, source references, valid result statuses, explicit freeze blockers and non-frozen simulator outputs. Schema v1.2.0 also binds each frozen receipt to a domain-separated SHA-256 over a key-sorted repository-local canonical JSON representation, rejecting stale receipt digests after a field mutation. This is content-integrity checking only, not signer authentication or proof of scientific truth.
 
 ## Executable registry contract check
 
