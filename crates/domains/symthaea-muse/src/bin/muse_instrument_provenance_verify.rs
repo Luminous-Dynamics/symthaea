@@ -172,16 +172,17 @@ fn verify_reports(
     let probe_revision = string_field(probe, "source_revision");
     let inventory_revision = string_field(inventory, "source_revision");
     let source_revision = probe_revision.map(str::to_owned);
+    let revision_status = string_field(probe, "source_revision_status");
     let source_revision_match = match (probe_revision, inventory_revision) {
-        (Some(left), Some(right))
-            if valid_git_revision(left)
-                && valid_git_revision(right)
-                && left == right
-                && string_field(probe, "source_revision_status") != Some("unavailable") =>
-        {
-            true
+        (Some(left), Some(right)) if !valid_git_revision(left) || !valid_git_revision(right) => {
+            push_incomplete(
+                &mut findings,
+                "source_revision_invalid",
+                "source revision must be a 40- or 64-character hexadecimal Git object ID".into(),
+            );
+            false
         }
-        (Some(left), Some(right)) if valid_git_revision(left) && valid_git_revision(right) => {
+        (Some(left), Some(right)) if left != right => {
             push_error(
                 &mut findings,
                 "source_revision_mismatch",
@@ -189,6 +190,20 @@ fn verify_reports(
             );
             false
         }
+        (Some(_), Some(_))
+            if !matches!(
+                revision_status,
+                Some("runtime_symthaea_source_rev" | "runtime_github_sha" | "compile_time_embedded")
+            ) =>
+        {
+            push_incomplete(
+                &mut findings,
+                "source_revision_status_untrusted",
+                "source revision is present but its provenance status is missing or unavailable".into(),
+            );
+            false
+        }
+        (Some(_), Some(_)) => true,
         _ => {
             push_incomplete(
                 &mut findings,
@@ -316,6 +331,13 @@ fn verify_reports(
         }
     };
     let cases_total = cases.len();
+    if cases.is_empty() {
+        push_incomplete(
+            &mut findings,
+            "probe_has_no_cases",
+            "an empty probe cannot establish per-case provenance consistency".into(),
+        );
+    }
     if probe.get("cases_total").and_then(Value::as_u64) != Some(cases_total as u64) {
         push_error(
             &mut findings,
@@ -712,6 +734,16 @@ mod tests {
         let report = test_report(&probe, &inventory);
         assert_eq!(report.verdict, "inconsistent");
         assert!(report.findings.iter().any(|finding| finding.code == "source_revision_mismatch"));
+    }
+
+    #[test]
+    fn unavailable_source_revision_status_is_incomplete_not_mislabeled_as_mismatch() {
+        let (mut probe, inventory) = fixtures();
+        probe["source_revision_status"] = json!("unavailable");
+        let report = test_report(&probe, &inventory);
+        assert_eq!(report.verdict, "incomplete");
+        assert!(report.findings.iter().any(|finding| finding.code == "source_revision_status_untrusted"));
+        assert!(!report.findings.iter().any(|finding| finding.code == "source_revision_mismatch"));
     }
 
     #[test]
