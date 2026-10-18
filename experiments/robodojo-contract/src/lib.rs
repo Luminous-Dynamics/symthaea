@@ -450,10 +450,10 @@ pub fn compare_paired_trials(
     let mut safety_delta = 0i64;
     for (key, b) in &base {
         let c = cand.get(key).expect("paired key sets were checked");
-        candidate_completions += usize::from(c.completed);
-        baseline_completions += usize::from(b.completed);
-        candidate_valid += usize::from(c.valid_run);
-        baseline_valid += usize::from(b.valid_run);
+        candidate_completions += if c.completed { 1 } else { 0 };
+        baseline_completions += if b.completed { 1 } else { 0 };
+        candidate_valid += if c.valid_run { 1 } else { 0 };
+        baseline_valid += if b.valid_run { 1 } else { 0 };
         elapsed_delta += c.elapsed_seconds - b.elapsed_seconds;
         cost_delta += c.estimated_cost_usd - b.estimated_cost_usd;
         safety_delta += c.safety_events as i64 - b.safety_events as i64;
@@ -505,7 +505,7 @@ fn next_random(state: &mut u64) -> u64 {
     *state ^= *state >> 12;
     *state ^= *state << 25;
     *state ^= *state >> 27;
-    state.wrapping_mul(0x2545f4914f6cdd1d)
+    (*state).wrapping_mul(0x2545f4914f6cdd1d)
 }
 
 fn percentile(sorted: &[f64], numerator: usize, denominator: usize) -> f64 {
