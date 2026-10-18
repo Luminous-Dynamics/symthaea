@@ -34,7 +34,7 @@
       "git_blob_sha1": "cce1b5f76b23aec37d2c2f58b83d7ea9ffd4ba5b"
     },
     "README.md": {
-      "git_blob_sha1": "483c15ccfeec04e49eb209a4e6a9305002d03cc9"
+      "git_blob_sha1": "688d9409f136dbe47a76d8a14350f8217a602efe"
     },
     "property-sweep.sh": {
       "sha256": "4ddd3d3a737242735447aea83d272f8b88ef9aae2d110ea2c9a4ebe1ed8748c7",
@@ -47,6 +47,9 @@
     },
     "verify-receipt.sh": {
       "git_blob_sha1": "fadec74dd33303856327d1285a04855cf20c3b47"
+    },
+    "mutation-controls.sh": {
+      "git_blob_sha1": "acfbf3c858e5d72c5e5bb8b755651e715e2a6e52"
     }
   },
   "upstream_observation": {
@@ -97,5 +100,20 @@
     "result": "All 169,330 representations matched the bytewise oracle with zero mismatches.",
     "claim_ceiling": "Synthetic contract property test only; REA/Unblob provider, recovered firmware and hardware not exercised.",
     "tested_script_sha256": "9119a8eea7969413efc1b132807d57259834ccd9a916cda56ed6c720d96daac7"
+  },
+  "automation": {
+    "workflow_path": ".github/workflows/rea-coverage-contract.yml",
+    "workflow_git_blob_sha1": "587053534ee1ab4dac43b31cc662e97aa5558a30",
+    "runner": "ubuntu-24.04",
+    "action": "actions/checkout@11d5960a326750d5838078e36cf38b85af677262",
+    "enabled_lanes": [
+      "fixed known-answer corpus",
+      "510 byte-mask sweep",
+      "169330 interval-representation sweep",
+      "receipt identity verification",
+      "three fail-closed mutation controls"
+    ],
+    "status": "authored; no GitHub Actions pass is claimed",
+    "mutation_script_git_blob_sha1": "acfbf3c858e5d72c5e5bb8b755651e715e2a6e52"
   }
 }
