@@ -13,7 +13,7 @@ use std::collections::{HashMap, HashSet};
 use std::fs::File;
 use std::io::{self, Read, Write};
 use std::path::{Path, PathBuf};
-use std::process::ExitCode;
+use std::process::{Command, ExitCode};
 
 #[derive(Debug)]
 struct Options {
@@ -22,6 +22,32 @@ struct Options {
     renderer_binary_path: PathBuf,
     vcsl_root: PathBuf,
     vsco2_root: PathBuf,
+}
+
+#[derive(Debug, Default)]
+struct SourceTermsAudit {
+    roots_verified: usize,
+    license_documents_verified: usize,
+    readme_documents_verified: usize,
+    clean_upstream_checkouts_verified: usize,
+}
+
+#[derive(Debug, Clone, Copy)]
+struct SourceTermsPolicy {
+    source_library: &'static str,
+    upstream_repository_url: &'static str,
+    expected_remote: &'static str,
+    declared_license_spdx: &'static str,
+    readme_relative_path: &'static str,
+    upstream_readme_request: &'static str,
+}
+
+#[derive(Debug)]
+struct GitCheckoutObservation {
+    upstream_revision: Option<String>,
+    origin_matches_expected: bool,
+    clean: Option<bool>,
+    status: &'static str,
 }
 
 #[derive(Debug)]
@@ -50,6 +76,10 @@ struct VerificationReport {
     vcsl_root_content_manifest_sha256: Option<String>,
     vsco2_root_content_manifest_sha256: Option<String>,
     root_content_manifests_verified: usize,
+    source_terms_roots_verified: usize,
+    source_license_documents_verified: usize,
+    source_readme_documents_verified: usize,
+    clean_upstream_checkouts_verified: usize,
     selected_samples_total: usize,
     selected_samples_with_matching_actual_file_digest: usize,
     selected_samples_with_valid_file_digest: usize,
@@ -220,12 +250,12 @@ fn verify_reports(
         );
     }
     if string_field(inventory, "schema_version")
-        != Some("melothaea.instrument-capability-matrix.v3")
+        != Some("melothaea.instrument-capability-matrix.v4")
     {
         push_error(
             &mut findings,
             "inventory_schema_unsupported",
-            "capability report must use melothaea.instrument-capability-matrix.v3".into(),
+            "capability report must use melothaea.instrument-capability-matrix.v4".into(),
         );
     }
 
@@ -344,6 +374,13 @@ fn verify_reports(
             root_content_manifests_verified += 1;
         }
     }
+
+    let source_terms_audit = verify_source_terms_evidence(
+        inventory,
+        vcsl_root_observation,
+        vsco2_root_observation,
+        &mut findings,
+    );
 
     if bool_field(inventory, "indexed_sample_content_hashing_enabled") != Some(true) {
         push_incomplete(
@@ -663,6 +700,10 @@ fn verify_reports(
         vcsl_root_content_manifest_sha256: vcsl_root_observation.content_manifest_sha256.clone(),
         vsco2_root_content_manifest_sha256: vsco2_root_observation.content_manifest_sha256.clone(),
         root_content_manifests_verified,
+        source_terms_roots_verified: source_terms_audit.roots_verified,
+        source_license_documents_verified: source_terms_audit.license_documents_verified,
+        source_readme_documents_verified: source_terms_audit.readme_documents_verified,
+        clean_upstream_checkouts_verified: source_terms_audit.clean_upstream_checkouts_verified,
         selected_samples_total,
         selected_samples_with_valid_file_digest,
         selected_samples_with_valid_bank_digest,
