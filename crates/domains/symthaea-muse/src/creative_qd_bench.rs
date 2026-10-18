@@ -406,6 +406,24 @@ mod tests {
             "regular and irregular onset intervals occupy different cells"
         );
         assert_eq!(groove.accepted_candidates_collapsed_by_descriptor_bins, 0);
+        assert_eq!(
+            report.accepted_candidates_collapsed_by_descriptor_bins,
+            1,
+            "the duplicate ambient candidate should collide with one archive cell"
+        );
+
+        let steady_a = ambient
+            .candidates
+            .iter()
+            .find(|candidate| candidate.candidate_id == "steady-drone-a")
+            .unwrap();
+        let steady_z = ambient
+            .candidates
+            .iter()
+            .find(|candidate| candidate.candidate_id == "steady-drone-z")
+            .unwrap();
+        assert!(steady_a.retained_in_archive);
+        assert!(!steady_z.retained_in_archive);
     }
 
     #[test]
