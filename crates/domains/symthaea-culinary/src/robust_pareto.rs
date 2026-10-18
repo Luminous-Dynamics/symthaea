@@ -204,10 +204,14 @@ pub fn evaluate_robust_frontier(
             let expected_digest = sorted_scenarios
                 .iter()
                 .find(|scenario| scenario.id == metrics.scenario_id)
-                .expect("scenario ID was checked above")
-                .digest
-                .as_str();
-            if metrics.scenario_digest != expected_digest {
+                .map(|scenario| scenario.digest.as_str())
+                .ok_or_else(|| {
+                    invalid(format!(
+                        "registered scenario {} disappeared during validation",
+                        metrics.scenario_id
+                    ))
+                })?;
+            if metrics.scenario_digest.as_str() != expected_digest {
                 return Err(invalid(format!(
                     "candidate {} metrics for scenario {} use a different scenario digest",
                     candidate.id, metrics.scenario_id
@@ -256,8 +260,13 @@ pub fn evaluate_robust_frontier(
                     .scenario_metrics
                     .iter()
                     .find(|metrics| metrics.scenario_id == scenario.id)
-                    .expect("scenario coverage was validated");
-                CulinaryCandidate {
+                    .ok_or_else(|| {
+                        invalid(format!(
+                            "candidate {} is missing scenario {} after validation",
+                            candidate.id, scenario.id
+                        ))
+                    })?;
+                Ok(CulinaryCandidate {
                     id: candidate.id.clone(),
                     gates: candidate.gates.clone(),
                     objectives: metrics
@@ -270,9 +279,9 @@ pub fn evaluate_robust_frontier(
                             evidence_ref: objective.evidence_ref.clone(),
                         })
                         .collect(),
-                }
+                })
             })
-            .collect();
+            .collect::<Result<_, RobustParetoError>>()?;
 
         let pareto = evaluate_frontier(&point_candidates)?;
         scenario_reports.push(ScenarioFrontier {
@@ -298,7 +307,12 @@ pub fn evaluate_robust_frontier(
                 .candidates
                 .iter()
                 .find(|assessment| assessment.id == candidate.id)
-                .expect("the point evaluator reports every validated candidate");
+                .ok_or_else(|| {
+                    invalid(format!(
+                        "scenario {} omitted candidate {} from its report",
+                        scenario_report.scenario.id, candidate.id
+                    ))
+                })?;
 
             if assessment.on_frontier {
                 frontier_in.push(scenario_report.scenario.id.clone());
@@ -635,7 +649,10 @@ mod tests {
     fn robust_dominance_requires_no_worse_values_in_every_scenario() {
         let report = evaluate_robust_frontier(
             &scenarios(),
-            &[candidate("stable_winner", Some(5.0), Some(5.0)), candidate("worse", Some(6.0), Some(7.0))],
+            &[
+                candidate("stable_winner", Some(5.0), Some(5.0)),
+                candidate("worse", Some(6.0), Some(7.0)),
+            ],
         )
         .unwrap();
 
@@ -719,7 +736,10 @@ mod tests {
 
     #[test]
     fn objective_declaration_order_does_not_change_scenario_report() {
-        let ordered = vec![candidate("a", Some(5.0), Some(5.0)), candidate("b", Some(6.0), Some(6.0))];
+        let ordered = vec![
+            candidate("a", Some(5.0), Some(5.0)),
+            candidate("b", Some(6.0), Some(6.0)),
+        ];
         let expected = evaluate_robust_frontier(&scenarios(), &ordered).unwrap();
         let mut reordered = ordered.clone();
         for candidate in &mut reordered {
