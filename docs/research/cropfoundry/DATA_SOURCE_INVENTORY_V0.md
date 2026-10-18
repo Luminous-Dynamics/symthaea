@@ -4,6 +4,8 @@
 **Status:** discovery shortlist only; no external dataset files have been downloaded, parsed, normalized, or scored for this PR.  
 **Purpose:** make the first data-ingestion decision auditable, rights-aware, and matched to a real benchmark question.
 
+**Machine-readable registry:** [data-source-manifest-v0.json](./data-source-manifest-v0.json). The Rust validator at `cargo run -p xtask -- cropfoundry-validate` checks that these candidates remain non-trainable unless artifact-specific rights, access authorization, an exact pinned digest, intended use, and schema review are recorded.
+
 ## Decision
 
 Do not start by bulk-ingesting every crop database. First build a source manifest and deeply inspect a small, complementary set:
