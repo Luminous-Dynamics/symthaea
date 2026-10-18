@@ -188,18 +188,33 @@ fn validate_source_manifest(root: &Value) -> std::result::Result<usize, Vec<Stri
             errors.push(format!("{prefix}.ingestion_status is missing or unsupported"));
         }
 
-        let training_authorized = source
-            .get("training_authorized")
-            .and_then(Value::as_bool)
-            .unwrap_or(false);
-        let permitted_uses: Vec<&str> = source
-            .get("permitted_current_use")
-            .and_then(Value::as_array)
+        let training_authorized = match source.get("training_authorized").and_then(Value::as_bool) {
+            Some(value) => value,
+            None => {
+                errors.push(format!("{prefix}.training_authorized must be an explicit boolean"));
+                false
+            }
+        };
+        let permitted_uses_array = source.get("permitted_current_use").and_then(Value::as_array);
+        if !permitted_uses_array.is_some_and(|items| !items.is_empty() && items.iter().all(Value::is_string)) {
+            errors.push(format!("{prefix}.permitted_current_use must be a non-empty array of strings"));
+        }
+        let permitted_uses: Vec<&str> = permitted_uses_array
             .map(|items| items.iter().filter_map(Value::as_str).collect())
             .unwrap_or_default();
         let declares_training_use = permitted_uses.contains(&"model_training")
             || permitted_uses.contains(&"training")
             || permitted_uses.contains(&"fine_tuning");
+        let global_training_disabled = root
+            .get("policy")
+            .and_then(|policy| policy.get("no_source_is_training_authorized"))
+            .and_then(Value::as_bool)
+            == Some(true);
+        if global_training_disabled && training_authorized {
+            errors.push(format!(
+                "{prefix} is training-authorized while the manifest globally forbids training"
+            ));
+        }
 
         if !training_authorized {
             if ingestion_status == Some("ingestion_authorized") {
