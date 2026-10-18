@@ -133,19 +133,26 @@ fn validate_source_manifest(root: &Value) -> std::result::Result<usize, Vec<Stri
     if !nonempty_string(root, "version") {
         errors.push("version must be a non-empty string".to_owned());
     }
-    if string_at(root, "status") != Some("discovery_only") {
-        errors.push(
-            "manifest status must remain discovery_only until acquisition is reviewed".to_owned(),
-        );
+    let manifest_status = string_at(root, "status");
+    const MANIFEST_STATES: &[&str] = &[
+        "discovery_only",
+        "source_rights_reviewed",
+        "controlled_subset_authorized",
+    ];
+    if !manifest_status.is_some_and(|status| MANIFEST_STATES.contains(&status)) {
+        errors.push("manifest status is missing or unsupported".to_owned());
     }
-    if root
+    let declared_no_training = match root
         .get("policy")
         .and_then(|policy| policy.get("no_source_is_training_authorized"))
         .and_then(Value::as_bool)
-        != Some(true)
     {
-        errors.push("policy.no_source_is_training_authorized must be true".to_owned());
-    }
+        Some(value) => value,
+        None => {
+            errors.push("policy.no_source_is_training_authorized must be an explicit boolean".to_owned());
+            true
+        }
+    };
 
     let Some(sources) = root.get("sources").and_then(Value::as_array) else {
         errors.push("sources must be an array".to_owned());
@@ -163,6 +170,7 @@ fn validate_source_manifest(root: &Value) -> std::result::Result<usize, Vec<Stri
         "ingestion_authorized",
     ];
     let mut ids = BTreeSet::new();
+    let mut any_training_authorized = false;
 
     for (index, source) in sources.iter().enumerate() {
         let prefix = format!("sources[{index}]");
@@ -226,12 +234,13 @@ fn validate_source_manifest(root: &Value) -> std::result::Result<usize, Vec<Stri
             .and_then(|policy| policy.get("no_source_is_training_authorized"))
             .and_then(Value::as_bool)
             == Some(true);
-        if global_training_disabled && training_authorized {
+        any_training_authorized |= training_authorized;
+        if declared_no_training && training_authorized {
             errors.push(format!(
-                "{prefix} is training-authorized while the manifest globally forbids training"
+                "{prefix} is training-authorized while the manifest declares no training authorization"
             ));
         }
-        if string_at(root, "status") == Some("discovery_only") && training_authorized {
+        if manifest_status == Some("discovery_only") && training_authorized {
             errors.push(format!(
                 "{prefix} cannot be training-authorized while the manifest status is discovery_only"
             ));
@@ -301,6 +310,19 @@ fn validate_source_manifest(root: &Value) -> std::result::Result<usize, Vec<Stri
                 )),
             }
         }
+    }
+
+    if declared_no_training == any_training_authorized {
+        errors.push(
+            "policy.no_source_is_training_authorized must equal whether all source records are non-trainable"
+                .to_owned(),
+        );
+    }
+    if manifest_status == Some("controlled_subset_authorized") && !any_training_authorized {
+        errors.push(
+            "controlled_subset_authorized requires at least one source with explicit authorization"
+                .to_owned(),
+        );
     }
 
     errors_or_ok(errors).map(|()| sources.len())
@@ -475,6 +497,37 @@ mod tests {
                 .iter()
                 .any(|error| error.contains("manifest status is discovery_only"))
         );
+    }
+
+    #[test]
+    fn manifest_global_training_flag_must_match_source_records() {
+        let mut fixture: Value = serde_json::from_str(SOURCE_FIXTURE).unwrap();
+        fixture["policy"]["no_source_is_training_authorized"] = json!(false);
+        let errors = validate_source_manifest(&fixture).unwrap_err();
+        assert!(errors.iter().any(|error| error.contains("must equal whether all source records are non-trainable")));
+    }
+
+    #[test]
+    fn fully_reviewed_subset_can_be_authorized_without_weakening_gates() {
+        let mut fixture: Value = serde_json::from_str(SOURCE_FIXTURE).unwrap();
+        fixture["status"] = json!("controlled_subset_authorized");
+        fixture["policy"]["no_source_is_training_authorized"] = json!(false);
+
+        let source = &mut fixture["sources"][0];
+        source["training_authorized"] = json!(true);
+        source["permitted_current_use"] = json!(["model_training"]);
+        source["ingestion_status"] = json!("ingestion_authorized");
+        source["license_status"] = json!("verified");
+        source["access_status"] = json!("authorized");
+        source["retrieval_timestamp"] = json!("2026-10-18T00:00:00Z");
+        source["license_evidence_uri"] = json!("https://example.invalid/license");
+        source["access_terms_evidence_uri"] = json!("https://example.invalid/terms");
+        source["intended_use"] = json!("benchmark training");
+        source["dataset_structure_reviewed"] = json!(true);
+        source["content_sha256"] =
+            json!("aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa");
+
+        assert_eq!(validate_source_manifest(&fixture).unwrap(), 11);
     }
 
     #[test]
