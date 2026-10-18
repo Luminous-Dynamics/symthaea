@@ -104,6 +104,16 @@ Targets are provisional and need preregistration before final evaluation.
 
 No aggregate score should hide an unauthorized tranche release or an accounting error. Report the costs of waiting as carefully as the benefits of preserving the option to stop.
 
+## Robust capital ranking when probabilities are intervals
+
+A point-probability EVSI or NPV calculation answers a conditional question: “What follows if this declared distribution and payoff table are suitable?” When evidence supports only lower/upper probability bounds, ICCB should also report what remains true across every probability vector allowed by those bounds.
+
+The new `robust_decision.rs` prototype bounds the probability mass assigned to each discrete state while treating payoffs as fixed. It computes each action's exact minimum and maximum expected-value numerators on the feasible probability simplex. The algorithm starts from lower probability bounds and allocates the remaining mass to the lowest-payoff states for the minimum or highest-payoff states for the maximum; ties resolve by stable state ID. Output values use conservative floor/ceiling rounding and include the extremizing probability allocations.
+
+The protocol labels an action a unique robust winner only when its minimum exact expectation strictly exceeds every alternative's maximum exact expectation. Overlapping payoff envelopes mean **no unique robust winner**, not permission to silently use the midpoint of the probability intervals. If the admissible probability constraints are impossible, the evaluator fails closed.
+
+This version bounds probability ambiguity only. It does not bound uncertain payoff values, model-form discrepancy, omitted states, or out-of-domain behavior. Those require their own qualified inputs and should be kept distinct. See [ICCB-004](https://github.com/Luminous-Dynamics/symthaea/issues/8024), which aligns with Symtropy's [robust-design research #1769](https://github.com/Luminous-Dynamics/symtropy/issues/1769) and [model-discrepancy qualification #1812](https://github.com/Luminous-Dynamics/symtropy/issues/1812).
+
 ## Value-of-information budgeting: decide which uncertainty to buy down
 
 Capital allocation should include a fourth decision class: **fund evidence acquisition**. A geotechnical survey, independent condition inspection, demand experiment, source confirmation, or small pilot can change the subsequent decision. The relevant question is not “would more data be useful?” but “what is the expected improvement in the decision after observing the result, and is that improvement worth the full cost and delay?”
