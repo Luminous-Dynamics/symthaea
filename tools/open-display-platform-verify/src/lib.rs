@@ -1008,9 +1008,10 @@ mod tests {
         let source_hash = sha256_hex(CAD_SOURCE.as_bytes());
 
         assert!(CAD_SOURCE.contains("SPDX-License-Identifier: CERN-OHL-S-2.0"));
-        assert!(HARDWARE_LICENSE_TEXT.contains(
-            "CERN Open Hardware Licence Version 2 - Strongly Reciprocal"
-        ));
+        assert!(
+            HARDWARE_LICENSE_TEXT
+                .contains("CERN Open Hardware Licence Version 2 - Strongly Reciprocal")
+        );
         assert!(HARDWARE_README_TEXT.contains("[LICENSE](LICENSE)"));
 
         assert_eq!(
@@ -1020,9 +1021,7 @@ mod tests {
             Some(source_hash.as_str())
         );
         assert_eq!(
-            receipt
-                .pointer("/source_path")
-                .and_then(Value::as_str),
+            receipt.pointer("/source_path").and_then(Value::as_str),
             Some("hardware/open-display-reference/cad/odrh_sensor_interface_plate.scad")
         );
         assert_eq!(
@@ -1049,9 +1048,11 @@ mod tests {
             .and_then(Value::as_array)
             .expect("CAD receipt must declare checks");
         assert!(!checks.is_empty());
-        assert!(checks.iter().all(|check| {
-            check.get("status").and_then(Value::as_str) == Some("PASS")
-        }));
+        assert!(
+            checks
+                .iter()
+                .all(|check| { check.get("status").and_then(Value::as_str) == Some("PASS") })
+        );
         for check in checks {
             if let Some(hash) = check.get("output_sha256").and_then(Value::as_str) {
                 assert_eq!(hash.len(), 64, "output SHA-256 must be 64 hex digits");
