@@ -345,7 +345,7 @@ fn descriptor_digest_matches(descriptor: &str, supplied_digest: &str) -> bool {
     let digest = Sha256::digest(descriptor.as_bytes());
     let mut expected = String::with_capacity(64);
     const HEX: &[u8; 16] = b"0123456789abcdef";
-    for byte in digest {
+    for byte in digest.iter().copied() {
         expected.push(HEX[(byte >> 4) as usize] as char);
         expected.push(HEX[(byte & 0x0f) as usize] as char);
     }
