@@ -25,7 +25,7 @@ For a nonempty selection of length `L`:
 
 ## Cases
 
-`cases.json` holds 15 normalized-report examples; `oracle.json` separately records expected dispositions. The set covers whole-input and selected-subrange zero-chunk false-completeness, out-of-order adjacent and overlapping chunks, an interior uncovered span, correctly mapped gaps, unknown/encrypted chunks, depth-limit signals, missing-extractor diagnostics, empty selections, out-of-bounds chunks, mismatched root offsets and spurious gaps.
+`cases.json` holds 16 normalized-report examples; `oracle.json` separately records expected dispositions. The set covers whole-input and selected-subrange zero-chunk false-completeness, out-of-order adjacent and overlapping chunks, an interior uncovered span, correctly mapped gaps, unknown/encrypted chunks, depth-limit signals, missing-extractor diagnostics, empty selections, out-of-bounds chunks, mismatched root offsets and spurious gaps.
 
 | Target | Acceptance gate |
 |---|---|
@@ -46,7 +46,7 @@ Requires `jq` and `sha256sum` only; it does not require Node, Binwalk, Unblob, a
 benchmarks/rea-coverage/v1/verify.sh
 ```
 
-Recorded local result: 15/15 case dispositions matched the oracle: 5 internally consistent reports accepted, 8 inconsistent reports rejected, 1 empty input marked invalid, and 1 malformed report rejected. Exact corpus digests and file identities are in `receipt.json`.
+Recorded local result: 16/16 case dispositions matched the oracle: 5 internally consistent reports accepted, 8 inconsistent reports rejected, 1 empty input marked invalid, and 2 malformed reports rejected. Exact corpus digests and file identities are in `receipt.json`.
 
 ## Next evidence gate
 
