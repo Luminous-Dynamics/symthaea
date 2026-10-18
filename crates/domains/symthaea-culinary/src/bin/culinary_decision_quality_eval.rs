@@ -104,7 +104,7 @@ fn candidate_by_id<'a>(case: &'a Value, id: &str) -> Option<&'a Value> {
         .find(|candidate| candidate.get("id").and_then(Value::as_str) == Some(id))
 }
 
-fn recursively_has_status(value: &Value, status: &str) -> bool {
+fn recursively_has_key_value(value: &Value, key_name: &str, expected_value: &str) -> bool {
     match value {
         Value::Object(map) => {
             map.iter().any(|(key, child)| {
@@ -136,7 +136,7 @@ fn hard_gate_or_missing_data_violations(case: &Value, output: &Value) -> Vec<Str
             if disposition == "recommend"
                 && candidate
                     .get("nutrition")
-                    .is_some_and(|nutrition| recursively_has_status(nutrition, "missing"))
+                    .is_some_and(|nutrition| recursively_has_key_value(nutrition, "status", "missing"))
             {
                 violations.push(format!(
                     "{case_id}: recommendation selects {id} with missing nutrition evidence"
@@ -145,7 +145,7 @@ fn hard_gate_or_missing_data_violations(case: &Value, output: &Value) -> Vec<Str
             if disposition == "recommend"
                 && candidate
                     .get("cost")
-                    .is_some_and(|cost| recursively_has_status(cost, "stale"))
+                    .is_some_and(|cost| (recursively_has_key_value(cost, "status", "stale")\n                    || recursively_has_key_value(cost, "freshness", "stale")))
             {
                 violations.push(format!(
                     "{case_id}: recommendation selects {id} with stale cost evidence"
