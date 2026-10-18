@@ -22,6 +22,7 @@ const EXPECTED_METHOD_NORMAL: usize = 182_777;
 const EXPECTED_METHOD_EXPERIMENTAL: usize = 26_029;
 const EXPECTED_METHOD_NATURAL: usize = 1_322;
 const SOURCE_BLOB_SHA1: &str = "0029b6f156847ecc052f57ae45fd025ad032d086";
+const SOURCE_SHA256: &str = "534715c2a8bcbd734b80040ef160e656203c5512dab292dcaabd7e5c349fc9d6";
 
 const EXPECTED_HEADER: &[&str] = &[
     "Unit_ID",
@@ -57,6 +58,7 @@ struct IntakeReport {
     upstream_uri: String,
     upstream_blob_sha1: String,
     reconstructed_csv_sha256: String,
+    source_sha256_match: bool,
     shard_count: usize,
     summary: DataSummary,
     source_profile_match: bool,
@@ -201,6 +203,8 @@ pub fn run(input_dir: &Path, output_path: Option<&Path>) -> Result<()> {
         raw.extend_from_slice(&part);
     }
 
+    let reconstructed_csv_sha256 = format!("{:x}", Sha256::digest(&raw));
+    let source_sha256_match = reconstructed_csv_sha256 == SOURCE_SHA256;
     let summary = inspect_csv(&raw)?;
     let source_profile_match = matches_source_profile(&summary);
     let report = IntakeReport {
@@ -208,11 +212,12 @@ pub fn run(input_dir: &Path, output_path: Option<&Path>) -> Result<()> {
         dataset_id: "PASSENGER_TIRE_TPMS_CC_BY".into(),
         upstream_uri: "https://github.com/kerzeyc/tire-monitoring-dataset".into(),
         upstream_blob_sha1: SOURCE_BLOB_SHA1.into(),
-        reconstructed_csv_sha256: format!("{:x}", Sha256::digest(&raw)),
+        reconstructed_csv_sha256,
+        source_sha256_match,
         shard_count: SHARD_COUNT,
         summary,
         source_profile_match,
-        intake_integrity_pass: source_profile_match,
+        intake_integrity_pass: source_profile_match && source_sha256_match,
         claim_ceiling: "CSV schema, content digest, source-profile counts and ranges only. This is passenger-car tire pressure/temperature/speed anomaly data, not motorcycle grip, tire-force, wear, wet-braking, structural or roadworthiness evidence.".into(),
     };
     let encoded = serde_json::to_string_pretty(&report)?;
@@ -225,8 +230,11 @@ pub fn run(input_dir: &Path, output_path: Option<&Path>) -> Result<()> {
             .with_context(|| format!("writing tire intake report {}", path.display()))?;
     }
     println!("{encoded}");
+    if !report.source_sha256_match {
+        bail!("reconstructed tire-monitoring CSV SHA-256 differs from the pinned upstream artifact");
+    }
     if !report.intake_integrity_pass {
-        bail!("tire dataset intake checks did not match the frozen source profile");
+        bail!("tire dataset intake checks did not match the frozen source profile and digest");
     }
     Ok(())
 }
