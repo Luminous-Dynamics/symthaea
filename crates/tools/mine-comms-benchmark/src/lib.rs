@@ -1756,9 +1756,11 @@ pub fn generate_single_fault_suite(
         return Err("fault suite requires at least one link");
     }
 
+    let validation_time = links.iter().map(|link| link.observed_at_ms).max().unwrap_or(0);
     let mut link_ids = BTreeSet::new();
     let mut domains = BTreeSet::new();
     for link in links {
+        link.validate(validation_time)?;
         if link.id.trim().is_empty() {
             return Err("fault suite link ids must not be empty");
         }
@@ -2127,6 +2129,17 @@ mod fault_campaign_tests {
             RoutePolicy::AdaptiveLatencyEnergy,
             &[scenario("conflict", &["sa"], &[], &["sa"])], 4,
         ).is_err());
+    }
+
+    #[test]
+    fn generator_rejects_structurally_invalid_links_before_creating_a_suite() {
+        let mut links = topology();
+        links[0].from = " ".to_owned();
+        assert!(generate_single_fault_suite(&links, 32).is_err());
+
+        let mut links = topology();
+        links[0].quality_permille = 1001;
+        assert!(generate_single_fault_suite(&links, 32).is_err());
     }
 
     #[test]

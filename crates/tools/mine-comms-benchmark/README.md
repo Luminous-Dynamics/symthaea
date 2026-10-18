@@ -45,7 +45,7 @@ Time semantics: the message evaluator rejects messages already expired when eval
 
 The kernel now generates a reproducible suite containing one nominal case, one case per link failure, and one case per declared shared failure domain. The generator requires complete, non-empty dependency inventories and fails rather than silently truncating the suite when its case cap would be exceeded.
 
-\`evaluate_fault_campaign\` runs each declared fault snapshot at a common evaluation time and reports four distinct outcomes: on-time delivery, deadline miss, no route, and expiry before delivery. Scenarios can fail links, fail shared domains, or make selected observations stale. Unknown references, conflicting faults, duplicate scenario IDs, incomplete domain inventories for domain-outage cases and malformed deadlines are rejected.
+`evaluate_fault_campaign` runs each declared fault snapshot at a common evaluation time and reports four distinct outcomes: on-time delivery, deadline miss, no route, and expiry before delivery. Scenarios can fail links, fail shared domains, or make selected observations stale. Unknown references, conflicting faults, duplicate scenario IDs, incomplete domain inventories for domain-outage cases and malformed deadlines are rejected.
 
 This is **snapshot-based graph/latency evaluation**, not yet a time-evolving multi-hop network simulation. It does not model faults that occur while a message is in flight, per-hop airtime queues, random loss, contention or store-carry-forward. Its results are synthetic benchmark evidence only. The next increment should replay frozen time-series link traces with per-hop queue/ACK budgets, then compare calibrated predictions against held-out measured traces.
 
