@@ -54,11 +54,11 @@ Use this candidate matrix for the pilot, then pin the official task/config revis
 
 | Capability | Candidate tasks | What it probes |
 |---|---|---|
-| Generalization | Stack Bowls; Sweep Blocks | Standardized placement versus tool handoff and scene/task variation |
-| Memory | Imitate Sorting Sequence; Press By Number | Retaining an observed sequence or numbers while executing later actions |
-| Precision | Insert Tubes; Insert Key | Alignment and insertion tolerance |
-| Long-Horizon | Organize Table; Put Bottles Into Dustbin | Multi-step completion and accumulated-error sensitivity |
-| Open-vocabulary | Stack Blocks by Language; Classify Objects by Language | Grounding instruction phrases into object selection and action |
+| Generalization | [Stack Bowls](https://robodojo-benchmark.com/doc/sim-tasks/stack-bowls/); [Sweep Blocks](https://robodojo-benchmark.com/doc/sim-tasks/sweep-blocks/) | Placement versus coordinated tool handoff and scene/task variation |
+| Memory | [Imitate Sorting Sequence](https://robodojo-benchmark.com/doc/sim-tasks/imitate-sorting-sequence/); [Press By Number](https://robodojo-benchmark.com/doc/sim-tasks/press-by-number/) | Retaining an observed sequence or numbers while executing later actions |
+| Precision | [Insert Tubes](https://robodojo-benchmark.com/doc/sim-tasks/insert-tubes/); [Insert Key](https://robodojo-benchmark.com/doc/sim-tasks/insert-key/) | Alignment and insertion tolerance |
+| Long-Horizon | [Organize Table](https://robodojo-benchmark.com/doc/sim-tasks/organize-table/); [Put Bottles Into Dustbin](https://robodojo-benchmark.com/doc/sim-tasks/put-bottles-into-dustbin/) | Multi-step completion and accumulated-error sensitivity |
+| Open-vocabulary | [Stack Blocks by Language](https://robodojo-benchmark.com/doc/sim-tasks/stack-blocks-by-language/); [Classify Objects by Language](https://robodojo-benchmark.com/doc/sim-tasks/classify-objects-by-language/) | Grounding instruction phrases into object selection and action |
 
 The smallest useful preflight is **Stack Bowls** for task/action wiring, then **Imitate Sorting Sequence** for an explicitly memory-dependent task, then **Insert Tubes** for precision. The XPolicyLab demo adapter documents Stack Bowls as a wiring example but emits zero actions, so it validates the protocol only; it is not a success-rate baseline. Verify the current task taxonomy before freezing the matrix because benchmark tasks and variants can evolve.
 
