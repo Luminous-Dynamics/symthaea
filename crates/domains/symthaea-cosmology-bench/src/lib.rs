@@ -73,7 +73,9 @@ pub enum ChainAuditError {
     InvalidSha256(String),
     MissingManifestEntry(String),
     DuplicateManifestEntry(String),
-    MalformedChecksumManifestLine { line: usize },
+    MalformedChecksumManifestLine {
+        line: usize,
+    },
     NumericalOverflow,
 }
 
@@ -81,28 +83,53 @@ impl fmt::Display for ChainAuditError {
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
         match self {
             Self::Io(message) => write!(f, "I/O error: {message}"),
-            Self::MissingHeader => f.write_str("missing Cobaya header beginning with '# weight minuslogpost'"),
+            Self::MissingHeader => {
+                f.write_str("missing Cobaya header beginning with '# weight minuslogpost'")
+            }
             Self::InvalidHeader(message) => write!(f, "invalid chain header: {message}"),
             Self::DuplicateColumn(name) => write!(f, "duplicate chain column: {name}"),
             Self::MissingSamples => f.write_str("chain contains no sample rows"),
-            Self::MismatchedChainHeaders => f.write_str("cannot combine chain files with different column headers"),
-            Self::WrongColumnCount { line, expected, actual } => {
-                write!(f, "line {line}: expected {expected} columns, found {actual}")
+            Self::MismatchedChainHeaders => {
+                f.write_str("cannot combine chain files with different column headers")
             }
-            Self::InvalidNumber { line, column, value } => {
+            Self::WrongColumnCount {
+                line,
+                expected,
+                actual,
+            } => {
+                write!(
+                    f,
+                    "line {line}: expected {expected} columns, found {actual}"
+                )
+            }
+            Self::InvalidNumber {
+                line,
+                column,
+                value,
+            } => {
                 write!(f, "line {line}, column {column}: invalid number {value:?}")
             }
             Self::NonFiniteValue { line, column } => {
                 write!(f, "line {line}, column {column}: non-finite value")
             }
-            Self::NegativeWeight { line } => write!(f, "line {line}: sample weight must be non-negative"),
+            Self::NegativeWeight { line } => {
+                write!(f, "line {line}: sample weight must be non-negative")
+            }
             Self::ZeroTotalWeight => f.write_str("chain total weight must be finite and positive"),
             Self::UnknownColumn(name) => write!(f, "unknown chain column: {name}"),
             Self::InvalidSha256(value) => write!(f, "invalid SHA-256 digest: {value:?}"),
-            Self::MissingManifestEntry(path) => write!(f, "SHA-256 manifest has no entry for {path:?}"),
-            Self::DuplicateManifestEntry(path) => write!(f, "SHA-256 manifest has duplicate entries for {path:?}"),
-            Self::MalformedChecksumManifestLine { line } => write!(f, "malformed SHA-256 manifest line {line}"),
-            Self::NumericalOverflow => f.write_str("chain summary overflowed floating-point arithmetic"),
+            Self::MissingManifestEntry(path) => {
+                write!(f, "SHA-256 manifest has no entry for {path:?}")
+            }
+            Self::DuplicateManifestEntry(path) => {
+                write!(f, "SHA-256 manifest has duplicate entries for {path:?}")
+            }
+            Self::MalformedChecksumManifestLine { line } => {
+                write!(f, "malformed SHA-256 manifest line {line}")
+            }
+            Self::NumericalOverflow => {
+                f.write_str("chain summary overflowed floating-point arithmetic")
+            }
         }
     }
 }
@@ -118,8 +145,7 @@ pub fn sha256_bytes(bytes: &[u8]) -> String {
 
 /// Stream a file and return its lowercase SHA-256 hex digest.
 pub fn sha256_file(path: impl AsRef<Path>) -> Result<String, ChainAuditError> {
-    let file = File::open(path.as_ref())
-        .map_err(|error| ChainAuditError::Io(error.to_string()))?;
+    let file = File::open(path.as_ref()).map_err(|error| ChainAuditError::Io(error.to_string()))?;
     let mut reader = std::io::BufReader::new(file);
     let mut hasher = Sha256::new();
     let mut buffer = [0u8; 64 * 1024];
@@ -146,10 +172,7 @@ pub fn verify_sha256_digest(actual: &str, expected: &str) -> Result<bool, ChainA
 /// Verify a local file against a SHA-256 digest obtained from an external
 /// trusted manifest. A false result means bytes differ; malformed digests are
 /// errors. The caller chooses the local path; URLs are never fetched here.
-pub fn verify_sha256_file(
-    path: impl AsRef<Path>,
-    expected: &str,
-) -> Result<bool, ChainAuditError> {
+pub fn verify_sha256_file(path: impl AsRef<Path>, expected: &str) -> Result<bool, ChainAuditError> {
     let actual = sha256_file(path)?;
     verify_sha256_digest(&actual, expected)
 }
@@ -173,7 +196,9 @@ pub fn expected_sha256_from_manifest(
         || relative_path.starts_with('/')
         || relative_path.contains('\\')
         || relative_path.chars().any(char::is_control)
-        || relative_path.split('/').any(|component| component == ".." || component.is_empty())
+        || relative_path
+            .split('/')
+            .any(|component| component == ".." || component.is_empty())
     {
         return Err(ChainAuditError::InvalidHeader(
             "manifest target must be a non-empty POSIX relative path without empty or '..' components".to_string(),
@@ -188,7 +213,9 @@ pub fn expected_sha256_from_manifest(
             continue;
         }
         if line.len() < 66
-            || !line.as_bytes()[..64].iter().all(|byte| byte.is_ascii_hexdigit())
+            || !line.as_bytes()[..64]
+                .iter()
+                .all(|byte| byte.is_ascii_hexdigit())
         {
             return Err(ChainAuditError::MalformedChecksumManifestLine { line: line_number });
         }
@@ -211,7 +238,9 @@ pub fn expected_sha256_from_manifest(
         }
         validate_sha256_hex(digest)?;
         if match_digest.is_some() {
-            return Err(ChainAuditError::DuplicateManifestEntry(relative_path.to_string()));
+            return Err(ChainAuditError::DuplicateManifestEntry(
+                relative_path.to_string(),
+            ));
         }
         match_digest = Some(digest.to_ascii_lowercase());
     }
@@ -275,7 +304,10 @@ impl ChainTable {
                     && candidate.first() == Some(&"weight")
                     && candidate.get(1) == Some(&"minuslogpost")
                 {
-                    let parsed = candidate.iter().map(|value| (*value).to_string()).collect::<Vec<_>>();
+                    let parsed = candidate
+                        .iter()
+                        .map(|value| (*value).to_string())
+                        .collect::<Vec<_>>();
                     validate_header(&parsed)?;
                     columns = Some(parsed);
                 }
@@ -293,11 +325,13 @@ impl ChainTable {
             }
             let mut values = Vec::with_capacity(tokens.len());
             for (column_index, token) in tokens.iter().enumerate() {
-                let value = token.parse::<f64>().map_err(|_| ChainAuditError::InvalidNumber {
-                    line: line_number,
-                    column: header[column_index].clone(),
-                    value: (*token).to_string(),
-                })?;
+                let value = token
+                    .parse::<f64>()
+                    .map_err(|_| ChainAuditError::InvalidNumber {
+                        line: line_number,
+                        column: header[column_index].clone(),
+                        value: (*token).to_string(),
+                    })?;
                 if !value.is_finite() {
                     return Err(ChainAuditError::NonFiniteValue {
                         line: line_number,
@@ -422,7 +456,9 @@ fn validate_header(columns: &[String]) -> Result<(), ChainAuditError> {
     let mut unique = HashSet::with_capacity(columns.len());
     for column in columns {
         if column.trim().is_empty() {
-            return Err(ChainAuditError::InvalidHeader("empty column name".to_string()));
+            return Err(ChainAuditError::InvalidHeader(
+                "empty column name".to_string(),
+            ));
         }
         if !unique.insert(column.as_str()) {
             return Err(ChainAuditError::DuplicateColumn(column.clone()));
@@ -453,7 +489,9 @@ fn validate_table(table: &ChainTable) -> Result<(), ChainAuditError> {
                 });
             }
             if column_index == 0 && *value < 0.0 {
-                return Err(ChainAuditError::NegativeWeight { line: row_index + 1 });
+                return Err(ChainAuditError::NegativeWeight {
+                    line: row_index + 1,
+                });
             }
         }
         total_weight += row[0];
@@ -524,14 +562,20 @@ mod tests {
             "ba7816bf8f01cfea414140de5dae2223b00361a396177a9cb410ff61f20015ad"
         );
         assert!(verify_sha256_file(&path, &actual).unwrap());
-        assert!(verify_sha256_digest(
-            &actual,
-            "BA7816BF8F01CFEA414140DE5DAE2223B00361A396177A9CB410FF61F20015AD"
-        ).unwrap());
-        assert!(!verify_sha256_digest(
-            &actual,
-            "ca7816bf8f01cfea414140de5dae2223b00361a396177a9cb410ff61f20015ad"
-        ).unwrap());
+        assert!(
+            verify_sha256_digest(
+                &actual,
+                "BA7816BF8F01CFEA414140DE5DAE2223B00361A396177A9CB410FF61F20015AD"
+            )
+            .unwrap()
+        );
+        assert!(
+            !verify_sha256_digest(
+                &actual,
+                "ca7816bf8f01cfea414140de5dae2223b00361a396177a9cb410ff61f20015ad"
+            )
+            .unwrap()
+        );
         assert!(verify_sha256_digest(&actual, "bad").is_err());
         std::fs::remove_file(path).unwrap();
     }
@@ -546,12 +590,16 @@ mod tests {
         );
         assert_eq!(
             expected_sha256_from_manifest(&manifest, "missing.txt"),
-            Err(ChainAuditError::MissingManifestEntry("missing.txt".to_string()))
+            Err(ChainAuditError::MissingManifestEntry(
+                "missing.txt".to_string()
+            ))
         );
         let duplicate = format!("{digest}  data/abc.txt\n{digest}  data/abc.txt\n");
         assert_eq!(
             expected_sha256_from_manifest(&duplicate, "data/abc.txt"),
-            Err(ChainAuditError::DuplicateManifestEntry("data/abc.txt".to_string()))
+            Err(ChainAuditError::DuplicateManifestEntry(
+                "data/abc.txt".to_string()
+            ))
         );
         assert!(matches!(
             expected_sha256_from_manifest("not a checksum line\n", "data/abc.txt"),
@@ -568,17 +616,13 @@ mod tests {
             "7c869b6928ef91134674551165d8a6528af7e4f210f54e2632d5bf8c0bdebb89  cobaya/base/desi-bao-all/chain.margestats\n"
         );
         assert_eq!(
-            expected_sha256_from_manifest(
-                manifest,
-                "cobaya/base/desi-bao-all/chain.1.txt"
-            ).unwrap(),
+            expected_sha256_from_manifest(manifest, "cobaya/base/desi-bao-all/chain.1.txt")
+                .unwrap(),
             "fde589a17a4ca0fd58371b61290ada939dd672484cb3d523adacb8565a340ced"
         );
         assert_eq!(
-            expected_sha256_from_manifest(
-                manifest,
-                "cobaya/base/desi-bao-all/chain.margestats"
-            ).unwrap(),
+            expected_sha256_from_manifest(manifest, "cobaya/base/desi-bao-all/chain.margestats")
+                .unwrap(),
             "7c869b6928ef91134674551165d8a6528af7e4f210f54e2632d5bf8c0bdebb89"
         );
     }
@@ -598,14 +642,16 @@ mod tests {
             &local,
             &manifest,
             "cobaya/base/desi-bao-all/chain.1.txt",
-        ).unwrap();
+        )
+        .unwrap();
         assert_eq!(result, (digest.to_string(), digest.to_string(), true));
         std::fs::write(&local, b"abd").unwrap();
         let result = verify_sha256_file_against_manifest(
             &local,
             &manifest,
             "cobaya/base/desi-bao-all/chain.1.txt",
-        ).unwrap();
+        )
+        .unwrap();
         assert!(!result.2);
         std::fs::remove_dir_all(directory).unwrap();
     }
@@ -630,7 +676,8 @@ mod tests {
         let first = ChainTable::parse(Cursor::new(FIXTURE)).unwrap();
         let second = ChainTable::parse(Cursor::new(
             "# weight minuslogpost H0 omega_m\n1 -9 70 0.33\n",
-        )).unwrap();
+        ))
+        .unwrap();
         let combined = ChainTable::combine(vec![first.clone(), second]).unwrap();
         assert_eq!(combined.rows.len(), 4);
         let summary = combined.summarize("H0").unwrap();
@@ -639,7 +686,8 @@ mod tests {
 
         let wrong_header = ChainTable::parse(Cursor::new(
             "# weight minuslogpost omega_m H0\n1 -9 0.33 70\n",
-        )).unwrap();
+        ))
+        .unwrap();
         assert_eq!(
             ChainTable::combine(vec![first, wrong_header]),
             Err(ChainAuditError::MismatchedChainHeaders)
@@ -716,7 +764,9 @@ mod tests {
         let chain = ChainTable::parse(Cursor::new(FIXTURE)).unwrap();
         assert_eq!(
             chain.summarize("not_a_parameter"),
-            Err(ChainAuditError::UnknownColumn("not_a_parameter".to_string()))
+            Err(ChainAuditError::UnknownColumn(
+                "not_a_parameter".to_string()
+            ))
         );
     }
 }
