@@ -482,11 +482,9 @@ mod tests {
         let scenario = &mut corpus.scenarios[0];
         scenario.profile.taxon_resolution = TaxonResolution::Ambiguous;
         let result = evaluate_scenario(scenario);
-        assert!(
-            result
-                .actual_reason_codes
-                .contains(&"TAXON_IDENTITY_UNRESOLVED".to_owned())
-        );
+        assert!(result
+            .actual_reason_codes
+            .contains(&"TAXON_IDENTITY_UNRESOLVED".to_owned()));
     }
 
     #[test]
@@ -495,11 +493,9 @@ mod tests {
         let scenario = &mut corpus.scenarios[0];
         scenario.query.purpose = QueryPurpose::LotSelection;
         let result = evaluate_scenario(scenario);
-        assert!(
-            result
-                .actual_reason_codes
-                .contains(&"EVIDENCE_SCOPE_MISMATCH".to_owned())
-        );
+        assert!(result
+            .actual_reason_codes
+            .contains(&"EVIDENCE_SCOPE_MISMATCH".to_owned()));
     }
 
     #[test]
@@ -508,11 +504,9 @@ mod tests {
         let scenario = &mut corpus.scenarios[3];
         scenario.profile.properties[0].direction = GrainDirection::Radial;
         let result = evaluate_scenario(scenario);
-        assert!(
-            result
-                .actual_reason_codes
-                .contains(&"PROPERTY_DIRECTION_MISMATCH".to_owned())
-        );
+        assert!(result
+            .actual_reason_codes
+            .contains(&"PROPERTY_DIRECTION_MISMATCH".to_owned()));
     }
 
     #[test]
@@ -520,16 +514,12 @@ mod tests {
         let mut corpus = corpus();
         let scenario = &mut corpus.scenarios[1];
         let result = evaluate_scenario(scenario);
-        assert!(
-            result
-                .actual_reason_codes
-                .contains(&"STRUCTURAL_VALUE_NOT_QUALIFIED".to_owned())
-        );
-        assert!(
-            result
-                .actual_reason_codes
-                .contains(&"TAXON_IDENTITY_UNRESOLVED".to_owned())
-        );
+        assert!(result
+            .actual_reason_codes
+            .contains(&"STRUCTURAL_VALUE_NOT_QUALIFIED".to_owned()));
+        assert!(result
+            .actual_reason_codes
+            .contains(&"TAXON_IDENTITY_UNRESOLVED".to_owned()));
     }
 
     #[test]
@@ -537,10 +527,8 @@ mod tests {
         let mut corpus = corpus();
         let scenario = &mut corpus.scenarios[4];
         let result = evaluate_scenario(scenario);
-        assert!(
-            result
-                .actual_reason_codes
-                .contains(&"PROPERTY_CONDITION_MISMATCH".to_owned())
-        );
+        assert!(result
+            .actual_reason_codes
+            .contains(&"PROPERTY_CONDITION_MISMATCH".to_owned()));
     }
 }
