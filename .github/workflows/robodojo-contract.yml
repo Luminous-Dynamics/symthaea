@@ -38,5 +38,16 @@ jobs:
       - name: Test observation/action contracts and RC statistics
         run: cargo test --locked --manifest-path experiments/robodojo-contract/Cargo.toml
 
+      - name: Check formatting
+        run: cargo fmt --manifest-path experiments/robodojo-contract/Cargo.toml -- --check
+
       - name: Run end-to-end contract smoke trace
         run: cargo run --locked --manifest-path experiments/robodojo-contract/Cargo.toml
+
+      - name: Exercise trial TSV summary and paired comparison
+        run: |
+          cargo run --locked --manifest-path experiments/robodojo-contract/Cargo.toml -- --summarize experiments/robodojo-contract/examples/synthetic_trials.tsv
+          cargo run --locked --manifest-path experiments/robodojo-contract/Cargo.toml -- --compare experiments/robodojo-contract/examples/synthetic_trials.tsv baseline symthaea_sidecar
+
+      - name: Exercise confidence calibration CLI
+        run: cargo run --locked --manifest-path experiments/robodojo-contract/Cargo.toml -- --calibrate experiments/robodojo-contract/examples/synthetic_forecasts.tsv
