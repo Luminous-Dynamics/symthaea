@@ -124,3 +124,27 @@ fn duplicate_attribute_checks_are_rejected() {
     let errors = violations(&value);
     assert!(errors.iter().any(|error| error.contains("duplicate attribute check")));
 }
+
+#[test]
+fn malformed_language_tags_are_rejected() {
+    let mut value = fixture();
+    value["query_record"]["names"][0]["language_tag"] = serde_json::json!("en--ZA");
+    let errors = violations(&value);
+    assert!(errors.iter().any(|error| error.contains("not a valid-looking BCP 47 tag")));
+}
+
+#[test]
+fn exact_match_requires_explicit_assessment_of_fortification_and_brand_identity() {
+    let mut value = fixture();
+    value["attribute_checks"] = serde_json::Value::Array(
+        value["attribute_checks"]
+            .as_array()
+            .unwrap()
+            .iter()
+            .filter(|check| check["attribute_id"] != "fortification")
+            .cloned()
+            .collect()
+    );
+    let errors = violations(&value);
+    assert!(errors.iter().any(|error| error.contains("hard-block identity attribute \"fortification\"")));
+}
