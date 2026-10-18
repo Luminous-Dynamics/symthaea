@@ -999,6 +999,53 @@ mod tests {
         assert!(receipt.errors.iter().any(|error| error == "GIT_HEAD_IDENTITY_MISSING"));
     }
 
+
+    #[test]
+    fn permitted_source_with_missing_required_attribution_is_blocked() {
+        let mut corpus = fixture_corpus();
+        let case = corpus
+            .cases
+            .iter_mut()
+            .find(|c| c.case_id == "BIOP-GATE0-001")
+            .unwrap();
+        case.candidate.source.attribution_required = true;
+        case.candidate.source.attribution_present = false;
+        let actual = evaluate_case(case);
+        assert_eq!(actual.disposition, Disposition::Blocked);
+        assert_eq!(actual.reason_codes, vec!["ATTRIBUTION_MISSING".to_owned()]);
+    }
+
+    #[test]
+    fn malformed_case_id_is_incomplete_not_pass() {
+        let mut corpus = fixture_corpus();
+        corpus.cases[0].case_id = "BIOP-GATEQ-01X".to_owned();
+        let raw = serde_json::to_vec(&corpus).unwrap();
+        let receipt = run_corpus(&raw, Some("head-a"), Some("head-a"));
+        assert_eq!(receipt.status, RunStatus::Incomplete);
+        assert!(
+            receipt
+                .errors
+                .iter()
+                .any(|error| error.starts_with("CASE_ID_FORMAT_INVALID:"))
+        );
+    }
+
+    #[test]
+    fn head_mismatch_is_reported_even_when_a_case_fails() {
+        let mut corpus = fixture_corpus();
+        corpus.cases[0].expected.reason_codes = vec!["WRONG_EXPECTED_REASON".to_owned()];
+        let raw = serde_json::to_vec(&corpus).unwrap();
+        let receipt = run_corpus(&raw, Some("actual-sha"), Some("expected-sha"));
+        assert_eq!(receipt.status, RunStatus::Fail);
+        assert!(receipt.errors.iter().any(|error| error == "GIT_HEAD_MISMATCH"));
+        assert!(
+            receipt
+                .errors
+                .iter()
+                .any(|error| error == "EXPECTED_ACTUAL_MISMATCHES:1")
+        );
+    }
+
     #[test]
     fn duplicate_case_id_is_incomplete_not_pass() {
         let mut corpus = fixture_corpus();
