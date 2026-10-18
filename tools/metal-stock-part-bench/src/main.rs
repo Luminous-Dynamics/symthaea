@@ -135,6 +135,7 @@ struct FlowLedger {
     chips_mass_g: u64,
     mixed_scrap_mass_g: u64,
     residue_mass_g: u64,
+    process_loss_mass_g: u64,
     claimed_clean_offcut_recovery_g: u64,
 }
 
@@ -143,10 +144,12 @@ struct FlowLedger {
 struct InspectionRecord {
     source: MeasurementSource,
     calibration: CalibrationState,
+    calibration_record_ref: Option<String>,
     method_id: Option<String>,
     measurement_record_ref: Option<String>,
     nominal_dimension_um: u64,
     measured_dimension_um: Option<u64>,
+    measurement_uncertainty_um: Option<u64>,
     tolerance_um: u64,
 }
 
@@ -244,8 +247,14 @@ fn evaluate_scenario(scenario: &Scenario, mass_tolerance_ppm: u64) -> ScenarioRe
         if !option_nonempty(&stock.custody_evidence_ref) {
             reasons.insert("SECONDARY_CUSTODY_MISSING".to_owned());
         }
-        if stock.contamination_state != ContaminationState::Clear {
-            reasons.insert("SECONDARY_CONTAMINATION_UNRESOLVED".to_owned());
+        match stock.contamination_state {
+            ContaminationState::Clear => {}
+            ContaminationState::Unknown => {
+                reasons.insert("SECONDARY_CONTAMINATION_UNRESOLVED".to_owned());
+            }
+            ContaminationState::Contaminated => {
+                reasons.insert("SECONDARY_CONTAMINATION_REJECTED".to_owned());
+            }
         }
         if !option_nonempty(&stock.requalification_ref) {
             reasons.insert("SECONDARY_REQUALIFICATION_MISSING".to_owned());
@@ -264,9 +273,23 @@ fn evaluate_scenario(scenario: &Scenario, mass_tolerance_ppm: u64) -> ScenarioRe
     if route
         .required_operations
         .iter()
+        .any(|operation| !route.planned_operations.contains(operation))
+    {
+        reasons.insert("PROCESS_OPERATION_NOT_PLANNED".to_owned());
+    }
+    if route
+        .required_operations
+        .iter()
         .any(|operation| !route.executed_operations.contains(operation))
     {
         reasons.insert("PROCESS_OPERATION_MISSING".to_owned());
+    }
+    if route
+        .executed_operations
+        .iter()
+        .any(|operation| !route.planned_operations.contains(operation))
+    {
+        reasons.insert("UNPLANNED_OPERATION_EXECUTED".to_owned());
     }
     if route.output_material_state != part.required_material_state {
         reasons.insert("MATERIAL_STATE_MISMATCH".to_owned());
@@ -288,7 +311,8 @@ fn evaluate_scenario(scenario: &Scenario, mass_tolerance_ppm: u64) -> ScenarioRe
         + u128::from(flow.clean_offcut_mass_g)
         + u128::from(flow.chips_mass_g)
         + u128::from(flow.mixed_scrap_mass_g)
-        + u128::from(flow.residue_mass_g);
+        + u128::from(flow.residue_mass_g)
+        + u128::from(flow.process_loss_mass_g);
     let input_mass = u128::from(flow.input_mass_g);
     let difference = output_mass.abs_diff(input_mass);
     if input_mass == 0
@@ -305,6 +329,9 @@ fn evaluate_scenario(scenario: &Scenario, mass_tolerance_ppm: u64) -> ScenarioRe
         reasons.insert("PHYSICAL_INSPECTION_MISSING".to_owned());
     }
     match inspection.calibration {
+        CalibrationState::Current if !option_nonempty(&inspection.calibration_record_ref) => {
+            reasons.insert("METROLOGY_CALIBRATION_REFERENCE_MISSING".to_owned());
+        }
         CalibrationState::Current => {}
         CalibrationState::Stale => {
             reasons.insert("METROLOGY_CALIBRATION_STALE".to_owned());
@@ -318,16 +345,29 @@ fn evaluate_scenario(scenario: &Scenario, mass_tolerance_ppm: u64) -> ScenarioRe
     {
         reasons.insert("INSPECTION_PROVENANCE_MISSING".to_owned());
     }
-    match inspection.measured_dimension_um {
-        Some(measured)
-            if measured.abs_diff(inspection.nominal_dimension_um) > inspection.tolerance_um =>
-        {
-            reasons.insert("PART_OUT_OF_TOLERANCE".to_owned());
-        }
-        None => {
+    match (
+        inspection.measured_dimension_um,
+        inspection.measurement_uncertainty_um,
+    ) {
+        (None, _) => {
             reasons.insert("INSPECTION_VALUE_MISSING".to_owned());
         }
-        _ => {}
+        (Some(measured), None) => {
+            reasons.insert("INSPECTION_UNCERTAINTY_MISSING".to_owned());
+            if measured.abs_diff(inspection.nominal_dimension_um) > inspection.tolerance_um {
+                reasons.insert("PART_OUT_OF_TOLERANCE".to_owned());
+            }
+        }
+        (Some(measured), Some(uncertainty)) => {
+            let deviation = measured.abs_diff(inspection.nominal_dimension_um);
+            if deviation > inspection.tolerance_um {
+                reasons.insert("PART_OUT_OF_TOLERANCE".to_owned());
+            } else if u128::from(deviation) + u128::from(uncertainty)
+                > u128::from(inspection.tolerance_um)
+            {
+                reasons.insert("INSPECTION_UNCERTAINTY_EXCEEDS_MARGIN".to_owned());
+            }
+        }
     }
 
     let actual_disposition = if reasons.is_empty() {
@@ -453,7 +493,7 @@ mod tests {
             .iter()
             .map(|scenario| evaluate_scenario(scenario, corpus.mass_tolerance_ppm))
             .collect();
-        assert_eq!(20, results.len());
+        assert_eq!(24, results.len());
         assert!(results.iter().all(|result| result.expected_control_matched));
     }
 
