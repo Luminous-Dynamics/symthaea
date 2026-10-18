@@ -1203,6 +1203,38 @@ $3}],
         mode
     }
 
+    fn temporal_sample(
+        step_offset: usize,
+        value: Option<&str>,
+        prediction_confidence_ppm: Option<u32>,
+    ) -> TemporalSignatureSample {
+        TemporalSignatureSample {
+            step_offset,
+            value: value.map(str::to_owned),
+            prediction_confidence_ppm,
+        }
+    }
+
+    fn temporal_pair(
+        left_samples: Vec<TemporalSignatureSample>,
+        right_samples: Vec<TemporalSignatureSample>,
+    ) -> MissionFaultModel {
+        let mut model = valid_model();
+        model.failure_modes[0].observable_signals[0].temporal_samples = left_samples;
+        let mut right = second_critical_mode();
+        right.observable_signals[0].temporal_samples = right_samples;
+        model.failure_modes.push(right);
+        model
+    }
+
+    fn temporal_policy() -> TemporalDiagnosabilityPolicy {
+        TemporalDiagnosabilityPolicy {
+            horizon_steps: 5,
+            response_deadline_steps: 2,
+            min_prediction_confidence_ppm: 900_000,
+        }
+    }
+
     #[test]
     fn pair_report_flags_identical_complete_critical_signatures() {
         let mut model = valid_model();
@@ -1323,6 +1355,173 @@ $3});
         assert_eq!(first, second);
         assert_eq!(first.source_design_sha256, model.source_design.sha256);
         assert_eq!(first.source_design_revision, model.source_design.revision);
+    }
+
+
+    #[test]
+    fn temporal_analysis_reports_first_divergence_within_response_deadline() {
+        let model = temporal_pair(
+            vec![
+                temporal_sample(0, Some("available"), Some(990_000)),
+                temporal_sample(2, Some("unavailable"), Some(990_000)),
+            ],
+            vec![
+                temporal_sample(0, Some("available"), Some(990_000)),
+                temporal_sample(2, Some("available"), Some(990_000)),
+            ],
+        );
+        let report = model
+            .analyze_temporal_fault_signatures(temporal_policy())
+            .expect("valid temporal signatures");
+        assert_eq!(report.critical_pair_denominator(), 1);
+        assert!(report.all_critical_pairs_timely());
+        assert!(matches!(
+            &report.findings[0].disposition,
+            TemporalFaultPairDisposition::TimelyDistinguishable {
+                first_divergence_step: 2,
+                separating_signal_ids,
+            } if separating_signal_ids == &vec!["ground_link_available".to_owned()]
+        ));
+    }
+
+    #[test]
+    fn temporal_analysis_never_calls_late_divergence_timely() {
+        let model = temporal_pair(
+            vec![
+                temporal_sample(0, Some("available"), Some(990_000)),
+                temporal_sample(4, Some("unavailable"), Some(990_000)),
+            ],
+            vec![
+                temporal_sample(0, Some("available"), Some(990_000)),
+                temporal_sample(4, Some("available"), Some(990_000)),
+            ],
+        );
+        let report = model
+            .analyze_temporal_fault_signatures(temporal_policy())
+            .expect("valid temporal signatures");
+        assert!(!report.all_critical_pairs_timely());
+        assert_eq!(report.late_pair_count(), 1);
+        assert!(matches!(
+            &report.findings[0].disposition,
+            TemporalFaultPairDisposition::LateDivergence {
+                first_divergence_step: 4,
+                response_deadline_steps: 2,
+                ..
+            }
+        ));
+    }
+
+    #[test]
+    fn temporal_low_confidence_never_separates_faults() {
+        let model = temporal_pair(
+            vec![temporal_sample(1, Some("failed"), Some(899_999))],
+            vec![temporal_sample(1, Some("passed"), Some(990_000))],
+        );
+        let report = model
+            .analyze_temporal_fault_signatures(temporal_policy())
+            .expect("low confidence is unresolved rather than malformed");
+        assert!(!report.all_critical_pairs_timely());
+        assert!(matches!(
+            &report.findings[0].disposition,
+            TemporalFaultPairDisposition::NotDemonstrated {
+                reason: TemporalFaultPairIndeterminacy::BelowConfidenceThreshold,
+                ..
+            }
+        ));
+    }
+
+    #[test]
+    fn temporal_unknown_outcome_or_confidence_is_not_evidence() {
+        let model = temporal_pair(
+            vec![temporal_sample(1, None, Some(990_000))],
+            vec![temporal_sample(1, Some("passed"), None)],
+        );
+        let report = model
+            .analyze_temporal_fault_signatures(temporal_policy())
+            .expect("unknown values are allowed but not decisive");
+        assert!(matches!(
+            &report.findings[0].disposition,
+            TemporalFaultPairDisposition::NotDemonstrated {
+                reason: TemporalFaultPairIndeterminacy::MissingOutcomeOrConfidence,
+                ..
+            }
+        ));
+    }
+
+    #[test]
+    fn equal_high_confidence_traces_are_indistinguishable_through_horizon() {
+        let model = temporal_pair(
+            vec![
+                temporal_sample(0, Some("available"), Some(990_000)),
+                temporal_sample(3, Some("available"), Some(990_000)),
+            ],
+            vec![
+                temporal_sample(0, Some("available"), Some(990_000)),
+                temporal_sample(3, Some("available"), Some(990_000)),
+            ],
+        );
+        let report = model
+            .analyze_temporal_fault_signatures(temporal_policy())
+            .expect("valid equal traces");
+        assert_eq!(report.unresolved_pair_count(), 1);
+        assert!(matches!(
+            &report.findings[0].disposition,
+            TemporalFaultPairDisposition::IndistinguishableThroughHorizon {
+                horizon_steps: 5,
+                ..
+            }
+        ));
+    }
+
+    #[test]
+    fn temporal_analysis_fails_closed_on_nonmatching_sample_offsets() {
+        let model = temporal_pair(
+            vec![temporal_sample(1, Some("failed"), Some(990_000))],
+            vec![temporal_sample(2, Some("passed"), Some(990_000))],
+        );
+        let report = model
+            .analyze_temporal_fault_signatures(temporal_policy())
+            .expect("nonmatching sample offsets are a reportable gap");
+        assert!(matches!(
+            &report.findings[0].disposition,
+            TemporalFaultPairDisposition::NotDemonstrated {
+                reason: TemporalFaultPairIndeterminacy::NoSharedSampleOffsets,
+                ..
+            }
+        ));
+    }
+
+    #[test]
+    fn temporal_policy_and_sample_integrity_are_validated() {
+        let mut model = temporal_pair(
+            vec![temporal_sample(1, Some("failed"), Some(990_000))],
+            vec![temporal_sample(1, Some("passed"), Some(990_000))],
+        );
+        let invalid_policy = TemporalDiagnosabilityPolicy {
+            horizon_steps: 2,
+            response_deadline_steps: 3,
+            min_prediction_confidence_ppm: 900_000,
+        };
+        assert_eq!(
+            model.analyze_temporal_fault_signatures(invalid_policy),
+            Err(MissionFaultModelError::InvalidTemporalPolicy)
+        );
+
+        model.failure_modes[0].observable_signals[0].temporal_samples.push(
+            temporal_sample(1, Some("failed-again"), Some(990_000)),
+        );
+        assert!(matches!(
+            model.validate(),
+            Err(MissionFaultModelError::DuplicateTemporalSampleStep { .. })
+        ));
+
+        model.failure_modes[0].observable_signals[0].temporal_samples[1].step_offset = 2;
+        model.failure_modes[0].observable_signals[0].temporal_samples[1]
+            .prediction_confidence_ppm = Some(1_000_001);
+        assert!(matches!(
+            model.validate(),
+            Err(MissionFaultModelError::InvalidTemporalConfidence { .. })
+        ));
     }
 
     #[test]
