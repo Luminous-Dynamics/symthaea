@@ -269,7 +269,8 @@ impl RobustDecisionScenario {
         let mut numerator = 0_i128;
         let mut recorded = Vec::with_capacity(allocation.len());
         for (state, probability) in self.state_probability_bounds.iter().zip(allocation) {
-            numerator += i128::from(probability) * i128::from(self.payoff(action_id, &state.state_id));
+            numerator += i128::from(probability)
+                * i128::from(self.payoff(action_id, &state.state_id));
             recorded.push(ProbabilityAllocation {
                 state_id: state.state_id.clone(),
                 probability_bps: probability,
@@ -478,6 +479,70 @@ mod tests {
         permuted.action_ids.reverse();
         permuted.payoffs.reverse();
         assert_eq!(baseline, permuted.evaluate().unwrap());
+    }
+
+    #[test]
+    fn greedy_extrema_match_independent_grid_oracle() {
+        let mut input = scenario();
+        input.state_probability_bounds = vec![
+            StateProbabilityBound {
+                state_id: "alpha".into(),
+                lower_bps: 2_000,
+                upper_bps: 6_000,
+            },
+            StateProbabilityBound {
+                state_id: "beta".into(),
+                lower_bps: 2_000,
+                upper_bps: 6_000,
+            },
+            StateProbabilityBound {
+                state_id: "gamma".into(),
+                lower_bps: 2_000,
+                upper_bps: 6_000,
+            },
+        ];
+        input.action_ids = vec!["test-action".into()];
+        input.payoffs = vec![
+            RobustPayoff {
+                action_id: "test-action".into(),
+                state_id: "alpha".into(),
+                payoff_minor: 17,
+            },
+            RobustPayoff {
+                action_id: "test-action".into(),
+                state_id: "beta".into(),
+                payoff_minor: -9,
+            },
+            RobustPayoff {
+                action_id: "test-action".into(),
+                state_id: "gamma".into(),
+                payoff_minor: 23,
+            },
+        ];
+
+        let mut oracle_min = i128::MAX;
+        let mut oracle_max = i128::MIN;
+        for alpha in (2_000_u32..=6_000).step_by(1_000) {
+            for beta in (2_000_u32..=6_000).step_by(1_000) {
+                if u64::from(alpha) + u64::from(beta) > TOTAL_BPS {
+                    continue;
+                }
+                let gamma = TOTAL_BPS - u64::from(alpha) - u64::from(beta);
+                if !(2_000..=6_000).contains(&gamma) || gamma % 1_000 != 0 {
+                    continue;
+                }
+                let numerator = i128::from(alpha) * 17
+                    + i128::from(beta) * -9
+                    + i128::from(gamma) * 23;
+                oracle_min = oracle_min.min(numerator);
+                oracle_max = oracle_max.max(numerator);
+            }
+        }
+
+        let report = input.evaluate().unwrap();
+        let evaluated = envelope(&report, "test-action");
+        assert_eq!(evaluated.lower_expected_value_numerator, oracle_min);
+        assert_eq!(evaluated.upper_expected_value_numerator, oracle_max);
     }
 
     #[test]
