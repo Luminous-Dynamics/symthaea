@@ -594,6 +594,15 @@ mod tests {
     }
 
     #[test]
+    fn non_finite_build_orientation_blocks_evaluation() {
+        let mut input = case(EvidenceClass::Synthetic, Some(10.0), Some(0.0));
+        input.manifest.build_orientation_deg[2] = f64::INFINITY;
+        let result = evaluate_fdm_case(&input);
+        assert_eq!(result.disposition, GeometryDisposition::NotEvaluable);
+        assert!(result.issues.iter().any(|issue| issue.contains("build orientation")));
+    }
+
+    #[test]
     fn empty_specimen_or_coordinate_frame_identity_blocks_evaluation() {
         let mut input = case(EvidenceClass::Synthetic, Some(10.0), Some(0.0));
         input.manifest.specimen_id.clear();
