@@ -68,7 +68,7 @@ pub enum ValueOfInformationError {
     IncompletePayoffTable,
     DuplicatePayoffEntry,
     UnknownStateReference,
-    UnknownOutcomeOrActionReference,
+    UnknownStateOrActionReference,
     NegativeInformationCost,
     InformationCostOverflow,
     ExpectedValueOverflow,
@@ -159,7 +159,7 @@ impl ValueOfInformationScenario {
                     marginal_probability_numerator,
                 )
                 .map_err(|_| ValueOfInformationError::ExpectedValueOverflow)?,
-                conditional_expected_value_numerator: best_conditional_numerator,
+                joint_weighted_payoff_numerator: best_conditional_numerator,
             });
         }
 
@@ -300,7 +300,7 @@ impl ValueOfInformationScenario {
             if !state_ids.contains(payoff.state_id.as_str())
                 || !action_ids.contains(payoff.action_id.as_str())
             {
-                return Err(ValueOfInformationError::UnknownOutcomeOrActionReference);
+                return Err(ValueOfInformationError::UnknownStateOrActionReference);
             }
             if !payoff_keys.insert((payoff.action_id.as_str(), payoff.state_id.as_str())) {
                 return Err(ValueOfInformationError::DuplicatePayoffEntry);
