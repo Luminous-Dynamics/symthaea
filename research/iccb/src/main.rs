@@ -1,6 +1,6 @@
 use iccb_evaluator::{
-    cash_maximizing_feasible_baseline, pareto_frontier, CandidateScenario, DecisionOption,
-    EvidenceClaim, EvidenceState, Mandate,
+    cash_maximizing_feasible_baseline, pareto_frontier, staging::TrancheRequest,
+    CandidateScenario, DecisionOption, EvidenceClaim, EvidenceState, Mandate,
 };
 use std::collections::BTreeSet;
 
@@ -31,6 +31,18 @@ fn main() {
                 available_liquidity_after_minor: 20_000,
                 productive_capacity_delta: 2,
                 maintenance_backlog_delta_minor: 8_000,
+                dependency_ids: vec!["grid-a".into()],
+                evidence: vec![claim.clone()],
+                authority_granted: true,
+            },
+            DecisionOption {
+                id: "balanced-cash-option".into(),
+                expected_net_cash_minor: 42_000,
+                reported_valuation_change_minor: 150_000,
+                required_capital_minor: 55_000,
+                available_liquidity_after_minor: 21_000,
+                productive_capacity_delta: 5,
+                maintenance_backlog_delta_minor: 2_000,
                 dependency_ids: vec!["grid-a".into()],
                 evidence: vec![claim.clone()],
                 authority_granted: true,
@@ -71,4 +83,26 @@ fn main() {
             evaluated.outcomes.critical_dependency_count,
         );
     }
+
+    let tranche = TrancheRequest {
+        tranche_id: "stage-2-after-inspection".into(),
+        amount_minor: 25_000,
+        previously_committed_minor: 30_000,
+        total_commitment_cap_minor: 80_000,
+        evaluation_day: 12,
+        milestone_satisfied: false,
+        authority_granted: true,
+        milestone_evidence: vec![EvidenceClaim {
+            id: "inspection-001".into(),
+            state: EvidenceState::Stale,
+            source_id: Some("synthetic-inspection-record".into()),
+            observed_day: Some(1),
+            valid_through_day: Some(7),
+        }],
+    }
+    .evaluate_release();
+    println!(
+        "Next tranche approved: {}, reasons: {:?}",
+        tranche.approved, tranche.rejection_reasons
+    );
 }
