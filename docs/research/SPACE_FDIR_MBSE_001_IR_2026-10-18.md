@@ -100,3 +100,6 @@ Only the same signal ID, same unit, and same relative sample offset can be compa
 - Report per-pair earliest separation steps and aggregate minimum/median/p95 only when actual scenario outputs support those summaries.
 - Evaluate sensitivity across frozen confidence thresholds and horizon/deadline changes; all changed policies produce distinct report identities.
 - Keep physical sensor calibration, empirical fault-detection probability, false-alarm rate, and real-time/onboard performance outside this structural model until measured evidence exists.
+
+
+The known-answer input corpus is versioned at `crates/domains/symthaea-orbital/fixtures/space_fdir_mbse_001/temporal_diagnosability_cases.json`. It contains eight synthetic cases for early separation, late separation, below-threshold confidence, unknown outcome/confidence, complete equal traces, nonmatching sample offsets, horizon truncation, and same-name incompatible units. A Rust regression consumes the corpus and checks each expected disposition and any declared first-separation step; a separate source-side JavaScript replay was also used as a sanity check. Neither constitutes a Rust compilation/test pass until the exact branch is built and tests execute.
