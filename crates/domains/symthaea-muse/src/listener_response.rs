@@ -78,6 +78,9 @@ pub struct ListenerResponseRecord {
     /// Optional symbolic score digest where a score exists.
     pub score_sha256: Option<String>,
     pub model_version: Option<String>,
+    /// Monotonic, study-local collection order across all participants. This is
+    /// an ordinal for temporal splits, not a timestamp or direct identifier.
+    pub collection_sequence: u64,
     /// 1-based session-local indices; no precise timestamp is stored.
     pub session_index: u32,
     pub order_in_session: u32,
@@ -109,6 +112,7 @@ pub enum ListenerResponseIssue {
     InvalidOrdinal { field: String },
     MissingTargetForShiftIntent,
     NonIncreasingCheckpointTime,
+    ZeroCollectionSequence,
 }
 
 impl ListenerResponseRecord {
@@ -138,6 +142,9 @@ impl ListenerResponseRecord {
             issues.push(ListenerResponseIssue::EmptyField {
                 field: "model_version".to_owned(),
             });
+        }
+        if self.collection_sequence == 0 {
+            issues.push(ListenerResponseIssue::ZeroCollectionSequence);
         }
         if self.session_index == 0 {
             issues.push(ListenerResponseIssue::InvalidOrdinal {
@@ -242,6 +249,7 @@ mod tests {
             audio_sha256: "a".repeat(64),
             score_sha256: Some("b".repeat(64)),
             model_version: Some("muse-test-model-v1".to_owned()),
+            collection_sequence: 1,
             session_index: 1,
             order_in_session: 1,
             intent: ListeningIntent::ShiftTowardTarget,
