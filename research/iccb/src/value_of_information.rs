@@ -471,6 +471,90 @@ mod tests {
     }
 
     #[test]
+    fn matches_symtropy_cislunar_survey_reference_fixture() {
+        // Shared with Symtropy issue #1738; synthetic contract values only.
+        // Rich prior 0.40, build payoff +100 / -150, survey cost 10,
+        // sensitivity 0.90 and specificity 0.90 give gross EVSI 27, net 17,
+        // and EVPI 40. No real lunar-resource or project estimate is implied.
+        let input = ValueOfInformationScenario {
+            id: "SYM-EVSI-CISLUNAR-REF-001".into(),
+            information_cost_minor: 10,
+            states: vec![
+                InformationState {
+                    id: "rich-deposit".into(),
+                    prior_probability_bps: 4_000,
+                },
+                InformationState {
+                    id: "poor-deposit".into(),
+                    prior_probability_bps: 6_000,
+                },
+            ],
+            signals: vec![
+                InformationSignal {
+                    id: "survey-positive".into(),
+                    likelihoods: vec![
+                        SignalLikelihood {
+                            state_id: "rich-deposit".into(),
+                            likelihood_bps: 9_000,
+                        },
+                        SignalLikelihood {
+                            state_id: "poor-deposit".into(),
+                            likelihood_bps: 1_000,
+                        },
+                    ],
+                },
+                InformationSignal {
+                    id: "survey-negative".into(),
+                    likelihoods: vec![
+                        SignalLikelihood {
+                            state_id: "rich-deposit".into(),
+                            likelihood_bps: 1_000,
+                        },
+                        SignalLikelihood {
+                            state_id: "poor-deposit".into(),
+                            likelihood_bps: 9_000,
+                        },
+                    ],
+                },
+            ],
+            action_ids: vec!["build-isru".into(), "import".into()],
+            payoffs: vec![
+                DecisionPayoff {
+                    action_id: "build-isru".into(),
+                    state_id: "rich-deposit".into(),
+                    net_value_minor: 100,
+                },
+                DecisionPayoff {
+                    action_id: "build-isru".into(),
+                    state_id: "poor-deposit".into(),
+                    net_value_minor: -150,
+                },
+                DecisionPayoff {
+                    action_id: "import".into(),
+                    state_id: "rich-deposit".into(),
+                    net_value_minor: 0,
+                },
+                DecisionPayoff {
+                    action_id: "import".into(),
+                    state_id: "poor-deposit".into(),
+                    net_value_minor: 0,
+                },
+            ],
+        };
+
+        let report = input.evaluate().unwrap();
+        assert_eq!(report.baseline_action_id, "import");
+        assert_eq!(report.baseline_expected_value_minor, 0);
+        assert_eq!(report.expected_value_with_signal_minor, 27);
+        assert_eq!(report.gross_evsi_minor, 27);
+        assert_eq!(report.information_cost_minor, 10);
+        assert_eq!(report.net_evsi_minor, 17);
+        assert_eq!(report.perfect_information_expected_value_minor, 40);
+        assert_eq!(report.evpi_minor, 40);
+        assert!(report.worthwhile_at_declared_cost);
+    }
+
+    #[test]
     fn information_cost_can_exceed_gross_value() {
         let report = perfect_signal_scenario(101).evaluate().unwrap();
         assert_eq!(report.gross_evsi_minor, 50);
