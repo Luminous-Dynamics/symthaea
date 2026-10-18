@@ -11,16 +11,22 @@
 //! 1. **IVP — Exponential Growth**: dy/dt = y, y(0) = 1 → y(t) = eᵗ
 //!    Checks RK4 solution at t=1 against e ≈ 2.71828.
 //!
-//! 2. **BVP — Harmonic Oscillator**: y'' + y = 0, y(0) = 0, y(π) = 0
-//!    Shooting method; verifies residual at right boundary is < 1e-6.
+//! 2. **BVP — Harmonic Oscillator**: y'' + y = 0 on [0, π/2], with
+//!    y(0)=0 and y(π/2)=1. The unique solution is y(t)=sin(t); score the
+//!    shooting slope and the full trajectory so a zero solution cannot pass.
 //!
-//! 3. **PDE — 1-D Heat Equation**: ∂u/∂t = α ∂²u/∂x², checks that
-//!    total energy monotonically decays (diffusion dissipates heat).
+//! 3. **PDE — 1-D Heat Equation**: u(x,0)=sin(πx/L) with zero Dirichlet
+//!    boundaries. Compare the computed solution with the analytical eigenmode
+//!    at the requested time; energy decay remains only a qualitative invariant.
 //!
-//! Human baselines (Burden & Faires, 2010):
-//! - ivp_relative_error:   < 0.01  (RK4 accuracy ≈ 0.99+)
-//! - bvp_converged_rate:   0.88 (SD ~0.08)
-//! - pde_energy_decay_rate: 0.95 (SD ~0.05) — heat always dissipates
+//! Legacy broad smoke-test targets (historical project values, not literature norms):
+//! - ivp_relative_error:    < 0.01
+//! - bvp_converged_rate:    0.88
+//! - pde_energy_decay_rate: 0.95
+//!
+//! Provisional exact-reference gates (project targets, not literature norms):
+//! - BVP slope error and max trajectory absolute error: < 1e-4.
+//! - Heat-mode relative L2 error: < 1e-2.
 
 use crate::harness::config::BenchmarkConfig;
 use crate::harness::report::{BenchmarkResult, MetricValue};
@@ -33,7 +39,11 @@ pub struct DifferentialEquationsBenchmark;
 struct TrialResult {
     ivp_relative_error: f64,
     bvp_converged: f64,
+    bvp_boundary_residual: f64,
+    bvp_slope_abs_error: f64,
+    bvp_max_abs_error: f64,
     pde_energy_decay: f64,
+    pde_relative_l2_error: f64,
 }
 
 // ── IVP helpers ──────────────────────────────────────────────────────────────
@@ -52,15 +62,14 @@ fn harmonic_oscillator_rhs(_t: f64, y: &[f64]) -> Vec<f64> {
 
 // ── PDE helpers ──────────────────────────────────────────────────────────────
 
-/// Gaussian bump initial condition: u(x,0) = exp(-50(x-L/2)²)
-fn gaussian_ic(n_x: usize, length: f64) -> Vec<f64> {
+/// First Dirichlet eigenmode: u(x,0) = sin(πx/L).
+///
+/// Its analytical heat-equation solution is
+/// u(x,t) = exp(-α(π/L)²t) sin(πx/L), giving an independent reference.
+fn sine_mode_ic(n_x: usize, length: f64) -> Vec<f64> {
     let dx = length / (n_x + 1) as f64;
     (1..=n_x)
-        .map(|i| {
-            let x = i as f64 * dx;
-            let center = length / 2.0;
-            (-(x - center).powi(2) * 50.0).exp()
-        })
+        .map(|i| (std::f64::consts::PI * i as f64 * dx / length).sin())
         .collect()
 }
 
@@ -82,37 +91,69 @@ impl DifferentialEquationsBenchmark {
         let exact_e = std::f64::consts::E;
         let ivp_relative_error = (y_at_1 - exact_e).abs() / exact_e;
 
-        // ── 2. BVP: Harmonic oscillator y'' + y = 0, y(0)=0, y(π)=0 ─────
-        // Exact solution: y(t) = C·sin(t). BVP has infinitely many solutions;
-        // we verify the shooting method converges (boundary residual < tol).
+        // ── 2. BVP: Harmonic oscillator y'' + y = 0 on [0, π/2] ─────────
+        // y(0)=0, y(π/2)=1 gives the unique nontrivial solution y(t)=sin(t).
+        // This rejects the former degenerate zero solution that satisfied
+        // y(0)=y(π)=0 with a tiny boundary residual.
         let bvp = DifferentialEquationsEngine::solve_bvp_shooting(
             harmonic_oscillator_rhs,
-            0.0,                  // a (left boundary t)
-            std::f64::consts::PI, // b (right boundary t)
-            0.0,                  // y(a) = 0
-            0.0,                  // y(b) = 0
-            -10.0,                // slope_lo bracket
-            10.0,                 // slope_hi bracket
-            500,                  // IVP steps
+            0.0,                         // a (left boundary t)
+            std::f64::consts::FRAC_PI_2, // b (right boundary t)
+            0.0,                         // y(a) = 0
+            1.0,                         // y(b) = 1; excludes zero solution
+            -10.0,                       // slope_lo bracket
+            10.0,                        // slope_hi bracket
+            500,                         // IVP steps
         );
-        let bvp_converged = if bvp.converged && bvp.boundary_residual < 1e-4 {
+        let bvp_max_abs_error = bvp
+            .trajectory
+            .t_values
+            .iter()
+            .zip(&bvp.trajectory.y_values)
+            .map(|(&t, state)| (state[0] - t.sin()).abs())
+            .fold(0.0_f64, f64::max);
+        let bvp_boundary_residual = bvp.boundary_residual;
+        let bvp_slope_abs_error = (bvp.shooting_slope - 1.0).abs();
+        let bvp_converged = if bvp.converged
+            && bvp_boundary_residual < 1e-4
+            && bvp_slope_abs_error < 1e-4
+            && bvp_max_abs_error < 1e-4
+        {
             1.0
         } else {
             0.0
         };
 
-        // ── 3. PDE: 1-D Heat Equation — energy must decay ────────────────
+        // ── 3. PDE: 1-D Heat Equation — analytical eigenmode comparison ───
         let n_x = 20usize;
         let length = 1.0_f64;
         let alpha = 0.01_f64; // thermal diffusivity
         let t_end = 0.5_f64;
-        let u0 = gaussian_ic(n_x, length);
+        let u0 = sine_mode_ic(n_x, length);
         let initial_energy: f64 = u0.iter().map(|v| v * v).sum::<f64>().sqrt();
 
         let pde = DifferentialEquationsEngine::heat_equation_1d(alpha, length, t_end, n_x, &u0);
         let final_energy: f64 = pde.u_final.iter().map(|v| v * v).sum::<f64>().sqrt();
+        let decay = (-alpha * (std::f64::consts::PI / length).powi(2) * t_end).exp();
+        let exact: Vec<f64> = pde
+            .x_grid
+            .iter()
+            .map(|&x| decay * (std::f64::consts::PI * x / length).sin())
+            .collect();
+        let exact_norm_squared: f64 = exact.iter().map(|v| v * v).sum();
+        let squared_error: f64 = pde
+            .u_final
+            .iter()
+            .zip(&exact)
+            .map(|(actual, expected)| (actual - expected).powi(2))
+            .sum();
+        let pde_relative_l2_error = if exact_norm_squared > 0.0 {
+            (squared_error / exact_norm_squared).sqrt()
+        } else {
+            f64::INFINITY
+        };
 
-        // Correct if energy decayed (heat dissipates) AND by more than 10%
+        // Retain the qualitative invariant, but do not treat it as accuracy.
         let pde_energy_decay = if initial_energy > 0.0
             && final_energy < initial_energy * 0.99
             && final_energy >= 0.0
@@ -125,7 +166,11 @@ impl DifferentialEquationsBenchmark {
         TrialResult {
             ivp_relative_error,
             bvp_converged,
+            bvp_boundary_residual,
+            bvp_slope_abs_error,
+            bvp_max_abs_error,
             pde_energy_decay,
+            pde_relative_l2_error,
         }
     }
 }
@@ -150,20 +195,44 @@ impl PsychBenchmark for DifferentialEquationsBenchmark {
 
         let mut ivp_errors = Vec::with_capacity(config.trials_per_condition);
         let mut bvp_rates = Vec::with_capacity(config.trials_per_condition);
+        let mut bvp_boundary_residuals = Vec::with_capacity(config.trials_per_condition);
+        let mut bvp_slope_errors = Vec::with_capacity(config.trials_per_condition);
+        let mut bvp_errors = Vec::with_capacity(config.trials_per_condition);
         let mut pde_decays = Vec::with_capacity(config.trials_per_condition);
+        let mut pde_errors = Vec::with_capacity(config.trials_per_condition);
 
         for trial in 0..config.trials_per_condition {
             let r = self.run_trial(config, trial);
             ivp_errors.push(r.ivp_relative_error);
             bvp_rates.push(r.bvp_converged);
+            bvp_boundary_residuals.push(r.bvp_boundary_residual);
+            bvp_slope_errors.push(r.bvp_slope_abs_error);
+            bvp_errors.push(r.bvp_max_abs_error);
             pde_decays.push(r.pde_energy_decay);
+            pde_errors.push(r.pde_relative_l2_error);
         }
 
         result.insert("ivp_relative_error", MetricValue::from_samples(&ivp_errors));
         result.insert("bvp_converged_rate", MetricValue::from_samples(&bvp_rates));
         result.insert(
+            "bvp_boundary_residual",
+            MetricValue::from_samples(&bvp_boundary_residuals),
+        );
+        result.insert(
+            "bvp_slope_abs_error",
+            MetricValue::from_samples(&bvp_slope_errors),
+        );
+        result.insert(
+            "bvp_max_abs_error",
+            MetricValue::from_samples(&bvp_errors),
+        );
+        result.insert(
             "pde_energy_decay_rate",
             MetricValue::from_samples(&pde_decays),
+        );
+        result.insert(
+            "pde_relative_l2_error",
+            MetricValue::from_samples(&pde_errors),
         );
 
         result.conditions = 3; // IVP, BVP, PDE
@@ -190,7 +259,11 @@ mod tests {
         let result = DifferentialEquationsBenchmark.run(&test_config());
         assert!(result.metrics.contains_key("ivp_relative_error"));
         assert!(result.metrics.contains_key("bvp_converged_rate"));
+        assert!(result.metrics.contains_key("bvp_boundary_residual"));
+        assert!(result.metrics.contains_key("bvp_slope_abs_error"));
+        assert!(result.metrics.contains_key("bvp_max_abs_error"));
         assert!(result.metrics.contains_key("pde_energy_decay_rate"));
+        assert!(result.metrics.contains_key("pde_relative_l2_error"));
     }
 
     #[test]
@@ -222,9 +295,9 @@ mod tests {
         let bvp = DifferentialEquationsEngine::solve_bvp_shooting(
             harmonic_oscillator_rhs,
             0.0,
-            std::f64::consts::PI,
+            std::f64::consts::FRAC_PI_2,
             0.0,
-            0.0,
+            1.0,
             -10.0,
             10.0,
             500,
@@ -235,17 +308,55 @@ mod tests {
             "Boundary residual {:.2e} too large",
             bvp.boundary_residual
         );
+        assert!(
+            (bvp.shooting_slope - 1.0).abs() < 1e-4,
+            "Expected nontrivial shooting slope 1, got {:.6}",
+            bvp.shooting_slope
+        );
+        let max_abs_error = bvp
+            .trajectory
+            .t_values
+            .iter()
+            .zip(&bvp.trajectory.y_values)
+            .map(|(&t, state)| (state[0] - t.sin()).abs())
+            .fold(0.0_f64, f64::max);
+        assert!(
+            max_abs_error < 1e-4,
+            "Trajectory error {:.2e} exceeds 1e-4",
+            max_abs_error
+        );
     }
 
     #[test]
     fn test_pde_heat_energy_decays() {
         let n_x = 20;
         let length = 1.0;
-        let u0 = gaussian_ic(n_x, length);
+        let u0 = sine_mode_ic(n_x, length);
         let initial_energy: f64 = u0.iter().map(|v| v * v).sum::<f64>().sqrt();
 
-        let pde = DifferentialEquationsEngine::heat_equation_1d(0.01, length, 0.5, n_x, &u0);
+        let alpha = 0.01_f64;
+        let t_end = 0.5_f64;
+        let pde = DifferentialEquationsEngine::heat_equation_1d(alpha, length, t_end, n_x, &u0);
         let final_energy: f64 = pde.u_final.iter().map(|v| v * v).sum::<f64>().sqrt();
+        let decay = (-alpha * (std::f64::consts::PI / length).powi(2) * t_end).exp();
+        let exact: Vec<f64> = pde
+            .x_grid
+            .iter()
+            .map(|&x| decay * (std::f64::consts::PI * x / length).sin())
+            .collect();
+        let exact_norm_squared: f64 = exact.iter().map(|v| v * v).sum();
+        let squared_error: f64 = pde
+            .u_final
+            .iter()
+            .zip(&exact)
+            .map(|(actual, expected)| (actual - expected).powi(2))
+            .sum();
+        let relative_l2_error = (squared_error / exact_norm_squared).sqrt();
+        assert!(
+            relative_l2_error < 1e-2,
+            "Heat-equation relative L2 error {:.3e} exceeds 1e-2",
+            relative_l2_error
+        );
 
         assert!(
             final_energy < initial_energy,
