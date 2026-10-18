@@ -566,7 +566,8 @@ impl MissionFaultModel {
         policy: TemporalDiagnosabilityPolicy,
     ) -> Result<TemporalFaultDiagnosabilityReport, MissionFaultModelError> {
         self.validate()?;
-        if policy.min_prediction_confidence_ppm > TEMPORAL_CONFIDENCE_SCALE_PPM
+        if policy.min_prediction_confidence_ppm == 0
+            || policy.min_prediction_confidence_ppm > TEMPORAL_CONFIDENCE_SCALE_PPM
             || policy.response_deadline_steps > policy.horizon_steps
         {
             return Err(MissionFaultModelError::InvalidTemporalPolicy);
@@ -1522,6 +1523,84 @@ $3});
             model.validate(),
             Err(MissionFaultModelError::InvalidTemporalConfidence { .. })
         ));
+    }
+
+
+    #[test]
+    fn temporal_horizon_change_distinguishes_late_from_not_yet_observed() {
+        let model = temporal_pair(
+            vec![
+                temporal_sample(0, Some("available"), Some(990_000)),
+                temporal_sample(4, Some("unavailable"), Some(990_000)),
+            ],
+            vec![
+                temporal_sample(0, Some("available"), Some(990_000)),
+                temporal_sample(4, Some("available"), Some(990_000)),
+            ],
+        );
+        let short = model
+            .analyze_temporal_fault_signatures(TemporalDiagnosabilityPolicy {
+                horizon_steps: 3,
+                response_deadline_steps: 2,
+                min_prediction_confidence_ppm: 900_000,
+            })
+            .expect("short horizon is valid");
+        let long = model
+            .analyze_temporal_fault_signatures(temporal_policy())
+            .expect("long horizon is valid");
+
+        assert!(matches!(
+            &short.findings[0].disposition,
+            TemporalFaultPairDisposition::IndistinguishableThroughHorizon {
+                horizon_steps: 3,
+                ..
+            }
+        ));
+        assert!(matches!(
+            &long.findings[0].disposition,
+            TemporalFaultPairDisposition::LateDivergence {
+                first_divergence_step: 4,
+                ..
+            }
+        ));
+        assert_ne!(short.policy, long.policy);
+    }
+
+    #[test]
+    fn temporal_signal_unit_mismatch_cannot_create_a_separator() {
+        let mut model = temporal_pair(
+            vec![temporal_sample(1, Some("failed"), Some(990_000))],
+            vec![temporal_sample(1, Some("passed"), Some(990_000))],
+        );
+        model.failure_modes[1].observable_signals[0].unit = "status_code".to_owned();
+        let report = model
+            .analyze_temporal_fault_signatures(temporal_policy())
+            .expect("unit mismatch is a reportable non-comparison");
+        assert!(matches!(
+            &report.findings[0].disposition,
+            TemporalFaultPairDisposition::NotDemonstrated {
+                reason: TemporalFaultPairIndeterminacy::NoComparableSignals,
+                ..
+            }
+        ));
+    }
+
+    #[test]
+    fn temporal_policy_rejects_zero_confidence_threshold_and_empty_denominators() {
+        let model = temporal_pair(vec![], vec![]);
+        assert_eq!(
+            model.analyze_temporal_fault_signatures(TemporalDiagnosabilityPolicy {
+                horizon_steps: 5,
+                response_deadline_steps: 2,
+                min_prediction_confidence_ppm: 0,
+            }),
+            Err(MissionFaultModelError::InvalidTemporalPolicy)
+        );
+        let one_mode = valid_model()
+            .analyze_temporal_fault_signatures(temporal_policy())
+            .expect("single-mode report is valid but has no pair denominator");
+        assert_eq!(one_mode.critical_pair_denominator(), 0);
+        assert!(!one_mode.all_critical_pairs_timely());
     }
 
     #[test]
