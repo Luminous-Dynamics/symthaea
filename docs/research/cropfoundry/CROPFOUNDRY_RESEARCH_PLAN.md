@@ -72,6 +72,8 @@ update uncertainty and next-generation decisions
 
 Each arrow needs its own evidence contract. If pedigree, genotype, license, or phenotype history is absent, the system must say so and stop short of a breeding-policy claim.
 
+A second, separate design shift is to optimize **decision quality rather than prediction score alone**. CF-014 compares candidate recommendations against a declared baseline using decision regret under held-out environment/price scenarios, with hard constraints and sensitivity to utility assumptions. A slightly less accurate yield predictor may still make better planting or resource-allocation choices; conversely, a model with low average error can be harmful when errors cluster around high-cost extremes. Begin with synthetic and retrospective replay, then require local cost data and prospective evaluation before asserting economic benefit.
+
 ## System boundaries
 
 - **Symthaea:** evidence-aware reasoning, candidate generation, uncertainty handling, multi-objective ranking, experiment selection, and recommendation receipts.
