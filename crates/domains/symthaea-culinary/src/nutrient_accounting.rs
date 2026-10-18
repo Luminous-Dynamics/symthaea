@@ -353,7 +353,6 @@ pub fn validate_nutrient_accounting_v1(
     };
     let mut output_ids = BTreeSet::new();
     let mut results = Vec::new();
-    let mut normalized_expectations = BTreeMap::new();
 
     for (index, expected) in expected_outputs.iter().enumerate() {
         let label = format!("expected_outputs[{index}]");
@@ -467,7 +466,6 @@ pub fn validate_nutrient_accounting_v1(
                 errors.push(format!("{label}.per_100g_final disagrees with recomputation"));
             }
         }
-        normalized_expectations.insert(nutrient_id.to_owned(), ());
         results.push(NutrientOutputV1 {
             nutrient_id: nutrient_id.to_owned(),
             unit: unit.to_owned(),
