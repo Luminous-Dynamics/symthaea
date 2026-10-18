@@ -119,7 +119,8 @@ fn attribute_check_cannot_rewrite_source_record_identity() {
 #[test]
 fn duplicate_attribute_checks_are_rejected() {
     let mut value = fixture();
-    value["attribute_checks"].as_array_mut().unwrap().push(value["attribute_checks"][0].clone());
+    let first_check = value["attribute_checks"][0].clone();
+    value["attribute_checks"].as_array_mut().unwrap().push(first_check);
     let errors = violations(&value);
     assert!(errors.iter().any(|error| error.contains("duplicate attribute check")));
 }
