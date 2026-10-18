@@ -180,6 +180,16 @@ Choose one asset class and one repeated decision workflow. Keep recommendations 
 ### Step 6 — Expand only after value is established
 Only then consider additional portfolio companies, regions, or sovereign / transnational stakeholders. Institutional deployment requires a security and governance case appropriate to the customer, not just benchmark scores.
 
+## Probability ambiguity: never manufacture a point prior
+
+The benchmark now includes a complementary robust decision mode for cases where an evaluator can justify lower and upper probability bounds for discrete states but cannot justify one point distribution. See the implementation work in [ICCB-004](https://github.com/Luminous-Dynamics/symthaea/issues/8024).
+
+The robust mode holds the payoff table fixed and computes, for each action, its minimum and maximum expected payoff over all probability vectors satisfying the declared bounds and summing to 10,000 basis points. It returns a unique robust winner only when one action's exact worst-case value strictly exceeds every alternative's exact best-case value. If envelopes overlap, it reports that the ranking is ambiguous rather than substituting interval midpoints or inventing a probability.
+
+The current prototype bounds **probability uncertainty only**. It does not model uncertain payoff outputs, unknown/out-of-domain states, or model-discrepancy intervals. Those require their own validated inputs and must not be folded into this label. This track complements Symtropy's [CIV-INFRA-ROBUST-001 #1769](https://github.com/Luminous-Dynamics/symtropy/issues/1769) and [CIV-INFRA-CAL-001 #1812](https://github.com/Luminous-Dynamics/symtropy/issues/1812); ICCB should consume qualified robustness/model-discrepancy evidence from those domains rather than duplicating their calibrators or physical models.
+
+Provisional acceptance targets: 100% agreement with a separately implemented grid oracle on frozen small fixtures; every extremal probability allocation respects per-state bounds and sums to one; infeasible interval simplexes fail closed; conservative floor/ceiling results are correct for negative fractional expectations; permutations preserve canonical outputs; and no unique winner is reported unless exact worst-case/best-case envelopes strictly separate.
+
 ## Decision rule
 
 Proceed beyond the synthetic phase only if all hard gates pass, material limitations are explicit, and the candidate beats a simpler baseline on at least one preregistered use case without unacceptable regressions. Otherwise, narrow the scope or reject the hypothesis.
