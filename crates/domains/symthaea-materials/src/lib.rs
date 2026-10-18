@@ -14,6 +14,7 @@
 pub mod aging;
 pub mod capacitor_device;
 pub mod capacitor_spectrum;
+pub mod capacitor_magnitude_esr;
 pub mod compound_stability;
 pub mod database;
 pub mod encoder;
@@ -29,6 +30,14 @@ pub use capacitor_device::{
     CapacitorDeviceScreeningLimitation, CapacitorDeviceScreeningReport,
     CapacitorDeviceScreeningRequirements, SeriesRlcCapacitorModel,
     calculate_capacitor_device_metrics, screen_capacitor_device,
+};
+pub use capacitor_magnitude_esr::{
+    calculate_magnitude_esr_spectrum_metrics, screen_magnitude_esr_spectrum,
+    CapacitorDcBiasCondition, CapacitorMagnitudeEsrSweep, MagnitudeEsrConstraintViolation,
+    MagnitudeEsrEvaluation, MagnitudeEsrScreeningDisposition,
+    MagnitudeEsrScreeningLimitation, MagnitudeEsrScreeningReport,
+    MagnitudeEsrScreeningRequirements, MagnitudeEsrSpectrumComponentResult,
+    MagnitudeEsrSpectrumMetrics, MagnitudeEsrSweepError, MagnitudeEsrSweepPoint,
 };
 pub use capacitor_spectrum::{
     calculate_capacitor_spectrum_metrics, screen_capacitor_spectrum,
