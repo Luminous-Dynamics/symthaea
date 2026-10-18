@@ -1,0 +1,70 @@
+{
+  "schema_version": "0.1.0",
+  "validation_id": "ODRH-CAD-CHECK-001",
+  "source_path": "hardware/open-display-reference/cad/odrh_sensor_interface_plate.scad",
+  "source_revision": {
+    "git_blob_sha1": "60976ea6fc4879cfeccf5d01c0763094e8978551",
+    "sha256": "ac13e253beb90077183c89b9ca86b1dee8aecb33c05221a4fc0e20a2aeb0d1a4"
+  },
+  "tool": {
+    "name": "OpenSCAD",
+    "version": "2021.01",
+    "environment": "tooling_container",
+    "validation_scope": "native CAD parse, CSG render/export, and mesh bounding-box arithmetic only"
+  },
+  "default_configuration": {
+    "plate_width_mm": 80,
+    "plate_height_mm": 80,
+    "plate_thickness_mm": 5,
+    "sensor_aperture_d_mm": 20,
+    "mount_hole_d_mm": 3.4,
+    "mount_pitch_x_mm": 25,
+    "mount_pitch_z_mm": 25,
+    "mount_counterbore_d_mm": 6.2,
+    "mount_counterbore_depth_mm": 1.6,
+    "bracket_slot_width_mm": 5.5,
+    "bracket_slot_length_mm": 18,
+    "bracket_slot_x_mm": 28.5,
+    "edge_margin_mm": 6
+  },
+  "checks": [
+    {
+      "id": "ODRH-CAD-DEFAULT-EXPORT",
+      "status": "PASS",
+      "detail": "OpenSCAD successfully generated a 3D STL from the default design.",
+      "output_format": "ASCII STL",
+      "output_sha256": "44f887ac77461fe193812ddc3fbd00ea6c09495363fc640f00300c4821bad0b5",
+      "triangle_count": 2872
+    },
+    {
+      "id": "ODRH-CAD-DEFAULT-BOUNDS",
+      "status": "PASS",
+      "expected_extents_mm": [80, 5, 80],
+      "observed_extents_mm": [80, 5, 80],
+      "absolute_tolerance_mm": 0.02,
+      "detail": "Bounding box computed from exported mesh vertex coordinates."
+    },
+    {
+      "id": "ODRH-CAD-NEGATIVE-APERTURE-ASSERTION",
+      "status": "PASS",
+      "override": {
+        "sensor_aperture_d_mm": 100
+      },
+      "expected": "Reject invalid aperture-to-mounting-hole clearance.",
+      "observed": "OpenSCAD exited nonzero and emitted the assertion 'Sensor aperture overlaps the diagonal mounting-hole envelope'.",
+      "exit_code": 1
+    }
+  ],
+  "claim_boundaries": {
+    "native_source_rendered": true,
+    "mesh_extents_checked": true,
+    "parameter_assertion_negative_control_checked": true,
+    "physical_print_performed": false,
+    "sensor_or_bracket_fit_checked": false,
+    "mechanical_strength_or_load_qualified": false,
+    "dimensional_accuracy_of_printed_part_measured": false,
+    "optical_or_metrology_performance_validated": false,
+    "physical_validation": "NOT_PERFORMED",
+    "overall_disposition": "GEOMETRY_EXPORT_CHECKED_NOT_PHYSICALLY_QUALIFIED"
+  }
+}
