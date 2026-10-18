@@ -1,0 +1,35 @@
+name: MUS-DOE experiment split audit
+
+on:
+  pull_request:
+    paths:
+      - "tools/mus-doe-audit/**"
+      - "schemas/instrument-engineering/mus_doe_split_corpus_v0_1.schema.json"
+      - "fixtures/instrument-engineering/mus_doe_split_corpus_v0_1.json"
+      - ".github/workflows/mus-doe-audit.yml"
+  push:
+    branches: [main]
+    paths:
+      - "tools/mus-doe-audit/**"
+      - "schemas/instrument-engineering/mus_doe_split_corpus_v0_1.schema.json"
+      - "fixtures/instrument-engineering/mus_doe_split_corpus_v0_1.json"
+      - ".github/workflows/mus-doe-audit.yml"
+
+permissions:
+  contents: read
+
+jobs:
+  audit:
+    name: MUS-DOE schema, leakage tests and fixture audit
+    runs-on: ubuntu-latest
+    steps:
+      - name: Check out repository
+        uses: actions/checkout@v4
+      - name: Install stable Rust
+        uses: dtolnay/rust-toolchain@stable
+      - name: Check formatting
+        run: cargo fmt --manifest-path tools/mus-doe-audit/Cargo.toml -- --check
+      - name: Run auditor unit tests
+        run: cargo test --manifest-path tools/mus-doe-audit/Cargo.toml
+      - name: Audit synthetic split corpus
+        run: cargo run --manifest-path tools/mus-doe-audit/Cargo.toml -- --schema schemas/instrument-engineering/mus_doe_split_corpus_v0_1.schema.json --corpus fixtures/instrument-engineering/mus_doe_split_corpus_v0_1.json
