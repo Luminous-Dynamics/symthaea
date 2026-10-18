@@ -14,15 +14,39 @@
   },
   "related_sources": [
     {
-      "id": "AMB2022-01",
+      "id": "AMB2022-01-modeling-description",
+      "doi": "10.18434/mds2-2607",
+      "role": "AM Bench 2022 3D-build modeling-challenge description data; candidate calibration reference",
+      "url": "https://doi.org/10.18434/mds2-2607"
+    },
+    {
+      "id": "AMB2022-01-thermography-processing",
+      "doi": "10.18434/mds2-2715",
+      "role": "in-situ thermography and data-processing scripts for IN718 builds; candidate calibration reference",
+      "url": "https://doi.org/10.18434/mds2-2715"
+    },
+    {
+      "id": "AMB2022-01-microstructure",
+      "doi": "10.18434/mds2-2692",
+      "role": "microstructure measurements for IN718 3D builds; candidate calibration reference",
+      "url": "https://doi.org/10.18434/mds2-2692"
+    },
+    {
+      "id": "AMB2022-01-residual-strain-stress-deflection",
+      "doi": "10.18434/mds2-2711",
+      "role": "residual elastic strain, residual stress, and part-deflection measurements; candidate calibration reference",
+      "url": "https://doi.org/10.18434/mds2-2711"
+    },
+    {
+      "id": "AMB2022-01-serial-sectioning-xct",
       "doi": "10.18434/mds2-2767",
-      "role": "upstream processing and microstructure calibration source",
+      "role": "serial-sectioning and X-ray CT measurements; explicitly linked by the AMB2025-02 README as the EBSD-related calibration source",
       "url": "https://doi.org/10.18434/mds2-2767"
     },
     {
-      "id": "AMB2022-01-description",
+      "id": "AMB2022-01-description-web",
       "doi": "not_applicable_web_description",
-      "role": "program description and source links",
+      "role": "NIST AM Bench 2022 challenge-problem descriptions and source links",
       "url": "https://www.nist.gov/ambench/am-bench-2022-challenge-problems-and-measurement-results"
     }
   ],
