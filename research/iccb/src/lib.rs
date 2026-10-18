@@ -9,6 +9,7 @@ use std::collections::BTreeSet;
 pub mod fixtures;
 pub mod policy;
 pub mod staging;
+pub mod value_of_information;
 
 #[derive(Clone, Copy, Debug, PartialEq, Eq)]
 pub enum EvidenceState {
