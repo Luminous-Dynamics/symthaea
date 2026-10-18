@@ -3,6 +3,7 @@ use std::path::PathBuf;
 
 mod crate_status;
 mod cropfoundry_validate;
+mod cropfoundry_csv_audit;
 mod duplicate_scan;
 mod manifest;
 mod rhn_sweep;
@@ -42,6 +43,27 @@ enum Commands {
         /// Workspace root to validate.
         #[arg(long, default_value = ".")]
         root: PathBuf,
+    },
+    /// Audit a locally supplied CropFoundry CSV without training a model or authorizing data use.
+    CropfoundryAuditCsv {
+        /// Path to the local CSV file. No data is downloaded by this command.
+        #[arg(long)]
+        input: PathBuf,
+        /// Source-manifest identifier.
+        #[arg(long, default_value = "DS-010")]
+        source_id: String,
+        /// Canonical dataset source URI.
+        #[arg(long, default_value = "https://zenodo.org/records/16745911")]
+        source_uri: String,
+        /// Single-byte CSV delimiter.
+        #[arg(long, default_value = ";")]
+        delimiter: char,
+        /// Optional expected data-record count from a pinned file-level source note.
+        #[arg(long)]
+        expected_data_records: Option<usize>,
+        /// Optional path to write the JSON audit receipt.
+        #[arg(long)]
+        out: Option<PathBuf>,
     },
     RhnSweep {
         #[arg(long, default_value = "1024")]
@@ -89,6 +111,23 @@ fn main() -> anyhow::Result<()> {
                 workspace_root.join(root)
             };
             cropfoundry_validate::run(&root)?;
+        }
+        Commands::CropfoundryAuditCsv {
+            input,
+            source_id,
+            source_uri,
+            delimiter,
+            expected_data_records,
+            out,
+        } => {
+            cropfoundry_csv_audit::run(
+                input,
+                source_id,
+                source_uri,
+                delimiter,
+                expected_data_records,
+                out,
+            )?;
         }
         Commands::RhnSweep {
             dims,
