@@ -29,6 +29,17 @@ Use existing open hardware for the parts of the measurement problem it actually 
 
 Source details: Antmicro's README and LICENSE are at [README](https://github.com/antmicro/programmable-led-panel/blob/main/README.md) and [Apache-2.0 license](https://github.com/antmicro/programmable-led-panel/blob/main/LICENSE). frameprobe's source and tests are at its [README](https://github.com/frameprobe/frameprobe) and [license](https://github.com/frameprobe/frameprobe/blob/main/LICENSE). Historical ColorHug repository status and native GEDA source are visible in the [ColorHug2 hardware repository](https://github.com/hughski/colorhug2-hardware). The INA226 datasheet is linked from the [TI product page](https://www.ti.com/product/INA226).
 
+## South African procurement reality (research snapshot: 2026-10-18)
+
+This is budget context, **not a selected BOM or a current supplier quote**. Retail stock, delivery, tax and compatibility need rechecking before purchase.
+
+- A local Johannesburg retailer currently lists the [Calibrite Display 123](https://www.outdoorphoto.co.za/collections/calibration-tools) at about **R2,955**, with Johannesburg stock shown. This is a candidate off-the-shelf third-party display colorimeter, not an open-hardware component. Its exact Linux/ArgyllCMS support, spectral corrections, calibration traceability and fitness for any chosen absolute measurand still need qualification.
+- A separate local product listing puts the [Calibrite Display Pro HL / Display Plus HL family](https://www.progearsa.co.za/monitor-calibration/) roughly in the **R5,400–R6,776 inclusive-of-VAT** range, depending on the model. This confirms that reference colorimetry can cost several thousand rand before the fixture and lab work, not that a particular model has been qualified.
+- The [VBPW34S photodiode listing on DigiKey South Africa](https://www.digikey.co.za/en/products/detail/vishay-semiconductor-opto-division/VBPW34S/2354871) shows a low component price but a long stated lead time. The [RS South Africa listing](https://za.rs-online.com/web/p/photodiodes/7689405) shows a small-bag price yet reports temporary out-of-stock status. Treat these as evidence of supplier/lead-time uncertainty, not an actionable price promise.
+- Low-cost generic INA226 boards listed by marketplaces are not interchangeable metrology references. Shunt tolerance, layout, wiring, thermal behavior, conversion interval and calibration may dominate the headline ADC resolution. For the first prototype, borrow/use a trusted external meter where possible and cross-check the low-cost logger against it.
+
+**Implication:** start with two independent capability lanes. A photodiode fixture can measure temporal transitions and relative changes after its analog/sampling chain is validated; a colorimeter/spectroradiometer is needed for those absolute photometric/colorimetric claims within its own supported capability. Do not require expensive colorimetry to develop the mechanical fixture, raw trace schema or latency methodology, and do not label latency-only success as display-quality qualification.
+
 ## Recommended sequence
 
 ### V0 — measure a complete monitor without pretending to open its internals
