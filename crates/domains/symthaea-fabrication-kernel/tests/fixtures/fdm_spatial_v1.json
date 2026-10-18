@@ -1,0 +1,36 @@
+{
+  "schema_version": "symthaea.fdm-spatial-synthetic.v1",
+  "seed": 42,
+  "policy_metrics": [
+    {
+      "policy": "global_mean",
+      "predicted_count": 20,
+      "unknown_count": 0,
+      "coverage": 1.0,
+      "mean_signed_prediction_error_mm": 0.005590444444444,
+      "mean_absolute_prediction_error_mm": 0.050104644444444,
+      "root_mean_squared_prediction_error_mm": 0.065319874685171,
+      "maximum_absolute_prediction_error_mm": 0.144331555555556
+    },
+    {
+      "policy": "nearest_neighbor",
+      "predicted_count": 16,
+      "unknown_count": 4,
+      "coverage": 0.8,
+      "mean_signed_prediction_error_mm": 0.00328375,
+      "mean_absolute_prediction_error_mm": 0.029644625,
+      "root_mean_squared_prediction_error_mm": 0.034606770668830,
+      "maximum_absolute_prediction_error_mm": 0.06936
+    },
+    {
+      "policy": "inverse_distance_weighted",
+      "predicted_count": 16,
+      "unknown_count": 4,
+      "coverage": 0.8,
+      "mean_signed_prediction_error_mm": 0.004770257816218,
+      "mean_absolute_prediction_error_mm": 0.005157941639747,
+      "root_mean_squared_prediction_error_mm": 0.005847187170473,
+      "maximum_absolute_prediction_error_mm": 0.009654391724422
+    }
+  ]
+}
