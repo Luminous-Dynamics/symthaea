@@ -64,6 +64,19 @@ Use these boundaries strictly:
 
 No recipe values, chemical/gas conditions, laser operating points, or actuation authority are embedded in this corpus.
 
+## 4A. Model the route as a dependency graph, not a flat checklist
+
+The route manifest now carries `predecessor_groups` per stage. A route's sequence number is a topological ordering for review, not a declaration that every stage is a single linear chain.
+
+- `all_of` groups require all declared upstream stage dispositions.
+- `one_of_conditioned` groups record explicitly conditioned alternatives such as an inspected part passing without repair versus an inspected part being repaired and retested.
+- Multiple groups on a stage are conjunctive: for example, light-engine acceptance **and** a waveguide output (from the appropriate fabrication/stack branch) are both needed before alignment.
+- Root stages have no predecessors. Every non-root dependency must reference an earlier stage in the same route. Cross-route links are forbidden; physical material/wafer/component lineage requires its own exact subject reference.
+- Conditional steps do not create an inferred output when they were skipped. A skipped repair path must carry the inspection gate's explicit no-repair disposition; a missing result is not the same as “no repair required.”
+- Rework or retest creates a new evidence lineage; it must not overwrite the preceding failed state.
+
+This is only a route-level contract adapter. The canonical MFG-PROC/SEMI-PROC owners remain responsible for full state transition, branch reachability, process-plan canonicalization and observed-versus-intended state semantics. The route manifest must later bind to those types rather than growing a second process-flow engine.
+
 ## 5. Core benchmark definitions
 
 ### Yield denominators
