@@ -6,6 +6,7 @@ use std::path::Path;
 
 use symthaea_robodojo_contract::{
     calibration::{summarize_calibration, SuccessForecast},
+    shift::{audit_shift_robustness, ShiftAssignment, ShiftFamily, ShiftSeverity, SHIFT_PLAN_HEADER},
     compare_paired_trials, summarize_trials, ActionProposal, ActionRejection, AxisLimit,
     EpisodeGuard, FailureClass, GateConfig, ObservationDecision, ObservationFrame, TrialRecord,
 };
@@ -85,6 +86,48 @@ fn run() -> Result<(), Box<dyn Error>> {
                     pct(row.mean_predicted_probability), row.brier_score, row.log_loss,
                     row.expected_calibration_error, row.high_confidence_trials,
                     optional_pct(row.high_confidence_failure_rate), row.risk_coverage_auc
+                );
+            }
+            Ok(())
+        }
+        Some("--shift-audit") => {
+            if !(5..=7).contains(&args.len()) {
+                return Err(invalid_input("usage: --shift-audit TRIALS.tsv SHIFT_PLAN.tsv BASELINE CANDIDATE [BOOTSTRAPS] [SEED]").into());
+            }
+            let records = read_trials(&args[1])?;
+            let assignments = read_shift_plan(&args[2])?;
+            let baseline_name = &args[3];
+            let candidate_name = &args[4];
+            let replicates = parse_optional(&args, 5, 2_000usize, "bootstrap count")?;
+            let seed = parse_optional(&args, 6, 42u64, "seed")?;
+            let unexpected: Vec<&str> = records.iter()
+                .filter(|r| r.variant_id.as_str() != baseline_name.as_str() && r.variant_id.as_str() != candidate_name.as_str())
+                .map(|r| r.variant_id.as_str()).collect();
+            if !unexpected.is_empty() {
+                return Err(invalid_input(format!("unexpected variants in input: {}", unexpected.join(","))).into());
+            }
+            let baseline: Vec<TrialRecord> = records.iter()
+                .filter(|r| r.variant_id.as_str() == baseline_name.as_str()).cloned().collect();
+            let candidate: Vec<TrialRecord> = records.iter()
+                .filter(|r| r.variant_id.as_str() == candidate_name.as_str()).cloned().collect();
+            let summaries = audit_shift_robustness(&baseline, &candidate, &assignments, replicates, seed)
+                .map_err(|error| invalid_input(format!("cannot audit shift strata: {error:?}")))?;
+            println!("family\tseverity\tperturbation_spec_sha256\tconditions\tpairs\tscored_pairs\tprogress_delta_pp\tci95_low_pp\tci95_high_pp\tcompletion_rate_delta_pp\tvalid_rate_delta_pp\telapsed_delta_s\tcost_delta_usd\tsafety_event_delta\ttimeout_delta\tthermal_stop_delta\tserver_error_delta\tinvalid_action_delta\tsafety_stop_delta\tother_failure_delta");
+            for row in summaries {
+                let (lo, hi) = match row.progress_delta_ci95 {
+                    Some((lo, hi)) => (format!("{:.4}", lo * 100.0), format!("{:.4}", hi * 100.0)),
+                    None => ("NA".to_owned(), "NA".to_owned()),
+                };
+                println!(
+                    "{}\t{}\t{}\t{}\t{}\t{}\t{}\t{}\t{}\t{:.4}\t{:.4}\t{:.4}\t{:.4}\t{}\t{}\t{}\t{}\t{}\t{}\t{}",
+                    row.family.as_str(), row.severity.as_str(), row.perturbation_spec_sha256,
+                    row.condition_count, row.pairs, row.scored_pairs,
+                    row.mean_progress_delta.map(|x| format!("{:.4}", x * 100.0)).unwrap_or_else(|| "NA".to_owned()),
+                    lo, hi, row.completion_rate_delta * 100.0, row.valid_run_rate_delta * 100.0,
+                    row.mean_elapsed_seconds_delta, row.mean_cost_usd_delta,
+                    row.safety_event_count_delta, row.timeout_count_delta, row.thermal_stop_count_delta,
+                    row.server_error_count_delta, row.invalid_action_count_delta,
+                    row.safety_stop_count_delta, row.other_failure_count_delta
                 );
             }
             Ok(())
@@ -216,6 +259,45 @@ fn read_trials(path: impl AsRef<Path>) -> Result<Vec<TrialRecord>, Box<dyn Error
     Ok(records)
 }
 
+fn read_shift_plan(path: impl AsRef<Path>) -> Result<Vec<ShiftAssignment>, Box<dyn Error>> {
+    let contents = fs::read_to_string(path.as_ref())?;
+    let mut lines = contents.lines();
+    let header = lines.next().ok_or_else(|| invalid_input("shift plan is empty"))?;
+    if header.trim_end_matches('\r') != SHIFT_PLAN_HEADER {
+        return Err(invalid_input(format!("unexpected shift-plan header; expected: {SHIFT_PLAN_HEADER}")).into());
+    }
+    let mut assignments = Vec::new();
+    for (zero_based_line, line) in lines.enumerate() {
+        let line = line.trim_end_matches('\r');
+        if line.is_empty() || line.starts_with('#') { continue; }
+        let columns: Vec<&str> = line.split('\t').collect();
+        if columns.len() != 7 {
+            return Err(invalid_input(format!("{}:{} expected 7 tab-separated fields, got {}",
+                path.as_ref().display(), zero_based_line + 2, columns.len())).into());
+        }
+        let family = ShiftFamily::parse(columns[3]).ok_or_else(|| invalid_input(format!(
+            "line {} unknown shift family: {:?}", zero_based_line + 2, columns[3]
+        )))?;
+        let severity = ShiftSeverity::parse(columns[4]).ok_or_else(|| invalid_input(format!(
+            "line {} unknown shift severity: {:?}", zero_based_line + 2, columns[4]
+        )))?;
+        let seed = columns[5].parse::<u64>().map_err(|_| invalid_input(format!(
+            "line {} invalid seed: {:?}", zero_based_line + 2, columns[5]
+        )))?;
+        let assignment = ShiftAssignment {
+            task_id: columns[0].to_owned(), trial_id: columns[1].to_owned(),
+            condition_id: columns[2].to_owned(), family, severity, seed,
+            perturbation_spec_sha256: columns[6].to_owned(),
+        };
+        assignment.validate().map_err(|error| invalid_input(format!(
+            "line {} invalid shift assignment: {error:?}", zero_based_line + 2
+        )))?;
+        assignments.push(assignment);
+    }
+    if assignments.is_empty() { return Err(invalid_input("shift plan contains no assignments").into()); }
+    Ok(assignments)
+}
+
 fn read_forecast_probabilities(path: impl AsRef<Path>) -> Result<Vec<ForecastProbability>, Box<dyn Error>> {
     let contents = fs::read_to_string(path.as_ref())?;
     let mut lines = contents.lines();
@@ -323,9 +405,11 @@ fn print_help() {
     println!("  cargo run --locked --manifest-path experiments/robodojo-contract/Cargo.toml -- --compare TRIALS.tsv BASELINE CANDIDATE [BOOTSTRAPS] [SEED]");
     println!("      Compare matched trials; report task-macro partial-progress delta and reliability/cost deltas.");
     println!("  cargo run --locked --manifest-path experiments/robodojo-contract/Cargo.toml -- --calibrate FORECASTS.tsv TRIALS.tsv [BIN_COUNT] [HIGH_CONFIDENCE_THRESHOLD]");
+    println!("  cargo run --locked --manifest-path experiments/robodojo-contract/Cargo.toml -- --shift-audit TRIALS.tsv SHIFT_PLAN.tsv BASELINE CANDIDATE [BOOTSTRAPS] [SEED]");
     println!("      Score pre-trial completion-probability forecasts with Brier, log loss, ECE, high-confidence failure rate, and risk-coverage AUC.");
+    println!("      Audit matched outcomes per shift family, severity, and perturbation configuration digest.");
     println!();
-    println!("TRIALS.tsv must use the exact header documented in README.md. FORECASTS.tsv contains only pre-trial probabilities; outcomes are joined from TRIALS.tsv by task/variant/trial ID.");
+    println!("TRIALS.tsv must use the exact header documented in README.md. FORECASTS.tsv contains only pre-trial probabilities; outcomes are joined from TRIALS.tsv by task/variant/trial ID. SHIFT_PLAN.tsv must match selected task/trial pairs exactly.");
 }
 
 fn run_contract_smoke() -> Result<(), Box<dyn Error>> {
