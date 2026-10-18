@@ -41,6 +41,7 @@ pub mod kitchen;
 pub mod nutrition;
 pub mod palate;
 pub mod pareto;
+pub mod robust_pareto;
 pub mod presets;
 pub mod reaction;
 pub mod rng;
@@ -58,6 +59,11 @@ pub use pareto::{
     CandidateAssessment, CulinaryCandidate, GateDisposition, GateEvidence, GateStatus,
     ObjectiveDirection, ObjectiveMetric, ParetoError, ParetoReport, RankingDisposition,
     evaluate_frontier,
+};
+pub use robust_pareto::{
+    CandidateScenarioMetrics, ObjectiveDefinition, RobustCandidateAssessment, RobustParetoError,
+    RobustParetoReport, ScenarioCandidate, ScenarioFrontier, ScenarioObjective, ScenarioSpec,
+    evaluate_robust_frontier,
 };
 pub use reaction::{arrhenius_rate, maillard_feasible, q10, reaction_extent};
 pub use spec::CulinarySpec;
