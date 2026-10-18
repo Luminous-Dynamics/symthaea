@@ -7,6 +7,7 @@
 //! baseline on held-out points. All observations are synthetic. This module
 //! performs no machine I/O and does not model real printer physics.
 
+use crate::crypto_digest::sha256;
 use serde::{Deserialize, Serialize};
 use std::collections::HashSet;
 
@@ -109,6 +110,8 @@ pub struct SpatialPolicyMetrics {
 pub struct SpatialPolicyReport {
     pub policy: SpatialPolicy,
     pub evidence_class: SpatialEvidenceClass,
+    /// Domain-separated SHA-256 of the validated serialized synthetic corpus.
+    pub corpus_digest_sha256: String,
     pub metrics: SpatialPolicyMetrics,
     pub points: Vec<SpatialPointResult>,
 }
@@ -117,6 +120,7 @@ pub struct SpatialPolicyReport {
 pub enum SpatialBenchmarkError {
     InvalidCorpus(Vec<String>),
     InvalidPolicy(&'static str),
+    SerializationFailure,
 }
 
 impl std::fmt::Display for SpatialBenchmarkError {
@@ -128,6 +132,9 @@ impl std::fmt::Display for SpatialBenchmarkError {
                 issues.join("; ")
             ),
             Self::InvalidPolicy(reason) => write!(formatter, "invalid spatial policy: {reason}"),
+            Self::SerializationFailure => {
+                formatter.write_str("could not serialize the validated spatial corpus")
+            }
         }
     }
 }
@@ -333,13 +340,27 @@ fn validate_policy(policy: &SpatialPolicy) -> Result<(), SpatialBenchmarkError> 
     }
 }
 
+/// Domain-separated identity of the exact validated corpus used for evaluation.
+pub fn digest_spatial_corpus(
+    corpus: &SyntheticSpatialCorpus,
+) -> Result<String, SpatialBenchmarkError> {
+    validate_spatial_corpus(corpus)?;
+    let serialized =
+        serde_json::to_vec(corpus).map_err(|_| SpatialBenchmarkError::SerializationFailure)?;
+    let domain = b"symthaea.fdm-spatial-synthetic-corpus.v1\\0";
+    let mut bytes = Vec::with_capacity(domain.len() + serialized.len());
+    bytes.extend_from_slice(domain);
+    bytes.extend_from_slice(&serialized);
+    Ok(sha256(&bytes).to_hex())
+}
+
 /// Run policies against held-out targets. Prediction receives discovery only;
 /// the confirmation oracle is read solely to recompute independent metrics.
 pub fn evaluate_spatial_policies(
     corpus: &SyntheticSpatialCorpus,
     policies: &[SpatialPolicy],
 ) -> Result<Vec<SpatialPolicyReport>, SpatialBenchmarkError> {
-    validate_spatial_corpus(corpus)?;
+    let corpus_digest_sha256 = digest_spatial_corpus(corpus)?;
     for policy in policies {
         validate_policy(policy)?;
     }
@@ -363,6 +384,7 @@ pub fn evaluate_spatial_policies(
         reports.push(SpatialPolicyReport {
             policy: policy.clone(),
             evidence_class: corpus.evidence_class,
+            corpus_digest_sha256: corpus_digest_sha256.clone(),
             metrics,
             points,
         });
@@ -610,6 +632,78 @@ mod tests {
                 "inverse-distance neighbour count must be positive"
             )
         );
+    }
+
+    #[derive(serde::Deserialize)]
+    struct FrozenSpatialCorpusSummary {
+        schema_version: String,
+        seed: u64,
+        policy_metrics: Vec<FrozenSpatialPolicyMetrics>,
+    }
+
+    #[derive(serde::Deserialize)]
+    struct FrozenSpatialPolicyMetrics {
+        policy: String,
+        predicted_count: usize,
+        unknown_count: usize,
+        coverage: f64,
+        mean_signed_prediction_error_mm: f64,
+        mean_absolute_prediction_error_mm: f64,
+        root_mean_squared_prediction_error_mm: f64,
+        maximum_absolute_prediction_error_mm: f64,
+    }
+
+    #[test]
+    fn frozen_reference_metrics_match_independent_expected_values() {
+        let fixture: FrozenSpatialCorpusSummary = serde_json::from_str(include_str!(
+            "../tests/fixtures/fdm_spatial_v1.json"
+        ))
+        .expect("frozen spatial metric fixture must parse");
+        assert_eq!(fixture.schema_version, FDM_SPATIAL_CORPUS_SCHEMA);
+        let corpus = demo_synthetic_spatial_corpus(fixture.seed);
+        let reports = evaluate_spatial_policies(&corpus, &policies()).unwrap();
+        assert_eq!(reports.len(), fixture.policy_metrics.len());
+
+        for expected in fixture.policy_metrics {
+            let actual = reports
+                .iter()
+                .find(|report| report.policy.name() == expected.policy)
+                .expect("fixture names a policy that is evaluated");
+            assert_eq!(actual.metrics.predicted_count, expected.predicted_count);
+            assert_eq!(actual.metrics.unknown_count, expected.unknown_count);
+            let within = |actual: f64, expected: f64| (actual - expected).abs() < 1.0e-11;
+            assert!(within(actual.metrics.coverage, expected.coverage));
+            assert!(within(
+                actual.metrics.mean_signed_prediction_error_mm.unwrap(),
+                expected.mean_signed_prediction_error_mm
+            ));
+            assert!(within(
+                actual.metrics.mean_absolute_prediction_error_mm.unwrap(),
+                expected.mean_absolute_prediction_error_mm
+            ));
+            assert!(within(
+                actual.metrics.root_mean_squared_prediction_error_mm.unwrap(),
+                expected.root_mean_squared_prediction_error_mm
+            ));
+            assert!(within(
+                actual.metrics.maximum_absolute_prediction_error_mm.unwrap(),
+                expected.maximum_absolute_prediction_error_mm
+            ));
+            assert_eq!(actual.corpus_digest_sha256.len(), 64);
+            assert_eq!(
+                actual.corpus_digest_sha256,
+                digest_spatial_corpus(&corpus).unwrap()
+            );
+        }
+    }
+
+    #[test]
+    fn corpus_digest_changes_when_discovery_observation_changes() {
+        let mut corpus = demo_synthetic_spatial_corpus(42);
+        let first = digest_spatial_corpus(&corpus).unwrap();
+        corpus.discovery[0].signed_error_mm += 0.001;
+        let second = digest_spatial_corpus(&corpus).unwrap();
+        assert_ne!(first, second);
     }
 
     #[test]
