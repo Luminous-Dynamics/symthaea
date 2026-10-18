@@ -22,7 +22,7 @@ use symthaea_muse::listener_response_benchmark::{
     evaluate_temporal_holdout,
 };
 
-const RUNNER_VERSION: &str = "muse-listener-response-runner-v1";
+const RUNNER_VERSION: &str = "muse-listener-response-runner-v2";
 
 #[derive(Debug, Default)]
 struct Options {
@@ -301,7 +301,7 @@ fn run(options: Options) -> Result<String, String> {
         })?;
 
     let artifact = BenchmarkArtifact {
-        artifact_version: "muse-listener-response-evidence-v1",
+        artifact_version: "muse-listener-response-evidence-v2",
         runner_version: RUNNER_VERSION,
         runner_build_revision: option_env!("GIT_COMMIT_SHA")
             .or(option_env!("GITHUB_SHA"))
@@ -373,7 +373,13 @@ mod tests {
         assert_eq!(value["report"]["training_records"], 4);
         assert_eq!(value["report"]["embargoed_records"], 2);
         assert_eq!(value["report"]["testing_records"], 2);
+        assert_eq!(value["artifact_version"], "muse-listener-response-evidence-v2");
+        assert_eq!(
+            value["report"]["benchmark_version"],
+            "muse-listener-response-benchmark-v2"
+        );
         assert_eq!(value["report"]["channels"][0]["scored_test_observations"], 2);
+        assert!(value["report"]["channels"][0]["participant_cluster_comparisons"].is_array());
     }
 
     #[test]
