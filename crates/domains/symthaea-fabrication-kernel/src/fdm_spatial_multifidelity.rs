@@ -491,11 +491,9 @@ fn measure_action(
         mean_mm: mean,
         sample_standard_deviation_mm: sample_variance.sqrt(),
         reported_standard_uncertainty_mm: uncertainty,
-        calibration_state: match stress {
-            MetrologyStressCase::StaleReferenceCalibration
-                if action.method == MetrologyMethod::ReferenceMetrology => "stale_unrecognized".to_owned(),
-            _ => "nominal_synthetic".to_owned(),
-        },
+        // The selector sees only the declared state. The stressed stale-reference
+        // condition stays in the evaluator's report metadata, not this observation.
+        calibration_state: "declared_nominal".to_owned(),
     }
 }
 
@@ -1367,7 +1365,7 @@ mod tests {
             SyntheticSpatialSurface::SmoothQuadratic, MetrologyStressCase::StaleReferenceCalibration, 7, &reference_action, 0,
         );
         assert_ne!(current.mean_mm, stale.mean_mm);
-        assert_eq!(stale.calibration_state, "stale_unrecognized");
+        assert_eq!(stale.calibration_state, "declared_nominal");
     }
 
     #[test]
