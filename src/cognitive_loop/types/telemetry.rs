@@ -1129,6 +1129,9 @@ pub struct CycleMetadata {
     /// Defect prediction confidence [0, 1].
     #[serde(default)]
     pub fabrication_defect_confidence: f32,
+    /// True only when the defect score is backed by a valid prediction source.
+    #[serde(default)]
+    pub fabrication_defect_prediction_available: bool,
 
     // ── CPG Manager Telemetry ─────────────────────────────────────────────
     /// Kuramoto synchronization index [0, 1]. 0 = incoherent, 1 = perfect sync.
