@@ -24,6 +24,11 @@ Family offices surveyed by UBS in 2026 reported interest in AI, power/resources,
 
 More immediately, recent reporting on the AI infrastructure build-out describes project delays/cancellations and increasing financing / execution concerns. The lesson for ICCB is not that all infrastructure investments are bad. It is that a benchmark should include the cost of committed capital, schedule slippage, changing assumptions, and the ability to stop before additional irreversible expenditure. See [Financial Times, “America's $10tn AI infrastructure boom is starting to fray”](https://www.ft.com/content/9ea5a37d-15c9-4d5b-94d6-719048c9cd3c) (published 18 October 2026; article is paywalled).
 
+Two research findings sharpen the model:
+
+- Bun, Huisman, de Kleijne and Kort's September 2026 Tilburg working paper, [*Staged Capacity Investments under Uncertainty*](https://research.tilburguniversity.edu/en/publications/staged-capacity-investments-under-uncertainty/), models multiple lumpy capacity investments. Its abstract reports that more opportunities to invest can lead a firm to invest earlier and in smaller amounts, expanding when demand increases sufficiently; this is especially profitable with a few highly price-inelastic customers. This argues against the simplistic rule “always wait” or “always stage.” Test the number of future opportunities, demand elasticity, and profit earned between stages.
+- The World Bank's [*Infrastructure Foundations: From Current Assets to Future Growth*](https://www.worldbank.org/en/topic/infrastructure/publication/infrastructure-foundations-from-current-assets-to-future-growth) stresses asset stocks, financing and maintenance costs, social returns, and cross-sector complementarity. Its summary presents an Infrastructure Efficiency Ratio comparing social returns with the costs of financing and maintaining infrastructure. ICCB should therefore model complementary bundles—not just score assets as independent projects—and keep private returns distinct from wider social/productive effects.
+
 ## Decision model
 
 Represent a capital plan as a stateful sequence:
@@ -69,6 +74,10 @@ Add at least these cases to the frozen synthetic corpus:
 8. **Liquidity shock mid-project:** a subsequent tranche would violate a predeclared liquidity floor.
 9. **Dependency shock between stages:** a shared grid, water, logistics, or supplier dependency changes before release.
 10. **Governance override attempt:** a high-return narrative tries to bypass the required approver or total commitment cap.
+11. **Staging is not always better:** compare one-shot, wait-first, and staged policies across scenarios with different demand elasticity, future investment opportunities, financing costs, stage costs, and salvage values.
+12. **Complementary infrastructure bundle:** energy capacity alone, digital connectivity alone, and a combined package produce different network value. Detect when a siloed optimum is dominated by a feasible bundle, while preserving each project's cost and risk.
+13. **Waiting-cost trap:** a delay preserves flexibility but loses value through financing cost, missed revenue, scarce capacity, inflation or an expiring opportunity.
+14. **Interdependent options:** a first project changes the cost, feasibility or salvage value of later projects; the evaluator must model endogenous as well as external uncertainty.
 
 Each scenario needs at least one negative control and a simple policy baseline. The hidden evaluator knows what actually happened; candidate-facing inputs must not reveal outcome labels.
 
@@ -82,8 +91,10 @@ Targets are provisional and need preregistration before final evaluation.
 | Capital bound | Cumulative commitment exceeding approved cap due to evaluation logic | 0 |
 | Evidence invalidation | Detection of stale, scope-mismatched and contradicted milestone evidence | ≥95% recall on planted faults; report false positives separately |
 | Sunk-cost resistance | Cases in which past spend improperly changes the incremental action absent future-value justification | 0 unjustified continuations in scripted negative controls |
-| Decision regret | Difference from evaluator oracle, under a declared objective vector and scenario family | Compare to simple all-at-once and cash-maximizing baselines; no preclaimed universal improvement |
+| Decision regret | Difference from evaluator oracle, under a declared objective vector and scenario family | Compare to all-at-once, wait-first, staged, and cash-maximizing baselines; no preclaimed universal improvement |
+| Policy choice quality | Whether the selected policy (one-shot, wait, stage, expand, pause, or abandon) matches the best policy for each frozen scenario | Score against a dynamic-programming / exhaustive-search oracle for small synthetic cases, plus regret rather than accuracy alone |
 | Option preservation | Unnecessary irreversible commitment under uncertainty when a reversible path preserves value at tolerable cost | Measure on held-out scripted cases; report assumptions and regret |
+| Complementarity | Difference between the best feasible project bundle and independently ranked silo choices | Include positive and negative interaction fixtures; do not assume synergies exist without model evidence |
 | Time / financing cost | Delay, bridging finance, inflation and opportunity cost introduced by staging | Always report; staging does not receive free option value |
 | Liquidity resilience | Violations under mid-project liquidity shocks | 0 hard-floor breaches in required negative controls |
 | Decision trace | Exact approver, conditions, evidence and rationale for each release | 100% present in synthetic receipts |
@@ -106,6 +117,8 @@ No aggregate score should hide an unauthorized tranche release or an accounting 
 - UBS, [Global Family Office Report 2026](https://www.ubs.com/global/en/media/display-page-ndp/en-20260528-global-family-office-report-2026.html).
 - J.P. Morgan, [2026 Global Family Office Report](https://privatebank.jpmorgan.com/nam/en/insights/reports/2026-family-office-report).
 - Financial Times, [“America's $10tn AI infrastructure boom is starting to fray”](https://www.ft.com/content/9ea5a37d-15c9-4d5b-94d6-719048c9cd3c), 18 October 2026.
+- Bun, Huisman, de Kleijne & Kort, [*Staged Capacity Investments under Uncertainty*](https://research.tilburguniversity.edu/en/publications/staged-capacity-investments-under-uncertainty/), Tilburg CentER Discussion Paper 2026-017, published 29 September 2026.
+- World Bank, [*Infrastructure Foundations: From Current Assets to Future Growth*](https://www.worldbank.org/en/topic/infrastructure/publication/infrastructure-foundations-from-current-assets-to-future-growth).
 - Existing ICCB protocol and Rust prototype: [PR #7974](https://github.com/Luminous-Dynamics/symthaea/pull/7974), [PR #7987](https://github.com/Luminous-Dynamics/symthaea/pull/7987), and [issue #7976](https://github.com/Luminous-Dynamics/symthaea/issues/7976).
 
 No real asset model, customer stage-gate workflow, live investment result, or customer commitment is represented by this document.
