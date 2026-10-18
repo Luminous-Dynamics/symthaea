@@ -272,6 +272,54 @@
       "training_authorized": false,
       "content_sha256": null,
       "next_gate": "Review README and artifact terms; download only selected authorized components; verify provided SHA-256 checksums against bytes; inspect split grouping, duplicate/near-duplicate frames, annotation audit, and privacy; then pin exact artifact digests before any model training."
+    },
+    {
+      "id": "DS-012",
+      "title": "Thermal infrared and hyperspectral image based transpiration rate modelling, Part 1",
+      "source_uri": "https://zenodo.org/records/7807989",
+      "source_type": "multimodal_thermal_hyperspectral_maize_drought",
+      "reported_content": [
+        "raw thermal infrared data and processed thermal data",
+        "raw and processed hyperspectral imaging from maize drought-severity experiments",
+        "RGB segmentation filters, image preprocessing and empirical/physical modelling files",
+        "hyperspectral transferability data involving new genotypes, with related parts on linked Zenodo records"
+      ],
+      "observed_metadata": "The Zenodo record describes maize drought experiments and thermal/hyperspectral data; it lists a 14.4 GB package for this record version and links related hyperspectral parts. The rendered Rights/License area does not show a populated license. Individual code/data archives and related records may have different terms. The page provides MD5 values for listed artifacts, not an acquired local SHA-256 pin.",
+      "license_status": "unresolved_license_field_not_populated_on_record",
+      "access_status": "public_landing_page_artifact_terms_not_verified",
+      "ingestion_status": "quarantined",
+      "permitted_current_use": [
+        "public_metadata_review",
+        "citation"
+      ],
+      "training_authorized": false,
+      "content_sha256": null,
+      "next_gate": "Resolve license and access terms for each exact data/code artifact and any related-part dependency before download; if authorized, retrieve only the minimum relevant subset, record retrieval timestamp, verify provider-listed MD5, calculate SHA-256, inspect README/units/calibration/experimental grouping, and preserve genotype/site/time holdouts.",
+      "initial_intended_role": "Candidate for CF-020 thermal/spectral modality evaluation and genotype-transfer methodology after rights and schema review. Automated phenotyping platform data do not establish farm-scale or South African transfer."
+    },
+    {
+      "id": "DS-013",
+      "title": "Canopy-level hyperspectral, chlorophyll fluorescence and pigment dataset of tomato under heat stress in darkness",
+      "source_uri": "https://zenodo.org/records/19883527",
+      "source_type": "controlled_environment_tomato_spectral_fluorescence_heat",
+      "reported_content": [
+        "canopy-level VNIR spectral reflectance from 380–900 nm at multiple measuring points",
+        "PAM chlorophyll fluorescence parameters and derived measurements",
+        "HPLC-based chlorophyll and xanthophyll-cycle pigment measurements",
+        "controlled heat exposure from 20°C to 35°C in darkness, with a 22°C control and post-reillumination measurements"
+      ],
+      "observed_metadata": "The Zenodo record was published 2026-04-29 and lists three XLSX artifacts totalling about 253 kB on the file table. The record describes multiple time points and paired physiology-related modalities, but the rendered Rights/License area does not show a populated license. The experiment is controlled-environment and performed under dark heat conditions; it is not field-scale thermal imaging or evidence of local transfer.",
+      "license_status": "unresolved_license_field_not_populated_on_record",
+      "access_status": "public_landing_page_artifacts_not_reviewed",
+      "ingestion_status": "quarantined",
+      "permitted_current_use": [
+        "public_metadata_review",
+        "citation"
+      ],
+      "training_authorized": false,
+      "content_sha256": null,
+      "next_gate": "Confirm artifact-specific license/access terms and any linked paper/data terms. If authorized, download the three listed workbooks, pin SHA-256 hashes and retrieval time, inspect units/replicate/time-point structure and missingness, and determine whether time points support a predeclared chronological evaluation.",
+      "initial_intended_role": "Small-scale CF-020 feasibility candidate for spectral/fluorescence/physiological alignment under controlled heat. It cannot establish thermal-camera performance, early warning before visible symptoms, field efficacy, or South African geographic transfer."
     }
   ]
 }
