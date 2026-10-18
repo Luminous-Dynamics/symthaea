@@ -188,6 +188,7 @@ fn validate_streams(facts: &Value, scenario_id: &str) -> Result<()> {
         let Some(streams) = streams.as_array() else {
             bail!("{scenario_id}: {key} must be an array");
         };
+        let mut stream_ids = BTreeSet::new();
         for (index, stream) in streams.iter().enumerate() {
             let energy = stream.get("energy_j").and_then(Value::as_f64);
             let uncertainty = stream.get("uncertainty_j").and_then(Value::as_f64);
@@ -197,8 +198,11 @@ fn validate_streams(facts: &Value, scenario_id: &str) -> Result<()> {
             if uncertainty.is_none_or(|value| !value.is_finite() || value < 0.0) {
                 bail!("{scenario_id}: {key}[{index}] has invalid uncertainty_j");
             }
-            if stream.get("id").and_then(Value::as_str).is_none_or(str::is_empty) {
+            let Some(stream_id) = stream.get("id").and_then(Value::as_str) else {
                 bail!("{scenario_id}: {key}[{index}] is missing a stream ID");
+            };
+            if stream_id.is_empty() || !stream_ids.insert(stream_id) {
+                bail!("{scenario_id}: {key}[{index}] has an empty or duplicate stream ID");
             }
         }
     }
@@ -317,6 +321,22 @@ fn evaluate_case(facts: &Value) -> (String, Vec<String>) {
             vec!["required auxiliary energy inputs are incomplete".into()],
         );
     }
+    if claim == "powertrain_comparison"
+        && boolean(facts, "comparison_boundaries_match") != Some(true)
+    {
+        return (
+            "INDETERMINATE".into(),
+            vec!["matching comparison-boundary evidence is not established".into()],
+        );
+    }
+    if string(facts, "boundary_id").is_none_or(str::is_empty)
+        || string(facts, "boundary_definition").is_none_or(str::is_empty)
+    {
+        return (
+            "INDETERMINATE".into(),
+            vec!["boundary identity and definition are missing".into()],
+        );
+    }
     if boolean(facts, "energy_metered_at_boundary") != Some(true) {
         return (
             "INDETERMINATE".into(),
@@ -324,6 +344,14 @@ fn evaluate_case(facts: &Value) -> (String, Vec<String>) {
         );
     }
     if boolean(facts, "complete_energy_balance") == Some(true) {
+        if facts.get("input_streams").and_then(Value::as_array).is_none_or(Vec::is_empty)
+            || facts.get("output_streams").and_then(Value::as_array).is_none_or(Vec::is_empty)
+        {
+            return (
+                "INCOMPLETE_LEDGER".into(),
+                vec!["a complete balance requires non-empty input and output stream inventories".into()],
+            );
+        }
         let Some((output_lower, input_upper)) = balance_bounds(facts) else {
             return (
                 "INCOMPLETE_LEDGER".into(),
@@ -474,5 +502,37 @@ mod tests {
         });
         let (decision, _) = evaluate_case(&facts);
         assert_eq!(decision, "BLOCK");
+    }
+
+    #[test]
+    fn missing_boundary_definition_cannot_be_passed() {
+        let facts = serde_json::json!({
+            "boundary_declared":true,
+            "input_inventory_complete":true,
+            "auxiliary_inputs_complete":true,
+            "energy_metered_at_boundary":true,
+            "complete_energy_balance":false,
+            "claim_kind":"conversion_efficiency"
+        });
+        let (decision, _) = evaluate_case(&facts);
+        assert_eq!(decision, "INDETERMINATE");
+    }
+
+    #[test]
+    fn empty_stream_inventory_cannot_support_complete_balance() {
+        let facts = serde_json::json!({
+            "boundary_declared":true,
+            "boundary_id":"SYNTHETIC-BOUNDARY",
+            "boundary_definition":"Synthetic, declared boundary",
+            "input_inventory_complete":true,
+            "auxiliary_inputs_complete":true,
+            "energy_metered_at_boundary":true,
+            "complete_energy_balance":true,
+            "input_streams":[],
+            "output_streams":[],
+            "claim_kind":"conversion_efficiency"
+        });
+        let (decision, _) = evaluate_case(&facts);
+        assert_eq!(decision, "INCOMPLETE_LEDGER");
     }
 }
