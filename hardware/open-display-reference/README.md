@@ -36,4 +36,4 @@ The central aperture is a geometric datum only; it is not a calibrated stop, len
 
 ## Licensing
 
-The CAD design source is licensed under CERN-OHL-S-2.0. See the [official license text](https://opensource.org/license/CERN-OHL-S-2.0). This project is not endorsed by CERN. Third-party designs and components retain their own license, trademark and redistribution conditions.
+The CAD design source is licensed under CERN-OHL-S-2.0. The unmodified license text is included in this directory as [LICENSE](LICENSE); see also the [official OSI-hosted license](https://opensource.org/license/CERN-OHL-S-2.0). This project is not endorsed by CERN. Third-party designs and components retain their own license, trademark and redistribution conditions.
