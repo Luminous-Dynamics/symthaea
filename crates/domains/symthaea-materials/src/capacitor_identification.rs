@@ -463,7 +463,7 @@ pub fn assess_capacitor_identification(
         let capacitive_reactance_magnitude =
             1.0 / (omega * campaign.series_capacitance_f);
         let scaled_omega = observation.frequency_hz / geometric_mean_frequency_hz;
-        let corrected_imaginary_ohm = imaginary_ohm + capacitive_reactance_magnitude;
+        let corrected_imaginary_ohm = *imaginary_ohm + capacitive_reactance_magnitude;
         let scaled_corrected_imaginary = corrected_imaginary_ohm / omega_scale;
         if !omega.is_finite()
             || !capacitive_reactance_magnitude.is_finite()
@@ -507,7 +507,7 @@ pub fn assess_capacitor_identification(
     {
         let inductive_reactance = omega * physical_model_inductance_h;
         let predicted_imaginary_ohm = inductive_reactance - xc;
-        let residual = measured_imaginary_ohm - predicted_imaginary_ohm;
+        let residual = *measured_imaginary_ohm - predicted_imaginary_ohm;
         let scale = inductive_reactance
             .abs()
             .max(xc.abs())
@@ -540,9 +540,7 @@ pub fn assess_capacitor_identification(
         limitations.push(CapacitorIdentificationLimitation::ImaginaryFitResidualAboveMaximum);
     }
 
-    let disposition = if matches!(campaign.dc_bias, CapacitorDcBiasCondition::Unknown) {
-        CapacitorIdentificationDisposition::NotEvaluable
-    } else if limitations.iter().any(|limitation| {
+    let disposition = if limitations.iter().any(|limitation| {
         matches!(
             limitation,
             CapacitorIdentificationLimitation::EsrDispersionAboveMaximum
@@ -551,6 +549,8 @@ pub fn assess_capacitor_identification(
         )
     }) {
         CapacitorIdentificationDisposition::SeriesRlcModelMismatch
+    } else if matches!(campaign.dc_bias, CapacitorDcBiasCondition::Unknown) {
+        CapacitorIdentificationDisposition::NotEvaluable
     } else {
         CapacitorIdentificationDisposition::PassesObservabilityGate
     };
@@ -775,6 +775,25 @@ mod tests {
         let report = assess_capacitor_identification(&sample, &requirements()).unwrap();
         assert!((report.estimated_esr_ohm.unwrap() - ESR_OHM).abs() <= 1.0e-12);
         assert!((report.estimated_series_inductance_h.unwrap() - INDUCTANCE_H).abs() <= 1.0e-15);
+    }
+
+    #[test]
+    fn relative_voltage_current_phase_bias_is_not_mistaken_for_a_clean_fit() {
+        let mut sample = campaign();
+        for observation in &mut sample.observations {
+            let angle = 0.05_f64;
+            let (sin, cos) = angle.sin_cos();
+            let vr = observation.voltage_real_rms_v;
+            let vi = observation.voltage_imaginary_rms_v;
+            observation.voltage_real_rms_v = vr * cos - vi * sin;
+            observation.voltage_imaginary_rms_v = vr * sin + vi * cos;
+        }
+        let report = assess_capacitor_identification(&sample, &requirements()).unwrap();
+        assert_eq!(report.disposition, CapacitorIdentificationDisposition::SeriesRlcModelMismatch);
+        assert!(
+            report.limitations.contains(&CapacitorIdentificationLimitation::EsrDispersionAboveMaximum)
+                || report.limitations.contains(&CapacitorIdentificationLimitation::ImaginaryFitResidualAboveMaximum)
+        );
     }
 
     #[test]
