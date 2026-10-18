@@ -162,6 +162,8 @@ fn main() {
     let voi_scenario = ValueOfInformationScenario {
         id: "synthetic-diligence-survey".into(),
         information_cost_minor: 20,
+        delay_cost_minor: 0,
+        financing_cost_minor: 0,
         states: vec![
             InformationState {
                 id: "high-demand".into(),
@@ -226,10 +228,13 @@ fn main() {
     };
     match voi_scenario.evaluate() {
         Ok(report) => println!(
-            "Synthetic diligence value: baseline={:?}, gross_evsi_minor={}, cost_minor={}, net_evsi_minor={}, evpi_minor={}, worthwhile={}",
+            "Synthetic diligence value: baseline={:?}, gross_evsi_minor={}, survey_cost_minor={}, delay_cost_minor={}, financing_cost_minor={}, total_cost_minor={}, net_evsi_minor={}, evpi_minor={}, worthwhile={}",
             report.baseline_action_id,
             report.gross_evsi_minor,
             report.information_cost_minor,
+            report.delay_cost_minor,
+            report.financing_cost_minor,
+            report.total_cost_minor,
             report.net_evsi_minor,
             report.evpi_minor,
             report.worthwhile_at_declared_cost,
