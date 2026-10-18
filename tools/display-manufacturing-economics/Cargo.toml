@@ -1,0 +1,15 @@
+[package]
+name = "display-manufacturing-economics"
+version = "0.1.0"
+edition = "2024"
+rust-version = "1.96"
+license = "AGPL-3.0-or-later"
+description = "Dependency-free accounting references for display manufacturing yield, cost and inspection"
+repository = "https://github.com/Luminous-Dynamics/symthaea"
+publish = false
+
+[lib]
+path = "src/lib.rs"
+
+[workspace]
+resolver = "3"
