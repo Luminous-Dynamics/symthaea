@@ -42,7 +42,8 @@
           "basis": "SYNTHETIC_PER_KG_USABLE"
         },
         "lca_state": "not_requested",
-        "scenario_digest": "sha256:synthetic-scenario-a"
+        "scenario_digest": "sha256:synthetic-scenario-a",
+        "nutrition_evidence_state": "complete"
       },
       "expected": {
         "disposition": "eligible_for_declared_comparison",
@@ -97,7 +98,8 @@
           "basis": "SYNTHETIC_PER_KG_USABLE"
         },
         "lca_state": "not_requested",
-        "scenario_digest": "sha256:synthetic-scenario-a"
+        "scenario_digest": "sha256:synthetic-scenario-a",
+        "nutrition_evidence_state": "complete"
       },
       "expected": {
         "disposition": "blocked",
@@ -150,7 +152,8 @@
           "basis": "SYNTHETIC_PER_KG_USABLE"
         },
         "lca_state": "not_requested",
-        "scenario_digest": "sha256:synthetic-scenario-a"
+        "scenario_digest": "sha256:synthetic-scenario-a",
+        "nutrition_evidence_state": "complete"
       },
       "expected": {
         "disposition": "blocked",
@@ -203,7 +206,8 @@
           "basis": "SYNTHETIC_PER_KG_USABLE"
         },
         "lca_state": "not_requested",
-        "scenario_digest": "sha256:synthetic-scenario-a"
+        "scenario_digest": "sha256:synthetic-scenario-a",
+        "nutrition_evidence_state": "complete"
       },
       "expected": {
         "disposition": "blocked",
@@ -256,7 +260,8 @@
           "basis": "SYNTHETIC_PER_KG_USABLE"
         },
         "lca_state": "not_requested",
-        "scenario_digest": "sha256:synthetic-scenario-a"
+        "scenario_digest": "sha256:synthetic-scenario-a",
+        "nutrition_evidence_state": "complete"
       },
       "expected": {
         "disposition": "blocked",
@@ -309,7 +314,8 @@
           "basis": "SYNTHETIC_PER_KG_USABLE"
         },
         "lca_state": "not_requested",
-        "scenario_digest": "sha256:synthetic-scenario-a"
+        "scenario_digest": "sha256:synthetic-scenario-a",
+        "nutrition_evidence_state": "complete"
       },
       "expected": {
         "disposition": "indeterminate",
@@ -362,7 +368,8 @@
           "basis": "SYNTHETIC_PER_KG_USABLE"
         },
         "lca_state": "not_requested",
-        "scenario_digest": "sha256:synthetic-scenario-a"
+        "scenario_digest": "sha256:synthetic-scenario-a",
+        "nutrition_evidence_state": "complete"
       },
       "expected": {
         "disposition": "blocked",
@@ -415,7 +422,8 @@
           "basis": "SYNTHETIC_PER_KG_USABLE"
         },
         "lca_state": "not_requested",
-        "scenario_digest": "sha256:synthetic-scenario-a"
+        "scenario_digest": "sha256:synthetic-scenario-a",
+        "nutrition_evidence_state": "complete"
       },
       "expected": {
         "disposition": "blocked",
@@ -468,7 +476,8 @@
           "basis": "SYNTHETIC_PER_KG_USABLE"
         },
         "lca_state": "not_requested",
-        "scenario_digest": "sha256:synthetic-scenario-a"
+        "scenario_digest": "sha256:synthetic-scenario-a",
+        "nutrition_evidence_state": "missing_required"
       },
       "expected": {
         "disposition": "indeterminate",
@@ -521,7 +530,8 @@
           "basis": "SYNTHETIC_PER_KG_USABLE"
         },
         "lca_state": "not_requested",
-        "scenario_digest": "sha256:synthetic-scenario-a"
+        "scenario_digest": "sha256:synthetic-scenario-a",
+        "nutrition_evidence_state": "complete"
       },
       "expected": {
         "disposition": "not_comparable",
@@ -574,7 +584,8 @@
           "basis": "SYNTHETIC_PER_KG_USABLE"
         },
         "lca_state": "not_requested",
-        "scenario_digest": "sha256:synthetic-scenario-a"
+        "scenario_digest": "sha256:synthetic-scenario-a",
+        "nutrition_evidence_state": "complete"
       },
       "expected": {
         "disposition": "not_comparable",
@@ -627,7 +638,8 @@
           "basis": "SYNTHETIC_PER_KG_USABLE"
         },
         "lca_state": "not_requested",
-        "scenario_digest": "sha256:synthetic-scenario-a"
+        "scenario_digest": "sha256:synthetic-scenario-a",
+        "nutrition_evidence_state": "complete"
       },
       "expected": {
         "disposition": "eligible_for_declared_comparison",
@@ -682,7 +694,8 @@
           "basis": "SYNTHETIC_PER_KG_USABLE"
         },
         "lca_state": "not_requested",
-        "scenario_digest": "sha256:synthetic-scenario-a"
+        "scenario_digest": "sha256:synthetic-scenario-a",
+        "nutrition_evidence_state": "complete"
       },
       "expected": {
         "disposition": "blocked",
@@ -735,7 +748,8 @@
           "basis": "SYNTHETIC_PER_KG_USABLE"
         },
         "lca_state": "not_requested",
-        "scenario_digest": "sha256:synthetic-scenario-a"
+        "scenario_digest": "sha256:synthetic-scenario-a",
+        "nutrition_evidence_state": "not_assessed"
       },
       "expected": {
         "disposition": "indeterminate",
@@ -788,7 +802,8 @@
           "basis": "SYNTHETIC_PER_KG_USABLE"
         },
         "lca_state": "not_requested",
-        "scenario_digest": "sha256:synthetic-scenario-a"
+        "scenario_digest": "sha256:synthetic-scenario-a",
+        "nutrition_evidence_state": "complete"
       },
       "expected": {
         "disposition": "blocked",
@@ -841,7 +856,8 @@
           "basis": "SYNTHETIC_PER_KG_USABLE"
         },
         "lca_state": "not_requested",
-        "scenario_digest": "sha256:synthetic-scenario-a"
+        "scenario_digest": "sha256:synthetic-scenario-a",
+        "nutrition_evidence_state": "complete"
       },
       "expected": {
         "disposition": "indeterminate",
@@ -894,7 +910,8 @@
           "basis": "SYNTHETIC_PER_KG_USABLE"
         },
         "lca_state": "not_requested",
-        "scenario_digest": "sha256:synthetic-scenario-a"
+        "scenario_digest": "sha256:synthetic-scenario-a",
+        "nutrition_evidence_state": "complete"
       },
       "expected": {
         "disposition": "indeterminate",
@@ -947,7 +964,8 @@
           "basis": "SYNTHETIC_PER_KG_USABLE"
         },
         "lca_state": "not_requested",
-        "scenario_digest": "sha256:synthetic-scenario-a"
+        "scenario_digest": "sha256:synthetic-scenario-a",
+        "nutrition_evidence_state": "complete"
       },
       "expected": {
         "disposition": "blocked",
@@ -1000,7 +1018,8 @@
           "basis": "SYNTHETIC_PER_KG_USABLE"
         },
         "lca_state": "not_requested",
-        "scenario_digest": "sha256:synthetic-scenario-a"
+        "scenario_digest": "sha256:synthetic-scenario-a",
+        "nutrition_evidence_state": "complete"
       },
       "expected": {
         "disposition": "blocked",
@@ -1053,7 +1072,8 @@
           "basis": "SYNTHETIC_PER_KG_USABLE"
         },
         "lca_state": "not_requested",
-        "scenario_digest": "sha256:synthetic-scenario-a"
+        "scenario_digest": "sha256:synthetic-scenario-a",
+        "nutrition_evidence_state": "complete"
       },
       "expected": {
         "disposition": "indeterminate",
@@ -1106,7 +1126,8 @@
           "basis": "SYNTHETIC_PER_KG_USABLE"
         },
         "lca_state": "incomplete",
-        "scenario_digest": "sha256:synthetic-scenario-a"
+        "scenario_digest": "sha256:synthetic-scenario-a",
+        "nutrition_evidence_state": "complete"
       },
       "expected": {
         "disposition": "not_comparable",
@@ -1159,7 +1180,8 @@
           "basis": "SYNTHETIC_PER_KG_USABLE"
         },
         "lca_state": "not_requested",
-        "scenario_digest": "sha256:synthetic-scenario-b"
+        "scenario_digest": "sha256:synthetic-scenario-b",
+        "nutrition_evidence_state": "complete"
       },
       "expected": {
         "disposition": "not_comparable",
@@ -1213,7 +1235,8 @@
         },
         "lca_state": "not_requested",
         "scenario_digest": "sha256:synthetic-scenario-a",
-        "reported_as": "measured"
+        "reported_as": "measured",
+        "nutrition_evidence_state": "complete"
       },
       "expected": {
         "disposition": "invalid_evidence",
@@ -1266,7 +1289,8 @@
           "basis": "SYNTHETIC_PER_KG_USABLE"
         },
         "lca_state": "not_requested",
-        "scenario_digest": "sha256:synthetic-scenario-a"
+        "scenario_digest": "sha256:synthetic-scenario-a",
+        "nutrition_evidence_state": "complete"
       },
       "expected": {
         "disposition": "eligible_for_declared_comparison",
@@ -1322,7 +1346,8 @@
         },
         "lca_state": "not_requested",
         "scenario_digest": "sha256:synthetic-scenario-a",
-        "reported_as": "simulated"
+        "reported_as": "simulated",
+        "nutrition_evidence_state": "complete"
       },
       "expected": {
         "disposition": "indeterminate",
@@ -1375,7 +1400,8 @@
           "basis": ""
         },
         "lca_state": "not_requested",
-        "scenario_digest": "sha256:synthetic-scenario-a"
+        "scenario_digest": "sha256:synthetic-scenario-a",
+        "nutrition_evidence_state": "complete"
       },
       "expected": {
         "disposition": "invalid_evidence",
@@ -1428,7 +1454,8 @@
           "basis": "SYNTHETIC_PER_KG_USABLE"
         },
         "lca_state": "not_requested",
-        "scenario_digest": "sha256:synthetic-scenario-a"
+        "scenario_digest": "sha256:synthetic-scenario-a",
+        "nutrition_evidence_state": "complete"
       },
       "expected": {
         "disposition": "blocked",
@@ -1481,7 +1508,8 @@
           "basis": "SYNTHETIC_PER_KG_USABLE"
         },
         "lca_state": "not_requested",
-        "scenario_digest": "sha256:synthetic-scenario-a"
+        "scenario_digest": "sha256:synthetic-scenario-a",
+        "nutrition_evidence_state": "complete"
       },
       "expected": {
         "disposition": "eligible_for_declared_comparison",
@@ -1536,7 +1564,8 @@
           "basis": "SYNTHETIC_PER_KG_USABLE"
         },
         "lca_state": "not_requested",
-        "scenario_digest": "sha256:synthetic-scenario-a"
+        "scenario_digest": "sha256:synthetic-scenario-a",
+        "nutrition_evidence_state": "complete"
       },
       "expected": {
         "disposition": "blocked",
