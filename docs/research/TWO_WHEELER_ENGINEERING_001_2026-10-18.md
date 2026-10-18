@@ -1,9 +1,9 @@
 # TWO-WHEELER-ENG-001 — Co-designing bicycles, e-bikes, motorcycles and microfactories
 
-**Status:** Research and benchmark contract, v0.1 — proposed targets only  
+**Status:** Research/benchmark contract plus initial Rust verifier source, v0.1 — proposed targets only  
 **Tracker:** https://github.com/Luminous-Dynamics/symthaea/issues/8044  
 **Review date:** 2026-10-18  
-**Evidence status:** Literature/standards review and architecture proposal. No vehicle simulation, prototype test, production run, or CI result is claimed by this document.
+**Evidence status:** Literature/standards review, architecture proposal, frozen expected-output fixtures and an authored Rust verifier. The verifier has not been compiled or executed in this environment. No vehicle simulation, prototype test, production run, or CI result is claimed.
 
 ## Executive thesis
 
@@ -133,6 +133,17 @@ Every run should bind, either directly or by immutable reference:
 
 Evidence classes must remain explicit: `Source`, `Synthetic`, `Simulated`, `WorkshopMeasured`, `InstrumentedPhysical`, `FieldObserved`, and `RegulatoryReceipt`. These labels are descriptive, not a single ranking; evidence is applicable only to the configuration, observable and scope it actually supports.
 
+The initial independent-decision prototype is wired into `xtask`. From the workspace root, the authored commands are:
+
+```sh
+cargo test -p xtask twowheeler_benchmark
+cargo run -p xtask -- two-wheeler-benchmark \\
+  --input docs/research/data/two_wheeler_a0_benchmark_v0_1.json \\
+  --out reports/two_wheeler_a0_verification.json
+```
+
+These commands have **not** been run in the current environment. A verifier pass would establish agreement with these synthetic decision rules only, not physical engineering validity.
+
 Suggested execution loop:
 
 1. Freeze mission requirements and comparable baseline variants.
@@ -170,4 +181,4 @@ Check the official catalogue and relevant national adoption before every complia
 
 This document specifies a benchmark programme; it does not provide a finished bicycle/motorcycle design or demonstrate improvement. A benchmark pass may prove only the exact software contract and frozen synthetic scenarios that were executed. It does not prove structural strength, braking performance, user fit, physical durability, factory throughput, commercial economics, environmental superiority, roadworthiness, type approval, or permission to operate.
 
-**Initial fixture now frozen:** [`two_wheeler_a0_benchmark_v0_1.json`](data/two_wheeler_a0_benchmark_v0_1.json) records one positive synthetic control and 16 seeded negative controls. It is an expected-output manifest only: no runner or independent verifier is connected and no result has been executed. **Next implementation slice:** implement an independent verifier against these cases, test that it rejects every seeded invalid claim, and bind the manifest to the existing road-dynamics, repairability, manufacturing and factory-scheduler owners before expanding the design search or adding any solver.
+**Initial fixture and verifier source:** [`two_wheeler_a0_benchmark_v0_1.json`](data/two_wheeler_a0_benchmark_v0_1.json) records one positive synthetic control and 16 seeded negative controls. The Rust `xtask two-wheeler-benchmark` command recomputes decisions from declared facts and includes unit tests for all frozen outcomes, missing-cost handling and non-compensatory safety gates. The source has been added but **has not been compiled or executed here**. Next: run exact-head Cargo tests, review every mismatch, add independent malformed-input and mutation controls, and bind this contract to the existing road-dynamics, repairability, manufacturing and factory-scheduler owners before expanding design search or adding a solver.
