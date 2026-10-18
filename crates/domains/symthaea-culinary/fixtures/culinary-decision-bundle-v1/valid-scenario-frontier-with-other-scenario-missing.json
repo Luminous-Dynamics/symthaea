@@ -139,10 +139,10 @@
         }
       ],
       "rank_instability": {
-        "ranked_scenarios": 2,
+        "ranked_scenarios": 1,
         "frontier_scenarios": 1,
-        "dominated_scenarios": 1,
-        "incomplete_scenarios": 0
+        "dominated_scenarios": 0,
+        "incomplete_scenarios": 1
       }
     },
     {
