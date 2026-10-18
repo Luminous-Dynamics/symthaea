@@ -496,15 +496,12 @@ pub fn run_cost_budget_arm(
     }
 
     let mut candidates = candidate_positions();
-    let mut stop_reason: CostBudgetStopReason;
-    loop {
+    let stop_reason = loop {
         if trace.len() >= INITIAL_OBSERVATION_COUNT + ADDITIONAL_OBSERVATION_BUDGET {
-            stop_reason = CostBudgetStopReason::ObservationCapReached;
-            break;
+            break CostBudgetStopReason::ObservationCapReached;
         }
         if candidates.is_empty() {
-            stop_reason = CostBudgetStopReason::CandidatePoolExhausted;
-            break;
+            break CostBudgetStopReason::CandidatePoolExhausted;
         }
         let remaining = schedule.budget_units - cumulative;
         let selected = if strategy == CostBudgetStrategy::FixedStratified {
@@ -514,15 +511,11 @@ pub fn run_cost_budget_arm(
                 Some(position) => {
                     let required = incremental_cost(last_position, position, &schedule, false).total;
                     if required > remaining + EPSILON {
-                        stop_reason = CostBudgetStopReason::FixedPlanNextPointUnaffordable;
-                        break;
+                        break CostBudgetStopReason::FixedPlanNextPointUnaffordable;
                     }
                     Some(position)
                 }
-                None => {
-                    stop_reason = CostBudgetStopReason::CandidatePoolExhausted;
-                    break;
-                }
+                None => break CostBudgetStopReason::CandidatePoolExhausted,
             }
         } else {
             let raw: Vec<_> = trace.iter().map(|item| item.observation.clone()).collect();
@@ -533,13 +526,11 @@ pub fn run_cost_budget_arm(
         };
 
         let Some(position) = selected else {
-            stop_reason = CostBudgetStopReason::BudgetConstraintReached;
-            break;
+            break CostBudgetStopReason::BudgetConstraintReached;
         };
         let costs = incremental_cost(last_position, position, &schedule, false);
         if costs.total > remaining + EPSILON {
-            stop_reason = CostBudgetStopReason::BudgetConstraintReached;
-            break;
+            break CostBudgetStopReason::BudgetConstraintReached;
         }
         let index = trace.len();
         let item = costed_observation(
@@ -549,7 +540,7 @@ pub fn run_cost_budget_arm(
         last_position = position;
         trace.push(item);
         candidates.retain(|candidate| !same_position(*candidate, position));
-    }
+    };
 
     let metrics = evaluate_costed_design(surface, &trace, &schedule);
     let mut report = CostBudgetReport {
