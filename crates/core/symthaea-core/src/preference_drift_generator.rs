@@ -365,7 +365,7 @@ fn apply_axis_variation(
     Ok(scenario)
 }
 
-/// Generate a reproducible suite from a validated v2 hand-authored control fixture.
+/// Generate a reproducible suite from a validated hand-authored control fixture (source v3).
 ///
 /// Development and held-out wearer/session IDs are disjoint. Whole scenario families retain
 /// their declared split. The generator varies feedback age, freshness horizon, query budget,
