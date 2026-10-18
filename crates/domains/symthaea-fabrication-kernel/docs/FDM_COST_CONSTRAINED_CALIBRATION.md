@@ -22,6 +22,7 @@ All results are synthetic. Cost units are abstract scenario parameters, not seco
 - Candidate grid: normalized coordinates from 0.1 to 0.9 in 0.1 increments.
 - Every selector produces a deterministic next-location sequence from prior observations and a declared cost schedule. A budget run takes a prefix of that sequence and stops before the first unaffordable measurement. This creates nested budget/quality curves for a given surface, selector, seed, and cost schedule family.
 - Six fixed total budgets are evaluated: 17, 20, 23, 26, 29 and 32 abstract units.
+- Under the demo schedule, the common five-point initial route costs approximately 16.125483 abstract units (2 setup + 5 acquisition + 7.725483 travel + 1.4 edge surcharge). Thus the 17-unit arm is intentionally a start-only boundary case; higher budgets allow additional actions. This is direct arithmetic on the declared fixture constants, not an executed Rust test or physical cost estimate.
 - All surfaces and values remain synthetic; latent values and the evaluation grid are only consulted after the selector has proposed its next position.
 
 ## Explicit synthetic cost ledger
