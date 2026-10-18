@@ -1,0 +1,69 @@
+{
+  "schema_version": "0.1.0",
+  "corpus_id": "ORGAN-DESIGN-Q1-HOSTILE-CASES",
+  "status": "FIXTURE_SPECIFICATION_NOT_EXECUTION_RECEIPT",
+  "purpose": "Hostile case registry for an isolated synthetic-only candidate-ranking contract. Cases are not biological measurements or proof of organ-design capability.",
+  "evidence_ceiling": "synthetic_simulation",
+  "cases": [
+    {
+      "id": "identical-inputs-replay-deterministic",
+      "threat": "Candidate or metric input order changes output or canonical receipt material.",
+      "expected": "same normalized decisions and byte-identical canonical identity material"
+    },
+    {
+      "id": "objective-profile-changes-identity",
+      "threat": "The same candidates are scored under a changed objective direction or unit profile.",
+      "expected": "canonical identity material changes"
+    },
+    {
+      "id": "hard-constraint-cannot-be-traded-away",
+      "threat": "A candidate with a superior weighted/nominal score violates a declared hard constraint.",
+      "expected": "candidate rejected before Pareto ranking"
+    },
+    {
+      "id": "missing-or-wrong-units-fail-closed",
+      "threat": "A required metric is absent or has a mismatched/empty unit.",
+      "expected": "candidate rejected with a stable metric reason code"
+    },
+    {
+      "id": "unresolved-assumption-fails-closed",
+      "threat": "A candidate relies on a required unresolved model assumption.",
+      "expected": "candidate rejected; no inference from optimizer confidence"
+    },
+    {
+      "id": "stale-or-contradictory-evidence-fails-closed",
+      "threat": "Required evidence is stale or contradictory.",
+      "expected": "candidate rejected and evidence status retained in reason code"
+    },
+    {
+      "id": "confidence-cannot-promote-synthetic-evidence",
+      "threat": "Internal confidence is set to 1.0 without additional admitted evidence.",
+      "expected": "ranking unchanged and receipt ceiling remains synthetic"
+    },
+    {
+      "id": "synthetic-cannot-claim-physical-validation",
+      "threat": "A candidate asks to claim physical-bench, tissue-specific, or translational validity from synthetic outputs.",
+      "expected": "candidate rejected and profile ceiling remains synthetic"
+    },
+    {
+      "id": "heldout-cannot-be-used-for-selection",
+      "threat": "Held-out candidates are fed into a selection profile or a held-out profile emits an optimizer-usable Pareto ranking.",
+      "expected": "split mismatch rejection or evaluation-only decisions with selection disabled"
+    },
+    {
+      "id": "baseline-and-ablations-are-mandatory",
+      "threat": "A comparison omits the designated baseline or one required ablation, or one of those candidates is inadmissible.",
+      "expected": "receipt status BLOCKED, while candidate failures remain inspectable"
+    },
+    {
+      "id": "pareto-incomparables-are-preserved",
+      "threat": "Candidates trade coverage against cost and pressure-drop proxies.",
+      "expected": "nondominated candidates remain on the same Pareto front; no universal scalar winner"
+    },
+    {
+      "id": "duplicate-identities-are-rejected",
+      "threat": "Candidate IDs or required records are duplicated.",
+      "expected": "ranking stops or the candidate is rejected; duplicate identity never silently overwrites prior data"
+    }
+  ]
+}
