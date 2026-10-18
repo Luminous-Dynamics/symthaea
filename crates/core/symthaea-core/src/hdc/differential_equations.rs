@@ -89,7 +89,8 @@ pub struct ODEResult {
     pub method: ODEMethod,
     /// Total number of steps taken.
     pub steps: usize,
-    /// Consciousness measure (convergence quality).
+    /// Legacy/domain-specific score. This is not a numerical error bound,
+    /// convergence certificate, or independently validated accuracy metric.
     pub phi: f64,
     /// HDC encoding of the final state.
     pub encoding: BinaryHV,
@@ -132,6 +133,8 @@ pub enum ImplicitEulerErrorKind {
     InvalidStepCount { requested: usize, max_allowed: usize },
     InvalidNewtonIterationBudget { requested: usize, max_allowed: usize },
     SystemTooLargeForDenseNewton { dimension: usize, max_dimension: usize },
+    StateScaleDimensionMismatch { expected: usize, actual: usize },
+    InvalidStateScale { index: usize },
     NonFiniteInitialState { index: usize },
     NonFiniteIntermediateState { stage: &'static str, index: usize },
     RhsDimensionMismatch { stage: &'static str, expected: usize, actual: usize },
@@ -179,6 +182,8 @@ impl ImplicitEulerError {
                 | ImplicitEulerErrorKind::InvalidStepCount { .. }
                 | ImplicitEulerErrorKind::InvalidNewtonIterationBudget { .. }
                 | ImplicitEulerErrorKind::SystemTooLargeForDenseNewton { .. }
+                | ImplicitEulerErrorKind::StateScaleDimensionMismatch { .. }
+                | ImplicitEulerErrorKind::InvalidStateScale { .. }
                 | ImplicitEulerErrorKind::NonFiniteInitialState { .. }
         ) || (matches!(&kind, ImplicitEulerErrorKind::InvalidTimeSpan)
             && steps_completed == 0
@@ -321,6 +326,150 @@ fn implicit_euler_solve_dense(
     Ok(())
 }
 
+
+/// Report for the adaptive backward-Euler step-doubling integrator.
+#[derive(Debug, Clone)]
+pub struct AdaptiveImplicitEulerReport {
+    pub trajectory: ODEResult,
+    /// Macro-steps accepted by the local error controller.
+    pub accepted_steps: usize,
+    /// Macro-step trials rejected for local error or retryable Newton failures.
+    pub rejected_steps: usize,
+    /// Largest normalized step-doubling error among accepted macro-steps.
+    pub max_accepted_normalized_local_error: f64,
+    /// Largest normalized Newton residual observed across all subsolves.
+    pub max_normalized_newton_residual: f64,
+    pub newton_corrections: usize,
+    pub rhs_evaluations: usize,
+    pub estimated_dense_work_units: usize,
+    /// Number of attempted macro-steps, accepted or rejected.
+    pub attempts: usize,
+}
+
+/// Typed failure from adaptive implicit Euler.
+#[derive(Debug, Clone, PartialEq)]
+pub enum AdaptiveImplicitEulerErrorKind {
+    EmptySystem,
+    DimensionMismatch { expected: usize, actual: usize },
+    InvalidTimeSpan,
+    InvalidInitialStep,
+    NonFiniteInitialState { index: usize },
+    InvalidAbsoluteTolerance { index: usize },
+    ToleranceDimensionMismatch { expected: usize, actual: usize },
+    InvalidRelativeTolerance,
+    InvalidAttemptBudget { requested: usize, max_allowed: usize },
+    InvalidNewtonIterationBudget { requested: usize, max_allowed: usize },
+    SystemTooLargeForDenseNewton { dimension: usize, max_dimension: usize },
+    AttemptBudgetExceeded { max_attempts: usize },
+    RhsEvaluationBudgetExceeded { max_evaluations: usize },
+    DenseWorkBudgetExceeded { max_work_units: usize },
+    StepSolveFailed { cause: ImplicitEulerErrorKind },
+    NonFiniteToleranceScale { index: usize },
+    NonFiniteStepDoublingError,
+    StepSizeUnderflow { attempted_step: f64 },
+}
+
+/// Failure receipt retains the last accepted state/time and accumulated work.
+#[derive(Debug, Clone, PartialEq)]
+pub struct AdaptiveImplicitEulerError {
+    pub kind: AdaptiveImplicitEulerErrorKind,
+    pub time: f64,
+    pub last_state: Vec<f64>,
+    pub accepted_steps: usize,
+    pub rejected_steps: usize,
+    pub attempts: usize,
+    pub newton_corrections: usize,
+    pub rhs_evaluations: usize,
+    pub estimated_dense_work_units: usize,
+    pub max_normalized_newton_residual: f64,
+}
+
+impl AdaptiveImplicitEulerError {
+    fn new(
+        kind: AdaptiveImplicitEulerErrorKind,
+        time: f64,
+        last_state: &[f64],
+        accepted_steps: usize,
+        rejected_steps: usize,
+        attempts: usize,
+        work: &AdaptiveImplicitEulerWork,
+        max_normalized_newton_residual: f64,
+    ) -> Self {
+        Self {
+            kind,
+            time,
+            last_state: last_state.to_vec(),
+            accepted_steps,
+            rejected_steps,
+            attempts,
+            newton_corrections: work.newton_corrections,
+            rhs_evaluations: work.rhs_evaluations,
+            estimated_dense_work_units: work.estimated_dense_work_units,
+            max_normalized_newton_residual,
+        }
+    }
+}
+
+impl std::fmt::Display for AdaptiveImplicitEulerError {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        write!(
+            f,
+            "adaptive implicit Euler failed at t={:.17e} after {} accepted and {} rejected attempts: {:?}",
+            self.time, self.accepted_steps, self.rejected_steps, self.kind
+        )
+    }
+}
+
+impl std::error::Error for AdaptiveImplicitEulerError {}
+
+#[derive(Debug, Default)]
+struct AdaptiveImplicitEulerWork {
+    newton_corrections: usize,
+    rhs_evaluations: usize,
+    estimated_dense_work_units: usize,
+}
+
+impl AdaptiveImplicitEulerWork {
+    fn record_report(&mut self, report: &ImplicitEulerSolveReport) {
+        self.newton_corrections = self.newton_corrections.saturating_add(report.newton_corrections);
+        self.rhs_evaluations = self.rhs_evaluations.saturating_add(report.rhs_evaluations);
+        self.estimated_dense_work_units = self
+            .estimated_dense_work_units
+            .saturating_add(report.estimated_dense_work_units);
+    }
+
+    fn record_error(&mut self, error: &ImplicitEulerError, dimension: usize) {
+        self.newton_corrections = self.newton_corrections.saturating_add(error.newton_corrections);
+        self.rhs_evaluations = self.rhs_evaluations.saturating_add(error.rhs_evaluations);
+        let per_correction = dimension.saturating_mul(dimension).saturating_mul(dimension);
+        self.estimated_dense_work_units = self
+            .estimated_dense_work_units
+            .saturating_add(per_correction.saturating_mul(error.newton_corrections));
+    }
+
+    fn exceeded_budget(&self) -> Option<AdaptiveImplicitEulerErrorKind> {
+        if self.rhs_evaluations > MAX_IMPLICIT_RHS_EVALUATIONS {
+            Some(AdaptiveImplicitEulerErrorKind::RhsEvaluationBudgetExceeded {
+                max_evaluations: MAX_IMPLICIT_RHS_EVALUATIONS,
+            })
+        } else if self.estimated_dense_work_units > MAX_IMPLICIT_NEWTON_WORK_UNITS {
+            Some(AdaptiveImplicitEulerErrorKind::DenseWorkBudgetExceeded {
+                max_work_units: MAX_IMPLICIT_NEWTON_WORK_UNITS,
+            })
+        } else {
+            None
+        }
+    }
+}
+
+fn adaptive_implicit_retryable(kind: &ImplicitEulerErrorKind) -> bool {
+    matches!(
+        kind,
+        ImplicitEulerErrorKind::NewtonNonConvergence { .. }
+            | ImplicitEulerErrorKind::SingularJacobian { .. }
+    )
+}
+
 /// Result of a boundary-value-problem solve.
 #[derive(Debug, Clone)]
 pub struct BVPResult {
@@ -352,7 +501,7 @@ pub struct PDEResult {
     pub u_final: Vec<f64>,
     /// Number of time steps taken.
     pub time_steps: usize,
-    /// Phi measure (energy conservation or convergence quality).
+    /// Legacy/domain-specific score; not an error bound or numerical certificate.
     pub phi: f64,
     /// HDC encoding of the final solution.
     pub encoding: BinaryHV,
@@ -377,7 +526,7 @@ pub struct PDE2DResult {
     pub u_final: Vec<f64>,
     /// Number of time steps taken.
     pub time_steps: usize,
-    /// Phi measure.
+    /// Legacy/domain-specific score; not an error bound or numerical certificate.
     pub phi: f64,
     /// HDC encoding.
     pub encoding: BinaryHV,
@@ -1087,6 +1236,23 @@ impl DifferentialEquationsEngine {
         n_steps: usize,
         newton_iters: usize,
     ) -> Result<ImplicitEulerSolveReport, ImplicitEulerError> {
+        let state_scales = vec![1.0; system.dim];
+        Self::try_solve_implicit_euler_with_state_scales(
+            system, t0, t_end, y0, n_steps, newton_iters, &state_scales,
+        )
+    }
+
+    /// Internal full-Newton solve with explicit characteristic state scales
+    /// for finite-difference perturbations and normalized residual checks.
+    fn try_solve_implicit_euler_with_state_scales(
+        system: &ODESystem,
+        t0: f64,
+        t_end: f64,
+        y0: &[f64],
+        n_steps: usize,
+        newton_iters: usize,
+        state_scales: &[f64],
+    ) -> Result<ImplicitEulerSolveReport, ImplicitEulerError> {
         let mut y = y0.to_vec();
         let mut rhs_evaluations = 0usize;
         let mut total_corrections = 0usize;
@@ -1103,6 +1269,22 @@ impl DifferentialEquationsEngine {
                 ImplicitEulerErrorKind::DimensionMismatch {
                     expected: system.dim, actual: y0.len(),
                 }, t0, &y, 0, 0, 0, 0.0
+            ));
+        }
+        if state_scales.len() != system.dim {
+            return Err(ImplicitEulerError::new(
+                ImplicitEulerErrorKind::StateScaleDimensionMismatch {
+                    expected: system.dim, actual: state_scales.len(),
+                }, t0, &y, 0, 0, 0, 0.0
+            ));
+        }
+        if let Some(index) = state_scales
+            .iter()
+            .position(|value| !value.is_finite() || *value <= 0.0)
+        {
+            return Err(ImplicitEulerError::new(
+                ImplicitEulerErrorKind::InvalidStateScale { index },
+                t0, &y, 0, 0, 0, 0.0
             ));
         }
         if !t0.is_finite() || !t_end.is_finite() || t_end < t0 {
@@ -1236,7 +1418,14 @@ impl DifferentialEquationsEngine {
                             total_corrections, rhs_evaluations, step_residual_norm
                         ));
                     }
-                    let scale = 1.0 + y_next[i].abs().max(y[i].abs());
+                    let scale = state_scales[i] + y_next[i].abs().max(y[i].abs());
+                    if !scale.is_finite() || scale <= 0.0 {
+                        return Err(ImplicitEulerError::new(
+                            ImplicitEulerErrorKind::NonFiniteResidual { index: i },
+                            *t_values.last().unwrap_or(&t0), &y, step,
+                            total_corrections, rhs_evaluations, step_residual_norm
+                        ));
+                    }
                     let normalized = value.abs() / scale;
                     if !normalized.is_finite() {
                         return Err(ImplicitEulerError::new(
@@ -1283,7 +1472,9 @@ impl DifferentialEquationsEngine {
                 let mut jacobian = vec![0.0_f64; matrix_len];
                 for column in 0..dimension {
                     let original = y_next[column];
-                    let delta = f64::EPSILON.sqrt() * original.abs().max(1.0);
+                    let perturbation_scale = original.abs().max(state_scales[column]);
+                    let raw_delta = f64::EPSILON.sqrt() * perturbation_scale;
+                    let delta = if raw_delta > 0.0 { raw_delta } else { perturbation_scale };
                     let mut perturbed = original + delta;
                     let mut signed_delta = delta;
                     if !perturbed.is_finite() || perturbed == original {
@@ -1389,6 +1580,364 @@ impl DifferentialEquationsEngine {
             rhs_evaluations,
             max_normalized_residual,
             estimated_dense_work_units: dense_work_units,
+        })
+    }
+
+    /// Adaptive backward Euler using step doubling to estimate discretization error.
+    ///
+    /// Each trial compares one full backward-Euler step with two half steps.
+    /// The two-half-step result is accepted when the RMS component error,
+    /// scaled by `atol[i] + rtol * max(abs(y_old[i]), abs(y_fine[i]))`,
+    /// is at most one. A backward-Euler step has order one, so the controller
+    /// adjusts the step size with an error exponent of -1/2.
+    ///
+    /// Newton residual convergence and time-discretization error are distinct
+    /// checks. Retryable Newton convergence/singularity failures shrink the
+    /// time step; malformed RHS values and other structural failures stop the
+    /// solve. The maximum-attempt and accumulated-work budgets include rejected
+    /// macro-steps and all full/half-step subsolves.
+    ///
+    /// This is a first-order adaptive method, not a substitute for a qualified
+    /// variable-order BDF or Radau solver.
+    pub fn try_solve_implicit_euler_adaptive(
+        system: &ODESystem,
+        t0: f64,
+        t_end: f64,
+        y0: &[f64],
+        absolute_tolerances: &[f64],
+        relative_tolerance: f64,
+        initial_step: f64,
+        max_attempts: usize,
+        newton_iters: usize,
+    ) -> Result<AdaptiveImplicitEulerReport, AdaptiveImplicitEulerError> {
+        let mut y = y0.to_vec();
+        let mut t = t0;
+        let mut accepted_steps = 0usize;
+        let mut rejected_steps = 0usize;
+        let mut attempts = 0usize;
+        let mut max_accepted_error = 0.0_f64;
+        let mut max_newton_residual = 0.0_f64;
+        let mut work = AdaptiveImplicitEulerWork::default();
+
+        if system.dim == 0 {
+            return Err(AdaptiveImplicitEulerError::new(
+                AdaptiveImplicitEulerErrorKind::EmptySystem, t, &y, accepted_steps,
+                rejected_steps, attempts, &work, max_newton_residual
+            ));
+        }
+        if y0.len() != system.dim {
+            return Err(AdaptiveImplicitEulerError::new(
+                AdaptiveImplicitEulerErrorKind::DimensionMismatch {
+                    expected: system.dim, actual: y0.len(),
+                }, t, &y, accepted_steps, rejected_steps, attempts, &work, max_newton_residual
+            ));
+        }
+        if !t0.is_finite() || !t_end.is_finite() || t_end < t0 || !(t_end - t0).is_finite() {
+            return Err(AdaptiveImplicitEulerError::new(
+                AdaptiveImplicitEulerErrorKind::InvalidTimeSpan, t, &y, accepted_steps,
+                rejected_steps, attempts, &work, max_newton_residual
+            ));
+        }
+        if !initial_step.is_finite() || initial_step <= 0.0 {
+            return Err(AdaptiveImplicitEulerError::new(
+                AdaptiveImplicitEulerErrorKind::InvalidInitialStep, t, &y, accepted_steps,
+                rejected_steps, attempts, &work, max_newton_residual
+            ));
+        }
+        if max_attempts == 0 || max_attempts > MAX_STEPS {
+            return Err(AdaptiveImplicitEulerError::new(
+                AdaptiveImplicitEulerErrorKind::InvalidAttemptBudget {
+                    requested: max_attempts, max_allowed: MAX_STEPS,
+                }, t, &y, accepted_steps, rejected_steps, attempts, &work, max_newton_residual
+            ));
+        }
+        if newton_iters == 0 || newton_iters > MAX_NEWTON_ITERATIONS_PER_STEP {
+            return Err(AdaptiveImplicitEulerError::new(
+                AdaptiveImplicitEulerErrorKind::InvalidNewtonIterationBudget {
+                    requested: newton_iters, max_allowed: MAX_NEWTON_ITERATIONS_PER_STEP,
+                }, t, &y, accepted_steps, rejected_steps, attempts, &work, max_newton_residual
+            ));
+        }
+        if system.dim > MAX_DENSE_NEWTON_DIM {
+            return Err(AdaptiveImplicitEulerError::new(
+                AdaptiveImplicitEulerErrorKind::SystemTooLargeForDenseNewton {
+                    dimension: system.dim, max_dimension: MAX_DENSE_NEWTON_DIM,
+                }, t, &y, accepted_steps, rejected_steps, attempts, &work, max_newton_residual
+            ));
+        }
+        if absolute_tolerances.len() != system.dim {
+            return Err(AdaptiveImplicitEulerError::new(
+                AdaptiveImplicitEulerErrorKind::ToleranceDimensionMismatch {
+                    expected: system.dim, actual: absolute_tolerances.len(),
+                }, t, &y, accepted_steps, rejected_steps, attempts, &work, max_newton_residual
+            ));
+        }
+        if !relative_tolerance.is_finite() || relative_tolerance < 0.0 {
+            return Err(AdaptiveImplicitEulerError::new(
+                AdaptiveImplicitEulerErrorKind::InvalidRelativeTolerance, t, &y,
+                accepted_steps, rejected_steps, attempts, &work, max_newton_residual
+            ));
+        }
+        if let Some(index) = absolute_tolerances
+            .iter()
+            .position(|value| !value.is_finite() || *value <= 0.0)
+        {
+            return Err(AdaptiveImplicitEulerError::new(
+                AdaptiveImplicitEulerErrorKind::InvalidAbsoluteTolerance { index }, t, &y,
+                accepted_steps, rejected_steps, attempts, &work, max_newton_residual
+            ));
+        }
+        if let Some(index) = y0.iter().position(|value| !value.is_finite()) {
+            return Err(AdaptiveImplicitEulerError::new(
+                AdaptiveImplicitEulerErrorKind::NonFiniteInitialState { index },
+                t, &y, accepted_steps, rejected_steps, attempts, &work, max_newton_residual
+            ));
+        }
+
+        let span = t_end - t0;
+        let mut t_values = vec![t0];
+        let mut y_values = vec![y.clone()];
+        if span == 0.0 {
+            let trajectory = ODEResult {
+                t_values,
+                y_values,
+                method: ODEMethod::ImplicitEuler,
+                steps: 0,
+                phi: 1.0 / (1.0 + y.iter().map(|value| value.abs()).sum::<f64>() / system.dim as f64),
+                encoding: Self::encode_implicit_euler_result(&y),
+            };
+            return Ok(AdaptiveImplicitEulerReport {
+                trajectory,
+                accepted_steps: 0,
+                rejected_steps: 0,
+                max_accepted_normalized_local_error: 0.0,
+                max_normalized_newton_residual: 0.0,
+                newton_corrections: 0,
+                rhs_evaluations: 0,
+                estimated_dense_work_units: 0,
+                attempts: 0,
+            });
+        }
+
+        let mut step_size = initial_step.min(span);
+        while t < t_end {
+            if attempts >= max_attempts {
+                return Err(AdaptiveImplicitEulerError::new(
+                    AdaptiveImplicitEulerErrorKind::AttemptBudgetExceeded { max_attempts },
+                    t, &y, accepted_steps, rejected_steps, attempts, &work, max_newton_residual
+                ));
+            }
+            attempts += 1;
+            let remaining = t_end - t;
+            let trial_step = step_size.min(remaining);
+            let trial_end = if trial_step >= remaining { t_end } else { t + trial_step };
+            let midpoint = t + (trial_end - t) * 0.5;
+            if !trial_step.is_finite() || trial_step <= 0.0
+                || trial_end <= t || midpoint <= t || midpoint >= trial_end
+            {
+                return Err(AdaptiveImplicitEulerError::new(
+                    AdaptiveImplicitEulerErrorKind::StepSizeUnderflow { attempted_step: trial_step },
+                    t, &y, accepted_steps, rejected_steps, attempts, &work, max_newton_residual
+                ));
+            }
+
+            let full = Self::try_solve_implicit_euler_with_state_scales(
+                system, t, trial_end, &y, 1, newton_iters, absolute_tolerances
+            );
+            let full_state = match full {
+                Ok(report) => {
+                    max_newton_residual = max_newton_residual.max(report.max_normalized_residual);
+                    work.record_report(&report);
+                    if let Some(kind) = work.exceeded_budget() {
+                        return Err(AdaptiveImplicitEulerError::new(
+                            kind, t, &y, accepted_steps, rejected_steps, attempts, &work, max_newton_residual
+                        ));
+                    }
+                    report.trajectory.final_state().to_vec()
+                }
+                Err(error) => {
+                    max_newton_residual = max_newton_residual.max(error.residual_norm);
+                    work.record_error(&error, system.dim);
+                    if let Some(kind) = work.exceeded_budget() {
+                        return Err(AdaptiveImplicitEulerError::new(
+                            kind, t, &y, accepted_steps, rejected_steps, attempts, &work, max_newton_residual
+                        ));
+                    }
+                    if adaptive_implicit_retryable(&error.kind) {
+                        rejected_steps += 1;
+                        step_size = trial_step * 0.5;
+                        if !step_size.is_finite() || step_size <= 0.0 || t + step_size <= t {
+                            return Err(AdaptiveImplicitEulerError::new(
+                                AdaptiveImplicitEulerErrorKind::StepSizeUnderflow { attempted_step: step_size },
+                                t, &y, accepted_steps, rejected_steps, attempts, &work, max_newton_residual
+                            ));
+                        }
+                        continue;
+                    }
+                    return Err(AdaptiveImplicitEulerError::new(
+                        AdaptiveImplicitEulerErrorKind::StepSolveFailed { cause: error.kind },
+                        t, &y, accepted_steps, rejected_steps, attempts, &work, max_newton_residual
+                    ));
+                }
+            };
+
+            let first_half = Self::try_solve_implicit_euler_with_state_scales(
+                system, t, midpoint, &y, 1, newton_iters, absolute_tolerances
+            );
+            let midpoint_state = match first_half {
+                Ok(report) => {
+                    max_newton_residual = max_newton_residual.max(report.max_normalized_residual);
+                    work.record_report(&report);
+                    if let Some(kind) = work.exceeded_budget() {
+                        return Err(AdaptiveImplicitEulerError::new(
+                            kind, t, &y, accepted_steps, rejected_steps, attempts, &work, max_newton_residual
+                        ));
+                    }
+                    report.trajectory.final_state().to_vec()
+                }
+                Err(error) => {
+                    max_newton_residual = max_newton_residual.max(error.residual_norm);
+                    work.record_error(&error, system.dim);
+                    if let Some(kind) = work.exceeded_budget() {
+                        return Err(AdaptiveImplicitEulerError::new(
+                            kind, t, &y, accepted_steps, rejected_steps, attempts, &work, max_newton_residual
+                        ));
+                    }
+                    if adaptive_implicit_retryable(&error.kind) {
+                        rejected_steps += 1;
+                        step_size = trial_step * 0.5;
+                        if !step_size.is_finite() || step_size <= 0.0 || t + step_size <= t {
+                            return Err(AdaptiveImplicitEulerError::new(
+                                AdaptiveImplicitEulerErrorKind::StepSizeUnderflow { attempted_step: step_size },
+                                t, &y, accepted_steps, rejected_steps, attempts, &work, max_newton_residual
+                            ));
+                        }
+                        continue;
+                    }
+                    return Err(AdaptiveImplicitEulerError::new(
+                        AdaptiveImplicitEulerErrorKind::StepSolveFailed { cause: error.kind },
+                        t, &y, accepted_steps, rejected_steps, attempts, &work, max_newton_residual
+                    ));
+                }
+            };
+
+            let second_half = Self::try_solve_implicit_euler_with_state_scales(
+                system, midpoint, trial_end, &midpoint_state, 1, newton_iters, absolute_tolerances
+            );
+            let fine_state = match second_half {
+                Ok(report) => {
+                    max_newton_residual = max_newton_residual.max(report.max_normalized_residual);
+                    work.record_report(&report);
+                    if let Some(kind) = work.exceeded_budget() {
+                        return Err(AdaptiveImplicitEulerError::new(
+                            kind, t, &y, accepted_steps, rejected_steps, attempts, &work, max_newton_residual
+                        ));
+                    }
+                    report.trajectory.final_state().to_vec()
+                }
+                Err(error) => {
+                    max_newton_residual = max_newton_residual.max(error.residual_norm);
+                    work.record_error(&error, system.dim);
+                    if let Some(kind) = work.exceeded_budget() {
+                        return Err(AdaptiveImplicitEulerError::new(
+                            kind, t, &y, accepted_steps, rejected_steps, attempts, &work, max_newton_residual
+                        ));
+                    }
+                    if adaptive_implicit_retryable(&error.kind) {
+                        rejected_steps += 1;
+                        step_size = trial_step * 0.5;
+                        if !step_size.is_finite() || step_size <= 0.0 || t + step_size <= t {
+                            return Err(AdaptiveImplicitEulerError::new(
+                                AdaptiveImplicitEulerErrorKind::StepSizeUnderflow { attempted_step: step_size },
+                                t, &y, accepted_steps, rejected_steps, attempts, &work, max_newton_residual
+                            ));
+                        }
+                        continue;
+                    }
+                    return Err(AdaptiveImplicitEulerError::new(
+                        AdaptiveImplicitEulerErrorKind::StepSolveFailed { cause: error.kind },
+                        t, &y, accepted_steps, rejected_steps, attempts, &work, max_newton_residual
+                    ));
+                }
+            };
+
+            let mut squared_error_sum = 0.0_f64;
+            for i in 0..system.dim {
+                let scale = absolute_tolerances[i]
+                    + relative_tolerance * y[i].abs().max(fine_state[i].abs());
+                if !scale.is_finite() || scale <= 0.0 {
+                    return Err(AdaptiveImplicitEulerError::new(
+                        AdaptiveImplicitEulerErrorKind::NonFiniteToleranceScale { index: i },
+                        t, &y, accepted_steps, rejected_steps, attempts, &work, max_newton_residual
+                    ));
+                }
+                let normalized = (fine_state[i] - full_state[i]) / scale;
+                squared_error_sum += normalized * normalized;
+                if !squared_error_sum.is_finite() {
+                    return Err(AdaptiveImplicitEulerError::new(
+                        AdaptiveImplicitEulerErrorKind::NonFiniteStepDoublingError,
+                        t, &y, accepted_steps, rejected_steps, attempts, &work, max_newton_residual
+                    ));
+                }
+            }
+            let error_norm = (squared_error_sum / system.dim as f64).sqrt();
+            if !error_norm.is_finite() {
+                return Err(AdaptiveImplicitEulerError::new(
+                    AdaptiveImplicitEulerErrorKind::NonFiniteStepDoublingError,
+                    t, &y, accepted_steps, rejected_steps, attempts, &work, max_newton_residual
+                ));
+            }
+
+            if error_norm <= 1.0 {
+                t = trial_end;
+                y = fine_state;
+                t_values.push(t);
+                y_values.push(y.clone());
+                accepted_steps += 1;
+                max_accepted_error = max_accepted_error.max(error_norm);
+                let factor = if error_norm == 0.0 {
+                    2.0
+                } else {
+                    (0.9 / error_norm.sqrt()).clamp(0.2, 2.0)
+                };
+                step_size = trial_step * factor;
+                if !step_size.is_finite() || step_size <= 0.0 {
+                    return Err(AdaptiveImplicitEulerError::new(
+                        AdaptiveImplicitEulerErrorKind::StepSizeUnderflow { attempted_step: step_size },
+                        t, &y, accepted_steps, rejected_steps, attempts, &work, max_newton_residual
+                    ));
+                }
+            } else {
+                rejected_steps += 1;
+                let factor = (0.9 / error_norm.sqrt()).clamp(0.1, 0.5);
+                step_size = trial_step * factor;
+                if !step_size.is_finite() || step_size <= 0.0 || t + step_size <= t {
+                    return Err(AdaptiveImplicitEulerError::new(
+                        AdaptiveImplicitEulerErrorKind::StepSizeUnderflow { attempted_step: step_size },
+                        t, &y, accepted_steps, rejected_steps, attempts, &work, max_newton_residual
+                    ));
+                }
+            }
+        }
+
+        let trajectory = ODEResult {
+            t_values,
+            y_values,
+            method: ODEMethod::ImplicitEuler,
+            steps: accepted_steps,
+            phi: 1.0 / (1.0 + y.iter().map(|value| value.abs()).sum::<f64>() / system.dim as f64),
+            encoding: Self::encode_implicit_euler_result(&y),
+        };
+        Ok(AdaptiveImplicitEulerReport {
+            trajectory,
+            accepted_steps,
+            rejected_steps,
+            max_accepted_normalized_local_error: max_accepted_error,
+            max_normalized_newton_residual: max_newton_residual,
+            newton_corrections: work.newton_corrections,
+            rhs_evaluations: work.rhs_evaluations,
+            estimated_dense_work_units: work.estimated_dense_work_units,
+            attempts,
         })
     }
 
@@ -2128,6 +2677,215 @@ mod tests {
     /// STIFF TEST: dy/dt = -1000y + 1000 → y(t) = 1 - exp(-1000t), y(0) = 0
     /// Eigenvalue ratio = 1000. Forward Euler requires h < 0.002.
     /// Implicit Euler should handle h = 0.01 (5× beyond explicit stability).
+    #[test]
+    fn test_adaptive_implicit_euler_zero_duration_is_identity() {
+        fn growth(_t: f64, y: &[f64]) -> Vec<f64> {
+            vec![y[0]]
+        }
+        let system = ODESystem { f: growth, dim: 1 };
+        let report = DifferentialEquationsEngine::try_solve_implicit_euler_adaptive(
+            &system, 2.0, 2.0, &[3.5], &[1e-6], 1e-3, 0.1, 100, 8,
+        )
+        .expect("zero-duration solve should be an identity");
+        assert_eq!(report.trajectory.t_values, vec![2.0]);
+        assert_eq!(report.trajectory.y_values, vec![vec![3.5]]);
+        assert_eq!(report.accepted_steps, 0);
+        assert_eq!(report.rejected_steps, 0);
+        assert_eq!(report.attempts, 0);
+    }
+
+    #[test]
+    fn test_adaptive_implicit_euler_non_finite_initial_state_is_rejected() {
+        fn decay(_t: f64, y: &[f64]) -> Vec<f64> {
+            vec![-y[0]]
+        }
+        let system = ODESystem { f: decay, dim: 1 };
+        let error = DifferentialEquationsEngine::try_solve_implicit_euler_adaptive(
+            &system, 0.0, 1.0, &[f64::INFINITY], &[1e-6], 1e-3, 0.1, 100, 8,
+        )
+        .unwrap_err();
+        assert!(matches!(
+            error.kind,
+            AdaptiveImplicitEulerErrorKind::NonFiniteInitialState { index: 0 }
+        ));
+        assert_eq!(error.accepted_steps, 0);
+        assert_eq!(error.time, 0.0);
+    }
+
+    #[test]
+    fn test_adaptive_implicit_euler_step_doubling_reduces_exponential_error() {
+        fn growth(_t: f64, y: &[f64]) -> Vec<f64> {
+            vec![y[0]]
+        }
+        let system = ODESystem { f: growth, dim: 1 };
+        let coarse = DifferentialEquationsEngine::try_solve_implicit_euler_adaptive(
+            &system, 0.0, 1.0, &[1.0], &[1e-3], 1e-3, 1.0, 10_000, 12,
+        )
+        .expect("looser tolerance should reach the endpoint");
+        let tight = DifferentialEquationsEngine::try_solve_implicit_euler_adaptive(
+            &system, 0.0, 1.0, &[1.0], &[1e-5], 1e-5, 1.0, 10_000, 12,
+        )
+        .expect("tighter tolerance should reach the endpoint");
+        let exact = 1.0_f64.exp();
+        let coarse_error = (coarse.trajectory.final_state()[0] - exact).abs();
+        let tight_error = (tight.trajectory.final_state()[0] - exact).abs();
+
+        assert_eq!(coarse.trajectory.t_end(), 1.0);
+        assert_eq!(tight.trajectory.t_end(), 1.0);
+        assert!(coarse.accepted_steps > 1);
+        assert!(coarse.rejected_steps > 0 && tight.rejected_steps > 0);
+        assert!(tight.accepted_steps > coarse.accepted_steps);
+        assert!(tight_error < coarse_error);
+        assert!(coarse.max_accepted_normalized_local_error <= 1.0);
+        assert!(tight.max_accepted_normalized_local_error <= 1.0);
+        assert!(
+            tight.max_normalized_newton_residual.is_finite(),
+            "The report should retain finite residual diagnostics even for rejected trials",
+        );
+    }
+
+    #[test]
+    fn test_adaptive_implicit_euler_tolerances_are_unit_rescaling_consistent() {
+        fn nonlinear_native(_t: f64, y: &[f64]) -> Vec<f64> {
+            vec![y[0] * y[0], 1e12 * y[1] * y[1]]
+        }
+        fn nonlinear_rescaled(_t: f64, y: &[f64]) -> Vec<f64> {
+            vec![y[0] * y[0], y[1] * y[1]]
+        }
+        let native_system = ODESystem { f: nonlinear_native, dim: 2 };
+        let rescaled_system = ODESystem { f: nonlinear_rescaled, dim: 2 };
+        let native = DifferentialEquationsEngine::try_solve_implicit_euler_adaptive(
+            &native_system,
+            0.0,
+            0.2,
+            &[1.0, 1e-12],
+            &[1e-3, 1e-14],
+            0.0,
+            0.1,
+            10_000,
+            12,
+        )
+        .expect("nonlinear mixed-scale state should integrate");
+        let rescaled = DifferentialEquationsEngine::try_solve_implicit_euler_adaptive(
+            &rescaled_system,
+            0.0,
+            0.2,
+            &[1.0, 1.0],
+            &[1e-3, 1e-2],
+            0.0,
+            0.1,
+            10_000,
+            12,
+        )
+        .expect("equivalently rescaled nonlinear state should integrate");
+        assert_eq!(native.trajectory.t_end(), 0.2);
+        assert_eq!(rescaled.trajectory.t_end(), 0.2);
+        assert!(
+            native.accepted_steps.abs_diff(rescaled.accepted_steps) <= 1,
+            "Unit rescaling should preserve step decisions: native={}, rescaled={}",
+            native.accepted_steps,
+            rescaled.accepted_steps,
+        );
+        let native_scaled = native.trajectory.final_state()[1] / 1e-12;
+        let rescaled_value = rescaled.trajectory.final_state()[1];
+        assert!(
+            (native_scaled - rescaled_value).abs() < 1e-8,
+            "Normalized final states differ: native={native_scaled}, rescaled={rescaled_value}",
+        );
+    }
+
+    #[test]
+    fn test_adaptive_implicit_euler_attempt_budget_counts_rejections() {
+        fn growth(_t: f64, y: &[f64]) -> Vec<f64> {
+            vec![y[0]]
+        }
+        let system = ODESystem { f: growth, dim: 1 };
+        let error = DifferentialEquationsEngine::try_solve_implicit_euler_adaptive(
+            &system, 0.0, 1.0, &[1.0], &[1e-12], 1e-12, 0.1, 1, 8,
+        )
+        .expect_err("one attempt should be exhausted after rejecting an inaccurate step");
+        assert!(matches!(
+            error.kind,
+            AdaptiveImplicitEulerErrorKind::AttemptBudgetExceeded { max_attempts: 1 }
+        ));
+        assert_eq!(error.accepted_steps, 0);
+        assert_eq!(error.rejected_steps, 1);
+        assert_eq!(error.attempts, 1);
+        assert_eq!(error.last_state, vec![1.0]);
+    }
+
+    #[test]
+    fn test_adaptive_implicit_euler_invalid_tolerances_are_typed() {
+        fn growth(_t: f64, y: &[f64]) -> Vec<f64> {
+            vec![y[0], y[1]]
+        }
+        let system = ODESystem { f: growth, dim: 2 };
+        let error = DifferentialEquationsEngine::try_solve_implicit_euler_adaptive(
+            &system, 0.0, 1.0, &[1.0, 1.0], &[1e-5], 1e-3, 0.1, 100, 8,
+        )
+        .unwrap_err();
+        assert!(matches!(
+            error.kind,
+            AdaptiveImplicitEulerErrorKind::ToleranceDimensionMismatch {
+                expected: 2,
+                actual: 1,
+            }
+        ));
+    }
+
+    #[test]
+    fn test_adaptive_implicit_euler_rejects_overflowed_residual_scale() {
+        fn stationary(_t: f64, _y: &[f64]) -> Vec<f64> {
+            vec![0.0]
+        }
+        let system = ODESystem { f: stationary, dim: 1 };
+        let error = DifferentialEquationsEngine::try_solve_implicit_euler_adaptive(
+            &system,
+            0.0,
+            1.0,
+            &[1e308],
+            &[1e308],
+            0.0,
+            0.1,
+            100,
+            8,
+        )
+        .expect_err("overflowed residual normalization must not certify convergence");
+        assert!(matches!(
+            error.kind,
+            AdaptiveImplicitEulerErrorKind::StepSolveFailed {
+                cause: ImplicitEulerErrorKind::NonFiniteResidual { index: 0 }
+            }
+        ));
+        assert_eq!(error.time, 0.0);
+        assert_eq!(error.last_state, vec![1e308]);
+    }
+
+    #[test]
+    fn test_adaptive_implicit_euler_malformed_rhs_fails_without_advancing_time() {
+        fn malformed(_t: f64, _y: &[f64]) -> Vec<f64> {
+            vec![]
+        }
+        let system = ODESystem { f: malformed, dim: 1 };
+        let error = DifferentialEquationsEngine::try_solve_implicit_euler_adaptive(
+            &system, 0.0, 1.0, &[1.0], &[1e-5], 1e-3, 0.1, 100, 8,
+        )
+        .unwrap_err();
+        assert!(matches!(
+            error.kind,
+            AdaptiveImplicitEulerErrorKind::StepSolveFailed {
+                cause: ImplicitEulerErrorKind::RhsDimensionMismatch {
+                    expected: 1,
+                    actual: 0,
+                    ..
+                }
+            }
+        ));
+        assert_eq!(error.time, 0.0);
+        assert_eq!(error.last_state, vec![1.0]);
+        assert_eq!(error.accepted_steps, 0);
+    }
+
     #[test]
     fn test_implicit_euler_full_newton_solves_coupled_linear_system() {
         fn coupled(_t: f64, y: &[f64]) -> Vec<f64> {
