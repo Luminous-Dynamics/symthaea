@@ -425,7 +425,7 @@ mod tests {
     fn current_source_manifest_keeps_every_source_non_trainable() {
         let fixture: Value = serde_json::from_str(SOURCE_FIXTURE).unwrap();
         let count = validate_source_manifest(&fixture).unwrap();
-        assert_eq!(count, 11);
+        assert_eq!(count, 13);
         assert!(
             fixture["sources"]
                 .as_array()
@@ -529,7 +529,7 @@ mod tests {
         source["content_sha256"] =
             json!("aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa");
 
-        assert_eq!(validate_source_manifest(&fixture).unwrap(), 11);
+        assert_eq!(validate_source_manifest(&fixture).unwrap(), 13);
     }
 
     #[test]
