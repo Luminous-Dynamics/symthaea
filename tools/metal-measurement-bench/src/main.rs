@@ -215,7 +215,47 @@ fn nonblank(value: &str) -> bool {
 }
 
 fn is_http_url(value: &str) -> bool {
-    value.starts_with("https://") || value.starts_with("http://")
+    let Some((scheme, remainder)) = value.split_once("://") else {
+        return false;
+    };
+    if !matches!(scheme, "https" | "http") {
+        return false;
+    }
+
+    // Reject empty authorities and whitespace instead of accepting any string
+    // that merely starts with an HTTP(S) scheme prefix.
+    let authority = remainder
+        .split(|character| matches!(character, '/' | '?' | '#'))
+        .next()
+        .unwrap_or_default();
+    if authority.is_empty() || authority.chars().any(char::is_whitespace) {
+        return false;
+    }
+    let host_port = authority.rsplit('@').next().unwrap_or_default();
+    if host_port.is_empty() || host_port.starts_with(':') || host_port.ends_with(':') {
+        return false;
+    }
+    if host_port.starts_with('[') {
+        let Some(close_bracket) = host_port.find(']') else {
+            return false;
+        };
+        if close_bracket <= 1 {
+            return false;
+        }
+        let suffix = &host_port[close_bracket + 1..];
+        suffix.is_empty()
+            || (suffix.starts_with(':')
+                && suffix[1..].parse::<u16>().is_ok())
+    } else {
+        let mut pieces = host_port.split(':');
+        let host = pieces.next().unwrap_or_default();
+        let port = pieces.next();
+        !host.is_empty()
+            && pieces.next().is_none()
+            && port.is_none_or(|number| number.parse::<u16>().is_ok())
+            && !host.contains('[')
+            && !host.contains(']')
+    }
 }
 
 fn is_valid_iso_date(value: &str) -> bool {
@@ -264,6 +304,7 @@ fn is_hex_sha256(value: &str) -> bool {
 fn safe_relative_path(raw: &str) -> Result<PathBuf> {
     let path = Path::new(raw);
     if raw.is_empty()
+        || raw.contains('\\')
         || path.is_absolute()
         || path.components().any(|component| !matches!(component, Component::Normal(_)))
     {
@@ -1178,6 +1219,7 @@ mod tests {
     #[test]
     fn rejects_path_traversal_in_artifact_paths() {
         assert!(safe_relative_path("../private.csv").is_err());
+        assert!(safe_relative_path(r"..\\private.csv").is_err());
         assert!(safe_relative_path("nested/data.csv").is_ok());
     }
 
@@ -1425,5 +1467,29 @@ mod tests {
             assert!(is_valid_iso_date(valid), "rejected valid date {valid}");
         }
         assert!(!is_valid_iso_date("1900-02-29"), "1900 is not a Gregorian leap year");
+    }
+
+    #[test]
+    fn http_url_validator_rejects_empty_or_malformed_authorities() {
+        for valid in [
+            "https://data.nist.gov/od/id/mds2-3735",
+            "http://localhost:8080/manifest.json",
+            "https://[2001:db8::1]:443/dataset",
+        ] {
+            assert!(is_http_url(valid), "rejected HTTP(S) URL {valid}");
+        }
+        for invalid in [
+            "",
+            "https://",
+            "https:///resource",
+            "https:// example.org/data",
+            "https://@/data",
+            "https://example.org:",
+            "https://example.org:port/data",
+            "ftp://example.org/data",
+            "not-a-url",
+        ] {
+            assert!(!is_http_url(invalid), "accepted malformed URL {invalid}");
+        }
     }
 }
