@@ -403,7 +403,9 @@ mod tests {
         assert!((valence.no_change_mae.unwrap() - 0.4).abs() < 1e-6);
         assert_eq!(valence.personal_history_observations, 1);
         assert_eq!(valence.personal_history_coverage, 0.5);
-        assert_eq!(valence.no_change_mae_on_personal_history, Some(0.4));
+        assert!(
+            (valence.no_change_mae_on_personal_history.unwrap() - 0.4).abs() < 1e-6
+        );
         assert_eq!(valence.population_delta_mae_on_personal_history, Some(0.0));
         assert_eq!(valence.personal_history_mae, Some(0.0));
     }
