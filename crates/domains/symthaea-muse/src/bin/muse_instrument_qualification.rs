@@ -57,10 +57,10 @@ struct AssetSourceTermsEvidenceV1 {
     readme_document_sha256: Option<String>,
     readme_document_status: &'static str,
     upstream_readme_request: &'static str,
-    upstream_revision: Option<String>,
-    upstream_origin_matches_expected: bool,
+    source_checkout_revision: Option<String>,
+    checkout_origin_matches_expected: bool,
     source_checkout_clean: Option<bool>,
-    source_revision_status: &'static str,
+    source_checkout_status: &'static str,
 }
 
 #[derive(Debug, Serialize)]
@@ -198,8 +198,8 @@ fn inspect_asset_source_terms(
         hash_local_source_document(root, "LICENSE");
     let (readme_document_sha256, readme_document_status) =
         hash_local_source_document(root, readme_document_relative_path);
-    let (upstream_revision, upstream_origin_matches_expected, source_checkout_clean, source_revision_status) =
-        inspect_upstream_checkout(root, expected_remote);
+    let (source_checkout_revision, checkout_origin_matches_expected, source_checkout_clean, source_checkout_status) =
+        inspect_source_checkout(root, expected_remote);
 
     AssetSourceTermsEvidenceV1 {
         source_library,
@@ -213,10 +213,10 @@ fn inspect_asset_source_terms(
         readme_document_sha256,
         readme_document_status,
         upstream_readme_request,
-        upstream_revision,
-        upstream_origin_matches_expected,
+        source_checkout_revision,
+        checkout_origin_matches_expected,
         source_checkout_clean,
-        source_revision_status,
+        source_checkout_status,
     }
 }
 
@@ -255,7 +255,7 @@ fn sha256_file(path: &Path) -> std::io::Result<String> {
     Ok(format!("{:x}", hasher.finalize()))
 }
 
-fn inspect_upstream_checkout(
+fn inspect_source_checkout(
     root: &Path,
     expected_remote: &str,
 ) -> (Option<String>, bool, Option<bool>, &'static str) {
@@ -285,7 +285,7 @@ fn inspect_upstream_checkout(
         return (None, false, None, "asset_root_is_not_repository_root");
     }
 
-    let upstream_revision = match git(&["rev-parse", "HEAD"]) {
+    let source_checkout_revision = match git(&["rev-parse", "HEAD"]) {
         Ok(output) if output.status.success() => {
             let revision = String::from_utf8_lossy(&output.stdout).trim().to_owned();
             if valid_git_revision(&revision) {
@@ -303,7 +303,7 @@ fn inspect_upstream_checkout(
         }
         _ => None,
     };
-    let upstream_origin_matches_expected = remote
+    let checkout_origin_matches_expected = remote
         .as_deref()
         .and_then(normalize_github_remote)
         .is_some_and(|remote| remote == expected_remote.to_ascii_lowercase());
@@ -314,15 +314,15 @@ fn inspect_upstream_checkout(
         }
         _ => None,
     };
-    let status = match (upstream_origin_matches_expected, clean) {
-        (true, Some(true)) => "clean_upstream_checkout",
-        (false, _) => "upstream_origin_mismatch",
+    let status = match (checkout_origin_matches_expected, clean) {
+        (true, Some(true)) => "clean_expected_origin_checkout",
+        (false, _) => "expected_origin_mismatch",
         (true, Some(false)) => "dirty_worktree",
         (true, None) => "git_status_unavailable",
     };
     (
-        upstream_revision,
-        upstream_origin_matches_expected,
+        source_checkout_revision,
+        checkout_origin_matches_expected,
         clean,
         status,
     )
