@@ -627,6 +627,10 @@ pub(crate) struct DecodedSample {
     pub(crate) source_relative_path: String,
     /// SHA-256 over the exact source WAV file bytes, not decoded PCM.
     pub(crate) source_file_sha256: String,
+    /// Optional digest of all indexable WAVs in this mapped bank.
+    pub(crate) source_bank_content_manifest_sha256: Option<String>,
+    /// "not_requested", "hashed", or "hash_failed".
+    pub(crate) source_bank_manifest_status: &'static str,
     pub(crate) source_dynamic: f32,
 }
 
@@ -636,6 +640,8 @@ pub(crate) struct InstrumentBank {
     cache: Mutex<HashMap<usize, Arc<DecodedSample>>>,
     source_library: String,
     source_relative_directory: String,
+    /// Populated on demand because a bank may contain gigabytes of source WAVs.
+    indexed_content_manifest_sha256: OnceLock<Option<String>>,
 }
 
 impl InstrumentBank {
@@ -712,6 +718,7 @@ impl InstrumentBank {
             cache: Mutex::new(HashMap::new()),
             source_library: source_library.to_string(),
             source_relative_directory: source_relative_directory.to_string(),
+            indexed_content_manifest_sha256: OnceLock::new(),
         })
     }
 
@@ -763,6 +770,27 @@ impl InstrumentBank {
         self.decode(chosen)
     }
 
+    /// Return an opt-in digest that matches the instrument qualification
+    /// matrix's indexed_sample_content_manifest_sha256 field for this bank.
+    /// The manifest hashes sorted indexable WAV filenames, sizes, and bytes.
+    /// It is cached per bank because reading every asset can be expensive.
+    fn content_manifest_evidence(
+        &self,
+        requested: bool,
+    ) -> (Option<String>, &'static str) {
+        if !requested {
+            return (None, "not_requested");
+        }
+        let digest = self
+            .indexed_content_manifest_sha256
+            .get_or_init(|| indexed_sample_content_manifest_sha256(self).ok())
+            .clone();
+        match digest {
+            Some(digest) => (Some(digest), "hashed"),
+            None => (None, "hash_failed"),
+        }
+    }
+
     fn decode(&self, idx: usize) -> Option<Arc<DecodedSample>> {
         if let Some(hit) = self.cache.lock().ok()?.get(&idx) {
             return Some(hit.clone());
@@ -800,6 +828,12 @@ impl InstrumentBank {
             source_filename
         );
         let source_file_sha256 = sha256_file(&meta.path).ok()?;
+        // This is deliberately opt-in: a mapped bank can contain gigabytes of
+        // source audio. Set the variable before starting the process.
+        let hash_bank_manifest = std::env::var("SYMTHAEA_MUSE_HASH_SOURCE_BANK_MANIFEST")
+            .is_ok_and(|value| value == "1");
+        let (source_bank_content_manifest_sha256, source_bank_manifest_status) =
+            self.content_manifest_evidence(hash_bank_manifest);
         let decoded = Arc::new(DecodedSample {
             frames: mono,
             sample_rate: spec.sample_rate,
@@ -807,6 +841,8 @@ impl InstrumentBank {
             source_library: self.source_library.clone(),
             source_relative_path,
             source_file_sha256,
+            source_bank_content_manifest_sha256,
+            source_bank_manifest_status,
             source_dynamic: meta.dynamic,
         });
         self.cache.lock().ok()?.insert(idx, decoded.clone());
