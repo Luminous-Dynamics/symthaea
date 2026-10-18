@@ -466,7 +466,7 @@ mod tests {
         assert!(steady_a.retained_in_archive);
         assert!(!steady_z.retained_in_archive);
         assert!(matches!(
-            steady_a.temporal_support,
+            &steady_a.temporal_support,
             CreativeTemporalSupportOutcomeV1::Measured { .. }
         ));
         if let CreativeTemporalSupportOutcomeV1::Measured { metrics } =
@@ -494,7 +494,7 @@ mod tests {
             .find(|candidate| candidate.candidate_id == "invalid-note-in-melody")
             .unwrap();
         assert!(matches!(
-            invalid.temporal_support,
+            &invalid.temporal_support,
             CreativeTemporalSupportOutcomeV1::Unavailable {
                 error: CreativeTemporalSupportError::InvalidNote { index: 3 }
             }
