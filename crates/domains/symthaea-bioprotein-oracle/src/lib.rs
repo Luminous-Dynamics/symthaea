@@ -31,6 +31,37 @@ pub enum Claim {
 
 #[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
 #[serde(rename_all = "snake_case")]
+pub enum IntendedUse {
+    IngredientScreen,
+    ComplementaryFoodScreen,
+    CompleteDietScreen,
+    FeedScreen,
+    CultivatedProcessScreen,
+}
+
+#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
+#[serde(rename_all = "snake_case")]
+pub enum IngredientClass {
+    Conventional,
+    Microbial,
+    Fungal,
+    Algae,
+    FermentationDerived,
+    CultivatedCell,
+    Hybrid,
+    SyntheticControl,
+}
+
+#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
+#[serde(rename_all = "snake_case")]
+pub enum FreshnessState {
+    Current,
+    Stale,
+    Unknown,
+}
+
+#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
+#[serde(rename_all = "snake_case")]
 pub enum Disposition {
     EligibleForDeclaredComparison,
     Blocked,
@@ -161,11 +192,11 @@ pub struct CostValue {
 #[serde(deny_unknown_fields)]
 pub struct Candidate {
     pub candidate_id: String,
-    pub ingredient_class: String,
+    pub ingredient_class: IngredientClass,
     pub source: SourceEvidence,
     pub identity_match: MatchState,
     pub target_match: MatchState,
-    pub source_freshness: String,
+    pub source_freshness: FreshnessState,
     pub basis_state: BasisState,
     pub nutrition_gate: NutritionGate,
     pub nutrition_evidence_state: NutritionEvidenceState,
@@ -185,7 +216,7 @@ pub struct Candidate {
 pub struct Request {
     pub target_species: String,
     pub life_stage: String,
-    pub intended_use: String,
+    pub intended_use: IntendedUse,
     pub requested_claim: Claim,
     pub scenario_digest: String,
 }
@@ -431,10 +462,14 @@ pub fn evaluate_case(fixture: &CaseFixture) -> OracleOutcome {
         return result;
     }
 
-    match candidate.source_freshness.as_str() {
-        "current" => {}
-        "stale" => return outcome(Disposition::Indeterminate, "SOURCE_STALE"),
-        _ => return outcome(Disposition::Indeterminate, "SOURCE_FRESHNESS_UNKNOWN"),
+    match &candidate.source_freshness {
+        FreshnessState::Current => {}
+        FreshnessState::Stale => {
+            return outcome(Disposition::Indeterminate, "SOURCE_STALE")
+        }
+        FreshnessState::Unknown => {
+            return outcome(Disposition::Indeterminate, "SOURCE_FRESHNESS_UNKNOWN")
+        }
     }
 
     match candidate.identity_match {
