@@ -140,7 +140,7 @@ pub struct PreferenceQueryBudgetFrontierPointV1 {
     pub assessments: Vec<PreferenceQueryEpisodeAssessmentV1>,
 }
 
-/// Comparison of query cost versus final disposition for two query selectors.
+/// Comparison of query cost versus final disposition for three query selectors.
 #[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
 #[serde(deny_unknown_fields)]
 pub struct PreferenceQueryBudgetFrontierReportV1 {
