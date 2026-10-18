@@ -8,6 +8,7 @@ use std::collections::BTreeSet;
 
 pub mod fixtures;
 pub mod policy;
+pub mod robust_decision;
 pub mod staging;
 pub mod value_of_information;
 
