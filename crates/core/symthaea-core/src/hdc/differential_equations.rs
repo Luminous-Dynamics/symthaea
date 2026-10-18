@@ -835,8 +835,15 @@ impl DifferentialEquationsEngine {
         }
         if y0.len() != system.dim {
             return Err(RK45Error::new(
-                RK45ErrorKind::DimensionMismatch { expected: system.dim, actual: y0.len() },
-                t, &y, accepted_steps, rejected_steps, error_estimate
+                RK45ErrorKind::DimensionMismatch {
+                    expected: system.dim,
+                    actual: y0.len(),
+                },
+                t,
+                &y,
+                accepted_steps,
+                rejected_steps,
+                error_estimate,
             ));
         }
         if !t0.is_finite() || !t_end.is_finite() || t_end < t0 {
@@ -862,7 +869,11 @@ impl DifferentialEquationsEngine {
         if let Some(index) = y0.iter().position(|value| !value.is_finite()) {
             return Err(RK45Error::new(
                 RK45ErrorKind::NonFiniteInitialState { index },
-                t, &y, accepted_steps, rejected_steps, error_estimate
+                t,
+                &y,
+                accepted_steps,
+                rejected_steps,
+                error_estimate,
             ));
         }
 
@@ -891,8 +902,15 @@ impl DifferentialEquationsEngine {
         let mut h = span / 100.0;
         if !h_max.is_finite() || h_max <= 0.0 || !h.is_finite() || h <= 0.0 {
             return Err(RK45Error::new(
-                RK45ErrorKind::StepSizeUnderflow { attempted_step: h, error_norm: error_estimate },
-                t, &y, accepted_steps, rejected_steps, error_estimate
+                RK45ErrorKind::StepSizeUnderflow {
+                    attempted_step: h,
+                    error_norm: error_estimate,
+                },
+                t,
+                &y,
+                accepted_steps,
+                rejected_steps,
+                error_estimate,
             ));
         }
 
@@ -949,7 +967,11 @@ impl DifferentialEquationsEngine {
             if attempts >= max_attempts {
                 return Err(RK45Error::new(
                     RK45ErrorKind::StepBudgetExceeded { max_attempts },
-                    t, &y, accepted_steps, rejected_steps, error_estimate
+                    t,
+                    &y,
+                    accepted_steps,
+                    rejected_steps,
+                    error_estimate,
                 ));
             }
 
@@ -957,24 +979,35 @@ impl DifferentialEquationsEngine {
             if !remaining.is_finite() || remaining <= 0.0 {
                 return Err(RK45Error::new(
                     RK45ErrorKind::InvalidTimeSpan,
-                t,
-                &y,
-                accepted_steps,
-                rejected_steps,
-                error_estimate,
+                    t,
+                    &y,
+                    accepted_steps,
+                    rejected_steps,
+                    error_estimate,
                 ));
             }
             h = h.min(h_max).min(remaining);
             if !h.is_finite() || h <= 0.0 {
                 return Err(RK45Error::new(
-                    RK45ErrorKind::StepSizeUnderflow { attempted_step: h, error_norm: error_estimate },
-                    t, &y, accepted_steps, rejected_steps, error_estimate
+                    RK45ErrorKind::StepSizeUnderflow {
+                        attempted_step: h,
+                        error_norm: error_estimate,
+                    },
+                    t,
+                    &y,
+                    accepted_steps,
+                    rejected_steps,
+                    error_estimate,
                 ));
             }
             if t + h <= t {
                 return Err(RK45Error::new(
                     RK45ErrorKind::NonProgress { attempted_step: h },
-                    t, &y, accepted_steps, rejected_steps, error_estimate
+                    t,
+                    &y,
+                    accepted_steps,
+                    rejected_steps,
+                    error_estimate,
                 ));
             }
             attempts += 1;
@@ -1177,8 +1210,15 @@ impl DifferentialEquationsEngine {
                 let next_h = h * factor;
                 if !next_h.is_finite() || next_h <= 0.0 {
                     return Err(RK45Error::new(
-                        RK45ErrorKind::StepSizeUnderflow { attempted_step: next_h, error_norm: err },
-                        t, &y, accepted_steps, rejected_steps, error_estimate
+                        RK45ErrorKind::StepSizeUnderflow {
+                            attempted_step: next_h,
+                            error_norm: err,
+                        },
+                        t,
+                        &y,
+                        accepted_steps,
+                        rejected_steps,
+                        error_estimate,
                     ));
                 }
                 h = next_h.min(h_max);
@@ -1188,8 +1228,15 @@ impl DifferentialEquationsEngine {
                 let next_h = h * factor;
                 if !next_h.is_finite() || next_h <= 0.0 || next_h >= h || t + next_h <= t {
                     return Err(RK45Error::new(
-                        RK45ErrorKind::StepSizeUnderflow { attempted_step: next_h, error_norm: err },
-                        t, &y, accepted_steps, rejected_steps, error_estimate
+                        RK45ErrorKind::StepSizeUnderflow {
+                            attempted_step: next_h,
+                            error_norm: err,
+                        },
+                        t,
+                        &y,
+                        accepted_steps,
+                        rejected_steps,
+                        error_estimate,
                     ));
                 }
                 h = next_h;
