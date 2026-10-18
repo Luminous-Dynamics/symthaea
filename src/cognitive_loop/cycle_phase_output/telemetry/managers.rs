@@ -146,6 +146,7 @@ impl CognitiveLoopService {
             metadata.fabrication_mrp_work_orders = ft.mrp_work_order_count;
             metadata.fabrication_defect_prediction = ft.defect_prediction;
             metadata.fabrication_defect_confidence = ft.defect_confidence;
+            metadata.fabrication_defect_prediction_available = ft.defect_prediction_available;
         }
 
         #[cfg(feature = "mesh")]
