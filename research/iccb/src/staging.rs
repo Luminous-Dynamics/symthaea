@@ -87,8 +87,7 @@ impl TrancheRequest {
                 .iter()
                 .any(|claim| !claim.is_usable(self.evaluation_day))
         {
-            rejection_reasons
-                .push(TrancheRejectionReason::MilestoneEvidenceMissingOrUnusable);
+            rejection_reasons.push(TrancheRejectionReason::MilestoneEvidenceMissingOrUnusable);
         }
 
         TrancheDecision {
@@ -143,9 +142,11 @@ mod tests {
         request.milestone_satisfied = false;
         let decision = request.evaluate_release();
         assert!(!decision.approved);
-        assert!(decision
-            .rejection_reasons
-            .contains(&TrancheRejectionReason::MilestoneNotSatisfied));
+        assert!(
+            decision
+                .rejection_reasons
+                .contains(&TrancheRejectionReason::MilestoneNotSatisfied)
+        );
     }
 
     #[test]
@@ -154,9 +155,11 @@ mod tests {
         request.milestone_evidence = vec![evidence(EvidenceState::Stale)];
         let decision = request.evaluate_release();
         assert!(!decision.approved);
-        assert!(decision
-            .rejection_reasons
-            .contains(&TrancheRejectionReason::MilestoneEvidenceMissingOrUnusable));
+        assert!(
+            decision
+                .rejection_reasons
+                .contains(&TrancheRejectionReason::MilestoneEvidenceMissingOrUnusable)
+        );
     }
 
     #[test]
@@ -166,9 +169,11 @@ mod tests {
         request.amount_minor = 1_001;
         let decision = request.evaluate_release();
         assert!(!decision.approved);
-        assert!(decision
-            .rejection_reasons
-            .contains(&TrancheRejectionReason::CommitmentCapExceeded));
+        assert!(
+            decision
+                .rejection_reasons
+                .contains(&TrancheRejectionReason::CommitmentCapExceeded)
+        );
     }
 
     #[test]
@@ -177,9 +182,11 @@ mod tests {
         request.authority_granted = false;
         let decision = request.evaluate_release();
         assert!(!decision.approved);
-        assert!(decision
-            .rejection_reasons
-            .contains(&TrancheRejectionReason::Unauthorized));
+        assert!(
+            decision
+                .rejection_reasons
+                .contains(&TrancheRejectionReason::Unauthorized)
+        );
     }
 
     #[test]
@@ -191,8 +198,10 @@ mod tests {
         let decision = request.evaluate_release();
         assert!(!decision.approved);
         assert_eq!(decision.cumulative_commitment_after_minor, None);
-        assert!(decision
-            .rejection_reasons
-            .contains(&TrancheRejectionReason::ArithmeticOverflow));
+        assert!(
+            decision
+                .rejection_reasons
+                .contains(&TrancheRejectionReason::ArithmeticOverflow)
+        );
     }
 }
