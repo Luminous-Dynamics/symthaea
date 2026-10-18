@@ -108,6 +108,7 @@ These are **proposed acceptance targets**, not results or claims about current S
 | Precision | Task success plus placement/alignment errors where ground truth is exposed | Success must not improve by trading away declared tolerances or safety constraints |
 | Long horizon | Completion rate, interventions, and failure point by step/chunk | Report survival/completion curves, not only final averages |
 | Runtime | End-to-end policy latency (p50/p95), deadline misses, CPU/GPU memory, and power/energy if measurable | p95 under 80% of the configured action deadline as a target; zero unhandled deadline misses |
+| Confidence calibration | Brier score, log loss, fixed-bin ECE, risk-coverage curve, high-confidence failure rate | Improve Brier/ECE against uncalibrated forecasts on held-out trials; do not claim a universal percentage target before measuring the base calibration |
 | Safety | Invalid actions, limit violations, collisions/unsafe contacts when telemetry exists, safe-stop behavior | Zero invalid actions and zero unhandled limit violations in the pilot; report every observed contact/failure, not only averages |
 | Data efficiency | Additional training data and fine-tuning budget | First test should require no benchmark-specific retraining of the frozen baseline; report any extra data or learning explicitly |
 
@@ -121,6 +122,7 @@ Keep the base manipulation policy constant and change one item at a time:
 - Base + persistent HDC/episodic memory.
 - Base + temporal/CfC state.
 - Base + uncertainty or prediction-error signal.
+- Base + calibrated completion-probability forecast and selective intervention gate.
 - Base + structured recovery/replanning request.
 - Base + explicit safety governor.
 - Full sidecar.
@@ -151,9 +153,27 @@ Do not commit large licensed assets or checkpoints. Keep experiment scripts and 
 4. **Treat internal claims as hypotheses.** Use ablations and baseline controls; do not infer robotics competence from a high internal metric, a synthetic simulator run, or a correlation.
 5. **Make the benchmark falsifiable.** Pin versions, preregister tasks and thresholds, retain failure artifacts, and publish negative findings.
 
+## New research slice: calibrated event-triggered replanning
+
+A threshold on raw prediction error is an initial contract test, not yet a trustworthy decision policy. Add a separate full-completion probability forecast emitted before the outcome is known, then evaluate its calibration and its ability to rank failures. The standalone crate now implements Brier score, log loss, fixed-bin expected calibration error, high-confidence failure rate, and a confidence-ranked risk/coverage curve, with operationally invalid attempts counted as failures for end-to-end completion.
+
+Use an explicit baseline/control ladder:
+
+1. Frozen policy with no gate.
+2. Same policy with a fixed, uncalibrated threshold.
+3. Same policy with calibration fitted only on a designated calibration split.
+4. Calibrated gate using uncertainty to request fresh observation, shorten the open-loop action chunk, or replan when the supported serving interface allows it.
+5. Ablation/placebo controls to quantify intervention overhead.
+
+Report success/progress, high-confidence failure rate, intervention frequency, extra model calls, median and p95 latency, cost, and all invalid/timeout/safety events. The gate is useful only if its calibration improves on held-out data and its physical trade-off is favorable. Never treat confidence or HDC/Phi metrics as a safety proof. The threshold must not be tuned on held-out task results.
+
+A current independent framework worth evaluating for adapter reuse is [Inspect Robots](https://docs.inspectrobots.org/). Its documented abstraction keeps policy, embodiment, task/scorer separate, fails fast on incompatible action/observation spaces, and writes versioned evaluation logs; it also lists XPolicyLab and Isaac Sim adapters. We should check whether its current versions can host RC or official RoboDojo tasks before writing a parallel Python evaluation stack. For Luminous Dynamics, keep the control/metrics core in Rust and use only a thin boundary adapter where upstream infrastructure requires it.
+
+The rationale is supported by two useful external observations: Robocurve's RCI reports held-out Brier-skill comparisons and explicitly discusses calibration, while its October 2026 data excludes Stand Up Bottles from the composite fit due to timeouts/overheat issues. Separately, recent work on uncertainty-calibrated safety gating under domain shift reports measurable calibration and intervention trade-offs, reinforcing that calibration and cost should be evaluated explicitly rather than using an arbitrary threshold as the result. Sources: https://robocurve.org/rci/ and https://www.mdpi.com/1424-8220/26/10/3140.
+
 ## Immediate runnable work
 
-A dependency-free nested Rust crate now lives at **experiments/robodojo-contract/**. Its 18 library tests cover episode identity/reset, state dimensions and finiteness, step ordering, stale action rejection, action dimensions and range checks, prediction-error replanning, latched stops, configuration rejection, deterministic trace behavior, and trial statistics. The binary adds two CLI tests for parsing and comparing the synthetic TSV fixture. A small executable exercises accepted action → replan request → latched stop.
+A dependency-free nested Rust crate now lives at **experiments/robodojo-contract/**. Its 25 library tests cover episode identity/reset, state dimensions and finiteness, step ordering, stale action rejection, action dimensions and range checks, prediction-error replanning, latched stops, configuration rejection, deterministic trace behavior, and trial statistics. The binary adds three CLI tests for parsing and comparing the synthetic TSV fixture. A small executable exercises accepted action → replan request → latched stop.
 
 Run locally with:
 
