@@ -257,6 +257,8 @@ pub struct TrialRecord {
     pub completed: bool,
     pub valid_run: bool,
     pub timed_out: bool,
+    /// Explicit operational fault class; kept separate from graded task progress.
+    pub failure_class: FailureClass,
     pub elapsed_seconds: f64,
     pub model_calls: u32,
     pub action_steps: u32,
@@ -280,6 +282,9 @@ impl TrialRecord {
         }
         if self.valid_run != self.progress.is_some() {
             return Err(MetricError::ValidityScoreMismatch);
+        }
+        if self.timed_out != (self.failure_class == FailureClass::Timeout) {
+            return Err(MetricError::FailureClassMismatch);
         }
         match self.progress {
             Some(score) if !score.is_finite() || !(0.0..=1.0).contains(&score) => {
@@ -307,6 +312,47 @@ pub enum MetricError {
     MixedVariants,
     MismatchedPairedTrials,
     TooFewBootstrapSamples,
+    FailureClassMismatch,
+}
+
+/// Operational failure type, independent of whether the final rubric score is usable.
+/// For example, a timed-out task can still have a valid partial-progress grade.
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub enum FailureClass {
+    None,
+    Timeout,
+    ThermalStop,
+    ServerError,
+    InvalidAction,
+    SafetyStop,
+    Other,
+}
+
+impl FailureClass {
+    pub fn as_str(self) -> &'static str {
+        match self {
+            Self::None => "none",
+            Self::Timeout => "timeout",
+            Self::ThermalStop => "thermal_stop",
+            Self::ServerError => "server_error",
+            Self::InvalidAction => "invalid_action",
+            Self::SafetyStop => "safety_stop",
+            Self::Other => "other",
+        }
+    }
+
+    pub fn parse(value: &str) -> Option<Self> {
+        match value {
+            "none" => Some(Self::None),
+            "timeout" => Some(Self::Timeout),
+            "thermal_stop" => Some(Self::ThermalStop),
+            "server_error" => Some(Self::ServerError),
+            "invalid_action" => Some(Self::InvalidAction),
+            "safety_stop" => Some(Self::SafetyStop),
+            "other" => Some(Self::Other),
+            _ => None,
+        }
+    }
 }
 
 #[derive(Debug, Clone, PartialEq)]
@@ -329,6 +375,11 @@ pub struct TaskSummary {
     pub mean_action_steps: f64,
     pub mean_estimated_cost_usd: f64,
     pub timeout_count: usize,
+    pub thermal_stop_count: usize,
+    pub server_error_count: usize,
+    pub invalid_action_count: usize,
+    pub safety_stop_count: usize,
+    pub other_failure_count: usize,
     pub safety_event_count: u64,
 }
 
@@ -382,7 +433,12 @@ pub fn summarize_trials(
             mean_model_calls: sum(|r| r.model_calls as f64),
             mean_action_steps: sum(|r| r.action_steps as f64),
             mean_estimated_cost_usd: sum(|r| r.estimated_cost_usd),
-            timeout_count: trials.iter().filter(|r| r.timed_out).count(),
+            timeout_count: trials.iter().filter(|r| r.failure_class == FailureClass::Timeout).count(),
+            thermal_stop_count: trials.iter().filter(|r| r.failure_class == FailureClass::ThermalStop).count(),
+            server_error_count: trials.iter().filter(|r| r.failure_class == FailureClass::ServerError).count(),
+            invalid_action_count: trials.iter().filter(|r| r.failure_class == FailureClass::InvalidAction).count(),
+            safety_stop_count: trials.iter().filter(|r| r.failure_class == FailureClass::SafetyStop).count(),
+            other_failure_count: trials.iter().filter(|r| r.failure_class == FailureClass::Other).count(),
             safety_event_count: trials.iter().map(|r| r.safety_events as u64).sum(),
         });
     }
@@ -406,6 +462,12 @@ pub struct PairedComparison {
     pub mean_elapsed_seconds_delta: f64,
     pub mean_cost_usd_delta: f64,
     pub safety_event_count_delta: i64,
+    pub timeout_count_delta: i64,
+    pub thermal_stop_count_delta: i64,
+    pub server_error_count_delta: i64,
+    pub invalid_action_count_delta: i64,
+    pub safety_stop_count_delta: i64,
+    pub other_failure_count_delta: i64,
 }
 
 /// Compare two conditions only when each task/trial key is present exactly once
@@ -457,6 +519,12 @@ pub fn compare_paired_trials(
     let mut elapsed_delta = 0.0;
     let mut cost_delta = 0.0;
     let mut safety_delta = 0i64;
+    let mut timeout_delta = 0i64;
+    let mut thermal_stop_delta = 0i64;
+    let mut server_error_delta = 0i64;
+    let mut invalid_action_delta = 0i64;
+    let mut safety_stop_delta = 0i64;
+    let mut other_failure_delta = 0i64;
     for (key, b) in &base {
         let c = cand.get(key).expect("paired key sets were checked");
         candidate_completions += if c.completed { 1 } else { 0 };
@@ -466,6 +534,12 @@ pub fn compare_paired_trials(
         elapsed_delta += c.elapsed_seconds - b.elapsed_seconds;
         cost_delta += c.estimated_cost_usd - b.estimated_cost_usd;
         safety_delta += c.safety_events as i64 - b.safety_events as i64;
+        timeout_delta += i64::from(c.failure_class == FailureClass::Timeout) - i64::from(b.failure_class == FailureClass::Timeout);
+        thermal_stop_delta += i64::from(c.failure_class == FailureClass::ThermalStop) - i64::from(b.failure_class == FailureClass::ThermalStop);
+        server_error_delta += i64::from(c.failure_class == FailureClass::ServerError) - i64::from(b.failure_class == FailureClass::ServerError);
+        invalid_action_delta += i64::from(c.failure_class == FailureClass::InvalidAction) - i64::from(b.failure_class == FailureClass::InvalidAction);
+        safety_stop_delta += i64::from(c.failure_class == FailureClass::SafetyStop) - i64::from(b.failure_class == FailureClass::SafetyStop);
+        other_failure_delta += i64::from(c.failure_class == FailureClass::Other) - i64::from(b.failure_class == FailureClass::Other);
         if let (Some(bp), Some(cp)) = (b.progress, c.progress) {
             per_task_deltas.entry(key.0.clone()).or_default().push(cp - bp);
             scored_pairs += 1;
@@ -498,6 +572,12 @@ pub fn compare_paired_trials(
         mean_elapsed_seconds_delta: elapsed_delta / n,
         mean_cost_usd_delta: cost_delta / n,
         safety_event_count_delta: safety_delta,
+        timeout_count_delta: timeout_delta,
+        thermal_stop_count_delta: thermal_stop_delta,
+        server_error_count_delta: server_error_delta,
+        invalid_action_count_delta: invalid_action_delta,
+        safety_stop_count_delta: safety_stop_delta,
+        other_failure_count_delta: other_failure_delta,
     })
 }
 
