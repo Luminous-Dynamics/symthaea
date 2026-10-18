@@ -1,0 +1,27 @@
+{
+  "schema_version": "symthaea.rea-coverage-oracle.v1",
+  "benchmark_id": "ENG-REA-003",
+  "scope": "Public development known-answer corpus; this is a contract-test oracle, not a blind benchmark or real-provider result.",
+  "expected_dispositions": {
+    "RCG-001": "reject",
+    "RCG-002": "reject",
+    "RCG-003": "accept",
+    "RCG-004": "reject",
+    "RCG-005": "accept",
+    "RCG-006": "accept",
+    "RCG-007": "reject",
+    "RCG-008": "reject",
+    "RCG-009": "reject",
+    "RCG-010": "accept",
+    "RCG-011": "invalid-input",
+    "RCG-012": "invalid-report",
+    "RCG-013": "reject",
+    "RCG-014": "reject"
+  },
+  "claim_limits": [
+    "An accepted fixture means only that this synthetic normalized-report contract is internally consistent.",
+    "Coverage complete means no gaps or partial signals were reported for this selected range; it is not proof that firmware was fully reconstructed or that runtime behavior is equivalent.",
+    "The manifest is public and must not be presented as held-out generalization evidence.",
+    "No case invokes REA, Binwalk, Unblob, a decompiler, an emulator, a device, or a hardware-write path."
+  ]
+}
