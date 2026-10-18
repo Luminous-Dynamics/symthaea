@@ -95,7 +95,7 @@
       "then": {
         "properties": {
           "input": { "properties": { "evidence_status": { "const": "qualified" } } },
-          "steps": { "items": { "properties": { "evidence_status": { "const": "qualified" } } }
+          "steps": { "items": { "properties": { "evidence_status": { "const": "qualified" } } } }
         }
       }
     }
