@@ -297,13 +297,13 @@ fn evaluate_case(facts: &Value, evidence_class: &str) -> (String, Vec<String>) {
         string(facts, "requirement_unit"),
         string(facts, "observed_unit"),
     ) {
-        if required_unit != observed_unit
-            && string(facts, "explicit_conversion_model") != Some("true")
-            && boolean(facts, "explicit_conversion_model") != Some(true)
-        {
+        if required_unit != observed_unit {
+            // A boolean/string flag is not a validated conversion. Until a
+            // typed conversion model and its provenance are bound into the
+            // fixture contract, mismatched units must be rejected.
             return (
                 "BLOCK".to_string(),
-                vec!["unit mismatch has no explicit, dimensionally valid conversion".into()],
+                vec!["unit mismatch has no validated typed conversion evidence".into()],
             );
         }
     }
@@ -493,6 +493,45 @@ mod tests {
             "aggregate_score": 0.97,
             "hard_safety_gate": "failed",
             "requested_claim": "overall_design_pass"
+        });
+        let (decision, _) = evaluate_case(&facts, "Synthetic");
+        assert_eq!(decision, "BLOCK");
+    }
+
+    #[test]
+    fn incompatible_physical_quantities_are_blocked() {
+        let facts = serde_json::json!({
+            "requirement_quantity": "braking_force",
+            "requirement_unit": "N",
+            "observed_quantity": "mass",
+            "observed_unit": "kg",
+            "explicit_conversion_model": true,
+            "requested_claim": "requirement_satisfied"
+        });
+        let (decision, _) = evaluate_case(&facts, "Synthetic");
+        assert_eq!(decision, "BLOCK");
+    }
+
+    #[test]
+    fn out_of_domain_model_use_is_indeterminate() {
+        let facts = serde_json::json!({
+            "model_scope": "urban_duty_cycle_only",
+            "requested_environment": "rough_terrain_high_payload",
+            "out_of_domain_policy": "unspecified",
+            "requested_claim": "robust_design_pass"
+        });
+        let (decision, _) = evaluate_case(&facts, "Synthetic");
+        assert_eq!(decision, "INDETERMINATE");
+    }
+
+    #[test]
+    fn overlapping_exclusive_factory_resource_is_blocked() {
+        let facts = serde_json::json!({
+            "resource_id": "WELD_FIXTURE_SYN_1",
+            "operation_a_interval": [0, 10],
+            "operation_b_interval": [5, 12],
+            "resource_capacity": 1,
+            "requested_claim": "valid_schedule"
         });
         let (decision, _) = evaluate_case(&facts, "Synthetic");
         assert_eq!(decision, "BLOCK");
