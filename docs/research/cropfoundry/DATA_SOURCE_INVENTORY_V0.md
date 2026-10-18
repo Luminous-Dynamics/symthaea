@@ -34,6 +34,25 @@ The UdeA file preview has been inspected for column headings and example records
 | DS-010 | [UdeA Mobile and Manual Dataset for Greenhouse Tomato Crop](https://zenodo.org/records/16745911). Zenodo's canonical CSV is described as 2,666 rows × 40 columns; 135 plants, 27 treatment combinations and 20 weekly sessions from November 2023–April 2024. The CSV preview reveals plant, date, treatment, sensor/manual variables and yield-related fields. | First tabular-contract and leakage-audit pilot; explore prediction feasibility only after direct artifact inspection. | The Zenodo record states CC BY 4.0. Its GitHub mirror README reports 2,664 rows × 44 columns, so the mirror and canonical artifact must not be silently mixed. The canonical file is not locally pinned or scored. | **P0 schema / split audit; no random-row split and no South African transfer claim.** |
 | DS-011 | [AerialYield-T2M](https://zenodo.org/records/22071809). 677 RGB frames (535 close-range, 142 drone), 14,303 tomato instances, six ripeness stages, masks, count labels, split metadata and a SHA-256 checksum list. | Separate visual-phenotyping benchmark: ripeness classification, instance detection/segmentation and fruit counting. It is not a crop-yield or genetics dataset. | Public Zenodo release includes a LICENSE file explicitly stating CC BY 4.0. The 3.6 GB artifacts and checksum file have not been downloaded or verified locally. One commercial greenhouse in the UAE limits external validity. | **P1 after minimal artifact/split/checksum audit.** |
 
+## Local-only CSV audit command
+
+After the canonical DS-010 artifact is legitimately acquired to a local path, run the **schema audit only**:
+
+```bash
+cargo run -q -p xtask -- cropfoundry-audit-csv \
+  --input /path/to/DB_Mobile_Manual_Tomato.csv \
+  --source-id DS-010 \
+  --source-uri https://zenodo.org/records/16745911 \
+  --delimiter ';' \
+  --out reports/cropfoundry/udea-csv-audit.json
+```
+
+Do not pass `--expected-data-records` until the canonical file's exact record-count semantics have been reconciled. The command binds to DS-010's canonical record URI and computes a SHA-256 digest over the exact local bytes. It reports header duplication, missing required fields, row-width anomalies, record count, per-column blank/zero/numeric counts, unique/missing Plant/Date/Treatment values, duplicate Plant-Date keys and unitless measurement headers. It writes no normalized training data and always reports `training_authorized: false`.
+
+The audit is intentionally descriptive rather than a source-backed adjudication. A unitless weight field is a warning, not permission to infer grams or kilograms. A zero harvested weight may be a valid early-season observation, not missingness. An audit receipt does not validate license terms, agronomic quality, a model split, or crop performance.
+
+The CSV auditor has deterministic synthetic unit tests for semicolon parsing, exact digest shape, repeated Plant-Date detection, malformed-width records, duplicate/missing columns, blank versus zero counts, unit warnings, count mismatch, empty input and source-identity mislabelling. Their presence is not a claim that the tests have passed on the current PR head.
+
 ## First ingestion gate
 
 Before a file enters a training or evaluation dataset, record:
