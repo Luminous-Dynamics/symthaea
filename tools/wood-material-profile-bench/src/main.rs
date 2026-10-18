@@ -405,8 +405,8 @@ fn run() -> Check<()> {
 
     let bytes = fs::read(&args[0]).map_err(|error| format!("cannot read corpus: {error}"))?;
     let digest = format!("{:x}", Sha256::digest(&bytes));
-    let corpus: Corpus = serde_json::from_slice(&bytes)
-        .map_err(|error| format!("invalid corpus JSON: {error}"))?;
+    let corpus: Corpus =
+        serde_json::from_slice(&bytes).map_err(|error| format!("invalid corpus JSON: {error}"))?;
     let receipt = validate_corpus(&corpus, digest, source_commit);
     println!(
         "{}",
