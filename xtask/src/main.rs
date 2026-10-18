@@ -2,8 +2,8 @@ use clap::{Parser, Subcommand};
 use std::path::PathBuf;
 
 mod crate_status;
-mod cropfoundry_validate;
 mod cropfoundry_csv_audit;
+mod cropfoundry_validate;
 mod duplicate_scan;
 mod manifest;
 mod rhn_sweep;
