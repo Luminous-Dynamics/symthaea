@@ -8,11 +8,15 @@
 From the repository root:
 
 ```sh
+SYMTHAEA_SOURCE_SHA="$(git rev-parse HEAD)" \
+RUSTC_VERSION="$(rustc --version)" \
+HOST_PROFILE="$(uname -m) / <CPU model>" \
+STORAGE_PROFILE="<filesystem and physical device model>" \
 cargo run -p symthaea-hdc-store --release --example metadata_coldopen_bench -- \
   --vectors 16384 --rounds 30 --seed 7 --csv /tmp/metadata-coldopen.csv
 ```
 
-The benchmark generates two new files under a unique temporary directory and deletes them on exit. It refuses to reuse an existing benchmark workspace or overwrite an existing CSV. Add `--keep-files` to preserve the generated synthetic files for inspection. Use a new CSV path for each run.
+The benchmark generates two new files under a unique temporary directory and deletes them on exit. It refuses to reuse an existing benchmark workspace or overwrite an existing CSV. Add `--keep-files` to preserve the generated synthetic files for inspection. The benchmark refuses to overwrite both the CSV and its `.meta.txt` sidecar; use fresh paths for each run. Injected run identity appears in console output and the sidecar.
 
 The maximum corpus is 1,048,576 vectors, but that creates multiple gigabytes of test files. Begin with the default 16,384 vectors and scale deliberately.
 
@@ -40,7 +44,7 @@ The benchmark intentionally reads only status and ID bytes during its timed scan
 
 ## Interpreting results
 
-Use at least 30 rounds per layout for a published result, keep raw CSV, and record source SHA, Rust version, OS/kernel, page size, filesystem, device model, power mode and whether the residency precondition was actually cold-ish. Compare:
+Use at least 30 rounds per layout for a published result, keep the raw CSV plus `.meta.txt` sidecar, and record source SHA, Rust version, OS/kernel, page size, filesystem, device model, power mode and whether the residency precondition was actually cold-ish. The harness records injected source/compiler/host/storage labels but cannot reliably discover every hardware/filesystem detail for you. Compare:
 1. pre-scan payload pages resident;
 2. post-scan payload pages resident;
 3. minor/major page-fault deltas;
