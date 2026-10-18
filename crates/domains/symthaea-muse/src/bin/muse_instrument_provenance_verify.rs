@@ -1098,7 +1098,7 @@ fn indexed_bank_content_manifest_sha256(
     }
 
     let mut manifest = Sha256::new();
-    manifest.update(b"muse-indexed-sample-content-manifest-v1\\0");
+    manifest.update(b"muse-indexed-sample-content-manifest-v1\0");
     let mut buffer = [0_u8; 64 * 1024];
     for path in indexed_paths {
         let name = path
@@ -1345,7 +1345,8 @@ mod tests {
             .clone()
             .expect("VSCO2 root should hash");
         let revision = "a".repeat(40);
-        let bank_digest = "b".repeat(64);
+        let bank_digest = indexed_bank_content_manifest_sha256(&vcsl_observation, "Piano")
+            .expect("indexed fixture bank should hash");
         let probe = json!({
             "schema_version": "melothaea.instrument-probe.v4",
             "source_revision": revision,
@@ -1438,6 +1439,7 @@ mod tests {
         assert_eq!(report.selected_samples_with_valid_file_digest, 1);
         assert_eq!(report.selected_samples_with_valid_bank_digest, 1);
         assert_eq!(report.selected_samples_with_matching_inventory_bank_digest, 1);
+        assert_eq!(report.selected_samples_with_matching_actual_bank_digest, 1);
         assert_eq!(report.error_count, 0);
         assert_eq!(report.incomplete_count, 0);
     }
@@ -1539,6 +1541,8 @@ mod tests {
     #[test]
     fn style_bank_receipts_can_be_matched_to_the_inventory() {
         let (probe, mut inventory, assets) = fixtures();
+        let bank_digest =
+            probe["cases"][0]["selected_sample"]["source_bank_content_manifest_sha256"].clone();
         inventory["instruments"][0]["sustained_samples"] = Value::Null;
         inventory["instruments"][0]["additional_sample_styles"] = json!([{
             "style_name": "normal",
@@ -1546,7 +1550,7 @@ mod tests {
             "evidence": {
                 "source_library": "vcsl",
                 "relative_directory": "Piano",
-                "indexed_sample_content_manifest_sha256": "b".repeat(64)
+                "indexed_sample_content_manifest_sha256": bank_digest
             }
         }]);
         let report = test_report(&probe, &inventory, &assets);
