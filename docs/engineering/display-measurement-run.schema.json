@@ -318,7 +318,8 @@
           "method_id",
           "method_revision",
           "raw_artifact_ids",
-          "notes"
+          "notes",
+          "uncertainty_budget"
         ],
         "properties": {
           "observation_id": {
@@ -396,6 +397,130 @@
           "notes": {
             "type": "string",
             "minLength": 1
+          },
+          "uncertainty_budget": {
+            "type": "object",
+            "additionalProperties": false,
+            "required": [
+              "status",
+              "method",
+              "terms",
+              "covariance_terms",
+              "combined_standard_uncertainty",
+              "coverage_factor",
+              "expanded_uncertainty",
+              "notes"
+            ],
+            "properties": {
+              "status": {
+                "type": "string",
+                "enum": [
+                  "NOT_EVALUATED",
+                  "CALCULATED_UNREVIEWED",
+                  "INDEPENDENTLY_REVIEWED"
+                ]
+              },
+              "method": {
+                "type": "string",
+                "enum": [
+                  "NOT_EVALUATED",
+                  "LINEARIZED_COVARIANCE",
+                  "MONTE_CARLO",
+                  "CONSERVATIVE_BOUND",
+                  "EXTERNAL_ANALYSIS"
+                ]
+              },
+              "terms": {
+                "type": "array",
+                "items": {
+                  "type": "object",
+                  "additionalProperties": false,
+                  "required": [
+                    "term_id",
+                    "label",
+                    "standard_uncertainty",
+                    "sensitivity_coefficient",
+                    "notes"
+                  ],
+                  "properties": {
+                    "term_id": {
+                      "type": "string",
+                      "pattern": "^[A-Z0-9][A-Z0-9_-]*$"
+                    },
+                    "label": {
+                      "type": "string",
+                      "minLength": 1
+                    },
+                    "standard_uncertainty": {
+                      "type": "number",
+                      "minimum": 0
+                    },
+                    "sensitivity_coefficient": {
+                      "type": "number"
+                    },
+                    "notes": {
+                      "type": "string",
+                      "minLength": 1
+                    }
+                  }
+                }
+              },
+              "covariance_terms": {
+                "type": "array",
+                "items": {
+                  "type": "object",
+                  "additionalProperties": false,
+                  "required": [
+                    "term_a_id",
+                    "term_b_id",
+                    "covariance_contribution",
+                    "notes"
+                  ],
+                  "properties": {
+                    "term_a_id": {
+                      "type": "string",
+                      "pattern": "^[A-Z0-9][A-Z0-9_-]*$"
+                    },
+                    "term_b_id": {
+                      "type": "string",
+                      "pattern": "^[A-Z0-9][A-Z0-9_-]*$"
+                    },
+                    "covariance_contribution": {
+                      "type": "number"
+                    },
+                    "notes": {
+                      "type": "string",
+                      "minLength": 1
+                    }
+                  }
+                }
+              },
+              "combined_standard_uncertainty": {
+                "type": [
+                  "number",
+                  "null"
+                ],
+                "minimum": 0
+              },
+              "coverage_factor": {
+                "type": [
+                  "number",
+                  "null"
+                ],
+                "exclusiveMinimum": 0
+              },
+              "expanded_uncertainty": {
+                "type": [
+                  "number",
+                  "null"
+                ],
+                "minimum": 0
+              },
+              "notes": {
+                "type": "string",
+                "minLength": 1
+              }
+            }
           }
         }
       }
