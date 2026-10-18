@@ -25,6 +25,7 @@ fn main() {
             DecisionOption {
                 id: "high-return-defers-maintenance".into(),
                 expected_net_cash_minor: 50_000,
+                reported_valuation_change_minor: 500_000,
                 required_capital_minor: 60_000,
                 available_liquidity_after_minor: 20_000,
                 productive_capacity_delta: 2,
@@ -36,6 +37,7 @@ fn main() {
             DecisionOption {
                 id: "lower-return-maintained-expansion".into(),
                 expected_net_cash_minor: 35_000,
+                reported_valuation_change_minor: 20_000,
                 required_capital_minor: 50_000,
                 available_liquidity_after_minor: 22_000,
                 productive_capacity_delta: 12,
@@ -52,11 +54,12 @@ fn main() {
     println!("No composite score is calculated; hard-gate failures cannot be offset by return.");
     for evaluated in receipt.evaluated_options {
         println!(
-            "{}: accepted={}, rejection_reasons={:?}, net_cash_minor={}, capacity_delta={}, maintenance_delta_minor={}, critical_dependencies={}",
+            "{}: accepted={}, rejection_reasons={:?}, net_cash_minor={}, valuation_change_minor={}, capacity_delta={}, maintenance_delta_minor={}, critical_dependencies={}",
             evaluated.option_id,
             evaluated.accepted,
             evaluated.rejection_reasons,
             evaluated.outcomes.expected_net_cash_minor,
+            evaluated.outcomes.reported_valuation_change_minor,
             evaluated.outcomes.productive_capacity_delta,
             evaluated.outcomes.maintenance_backlog_delta_minor,
             evaluated.outcomes.critical_dependency_count,
