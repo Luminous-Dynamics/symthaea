@@ -176,7 +176,8 @@ pub fn audit_shift_robustness(
         let comparison = compare_paired_trials(
             &b, &c, bootstrap_replicates, derived_seed(seed, family, severity, &digest),
         ).map_err(|_| ShiftAuditError::InvalidPairedTrials)?;
-        let mut scored_by_task: BTreeMap<String, usize> = BTreeMap::new();
+        let mut scored_by_task: BTreeMap<String, usize> =
+            b.iter().map(|row| (row.task_id.clone(), 0)).collect();
         for (base_row, candidate_row) in b.iter().zip(&c) {
             if base_row.progress.is_some() && candidate_row.progress.is_some() {
                 *scored_by_task.entry(base_row.task_id.clone()).or_default() += 1;
