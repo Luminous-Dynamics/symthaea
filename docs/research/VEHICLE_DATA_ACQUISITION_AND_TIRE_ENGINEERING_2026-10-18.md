@@ -1,0 +1,142 @@
+
+# Vehicle data acquisition and tire engineering — 2026-10-18
+
+**Tracker:** https://github.com/Luminous-Dynamics/symthaea/issues/8076  
+**Existing owners:** [road/off-road dynamics and tire/contact semantics #6247](https://github.com/Luminous-Dynamics/symthaea/issues/6247), [powertrain frontier #8056](https://github.com/Luminous-Dynamics/symthaea/issues/8056)  
+**Status:** source/licensing triage and test protocol. No physical tire result or completed acquisition of proprietary component maps is claimed.
+
+## Executive result
+
+We found useful open or potentially licensable material, but did **not** find a clearly licensed downloadable raw Roam Air motorcycle dataset with its original motor, inverter and battery maps. The 2026 papers say data are available on request; the rights of underlying data and Roam-owned components must be cleared separately from the published article.
+
+The best immediate rights-cleared tire-data inputs are:
+- Aalto's CC BY 4.0 raw intelligent-tire strain test data (low/high speed and load, slip angle 0 degrees). This supports strain/model methodology but **not** wet grip or tire-force maps.
+- A CC BY 4.0 tire pressure/temperature/speed dataset with 210,128 passenger-car observations and gradual-deflation/natural-leak segments. It supports pressure-health monitoring, not motorcycle grip, wear or structural qualification.
+- A CC BY 4.0 high-fidelity motorcycle simulation dataset for simulated sensor-pipeline tests only.
+
+The raw motorcycle race-telemetry deposits on Zenodo are promising for wheel speed, lean, braking, suspension and throttle, with both reported wet and dry days. Their record pages expose downloadable files but do not display a dataset license in the rights section. Visibility is not a reuse license, so obtain explicit written permission or a clear open license before ingestion or derivation. Full results and rights status are recorded in the JSON source register.
+
+No raw binary dataset was mirrored into this repository in this increment. The Aalto data host denied download through this execution path, and retrieval of the large GitHub-hosted CSV was not available through the current data-access mechanism. Upstream rights-cleared files remain the canonical source. That is not reported as successful acquisition.
+
+## P0: request the highest-value motorcycle dataset
+
+### Roam Air / Stellenbosch University
+
+The two 2026 electric-motorcycle papers describe measured motor/inverter maps, battery HPPC characterization, regenerative braking, controller behavior, drag/rolling resistance, and validation against six trips in Nairobi and Stellenbosch. The February paper says source data are available from the corresponding author on request; the August paper acknowledges Roam's motorcycle/data contribution. These are the most directly useful data because they include component characterization, not just vehicle traces.
+
+Request:
+- Original time-series telemetry for all available drive cycles, with original units, sample rates, timestamps and channel dictionaries.
+- Motor/inverter dynamometer points and calibrated torque/speed/voltage/current/temperature grids for traction and regeneration; exact map axes, interpolation rules, efficiency boundary, gearbox loss inclusion and clipping behavior.
+- Battery pack voltage/current/temperature traces; HPPC pulses; identified equivalent-circuit parameters by state of charge and temperature; capacity, DC resistance and usable-energy definitions.
+- BMS and controller limits, torque map, regenerative-braking limits, motor/controller firmware, gearing and configuration revisions.
+- Coast-down and braking measurements used to derive drag, rolling resistance and friction torque, including raw repeated runs and regression procedure.
+- Vehicle mass/configuration, tire make/size/compound/wear/inflation, rider posture, payload, wind, temperature, road/grade and calibration certificates.
+- Written permission to store raw data privately, generate derived tables/plots/model coefficients, publish a reproducibility package, and redistribute permitted raw or derived artifacts. Clarify any additional approval needed from Roam or the funders.
+- Exact license/grant, attribution text, confidentiality boundary, retention period and preferred citation.
+
+The reported results are prior evidence, not our results. The full-powertrain paper reports battery-power correlation 0.905–0.981, motor-speed correlation 0.912–0.996 and energy within 2.71% for five of six trips; the short downhill/high-throttle-transient trip has a 10.65% relative error. Its stated scope excludes mechanical braking inputs and auxiliary consumption and does not model thermal behavior. Don't claim our model reproduces the paper without licensed raw data and exact maps.
+
+### Andrei García Cuadra / Universidad Politécnica de Madrid
+
+Ask for a suitable explicit license or written grant for the Navarra and Cartagena deposits, including commercial research, derived features/model training if necessary, and redistribution of benchmark slices. Ask for sensor calibration, tire identification/pressure/wear, road-surface/water-depth metadata, acquisition-date confirmation and known data defects. Until then, these are public discovery links, not cleared project inputs.
+
+## Data intake checklist
+
+For every package, make an immutable intake record containing:
+1. Exact URL/DOI/version, license text or signed permission receipt, copyright/attribution and allowed transformations/use.
+2. Raw-file SHA-256, original filename/size, acquisition date/source, and unchanged copy where the permission allows.
+3. Vehicle/configuration/BOM and component revisions; tire make/size/load/speed index, compound/tread state and inflation when relevant.
+4. Signal dictionary/units, sign and coordinate conventions, sampling/time synchronization, calibration, uncertainty, missingness, censoring and known defects.
+5. Evidence class: Source, Synthetic, Simulated, WorkshopMeasured, InstrumentedPhysical, FieldObserved or RegulatoryReceipt, and its exact claim ceiling.
+6. Transform code/revision, output hashes, split manifest, raw-to-derived lineage and permission for sharing each artifact.
+7. Evidence that train/tune and holdout splits use independent whole runs/routes/days where appropriate.
+
+Never infer a dataset is CC BY because its paper is open access, that Zenodo's Open access flag supplies a license, or that a public download can automatically be mirrored.
+
+## If component maps cannot be licensed: build our own reference set
+
+Build a small instrumented campaign around one serviceable electric motorcycle and a conventional ICE control. Start with calibrated external instrumentation and manufacturer-authorized dynamometer or closed-course work. Do not disable safety systems or perform uncontrolled road tests.
+
+**Electric reference measurements**
+- Electrical input at a declared DC-bus boundary, torque/speed at motor or wheel, battery voltage/current/temperature, inverter/motor temperatures, ambient conditions and controller commands.
+- Map traction and regeneration separately over speed/load points within manufacturer current/temperature limits.
+- Battery HPPC and representative drive-profile characterization at several state-of-charge and temperature points; define charge/discharge energy and uncertainties.
+- Repeated coast-down tests with wind, posture, payload, tire pressure and route recorded; separately measure auxiliary loads, mechanical braking and regenerative braking.
+
+**ICE reference measurements**
+- Use an approved test cell/chassis dynamometer with a legal baseline configuration.
+- Record fuel consumption with calibration, engine speed/load/throttle, gear, wheel speed/torque, exhaust/coolant/oil temperatures, ambient conditions and emissions where available.
+- Keep fuel chemical energy, engine shaft work, drivetrain losses and wheel work separate. Do not infer fuel use or brake-specific fuel consumption from engine RPM alone.
+
+**Cross-platform controls**
+- Record sensor model/serial/calibration, firmware and configuration IDs.
+- Repeat reference points to quantify repeatability and hysteresis.
+- Reserve entire cycles and separate days for holdout validation.
+- Publish uncertainty and all poor fits; do not alter exclusions after inspecting holdout.
+- Preserve only rights-cleared raw data; publish benchmark subsets where participant/owner rights allow.
+
+The first self-generated data should be an auditable small grid and repeated routes, not a fabricated full map. Until measurements exist, unmeasured values stay unknown or are marked as explicit priors.
+
+## Can Symthaea engineer better tires?
+
+Yes. Symthaea can help design models, experiment plans, parameter searches, multi-objective trade-offs and evidence lineage for a better tire. It cannot establish that a tire is safe through optimization alone. Compound chemistry, carcass/tread geometry, production quality and road behavior require physical validation by qualified tire specialists and laboratories.
+
+The existing road/off-road issue #6247 assigns tire/contact/rolling/slip/traction semantics to that shared vehicle owner. Extend it rather than introducing a duplicate tire physics engine. The opportunity is a design-to-measurement loop: candidate specification → lab/track result → residual and uncertainty → next informative test → updated design Pareto set.
+
+## Target product profile
+
+First target: a durable commuter/utility tire for an African motorcycle or cargo vehicle, with high daily use, variable payload, patched/rough pavement, dust, wet-weather risk, hot surfaces, uneven maintenance and replacement-cost sensitivity. A racing slick is not the correct objective for this mission.
+
+### Design variables
+
+- Fit envelope: approved wheel/rim size, load/speed rating, geometry, mass and clearance.
+- Tread: drainage paths, void ratio, block/sipe geometry, edge support and wear behavior.
+- Carcass: stiffness distribution, ply/belt architecture, bead/sidewall design, impact compliance, dimensional stability and manufacturing tolerances.
+- Compound: candidate supplier formulations and permitted additives; evaluate grip, temperature, wear and ageing together rather than assuming one improves the others.
+- System: inflation-pressure window, tube/tubeless serviceability, puncture mitigation/repairability, compatible rim and field inspection.
+- Lifecycle: cost per service kilometre, availability, retread/reuse only where technically and legally suitable, end-of-life and wear debris.
+
+Change one family at a time initially (tread, carcass, compound, system). Use a designed experiment after safe baseline and process repeatability exist. Hold out specimens and test days so tuning cannot leak into qualification evidence.
+
+## Benchmark stack
+
+**Mandatory constraints; no trade-away score**
+- Applicable motorcycle tire tests and approval requirements are met for the exact tire/category, size, load/speed rating, rim and jurisdiction.
+- Structural integrity, bead retention, endurance, high-speed capability and load capability pass the relevant plan.
+- Wet/dry longitudinal and lateral force, braking and stability do not regress beyond a pre-registered non-inferiority margin justified by test uncertainty.
+- Uncalibrated sensors, unknown tire state, unsupported sizes, missing specimens or absent qualification receipts block promotion.
+
+**Performance measures**
+- Longitudinal/lateral force envelopes over load, slip, camber, speed, inflation, temperature and surface; wet tests state water depth and surface.
+- Wet/dry stopping distance with matched brake/tire/load/temperature/surface conditions.
+- Rolling resistance under the applicable motorcycle-specific lab method; don't infer whole-vehicle economy from a single-point lab value alone.
+- Tread wear/depth per controlled duty cycle, heat generation, pressure retention, puncture/impact resistance, casing damage, ageing, failure rate and repair time.
+- Total cost per service kilometre, downtime/parts lead time, supply resilience, embodied material/energy and end-of-life burden.
+- Model validation with per-condition/per-specimen residuals, uncertainty intervals, median/P90/maximum error and every safety-relevant outlier.
+
+**Provisional R&D stretch targets, not standards or achieved results**
+- At least 10% lower rolling resistance against a named matched baseline, while wet/dry force envelopes remain within a pre-registered non-inferiority margin.
+- At least 10% shorter wet stopping distance in a specified, independently repeated test without degrading structural/endurance qualification.
+- At least 20% improvement in controlled wear-life or puncture/impact metric; measure these separately, not as one blended score.
+- At least 15% lower lifecycle cost per tire-kilometre at equal safety/approval status and a comparable duty cycle.
+- Zero accepted critical safety failures; a candidate failing any mandatory requirement is ineligible, regardless of weighted score.
+
+These are hypotheses against an actual named baseline. The current strain/TPMS datasets alone cannot assess these targets.
+
+## Standards and laboratory discipline
+
+- [ISO 10231:2025](https://www.iso.org/standard/87303.html) specifies test methods to verify motorcycle tire capabilities and expressly says its methods are not for grading tire performance or quality levels.
+- [ISO 18164:2026](https://www.iso.org/standard/90269.html) specifies a controlled single-point motorcycle tire rolling-resistance method and cautions that its connection to whole-vehicle fuel economy is undetermined.
+- [UN Regulation No. 75](https://unece.org/transport/vehicle-regulations-wp29/standards/addenda-1958-agreement-regulations-61-80) covers approval of pneumatic tires for L-category vehicles; verify the current amendment and national adoption for the intended market.
+
+Standards need not be copied into the repository. Record the applicable edition, test method, calibration and independent acceptance record. A bench/simulation pass is not public-road permission.
+
+## Immediate work order
+
+1. Request Roam Air/Stellenbosch raw maps and traces under explicit use/redistribution terms, and request a clear license for the racing motorcycle deposits.
+2. Retrieve the two CC BY 4.0 tire datasets from their canonical upstream sources, with hashes/licenses/metadata preserved.
+3. Build a compact Rust-first intake/decoder under existing xtask and vehicle owners; avoid a production Python dependency.
+4. If data access is declined, instrument a reference vehicle or arrange a research-lab/dynamometer partner.
+5. Use the tire datasets only for the narrow scopes they support, then commission tire-force, rolling-resistance, wet-grip, endurance and wear testing before claiming improved tire performance.
+
+No data access requests were sent from an authenticated mailbox in this session; the source requests still need to be sent to the data owners. No raw binary data were downloaded into this repository during this work.
