@@ -25,13 +25,13 @@ Prediction error is a caller-defined scalar and must be calibrated for the selec
 The CLI requires this exact tab-separated header, in this order:
 
 ~~~text
-task_id variant_id trial_id progress completed valid_run timed_out elapsed_seconds model_calls action_steps estimated_cost_usd safety_events
+task_id variant_id trial_id progress completed valid_run timed_out failure_class elapsed_seconds model_calls action_steps estimated_cost_usd safety_events
 ~~~
 
-Fields are separated by tabs (the display above uses spaces). IDs should be stable slugs/identifiers without tabs. The progress field is a number in [0,1], or NA when no valid final judge score exists. Booleans must be true or false. An attempt with progress=NA must set valid_run=false and completed=false; it still counts as an attempted trial, timeout/runtime/cost observation, and non-completion.
+Fields are separated by tabs (the display above uses spaces). IDs should be stable slugs/identifiers without tabs. The progress field is a number in [0,1], or NA when no valid final judge score exists. Booleans must be true or false. An attempt with progress=NA must set valid_run=false and completed=false; it still counts as an attempted trial, timeout/runtime/cost observation, and non-completion. The failure_class must be one of none, timeout, thermal_stop, server_error, invalid_action, safety_stop, or other. timed_out=true must agree with failure_class=timeout. Invalid runs need an explicit non-none failure class; a timeout can still be a valid, partially graded run.
 
-- --summarize emits task-by-variant rows with attempts, validity, full completions, rubric mean and bootstrap interval, elapsed time, model calls, action steps, estimated cost, timeouts and safety events.
-- --compare requires exactly matching task/trial IDs across the chosen baseline and candidate; unpaired runs are rejected. It reports paired progress delta with a task-stratified bootstrap interval, plus completion/valid-run-rate deltas and runtime/cost/safety deltas.
+- --summarize emits task-by-variant rows with attempts, validity, full completions, rubric mean and bootstrap interval, elapsed time, model calls, action steps, estimated cost, timeouts, thermal stops, server errors, invalid actions, safety stops, other failures, and safety events.
+- --compare requires exactly matching task/trial IDs across the chosen baseline and candidate; unpaired runs are rejected. It reports paired progress delta with a task-stratified bootstrap interval, plus completion/valid-run-rate, runtime/cost/safety, and individual operational failure-class deltas.
 - Bootstrap count defaults to 2,000 and seed to 42. Reuse the same input and seed to reproduce the interval.
 
 ## Probability forecasts and calibration
