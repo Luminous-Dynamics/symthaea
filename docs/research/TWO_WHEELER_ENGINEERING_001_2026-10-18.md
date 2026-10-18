@@ -137,8 +137,8 @@ The initial independent-decision prototype is wired into `xtask`. From the works
 
 ```sh
 cargo test -p xtask twowheeler_benchmark
-cargo run -p xtask -- two-wheeler-benchmark \\
-  --input docs/research/data/two_wheeler_a0_benchmark_v0_1.json \\
+cargo run -p xtask -- two-wheeler-benchmark \
+  --input docs/research/data/two_wheeler_a0_benchmark_v0_1.json \
   --out reports/two_wheeler_a0_verification.json
 ```
 
