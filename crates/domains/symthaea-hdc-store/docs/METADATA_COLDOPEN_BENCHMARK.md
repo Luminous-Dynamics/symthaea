@@ -52,3 +52,10 @@ A strong result is one where the pre-scan residency is low and the SoA run consi
 ## Proposed next gate (not yet achieved)
 
 Only if the synthetic experiment shows a robust reduction in payload-page residency on a named host should work proceed to an actual versioned HdcStore candidate. That follow-on needs format versioning, checksummed metadata, exact live-content equivalence, interrupted-write/recovery tests, export/import and migration tests, and end-to-end retrieval benchmarks. Format v2 remains unchanged.
+
+## Operating-system references
+
+- Linux `mincore(2)` reports a snapshot of pages resident in memory, which can change after the call: [man7 mincore(2)](https://man7.org/linux/man-pages/man2/mincore.2.html).
+- Linux `POSIX_FADV_DONTNEED` attempts to free cached pages but is advisory, and partial-page requests can be ignored: [man7 posix_fadvise(2)](https://man7.org/linux/man-pages/man2/posix_fadvise.2.html).
+
+These are why each sample reports pre-scan residency and the hint's return code rather than assuming a cold cache.
