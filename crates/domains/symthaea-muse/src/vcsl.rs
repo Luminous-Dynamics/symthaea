@@ -792,6 +792,16 @@ impl InstrumentBank {
     }
 
     fn decode(&self, idx: usize) -> Option<Arc<DecodedSample>> {
+        let hash_bank_manifest = std::env::var("SYMTHAEA_MUSE_HASH_SOURCE_BANK_MANIFEST")
+            .is_ok_and(|value| value == "1");
+        self.decode_with_manifest_request(idx, hash_bank_manifest)
+    }
+
+    fn decode_with_manifest_request(
+        &self,
+        idx: usize,
+        hash_bank_manifest: bool,
+    ) -> Option<Arc<DecodedSample>> {
         if let Some(hit) = self.cache.lock().ok()?.get(&idx) {
             return Some(hit.clone());
         }
@@ -828,10 +838,6 @@ impl InstrumentBank {
             source_filename
         );
         let source_file_sha256 = sha256_file(&meta.path).ok()?;
-        // This is deliberately opt-in: a mapped bank can contain gigabytes of
-        // source audio. Set the variable before starting the process.
-        let hash_bank_manifest = std::env::var("SYMTHAEA_MUSE_HASH_SOURCE_BANK_MANIFEST")
-            .is_ok_and(|value| value == "1");
         let (source_bank_content_manifest_sha256, source_bank_manifest_status) =
             self.content_manifest_evidence(hash_bank_manifest);
         let decoded = Arc::new(DecodedSample {
@@ -3634,8 +3640,8 @@ mod tests {
         let bank = InstrumentBank::index(&bank_dir, "vcsl", "fixture/instrument")
             .expect("fixture bank should index");
         let sample = bank
-            .pick(60.0, 1.0, 42)
-            .expect("C4 layer should be selected and decoded");
+            .decode_with_manifest_request(0, true)
+            .expect("C4 layer should be decoded with manifest evidence");
         assert_eq!(sample.source_library, "vcsl");
         assert_eq!(
             sample.source_relative_path,
@@ -3649,6 +3655,15 @@ mod tests {
             sha256_file(&sample_path).unwrap(),
             "selected-sample digest binds exact source WAV bytes"
         );
+        assert_eq!(sample.source_bank_manifest_status, "hashed");
+        assert_eq!(
+            sample.source_bank_content_manifest_sha256.as_deref(),
+            Some(indexed_sample_content_manifest_sha256(&bank).unwrap().as_str()),
+            "selected-sample receipt carries the same digest as the indexed-bank inventory"
+        );
+        let (no_digest, no_digest_status) = bank.content_manifest_evidence(false);
+        assert_eq!(no_digest, None);
+        assert_eq!(no_digest_status, "not_requested");
         std::fs::remove_dir_all(root).unwrap();
     }
 
