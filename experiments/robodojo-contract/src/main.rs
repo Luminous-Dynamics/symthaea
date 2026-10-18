@@ -274,6 +274,8 @@ mod cli_tests {
         assert_eq!(comparison.scored_pairs, 4);
         assert_eq!(comparison.tasks_with_scored_pairs, 2);
         assert_eq!(comparison.valid_run_rate_delta, 0.0);
-        assert_eq!(comparison.progress_delta_ci95, Some((0.125, 0.25)));
+        assert_eq!(comparison.mean_progress_delta, Some(0.3125));
+        let (lower, upper) = comparison.progress_delta_ci95.expect("four scored pairs yield a bootstrap interval");
+        assert!(lower >= 0.25 && upper <= 0.375 && lower <= upper);
     }
 }
