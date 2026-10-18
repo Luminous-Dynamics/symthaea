@@ -140,6 +140,20 @@ This is a deterministic contract harness, not a general radio simulator:
 
 Next model increment should add a reproducible airtime trace with a declared medium-access policy and ACK budget, then compare it against measured instrumented-link traces before adding multi-hop queueing or learned route prediction.
 
+## 6.4 Deterministic fault-campaign evaluator
+
+The Rust kernel now adds a deterministic fault-campaign evaluator alongside route selection, time-causal receipts and the one-channel airtime model.
+
+- Generate a frozen set with one nominal case, every single-link outage and every single-declared-failure-domain outage.
+- Evaluate explicit fault snapshots for on-time delivery, deadline miss, no route and expiry as separate outcomes.
+- Inject stale observations to ensure the route evaluator excludes them and records the fallback selected.
+- Reject duplicate scenario IDs, unknown link/domain references, contradictory failed-and-stale declarations, invalid deadlines and incomplete dependency inventories for domain-fault cases.
+- Set a scenario-count ceiling before generation/evaluation. If the exhaustive generated suite exceeds the ceiling, fail explicitly instead of returning a partial corpus.
+
+The fault campaign is a set of independent snapshots evaluated at a common simulation time. It sums the declared latencies along a selected route; it does not represent events during flight, link contention, per-hop queues, acknowledgements or store-carry-forward. The reported delivery outcome is synthetic graph/latency evidence, not a measured radio reliability result.
+
+**Acceptance condition:** for a given graph, the generated suite count equals \(1 + |L| + |D|\), where \(L\) is the set of unique links and \(D\) is the set of unique declared domains. Every case is returned or the run is an explicit error; partial suites are not benchmark results. Domain-outage cases require complete non-empty domain inventories on every link. Report each failed case and separate deadline misses from unreachable/expired cases; do not fold them into a single quality score.
+
 ## 7. Initial acceptance targets (laboratory hypotheses)
 
 These are targets for test design; none are yet measured:

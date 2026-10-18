@@ -1664,3 +1664,481 @@ mod tests {
         assert!(MessageClass::Telemetry.priority_rank() < MessageClass::Bulk.priority_rank());
     }
 }
+
+/// A deterministic snapshot fault for an underground communications graph.
+///
+/// failed_link_ids removes explicit links. failed_domains removes every link
+/// declaring that shared-cause dependency. stale_link_ids makes the named
+/// observation stale at the campaign evaluation time. The inventories and fault
+/// schedule are synthetic inputs; they are not evidence that a real mine has
+/// complete dependency documentation.
+#[derive(Clone, Debug, Eq, PartialEq)]
+pub struct FaultScenario {
+    pub id: String,
+    pub failed_link_ids: Vec<String>,
+    pub failed_domains: Vec<String>,
+    pub stale_link_ids: Vec<String>,
+}
+
+impl FaultScenario {
+    pub fn nominal() -> Self {
+        Self {
+            id: "nominal".to_owned(),
+            failed_link_ids: Vec::new(),
+            failed_domains: Vec::new(),
+            stale_link_ids: Vec::new(),
+        }
+    }
+}
+
+/// Outcome for one fault snapshot. Deadline misses are kept separate from
+/// unreachable and expired messages so averages cannot hide distinct failures.
+#[derive(Clone, Copy, Debug, Eq, PartialEq)]
+pub enum FaultScenarioDisposition {
+    DeliveredOnTime,
+    DeadlineMissed,
+    NoRoute,
+    ExpiredBeforeDelivery,
+}
+
+#[derive(Clone, Debug, Eq, PartialEq)]
+pub struct FaultScenarioResult {
+    pub scenario_id: String,
+    pub disposition: FaultScenarioDisposition,
+    /// Explicit link failures plus links removed by a failed shared domain.
+    pub failed_link_ids: Vec<String>,
+    /// Observations deliberately made stale by the scenario.
+    pub stale_link_ids: Vec<String>,
+    pub route: Option<Route>,
+    /// Predicted route arrival, even if it is after the message expiry.
+    pub predicted_arrival_at_ms: Option<u64>,
+}
+
+#[derive(Clone, Debug, Eq, PartialEq)]
+pub struct FaultCampaignReport {
+    pub results: Vec<FaultScenarioResult>,
+    pub delivered_on_time: usize,
+    pub deadline_missed: usize,
+    pub no_route: usize,
+    pub expired_before_delivery: usize,
+}
+
+fn unique_nonempty_ids(
+    values: &[String],
+    empty_error: &'static str,
+    duplicate_error: &'static str,
+) -> Result<BTreeSet<String>, &'static str> {
+    let mut unique = BTreeSet::new();
+    for value in values {
+        if value.trim().is_empty() {
+            return Err(empty_error);
+        }
+        if !unique.insert(value.clone()) {
+            return Err(duplicate_error);
+        }
+    }
+    Ok(unique)
+}
+
+/// Generate a reproducible nominal + single-link-failure + single-domain-failure
+/// suite. A complete, non-empty domain inventory is mandatory because otherwise
+/// a "single-domain outage" could silently omit a real dependency. If the
+/// requested cap is exceeded, generation fails rather than returning a partial
+/// suite that could be mistaken for exhaustive coverage.
+pub fn generate_single_fault_suite(
+    links: &[Link],
+    max_scenarios: usize,
+) -> Result<Vec<FaultScenario>, &'static str> {
+    if max_scenarios == 0 {
+        return Err("fault suite scenario cap must be positive");
+    }
+    if links.is_empty() {
+        return Err("fault suite requires at least one link");
+    }
+
+    let mut link_ids = BTreeSet::new();
+    let mut domains = BTreeSet::new();
+    for link in links {
+        if link.id.trim().is_empty() {
+            return Err("fault suite link ids must not be empty");
+        }
+        if !link_ids.insert(link.id.clone()) {
+            return Err("fault suite link ids must be unique");
+        }
+        if !link.failure_domains_complete || link.failure_domains.is_empty() {
+            return Err("fault suite requires complete non-empty failure-domain inventories");
+        }
+        let mut local_domains = BTreeSet::new();
+        for domain in &link.failure_domains {
+            if domain.trim().is_empty() {
+                return Err("failure domain identifiers must not be empty");
+            }
+            if !local_domains.insert(domain.clone()) {
+                return Err("failure domain identifiers must be unique per link");
+            }
+            domains.insert(domain.clone());
+        }
+    }
+
+    let required_count = 1usize
+        .checked_add(link_ids.len())
+        .and_then(|count| count.checked_add(domains.len()))
+        .ok_or("fault suite scenario count overflow")?;
+    if required_count > max_scenarios {
+        return Err("fault suite exceeds configured scenario cap; no partial suite returned");
+    }
+
+    let mut scenarios = vec![FaultScenario::nominal()];
+    for link_id in link_ids {
+        scenarios.push(FaultScenario {
+            id: format!("link-failure:{link_id}"),
+            failed_link_ids: vec![link_id],
+            failed_domains: Vec::new(),
+            stale_link_ids: Vec::new(),
+        });
+    }
+    for domain in domains {
+        scenarios.push(FaultScenario {
+            id: format!("domain-failure:{domain}"),
+            failed_link_ids: Vec::new(),
+            failed_domains: vec![domain],
+            stale_link_ids: Vec::new(),
+        });
+    }
+    Ok(scenarios)
+}
+
+/// Evaluate each declared fault snapshot at a common dispatch/evaluation time.
+///
+/// The model routes once on each snapshot and sums declared per-link latency.
+/// It deliberately does not simulate a fault occurring mid-flight, per-hop
+/// queues, stochastic packet loss, medium access or store-carry-forward. Those
+/// require a time-series trace model and measured channel inputs.
+pub fn evaluate_fault_campaign(
+    links: &[Link],
+    source: &str,
+    destination: &str,
+    now_ms: u64,
+    expires_at_ms: u64,
+    deadline_at_ms: u64,
+    policy: RoutePolicy,
+    scenarios: &[FaultScenario],
+    max_scenarios: usize,
+) -> Result<FaultCampaignReport, &'static str> {
+    if scenarios.is_empty() {
+        return Err("fault campaign requires at least one scenario");
+    }
+    if max_scenarios == 0 || scenarios.len() > max_scenarios {
+        return Err("fault campaign exceeds configured scenario cap");
+    }
+    if deadline_at_ms < now_ms {
+        return Err("delivery deadline precedes campaign evaluation time");
+    }
+
+    // Validate the original graph once even when the message has already expired.
+    // A malformed graph must not become a seemingly valid expired-only report.
+    let _ = find_route(links, source, destination, now_ms, policy)?;
+
+    let known_links: BTreeSet<String> = links.iter().map(|link| link.id.clone()).collect();
+    let mut scenario_ids = BTreeSet::new();
+    let mut results = Vec::with_capacity(scenarios.len());
+
+    for scenario in scenarios {
+        if scenario.id.trim().is_empty() {
+            return Err("fault scenario id must not be empty");
+        }
+        if !scenario_ids.insert(scenario.id.clone()) {
+            return Err("fault scenario ids must be unique");
+        }
+
+        let explicit_failures = unique_nonempty_ids(
+            &scenario.failed_link_ids,
+            "failed link ids must not be empty",
+            "failed link ids must be unique",
+        )?;
+        let failed_domains = unique_nonempty_ids(
+            &scenario.failed_domains,
+            "failed domain ids must not be empty",
+            "failed domain ids must be unique",
+        )?;
+        let stale_links = unique_nonempty_ids(
+            &scenario.stale_link_ids,
+            "stale link ids must not be empty",
+            "stale link ids must be unique",
+        )?;
+
+        if explicit_failures.iter().any(|id| !known_links.contains(id))
+            || stale_links.iter().any(|id| !known_links.contains(id))
+        {
+            return Err("fault scenario references an unknown link id");
+        }
+        if explicit_failures.iter().any(|id| stale_links.contains(id)) {
+            return Err("a link cannot be both failed and stale in one snapshot");
+        }
+
+        let mut failed_link_ids = explicit_failures;
+        if !failed_domains.is_empty() {
+            if links
+                .iter()
+                .any(|link| !link.failure_domains_complete || link.failure_domains.is_empty())
+            {
+                return Err("domain fault campaign requires complete non-empty failure-domain inventories");
+            }
+            let known_domains: BTreeSet<String> = links
+                .iter()
+                .flat_map(|link| link.failure_domains.iter().cloned())
+                .collect();
+            if failed_domains.iter().any(|domain| !known_domains.contains(domain)) {
+                return Err("fault scenario references an unknown failure domain");
+            }
+            for link in links {
+                if link.failure_domains.iter().any(|domain| failed_domains.contains(domain)) {
+                    failed_link_ids.insert(link.id.clone());
+                }
+            }
+        }
+        if failed_link_ids.iter().any(|id| stale_links.contains(id)) {
+            return Err("a link cannot be both failed and stale in one snapshot");
+        }
+
+        let mut scenario_links = links.to_vec();
+        for link in &mut scenario_links {
+            if failed_link_ids.contains(&link.id) {
+                link.state = LinkState::Down;
+            } else if stale_links.contains(&link.id) {
+                if now_ms == 0 {
+                    return Err("stale-link fault injection requires a non-zero evaluation time");
+                }
+                link.state = LinkState::Up;
+                link.observed_at_ms = now_ms - 1;
+                link.max_observation_age_ms = 0;
+            }
+        }
+
+        let route = if expires_at_ms < now_ms {
+            None
+        } else {
+            find_route(&scenario_links, source, destination, now_ms, policy)?
+        };
+
+        let predicted_arrival_at_ms = if expires_at_ms < now_ms {
+            None
+        } else if let Some(route) = &route {
+            Some(
+                now_ms
+                    .checked_add(route.latency_ms)
+                    .ok_or("fault campaign arrival timestamp overflow")?,
+            )
+        } else {
+            None
+        };
+
+        let disposition = if expires_at_ms < now_ms {
+            FaultScenarioDisposition::ExpiredBeforeDelivery
+        } else if route.is_none() {
+            FaultScenarioDisposition::NoRoute
+        } else if predicted_arrival_at_ms.expect("route has a predicted arrival") > expires_at_ms {
+            FaultScenarioDisposition::ExpiredBeforeDelivery
+        } else if predicted_arrival_at_ms.expect("route has a predicted arrival") > deadline_at_ms {
+            FaultScenarioDisposition::DeadlineMissed
+        } else {
+            FaultScenarioDisposition::DeliveredOnTime
+        };
+
+        results.push(FaultScenarioResult {
+            scenario_id: scenario.id.clone(),
+            disposition,
+            failed_link_ids: failed_link_ids.into_iter().collect(),
+            stale_link_ids: stale_links.into_iter().collect(),
+            route,
+            predicted_arrival_at_ms,
+        });
+    }
+
+    results.sort_by(|a, b| a.scenario_id.cmp(&b.scenario_id));
+    let delivered_on_time = results
+        .iter()
+        .filter(|result| result.disposition == FaultScenarioDisposition::DeliveredOnTime)
+        .count();
+    let deadline_missed = results
+        .iter()
+        .filter(|result| result.disposition == FaultScenarioDisposition::DeadlineMissed)
+        .count();
+    let no_route = results
+        .iter()
+        .filter(|result| result.disposition == FaultScenarioDisposition::NoRoute)
+        .count();
+    let expired_before_delivery = results
+        .iter()
+        .filter(|result| result.disposition == FaultScenarioDisposition::ExpiredBeforeDelivery)
+        .count();
+
+    Ok(FaultCampaignReport {
+        results,
+        delivered_on_time,
+        deadline_missed,
+        no_route,
+        expired_before_delivery,
+    })
+}
+
+#[cfg(test)]
+mod fault_campaign_tests {
+    use super::*;
+
+    fn link(
+        id: &str,
+        from: &str,
+        to: &str,
+        latency_ms: u64,
+        energy_millijoules: u64,
+        failure_domains: &[&str],
+    ) -> Link {
+        Link {
+            id: id.to_owned(),
+            from: from.to_owned(),
+            to: to.to_owned(),
+            channel: ChannelKind::Backbone,
+            state: LinkState::Up,
+            quality_permille: 1000,
+            observed_at_ms: 100,
+            max_observation_age_ms: 100,
+            one_way_latency_ms: latency_ms,
+            energy_millijoules,
+            failure_domains: failure_domains.iter().map(|value| (*value).to_owned()).collect(),
+            failure_domains_complete: true,
+        }
+    }
+
+    fn topology() -> Vec<Link> {
+        vec![
+            link("sa", "s", "a", 10, 1, &["surface-power", "cable-a"]),
+            link("ad", "a", "d", 10, 1, &["cable-a", "power-a"]),
+            link("sb", "s", "b", 30, 2, &["surface-power", "cable-b"]),
+            link("bd", "b", "d", 30, 2, &["cable-b", "power-b"]),
+        ]
+    }
+
+    fn scenario(
+        id: &str,
+        failed_link_ids: &[&str],
+        failed_domains: &[&str],
+        stale_link_ids: &[&str],
+    ) -> FaultScenario {
+        FaultScenario {
+            id: id.to_owned(),
+            failed_link_ids: failed_link_ids.iter().map(|value| (*value).to_owned()).collect(),
+            failed_domains: failed_domains.iter().map(|value| (*value).to_owned()).collect(),
+            stale_link_ids: stale_link_ids.iter().map(|value| (*value).to_owned()).collect(),
+        }
+    }
+
+    #[test]
+    fn generated_suite_covers_nominal_every_link_and_every_domain_deterministically() {
+        let links = topology();
+        let first = generate_single_fault_suite(&links, 32).expect("complete inventories");
+        let mut reversed = links.clone();
+        reversed.reverse();
+        let second = generate_single_fault_suite(&reversed, 32).expect("complete inventories");
+        assert_eq!(first, second);
+        assert_eq!(first.first().unwrap().id, "nominal");
+        assert_eq!(first.len(), 1 + 4 + 5);
+        assert!(first.iter().any(|case| case.id == "link-failure:sa"));
+        assert!(first.iter().any(|case| case.id == "domain-failure:surface-power"));
+    }
+
+    #[test]
+    fn generated_suite_rejects_cap_overflow_without_returning_partial_cases() {
+        let links = topology();
+        assert!(generate_single_fault_suite(&links, 9).is_err());
+        assert!(generate_single_fault_suite(&links, 0).is_err());
+    }
+
+    #[test]
+    fn campaign_separates_on_time_deadline_miss_and_shared_domain_cut() {
+        let links = topology();
+        let scenarios = vec![
+            FaultScenario::nominal(),
+            scenario("fail-fast-link", &["sa"], &[], &[]),
+            scenario("shared-power-cut", &[], &["surface-power"], &[]),
+        ];
+        let report = evaluate_fault_campaign(
+            &links, "s", "d", 100, 300, 150,
+            RoutePolicy::AdaptiveLatencyEnergy, &scenarios, 8,
+        ).expect("valid campaign");
+        assert_eq!(report.results.len(), 3);
+        assert_eq!(report.delivered_on_time, 1);
+        assert_eq!(report.deadline_missed, 1);
+        assert_eq!(report.no_route, 1);
+        assert_eq!(report.expired_before_delivery, 0);
+
+        let fallback = report.results.iter().find(|r| r.scenario_id == "fail-fast-link").unwrap();
+        assert_eq!(fallback.disposition, FaultScenarioDisposition::DeadlineMissed);
+        assert_eq!(fallback.route.as_ref().unwrap().link_ids, vec!["sb", "bd"]);
+        let cut = report.results.iter().find(|r| r.scenario_id == "shared-power-cut").unwrap();
+        assert_eq!(cut.disposition, FaultScenarioDisposition::NoRoute);
+        assert_eq!(cut.failed_link_ids, vec!["sa", "sb"]);
+    }
+
+    #[test]
+    fn stale_link_fault_is_not_used_as_a_healthy_shortcut() {
+        let report = evaluate_fault_campaign(
+            &topology(), "s", "d", 100, 300, 200,
+            RoutePolicy::AdaptiveLatencyEnergy,
+            &[scenario("stale-fast-path", &[], &[], &["sa"])], 4,
+        ).expect("valid campaign");
+        assert_eq!(report.results[0].stale_link_ids, vec!["sa"]);
+        assert_eq!(report.results[0].route.as_ref().unwrap().link_ids, vec!["sb", "bd"]);
+    }
+
+    #[test]
+    fn already_expired_message_is_not_routed_in_campaign() {
+        let report = evaluate_fault_campaign(
+            &topology(), "s", "d", 100, 99, 200,
+            RoutePolicy::AdaptiveLatencyEnergy, &[FaultScenario::nominal()], 4,
+        ).expect("valid campaign");
+        assert_eq!(report.expired_before_delivery, 1);
+        assert_eq!(report.results[0].route, None);
+        assert_eq!(report.results[0].predicted_arrival_at_ms, None);
+    }
+
+    #[test]
+    fn domain_outage_fails_closed_when_any_inventory_is_incomplete() {
+        let mut links = topology();
+        links[0].failure_domains_complete = false;
+        assert!(evaluate_fault_campaign(
+            &links, "s", "d", 100, 300, 200,
+            RoutePolicy::AdaptiveLatencyEnergy,
+            &[scenario("domain-cut", &[], &["surface-power"], &[])], 4,
+        ).is_err());
+        assert!(generate_single_fault_suite(&links, 32).is_err());
+    }
+
+    #[test]
+    fn campaign_rejects_unknown_and_conflicting_fault_references() {
+        let links = topology();
+        assert!(evaluate_fault_campaign(
+            &links, "s", "d", 100, 300, 200,
+            RoutePolicy::AdaptiveLatencyEnergy,
+            &[scenario("unknown", &["missing"], &[], &[])], 4,
+        ).is_err());
+        assert!(evaluate_fault_campaign(
+            &links, "s", "d", 100, 300, 200,
+            RoutePolicy::AdaptiveLatencyEnergy,
+            &[scenario("conflict", &["sa"], &[], &["sa"])], 4,
+        ).is_err());
+    }
+
+    #[test]
+    fn campaign_rejects_duplicate_scenario_ids_and_invalid_deadline() {
+        let duplicate = vec![FaultScenario::nominal(), FaultScenario::nominal()];
+        assert!(evaluate_fault_campaign(
+            &topology(), "s", "d", 100, 300, 200,
+            RoutePolicy::AdaptiveLatencyEnergy, &duplicate, 4,
+        ).is_err());
+        assert!(evaluate_fault_campaign(
+            &topology(), "s", "d", 100, 300, 99,
+            RoutePolicy::AdaptiveLatencyEnergy, &[FaultScenario::nominal()], 4,
+        ).is_err());
+    }
+}
