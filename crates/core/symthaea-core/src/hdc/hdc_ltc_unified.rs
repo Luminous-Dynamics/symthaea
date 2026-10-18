@@ -58,7 +58,6 @@
 
 use crate::hdc::unified_hv::{ContinuousHV, HDC_DIMENSION};
 use serde::{Deserialize, Serialize};
-use thiserror::Error;
 
 // ═══════════════════════════════════════════════════════════════════════════════
 // CONFIGURATION
@@ -128,28 +127,6 @@ impl Default for UnifiedConfig {
             fourier_amplitude: 0.1,
         }
     }
-}
-
-/// Default work budget for the compatibility iterative-evolution API.
-pub const DEFAULT_MAX_ITERATIVE_SUBSTEPS: usize = 10_000;
-
-/// Errors returned before iterative HDC-LTC state evolution begins.
-#[derive(Debug, Error, Clone)]
-pub enum IterativeEvolutionError {
-    #[error("dt must be finite and non-negative; received {dt}")]
-    InvalidDuration { dt: f32 },
-    #[error("tau_base must be finite and positive; received {tau_base}")]
-    InvalidTauBase { tau_base: f32 },
-    #[error("dimension must be nonzero; received {dimension}")]
-    InvalidDimension { dimension: usize },
-    #[error("{field} dimension mismatch: expected {expected}, received {actual}")]
-    DimensionMismatch { field: &'static str, expected: usize, actual: usize },
-    #[error("max_substeps must be greater than zero")]
-    ZeroSubstepBudget,
-    #[error("requested {requested_substeps:.0} substeps exceeds budget {max_substeps}")]
-    SubstepBudgetExceeded { requested_substeps: f64, max_substeps: usize },
-    #[error("computed substep duration is not finite and positive")]
-    InvalidSubstepDuration,
 }
 
 /// Activation function types
@@ -1082,67 +1059,51 @@ impl HdcLtcUnifiedNeuron {
         self.update_stats(dt);
     }
 
-    /// Iteratively evolve nonlinear closed-form dynamics with an explicit work budget.
-    /// Validation is completed before mutating neuron state. The number of substeps
-    /// is ceil(dt / (tau_base / 10)); no silent truncation or time capping occurs.
-    /// Zero duration is a true no-op. Returns the number of substeps executed.
-    pub fn try_evolve_closed_form_iterative(
-        &mut self, dt: f32, input: &ContinuousHV, max_substeps: usize,
-    ) -> Result<usize, IterativeEvolutionError> {
-        if !dt.is_finite() || dt < 0.0 {
-            return Err(IterativeEvolutionError::InvalidDuration { dt });
-        }
-        if !self.config.tau_base.is_finite() || self.config.tau_base <= 0.0 {
-            return Err(IterativeEvolutionError::InvalidTauBase { tau_base: self.config.tau_base });
-        }
-        if self.config.dimension == 0 {
-            return Err(IterativeEvolutionError::InvalidDimension { dimension: self.config.dimension });
-        }
-        if max_substeps == 0 {
-            return Err(IterativeEvolutionError::ZeroSubstepBudget);
-        }
-        let expected = self.config.dimension;
-        for (field, actual) in [
-            ("input", input.dim()),
-            ("state", self.state.dim()),
-            ("weight_hv", self.weight_hv.dim()),
-            ("input_mask", self.input_mask.dim()),
-            ("tau_modulator", self.tau_modulator.dim()),
-        ] {
-            if actual != expected {
-                return Err(IterativeEvolutionError::DimensionMismatch { field, expected, actual });
-            }
-        }
-        if dt == 0.0 { return Ok(0); }
-        // Calculate in f64 so the work estimate is checked before integer conversion.
-        let max_substep = self.config.tau_base as f64 / 10.0;
-        let requested_substeps = ((dt as f64) / max_substep).ceil().max(1.0);
-        if !requested_substeps.is_finite() || requested_substeps > max_substeps as f64 {
-            return Err(IterativeEvolutionError::SubstepBudgetExceeded { requested_substeps, max_substeps });
-        }
-        let n_steps = requested_substeps as usize;
+    /// **ITERATIVE CLOSED-FORM EVOLUTION** - Handles nonlinear equilibrium
+    ///
+    /// For accurate closed-form evolution of the nonlinear ODE where x_∞ depends on x,
+    /// this method uses sub-stepping to recompute equilibrium periodically.
+    ///
+    /// ## Strategy
+    ///
+    /// 1. Split large dt into smaller sub-steps (at most tau/10 per step)
+    /// 2. Apply closed-form exponential decay for each sub-step
+    /// 3. Recompute equilibrium after each sub-step
+    ///
+    /// This achieves O(dt/tau) complexity instead of O(1) but provides accuracy
+    /// comparable to RK4 integration.
+    ///
+    /// ## Parameters
+    ///
+    /// - `dt`: Total time to evolve
+    /// - `input`: Input hypervector (assumed constant during evolution)
+    pub fn evolve_closed_form_iterative(&mut self, dt: f32, input: &ContinuousHV) {
+        // Determine sub-step size based on tau
+        // Using tau/10 gives high accuracy for the nonlinear dynamics (<1% error)
+        let base_tau = self.config.tau_base;
+        let max_substep = base_tau / 10.0;
+
+        // Calculate number of sub-steps needed
+        let n_steps = ((dt / max_substep).ceil() as usize).max(1);
         let sub_dt = dt / n_steps as f32;
-        if !sub_dt.is_finite() || sub_dt <= 0.0 {
-            return Err(IterativeEvolutionError::InvalidSubstepDuration);
-        }
+
+        // Apply closed-form evolution iteratively
         for _ in 0..n_steps {
+            // Recompute equilibrium at current state
             let x_inf = self.compute_equilibrium(input);
             let tau = self.compute_tau(input);
+
+            // Apply exponential decay (clamped to prevent f32 underflow)
             let decay = (-sub_dt / tau).max(-87.0).exp();
-            self.state = x_inf.scale(1.0 - decay).add(&self.state.scale(decay));
+            let weighted_equilibrium = x_inf.scale(1.0 - decay);
+            let weighted_current = self.state.scale(decay);
+            self.state = weighted_equilibrium.add(&weighted_current);
         }
+
         self.apply_state_bounds();
         self.update_stats(dt);
-        Ok(n_steps)
     }
 
-    /// Compatibility wrapper using a finite default work budget.
-    /// Use the fallible API when callers need to handle rejection or select a budget.
-    /// This wrapper panics before state mutation if validation fails or the budget is exceeded.
-    pub fn evolve_closed_form_iterative(&mut self, dt: f32, input: &ContinuousHV) {
-        self.try_evolve_closed_form_iterative(dt, input, DEFAULT_MAX_ITERATIVE_SUBSTEPS)
-            .expect("iterative HDC-LTC evolution request rejected");
-    }
     /// Compute derivative dx/dt for given state (used by RK4)
     fn compute_derivative(&self, input: &ContinuousHV, state: &ContinuousHV) -> ContinuousHV {
         // Temporarily use the provided state for equilibrium computation
@@ -2684,91 +2645,6 @@ mod tests {
     // Phase 3: Fourier basis injection tests
     // ═══════════════════════════════════════════════════════════════════
 
-    #[test]
-    fn iterative_checked_api_rejects_invalid_durations_without_mutation() {
-        let config = UnifiedConfig { dimension: 64, ..UnifiedConfig::default() };
-        let input = ContinuousHV::random(64, 123);
-        for dt in [f32::NAN, f32::INFINITY, f32::NEG_INFINITY, -0.01] {
-            let mut neuron = HdcLtcUnifiedNeuron::new(config.clone(), 42);
-            neuron.state_mut().values[0] = 0.25;
-            let state = neuron.state().values.clone();
-            let time = neuron.total_time();
-            let count = neuron.update_count();
-            assert!(matches!(neuron.try_evolve_closed_form_iterative(dt, &input, 100), Err(IterativeEvolutionError::InvalidDuration { .. })));
-            assert_eq!(neuron.state().values, state);
-            assert_eq!(neuron.total_time(), time);
-            assert_eq!(neuron.update_count(), count);
-        }
-    }
-
-    #[test]
-    fn iterative_checked_api_rejects_over_budget_without_mutation() {
-        let config = UnifiedConfig { dimension: 64, tau_base: 0.1, ..UnifiedConfig::default() };
-        let input = ContinuousHV::random(64, 123);
-        let mut neuron = HdcLtcUnifiedNeuron::new(config, 42);
-        neuron.state_mut().values[0] = 0.25;
-        let state = neuron.state().values.clone();
-        let time = neuron.total_time();
-        let count = neuron.update_count();
-        assert!(matches!(neuron.try_evolve_closed_form_iterative(100.0, &input, 9_999), Err(IterativeEvolutionError::SubstepBudgetExceeded { .. })));
-        assert_eq!(neuron.state().values, state);
-        assert_eq!(neuron.total_time(), time);
-        assert_eq!(neuron.update_count(), count);
-    }
-
-    #[test]
-    fn iterative_checked_api_zero_duration_is_noop() {
-        let config = UnifiedConfig { dimension: 64, ..UnifiedConfig::default() };
-        let input = ContinuousHV::random(64, 123);
-        let mut neuron = HdcLtcUnifiedNeuron::new(config, 42);
-        neuron.state_mut().values[0] = 0.25;
-        let state = neuron.state().values.clone();
-        let time = neuron.total_time();
-        let count = neuron.update_count();
-        assert_eq!(neuron.try_evolve_closed_form_iterative(0.0, &input, 100).unwrap(), 0);
-        assert_eq!(neuron.state().values, state);
-        assert_eq!(neuron.total_time(), time);
-        assert_eq!(neuron.update_count(), count);
-    }
-
-    #[test]
-    fn iterative_checked_api_rejects_dimension_mismatch_without_mutation() {
-        let config = UnifiedConfig { dimension: 64, ..UnifiedConfig::default() };
-        let input = ContinuousHV::random(32, 123);
-        let mut neuron = HdcLtcUnifiedNeuron::new(config, 42);
-        let state = neuron.state().values.clone();
-        let time = neuron.total_time();
-        let count = neuron.update_count();
-        assert!(matches!(neuron.try_evolve_closed_form_iterative(0.01, &input, 100), Err(IterativeEvolutionError::DimensionMismatch { field: "input", .. })));
-        assert_eq!(neuron.state().values, state);
-        assert_eq!(neuron.total_time(), time);
-        assert_eq!(neuron.update_count(), count);
-    }
-
-    #[test]
-    fn iterative_checked_api_accepts_valid_request_and_reports_substeps() {
-        let config = UnifiedConfig { dimension: 64, tau_base: 0.1, ..UnifiedConfig::default() };
-        let input = ContinuousHV::random(64, 123);
-        let mut neuron = HdcLtcUnifiedNeuron::new(config, 42);
-        assert_eq!(neuron.try_evolve_closed_form_iterative(0.05, &input, 10).unwrap(), 5);
-        assert_eq!(neuron.update_count(), 1);
-        assert!((neuron.total_time() - 0.05).abs() < 1e-6);
-        assert!(neuron.state().values.iter().all(|value| value.is_finite()));
-    }
-
-    #[test]
-    fn iterative_checked_api_rejects_invalid_tau_before_mutation() {
-        let config = UnifiedConfig { dimension: 64, tau_base: f32::NAN, ..UnifiedConfig::default() };
-        let input = ContinuousHV::random(64, 123);
-        let mut neuron = HdcLtcUnifiedNeuron::new(config, 42);
-        let state = neuron.state().values.clone();
-        let time = neuron.total_time();
-        let count = neuron.update_count();
-        assert!(matches!(neuron.try_evolve_closed_form_iterative(0.01, &input, 100), Err(IterativeEvolutionError::InvalidTauBase { .. })));
-        assert_eq!(neuron.state().values, state);
-        assert_eq!(neuron.total_time(), time);
-        assert_eq!(neuron.update_count(), count);
-    }
     #[test]
     fn test_fourier_basis_empty_config() {
         let neuron = HdcLtcUnifiedNeuron::new(UnifiedConfig::default(), 42);
