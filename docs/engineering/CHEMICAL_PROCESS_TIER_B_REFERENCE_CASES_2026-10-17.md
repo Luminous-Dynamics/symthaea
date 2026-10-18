@@ -139,7 +139,7 @@ Registry invariants:
 - A paired common-mode challenge makes dependency independence testable rather than a self-declared Boolean.
 - Missing outputs, skipped runs, and reference unavailability cannot count as PASS.
 
-This registry has been read back from the branch and structurally checked for parseability, unique IDs, source references, valid result statuses, explicit freeze blockers and non-frozen simulator outputs. Schema v1.2.0 also binds each frozen receipt to a domain-separated SHA-256 over a key-sorted repository-local canonical JSON representation, rejecting stale receipt digests after a field mutation. This is content-integrity checking only, not signer authentication or proof of scientific truth.
+This registry has been read back from the branch and structurally checked for parseability, unique IDs, source references, valid result statuses, explicit freeze blockers and non-frozen simulator outputs. Schema v1.2.0 binds each frozen receipt to a domain-separated SHA-256 over a key-sorted repository-local canonical JSON representation. Schema v1.3.0 additionally binds the complete candidate identity/configuration/run/output/receipt record to a second domain-separated envelope digest, preventing partial field edits from retaining a stale top-level integrity value. This is content-integrity checking only, not signer authentication or proof of scientific truth.
 
 ## Executable registry contract check
 
