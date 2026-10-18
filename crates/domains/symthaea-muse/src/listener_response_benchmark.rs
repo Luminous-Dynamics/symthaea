@@ -12,6 +12,7 @@ use std::collections::{BTreeMap, BTreeSet};
 
 pub const LISTENER_RESPONSE_BENCHMARK_VERSION: &str = "muse-listener-response-benchmark-v2";
 pub const PARTICIPANT_BOOTSTRAP_REPLICATES: usize = 2_000;
+pub const MIN_PARTICIPANTS_FOR_BOOTSTRAP: usize = 10;
 pub const DEFAULT_PERSONAL_PRIOR_STRENGTH: f64 = 3.0;
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, Deserialize)]
@@ -62,7 +63,7 @@ pub struct ParticipantClusterComparison {
     pub median_participant_mae_improvement: Option<f64>,
     pub participants_improved_fraction: Option<f64>,
     /// Percentile interval from participant-resampled cluster bootstrap.
-    /// Absent for fewer than two eligible participants.
+    /// Absent below MIN_PARTICIPANTS_FOR_BOOTSTRAP eligible participants.
     pub bootstrap_confidence_interval_95: Option<[f64; 2]>,
     pub bootstrap_replicates: usize,
     pub bootstrap_seed: u64,
@@ -406,7 +407,7 @@ fn participant_cluster_comparison(
                 / improvements.len() as f64,
         )
     };
-    let (bootstrap_replicates, confidence_interval) = if improvements.len() >= 2 {
+    let (bootstrap_replicates, confidence_interval) = if improvements.len() >= MIN_PARTICIPANTS_FOR_BOOTSTRAP {
         (
             PARTICIPANT_BOOTSTRAP_REPLICATES,
             Some(participant_bootstrap_ci(
@@ -441,7 +442,7 @@ fn median_sorted(sorted: &[f64]) -> Option<f64> {
 }
 
 fn participant_bootstrap_ci(values: &[f64], replicates: usize, seed: u64) -> [f64; 2] {
-    debug_assert!(values.len() >= 2);
+    debug_assert!(values.len() >= MIN_PARTICIPANTS_FOR_BOOTSTRAP);
     debug_assert!(replicates > 0);
     let mut rng = SplitMix64::new(seed);
     let mut draws = Vec::with_capacity(replicates);
@@ -661,37 +662,78 @@ mod tests {
 
     #[test]
     fn participant_bootstrap_counts_listeners_not_just_episodes() {
-        let records = vec![
-            episode("train-a", "p1", 1, 1, 1, 0.0, 0.1),
-            episode("train-b", "p2", 1, 1, 2, 0.0, 0.2),
-            episode("train-c", "p3", 1, 1, 3, 0.0, 0.3),
-            episode("train-d", "p4", 1, 1, 4, 0.0, 0.4),
-            episode("test-a", "p1", 2, 1, 5, 0.0, 0.1),
-            episode("test-b", "p2", 2, 1, 6, 0.0, 0.2),
-            episode("test-c", "p3", 2, 1, 7, 0.0, 0.3),
-            episode("test-d", "p4", 2, 1, 8, 0.0, 0.4),
-        ];
+        let mut records = Vec::new();
+        for index in 0..12u64 {
+            let id = index + 1;
+            let delta = (index as f32 + 1.0) / 100.0;
+            records.push(episode(
+                &format!("train-{id}"),
+                &format!("p{id}"),
+                1,
+                1,
+                id,
+                0.0,
+                delta,
+            ));
+            records.push(episode(
+                &format!("test-{id}"),
+                &format!("p{id}"),
+                2,
+                1,
+                id + 12,
+                0.0,
+                delta,
+            ));
+        }
         let split = TemporalHoldoutSplit {
-            training_through_sequence: 4,
-            testing_from_sequence: 5,
+            training_through_sequence: 12,
+            testing_from_sequence: 13,
         };
         let report = evaluate_temporal_holdout(&records, split, 3.0).unwrap();
-        let valence = report.channels.iter()
-            .find(|row| row.channel == ResponseChannel::Valence).unwrap();
-        let no_change = valence.participant_cluster_comparisons.iter()
-            .find(|comparison| comparison.comparator == BaselineComparator::NoChange).unwrap();
-        assert_eq!(no_change.participants, 4);
-        assert_eq!(no_change.matched_test_observations, 4);
+        let valence = report
+            .channels
+            .iter()
+            .find(|row| row.channel == ResponseChannel::Valence)
+            .unwrap();
+        let no_change = valence
+            .participant_cluster_comparisons
+            .iter()
+            .find(|comparison| comparison.comparator == BaselineComparator::NoChange)
+            .unwrap();
+        assert_eq!(no_change.participants, 12);
+        assert_eq!(no_change.matched_test_observations, 12);
         assert_eq!(no_change.participants_improved_fraction, Some(1.0));
         assert!(no_change.bootstrap_confidence_interval_95.unwrap()[0] > 0.0);
         assert_eq!(no_change.bootstrap_replicates, PARTICIPANT_BOOTSTRAP_REPLICATES);
-        assert_eq!(no_change.bootstrap_seed,
-            valence.participant_cluster_comparisons[0].bootstrap_seed);
+    }
+
+    #[test]
+    fn small_participant_count_suppresses_interval() {
+        let mut grouped = BTreeMap::new();
+        for (index, effect) in [0.1, 0.2, 0.3].iter().enumerate() {
+            grouped.insert(
+                format!("p{index}"),
+                ParticipantErrors {
+                    no_change: vec![*effect],
+                    population_delta: vec![*effect],
+                    personal_history: vec![0.0],
+                },
+            );
+        }
+        let result = participant_cluster_comparison(
+            &grouped,
+            BaselineComparator::NoChange,
+            99,
+        );
+        assert_eq!(result.participants, 3);
+        assert_eq!(result.bootstrap_confidence_interval_95, None);
+        assert_eq!(result.bootstrap_replicates, 0);
+        assert!((result.mean_participant_mae_improvement.unwrap() - 0.2).abs() < 1e-9);
     }
 
     #[test]
     fn bootstrap_is_deterministic_and_empty_clusters_have_no_interval() {
-        let values = [0.1, 0.2, 0.3, 0.4];
+        let values: Vec<f64> = (1..=12).map(|value| value as f64 / 100.0).collect();
         let first = participant_bootstrap_ci(&values, 500, 1234);
         let second = participant_bootstrap_ci(&values, 500, 1234);
         assert_eq!(first, second);
