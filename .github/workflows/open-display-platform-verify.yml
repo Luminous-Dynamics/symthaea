@@ -100,7 +100,28 @@ jobs:
           check_bounds "$RUNNER_TEMP/odrh-default.stl" 80 5 80
           check_bounds "$RUNNER_TEMP/odrh-alternate.stl" 100 5 60
 
+          receipt="hardware/open-display-reference/validation/odrh_sensor_plate_cad_check-v0.1.json"
           cad="hardware/open-display-reference/cad/odrh_sensor_interface_plate.scad"
+          expected_source_sha="$(jq -r '.source_revision.sha256' "$receipt")"
+          actual_source_sha="$(sha256sum "$cad" | awk '{print $1}')"
+          test "$actual_source_sha" = "$expected_source_sha"
+
+          expected_tool_version="$(jq -r '.tool.version' "$receipt")"
+          actual_tool_version="$(openscad --version | sed -n 's/^OpenSCAD version //p')"
+          test "$actual_tool_version" = "$expected_tool_version"
+
+          check_triangle_count() {
+            local file="$1" check_id="$2"
+            local expected actual
+            expected="$(jq -r --arg id "$check_id" \
+              '.checks[] | select(.id == $id) | .triangle_count' "$receipt")"
+            actual="$(grep -cE '^[[:space:]]*facet normal' "$file")"
+            echo "$check_id expected triangles=$expected observed triangles=$actual"
+            test "$actual" = "$expected"
+          }
+          check_triangle_count "$RUNNER_TEMP/odrh-default.stl" "ODRH-CAD-DEFAULT-EXPORT"
+          check_triangle_count "$RUNNER_TEMP/odrh-alternate.stl" "ODRH-CAD-ALTERNATE-DIMENSIONS"
+
           if openscad -D 'sensor_aperture_d_mm=100' \
             -o "$RUNNER_TEMP/odrh-invalid.stl" "$cad" \
             > "$RUNNER_TEMP/odrh-invalid.log" 2>&1; then
@@ -109,6 +130,24 @@ jobs:
           fi
           grep -F "Sensor aperture overlaps the diagonal mounting-hole envelope" \
             "$RUNNER_TEMP/odrh-invalid.log"
+
+          if openscad -D 'mount_pitch_x_mm=100' \
+            -o "$RUNNER_TEMP/odrh-invalid-pitch.stl" "$cad" \
+            > "$RUNNER_TEMP/odrh-invalid-pitch.log" 2>&1; then
+            echo "Invalid mount-pitch override unexpectedly rendered"
+            exit 1
+          fi
+          grep -F "Horizontal mounting-hole grid violates edge margin" \
+            "$RUNNER_TEMP/odrh-invalid-pitch.log"
+
+          if openscad -D 'plate_thickness_mm=0.5' \
+            -o "$RUNNER_TEMP/odrh-invalid-thickness.stl" "$cad" \
+            > "$RUNNER_TEMP/odrh-invalid-thickness.log" 2>&1; then
+            echo "Invalid plate-thickness override unexpectedly rendered"
+            exit 1
+          fi
+          grep -F "Counterbore depth must be smaller than plate thickness" \
+            "$RUNNER_TEMP/odrh-invalid-thickness.log"
 
       - name: Check formatting
         run: cargo fmt --manifest-path tools/open-display-platform-verify/Cargo.toml -- --check
