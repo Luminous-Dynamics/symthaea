@@ -910,7 +910,7 @@ fn asset_root_content_manifest_sha256(
     entries: &[(String, u64)],
 ) -> io::Result<String> {
     let mut manifest = Sha256::new();
-    manifest.update(b"muse-asset-root-content-manifest-v1\\0");
+    manifest.update(b"muse-asset-root-content-manifest-v1\0");
     let mut buffer = [0_u8; 64 * 1024];
     for (relative_path, expected_size) in entries {
         manifest.update((relative_path.len() as u64).to_le_bytes());
@@ -1082,10 +1082,52 @@ mod tests {
     use super::*;
     use serde_json::json;
 
-    fn fixtures() -> (Value, Value) {
+    struct TestAssets {
+        base: PathBuf,
+        vcsl_root: PathBuf,
+        vsco2_root: PathBuf,
+        sample_wav: PathBuf,
+    }
+
+    impl Drop for TestAssets {
+        fn drop(&mut self) {
+            let _ = std::fs::remove_dir_all(&self.base);
+        }
+    }
+
+    fn fixtures() -> (Value, Value, TestAssets) {
+        let nonce = std::time::SystemTime::now()
+            .duration_since(std::time::UNIX_EPOCH)
+            .unwrap_or_default()
+            .as_nanos();
+        let base = std::env::temp_dir().join(format!(
+            "muse-provenance-assets-{}-{nonce}",
+            std::process::id()
+        ));
+        let vcsl_root = base.join("vcsl");
+        let vsco2_root = base.join("vsco2_ce");
+        let sample_wav = vcsl_root.join("Piano").join("sample_C4.wav");
+        std::fs::create_dir_all(sample_wav.parent().expect("sample parent"))
+            .expect("VCSL fixture should be created");
+        std::fs::create_dir_all(&vsco2_root).expect("VSCO2 fixture should be created");
+        std::fs::write(&sample_wav, b"sample-WAV-content-for-provenance-test")
+            .expect("source sample fixture should be written");
+
+        let source_file_sha256 = file_sha256(&sample_wav)
+            .expect("source sample fixture should hash")
+            .0;
+        let vcsl_observation = observe_asset_root(&vcsl_root);
+        let vsco2_observation = observe_asset_root(&vsco2_root);
+        let vcsl_digest = vcsl_observation
+            .content_manifest_sha256
+            .clone()
+            .expect("VCSL root should hash");
+        let vsco2_digest = vsco2_observation
+            .content_manifest_sha256
+            .clone()
+            .expect("VSCO2 root should hash");
         let revision = "a".repeat(40);
         let bank_digest = "b".repeat(64);
-        let root_digest = "c".repeat(64);
         let probe = json!({
             "schema_version": "melothaea.instrument-probe.v4",
             "source_revision": revision,
@@ -1104,7 +1146,7 @@ mod tests {
                 "selected_sample": {
                     "source_library": "vcsl",
                     "source_relative_path": "Piano/sample_C4.wav",
-                    "source_file_sha256": "f".repeat(64),
+                    "source_file_sha256": source_file_sha256,
                     "source_bank_content_manifest_sha256": bank_digest,
                     "source_bank_manifest_status": "hashed"
                 }
@@ -1123,13 +1165,15 @@ mod tests {
             "root_content_manifest_hashing_enabled": true,
             "vcsl_root": {
                 "root_present": true,
+                "wav_file_count": vcsl_observation.wav_file_count.unwrap(),
                 "content_manifest_status": "hashed",
-                "content_manifest_sha256": root_digest
+                "content_manifest_sha256": vcsl_digest
             },
             "vsco2_root": {
                 "root_present": true,
+                "wav_file_count": vsco2_observation.wav_file_count.unwrap(),
                 "content_manifest_status": "hashed",
-                "content_manifest_sha256": root_digest
+                "content_manifest_sha256": vsco2_digest
             },
             "instruments": [{
                 "instrument": "Piano",
@@ -1138,10 +1182,20 @@ mod tests {
                 "additional_sample_styles": []
             }]
         });
-        (probe, inventory)
+        (
+            probe,
+            inventory,
+            TestAssets { base, vcsl_root, vsco2_root, sample_wav },
+        )
     }
 
-    fn test_report(probe: &Value, inventory: &Value) -> VerificationReport {
+    fn test_report(
+        probe: &Value,
+        inventory: &Value,
+        assets: &TestAssets,
+    ) -> VerificationReport {
+        let vcsl_observation = observe_asset_root(&assets.vcsl_root);
+        let vsco2_observation = observe_asset_root(&assets.vsco2_root);
         verify_reports(
             probe,
             inventory,
@@ -1150,13 +1204,15 @@ mod tests {
             "d".repeat(64),
             4096,
             "muse_instrument_probe",
+            &vcsl_observation,
+            &vsco2_observation,
         )
     }
 
     #[test]
     fn verifies_matching_revision_executable_roots_and_source_bank_digest() {
-        let (probe, inventory) = fixtures();
-        let report = test_report(&probe, &inventory);
+        let (probe, inventory, assets) = fixtures();
+        let report = test_report(&probe, &inventory, &assets);
         assert_eq!(report.verdict, "consistent");
         assert_eq!(report.root_content_manifests_verified, 2);
         assert_eq!(report.selected_samples_total, 1);
@@ -1169,9 +1225,9 @@ mod tests {
 
     #[test]
     fn mismatched_supplied_binary_is_rejected_even_when_report_sha_is_well_formed() {
-        let (mut probe, inventory) = fixtures();
+        let (mut probe, inventory, assets) = fixtures();
         probe["renderer_binary_sha256"] = serde_json::json!("9".repeat(64));
-        let report = test_report(&probe, &inventory);
+        let report = test_report(&probe, &inventory, &assets);
         assert_eq!(report.verdict, "inconsistent");
         assert!(!report.renderer_binary_identity_verified);
         assert!(report.findings.iter().any(|finding| finding.code == "renderer_binary_digest_mismatch"));
@@ -1179,28 +1235,28 @@ mod tests {
 
     #[test]
     fn same_schema_with_a_conflicting_bank_digest_is_rejected() {
-        let (probe, mut inventory) = fixtures();
+        let (probe, mut inventory, assets) = fixtures();
         inventory["instruments"][0]["sustained_samples"]
             ["indexed_sample_content_manifest_sha256"] = json!("9".repeat(64));
-        let report = test_report(&probe, &inventory);
+        let report = test_report(&probe, &inventory, &assets);
         assert_eq!(report.verdict, "inconsistent");
         assert!(report.findings.iter().any(|finding| finding.code == "source_bank_manifest_mismatch"));
     }
 
     #[test]
     fn different_source_revisions_are_rejected() {
-        let (probe, mut inventory) = fixtures();
+        let (probe, mut inventory, assets) = fixtures();
         inventory["source_revision"] = json!("1".repeat(40));
-        let report = test_report(&probe, &inventory);
+        let report = test_report(&probe, &inventory, &assets);
         assert_eq!(report.verdict, "inconsistent");
         assert!(report.findings.iter().any(|finding| finding.code == "source_revision_mismatch"));
     }
 
     #[test]
     fn unavailable_source_revision_status_is_incomplete_not_mislabeled_as_mismatch() {
-        let (mut probe, inventory) = fixtures();
+        let (mut probe, inventory, assets) = fixtures();
         probe["source_revision_status"] = json!("unavailable");
-        let report = test_report(&probe, &inventory);
+        let report = test_report(&probe, &inventory, &assets);
         assert_eq!(report.verdict, "incomplete");
         assert!(report.findings.iter().any(|finding| finding.code == "source_revision_status_untrusted"));
         assert!(!report.findings.iter().any(|finding| finding.code == "source_revision_mismatch"));
@@ -1208,10 +1264,10 @@ mod tests {
 
     #[test]
     fn missing_root_manifest_is_incomplete_not_a_pass() {
-        let (probe, mut inventory) = fixtures();
+        let (probe, mut inventory, assets) = fixtures();
         inventory["vcsl_root"]["content_manifest_status"] = json!("not_requested");
         inventory["vcsl_root"]["content_manifest_sha256"] = Value::Null;
-        let report = test_report(&probe, &inventory);
+        let report = test_report(&probe, &inventory, &assets);
         assert_eq!(report.verdict, "incomplete");
         assert!(report.findings.iter().any(|finding| finding.code == "root_manifest_incomplete"));
     }
@@ -1243,7 +1299,7 @@ mod tests {
 
     #[test]
     fn style_bank_receipts_can_be_matched_to_the_inventory() {
-        let (probe, mut inventory) = fixtures();
+        let (probe, mut inventory, assets) = fixtures();
         inventory["instruments"][0]["sustained_samples"] = Value::Null;
         inventory["instruments"][0]["additional_sample_styles"] = json!([{
             "style_name": "normal",
@@ -1254,7 +1310,7 @@ mod tests {
                 "indexed_sample_content_manifest_sha256": "b".repeat(64)
             }
         }]);
-        let report = test_report(&probe, &inventory);
+        let report = test_report(&probe, &inventory, &assets);
         assert_eq!(report.verdict, "consistent");
         assert_eq!(report.selected_samples_with_matching_inventory_bank_digest, 1);
     }
