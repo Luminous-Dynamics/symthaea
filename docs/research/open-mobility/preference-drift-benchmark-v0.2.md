@@ -170,9 +170,8 @@ A passing deterministic fixture can establish only that a particular implementat
 
 Sequence:
 1. Freeze the freshness-bounded fixture v2 contract and expected behavior.
-2. Run the Rust unit tests and workspace checks on an environment with the Rust toolchain; record exact source revision and actual output.
-3. Expand the source corpus with independently authored task and environment families and more wearer/session strata; preserve grouped holdouts and publish factor coverage so repeated template variants are not mistaken for independent conditions.
-4. Run the interaction-budget frontier over the generated suite and publish the exact seed/config/digest with per-family counts; compare the two question selectors without treating synthetic response counts as human interaction-time estimates.
-5. Add a Pareto-plus-query/abstention baseline that reuses the existing engineering feasibility/Pareto interfaces and never uses evaluation-oracle labels to rank questions.
-6. Run Rust/workspace tests on an environment with the toolchain and preserve exact-head execution evidence.
-7. Only after offline qualification, design a separate human study with appropriate protocol, consent/ethics, safety review, calibrated instrumentation, and real measures of task utility, comfort, exertion, and interaction burden.
+2. Expand the source corpus with independently authored task and environment families and more wearer/session strata; preserve grouped holdouts and publish factor coverage so repeated template variants are not mistaken for independent conditions.
+3. Run the interaction-budget frontier over the generated suite and publish the exact seed/config/digest with per-family counts; compare the two question selectors without treating synthetic response counts as human interaction-time estimates.
+4. Add a Pareto-plus-query/abstention baseline that reuses the existing engineering feasibility/Pareto interfaces and never uses evaluation-oracle labels to rank questions.
+5. Run Rust/workspace tests on an environment with the toolchain and preserve exact-head execution evidence.
+6. Only after offline qualification, design a separate human study with appropriate protocol, consent/ethics, safety review, calibrated instrumentation, and real measures of task utility, comfort, exertion, and interaction burden.
