@@ -6,12 +6,12 @@
   "execution": {
     "date": "2026-10-18",
     "command": "benchmarks/rea-coverage/v1/verify.sh",
-    "case_count": 15,
+    "case_count": 16,
     "accepted_consistent_reports": 5,
     "rejected_inconsistent_reports": 8,
     "invalid_input_cases": 1,
-    "malformed_report_cases": 1,
-    "result": "All 14 observed dispositions matched the independent expected_dispositions oracle."
+    "malformed_report_cases": 2,
+    "result": "All 16 observed dispositions matched the independent expected_dispositions oracle."
   },
   "environment": {
     "os_kernel": "Linux x86_64, kernel 6.18.55",
@@ -22,20 +22,20 @@
   },
   "files": {
     "cases.json": {
-      "sha256": "6b0fb4bf8926d25c2398d608ab9484f960e2cc4d7212e014972412fa66da6f53",
-      "git_blob_sha1": "ca9504dc6383a8411e2ca839188723bd90825a88"
+      "sha256": "39861e671ff0a204b75c69b35c8f44518558b66588e3815016382ade6d6bfbdd",
+      "git_blob_sha1": "999bcc970952da82da0957f50447519d22ee066b"
     },
     "oracle.json": {
-      "sha256": "5912f38b5ba58c7af4cccfd0c57e7b7d8dc7c136029a4d7938442ee9772fd82d",
-      "git_blob_sha1": "ed82eddbb4309e39b76bbe34e9160658a59c9667"
+      "sha256": "0489e9c36d81041a34a61abdc1ed31b37aeb94a9e1076452d6019ef7fe46ab0c",
+      "git_blob_sha1": "67d6cd533ebc4a878c8c32e687952a6fdb38f9d6"
     },
     "verify.sh": {
-      "sha256": "cc0a03aee18170fcb5a1913daca3ac666dc85c09d0a0b5127f8419a6f742cffb",
-      "git_blob_sha1": "e7458fdc4ef082473daf22bedcf1f0cfb1d61aea"
+      "sha256": "4d108d207f5be73e39c5f1e7484c50670b0e3d2502ebc5ad7909c21762712261",
+      "git_blob_sha1": "cce1b5f76b23aec37d2c2f58b83d7ea9ffd4ba5b"
     },
     "README.md": {
-      "sha256": "90b1e2ac6e455d89a03747fbc06b8a3953a9de55eef7183695d9bdf14b7bfc3e",
-      "git_blob_sha1": "59f185014f0a3650ff538e913ebcfbf617554dd6"
+      "sha256": "c308554da276dbaef647450b3deabf2581dd774273e48d458da98fbfeda3ff06",
+      "git_blob_sha1": "8e113daf83fbc9ed24b25bac10d6c687fa21acf5"
     }
   },
   "upstream_observation": {
