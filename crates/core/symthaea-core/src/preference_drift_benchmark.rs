@@ -247,6 +247,7 @@ pub fn validate_preference_drift_fixture(
     };
     let mut scenario_ids = HashSet::<String>::with_capacity(scenarios.len());
     let mut observation_ids = HashSet::<String>::new();
+    let mut family_splits = HashMap::<String, String>::new();
     let mut development_count = 0usize;
     let mut held_out_count = 0usize;
     let mut observation_count = 0usize;
@@ -269,7 +270,8 @@ pub fn validate_preference_drift_fixture(
                 "missing non-empty scenario ID",
             ),
         }
-        if nonempty_string(scenario, "scenario_family").is_none() {
+        let family = nonempty_string(scenario, "scenario_family");
+        if family.is_none() {
             finding(
                 &mut findings,
                 format!("{path}.scenario_family"),
@@ -284,7 +286,8 @@ pub fn validate_preference_drift_fixture(
             );
         }
 
-        match scenario.get("split").and_then(Value::as_str) {
+        let split = scenario.get("split").and_then(Value::as_str);
+        match split {
             Some("development") => development_count += 1,
             Some("held_out") => held_out_count += 1,
             _ => finding(
@@ -292,6 +295,21 @@ pub fn validate_preference_drift_fixture(
                 format!("{path}.split"),
                 "split must be development or held_out",
             ),
+        }
+        if let (Some(family), Some(split @ ("development" | "held_out"))) = (family, split) {
+            if let Some(previous_split) = family_splits.get(&family) {
+                if previous_split != split {
+                    finding(
+                        &mut findings,
+                        format!("{path}.scenario_family"),
+                        format!(
+                            "scenario family `{family}` leaks across {previous_split} and {split} splits"
+                        ),
+                    );
+                }
+            } else {
+                family_splits.insert(family, split.to_owned());
+            }
         }
 
         let eligible = match string_array(scenario, "eligible_candidate_ids") {
@@ -508,6 +526,15 @@ pub fn validate_preference_drift_fixture(
                         &format!("{path}.evaluation_oracle.acceptable_candidate_ids"),
                         &mut findings,
                     );
+                    for candidate_id in &accepted {
+                        if !eligible.contains(candidate_id) {
+                            finding(
+                                &mut findings,
+                                format!("{path}.evaluation_oracle.acceptable_candidate_ids"),
+                                format!("oracle marks ineligible candidate `{candidate_id}` acceptable"),
+                            );
+                        }
+                    }
                     if status == Some("ranking") && order.is_empty() {
                         finding(
                             &mut findings,
@@ -638,8 +665,8 @@ mod tests {
     #[test]
     fn duplicate_scenario_identity_is_rejected() {
         let mut value = parse_fixture();
-        value["scenarios"][1]["scenario_id"] =
-            value["scenarios"][0]["scenario_id"].clone();
+        let duplicate_id = value["scenarios"][0]["scenario_id"].clone();
+        value["scenarios"][1]["scenario_id"] = duplicate_id;
         let findings = validate_preference_drift_fixture(&encode(&value)).unwrap_err();
         assert!(findings.iter().any(|item| item.reason.contains("duplicate scenario ID")));
     }
