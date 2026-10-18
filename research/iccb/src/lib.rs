@@ -10,6 +10,7 @@ pub mod fixtures;
 pub mod policy;
 pub mod robust_decision;
 pub mod staging;
+pub mod uncertainty_contract;
 pub mod value_of_information;
 
 #[derive(Clone, Copy, Debug, PartialEq, Eq)]
