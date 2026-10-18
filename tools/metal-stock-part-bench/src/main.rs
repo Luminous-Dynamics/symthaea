@@ -389,7 +389,9 @@ fn evaluate_scenario(scenario: &Scenario, mass_tolerance_ppm: u64) -> ScenarioRe
 
 fn source_commit_from_args(args: &[String]) -> Check<String> {
     if args.len() != 4 || args[2] != "--source-commit" {
-        return Err("usage: metal-stock-part-bench <corpus.json> --source-commit <40-hex-sha>".to_owned());
+        return Err(
+            "usage: metal-stock-part-bench <corpus.json> --source-commit <40-hex-sha>".to_owned(),
+        );
     }
     let source_commit = args[3].to_ascii_lowercase();
     if source_commit.len() != 40
@@ -405,7 +407,9 @@ fn source_commit_from_args(args: &[String]) -> Check<String> {
 fn run() -> Check<ExitCode> {
     let args: Vec<String> = env::args().collect();
     if args.len() != 4 {
-        return Err("usage: metal-stock-part-bench <corpus.json> --source-commit <40-hex-sha>".to_owned());
+        return Err(
+            "usage: metal-stock-part-bench <corpus.json> --source-commit <40-hex-sha>".to_owned(),
+        );
     }
     let source_commit = source_commit_from_args(&args)?;
     let bytes = fs::read(&args[1]).map_err(|error| format!("cannot read corpus: {error}"))?;
