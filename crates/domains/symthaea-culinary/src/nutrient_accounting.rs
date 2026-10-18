@@ -85,11 +85,36 @@ fn timestamp_looks_rfc3339(value: &str) -> bool {
     {
         return false;
     }
-    for (start, end) in [(0, 4), (5, 7), (8, 10), (11, 13), (14, 16), (17, 19)] {
-        if !bytes[start..end].iter().all(|byte| byte.is_ascii_digit()) {
-            return false;
-        }
+    let parse = |start: usize, end: usize| {
+        std::str::from_utf8(&bytes[start..end])
+            .ok()
+            .and_then(|text| text.parse::<u32>().ok())
+    };
+    let (Some(year), Some(month), Some(day), Some(hour), Some(minute), Some(second)) = (
+        parse(0, 4), parse(5, 7), parse(8, 10),
+        parse(11, 13), parse(14, 16), parse(17, 19),
+    ) else {
+        return false;
+    };
+    if !(1..=12).contains(&month)
+        || hour > 23
+        || minute > 59
+        || second > 60
+    {
+        return false;
     }
+    let leap_year = year % 400 == 0 || (year % 4 == 0 && year % 100 != 0);
+    let days_in_month = match month {
+        1 | 3 | 5 | 7 | 8 | 10 | 12 => 31,
+        4 | 6 | 9 | 11 => 30,
+        2 if leap_year => 29,
+        2 => 28,
+        _ => return false,
+    };
+    if day == 0 || day > days_in_month {
+        return false;
+    }
+
     let timezone_start = if bytes.last() == Some(&b'Z') {
         bytes.len() - 1
     } else {
@@ -98,14 +123,22 @@ fn timestamp_looks_rfc3339(value: &str) -> bool {
         }
         let start = bytes.len() - 6;
         if !matches!(bytes[start], b'+' | b'-')
-            || !bytes[start + 1..start + 3].iter().all(|byte| byte.is_ascii_digit())
             || bytes[start + 3] != b':'
-            || !bytes[start + 4..start + 6].iter().all(|byte| byte.is_ascii_digit())
         {
+            return false;
+        }
+        let (Some(offset_hour), Some(offset_minute)) = (
+            parse(start + 1, start + 3),
+            parse(start + 4, start + 6),
+        ) else {
+            return false;
+        };
+        if offset_hour > 23 || offset_minute > 59 {
             return false;
         }
         start
     };
+
     if timezone_start == 19 {
         return true;
     }
