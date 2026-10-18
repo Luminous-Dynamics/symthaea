@@ -37,6 +37,7 @@ const DEFAULT_TOL: f64 = 1e-8;
 const MAX_STEPS: usize = 100_000;
 const MAX_DENSE_NEWTON_DIM: usize = 64;
 const MAX_IMPLICIT_RHS_EVALUATIONS: usize = 1_000_000;
+const MAX_IMPLICIT_JACOBIAN_EVALUATIONS: usize = 1_000_000;
 const MAX_IMPLICIT_NEWTON_WORK_UNITS: usize = 100_000_000;
 const MAX_NEWTON_ITERATIONS_PER_STEP: usize = 100;
 
@@ -78,6 +79,12 @@ pub struct ODESystem {
     pub dim: usize,
 }
 
+/// Optional analytical Jacobian callback for an ODE system.
+///
+/// Return the row-major flattened matrix df_i/dy_j with exactly dim * dim
+/// finite entries. Supplying a Jacobian avoids finite-difference RHS probes.
+pub type ODEJacobian = fn(f64, &[f64]) -> Vec<f64>;
+
 /// Result of an initial-value-problem solve.
 #[derive(Debug, Clone)]
 pub struct ODEResult {
@@ -116,8 +123,11 @@ pub struct ImplicitEulerSolveReport {
     pub trajectory: ODEResult,
     /// Number of Newton corrections applied across all accepted steps.
     pub newton_corrections: usize,
-    /// Number of right-hand-side evaluations, including finite-difference probes.
+    /// Number of RHS evaluations. With the finite-difference path, this includes
+    /// RHS probes used to approximate the Jacobian.
     pub rhs_evaluations: usize,
+    /// Number of analytical Jacobian callback evaluations (zero for finite differences).
+    pub jacobian_evaluations: usize,
     /// Largest normalized nonlinear residual among accepted steps.
     pub max_normalized_residual: f64,
     /// Estimated dense linear-algebra work units (dimension cubed per correction).
@@ -140,6 +150,9 @@ pub enum ImplicitEulerErrorKind {
     RhsDimensionMismatch { stage: &'static str, expected: usize, actual: usize },
     NonFiniteRhs { stage: &'static str, index: usize },
     RhsEvaluationBudgetExceeded { max_evaluations: usize },
+    JacobianEvaluationBudgetExceeded { max_evaluations: usize },
+    JacobianDimensionMismatch { expected: usize, actual: usize },
+    NonFiniteProvidedJacobian { index: usize },
     NonFinitePredictor { index: usize },
     NonFiniteResidual { index: usize },
     NonFiniteJacobian { row: usize, column: usize },
@@ -162,6 +175,7 @@ pub struct ImplicitEulerError {
     pub failed_step: usize,
     pub newton_corrections: usize,
     pub rhs_evaluations: usize,
+    pub jacobian_evaluations: usize,
     pub residual_norm: f64,
 }
 
@@ -203,6 +217,7 @@ impl ImplicitEulerError {
             failed_step,
             newton_corrections,
             rhs_evaluations,
+            jacobian_evaluations: 0,
             residual_norm,
         }
     }
@@ -341,6 +356,7 @@ pub struct AdaptiveImplicitEulerReport {
     pub max_normalized_newton_residual: f64,
     pub newton_corrections: usize,
     pub rhs_evaluations: usize,
+    pub jacobian_evaluations: usize,
     pub estimated_dense_work_units: usize,
     /// Number of attempted macro-steps, accepted or rejected.
     pub attempts: usize,
@@ -365,6 +381,9 @@ pub enum AdaptiveImplicitEulerErrorKind {
     DenseWorkBudgetExceeded { max_work_units: usize },
     StepSolveFailed { cause: ImplicitEulerErrorKind },
     NonFiniteToleranceScale { index: usize },
+    JacobianEvaluationBudgetExceeded { max_evaluations: usize },
+    JacobianDimensionMismatch { expected: usize, actual: usize },
+    NonFiniteProvidedJacobian { index: usize },
     NonFiniteStepDoublingError,
     StepSizeUnderflow { attempted_step: f64 },
 }
@@ -380,6 +399,7 @@ pub struct AdaptiveImplicitEulerError {
     pub attempts: usize,
     pub newton_corrections: usize,
     pub rhs_evaluations: usize,
+    pub jacobian_evaluations: usize,
     pub estimated_dense_work_units: usize,
     pub max_normalized_newton_residual: f64,
 }
@@ -426,6 +446,7 @@ impl std::error::Error for AdaptiveImplicitEulerError {}
 struct AdaptiveImplicitEulerWork {
     newton_corrections: usize,
     rhs_evaluations: usize,
+    jacobian_evaluations: usize,
     estimated_dense_work_units: usize,
 }
 
@@ -433,6 +454,8 @@ impl AdaptiveImplicitEulerWork {
     fn record_report(&mut self, report: &ImplicitEulerSolveReport) {
         self.newton_corrections = self.newton_corrections.saturating_add(report.newton_corrections);
         self.rhs_evaluations = self.rhs_evaluations.saturating_add(report.rhs_evaluations);
+        self.jacobian_evaluations = self.jacobian_evaluations
+            .saturating_add(report.jacobian_evaluations);
         self.estimated_dense_work_units = self
             .estimated_dense_work_units
             .saturating_add(report.estimated_dense_work_units);
@@ -441,6 +464,8 @@ impl AdaptiveImplicitEulerWork {
     fn record_error(&mut self, error: &ImplicitEulerError, dimension: usize) {
         self.newton_corrections = self.newton_corrections.saturating_add(error.newton_corrections);
         self.rhs_evaluations = self.rhs_evaluations.saturating_add(error.rhs_evaluations);
+        self.jacobian_evaluations = self.jacobian_evaluations
+            .saturating_add(error.jacobian_evaluations);
         let per_correction = dimension.saturating_mul(dimension).saturating_mul(dimension);
         self.estimated_dense_work_units = self
             .estimated_dense_work_units
@@ -451,6 +476,10 @@ impl AdaptiveImplicitEulerWork {
         if self.rhs_evaluations > MAX_IMPLICIT_RHS_EVALUATIONS {
             Some(AdaptiveImplicitEulerErrorKind::RhsEvaluationBudgetExceeded {
                 max_evaluations: MAX_IMPLICIT_RHS_EVALUATIONS,
+            })
+        } else if self.jacobian_evaluations > MAX_IMPLICIT_JACOBIAN_EVALUATIONS {
+            Some(AdaptiveImplicitEulerErrorKind::JacobianEvaluationBudgetExceeded {
+                max_evaluations: MAX_IMPLICIT_JACOBIAN_EVALUATIONS,
             })
         } else if self.estimated_dense_work_units > MAX_IMPLICIT_NEWTON_WORK_UNITS {
             Some(AdaptiveImplicitEulerErrorKind::DenseWorkBudgetExceeded {
