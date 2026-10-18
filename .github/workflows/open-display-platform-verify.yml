@@ -12,7 +12,7 @@ on:
       - "docs/engineering/OPEN_DISPLAY_HARDWARE_REUSE_CANDIDATES.md"
       - "docs/engineering/DISPLAY_METROLOGY_REPRODUCIBILITY_PROTOCOL.md"
       - "docs/engineering/display-measurement-run-template-v0.1.json"
-      - "docs/engineering/display-measurement-run-template.schema.json"
+      - "docs/engineering/display-measurement-run.schema.json"
       - "hardware/open-display-reference/**"
       - "docs/engineering/open-display-reference-platform-v0.1.json"
       - "docs/engineering/open-display-reference-platform.schema.json"
