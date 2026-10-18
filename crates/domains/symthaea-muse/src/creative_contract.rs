@@ -440,6 +440,51 @@ mod tests {
         assert!(audit.violations.contains(&CreativeContractViolation::InvalidNote { index: 0 }));
     }
 
+
+    #[test]
+    fn chord_tones_within_one_millisecond_count_as_one_onset() {
+        let notes = vec![
+            note(440.0, 0.0),
+            note(523.25, 0.0005),
+            note(392.0, 0.5),
+        ];
+        let contract = CreativeIntentContractV1 {
+            min_note_count: 1,
+            min_distinct_pitches: 1,
+            min_pitch_range_semitones: 0.0,
+            min_active_window_ratio: 0.0,
+            max_dominant_pitch_share: 1.0,
+            window_count: 4,
+        };
+        let audit = audit_candidate(&notes, 1.0, &contract);
+        assert_eq!(audit.distinct_onset_count, 2);
+        assert_eq!(audit.onset_interval_cv, 0.0);
+    }
+
+    #[test]
+    fn interval_variability_is_descriptive_and_deterministic() {
+        let contract = CreativeIntentContractV1 {
+            min_note_count: 1,
+            min_distinct_pitches: 1,
+            min_pitch_range_semitones: 0.0,
+            min_active_window_ratio: 0.0,
+            max_dominant_pitch_share: 1.0,
+            window_count: 4,
+        };
+        let regular: Vec<Note> = [0.0, 0.25, 0.5, 0.75]
+            .iter()
+            .map(|&start| note(440.0, start))
+            .collect();
+        let irregular: Vec<Note> = [0.0, 0.1, 0.4, 1.0]
+            .iter()
+            .map(|&start| note(440.0, start))
+            .collect();
+        let regular_audit = audit_candidate(&regular, 1.0, &contract);
+        let irregular_audit = audit_candidate(&irregular, 1.25, &contract);
+        assert_eq!(regular_audit.onset_interval_cv, 0.0);
+        assert!(irregular_audit.onset_interval_cv > regular_audit.onset_interval_cv);
+    }
+
     #[test]
     fn invalid_contract_is_rejected_before_scoring() {
         let bad_contract = CreativeIntentContractV1 {

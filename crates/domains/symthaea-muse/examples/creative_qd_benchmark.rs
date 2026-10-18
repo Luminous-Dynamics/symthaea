@@ -5,7 +5,7 @@
 //! Usage:
 //! cargo run -p symthaea-muse --example creative_qd_benchmark -- [source-commit-sha]
 
-use std::{error::Error, process};
+use std::error::Error;
 
 use symthaea_muse::creative_qd_bench::run_corpus_bytes;
 
@@ -18,8 +18,10 @@ fn main() -> Result<(), Box<dyn Error>> {
     println!("{}", serde_json::to_string_pretty(&receipt)?);
 
     if mismatches != 0 {
-        eprintln!("{mismatches} frozen candidate expectation(s) did not match the audit");
-        process::exit(2);
+        return Err(format!(
+            "{mismatches} frozen candidate expectation(s) did not match the audit"
+        )
+        .into());
     }
     Ok(())
 }

@@ -375,7 +375,11 @@ mod tests {
         assert_eq!(report.total_candidate_count, 16);
         assert_eq!(report.accepted_candidate_count, 8);
         assert_eq!(report.rejected_candidate_count, 8);
-        assert!(report.expected_outcome_mismatches.is_empty(), "{:?}", report.expected_outcome_mismatches);
+        assert!(
+            report.expected_outcome_mismatches.is_empty(),
+            "{:?}",
+            report.expected_outcome_mismatches
+        );
         assert_eq!(report.corpus_sha256.len(), 64);
         assert_eq!(report.source_commit.as_deref(), Some("test-source-sha"));
     }
@@ -383,10 +387,24 @@ mod tests {
     #[test]
     fn archive_preserves_density_and_interval_variants_without_scalar_ranking() {
         let report = run_corpus_bytes(FROZEN_CORPUS, None).expect("corpus should be valid");
-        let ambient = report.intents.iter().find(|intent| intent.intent_id == "ambient-drone").unwrap();
-        assert_eq!(ambient.archive_entry_count, 2, "steady and dense textures occupy different cells");
-        let groove = report.intents.iter().find(|intent| intent.intent_id == "rhythmic-groove").unwrap();
-        assert_eq!(groove.archive_entry_count, 2, "regular and irregular onset intervals occupy different cells");
+        let ambient = report
+            .intents
+            .iter()
+            .find(|intent| intent.intent_id == "ambient-drone")
+            .unwrap();
+        assert_eq!(
+            ambient.archive_entry_count, 2,
+            "steady and dense textures occupy different cells"
+        );
+        let groove = report
+            .intents
+            .iter()
+            .find(|intent| intent.intent_id == "rhythmic-groove")
+            .unwrap();
+        assert_eq!(
+            groove.archive_entry_count, 2,
+            "regular and irregular onset intervals occupy different cells"
+        );
         assert_eq!(groove.accepted_candidates_collapsed_by_descriptor_bins, 0);
     }
 
@@ -401,7 +419,11 @@ mod tests {
         let reversed_bytes = serde_json::to_vec(&corpus).expect("reversed corpus serializes");
         let after = run_corpus_bytes(&reversed_bytes, None).expect("reversed fixture validates");
         for before_intent in &before.intents {
-            let after_intent = after.intents.iter().find(|item| item.intent_id == before_intent.intent_id).unwrap();
+            let after_intent = after
+                .intents
+                .iter()
+                .find(|item| item.intent_id == before_intent.intent_id)
+                .unwrap();
             assert_eq!(before_intent.archive, after_intent.archive);
         }
     }
@@ -409,7 +431,11 @@ mod tests {
     #[test]
     fn unknown_corpus_fields_fail_closed() {
         let altered = String::from_utf8_lossy(FROZEN_CORPUS)
-            .replacen("\"schema_version\": 1,", "\"schema_version\": 1,\n  \"unexpected\": true,", 1);
+            .replacen(
+                "\"schema_version\": 1,",
+                "\"schema_version\": 1,\n  \"unexpected\": true,",
+                1,
+            );
         assert!(run_corpus_bytes(altered.as_bytes(), None).is_err());
     }
 }
