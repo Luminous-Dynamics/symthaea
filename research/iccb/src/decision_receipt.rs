@@ -66,7 +66,8 @@ pub enum DecisionReceiptError {
     ReceiptMismatch,
 }
 
-fn sha256_hex(bytes: &[u8]) -> String {
+/// Return the lowercase hexadecimal SHA-256 digest of the exact supplied bytes.
+pub fn sha256_hex(bytes: &[u8]) -> String {
     let digest = Sha256::digest(bytes);
     let mut result = String::with_capacity(64);
     for byte in digest {
