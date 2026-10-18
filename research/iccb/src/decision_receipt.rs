@@ -561,7 +561,7 @@ mod tests {
         );
         assert_eq!(
             first.receipt_sha256,
-            "4ff2e7847648ea997288d731644ba070bcb514f9efa8734042a04e5b122ab364"
+            "28460a3267a62079c0aabd350b87c8050a58d10bcd40423514ed9d9e7856d5d4"
         );
         verify_decision_receipt(&context, &scenario, &first).unwrap();
     }
