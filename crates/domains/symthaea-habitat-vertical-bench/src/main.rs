@@ -12,21 +12,18 @@ fn main() {
         process::exit(2);
     }
 
-    let owned_input;
-    let input = if let Some(path) = args.first() {
+    let input_storage = if let Some(path) = args.first() {
         match fs::read_to_string(path) {
-            Ok(contents) => {
-                owned_input = contents;
-                owned_input.as_str()
-            }
+            Ok(contents) => Some(contents),
             Err(error) => {
                 eprintln!("could not read fixture {}: {error}", path);
                 process::exit(2);
             }
         }
     } else {
-        EMBEDDED_FIXTURE
+        None
     };
+    let input = input_storage.as_deref().unwrap_or(EMBEDDED_FIXTURE);
 
     let report = match validate_fixture_str(input) {
         Ok(report) => report,
