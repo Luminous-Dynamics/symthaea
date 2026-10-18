@@ -26,10 +26,6 @@ const FALSE_ROBUST_DOMINANCE: &str =
     include_str!("../fixtures/culinary-decision-bundle-v1/semantic-rejects-false-robust-dominance.json");
 const PARTIAL_SCENARIO_RANKABILITY: &str =
     include_str!("../fixtures/culinary-decision-bundle-v1/valid-scenario-frontier-with-other-scenario-missing.json");
-const FALSE_SCENARIO_FRONTIER: &str =
-    include_str!("../fixtures/culinary-decision-bundle-v1/semantic-rejects-false-scenario-frontier.json");
-const FALSE_ROBUST_DOMINANCE: &str =
-    include_str!("../fixtures/culinary-decision-bundle-v1/semantic-rejects-false-robust-dominance.json");
 
 fn parse_fixture(raw: &str) -> Value {
     serde_json::from_str(raw).expect("fixture is valid JSON")
@@ -309,12 +305,15 @@ fn semantic_violations(bundle: &Value) -> Vec<String> {
             .collect();
         let expected_scenario_ids: BTreeSet<String> =
             scenario_digest_by_id.keys().cloned().collect();
-        if result_scenario_ids != expected_scenario_ids || result_scenario_ids.len() != results.len() {
+        let scenario_coverage_complete =
+            result_scenario_ids == expected_scenario_ids && result_scenario_ids.len() == results.len();
+        if !scenario_coverage_complete {
             errors.push(format!("{id}: scenario result coverage is missing, extra, or duplicated"));
         }
 
-        let mut all_scenarios_rankable = gate_disposition == "feasible";
-        let mut all_metrics_complete = true;
+        let mut all_scenarios_rankable =
+            gate_disposition == "feasible" && scenario_coverage_complete;
+        let mut all_metrics_complete = scenario_coverage_complete;
         for result in results {
             let scenario_id = result.get("scenario_id").and_then(Value::as_str).unwrap_or("");
             let recorded_digest = result
