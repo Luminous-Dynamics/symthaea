@@ -1,0 +1,587 @@
+//! Typed, design-derived fault-campaign obligations.
+//!
+//! This is a small intermediate representation, not a SysML v2 parser or a
+//! complete FMEA/FMECA. A generated simulator schedule proves only that a
+//! scenario was described; critical coverage remains open while any required
+//! trace, observable, monitor, mitigation, invariant, or evidence link is gapful.
+
+use std::collections::HashSet;
+
+use serde::{Deserialize, Serialize};
+
+use crate::perturbations::{
+    OrbitalPerturbation, PerturbationError, PerturbationSchedule,
+};
+
+pub const MISSION_FAULT_MODEL_SCHEMA_VERSION: &str = "0.1";
+
+#[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
+pub struct MissionFaultModel {
+    pub schema_version: String,
+    pub model_id: String,
+    pub model_revision: String,
+    pub source_design: SourceDesignRef,
+    pub failure_modes: Vec<FailureMode>,
+}
+
+#[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
+pub struct SourceDesignRef {
+    pub system_id: String,
+    pub revision: String,
+    /// SHA-256 of the exact source-design bytes, encoded as 64 hex characters.
+    pub sha256: String,
+}
+
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, Deserialize)]
+#[serde(rename_all = "snake_case")]
+pub enum FailureCriticality {
+    Critical,
+    Major,
+    Minor,
+}
+
+#[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
+pub struct FailureMode {
+    pub id: String,
+    pub component_id: String,
+    pub description: String,
+    pub criticality: FailureCriticality,
+    pub requirement_refs: Vec<String>,
+    pub injection: Option<InjectionSpec>,
+    pub observable_signals: Vec<ObservableSignal>,
+    pub monitor: Option<MonitorContract>,
+    pub mitigation: Option<MitigationConstraint>,
+    pub safety_invariant_refs: Vec<String>,
+    pub evidence_refs: Vec<String>,
+}
+
+#[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
+#[serde(tag = "kind", rename_all = "snake_case")]
+pub enum InjectionSpec {
+    CommunicationBlackout {
+        at_step: usize,
+        duration_steps: usize,
+    },
+    /// Synthetic instantaneous external delta-v proxy in inertial-frame m/s.
+    /// This does not model debris contact, fragmentation, or impact mechanics.
+    VelocityImpulse {
+        at_step: usize,
+        delta_v_m_s: [f64; 3],
+    },
+}
+
+#[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
+pub struct ObservableSignal {
+    pub id: String,
+    pub unit: String,
+    pub expected_fault_effect: String,
+}
+
+#[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
+pub struct MonitorContract {
+    pub id: String,
+    /// Maximum permitted simulator steps between injection and required alarm.
+    pub response_deadline_steps: usize,
+    /// Nominal or confounding conditions that must not trigger this monitor.
+    pub false_alarm_controls: Vec<String>,
+}
+
+#[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
+pub struct MitigationConstraint {
+    pub id: String,
+    pub allowed_actions: Vec<String>,
+    pub protected_invariant_refs: Vec<String>,
+}
+
+#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
+#[serde(rename_all = "snake_case")]
+pub enum CoverageGap {
+    MissingRequirementTrace,
+    MissingInjection,
+    MissingObservableSignal,
+    MissingMonitorContract,
+    MissingMonitorNegativeControl,
+    MissingMitigationContract,
+    MissingPermittedMitigation,
+    MissingSafetyInvariant,
+    MissingMitigationInvariantLink,
+    MissingEvidenceReference,
+}
+
+#[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
+pub struct FaultScenario {
+    pub id: String,
+    pub failure_mode_id: String,
+    pub source_design_revision: String,
+    pub injection: InjectionSpec,
+    pub expected_signal_ids: Vec<String>,
+    pub monitor_id: String,
+    pub response_deadline_steps: usize,
+    pub allowed_mitigation_actions: Vec<String>,
+    pub protected_invariant_refs: Vec<String>,
+}
+
+#[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
+pub struct FaultObligation {
+    pub failure_mode_id: String,
+    pub criticality: FailureCriticality,
+    /// Present means a mechanically representable scenario was generated.
+    /// It does not mean the associated failure mode is fully covered.
+    pub scenario: Option<FaultScenario>,
+    pub gaps: Vec<CoverageGap>,
+}
+
+#[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
+pub struct FaultCampaignManifest {
+    pub schema_version: String,
+    pub model_id: String,
+    pub model_revision: String,
+    pub source_design_revision: String,
+    pub obligations: Vec<FaultObligation>,
+    /// Contains representable injections even when other evidence obligations
+    /// remain open; consumers must inspect obligations before claiming coverage.
+    pub schedule: PerturbationSchedule,
+}
+
+impl FaultCampaignManifest {
+    /// A non-empty critical denominator is mandatory; an empty campaign is not
+    /// accepted by vacuous truth.
+    pub fn critical_coverage_closed(&self) -> bool {
+        let critical: Vec<_> = self
+            .obligations
+            .iter()
+            .filter(|obligation| obligation.criticality == FailureCriticality::Critical)
+            .collect();
+
+        !critical.is_empty()
+            && critical
+                .iter()
+                .all(|obligation| obligation.scenario.is_some() && obligation.gaps.is_empty())
+    }
+
+    pub fn critical_mode_count(&self) -> usize {
+        self.obligations
+            .iter()
+            .filter(|obligation| obligation.criticality == FailureCriticality::Critical)
+            .count()
+    }
+
+    pub fn critical_modes_with_gaps(&self) -> Vec<&FaultObligation> {
+        self.obligations
+            .iter()
+            .filter(|obligation| {
+                obligation.criticality == FailureCriticality::Critical
+                    && (obligation.scenario.is_none() || !obligation.gaps.is_empty())
+            })
+            .collect()
+    }
+}
+
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub enum MissionFaultModelError {
+    UnsupportedSchemaVersion(String),
+    EmptyField(&'static str),
+    EmptyFailureModes,
+    InvalidSourceSha256,
+    DuplicateFailureModeId(String),
+    DuplicateSignalId {
+        failure_mode_id: String,
+        signal_id: String,
+    },
+    InvalidInjectionParameters {
+        failure_mode_id: String,
+        reason: String,
+    },
+    InvalidGeneratedSchedule(PerturbationError),
+}
+
+impl std::fmt::Display for MissionFaultModelError {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        write!(f, "{self:?}")
+    }
+}
+
+impl std::error::Error for MissionFaultModelError {}
+
+impl MissionFaultModel {
+    /// Validate identity and executable event assumptions. Missing engineering
+    /// links are deliberately not rejected here; they become explicit coverage
+    /// gaps in the emitted manifest.
+    pub fn validate(&self) -> Result<(), MissionFaultModelError> {
+        if self.schema_version != MISSION_FAULT_MODEL_SCHEMA_VERSION {
+            return Err(MissionFaultModelError::UnsupportedSchemaVersion(
+                self.schema_version.clone(),
+            ));
+        }
+
+        require_nonblank(&self.model_id, "model_id")?;
+        require_nonblank(&self.model_revision, "model_revision")?;
+        require_nonblank(&self.source_design.system_id, "source_design.system_id")?;
+        require_nonblank(&self.source_design.revision, "source_design.revision")?;
+        if self.source_design.sha256.len() != 64
+            || !self
+                .source_design
+                .sha256
+                .bytes()
+                .all(|byte| byte.is_ascii_hexdigit())
+        {
+            return Err(MissionFaultModelError::InvalidSourceSha256);
+        }
+        if self.failure_modes.is_empty() {
+            return Err(MissionFaultModelError::EmptyFailureModes);
+        }
+
+        let mut mode_ids = HashSet::new();
+        for mode in &self.failure_modes {
+            require_nonblank(&mode.id, "failure_mode.id")?;
+            require_nonblank(&mode.component_id, "failure_mode.component_id")?;
+            require_nonblank(&mode.description, "failure_mode.description")?;
+
+            if !mode_ids.insert(mode.id.as_str()) {
+                return Err(MissionFaultModelError::DuplicateFailureModeId(
+                    mode.id.clone(),
+                ));
+            }
+
+            let mut signal_ids = HashSet::new();
+            for signal in &mode.observable_signals {
+                require_nonblank(&signal.id, "observable_signal.id")?;
+                require_nonblank(&signal.unit, "observable_signal.unit")?;
+                require_nonblank(
+                    &signal.expected_fault_effect,
+                    "observable_signal.expected_fault_effect",
+                )?;
+                if !signal_ids.insert(signal.id.as_str()) {
+                    return Err(MissionFaultModelError::DuplicateSignalId {
+                        failure_mode_id: mode.id.clone(),
+                        signal_id: signal.id.clone(),
+                    });
+                }
+            }
+
+            if let Some(injection) = &mode.injection {
+                match injection {
+                    InjectionSpec::CommunicationBlackout {
+                        at_step,
+                        duration_steps,
+                    } => {
+                        if *duration_steps == 0 {
+                            return Err(MissionFaultModelError::InvalidInjectionParameters {
+                                failure_mode_id: mode.id.clone(),
+                                reason: "blackout duration must be positive".to_owned(),
+                            });
+                        }
+                        if at_step.checked_add(*duration_steps).is_none() {
+                            return Err(MissionFaultModelError::InvalidInjectionParameters {
+                                failure_mode_id: mode.id.clone(),
+                                reason: "blackout end step overflows usize".to_owned(),
+                            });
+                        }
+                    }
+                    InjectionSpec::VelocityImpulse { delta_v_m_s, .. } => {
+                        if delta_v_m_s.iter().any(|value| !value.is_finite()) {
+                            return Err(MissionFaultModelError::InvalidInjectionParameters {
+                                failure_mode_id: mode.id.clone(),
+                                reason: "delta-v components must be finite".to_owned(),
+                            });
+                        }
+                    }
+                }
+            }
+        }
+
+        Ok(())
+    }
+
+    /// Project the design IR into a deterministic scenario manifest and the
+    /// currently supported orbital perturbation interface. Coverage gaps stay
+    /// attached to each failure mode; generating an event never clears them.
+    pub fn compile_campaign(
+        &self,
+    ) -> Result<FaultCampaignManifest, MissionFaultModelError> {
+        self.validate()?;
+
+        let mut obligations = Vec::with_capacity(self.failure_modes.len());
+        let mut perturbations = Vec::new();
+
+        for mode in &self.failure_modes {
+            let gaps = coverage_gaps(mode);
+            let scenario = mode.injection.as_ref().map(|injection| {
+                let monitor = mode.monitor.as_ref();
+                let mitigation = mode.mitigation.as_ref();
+
+                let mut protected_invariant_refs = mode.safety_invariant_refs.clone();
+                if let Some(mitigation) = mitigation {
+                    for reference in &mitigation.protected_invariant_refs {
+                        if !protected_invariant_refs.contains(reference) {
+                            protected_invariant_refs.push(reference.clone());
+                        }
+                    }
+                }
+
+                FaultScenario {
+                    id: format!("{}::{}", self.model_id, mode.id),
+                    failure_mode_id: mode.id.clone(),
+                    source_design_revision: self.source_design.revision.clone(),
+                    injection: injection.clone(),
+                    expected_signal_ids: mode
+                        .observable_signals
+                        .iter()
+                        .map(|signal| signal.id.clone())
+                        .collect(),
+                    monitor_id: monitor.map(|value| value.id.clone()).unwrap_or_default(),
+                    response_deadline_steps: monitor
+                        .map(|value| value.response_deadline_steps)
+                        .unwrap_or_default(),
+                    allowed_mitigation_actions: mitigation
+                        .map(|value| value.allowed_actions.clone())
+                        .unwrap_or_default(),
+                    protected_invariant_refs,
+                }
+            });
+
+            if let Some(injection) = &mode.injection {
+                let event = match injection {
+                    InjectionSpec::CommunicationBlackout {
+                        at_step,
+                        duration_steps,
+                    } => OrbitalPerturbation::CommBlackout {
+                        at_step: *at_step,
+                        duration: *duration_steps,
+                    },
+                    InjectionSpec::VelocityImpulse {
+                        at_step,
+                        delta_v_m_s,
+                    } => OrbitalPerturbation::DebrisImpact {
+                        at_step: *at_step,
+                        delta_v_m_s: *delta_v_m_s,
+                    },
+                };
+                perturbations.push(event);
+            }
+
+            obligations.push(FaultObligation {
+                failure_mode_id: mode.id.clone(),
+                criticality: mode.criticality,
+                scenario,
+                gaps,
+            });
+        }
+
+        let schedule = PerturbationSchedule { perturbations };
+        schedule
+            .validate()
+            .map_err(MissionFaultModelError::InvalidGeneratedSchedule)?;
+
+        Ok(FaultCampaignManifest {
+            schema_version: MISSION_FAULT_MODEL_SCHEMA_VERSION.to_owned(),
+            model_id: self.model_id.clone(),
+            model_revision: self.model_revision.clone(),
+            source_design_revision: self.source_design.revision.clone(),
+            obligations,
+            schedule,
+        })
+    }
+}
+
+fn require_nonblank(
+    value: &str,
+    field: &'static str,
+) -> Result<(), MissionFaultModelError> {
+    if value.trim().is_empty() {
+        return Err(MissionFaultModelError::EmptyField(field));
+    }
+    Ok(())
+}
+
+fn has_reference(references: &[String]) -> bool {
+    references.iter().any(|reference| !reference.trim().is_empty())
+}
+
+fn coverage_gaps(mode: &FailureMode) -> Vec<CoverageGap> {
+    let mut gaps = Vec::new();
+
+    if !has_reference(&mode.requirement_refs) {
+        gaps.push(CoverageGap::MissingRequirementTrace);
+    }
+    if mode.injection.is_none() {
+        gaps.push(CoverageGap::MissingInjection);
+    }
+    if mode.observable_signals.is_empty() {
+        gaps.push(CoverageGap::MissingObservableSignal);
+    }
+    match &mode.monitor {
+        None => gaps.push(CoverageGap::MissingMonitorContract),
+        Some(monitor) if !has_reference(&monitor.false_alarm_controls) => {
+            gaps.push(CoverageGap::MissingMonitorNegativeControl);
+        }
+        Some(_) => {}
+    }
+    match &mode.mitigation {
+        None => gaps.push(CoverageGap::MissingMitigationContract),
+        Some(mitigation) => {
+            if !has_reference(&mitigation.allowed_actions) {
+                gaps.push(CoverageGap::MissingPermittedMitigation);
+            }
+            if !has_reference(&mitigation.protected_invariant_refs) {
+                gaps.push(CoverageGap::MissingMitigationInvariantLink);
+            }
+        }
+    }
+    if !has_reference(&mode.safety_invariant_refs) {
+        gaps.push(CoverageGap::MissingSafetyInvariant);
+    }
+    if !has_reference(&mode.evidence_refs) {
+        gaps.push(CoverageGap::MissingEvidenceReference);
+    }
+
+    gaps
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    fn valid_model() -> MissionFaultModel {
+        MissionFaultModel {
+            schema_version: MISSION_FAULT_MODEL_SCHEMA_VERSION.to_owned(),
+            model_id: "synthetic-communications-resilience".to_owned(),
+            model_revision: "0.1.0".to_owned(),
+            source_design: SourceDesignRef {
+                system_id: "synthetic-cubesat-communications".to_owned(),
+                revision: "v0.1".to_owned(),
+                sha256: "5236acfe93db6bf5f79992868d0a78a67230875907eef5bb8c8a90bcfe17f6d1"
+                    .to_owned(),
+            },
+            failure_modes: vec![FailureMode {
+                id: "FM-COMM-001".to_owned(),
+                component_id: "comms_transceiver".to_owned(),
+                description: "Synthetic total radio-link blackout".to_owned(),
+                criticality: FailureCriticality::Critical,
+                requirement_refs: vec!["REQ-COMM-001".to_owned()],
+                injection: Some(InjectionSpec::CommunicationBlackout {
+                    at_step: 4,
+                    duration_steps: 3,
+                }),
+                observable_signals: vec![ObservableSignal {
+                    id: "ground_link_available".to_owned(),
+                    unit: "boolean".to_owned(),
+                    expected_fault_effect:
+                        "false for steps 4 through 6; geometry remains unchanged".to_owned(),
+                }],
+                monitor: Some(MonitorContract {
+                    id: "MON-COMM-001".to_owned(),
+                    response_deadline_steps: 1,
+                    false_alarm_controls: vec![
+                        "nominal_link_available".to_owned(),
+                        "line_of_sight_loss_without_radio_fault".to_owned(),
+                    ],
+                }),
+                mitigation: Some(MitigationConstraint {
+                    id: "MIT-COMM-001".to_owned(),
+                    allowed_actions: vec![
+                        "buffer_noncritical_telemetry".to_owned(),
+                        "retry_after_link_recovery".to_owned(),
+                    ],
+                    protected_invariant_refs: vec!["INV-COMMAND-AUTHORITY".to_owned()],
+                }),
+                safety_invariant_refs: vec![
+                    "INV-COMMAND-AUTHORITY".to_owned(),
+                    "INV-POWER-BUDGET".to_owned(),
+                ],
+                evidence_refs: vec!["EVID-SYNTHETIC-SOURCE-001".to_owned()],
+            }],
+        }
+    }
+
+    #[test]
+    fn complete_critical_mode_generates_schedule_and_closes_synthetic_coverage() {
+        let manifest = valid_model().compile_campaign().expect("valid synthetic model");
+        assert_eq!(manifest.critical_mode_count(), 1);
+        assert!(manifest.critical_coverage_closed());
+        assert!(manifest.critical_modes_with_gaps().is_empty());
+        assert_eq!(manifest.schedule.perturbations.len(), 1);
+        assert!(matches!(
+            manifest.schedule.perturbations[0],
+            OrbitalPerturbation::CommBlackout {
+                at_step: 4,
+                duration: 3
+            }
+        ));
+    }
+
+    #[test]
+    fn missing_monitor_is_a_gap_even_when_injection_is_generated() {
+        let mut model = valid_model();
+        model.failure_modes[0].monitor = None;
+
+        let manifest = model.compile_campaign().expect("missing links are coverage gaps");
+        assert!(manifest.obligations[0].scenario.is_some());
+        assert!(manifest.obligations[0]
+            .gaps
+            .contains(&CoverageGap::MissingMonitorContract));
+        assert!(!manifest.critical_coverage_closed());
+    }
+
+    #[test]
+    fn missing_observable_is_not_laundered_by_a_simulator_schedule() {
+        let mut model = valid_model();
+        model.failure_modes[0].observable_signals.clear();
+
+        let manifest = model.compile_campaign().expect("model remains structurally valid");
+        assert!(manifest.schedule.perturbations.len() == 1);
+        assert!(manifest.obligations[0]
+            .gaps
+            .contains(&CoverageGap::MissingObservableSignal));
+        assert!(!manifest.critical_coverage_closed());
+    }
+
+    #[test]
+    fn duplicate_failure_modes_and_bad_source_digests_fail_closed() {
+        let mut duplicate = valid_model();
+        duplicate.failure_modes.push(duplicate.failure_modes[0].clone());
+        assert!(matches!(
+            duplicate.validate(),
+            Err(MissionFaultModelError::DuplicateFailureModeId(_))
+        ));
+
+        let mut bad_digest = valid_model();
+        bad_digest.source_design.sha256 = "not-a-sha256".to_owned();
+        assert_eq!(
+            bad_digest.validate(),
+            Err(MissionFaultModelError::InvalidSourceSha256)
+        );
+    }
+
+    #[test]
+    fn invalid_injection_parameters_fail_before_manifest_generation() {
+        let mut zero_duration = valid_model();
+        zero_duration.failure_modes[0].injection =
+            Some(InjectionSpec::CommunicationBlackout {
+                at_step: 4,
+                duration_steps: 0,
+            });
+        assert!(matches!(
+            zero_duration.compile_campaign(),
+            Err(MissionFaultModelError::InvalidInjectionParameters { .. })
+        ));
+
+        let mut non_finite = valid_model();
+        non_finite.failure_modes[0].injection = Some(InjectionSpec::VelocityImpulse {
+            at_step: 4,
+            delta_v_m_s: [0.0, f64::NAN, 0.0],
+        });
+        assert!(matches!(
+            non_finite.validate(),
+            Err(MissionFaultModelError::InvalidInjectionParameters { .. })
+        ));
+    }
+
+    #[test]
+    fn identical_source_model_compiles_deterministically() {
+        let model = valid_model();
+        let first = model.compile_campaign().expect("first compilation");
+        let second = model.compile_campaign().expect("second compilation");
+        assert_eq!(first, second);
+    }
+}
