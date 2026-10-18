@@ -413,9 +413,9 @@ mod tests {
         let report = run_corpus_bytes(FROZEN_CORPUS, Some("test-source-sha"))
             .expect("frozen creative intent corpus should parse and validate");
         assert_eq!(report.schema_version, CREATIVE_QD_BENCH_SCHEMA_VERSION);
-        assert_eq!(report.total_candidate_count, 16);
+        assert_eq!(report.total_candidate_count, 17);
         assert_eq!(report.accepted_candidate_count, 8);
-        assert_eq!(report.rejected_candidate_count, 8);
+        assert_eq!(report.rejected_candidate_count, 9);
         assert!(
             report.expected_outcome_mismatches.is_empty(),
             "{:?}",
@@ -497,6 +497,30 @@ mod tests {
             &invalid.temporal_support,
             CreativeTemporalSupportOutcomeV1::Unavailable {
                 error: CreativeTemporalSupportError::InvalidNote { index: 3 }
+            }
+        ));
+    }
+
+    #[test]
+    fn zero_velocity_candidate_fails_closed_and_has_no_archive_cell() {
+        let report = run_corpus_bytes(FROZEN_CORPUS, None).expect("corpus should be valid");
+        let melody = report
+            .intents
+            .iter()
+            .find(|intent| intent.intent_id == "lyrical-melody")
+            .unwrap();
+        let silent = melody
+            .candidates
+            .iter()
+            .find(|candidate| candidate.candidate_id == "silent-note-count-trap")
+            .unwrap();
+
+        assert!(!silent.observed_accepted);
+        assert!(silent.descriptor_cell.is_none());
+        assert!(matches!(
+            &silent.temporal_support,
+            CreativeTemporalSupportOutcomeV1::Unavailable {
+                error: CreativeTemporalSupportError::InvalidNote { index: 0 }
             }
         ));
     }
