@@ -24,6 +24,12 @@ const FALSE_SCENARIO_FRONTIER: &str =
     include_str!("../fixtures/culinary-decision-bundle-v1/semantic-rejects-false-scenario-frontier.json");
 const FALSE_ROBUST_DOMINANCE: &str =
     include_str!("../fixtures/culinary-decision-bundle-v1/semantic-rejects-false-robust-dominance.json");
+const PARTIAL_SCENARIO_RANKABILITY: &str =
+    include_str!("../fixtures/culinary-decision-bundle-v1/valid-scenario-frontier-with-other-scenario-missing.json");
+const FALSE_SCENARIO_FRONTIER: &str =
+    include_str!("../fixtures/culinary-decision-bundle-v1/semantic-rejects-false-scenario-frontier.json");
+const FALSE_ROBUST_DOMINANCE: &str =
+    include_str!("../fixtures/culinary-decision-bundle-v1/semantic-rejects-false-robust-dominance.json");
 
 fn parse_fixture(raw: &str) -> Value {
     serde_json::from_str(raw).expect("fixture is valid JSON")
@@ -626,6 +632,55 @@ fn simulated_evidence_cannot_be_relabelled_as_observed() {
     let bundle = parse_fixture(SIMULATED_AS_OBSERVED);
     let violations = semantic_violations(&bundle);
     assert!(violations.iter().any(|error| error.contains("relabels synthetic/simulated")));
+}
+
+#[test]
+fn falsely_declared_scenario_frontier_is_rejected() {
+    let bundle = parse_fixture(FALSE_SCENARIO_FRONTIER);
+    let violations = semantic_violations(&bundle);
+    assert!(violations.iter().any(|error| {
+        error.contains("frontier claim in scenario observed_basket")
+    }));
+}
+
+#[test]
+fn falsely_declared_robust_dominance_is_rejected_even_when_reciprocal() {
+    let bundle = parse_fixture(FALSE_ROBUST_DOMINANCE);
+    let violations = semantic_violations(&bundle);
+    assert!(violations.iter().any(|error| {
+        error.contains("differs from independently recomputed robust dominance")
+    }));
+    assert!(violations.iter().any(|error| {
+        error.contains("robust_frontier_ids differ from independently recomputed robust frontier")
+    }));
+}
+
+#[test]
+fn scenario_frontier_can_be_known_when_another_scenario_is_incomplete() {
+    let bundle = parse_fixture(PARTIAL_SCENARIO_RANKABILITY);
+    let violations = semantic_violations(&bundle);
+    assert!(
+        violations.is_empty(),
+        "unexpected semantic violations: {:?}",
+        violations
+    );
+    let alpha = bundle["candidate_results"]
+        .as_array()
+        .unwrap()
+        .iter()
+        .find(|candidate| candidate["candidate_id"] == "alpha")
+        .unwrap();
+    assert_eq!(alpha["ranking_disposition"], "incomplete_metrics");
+    assert!(!alpha["robustly_rankable"].as_bool().unwrap());
+    assert!(alpha["scenario_results"]
+        .as_array()
+        .unwrap()
+        .iter()
+        .find(|scenario| scenario["scenario_id"] == "observed_basket")
+        .unwrap()["frontier"]
+        .as_bool()
+        .unwrap());
+    assert_eq!(bundle["robust_frontier_ids"], serde_json::json!(["beta"]));
 }
 
 #[test]
