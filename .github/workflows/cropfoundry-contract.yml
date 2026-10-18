@@ -13,6 +13,7 @@ on:
       - research/cropfoundry-benchmark-contract-2026-10
     paths:
       - ".github/workflows/cropfoundry-contract.yml"
+      - "Cargo.toml"
       - "xtask/**"
       - "docs/research/cropfoundry/**"
   workflow_dispatch:
@@ -39,7 +40,10 @@ jobs:
         run: cargo fmt -p xtask -- --check
 
       - name: Test fail-closed contract validator
-        run: cargo test -p xtask cropfoundry_validate
+        run: cargo test -p xtask cropfoundry
 
       - name: Validate checked-in contracts
         run: cargo run -q -p xtask -- cropfoundry-validate
+
+      - name: Check local CSV auditor CLI
+        run: cargo run -q -p xtask -- cropfoundry-audit-csv --help
