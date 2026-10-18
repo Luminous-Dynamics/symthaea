@@ -1033,6 +1033,10 @@ mod tests {
         "baseline-and-ablations-are-mandatory",
         "pareto-incomparables-are-preserved",
         "duplicate-identities-are-rejected",
+        "nonfinite-metric-fails-closed",
+        "missing-metric-fails-closed",
+        "evidence-digest-mismatch-fails-closed",
+        "profile-tier-cannot-exceed-synthetic",
     ];
 
     fn profile() -> EvaluationProfile {
@@ -1276,6 +1280,46 @@ mod tests {
         assert!(receipt.decisions.iter().all(|item| {
             matches!(item, CandidateDecision::EvaluatedOnly { .. })
         }));
+    }
+
+    #[test]
+    fn nonfinite_metric_fails_closed() {
+        let p = profile();
+        let mut candidates = standard_candidates();
+        candidates[2].metrics[0].value = f64::NAN;
+        let receipt = evaluate_candidates(&p, &candidates).unwrap();
+        assert!(matches!(decision(&receipt, "design-a"), CandidateDecision::Rejected { reasons, .. }
+            if reasons.contains(&CandidateRejectionReason::NonFiniteMetric("coverage_proxy".into()))));
+    }
+
+    #[test]
+    fn missing_metric_fails_closed() {
+        let p = profile();
+        let mut candidates = standard_candidates();
+        candidates[2].metrics.retain(|metric| metric.objective_id != "coverage_proxy");
+        let receipt = evaluate_candidates(&p, &candidates).unwrap();
+        assert!(matches!(decision(&receipt, "design-a"), CandidateDecision::Rejected { reasons, .. }
+            if reasons.contains(&CandidateRejectionReason::MissingMetric("coverage_proxy".into()))));
+    }
+
+    #[test]
+    fn mismatched_evidence_digest_fails_closed() {
+        let p = profile();
+        let mut candidates = standard_candidates();
+        candidates[2].evidence[0].sha256 = "b".repeat(64);
+        let receipt = evaluate_candidates(&p, &candidates).unwrap();
+        assert!(matches!(decision(&receipt, "design-a"), CandidateDecision::Rejected { reasons, .. }
+            if reasons.contains(&CandidateRejectionReason::EvidenceDigestMismatch("q0-fixture-corpus".into()))));
+    }
+
+    #[test]
+    fn profile_cannot_promote_q1_above_synthetic_evidence() {
+        let mut p = profile();
+        p.result_evidence_tier = EvidenceTier::PhysicalBench;
+        assert_eq!(
+            evaluate_candidates(&p, &standard_candidates()),
+            Err(RankingError::Q1MustRemainSyntheticOnly)
+        );
     }
 
     #[test]
