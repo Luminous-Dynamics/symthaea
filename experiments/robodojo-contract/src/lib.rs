@@ -7,6 +7,7 @@
 #![forbid(unsafe_code)]
 
 pub mod calibration;
+pub mod shift;
 
 #[derive(Debug, Clone, Copy, PartialEq)]
 pub struct AxisLimit { pub min: f64, pub max: f64 }
