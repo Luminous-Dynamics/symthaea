@@ -227,6 +227,15 @@
           "source": "explicit_synthetic_ordinal_feedback",
           "preferred_candidate_id": "flex",
           "rejected_candidate_id": "assist"
+        },
+        {
+          "observation_id": "HOLD-SHIFT-001-O2",
+          "step": 1,
+          "task_id": "overground_walk",
+          "context_id": "level-rested",
+          "source": "explicit_synthetic_ordinal_feedback",
+          "preferred_candidate_id": "flex",
+          "rejected_candidate_id": "stable"
         }
       ],
       "evaluation_oracle": {
