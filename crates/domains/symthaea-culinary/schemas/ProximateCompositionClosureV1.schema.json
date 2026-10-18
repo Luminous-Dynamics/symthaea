@@ -5,52 +5,248 @@
   "description": "Source-bearing profile for proximate composition closure screening, not proof of individual component correctness.",
   "type": "object",
   "additionalProperties": false,
-  "required": ["schema_version", "profile_id", "basis", "food_state", "carbohydrate_basis", "components", "unavailable_components"],
+  "required": [
+    "schema_version",
+    "profile_id",
+    "basis",
+    "food_state",
+    "carbohydrate_basis",
+    "components",
+    "unavailable_components"
+  ],
   "properties": {
-    "schema_version": { "const": "1.0.0" },
-    "profile_id": { "type": "string", "minLength": 1 },
-    "basis": { "const": "per_100g_edible_fresh_weight" },
-    "food_state": { "type": "string", "minLength": 1 },
-    "carbohydrate_basis": { "enum": ["available_plus_fibre", "total_includes_fibre"] },
-    "components": { "type": "array", "items": { "$ref": "#/$defs/component" } },
-    "unavailable_components": { "type": "array", "items": { "$ref": "#/$defs/unavailable" } }
+    "schema_version": {
+      "const": "1.0.0"
+    },
+    "profile_id": {
+      "type": "string",
+      "minLength": 1
+    },
+    "basis": {
+      "const": "per_100g_edible_fresh_weight"
+    },
+    "food_state": {
+      "type": "string",
+      "minLength": 1
+    },
+    "carbohydrate_basis": {
+      "enum": [
+        "available_plus_fibre",
+        "total_includes_fibre"
+      ]
+    },
+    "components": {
+      "type": "array",
+      "items": {
+        "$ref": "#/$defs/component"
+      }
+    },
+    "unavailable_components": {
+      "type": "array",
+      "items": {
+        "$ref": "#/$defs/unavailable"
+      }
+    }
   },
   "$defs": {
     "evidence": {
       "type": "object",
       "additionalProperties": false,
-      "required": ["source_ref", "source_version", "known_at", "evidence_status"],
+      "required": [
+        "source_ref",
+        "source_version",
+        "known_at",
+        "evidence_status"
+      ],
       "properties": {
-        "source_ref": { "type": "string", "minLength": 1 },
-        "source_version": { "type": "string", "minLength": 1 },
-        "known_at": { "type": "string", "format": "date-time" },
-        "evidence_status": { "enum": ["synthetic", "unreviewed", "reviewed", "qualified"] }
-      }
+        "source_ref": {
+          "type": "string",
+          "minLength": 1
+        },
+        "source_version": {
+          "type": "string",
+          "minLength": 1
+        },
+        "known_at": {
+          "type": "string",
+          "format": "date-time"
+        },
+        "evidence_status": {
+          "enum": [
+            "synthetic",
+            "unreviewed",
+            "reviewed",
+            "qualified"
+          ]
+        }
+      },
+      "allOf": [
+        {
+          "if": {
+            "properties": {
+              "evidence_status": {
+                "const": "qualified"
+              },
+              "source_ref": {
+                "pattern": "^urn:synthetic:"
+              }
+            },
+            "required": [
+              "evidence_status",
+              "source_ref"
+            ]
+          },
+          "then": false
+        }
+      ]
     },
     "component": {
       "type": "object",
       "additionalProperties": false,
-      "required": ["component_id", "measurement_status", "value", "lower", "upper", "unit", "basis", "food_state", "evidence"],
+      "required": [
+        "component_id",
+        "measurement_status",
+        "value",
+        "lower",
+        "upper",
+        "unit",
+        "basis",
+        "food_state",
+        "evidence"
+      ],
       "properties": {
-        "component_id": { "enum": ["water", "protein", "fat", "available_carbohydrate", "dietary_fibre", "total_carbohydrate", "ash", "alcohol"] },
-        "measurement_status": { "enum": ["measured", "calculated", "below_quantification_limit"] },
-        "value": { "type": ["number", "null"], "minimum": 0 },
-        "lower": { "type": "number", "minimum": 0 },
-        "upper": { "type": "number", "minimum": 0 },
-        "unit": { "const": "g/100g" },
-        "basis": { "const": "per_100g_edible_fresh_weight" },
-        "food_state": { "type": "string", "minLength": 1 },
-        "evidence": { "$ref": "#/$defs/evidence" }
-      }
+        "component_id": {
+          "enum": [
+            "water",
+            "protein",
+            "fat",
+            "available_carbohydrate",
+            "dietary_fibre",
+            "total_carbohydrate",
+            "ash",
+            "alcohol"
+          ]
+        },
+        "measurement_status": {
+          "enum": [
+            "measured",
+            "calculated",
+            "below_quantification_limit"
+          ]
+        },
+        "value": {
+          "type": [
+            "number",
+            "null"
+          ],
+          "minimum": 0
+        },
+        "lower": {
+          "type": "number",
+          "minimum": 0
+        },
+        "upper": {
+          "type": "number",
+          "minimum": 0
+        },
+        "unit": {
+          "const": "g/100g"
+        },
+        "basis": {
+          "const": "per_100g_edible_fresh_weight"
+        },
+        "food_state": {
+          "type": "string",
+          "minLength": 1
+        },
+        "evidence": {
+          "$ref": "#/$defs/evidence"
+        }
+      },
+      "allOf": [
+        {
+          "if": {
+            "properties": {
+              "measurement_status": {
+                "enum": [
+                  "measured",
+                  "calculated"
+                ]
+              }
+            },
+            "required": [
+              "measurement_status"
+            ]
+          },
+          "then": {
+            "properties": {
+              "value": {
+                "type": "number"
+              }
+            }
+          }
+        },
+        {
+          "if": {
+            "properties": {
+              "measurement_status": {
+                "const": "below_quantification_limit"
+              }
+            },
+            "required": [
+              "measurement_status"
+            ]
+          },
+          "then": {
+            "properties": {
+              "value": {
+                "type": "null"
+              },
+              "lower": {
+                "const": 0
+              },
+              "upper": {
+                "exclusiveMinimum": 0
+              }
+            }
+          }
+        }
+      ]
     },
     "unavailable": {
       "type": "object",
       "additionalProperties": false,
-      "required": ["component_id", "reason", "detail"],
+      "required": [
+        "component_id",
+        "reason",
+        "detail"
+      ],
       "properties": {
-        "component_id": { "enum": ["water", "protein", "fat", "available_carbohydrate", "dietary_fibre", "total_carbohydrate", "ash", "alcohol"] },
-        "reason": { "enum": ["not_analyzed", "not_reported", "unsupported_basis", "conflicting_sources", "unknown"] },
-        "detail": { "type": "string", "minLength": 1 }
+        "component_id": {
+          "enum": [
+            "water",
+            "protein",
+            "fat",
+            "available_carbohydrate",
+            "dietary_fibre",
+            "total_carbohydrate",
+            "ash",
+            "alcohol"
+          ]
+        },
+        "reason": {
+          "enum": [
+            "not_analyzed",
+            "not_reported",
+            "unsupported_basis",
+            "conflicting_sources",
+            "unknown"
+          ]
+        },
+        "detail": {
+          "type": "string",
+          "minLength": 1
+        }
       }
     }
   }
