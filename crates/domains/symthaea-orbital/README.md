@@ -374,3 +374,12 @@ Focused tests are authored, including fixture deserialization, event mapping, ex
 ### Critical fault-signature preflight
 
 The IR can also compare declared categorical signal outcomes for every pair of critical fault modes. It reports structurally distinguishing channels, exact complete-signature collisions, or an unresolved result when canonical outcomes/signal mappings are incomplete or incomparable. `None` is unknown and cannot distinguish; matching signal IDs with different declared units cannot be compared. This is a conservative structural preflight only—not proof of physical observability or diagnostic accuracy. Generic decision-specific sufficiency and minimum sensor-cut semantics remain owned by PIE-009N (#2032).
+
+
+### Temporal fault-signature analysis (prototype)
+
+The design IR supports optional time-indexed categorical samples per observable signal. Each sample records steps since fault injection, a known/unknown category, and an explicitly declared model-prediction confidence (PPM). The analyzer needs matching signal ID, unit, and sample offset; both categories must be known and both confidence values must clear the explicit policy threshold.
+
+Per-pair outputs distinguish timely divergence, late divergence, indistinguishability through the stated horizon, and unresolved comparisons. This prevents a fault that becomes distinguishable only after the response deadline from being called timely, and prevents unknown/low-confidence samples from manufacturing separation. PPM is not an empirical probability without calibration evidence. Step counts are not converted to wall-clock time here.
+
+Additional temporal regressions cover early/late divergence, low confidence, missing outcome/confidence, equal high-confidence traces, nonmatching sample offsets, and invalid policy/sample data. As above, this is authored structural code only; no compilation, physical sensor performance, diagnosis accuracy, or flight safety is claimed.
