@@ -283,16 +283,19 @@ pub fn validate_food_identity_match_v1(assessment: &Value) -> Result<(), Vec<Str
     }
     let query_identity = query.get("identity");
     let candidate_identity = candidate.get("identity");
-    let branded_without_identity = [
-        query_identity,
-        candidate_identity,
-    ].iter().any(|identity| {
-        identity
-            .and_then(|value| value.get("product_kind"))
-            .and_then(Value::as_str)
-            == Some("branded_product")
-            && identity.and_then(|value| value.get("brand_id")).and_then(Value::as_str).is_none()
-    });
+    let branded_without_identity = [query_identity, candidate_identity]
+        .iter()
+        .any(|identity| {
+            let identity = *identity;
+            identity
+                .and_then(|value| value.get("product_kind"))
+                .and_then(Value::as_str)
+                == Some("branded_product")
+                && identity
+                    .and_then(|value| value.get("brand_id"))
+                    .and_then(Value::as_str)
+                    .is_none()
+        });
     if matches!(outcome, Some("exact_match" | "qualified_approximation"))
         && branded_without_identity
     {
@@ -380,8 +383,8 @@ pub fn validate_food_identity_match_v1(assessment: &Value) -> Result<(), Vec<Str
         );
     }
 
-    let claims = match assessment.get("component_claims").and_then(Value::as_array) {
-        Some(claims) => claims,
+    let claims: &[Value] = match assessment.get("component_claims").and_then(Value::as_array) {
+        Some(claims) => claims.as_slice(),
         None => {
             errors.push("component_claims must be an array (empty is allowed)".to_owned());
             &[]
@@ -517,7 +520,7 @@ mod tests {
     }
 
     #[test]
-    fn branded_food_identity_requires_explicit_brand_and_fortification_checks_when_present() {
+    fn duplicate_brand_checks_and_claimed_conflicts_are_rejected() {
         let mut value = assessment();
         value["attribute_checks"][0]["relation"] = json!("match");
         value["attribute_checks"].as_array_mut().unwrap().push(json!({
