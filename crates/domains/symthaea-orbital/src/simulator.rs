@@ -685,7 +685,7 @@ mod tests {
             .expect("valid impact schedule should apply");
 
         for (axis, expected_delta) in [0.012, -0.005, 0.00025].iter().enumerate() {
-            let expected = baseline.state().velocity_km_s[axis] + expected_delta;
+            let expected = baseline.state().velocity_km_s[axis] + *expected_delta;
             assert!(
                 (affected.state().velocity_km_s[axis] - expected).abs() < 1e-12,
                 "velocity axis {axis} did not receive expected post-step delta-v"
