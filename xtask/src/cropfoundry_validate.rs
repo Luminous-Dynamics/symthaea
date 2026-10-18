@@ -1,13 +1,11 @@
-use anyhow::{anyhow, Context, Result};
+use anyhow::{Context, Result, anyhow};
 use serde_json::Value;
 use std::collections::BTreeSet;
 use std::fs;
 use std::path::Path;
 
-const BENCHMARK_RELATIVE_PATH: &str =
-    "docs/research/cropfoundry/cropfoundry-benchmark-v0.json";
-const SOURCE_RELATIVE_PATH: &str =
-    "docs/research/cropfoundry/data-source-manifest-v0.json";
+const BENCHMARK_RELATIVE_PATH: &str = "docs/research/cropfoundry/cropfoundry-benchmark-v0.json";
+const SOURCE_RELATIVE_PATH: &str = "docs/research/cropfoundry/data-source-manifest-v0.json";
 
 fn string_at<'a>(value: &'a Value, key: &str) -> Option<&'a str> {
     value.get(key).and_then(Value::as_str)
@@ -34,7 +32,9 @@ fn validate_benchmark_contract(root: &Value) -> std::result::Result<usize, Vec<S
         errors.push("suite must be exactly CropFoundry".to_owned());
     }
     if string_at(root, "status") != Some("proposed_not_run") {
-        errors.push("suite status must remain proposed_not_run until scored evidence exists".to_owned());
+        errors.push(
+            "suite status must remain proposed_not_run until scored evidence exists".to_owned(),
+        );
     }
     if !nonempty_string(root, "suite_version") {
         errors.push("suite_version must be a non-empty string".to_owned());
@@ -132,7 +132,9 @@ fn validate_source_manifest(root: &Value) -> std::result::Result<usize, Vec<Stri
         errors.push("version must be a non-empty string".to_owned());
     }
     if string_at(root, "status") != Some("discovery_only") {
-        errors.push("manifest status must remain discovery_only until acquisition is reviewed".to_owned());
+        errors.push(
+            "manifest status must remain discovery_only until acquisition is reviewed".to_owned(),
+        );
     }
     if root
         .get("policy")
@@ -187,19 +189,29 @@ fn validate_source_manifest(root: &Value) -> std::result::Result<usize, Vec<Stri
 
         let ingestion_status = string_at(source, "ingestion_status");
         if !ingestion_status.is_some_and(|status| INGESTION_STATES.contains(&status)) {
-            errors.push(format!("{prefix}.ingestion_status is missing or unsupported"));
+            errors.push(format!(
+                "{prefix}.ingestion_status is missing or unsupported"
+            ));
         }
 
         let training_authorized = match source.get("training_authorized").and_then(Value::as_bool) {
             Some(value) => value,
             None => {
-                errors.push(format!("{prefix}.training_authorized must be an explicit boolean"));
+                errors.push(format!(
+                    "{prefix}.training_authorized must be an explicit boolean"
+                ));
                 false
             }
         };
-        let permitted_uses_array = source.get("permitted_current_use").and_then(Value::as_array);
-        if !permitted_uses_array.is_some_and(|items| !items.is_empty() && items.iter().all(Value::is_string)) {
-            errors.push(format!("{prefix}.permitted_current_use must be a non-empty array of strings"));
+        let permitted_uses_array = source
+            .get("permitted_current_use")
+            .and_then(Value::as_array);
+        if !permitted_uses_array
+            .is_some_and(|items| !items.is_empty() && items.iter().all(Value::is_string))
+        {
+            errors.push(format!(
+                "{prefix}.permitted_current_use must be a non-empty array of strings"
+            ));
         }
         let permitted_uses: Vec<&str> = permitted_uses_array
             .map(|items| items.iter().filter_map(Value::as_str).collect())
@@ -243,10 +255,14 @@ fn validate_source_manifest(root: &Value) -> std::result::Result<usize, Vec<Stri
                 ));
             }
             if string_at(source, "license_status") != Some("verified") {
-                errors.push(format!("{prefix} requires license_status verified for training"));
+                errors.push(format!(
+                    "{prefix} requires license_status verified for training"
+                ));
             }
             if string_at(source, "access_status") != Some("authorized") {
-                errors.push(format!("{prefix} requires access_status authorized for training"));
+                errors.push(format!(
+                    "{prefix} requires access_status authorized for training"
+                ));
             }
             if !declares_training_use {
                 errors.push(format!(
@@ -265,7 +281,11 @@ fn validate_source_manifest(root: &Value) -> std::result::Result<usize, Vec<Stri
                     ));
                 }
             }
-            if source.get("dataset_structure_reviewed").and_then(Value::as_bool) != Some(true) {
+            if source
+                .get("dataset_structure_reviewed")
+                .and_then(Value::as_bool)
+                != Some(true)
+            {
                 errors.push(format!(
                     "{prefix}.dataset_structure_reviewed must be true before training can be authorized"
                 ));
@@ -308,7 +328,9 @@ pub fn run(root: &Path) -> Result<()> {
         .map_err(|errors| render_errors("data-source manifest", errors))?;
 
     println!("PASS benchmark contract: {benchmark_count} entries; proposal semantics validated");
-    println!("PASS data-source manifest: {source_count} entries; training authorization remains fail-closed");
+    println!(
+        "PASS data-source manifest: {source_count} entries; training authorization remains fail-closed"
+    );
     println!("PASS CropFoundry proposal contract; no scientific results were evaluated");
     Ok(())
 }
@@ -316,7 +338,7 @@ pub fn run(root: &Path) -> Result<()> {
 #[cfg(test)]
 mod tests {
     use super::*;
-    use serde_json::{json, Value};
+    use serde_json::{Value, json};
 
     const BENCHMARK_FIXTURE: &str =
         include_str!("../../docs/research/cropfoundry/cropfoundry-benchmark-v0.json");
@@ -336,7 +358,11 @@ mod tests {
         let first_id = fixture["benchmarks"][0]["id"].clone();
         fixture["benchmarks"][1]["id"] = first_id;
         let errors = validate_benchmark_contract(&fixture).unwrap_err();
-        assert!(errors.iter().any(|error| error.contains("duplicate benchmark id")));
+        assert!(
+            errors
+                .iter()
+                .any(|error| error.contains("duplicate benchmark id"))
+        );
     }
 
     #[test]
@@ -364,7 +390,11 @@ mod tests {
         let first_id = fixture["invariants"][0]["id"].clone();
         fixture["invariants"][1]["id"] = first_id;
         let errors = validate_benchmark_contract(&fixture).unwrap_err();
-        assert!(errors.iter().any(|error| error.contains("duplicate invariant id")));
+        assert!(
+            errors
+                .iter()
+                .any(|error| error.contains("duplicate invariant id"))
+        );
     }
 
     #[test]
@@ -372,11 +402,13 @@ mod tests {
         let fixture: Value = serde_json::from_str(SOURCE_FIXTURE).unwrap();
         let count = validate_source_manifest(&fixture).unwrap();
         assert_eq!(count, 9);
-        assert!(fixture["sources"]
-            .as_array()
-            .unwrap()
-            .iter()
-            .all(|source| source["training_authorized"] == false));
+        assert!(
+            fixture["sources"]
+                .as_array()
+                .unwrap()
+                .iter()
+                .all(|source| source["training_authorized"] == false)
+        );
     }
 
     #[test]
@@ -396,7 +428,11 @@ mod tests {
             json!("aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa");
 
         let errors = validate_source_manifest(&fixture).unwrap_err();
-        assert!(errors.iter().any(|error| error.contains("license_status verified")));
+        assert!(
+            errors
+                .iter()
+                .any(|error| error.contains("license_status verified"))
+        );
     }
 
     #[test]
@@ -405,7 +441,11 @@ mod tests {
         fixture["sources"][0]["permitted_current_use"] =
             json!(["public_metadata_review", "training"]);
         let errors = validate_source_manifest(&fixture).unwrap_err();
-        assert!(errors.iter().any(|error| error.contains("permits training")));
+        assert!(
+            errors
+                .iter()
+                .any(|error| error.contains("permits training"))
+        );
     }
 
     #[test]
@@ -416,7 +456,11 @@ mod tests {
             .unwrap()
             .remove("training_authorized");
         let errors = validate_source_manifest(&fixture).unwrap_err();
-        assert!(errors.iter().any(|error| error.contains("training_authorized must be an explicit boolean")));
+        assert!(
+            errors
+                .iter()
+                .any(|error| error.contains("training_authorized must be an explicit boolean"))
+        );
     }
 
     #[test]
@@ -424,7 +468,11 @@ mod tests {
         let mut fixture: Value = serde_json::from_str(SOURCE_FIXTURE).unwrap();
         fixture["sources"][0]["training_authorized"] = json!(true);
         let errors = validate_source_manifest(&fixture).unwrap_err();
-        assert!(errors.iter().any(|error| error.contains("manifest status is discovery_only")));
+        assert!(
+            errors
+                .iter()
+                .any(|error| error.contains("manifest status is discovery_only"))
+        );
     }
 
     #[test]
@@ -433,6 +481,10 @@ mod tests {
         let first_id = fixture["sources"][0]["id"].clone();
         fixture["sources"][1]["id"] = first_id;
         let errors = validate_source_manifest(&fixture).unwrap_err();
-        assert!(errors.iter().any(|error| error.contains("duplicate source id")));
+        assert!(
+            errors
+                .iter()
+                .any(|error| error.contains("duplicate source id"))
+        );
     }
 }
