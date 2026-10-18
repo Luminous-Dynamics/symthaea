@@ -6,6 +6,7 @@ mod duplicate_scan;
 mod manifest;
 mod rhn_sweep;
 mod twowheeler_benchmark;
+mod powertrain_energy_ledger;
 
 #[derive(Parser)]
 struct Cli {
@@ -72,6 +73,15 @@ enum Commands {
         #[arg(long)]
         out: Option<PathBuf>,
     },
+    /// Verify the frozen synthetic powertrain energy-ledger controls.
+    /// A pass establishes accounting-contract conformance only, not physical efficiency.
+    PowertrainEnergyLedger {
+        #[arg(long, default_value = "docs/research/data/two_wheeler_powertrain_energy_ledger_v0_1.json")]
+        input: PathBuf,
+        /// Optional path for a JSON report; otherwise report to stdout.
+        #[arg(long)]
+        out: Option<PathBuf>,
+    },
     GenerateManifest {
         #[arg(long, default_value = ".")]
         root: PathBuf,
@@ -128,6 +138,15 @@ fn main() -> anyhow::Result<()> {
             };
             let out = out.map(|path| if path.is_absolute() { path } else { root.join(path) });
             twowheeler_benchmark::run(&input, out.as_deref())?;
+        }
+        Commands::PowertrainEnergyLedger { input, out } => {
+            let root = PathBuf::from(env!("CARGO_MANIFEST_DIR"))
+                .parent()
+                .expect("xtask lives one level below the workspace root")
+                .to_path_buf();
+            let input = if input.is_absolute() { input } else { root.join(input) };
+            let out = out.map(|path| if path.is_absolute() { path } else { root.join(path) });
+            powertrain_energy_ledger::run(&input, out.as_deref())?;
         }
         Commands::GenerateManifest { root } => {
             let files = vec!["Cargo.toml", "src/lib.rs", "symthaea-core/Cargo.toml"];
