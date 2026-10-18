@@ -29,6 +29,10 @@ Both generated files contain identical, deterministic 2,048-byte payloads and a 
 
 This is a synthetic layout experiment, not a parser for production HdcStore files. A successful result does not make the candidate format compatible, crash-safe or production-ready.
 
+## Design precedent
+
+The metadata-first candidate applies the general row-vs-column / structure-of-arrays trade-off: separate homogeneous fields to make a metadata scan contiguous, while accepting the extra layout/mutation complexity. Apache Arrow's columnar format specification describes data adjacency for scans and vectorization as a layout goal, with trade-offs for mutation costs ([Arrow columnar format](https://arrow.apache.org/docs/format/Columnar.html)). That is a precedent for testing the layout, not evidence that it will outperform this HDC store.
+
 ## Measurements and their limitations
 
 On Linux the example collects:
