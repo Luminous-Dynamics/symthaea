@@ -5,6 +5,9 @@ on:
     branches: ["main"]
     paths:
       - "tools/open-display-platform-verify/**"
+      - "hardware/open-display-reference/**"
+      - "docs/engineering/DISPLAY_METROLOGY_REPRODUCIBILITY_PROTOCOL.md"
+      - "docs/engineering/OPEN_DISPLAY_HARDWARE_REUSE_CANDIDATES.md"
       - "docs/engineering/OPEN_DISPLAY_REFERENCE_HARDWARE.md"
       - "docs/engineering/open-display-reference-platform-v0.1.json"
       - "docs/engineering/open-display-reference-platform.schema.json"
@@ -13,6 +16,9 @@ on:
     branches: ["main"]
     paths:
       - "tools/open-display-platform-verify/**"
+      - "hardware/open-display-reference/**"
+      - "docs/engineering/DISPLAY_METROLOGY_REPRODUCIBILITY_PROTOCOL.md"
+      - "docs/engineering/OPEN_DISPLAY_HARDWARE_REUSE_CANDIDATES.md"
       - "docs/engineering/OPEN_DISPLAY_REFERENCE_HARDWARE.md"
       - "docs/engineering/open-display-reference-platform-v0.1.json"
       - "docs/engineering/open-display-reference-platform.schema.json"
