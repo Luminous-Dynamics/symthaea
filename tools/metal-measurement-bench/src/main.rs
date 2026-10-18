@@ -355,7 +355,7 @@ fn validate_manifest(manifest: &SourceManifest) -> Result<()> {
         }
     }
 
-    let mut source_object_ids = BTreeSet::new();
+    let mut source_object_ids: BTreeSet<String> = BTreeSet::new();
     let mut declared_source_dois = BTreeSet::new();
     declared_source_dois.insert(manifest.dataset.doi.as_str());
     for source in &manifest.related_sources {
@@ -375,7 +375,7 @@ fn validate_manifest(manifest: &SourceManifest) -> Result<()> {
                 )));
             }
         }
-        if !source_object_ids.insert(object.id.as_str()) {
+        if !source_object_ids.insert(object.id.clone()) {
             return Err(AdapterError::Validation(format!(
                 "duplicate source object id {:?}", object.id
             )));
@@ -448,7 +448,7 @@ fn validate_manifest(manifest: &SourceManifest) -> Result<()> {
                 artifact.relative_path
             )));
         }
-        if !source_object_ids.contains(artifact.source_object_id.as_str()) {
+        if !source_object_ids.contains(&artifact.source_object_id) {
             return Err(AdapterError::Validation(format!(
                 "artifact {:?} references undeclared source object {:?}",
                 artifact.relative_path, artifact.source_object_id
@@ -461,6 +461,12 @@ fn validate_manifest(manifest: &SourceManifest) -> Result<()> {
             return Err(AdapterError::Validation(format!(
                 "artifact {:?} DOI {:?} does not match source object DOI {:?}",
                 artifact.relative_path, artifact.source_doi, source_object.source_doi
+            )));
+        }
+        if !source_object.terms_reviewed || !source_object.local_use_authorized {
+            return Err(AdapterError::Validation(format!(
+                "artifact {:?} is blocked by source-object reuse permissions",
+                artifact.relative_path
             )));
         }
         if !is_hex_sha256(&artifact.sha256) {
@@ -1043,7 +1049,7 @@ mod tests {
         let mut value = manifest();
         value.artifacts.push(SourceArtifact {
             relative_path: "results.csv".into(),
-            source_object_id: "artifact-001".into(),
+            source_object_id: "amb2025-02-targets".into(),
             source_doi: "10.18434/mds2-3735".into(),
             artifact_revision: "source-revision-pending".into(),
             accessed_on: "2026-10-18".into(),
@@ -1075,7 +1081,7 @@ mod tests {
         value.reuse_policy.local_use_authorized = true;
         value.artifacts.push(SourceArtifact {
             relative_path: "sample.csv".into(),
-            source_object_id: "sample-file-001".into(),
+            source_object_id: "amb2025-02-targets".into(),
             source_doi: "10.18434/mds2-3735".into(),
             artifact_revision: "fixture-v1".into(),
             accessed_on: "2026-10-18".into(),
