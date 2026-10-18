@@ -397,7 +397,11 @@ fn validate_measurement_run_semantics(record: &Value) -> Vec<String> {
                 let supports_measurand = instrument
                     .get("supported_measurands")
                     .and_then(Value::as_array)
-                    .is_some_and(|measurands| measurands.iter().any(|item| item.as_str() == Some(measurand)));
+                    .is_some_and(|measurands| {
+                        measurands
+                            .iter()
+                            .any(|item| item.as_str() == Some(measurand))
+                    });
                 if !supports_measurand {
                     errors.push(format!(
                         "instrument {id} does not declare support for measurand {measurand}"
@@ -461,7 +465,10 @@ fn validate_measurement_run_semantics(record: &Value) -> Vec<String> {
             }
         }
         "ACQUIRED_UNQUALIFIED" => {
-            if physical_state != "MEASURED_UNQUALIFIED" || acquired_at.is_none() || measured_count == 0 {
+            if physical_state != "MEASURED_UNQUALIFIED"
+                || acquired_at.is_none()
+                || measured_count == 0
+            {
                 errors.push(
                     "ACQUIRED_UNQUALIFIED record needs acquisition time, measured data, and MEASURED_UNQUALIFIED physical state".to_owned(),
                 );
@@ -813,8 +820,8 @@ mod tests {
     #[test]
     fn run_record_rejects_duplicate_observation_ids() {
         let mut record = parse_run();
-        record["observations"][1]["observation_id"] =
-            record["observations"][0]["observation_id"].clone();
+        let first_id = record["observations"][0]["observation_id"].clone();
+        record["observations"][1]["observation_id"] = first_id;
         assert!(validate_measurement_run_str(&encoded(&record), RUN_SCHEMA_TEXT)
             .expect_err("duplicate observation identities must fail")
             .iter()
