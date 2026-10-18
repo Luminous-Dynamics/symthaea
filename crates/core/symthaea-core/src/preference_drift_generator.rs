@@ -3,7 +3,7 @@
 // Commercial licensing: see COMMERCIAL_LICENSE.md at repository root
 //! Deterministic factorized scenario expansion for the synthetic mobility benchmark.
 //!
-//! This creates synthetic benchmark cases from the reviewed v2 control corpus. It is not a
+//! This creates synthetic benchmark cases from the v3 corpus, which extends reviewed v2 controls. It is not a
 //! simulator of human physiology, a preference model, or evidence about real wearers.
 
 use std::collections::{BTreeMap, BTreeSet};
