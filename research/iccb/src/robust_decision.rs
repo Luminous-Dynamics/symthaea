@@ -64,8 +64,13 @@ pub struct ActionPayoffEnvelope {
     pub lower_expected_value_numerator: i128,
     /// Exact expectation numerator; divide by 10,000 for currency minor units.
     pub upper_expected_value_numerator: i128,
+    /// Conservative ceiling on worst-case expected regret in currency minor units.
+    pub worst_case_expected_regret_upper_minor: i64,
+    /// Exact worst-case expected-regret numerator; divide by 10,000 for minor units.
+    pub worst_case_expected_regret_numerator: i128,
     pub worst_case_probability_allocation: Vec<ProbabilityAllocation>,
     pub best_case_probability_allocation: Vec<ProbabilityAllocation>,
+    pub worst_case_regret_probability_allocation: Vec<ProbabilityAllocation>,
 }
 
 #[derive(Clone, Debug, PartialEq, Eq)]
@@ -82,6 +87,8 @@ pub struct RobustDecisionReport {
     pub scenario_id: String,
     pub status: RobustDecisionStatus,
     pub action_envelopes: Vec<ActionPayoffEnvelope>,
+    /// All actions tied for minimum worst-case expected regret, in stable ID order.
+    pub minimax_regret_action_ids: Vec<String>,
 }
 
 impl RobustDecisionScenario {
@@ -113,10 +120,22 @@ impl RobustDecisionScenario {
             _ => RobustDecisionStatus::NoUniqueRobustWinner,
         };
 
+        let lowest_regret = envelopes
+            .iter()
+            .map(|envelope| envelope.worst_case_expected_regret_numerator)
+            .min()
+            .expect("validated action set must be non-empty");
+        let minimax_regret_action_ids = envelopes
+            .iter()
+            .filter(|envelope| envelope.worst_case_expected_regret_numerator == lowest_regret)
+            .map(|envelope| envelope.action_id.clone())
+            .collect();
+
         Ok(RobustDecisionReport {
             scenario_id: self.id.clone(),
             status,
             action_envelopes: envelopes,
+            minimax_regret_action_ids,
         })
     }
 
@@ -204,6 +223,10 @@ impl RobustDecisionScenario {
 
         let lower_expected_value_minor = floor_ratio_to_i64(lower_expected_value_numerator, BPS)?;
         let upper_expected_value_minor = ceil_ratio_to_i64(upper_expected_value_numerator, BPS)?;
+        let (worst_case_expected_regret_numerator, worst_case_regret_probability_allocation) =
+            self.worst_case_regret_allocation(action_id)?;
+        let worst_case_expected_regret_upper_minor =
+            ceil_ratio_to_i64(worst_case_expected_regret_numerator, BPS)?;
 
         Ok(ActionPayoffEnvelope {
             action_id: action_id.to_owned(),
@@ -211,8 +234,11 @@ impl RobustDecisionScenario {
             upper_expected_value_minor,
             lower_expected_value_numerator,
             upper_expected_value_numerator,
+            worst_case_expected_regret_upper_minor,
+            worst_case_expected_regret_numerator,
             worst_case_probability_allocation,
             best_case_probability_allocation,
+            worst_case_regret_probability_allocation,
         })
     }
 
@@ -271,6 +297,85 @@ impl RobustDecisionScenario {
         for (state, probability) in self.state_probability_bounds.iter().zip(allocation) {
             numerator += i128::from(probability)
                 * i128::from(self.payoff(action_id, &state.state_id));
+            recorded.push(ProbabilityAllocation {
+                state_id: state.state_id.clone(),
+                probability_bps: probability,
+            });
+        }
+        recorded.sort_by(|left, right| left.state_id.cmp(&right.state_id));
+        Ok((numerator, recorded))
+    }
+
+    fn worst_case_regret_allocation(
+        &self,
+        action_id: &str,
+    ) -> Result<(i128, Vec<ProbabilityAllocation>), RobustDecisionError> {
+        let mut allocation = self
+            .state_probability_bounds
+            .iter()
+            .map(|state| state.lower_bps)
+            .collect::<Vec<_>>();
+        let lower_sum = allocation.iter().map(|value| u64::from(*value)).sum::<u64>();
+        let mut remaining = TOTAL_BPS
+            .checked_sub(lower_sum)
+            .ok_or(RobustDecisionError::InfeasibleProbabilityBounds)?;
+
+        let regrets = self
+            .state_probability_bounds
+            .iter()
+            .map(|state| {
+                let best_payoff = self
+                    .action_ids
+                    .iter()
+                    .map(|candidate| i128::from(self.payoff(candidate, &state.state_id)))
+                    .max()
+                    .expect("validated action set must be non-empty");
+                let current_payoff = i128::from(self.payoff(action_id, &state.state_id));
+                best_payoff - current_payoff
+            })
+            .collect::<Vec<_>>();
+
+        let mut order = (0..self.state_probability_bounds.len()).collect::<Vec<_>>();
+        order.sort_by(|left, right| {
+            regrets[*right]
+                .cmp(&regrets[*left])
+                .then_with(|| {
+                    self.state_probability_bounds[*left]
+                        .state_id
+                        .cmp(&self.state_probability_bounds[*right].state_id)
+                })
+        });
+
+        for index in order {
+            if remaining == 0 {
+                break;
+            }
+            let state = &self.state_probability_bounds[index];
+            let capacity = u64::from(state.upper_bps - allocation[index]);
+            let assigned = remaining.min(capacity);
+            allocation[index] = allocation[index]
+                .checked_add(u32::try_from(assigned).map_err(|_| {
+                    RobustDecisionError::ProbabilityAllocationInfeasible
+                })?)
+                .ok_or(RobustDecisionError::ProbabilityAllocationInfeasible)?;
+            remaining -= assigned;
+        }
+
+        if remaining != 0
+            || allocation.iter().map(|value| u64::from(*value)).sum::<u64>() != TOTAL_BPS
+        {
+            return Err(RobustDecisionError::ProbabilityAllocationInfeasible);
+        }
+
+        let mut numerator = 0_i128;
+        let mut recorded = Vec::with_capacity(allocation.len());
+        for ((state, probability), regret) in self
+            .state_probability_bounds
+            .iter()
+            .zip(allocation)
+            .zip(regrets)
+        {
+            numerator += i128::from(probability) * regret;
             recorded.push(ProbabilityAllocation {
                 state_id: state.state_id.clone(),
                 probability_bps: probability,
