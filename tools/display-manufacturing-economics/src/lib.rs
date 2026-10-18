@@ -214,15 +214,19 @@ pub fn summarize_inspection(
     if counts.inspected_units > counts.eligible_units {
         return Err(ManufacturingMetricError::InspectedExceedsEligible);
     }
-    if counts.true_positive + counts.false_positive > counts.inspected_units
-        || counts.true_positive + counts.false_negative > counts.eligible_units
-    {
+    let positive_calls = counts
+        .true_positive
+        .checked_add(counts.false_positive)
+        .ok_or(ManufacturingMetricError::InspectionCountsExceedPopulation)?;
+    let represented_defects = counts
+        .true_positive
+        .checked_add(counts.false_negative)
+        .ok_or(ManufacturingMetricError::InspectionCountsExceedPopulation)?;
+    if positive_calls > counts.inspected_units || represented_defects > counts.eligible_units {
         return Err(ManufacturingMetricError::InspectionCountsExceedPopulation);
     }
 
     let coverage = counts.inspected_units as f64 / counts.eligible_units as f64;
-    let positive_calls = counts.true_positive + counts.false_positive;
-    let represented_defects = counts.true_positive + counts.false_negative;
     let precision = if positive_calls == 0 {
         None
     } else {
