@@ -169,13 +169,21 @@ cargo run -p symthaea-muse --bin muse_instrument_probe -- --calibrate-pitch-esti
 
 # Keep runtime lower while inspecting signal health.
 cargo run -p symthaea-muse --bin muse_instrument_probe -- --instrument harmonica --repeats 1
+
+# Optional, I/O-intensive: put the selected bank's indexed-content digest
+# in every selected-sample receipt. Must be set before the process starts.
+SYMTHAEA_MUSE_HASH_SOURCE_BANK_MANIFEST=1 cargo run -p symthaea-muse --bin muse_instrument_probe -- --instrument harp > harp-probe-with-bank-manifest.json
+
+# Generate the inventory-side digest for comparison. Use the same VCSL/VSCO2
+# asset roots and code/indexer revision as the render probe above.
+cargo run -p symthaea-muse --bin muse_instrument_qualification -- --hash-indexed-samples > mel-instrument-capability-matrix.json
 ```
 
 Use `cargo test -p symthaea-muse --bin muse_instrument_probe` for roster/bounds checks, synthetic sine pitch-estimator sanity tests, silence rejection and velocity-response summary tests.
 Use `cargo test -p symthaea-muse --bin muse_instrument_qualification` for fail-closed source-status classification and the explicit unvalidated-gesture worklist.
 These tests and commands are authored/documented but are not marked as executed by these changes.
 
-The next increment should couple each selected-file hash to a pinned library/root manifest and add instrument-specific range, pitch-accuracy, and gesture tests. Keep a per-note evidence record linking the requested instrument, selected renderer, selected source sample, signal checks, and exact renderer/asset digests. Do not collapse these fields into a pooled “instrument score.”
+The probe can now optionally add the indexed-content digest for the selected mapped bank beside the selected-WAV byte hash. Compare `selected_sample.source_bank_content_manifest_sha256` in the render report against `indexed_sample_content_manifest_sha256` for the corresponding instrument/bank in the qualification matrix, using the same asset roots and code/indexer revision. This bank manifest covers only WAVs accepted by the bank indexer; a complete root-level manifest (including unindexed assets) and an explicit renderer-binary digest remain separate follow-ups. Then add instrument-specific range, pitch-accuracy, and gesture tests. Keep a per-note evidence record linking requested instrument, selected renderer, selected source sample, signal checks, and exact asset/renderer digests. Do not collapse these fields into a pooled “instrument score.”
 
 ### P2a — Calibrate the measurement instrument first
 - Run MEL-PITCH-CAL-001 on the default synthetic-tone sweep (MIDI 36–96) before interpreting instrument pitch errors.
@@ -221,7 +229,7 @@ These are engineering targets to adopt after the new v2 measurements are locally
 | Periodic-tone pitch accuracy | Synthetic sine fixtures: median absolute error ≤ 2 cents; p95 ≤ 5 cents | Run MEL-PITCH-CAL-001; report coverage, median, p95, maximum, and counts beyond 2/5/15 cents before interpreting instrument pitch results |
 | Instrument pitch accuracy | For calibrated, pitched instruments: median absolute error ≤ 5 cents and p95 ≤ 15 cents over supported range | Exclude or separately model inharmonic/percussive timbres and report low-confidence cells |
 | Velocity controllability | ≥95% of declared velocity-sensitive cells show expected loudness direction; exceptions explicitly documented | Treat this as a target only after per-instrument baseline and within-velocity repeatability are measured |
-| Source coverage | 100% of sample-backed cells trace to a relative source path, source WAV byte hash, source root pitch, and source rate | Selected-file hash is now in each receipt; coupling to a full library/root manifest digest is still open |
+| Source coverage | 100% of sample-backed cells trace to a relative source path, source WAV byte hash, source root pitch, and source rate; with bank hashing enabled, every sample-backed cell carries the indexed-bank content digest | The selected-bank digest is opt-in and must match the qualification matrix for the same assets and indexer revision; complete root coverage remains open |
 | Gesture semantics | 100% of marketed gestures have positive controls, negative controls, and renderer receipts | Untested gestures remain unavailable |
 | Human preference | Paired preference accuracy reported with confidence intervals; target ≥60% preference for improved vs matched baseline with lower 95% CI >50% | Separate instrumental identity, musicality, prompt alignment and production quality; blind review is required |
 
