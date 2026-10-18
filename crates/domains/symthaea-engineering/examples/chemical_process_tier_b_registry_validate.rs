@@ -125,6 +125,33 @@ fn freeze_receipt_digest(receipt: &Value) -> Result<String, String> {
     Ok(format!("sha256:{}", sha256(&bytes).to_hex()))
 }
 
+
+const FROZEN_EVIDENCE_ENVELOPE_DOMAIN: &[u8] =
+    b"symthaea:chemical-process-tier-b-frozen-evidence-envelope:v1\n";
+
+/// Bind registry schema, full candidate identity/configuration, run metadata,
+/// output digests, and the frozen receipt into one content-addressed envelope.
+/// The envelope's own digest field is omitted to avoid recursive hashing.
+fn frozen_evidence_envelope_digest(
+    registry: &Value,
+    candidate: &Value,
+) -> Result<String, String> {
+    let mut candidate_without_digest = candidate.clone();
+    let outputs = candidate_without_digest
+        .get_mut("reference_outputs")
+        .and_then(Value::as_object_mut)
+        .ok_or_else(|| "candidate reference_outputs must be an object".to_owned())?;
+    outputs.remove("frozen_evidence_envelope_sha256");
+    let payload = json!({
+        "schema_id": registry["schema_id"],
+        "schema_version": registry["schema_version"],
+        "candidate": candidate_without_digest
+    });
+    let mut bytes = FROZEN_EVIDENCE_ENVELOPE_DOMAIN.to_vec();
+    append_canonical_json(&payload, &mut bytes)?;
+    Ok(format!("sha256:{}", sha256(&bytes).to_hex()))
+}
+
 fn source_has_url(source: &Value) -> bool {
     source.as_object().is_some_and(|fields| {
         fields.values().any(|value| {
@@ -365,7 +392,7 @@ fn validate_receipt_shape(
     }
 }
 
-fn validate_frozen_receipt(candidate: &Value, errors: &mut Vec<String>, id: &str) {
+fn validate_frozen_receipt(registry: &Value, candidate: &Value, errors: &mut Vec<String>, id: &str) {
     let execution = &candidate["execution"];
     let outputs = &candidate["reference_outputs"];
     let freeze_state = text(candidate, "freeze_state").unwrap_or_default();
@@ -394,6 +421,17 @@ fn validate_frozen_receipt(candidate: &Value, errors: &mut Vec<String>, id: &str
         }
         if !nonempty_text(execution, "simulator_version") {
             errors.push(format!("{id}: frozen outputs require a pinned simulator_version"));
+        }
+
+        match frozen_evidence_envelope_digest(registry, candidate) {
+            Ok(expected_digest) => {
+                if !is_sha256(&outputs["frozen_evidence_envelope_sha256"])
+                    || text(outputs, "frozen_evidence_envelope_sha256") != Some(expected_digest.as_str())
+                {
+                    errors.push(format!("{id}: frozen_evidence_envelope_sha256 does not match candidate identity, configuration, run and output evidence"));
+                }
+            }
+            Err(reason) => errors.push(format!("{id}: cannot compute frozen evidence envelope digest: {reason}")),
         }
 
         let receipt = &outputs["freeze_receipt"];
@@ -435,6 +473,9 @@ fn validate_frozen_receipt(candidate: &Value, errors: &mut Vec<String>, id: &str
         }
         if !outputs["freeze_receipt_sha256"].is_null() {
             errors.push(format!("{id}: non-frozen outputs require freeze_receipt_sha256=null"));
+        }
+        if !outputs["frozen_evidence_envelope_sha256"].is_null() {
+            errors.push(format!("{id}: non-frozen outputs require frozen_evidence_envelope_sha256=null"));
         }
         if outputs.get("freeze_receipt").is_some_and(has_content) {
             errors.push(format!("{id}: non-frozen outputs may not carry a freeze_receipt"));
@@ -519,11 +560,24 @@ fn validate_registry(registry: &Value) -> Vec<String> {
     {
         errors.push("schema_id is missing or unrecognized".to_owned());
     }
-    if text(registry, "schema_version") != Some("1.2.0") {
-        errors.push("schema_version must be 1.2.0".to_owned());
+    if text(registry, "schema_version") != Some("1.3.0") {
+        errors.push("schema_version must be 1.3.0".to_owned());
     }
     if text(registry, "purpose").is_none_or(|value| value.trim().is_empty()) {
         errors.push("purpose must be explicit".to_owned());
+    }
+
+    let envelope_policy = &registry["frozen_evidence_envelope_digest_policy"];
+    for (field, expected) in [
+        ("field", "reference_outputs.frozen_evidence_envelope_sha256"),
+        ("algorithm", "SHA-256"),
+        ("domain_separator", "symthaea:chemical-process-tier-b-frozen-evidence-envelope:v1\n"),
+        ("payload", "Registry schema_id/schema_version plus the full candidate object with only reference_outputs.frozen_evidence_envelope_sha256 removed."),
+        ("security_boundary", "Binds case identity/configuration, execution status/version/raw-output digest, output digest, receipt digest and receipt content against accidental or partial mutation. Unauthenticated content digest only; not a signature or proof of scientific truth.")
+    ] {
+        if text(envelope_policy, field) != Some(expected) {
+            errors.push(format!("frozen_evidence_envelope_digest_policy.{field} must exactly match the implementation contract"));
+        }
     }
 
     let digest_policy = &registry["freeze_receipt_digest_policy"];
@@ -616,6 +670,9 @@ fn validate_registry(registry: &Value) -> Vec<String> {
         if candidate["reference_outputs"].get("freeze_receipt_sha256").is_none() {
             errors.push(format!("{id}: reference_outputs.freeze_receipt_sha256 must be explicit (null until frozen)"));
         }
+        if candidate["reference_outputs"].get("frozen_evidence_envelope_sha256").is_none() {
+            errors.push(format!("{id}: reference_outputs.frozen_evidence_envelope_sha256 must be explicit (null until frozen)"));
+        }
 
         if !freeze_state.eq("FROZEN")
             && !candidate["freeze_blockers"]
@@ -641,7 +698,7 @@ fn validate_registry(registry: &Value) -> Vec<String> {
             }
         }
 
-        validate_frozen_receipt(candidate, &mut errors, id);
+        validate_frozen_receipt(registry, candidate, &mut errors, id);
     }
 
     let targets = &registry["acceptance_targets"];
@@ -654,6 +711,7 @@ fn validate_registry(registry: &Value) -> Vec<String> {
         ("malformed_lineage_graph_detection", 1.0_f64),
         ("frozen_receipt_digest_mutation_detection", 1.0_f64),
         ("freeze_receipt_digest_policy_mutation_detection", 1.0_f64),
+        ("frozen_evidence_envelope_mutation_detection", 1.0_f64),
     ] {
         let actual = targets[field]["target"].as_f64();
         if actual != Some(expected) || targets[field]["hard_gate"].as_bool() != Some(true) {
@@ -1172,6 +1230,43 @@ mod tests {
                 .iter()
                 .any(|error| error.contains("freeze_receipt_digest_policy.domain_separator")),
             "digest policy cannot drift away from the compiled implementation"
+        );
+    }
+
+
+
+    #[test]
+    fn frozen_evidence_envelope_detects_output_or_configuration_mutation() {
+        let mut value = frozen_receipt_registry();
+        assert!(validate_registry(&value).is_empty());
+
+        value["candidates"][0]["reference_outputs"]["output_digest"] =
+            json!("sha256:cccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccc");
+        let errors = validate_registry(&value);
+        assert!(
+            errors.iter().any(|error| error.contains("frozen_evidence_envelope_sha256 does not match")),
+            "changing output digest without rebinding envelope must fail closed: {errors:?}"
+        );
+
+        let mut changed_identity = frozen_receipt_registry();
+        changed_identity["candidates"][0]["configuration"]["compound"] = json!("not-water");
+        let identity_errors = validate_registry(&changed_identity);
+        assert!(
+            identity_errors.iter().any(|error| error.contains("frozen_evidence_envelope_sha256 does not match")),
+            "configuration mutation must invalidate the frozen evidence envelope"
+        );
+    }
+
+    #[test]
+    fn frozen_evidence_envelope_policy_mutation_is_rejected() {
+        let mut value = registry();
+        value["frozen_evidence_envelope_digest_policy"]["payload"] =
+            json!("receipt only");
+        assert!(
+            validate_registry(&value)
+                .iter()
+                .any(|error| error.contains("frozen_evidence_envelope_digest_policy.payload")),
+            "the envelope digest contract must not drift from its implementation"
         );
     }
 
