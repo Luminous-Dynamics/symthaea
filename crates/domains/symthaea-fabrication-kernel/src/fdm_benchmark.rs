@@ -571,7 +571,8 @@ mod tests {
         input.measurements.push(duplicate);
         let result = evaluate_fdm_case(&input);
         assert_eq!(result.disposition, GeometryDisposition::NotEvaluable);
-        assert_eq!(result.features.len(), 0); // Global identity/structure error blocks scoring.
+        assert_eq!(result.features.len(), 1);
+        assert_eq!(result.features[0].disposition, FeatureDisposition::Invalid);
     }
 
     #[test]
