@@ -127,12 +127,14 @@
         "upstream says blowouts/instantaneous failures are not included",
         "formal academic citation is not yet supplied in upstream README; preserve repository citation and attribution"
       ],
-      "next_action": "Run cargo run -p xtask -- tire-monitoring-intake on the committed shards, retain the output SHA-256 report, split only by Unit_ID, and evaluate pressure/temp/speed anomaly detection on whole-segment holdouts. Never upgrade this evidence to motorcycle grip or powertrain validation.",
+      "next_action": "Run cargo test -p xtask tire_monitoring_intake and cargo run -p xtask -- tire-monitoring-intake on the exact PR head; then use whole-Unit_ID holdouts for pressure/temp/speed anomaly research only.",
       "repository_paths": [
         "data/third_party/tire-monitoring-dataset/tire_monitoring_dataset.csv.part-0001 through .part-0009",
         "data/third_party/tire-monitoring-dataset/README.upstream.md",
         "data/third_party/tire-monitoring-dataset/LICENSE.txt",
-        "data/third_party/tire-monitoring-dataset/README.md"
+        "data/third_party/tire-monitoring-dataset/README.md",
+        "data/third_party/tire-monitoring-dataset/INTAKE_RECEIPT.json",
+        "xtask/src/tire_monitoring_intake.rs"
       ],
       "integrity_observation": {
         "upstream_git_blob_sha1": "0029b6f156847ecc052f57ae45fd025ad032d086",
