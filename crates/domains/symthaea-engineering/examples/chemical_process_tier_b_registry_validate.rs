@@ -1152,7 +1152,7 @@ mod tests {
 
         assert_eq!(
             std::str::from_utf8(&canonical).unwrap(),
-            "symthaea:chemical-process-tier-b-freeze-receipt:v1\\n{\\"a\\":{\\"b\\":null,\\"y\\":true},\\"z\\":9}"
+            "symthaea:chemical-process-tier-b-freeze-receipt:v1\n{\"a\":{\"b\":null,\"y\":true},\"z\":9}"
         );
         assert_eq!(
             freeze_receipt_digest(&value).unwrap(),
