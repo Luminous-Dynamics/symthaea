@@ -3799,15 +3799,23 @@ mod tests {
 
         write_wav(&sample_path, 4000);
         let original_sample_size = std::fs::metadata(&sample_path).unwrap().len();
-        let first = capability_inventory_with_options(
+        let first = capability_inventory_with_provenance_options(
             &vcsl_root,
             &vsco2_root,
             None,
             None,
             true,
+            true,
         )
         .unwrap();
         assert!(first.indexed_sample_content_hashing_enabled);
+        assert!(first.root_content_manifest_hashing_enabled);
+        assert_eq!(first.vcsl_root.content_manifest_status, "hashed");
+        let first_root_content_hash = first
+            .vcsl_root
+            .content_manifest_sha256
+            .clone()
+            .expect("explicit root content hashing should produce a digest");
         let harp = first
             .instruments
             .iter()
@@ -3822,11 +3830,12 @@ mod tests {
             .expect("explicit content hashing should produce a manifest digest");
         let layout_hash = first.vcsl_root.path_size_manifest_sha256.clone().unwrap();
 
-        let repeated = capability_inventory_with_options(
+        let repeated = capability_inventory_with_provenance_options(
             &vcsl_root,
             &vsco2_root,
             None,
             None,
+            true,
             true,
         )
         .unwrap();
@@ -3845,6 +3854,11 @@ mod tests {
             Some(first_hash.as_str()),
             "same indexed sample bytes must yield a stable content manifest"
         );
+        assert_eq!(
+            repeated.vcsl_root.content_manifest_sha256.as_deref(),
+            Some(first_root_content_hash.as_str()),
+            "same root WAV bytes must yield a stable content manifest"
+        );
 
         // Keep the WAV frame count and byte length fixed while changing audio.
         write_wav(&sample_path, 9000);
@@ -3853,11 +3867,12 @@ mod tests {
             original_sample_size,
             "fixture changes audio payload without changing file size"
         );
-        let changed = capability_inventory_with_options(
+        let changed = capability_inventory_with_provenance_options(
             &vcsl_root,
             &vsco2_root,
             None,
             None,
+            true,
             true,
         )
         .unwrap();
@@ -3883,8 +3898,16 @@ mod tests {
             Some(layout_hash.as_str()),
             "the legacy path/size manifest is intentionally content-agnostic"
         );
+        assert_ne!(
+            changed.vcsl_root.content_manifest_sha256.as_deref(),
+            Some(first_root_content_hash.as_str()),
+            "root content manifest must catch same-size WAV byte changes"
+        );
 
         let default_inventory = capability_inventory(&vcsl_root, &vsco2_root, None).unwrap();
+        assert!(!default_inventory.root_content_manifest_hashing_enabled);
+        assert_eq!(default_inventory.vcsl_root.content_manifest_status, "not_requested");
+        assert!(default_inventory.vcsl_root.content_manifest_sha256.is_none());
         let default_harp = default_inventory
             .instruments
             .iter()
