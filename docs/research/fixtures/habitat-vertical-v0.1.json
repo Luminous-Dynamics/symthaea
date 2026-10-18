@@ -214,7 +214,7 @@
       "capability_profile": "SYN-CUT-PROFILE-A",
       "qualification": "synthetic_only",
       "available": true,
-      "skills_required": [
+      "qualified_skills": [
         "textile_cutting"
       ]
     },
@@ -224,7 +224,7 @@
       "capability_profile": "SYN-SEW-PROFILE-A",
       "qualification": "synthetic_only",
       "available": true,
-      "skills_required": [
+      "qualified_skills": [
         "sewing"
       ]
     },
@@ -234,7 +234,7 @@
       "capability_profile": "SYN-ASSEMBLY-PROFILE-A",
       "qualification": "synthetic_only",
       "available": true,
-      "skills_required": [
+      "qualified_skills": [
         "assembly"
       ]
     },
@@ -244,7 +244,7 @@
       "capability_profile": "SYN-INSPECT-PROFILE-A",
       "qualification": "synthetic_only",
       "available": true,
-      "skills_required": [
+      "qualified_skills": [
         "inspection",
         "measurement"
       ]
@@ -255,7 +255,7 @@
       "capability_profile": "SYN-PACK-PROFILE-A",
       "qualification": "synthetic_only",
       "available": true,
-      "skills_required": [
+      "qualified_skills": [
         "packaging"
       ]
     },
@@ -265,7 +265,7 @@
       "capability_profile": "SYN-RECEIVE-PROFILE-A",
       "qualification": "synthetic_only",
       "available": true,
-      "skills_required": [
+      "qualified_skills": [
         "receiving"
       ]
     }
