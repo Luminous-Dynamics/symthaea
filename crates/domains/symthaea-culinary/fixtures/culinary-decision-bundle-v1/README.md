@@ -8,7 +8,7 @@ These files are synthetic conformance inputs, not measured food data.
 - `semantic-rejects-simulation-relabelled-observation.json`: expected to fail semantic validation because a synthetic input is mislabeled as an observed objective.
 - `semantic-rejects-unknown-gate-on-frontier.json`: expected to fail semantic validation because an unresolved hard gate is reported as ranked/on-frontier.
 
-The negative fixtures are intentionally invalid. Their presence is useful only if a future independent validator asserts the expected rejection reason. They are not evidence that an executable validator already rejects them.
+The negative fixtures are intentionally invalid. The current Rust semantic validator is intended to reject the semantic negative controls and the positive/partial cases are intended to pass its semantic checks. The private-coordinate case additionally requires JSON Schema validation because the Rust function is not a full JSON Schema implementation. Tests are authored but have not been compiled or executed.
 
 - `semantic-rejects-false-scenario-frontier.json`: expected to fail semantic validation because the reported observed-basket frontier hides alpha even though its complete objective vector dominates beta in that scenario.
 - `semantic-rejects-false-robust-dominance.json`: expected to fail semantic validation because reciprocal robust-dominance claims are made for candidates whose relative cost reverses across scenarios.
