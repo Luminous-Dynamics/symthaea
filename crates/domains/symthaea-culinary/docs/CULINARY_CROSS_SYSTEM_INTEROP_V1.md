@@ -29,6 +29,8 @@ Existing work to compose rather than duplicate:
 
 `CulinaryDecisionBundleV1` is a portable **decision receipt**, not a general-purpose canonical database. It states what a producer computed from which frozen inputs, at which commit and declared time/scope. It does not inline licensed or private source datasets; it links to authorized evidence references and source/input manifests.
 
+The Rust crate exposes `symthaea_culinary::interop::validate_decision_bundle_semantics(&serde_json::Value)` as a reusable semantic checker. It independently recomputes scenario frontiers and robust dominance from complete objective vectors rather than trusting producer-declared frontier flags or mutually consistent dominance claims. This API is **not** a full JSON Schema 2020-12 validator: consumers must validate the wire shape against the published schema as well, and must still resolve/qualify external evidence references.
+
 The envelope includes:
 - schema version, bundle ID, generated-at time, producer system/component/repository/version/40-character commit SHA;
 - declared purpose, geographic granularity, validity window and known-at time;
