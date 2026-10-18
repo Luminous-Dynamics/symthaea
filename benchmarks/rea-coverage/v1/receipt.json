@@ -1,0 +1,58 @@
+{
+  "schema_version": "symthaea.rea-coverage-receipt.v1",
+  "benchmark_id": "ENG-REA-003",
+  "run_status": "pass",
+  "claim_ceiling": "Synthetic normalized-report contract only; no REA provider or physical-device qualification.",
+  "execution": {
+    "date": "2026-10-18",
+    "command": "benchmarks/rea-coverage/v1/verify.sh",
+    "case_count": 14,
+    "accepted_consistent_reports": 4,
+    "rejected_inconsistent_reports": 8,
+    "invalid_input_cases": 1,
+    "malformed_report_cases": 1,
+    "result": "All 14 observed dispositions matched the independent expected_dispositions oracle."
+  },
+  "environment": {
+    "os_kernel": "Linux x86_64, kernel 6.18.55",
+    "jq": "jq-1.7",
+    "sha256sum": "GNU coreutils 9.7",
+    "requires_node_or_rust": false,
+    "requires_binwalk_or_unblob": false
+  },
+  "files": {
+    "cases.json": {
+      "sha256": "4da7e05a6aa10364934efba0ff271ea027b80319e26f2c3c4b3215db965f32e2",
+      "git_blob_sha1": "0c9bb7a96b20d596e2e1621d294971a0f8dd7eed"
+    },
+    "oracle.json": {
+      "sha256": "c64b15f0575de3d2037385dbed8d09ba8ddac39eb053576ab73e4907672c44b8",
+      "git_blob_sha1": "e473df45ab15bb7be058f20252b60043a89eb582"
+    },
+    "verify.sh": {
+      "sha256": "ecd90cf8d695e1bdf93e9f1a475558446bc746d907a9673c89f0590809814c6e",
+      "git_blob_sha1": "a65889d16cf2a5aed21170427026f51062697b1e"
+    },
+    "README.md": {
+      "sha256": "a101bdbb1d44bbfef288c31374c18f27701421bb5b0b932859483684a0238cac",
+      "git_blob_sha1": "6b2da5fa5c2d9ce587fba380490da9ccd53aee8c"
+    }
+  },
+  "upstream_observation": {
+    "repository": "morluto/rea",
+    "file": "src/firmware/FirmwareReports.ts",
+    "observed_blob_sha1": "f06129aa2894e1a03a5ad573c90e432cbddd1712",
+    "candidate_fix": "https://github.com/morluto/rea/pull/4953",
+    "candidate_fix_state_at_research_time": "open draft; not assumed merged"
+  },
+  "not_run": [
+    "REA CLI or MCP",
+    "Binwalk",
+    "Unblob",
+    "Ghidra or other native-analysis provider",
+    "recovered/vendor firmware execution",
+    "emulation",
+    "physical hardware or hardware-write paths",
+    "GitHub Actions"
+  ]
+}
