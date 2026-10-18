@@ -22,7 +22,7 @@ The prototype intentionally has no third-party dependencies. Its manifest define
 - A feasible cash-maximizing baseline and coordinate-wise Pareto frontier; valuation change is observable but does not dominate real capacity or cash-flow dimensions.
 - An evidence-gated staged-tranche release contract that refuses release on failed milestones, stale evidence, unauthorized requests, commitment-cap breaches or arithmetic overflow.
 - Reported valuation change, expected net cash, productive-capacity delta, maintenance burden and distinct declared dependency links are separate fields. Declared link count is descriptive only and is not a risk or criticality score.
-- An outcome vector that keeps net cash, liquidity, productive capacity, maintenance burden and dependency exposure separate.
+- An outcome vector that keeps net cash, liquidity, productive capacity and maintenance burden separate; declared dependency-link count is descriptive metadata only.
 - Unit tests for negative controls, stale/expired/missing-source evidence, repeated dependency IDs, constraints and deterministic equality.
 - A demo in which the higher-cash option fails the maintenance gate while a lower-cash, higher-capacity option passes.
 
