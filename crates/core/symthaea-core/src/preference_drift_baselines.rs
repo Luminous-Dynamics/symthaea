@@ -72,6 +72,8 @@ pub struct PreferenceSelectionBaselineScoreV1 {
     pub selection_on_reject_all_count: usize,
     /// Selections made while at least one preference observation is task/context mismatched.
     pub stale_context_selection_count: usize,
+    /// Selections made while at least one matching task/context observation has expired.
+    pub expired_preference_selection_count: usize,
     /// Per-scenario output, preserving fixture order.
     pub assessments: Vec<PreferenceSelectionBaselineAssessmentV1>,
 }
@@ -268,8 +270,11 @@ fn choose_fixed_weight(
         )])?;
         let utility = fixed_weight_utility(candidate, *profile, task_id, candidate_id)
             .map_err(|error| vec![error])?;
-        // Preserve the first eligible candidate on exact ties; tie-breaking is deterministic.
-        if selected.as_ref().is_none_or(|(_, best)| utility > *best) {
+        // Candidate-array order is not evidence. Use lexical ID order on exact utility ties.
+        let should_replace = selected.as_ref().is_none_or(|(best_id, best)| {
+            utility > *best || (utility == *best && candidate_id < best_id.as_str())
+        });
+        if should_replace {
             selected = Some((candidate_id.to_owned(), utility));
         }
     }
@@ -321,8 +326,12 @@ fn choose_seeded_random(
             format!("$.scenarios[{scenario_id}].eligible_candidate_ids"),
             "candidate IDs must be strings",
         )])?;
-    let selected_candidate_id =
-        seeded_index(seed, scenario_id, ids.len()).and_then(|index| ids.get(index).cloned());
+    // Hash the scenario/seed pair, then index a canonical candidate order rather than
+    // the serialized eligible-list order.
+    let mut canonical_ids = ids;
+    canonical_ids.sort_unstable();
+    let selected_candidate_id = seeded_index(seed, scenario_id, canonical_ids.len())
+        .and_then(|index| canonical_ids.get(index).cloned());
 
     Ok(PreferenceSelectionBaselineAssessmentV1 {
         scenario_id: scenario_id.to_owned(),
@@ -350,6 +359,7 @@ fn score_selections(
         selection_without_ranking_count: 0,
         selection_on_reject_all_count: 0,
         stale_context_selection_count: 0,
+        expired_preference_selection_count: 0,
         assessments: assessments.to_vec(),
     };
 
@@ -385,18 +395,45 @@ fn score_selections(
         if selected.is_some() {
             let task_id = scenario.get("task_id").and_then(Value::as_str);
             let context_id = scenario.get("current_context_id").and_then(Value::as_str);
-            let has_mismatch = scenario
+            let observations = scenario
                 .get("preference_observations")
-                .and_then(Value::as_array)
-                .is_some_and(|observations| {
-                    observations.iter().any(|observation| {
-                        observation.get("task_id").and_then(Value::as_str) != task_id
-                            || observation.get("context_id").and_then(Value::as_str)
-                                != context_id
-                    })
-                });
+                .and_then(Value::as_array);
+            let has_mismatch = observations.is_some_and(|observations| {
+                observations.iter().any(|observation| {
+                    observation.get("task_id").and_then(Value::as_str) != task_id
+                        || observation.get("context_id").and_then(Value::as_str) != context_id
+                })
+            });
             if has_mismatch {
                 score.stale_context_selection_count += 1;
+            }
+
+            let current_step = scenario.get("current_step").and_then(Value::as_u64);
+            let max_age = scenario
+                .get("preference_max_age_steps")
+                .and_then(Value::as_u64);
+            let has_expired = match (observations, task_id, context_id, current_step, max_age) {
+                (Some(observations), Some(task), Some(context), Some(now), Some(horizon)) => {
+                    observations.iter().any(|observation| {
+                        let matches_context = observation
+                            .get("task_id")
+                            .and_then(Value::as_str)
+                            == Some(task)
+                            && observation
+                                .get("context_id")
+                                .and_then(Value::as_str)
+                                == Some(context);
+                        let old_enough = observation
+                            .get("step")
+                            .and_then(Value::as_u64)
+                            .is_some_and(|step| step <= now && now - step > horizon);
+                        matches_context && old_enough
+                    })
+                }
+                _ => false,
+            };
+            if has_expired {
+                score.expired_preference_selection_count += 1;
             }
         }
     }
@@ -484,6 +521,8 @@ pub struct PreferenceRandomSeedSweepPointV1 {
     pub selection_on_reject_all_count: usize,
     /// Selections made with at least one stale/mismatched preference observation present.
     pub stale_context_selection_count: usize,
+    /// Selections made while matching task/context preference evidence has expired.
+    pub expired_preference_selection_count: usize,
 }
 
 /// Reproducible multi-seed diagnostic for the random eligible-candidate baseline.
@@ -514,6 +553,8 @@ pub struct PreferenceRandomSeedSweepReportV1 {
     pub selection_on_reject_all_count: usize,
     /// Selections with stale/mismatched preference observations in the episode.
     pub stale_context_selection_count: usize,
+    /// Selections while matching task/context preference evidence has expired.
+    pub expired_preference_selection_count: usize,
     /// Minimum acceptable selections in any one seed replicate.
     pub min_acceptable_per_seed: usize,
     /// Maximum acceptable selections in any one seed replicate.
@@ -566,6 +607,7 @@ pub fn evaluate_seeded_random_seed_sweep(
     let mut no_ranking_total = 0usize;
     let mut reject_all_total = 0usize;
     let mut stale_total = 0usize;
+    let mut expired_total = 0usize;
     let mut min_acceptable = usize::MAX;
     let mut max_acceptable = 0usize;
     let mut ranking_scenarios_per_seed: Option<usize> = None;
@@ -583,6 +625,7 @@ pub fn evaluate_seeded_random_seed_sweep(
         no_ranking_total += scored.selection_without_ranking_count;
         reject_all_total += scored.selection_on_reject_all_count;
         stale_total += scored.stale_context_selection_count;
+        expired_total += scored.expired_preference_selection_count;
         min_acceptable = min_acceptable.min(scored.acceptable_selection_count);
         max_acceptable = max_acceptable.max(scored.acceptable_selection_count);
         per_seed.push(PreferenceRandomSeedSweepPointV1 {
@@ -592,6 +635,7 @@ pub fn evaluate_seeded_random_seed_sweep(
             selection_without_ranking_count: scored.selection_without_ranking_count,
             selection_on_reject_all_count: scored.selection_on_reject_all_count,
             stale_context_selection_count: scored.stale_context_selection_count,
+            expired_preference_selection_count: scored.expired_preference_selection_count,
         });
     }
 
@@ -610,6 +654,7 @@ pub fn evaluate_seeded_random_seed_sweep(
         selection_without_ranking_count: no_ranking_total,
         selection_on_reject_all_count: reject_all_total,
         stale_context_selection_count: stale_total,
+        expired_preference_selection_count: expired_total,
         min_acceptable_per_seed: min_acceptable,
         max_acceptable_per_seed: max_acceptable,
         per_seed,
@@ -654,6 +699,60 @@ mod tests {
         let first = evaluate_preference_selection_baselines(FIXTURE, 12345).unwrap();
         let second = evaluate_preference_selection_baselines(FIXTURE, 12345).unwrap();
         assert_eq!(first.seeded_random_score, second.seeded_random_score);
+    }
+
+    #[test]
+    fn expired_matching_feedback_is_reported_separately_from_context_mismatch() {
+        let mut root: Value = serde_json::from_str(FIXTURE).unwrap();
+        let scenario = root["scenarios"]
+            .as_array_mut()
+            .unwrap()
+            .iter_mut()
+            .find(|scenario| scenario["scenario_id"] == "DEV-WALK-001")
+            .unwrap();
+        scenario["current_step"] = serde_json::json!(10);
+        scenario["preference_max_age_steps"] = serde_json::json!(2);
+        let report = evaluate_preference_selection_baselines(&root.to_string(), 20261018).unwrap();
+
+        assert_eq!(report.fixed_weight_score.expired_preference_selection_count, 1);
+        assert_eq!(report.seeded_random_score.expired_preference_selection_count, 1);
+        assert_eq!(report.fixed_weight_score.stale_context_selection_count, 4);
+        assert_eq!(report.seeded_random_score.stale_context_selection_count, 4);
+    }
+
+    #[test]
+    fn candidate_order_permutation_does_not_change_baseline_selections() {
+        let original = evaluate_preference_selection_baselines(FIXTURE, 20261018).unwrap();
+        let mut root: Value = serde_json::from_str(FIXTURE).unwrap();
+        for scenario in root["scenarios"].as_array_mut().unwrap() {
+            scenario["eligible_candidate_ids"]
+                .as_array_mut()
+                .unwrap()
+                .reverse();
+            scenario["preference_observations"]
+                .as_array_mut()
+                .unwrap()
+                .reverse();
+        }
+        let permuted_json = serde_json::to_string(&root).unwrap();
+        let permuted = evaluate_preference_selection_baselines(&permuted_json, 20261018).unwrap();
+
+        for (before, after) in original
+            .fixed_weight_score
+            .assessments
+            .iter()
+            .zip(&permuted.fixed_weight_score.assessments)
+        {
+            assert_eq!(before.selected_candidate_id, after.selected_candidate_id);
+        }
+        for (before, after) in original
+            .seeded_random_score
+            .assessments
+            .iter()
+            .zip(&permuted.seeded_random_score.assessments)
+        {
+            assert_eq!(before.selected_candidate_id, after.selected_candidate_id);
+        }
     }
 
     #[test]

@@ -1,10 +1,11 @@
 // Copyright (C) 2024-2026 Tristan Stoltz / Luminous Dynamics
 // SPDX-License-Identifier: AGPL-3.0-or-later
 // Commercial licensing: see COMMERCIAL_LICENSE.md at repository root
-//! Deterministic contract validation for the Open Mobility preference-drift fixture.
+//! Deterministic contract validation for Open Mobility synthetic preference-drift fixtures.
 //!
-//! This module validates the hand-authored synthetic corpus only. It does not fit a preference
-//! model, rank candidates, estimate calibration, operate hardware, or establish human evidence.
+//! This module validates the hand-authored v2 controls and versioned factorized-generator output.
+//! It does not fit a preference model, rank candidates, estimate calibration, operate hardware, or
+//! establish human evidence. Generated records remain synthetic, template-derived test inputs.
 
 use std::collections::{HashMap, HashSet};
 
@@ -156,19 +157,34 @@ pub fn validate_preference_drift_fixture(
             "fixture must remain explicitly synthetic",
         );
     }
-    if root
+    let generation_method = root
+        .pointer("/generation/method")
+        .and_then(Value::as_str);
+    let random_generator_used = root
         .pointer("/generation/random_generator_used")
-        .and_then(Value::as_bool)
-        != Some(false)
-        || root
-            .pointer("/generation/empirical_data_used")
-            .and_then(Value::as_bool)
-            != Some(false)
-    {
+        .and_then(Value::as_bool);
+    let empirical_data_used = root
+        .pointer("/generation/empirical_data_used")
+        .and_then(Value::as_bool);
+    let is_hand_authored = generation_method == Some("hand_authored_deterministic")
+        && random_generator_used == Some(false);
+    let is_factorized_generated = generation_method == Some("factorized_seeded_generator_v1")
+        && random_generator_used == Some(true)
+        && root
+            .pointer("/generation/seed")
+            .and_then(Value::as_u64)
+            .is_some()
+        && nonempty_string(root.get("generation").unwrap_or(&Value::Null), "generator_version")
+            .is_some()
+        && root
+            .pointer("/generation/config")
+            .and_then(Value::as_object)
+            .is_some();
+    if !(is_hand_authored || is_factorized_generated) || empirical_data_used != Some(false) {
         finding(
             &mut findings,
             "$.generation",
-            "hand-authored fixture must not claim random generation or empirical data",
+            "generation provenance must identify a supported synthetic generator and cannot claim empirical data",
         );
     }
     if root
@@ -1474,6 +1490,21 @@ mod tests {
         assert_eq!(report.used_observation_count, 0);
         assert_eq!(report.context_matched_observation_count, 2);
         assert_eq!(report.expired_preference_observation_count, 2);
+    }
+
+    #[test]
+    fn feedback_at_freshness_horizon_is_usable_but_older_feedback_expires() {
+        let fixture = parse_fixture();
+        let mut scenario = scenario_by_id(&fixture, "DEV-WALK-001").clone();
+        scenario["current_step"] = serde_json::json!(3);
+        scenario["preference_max_age_steps"] = serde_json::json!(1);
+
+        let report = replay_preference_episode(&scenario).unwrap();
+        assert_eq!(report.action, PreferenceReplayActionV1::Query);
+        assert_eq!(report.used_observation_count, 1);
+        assert_eq!(report.context_matched_observation_count, 2);
+        assert_eq!(report.expired_preference_observation_count, 1);
+        assert_eq!(report.stale_or_mismatched_observation_count, 0);
     }
 
     #[test]

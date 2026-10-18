@@ -1,6 +1,6 @@
 # Open Mobility — Preference Drift, Freshness, and Held-Out Task Transfer v0.2
 
-**Status:** research benchmark protocol draft; fixture v2; software tests authored, execution pending  
+**Status:** research benchmark protocol draft; fixture v2; factorized generator prototype added; Rust execution pending  
 **Tracking issue:** [MOBILITY-ASSIST-011 / #7921](https://github.com/Luminous-Dynamics/symthaea/issues/7921)  
 **Upstream comparison:** [interval-aware architecture robustness / PR #7892](https://github.com/Luminous-Dynamics/symthaea/pull/7892)  
 **Decision-sensitive evidence gathering:** [PR #7907](https://github.com/Luminous-Dynamics/symthaea/pull/7907)  
@@ -26,7 +26,9 @@ A preference score must never re-admit a candidate rejected by a hard feasibilit
 
 ## 3. Fixture contract and limitations
 
-The versioned JSON fixture v2 contains three synthetic candidate profiles and 12 hand-authored scenario records: two development examples and ten held-out negative/shift controls. It covers steady-context explicit feedback, fatigue-related preference reversal, transfer from level walking to sit-to-stand, an environment transition, a hard feasibility gate, no preference evidence, contradictory feedback, rejection of all eligible options, exhausted query budget, noisy feedback, and explicit preference that disagrees with an engineering metric proxy. Each scenario now declares `current_step` and `preference_max_age_steps`; schema validation rejects missing freshness metadata and observations dated after the episode's current step. The corpus still has only 12 scenarios and is not statistically powered.
+The versioned JSON fixture v2 contains three synthetic candidate profiles and 12 hand-authored scenario records: two development examples and ten held-out negative/shift controls. It covers steady-context explicit feedback, fatigue-related preference reversal, transfer from level walking to sit-to-stand, an environment transition, a hard feasibility gate, no preference evidence, contradictory feedback, rejection of all eligible options, exhausted query budget, noisy feedback, and explicit preference that disagrees with an engineering metric proxy. Each scenario now declares `current_step` and `preference_max_age_steps`; schema validation rejects missing freshness metadata and observations dated after the episode's current step. The corpus still has only 12 source cases and is not statistically powered.
+
+The Rust generator prototype is in `preference_drift_generator.rs`. Its source corpus v3 adds two independently authored held-out controls to v2: (1) a context transition with fresh current-context feedback that preserves the earlier preference, and (2) an inclusive freshness-boundary case where evidence exactly at the age horizon stays valid while a one-step-older conflicting observation expires. With default configuration, v3 expands into 1,460 synthetic episodes: 20 development and 1,440 held-out, 50 disjoint wearer/session IDs, and 12 held-out scenario families. It varies terrain (level, ramp, uneven, stairs), fatigue state, payload class, time window, observation age, freshness horizon, query budgets, and candidate/observation order. Explicit feedback variants are tagged as historical-only, synthetic feedback scoped to the generated current context, or a controlled pairwise-preference reversal; the reversal case reverses its template oracle order before policy outputs are scored. Generated feedback preserves source-observation lineage. The manifest records seed/config/split/family counts, per-axis category counts, reversal count, and a BLAKE3 digest of the exact serialized fixture bytes. The source suite now has 14 hand-authored scenarios (2 development, 12 held-out). Generated episodes remain controlled variations of these templates, **not independent task or physiology conditions**. Static JavaScript checks are not Rust tests or human evidence; counts alone do not establish generalization.
 
 All candidate metrics, preference records, contexts, and evaluation oracles in this file are synthetic and illustrative. They are not measured biomechanics, human-subject data, inferred preferences, or performance results. The small fixture is a contract/smoke corpus, **not a statistically powered benchmark**. The evaluation oracle is evaluation-only: it must never be passed into a policy, query selector, calibration stage, feature builder, or model-fitting call.
 
@@ -56,9 +58,15 @@ Compare on identical scenarios, candidate feasibility, initial observations, and
 1. **Fixed-weight scalar objective:** weights and metric normalization preregistered on development data; never tune weights after seeing held-out results.
 2. **Single-objective selection:** show each objective's result or a preregistered rotation, rather than selecting the best-performing objective post hoc.
 3. **Pareto + explicit query/abstention:** preserve all feasible candidates not robustly dominated; use context-matched preference observations and query or abstain when evidence cannot resolve a context-specific choice.
-4. **Seeded-random eligible selection:** reproducible, seed-controlled selection from the declared eligible set, with no preference or metric ranking.
+4. **Seeded-random eligible selection:** reproducible, seed-controlled selection from the declared eligible set sorted by stable candidate ID; reordering the input array must not change a choice.
 5. **Context-blind preference replay:** an ablation that ignores context matching while preserving task identity and the same freshness horizon.
 6. **Context-aware explicit-feedback replay:** the conservative policy that requires fresh, task- and context-matched ordinal evidence, then queries or abstains under uncertainty.
+
+On exact utility ties, deterministic metric-based selectors use a stable documented tie-break (candidate ID), not serialized candidate order. Seeded-random baselines sort candidate IDs before applying the seed/scenario selector.
+
+The query frontier now compares three explicitly limited selectors: (1) canonical lexicographic unasked-pair selection, (2) seeded-random unasked-pair selection, and (3) **maximum unresolved direct-comparison coverage**—choose an unasked pair whose candidates have the most remaining directly unobserved pairwise comparisons. The third strategy counts only fresh, task/context-matched direct observations between currently eligible candidates; it does not infer transitive preferences or inspect evaluation-oracle labels. All three return complete per-budget and per-family receipts. Each frontier budget is an *additional* question allowance for this counterfactual run; prior source-episode question usage is retained in the cumulative policy-budget fields, so the evaluator does not accidentally refund previous queries.
+
+The synthetic interaction-budget prototype is in `preference_drift_frontier.rs`. For every additional-question budget from zero through a caller-bounded maximum, it compares three strategies: canonical lexicographic, seeded-random, and maximum unresolved direct-comparison coverage for previously unasked eligible candidate pairs. It preserves the source episode's prior query usage. A query is frozen before an offline synthetic responder consults the evaluation oracle; the response is then added as explicitly synthetic feedback, or recorded as unanswered when the oracle supplies no ranking. The frontier reports query counts, unanswered questions, final recommendations, acceptable/unacceptable choices, abstentions, reject-all handling, and per-family slices. The oracle is not present in the policy-view or question-selector inputs. This qualifies the interaction protocol and cost bookkeeping, not a learned preference policy or real wearer response/time.
 
 The frozen fixed-weight engineering comparator uses task success (0.40), stability margin (0.20), normalized wearer-borne mass (0.15), normalized energy per task (0.10), and movement freedom (0.15). Its weights and scales are constants, not fitted to evaluation-oracle labels. It is an engineering-metric proxy, not a model of subjective preference.
 
@@ -74,8 +82,12 @@ Report raw numerators/denominators, uncertainty intervals, excluded episodes, an
 | Preference regret / top-choice agreement | Evaluate only where the evaluation oracle explicitly supplies a ranking; do not manufacture a ranking for “insufficient evidence” or “reject all” episodes |
 | Reversal-detection latency | Query/feedback steps from a scripted context change until policy flags stale preference or updates its recommendation; distinguish no-feedback detection from actual preference confirmation |
 | Query burden | Number of queries, cost budget, and answerable decisions; report query-budget exhaustion separately |
+| Query budget frontier | For each budget, report selected pairs, answered/unanswered questions, final acceptable choices, abstentions, and per-family counts; report synthetic responder assumptions separately |
 | Abstention behavior | Correct abstention/query on missing, contradictory, expired, rejected-all, and budget-exhausted controls; useful coverage on positive controls |
 | Preference freshness | Zero expired observations used in recommendations; zero future-dated records accepted; report expiration separately from context mismatch |
+| Order invariance | The same logical candidate/observation sets yield the same normalized choices regardless of array order; seeded random selection hashes a scenario identity and indexes canonical candidate IDs |
+| Direct-comparison coverage | Report unresolved direct comparisons per eligible option; the coverage selector may improve query allocation but must never claim transitivity or human-preference calibration |
+| Expired-evidence exposure | Separately count baseline selections made while same-task, same-context feedback has expired; do not blend expiry with task/context mismatch counts |
 | Selective decision quality | Plot recommendation coverage against unacceptable-selection rate and query/abstention burden; do not collapse them into one scalar |
 | Held-out task transfer | Pairwise/top-choice behavior on task families absent from policy fitting; report by task/context shift, never as same-task replay |
 | Feasible Pareto recall | Fraction of known feasible non-dominated candidates preserved; use upstream comparator semantics and its declared intervals |
@@ -97,7 +109,8 @@ The initial fixture should be implemented as deterministic contract tests. Propo
 - **100%** of over-age preference records are excluded from policy decisions, with expiry visible in the decision receipt.
 - Future-dated feedback and missing/invalid freshness metadata fail closed.
 - **100%** of missing/contradictory/reject-all controls trigger explicit uncertainty, query, or abstention behavior consistent with available query budget.
-- **0** evaluation-oracle fields reach policy features, model fitting, active query ranking, or calibration.
+- **0** evaluation-oracle fields reach policy features, model fitting, query-pair selection, or calibration; use the oracle only after the question is frozen to simulate a response, and after the episode to score outcomes.
+- Candidate/observation permutations preserve normalized replay receipts and baseline choices; query-pair selectors are invariant to candidate array ordering.
 - **0** synthetic preference records are reported as actual wearer input or clinical evidence.
 - Same canonical fixture + same policy revision/parameters produces byte-identical replay artifacts.
 - Reordering an eligible-candidate list or the same set of preference observations must not change the normalized decision receipt; ordering is not preference evidence.
@@ -136,7 +149,9 @@ Use matched seeds for every baseline. Split by wearer/session and full trajector
 - [ISO 18646-6:2026](https://www.iso.org/standard/88497.html) specifies performance indices and tests using an anthropomorphic test dummy for lower-limb wearable robots. It is relevant to technical assistance/enhancement measurement, not a substitute for explicit human preference evidence; the published scope excludes robots operated based on biosignals such as EMG.
 - [ASTM F3474-25](https://store.astm.org/f3474-25.html) provides practice for choosing functional ergonomic parameters and metrics across exoskeleton contexts and time horizons.
 
-These references reinforce a system-level benchmark that keeps assistance, feasibility, wearer interaction, context and time in view. They do not validate the synthetic fixture or set its numerical gates.
+- A recent 2026 interdisciplinary perspective argues that human-in-the-loop exoskeleton optimization should account for individual capabilities, clinical expertise, and structured training—not only optimize a device parameter vector: [PubMed record](https://pubmed.ncbi.nlm.nih.gov/42657862/).
+
+These references reinforce a system-level benchmark that keeps assistance, feasibility, wearer interaction, context, time, and clinical/training context in view. They do not validate the synthetic fixture or set its numerical gates.
 
 ## 10. Proposed benchmark targets
 
@@ -158,8 +173,8 @@ A passing deterministic fixture can establish only that a particular implementat
 
 Sequence:
 1. Freeze the freshness-bounded fixture v2 contract and expected behavior.
-2. Run the Rust unit tests and workspace checks on an environment with the Rust toolchain; record exact source revision and actual output.
-3. Add a versioned factorized scenario generator, grouped wearer/session and shift-family manifest, and paired baseline runner.
-4. Implement/compare a Pareto-plus-query/abstention baseline and a decision-relevant query-selection baseline; do not connect to actuation.
-5. Qualify generated-suite metrics and only then design a separate human study with suitable protocol, consent/ethics, safety review, and calibrated instrumentation.
-5. Only after offline benchmark qualification, design any human study separately with appropriate protocol, consent/ethics, safety review and calibrated instrumentation.
+2. Expand the source corpus with independently authored task and environment families and more wearer/session strata; preserve grouped holdouts and publish factor coverage so repeated template variants are not mistaken for independent conditions.
+3. Run the interaction-budget frontier over the generated suite and publish the exact seed/config/digest with per-family counts; compare the two question selectors without treating synthetic response counts as human interaction-time estimates.
+4. Add a Pareto-plus-query/abstention baseline that reuses the existing engineering feasibility/Pareto interfaces and never uses evaluation-oracle labels to rank questions.
+5. Run Rust/workspace tests on an environment with the toolchain and preserve exact-head execution evidence.
+6. Only after offline qualification, design a separate human study with appropriate protocol, consent/ethics, safety review, calibrated instrumentation, and real measures of task utility, comfort, exertion, and interaction burden.
