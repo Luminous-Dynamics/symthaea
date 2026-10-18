@@ -1963,7 +1963,7 @@ mod tests {
             "source_library": policy.source_library,
             "upstream_repository_url": policy.upstream_repository_url,
             "declared_license_spdx": policy.declared_license_spdx,
-            "license_declaration_boundary": "Declared from the upstream repository license metadata; this field is not a legal opinion and does not replace inspection of the hashed license/readme bytes.",
+            "license_declaration_boundary": "Expected SPDX-style license identifier from reviewed upstream-repository policy; not automatically inferred from local bytes, not a legal opinion, and never a substitute for inspecting the hashed license/readme files.",
             "license_document_relative_path": "LICENSE",
             "license_document_sha256": license_digest,
             "license_document_status": "hashed",
