@@ -41,6 +41,7 @@ pub mod food_matching;
 pub mod ingredient;
 pub mod interop;
 pub mod kitchen;
+pub mod nutrient_accounting;
 pub mod nutrition;
 pub mod palate;
 pub mod pareto;

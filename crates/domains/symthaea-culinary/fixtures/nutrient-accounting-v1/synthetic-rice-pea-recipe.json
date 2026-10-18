@@ -1,0 +1,137 @@
+{
+  "schema_version": "1.0.0",
+  "calculation_id": "synthetic-rice-pea-recipe-protein-v1",
+  "claim_status": "calculation_only",
+  "process_id": "synthetic-boil-with-water-v1",
+  "ingredients": [
+    {
+      "ingredient_id": "rice",
+      "edible_mass_g": {
+        "value": 150,
+        "lower": 148,
+        "upper": 152
+      },
+      "mass_evidence": {
+        "source_ref": "urn:synthetic:mass:rice",
+        "source_version": "illustrative-v1",
+        "known_at": "2026-10-18T00:00:00Z",
+        "evidence_status": "synthetic"
+      },
+      "composition_basis": "per_100g_edible",
+      "composition_source": {
+        "source_ref": "urn:synthetic:composition:rice",
+        "source_version": "illustrative-v1",
+        "known_at": "2026-10-18T00:00:00Z",
+        "evidence_status": "synthetic"
+      },
+      "nutrients": [
+        {
+          "nutrient_id": "protein",
+          "unit": "g",
+          "per_100g": {
+            "value": 7,
+            "lower": 6.8,
+            "upper": 7.2
+          }
+        }
+      ],
+      "composition_state": "raw"
+    },
+    {
+      "ingredient_id": "peas",
+      "edible_mass_g": {
+        "value": 50,
+        "lower": 49,
+        "upper": 51
+      },
+      "mass_evidence": {
+        "source_ref": "urn:synthetic:mass:peas",
+        "source_version": "illustrative-v1",
+        "known_at": "2026-10-18T00:00:00Z",
+        "evidence_status": "synthetic"
+      },
+      "composition_basis": "per_100g_edible",
+      "composition_source": {
+        "source_ref": "urn:synthetic:composition:peas",
+        "source_version": "illustrative-v1",
+        "known_at": "2026-10-18T00:00:00Z",
+        "evidence_status": "synthetic"
+      },
+      "nutrients": [
+        {
+          "nutrient_id": "protein",
+          "unit": "g",
+          "per_100g": {
+            "value": 5,
+            "lower": 4.8,
+            "upper": 5.2
+          }
+        }
+      ],
+      "composition_state": "raw"
+    }
+  ],
+  "nutrient_retention": [
+    {
+      "ingredient_id": "rice",
+      "nutrient_id": "protein",
+      "value": 0.95,
+      "lower": 0.93,
+      "upper": 0.97,
+      "evidence": {
+        "source_ref": "urn:synthetic:retention:rice-protein",
+        "source_version": "illustrative-v1",
+        "known_at": "2026-10-18T00:00:00Z",
+        "evidence_status": "synthetic"
+      },
+      "process_id": "synthetic-boil-with-water-v1",
+      "input_state": "raw",
+      "output_state": "cooked"
+    },
+    {
+      "ingredient_id": "peas",
+      "nutrient_id": "protein",
+      "value": 0.9,
+      "lower": 0.88,
+      "upper": 0.92,
+      "evidence": {
+        "source_ref": "urn:synthetic:retention:peas-protein",
+        "source_version": "illustrative-v1",
+        "known_at": "2026-10-18T00:00:00Z",
+        "evidence_status": "synthetic"
+      },
+      "process_id": "synthetic-boil-with-water-v1",
+      "input_state": "raw",
+      "output_state": "cooked"
+    }
+  ],
+  "final_food_mass_g": {
+    "value": 330,
+    "lower": 320,
+    "upper": 340
+  },
+  "final_mass_evidence": {
+    "source_ref": "urn:synthetic:final-recipe-mass",
+    "source_version": "illustrative-v1",
+    "known_at": "2026-10-18T00:00:00Z",
+    "evidence_status": "synthetic"
+  },
+  "expected_outputs": [
+    {
+      "nutrient_id": "protein",
+      "unit": "g",
+      "retained_total": {
+        "value": 12.225,
+        "lower": 11.42928,
+        "upper": 13.055520000000001
+      },
+      "per_100g_final": {
+        "value": 3.7045454545454546,
+        "lower": 3.361552941176471,
+        "upper": 4.07985
+      }
+    }
+  ],
+  "rationale": "Synthetic arithmetic fixture only. Ingredient nutrient concentrations and all empirical retention factors are illustrative; the fixture is not nutrition advice, composition data, or a recipe recommendation. Water used as a cooking medium is not counted as an ingredient nutrient source here; final prepared mass is independently measured and source-pinned.",
+  "final_food_state": "cooked"
+}
