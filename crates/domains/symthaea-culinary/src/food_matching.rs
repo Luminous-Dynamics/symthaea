@@ -493,6 +493,14 @@ mod tests {
         let mut value = assessment();
         value["outcome"] = json!("qualified_approximation");
         value["use_scope"] = json!("allergen_screening");
+        value["query_record"]["identity"]["cultivar"] = json!("cultivar:a");
+        value["candidate_record"]["identity"]["cultivar"] = json!("cultivar:b");
+        value["attribute_checks"].as_array_mut().unwrap().push(json!({
+            "attribute_id":"cultivar",
+            "query_value":"cultivar:a",
+            "candidate_value":"cultivar:b",
+            "relation":"different"
+        }));
         value["deviations"] = json!([{"attribute_id":"cultivar","reason":"synthetic example"}]);
         let errors = validate_food_identity_match_v1(&value).unwrap_err();
         assert!(errors.iter().any(|e| e.contains("not permitted")));
