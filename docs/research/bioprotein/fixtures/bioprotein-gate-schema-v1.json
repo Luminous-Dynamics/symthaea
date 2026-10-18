@@ -49,7 +49,8 @@
             "nutrition_feasibility",
             "lca_comparison",
             "scenario_feasibility",
-            "cost_comparison"
+            "cost_comparison",
+            "animal_outcome"
           ]
         },
         "scenario_digest": {
@@ -290,7 +291,8 @@
               "nutrition_feasibility",
               "lca_comparison",
               "scenario_feasibility",
-              "cost_comparison"
+              "cost_comparison",
+              "animal_outcome"
             ]
           }
         },
