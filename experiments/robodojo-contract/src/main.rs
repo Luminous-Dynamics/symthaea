@@ -62,7 +62,7 @@ fn run() -> Result<(), Box<dyn Error>> {
             let replicates = parse_optional(&args, 4, 2_000usize, "bootstrap count")?;
             let seed = parse_optional(&args, 5, 42u64, "seed")?;
             let unexpected: Vec<&str> = records.iter()
-                .filter(|row| row.variant_id != *baseline_name && row.variant_id != *candidate_name)
+                .filter(|row| row.variant_id.as_str() != baseline_name.as_str() && row.variant_id.as_str() != candidate_name.as_str())
                 .map(|row| row.variant_id.as_str())
                 .collect();
             if !unexpected.is_empty() {
@@ -72,9 +72,9 @@ fn run() -> Result<(), Box<dyn Error>> {
                 )).into());
             }
             let baseline: Vec<TrialRecord> = records.iter()
-                .filter(|row| row.variant_id == *baseline_name).cloned().collect();
+                .filter(|row| row.variant_id.as_str() == baseline_name.as_str()).cloned().collect();
             let candidate: Vec<TrialRecord> = records.iter()
-                .filter(|row| row.variant_id == *candidate_name).cloned().collect();
+                .filter(|row| row.variant_id.as_str() == candidate_name.as_str()).cloned().collect();
             let comparison = compare_paired_trials(&baseline, &candidate, replicates, seed)
                 .map_err(|error| invalid_input(format!("cannot compare paired trials: {error:?}")))?;
             let (lo, hi) = match comparison.progress_delta_ci95 {
