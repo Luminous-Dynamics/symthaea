@@ -3049,6 +3049,86 @@ mod tests {
     }
 
     #[test]
+    fn test_implicit_euler_analytic_jacobian_matches_finite_difference_with_fewer_rhs_calls() {
+        fn coupled(_t: f64, y: &[f64]) -> Vec<f64> {
+            vec![10.0 * y[1], 10.0 * y[0]]
+        }
+        fn coupled_jacobian(_t: f64, _y: &[f64]) -> Vec<f64> {
+            // Row-major df_i/dy_j.
+            vec![0.0, 10.0, 10.0, 0.0]
+        }
+        let system = ODESystem { f: coupled, dim: 2 };
+        let finite_difference = DifferentialEquationsEngine::try_solve_implicit_euler(
+            &system, 0.0, 0.04, &[1.0, 0.0], 1, 8,
+        )
+        .expect("finite-difference full Newton should solve the linear system");
+        let analytical = DifferentialEquationsEngine::try_solve_implicit_euler_with_jacobian(
+            &system, coupled_jacobian, 0.0, 0.04, &[1.0, 0.0], 1, 8,
+        )
+        .expect("supplied analytical Jacobian should solve the same system");
+
+        for (actual, expected) in analytical
+            .trajectory
+            .final_state()
+            .iter()
+            .zip(finite_difference.trajectory.final_state())
+        {
+            assert!(
+                (actual - expected).abs() < 1e-9,
+                "Analytic and finite-difference trajectories differ: {actual} != {expected}",
+            );
+        }
+        assert!(analytical.jacobian_evaluations > 0);
+        assert_eq!(finite_difference.jacobian_evaluations, 0);
+        assert!(
+            analytical.rhs_evaluations < finite_difference.rhs_evaluations,
+            "Analytical Jacobian should save RHS probes: analytic={}, finite-difference={}",
+            analytical.rhs_evaluations,
+            finite_difference.rhs_evaluations,
+        );
+
+        let exact = [1.0 / 0.84, 0.4 / 0.84];
+        for (actual, expected) in analytical.trajectory.final_state().iter().zip(exact) {
+            assert!((actual - expected).abs() < 1e-9, "state={:?}", analytical.trajectory.final_state());
+        }
+    }
+
+    #[test]
+    fn test_implicit_euler_analytic_jacobian_rejects_wrong_shape_and_non_finite_values() {
+        fn decay(_t: f64, y: &[f64]) -> Vec<f64> {
+            vec![-y[0]]
+        }
+        fn wrong_shape(_t: f64, _y: &[f64]) -> Vec<f64> {
+            vec![]
+        }
+        fn non_finite(_t: f64, _y: &[f64]) -> Vec<f64> {
+            vec![f64::NAN]
+        }
+        let system = ODESystem { f: decay, dim: 1 };
+        let shape_error = DifferentialEquationsEngine::try_solve_implicit_euler_with_jacobian(
+            &system, wrong_shape, 0.0, 1.0, &[1.0], 1, 8,
+        )
+        .unwrap_err();
+        assert!(matches!(
+            shape_error.kind,
+            ImplicitEulerErrorKind::JacobianDimensionMismatch { expected: 1, actual: 0 }
+        ));
+        assert_eq!(shape_error.jacobian_evaluations, 1);
+        assert_eq!(shape_error.last_state, vec![1.0]);
+
+        let non_finite_error = DifferentialEquationsEngine::try_solve_implicit_euler_with_jacobian(
+            &system, non_finite, 0.0, 1.0, &[1.0], 1, 8,
+        )
+        .unwrap_err();
+        assert!(matches!(
+            non_finite_error.kind,
+            ImplicitEulerErrorKind::NonFiniteProvidedJacobian { index: 0 }
+        ));
+        assert_eq!(non_finite_error.jacobian_evaluations, 1);
+        assert_eq!(non_finite_error.last_state, vec![1.0]);
+    }
+
+    #[test]
     fn test_implicit_euler_full_newton_solves_coupled_linear_system() {
         fn coupled(_t: f64, y: &[f64]) -> Vec<f64> {
             vec![10.0 * y[1], 10.0 * y[0]]
