@@ -7,6 +7,8 @@
 //! Public development tests here are not a secret or held-out dataset. Package
 //! separation is an architectural boundary for data flow, not a security sandbox.
 
+pub mod decision_receipt_verifier;
+
 use std::collections::BTreeSet;
 
 #[derive(Clone, Debug, PartialEq, Eq)]
