@@ -2,8 +2,8 @@
   "manifest_id": "vehicle_tire_data_source_register_v0_1",
   "schema_version": "0.1.0",
   "review_date": "2026-10-18",
-  "status": "literature_and_rights_triage_not_binary_ingestion",
-  "claim_ceiling": "This register catalogs candidate inputs and their reported rights. It is not proof a dataset has been downloaded, independently verified, or validated for a vehicle model.",
+  "status": "rights_triage_with_one_cc_by_dataset_vendored_and_reconstruction_checked",
+  "claim_ceiling": "One passenger-car tire-health dataset is vendored under its upstream CC BY 4.0 license and its ordered shard concatenation was checked against the upstream GitHub blob content. Other records remain rights requests, external references or proxy-only sources. No motorcycle component maps are yet acquired; no tire performance is physically validated.",
   "sources": [
     {
       "source_id": "ROAM_AIR_POWERTRAIN_2026_01",
@@ -112,20 +112,41 @@
       "title": "Multi-scenario tire monitoring dataset with synchronized pressure, temperature, and speed measurements",
       "uri": "https://github.com/kerzeyc/tire-monitoring-dataset",
       "vehicle_scope": "Passenger-car 205/55 R16 tires; not motorcycle tires",
-      "data_available": "CSV listed as 210,128 samples; pressure, temperature, speed and anomaly labels; controlled gradual-deflation and natural-leak segments",
+      "data_available": "Full upstream CSV preserved byte-for-byte as nine ordered text shards; 210128 samples; 1755 Unit_ID segments; pressure, temperature, speed and anomaly labels. Original README and CC BY 4.0 license are preserved alongside the shards.",
       "rights_status": "CC-BY-4.0 explicitly stated by upstream repository",
       "evidence_class": "FieldObserved",
-      "readiness": "rights_clear_upstream_download_not_verified_in_this_session",
+      "readiness": "rights_cleared_vendored_in_public_branch",
       "useful_for": [
         "pressure/temperature anomaly detection",
         "telemetry ingestion and segment-level split discipline",
         "tire-health monitoring prototype"
       ],
       "limitations": [
-        "not tire-force, grip, puncture, compound, tread-wear or motorcycle data",
-        "upstream citation currently says it will be updated; preserve author attribution and license"
+        "passenger-car 205/55 R16 data, not motorcycle data",
+        "not tire-force, grip, puncture-resistance, compound, tread-wear or structural qualification data",
+        "upstream says blowouts/instantaneous failures are not included",
+        "formal academic citation is not yet supplied in upstream README; preserve repository citation and attribution"
       ],
-      "next_action": "Retrieve upstream CSV, verify hash/column schema and license file, retain original unchanged, and create attributed transformed data only."
+      "next_action": "Run cargo run -p xtask -- tire-monitoring-intake on the committed shards, retain the output SHA-256 report, split only by Unit_ID, and evaluate pressure/temp/speed anomaly detection on whole-segment holdouts. Never upgrade this evidence to motorcycle grip or powertrain validation.",
+      "repository_paths": [
+        "data/third_party/tire-monitoring-dataset/tire_monitoring_dataset.csv.part-0001 through .part-0009",
+        "data/third_party/tire-monitoring-dataset/README.upstream.md",
+        "data/third_party/tire-monitoring-dataset/LICENSE.txt",
+        "data/third_party/tire-monitoring-dataset/README.md"
+      ],
+      "integrity_observation": {
+        "upstream_git_blob_sha1": "0029b6f156847ecc052f57ae45fd025ad032d086",
+        "retrieved_content_characters": 7808266,
+        "shard_count": 9,
+        "reconstructed_string_exact_match": true,
+        "rows": 210128,
+        "distinct_unit_id_segments": 1755,
+        "normal_label_rows": 196260,
+        "anomalous_label_rows": 13868,
+        "malformed_rows": 0,
+        "empty_fields": 0,
+        "provenance_class": "source_side_intake_check_not_Rust_execution"
+      }
     },
     {
       "source_id": "MOTORCYCLE_SIMULATION_DARUS",
