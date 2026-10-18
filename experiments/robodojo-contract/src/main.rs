@@ -6,10 +6,10 @@ use std::path::Path;
 use symthaea_robodojo_contract::{
     calibration::{summarize_calibration, SuccessForecast},
     compare_paired_trials, summarize_trials, ActionProposal, ActionRejection, AxisLimit,
-    EpisodeGuard, GateConfig, ObservationDecision, ObservationFrame, TrialRecord,
+    EpisodeGuard, FailureClass, GateConfig, ObservationDecision, ObservationFrame, TrialRecord,
 };
 
-const TRIALS_HEADER: &str = "task_id\tvariant_id\ttrial_id\tprogress\tcompleted\tvalid_run\ttimed_out\telapsed_seconds\tmodel_calls\taction_steps\testimated_cost_usd\tsafety_events";
+const TRIALS_HEADER: &str = "task_id\tvariant_id\ttrial_id\tprogress\tcompleted\tvalid_run\ttimed_out\tfailure_class\telapsed_seconds\tmodel_calls\taction_steps\testimated_cost_usd\tsafety_events";
 const FORECASTS_HEADER: &str = "task_id\tvariant_id\ttrial_id\tpredicted_success_probability\tsuccess\tvalid_run";
 
 fn main() {
@@ -36,7 +36,7 @@ fn run() -> Result<(), Box<dyn Error>> {
             let seed = parse_optional(&args, 3, 42u64, "seed")?;
             let summaries = summarize_trials(&records, replicates, seed)
                 .map_err(|error| invalid_input(format!("cannot summarize trials: {error:?}")))?;
-            println!("task_id\tvariant_id\tattempts\tvalid\tinvalid\tcompletions\tcompletion_all_pct\tcompletion_scored_pct\tmean_progress_pct\tci95_low_pct\tci95_high_pct\tmean_elapsed_s\tmean_model_calls\tmean_action_steps\tmean_cost_usd\ttimeouts\tsafety_events");
+            println!("task_id\tvariant_id\tattempts\tvalid\tinvalid\tcompletions\tcompletion_all_pct\tcompletion_scored_pct\tmean_progress_pct\tci95_low_pct\tci95_high_pct\tmean_elapsed_s\tmean_model_calls\tmean_action_steps\tmean_cost_usd\ttimeouts\tthermal_stops\tserver_errors\tinvalid_actions\tsafety_stops\tother_failures\tsafety_events");
             for row in summaries {
                 let valid_completion = optional_pct(row.completion_rate_valid_trials);
                 let (lo, hi) = match row.progress_ci95 {
@@ -44,12 +44,14 @@ fn run() -> Result<(), Box<dyn Error>> {
                     None => ("NA".to_owned(), "NA".to_owned()),
                 };
                 println!(
-                    "{}\t{}\t{}\t{}\t{}\t{}\t{}\t{}\t{}\t{}\t{}\t{:.4}\t{:.3}\t{:.3}\t{:.4}\t{}\t{}",
+                    "{}\t{}\t{}\t{}\t{}\t{}\t{}\t{}\t{}\t{}\t{}\t{:.4}\t{:.3}\t{:.3}\t{:.4}\t{}\t{}\t{}\t{}\t{}\t{}\t{}",
                     row.task_id, row.variant_id, row.total_trials, row.valid_trials,
                     row.invalid_trials, row.completions, pct(row.completion_rate_all_trials),
                     valid_completion, optional_pct(row.mean_progress), lo, hi,
                     row.mean_elapsed_seconds, row.mean_model_calls, row.mean_action_steps,
-                    row.mean_estimated_cost_usd, row.timeout_count, row.safety_event_count
+                    row.mean_estimated_cost_usd, row.timeout_count, row.thermal_stop_count,
+                    row.server_error_count, row.invalid_action_count, row.safety_stop_count,
+                    row.other_failure_count, row.safety_event_count
                 );
             }
             Ok(())
@@ -105,16 +107,19 @@ fn run() -> Result<(), Box<dyn Error>> {
                 Some((lo, hi)) => (pct(lo), pct(hi)),
                 None => ("NA".to_owned(), "NA".to_owned()),
             };
-            println!("baseline\tcandidate\tpairs\tscored_pairs\ttasks_scored\tprogress_delta_pp\tci95_low_pp\tci95_high_pp\tcompletion_rate_delta_pp\tvalid_rate_delta_pp\telapsed_delta_s\tcost_delta_usd\tsafety_event_delta");
+            println!("baseline\tcandidate\tpairs\tscored_pairs\ttasks_scored\tprogress_delta_pp\tci95_low_pp\tci95_high_pp\tcompletion_rate_delta_pp\tvalid_rate_delta_pp\telapsed_delta_s\tcost_delta_usd\tsafety_event_delta\ttimeout_delta\tthermal_stop_delta\tserver_error_delta\tinvalid_action_delta\tsafety_stop_delta\tother_failure_delta");
             println!(
-                "{}\t{}\t{}\t{}\t{}\t{}\t{}\t{}\t{}\t{}\t{:.4}\t{:.4}\t{}",
+                "{}\t{}\t{}\t{}\t{}\t{}\t{}\t{}\t{}\t{}\t{:.4}\t{:.4}\t{}\t{}\t{}\t{}\t{}\t{}\t{}",
                 comparison.baseline_variant, comparison.candidate_variant,
                 comparison.total_pairs, comparison.scored_pairs, comparison.tasks_with_scored_pairs,
                 comparison.mean_progress_delta.map(|x| format!("{:.4}", x * 100.0)).unwrap_or_else(|| "NA".to_owned()),
                 lo, hi, comparison.completion_rate_delta * 100.0,
                 comparison.valid_run_rate_delta * 100.0,
                 comparison.mean_elapsed_seconds_delta, comparison.mean_cost_usd_delta,
-                comparison.safety_event_count_delta
+                comparison.safety_event_count_delta, comparison.timeout_count_delta,
+                comparison.thermal_stop_count_delta, comparison.server_error_count_delta,
+                comparison.invalid_action_count_delta, comparison.safety_stop_count_delta,
+                comparison.other_failure_count_delta
             );
             Ok(())
         }
@@ -147,9 +152,9 @@ fn read_trials(path: impl AsRef<Path>) -> Result<Vec<TrialRecord>, Box<dyn Error
         let line = line.trim_end_matches('\r');
         if line.is_empty() || line.starts_with('#') { continue; }
         let columns: Vec<&str> = line.split('\t').collect();
-        if columns.len() != 12 {
+        if columns.len() != 13 {
             return Err(invalid_input(format!(
-                "{}:{} expected 12 tab-separated fields, got {}",
+                "{}:{} expected 13 tab-separated fields, got {}",
                 path.as_ref().display(), zero_based_line + 2, columns.len()
             )).into());
         }
@@ -172,6 +177,10 @@ fn read_trials(path: impl AsRef<Path>) -> Result<Vec<TrialRecord>, Box<dyn Error
             "" | "NA" => None,
             raw => Some(raw.parse::<f64>().map_err(|_| invalid_input(format!("line {} invalid progress: {raw:?}", zero_based_line + 2)))?),
         };
+        let failure_class = FailureClass::parse(columns[7]).ok_or_else(|| invalid_input(format!(
+            "line {} invalid failure_class: {:?}; expected none, timeout, thermal_stop, server_error, invalid_action, safety_stop, or other",
+            zero_based_line + 2, columns[7]
+        )))?;
         let record = TrialRecord {
             task_id: columns[0].to_owned(),
             variant_id: columns[1].to_owned(),
@@ -180,11 +189,12 @@ fn read_trials(path: impl AsRef<Path>) -> Result<Vec<TrialRecord>, Box<dyn Error
             completed: boolean(4, "completed")?,
             valid_run: boolean(5, "valid_run")?,
             timed_out: boolean(6, "timed_out")?,
-            elapsed_seconds: number(7, "elapsed_seconds")?,
-            model_calls: integer(8, "model_calls")?,
-            action_steps: integer(9, "action_steps")?,
-            estimated_cost_usd: number(10, "estimated_cost_usd")?,
-            safety_events: integer(11, "safety_events")?,
+            failure_class,
+            elapsed_seconds: number(8, "elapsed_seconds")?,
+            model_calls: integer(9, "model_calls")?,
+            action_steps: integer(10, "action_steps")?,
+            estimated_cost_usd: number(11, "estimated_cost_usd")?,
+            safety_events: integer(12, "safety_events")?,
         };
         record.validate().map_err(|error| invalid_input(format!(
             "line {} invalid trial record: {error:?}", zero_based_line + 2
