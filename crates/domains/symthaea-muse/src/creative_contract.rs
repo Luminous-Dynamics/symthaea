@@ -153,7 +153,7 @@ fn onset_interval_stats(valid_notes: &[(Note, f32)]) -> (usize, f64) {
 /// Audit notes against an explicit intent contract.
 ///
 /// Non-finite values, non-positive frequency/duration, negative onset, onset at or
-/// beyond the declared duration, and velocity outside [0, 1] are rejected rather
+/// beyond the declared duration, and velocity outside (0, 1] are rejected rather
 /// than silently discarded. Measured observations are still returned for valid
 /// notes, but any invalid note makes the candidate inadmissible.
 ///
