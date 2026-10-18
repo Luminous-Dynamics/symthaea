@@ -242,8 +242,11 @@ fn audit(root: &Value, input_sha256: &str) -> Result<Value, String> {
             let profile = episode
                 .get("advisory_profile_id")
                 .ok_or_else(|| format!("{where_}.advisory_profile_id is required; use null outside A2"))?;
-            if !profile.is_null() || !advisory_evidence_refs.is_empty() {
-                return Err(format!("{where_}: A0/A1 cannot carry a Symthaea profile or advisory evidence"));
+            let advisory_reason = episode
+                .get("advisory_reason")
+                .ok_or_else(|| format!("{where_}.advisory_reason is required; use null outside A2"))?;
+            if !profile.is_null() || !advisory_evidence_refs.is_empty() || !advisory_reason.is_null() {
+                return Err(format!("{where_}: A0/A1 cannot carry a Symthaea profile, reason, or advisory evidence"));
             }
         }
 
@@ -404,6 +407,15 @@ fn audit(root: &Value, input_sha256: &str) -> Result<Value, String> {
             .iter()
             .filter(|episode| episode.get("advisory_claim").and_then(Value::as_str) == Some("abstain"))
             .count();
+        let advisory_evidence_bound_count = selected
+            .iter()
+            .filter(|episode| {
+                episode
+                    .get("advisory_evidence_refs")
+                    .and_then(Value::as_array)
+                    .is_some_and(|references| !references.is_empty())
+            })
+            .count();
 
         arm_reports.insert(
             arm.to_owned(),
@@ -415,6 +427,7 @@ fn audit(root: &Value, input_sha256: &str) -> Result<Value, String> {
                 "unknown_elapsed_count": unknown_elapsed_count,
                 "advisory_hypotheses": advisory_hypotheses,
                 "advisory_abstentions": advisory_abstentions,
+                "advisory_evidence_bound_count": advisory_evidence_bound_count,
                 "verified_restoration_time_minutes": {
                     "n": n,
                     "median": median,
@@ -481,6 +494,7 @@ mod tests {
         assert_eq!(report["arms"]["A2"]["attempts_started"], 3);
         assert_eq!(report["arms"]["A2"]["outcome_counts"]["safety_stopped"], 1);
         assert_eq!(report["arms"]["A2"]["advisory_abstentions"], 1);
+        assert_eq!(report["arms"]["A2"]["advisory_evidence_bound_count"], 3);
         assert_eq!(report["arms"]["A2"]["verified_restoration_time_minutes"]["median"], 12.0);
     }
 
@@ -554,6 +568,13 @@ mod tests {
         let mut data = fixture();
         data["episodes"][0]["currency"] = json!("USD");
         assert!(run(&data).unwrap_err().contains("differs from root currency"));
+    }
+
+    #[test]
+    fn baseline_arms_cannot_smuggle_an_advisory_reason() {
+        let mut data = fixture();
+        data["episodes"][0]["advisory_reason"] = json!("hidden diagnostic output");
+        assert!(run(&data).unwrap_err().contains("A0/A1 cannot carry a Symthaea profile"));
     }
 
     #[test]
