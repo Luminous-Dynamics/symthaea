@@ -64,6 +64,8 @@ pub enum UncertaintyRoutingError {
 #[derive(Clone, Debug, PartialEq, Eq)]
 pub struct UncertaintyRoutingReceipt {
     pub scenario_id: String,
+    /// Version of the producer that emitted the referenced uncertainty assessment.
+    pub producer_version: String,
     pub route: CompatibleAnalysisRoute,
     /// The evidence/qualification reference used for routing.
     pub evidence_reference: String,
@@ -164,6 +166,7 @@ impl UncertaintyAssessmentRef {
 
         Ok(UncertaintyRoutingReceipt {
             scenario_id: self.scenario_id.clone(),
+            producer_version: self.producer_version.clone(),
             route,
             evidence_reference,
             source_manifest_digest: self.source_manifest_digest.clone(),
