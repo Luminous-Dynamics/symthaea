@@ -1,0 +1,41 @@
+name: CropFoundry contract validation
+
+on:
+  pull_request:
+    paths:
+      - ".github/workflows/cropfoundry-contract.yml"
+      - "xtask/**"
+      - "docs/research/cropfoundry/**"
+  push:
+    branches:
+      - main
+      - research/cropfoundry-benchmark-contract-2026-10
+    paths:
+      - ".github/workflows/cropfoundry-contract.yml"
+      - "xtask/**"
+      - "docs/research/cropfoundry/**"
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+concurrency:
+  group: cropfoundry-contract-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  validate:
+    name: Validate CropFoundry contracts (not crop performance)
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Install pinned Rust toolchain
+        uses: dtolnay/rust-toolchain@1.96.0
+
+      - name: Test fail-closed contract validator
+        run: cargo test -p xtask cropfoundry_validate
+
+      - name: Validate checked-in contracts
+        run: cargo run -q -p xtask -- cropfoundry-validate
