@@ -1,0 +1,63 @@
+name: Human Tool Bench
+
+on:
+  pull_request:
+    paths:
+      - "tools/human-tool-bench/**"
+      - "fixtures/human_tool_bench_v0_1.json"
+      - "docs/research/HUMAN_TOOL_BENCHMARK_V0_1.md"
+      - ".github/workflows/human-tool-bench.yml"
+  push:
+    branches:
+      - "research/human-tool-bench-v0-1"
+    paths:
+      - "tools/human-tool-bench/**"
+      - "fixtures/human_tool_bench_v0_1.json"
+      - "docs/research/HUMAN_TOOL_BENCHMARK_V0_1.md"
+      - ".github/workflows/human-tool-bench.yml"
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+concurrency:
+  group: human-tool-bench-${{ github.event.pull_request.number || github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  contract-audit:
+    name: Offline contract and mutation tests
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Install pinned Rust toolchain
+        uses: dtolnay/rust-toolchain@1.96.0
+        with:
+          components: rustfmt
+
+      - name: Check formatting
+        run: cargo fmt --manifest-path tools/human-tool-bench/Cargo.toml -- --check
+
+      - name: Run unit and negative-control tests
+        run: cargo test --manifest-path tools/human-tool-bench/Cargo.toml
+
+      - name: Audit frozen synthetic fixture
+        shell: bash
+        run: |
+          set -euo pipefail
+          cargo run --manifest-path tools/human-tool-bench/Cargo.toml -- fixtures/human_tool_bench_v0_1.json > human-tool-report.json
+          jq -e '
+            .report_version == "human-tool-bench-report-v0.1" and
+            .evidence_class == "synthetic_contract_only" and
+            .episode_records == 9 and
+            .unique_episode_ids == 9 and
+            .arms.A0.attempts_started == 3 and
+            .arms.A1.attempts_started == 3 and
+            .arms.A2.attempts_started == 3 and
+            .arms.A2.outcome_counts.safety_stopped == 1 and
+            .arms.A2.advisory_abstentions == 1 and
+            .arms.A2.verified_restoration_time_minutes.median == 12
+          ' human-tool-report.json
+          jq '{report_version, evidence_class, input_sha256, episode_records, arms}' human-tool-report.json
