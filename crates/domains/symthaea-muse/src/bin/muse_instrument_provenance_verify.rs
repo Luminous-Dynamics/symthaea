@@ -29,7 +29,7 @@ struct SourceTermsAudit {
     roots_verified: usize,
     license_documents_verified: usize,
     readme_documents_verified: usize,
-    clean_upstream_checkouts_verified: usize,
+    clean_expected_origin_checkouts_verified: usize,
 }
 
 #[derive(Debug, Clone, Copy)]
@@ -44,7 +44,7 @@ struct SourceTermsPolicy {
 
 #[derive(Debug)]
 struct GitCheckoutObservation {
-    upstream_revision: Option<String>,
+    source_checkout_revision: Option<String>,
     origin_matches_expected: bool,
     clean: Option<bool>,
     status: &'static str,
@@ -79,7 +79,7 @@ struct VerificationReport {
     source_terms_roots_verified: usize,
     source_license_documents_verified: usize,
     source_readme_documents_verified: usize,
-    clean_upstream_checkouts_verified: usize,
+    clean_expected_origin_checkouts_verified: usize,
     selected_samples_total: usize,
     selected_samples_with_matching_actual_file_digest: usize,
     selected_samples_with_valid_file_digest: usize,
@@ -703,7 +703,7 @@ fn verify_reports(
         source_terms_roots_verified: source_terms_audit.roots_verified,
         source_license_documents_verified: source_terms_audit.license_documents_verified,
         source_readme_documents_verified: source_terms_audit.readme_documents_verified,
-        clean_upstream_checkouts_verified: source_terms_audit.clean_upstream_checkouts_verified,
+        clean_expected_origin_checkouts_verified: source_terms_audit.clean_expected_origin_checkouts_verified,
         selected_samples_total,
         selected_samples_with_valid_file_digest,
         selected_samples_with_valid_bank_digest,
@@ -922,7 +922,7 @@ fn verify_source_terms_evidence(
                     audit.readme_documents_verified += 1;
                 }
                 if checkout_matches {
-                    audit.clean_upstream_checkouts_verified += 1;
+                    audit.clean_expected_origin_checkouts_verified += 1;
                 }
                 if declarations_match && license_matches && readme_matches && checkout_matches {
                     audit.roots_verified += 1;
@@ -1064,11 +1064,11 @@ fn source_terms_checkout_matches(
         );
         return false;
     };
-    let observed = inspect_upstream_checkout(root_path, policy.expected_remote);
+    let observed = inspect_source_checkout(root_path, policy.expected_remote);
     let mut matches = true;
 
-    if string_field(entry, "source_revision_status") != Some(observed.status) {
-        if string_field(entry, "source_revision_status") == Some("clean_upstream_checkout") {
+    if string_field(entry, "source_checkout_status") != Some(observed.status) {
+        if string_field(entry, "source_checkout_status") == Some("clean_expected_origin_checkout") {
             push_error(
                 findings,
                 "source_checkout_status_mismatch",
@@ -1083,7 +1083,7 @@ fn source_terms_checkout_matches(
         }
         matches = false;
     }
-    if bool_field(entry, "upstream_origin_matches_expected") != Some(observed.origin_matches_expected) {
+    if bool_field(entry, "checkout_origin_matches_expected") != Some(observed.origin_matches_expected) {
         push_error(
             findings,
             "source_checkout_origin_status_mismatch",
@@ -1116,7 +1116,7 @@ fn source_terms_checkout_matches(
         matches = false;
     }
 
-    match string_field(entry, "upstream_revision") {
+    match string_field(entry, "source_checkout_revision") {
         Some(reported_revision) if !valid_git_revision(reported_revision) => {
             push_error(
                 findings,
@@ -1126,7 +1126,7 @@ fn source_terms_checkout_matches(
             matches = false;
         }
         Some(reported_revision) => {
-            if observed.upstream_revision.as_deref() != Some(reported_revision) {
+            if observed.source_checkout_revision.as_deref() != Some(reported_revision) {
                 push_error(
                     findings,
                     "source_checkout_revision_mismatch",
@@ -1168,12 +1168,12 @@ fn hash_relative_source_document(root: &Path, relative_path: &str) -> Result<Str
         .map_err(|error| error.to_string())
 }
 
-fn inspect_upstream_checkout(root: &Path, expected_remote: &str) -> GitCheckoutObservation {
+fn inspect_source_checkout(root: &Path, expected_remote: &str) -> GitCheckoutObservation {
     let canonical_root = match std::fs::canonicalize(root) {
         Ok(path) if path.is_dir() => path,
         _ => {
             return GitCheckoutObservation {
-                upstream_revision: None,
+                source_checkout_revision: None,
                 origin_matches_expected: false,
                 clean: None,
                 status: "root_unavailable",
@@ -1194,7 +1194,7 @@ fn inspect_upstream_checkout(root: &Path, expected_remote: &str) -> GitCheckoutO
                 Ok(path) if path == canonical_root => path,
                 Ok(_) => {
                     return GitCheckoutObservation {
-                        upstream_revision: None,
+                        source_checkout_revision: None,
                         origin_matches_expected: false,
                         clean: None,
                         status: "asset_root_is_not_repository_root",
@@ -1202,7 +1202,7 @@ fn inspect_upstream_checkout(root: &Path, expected_remote: &str) -> GitCheckoutO
                 }
                 Err(_) => {
                     return GitCheckoutObservation {
-                        upstream_revision: None,
+                        source_checkout_revision: None,
                         origin_matches_expected: false,
                         clean: None,
                         status: "git_root_unreadable",
@@ -1212,7 +1212,7 @@ fn inspect_upstream_checkout(root: &Path, expected_remote: &str) -> GitCheckoutO
         }
         Ok(_) => {
             return GitCheckoutObservation {
-                upstream_revision: None,
+                source_checkout_revision: None,
                 origin_matches_expected: false,
                 clean: None,
                 status: "not_a_git_checkout",
@@ -1220,7 +1220,7 @@ fn inspect_upstream_checkout(root: &Path, expected_remote: &str) -> GitCheckoutO
         }
         Err(_) => {
             return GitCheckoutObservation {
-                upstream_revision: None,
+                source_checkout_revision: None,
                 origin_matches_expected: false,
                 clean: None,
                 status: "git_unavailable",
@@ -1229,14 +1229,14 @@ fn inspect_upstream_checkout(root: &Path, expected_remote: &str) -> GitCheckoutO
     };
     let _ = top_level;
 
-    let upstream_revision = match git(&["rev-parse", "HEAD"]) {
+    let source_checkout_revision = match git(&["rev-parse", "HEAD"]) {
         Ok(output) if output.status.success() => {
             let revision = String::from_utf8_lossy(&output.stdout).trim().to_owned();
             if valid_git_revision(&revision) {
                 Some(revision)
             } else {
                 return GitCheckoutObservation {
-                    upstream_revision: None,
+                    source_checkout_revision: None,
                     origin_matches_expected: false,
                     clean: None,
                     status: "invalid_git_revision",
@@ -1245,7 +1245,7 @@ fn inspect_upstream_checkout(root: &Path, expected_remote: &str) -> GitCheckoutO
         }
         _ => {
             return GitCheckoutObservation {
-                upstream_revision: None,
+                source_checkout_revision: None,
                 origin_matches_expected: false,
                 clean: None,
                 status: "git_revision_unavailable",
@@ -1266,13 +1266,13 @@ fn inspect_upstream_checkout(root: &Path, expected_remote: &str) -> GitCheckoutO
         _ => None,
     };
     let status = match (origin_matches_expected, clean) {
-        (true, Some(true)) => "clean_upstream_checkout",
-        (false, _) => "upstream_origin_mismatch",
+        (true, Some(true)) => "clean_expected_origin_checkout",
+        (false, _) => "expected_origin_mismatch",
         (true, Some(false)) => "dirty_worktree",
         (true, None) => "git_status_unavailable",
     };
     GitCheckoutObservation {
-        upstream_revision,
+        source_checkout_revision,
         origin_matches_expected,
         clean,
         status,
@@ -1958,7 +1958,7 @@ mod tests {
             hash_relative_source_document(&canonical, "LICENSE").expect("license should hash");
         let readme_digest = hash_relative_source_document(&canonical, policy.readme_relative_path)
             .expect("README should hash");
-        let checkout = inspect_upstream_checkout(&canonical, policy.expected_remote);
+        let checkout = inspect_source_checkout(&canonical, policy.expected_remote);
         json!({
             "source_library": policy.source_library,
             "upstream_repository_url": policy.upstream_repository_url,
@@ -1971,10 +1971,10 @@ mod tests {
             "readme_document_sha256": readme_digest,
             "readme_document_status": "hashed",
             "upstream_readme_request": policy.upstream_readme_request,
-            "upstream_revision": checkout.upstream_revision,
-            "upstream_origin_matches_expected": checkout.origin_matches_expected,
+            "source_checkout_revision": checkout.source_checkout_revision,
+            "checkout_origin_matches_expected": checkout.origin_matches_expected,
             "source_checkout_clean": checkout.clean,
-            "source_revision_status": checkout.status
+            "source_checkout_status": checkout.status
         })
     }
 
@@ -2007,7 +2007,7 @@ mod tests {
         assert_eq!(report.source_terms_roots_verified, 2);
         assert_eq!(report.source_license_documents_verified, 2);
         assert_eq!(report.source_readme_documents_verified, 2);
-        assert_eq!(report.clean_upstream_checkouts_verified, 2);
+        assert_eq!(report.clean_expected_origin_checkouts_verified, 2);
         assert_eq!(report.selected_samples_total, 1);
         assert_eq!(report.selected_samples_with_matching_actual_file_digest, 1);
         assert_eq!(report.selected_samples_with_valid_file_digest, 1);
