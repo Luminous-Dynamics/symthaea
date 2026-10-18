@@ -107,6 +107,8 @@ struct ProbeReport {
     cases_with_mismatched_receipts: usize,
     cases_with_render_path_mismatch: usize,
     cases_with_sample_evidence_mismatch: usize,
+    source_bank_manifest_hashing_enabled: bool,
+    cases_with_source_bank_manifest_unavailable: usize,
     velocity_response_group_count: usize,
     velocity_groups_with_non_monotonic_rms: usize,
     evidence_boundary: &'static str,
@@ -214,6 +216,9 @@ fn main() -> ExitCode {
 
 fn run() -> Result<(), String> {
     let options = parse_args()?;
+    let source_bank_manifest_hashing_enabled =
+        std::env::var("SYMTHAEA_MUSE_HASH_SOURCE_BANK_MANIFEST")
+            .is_ok_and(|value| value == "1");
     if options.calibrate_pitch_estimator {
         return run_pitch_estimator_calibration(&options);
     }
@@ -352,6 +357,12 @@ fn run() -> Result<(), String> {
                     "render_receipt_mismatch"
                 } else if !sample_evidence_repeats_match {
                     "sample_evidence_mismatch"
+                } else if source_bank_manifest_hashing_enabled
+                    && selected_sample
+                        .as_ref()
+                        .is_some_and(|sample| sample.source_bank_manifest_status != "hashed")
+                {
+                    "source_bank_manifest_unavailable"
                 } else if !render_path_repeats_match {
                     "render_path_mismatch"
                 } else if metrics.peak < 1.0e-5 {
@@ -448,9 +459,19 @@ fn run() -> Result<(), String> {
             .iter()
             .filter(|case| !case.sample_evidence_repeats_match)
             .count(),
+        source_bank_manifest_hashing_enabled,
+        cases_with_source_bank_manifest_unavailable: cases
+            .iter()
+            .filter(|case| {
+                source_bank_manifest_hashing_enabled
+                    && case.selected_sample.as_ref().is_some_and(|sample| {
+                        sample.source_bank_manifest_status != "hashed"
+                    })
+            })
+            .count(),
         velocity_response_group_count: velocity_response_groups.len(),
         velocity_groups_with_non_monotonic_rms,
-        evidence_boundary: "signal health, renderer/source receipts, exploratory pitch estimate, velocity-response shape, and same-process repeat determinism; pitch diagnostics are not instrument-family calibrated and do not prove fidelity or human preference",
+        evidence_boundary: "signal health, renderer/source receipts, exploratory pitch estimate, velocity-response shape, and same-process repeat determinism; optional source-bank content manifest covers indexed files in the selected mapped bank only and does not prove instrument fidelity or human preference",
         cases,
         velocity_response_groups,
     };
