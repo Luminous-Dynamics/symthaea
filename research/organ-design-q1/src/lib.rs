@@ -1051,6 +1051,7 @@ mod tests {
         "evidence-digest-mismatch-fails-closed",
         "profile-tier-cannot-exceed-synthetic",
         "missing-evidence-fails-closed",
+        "malformed-design-digest-fails-closed",
     ];
 
     fn profile() -> EvaluationProfile {
