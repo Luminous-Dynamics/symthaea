@@ -78,7 +78,7 @@ cat > "$RECEIPT_PATH" <<JSON
   "cargo_manifest_sha256": "$MANIFEST_SHA",
   "ranking_source_sha256": "$SOURCE_SHA",
   "hostile_case_catalog_sha256": "$CATALOG_SHA",
-  "hostile_case_count": 16,
+  "hostile_case_count": 18,
   "format_check": "$FMT_RESULT",
   "test_command": "$TEST_RESULT",
   "format_exit_code": $FMT_EXIT,
