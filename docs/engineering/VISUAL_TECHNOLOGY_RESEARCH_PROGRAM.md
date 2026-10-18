@@ -233,3 +233,5 @@ The benchmark optimizes cost/resource use per **final calibrated-good module**, 
 
 The manufacturing economics reference also implements typed batch/accounting identity and a Pareto route comparison with exact match on target profile, protocol, currency, accounting boundary and evidence class, plus evidence-bundle and uncertainty-method identities. A route cannot dominate another if it fails mandatory floors; cheaper but higher-energy or lower-yield alternatives remain incomparable. Synthetic near-perfect-transfer vs repair-capable route tests illustrate this principle without claiming a real process result.
 
+The AR waveguide manufacturing route has been refined with variant-specific nanoimprint and lithography/etch paths. Its component contract covers master wear/inspection, resist/material lot, residual-layer thickness, fill/demold defect mapping, overlay and replica fidelity across the full field, then verifies downstream angle-/wavelength-resolved optical performance. This is grounded in the September 2026 NIL manufacturing review and remains UNQUALIFIED; it does not prescribe tool recipes or claim local process yield.
+
