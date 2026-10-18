@@ -124,7 +124,7 @@
       "properties": {
         "observation_id": {
           "type": "string",
-          "pattern": "^[a-z]+-[0-9]{3}$"
+          "pattern": "^[a-z]+-[0-9]{3,8}$"
         },
         "partition": {
           "enum": [
