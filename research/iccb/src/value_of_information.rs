@@ -40,7 +40,12 @@ pub struct DecisionPayoff {
 #[derive(Clone, Debug, PartialEq, Eq)]
 pub struct ValueOfInformationScenario {
     pub id: String,
+    /// Direct cost of the survey / measurement in currency minor units.
     pub information_cost_minor: i64,
+    /// Economic cost of waiting for the signal (e.g. lost contribution margin).
+    pub delay_cost_minor: i64,
+    /// Financing / carrying cost attributable to the acquisition delay.
+    pub financing_cost_minor: i64,
     pub states: Vec<InformationState>,
     pub signals: Vec<InformationSignal>,
     pub action_ids: Vec<String>,
@@ -62,6 +67,7 @@ pub enum ValueOfInformationError {
     UnknownStateReference,
     UnknownSignalOrActionReference,
     NegativeInformationCost,
+    InformationCostOverflow,
     ExpectedValueOverflow,
 }
 
@@ -82,6 +88,9 @@ pub struct ValueOfInformationReport {
     pub expected_value_with_signal_minor: i64,
     pub gross_evsi_minor: i64,
     pub information_cost_minor: i64,
+    pub delay_cost_minor: i64,
+    pub financing_cost_minor: i64,
+    pub total_cost_minor: i64,
     pub net_evsi_minor: i64,
     pub perfect_information_expected_value_minor: i64,
     pub evpi_minor: i64,
@@ -156,8 +165,13 @@ impl ValueOfInformationScenario {
         let gross_evsi_numerator =
             with_signal_numerator - baseline_numerator * BPS;
         let gross_evsi_minor = to_i64(gross_evsi_numerator.div_euclid(BPS_SQUARED))?;
+        let total_cost_minor = self
+            .information_cost_minor
+            .checked_add(self.delay_cost_minor)
+            .and_then(|cost| cost.checked_add(self.financing_cost_minor))
+            .ok_or(ValueOfInformationError::InformationCostOverflow)?;
         let net_evsi_minor = gross_evsi_minor
-            .checked_sub(self.information_cost_minor)
+            .checked_sub(total_cost_minor)
             .ok_or(ValueOfInformationError::ExpectedValueOverflow)?;
 
         let mut perfect_information_numerator = 0_i128;
@@ -184,6 +198,9 @@ impl ValueOfInformationScenario {
             expected_value_with_signal_minor,
             gross_evsi_minor,
             information_cost_minor: self.information_cost_minor,
+            delay_cost_minor: self.delay_cost_minor,
+            financing_cost_minor: self.financing_cost_minor,
+            total_cost_minor,
             net_evsi_minor,
             perfect_information_expected_value_minor,
             evpi_minor,
@@ -203,9 +220,16 @@ impl ValueOfInformationScenario {
         {
             return Err(ValueOfInformationError::EmptyIdentifier);
         }
-        if self.information_cost_minor < 0 {
+        if self.information_cost_minor < 0
+            || self.delay_cost_minor < 0
+            || self.financing_cost_minor < 0
+        {
             return Err(ValueOfInformationError::NegativeInformationCost);
         }
+        self.information_cost_minor
+            .checked_add(self.delay_cost_minor)
+            .and_then(|cost| cost.checked_add(self.financing_cost_minor))
+            .ok_or(ValueOfInformationError::InformationCostOverflow)?;
         if self.states.is_empty() || self.signals.is_empty() || self.action_ids.is_empty() {
             return Err(ValueOfInformationError::EmptyStatesSignalsOrActions);
         }
@@ -354,6 +378,8 @@ mod tests {
         ValueOfInformationScenario {
             id: "ICCB-VOI-PERFECT-SIGNAL".into(),
             information_cost_minor,
+            delay_cost_minor: 0,
+            financing_cost_minor: 0,
             states: vec![
                 InformationState {
                     id: "high-demand".into(),
@@ -479,6 +505,8 @@ mod tests {
         let input = ValueOfInformationScenario {
             id: "SYM-EVSI-CISLUNAR-REF-001".into(),
             information_cost_minor: 10,
+            delay_cost_minor: 0,
+            financing_cost_minor: 0,
             states: vec![
                 InformationState {
                     id: "rich-deposit".into(),
@@ -552,6 +580,49 @@ mod tests {
         assert_eq!(report.perfect_information_expected_value_minor, 40);
         assert_eq!(report.evpi_minor, 40);
         assert!(report.worthwhile_at_declared_cost);
+    }
+
+    #[test]
+    fn total_diligence_cost_includes_survey_delay_and_financing() {
+        let mut input = perfect_signal_scenario(50);
+        input.delay_cost_minor = 30;
+        input.financing_cost_minor = 25;
+        let report = input.evaluate().unwrap();
+
+        assert_eq!(report.gross_evsi_minor, 50);
+        assert_eq!(report.information_cost_minor, 50);
+        assert_eq!(report.delay_cost_minor, 30);
+        assert_eq!(report.financing_cost_minor, 25);
+        assert_eq!(report.total_cost_minor, 105);
+        assert_eq!(report.net_evsi_minor, -55);
+        assert!(!report.worthwhile_at_declared_cost);
+    }
+
+    #[test]
+    fn negative_delay_or_financing_cost_fails_closed() {
+        let mut input = perfect_signal_scenario(0);
+        input.delay_cost_minor = -1;
+        assert_eq!(
+            input.evaluate(),
+            Err(ValueOfInformationError::NegativeInformationCost)
+        );
+
+        let mut input = perfect_signal_scenario(0);
+        input.financing_cost_minor = -1;
+        assert_eq!(
+            input.evaluate(),
+            Err(ValueOfInformationError::NegativeInformationCost)
+        );
+    }
+
+    #[test]
+    fn cost_component_overflow_fails_closed() {
+        let mut input = perfect_signal_scenario(i64::MAX);
+        input.delay_cost_minor = 1;
+        assert_eq!(
+            input.evaluate(),
+            Err(ValueOfInformationError::InformationCostOverflow)
+        );
     }
 
     #[test]
