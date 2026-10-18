@@ -530,7 +530,7 @@ mod tests {
     use std::collections::BTreeSet;
 
     use super::*;
-    use crate::accountability::AccountabilityCase;
+    use crate::accountability::{AccountabilityCase, RepairAction, RepairActionId};
     use crate::authority_envelope::RelationalAuthorityAssessment;
     use crate::evidence_ledger::{EvidenceObservation, EvidenceRelation, NormativeClaimId};
     use crate::ontology::ActionAuthority;
@@ -552,12 +552,14 @@ mod tests {
         evidence.add_fact(fact("conflict-a"), "sensor reports low flow", 0.8).unwrap();
         evidence.add_fact(fact("conflict-b"), "farmer observation reports normal flow", 0.75).unwrap();
         evidence.add_fact(fact("replacement-premise"), "replacement premise", 0.9).unwrap();
+        evidence.add_fact(fact("advice-corrected"), "the prior advice was corrected and affected party informed", 0.95).unwrap();
         for (id, source, confidence) in [
             ("premise-measured", "sensor:demo-flow", 0.9),
             ("forecast-flow", "model:irrigation-demo-v1", 0.7),
             ("observed-flow", "sensor:follow-up-flow", 0.95),
             ("conflict-a", "sensor:flow-a", 0.8),
             ("conflict-b", "farmer:observation-b", 0.75),
+            ("advice-corrected", "repair:correction-receipt", 0.95),
         ] {
             evidence.add_fact_evidence(
                 &fact(id),
@@ -707,6 +709,29 @@ mod tests {
         p.record_disposition(FarmerAdviceDisposition::Declined);
         assert_eq!(p.disposition(), Some(FarmerAdviceDisposition::Declined));
         assert_eq!(p.review_state(&case, &e), Ok(AdviceReviewState::Active));
+    }
+
+    #[test]
+    fn completed_wcare_correction_repair_drives_profile_state() {
+        let e = evidence();
+        let mut case = wcare_case(&e);
+        let repair_id = RepairActionId::new("repair-advice-correction").unwrap();
+        case.add_repair(
+            RepairAction::new(
+                repair_id.clone(),
+                RepairKind::RetractOrCorrectAdvice,
+                None,
+                fact("advice-corrected"),
+            ),
+            &e,
+        ).unwrap();
+        case.complete_repair(&repair_id, &e).unwrap();
+
+        let p = profile(&e, &case);
+        assert_eq!(
+            p.review_state(&case, &e),
+            Ok(AdviceReviewState::CorrectionOrRetractionCompleted)
+        );
     }
 
     #[test]
