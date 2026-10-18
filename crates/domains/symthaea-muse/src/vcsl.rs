@@ -3763,6 +3763,19 @@ mod tests {
     }
 
     #[test]
+    fn absent_asset_root_is_explicit_when_content_hashing_is_requested() {
+        let root = std::env::temp_dir().join(format!(
+            "muse-missing-root-manifest-{}",
+            std::process::id()
+        ));
+        let _ = std::fs::remove_dir_all(&root);
+        let evidence = asset_root_evidence(&root, true).unwrap();
+        assert!(!evidence.root_present);
+        assert_eq!(evidence.content_manifest_status, "root_missing");
+        assert!(evidence.content_manifest_sha256.is_none());
+    }
+
+    #[test]
     fn indexed_sample_content_hash_detects_same_size_audio_changes() {
         let root = std::env::temp_dir().join(format!(
             "muse-instrument-inventory-content-hash-{}",
@@ -3776,6 +3789,10 @@ mod tests {
         std::fs::create_dir_all(&harp_dir).unwrap();
         std::fs::create_dir_all(&vsco2_root).unwrap();
         let sample_path = harp_dir.join("Harp_A4_vl1.wav");
+        let unindexed_path = vcsl_root.join("misc/unindexed-placeholder.wav");
+        std::fs::create_dir_all(unindexed_path.parent().unwrap()).unwrap();
+        // Root hashing must cover WAV files that the scientific-pitch indexer rejects.
+        std::fs::write(&unindexed_path, b"unindexed-placeholder-payload-A").unwrap();
 
         fn write_wav(path: &Path, amplitude: i16) {
             let spec = hound::WavSpec {
@@ -3902,6 +3919,31 @@ mod tests {
             changed.vcsl_root.content_manifest_sha256.as_deref(),
             Some(first_root_content_hash.as_str()),
             "root content manifest must catch same-size WAV byte changes"
+        );
+
+        // Alter only a WAV rejected by the pitch-sample indexer. Its equal-size
+        // payload change must affect the root digest but not the path/size seal.
+        let unindexed_size = std::fs::metadata(&unindexed_path).unwrap().len();
+        std::fs::write(&unindexed_path, b"unindexed-placeholder-payload-B").unwrap();
+        assert_eq!(std::fs::metadata(&unindexed_path).unwrap().len(), unindexed_size);
+        let changed_unindexed = capability_inventory_with_provenance_options(
+            &vcsl_root,
+            &vsco2_root,
+            None,
+            None,
+            false,
+            true,
+        )
+        .unwrap();
+        assert_ne!(
+            changed_unindexed.vcsl_root.content_manifest_sha256.as_deref(),
+            changed.vcsl_root.content_manifest_sha256.as_deref(),
+            "root manifest must cover WAV files rejected by the sample indexer"
+        );
+        assert_eq!(
+            changed_unindexed.vcsl_root.path_size_manifest_sha256.as_deref(),
+            Some(layout_hash.as_str()),
+            "same-size unindexed payload changes leave path/size digest unchanged"
         );
 
         let default_inventory = capability_inventory(&vcsl_root, &vsco2_root, None).unwrap();
