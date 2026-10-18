@@ -10,6 +10,7 @@
 //! for choosing discriminating simulations or physical measurements.
 
 use serde::{Deserialize, Serialize};
+use sha2::{Digest, Sha256};
 use std::collections::BTreeSet;
 use std::error::Error;
 use std::fmt::{self, Display, Formatter};
@@ -49,6 +50,8 @@ pub struct CandidateExperiment {
 #[serde(deny_unknown_fields)]
 pub struct ObservablePrediction {
     pub observable_id: String,
+    /// Unit for every prediction under this observable (SI symbol or explicitly declared unit).
+    pub unit: String,
     pub predictions: Vec<HypothesisPrediction>,
 }
 
@@ -56,9 +59,17 @@ pub struct ObservablePrediction {
 #[serde(deny_unknown_fields)]
 pub struct HypothesisPrediction {
     pub hypothesis_id: String,
+    /// Canonical UTF-8 descriptor of the exact predictive model and parameters.
+    pub model_descriptor: String,
+    /// Lowercase SHA-256 digest of the exact model_descriptor UTF-8 bytes.
+    pub model_digest_sha256: String,
     pub mean: f64,
     /// One-standard-deviation predictive uncertainty for this observable under the hypothesis.
     pub standard_uncertainty: f64,
+    /// Canonical UTF-8 descriptor of the uncertainty model or fixture assumption.
+    pub uncertainty_descriptor: String,
+    /// Lowercase SHA-256 digest of the exact uncertainty_descriptor UTF-8 bytes.
+    pub uncertainty_digest_sha256: String,
 }
 
 #[derive(Clone, Debug, PartialEq, Serialize, Deserialize)]
@@ -99,6 +110,16 @@ pub enum PlanError {
     DuplicateObservable {
         experiment_id: String,
         observable_id: String,
+    },
+    InvalidObservableUnit {
+        experiment_id: String,
+        observable_id: String,
+    },
+    DescriptorDigestMismatch {
+        experiment_id: String,
+        observable_id: String,
+        hypothesis_id: String,
+        descriptor_kind: String,
     },
     PredictionCountMismatch {
         experiment_id: String,
@@ -148,6 +169,18 @@ impl Display for PlanError {
             Self::DuplicateObservable { experiment_id, observable_id } => {
                 write!(f, "experiment {experiment_id} repeats observable {observable_id}")
             }
+            Self::InvalidObservableUnit { experiment_id, observable_id } => {
+                write!(f, "experiment {experiment_id}, observable {observable_id} needs a non-empty unit")
+            }
+            Self::DescriptorDigestMismatch {
+                experiment_id,
+                observable_id,
+                hypothesis_id,
+                descriptor_kind,
+            } => write!(
+                f,
+                "experiment {experiment_id}, observable {observable_id}, hypothesis {hypothesis_id}: {descriptor_kind} descriptor SHA-256 mismatch"
+            ),
             Self::PredictionCountMismatch {
                 experiment_id,
                 observable_id,
@@ -300,6 +333,25 @@ pub fn rank_experiments(input: &ExperimentDesignInput) -> Result<DesignReport, P
     })
 }
 
+fn descriptor_digest_matches(descriptor: &str, supplied_digest: &str) -> bool {
+    if supplied_digest.len() != 64
+        || !supplied_digest
+            .bytes()
+            .all(|byte| byte.is_ascii_digit() || (b'a'..=b'f').contains(&byte))
+    {
+        return false;
+    }
+
+    let digest = Sha256::digest(descriptor.as_bytes());
+    let mut expected = String::with_capacity(64);
+    const HEX: &[u8; 16] = b"0123456789abcdef";
+    for byte in digest {
+        expected.push(HEX[(byte >> 4) as usize] as char);
+        expected.push(HEX[(byte & 0x0f) as usize] as char);
+    }
+    expected == supplied_digest
+}
+
 fn validate_input(input: &ExperimentDesignInput) -> Result<(), PlanError> {
     if input.schema_version != SCHEMA_VERSION {
         return Err(PlanError::UnsupportedSchema(input.schema_version.clone()));
@@ -371,6 +423,12 @@ fn validate_input(input: &ExperimentDesignInput) -> Result<(), PlanError> {
                     observable_id: observable.observable_id.clone(),
                 });
             }
+            if observable.unit.trim().is_empty() {
+                return Err(PlanError::InvalidObservableUnit {
+                    experiment_id: experiment.experiment_id.clone(),
+                    observable_id: observable.observable_id.clone(),
+                });
+            }
             if observable.predictions.len() != hypotheses.len() {
                 return Err(PlanError::PredictionCountMismatch {
                     experiment_id: experiment.experiment_id.clone(),
@@ -394,6 +452,32 @@ fn validate_input(input: &ExperimentDesignInput) -> Result<(), PlanError> {
                         experiment_id: experiment.experiment_id.clone(),
                         observable_id: observable.observable_id.clone(),
                         hypothesis_id: prediction.hypothesis_id.clone(),
+                    });
+                }
+                if prediction.model_descriptor.trim().is_empty()
+                    || !descriptor_digest_matches(
+                        &prediction.model_descriptor,
+                        &prediction.model_digest_sha256,
+                    )
+                {
+                    return Err(PlanError::DescriptorDigestMismatch {
+                        experiment_id: experiment.experiment_id.clone(),
+                        observable_id: observable.observable_id.clone(),
+                        hypothesis_id: prediction.hypothesis_id.clone(),
+                        descriptor_kind: "model".to_owned(),
+                    });
+                }
+                if prediction.uncertainty_descriptor.trim().is_empty()
+                    || !descriptor_digest_matches(
+                        &prediction.uncertainty_descriptor,
+                        &prediction.uncertainty_digest_sha256,
+                    )
+                {
+                    return Err(PlanError::DescriptorDigestMismatch {
+                        experiment_id: experiment.experiment_id.clone(),
+                        observable_id: observable.observable_id.clone(),
+                        hypothesis_id: prediction.hypothesis_id.clone(),
+                        descriptor_kind: "uncertainty".to_owned(),
                     });
                 }
                 if !prediction.mean.is_finite() {
@@ -545,6 +629,50 @@ mod tests {
         let degraded = rank_experiments(&input).unwrap();
         let degraded_score = degraded.ranked_experiments[0].worst_case_separation_sigma;
         assert!((degraded_score * 10.0 - baseline_score).abs() < 1.0e-10);
+    }
+
+    #[test]
+    fn descriptor_digests_and_units_are_required_and_verified() {
+        let mut input = galileo_demo_input();
+        assert_eq!(input.experiments[0].observables[0].unit, "m");
+
+        let valid = input.experiments[0].observables[0].predictions[0].clone();
+        assert!(descriptor_digest_matches(
+            &valid.model_descriptor,
+            &valid.model_digest_sha256
+        ));
+        assert!(descriptor_digest_matches(
+            &valid.uncertainty_descriptor,
+            &valid.uncertainty_digest_sha256
+        ));
+
+        input.experiments[0].observables[0].predictions[0].model_digest_sha256 =
+            "0".repeat(64);
+        assert!(matches!(
+            rank_experiments(&input),
+            Err(PlanError::DescriptorDigestMismatch {
+                descriptor_kind,
+                ..
+            }) if descriptor_kind == "model"
+        ));
+
+        let mut input = galileo_demo_input();
+        input.experiments[0].observables[0].predictions[0].uncertainty_digest_sha256 =
+            "x".repeat(64);
+        assert!(matches!(
+            rank_experiments(&input),
+            Err(PlanError::DescriptorDigestMismatch {
+                descriptor_kind,
+                ..
+            }) if descriptor_kind == "uncertainty"
+        ));
+
+        let mut input = galileo_demo_input();
+        input.experiments[0].observables[0].unit.clear();
+        assert!(matches!(
+            rank_experiments(&input),
+            Err(PlanError::InvalidObservableUnit { .. })
+        ));
     }
 
     #[test]
