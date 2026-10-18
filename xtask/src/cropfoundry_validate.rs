@@ -246,17 +246,10 @@ fn validate_source_manifest(root: &Value) -> std::result::Result<usize, Vec<Stri
             ));
         }
 
-        if !training_authorized {
-            if ingestion_status == Some("ingestion_authorized") {
-                errors.push(format!(
-                    "{prefix} claims ingestion_authorized while training_authorized is false"
-                ));
-            }
-            if declares_training_use {
-                errors.push(format!(
-                    "{prefix} permits training while training_authorized is false"
-                ));
-            }
+        if !training_authorized && declares_training_use {
+            errors.push(format!(
+                "{prefix} permits training while training_authorized is false"
+            ));
         }
 
         if training_authorized {
@@ -315,6 +308,12 @@ fn validate_source_manifest(root: &Value) -> std::result::Result<usize, Vec<Stri
     if declared_no_training == any_training_authorized {
         errors.push(
             "policy.no_source_is_training_authorized must equal whether all source records are non-trainable"
+                .to_owned(),
+        );
+    }
+    if any_training_authorized && manifest_status != Some("controlled_subset_authorized") {
+        errors.push(
+            "training-authorized sources require manifest status controlled_subset_authorized"
                 .to_owned(),
         );
     }
