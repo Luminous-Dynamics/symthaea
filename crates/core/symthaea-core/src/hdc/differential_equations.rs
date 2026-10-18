@@ -2683,11 +2683,58 @@ mod tests {
         assert_eq!(coarse.trajectory.t_end(), 1.0);
         assert_eq!(tight.trajectory.t_end(), 1.0);
         assert!(coarse.accepted_steps > 1);
+        assert!(coarse.rejected_steps > 0 && tight.rejected_steps > 0);
         assert!(tight.accepted_steps > coarse.accepted_steps);
         assert!(tight_error < coarse_error);
         assert!(coarse.max_accepted_normalized_local_error <= 1.0);
         assert!(tight.max_accepted_normalized_local_error <= 1.0);
         assert!(tight.max_normalized_newton_residual <= 1e-10);
+    }
+
+    #[test]
+    fn test_adaptive_implicit_euler_tolerances_are_unit_rescaling_consistent() {
+        fn growth(_t: f64, y: &[f64]) -> Vec<f64> {
+            vec![y[0], y[1]]
+        }
+        let system = ODESystem { f: growth, dim: 2 };
+        let native = DifferentialEquationsEngine::try_solve_implicit_euler_adaptive(
+            &system,
+            0.0,
+            1.0,
+            &[1.0, 1e-12],
+            &[1e-3, 1e-14],
+            0.0,
+            0.1,
+            10_000,
+            12,
+        )
+        .expect("mixed-scale state should integrate");
+        let rescaled = DifferentialEquationsEngine::try_solve_implicit_euler_adaptive(
+            &system,
+            0.0,
+            1.0,
+            &[1.0, 1.0],
+            &[1e-3, 1e-2],
+            0.0,
+            0.1,
+            10_000,
+            12,
+        )
+        .expect("equivalently rescaled state should integrate");
+        assert_eq!(native.trajectory.t_end(), 1.0);
+        assert_eq!(rescaled.trajectory.t_end(), 1.0);
+        assert!(
+            native.accepted_steps.abs_diff(rescaled.accepted_steps) <= 1,
+            "Unit rescaling should preserve step decisions: native={}, rescaled={}",
+            native.accepted_steps,
+            rescaled.accepted_steps,
+        );
+        let native_scaled = native.trajectory.final_state()[1] / 1e-12;
+        let rescaled_value = rescaled.trajectory.final_state()[1];
+        assert!(
+            (native_scaled - rescaled_value).abs() < 1e-9,
+            "Normalized final states differ: native={native_scaled}, rescaled={rescaled_value}",
+        );
     }
 
     #[test]
