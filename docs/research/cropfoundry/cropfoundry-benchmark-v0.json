@@ -293,6 +293,16 @@
       "proposed_target": "Only on datasets with documented randomization or a prespecified defensible causal identification strategy, compare against a simple design-appropriate statistical baseline; target calibrated treatment-effect intervals and lower held-out decision regret without violating safety/resource constraints. If assignment mechanism, blocks, replication, or major confounders cannot be established, causal benchmark status remains blocked and outputs must be labeled associational.",
       "split_protocol": "Before outcome analysis, pin the allocation mechanism, experimental unit, blocks/replicates, treatments, baseline/comparator, environment, time window, outcomes, exclusions, and causal estimand. Split by independent blocks/site-years and respect treatment assignment. Avoid leakage from repeated observations or post-treatment variables. Compare on held-out units; report uncertainty and sensitivity to assumptions.",
       "status": "not_evaluable_until_experimental_design_documented"
+    },
+    {
+      "id": "CF-019",
+      "category": "digital_twin_assimilation",
+      "name": "Sequential plant-state assimilation and forecast reliability",
+      "question": "When chronological plant and environment observations arrive, does a versioned digital twin update improve short-horizon predictions and uncertainty calibration versus a frozen model and simple time-series baselines, while correctly detecting stale/drifting sensors?",
+      "primary_metric": "Horizon-specific MAE/RMSE plus probabilistic score or prediction-interval coverage/width, update latency, missing-data robustness, drift-detection precision/recall, and forecast abstention quality",
+      "proposed_target": "On a pinned time-series dataset with interpretable timestamps and units, aim for at least 10% lower predeclared horizon-weighted error than a frozen-model baseline while meeting predeclared interval-calibration and missing-data thresholds. Compare against simple persistence/seasonal baselines, preserve model/data version lineage, and test sensor dropout/drift. This is a retrospective methodology target, not field-impact evidence.",
+      "split_protocol": "Use prequential/chronological evaluation: at prediction time t, only observations available by t may update state or parameters. Hold out complete future windows, audit event-time versus receive-time, prevent same-period harvest/outcome leakage, and replay stale, duplicated, missing and drifted sensor observations. Report each forecast horizon and each environment separately.",
+      "status": "not_evaluable_until_time_series_metadata_pinned"
     }
   ],
   "first_milestone_exit_criteria": [
