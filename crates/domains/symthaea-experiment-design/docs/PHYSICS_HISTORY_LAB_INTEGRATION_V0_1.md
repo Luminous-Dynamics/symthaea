@@ -83,7 +83,7 @@ This is **not** Bayesian expected information gain, a Bayes factor, a posterior 
 
 ## Shared Galileo handoff fixture
 
-The JSON input in `fixtures/galileo-discrimination-v0.1.json` is deliberately also stored in Symtropy at `tools/physics-experiment-atlas/fixtures/galileo-discrimination-v0.1.json`. It is a transport fixture, not generated observation data. Both copies identify the same model equations and uncertainty assumptions using SHA-256 digests of canonical descriptor strings. The digest check catches accidental descriptor edits that were not accompanied by a digest update, but it is not proof that code executed the described equation.
+The JSON input in `fixtures/galileo-discrimination-v0.1.json` is deliberately also stored in Symtropy at `tools/physics-experiment-atlas/fixtures/galileo-discrimination-v0.1.json`. It is a transport fixture, not generated observation data. Both copies identify the same model equations and uncertainty assumptions using SHA-256 digests of canonical descriptor strings. The digest check catches accidental descriptor edits that were not accompanied by a digest update, but it is not proof that code executed the described equation. Both focused workflows pin the fixture's Git object fingerprint (1b2a9862498722619c2259688d4557eb2dac9cef), so unreviewed fixture drift fails the affected repository's gate. The fingerprint is a drift check, not an executable/model attestation.
 
 ## Relationship to existing experiment design
 
