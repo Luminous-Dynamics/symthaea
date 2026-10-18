@@ -530,6 +530,16 @@ mod tests {
     }
 
     #[test]
+    fn ingestion_for_schema_review_does_not_imply_training_authority() {
+        let mut fixture: Value = serde_json::from_str(SOURCE_FIXTURE).unwrap();
+        fixture["sources"][0]["ingestion_status"] = json!("ingestion_authorized");
+        fixture["sources"][0]["permitted_current_use"] =
+            json!(["public_metadata_review", "schema_audit"]);
+        fixture["sources"][0]["training_authorized"] = json!(false);
+        assert_eq!(validate_source_manifest(&fixture).unwrap(), 11);
+    }
+
+    #[test]
     fn duplicate_source_ids_fail_closed() {
         let mut fixture: Value = serde_json::from_str(SOURCE_FIXTURE).unwrap();
         let first_id = fixture["sources"][0]["id"].clone();
