@@ -959,6 +959,32 @@ mod tests {
     }
 
     #[test]
+    fn additional_query_budget_preserves_prior_queries_already_used() {
+        let fixture: Value = serde_json::from_str(FIXTURE).unwrap();
+        let scenario = scenario_by_id(&fixture, "HOLD-BUDGET-001");
+
+        let no_additional_budget = run_interactive_episode(
+            scenario,
+            0,
+            PreferenceQuerySelectionStrategyV1::LexicographicUnaskedPair,
+            1,
+        )
+        .unwrap();
+        assert_eq!(no_additional_budget.query_count, 0);
+        assert_eq!(no_additional_budget.final_action, PreferenceReplayActionV1::Abstain);
+
+        let one_additional_query = run_interactive_episode(
+            scenario,
+            1,
+            PreferenceQuerySelectionStrategyV1::LexicographicUnaskedPair,
+            1,
+        )
+        .unwrap();
+        assert_eq!(one_additional_query.query_count, 1);
+        assert_eq!(one_additional_query.queries.len(), 1);
+    }
+
+    #[test]
     fn zero_budget_never_emits_a_query() {
         let fixture: Value = serde_json::from_str(FIXTURE).unwrap();
         let scenario = scenario_by_id(&fixture, "HOLD-UNKNOWN-001");
