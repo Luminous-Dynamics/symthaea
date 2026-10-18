@@ -8,15 +8,15 @@
 
 ## Decision
 
-Do not start by bulk-ingesting every crop database. First build a source manifest and deeply inspect a small, complementary set:
+Do not start by bulk-ingesting every crop database. Prefer two sharply separated, small proofs with explicit license evidence:
 
-1. One **structured tomato trial dataset** for agronomic/phenotypic schema mapping and a feasibility check.
-2. One **multimodal greenhouse tomato dataset** if its exact dataset license permits the intended use.
+1. **First tabular pipeline candidate:** [UdeA Mobile and Manual Tomato](https://zenodo.org/records/16745911). Zenodo states CC BY 4.0 and describes 135 plants, 27 treatment combinations and 20 weekly sessions. The accessible CSV preview exposes row-level plant/time identifiers, treatment labels, mixed sensor/manual variables and yield fields. Do not randomly split rows: hold out whole plants for one question and later dates for a separate temporal question. The related GitHub mirror's stated row/column counts conflict with the Zenodo record, so pin and inspect the canonical Zenodo artifact before scoring it.
+2. **Separate phenotyping/vision candidate:** [AerialYield-T2M](https://zenodo.org/records/22071809), a six-stage tomato-ripeness/mask/count dataset with 677 frames, 14,303 annotated tomato instances, explicit block-grouped splits, a checksum list and a bundled CC BY 4.0 LICENSE file. It is a single commercial greenhouse in the UAE, so it cannot establish yield, genotype, or South African transfer.
 3. The **existing Mycelix lettuce/DWC profile and cultivar-admission work** as an integration/contract lane, not as measured yield evidence.
 4. An **ARC partnership/access request** for one locally relevant underutilized leafy vegetable rather than assuming its trial records are openly downloadable.
-5. A **germplasm discovery** lane through Genesys or the relevant national/institutional collections, subject to access terms and material-transfer conditions.
+5. A **germplasm discovery** lane through Genesys or relevant national/institutional collections, subject to access terms and material-transfer conditions.
 
-A Portuguese tomato trial is not evidence that the same cultivar or model transfers to Johannesburg. It is initially useful for testing metadata mapping, split design, and pipeline correctness. South African transfer needs local data or new validation.
+The UdeA file preview has been inspected for column headings and example records through Zenodo's web preview, but no data bytes have been pinned locally, normalized, or scored. These non-South-African studies are pipeline/benchmark candidates, not evidence that varieties or models transfer to Johannesburg.
 
 ## Candidate source register
 
@@ -31,6 +31,8 @@ A Portuguese tomato trial is not evidence that the same cultivar or model transf
 | DS-007 | [FAOSTAT](https://www.fao.org/faostat/). Country/region-level production, prices, inputs, trade and food-security statistics. | Context variables, plausible production/price baselines and food-system prioritization. | Public statistical portal; capture dataset vintage, series definition, geography, units and terms. Aggregated time series are not cultivar-level trial evidence. | **P0 contextual baseline only.** |
 | DS-008 | [Plant Phenotyping Datasets](https://www.plant-phenotyping.org/datasets-home). Existing image/annotation benchmark resources for detection, localization, segmentation, leaf counting and related CV tasks. | Reproducible computer-vision baseline before new imaging models. | Each dataset's own license, annotation protocol and train/test conventions must be checked separately. | **P1 for CV work only.** |
 | DS-009 | [Mycelix #3303 ProductiveLoopV1](https://github.com/Luminous-Dynamics/mycelix/issues/3303), [#3309 lettuce/DWC profile](https://github.com/Luminous-Dynamics/mycelix/issues/3309), [#3311 cultivar-admission profile](https://github.com/Luminous-Dynamics/mycelix/issues/3311), and [#3317 admission validator](https://github.com/Luminous-Dynamics/mycelix/issues/3317). | Reuse existing output/lot/cultivar semantics and negative controls for controlled-environment integration. | These are project design/implementation work items, not third-party biological validation datasets. Their references must keep claim ceilings intact. | **P0 integration; do not count as biological observations.** |
+| DS-010 | [UdeA Mobile and Manual Dataset for Greenhouse Tomato Crop](https://zenodo.org/records/16745911). Zenodo's canonical CSV is described as 2,666 rows × 40 columns; 135 plants, 27 treatment combinations and 20 weekly sessions from November 2023–April 2024. The CSV preview reveals plant, date, treatment, sensor/manual variables and yield-related fields. | First tabular-contract and leakage-audit pilot; explore prediction feasibility only after direct artifact inspection. | The Zenodo record states CC BY 4.0. Its GitHub mirror README reports 2,664 rows × 44 columns, so the mirror and canonical artifact must not be silently mixed. The canonical file is not locally pinned or scored. | **P0 schema / split audit; no random-row split and no South African transfer claim.** |
+| DS-011 | [AerialYield-T2M](https://zenodo.org/records/22071809). 677 RGB frames (535 close-range, 142 drone), 14,303 tomato instances, six ripeness stages, masks, count labels, split metadata and a SHA-256 checksum list. | Separate visual-phenotyping benchmark: ripeness classification, instance detection/segmentation and fruit counting. It is not a crop-yield or genetics dataset. | Public Zenodo release includes a LICENSE file explicitly stating CC BY 4.0. The 3.6 GB artifacts and checksum file have not been downloaded or verified locally. One commercial greenhouse in the UAE limits external validity. | **P1 after minimal artifact/split/checksum audit.** |
 
 ## First ingestion gate
 
@@ -48,12 +50,13 @@ Before a file enters a training or evaluation dataset, record:
 
 ## Recommended initial work order
 
-1. Resolve DS-001 and DS-002 exact terms, download only if allowed, and inspect workbook structure manually/reproducibly. Do not merge them just because both are tomato data.
-2. Build a trait/measurement crosswalk against MIAPPE + Crop Ontology, then determine whether one outcome is comparable enough for a first baseline.
-3. Check sample count and grouping structure **after actual inspection**; if there are too few site-years or replicates, stop the predictive benchmark and use the data only for schema/benchmark plumbing.
-4. Verify DS-003's data-specific license before any processing beyond public metadata review.
-5. Open an ARC collaboration/access conversation for the indigenous-crop lane; choose the crop based on local relevance and actual evidence/seed access, not on a preconceived model target.
-6. Only after the dataset inventory passes should we freeze the specific trait, model baselines, held-out split, metrics and evaluation receipt.
+1. Use the canonical DS-010 Zenodo artifact as the first small tabular pipeline candidate: verify file identity/checksum, exact headers/units, plant/date/treatment grouping, missingness and the row/column discrepancy before scoring. CC BY 4.0 is recorded on the Zenodo item, but artifact bytes must be pinned for a reproducible run.
+2. Design two separate leakage-resistant questions: unseen-plant generalization and future-date prediction. Never use random-row split as the only evaluation because repeated measures of the same plants can leak across partitions.
+3. Start with descriptive QA and simple baselines only if the chosen target has enough non-missing observations and a valid group split. Report dataset coverage before any prediction result; if groups are too few, keep the result at schema-validation level.
+4. Keep DS-011 as a separate image task: start with metadata, bundled license, checksum file and split-integrity review; only then download the minimum authorized components needed for a baseline.
+5. Keep DS-001, DS-002 and DS-003 quarantined until their individual artifact rights/access terms have been resolved.
+6. Open an ARC collaboration/access conversation for the indigenous-crop lane; choose the crop based on local relevance and real evidence/seed access, not on a preconceived model target.
+7. Freeze traits, baselines, splits, metrics and a run receipt only after the applicable inventory gate passes.
 
 ## Source notes
 
