@@ -8,7 +8,7 @@
 
 A point-estimate Pareto frontier answers: “Which candidates are non-dominated under these supplied values?” It does not answer whether a candidate remains competitive when assumptions change.
 
-The evaluator accepts named scenarios with caller-supplied version/digest identifiers. Every candidate must provide one metric vector per scenario. It reports:
+The evaluator accepts named scenarios with caller-supplied version/digest identifiers. Every candidate must provide one metric vector per scenario, and each vector must match the registered scenario digest. It reports:
 
 1. The baseline Pareto report.
 2. A complete Pareto report for every scenario.
@@ -35,7 +35,7 @@ All fixtures should be versioned before runtime tuning, with hand-computed expec
 |---|---|
 | Baseline/shock rank reversal | Baseline and shocked frontiers differ when a price shock reverses dominance; neither alternative is falsely called a universal winner. |
 | Stable robust dominance | A candidate no worse in every metric/scenario and strictly better somewhere robustly dominates its comparator. |
-| Shared scenario assumption | Candidates are evaluated against the exact same scenario IDs and digest set; per-candidate scenario sets cannot silently drift. |
+| Shared scenario assumption | Candidates are evaluated against the exact same scenario IDs and digest set; per-candidate scenario sets and per-candidate metric digests cannot silently drift. |
 | Missing scenario value | The candidate is incomplete in that scenario and is ineligible for robust dominance; no baseline carry-forward occurs. |
 | Gate failure / unknown | Blocked or indeterminate candidates never enter any scenario frontier or the robust frontier. |
 | Schema mismatch | Empty/duplicate scenario IDs, duplicate scenario records, missing scenarios, unknown scenarios, inconsistent objective keys/directions/units, non-finite values, and missing provenance for present values fail closed. |
