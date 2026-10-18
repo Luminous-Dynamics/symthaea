@@ -96,6 +96,28 @@ This separates a single sustained drone from a sequence of staccato attacks that
 
 The measurements are descriptive and are **not** currently used to accept/reject V1 candidates, rank outputs, or modify production selection. They should become QD dimensions only after calibration against human judgments. This feature is descriptive only, not yet used for archive bins or candidate ranking. It measures symbolic note timing/velocity validity rather than inspecting rendered audio energy; a later audio-level benchmark must reject empty or near-silent renderings and bind those measurements to the exact renderer, instrument/sample-bank identity, and output digest. The tests cover long sustain, short attacks, interval union, clip-edge clipping, malformed notes, empty scores, window limits, note-order invariance, and duplicate-note invariance.
 
+## Waveform-level integrity audit
+
+`src/creative_audio_audit.rs` audits the actual `AudioData` buffer after rendering, separately from note-level contracts. It reports normalized sample peak and RMS, per-channel DC offsets, non-finite and out-of-range sample counts, near-ceiling and near-zero sample ratios, active-window coverage, longest contiguous near-silent run, and an explicitly thresholded effectively-silent flag. The caller's thresholds are included in the config and are not presented as universal musical-audibility cutoffs.
+
+The first gate is intentionally narrow:
+
+- Empty buffers and invalid measurement configuration return explicit errors.
+- Non-finite samples are counted, not hidden; aggregate arithmetic substitutes zero only so the other observations remain inspectable.
+- Samples outside the normalized `[-1, 1]` range are reported, not silently clipped by the audit.
+- A zero-RMS render is distinct from a sparse but nonzero render. Near-silence and active-window coverage remain thresholded diagnostic measurements.
+- Mono i16, mono f32, and stereo f32 buffers are handled without re-rendering or normalizing them.
+- A test renders a real note using Muse's existing renderer and audits the result.
+
+This does **not** implement true-peak measurement, broadcast-loudness compliance, timbral quality, or perceived audibility. Muse already has `auto_master::measure_lufs`; that separate algorithm should be validated against the EBU Tech 3341 minimum-requirement signals before claiming EBU meter conformance. EBU's `-23 LUFS` recommendation is a broadcast normalization target, not a universal creative-music quality target. Sample peak is also not true peak, so the new audit deliberately does not claim to detect every inter-sample peak.
+
+Research and benchmark framing:
+- MIREX 2026 Music Audio Generation evaluates melody, harmony, key consistency, style consistency, and arrangement/production separately; its auxiliary acoustic descriptors are described as diagnostic rather than ranking scores: https://www.music-ir.org/mirex/wiki/2026%3AMusic_Audio_Generation
+- EBU Tech 3341 specifies loudness-meter behaviors and a defined test-signal suite for momentary, short-term, integrated loudness, and true-peak checks: https://tech.ebu.ch/publications/tech3341
+- MIREX 2026 Symbolic Music Generation uses blind subjective ratings and a fixed eight-candidate choice budget: https://www.music-ir.org/mirex/wiki/2026%3ASymbolic_Music_Generation
+
+Proposed next gates (not yet achieved): zero non-finite samples, zero out-of-range samples, non-empty duration, and no effectively-silent waveform for briefs that require sound. Report peak/RMS/DC/silence diagnostics for every output, but do not impose a universal RMS or loudness target across ambient, sparse, percussion, and full-arrangement intents. Add audio-rendered positive/negative fixture pairs and repeat them across output formats, sample rates, instrument fallbacks, and optional sample-bank paths. Tie each receipt to the exact source revision, renderer configuration, sample rate, sample-bank identity, and output-byte digest before making reproducibility claims.
+
 ## Research basis
 
 - Khalifa et al., The Procedural Content Generation Benchmark: An Open-source Testbed for Generative Challenges in Games (FDG 2025). It explicitly separates quality, diversity and controllability over 12 game-content problems: https://arxiv.org/abs/2503.21474
