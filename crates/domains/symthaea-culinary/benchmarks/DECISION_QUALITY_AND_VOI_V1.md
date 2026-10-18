@@ -2,6 +2,9 @@
 
 **Status:** benchmark contract proposal, stacked on the draft decision-bundle validator PR. No runtime implementation, held-out result, household study, or measured benefit is claimed by this document.
 
+
+**Offline evaluator:** [`DECISION_QUALITY_EVALUATOR_V1.md`](DECISION_QUALITY_EVALUATOR_V1.md) and `src/bin/culinary_decision_quality_eval.rs` provide a post-inference scoring path for frozen policy outputs. The scorer is not passed to the candidate policy; it is synthetic contract evaluation only and has not been compiled or run in this environment.
+
 ## Why this is a different problem
 
 A correct Pareto frontier is necessary but not sufficient for a useful culinary assistant. A system can correctly compute a frontier from stale prices, overstate evidence, ask for measurements that cannot change a decision, or recommend a high-average plan that breaks an essential constraint for one household group.
