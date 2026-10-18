@@ -1,0 +1,274 @@
+{
+  "schema_version": "1.0.0",
+  "corpus_id": "symthaea-manufacturing-assumption-falsification-synthetic-v1",
+  "status": "synthetic_reference_cases_not_physical_evidence",
+  "semantics": {
+    "unknown_is_not_zero": true,
+    "interval_is_not_probability_distribution": true,
+    "observation_within_measurement_uncertainty_is_not_a_contradiction": true,
+    "safety_gate_cannot_be_traded_for_utility": true
+  },
+  "cases": [
+    {
+      "id": "AF-001",
+      "title": "Unknown critical material property",
+      "objective": "Ensure an unknown critical value cannot silently satisfy a design gate.",
+      "assumptions": [
+        {
+          "id": "MAT-YIELD",
+          "claim": "Material yield strength exceeds required minimum",
+          "value": null,
+          "unit": "MPa",
+          "status": "unknown",
+          "critical": true
+        }
+      ],
+      "observations": [],
+      "expected": {
+        "decision": "abstain",
+        "falsified_assumptions": [],
+        "rejected_reason": "critical_value_unknown"
+      }
+    },
+    {
+      "id": "AF-002",
+      "title": "Contradiction outside measurement uncertainty",
+      "objective": "Detect a direct contradiction when the measured interval lies wholly outside the predicted acceptable interval.",
+      "assumptions": [
+        {
+          "id": "DIM-01",
+          "claim": "Measured hole diameter is within 10.00 ± 0.10 mm",
+          "predicted_interval": [
+            9.9,
+            10.1
+          ],
+          "unit": "mm",
+          "status": "supported",
+          "critical": true
+        }
+      ],
+      "observations": [
+        {
+          "id": "MEAS-01",
+          "measured_interval": [
+            10.24,
+            10.28
+          ],
+          "unit": "mm",
+          "calibration_status": "valid"
+        }
+      ],
+      "expected": {
+        "decision": "reopen_review",
+        "falsified_assumptions": [
+          "DIM-01"
+        ],
+        "rejected_reason": "observation_interval_disjoint_from_prediction"
+      }
+    },
+    {
+      "id": "AF-003",
+      "title": "Measurement interval overlaps prediction",
+      "objective": "Avoid claiming falsification when the observation uncertainty overlaps the predicted acceptable interval.",
+      "assumptions": [
+        {
+          "id": "DIM-02",
+          "claim": "Measured plate thickness is within 5.00 ± 0.10 mm",
+          "predicted_interval": [
+            4.9,
+            5.1
+          ],
+          "unit": "mm",
+          "status": "supported",
+          "critical": true
+        }
+      ],
+      "observations": [
+        {
+          "id": "MEAS-02",
+          "measured_interval": [
+            5.08,
+            5.14
+          ],
+          "unit": "mm",
+          "calibration_status": "valid"
+        }
+      ],
+      "expected": {
+        "decision": "inconclusive_or_review",
+        "falsified_assumptions": [],
+        "rejected_reason": "measurement_interval_overlaps_prediction"
+      }
+    },
+    {
+      "id": "AF-004",
+      "title": "Critical dependency changed",
+      "objective": "Invalidate downstream decisions when a critical assumption revision changes.",
+      "assumptions": [
+        {
+          "id": "FIXTURE-REV",
+          "revision": 2,
+          "claim": "Fixture datum matches drawing baseline",
+          "status": "challenged",
+          "critical": true
+        }
+      ],
+      "dependencies": [
+        {
+          "decision_id": "TOLERANCE-RECEIPT-1",
+          "depends_on": [
+            {
+              "assumption_id": "FIXTURE-REV",
+              "revision": 1
+            }
+          ]
+        }
+      ],
+      "observations": [],
+      "expected": {
+        "decision": "invalidate_dependent_receipt",
+        "invalidated_receipts": [
+          "TOLERANCE-RECEIPT-1"
+        ],
+        "rejected_reason": "critical_dependency_revision_mismatch"
+      }
+    },
+    {
+      "id": "AF-005",
+      "title": "High uncertainty but no decision sensitivity",
+      "objective": "Prefer decision-relevant experiments over simply measuring the most uncertain variable.",
+      "assumptions": [
+        {
+          "id": "COLOR-01",
+          "claim": "Non-functional coating shade estimate",
+          "value": null,
+          "uncertainty": "high",
+          "status": "unknown",
+          "critical": false
+        },
+        {
+          "id": "LOAD-01",
+          "claim": "Bracket load margin exceeds required minimum",
+          "value": 1.02,
+          "uncertainty": "moderate",
+          "status": "supported",
+          "critical": true
+        }
+      ],
+      "candidate_experiments": [
+        {
+          "id": "EXP-COLOR",
+          "measures": [
+            "COLOR-01"
+          ],
+          "cost_units": 1,
+          "expected_decision_value": 0,
+          "safety_approved": true
+        },
+        {
+          "id": "EXP-LOAD",
+          "measures": [
+            "LOAD-01"
+          ],
+          "cost_units": 3,
+          "expected_decision_value": 10,
+          "safety_approved": true
+        }
+      ],
+      "expected": {
+        "decision": "select_experiment",
+        "selected_experiment": "EXP-LOAD",
+        "rejected_reason": "higher_expected_decision_value_per_cost"
+      }
+    },
+    {
+      "id": "AF-006",
+      "title": "Uncalibrated probability claim",
+      "objective": "Reject P95 language when the supplied data are only deterministic bounds with no calibration evidence.",
+      "assumptions": [
+        {
+          "id": "DURATION-01",
+          "claim": "Weld duration",
+          "interval": [
+            20,
+            45
+          ],
+          "unit": "min",
+          "uncertainty_semantics": "deterministic_declared_bounds",
+          "calibration_dataset": null,
+          "status": "supported",
+          "critical": true
+        }
+      ],
+      "observations": [],
+      "expected": {
+        "decision": "reject_probability_claim",
+        "falsified_assumptions": [],
+        "rejected_reason": "no_probability_model_or_calibration_evidence"
+      }
+    },
+    {
+      "id": "AF-007",
+      "title": "Invalid sensor calibration",
+      "objective": "Prevent a measurement from falsifying or supporting an assumption when its calibration is invalid.",
+      "assumptions": [
+        {
+          "id": "TEMP-01",
+          "claim": "Thermal process remains below the approved limit",
+          "predicted_interval": [
+            0,
+            180
+          ],
+          "unit": "degC",
+          "status": "supported",
+          "critical": true
+        }
+      ],
+      "observations": [
+        {
+          "id": "TEMP-MEAS-01",
+          "measured_interval": [
+            195,
+            200
+          ],
+          "unit": "degC",
+          "calibration_status": "expired"
+        }
+      ],
+      "expected": {
+        "decision": "invalidate_observation_and_escalate",
+        "falsified_assumptions": [],
+        "rejected_reason": "measurement_calibration_invalid"
+      }
+    },
+    {
+      "id": "AF-008",
+      "title": "Unsafe experiment candidate",
+      "objective": "Verify hard safety and authorization filters cannot be overridden by expected information gain.",
+      "assumptions": [
+        {
+          "id": "PRESSURE-01",
+          "claim": "Pressure boundary remains below approved operating limit",
+          "status": "challenged",
+          "critical": true
+        }
+      ],
+      "candidate_experiments": [
+        {
+          "id": "EXP-UNSAFE",
+          "measures": [
+            "PRESSURE-01"
+          ],
+          "expected_information_gain": 1000,
+          "safety_approved": false,
+          "qualified_operator_available": false
+        }
+      ],
+      "expected": {
+        "decision": "reject_experiment",
+        "selected_experiment": null,
+        "rejected_reason": "safety_or_authority_gate_failed"
+      }
+    }
+  ]
+}
