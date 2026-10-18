@@ -18,7 +18,7 @@ pub const RUNNER_VERSION: &str = "0.1.0";
 pub const EXPECTED_CORPUS_ID: &str = "BIOPROTEIN-GATE-CORPUS-V1";
 pub const EXPECTED_CORPUS_SCHEMA_VERSION: &str = "1.0.0";
 
-#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, Deserialize)]
 #[serde(rename_all = "snake_case")]
 pub enum Claim {
     EvidenceEligibility,
@@ -29,7 +29,7 @@ pub enum Claim {
     AnimalOutcome,
 }
 
-#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, Deserialize)]
 #[serde(rename_all = "snake_case")]
 pub enum IntendedUse {
     IngredientScreen,
@@ -39,7 +39,7 @@ pub enum IntendedUse {
     CultivatedProcessScreen,
 }
 
-#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, Deserialize)]
 #[serde(rename_all = "snake_case")]
 pub enum IngredientClass {
     Conventional,
@@ -52,7 +52,7 @@ pub enum IngredientClass {
     SyntheticControl,
 }
 
-#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, Deserialize)]
 #[serde(rename_all = "snake_case")]
 pub enum FreshnessState {
     Current,
@@ -60,7 +60,7 @@ pub enum FreshnessState {
     Unknown,
 }
 
-#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, Deserialize)]
 #[serde(rename_all = "snake_case")]
 pub enum Disposition {
     EligibleForDeclaredComparison,
@@ -70,7 +70,7 @@ pub enum Disposition {
     InvalidEvidence,
 }
 
-#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, Deserialize)]
 #[serde(rename_all = "snake_case")]
 pub enum RightsStatus {
     Permitted,
@@ -81,7 +81,7 @@ pub enum RightsStatus {
     Revoked,
 }
 
-#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, Deserialize)]
 #[serde(rename_all = "snake_case")]
 pub enum MatchState {
     Match,
@@ -89,7 +89,7 @@ pub enum MatchState {
     Unknown,
 }
 
-#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, Deserialize)]
 #[serde(rename_all = "snake_case")]
 pub enum BasisState {
     Normalized,
@@ -98,7 +98,7 @@ pub enum BasisState {
     IncompatibleUnits,
 }
 
-#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, Deserialize)]
 #[serde(rename_all = "snake_case")]
 pub enum NutritionGate {
     Pass,
@@ -107,7 +107,7 @@ pub enum NutritionGate {
     NotRequested,
 }
 
-#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, Deserialize)]
 #[serde(rename_all = "snake_case")]
 pub enum NutritionEvidenceState {
     Complete,
@@ -117,7 +117,7 @@ pub enum NutritionEvidenceState {
     NotApplicable,
 }
 
-#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, Deserialize)]
 #[serde(rename_all = "snake_case")]
 pub enum SafetyGate {
     Pass,
@@ -126,7 +126,7 @@ pub enum SafetyGate {
     NotAssessed,
 }
 
-#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, Deserialize)]
 #[serde(rename_all = "snake_case")]
 pub enum AuthorizationGate {
     Pass,
@@ -135,7 +135,7 @@ pub enum AuthorizationGate {
     NotApplicable,
 }
 
-#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, Deserialize)]
 #[serde(rename_all = "snake_case")]
 pub enum Availability {
     Available,
@@ -143,7 +143,7 @@ pub enum Availability {
     SeasonalUnknown,
 }
 
-#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, Deserialize)]
 #[serde(rename_all = "snake_case")]
 pub enum EvidenceKind {
     Measured,
@@ -152,7 +152,7 @@ pub enum EvidenceKind {
     Simulated,
 }
 
-#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, Deserialize)]
 #[serde(rename_all = "snake_case")]
 pub enum OutcomeEvidenceState {
     NotRequested,
@@ -161,7 +161,7 @@ pub enum OutcomeEvidenceState {
     Missing,
 }
 
-#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, Deserialize)]
 #[serde(rename_all = "snake_case")]
 pub enum LcaState {
     Complete,
@@ -256,7 +256,7 @@ pub struct Corpus {
     pub cases: Vec<CaseFixture>,
 }
 
-#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, Deserialize)]
 #[serde(rename_all = "snake_case")]
 pub enum RunStatus {
     Pass,
