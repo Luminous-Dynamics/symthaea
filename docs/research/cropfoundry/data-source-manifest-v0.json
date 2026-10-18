@@ -1,0 +1,223 @@
+{
+  "manifest": "CropFoundryDataSourceInventory",
+  "version": "0.1.0-proposal",
+  "snapshot_date": "2026-10-18",
+  "status": "discovery_only",
+  "policy": {
+    "default_ingestion_state": "quarantined",
+    "no_source_is_training_authorized": true,
+    "authorize_training_requires": [
+      "verified_artifact_specific_license_or_explicit_permission",
+      "verified_access_terms",
+      "retrieval_timestamp",
+      "content_digest_sha256",
+      "citation_and_source_identity",
+      "documented_intended_use",
+      "dataset_structure_and_schema_review",
+      "privacy_and_material_transfer_review_when_applicable"
+    ],
+    "principle": "A public landing page is not blanket permission to redistribute or train on every linked artifact. Source availability, source license, artifact license, and intended-use permission are distinct."
+  },
+  "sources": [
+    {
+      "id": "DS-001",
+      "title": "Evaluation of tomato breeding lines under organic and low-input conditions in Portugal (2023)",
+      "source_uri": "https://zenodo.org/records/21789988",
+      "source_type": "trial_dataset",
+      "reported_content": [
+        "agronomic traits",
+        "phenology",
+        "yield-related traits",
+        "fruit morphology",
+        "sensory and quality characteristics"
+      ],
+      "observed_metadata": "The record describes a downloadable XLSX trial workbook. The rendered record has no clearly populated license field.",
+      "license_status": "unresolved",
+      "access_status": "public_metadata_visible_artifact_not_reviewed",
+      "ingestion_status": "quarantined",
+      "permitted_current_use": [
+        "public_metadata_review",
+        "citation"
+      ],
+      "training_authorized": false,
+      "content_sha256": null,
+      "next_gate": "Inspect exact record metadata and artifact terms; if authorized, download and pin the file digest before inspecting workbook schema."
+    },
+    {
+      "id": "DS-002",
+      "title": "Tomato shuttle-breeding, sensory and ideotype-selection trials in Portugal (2024–2025)",
+      "source_uri": "https://zenodo.org/records/22008471",
+      "source_type": "trial_dataset",
+      "reported_content": [
+        "agronomic traits",
+        "morphology",
+        "yield-related traits",
+        "fruit sensory characteristics"
+      ],
+      "observed_metadata": "The record describes a downloadable XLSX. The rendered Rights/License fields do not clearly specify an artifact license.",
+      "license_status": "unresolved",
+      "access_status": "public_metadata_visible_artifact_not_reviewed",
+      "ingestion_status": "quarantined",
+      "permitted_current_use": [
+        "public_metadata_review",
+        "citation"
+      ],
+      "training_authorized": false,
+      "content_sha256": null,
+      "next_gate": "Inspect exact record metadata, related study terms and artifact terms; download only after use is authorized."
+    },
+    {
+      "id": "DS-003",
+      "title": "Horti-M3-Tomato multi-year multimodal cultivation dataset",
+      "source_uri": "https://doi.org/10.5281/zenodo.17217565",
+      "source_type": "multimodal_crop_dataset",
+      "reported_content": [
+        "RGB plant images",
+        "environmental sensor logs",
+        "soil/environment data",
+        "phenotypic records",
+        "yield and management records"
+      ],
+      "observed_metadata": "The 2026 article describes a public dataset and states research/educational reuse; verify the Zenodo artifact's own license, subfile terms, and third-party content before processing or redistribution.",
+      "license_status": "publication_reports_research_educational_reuse_dataset_terms_not_pinned",
+      "access_status": "public_landing_page_artifact_terms_not_pinned",
+      "ingestion_status": "quarantined",
+      "permitted_current_use": [
+        "public_metadata_review",
+        "citation"
+      ],
+      "training_authorized": false,
+      "content_sha256": null,
+      "next_gate": "Fetch dataset-specific API metadata, inspect files/licenses/README, and record exact terms and SHA-256 digests for the authorized subset."
+    },
+    {
+      "id": "DS-004",
+      "title": "TomatoMAP multi-angle / multi-pose tomato phenotyping dataset and paper",
+      "source_uri": "https://www.nature.com/articles/s41597-026-06926-9",
+      "source_type": "phenotyping_imagery",
+      "reported_content": [
+        "tomato imaging",
+        "phenotyping annotations"
+      ],
+      "observed_metadata": "Article metadata reports open licensing; dataset files and possible third-party exceptions must be verified independently.",
+      "license_status": "article_license_reported_artifact_terms_unverified",
+      "access_status": "metadata_visible_artifact_not_reviewed",
+      "ingestion_status": "quarantined",
+      "permitted_current_use": [
+        "public_metadata_review",
+        "citation"
+      ],
+      "training_authorized": false,
+      "content_sha256": null,
+      "next_gate": "Inspect article data availability, downloadable artifact license and any third-party annotation/image restrictions."
+    },
+    {
+      "id": "DS-005",
+      "title": "South African Agricultural Research Council indigenous/traditional leafy-vegetable research programme",
+      "source_uri": "https://arc.agric.za/arc-vopi/Pages/Crop%20Science/Indigenous-Crops.aspx",
+      "source_type": "research_program_context",
+      "reported_content": [
+        "species/programme context",
+        "agronomic research areas",
+        "potential institutional partner path"
+      ],
+      "observed_metadata": "Program page establishes research scope, not the existence of a freely downloadable raw trial dataset.",
+      "license_status": "not_applicable_to_programme_summary_raw_dataset_access_not_established",
+      "access_status": "public_programme_page_only",
+      "ingestion_status": "context_only",
+      "permitted_current_use": [
+        "citation",
+        "partner_and_data_access_discovery"
+      ],
+      "training_authorized": false,
+      "content_sha256": null,
+      "next_gate": "Contact through official institutional channels to ask about relevant trial records, terms, crop priorities, and collaboration."
+    },
+    {
+      "id": "DS-006",
+      "title": "Genesys Plant Genetic Resources database",
+      "source_uri": "https://www.genesys-pgr.org/",
+      "source_type": "germplasm_discovery",
+      "reported_content": [
+        "accession passport metadata",
+        "available descriptors and trait data, depending on collection"
+      ],
+      "observed_metadata": "API documentation describes token-based access; collection terms and material-transfer conditions remain accession/collection-specific.",
+      "license_status": "per-record_and_collection_terms_required",
+      "access_status": "authorized_api_access_not_established",
+      "ingestion_status": "discovery_only",
+      "permitted_current_use": [
+        "public_metadata_review",
+        "citation"
+      ],
+      "training_authorized": false,
+      "content_sha256": null,
+      "next_gate": "Establish API access and terms, then inspect accession-level records and provider-specific restrictions."
+    },
+    {
+      "id": "DS-007",
+      "title": "FAOSTAT food and agriculture statistics",
+      "source_uri": "https://www.fao.org/faostat/",
+      "source_type": "aggregate_agricultural_statistics",
+      "reported_content": [
+        "country-level agricultural production",
+        "trade",
+        "prices and other published series, dependent on dataset"
+      ],
+      "observed_metadata": "Useful for context and macro-level baselines, not cultivar-level replicated trial outcomes. Each series needs units, geography, vintage and definition.",
+      "license_status": "verify_current_FAO_terms_and_series_metadata_at_acquisition",
+      "access_status": "public_portal",
+      "ingestion_status": "context_only",
+      "permitted_current_use": [
+        "citation",
+        "contextual_analysis_after_metadata_review"
+      ],
+      "training_authorized": false,
+      "content_sha256": null,
+      "next_gate": "Record exact dataset series, data vintage, units, geography, terms and file digest before using it in a scored run."
+    },
+    {
+      "id": "DS-008",
+      "title": "Plant Phenotyping Datasets portal",
+      "source_uri": "https://www.plant-phenotyping.org/datasets-home",
+      "source_type": "phenotyping_dataset_catalogue",
+      "reported_content": [
+        "links to plant image / annotation datasets and tasks"
+      ],
+      "observed_metadata": "This is a catalogue; each linked dataset has its own license, annotation protocol, and split rules.",
+      "license_status": "per_dataset_terms_required",
+      "access_status": "catalogue_visible",
+      "ingestion_status": "discovery_only",
+      "permitted_current_use": [
+        "public_metadata_review",
+        "citation"
+      ],
+      "training_authorized": false,
+      "content_sha256": null,
+      "next_gate": "Choose one concrete dataset only after per-dataset license, annotation/split rules, and applicability are reviewed."
+    },
+    {
+      "id": "DS-009",
+      "title": "Mycelix ProductiveLoop and lettuce/DWC cultivar-admission project contracts",
+      "source_uri": "https://github.com/Luminous-Dynamics/mycelix/issues/3303",
+      "source_type": "internal_project_contract_reference",
+      "reported_content": [
+        "useful-output evidence semantics",
+        "lettuce/DWC reference profile",
+        "cultivar admission boundary",
+        "sensor/evidence invariants"
+      ],
+      "observed_metadata": "Implementation/design references for integration; not third-party biological outcome observations.",
+      "license_status": "repository_license_applies_to_project_artifacts_external_biology_not_included",
+      "access_status": "public_issue_reference",
+      "ingestion_status": "integration_only",
+      "permitted_current_use": [
+        "crosswalk_contracts",
+        "integration_tests"
+      ],
+      "training_authorized": false,
+      "content_sha256": null,
+      "next_gate": "Crosswalk canonical types and invariant IDs; never count these contracts as crop-performance data."
+    }
+  ]
+}
