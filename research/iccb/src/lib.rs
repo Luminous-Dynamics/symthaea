@@ -6,6 +6,8 @@
 
 use std::collections::BTreeSet;
 
+pub mod fixtures;
+
 #[derive(Clone, Copy, Debug, PartialEq, Eq)]
 pub enum EvidenceState {
     Qualified,
