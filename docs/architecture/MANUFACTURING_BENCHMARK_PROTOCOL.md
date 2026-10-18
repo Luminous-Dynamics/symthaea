@@ -171,3 +171,44 @@ IACS Unified Requirements are minimum requirements and their incorporation is su
 3. Turn M1 and M2 into deterministic Rust tests before building the larger corpus.
 4. Add versioned fixtures for W1/C1/S1, initially with provenance and schema validation, then progressively add reference and physical evidence.
 5. Track compile/test/CI receipts against the exact commit SHA; do not interpret queued status as a pass.
+
+
+## 10. Capacity-aware schedule validation (Symtropy)
+
+The schedule validator must distinguish exclusive assets from explicitly declared pools of interchangeable capacity. A single CNC machine or dry dock is normally exclusive; a declared pool may represent two qualified NDT teams, cranes, or equivalent stations. The pool capacity declaration does not establish job-specific capability, licensing, certification, or interchangeability for a particular task.
+
+### SC2 — Schedule feasibility and resource-pool semantics
+
+**Cases:**
+- Capacity-one resources with overlaps and exact back-to-back intervals.
+- Capacity-N pools at N simultaneous operations, N+1 operations, multiple operation start/end ties, and nested intervals.
+- Missing, duplicate, empty, or zero resource-capacity declarations.
+- Resource identifiers used by operations but omitted from the declared capacity inventory.
+- Missing/duplicate/self/cyclic predecessors, precedence inversions, invalid interval values and end-time overflow.
+- Permutations of the same input to test normalized report determinism.
+- Mixed CNC, inspection, welding-bay and crane scenarios with clearly labeled synthetic durations until a licensed and provenance-pinned measured workload is available.
+
+**Hard gates:**
+- Zero silent acceptance of a capacity overflow or an undeclared/ambiguous resource capacity in the pinned test suite.
+- Back-to-back half-open intervals remain legal.
+- A schedule is not marked feasible when any modeled hard constraint fails.
+- Diagnostic output is stable for equivalent input records and carries machine-readable violation codes.
+- Capability qualification, shift calendars, planned maintenance, setup/changeover, material delivery and process-specific physics must be reported as out of scope until their respective validators are connected; absence of those models must not be narrated as having verified those constraints.
+
+### Scale and efficiency benchmark
+
+Use deterministic generated workloads with declared seeds and resource distributions at 1,000, 10,000 and 100,000 operations. Include low contention, high contention, a single overloaded pool, many small pools, and long nested intervals. Run each configuration in release mode with environment, toolchain, corpus digest and exact source SHA recorded.
+
+Report median and p95 runtime, peak memory if measurable, total event count, capacity-overflow recall against an analytic oracle, false rejection count, and normalized-output digest. Do not use flaky wall-clock thresholds as unit tests. Performance claims require repeated runs and a named hardware/runtime profile. The expected complexity for capacity checking is dominated by sorting at O(n log n), with linear event processing after the sort; the benchmark must confirm practical behavior rather than infer a speedup from asymptotic notation alone.
+
+### External data policy
+
+Use the [NIST Smart Manufacturing Systems Test Bed](https://www.nist.gov/laboratories/tools-instruments/smart-manufacturing-systems-sms-test-bed) and its [public repository](https://github.com/usnistgov/smstestbed) as candidate sources for CNC/MTConnect and product-lifecycle/inspection evidence. Before importing any subset, record the exact artifact URI, revision or retrieval date, content digest, license/usage conditions, schema, machine/product identity and permitted benchmark role. These resources support CNC and digital-thread studies; they are not, by themselves, a shipyard scheduling ground truth.
+
+Separate all evidence classes in reports:
+- **Measured/public reference:** traceable externally obtained data with source digest and usage terms.
+- **Synthetic stress fixture:** deliberately generated data that proves validator behavior only.
+- **Scenario assumption:** a documented planning assumption, never presented as an observation.
+- **Physical qualification:** independently obtained evidence that a real component/process meets its applicable requirement.
+
+The first useful integration target is a small CNC-to-metrology job chain with explicit resource declarations, then a welding/NDT sequence, then a shipyard block/crane scenario. Use the same violation taxonomy and evidence contract across each stage without pretending their physical constraints are interchangeable.
