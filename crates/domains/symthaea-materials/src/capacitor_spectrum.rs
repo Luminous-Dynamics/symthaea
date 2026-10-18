@@ -725,7 +725,7 @@ mod tests {
             dc_bias_v: Some(1.0),
             source_reference: "test-fixture://not-real-sweep".to_string(),
             method_reference: "synthetic analytic sweep fixture".to_string(),
-            evidence_kind: CapacitorDeviceEvidenceKind::MeasuredDevice,
+            evidence_kind: CapacitorDeviceEvidenceKind::SyntheticFixture,
             points: vec![
                 ImpedanceSweepPoint { frequency_hz: 1.0e3, real_ohm: 0.1, imaginary_ohm: -10.0 },
                 ImpedanceSweepPoint { frequency_hz: 1.0e4, real_ohm: 0.2, imaginary_ohm: -1.0 },
@@ -757,7 +757,7 @@ mod tests {
             max_total_ripple_voltage_rms_v: Some(6.0),
             thermal_resistance_k_per_w: Some(10.0),
             max_temperature_rise_k: Some(0.6),
-            accepted_evidence_kinds: vec![CapacitorDeviceEvidenceKind::MeasuredDevice],
+            accepted_evidence_kinds: vec![CapacitorDeviceEvidenceKind::SyntheticFixture],
         }
     }
 
@@ -773,7 +773,7 @@ mod tests {
 
     #[test]
     fn log_frequency_interpolation_retains_bracketing_knots() {
-        let result = sweep().evaluate(1.0e4_f64.sqrt() * 1.0e3).unwrap();
+        let result = sweep().evaluate(1.0e3_f64.sqrt() * 1.0e4_f64.sqrt()).unwrap();
         assert_eq!(result.evaluation_kind, ImpedanceEvaluationKind::InterpolatedBetweenKnots);
         assert_eq!(result.lower_bracket_frequency_hz, 1.0e3);
         assert_eq!(result.upper_bracket_frequency_hz, 1.0e4);
@@ -808,6 +808,16 @@ mod tests {
         assert!((result.total_current_rms_a - (0.5_f64.powi(2) + 0.2_f64.powi(2)).sqrt()).abs() <= 1.0e-12);
         assert_eq!(result.components[0].evaluation_kind, ImpedanceEvaluationKind::MeasuredKnot);
         assert_eq!(result.components[1].evaluation_kind, ImpedanceEvaluationKind::MeasuredKnot);
+    }
+
+    #[test]
+    fn frequency_dependent_real_impedance_beats_one_esr_simplification() {
+        let result = calculate_capacitor_spectrum_metrics(&sweep(), &spectrum(), None).unwrap();
+        let constant_low_frequency_esr_estimate =
+            (0.5_f64.powi(2) + 0.2_f64.powi(2)) * 0.1;
+        assert!((result.total_loss_power_w - 0.045).abs() <= 1.0e-12);
+        assert!(result.total_loss_power_w > constant_low_frequency_esr_estimate);
+        assert!((result.total_loss_power_w - constant_low_frequency_esr_estimate) > 0.015);
     }
 
     #[test]
