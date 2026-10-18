@@ -627,7 +627,7 @@ mod tests {
 
     const FIXTURE: &str = include_str!(concat!(
         "../../../../docs/research/open-mobility/fixtures/",
-        "preference-drift-scenarios-v1.json"
+        "preference-drift-scenarios-v2.json"
     ));
 
     #[test]
