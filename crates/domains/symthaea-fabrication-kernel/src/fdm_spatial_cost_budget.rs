@@ -304,8 +304,6 @@ fn choose_cost_normalized_disagreement(
     observations: &[SpatialDesignObservation],
     last_position: NormalizedPosition,
     schedule: &SyntheticCostSchedule,
-    seed: u64,
-    step: usize,
 ) -> Option<NormalizedPosition> {
     candidates.iter().copied().max_by(|left, right| {
         let score = |target: NormalizedPosition| {
@@ -333,9 +331,6 @@ fn choose_cost_normalized_disagreement(
             })
             .then_with(|| right.y.total_cmp(&left.y))
             .then_with(|| right.x.total_cmp(&left.x))
-    }).or_else(|| {
-        let _ = (seed, step);
-        None
     })
 }
 
@@ -347,7 +342,6 @@ fn select_candidate(
     schedule: &SyntheticCostSchedule,
     seed: u64,
     step: usize,
-    remaining_budget: f64,
 ) -> Option<NormalizedPosition> {
     if candidates.is_empty() {
         return None;
@@ -356,31 +350,26 @@ fn select_candidate(
         return fixed_stratified_priority().into_iter()
             .find(|preferred| candidates.iter().any(|candidate| same_position(*candidate, *preferred)));
     }
-    let affordable: Vec<_> = candidates.iter().copied().filter(|candidate| {
-        incremental_cost(last_position, *candidate, schedule, false).total
-            <= remaining_budget + EPSILON
-    }).collect();
-    if affordable.is_empty() {
-        return None;
-    }
+    // Selectors generate a budget-independent candidate sequence. Each budget
+    // run takes a prefix of that sequence and stops before the first unaffordable
+    // action, making cost/quality curves nested and reproducible.
     match strategy {
         CostBudgetStrategy::FixedStratified => unreachable!("handled above"),
         CostBudgetStrategy::FarthestPoint => choose_next_location(
-            SamplingStrategy::FarthestPoint, &affordable, observations, seed, step,
+            SamplingStrategy::FarthestPoint, candidates, observations, seed, step,
         ),
         CostBudgetStrategy::ModelDisagreement => choose_next_location(
-            SamplingStrategy::ModelDisagreement, &affordable, observations, seed, step,
+            SamplingStrategy::ModelDisagreement, candidates, observations, seed, step,
         ),
         CostBudgetStrategy::CoverageGuardedDisagreement => choose_next_location(
-            SamplingStrategy::CoverageGuardedDisagreement, &affordable, observations, seed, step,
+            SamplingStrategy::CoverageGuardedDisagreement, candidates, observations, seed, step,
         ),
         CostBudgetStrategy::CostNormalizedDisagreement => choose_cost_normalized_disagreement(
-            &affordable, observations, last_position, schedule, seed, step,
+            candidates, observations, last_position, schedule,
         ),
         CostBudgetStrategy::SeededRandom => choose_next_location(
-            SamplingStrategy::SeededRandom, &affordable, observations, seed, step,
+            SamplingStrategy::SeededRandom, candidates, observations, seed, step,
         ),
-        CostBudgetStrategy::FixedStratified => unreachable!("handled above"),
     }
 }
 
@@ -539,7 +528,7 @@ pub fn run_cost_budget_arm(
             let raw: Vec<_> = trace.iter().map(|item| item.observation.clone()).collect();
             select_candidate(
                 strategy, &candidates, &raw, last_position, &schedule, seed,
-                trace.len().saturating_sub(INITIAL_OBSERVATION_COUNT), remaining,
+                trace.len().saturating_sub(INITIAL_OBSERVATION_COUNT),
             )
         };
 
@@ -549,9 +538,8 @@ pub fn run_cost_budget_arm(
         };
         let costs = incremental_cost(last_position, position, &schedule, false);
         if costs.total > remaining + EPSILON {
-            return Err(CostBudgetError::InvalidTrace(
-                "selector returned a measurement that exceeds the remaining budget".to_owned(),
-            ));
+            stop_reason = CostBudgetStopReason::BudgetConstraintReached;
+            break;
         }
         let index = trace.len();
         let item = costed_observation(
@@ -715,7 +703,8 @@ mod tests {
     #[test]
     fn lower_budgets_never_spend_more_than_higher_budgets() {
         for strategy in CostBudgetStrategy::all() {
-            let mut previous_budget = 0.0;
+            let mut previous_spend = 0.0;
+            let mut previous_positions: Vec<NormalizedPosition> = Vec::new();
             for budget in COST_BUDGET_LEVELS {
                 let report = run_cost_budget_arm(
                     SyntheticSpatialSurface::Anisotropic,
@@ -724,8 +713,13 @@ mod tests {
                     SyntheticCostSchedule::demo(budget),
                 ).unwrap();
                 assert!(report.metrics.spent_budget_units <= budget + EPSILON);
-                assert!(report.metrics.spent_budget_units + EPSILON >= previous_budget);
-                previous_budget = report.metrics.spent_budget_units;
+                assert!(report.metrics.spent_budget_units + EPSILON >= previous_spend);
+                let positions: Vec<_> = report.observations.iter()
+                    .map(|item| item.observation.position).collect();
+                assert!(positions.len() >= previous_positions.len());
+                assert_eq!(&positions[..previous_positions.len()], previous_positions.as_slice());
+                previous_positions = positions;
+                previous_spend = report.metrics.spent_budget_units;
             }
         }
     }
