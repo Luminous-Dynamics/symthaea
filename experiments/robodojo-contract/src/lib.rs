@@ -652,4 +652,112 @@ mod tests {
         }
         assert_eq!(trace(), trace());
     }
+
+    fn trial(task: &str, variant: &str, id: &str, progress: Option<f64>, elapsed: f64) -> TrialRecord {
+        TrialRecord {
+            task_id: task.to_owned(),
+            variant_id: variant.to_owned(),
+            trial_id: id.to_owned(),
+            progress,
+            completed: progress == Some(1.0),
+            valid_run: progress.is_some(),
+            timed_out: false,
+            elapsed_seconds: elapsed,
+            model_calls: 12,
+            action_steps: 80,
+            estimated_cost_usd: 0.25,
+            safety_events: 0,
+        }
+    }
+
+    #[test]
+    fn partial_progress_and_invalid_runs_are_reported_separately() {
+        let mut invalid = trial("stack-bowls", "base", "03", None, 5.0);
+        invalid.timed_out = true;
+        let rows = vec![
+            trial("stack-bowls", "base", "01", Some(0.5), 4.0),
+            trial("stack-bowls", "base", "02", Some(1.0), 6.0),
+            invalid,
+        ];
+        let summary = summarize_trials(&rows, 2_000, 7).unwrap();
+        assert_eq!(summary.len(), 1);
+        let s = &summary[0];
+        assert_eq!(s.total_trials, 3);
+        assert_eq!(s.valid_trials, 2);
+        assert_eq!(s.invalid_trials, 1);
+        assert_eq!(s.completions, 1);
+        assert!((s.completion_rate_all_trials - (1.0 / 3.0)).abs() < 1e-12);
+        assert_eq!(s.completion_rate_valid_trials, Some(0.5));
+        assert_eq!(s.mean_progress, Some(0.75));
+        assert_eq!(s.timeout_count, 1);
+        assert!(s.progress_ci95.is_some());
+    }
+
+    #[test]
+    fn paired_comparison_is_task_macro_averaged_and_repeatable() {
+        let mut base = vec![
+            trial("task-a", "baseline", "01", Some(0.25), 10.0),
+            trial("task-a", "baseline", "02", Some(0.50), 10.0),
+            trial("task-b", "baseline", "01", Some(0.25), 10.0),
+            trial("task-b", "baseline", "02", Some(0.50), 10.0),
+        ];
+        let mut candidate = vec![
+            trial("task-a", "sidecar", "01", Some(0.50), 9.0),
+            trial("task-a", "sidecar", "02", Some(0.75), 9.0),
+            trial("task-b", "sidecar", "01", Some(0.50), 9.0),
+            trial("task-b", "sidecar", "02", Some(0.75), 9.0),
+        ];
+        for row in &mut base { row.estimated_cost_usd = 1.00; }
+        for row in &mut candidate { row.estimated_cost_usd = 0.80; }
+        let a = compare_paired_trials(&base, &candidate, 2_000, 99).unwrap();
+        let b = compare_paired_trials(&base, &candidate, 2_000, 99).unwrap();
+        assert_eq!(a, b);
+        assert_eq!(a.total_pairs, 4);
+        assert_eq!(a.scored_pairs, 4);
+        assert_eq!(a.tasks_with_scored_pairs, 2);
+        assert_eq!(a.mean_progress_delta, Some(0.25));
+        assert_eq!(a.progress_delta_ci95, Some((0.25, 0.25)));
+        assert_eq!(a.mean_elapsed_seconds_delta, -1.0);
+        assert!((a.mean_cost_usd_delta + 0.20).abs() < 1e-12);
+    }
+
+    #[test]
+    fn duplicate_trials_are_rejected() {
+        let x = trial("task-a", "baseline", "same-id", Some(0.25), 1.0);
+        assert_eq!(summarize_trials(&[x.clone(), x], 0, 1), Err(MetricError::DuplicateTrial));
+    }
+
+    #[test]
+    fn unpaired_baseline_and_candidate_are_rejected() {
+        let base = vec![trial("task-a", "baseline", "seed-1", Some(0.25), 1.0)];
+        let candidate = vec![trial("task-a", "sidecar", "seed-2", Some(0.50), 1.0)];
+        assert_eq!(
+            compare_paired_trials(&base, &candidate, 0, 1),
+            Err(MetricError::MismatchedPairedTrials)
+        );
+    }
+
+    #[test]
+    fn invalid_trial_must_not_claim_a_grade_or_completion() {
+        let mut bad = trial("task-a", "baseline", "bad", None, 1.0);
+        bad.completed = true;
+        assert_eq!(bad.validate(), Err(MetricError::CompletionScoreMismatch));
+        let mut bad_score = trial("task-a", "baseline", "bad-score", Some(1.2), 1.0);
+        bad_score.completed = true;
+        assert_eq!(bad_score.validate(), Err(MetricError::InvalidProgress));
+    }
+
+    #[test]
+    fn task_summaries_do_not_silently_drop_all_invalid_trials() {
+        let mut x = trial("store-safe", "baseline", "t1", None, 12.0);
+        x.timed_out = true;
+        let s = summarize_trials(&[x], 0, 1).unwrap();
+        assert_eq!(s[0].valid_trials, 0);
+        assert_eq!(s[0].invalid_trials, 1);
+        assert_eq!(s[0].mean_progress, None);
+        assert_eq!(s[0].progress_ci95, None);
+        assert_eq!(s[0].timeout_count, 1);
+        assert_eq!(s[0].completion_rate_all_trials, 0.0);
+    }
+
 }
