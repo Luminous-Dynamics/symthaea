@@ -104,7 +104,7 @@ pub struct PreferenceQueryBudgetFamilyScoreV1 {
 #[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
 #[serde(deny_unknown_fields)]
 pub struct PreferenceQueryBudgetFrontierPointV1 {
-    /// Maximum number of questions per episode, inclusive.
+    /// Maximum number of additional questions per episode, inclusive of this frontier point.
     pub query_budget_limit: u64,
     /// Number of episodes scored.
     pub scenario_count: usize,
@@ -195,7 +195,7 @@ fn current_policy_view(
     scenario: &Value,
     current_step: u64,
     query_budget: u64,
-    queries_used: usize,
+    queries_used: u64,
     observations: &[Value],
 ) -> Value {
     json!({
@@ -443,17 +443,27 @@ fn run_interactive_episode(
         .cloned()
         .ok_or_else(|| finding("$.preference_observations", "missing observation array"))?;
 
+    let prior_queries_used = scenario
+        .get("queries_already_used")
+        .and_then(Value::as_u64)
+        .ok_or_else(|| finding("$.queries_already_used", "missing or invalid prior query count"))?;
     let mut asked_pairs = HashSet::<(String, String)>::new();
     let mut queries = Vec::<PreferenceQueryReceiptV1>::new();
     let mut unanswered_query_count = 0usize;
     let mut query_selector_exhausted = false;
 
     loop {
+        let total_budget = prior_queries_used.checked_add(query_budget).ok_or_else(|| {
+            finding("$.query_budget", "prior plus additional query budget would overflow")
+        })?;
+        let cumulative_queries_used = prior_queries_used
+            .checked_add(queries.len() as u64)
+            .ok_or_else(|| finding("$.queries_already_used", "query count would overflow"))?;
         let policy_view = current_policy_view(
             scenario,
             current_step,
-            query_budget,
-            queries.len(),
+            total_budget,
+            cumulative_queries_used,
             &observations,
         );
         let assessment = replay_preference_episode(&policy_view)?;
@@ -649,9 +659,10 @@ fn score_frontier_point(
     point
 }
 
-/// Evaluate lexicographic and seeded-random query policies over every budget from zero to the
-/// configured maximum. The evaluation oracle is omitted from policy views; it acts only as a
-/// simulated respondent after each question has been selected and as a post-decision scorer.
+/// Evaluate three query policies over every *additional-query* budget from zero to the configured
+/// maximum. Prior questions already used in the source episode remain counted. The evaluation
+/// oracle is omitted from policy views; it acts only as a simulated respondent after each question
+/// has been selected and as a post-decision scorer.
 pub fn evaluate_preference_query_budget_frontier(
     input: &str,
     max_query_budget: u64,
