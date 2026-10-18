@@ -76,3 +76,41 @@ Potential sources:
 ## Qualification boundary
 
 The implementation and authored unit tests are not evidence of compilation, test passage, runtime performance, truthful ingredient data, or household impact. Before qualification, run formatting, unit tests, Clippy as appropriate, and exact-head CI. Then independently review the oracle fixtures and source-data receipts. A source-data adapter should be a separate increment after the decision semantics are qualified.
+
+## Additional paradigm shift: decision quality includes distribution, not only a frontier
+
+A Pareto-correct answer can still be socially poor. Aggregate basket cost can improve while the least-resourced households become worse off; aggregate crop output can rise while usable food delivery or dietary diversity declines; mean satisfaction can conceal that one community's customary foods disappeared from the feasible set.
+
+Keep these outcomes as distinct, declared quantities rather than applying a hidden “equity score”:
+- household-level feasibility by consented/appropriately aggregated affordability and access strata;
+- producer net revenue, labour burden and payment timing where evidence permits;
+- coverage gaps, food-group/nutrient shortfalls, seasonal shortage duration and distribution losses;
+- culturally accepted alternatives and explicitly stated preference/knowledge-rights constraints;
+- who receives the benefit and who bears the cost, with disclosure at a privacy-safe granularity.
+
+A recommendation should expose infeasibility and the binding constraint; do not relax a household's hard restriction or a community right to preserve a positive aggregate score. The objective schema can represent these dimensions, but the pilot must define and validate each metric's denominator and source rather than assume they are already measured.
+
+This is supported by current research gaps rather than a claim of novelty: a June 2026 systematic scoping review of food-and-nutrition-system sustainability literature identifies substantial under-attention to governance, equity, gender, labour and migration relative to more frequently studied technical/environmental topics ([Mahmoudi et al., 2026](https://doi.org/10.1016/j.meafoo.2026.100282)). A 2025 review of 101 food-composition databases across 110 countries also found substantial variation in metadata, access, interoperability and reuse, which is a reason to benchmark data quality and reuse conditions explicitly rather than assume a universal clean dataset ([Frontiers in Nutrition, 2025](https://doi.org/10.3389/fnut.2025.1552367)).
+
+## Measurement-action / value-of-information gate
+
+The scenario frontier should inform—but not itself compute—a value-of-information plan. When the rank changes because one local price or food-identity match is unknown, the next best action may be collecting that evidence rather than generating hundreds of new candidates.
+
+- Compare each proposed measurement with a declared “take no further measurement” baseline.
+- Report action cost, lead time, feasibility, access rights, who bears the burden, which uncertainty it targets, and what decision result would change.
+- Compute numeric expected value of information only when the relevant probability and outcome assumptions are justified; otherwise use bounded sensitivity and explicitly avoid fabricated probabilities.
+- No measurement action may override consent, source licensing, safety, land permission or other hard constraints.
+- Proposed target: 100% agreement with hand-computed synthetic measurement-priority cases, zero prohibited/rights-blocked actions recommended, and explicit reporting of cases where no additional measurement can change the current decision.
+
+Symtropy's existing [AGRI-VOI-001 issue #1661](https://github.com/Luminous-Dynamics/symtropy/issues/1661) is the canonical home for that measurement-action planner. The robust Pareto evaluator should emit the uncertainty and decision-sensitivity facts needed by that planner, not become a competing VOI implementation.
+
+## Independent decision-receipt conformance
+
+A producer-supplied `frontier=true` or `robust_dominates=[...]` is a claim to verify—not a fact to trust. The interop fixture corpus and Rust test harness should independently recompute scenario frontiers and robust dominance from complete, unit-compatible objective vectors, then compare its results with the claimed receipt.
+
+Add exact negative controls for:
+- falsely hiding a candidate from a scenario frontier despite objective dominance;
+- reciprocal but false robust-dominance claims where a scenario reverses the ranking;
+- scenario-local frontier membership where another scenario is missing (valid locally, but not robustly rankable).
+
+The distinction between scenario-local rankability and all-scenario robust rankability is required: an incomplete candidate can be honestly shown on a frontier for the scenarios where its full metric vector is present, while remaining excluded from robust comparisons.
