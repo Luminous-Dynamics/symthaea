@@ -34,8 +34,11 @@
       "git_blob_sha1": "cce1b5f76b23aec37d2c2f58b83d7ea9ffd4ba5b"
     },
     "README.md": {
-      "sha256": "a704ad76c901c9d26359bb0b9b34e00796049c3a2e9ca45c9abec0e2f301e1f2",
-      "git_blob_sha1": "878b4949efcc9bbebe5690afabefad83271bb3de"
+      "git_blob_sha1": "f3951f2173d522fcac10bbeb1da6478a946e9b46"
+    },
+    "property-sweep.sh": {
+      "sha256": "4ddd3d3a737242735447aea83d272f8b88ef9aae2d110ea2c9a4ebe1ed8748c7",
+      "git_blob_sha1": "6a56e5411449c998779b39db901fb727e3e05422"
     }
   },
   "upstream_observation": {
@@ -54,5 +57,17 @@
     "emulation",
     "physical hardware or hardware-write paths",
     "GitHub Actions"
-  ]
+  ],
+  "property_sweep_execution": {
+    "run_status": "pass",
+    "date": "2026-10-18",
+    "command": "benchmarks/rea-coverage/v1/property-sweep.sh",
+    "tested_script_git_blob_sha1": "6a56e5411449c998779b39db901fb727e3e05422",
+    "domain": "all covered/uncovered byte masks for selected-input lengths 1 through 8",
+    "case_count": 510,
+    "independent_reference": "Bytewise bitmap-to-gap-run construction, compared against the interval-union complement implementation",
+    "root_range_check": "510 deterministic selected-to-root source offsets",
+    "result": "All 510 masks accepted against the independent bytewise gap oracle; root-file offset mappings matched.",
+    "claim_ceiling": "Synthetic normalized-report property test only; not REA/Unblob provider qualification."
+  }
 }
