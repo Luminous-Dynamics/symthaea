@@ -215,16 +215,16 @@ pub fn evaluate_fdm_case(case: &FdmBenchmarkCase) -> FdmBenchmarkEvaluation {
         }
     }
 
-    let mut measurement_ids = HashSet::new();
-    let mut seen_discovery = HashSet::new();
+    let mut measurement_ids = HashSet::<String>::new();
+    let mut seen_discovery = HashSet::<String>::new();
     for id in &case.manifest.discovery_observation_ids {
-        seen_discovery.insert(id.as_str());
+        seen_discovery.insert(id.clone());
     }
     for measurement in &case.measurements {
         if measurement.measurement_id.trim().is_empty() {
             issues.push("measurement ID may not be empty".to_owned());
         }
-        if !measurement_ids.insert(measurement.measurement_id.as_str()) {
+        if !measurement_ids.insert(measurement.measurement_id.clone()) {
             issues.push(format!("duplicate measurement ID: {}", measurement.measurement_id));
         }
         if !feature_ids.contains(&measurement.feature_id) {
@@ -246,7 +246,7 @@ pub fn evaluate_fdm_case(case: &FdmBenchmarkCase) -> FdmBenchmarkEvaluation {
             issues.push(format!("measurement {} has no source reference", measurement.measurement_id));
         }
         if case.manifest.phase == BenchmarkPhase::Confirmatory
-            && seen_discovery.contains(measurement.measurement_id.as_str())
+            && seen_discovery.contains(&measurement.measurement_id)
         {
             issues.push(format!(
                 "confirmatory measurement {} leaks a discovery observation ID",
@@ -291,7 +291,7 @@ pub fn evaluate_fdm_case(case: &FdmBenchmarkCase) -> FdmBenchmarkEvaluation {
         .map(|feature| {
             let matching = measurements_by_feature
                 .get(feature.feature_id.as_str())
-                .map(Vec::as_slice)
+                .map(|items| items.as_slice())
                 .unwrap_or(&[]);
             evaluate_feature(feature, matching)
         })
