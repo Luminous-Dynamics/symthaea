@@ -168,6 +168,17 @@ fn apply_axis_variation(
     rng: &mut SplitMix64V1,
 ) -> Result<Value, Vec<PreferenceDriftFixtureFindingV1>> {
     let scenario_id = format!("GEN-{template_id}-W{wearer_session_index:04}-R{repetition:03}");
+    let source_context_id = scenario
+        .get("current_context_id")
+        .and_then(Value::as_str)
+        .map(str::to_owned)
+        .ok_or_else(|| finding("$.scenarios.current_context_id", "template lacks current_context_id"))?;
+    let task_id = scenario
+        .get("task_id")
+        .and_then(Value::as_str)
+        .map(str::to_owned)
+        .ok_or_else(|| finding("$.scenarios.task_id", "template lacks task_id"))?;
+
     scenario["scenario_id"] = json!(scenario_id);
     scenario["synthetic_wearer_id"] = json!(format!("synthetic-session-{wearer_session_index:04}"));
 
@@ -180,8 +191,6 @@ fn apply_axis_variation(
         finding("$.scenarios.current_step", "current-step variation overflow")
     })?;
     scenario["current_step"] = json!(current_step);
-    // Steps are relative synthetic ticks. Varying now without moving the old observation
-    // timestamps creates controlled fresh/expired cases while keeping causal order valid.
     scenario["preference_max_age_steps"] = json!(rng.bounded(4) as u64);
 
     let query_budget = rng.bounded(3) as u64;
@@ -193,6 +202,70 @@ fn apply_axis_variation(
     scenario["query_budget_total"] = json!(query_budget);
     scenario["queries_already_used"] = json!(queries_used);
 
+    const TERRAINS: [&str; 4] = ["level", "ramp", "uneven", "stairs"];
+    const FATIGUE_STATES: [&str; 3] = ["rested", "mild_fatigue", "fatigued"];
+    const PAYLOAD_CLASSES: [&str; 3] = ["light", "standard", "loaded"];
+    const TIME_WINDOWS: [&str; 3] = ["early", "middle", "late"];
+    let terrain = TERRAINS[rng.bounded(TERRAINS.len())];
+    let fatigue = FATIGUE_STATES[rng.bounded(FATIGUE_STATES.len())];
+    let payload_class = PAYLOAD_CLASSES[rng.bounded(PAYLOAD_CLASSES.len())];
+    let time_window = TIME_WINDOWS[rng.bounded(TIME_WINDOWS.len())];
+    let current_context_id = format!(
+        "{}__gen_{}_{}_{}_{}",
+        source_context_id, terrain, fatigue, payload_class, time_window
+    );
+    {
+        let context = scenario
+            .get_mut("current_context")
+            .and_then(Value::as_object_mut)
+            .ok_or_else(|| finding("$.scenarios.current_context", "template lacks context object"))?;
+        context.insert("terrain".to_owned(), json!(terrain));
+        context.insert("fatigue".to_owned(), json!(fatigue));
+        context.insert("payload_class".to_owned(), json!(payload_class));
+        context.insert("time_window".to_owned(), json!(time_window));
+    }
+    scenario["current_context_id"] = json!(current_context_id);
+
+    let has_current_context_observation = scenario
+        .get("preference_observations")
+        .and_then(Value::as_array)
+        .is_some_and(|observations| {
+            observations.iter().any(|observation| {
+                observation.get("task_id").and_then(Value::as_str) == Some(task_id.as_str())
+                    && observation.get("context_id").and_then(Value::as_str)
+                        == Some(source_context_id.as_str())
+            })
+        });
+    let has_current_pairwise_feedback = scenario
+        .get("preference_observations")
+        .and_then(Value::as_array)
+        .is_some_and(|observations| {
+            observations.iter().any(|observation| {
+                observation.get("task_id").and_then(Value::as_str) == Some(task_id.as_str())
+                    && observation.get("context_id").and_then(Value::as_str)
+                        == Some(source_context_id.as_str())
+                    && observation.get("preferred_candidate_id").and_then(Value::as_str).is_some()
+                    && observation.get("rejected_candidate_id").and_then(Value::as_str).is_some()
+            })
+        });
+
+    // Context-derived synthetic feedback is never treated as real wearer data: its provenance
+    // is rewritten explicitly, and a historical-only episode keeps the source context IDs.
+    let feedback_mode = if !has_current_context_observation {
+        "historical_only"
+    } else if has_current_pairwise_feedback {
+        match rng.bounded(3) {
+            0 => "historical_only",
+            1 => "fresh_synthetic_context",
+            _ => "reversed_synthetic_context",
+        }
+    } else if rng.bounded(2) == 0 {
+        "historical_only"
+    } else {
+        "fresh_synthetic_context"
+    };
+
+    let mut reversal_applied = false;
     let observations = scenario
         .get_mut("preference_observations")
         .and_then(Value::as_array_mut)
@@ -203,9 +276,70 @@ fn apply_axis_variation(
             )
         })?;
     for (index, observation) in observations.iter_mut().enumerate() {
+        let source_observation_id = observation
+            .get("observation_id")
+            .and_then(Value::as_str)
+            .map(str::to_owned)
+            .unwrap_or_else(|| format!("observation-{index}"));
         observation["observation_id"] = json!(format!("{scenario_id}-O{index:02}"));
+        let current_task_and_context =
+            observation.get("task_id").and_then(Value::as_str) == Some(task_id.as_str())
+                && observation.get("context_id").and_then(Value::as_str)
+                    == Some(source_context_id.as_str());
+        if current_task_and_context && feedback_mode != "historical_only" {
+            observation["source_observation_id"] = json!(source_observation_id);
+            observation["context_id"] = json!(current_context_id);
+            observation["source"] = json!("explicit_synthetic_generated_ordinal_feedback");
+
+            if feedback_mode == "reversed_synthetic_context" {
+                let preferred = observation.get("preferred_candidate_id").cloned();
+                let rejected = observation.get("rejected_candidate_id").cloned();
+                if let (Some(preferred), Some(rejected)) = (preferred, rejected) {
+                    observation["preferred_candidate_id"] = rejected;
+                    observation["rejected_candidate_id"] = preferred;
+                    reversal_applied = true;
+                }
+            }
+        }
     }
     rng.shuffle(observations);
+
+    // Evaluation labels are generated only from the declared synthetic template oracle. For a
+    // scripted preference reversal, reverse that template order before any policy output is scored.
+    scenario["evaluation_oracle"]["context_id"] = json!(current_context_id);
+    if reversal_applied
+        && scenario.pointer("/evaluation_oracle/status").and_then(Value::as_str)
+            == Some("ranking")
+    {
+        let mut preferred_order = scenario
+            .pointer("/evaluation_oracle/preferred_order")
+            .and_then(Value::as_array)
+            .cloned()
+            .ok_or_else(|| finding("$.evaluation_oracle.preferred_order", "ranking lacks order"))?;
+        let acceptable_count = scenario
+            .pointer("/evaluation_oracle/acceptable_candidate_ids")
+            .and_then(Value::as_array)
+            .map(Vec::len)
+            .unwrap_or_default();
+        preferred_order.reverse();
+        let acceptable = preferred_order
+            .iter()
+            .take(acceptable_count)
+            .cloned()
+            .collect::<Vec<_>>();
+        scenario["evaluation_oracle"]["preferred_order"] = Value::Array(preferred_order);
+        scenario["evaluation_oracle"]["acceptable_candidate_ids"] = Value::Array(acceptable);
+    }
+
+    scenario["generator_variation"] = json!({
+        "terrain": terrain,
+        "fatigue": fatigue,
+        "payload_class": payload_class,
+        "time_window": time_window,
+        "feedback_mode": feedback_mode,
+        "preference_reversed": reversal_applied,
+        "source_scenario_template_id": template_id
+    });
 
     let eligible = scenario
         .get_mut("eligible_candidate_ids")
