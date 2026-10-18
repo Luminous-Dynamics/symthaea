@@ -80,6 +80,7 @@ pub enum BenchmarkIssue {
     DuplicateCollectionSequence { sequence: u64 },
     DuplicateEpisodeId { episode_id: String },
     ParticipantChronologyViolation { participant_token: String, sequence: u64 },
+    SessionCrossesSplitBoundary { participant_token: String, session_index: u32 },
     EmptyTrainingPartition,
     EmptyTestingPartition,
 }
@@ -111,6 +112,7 @@ pub fn evaluate_temporal_holdout(
     let mut sequences = BTreeSet::new();
     let mut episodes = BTreeSet::new();
     let mut by_participant: BTreeMap<String, Vec<&ListenerResponseRecord>> = BTreeMap::new();
+    let mut session_partitions: BTreeMap<(String, u32), BTreeSet<u8>> = BTreeMap::new();
     for (index, record) in records.iter().enumerate() {
         for issue in record.validate() {
             issues.push(BenchmarkIssue::InvalidRecord { index, issue });
@@ -129,6 +131,26 @@ pub fn evaluate_temporal_holdout(
             .entry(record.participant_token.clone())
             .or_default()
             .push(record);
+        let partition = if record.collection_sequence <= split.training_through_sequence {
+            0
+        } else if record.collection_sequence < split.testing_from_sequence {
+            1
+        } else {
+            2
+        };
+        session_partitions
+            .entry((record.participant_token.clone(), record.session_index))
+            .or_default()
+            .insert(partition);
+    }
+
+    for ((participant_token, session_index), partitions) in session_partitions {
+        if partitions.len() > 1 {
+            issues.push(BenchmarkIssue::SessionCrossesSplitBoundary {
+                participant_token,
+                session_index,
+            });
+        }
     }
 
     for (participant, participant_records) in &mut by_participant {
@@ -415,6 +437,27 @@ mod tests {
         );
         assert!(result.unwrap_err().iter().any(|issue| matches!(
             issue, BenchmarkIssue::ParticipantChronologyViolation { .. }
+        )));
+    }
+
+    #[test]
+    fn one_listener_session_cannot_cross_train_test_boundary() {
+        let first = episode("part-a", "p1", 1, 1, 1, 0.0, 0.3);
+        let second = episode("part-b", "p1", 1, 2, 2, 0.0, 0.2);
+        let result = evaluate_temporal_holdout(
+            &[first, second],
+            TemporalHoldoutSplit {
+                training_through_sequence: 1,
+                testing_from_sequence: 2,
+            },
+            3.0,
+        );
+        assert!(result.unwrap_err().iter().any(|issue| matches!(
+            issue,
+            BenchmarkIssue::SessionCrossesSplitBoundary {
+                participant_token,
+                session_index: 1
+            } if participant_token == "p1"
         )));
     }
 
