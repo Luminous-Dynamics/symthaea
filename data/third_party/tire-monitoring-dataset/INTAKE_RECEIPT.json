@@ -1,0 +1,91 @@
+{
+  "receipt_id": "PASSENGER_TIRE_TPMS_CC_BY_INTAKE_2026_10_18",
+  "schema_version": "0.1.0",
+  "status": "vendored_shards_and_source_side_reconstruction_checked",
+  "source": {
+    "repository": "https://github.com/kerzeyc/tire-monitoring-dataset",
+    "file": "tire_monitoring_dataset.csv",
+    "git_blob_sha1": "0029b6f156847ecc052f57ae45fd025ad032d086",
+    "license": "CC BY 4.0",
+    "license_uri": "https://creativecommons.org/licenses/by/4.0/",
+    "upstream_readme": "https://github.com/kerzeyc/tire-monitoring-dataset/blob/main/README.md",
+    "limitations": [
+      "passenger-car tire-monitoring data",
+      "gradual-pressure anomaly detection rather than blowouts",
+      "not tire-force, grip, wet braking, wear, structural or motorcycle validation"
+    ]
+  },
+  "vendored_artifact": {
+    "directory": "data/third_party/tire-monitoring-dataset/",
+    "ordered_shards": [
+      "tire_monitoring_dataset.csv.part-0001",
+      "tire_monitoring_dataset.csv.part-0002",
+      "tire_monitoring_dataset.csv.part-0003",
+      "tire_monitoring_dataset.csv.part-0004",
+      "tire_monitoring_dataset.csv.part-0005",
+      "tire_monitoring_dataset.csv.part-0006",
+      "tire_monitoring_dataset.csv.part-0007",
+      "tire_monitoring_dataset.csv.part-0008",
+      "tire_monitoring_dataset.csv.part-0009"
+    ],
+    "concat_order": "ascending numeric suffix, no inserted separators",
+    "upstream_readme_preserved": true,
+    "upstream_license_preserved_verbatim": true,
+    "upstream_attribution_preserved": true,
+    "fetched_upstream_content_characters": 7808266,
+    "reconstructed_content_characters": 7808266,
+    "exact_upstream_content_match": true,
+    "sha256": "not_yet_recorded; the Rust tire-monitoring-intake command emits reconstructed_csv_sha256"
+  },
+  "source_side_quality_scan": {
+    "method": "CSV field parsing and source-side per-row arithmetic; Rust command not yet executed",
+    "rows": 210128,
+    "distinct_unit_id_segments": 1755,
+    "labels": {
+      "0_normal": 196260,
+      "1_anomalous": 13868
+    },
+    "collection_method_rows": {
+      "Normal": 182777,
+      "Experimental": 26029,
+      "Natural": 1322
+    },
+    "malformed_rows": 0,
+    "empty_fields": 0,
+    "ranges": {
+      "pressure_kpa": {
+        "min": 197.37,
+        "max": 289.31
+      },
+      "temperature_c": {
+        "min": 1.6,
+        "max": 45.94
+      },
+      "speed_kmh": {
+        "min": 2.84,
+        "max": 144.94
+      }
+    }
+  },
+  "downstream_rule": {
+    "split_group": "Unit_ID",
+    "prohibition": "Do not split samples from one Unit_ID segment across train/validation/test partitions.",
+    "permitted_claim": "Dataset intake and pressure/temperature/speed anomaly-detection research only.",
+    "prohibited_claims": [
+      "motorcycle tire grip",
+      "tire force/slip maps",
+      "wet stopping distance",
+      "compound performance",
+      "tread wear life",
+      "structural tire qualification",
+      "motorcycle powertrain efficiency"
+    ]
+  },
+  "validation_status": {
+    "github_shards_refetched": true,
+    "concatenated_content_exactly_matched_upstream_blob_text": true,
+    "upstream_git_blob_sha1_recomputed_locally": false,
+    "rust_command_compiled_or_run": false,
+    "physical_vehicle_test": false
+  }
+}
