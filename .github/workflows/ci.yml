@@ -63,6 +63,12 @@ jobs:
       - name: Deterministic demonstration
         run: cargo run --manifest-path research/iccb/Cargo.toml
 
+      - name: Evaluator harness format check
+        run: cargo fmt --manifest-path research/iccb-evaluator-harness/Cargo.toml --check
+
+      - name: Evaluator harness tests
+        run: cargo test --manifest-path research/iccb-evaluator-harness/Cargo.toml
+
   governance:
     name: Governance Check (Class A/B Changes)
     runs-on: ubuntu-latest
