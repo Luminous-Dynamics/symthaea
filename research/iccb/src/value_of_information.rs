@@ -24,7 +24,6 @@ pub struct SignalLikelihood {
     pub likelihood_bps: u32,
 }
 
-#[derive(Clone, Debug, PartialEq, Eq)]
 /// One possible, mutually exclusive outcome of a single measurement action.
 #[derive(Clone, Debug, PartialEq, Eq)]
 pub struct SignalOutcome {
