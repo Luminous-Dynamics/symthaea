@@ -233,6 +233,16 @@
       "proposed_target": "No universal percentage threshold before the local reference economics and priorities are established; require transparent absolute units, sensitivity analysis, distribution of benefits/costs, and grower review",
       "split_protocol": "Use local prices and season-specific input assumptions with dates; run sensitivity analyses and include non-financial constraints such as seed access and labor.",
       "status": "not_evaluable_until_local_cost_and_partner_data"
+    },
+    {
+      "id": "CF-013",
+      "category": "breeding_strategy",
+      "name": "Multi-generation breeding-policy value",
+      "question": "When genotype, pedigree, phenotyping, and a defensible breeding simulator or retrospective program are available, does a sequential breeding policy outperform candidate-by-candidate ranking under the same cycle and trial budget?",
+      "primary_metric": "cumulative gain across pre-registered trait objectives, constraint violations, time/cycle cost, and evaluated candidates per breeding cycle",
+      "proposed_target": "On synthetic and retrospective replay only, outperform a predeclared greedy candidate-ranking baseline on at least one primary objective at equal budget without worsening hard constraints; require multi-seed sensitivity analysis and publish all trade-offs. This is a research target, not evidence of real breeding gain.",
+      "split_protocol": "Separate breeding programs/generations or pedigrees where possible; never leak a candidate's future phenotype, progeny outcomes, or post-selection information into policy decisions. Fit policy and hyperparameters on training histories and score once on untouched retrospective histories. Simulation/replay must remain labeled as such.",
+      "status": "not_evaluable_until_genotype_and_pedigree_data"
     }
   ],
   "first_milestone_exit_criteria": [
