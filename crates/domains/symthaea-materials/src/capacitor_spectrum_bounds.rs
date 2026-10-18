@@ -604,8 +604,9 @@ pub fn screen_capacitor_spectrum_bounded(
 #[cfg(test)]
 mod tests {
     use super::*;
+    use crate::capacitor_device::CapacitorDeviceEvidenceKind;
     use crate::capacitor_spectrum::{
-        CapacitorDeviceEvidenceKind, CapacitorSpectrumScreeningRequirements, CurrentSpectrumComponent,
+        CapacitorSpectrumScreeningRequirements, CurrentSpectrumComponent,
         ImpedanceSweepPoint,
     };
 
