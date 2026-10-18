@@ -30,8 +30,22 @@
       "selection_offset": 64,
       "selection_length": 16,
       "chunks": [
-        {"range": {"offset": 8, "length": 8}, "handler": "archive", "encrypted": false},
-        {"range": {"offset": 0, "length": 8}, "handler": "header", "encrypted": false}
+        {
+          "range": {
+            "offset": 8,
+            "length": 8
+          },
+          "handler": "archive",
+          "encrypted": false
+        },
+        {
+          "range": {
+            "offset": 0,
+            "length": 8
+          },
+          "handler": "header",
+          "encrypted": false
+        }
       ],
       "coverage": "complete",
       "partial_signals": [],
@@ -43,8 +57,22 @@
       "selection_offset": 100,
       "selection_length": 16,
       "chunks": [
-        {"range": {"offset": 0, "length": 8}, "handler": "header", "encrypted": false},
-        {"range": {"offset": 12, "length": 4}, "handler": "payload", "encrypted": false}
+        {
+          "range": {
+            "offset": 0,
+            "length": 8
+          },
+          "handler": "header",
+          "encrypted": false
+        },
+        {
+          "range": {
+            "offset": 12,
+            "length": 4
+          },
+          "handler": "payload",
+          "encrypted": false
+        }
       ],
       "coverage": "complete",
       "partial_signals": [],
@@ -56,13 +84,37 @@
       "selection_offset": 100,
       "selection_length": 16,
       "chunks": [
-        {"range": {"offset": 0, "length": 8}, "handler": "header", "encrypted": false},
-        {"range": {"offset": 12, "length": 4}, "handler": "payload", "encrypted": false}
+        {
+          "range": {
+            "offset": 0,
+            "length": 8
+          },
+          "handler": "header",
+          "encrypted": false
+        },
+        {
+          "range": {
+            "offset": 12,
+            "length": 4
+          },
+          "handler": "payload",
+          "encrypted": false
+        }
       ],
       "coverage": "partial",
       "partial_signals": [],
       "extraction_gaps": [
-        {"kind": "unreported-input-region", "range": {"offset": 8, "length": 4}, "root_file_range": {"offset": 108, "length": 4}}
+        {
+          "kind": "unreported-input-region",
+          "range": {
+            "offset": 8,
+            "length": 4
+          },
+          "root_file_range": {
+            "offset": 108,
+            "length": 4
+          }
+        }
       ]
     },
     {
@@ -71,12 +123,29 @@
       "selection_offset": 0,
       "selection_length": 16,
       "chunks": [
-        {"range": {"offset": 0, "length": 16}, "handler": null, "encrypted": false}
+        {
+          "range": {
+            "offset": 0,
+            "length": 16
+          },
+          "handler": null,
+          "encrypted": false
+        }
       ],
       "coverage": "partial",
       "partial_signals": [],
       "extraction_gaps": [
-        {"kind": "unknown-chunk-handler", "range": {"offset": 0, "length": 16}, "root_file_range": {"offset": 0, "length": 16}}
+        {
+          "kind": "unknown-chunk-handler",
+          "range": {
+            "offset": 0,
+            "length": 16
+          },
+          "root_file_range": {
+            "offset": 0,
+            "length": 16
+          }
+        }
       ]
     },
     {
@@ -85,7 +154,14 @@
       "selection_offset": 0,
       "selection_length": 16,
       "chunks": [
-        {"range": {"offset": 0, "length": 16}, "handler": null, "encrypted": false}
+        {
+          "range": {
+            "offset": 0,
+            "length": 16
+          },
+          "handler": null,
+          "encrypted": false
+        }
       ],
       "coverage": "complete",
       "partial_signals": [],
@@ -97,7 +173,14 @@
       "selection_offset": 0,
       "selection_length": 16,
       "chunks": [
-        {"range": {"offset": 0, "length": 16}, "handler": "container", "encrypted": true}
+        {
+          "range": {
+            "offset": 0,
+            "length": 16
+          },
+          "handler": "container",
+          "encrypted": true
+        }
       ],
       "coverage": "complete",
       "partial_signals": [],
@@ -109,10 +192,19 @@
       "selection_offset": 0,
       "selection_length": 16,
       "chunks": [
-        {"range": {"offset": 0, "length": 16}, "handler": "archive", "encrypted": false}
+        {
+          "range": {
+            "offset": 0,
+            "length": 16
+          },
+          "handler": "archive",
+          "encrypted": false
+        }
       ],
       "coverage": "complete",
-      "partial_signals": ["depth-limited"],
+      "partial_signals": [
+        "depth-limited"
+      ],
       "extraction_gaps": []
     },
     {
@@ -121,13 +213,42 @@
       "selection_offset": 512,
       "selection_length": 16,
       "chunks": [
-        {"range": {"offset": 0, "length": 8}, "handler": "header", "encrypted": false}
+        {
+          "range": {
+            "offset": 0,
+            "length": 8
+          },
+          "handler": "header",
+          "encrypted": false
+        }
       ],
       "coverage": "partial",
-      "partial_signals": ["missing-extractor-dependency"],
+      "partial_signals": [
+        "missing-extractor-dependency"
+      ],
       "extraction_gaps": [
-        {"kind": "missing-extractor-dependency", "range": {"offset": 0, "length": 8}, "root_file_range": {"offset": 512, "length": 8}},
-        {"kind": "unreported-input-region", "range": {"offset": 8, "length": 8}, "root_file_range": {"offset": 520, "length": 8}}
+        {
+          "kind": "missing-extractor-dependency",
+          "range": {
+            "offset": 0,
+            "length": 8
+          },
+          "root_file_range": {
+            "offset": 512,
+            "length": 8
+          }
+        },
+        {
+          "kind": "unreported-input-region",
+          "range": {
+            "offset": 8,
+            "length": 8
+          },
+          "root_file_range": {
+            "offset": 520,
+            "length": 8
+          }
+        }
       ]
     },
     {
@@ -146,7 +267,14 @@
       "selection_offset": 0,
       "selection_length": 16,
       "chunks": [
-        {"range": {"offset": 14, "length": 4}, "handler": "payload", "encrypted": false}
+        {
+          "range": {
+            "offset": 14,
+            "length": 4
+          },
+          "handler": "payload",
+          "encrypted": false
+        }
       ],
       "coverage": "partial",
       "partial_signals": [],
@@ -158,13 +286,37 @@
       "selection_offset": 100,
       "selection_length": 16,
       "chunks": [
-        {"range": {"offset": 0, "length": 8}, "handler": "header", "encrypted": false},
-        {"range": {"offset": 12, "length": 4}, "handler": "payload", "encrypted": false}
+        {
+          "range": {
+            "offset": 0,
+            "length": 8
+          },
+          "handler": "header",
+          "encrypted": false
+        },
+        {
+          "range": {
+            "offset": 12,
+            "length": 4
+          },
+          "handler": "payload",
+          "encrypted": false
+        }
       ],
       "coverage": "partial",
       "partial_signals": [],
       "extraction_gaps": [
-        {"kind": "unreported-input-region", "range": {"offset": 8, "length": 4}, "root_file_range": {"offset": 8, "length": 4}}
+        {
+          "kind": "unreported-input-region",
+          "range": {
+            "offset": 8,
+            "length": 4
+          },
+          "root_file_range": {
+            "offset": 8,
+            "length": 4
+          }
+        }
       ]
     },
     {
@@ -173,14 +325,65 @@
       "selection_offset": 0,
       "selection_length": 16,
       "chunks": [
-        {"range": {"offset": 0, "length": 8}, "handler": "header", "encrypted": false},
-        {"range": {"offset": 8, "length": 8}, "handler": "payload", "encrypted": false}
+        {
+          "range": {
+            "offset": 0,
+            "length": 8
+          },
+          "handler": "header",
+          "encrypted": false
+        },
+        {
+          "range": {
+            "offset": 8,
+            "length": 8
+          },
+          "handler": "payload",
+          "encrypted": false
+        }
       ],
       "coverage": "partial",
       "partial_signals": [],
       "extraction_gaps": [
-        {"kind": "unreported-input-region", "range": {"offset": 8, "length": 1}, "root_file_range": {"offset": 8, "length": 1}}
+        {
+          "kind": "unreported-input-region",
+          "range": {
+            "offset": 8,
+            "length": 1
+          },
+          "root_file_range": {
+            "offset": 8,
+            "length": 1
+          }
+        }
       ]
+    },
+    {
+      "id": "RCG-015",
+      "description": "Overlapping known chunk ranges still cover the whole selected input; compute the interval union without inventing a gap.",
+      "selection_offset": 32,
+      "selection_length": 16,
+      "chunks": [
+        {
+          "range": {
+            "offset": 0,
+            "length": 10
+          },
+          "handler": "container-header",
+          "encrypted": false
+        },
+        {
+          "range": {
+            "offset": 8,
+            "length": 8
+          },
+          "handler": "payload",
+          "encrypted": false
+        }
+      ],
+      "coverage": "complete",
+      "partial_signals": [],
+      "extraction_gaps": []
     }
   ]
 }
