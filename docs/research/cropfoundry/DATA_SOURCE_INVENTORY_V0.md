@@ -85,7 +85,8 @@ Before a file enters a training or evaluation dataset, record:
 4. Keep DS-011 as a separate image task: start with metadata, bundled license, checksum file and split-integrity review; only then download the minimum authorized components needed for a baseline.
 5. Keep DS-001, DS-002 and DS-003 quarantined until their individual artifact rights/access terms have been resolved.
 6. Open an ARC collaboration/access conversation for the indigenous-crop lane; choose the crop based on local relevance and real evidence/seed access, not on a preconceived model target.
-7. Before treatment recommendations, separately verify randomization/allocation, experimental units, blocking, replication, treatment definitions, and source-backed outcomes. If those design details are unavailable, keep the task descriptive/predictive and do not claim causal treatment effects. 8. Freeze traits, baselines, splits, metrics and a run receipt only after the applicable inventory gate passes.
+7. Before treatment recommendations, separately verify randomization/allocation, experimental units, blocking, replication, treatment definitions, and source-backed outcomes. If those design details are unavailable, keep the task descriptive/predictive and do not claim causal treatment effects.
+8. Freeze traits, baselines, splits, metrics and a run receipt only after the applicable inventory gate passes.
 
 ## Source notes
 
