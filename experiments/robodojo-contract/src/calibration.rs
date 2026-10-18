@@ -199,7 +199,7 @@ pub fn summarize_calibration(
             expected_calibration_error,
             confidence_threshold,
             high_confidence_trials: high_count,
-            high_confidence_failure_rate: (high_count > 0).then_some(high_failures as f64 / high_count as f64),
+            high_confidence_failure_rate: (high_count > 0).then(|| high_failures as f64 / high_count as f64),
             risk_coverage_auc,
             reliability_bins,
             risk_coverage,
