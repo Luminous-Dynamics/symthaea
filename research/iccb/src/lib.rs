@@ -72,7 +72,6 @@ pub struct Mandate {
 pub struct CandidateScenario {
     pub id: String,
     pub mandate: Mandate,
-    pub known_critical_dependency_ids: BTreeSet<String>,
     pub options: Vec<DecisionOption>,
 }
 
@@ -93,7 +92,7 @@ pub struct OutcomeVector {
     pub available_liquidity_after_minor: i64,
     pub productive_capacity_delta: i64,
     pub maintenance_backlog_delta_minor: i64,
-    pub critical_dependency_count: usize,
+    pub declared_dependency_count: usize,
 }
 
 #[derive(Clone, Debug, PartialEq, Eq)]
@@ -151,10 +150,11 @@ impl CandidateScenario {
 
             // Deduplicate dependencies before counting overlaps with known critical
             // dependencies; repeating an ID must not inflate or reduce the count.
-            let critical_dependency_count = option
+            // Count unique declared links only. Criticality is an evaluator-side
+            // label and must not be embedded in the candidate-facing scenario.
+            let declared_dependency_count = option
                 .dependency_ids
                 .iter()
-                .filter(|dependency| self.known_critical_dependency_ids.contains(*dependency))
                 .collect::<BTreeSet<_>>()
                 .len();
 
@@ -168,7 +168,7 @@ impl CandidateScenario {
                     available_liquidity_after_minor: option.available_liquidity_after_minor,
                     productive_capacity_delta: option.productive_capacity_delta,
                     maintenance_backlog_delta_minor: option.maintenance_backlog_delta_minor,
-                    critical_dependency_count,
+                    declared_dependency_count,
                 },
             });
         }
@@ -231,17 +231,17 @@ pub fn pareto_frontier(evaluations: &[OptionEvaluation]) -> Vec<String> {
 }
 
 fn dominates(left: &OutcomeVector, right: &OutcomeVector) -> bool {
+    // Dependency-link count is descriptive only: fewer links can reflect missing
+    // topology, not lower risk, so it must not establish Pareto dominance.
     let no_worse = left.expected_net_cash_minor >= right.expected_net_cash_minor
         && left.available_liquidity_after_minor >= right.available_liquidity_after_minor
         && left.productive_capacity_delta >= right.productive_capacity_delta
-        && left.maintenance_backlog_delta_minor <= right.maintenance_backlog_delta_minor
-        && left.critical_dependency_count <= right.critical_dependency_count;
+        && left.maintenance_backlog_delta_minor <= right.maintenance_backlog_delta_minor;
 
     let strictly_better = left.expected_net_cash_minor > right.expected_net_cash_minor
         || left.available_liquidity_after_minor > right.available_liquidity_after_minor
         || left.productive_capacity_delta > right.productive_capacity_delta
-        || left.maintenance_backlog_delta_minor < right.maintenance_backlog_delta_minor
-        || left.critical_dependency_count < right.critical_dependency_count;
+        || left.maintenance_backlog_delta_minor < right.maintenance_backlog_delta_minor;
 
     no_worse && strictly_better
 }
@@ -289,9 +289,6 @@ mod tests {
         CandidateScenario {
             id: "synthetic-test".to_owned(),
             mandate: base_mandate(),
-            known_critical_dependency_ids: ["grid-west".to_owned(), "water-east".to_owned()]
-                .into_iter()
-                .collect(),
             options,
         }
     }
@@ -338,11 +335,11 @@ mod tests {
     }
 
     #[test]
-    fn dependency_exposure_is_separate_from_return_and_capacity() {
+    fn declared_dependency_count_is_not_a_criticality_score() {
         let result = scenario(vec![option("depends-on-grid")]).evaluate();
         let metrics = &result.evaluated_options[0].outcomes;
 
-        assert_eq!(metrics.critical_dependency_count, 1);
+        assert_eq!(metrics.declared_dependency_count, 1);
         assert_eq!(metrics.expected_net_cash_minor, 4_000);
         assert_eq!(metrics.productive_capacity_delta, 10);
     }
@@ -360,7 +357,7 @@ mod tests {
         assert_eq!(
             result.evaluated_options[0]
                 .outcomes
-                .critical_dependency_count,
+                .declared_dependency_count,
             1
         );
     }
