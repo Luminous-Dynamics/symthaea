@@ -1310,6 +1310,32 @@ mod tests {
     }
 
     #[test]
+    fn committed_receipt_schema_binds_csv_inventory_to_inspect_operation() {
+        let schema: serde_json::Value = serde_json::from_str(
+            include_str!("../schemas/audit-receipt-v0.1.schema.json")
+        ).unwrap();
+        let required = schema["required"].as_array().unwrap();
+        for field in [
+            "receipt_schema_version",
+            "manifest_sha256",
+            "evidence_input_sha256",
+            "artifact_count",
+            "record_count",
+            "claim_ceiling",
+        ] {
+            assert!(required.iter().any(|value| value == field),
+                "receipt schema does not require {field}");
+        }
+        assert!(schema["properties"]["csv_inventory"]["properties"]["artifact_sha256"].is_object());
+        assert!(schema["properties"]["csv_inventory"]["properties"]["columns"]["items"]["properties"]["empty_cells"].is_object());
+        assert!(schema["allOf"].as_array().unwrap().iter().any(|condition| {
+            condition["if"]["properties"]["operation"]["const"] == "inspect-csv"
+                && condition["then"]["required"].as_array().unwrap().iter()
+                    .any(|value| value == "csv_inventory")
+        }));
+    }
+
+    #[test]
     fn committed_observation_schema_binds_units_and_censoring_contract() {
         let schema: serde_json::Value = serde_json::from_str(include_str!("../schemas/observation-set-v0.1.schema.json")).unwrap();
         let record = &schema["properties"]["records"]["items"];
