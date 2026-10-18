@@ -85,6 +85,9 @@ pub mod preference_drift_benchmark;
 /// Frozen engineering-weight and seeded-random baselines for preference-drift replay.
 #[allow(missing_docs)]
 pub mod preference_drift_baselines;
+/// Deterministic factorized generator and content-digest manifest for synthetic mobility scenarios.
+#[allow(missing_docs)]
+pub mod preference_drift_generator;
 /// Report-only lifecycle and wearability evidence evaluator for exosuit research.
 #[allow(missing_docs)]
 pub mod wearability;
