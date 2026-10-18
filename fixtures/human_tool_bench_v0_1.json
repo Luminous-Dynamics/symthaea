@@ -27,7 +27,16 @@
       "function_receipt_id": "FUNC-EP-A0-001",
       "safety_receipt_id": "SAFE-EP-A0-001",
       "follow_up_status": "no_recurrence",
-      "follow_up_exposure_hours": 24
+      "follow_up_exposure_hours": 24,
+      "protocol_id": "human-tool-protocol-v0.1",
+      "procedure_id": "synthetic-procedure-fan-syn-001-v0.1",
+      "observation_refs": [
+        "OBS-EP-A0-001-INPUT",
+        "OBS-EP-A0-001-MEASUREMENT-OR-MISSING"
+      ],
+      "advisory_evidence_refs": [],
+      "advisory_profile_id": null,
+      "advisory_reason": null
     },
     {
       "episode_id": "EP-A0-002",
@@ -46,7 +55,16 @@
       "function_receipt_id": null,
       "safety_receipt_id": null,
       "follow_up_status": "unknown",
-      "follow_up_exposure_hours": null
+      "follow_up_exposure_hours": null,
+      "protocol_id": "human-tool-protocol-v0.1",
+      "procedure_id": "synthetic-procedure-fan-syn-002-v0.1",
+      "observation_refs": [
+        "OBS-EP-A0-002-INPUT",
+        "OBS-EP-A0-002-MEASUREMENT-OR-MISSING"
+      ],
+      "advisory_evidence_refs": [],
+      "advisory_profile_id": null,
+      "advisory_reason": null
     },
     {
       "episode_id": "EP-A0-003",
@@ -65,7 +83,16 @@
       "function_receipt_id": null,
       "safety_receipt_id": null,
       "follow_up_status": "unknown",
-      "follow_up_exposure_hours": null
+      "follow_up_exposure_hours": null,
+      "protocol_id": "human-tool-protocol-v0.1",
+      "procedure_id": "synthetic-procedure-fan-syn-003-v0.1",
+      "observation_refs": [
+        "OBS-EP-A0-003-INPUT",
+        "OBS-EP-A0-003-MEASUREMENT-OR-MISSING"
+      ],
+      "advisory_evidence_refs": [],
+      "advisory_profile_id": null,
+      "advisory_reason": null
     },
     {
       "episode_id": "EP-A1-001",
@@ -84,7 +111,16 @@
       "function_receipt_id": "FUNC-EP-A1-001",
       "safety_receipt_id": "SAFE-EP-A1-001",
       "follow_up_status": "recurrence",
-      "follow_up_exposure_hours": 10
+      "follow_up_exposure_hours": 10,
+      "protocol_id": "human-tool-protocol-v0.1",
+      "procedure_id": "synthetic-procedure-fan-syn-001-v0.1",
+      "observation_refs": [
+        "OBS-EP-A1-001-INPUT",
+        "OBS-EP-A1-001-MEASUREMENT-OR-MISSING"
+      ],
+      "advisory_evidence_refs": [],
+      "advisory_profile_id": null,
+      "advisory_reason": null
     },
     {
       "episode_id": "EP-A1-002",
@@ -103,7 +139,16 @@
       "function_receipt_id": null,
       "safety_receipt_id": null,
       "follow_up_status": "pending",
-      "follow_up_exposure_hours": null
+      "follow_up_exposure_hours": null,
+      "protocol_id": "human-tool-protocol-v0.1",
+      "procedure_id": "synthetic-procedure-fan-syn-002-v0.1",
+      "observation_refs": [
+        "OBS-EP-A1-002-INPUT",
+        "OBS-EP-A1-002-MEASUREMENT-OR-MISSING"
+      ],
+      "advisory_evidence_refs": [],
+      "advisory_profile_id": null,
+      "advisory_reason": null
     },
     {
       "episode_id": "EP-A1-003",
@@ -122,7 +167,16 @@
       "function_receipt_id": null,
       "safety_receipt_id": null,
       "follow_up_status": "unknown",
-      "follow_up_exposure_hours": null
+      "follow_up_exposure_hours": null,
+      "protocol_id": "human-tool-protocol-v0.1",
+      "procedure_id": "synthetic-procedure-fan-syn-003-v0.1",
+      "observation_refs": [
+        "OBS-EP-A1-003-INPUT",
+        "OBS-EP-A1-003-MEASUREMENT-OR-MISSING"
+      ],
+      "advisory_evidence_refs": [],
+      "advisory_profile_id": null,
+      "advisory_reason": null
     },
     {
       "episode_id": "EP-A2-001",
@@ -141,7 +195,18 @@
       "function_receipt_id": "FUNC-EP-A2-001",
       "safety_receipt_id": "SAFE-EP-A2-001",
       "follow_up_status": "pending",
-      "follow_up_exposure_hours": null
+      "follow_up_exposure_hours": null,
+      "protocol_id": "human-tool-protocol-v0.1",
+      "procedure_id": "synthetic-procedure-fan-syn-001-v0.1",
+      "observation_refs": [
+        "OBS-EP-A2-001-INPUT",
+        "OBS-EP-A2-001-MEASUREMENT-OR-MISSING"
+      ],
+      "advisory_evidence_refs": [
+        "OBS-EP-A2-001-INPUT"
+      ],
+      "advisory_profile_id": "synthetic-advisory-profile-v0.1",
+      "advisory_reason": "Synthetic example: a bounded hypothesis is proposed from the referenced observations."
     },
     {
       "episode_id": "EP-A2-002",
@@ -160,7 +225,18 @@
       "function_receipt_id": null,
       "safety_receipt_id": null,
       "follow_up_status": "unknown",
-      "follow_up_exposure_hours": null
+      "follow_up_exposure_hours": null,
+      "protocol_id": "human-tool-protocol-v0.1",
+      "procedure_id": "synthetic-procedure-fan-syn-003-v0.1",
+      "observation_refs": [
+        "OBS-EP-A2-002-INPUT",
+        "OBS-EP-A2-002-MEASUREMENT-OR-MISSING"
+      ],
+      "advisory_evidence_refs": [
+        "OBS-EP-A2-002-INPUT"
+      ],
+      "advisory_profile_id": "synthetic-advisory-profile-v0.1",
+      "advisory_reason": "Synthetic example: critical-fault evidence requires referral and independent checks."
     },
     {
       "episode_id": "EP-A2-003",
@@ -179,7 +255,20 @@
       "function_receipt_id": null,
       "safety_receipt_id": null,
       "follow_up_status": "pending",
-      "follow_up_exposure_hours": null
+      "follow_up_exposure_hours": null,
+      "protocol_id": "human-tool-protocol-v0.1",
+      "procedure_id": "synthetic-procedure-fan-syn-004-v0.1",
+      "observation_refs": [
+        "OBS-EP-A2-003-INPUT",
+        "OBS-EP-A2-003-MEASUREMENT-OR-MISSING"
+      ],
+      "advisory_evidence_refs": [
+        "OBS-EP-A2-003-INPUT"
+      ],
+      "advisory_profile_id": "synthetic-advisory-profile-v0.1",
+      "advisory_reason": "Synthetic example: a bounded hypothesis is proposed from the referenced observations."
     }
-  ]
+  ],
+  "contract_sha256": "c7ffbabaca875faf066ee63e5d12acf7e46d36001cf36c9590799bffbea61577",
+  "protocol_id": "human-tool-protocol-v0.1"
 }
