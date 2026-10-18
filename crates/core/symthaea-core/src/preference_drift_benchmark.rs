@@ -135,6 +135,13 @@ pub fn validate_preference_drift_fixture(
     if nonempty_string(&root, "benchmark_id").is_none() {
         finding(&mut findings, "$.benchmark_id", "missing non-empty benchmark ID");
     }
+    if nonempty_string(&root, "fixture_version").is_none() {
+        finding(
+            &mut findings,
+            "$.fixture_version",
+            "missing non-empty fixture version",
+        );
+    }
     if nonempty_string(&root, "claim_ceiling").is_none() {
         finding(&mut findings, "$.claim_ceiling", "missing claim ceiling");
     }
@@ -895,6 +902,127 @@ pub fn replay_preference_episode(
         PreferenceReplayActionV1::Abstain
     };
     Ok(build(action, reason, None))
+}
+
+/// Deterministic report from replaying every episode in one validated fixture.
+#[derive(Debug, Clone, PartialEq, Eq, serde::Serialize, serde::Deserialize)]
+#[serde(deny_unknown_fields)]
+pub struct PreferenceReplayBenchmarkReportV1 {
+    /// Fixture schema version.
+    pub schema_version: u64,
+    /// Version string identifying the synthetic fixture corpus.
+    pub fixture_version: String,
+    /// Number of candidates in the fixture catalog.
+    pub candidate_count: usize,
+    /// Number of replayed scenarios.
+    pub scenario_count: usize,
+    /// Number of development scenarios.
+    pub development_scenario_count: usize,
+    /// Number of held-out scenarios.
+    pub held_out_scenario_count: usize,
+    /// Number of synthetic preference/rejection observations in the corpus.
+    pub observation_count: usize,
+    /// Replay action counts; these are synthetic fixture dispositions, not real-world rates.
+    pub recommendation_count: usize,
+    /// Number of episodes where the policy requests current-context feedback.
+    pub query_count: usize,
+    /// Number of episodes where it abstains.
+    pub abstention_count: usize,
+    /// Number of episodes where explicit feedback rejects every eligible candidate.
+    pub reject_all_count: usize,
+    /// Number of episodes with no technically eligible candidate.
+    pub no_feasible_candidate_count: usize,
+    /// Per-scenario deterministic reports, preserving fixture order.
+    pub assessments: Vec<PreferenceReplayAssessmentV1>,
+    /// Explicit limitation of any inference from this synthetic replay.
+    pub claim_ceiling: String,
+}
+
+/// Validate and replay the synthetic fixture into a deterministic, report-only benchmark receipt.
+///
+/// The policy input is allow-listed to scenario ID, task/context IDs, eligible candidate IDs,
+/// query budget, and explicit preference observations. Evaluation oracles, scenario split labels,
+/// synthetic engineering profiles, and other evaluation metadata are not copied into a policy
+/// episode. This entry point reports baseline behavior; it does not compare learned policies or
+/// estimate real-world preference accuracy.
+pub fn replay_preference_fixture(
+    input: &str,
+) -> Result<PreferenceReplayBenchmarkReportV1, Vec<PreferenceDriftFixtureFindingV1>> {
+    let summary = validate_preference_drift_fixture(input)?;
+    let root: Value = serde_json::from_str(input).map_err(|error| {
+        vec![PreferenceDriftFixtureFindingV1 {
+            path: "$".to_owned(),
+            reason: format!("invalid JSON after validation: {error}"),
+        }]
+    })?;
+    let fixture_version = nonempty_string(&root, "fixture_version").ok_or_else(|| {
+        vec![PreferenceDriftFixtureFindingV1 {
+            path: "$.fixture_version".to_owned(),
+            reason: "missing fixture version".to_owned(),
+        }]
+    })?;
+    let scenarios = root
+        .get("scenarios")
+        .and_then(Value::as_array)
+        .ok_or_else(|| {
+            vec![PreferenceDriftFixtureFindingV1 {
+                path: "$.scenarios".to_owned(),
+                reason: "missing scenario array after validation".to_owned(),
+            }]
+        })?;
+
+    let mut assessments = Vec::with_capacity(scenarios.len());
+    for scenario in scenarios {
+        let policy_input = serde_json::json!({
+            "scenario_id": scenario.get("scenario_id"),
+            "task_id": scenario.get("task_id"),
+            "current_context_id": scenario.get("current_context_id"),
+            "eligible_candidate_ids": scenario.get("eligible_candidate_ids"),
+            "query_budget_total": scenario.get("query_budget_total"),
+            "queries_already_used": scenario.get("queries_already_used"),
+            "preference_observations": scenario.get("preference_observations"),
+        });
+        assessments.push(replay_preference_episode(&policy_input)?);
+    }
+
+    let recommendation_count = assessments
+        .iter()
+        .filter(|item| item.action == PreferenceReplayActionV1::Recommend)
+        .count();
+    let query_count = assessments
+        .iter()
+        .filter(|item| item.action == PreferenceReplayActionV1::Query)
+        .count();
+    let abstention_count = assessments
+        .iter()
+        .filter(|item| item.action == PreferenceReplayActionV1::Abstain)
+        .count();
+    let reject_all_count = assessments
+        .iter()
+        .filter(|item| item.action == PreferenceReplayActionV1::RejectAll)
+        .count();
+    let no_feasible_candidate_count = assessments
+        .iter()
+        .filter(|item| item.action == PreferenceReplayActionV1::NoFeasibleCandidate)
+        .count();
+
+    Ok(PreferenceReplayBenchmarkReportV1 {
+        schema_version: summary.schema_version,
+        fixture_version,
+        candidate_count: summary.candidate_count,
+        scenario_count: summary.scenario_count,
+        development_scenario_count: summary.development_scenario_count,
+        held_out_scenario_count: summary.held_out_scenario_count,
+        observation_count: summary.observation_count,
+        recommendation_count,
+        query_count,
+        abstention_count,
+        reject_all_count,
+        no_feasible_candidate_count,
+        assessments,
+        claim_ceiling: "Synthetic replay behavior only; no real wearer preference, safety, clinical, or deployment claim."
+            .to_owned(),
+    })
 }
 
 #[cfg(test)]
