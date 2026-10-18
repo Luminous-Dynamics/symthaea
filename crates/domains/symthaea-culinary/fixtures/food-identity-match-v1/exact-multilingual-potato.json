@@ -107,6 +107,12 @@
       "query_value": null,
       "candidate_value": null,
       "relation": "not_applicable"
+    },
+    {
+      "attribute_id": "fortification",
+      "query_value": null,
+      "candidate_value": null,
+      "relation": "not_applicable"
     }
   ],
   "deviations": [],
