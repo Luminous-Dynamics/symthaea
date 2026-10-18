@@ -592,7 +592,7 @@ mod tests {
     use super::*;
 
     const SOURCE_FIXTURE: &str =
-        include_str!("../../../../docs/research/open-mobility/fixtures/preference-drift-scenarios-v2.json");
+        include_str!("../../../../docs/research/open-mobility/fixtures/preference-drift-scenarios-v3.json");
 
     #[test]
     fn generated_suite_is_reproducible_and_digest_matches_exact_bytes() {
@@ -619,11 +619,11 @@ mod tests {
         assert_eq!(suite.manifest.wearer_session_count, 50);
         assert_eq!(suite.manifest.development_wearer_session_count, 10);
         assert_eq!(suite.manifest.held_out_wearer_session_count, 40);
-        assert_eq!(suite.manifest.held_out_family_count, 10);
+        assert_eq!(suite.manifest.held_out_family_count, 12);
         assert_eq!(suite.manifest.development_scenario_count, 20);
-        assert_eq!(suite.manifest.held_out_scenario_count, 1200);
-        assert_eq!(suite.manifest.scenario_count, 1220);
-        assert_eq!(scenarios.len(), 1220);
+        assert_eq!(suite.manifest.held_out_scenario_count, 1440);
+        assert_eq!(suite.manifest.scenario_count, 1460);
+        assert_eq!(scenarios.len(), 1460);
         assert_eq!(
             suite.manifest.scenario_counts_by_family.get("steady_context_explicit_preference"),
             Some(&20)
@@ -631,11 +631,11 @@ mod tests {
         assert_eq!(suite.manifest.scenario_family_splits.len(), 11);
         assert_eq!(
             suite.manifest.scenario_counts_by_family.values().sum::<usize>(),
-            1220
+            1460
         );
         assert_eq!(
             suite.manifest.variation_counts_by_axis["terrain"].values().sum::<usize>(),
-            1220
+            1460
         );
         assert_eq!(
             suite.manifest.variation_counts_by_axis["fatigue"].len(),
@@ -723,6 +723,51 @@ mod tests {
             applied_reversals,
             suite.manifest.preference_reversal_scenario_count
         );
+    }
+
+    #[test]
+    fn context_no_reversal_and_inclusive_freshness_boundary_are_explicit_controls() {
+        let fixture: Value = serde_json::from_str(SOURCE_FIXTURE).unwrap();
+        let scenarios = fixture["scenarios"].as_array().unwrap();
+
+        let no_reversal = scenarios
+            .iter()
+            .find(|scenario| {
+                scenario["scenario_id"] == "HOLD-CONTEXT-NO-REVERSAL-001"
+            })
+            .expect("context-change-without-reversal control");
+        let no_reversal_assessment =
+            crate::preference_drift_benchmark::replay_preference_episode(no_reversal).unwrap();
+        assert_eq!(
+            no_reversal_assessment.action,
+            crate::preference_drift_benchmark::PreferenceReplayActionV1::Recommend
+        );
+        assert_eq!(
+            no_reversal_assessment.recommended_candidate_id.as_deref(),
+            Some("flex")
+        );
+        assert_eq!(no_reversal_assessment.stale_or_mismatched_observation_count, 1);
+
+        let freshness_boundary = scenarios
+            .iter()
+            .find(|scenario| {
+                scenario["scenario_id"] == "HOLD-FRESHNESS-BOUNDARY-001"
+            })
+            .expect("inclusive freshness-boundary control");
+        let boundary_assessment =
+            crate::preference_drift_benchmark::replay_preference_episode(freshness_boundary)
+                .unwrap();
+        assert_eq!(
+            boundary_assessment.action,
+            crate::preference_drift_benchmark::PreferenceReplayActionV1::Recommend
+        );
+        assert_eq!(
+            boundary_assessment.recommended_candidate_id.as_deref(),
+            Some("stable")
+        );
+        assert_eq!(boundary_assessment.used_observation_count, 2);
+        assert_eq!(boundary_assessment.context_matched_observation_count, 3);
+        assert_eq!(boundary_assessment.expired_preference_observation_count, 1);
     }
 
     #[test]
