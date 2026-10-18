@@ -205,6 +205,18 @@
         "unit": "piece_equivalent"
       },
       "inspection_disposition": "synthetic_accept_for_graph_test_only"
+    },
+    {
+      "lot_id": "SYN-LOT-UNRELATED-099",
+      "supplier_id": "SYN-SUP-FABRIC-01",
+      "material_subject": "SYN-FABRIC-CONTROL-GRADE",
+      "grade_evidence": "synthetic_fixture_only",
+      "received_quantity": {
+        "value": 1,
+        "unit": "piece_equivalent"
+      },
+      "inspection_disposition": "synthetic_control_only",
+      "traceability_role": "unrelated_control"
     }
   ],
   "synthetic_resources": [
@@ -707,5 +719,345 @@
     "facility_commissioning": "not_started",
     "human_evaluation": "none",
     "independent_replication": "none"
-  }
+  },
+  "traceability_nodes": [
+    {
+      "node_id": "SYN-LOT-FABRIC-001",
+      "node_kind": "material_lot"
+    },
+    {
+      "node_id": "SYN-LOT-LAYER-001",
+      "node_kind": "material_lot"
+    },
+    {
+      "node_id": "SYN-LOT-TRIM-001",
+      "node_kind": "material_lot"
+    },
+    {
+      "node_id": "SYN-LOT-UNRELATED-099",
+      "node_kind": "material_lot"
+    },
+    {
+      "node_id": "OP-10-RECEIVE",
+      "node_kind": "process_operation"
+    },
+    {
+      "node_id": "OP-20-INCOMING-QA",
+      "node_kind": "process_operation"
+    },
+    {
+      "node_id": "OP-30-CUT",
+      "node_kind": "process_operation"
+    },
+    {
+      "node_id": "OP-40-SEW",
+      "node_kind": "process_operation"
+    },
+    {
+      "node_id": "OP-50-ASSEMBLE",
+      "node_kind": "process_operation"
+    },
+    {
+      "node_id": "OP-60-FINAL-QA",
+      "node_kind": "process_operation"
+    },
+    {
+      "node_id": "OP-70-PACK",
+      "node_kind": "process_operation"
+    },
+    {
+      "node_id": "SYN-WIP-COVER-PANELS-BATCH-001",
+      "node_kind": "work_in_process"
+    },
+    {
+      "node_id": "SYN-WIP-SEWN-COVER-A",
+      "node_kind": "work_in_process"
+    },
+    {
+      "node_id": "SYN-WIP-SEWN-COVER-B",
+      "node_kind": "work_in_process"
+    },
+    {
+      "node_id": "SYN-WIP-ASSEMBLED-TOPPER-A",
+      "node_kind": "work_in_process"
+    },
+    {
+      "node_id": "SYN-WIP-ASSEMBLED-TOPPER-B",
+      "node_kind": "work_in_process"
+    },
+    {
+      "node_id": "SYN-ARTICLE-ACCEPTED-A",
+      "node_kind": "accepted_article"
+    },
+    {
+      "node_id": "SYN-ARTICLE-ACCEPTED-B",
+      "node_kind": "accepted_article"
+    },
+    {
+      "node_id": "SYN-UNIT-PACKED-A",
+      "node_kind": "packaged_unit"
+    },
+    {
+      "node_id": "SYN-UNIT-PACKED-B",
+      "node_kind": "packaged_unit"
+    },
+    {
+      "node_id": "SYN-UNRELATED-ASSEMBLY-CONTROL",
+      "node_kind": "control_operation"
+    },
+    {
+      "node_id": "SYN-UNRELATED-ARTICLE-CONTROL",
+      "node_kind": "control_article"
+    },
+    {
+      "node_id": "SYN-UNRELATED-PACKED-CONTROL",
+      "node_kind": "control_packaged_unit"
+    }
+  ],
+  "traceability_edges": [
+    {
+      "edge_id": "TR-001",
+      "from_id": "SYN-LOT-FABRIC-001",
+      "to_id": "OP-10-RECEIVE",
+      "relation": "received_by"
+    },
+    {
+      "edge_id": "TR-002",
+      "from_id": "SYN-LOT-LAYER-001",
+      "to_id": "OP-10-RECEIVE",
+      "relation": "received_by"
+    },
+    {
+      "edge_id": "TR-003",
+      "from_id": "SYN-LOT-TRIM-001",
+      "to_id": "OP-10-RECEIVE",
+      "relation": "received_by"
+    },
+    {
+      "edge_id": "TR-004",
+      "from_id": "OP-10-RECEIVE",
+      "to_id": "OP-20-INCOMING-QA",
+      "relation": "precedes_in_process"
+    },
+    {
+      "edge_id": "TR-005",
+      "from_id": "SYN-LOT-FABRIC-001",
+      "to_id": "OP-20-INCOMING-QA",
+      "relation": "inspected_by"
+    },
+    {
+      "edge_id": "TR-006",
+      "from_id": "SYN-LOT-LAYER-001",
+      "to_id": "OP-20-INCOMING-QA",
+      "relation": "inspected_by"
+    },
+    {
+      "edge_id": "TR-007",
+      "from_id": "SYN-LOT-TRIM-001",
+      "to_id": "OP-20-INCOMING-QA",
+      "relation": "inspected_by"
+    },
+    {
+      "edge_id": "TR-008",
+      "from_id": "SYN-LOT-FABRIC-001",
+      "to_id": "OP-30-CUT",
+      "relation": "consumed_by"
+    },
+    {
+      "edge_id": "TR-009",
+      "from_id": "OP-30-CUT",
+      "to_id": "SYN-WIP-COVER-PANELS-BATCH-001",
+      "relation": "produces"
+    },
+    {
+      "edge_id": "TR-010",
+      "from_id": "SYN-WIP-COVER-PANELS-BATCH-001",
+      "to_id": "OP-40-SEW",
+      "relation": "input_to"
+    },
+    {
+      "edge_id": "TR-011",
+      "from_id": "SYN-LOT-TRIM-001",
+      "to_id": "OP-40-SEW",
+      "relation": "consumed_by"
+    },
+    {
+      "edge_id": "TR-012",
+      "from_id": "OP-40-SEW",
+      "to_id": "SYN-WIP-SEWN-COVER-A",
+      "relation": "produces"
+    },
+    {
+      "edge_id": "TR-013",
+      "from_id": "OP-40-SEW",
+      "to_id": "SYN-WIP-SEWN-COVER-B",
+      "relation": "produces"
+    },
+    {
+      "edge_id": "TR-014",
+      "from_id": "SYN-WIP-SEWN-COVER-A",
+      "to_id": "OP-50-ASSEMBLE",
+      "relation": "input_to"
+    },
+    {
+      "edge_id": "TR-015",
+      "from_id": "SYN-WIP-SEWN-COVER-B",
+      "to_id": "OP-50-ASSEMBLE",
+      "relation": "input_to"
+    },
+    {
+      "edge_id": "TR-016",
+      "from_id": "SYN-LOT-LAYER-001",
+      "to_id": "OP-50-ASSEMBLE",
+      "relation": "consumed_by"
+    },
+    {
+      "edge_id": "TR-017",
+      "from_id": "OP-50-ASSEMBLE",
+      "to_id": "SYN-WIP-ASSEMBLED-TOPPER-A",
+      "relation": "produces"
+    },
+    {
+      "edge_id": "TR-018",
+      "from_id": "OP-50-ASSEMBLE",
+      "to_id": "SYN-WIP-ASSEMBLED-TOPPER-B",
+      "relation": "produces"
+    },
+    {
+      "edge_id": "TR-019",
+      "from_id": "SYN-WIP-ASSEMBLED-TOPPER-A",
+      "to_id": "OP-60-FINAL-QA",
+      "relation": "inspection_subject"
+    },
+    {
+      "edge_id": "TR-020",
+      "from_id": "SYN-WIP-ASSEMBLED-TOPPER-B",
+      "to_id": "OP-60-FINAL-QA",
+      "relation": "inspection_subject"
+    },
+    {
+      "edge_id": "TR-021",
+      "from_id": "OP-60-FINAL-QA",
+      "to_id": "SYN-ARTICLE-ACCEPTED-A",
+      "relation": "accepted_as"
+    },
+    {
+      "edge_id": "TR-022",
+      "from_id": "OP-60-FINAL-QA",
+      "to_id": "SYN-ARTICLE-ACCEPTED-B",
+      "relation": "accepted_as"
+    },
+    {
+      "edge_id": "TR-023",
+      "from_id": "SYN-ARTICLE-ACCEPTED-A",
+      "to_id": "OP-70-PACK",
+      "relation": "packaging_input"
+    },
+    {
+      "edge_id": "TR-024",
+      "from_id": "SYN-ARTICLE-ACCEPTED-B",
+      "to_id": "OP-70-PACK",
+      "relation": "packaging_input"
+    },
+    {
+      "edge_id": "TR-025",
+      "from_id": "OP-70-PACK",
+      "to_id": "SYN-UNIT-PACKED-A",
+      "relation": "packages"
+    },
+    {
+      "edge_id": "TR-026",
+      "from_id": "OP-70-PACK",
+      "to_id": "SYN-UNIT-PACKED-B",
+      "relation": "packages"
+    },
+    {
+      "edge_id": "TR-027",
+      "from_id": "SYN-LOT-UNRELATED-099",
+      "to_id": "SYN-UNRELATED-ASSEMBLY-CONTROL",
+      "relation": "consumed_by"
+    },
+    {
+      "edge_id": "TR-028",
+      "from_id": "SYN-UNRELATED-ASSEMBLY-CONTROL",
+      "to_id": "SYN-UNRELATED-ARTICLE-CONTROL",
+      "relation": "produces"
+    },
+    {
+      "edge_id": "TR-029",
+      "from_id": "SYN-UNRELATED-ARTICLE-CONTROL",
+      "to_id": "SYN-UNRELATED-PACKED-CONTROL",
+      "relation": "packages"
+    }
+  ],
+  "expected_containment_queries": [
+    {
+      "source_lot_id": "SYN-LOT-FABRIC-001",
+      "expected_descendants": [
+        "OP-10-RECEIVE",
+        "OP-20-INCOMING-QA",
+        "OP-30-CUT",
+        "OP-40-SEW",
+        "OP-50-ASSEMBLE",
+        "OP-60-FINAL-QA",
+        "OP-70-PACK",
+        "SYN-ARTICLE-ACCEPTED-A",
+        "SYN-ARTICLE-ACCEPTED-B",
+        "SYN-UNIT-PACKED-A",
+        "SYN-UNIT-PACKED-B",
+        "SYN-WIP-ASSEMBLED-TOPPER-A",
+        "SYN-WIP-ASSEMBLED-TOPPER-B",
+        "SYN-WIP-COVER-PANELS-BATCH-001",
+        "SYN-WIP-SEWN-COVER-A",
+        "SYN-WIP-SEWN-COVER-B"
+      ],
+      "status": "synthetic_known_answer_not_measurement"
+    },
+    {
+      "source_lot_id": "SYN-LOT-TRIM-001",
+      "expected_descendants": [
+        "OP-10-RECEIVE",
+        "OP-20-INCOMING-QA",
+        "OP-40-SEW",
+        "OP-50-ASSEMBLE",
+        "OP-60-FINAL-QA",
+        "OP-70-PACK",
+        "SYN-ARTICLE-ACCEPTED-A",
+        "SYN-ARTICLE-ACCEPTED-B",
+        "SYN-UNIT-PACKED-A",
+        "SYN-UNIT-PACKED-B",
+        "SYN-WIP-ASSEMBLED-TOPPER-A",
+        "SYN-WIP-ASSEMBLED-TOPPER-B",
+        "SYN-WIP-SEWN-COVER-A",
+        "SYN-WIP-SEWN-COVER-B"
+      ],
+      "status": "synthetic_known_answer_not_measurement"
+    },
+    {
+      "source_lot_id": "SYN-LOT-LAYER-001",
+      "expected_descendants": [
+        "OP-10-RECEIVE",
+        "OP-20-INCOMING-QA",
+        "OP-50-ASSEMBLE",
+        "OP-60-FINAL-QA",
+        "OP-70-PACK",
+        "SYN-ARTICLE-ACCEPTED-A",
+        "SYN-ARTICLE-ACCEPTED-B",
+        "SYN-UNIT-PACKED-A",
+        "SYN-UNIT-PACKED-B",
+        "SYN-WIP-ASSEMBLED-TOPPER-A",
+        "SYN-WIP-ASSEMBLED-TOPPER-B"
+      ],
+      "status": "synthetic_known_answer_not_measurement"
+    },
+    {
+      "source_lot_id": "SYN-LOT-UNRELATED-099",
+      "expected_descendants": [
+        "SYN-UNRELATED-ARTICLE-CONTROL",
+        "SYN-UNRELATED-ASSEMBLY-CONTROL",
+        "SYN-UNRELATED-PACKED-CONTROL"
+      ],
+      "status": "synthetic_known_answer_not_measurement"
+    }
+  ]
 }
