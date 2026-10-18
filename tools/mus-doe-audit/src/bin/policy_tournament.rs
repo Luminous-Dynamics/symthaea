@@ -48,9 +48,7 @@ impl SurfaceFamily {
                     0.215 + 0.9 * (x - 0.43)
                 }
             }
-            Self::Multiscale => {
-                0.45 * (tau * x).sin() + 0.3 * (5.0 * tau * x).sin() + 0.15 * x
-            }
+            Self::Multiscale => 0.45 * (tau * x).sin() + 0.3 * (5.0 * tau * x).sin() + 0.15 * x,
         }
     }
 }
@@ -215,9 +213,9 @@ fn select_next(
         SelectionPolicy::SeededRandom => {
             let mut counter = 0_u64;
             loop {
-                let candidate = (splitmix64(
-                    seed ^ (step as u64).wrapping_mul(0xA076_1D64_78BD_642F) ^ counter,
-                ) % (GRID_STEPS as u64 + 1)) as usize;
+                let candidate =
+                    (splitmix64(seed ^ (step as u64).wrapping_mul(0xA076_1D64_78BD_642F) ^ counter)
+                        % (GRID_STEPS as u64 + 1)) as usize;
                 if !already_sampled(observations, candidate) {
                     break candidate;
                 }
@@ -383,13 +381,19 @@ fn run_tournament(seed_count: usize, budget: usize) -> TournamentReport {
             let mean_absolute_error = if matched.is_empty() {
                 0.0
             } else {
-                matched.iter().map(|result| result.mean_absolute_error).sum::<f64>()
+                matched
+                    .iter()
+                    .map(|result| result.mean_absolute_error)
+                    .sum::<f64>()
                     / matched.len() as f64
             };
             let mean_root_mean_square_error = if matched.is_empty() {
                 0.0
             } else {
-                matched.iter().map(|result| result.root_mean_square_error).sum::<f64>()
+                matched
+                    .iter()
+                    .map(|result| result.root_mean_square_error)
+                    .sum::<f64>()
                     / matched.len() as f64
             };
             let worst_trial_maximum_absolute_error = matched
@@ -451,7 +455,9 @@ fn parse_args() -> Result<(usize, usize), String> {
                     .map_err(|_| "--budget requires an odd integer from 3 to 101")?;
             }
             "--help" | "-h" => {
-                println!("policy_tournament [--seeds N] [--budget ODD_N]\nRuns a deterministic synthetic selection-policy comparison.");
+                println!(
+                    "policy_tournament [--seeds N] [--budget ODD_N]\nRuns a deterministic synthetic selection-policy comparison."
+                );
                 std::process::exit(0);
             }
             other => return Err(format!("unknown argument: {other}")),
@@ -495,9 +501,19 @@ mod tests {
     fn every_policy_obeys_same_budget_and_unique_candidate_positions() {
         for policy in SelectionPolicy::ALL {
             let observations = select_observations(SurfaceFamily::Smooth, policy, 19, 11);
-            let indices = observations.iter().map(|(index, _)| *index).collect::<Vec<_>>();
+            let indices = observations
+                .iter()
+                .map(|(index, _)| *index)
+                .collect::<Vec<_>>();
             assert_eq!(indices.len(), 11);
-            assert_eq!(indices.iter().copied().collect::<std::collections::BTreeSet<_>>().len(), 11);
+            assert_eq!(
+                indices
+                    .iter()
+                    .copied()
+                    .collect::<std::collections::BTreeSet<_>>()
+                    .len(),
+                11
+            );
             assert!(indices.contains(&0));
             assert!(indices.contains(&(GRID_STEPS / 2)));
             assert!(indices.contains(&GRID_STEPS));
@@ -513,8 +529,14 @@ mod tests {
 
     #[test]
     fn held_out_metrics_exclude_all_sampled_candidate_positions() {
-        let observations = select_observations(SurfaceFamily::Kink, SelectionPolicy::ModelDisagreement, 7, 11);
-        let (held_out_count, mae, rmse, max_error) = held_out_metrics(SurfaceFamily::Kink, &observations);
+        let observations = select_observations(
+            SurfaceFamily::Kink,
+            SelectionPolicy::ModelDisagreement,
+            7,
+            11,
+        );
+        let (held_out_count, mae, rmse, max_error) =
+            held_out_metrics(SurfaceFamily::Kink, &observations);
         assert_eq!(held_out_count, EVAL_STEPS + 1 - observations.len());
         assert!(mae.is_finite() && mae >= 0.0);
         assert!(rmse.is_finite() && rmse >= 0.0);
@@ -525,7 +547,10 @@ mod tests {
     fn matched_synthetic_observation_does_not_depend_on_selection_policy() {
         for surface in SurfaceFamily::ALL {
             for candidate in [0, 10, 37, 50, 91, 100] {
-                assert_eq!(observe(surface, candidate, 123), observe(surface, candidate, 123));
+                assert_eq!(
+                    observe(surface, candidate, 123),
+                    observe(surface, candidate, 123)
+                );
             }
         }
     }
@@ -533,9 +558,25 @@ mod tests {
     #[test]
     fn equal_budget_comparison_covers_all_surface_policy_pairs() {
         let report = run_tournament(3, 11);
-        assert_eq!(report.trials.len(), SurfaceFamily::ALL.len() * SelectionPolicy::ALL.len() * 3);
-        assert_eq!(report.summaries.len(), SurfaceFamily::ALL.len() * SelectionPolicy::ALL.len());
-        assert!(report.trials.iter().all(|trial| trial.observation_count == 11));
-        assert!(report.trials.iter().all(|trial| trial.held_out_point_count == 990));
+        assert_eq!(
+            report.trials.len(),
+            SurfaceFamily::ALL.len() * SelectionPolicy::ALL.len() * 3
+        );
+        assert_eq!(
+            report.summaries.len(),
+            SurfaceFamily::ALL.len() * SelectionPolicy::ALL.len()
+        );
+        assert!(
+            report
+                .trials
+                .iter()
+                .all(|trial| trial.observation_count == 11)
+        );
+        assert!(
+            report
+                .trials
+                .iter()
+                .all(|trial| trial.held_out_point_count == 990)
+        );
     }
 }
