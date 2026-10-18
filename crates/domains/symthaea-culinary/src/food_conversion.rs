@@ -77,7 +77,8 @@ fn validate_evidence<'a>(
     label: &str,
     errors: &mut Vec<String>,
 ) -> Option<&'a str> {
-    if non_empty(value, "source_ref").is_none() {
+    let source_ref = non_empty(value, "source_ref");
+    if source_ref.is_none() {
         errors.push(format!("{label}.source_ref must be a non-empty source locator"));
     }
     if non_empty(value, "source_version").is_none() {
@@ -88,6 +89,14 @@ fn validate_evidence<'a>(
         _ => errors.push(format!("{label}.known_at must be an RFC3339 timestamp")),
     }
     match non_empty(value, "evidence_status") {
+        Some("qualified")
+            if source_ref.is_some_and(|reference| reference.starts_with("urn:synthetic:")) =>
+        {
+            errors.push(format!(
+                "{label}.evidence_status cannot be qualified while source_ref is synthetic"
+            ));
+            None
+        }
         Some(status)
             if matches!(status, "synthetic" | "unreviewed" | "reviewed" | "qualified") =>
         {
