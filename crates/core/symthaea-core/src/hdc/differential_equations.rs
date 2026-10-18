@@ -348,6 +348,7 @@ pub enum AdaptiveImplicitEulerErrorKind {
     DimensionMismatch { expected: usize, actual: usize },
     InvalidTimeSpan,
     InvalidInitialStep,
+    NonFiniteInitialState { index: usize },
     InvalidAbsoluteTolerance { index: usize },
     ToleranceDimensionMismatch { expected: usize, actual: usize },
     InvalidRelativeTolerance,
@@ -1641,9 +1642,8 @@ impl DifferentialEquationsEngine {
         }
         if let Some(index) = y0.iter().position(|value| !value.is_finite()) {
             return Err(AdaptiveImplicitEulerError::new(
-                AdaptiveImplicitEulerErrorKind::StepSolveFailed {
-                    cause: ImplicitEulerErrorKind::NonFiniteInitialState { index },
-                }, t, &y, accepted_steps, rejected_steps, attempts, &work, max_newton_residual
+                AdaptiveImplicitEulerErrorKind::NonFiniteInitialState { index },
+                t, &y, accepted_steps, rejected_steps, attempts, &work, max_newton_residual
             ));
         }
 
@@ -1849,8 +1849,7 @@ impl DifferentialEquationsEngine {
                 } else {
                     (0.9 / error_norm.sqrt()).clamp(0.2, 2.0)
                 };
-                step_size = (trial_end - *t_values.get(t_values.len().saturating_sub(2)).unwrap_or(&t0))
-                    * factor;
+                step_size = trial_step * factor;
                 if !step_size.is_finite() || step_size <= 0.0 {
                     return Err(AdaptiveImplicitEulerError::new(
                         AdaptiveImplicitEulerErrorKind::StepSizeUnderflow { attempted_step: step_size },
@@ -2662,7 +2661,7 @@ mod tests {
         }
         let system = ODESystem { f: growth, dim: 1 };
         let error = DifferentialEquationsEngine::try_solve_implicit_euler_adaptive(
-            &system, 0.0, 1.0, &[1.0], &[1e-12], 1e-12, 1.0, 1, 8,
+            &system, 0.0, 1.0, &[1.0], &[1e-12], 1e-12, 0.1, 1, 8,
         )
         .expect_err("one attempt should be exhausted after rejecting an inaccurate step");
         assert!(matches!(
