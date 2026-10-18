@@ -142,6 +142,7 @@ pub enum ImplicitEulerErrorKind {
     NonFiniteJacobian { row: usize, column: usize },
     SingularJacobian { column: usize, pivot_magnitude: f64 },
     NonFiniteNewtonCorrection { index: usize },
+    NonFiniteLinearSolve { column: usize },
     NewtonNonConvergence { iteration_limit: usize, residual_norm: f64 },
     NewtonWorkBudgetExceeded { max_work_units: usize },
 }
@@ -171,25 +172,27 @@ impl ImplicitEulerError {
         rhs_evaluations: usize,
         residual_norm: f64,
     ) -> Self {
+        let validation_failure = matches!(
+            &kind,
+            ImplicitEulerErrorKind::EmptySystem
+                | ImplicitEulerErrorKind::DimensionMismatch { .. }
+                | ImplicitEulerErrorKind::InvalidTimeSpan
+                | ImplicitEulerErrorKind::InvalidStepCount { .. }
+                | ImplicitEulerErrorKind::InvalidNewtonIterationBudget { .. }
+                | ImplicitEulerErrorKind::SystemTooLargeForDenseNewton { .. }
+                | ImplicitEulerErrorKind::NonFiniteInitialState { .. }
+        );
+        let failed_step = if validation_failure {
+            0
+        } else {
+            steps_completed + 1
+        };
         Self {
             kind,
             time,
             last_state: last_state.to_vec(),
             steps_completed,
-            failed_step: if matches!(
-                kind,
-                ImplicitEulerErrorKind::EmptySystem
-                    | ImplicitEulerErrorKind::DimensionMismatch { .. }
-                    | ImplicitEulerErrorKind::InvalidTimeSpan
-                    | ImplicitEulerErrorKind::InvalidStepCount { .. }
-                    | ImplicitEulerErrorKind::InvalidNewtonIterationBudget { .. }
-                    | ImplicitEulerErrorKind::SystemTooLargeForDenseNewton { .. }
-                    | ImplicitEulerErrorKind::NonFiniteInitialState { .. }
-            ) {
-                0
-            } else {
-                steps_completed + 1
-            },
+            failed_step,
             newton_corrections,
             rhs_evaluations,
             residual_norm,
@@ -1296,9 +1299,13 @@ impl DifferentialEquationsEngine {
                     };
 
                     for row in 0..dimension {
-                        let g_perturbed = perturbed * if row == column { 1.0 } else { 0.0 }
-                            + y_next[row] * if row != column { 1.0 } else { 0.0 }
-                            - y[row] - h * f_perturbed[row];
+                        let candidate_component = if row == column {
+                            perturbed
+                        } else {
+                            y_next[row]
+                        };
+                        let g_perturbed =
+                            candidate_component - y[row] - h * f_perturbed[row];
                         let g_base = residual[row];
                         let entry = (g_perturbed - g_base) / signed_delta;
                         if !entry.is_finite() {
@@ -1316,8 +1323,13 @@ impl DifferentialEquationsEngine {
                 if let Err((column, pivot_magnitude)) =
                     implicit_euler_solve_dense(&mut jacobian, &mut correction, dimension)
                 {
+                    let kind = if pivot_magnitude.is_finite() {
+                        ImplicitEulerErrorKind::SingularJacobian { column, pivot_magnitude }
+                    } else {
+                        ImplicitEulerErrorKind::NonFiniteLinearSolve { column }
+                    };
                     return Err(ImplicitEulerError::new(
-                        ImplicitEulerErrorKind::SingularJacobian { column, pivot_magnitude },
+                        kind,
                         *t_values.last().unwrap_or(&t0), &y, step,
                         total_corrections, rhs_evaluations, step_residual_norm
                     ));
