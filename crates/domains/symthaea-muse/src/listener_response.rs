@@ -257,13 +257,19 @@ mod tests {
                 AffectCheckpoint {
                     elapsed_ms: 10_000,
                     affect: SelfReportedAffect {
-                        valence: Some(0.0), arousal: Some(0.5), tension: Some(0.4), energy: Some(0.5),
+                        valence: Some(0.0),
+                        arousal: Some(0.5),
+                        tension: Some(0.4),
+                        energy: Some(0.5),
                     },
                 },
                 AffectCheckpoint {
                     elapsed_ms: 20_000,
                     affect: SelfReportedAffect {
-                        valence: Some(0.2), arousal: Some(0.4), tension: Some(0.3), energy: Some(0.5),
+                        valence: Some(0.2),
+                        arousal: Some(0.4),
+                        tension: Some(0.3),
+                        energy: Some(0.5),
                     },
                 },
             ],
@@ -304,13 +310,19 @@ mod tests {
             issue, ListenerResponseIssue::InvalidSha256 { field } if field == "audio_sha256"
         )));
         assert!(issues.iter().any(|issue| matches!(
-            issue, ListenerResponseIssue::InvalidAffectValue { field } if field == "felt_after.valence"
+            issue,
+            ListenerResponseIssue::InvalidAffectValue { field }
+                if field == "felt_after.valence"
         )));
         assert!(issues.iter().any(|issue| matches!(
-            issue, ListenerResponseIssue::InvalidAffectValue { field } if field == "felt_after.arousal"
+            issue,
+            ListenerResponseIssue::InvalidAffectValue { field }
+                if field == "felt_after.arousal"
         )));
         assert!(issues.iter().any(|issue| matches!(
-            issue, ListenerResponseIssue::InvalidAffectValue { field } if field == "felt_after.tension"
+            issue,
+            ListenerResponseIssue::InvalidAffectValue { field }
+                if field == "felt_after.tension"
         )));
     }
 
