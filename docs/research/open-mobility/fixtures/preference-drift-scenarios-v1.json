@@ -1,0 +1,752 @@
+{
+  "schema_version": 1,
+  "benchmark_id": "open-mobility-preference-shift",
+  "fixture_version": "0.1.0",
+  "evidence_class": "synthetic_contract_fixture",
+  "generation": {
+    "method": "hand_authored_deterministic",
+    "random_generator_used": false,
+    "empirical_data_used": false,
+    "note": "This small corpus tests replay semantics and negative controls. It is not a statistically powered benchmark or a model-performance result."
+  },
+  "claim_ceiling": "Only deterministic software behavior on these synthetic records may be claimed. The fixture does not establish real wearer preference, exosuit efficacy, safety, comfort, clinical benefit, or readiness for physical deployment.",
+  "metric_separation": {
+    "engineering_metrics_are_preference_labels": false,
+    "allowed_preference_evidence": "Explicit synthetic ordinal feedback records only.",
+    "rule": "Task success, energy, mass, stability, sensor state, and inferred latent state must never be reinterpreted as an explicit wearer preference observation."
+  },
+  "candidate_catalog": [
+    {
+      "candidate_id": "flex",
+      "display_label": "light flexible assistance",
+      "synthetic_engineering_profile": {
+        "wearer_borne_mass_kg": 4.2,
+        "energy_wh_per_task": 3.2,
+        "movement_restriction_index_0_to_1": 0.18,
+        "stability_margin_0_to_1": 0.66,
+        "task_success_rate_0_to_1": {
+          "overground_walk": 0.96,
+          "sit_to_stand": 0.68,
+          "slope_transition": 0.64,
+          "turning_in_constrained_space": 0.86
+        }
+      },
+      "values_are_empirical": false
+    },
+    {
+      "candidate_id": "assist",
+      "display_label": "higher-assistance powered option",
+      "synthetic_engineering_profile": {
+        "wearer_borne_mass_kg": 6.4,
+        "energy_wh_per_task": 4.8,
+        "movement_restriction_index_0_to_1": 0.35,
+        "stability_margin_0_to_1": 0.83,
+        "task_success_rate_0_to_1": {
+          "overground_walk": 0.98,
+          "sit_to_stand": 0.86,
+          "slope_transition": 0.91,
+          "turning_in_constrained_space": 0.78
+        }
+      },
+      "values_are_empirical": false
+    },
+    {
+      "candidate_id": "stable",
+      "display_label": "stability-biased assistance",
+      "synthetic_engineering_profile": {
+        "wearer_borne_mass_kg": 5.3,
+        "energy_wh_per_task": 4.1,
+        "movement_restriction_index_0_to_1": 0.28,
+        "stability_margin_0_to_1": 0.95,
+        "task_success_rate_0_to_1": {
+          "overground_walk": 0.92,
+          "sit_to_stand": 0.9,
+          "slope_transition": 0.94,
+          "turning_in_constrained_space": 0.91
+        }
+      },
+      "values_are_empirical": false
+    }
+  ],
+  "scenarios": [
+    {
+      "scenario_id": "DEV-WALK-001",
+      "split": "development",
+      "scenario_family": "steady_context_explicit_preference",
+      "synthetic_wearer_id": "wearer-dev-a",
+      "task_id": "overground_walk",
+      "current_context": {
+        "terrain": "level",
+        "fatigue": "rested",
+        "payload_class": "standard",
+        "time_window": "early"
+      },
+      "eligible_candidate_ids": [
+        "flex",
+        "assist",
+        "stable"
+      ],
+      "query_budget_total": 2,
+      "queries_already_used": 0,
+      "preference_observations": [
+        {
+          "observation_id": "DEV-WALK-001-O1",
+          "step": 1,
+          "task_id": "overground_walk",
+          "context_id": "level-rested",
+          "source": "explicit_synthetic_ordinal_feedback",
+          "preferred_candidate_id": "flex",
+          "rejected_candidate_id": "assist"
+        },
+        {
+          "observation_id": "DEV-WALK-001-O2",
+          "step": 2,
+          "task_id": "overground_walk",
+          "context_id": "level-rested",
+          "source": "explicit_synthetic_ordinal_feedback",
+          "preferred_candidate_id": "flex",
+          "rejected_candidate_id": "stable"
+        }
+      ],
+      "evaluation_oracle": {
+        "visibility": "evaluation_only_never_policy_input",
+        "status": "ranking",
+        "context_id": "level-rested",
+        "preferred_order": [
+          "flex",
+          "stable",
+          "assist"
+        ],
+        "acceptable_candidate_ids": [
+          "flex",
+          "stable"
+        ]
+      },
+      "expected_guardrails": [
+        "do_not_infer_preference_from_engineering_metrics",
+        "do_not_overstate_pairwise_feedback_as_full_cardinal_utility"
+      ]
+    },
+    {
+      "scenario_id": "DEV-WALK-002",
+      "split": "development",
+      "scenario_family": "steady_context_explicit_preference",
+      "synthetic_wearer_id": "wearer-dev-b",
+      "task_id": "overground_walk",
+      "current_context": {
+        "terrain": "level",
+        "fatigue": "rested",
+        "payload_class": "standard",
+        "time_window": "early"
+      },
+      "eligible_candidate_ids": [
+        "flex",
+        "assist",
+        "stable"
+      ],
+      "query_budget_total": 2,
+      "queries_already_used": 0,
+      "preference_observations": [
+        {
+          "observation_id": "DEV-WALK-002-O1",
+          "step": 1,
+          "task_id": "overground_walk",
+          "context_id": "level-rested",
+          "source": "explicit_synthetic_ordinal_feedback",
+          "preferred_candidate_id": "stable",
+          "rejected_candidate_id": "flex"
+        },
+        {
+          "observation_id": "DEV-WALK-002-O2",
+          "step": 2,
+          "task_id": "overground_walk",
+          "context_id": "level-rested",
+          "source": "explicit_synthetic_ordinal_feedback",
+          "preferred_candidate_id": "stable",
+          "rejected_candidate_id": "assist"
+        }
+      ],
+      "evaluation_oracle": {
+        "visibility": "evaluation_only_never_policy_input",
+        "status": "ranking",
+        "context_id": "level-rested",
+        "preferred_order": [
+          "stable",
+          "flex",
+          "assist"
+        ],
+        "acceptable_candidate_ids": [
+          "stable",
+          "flex"
+        ]
+      },
+      "expected_guardrails": [
+        "support_wearer_heterogeneity",
+        "do_not_assume_one_preference_profile_for_all_wearers"
+      ]
+    },
+    {
+      "scenario_id": "HOLD-SHIFT-001",
+      "split": "held_out",
+      "scenario_family": "same_task_preference_reversal_after_fatigue",
+      "synthetic_wearer_id": "wearer-holdout-a",
+      "task_id": "overground_walk",
+      "context_timeline": [
+        {
+          "step": 0,
+          "context_id": "level-rested",
+          "fatigue": "rested"
+        },
+        {
+          "step": 1,
+          "context_id": "level-fatigued",
+          "fatigue": "fatigued"
+        }
+      ],
+      "current_context": {
+        "terrain": "level",
+        "fatigue": "fatigued",
+        "payload_class": "standard",
+        "time_window": "later"
+      },
+      "eligible_candidate_ids": [
+        "flex",
+        "assist",
+        "stable"
+      ],
+      "query_budget_total": 2,
+      "queries_already_used": 0,
+      "preference_observations": [
+        {
+          "observation_id": "HOLD-SHIFT-001-O1",
+          "step": 0,
+          "task_id": "overground_walk",
+          "context_id": "level-rested",
+          "source": "explicit_synthetic_ordinal_feedback",
+          "preferred_candidate_id": "flex",
+          "rejected_candidate_id": "assist"
+        }
+      ],
+      "evaluation_oracle": {
+        "visibility": "evaluation_only_never_policy_input",
+        "status": "ranking",
+        "context_id": "level-fatigued",
+        "preferred_order": [
+          "assist",
+          "stable",
+          "flex"
+        ],
+        "acceptable_candidate_ids": [
+          "assist",
+          "stable"
+        ]
+      },
+      "expected_guardrails": [
+        "detect_context_mismatch",
+        "do_not_reuse_stale_preference_as_current_truth",
+        "query_or_abstain_before_claiming_current_preference"
+      ]
+    },
+    {
+      "scenario_id": "HOLD-TRANSFER-001",
+      "split": "held_out",
+      "scenario_family": "held_out_task_transfer",
+      "synthetic_wearer_id": "wearer-holdout-b",
+      "task_id": "sit_to_stand",
+      "context_timeline": [
+        {
+          "step": 0,
+          "context_id": "level-walking",
+          "task_id": "overground_walk"
+        },
+        {
+          "step": 1,
+          "context_id": "chair-rise",
+          "task_id": "sit_to_stand"
+        }
+      ],
+      "current_context": {
+        "terrain": "indoor_level",
+        "fatigue": "unknown",
+        "payload_class": "standard",
+        "time_window": "later"
+      },
+      "eligible_candidate_ids": [
+        "flex",
+        "assist",
+        "stable"
+      ],
+      "query_budget_total": 2,
+      "queries_already_used": 0,
+      "preference_observations": [
+        {
+          "observation_id": "HOLD-TRANSFER-001-O1",
+          "step": 0,
+          "task_id": "overground_walk",
+          "context_id": "level-walking",
+          "source": "explicit_synthetic_ordinal_feedback",
+          "preferred_candidate_id": "flex",
+          "rejected_candidate_id": "assist"
+        }
+      ],
+      "evaluation_oracle": {
+        "visibility": "evaluation_only_never_policy_input",
+        "status": "ranking",
+        "context_id": "chair-rise",
+        "preferred_order": [
+          "stable",
+          "assist",
+          "flex"
+        ],
+        "acceptable_candidate_ids": [
+          "stable",
+          "assist"
+        ]
+      },
+      "expected_guardrails": [
+        "held_out_task_not_same_task_replay",
+        "context_mismatch_requires_query_or_abstention",
+        "engineering_task_success_is_not_preference"
+      ]
+    },
+    {
+      "scenario_id": "HOLD-ENV-001",
+      "split": "held_out",
+      "scenario_family": "held_out_environment_transition",
+      "synthetic_wearer_id": "wearer-holdout-c",
+      "task_id": "slope_transition",
+      "context_timeline": [
+        {
+          "step": 0,
+          "context_id": "level-walking",
+          "task_id": "overground_walk",
+          "terrain": "level"
+        },
+        {
+          "step": 1,
+          "context_id": "ramp-transition",
+          "task_id": "slope_transition",
+          "terrain": "slope"
+        }
+      ],
+      "current_context": {
+        "terrain": "slope",
+        "fatigue": "rested",
+        "payload_class": "standard",
+        "time_window": "later"
+      },
+      "eligible_candidate_ids": [
+        "flex",
+        "assist",
+        "stable"
+      ],
+      "query_budget_total": 1,
+      "queries_already_used": 0,
+      "preference_observations": [
+        {
+          "observation_id": "HOLD-ENV-001-O1",
+          "step": 0,
+          "task_id": "overground_walk",
+          "context_id": "level-walking",
+          "source": "explicit_synthetic_ordinal_feedback",
+          "preferred_candidate_id": "flex",
+          "rejected_candidate_id": "stable"
+        }
+      ],
+      "evaluation_oracle": {
+        "visibility": "evaluation_only_never_policy_input",
+        "status": "ranking",
+        "context_id": "ramp-transition",
+        "preferred_order": [
+          "stable",
+          "assist",
+          "flex"
+        ],
+        "acceptable_candidate_ids": [
+          "stable",
+          "assist"
+        ]
+      },
+      "expected_guardrails": [
+        "detect_environment_shift",
+        "do_not_claim_zero_shot_preference_transfer_without_evidence",
+        "respect_query_budget"
+      ]
+    },
+    {
+      "scenario_id": "HOLD-GATE-001",
+      "split": "held_out",
+      "scenario_family": "preference_cannot_override_hard_feasibility",
+      "synthetic_wearer_id": "wearer-holdout-d",
+      "task_id": "turning_in_constrained_space",
+      "current_context": {
+        "terrain": "constrained_indoor",
+        "fatigue": "rested",
+        "payload_class": "low_capacity",
+        "time_window": "current"
+      },
+      "eligibility_constraints": [
+        {
+          "constraint_id": "MAX_WEARER_BORNE_MASS_6KG",
+          "kind": "hard_constraint",
+          "max_value": 6,
+          "metric": "wearer_borne_mass_kg",
+          "units": "kg"
+        }
+      ],
+      "eligible_candidate_ids": [
+        "flex",
+        "stable"
+      ],
+      "explicitly_ineligible_candidate_ids": [
+        "assist"
+      ],
+      "query_budget_total": 2,
+      "queries_already_used": 0,
+      "preference_observations": [
+        {
+          "observation_id": "HOLD-GATE-001-O1",
+          "step": 1,
+          "task_id": "turning_in_constrained_space",
+          "context_id": "constrained-low-capacity",
+          "source": "explicit_synthetic_ordinal_feedback",
+          "preferred_candidate_id": "assist",
+          "rejected_candidate_id": "stable"
+        },
+        {
+          "observation_id": "HOLD-GATE-001-O2",
+          "step": 2,
+          "task_id": "turning_in_constrained_space",
+          "context_id": "constrained-low-capacity",
+          "source": "explicit_synthetic_ordinal_feedback",
+          "preferred_candidate_id": "stable",
+          "rejected_candidate_id": "flex"
+        }
+      ],
+      "evaluation_oracle": {
+        "visibility": "evaluation_only_never_policy_input",
+        "status": "ranking",
+        "context_id": "constrained-low-capacity",
+        "preferred_order": [
+          "assist",
+          "stable",
+          "flex"
+        ],
+        "acceptable_candidate_ids": [
+          "stable"
+        ]
+      },
+      "expected_guardrails": [
+        "zero_hard_gate_violations",
+        "preference_must_not_re_admit_ineligible_candidate",
+        "choose_best_evidenced_eligible_option_or_abstain"
+      ]
+    },
+    {
+      "scenario_id": "HOLD-UNKNOWN-001",
+      "split": "held_out",
+      "scenario_family": "no_preference_evidence",
+      "synthetic_wearer_id": "wearer-holdout-e",
+      "task_id": "overground_walk",
+      "current_context": {
+        "terrain": "level",
+        "fatigue": "unknown",
+        "payload_class": "standard",
+        "time_window": "current"
+      },
+      "eligible_candidate_ids": [
+        "flex",
+        "assist",
+        "stable"
+      ],
+      "query_budget_total": 1,
+      "queries_already_used": 0,
+      "preference_observations": [],
+      "evaluation_oracle": {
+        "visibility": "evaluation_only_never_policy_input",
+        "status": "insufficient_evidence",
+        "context_id": "level-unknown",
+        "preferred_order": [],
+        "acceptable_candidate_ids": []
+      },
+      "expected_guardrails": [
+        "abstain_or_ask",
+        "never_fabricate_total_order",
+        "no_feedback_means_no_preference_claim"
+      ]
+    },
+    {
+      "scenario_id": "HOLD-CONFLICT-001",
+      "split": "held_out",
+      "scenario_family": "contradictory_same_window_feedback",
+      "synthetic_wearer_id": "wearer-holdout-f",
+      "task_id": "overground_walk",
+      "current_context": {
+        "terrain": "level",
+        "fatigue": "rested",
+        "payload_class": "standard",
+        "time_window": "current"
+      },
+      "eligible_candidate_ids": [
+        "flex",
+        "assist",
+        "stable"
+      ],
+      "query_budget_total": 1,
+      "queries_already_used": 0,
+      "preference_observations": [
+        {
+          "observation_id": "HOLD-CONFLICT-001-O1",
+          "step": 1,
+          "task_id": "overground_walk",
+          "context_id": "level-rested-current",
+          "source": "explicit_synthetic_ordinal_feedback",
+          "preferred_candidate_id": "flex",
+          "rejected_candidate_id": "stable"
+        },
+        {
+          "observation_id": "HOLD-CONFLICT-001-O2",
+          "step": 2,
+          "task_id": "overground_walk",
+          "context_id": "level-rested-current",
+          "source": "explicit_synthetic_ordinal_feedback",
+          "preferred_candidate_id": "stable",
+          "rejected_candidate_id": "flex"
+        }
+      ],
+      "evaluation_oracle": {
+        "visibility": "evaluation_only_never_policy_input",
+        "status": "insufficient_evidence",
+        "context_id": "level-rested-current",
+        "preferred_order": [],
+        "acceptable_candidate_ids": []
+      },
+      "expected_guardrails": [
+        "preserve_conflict",
+        "do_not_average_opposing_pairwise_labels_into_false_certainty",
+        "ask_if_budget_remains"
+      ]
+    },
+    {
+      "scenario_id": "HOLD-REJECT-001",
+      "split": "held_out",
+      "scenario_family": "wearer_rejects_all_eligible_options",
+      "synthetic_wearer_id": "wearer-holdout-g",
+      "task_id": "sit_to_stand",
+      "current_context": {
+        "terrain": "indoor_level",
+        "fatigue": "rested",
+        "payload_class": "standard",
+        "time_window": "current"
+      },
+      "eligible_candidate_ids": [
+        "flex",
+        "assist",
+        "stable"
+      ],
+      "query_budget_total": 0,
+      "queries_already_used": 0,
+      "preference_observations": [
+        {
+          "observation_id": "HOLD-REJECT-001-O1",
+          "step": 1,
+          "task_id": "sit_to_stand",
+          "context_id": "chair-rise-current",
+          "source": "explicit_synthetic_explicit_rejection",
+          "rejected_candidate_ids": [
+            "flex",
+            "assist",
+            "stable"
+          ]
+        }
+      ],
+      "evaluation_oracle": {
+        "visibility": "evaluation_only_never_policy_input",
+        "status": "reject_all",
+        "context_id": "chair-rise-current",
+        "preferred_order": [],
+        "acceptable_candidate_ids": []
+      },
+      "expected_guardrails": [
+        "do_not_force_a_recommendation",
+        "abstain_when_all_options_rejected",
+        "query_budget_must_not_be_exceeded"
+      ]
+    },
+    {
+      "scenario_id": "HOLD-BUDGET-001",
+      "split": "held_out",
+      "scenario_family": "preference_query_budget_exhaustion",
+      "synthetic_wearer_id": "wearer-holdout-h",
+      "task_id": "slope_transition",
+      "current_context": {
+        "terrain": "slope",
+        "fatigue": "unknown",
+        "payload_class": "standard",
+        "time_window": "current"
+      },
+      "eligible_candidate_ids": [
+        "flex",
+        "assist",
+        "stable"
+      ],
+      "query_budget_total": 1,
+      "queries_already_used": 1,
+      "preference_observations": [
+        {
+          "observation_id": "HOLD-BUDGET-001-O1",
+          "step": 0,
+          "task_id": "overground_walk",
+          "context_id": "level-walking",
+          "source": "explicit_synthetic_ordinal_feedback",
+          "preferred_candidate_id": "flex",
+          "rejected_candidate_id": "assist"
+        }
+      ],
+      "evaluation_oracle": {
+        "visibility": "evaluation_only_never_policy_input",
+        "status": "ranking",
+        "context_id": "slope-current",
+        "preferred_order": [
+          "stable",
+          "assist",
+          "flex"
+        ],
+        "acceptable_candidate_ids": [
+          "stable",
+          "assist"
+        ]
+      },
+      "expected_guardrails": [
+        "no_extra_query",
+        "abstain_when_context_specific_evidence_is_absent",
+        "report_budget_exhaustion_separately_from_model_error"
+      ]
+    },
+    {
+      "scenario_id": "HOLD-NOISE-001",
+      "split": "held_out",
+      "scenario_family": "noisy_ordinal_feedback",
+      "synthetic_wearer_id": "wearer-holdout-i",
+      "task_id": "overground_walk",
+      "current_context": {
+        "terrain": "level",
+        "fatigue": "rested",
+        "payload_class": "standard",
+        "time_window": "current"
+      },
+      "eligible_candidate_ids": [
+        "flex",
+        "assist",
+        "stable"
+      ],
+      "query_budget_total": 1,
+      "queries_already_used": 0,
+      "preference_observations": [
+        {
+          "observation_id": "HOLD-NOISE-001-O1",
+          "step": 1,
+          "task_id": "overground_walk",
+          "context_id": "level-rested-current",
+          "source": "explicit_synthetic_ordinal_feedback",
+          "preferred_candidate_id": "stable",
+          "rejected_candidate_id": "flex"
+        },
+        {
+          "observation_id": "HOLD-NOISE-001-O2",
+          "step": 2,
+          "task_id": "overground_walk",
+          "context_id": "level-rested-current",
+          "source": "explicit_synthetic_ordinal_feedback",
+          "preferred_candidate_id": "flex",
+          "rejected_candidate_id": "stable"
+        },
+        {
+          "observation_id": "HOLD-NOISE-001-O3",
+          "step": 3,
+          "task_id": "overground_walk",
+          "context_id": "level-rested-current",
+          "source": "explicit_synthetic_ordinal_feedback",
+          "preferred_candidate_id": "stable",
+          "rejected_candidate_id": "flex"
+        }
+      ],
+      "evaluation_oracle": {
+        "visibility": "evaluation_only_never_policy_input",
+        "status": "ranking",
+        "context_id": "level-rested-current",
+        "preferred_order": [
+          "stable",
+          "flex",
+          "assist"
+        ],
+        "acceptable_candidate_ids": [
+          "stable",
+          "flex"
+        ]
+      },
+      "expected_guardrails": [
+        "expose_feedback_disagreement",
+        "calibrate_or_lower_confidence",
+        "do_not_treat_majority_vote_as_a_calibrated_probability"
+      ]
+    },
+    {
+      "scenario_id": "HOLD-ENGINEERING-001",
+      "split": "held_out",
+      "scenario_family": "explicit_preference_disagrees_with_engineering_rank",
+      "synthetic_wearer_id": "wearer-holdout-j",
+      "task_id": "overground_walk",
+      "current_context": {
+        "terrain": "level",
+        "fatigue": "rested",
+        "payload_class": "standard",
+        "time_window": "current"
+      },
+      "eligible_candidate_ids": [
+        "flex",
+        "assist",
+        "stable"
+      ],
+      "query_budget_total": 1,
+      "queries_already_used": 0,
+      "preference_observations": [
+        {
+          "observation_id": "HOLD-ENGINEERING-001-O1",
+          "step": 1,
+          "task_id": "overground_walk",
+          "context_id": "level-rested-current",
+          "source": "explicit_synthetic_ordinal_feedback",
+          "preferred_candidate_id": "flex",
+          "rejected_candidate_id": "assist"
+        },
+        {
+          "observation_id": "HOLD-ENGINEERING-001-O2",
+          "step": 2,
+          "task_id": "overground_walk",
+          "context_id": "level-rested-current",
+          "source": "explicit_synthetic_ordinal_feedback",
+          "preferred_candidate_id": "flex",
+          "rejected_candidate_id": "stable"
+        }
+      ],
+      "evaluation_oracle": {
+        "visibility": "evaluation_only_never_policy_input",
+        "status": "ranking",
+        "context_id": "level-rested-current",
+        "preferred_order": [
+          "flex",
+          "stable",
+          "assist"
+        ],
+        "acceptable_candidate_ids": [
+          "flex"
+        ]
+      },
+      "expected_guardrails": [
+        "preference_evidence_beats_inferred_preference_from_metric_proxy",
+        "keep_engineering_merit_and_subjective_preference_separate"
+      ]
+    }
+  ]
+}
