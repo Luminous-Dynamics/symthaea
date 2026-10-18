@@ -203,12 +203,17 @@ fn validate_contract(manifest_text: &str, schema_text: &str) -> Vec<String> {
                     !value.starts_with("https://github.com/Luminous-Dynamics/symthaea/issues/")
                 })
             {
-                errors.push(format!("stage {stage_id} lacks a canonical process-semantics owner"));
+                errors.push(format!(
+                    "stage {stage_id} lacks a canonical process-semantics owner"
+                ));
             }
         }
 
         for stage in stages {
-            let stage_id = stage.get("stage_id").and_then(Value::as_str).unwrap_or("<missing>");
+            let stage_id = stage
+                .get("stage_id")
+                .and_then(Value::as_str)
+                .unwrap_or("<missing>");
             let current_sequence = stage.get("sequence").and_then(Value::as_u64).unwrap_or(0);
             let Some(groups) = stage.get("predecessor_groups").and_then(Value::as_array) else {
                 errors.push(format!("stage {stage_id} has no predecessor_groups array"));
@@ -303,8 +308,7 @@ fn rejects_promoted_component_status_and_unresolved_component_source() {
     let promoted_text = serde_json::to_string(&promoted).expect("promoted fixture serializes");
     assert!(!validate_contract(&promoted_text, SCHEMA_TEXT).is_empty());
 
-    let mut unresolved: Value =
-        serde_json::from_str(MANIFEST_TEXT).expect("fixture manifest JSON");
+    let mut unresolved: Value = serde_json::from_str(MANIFEST_TEXT).expect("fixture manifest JSON");
     unresolved["routes"][0]["component_interfaces"][0]["reference_source_ids"][0] =
         Value::String("SRC-NOT-DEFINED".to_owned());
     let unresolved_text =
