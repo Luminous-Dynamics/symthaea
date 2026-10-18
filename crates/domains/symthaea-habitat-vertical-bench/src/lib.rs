@@ -92,9 +92,13 @@ pub fn validate_fixture(root: &Value) -> ValidationReport {
     validate_unique_ids(root, "disruptions", "id", &mut issues);
     validate_unique_ids(root, "negative_controls", "case_id", &mut issues);
     validate_unique_ids(root, "hypothetical_factory.zones", "zone_id", &mut issues);
+    validate_unique_ids(root, "traceability_nodes", "node_id", &mut issues);
+    validate_unique_ids(root, "traceability_edges", "edge_id", &mut issues);
+    validate_unique_ids(root, "expected_containment_queries", "source_lot_id", &mut issues);
 
     validate_supplier_lot_references(root, &mut issues);
     validate_resources_and_process_graph(root, &mut issues);
+    validate_traceability_graph(root, &mut issues);
     validate_final_inspection_gate(root, &mut issues);
     validate_negative_controls(root, &mut issues);
     validate_disruptions(root, &mut issues);
@@ -236,6 +240,331 @@ fn string_list(item: &Value, field: &str) -> Option<Vec<String>> {
         .iter()
         .map(|value| value.as_str().map(ToOwned::to_owned))
         .collect()
+}
+
+/// Return all directed descendants of a lot in stable lexical order.
+///
+/// The result is a synthetic graph query, not proof that a physical operation
+/// occurred or that an affected unit has been measured or quarantined.
+pub fn traceability_descendants(
+    root: &Value,
+    source_lot_id: &str,
+) -> Result<Vec<String>, String> {
+    let nodes = root
+        .get("traceability_nodes")
+        .and_then(Value::as_array)
+        .ok_or_else(|| "traceability_nodes must be an array".to_owned())?;
+    let edges = root
+        .get("traceability_edges")
+        .and_then(Value::as_array)
+        .ok_or_else(|| "traceability_edges must be an array".to_owned())?;
+
+    let mut index_by_id: HashMap<String, usize> = HashMap::new();
+    let mut node_ids = Vec::with_capacity(nodes.len());
+    for (index, node) in nodes.iter().enumerate() {
+        let id = node
+            .get("node_id")
+            .and_then(Value::as_str)
+            .filter(|id| !id.trim().is_empty())
+            .ok_or_else(|| format!("traceability node {index} has no valid node_id"))?;
+        if index_by_id.insert(id.to_owned(), index).is_some() {
+            return Err(format!("duplicate traceability node id {id:?}"));
+        }
+        node_ids.push(id.to_owned());
+    }
+
+    let mut graph = Graph::new(nodes.len(), true);
+    for (index, edge) in edges.iter().enumerate() {
+        let from_id = edge
+            .get("from_id")
+            .and_then(Value::as_str)
+            .ok_or_else(|| format!("traceability edge {index} has no from_id"))?;
+        let to_id = edge
+            .get("to_id")
+            .and_then(Value::as_str)
+            .ok_or_else(|| format!("traceability edge {index} has no to_id"))?;
+        if edge
+            .get("relation")
+            .and_then(Value::as_str)
+            .is_none_or(str::is_empty)
+        {
+            return Err(format!("traceability edge {index} has no relation"));
+        }
+        let from = index_by_id
+            .get(from_id)
+            .copied()
+            .ok_or_else(|| format!("traceability edge {index} has unknown source {from_id:?}"))?;
+        let to = index_by_id
+            .get(to_id)
+            .copied()
+            .ok_or_else(|| format!("traceability edge {index} has unknown target {to_id:?}"))?;
+        graph.add_edge(from, to);
+    }
+
+    if graph.has_directed_cycle() {
+        return Err("traceability graph contains a directed cycle".to_owned());
+    }
+    let source = index_by_id
+        .get(source_lot_id)
+        .copied()
+        .ok_or_else(|| format!("source lot {source_lot_id:?} is not a traceability node"))?;
+
+    let mut descendants: Vec<String> = graph
+        .bfs(source)
+        .into_iter()
+        .filter(|&index| index != source)
+        .map(|index| node_ids[index].clone())
+        .collect();
+    descendants.sort_unstable();
+    Ok(descendants)
+}
+
+fn validate_traceability_graph(root: &Value, issues: &mut Vec<ValidationIssue>) {
+    let Some(nodes) = root.get("traceability_nodes").and_then(Value::as_array) else {
+        push(
+            issues,
+            "TRACEABILITY_NODES_MISSING",
+            "traceability_nodes",
+            "an explicit traceability node array is required",
+        );
+        return;
+    };
+    let Some(edges) = root.get("traceability_edges").and_then(Value::as_array) else {
+        push(
+            issues,
+            "TRACEABILITY_EDGES_MISSING",
+            "traceability_edges",
+            "an explicit traceability edge array is required",
+        );
+        return;
+    };
+    if nodes.is_empty() {
+        push(
+            issues,
+            "TRACEABILITY_NODES_EMPTY",
+            "traceability_nodes",
+            "traceability graph must contain nodes",
+        );
+        return;
+    }
+
+    let mut node_kind_by_id: HashMap<&str, &str> = HashMap::new();
+    for node in nodes {
+        if let (Some(id), Some(kind)) = (
+            node.get("node_id").and_then(Value::as_str),
+            node.get("node_kind").and_then(Value::as_str),
+        ) {
+            node_kind_by_id.insert(id, kind);
+        } else {
+            push(
+                issues,
+                "TRACEABILITY_NODE_INCOMPLETE",
+                "traceability_nodes",
+                "each node requires string node_id and node_kind",
+            );
+        }
+    }
+
+    if let Some(lots) = root.get("synthetic_material_lots").and_then(Value::as_array) {
+        for lot in lots {
+            let Some(id) = lot.get("lot_id").and_then(Value::as_str) else {
+                continue;
+            };
+            if node_kind_by_id.get(id).copied() != Some("material_lot") {
+                push(
+                    issues,
+                    "LOT_MISSING_TRACEABILITY_NODE",
+                    format!("synthetic_material_lots[{id}].lot_id"),
+                    "every declared material lot must have a material_lot node",
+                );
+            }
+        }
+    }
+    if let Some(operations) = root.get("synthetic_process_graph").and_then(Value::as_array) {
+        for operation in operations {
+            let Some(id) = operation.get("operation_id").and_then(Value::as_str) else {
+                continue;
+            };
+            if node_kind_by_id.get(id).copied() != Some("process_operation") {
+                push(
+                    issues,
+                    "OPERATION_MISSING_TRACEABILITY_NODE",
+                    format!("synthetic_process_graph[{id}].operation_id"),
+                    "every declared process operation must have a process_operation node",
+                );
+            }
+        }
+    }
+
+    let node_ids: HashSet<&str> = node_kind_by_id.keys().copied().collect();
+    for (index, edge) in edges.iter().enumerate() {
+        for field in ["from_id", "to_id"] {
+            match edge.get(field).and_then(Value::as_str) {
+                Some(id) if node_ids.contains(id) => {}
+                Some(id) => push(
+                    issues,
+                    "TRACEABILITY_EDGE_UNKNOWN_NODE",
+                    format!("traceability_edges[{index}].{field}"),
+                    format!("edge references undeclared node {id:?}"),
+                ),
+                None => push(
+                    issues,
+                    "TRACEABILITY_EDGE_ENDPOINT_MISSING",
+                    format!("traceability_edges[{index}].{field}"),
+                    "edge endpoint must be a string node_id",
+                ),
+            }
+        }
+        if edge
+            .get("relation")
+            .and_then(Value::as_str)
+            .is_none_or(str::is_empty)
+        {
+            push(
+                issues,
+                "TRACEABILITY_EDGE_RELATION_MISSING",
+                format!("traceability_edges[{index}].relation"),
+                "each traceability edge must declare a relation",
+            );
+        }
+    }
+
+    let known_lots = id_set(root, "synthetic_material_lots", "lot_id");
+    let Some(queries) = root
+        .get("expected_containment_queries")
+        .and_then(Value::as_array)
+    else {
+        push(
+            issues,
+            "CONTAINMENT_QUERIES_MISSING",
+            "expected_containment_queries",
+            "known-answer lot-containment queries are required",
+        );
+        return;
+    };
+    if queries.is_empty() {
+        push(
+            issues,
+            "CONTAINMENT_QUERIES_EMPTY",
+            "expected_containment_queries",
+            "at least one known-answer containment query is required",
+        );
+        return;
+    }
+
+    // Validate the whole graph once before comparing its known-answer queries.
+    let probe = nodes[0]
+        .get("node_id")
+        .and_then(Value::as_str)
+        .unwrap_or("");
+    if let Err(error) = traceability_descendants(root, probe) {
+        push(
+            issues,
+            "TRACEABILITY_GRAPH_INVALID",
+            "traceability_edges",
+            error,
+        );
+        return;
+    }
+
+    for (index, query) in queries.iter().enumerate() {
+        let prefix = format!("expected_containment_queries[{index}]");
+        let Some(source_lot_id) = query.get("source_lot_id").and_then(Value::as_str) else {
+            push(
+                issues,
+                "CONTAINMENT_SOURCE_MISSING",
+                format!("{prefix}.source_lot_id"),
+                "query source_lot_id must be a string",
+            );
+            continue;
+        };
+        if !known_lots.contains(source_lot_id) {
+            push(
+                issues,
+                "CONTAINMENT_SOURCE_UNKNOWN",
+                format!("{prefix}.source_lot_id"),
+                format!("source lot {source_lot_id:?} is not declared"),
+            );
+            continue;
+        }
+        if node_kind_by_id.get(source_lot_id).copied() != Some("material_lot") {
+            push(
+                issues,
+                "CONTAINMENT_SOURCE_NOT_LOT",
+                format!("{prefix}.source_lot_id"),
+                "containment query must begin at a material_lot node",
+            );
+            continue;
+        }
+
+        let Some(expected_values) = query.get("expected_descendants").and_then(Value::as_array)
+        else {
+            push(
+                issues,
+                "CONTAINMENT_EXPECTED_DESCENDANTS_MISSING",
+                format!("{prefix}.expected_descendants"),
+                "expected_descendants must be an array of node ids",
+            );
+            continue;
+        };
+        let mut expected = Vec::with_capacity(expected_values.len());
+        let mut valid_expected = true;
+        let mut seen = HashSet::new();
+        for (desc_index, value) in expected_values.iter().enumerate() {
+            match value.as_str() {
+                Some(id) if node_ids.contains(id) => {
+                    if id == source_lot_id || !seen.insert(id.to_owned()) {
+                        push(
+                            issues,
+                            "CONTAINMENT_EXPECTED_SET_INVALID",
+                            format!("{prefix}.expected_descendants[{desc_index}]"),
+                            "expected set must exclude its source and contain unique node ids",
+                        );
+                        valid_expected = false;
+                    }
+                    expected.push(id.to_owned());
+                }
+                Some(id) => {
+                    push(
+                        issues,
+                        "CONTAINMENT_EXPECTED_NODE_UNKNOWN",
+                        format!("{prefix}.expected_descendants[{desc_index}]"),
+                        format!("expected descendant {id:?} is not declared"),
+                    );
+                    valid_expected = false;
+                }
+                None => {
+                    push(
+                        issues,
+                        "CONTAINMENT_EXPECTED_NODE_INVALID",
+                        format!("{prefix}.expected_descendants[{desc_index}]"),
+                        "expected descendant must be a string node_id",
+                    );
+                    valid_expected = false;
+                }
+            }
+        }
+        if !valid_expected {
+            continue;
+        }
+        expected.sort_unstable();
+
+        match traceability_descendants(root, source_lot_id) {
+            Ok(actual) if actual == expected => {}
+            Ok(actual) => push(
+                issues,
+                "CONTAINMENT_KNOWN_ANSWER_MISMATCH",
+                format!("{prefix}.expected_descendants"),
+                format!("expected {} descendants, computed {}", expected.len(), actual.len()),
+            ),
+            Err(error) => push(
+                issues,
+                "CONTAINMENT_QUERY_NOT_EVALUABLE",
+                format!("{prefix}.source_lot_id"),
+                error,
+            ),
+        }
+    }
 }
 
 fn validate_synthetic_claim_boundary(root: &Value, issues: &mut Vec<ValidationIssue>) {
@@ -855,6 +1184,72 @@ mod tests {
         assert!(has_code(
             &validate_fixture(&value),
             "VERIFICATION_STATUS_CONTRADICTION"
+        ));
+    }
+
+    #[test]
+    fn traceability_containment_known_answers_match() {
+        let value = fixture();
+        let report = validate_fixture(&value);
+        assert!(report.is_valid(), "unexpected findings: {:#?}", report.issues);
+
+        let descendants = traceability_descendants(&value, "SYN-LOT-FABRIC-001").unwrap();
+        assert!(descendants.contains(&"SYN-UNIT-PACKED-A".to_owned()));
+        assert!(descendants.contains(&"SYN-UNIT-PACKED-B".to_owned()));
+        assert!(!descendants.contains(&"SYN-UNIT-PACKED-CONTROL".to_owned()));
+    }
+
+    #[test]
+    fn unrelated_lot_does_not_recall_household_product_units() {
+        let value = fixture();
+        let descendants =
+            traceability_descendants(&value, "SYN-LOT-UNRELATED-099").unwrap();
+        assert_eq!(
+            descendants,
+            vec![
+                "SYN-UNRELATED-ARTICLE-CONTROL".to_owned(),
+                "SYN-UNRELATED-ASSEMBLY-CONTROL".to_owned(),
+                "SYN-UNRELATED-PACKED-CONTROL".to_owned(),
+            ]
+        );
+    }
+
+    #[test]
+    fn unknown_traceability_endpoint_is_blocked() {
+        let mut value = fixture();
+        value["traceability_edges"][0]["to_id"] =
+            serde_json::json!("SYN-UNDECLARED-NODE");
+        assert!(has_code(
+            &validate_fixture(&value),
+            "TRACEABILITY_EDGE_UNKNOWN_NODE"
+        ));
+    }
+
+    #[test]
+    fn traceability_cycle_is_blocked() {
+        let mut value = fixture();
+        value["traceability_edges"].as_array_mut().unwrap().push(serde_json::json!({
+            "edge_id": "TR-CYCLE-CONTROL",
+            "from_id": "SYN-UNIT-PACKED-A",
+            "to_id": "SYN-LOT-FABRIC-001",
+            "relation": "invalid_cycle_control"
+        }));
+        assert!(has_code(
+            &validate_fixture(&value),
+            "TRACEABILITY_GRAPH_INVALID"
+        ));
+    }
+
+    #[test]
+    fn omitted_expected_containment_descendant_is_blocked() {
+        let mut value = fixture();
+        value["expected_containment_queries"][0]["expected_descendants"]
+            .as_array_mut()
+            .unwrap()
+            .pop();
+        assert!(has_code(
+            &validate_fixture(&value),
+            "CONTAINMENT_KNOWN_ANSWER_MISMATCH"
         ));
     }
 
