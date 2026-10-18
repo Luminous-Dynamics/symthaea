@@ -219,8 +219,16 @@ impl ValueOfInformationScenario {
             return Err(ValueOfInformationError::PriorProbabilitiesDoNotSumTo10000);
         }
 
-        let state_ids = self.states.iter().map(|state| state.id.as_str()).collect::<std::collections::BTreeSet<_>>();
-        let action_ids = self.action_ids.iter().map(String::as_str).collect::<std::collections::BTreeSet<_>>();
+        let state_ids = self
+            .states
+            .iter()
+            .map(|state| state.id.as_str())
+            .collect::<std::collections::BTreeSet<_>>();
+        let action_ids = self
+            .action_ids
+            .iter()
+            .map(String::as_str)
+            .collect::<std::collections::BTreeSet<_>>();
         let mut likelihood_keys = std::collections::BTreeSet::new();
         let mut likelihood_sums = self
             .states
