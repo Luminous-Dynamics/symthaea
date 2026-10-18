@@ -13,6 +13,7 @@
 
 pub mod aging;
 pub mod capacitor_device;
+pub mod capacitor_identification;
 pub mod capacitor_spectrum;
 pub mod capacitor_magnitude_esr;
 pub mod compound_stability;
@@ -24,6 +25,12 @@ pub mod properties;
 pub mod strategic;
 
 pub use aging::{AGING_HORIZON_LABELS, AGING_HORIZONS, AgingPrediction, MaterialAgingModel};
+pub use capacitor_identification::{
+    assess_capacitor_identification, CapacitorIdentificationDisposition,
+    CapacitorIdentificationError, CapacitorIdentificationLimitation,
+    CapacitorIdentificationReport, CapacitorIdentificationRequirements,
+    CapacitorPhasorCampaign, CapacitorPhasorObservation,
+};
 pub use capacitor_device::{
     CapacitorDeviceConstraintViolation, CapacitorDeviceEvidenceKind, CapacitorDeviceMetrics,
     CapacitorDeviceModelError, CapacitorDeviceScreeningDisposition,
