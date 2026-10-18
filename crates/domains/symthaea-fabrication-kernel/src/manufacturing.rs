@@ -256,6 +256,7 @@ pub struct ManufacturingOutput {
     pub safety_level: ManufacturingSafetyLevel,
     pub prediction_similarities: Vec<(f32, f32)>,
     /// True only after an explicit reference has been installed.
+    #[serde(default)]
     pub reference_calibrated: bool,
 }
 
