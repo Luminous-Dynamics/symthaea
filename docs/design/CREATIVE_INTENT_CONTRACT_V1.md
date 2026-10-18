@@ -81,7 +81,7 @@ The separate module `src/creative_temporal_support.rs` addresses a known blind s
 
 This separates a single sustained drone from a sequence of staccato attacks that happens to touch every window. Notes are fully validated; note tails crossing the declared clip end are clipped only for these measurements. Empty scores are representable and report zero occupancy with the full clip duration as silence. Excessive window counts fail before allocation.
 
-The measurements are descriptive and are **not** currently used to accept/reject V1 candidates, rank outputs, or modify production selection. They should become QD dimensions only after calibration against human judgments. The tests cover long sustain, short attacks, interval union, clip-edge clipping, malformed notes, empty scores, window limits, note-order invariance, and duplicate-note invariance.
+The measurements are descriptive and are **not** currently used to accept/reject V1 candidates, rank outputs, or modify production selection. They should become QD dimensions only after calibration against human judgments. This feature is descriptive only, not yet used for archive bins or candidate ranking. It measures symbolic note timing/velocity validity rather than inspecting rendered audio energy; a later audio-level benchmark must reject empty or near-silent renderings and bind those measurements to the exact renderer, instrument/sample-bank identity, and output digest. The tests cover long sustain, short attacks, interval union, clip-edge clipping, malformed notes, empty scores, window limits, note-order invariance, and duplicate-note invariance.
 
 ## Research basis
 
