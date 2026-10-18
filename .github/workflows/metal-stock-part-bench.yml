@@ -53,8 +53,8 @@ jobs:
             --source-commit "$source_commit" > metal-stock-part-receipt.json
           jq -e '
             .result == "validated"
-            and .scenario_count == 20
-            and .expected_controls_matched == 20
+            and .scenario_count == 24
+            and .expected_controls_matched == 24
             and (.corpus_sha256 | test("^[0-9a-f]{64}$"))
             and (.source_commit | test("^[0-9a-f]{40}$"))
             and ([.scenarios[].scenario_id] == [
@@ -77,7 +77,11 @@ jobs:
               "SYNTHETIC_VALID_REPAIR_REMANUFACTURE",
               "SYNTHETIC_REPAIR_SCOPE_MISSING",
               "SYNTHETIC_INSPECTION_RECORD_MISSING",
-              "SYNTHETIC_FEEDSTOCK_KIND_UNKNOWN"
+              "SYNTHETIC_FEEDSTOCK_KIND_UNKNOWN",
+              "SYNTHETIC_CURRENT_CALIBRATION_WITHOUT_RECORD",
+              "SYNTHETIC_MEASUREMENT_UNCERTAINTY_MISSING",
+              "SYNTHETIC_UNCERTAINTY_EXCEEDS_TOLERANCE_MARGIN",
+              "SYNTHETIC_REQUIRED_OPERATION_NOT_PLANNED_BUT_EXECUTED"
             ])
             and ([.scenarios[].actual_disposition] == [
               "pass", "reject", "reject", "reject", "reject",
