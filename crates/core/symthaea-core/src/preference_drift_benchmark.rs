@@ -11,7 +11,7 @@ use std::collections::{HashMap, HashSet};
 use serde_json::Value;
 
 /// Supported version of the preference-drift fixture contract.
-pub const PREFERENCE_DRIFT_FIXTURE_SCHEMA_VERSION_V1: u64 = 1;
+pub const PREFERENCE_DRIFT_FIXTURE_SCHEMA_VERSION_V2: u64 = 2;
 
 /// Counts from a validated fixture. Counts are bookkeeping, not model-performance metrics.
 #[derive(Debug, Clone, PartialEq, Eq)]
@@ -121,13 +121,13 @@ pub fn validate_preference_drift_fixture(
 
     let mut findings = Vec::new();
     let schema_version = root.get("schema_version").and_then(Value::as_u64);
-    if schema_version != Some(PREFERENCE_DRIFT_FIXTURE_SCHEMA_VERSION_V1) {
+    if schema_version != Some(PREFERENCE_DRIFT_FIXTURE_SCHEMA_VERSION_V2) {
         finding(
             &mut findings,
             "$.schema_version",
             format!(
                 "unsupported or missing schema version; expected {}",
-                PREFERENCE_DRIFT_FIXTURE_SCHEMA_VERSION_V1
+                PREFERENCE_DRIFT_FIXTURE_SCHEMA_VERSION_V2
             ),
         );
     }
@@ -308,6 +308,25 @@ pub fn validate_preference_drift_fixture(
             );
         }
 
+        let current_step = scenario.get("current_step").and_then(Value::as_u64);
+        let max_age_steps = scenario
+            .get("preference_max_age_steps")
+            .and_then(Value::as_u64);
+        if current_step.is_none() {
+            finding(
+                &mut findings,
+                format!("{path}.current_step"),
+                "current step must be an unsigned integer",
+            );
+        }
+        if max_age_steps.is_none() {
+            finding(
+                &mut findings,
+                format!("{path}.preference_max_age_steps"),
+                "preference freshness horizon must be an unsigned integer",
+            );
+        }
+
         let split = scenario.get("split").and_then(Value::as_str);
         match split {
             Some("development") => development_count += 1,
@@ -437,7 +456,8 @@ pub fn validate_preference_drift_fixture(
                     "preference must be an explicit synthetic feedback record",
                 );
             }
-            if observation.get("step").and_then(Value::as_u64).is_none()
+            let observation_step = observation.get("step").and_then(Value::as_u64);
+            if observation_step.is_none()
                 || nonempty_string(observation, "task_id").is_none()
                 || nonempty_string(observation, "context_id").is_none()
             {
@@ -446,6 +466,15 @@ pub fn validate_preference_drift_fixture(
                     &observation_path,
                     "observation requires non-negative step, task ID, and context ID",
                 );
+            }
+            if let (Some(step), Some(now)) = (observation_step, current_step) {
+                if step > now {
+                    finding(
+                        &mut findings,
+                        format!("{observation_path}.step"),
+                        "observation step is later than current_step",
+                    );
+                }
             }
 
             let preferred = nonempty_string(observation, "preferred_candidate_id");
@@ -675,6 +704,8 @@ pub enum PreferenceReplayReasonV1 {
     NoEligibleCandidates,
     /// No observations match both the current task and current context.
     NoContextMatchedPreferenceEvidence,
+    /// Matching-task observations exist, but all usable preference evidence has expired.
+    ExpiredPreferenceEvidence,
     /// Observations exist, but the evidence does not compare a unique winner to every eligible option.
     InsufficientPairwiseCoverage,
     /// Current-context feedback contains both directions for the same pair.
@@ -701,21 +732,24 @@ pub struct PreferenceReplayAssessmentV1 {
     pub eligible_candidate_ids: Vec<String>,
     /// Number of observations this baseline actually used for its decision.
     pub used_observation_count: usize,
-    /// Number of observations matching both exact current task and context, regardless of baseline.
+    /// Number of observations matching both exact current task and context, regardless of age.
     pub context_matched_observation_count: usize,
+    /// Number of observations excluded because they exceed the explicit freshness horizon.
+    pub expired_preference_observation_count: usize,
     /// Number of observations not applicable to the current task/context.
     pub stale_or_mismatched_observation_count: usize,
     /// Additional explicit feedback queries still allowed in this scenario.
     pub remaining_query_budget: u64,
 }
 
-/// Replay a conservative baseline using explicit, context-matched ordinal observations only.
+/// Replay a conservative baseline using fresh, explicit, context-matched ordinal observations.
 ///
 /// This is not a learned preference model. It recommends only when a single eligible candidate
-/// has explicit pairwise support against every other eligible candidate. Contradictory feedback,
-/// missing comparisons, context/task drift, and absent observations yield a query if permitted,
-/// otherwise abstention. A current-context reject-all record is preserved. The function does not
-/// inspect the evaluation-only oracle or infer preferences from engineering metrics.
+/// has fresh pairwise support against every other eligible candidate. Contradictory feedback,
+/// expired observations, missing comparisons, context/task drift, and absent observations yield
+/// a query if permitted, otherwise abstention. A fresh current-context reject-all record is
+/// preserved. The function does not inspect the evaluation-only oracle or infer preferences
+/// from engineering metrics.
 pub fn replay_preference_episode(
     scenario: &Value,
 ) -> Result<PreferenceReplayAssessmentV1, Vec<PreferenceDriftFixtureFindingV1>> {
@@ -789,8 +823,24 @@ fn replay_preference_episode_with_context_mode(
 
     let task_id = task_id.unwrap_or_default();
     let current_context_id = current_context_id.unwrap_or_default();
+    // Legacy single-episode callers may omit freshness fields; fixture v2 requires them.
+    let current_step = scenario
+        .get("current_step")
+        .and_then(Value::as_u64)
+        .unwrap_or_else(|| {
+            observations
+                .iter()
+                .filter_map(|observation| observation.get("step").and_then(Value::as_u64))
+                .max()
+                .unwrap_or_default()
+        });
+    let max_age_steps = scenario
+        .get("preference_max_age_steps")
+        .and_then(Value::as_u64)
+        .unwrap_or(u64::MAX);
     let mut matched = Vec::new();
     let mut context_matched_count = 0usize;
+    let mut expired_count = 0usize;
     let mut mismatched_count = 0usize;
 
     for observation in observations {
@@ -805,6 +855,21 @@ fn replay_preference_episode_with_context_mode(
             mismatched_count += 1;
         }
         if task_matches && (!require_context_match || context_matches) {
+            let observation_step = observation
+                .get("step")
+                .and_then(Value::as_u64)
+                .unwrap_or(current_step);
+            if observation_step > current_step {
+                return Err(vec![PreferenceDriftFixtureFindingV1 {
+                    path: "$.preference_observations.step".to_owned(),
+                    reason: "observation step is later than current_step".to_owned(),
+                }]);
+            }
+            let age_steps = current_step - observation_step;
+            if age_steps > max_age_steps {
+                expired_count += 1;
+                continue;
+            }
             matched.push(observation);
         }
     }
@@ -818,6 +883,7 @@ fn replay_preference_episode_with_context_mode(
         eligible_candidate_ids: eligible.clone(),
         used_observation_count: matched.len(),
         context_matched_observation_count: context_matched_count,
+        expired_preference_observation_count: expired_count,
         stale_or_mismatched_observation_count: mismatched_count,
         remaining_query_budget: remaining_budget,
     };
@@ -906,7 +972,9 @@ fn replay_preference_episode_with_context_mode(
         ));
     }
 
-    let reason = if matched.is_empty() {
+    let reason = if matched.is_empty() && expired_count > 0 {
+        PreferenceReplayReasonV1::ExpiredPreferenceEvidence
+    } else if matched.is_empty() {
         PreferenceReplayReasonV1::NoContextMatchedPreferenceEvidence
     } else {
         PreferenceReplayReasonV1::InsufficientPairwiseCoverage
@@ -1073,6 +1141,8 @@ pub fn replay_preference_fixture(
             "scenario_id": scenario.get("scenario_id"),
             "task_id": scenario.get("task_id"),
             "current_context_id": scenario.get("current_context_id"),
+            "current_step": scenario.get("current_step"),
+            "preference_max_age_steps": scenario.get("preference_max_age_steps"),
             "eligible_candidate_ids": scenario.get("eligible_candidate_ids"),
             "query_budget_total": scenario.get("query_budget_total"),
             "queries_already_used": scenario.get("queries_already_used"),
@@ -1159,8 +1229,8 @@ mod tests {
     fn batch_replay_emits_complete_deterministic_receipt() {
         let report = replay_preference_fixture(FIXTURE)
             .expect("checked-in fixture should replay");
-        assert_eq!(report.schema_version, 1);
-        assert_eq!(report.fixture_version, "0.1.0");
+        assert_eq!(report.schema_version, 2);
+        assert_eq!(report.fixture_version, "0.2.0");
         assert_eq!(report.candidate_count, 3);
         assert_eq!(report.scenario_count, 12);
         assert_eq!(report.development_scenario_count, 2);
@@ -1225,7 +1295,7 @@ mod tests {
     fn versioned_fixture_validates_and_reports_expected_counts() {
         let summary = validate_preference_drift_fixture(FIXTURE)
             .expect("the versioned fixture must satisfy its contract");
-        assert_eq!(summary.schema_version, 1);
+        assert_eq!(summary.schema_version, 2);
         assert_eq!(summary.candidate_count, 3);
         assert_eq!(summary.scenario_count, 12);
         assert_eq!(summary.development_scenario_count, 2);
@@ -1376,6 +1446,33 @@ mod tests {
         assert_eq!(report.recommended_candidate_id.as_deref(), Some("flex"));
         assert_eq!(report.context_matched_observation_count, 2);
         assert_eq!(report.stale_or_mismatched_observation_count, 0);
+    }
+
+    #[test]
+    fn same_context_feedback_expires_and_triggers_a_query() {
+        let fixture: Value = serde_json::from_str(FIXTURE).unwrap();
+        let mut scenario = scenario_by_id(&fixture, "DEV-WALK-001").clone();
+        scenario["current_step"] = serde_json::json!(10);
+        scenario["preference_max_age_steps"] = serde_json::json!(2);
+
+        let report = replay_preference_episode(&scenario).unwrap();
+        assert_eq!(report.action, PreferenceReplayActionV1::Query);
+        assert_eq!(report.reason, PreferenceReplayReasonV1::ExpiredPreferenceEvidence);
+        assert_eq!(report.recommended_candidate_id, None);
+        assert_eq!(report.used_observation_count, 0);
+        assert_eq!(report.context_matched_observation_count, 2);
+        assert_eq!(report.expired_preference_observation_count, 2);
+    }
+
+    #[test]
+    fn future_dated_feedback_is_rejected_by_fixture_contract() {
+        let mut value: Value = serde_json::from_str(FIXTURE).unwrap();
+        value["scenarios"][0]["preference_observations"][0]["step"] = serde_json::json!(99);
+        let findings = validate_preference_drift_fixture(&value.to_string()).unwrap_err();
+        assert!(findings.iter().any(|item| {
+            item.path == "$.scenarios[0].preference_observations[0].step"
+                && item.reason.contains("later than current_step")
+        }));
     }
 
     #[test]
