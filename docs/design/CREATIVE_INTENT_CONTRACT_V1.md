@@ -98,6 +98,12 @@ The measurements are descriptive and are **not** currently used to accept/reject
 
 ## Waveform-level integrity audit
 
+Run the standalone renderer/negative-control probe with:
+
+    cargo run -p symthaea-muse --example creative_audio_audit -- <source-revision-claim>
+
+The JSON receipt covers an actually rendered phrase, an empty-score render, a zero-velocity-note render, and a deliberately corrupted synthetic buffer. It includes explicit expected observations, per-case pass/fail, and a SHA-256 over the exact typed `AudioData` sample representation (this is not a hash of exported WAV bytes). The optional source revision is caller-supplied metadata, not an authenticated checkout identity.
+
 `src/creative_audio_audit.rs` audits the actual `AudioData` buffer after rendering, separately from note-level contracts. It reports normalized sample peak and RMS, per-channel DC offsets, non-finite and out-of-range sample counts, near-ceiling and near-zero sample ratios, active-window coverage, longest contiguous near-silent run, and an explicitly thresholded effectively-silent flag. The caller's thresholds are included in the config and are not presented as universal musical-audibility cutoffs.
 
 The first gate is intentionally narrow:
