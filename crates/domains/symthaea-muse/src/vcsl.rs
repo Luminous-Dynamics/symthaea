@@ -1469,7 +1469,7 @@ pub fn capability_inventory_with_provenance_options(
     };
 
     Ok(InstrumentCapabilityInventoryV1 {
-        schema_version: "muse-instrument-capability-inventory-v1",
+        schema_version: "muse-instrument-capability-inventory-v2",
         source_revision,
         instrument_count: instruments.len(),
         indexed_sample_content_hashing_enabled: hash_indexed_samples,
