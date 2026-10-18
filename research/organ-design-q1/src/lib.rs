@@ -155,6 +155,8 @@ pub struct EvidenceObservation {
 #[derive(Clone, Debug, PartialEq)]
 pub struct Candidate {
     pub id: String,
+    /// SHA-256 of the exact synthetic design/topology artifact for this candidate.
+    pub design_sha256: String,
     pub profile_id: String,
     pub data_split: DataSplit,
     pub metrics: Vec<Metric>,
@@ -173,6 +175,7 @@ pub enum CandidateRejectionReason {
     ProfileMismatch,
     SplitMismatch,
     ClaimCeilingExceeded,
+    InvalidDesignDigest,
     InvalidConfidence,
     MissingMetric(String),
     DuplicateMetric(String),
@@ -202,6 +205,7 @@ impl CandidateRejectionReason {
             Self::ProfileMismatch => "profile_mismatch",
             Self::SplitMismatch => "split_mismatch",
             Self::ClaimCeilingExceeded => "claim_ceiling_exceeded",
+            Self::InvalidDesignDigest => "invalid_design_digest",
             Self::InvalidConfidence => "invalid_confidence",
             Self::MissingMetric(_) => "missing_metric",
             Self::DuplicateMetric(_) => "duplicate_metric",
@@ -251,6 +255,7 @@ impl CandidateRejectionReason {
             Self::ProfileMismatch => "profile_id",
             Self::SplitMismatch => "data_split",
             Self::ClaimCeilingExceeded => "requested_claim_ceiling",
+            Self::InvalidDesignDigest => "design_sha256",
             Self::InvalidConfidence => "internal_confidence",
         }
     }
@@ -586,6 +591,9 @@ fn validate_candidate(
     if candidate.requested_claim_ceiling > profile.result_evidence_tier {
         reasons.push(CandidateRejectionReason::ClaimCeilingExceeded);
     }
+    if !is_sha256(&candidate.design_sha256) {
+        reasons.push(CandidateRejectionReason::InvalidDesignDigest);
+    }
     if candidate
         .internal_confidence
         .is_some_and(|value| !value.is_finite() || !(0.0..=1.0).contains(&value))
@@ -865,6 +873,7 @@ fn canonical_identity_material(
 
     for candidate in candidates {
         put(&mut out, "candidate_id", &candidate.id);
+        put(&mut out, "candidate_design_sha256", &candidate.design_sha256);
         put(&mut out, "candidate_profile_id", &candidate.profile_id);
         put(&mut out, "candidate_split", candidate.data_split.code());
         put(
@@ -1021,6 +1030,7 @@ fn put_record(out: &mut String, name: &str, fields: &[String]) {
 mod tests {
     use super::*;
     use serde_json::Value;
+    use sha2::{Digest, Sha256};
 
     const HOSTILE_CASES: &str = include_str!("../hostile-cases.v0.json");
     const HOSTILE_CASE_IDS: &[&str] = &[
@@ -1089,6 +1099,7 @@ mod tests {
     ) -> Candidate {
         Candidate {
             id: id.into(),
+            design_sha256: synthetic_design_digest(id),
             profile_id: "vascular-q1-synthetic-v0".into(),
             data_split: DataSplit::Training,
             metrics: vec![
@@ -1124,6 +1135,16 @@ mod tests {
             internal_confidence: Some(0.5),
             requested_claim_ceiling: EvidenceTier::SyntheticSimulation,
         }
+    }
+
+    fn synthetic_design_digest(id: &str) -> String {
+        // The test fixture treats this exact UTF-8 token as a synthetic design
+        // artifact; production callers must hash their actual serialized design.
+        let input = format!("synthetic-design-fixture:{id}");
+        Sha256::digest(input.as_bytes())
+            .iter()
+            .map(|byte| format!("{byte:02x}"))
+            .collect()
     }
 
     fn standard_candidates() -> Vec<Candidate> {
@@ -1379,6 +1400,19 @@ mod tests {
             evaluate_candidates(&p, &standard_candidates()),
             Err(RankingError::Q1MustRemainSyntheticOnly)
         );
+    }
+
+    #[test]
+    fn malformed_design_digest_fails_closed() {
+        let p = profile();
+        let mut candidates = standard_candidates();
+        candidates[2].design_sha256 = "not-a-sha256".into();
+        let receipt = evaluate_candidates(&p, &candidates).unwrap();
+        assert!(matches!(
+            decision(&receipt, "design-a"),
+            CandidateDecision::Rejected { reasons, .. }
+                if reasons.contains(&CandidateRejectionReason::InvalidDesignDigest)
+        ));
     }
 
     #[test]
