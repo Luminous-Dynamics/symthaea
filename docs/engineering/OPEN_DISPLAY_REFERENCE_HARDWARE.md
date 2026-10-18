@@ -169,13 +169,16 @@ After establishing a measured baseline, investigate either >=10% lower cost per 
 ## 9. Implementation sequence
 
 1. Validate manifest and schema; keep the platform `SPECIFICATION_ONLY`.
-2. Choose the actual monitor and available calibrated meter/instrument only after availability, interface, and datasheet/access review.
-3. Design an adjustable fixture around measured geometry; publish its native CAD and dimension checks.
-4. Freeze workload/procedure and verify deterministic stimulus identities.
-5. Capture baseline power, timing and optical results with uncertainty and raw artifact retention.
-6. Build an open carrier PCB only where the V0 instrument boundary shows a real need; avoid adding high-speed PHY circuitry just to make the PCB look more ambitious.
-7. After repeatability is established, progress to a specific documented panel/controller module and then a first open low-resolution pixel plane.
-8. Route process/yield evidence into the existing display manufacturing DAG and economics contract. Do not infer a production line from a bench test.
+2. Review existing designs before drawing new hardware: [Antmicro's triggerable 10×14 LED panel](https://github.com/antmicro/programmable-led-panel) is a plausible reference for synchronized camera/vision latency; [frameprobe](https://github.com/frameprobe/frameprobe) is a useful photodiode latency architecture reference. Neither replaces a calibrated monitor or photometric instrument, and neither should be redistributed until artifact-specific license scope and component availability are checked.
+3. Choose the actual monitor and available calibrated meter/instrument only after availability, interface, and datasheet/access review.
+4. Design an adjustable fixture around measured geometry; publish its native CAD and dimension checks.
+5. Freeze workload/procedure and verify deterministic stimulus identities.
+6. Capture baseline power, timing and optical results with uncertainty and raw artifact retention.
+7. Build an open carrier PCB only where the V0 instrument boundary shows a real need; avoid adding high-speed PHY circuitry just to make the PCB look more ambitious.
+8. After repeatability is established, progress to a specific documented panel/controller module and then a first open low-resolution pixel plane.
+9. Route process/yield evidence into the existing display manufacturing DAG and economics contract. Do not infer a production line from a bench test.
+
+The review shortlist, including the limitations of archived ColorHug2 hardware, the candidate PGenerator+ software, and power-measurement instrument requirements, is in [OPEN_DISPLAY_HARDWARE_REUSE_CANDIDATES.md](OPEN_DISPLAY_HARDWARE_REUSE_CANDIDATES.md).
 
 ## 10. Ownership
 
