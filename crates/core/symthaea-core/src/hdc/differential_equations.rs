@@ -11,7 +11,7 @@
 //! - **`solve_ivp`**: Initial value problem via classical 4th-order Runge-Kutta (RK4)
 //! - **`solve_bvp_shooting`**: Boundary value problem via shooting + Brent root-finding
 //! - **`heat_equation_1d`**: 1D heat equation via method of lines (explicit Euler)
-//! - **`wave_equation_1d`**: 1D wave equation via method of lines (leapfrog / Störmer-Verlet)
+//! - **`wave_equation_1d`** / **`try_wave_equation_1d`**: bounded 1D wave equation (leapfrog / Störmer-Verlet)
 //!
 //! ## Consciousness Coupling
 //!
@@ -139,6 +139,69 @@ pub struct PDEResult {
     /// HDC encoding of the final solution.
     pub encoding: BinaryHV,
 }
+
+/// Input, numerical-stability, or budget failure from the 1-D wave solver.
+#[derive(Debug, Clone, PartialEq)]
+pub enum WaveEquationError {
+    /// Initial displacement or velocity vector has the wrong dimension.
+    DimensionMismatch { expected: usize, actual: usize },
+    /// At least one interior grid point is required.
+    EmptyGrid,
+    /// Wave speed must be finite and strictly positive.
+    InvalidWaveSpeed,
+    /// Domain length must be finite and strictly positive.
+    InvalidLength,
+    /// Integration end time must be finite and non-negative.
+    InvalidEndTime,
+    /// Initial displacement contains a NaN or infinity.
+    NonFiniteInitialDisplacement { index: usize },
+    /// Initial velocity contains a NaN or infinity.
+    NonFiniteInitialVelocity { index: usize },
+    /// The requested grid or coefficients cannot produce a finite CFL step.
+    InvalidCflStep,
+    /// The stability-preserving step count exceeds the solver's explicit budget.
+    StabilityBudgetExceeded { required_steps: f64, max_steps: usize },
+    /// The actual Courant number exceeds the configured 0.9 margin.
+    UnstableTimestep { courant_number: f64 },
+    /// A numerical update produced a non-finite displacement component.
+    NonFiniteSolution { step: usize, index: usize },
+}
+
+impl std::fmt::Display for WaveEquationError {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        match self {
+            Self::DimensionMismatch { expected, actual } => write!(
+                f,
+                "wave initial vector length {actual} does not match grid size {expected}"
+            ),
+            Self::EmptyGrid => write!(f, "wave grid must contain at least one interior point"),
+            Self::InvalidWaveSpeed => write!(f, "wave speed must be finite and positive"),
+            Self::InvalidLength => write!(f, "wave domain length must be finite and positive"),
+            Self::InvalidEndTime => write!(f, "wave end time must be finite and non-negative"),
+            Self::NonFiniteInitialDisplacement { index } => {
+                write!(f, "initial displacement at index {index} is not finite")
+            }
+            Self::NonFiniteInitialVelocity { index } => {
+                write!(f, "initial velocity at index {index} is not finite")
+            }
+            Self::InvalidCflStep => write!(f, "no finite positive step satisfies the CFL contract"),
+            Self::StabilityBudgetExceeded { required_steps, max_steps } => write!(
+                f,
+                "wave solve requires {required_steps:.0} CFL-safe steps, exceeding budget {max_steps}"
+            ),
+            Self::UnstableTimestep { courant_number } => write!(
+                f,
+                "computed wave Courant number {courant_number:.6} exceeds 0.9"
+            ),
+            Self::NonFiniteSolution { step, index } => write!(
+                f,
+                "wave solve produced a non-finite displacement at step {step}, index {index}"
+            ),
+        }
+    }
+}
+
+impl std::error::Error for WaveEquationError {}
 
 /// Result of a 2D PDE solve.
 #[derive(Debug, Clone)]
@@ -395,27 +458,11 @@ impl DifferentialEquationsEngine {
 
     // ── PDE: 1-D Wave Equation ────────────────────────────────────────────
 
-    /// Solve the 1-D wave equation
+    /// Solve the 1-D wave equation using the historical infallible API.
     ///
-    /// ```text
-    /// ∂²u/∂t² = c² ∂²u/∂x²,   u(0,t) = u(L,t) = 0
-    /// u(x,0) = u0(x),   ∂u/∂t(x,0) = v0(x)
-    /// ```
-    ///
-    /// using the Method of Lines with a leapfrog (Störmer-Verlet) scheme,
-    /// which is 2nd-order in both time and space and energy-conserving.
-    ///
-    /// **Stability** (CFL condition): `c dt / dx ≤ 1`.  The engine enforces
-    /// this by capping `dt` to `0.9 * dx / c`.
-    ///
-    /// # Arguments
-    ///
-    /// * `c`      — wave speed (> 0)
-    /// * `length` — domain [0, length]
-    /// * `t_end`  — integration end time
-    /// * `n_x`    — number of interior spatial grid points
-    /// * `u0`     — initial displacement (len == n_x)
-    /// * `v0`     — initial velocity    (len == n_x)
+    /// Invalid inputs and a required CFL step count beyond MAX_STEPS panic
+    /// rather than silently clamping to a potentially unstable timestep.
+    /// Use try_wave_equation_1d when recoverable errors are needed.
     pub fn wave_equation_1d(
         c: f64,
         length: f64,
@@ -424,18 +471,84 @@ impl DifferentialEquationsEngine {
         u0: &[f64],
         v0: &[f64],
     ) -> PDEResult {
-        assert_eq!(u0.len(), n_x, "u0 length must equal n_x");
-        assert_eq!(v0.len(), n_x, "v0 length must equal n_x");
-        assert!(c > 0.0, "wave speed must be positive");
+        Self::try_wave_equation_1d(c, length, t_end, n_x, u0, v0)
+            .expect("wave_equation_1d rejected invalid input or CFL-budget overflow; use try_wave_equation_1d for recoverable errors")
+    }
 
-        let dx = length / (n_x + 1) as f64;
-        // CFL-safe time step
+    /// Fallible 1-D wave solver with an explicit CFL step budget.
+    ///
+    /// The implementation uses the leapfrog/Störmer-Verlet scheme. It chooses
+    /// a Courant number no greater than 0.9 and refuses if the necessary step
+    /// count exceeds MAX_STEPS. It never clamps the count to the budget.
+    pub fn try_wave_equation_1d(
+        c: f64,
+        length: f64,
+        t_end: f64,
+        n_x: usize,
+        u0: &[f64],
+        v0: &[f64],
+    ) -> Result<PDEResult, WaveEquationError> {
+        if u0.len() != n_x {
+            return Err(WaveEquationError::DimensionMismatch {
+                expected: n_x,
+                actual: u0.len(),
+            });
+        }
+        if v0.len() != n_x {
+            return Err(WaveEquationError::DimensionMismatch {
+                expected: n_x,
+                actual: v0.len(),
+            });
+        }
+        if n_x == 0 {
+            return Err(WaveEquationError::EmptyGrid);
+        }
+        if !c.is_finite() || c <= 0.0 {
+            return Err(WaveEquationError::InvalidWaveSpeed);
+        }
+        if !length.is_finite() || length <= 0.0 {
+            return Err(WaveEquationError::InvalidLength);
+        }
+        if !t_end.is_finite() || t_end < 0.0 {
+            return Err(WaveEquationError::InvalidEndTime);
+        }
+        if let Some(index) = u0.iter().position(|value| !value.is_finite()) {
+            return Err(WaveEquationError::NonFiniteInitialDisplacement { index });
+        }
+        if let Some(index) = v0.iter().position(|value| !value.is_finite()) {
+            return Err(WaveEquationError::NonFiniteInitialVelocity { index });
+        }
+
+        let intervals = n_x
+            .checked_add(1)
+            .ok_or(WaveEquationError::InvalidCflStep)?;
+        let dx = length / intervals as f64;
+        if !dx.is_finite() || dx <= 0.0 {
+            return Err(WaveEquationError::InvalidCflStep);
+        }
         let dt_max = 0.9 * dx / c;
-        let n_steps = ((t_end / dt_max).ceil() as usize).max(1).min(MAX_STEPS);
-        let dt = t_end / n_steps as f64;
-        let r = (c * dt / dx).powi(2);
+        if !dt_max.is_finite() || dt_max <= 0.0 {
+            return Err(WaveEquationError::InvalidCflStep);
+        }
+        let required_steps = (t_end / dt_max).ceil();
+        if !required_steps.is_finite() || required_steps < 0.0 {
+            return Err(WaveEquationError::InvalidCflStep);
+        }
+        if required_steps > MAX_STEPS as f64 {
+            return Err(WaveEquationError::StabilityBudgetExceeded {
+                required_steps,
+                max_steps: MAX_STEPS,
+            });
+        }
 
-        // Leapfrog: store u^{n-1}, u^n, then compute u^{n+1}
+        let n_steps = (required_steps as usize).max(1);
+        let dt = t_end / n_steps as f64;
+        let courant_number = c * dt / dx;
+        if !courant_number.is_finite() || courant_number > 0.9 + 1e-12 {
+            return Err(WaveEquationError::UnstableTimestep { courant_number });
+        }
+        let r = courant_number * courant_number;
+
         let laplacian = |u: &[f64]| -> Vec<f64> {
             (0..n_x)
                 .map(|i| {
@@ -446,28 +559,32 @@ impl DifferentialEquationsEngine {
                 .collect()
         };
 
-        // Bootstrap first step: u^1 = u^0 + dt*v0 + (r/2)*Lap(u^0)
         let lap0 = laplacian(u0);
         let mut u_prev: Vec<f64> = u0.to_vec();
         let mut u_curr: Vec<f64> = (0..n_x)
             .map(|i| u0[i] + dt * v0[i] + 0.5 * r * lap0[i])
             .collect();
+        if let Some(index) = u_curr.iter().position(|value| !value.is_finite()) {
+            return Err(WaveEquationError::NonFiniteSolution { step: 1, index });
+        }
 
-        for _ in 1..n_steps {
+        for step in 1..n_steps {
             let lap_curr = laplacian(&u_curr);
             let u_next: Vec<f64> = (0..n_x)
                 .map(|i| 2.0 * u_curr[i] - u_prev[i] + r * lap_curr[i])
                 .collect();
+            if let Some(index) = u_next.iter().position(|value| !value.is_finite()) {
+                return Err(WaveEquationError::NonFiniteSolution {
+                    step: step + 1,
+                    index,
+                });
+            }
             u_prev = std::mem::replace(&mut u_curr, u_next);
         }
 
         let x_grid: Vec<f64> = (1..=n_x).map(|i| i as f64 * dx).collect();
-
-        // Phi from energy conservation: kinetic + potential should be stable
         let initial_energy: f64 =
             u0.iter().map(|&v| v * v).sum::<f64>() + v0.iter().map(|&v| v * v).sum::<f64>();
-
-        // Estimate current energy via finite-difference velocity (u_curr - u_prev)/dt
         let kinetic_final: f64 = u_curr
             .iter()
             .zip(u_prev.iter())
@@ -477,23 +594,19 @@ impl DifferentialEquationsEngine {
         let potential_final: f64 = u_curr
             .iter()
             .zip(lap_final.iter())
-            .map(|(u, l)| -u * l) // ≈ (du/dx)^2 via integration by parts
+            .map(|(u, l)| -u * l)
             .sum::<f64>()
             .abs();
         let final_energy = kinetic_final + potential_final;
-
         let energy_ratio = if initial_energy > 1e-15 {
             final_energy / initial_energy
         } else {
             1.0
         };
-
-        // Good energy conservation: ratio close to 1
         let phi = 0.9 - 0.4 * (energy_ratio - 1.0).abs().min(1.0);
-
         let encoding = Self::encode_pde_result(&u_curr, "WAVE_EQ");
 
-        PDEResult {
+        Ok(PDEResult {
             x_grid,
             t_start: 0.0,
             t_end,
@@ -502,7 +615,7 @@ impl DifferentialEquationsEngine {
             time_steps: n_steps,
             phi,
             encoding,
-        }
+        })
     }
 
     // ── PDE: 2-D Heat Equation ────────────────────────────────────────────
@@ -1778,4 +1891,81 @@ mod tests {
         // All values finite
         assert!(result.u_final.iter().all(|v| v.is_finite()));
     }
+    // ── 1-D Wave Equation CFL-budget contract ─────────────────────────────
+
+    #[test]
+    fn test_wave_1d_rejects_cfl_budget_overflow() {
+        let n_x = 128usize;
+        let u0 = vec![0.0; n_x];
+        let v0 = vec![0.0; n_x];
+        let result =
+            DifferentialEquationsEngine::try_wave_equation_1d(1.0, 1.0, 1_000.0, n_x, &u0, &v0);
+        assert!(matches!(
+            result,
+            Err(WaveEquationError::StabilityBudgetExceeded {
+                required_steps,
+                max_steps
+            }) if required_steps > max_steps as f64 && max_steps == MAX_STEPS
+        ));
+    }
+
+    #[test]
+    fn test_wave_1d_rejects_invalid_and_non_finite_inputs() {
+        let u0 = vec![0.0; 4];
+        let v0 = vec![0.0; 4];
+        assert!(matches!(
+            DifferentialEquationsEngine::try_wave_equation_1d(f64::NAN, 1.0, 0.1, 4, &u0, &v0),
+            Err(WaveEquationError::InvalidWaveSpeed)
+        ));
+        assert!(matches!(
+            DifferentialEquationsEngine::try_wave_equation_1d(1.0, 0.0, 0.1, 4, &u0, &v0),
+            Err(WaveEquationError::InvalidLength)
+        ));
+        assert!(matches!(
+            DifferentialEquationsEngine::try_wave_equation_1d(1.0, 1.0, -0.1, 4, &u0, &v0),
+            Err(WaveEquationError::InvalidEndTime)
+        ));
+        assert!(matches!(
+            DifferentialEquationsEngine::try_wave_equation_1d(1.0, 1.0, 0.1, 5, &u0, &v0),
+            Err(WaveEquationError::DimensionMismatch { .. })
+        ));
+        let bad_u0 = [0.0, f64::INFINITY, 0.0, 0.0];
+        assert!(matches!(
+            DifferentialEquationsEngine::try_wave_equation_1d(1.0, 1.0, 0.1, 4, &bad_u0, &v0),
+            Err(WaveEquationError::NonFiniteInitialDisplacement { index: 1 })
+        ));
+        let bad_v0 = [0.0, 0.0, f64::NAN, 0.0];
+        assert!(matches!(
+            DifferentialEquationsEngine::try_wave_equation_1d(1.0, 1.0, 0.1, 4, &u0, &bad_v0),
+            Err(WaveEquationError::NonFiniteInitialVelocity { index: 2 })
+        ));
+        let huge = [1.0e308, -1.0e308, 1.0e308, -1.0e308];
+        assert!(matches!(
+            DifferentialEquationsEngine::try_wave_equation_1d(1.0, 1.0, 0.1, 4, &huge, &v0),
+            Err(WaveEquationError::NonFiniteSolution { .. })
+        ));
+    }
+
+    #[test]
+    fn test_wave_1d_accepted_schedule_respects_courant_limit() {
+        let n_x = 20usize;
+        let u0: Vec<f64> = (0..n_x)
+            .map(|i| (std::f64::consts::PI * (i + 1) as f64 / (n_x + 1) as f64).sin())
+            .collect();
+        let v0 = vec![0.0; n_x];
+        let result = DifferentialEquationsEngine::try_wave_equation_1d(
+            1.0, 1.0, 0.5, n_x, &u0, &v0,
+        )
+        .expect("small valid wave solve should fit the CFL budget");
+        let dx = 1.0_f64 / (n_x + 1) as f64;
+        let dt = 0.5 / result.time_steps as f64;
+        let courant = dt / dx;
+        assert!(
+            courant <= 0.9 + 1e-12,
+            "Accepted wave timestep violated CFL margin: {courant}"
+        );
+        assert_eq!(result.time_steps, 12);
+        assert!(result.u_final.iter().all(|value| value.is_finite()));
+    }
+
 }
