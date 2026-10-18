@@ -30,7 +30,9 @@ The central aperture is a geometric datum only; it is not a calibrated stop, len
 - Manufacturing exports: not yet generated; derive from the native source and record the generator version when a physical build is authorized.
 - Bill of materials: not yet purchase-ready; no sensor or bracket has been selected.
 - Physical metrology/fit test: not performed.
-- CAD rendering/export validation: not performed in the current workspace.
+- CAD check receipt: [odrh_sensor_plate_cad_check-v0.1.json](validation/odrh_sensor_plate_cad_check-v0.1.json).
+- OpenSCAD 2021.01 successfully rendered/exported the exact source revision recorded in the receipt. The exported mesh bounds are 80 × 5 × 80 mm, and the negative-control aperture override was rejected by the intended assertion.
+- This validates source parsing, default CSG export, nominal mesh bounds and one parameter guard only. It does not validate printed-part tolerances, sensor/bracket fit, strength, optical baffling, calibration or measurement performance.
 
 ## Licensing
 
