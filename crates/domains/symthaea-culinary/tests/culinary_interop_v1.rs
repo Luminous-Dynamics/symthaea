@@ -24,6 +24,8 @@ const FALSE_SCENARIO_FRONTIER: &str =
     include_str!("../fixtures/culinary-decision-bundle-v1/semantic-rejects-false-scenario-frontier.json");
 const FALSE_ROBUST_DOMINANCE: &str =
     include_str!("../fixtures/culinary-decision-bundle-v1/semantic-rejects-false-robust-dominance.json");
+const FALSE_RANK_INSTABILITY: &str =
+    include_str!("../fixtures/culinary-decision-bundle-v1/semantic-rejects-false-rank-instability-counts.json");
 const PARTIAL_SCENARIO_RANKABILITY: &str =
     include_str!("../fixtures/culinary-decision-bundle-v1/valid-scenario-frontier-with-other-scenario-missing.json");
 
@@ -101,6 +103,15 @@ fn falsely_declared_robust_dominance_is_rejected_even_when_reciprocal() {
     }));
     assert!(violations.iter().any(|error| {
         error.contains("robust_frontier_ids differ from independently recomputed robust frontier")
+    }));
+}
+
+#[test]
+fn false_rank_instability_counts_are_rejected() {
+    let bundle = parse_fixture(FALSE_RANK_INSTABILITY);
+    let violations = semantic_violations(&bundle);
+    assert!(violations.iter().any(|error| {
+        error.contains("rank_instability.ranked_scenarios does not match independently recomputed count")
     }));
 }
 
