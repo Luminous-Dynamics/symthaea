@@ -708,6 +708,9 @@ pub enum RK45ErrorKind {
     DimensionMismatch { expected: usize, actual: usize },
     InvalidTimeSpan,
     InvalidTolerance,
+    ToleranceDimensionMismatch { expected: usize, actual: usize },
+    InvalidAbsoluteTolerance { index: usize },
+    InvalidRelativeTolerance,
     NonFiniteInitialState { index: usize },
     RhsDimensionMismatch { stage: &'static str, expected: usize, actual: usize },
     NonFiniteIntermediateState { stage: &'static str, index: usize },
@@ -805,6 +808,34 @@ impl DifferentialEquationsEngine {
         Self::try_solve_rk45_with_budget(system, t0, t_end, y0, tol, 100_000)
     }
 
+    /// Fallible Dormand-Prince RK45 solve with mixed-scale error control.
+    ///
+    /// The component-wise error scale is
+    /// atol[i] + rtol * max(abs(y_old[i]), abs(y_new[i])). Absolute
+    /// tolerances must have one finite, strictly positive value per state
+    /// component. Relative tolerance must be finite and non-negative; setting
+    /// it to zero gives absolute-error-only control. As with all embedded
+    /// adaptive methods, this controls an error estimate, not proven global
+    /// error.
+    pub fn try_solve_rk45_with_tolerances(
+        system: &ODESystem,
+        t0: f64,
+        t_end: f64,
+        y0: &[f64],
+        absolute_tolerances: &[f64],
+        relative_tolerance: f64,
+    ) -> Result<RK45Result, RK45Error> {
+        Self::try_solve_rk45_with_tolerances_and_budget(
+            system,
+            t0,
+            t_end,
+            y0,
+            absolute_tolerances,
+            relative_tolerance,
+            100_000,
+        )
+    }
+
     fn try_solve_rk45_with_budget(
         system: &ODESystem,
         t0: f64,
@@ -812,6 +843,50 @@ impl DifferentialEquationsEngine {
         y0: &[f64],
         tol: f64,
         max_attempts: usize,
+    ) -> Result<RK45Result, RK45Error> {
+        let absolute_tolerances = vec![tol; system.dim];
+        Self::try_solve_rk45_core(
+            system,
+            t0,
+            t_end,
+            y0,
+            &absolute_tolerances,
+            tol,
+            max_attempts,
+            Some(tol),
+        )
+    }
+
+    fn try_solve_rk45_with_tolerances_and_budget(
+        system: &ODESystem,
+        t0: f64,
+        t_end: f64,
+        y0: &[f64],
+        absolute_tolerances: &[f64],
+        relative_tolerance: f64,
+        max_attempts: usize,
+    ) -> Result<RK45Result, RK45Error> {
+        Self::try_solve_rk45_core(
+            system,
+            t0,
+            t_end,
+            y0,
+            absolute_tolerances,
+            relative_tolerance,
+            max_attempts,
+            None,
+        )
+    }
+
+    fn try_solve_rk45_core(
+        system: &ODESystem,
+        t0: f64,
+        t_end: f64,
+        y0: &[f64],
+        absolute_tolerances: &[f64],
+        relative_tolerance: f64,
+        max_attempts: usize,
+        legacy_tolerance: Option<f64>,
     ) -> Result<RK45Result, RK45Error> {
         const MAX_STEP_GROWTH: f64 = 5.0;
         const MIN_STEP_GROWTH: f64 = 0.2;
@@ -856,15 +931,54 @@ impl DifferentialEquationsEngine {
                 error_estimate,
             ));
         }
-        if !tol.is_finite() || tol <= 0.0 {
-            return Err(RK45Error::new(
-                RK45ErrorKind::InvalidTolerance,
-                t,
-                &y,
-                accepted_steps,
-                rejected_steps,
-                error_estimate,
-            ));
+        if let Some(tol) = legacy_tolerance {
+            if !tol.is_finite() || tol <= 0.0 {
+                return Err(RK45Error::new(
+                    RK45ErrorKind::InvalidTolerance,
+                    t,
+                    &y,
+                    accepted_steps,
+                    rejected_steps,
+                    error_estimate,
+                ));
+            }
+        } else {
+            if !relative_tolerance.is_finite() || relative_tolerance < 0.0 {
+                return Err(RK45Error::new(
+                    RK45ErrorKind::InvalidRelativeTolerance,
+                    t,
+                    &y,
+                    accepted_steps,
+                    rejected_steps,
+                    error_estimate,
+                ));
+            }
+            if absolute_tolerances.len() != system.dim {
+                return Err(RK45Error::new(
+                    RK45ErrorKind::ToleranceDimensionMismatch {
+                        expected: system.dim,
+                        actual: absolute_tolerances.len(),
+                    },
+                    t,
+                    &y,
+                    accepted_steps,
+                    rejected_steps,
+                    error_estimate,
+                ));
+            }
+            if let Some(index) = absolute_tolerances
+                .iter()
+                .position(|value| !value.is_finite() || *value <= 0.0)
+            {
+                return Err(RK45Error::new(
+                    RK45ErrorKind::InvalidAbsoluteTolerance { index },
+                    t,
+                    &y,
+                    accepted_steps,
+                    rejected_steps,
+                    error_estimate,
+                ));
+            }
         }
         if let Some(index) = y0.iter().position(|value| !value.is_finite()) {
             return Err(RK45Error::new(
@@ -1153,7 +1267,8 @@ impl DifferentialEquationsEngine {
                         error_estimate,
                     ));
                 }
-                let scale = tol * (1.0 + y[i].abs().max(y_new[i].abs()));
+                let scale = absolute_tolerances[i]
+                    + relative_tolerance * y[i].abs().max(y_new[i].abs());
                 if !scale.is_finite() || scale <= 0.0 {
                     return Err(RK45Error::new(
                         RK45ErrorKind::InvalidErrorScale { index: i },
@@ -2118,6 +2233,110 @@ mod tests {
             "Tighter tolerance should spend more accepted steps: loose={}, tight={}",
             loose.steps_taken,
             tight.steps_taken
+        );
+    }
+
+    #[test]
+    fn test_rk45_componentwise_tolerances_control_mixed_scale_states() {
+        fn growth(_t: f64, y: &[f64]) -> Vec<f64> {
+            vec![y[0], y[1]]
+        }
+        let system = ODESystem { f: growth, dim: 2 };
+        let loose_small_component =
+            DifferentialEquationsEngine::try_solve_rk45_with_tolerances(
+                &system,
+                0.0,
+                1.0,
+                &[1.0, 1e-12],
+                &[1e-2, 1e-14],
+                0.0,
+            )
+            .expect("looser component-wise tolerances should integrate");
+        let strict_small_component =
+            DifferentialEquationsEngine::try_solve_rk45_with_tolerances(
+                &system,
+                0.0,
+                1.0,
+                &[1.0, 1e-12],
+                &[1e-2, 1e-20],
+                0.0,
+            )
+            .expect("strict small-component tolerance should integrate");
+
+        let exact = 1.0_f64.exp();
+        let loose_error =
+            (loose_small_component.y_final[1] - 1e-12 * exact).abs() / (1e-12 * exact);
+        let strict_error =
+            (strict_small_component.y_final[1] - 1e-12 * exact).abs() / (1e-12 * exact);
+
+        assert!(loose_small_component.converged && strict_small_component.converged);
+        assert!(
+            strict_small_component.steps_taken > loose_small_component.steps_taken,
+            "Tightening only the small component's absolute tolerance should increase work: loose={}, strict={}",
+            loose_small_component.steps_taken,
+            strict_small_component.steps_taken,
+        );
+        assert!(
+            strict_error < loose_error,
+            "The tighter small-component tolerance should reduce its global error: loose={loose_error:.3e}, strict={strict_error:.3e}",
+        );
+    }
+
+    #[test]
+    fn test_rk45_componentwise_tolerances_reject_invalid_contracts() {
+        fn growth(_t: f64, y: &[f64]) -> Vec<f64> {
+            vec![y[0], y[1]]
+        }
+        let system = ODESystem { f: growth, dim: 2 };
+        let solve = |atol: &[f64], rtol: f64| {
+            DifferentialEquationsEngine::try_solve_rk45_with_tolerances(
+                &system, 0.0, 1.0, &[1.0, 1.0], atol, rtol,
+            )
+        };
+
+        assert!(matches!(
+            solve(&[1e-6], 1e-3).unwrap_err().kind,
+            RK45ErrorKind::ToleranceDimensionMismatch { expected: 2, actual: 1 }
+        ));
+        assert!(matches!(
+            solve(&[1e-6, 0.0], 1e-3).unwrap_err().kind,
+            RK45ErrorKind::InvalidAbsoluteTolerance { index: 1 }
+        ));
+        assert!(matches!(
+            solve(&[1e-6, f64::NAN], 1e-3).unwrap_err().kind,
+            RK45ErrorKind::InvalidAbsoluteTolerance { index: 1 }
+        ));
+        assert!(matches!(
+            solve(&[1e-6, 1e-6], -1.0).unwrap_err().kind,
+            RK45ErrorKind::InvalidRelativeTolerance
+        ));
+        assert!(matches!(
+            solve(&[1e-6, 1e-6], f64::INFINITY).unwrap_err().kind,
+            RK45ErrorKind::InvalidRelativeTolerance
+        ));
+    }
+
+    #[test]
+    fn test_rk45_legacy_scalar_tolerance_preserves_existing_entrypoint() {
+        fn growth(_t: f64, y: &[f64]) -> Vec<f64> {
+            vec![y[0]]
+        }
+        let system = ODESystem { f: growth, dim: 1 };
+        let legacy = DifferentialEquationsEngine::try_solve_rk45(
+            &system, 0.0, 1.0, &[1.0], 1e-8,
+        )
+        .expect("legacy scalar tolerance entry point should remain valid");
+        let mixed_api = DifferentialEquationsEngine::try_solve_rk45_with_tolerances(
+            &system, 0.0, 1.0, &[1.0], &[1e-8], 1e-8,
+        )
+        .expect("equivalent mixed tolerance settings should integrate");
+
+        assert!(legacy.converged && mixed_api.converged);
+        assert_eq!(legacy.steps_taken, mixed_api.steps_taken);
+        assert_eq!(legacy.rejected_steps, mixed_api.rejected_steps);
+        assert!(
+            (legacy.y_final[0] - mixed_api.y_final[0]).abs() <= f64::EPSILON,
+            "Equivalent tolerance contracts should preserve the trajectory",
         );
     }
 
