@@ -583,7 +583,7 @@ mod tests {
 
         assert_eq!(baseline.pareto.frontier_ids, vec!["a"]);
         assert_eq!(shock.pareto.frontier_ids, vec!["b"]);
-        assert!(report.robust_frontier_ids.is_empty());
+        assert_eq!(report.robust_frontier_ids, vec!["a", "b"]);
         assert_eq!(
             report.candidates.iter().find(|item| item.id == "a").unwrap().frontier_scenario_count,
             1
