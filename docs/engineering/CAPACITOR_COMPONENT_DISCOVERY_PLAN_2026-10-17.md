@@ -246,3 +246,20 @@ Extend to inductors/transformers, switching devices, thermal paths, sensing/prot
 A candidate can be called **promising** when a reproducible, scoped model or solver result supports it. It can be called **simulation-validated** only when the relevant independent numerical and model checks pass. It can be called **experimentally demonstrated** only after measured data from a documented physical sample support the stated claim. It can be called **qualified** only after the applicable reliability, safety, manufacturing, and standards processes have been completed.
 
 These labels are not interchangeable.
+
+## Follow-on: property-specific calibration and decision value
+
+The first implementation records source-bound scalar observations, exact condition matching, evidence classes, and distinct hard-bound/statistical/confidence-interval semantics. That is a deliberately narrow foundation; it does not yet establish calibrated predictions, measurement-quality controls, cross-fidelity discrepancy, or useful next-measurement selection.
+
+The follow-on is tracked in [CAP-UQ-001 #7954](https://github.com/Luminous-Dynamics/symthaea/issues/7954), composed with [MAT-UQ-001 #6225](https://github.com/Luminous-Dynamics/symthaea/issues/6225), ENG-MEAS #4919, MAT-013 physical sample/process lineage (#4378), MAT-014 active discovery (#4345), and CAP-DISC-001 #7917. Avoid duplicating their common uncertainty, sample identity, measurement, and acquisition types.
+
+The next paradigm shift is **decision-centric, property-specific evidence**:
+- Bind each value to method/protocol, source locator, specimen/process state and conditions where available; quarantine missing provenance instead of guessing.
+- Keep repeatability, specimen/lot variation, model uncertainty, calibration failure, domain shift, numerical error, cross-fidelity discrepancy and unknown uncertainty distinct.
+- Treat each property and condition domain independently for calibration; a good permittivity predictor is not evidence that loss tangent is similarly calibrated.
+- Choose the next simulation, measurement, replication or abstention by expected impact on a declared feasibility/Pareto decision, not by uncertainty magnitude alone.
+- Compare policies at equal high-cost-evaluation budgets and preserve null outcomes, negative results, dependence/common-mode ancestry and source-grouped holdouts.
+
+A 2026 *Nature Electronics* study on temperature-stable high-κ oxides uses a hierarchical search and treats loss tangent differently from more modelable targets; its reported methods motivate staged property evaluation, but neither the paper nor its datasets are imported here and no Symthaea reproduction is claimed: https://www.nature.com/articles/s41928-026-01721-1. Data licensing/terms must be checked independently before corpus ingestion.
+
+Proposed gates for this follow-on—not current results—include zero silent cross-source/condition merges, zero semantic conversion between statistical uncertainty and hard bounds, subgroup calibration reporting by property and domain, independent-sample versus repeat-measurement controls, and improvement in decision regret or feasible Pareto progress at equal evaluation cost. Synthetic contract tests cannot establish material discovery or physical qualification.
