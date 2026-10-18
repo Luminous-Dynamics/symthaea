@@ -2834,6 +2834,34 @@ mod tests {
     }
 
     #[test]
+    fn test_adaptive_implicit_euler_rejects_overflowed_residual_scale() {
+        fn stationary(_t: f64, _y: &[f64]) -> Vec<f64> {
+            vec![0.0]
+        }
+        let system = ODESystem { f: stationary, dim: 1 };
+        let error = DifferentialEquationsEngine::try_solve_implicit_euler_adaptive(
+            &system,
+            0.0,
+            1.0,
+            &[1e308],
+            &[1e308],
+            0.0,
+            0.1,
+            100,
+            8,
+        )
+        .expect_err("overflowed residual normalization must not certify convergence");
+        assert!(matches!(
+            error.kind,
+            AdaptiveImplicitEulerErrorKind::StepSolveFailed {
+                cause: ImplicitEulerErrorKind::NonFiniteResidual { index: 0 }
+            }
+        ));
+        assert_eq!(error.time, 0.0);
+        assert_eq!(error.last_state, vec![1e308]);
+    }
+
+    #[test]
     fn test_adaptive_implicit_euler_malformed_rhs_fails_without_advancing_time() {
         fn malformed(_t: f64, _y: &[f64]) -> Vec<f64> {
             vec![]
