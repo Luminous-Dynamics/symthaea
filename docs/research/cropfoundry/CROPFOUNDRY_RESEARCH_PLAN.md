@@ -121,6 +121,19 @@ Priority benchmark dimensions:
 - Keep provenance for all claims, including counterevidence and failed experiments. Missing information must remain visible.
 - Do not weaken tests, split integrity, or thresholds to make a benchmark pass. A missing dataset, unavailable runner, or not-yet-measured outcome is **not evidence of success**.
 
+## Executable contract validator
+
+A dependency-light command is integrated into the existing workspace `xtask` instead of creating a separate domain crate or competing registry:
+
+```bash
+cargo test -p xtask cropfoundry_validate
+cargo run -p xtask -- cropfoundry-validate
+```
+
+The validator checks benchmark IDs, required metric/target/split fields, non-passing proposal states, invariant IDs, source IDs, controlled ingestion states, and the permission/provenance prerequisites before any source can be marked training-authorized. Current candidate sources intentionally remain non-trainable. Unit tests include negative mutations for duplicate IDs, a forged passed status, missing targets, and training authorization against unresolved license terms.
+
+The targeted workflow at `.github/workflows/cropfoundry-contract.yml` runs on matching pull requests, including draft PRs. This check validates the integrity of the research contract only: it does not download datasets, certify legal rights, run crop models, or validate biological performance. Local source review and static checks must never be represented as a Rust test pass until the command has actually run in a Rust environment.
+
 ## Exit criteria for the first research milestone
 
 The milestone is complete only when (a) a versioned, rights-aware dataset inventory exists, (b) one trait has a pinned and leakage-audited evaluation split, (c) baseline metrics and uncertainty are reproducible, (d) the benchmark contract is validated by a machine-readable checker, and (e) any proposed physical trial has an owner, protocol, comparison, and approval path. This PR defines the research contract only; it does not claim those downstream criteria have been met.
