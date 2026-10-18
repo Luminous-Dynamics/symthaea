@@ -559,6 +559,7 @@ fn validate_records(
 
     let target_group = manifest.challenge_context.target_parent_specimen_id.as_str();
     let mut record_ids: BTreeSet<String> = BTreeSet::new();
+    let mut source_cells: BTreeSet<(String, String, String)> = BTreeSet::new();
     let mut source_field_contracts: BTreeMap<(String, String), (String, String)> = BTreeMap::new();
     let mut normalized_units: BTreeMap<String, String> = BTreeMap::new();
     let mut calibration_outcome_groups = BTreeSet::new();
@@ -625,13 +626,25 @@ fn validate_records(
                 record.record_id
             )))?;
 
-        let source_key = (record.source_doi.clone(), record.source_field.clone());
+        let cell_key = (
+            record.source_object_id.clone(),
+            record.source_row_id.clone(),
+            record.source_field.clone(),
+        );
+        if !source_cells.insert(cell_key) {
+            return Err(AdapterError::Validation(format!(
+                "record {:?} duplicates a source object/row/field cell",
+                record.record_id
+            )));
+        }
+
+        let source_key = (record.source_object_id.clone(), record.source_field.clone());
         let field_contract = (record.variable_id.clone(), raw_unit.to_string());
         if let Some(previous) = source_field_contracts.get(&source_key) {
             if previous != &field_contract {
                 return Err(AdapterError::Validation(format!(
-                    "source field {:?} changes variable identity or raw unit within source {:?}: {:?} vs {:?}",
-                    record.source_field, record.source_doi, previous, field_contract
+                    "source field {:?} changes variable identity or raw unit within object {:?}: {:?} vs {:?}",
+                    record.source_field, record.source_object_id, previous, field_contract
                 )));
             }
         } else {
@@ -1262,6 +1275,19 @@ mod tests {
         row.censor_lower_bound = Some(950.0);
         row.censor_upper_bound = Some(900.0);
         let observations = ObservationSet { schema_version: "0.1.0".into(), records: vec![row] };
+        assert!(validate_records(&value, &observations).is_err());
+    }
+
+    #[test]
+    fn rejects_duplicate_source_object_row_field_cells() {
+        let value = record_manifest();
+        let first = record("obs-1", "AMB2022-718-AMMT-B7-P4", "aggregate-target", RecordRole::TargetOutcome, Split::HeldOut, "yield_strength", 920.0);
+        let mut second = record("obs-2", "AMB2022-718-AMMT-B7-P4", "aggregate-target", RecordRole::TargetOutcome, Split::HeldOut, "yield_strength", 920.0);
+        second.source_row_id = first.source_row_id.clone();
+        let observations = ObservationSet {
+            schema_version: "0.1.0".into(),
+            records: vec![first, second],
+        };
         assert!(validate_records(&value, &observations).is_err());
     }
 
