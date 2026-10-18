@@ -369,3 +369,8 @@ The `mission_fault_model` module adds the initial SPACE-FDIR-MBSE-001 typed inte
 Missing engineering links become explicit `CoverageGap` entries. A generated simulator schedule is not treated as proof of fault detection or complete coverage. The structural gate requires a non-empty critical-mode denominator and zero declared gaps, but does not authenticate referenced artifacts or establish physical-model correctness.
 
 Focused tests are authored, including fixture deserialization, event mapping, explicit missing-monitor/sensor gaps, duplicate IDs, invalid timing/non-finite inputs, source binding, and deterministic manifest generation. This source has not been compiled or executed in the current authoring environment; do not report these tests as passing until exact-head Cargo evidence is available.
+
+
+### Critical fault-signature preflight
+
+The IR can also compare declared categorical signal outcomes for every pair of critical fault modes. It reports structurally distinguishing channels, exact complete-signature collisions, or an unresolved result when canonical outcomes/signal mappings are incomplete or incomparable. `None` is unknown and cannot distinguish; matching signal IDs with different declared units cannot be compared. This is a conservative structural preflight only—not proof of physical observability or diagnostic accuracy. Generic decision-specific sufficiency and minimum sensor-cut semantics remain owned by PIE-009N (#2032).

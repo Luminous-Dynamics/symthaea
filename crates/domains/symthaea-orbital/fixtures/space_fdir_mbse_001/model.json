@@ -30,7 +30,8 @@
         {
           "id": "ground_link_available",
           "unit": "boolean",
-          "expected_fault_effect": "false during zero-based simulator steps 4, 5, and 6; orbital line-of-sight state does not change"
+          "expected_fault_effect": "false during zero-based simulator steps 4, 5, and 6; orbital line-of-sight state does not change",
+          "signature_value": "unavailable"
         }
       ],
       "monitor": {
