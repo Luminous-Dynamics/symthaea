@@ -364,6 +364,15 @@ mod tests {
     }
 
     #[test]
+    fn collection_sequence_must_be_nonzero() {
+        let mut record = valid_record();
+        record.collection_sequence = 0;
+        assert!(record
+            .validate()
+            .contains(&ListenerResponseIssue::ZeroCollectionSequence));
+    }
+
+    #[test]
     fn consent_must_be_confirmed() {
         let mut record = valid_record();
         record.consent_confirmed = false;
