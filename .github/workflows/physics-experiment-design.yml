@@ -1,0 +1,43 @@
+name: Physics Experiment Design
+
+on:
+  pull_request:
+    paths:
+      - "crates/domains/symthaea-experiment-design/**"
+      - "Cargo.lock"
+      - ".github/workflows/physics-experiment-design.yml"
+  push:
+    branches: [main]
+    paths:
+      - "crates/domains/symthaea-experiment-design/**"
+      - "Cargo.lock"
+      - ".github/workflows/physics-experiment-design.yml"
+
+permissions:
+  contents: read
+
+concurrency:
+  group: physics-experiment-design-${{ github.workflow }}-${{ github.event.pull_request.number || github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  qualify:
+    name: Plan contract and discriminating fixture
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - name: Set up Rust
+        uses: dtolnay/rust-toolchain@stable
+        with:
+          toolchain: "1.96.0"
+          components: clippy, rustfmt
+      - name: Check planner formatting
+        run: cargo fmt --package symthaea-experiment-design -- --check
+      - name: Run planner tests with locked dependencies
+        run: cargo test --locked -p symthaea-experiment-design
+      - name: Run Clippy on planner targets
+        run: cargo clippy --locked -p symthaea-experiment-design --all-targets -- -D warnings
+      - name: Run bundled Galileo discrimination demo
+        run: cargo run --locked -p symthaea-experiment-design -- --demo
+      - name: Exercise JSON input/output contract
+        run: cargo run --locked --quiet -p symthaea-experiment-design < crates/domains/symthaea-experiment-design/fixtures/galileo-discrimination-v0.1.json
