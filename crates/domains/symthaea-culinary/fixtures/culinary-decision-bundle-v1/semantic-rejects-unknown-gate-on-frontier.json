@@ -1,0 +1,238 @@
+{
+  "schema_version": "1.0.0",
+  "bundle_id": "fixture:culinary-rank-reversal-v1",
+  "generated_at": "2026-10-18T07:00:00+02:00",
+  "producer": {
+    "system": "symthaea",
+    "component": "symthaea-culinary",
+    "repository": "Luminous-Dynamics/symthaea",
+    "commit_sha": "81dbb04235e52f348b99e2ab11d2f26b6364e6f2",
+    "version": "0.1.0-draft"
+  },
+  "scope": {
+    "purpose": "research_benchmark",
+    "geographic_scope": {
+      "label": "Synthetic test market; not observed Johannesburg prices",
+      "granularity": "market_area",
+      "source_refs": [
+        "fixture:scope-not-real-market"
+      ]
+    },
+    "valid_time_start": "2026-10-01T00:00:00+02:00",
+    "valid_time_end": "2026-10-31T23:59:59+02:00",
+    "known_at": "2026-10-18T07:00:00+02:00",
+    "beneficiary_scope_ref": null,
+    "privacy_policy_ref": "fixture:synthetic-data-only"
+  },
+  "input_manifest": {
+    "digest": "fixture:manifest-rank-reversal-v1",
+    "digest_algorithm": "other_declared",
+    "evidence_refs": [
+      "fixture:scenario-inputs-v1"
+    ],
+    "parent_bundle_refs": []
+  },
+  "scenarios": [
+    {
+      "id": "observed_basket",
+      "digest": "scenario:observed-basket:v1",
+      "is_baseline": true,
+      "assumption_refs": [
+        "fixture:baseline-price-assumptions"
+      ],
+      "scenario_class": "synthetic"
+    },
+    {
+      "id": "seasonal_price_shock",
+      "digest": "scenario:seasonal-price-shock:v1",
+      "is_baseline": false,
+      "assumption_refs": [
+        "fixture:shared-seasonal-shock-assumption"
+      ],
+      "scenario_class": "synthetic"
+    }
+  ],
+  "objective_definitions": [
+    {
+      "key": "cost_per_serving",
+      "direction": "minimize",
+      "unit": "ZAR/serving",
+      "definition_ref": "fixture:cost-definition-v1"
+    }
+  ],
+  "robust_frontier_ids": [
+    "alpha",
+    "beta"
+  ],
+  "candidate_results": [
+    {
+      "candidate_id": "alpha",
+      "recipe_or_product_ref": "fixture:recipe-alpha",
+      "gate_disposition": "indeterminate",
+      "ranking_disposition": "ranked",
+      "robustly_rankable": true,
+      "robust_dominates": [],
+      "robust_dominated_by": [],
+      "gate_evidence": [
+        {
+          "key": "food_safety_constraints",
+          "status": "pass",
+          "evidence_refs": [
+            "fixture:gate-alpha-food-safety"
+          ],
+          "applies_to_ref": "fixture:recipe-alpha"
+        },
+        {
+          "key": "allergen_evidence_reviewed",
+          "status": "unknown",
+          "evidence_refs": [],
+          "applies_to_ref": "fixture:recipe-alpha"
+        }
+      ],
+      "scenario_results": [
+        {
+          "scenario_id": "observed_basket",
+          "scenario_digest": "scenario:observed-basket:v1",
+          "frontier": true,
+          "objectives": [
+            {
+              "key": "cost_per_serving",
+              "direction": "minimize",
+              "unit": "ZAR/serving",
+              "status": "synthetic",
+              "value": 5,
+              "evidence_refs": [
+                "fixture:alpha-baseline-cost"
+              ],
+              "source_scope_ref": "fixture:synthetic-market",
+              "observed_at": null,
+              "valid_at": null,
+              "transformation_ref": "fixture:synthetic-cost-calculation",
+              "quality_flags": [
+                "synthetic_not_observed"
+              ]
+            }
+          ]
+        },
+        {
+          "scenario_id": "seasonal_price_shock",
+          "scenario_digest": "scenario:seasonal-price-shock:v1",
+          "frontier": true,
+          "objectives": [
+            {
+              "key": "cost_per_serving",
+              "direction": "minimize",
+              "unit": "ZAR/serving",
+              "status": "synthetic",
+              "value": 8,
+              "evidence_refs": [
+                "fixture:alpha-shocked-cost"
+              ],
+              "source_scope_ref": "fixture:synthetic-market",
+              "observed_at": null,
+              "valid_at": null,
+              "transformation_ref": "fixture:synthetic-cost-calculation",
+              "quality_flags": [
+                "synthetic_not_observed"
+              ]
+            }
+          ]
+        }
+      ],
+      "rank_instability": {
+        "ranked_scenarios": 2,
+        "frontier_scenarios": 1,
+        "dominated_scenarios": 1,
+        "incomplete_scenarios": 0
+      }
+    },
+    {
+      "candidate_id": "beta",
+      "recipe_or_product_ref": "fixture:recipe-beta",
+      "gate_disposition": "feasible",
+      "ranking_disposition": "ranked",
+      "robustly_rankable": true,
+      "robust_dominates": [],
+      "robust_dominated_by": [],
+      "gate_evidence": [
+        {
+          "key": "food_safety_constraints",
+          "status": "pass",
+          "evidence_refs": [
+            "fixture:gate-beta-food-safety"
+          ],
+          "applies_to_ref": "fixture:recipe-beta"
+        },
+        {
+          "key": "allergen_evidence_reviewed",
+          "status": "pass",
+          "evidence_refs": [
+            "fixture:gate-beta-allergen-review"
+          ],
+          "applies_to_ref": "fixture:recipe-beta"
+        }
+      ],
+      "scenario_results": [
+        {
+          "scenario_id": "observed_basket",
+          "scenario_digest": "scenario:observed-basket:v1",
+          "frontier": false,
+          "objectives": [
+            {
+              "key": "cost_per_serving",
+              "direction": "minimize",
+              "unit": "ZAR/serving",
+              "status": "synthetic",
+              "value": 6,
+              "evidence_refs": [
+                "fixture:beta-baseline-cost"
+              ],
+              "source_scope_ref": "fixture:synthetic-market",
+              "observed_at": null,
+              "valid_at": null,
+              "transformation_ref": "fixture:synthetic-cost-calculation",
+              "quality_flags": [
+                "synthetic_not_observed"
+              ]
+            }
+          ]
+        },
+        {
+          "scenario_id": "seasonal_price_shock",
+          "scenario_digest": "scenario:seasonal-price-shock:v1",
+          "frontier": true,
+          "objectives": [
+            {
+              "key": "cost_per_serving",
+              "direction": "minimize",
+              "unit": "ZAR/serving",
+              "status": "synthetic",
+              "value": 6,
+              "evidence_refs": [
+                "fixture:beta-shocked-cost"
+              ],
+              "source_scope_ref": "fixture:synthetic-market",
+              "observed_at": null,
+              "valid_at": null,
+              "transformation_ref": "fixture:synthetic-cost-calculation",
+              "quality_flags": [
+                "synthetic_not_observed"
+              ]
+            }
+          ]
+        }
+      ],
+      "rank_instability": {
+        "ranked_scenarios": 2,
+        "frontier_scenarios": 1,
+        "dominated_scenarios": 1,
+        "incomplete_scenarios": 0
+      }
+    }
+  ],
+  "consumer_notes": [
+    "Synthetic semantic fixture only; all prices are invented test values and are not local prices.",
+    "Dominance reverses between baseline and shock; neither candidate robustly dominates the other.",
+    "No result in this fixture asserts physical food safety or observed prices."
+  ]
+}
