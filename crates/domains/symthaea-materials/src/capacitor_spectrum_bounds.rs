@@ -736,6 +736,56 @@ mod tests {
     }
 
     #[test]
+    fn sampled_values_inside_declared_hard_intervals_remain_inside_aggregated_bounds() {
+        let s = sweep();
+        let i = spectrum();
+        let z_bounds = impedance_bounds();
+        let i_bounds = current_bounds();
+        let bounded = calculate_bounded_capacitor_spectrum_metrics(
+            &s, &i, &z_bounds, &i_bounds, Some(5.0)
+        ).unwrap();
+
+        for step in 0..=1_000 {
+            let base_fraction = step as f64 / 1_000.0;
+            let mut total_current_squared = 0.0;
+            let mut total_voltage_squared = 0.0;
+            let mut total_loss = 0.0;
+            let mut maximum_impedance: f64 = 0.0;
+
+            for (index, component) in i.components.iter().enumerate() {
+                let z = z_bounds.iter().find(|b| b.frequency_hz == component.frequency_hz).unwrap();
+                let current = i_bounds.iter().find(|b| b.frequency_hz == component.frequency_hz).unwrap();
+                let r = z.real_ohm.lower
+                    + base_fraction * (z.real_ohm.upper - z.real_ohm.lower);
+                let x_fraction = ((step * 337 + index * 171) % 1_001) as f64 / 1_000.0;
+                let x = z.imaginary_ohm.lower
+                    + x_fraction * (z.imaginary_ohm.upper - z.imaginary_ohm.lower);
+                let i_fraction = ((step * 719 + index * 43) % 1_001) as f64 / 1_000.0;
+                let current_a = current.current_rms_a.lower
+                    + i_fraction
+                        * (current.current_rms_a.upper - current.current_rms_a.lower);
+                let magnitude = r.hypot(x);
+                let voltage = current_a * magnitude;
+                total_current_squared += current_a.powi(2);
+                total_voltage_squared += voltage.powi(2);
+                total_loss += current_a.powi(2) * r;
+                maximum_impedance = maximum_impedance.max(magnitude);
+            }
+
+            let total_current = total_current_squared.sqrt();
+            let total_voltage = total_voltage_squared.sqrt();
+            assert!(total_current >= bounded.total_current_rms_a.lower - 1.0e-12);
+            assert!(total_current <= bounded.total_current_rms_a.upper + 1.0e-12);
+            assert!(total_voltage >= bounded.total_ripple_voltage_rms_v.lower - 1.0e-12);
+            assert!(total_voltage <= bounded.total_ripple_voltage_rms_v.upper + 1.0e-12);
+            assert!(total_loss >= bounded.total_loss_power_w.lower - 1.0e-12);
+            assert!(total_loss <= bounded.total_loss_power_w.upper + 1.0e-12);
+            assert!(maximum_impedance >= bounded.maximum_component_impedance_ohm.lower - 1.0e-12);
+            assert!(maximum_impedance <= bounded.maximum_component_impedance_ohm.upper + 1.0e-12);
+        }
+    }
+
+    #[test]
     fn hard_bounds_can_pass_when_all_upper_limits_are_respected() {
         let report = screen_capacitor_spectrum_bounded(
             &sweep(),
