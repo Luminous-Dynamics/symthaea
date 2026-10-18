@@ -98,8 +98,10 @@ These are **proposed acceptance targets**, not results or claims about current S
 | Measure | What to publish | Proposed gate or stretch target |
 |---|---|---|
 | Protocol correctness | Valid resets, observations, action schemas, chunks, and server lifecycle | 100% on deterministic contract tests; zero malformed or non-finite actions |
-| Task success | Success rate per task and per capability dimension, with 95% confidence intervals | Stretch: +5 percentage points in overall macro-average and +10 points on a preregistered target dimension, with the paired 95% interval excluding zero |
-| Non-target regressions | Per-dimension difference versus the frozen baseline | No dimension regresses by more than 2 percentage points without an explicit trade-off analysis |
+| RC partial progress | Mean rubric score (0–1) per task and equal-weighted six-task macro-average | Stretch: +10 percentage points over a matched baseline, with the task-stratified paired 95% bootstrap interval excluding zero |
+| Full completion | Fraction of all attempted trials scoring exactly 1.0; invalid trials do not count as completions | Stretch: +5 percentage points, reported separately from partial progress |
+| Run reliability | Valid graded run rate, timeouts, thermal stops, server errors, and missing scores | No silent exclusions; target ≥99% valid scored runs in the pilot, with each failure class published |
+| Non-target regressions | Per-task delta versus the frozen baseline | No task regresses by more than 2 percentage points in mean progress without an explicit trade-off analysis |
 | Generalization | Performance on held-out layouts/objects/conditions available in the benchmark | Report the baseline-to-shift drop; target at least a 25% relative reduction in the drop, if the perturbation protocol permits a fair comparison |
 | Memory | Tasks where earlier observations/actions affect later decisions; reset isolation | Show a preregistered memory-task gain and zero episode-state leakage across resets |
 | Recovery | Success and time-to-recovery after benchmark-supported recoverable disturbances or injected faults | Report the full distribution; stretch: reduce median recovery time by 25% without increasing unsafe contacts |
@@ -109,7 +111,7 @@ These are **proposed acceptance targets**, not results or claims about current S
 | Safety | Invalid actions, limit violations, collisions/unsafe contacts when telemetry exists, safe-stop behavior | Zero invalid actions and zero unhandled limit violations in the pilot; report every observed contact/failure, not only averages |
 | Data efficiency | Additional training data and fine-tuning budget | First test should require no benchmark-specific retraining of the frozen baseline; report any extra data or learning explicitly |
 
-For success-rate comparisons, use paired task/seed results and bootstrap confidence intervals. Report raw counts and confidence intervals alongside percentages. These numeric targets are deliberately ambitious and should be revised only before—not after—looking at test results.
+For RC, use task-specific rubric progress and full-completion rate as different outcomes. Bootstrap trial differences within each task, then average task means equally; report raw counts and 95% intervals alongside percentages. Cost must be paired with progress (for example, dollars per 10 progress points), not treated as the objective by itself. Include invalid trials in reliability and full-completion denominators, while excluding ungraded scores only from the mean of graded progress. These numeric targets are deliberately ambitious and should be revised only before—not after—looking at test results.
 
 ## Ablation matrix
 
@@ -166,7 +168,9 @@ The existing **examples/robotics_benchmark_suite.rs** is a platform timing/stabi
 
 ## Upstream references
 
-- RoboDojo official benchmark: https://github.com/RoboDojo-Benchmark/RoboDojo
+- RoboDojo-RC Tier 1 task rubrics and trial artifacts: https://robocurve.org/opus-5-5-robodojo-rc-tier-1/
+- Robocurve October 2026 Robotics Capability Index method/results: https://robocurve.org/rci/
+- RoboDojo official benchmark (separate simulation track): https://github.com/RoboDojo-Benchmark/RoboDojo
 - RoboDojo documentation: https://robodojo-benchmark.com/doc/
 - XPolicyLab shared policy interface: https://github.com/XPolicyLab/XPolicyLab
 - XPolicyLab reference adapter: https://github.com/XPolicyLab/XPolicyLab/tree/main/policy/demo_policy
