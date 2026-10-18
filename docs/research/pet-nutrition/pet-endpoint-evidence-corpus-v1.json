@@ -702,7 +702,7 @@
         "funding_disclosure": "disclosed",
         "lca_boundary_defined": true,
         "functional_unit_defined": true,
-        "cost_basis_defined": false,
+        "cost_basis_defined": true,
         "protocol_preregistered": false,
         "power_status": "unknown",
         "uncertainty_reported": true
@@ -802,7 +802,7 @@
         "observed_endpoints": [
           "food_preference"
         ],
-        "scope_match": "mismatch",
+        "scope_match": "match",
         "metric_definition_complete": true,
         "methods_reported": true,
         "comparator_defined": true,
@@ -946,9 +946,9 @@
       "case_id": "PNE-018",
       "claim": {
         "endpoint": "process_productivity",
-        "target_species": "dog",
-        "life_stage": "adult",
-        "inclusion_percent": 10,
+        "target_species": "other",
+        "life_stage": "process",
+        "inclusion_percent": null,
         "minimum_horizon_days": null
       },
       "evidence": {
@@ -960,7 +960,7 @@
         "design": "simulation",
         "target_species": "other",
         "life_stage": "process",
-        "inclusion_percent": 10,
+        "inclusion_percent": null,
         "duration_days": 30,
         "sample_size": 30,
         "experimental_unit": "process_batch",
