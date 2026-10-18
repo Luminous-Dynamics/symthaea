@@ -60,7 +60,7 @@ pub struct PreferenceQueryEpisodeAssessmentV1 {
     pub scenario_id: String,
     /// Query-selection strategy used.
     pub strategy: PreferenceQuerySelectionStrategyV1,
-    /// Maximum number of pairwise questions this run could ask.
+    /// Maximum number of additional pairwise questions this run could ask.
     pub query_budget_limit: u64,
     /// Final disposition after simulated query responses and replay.
     pub final_action: PreferenceReplayActionV1,
@@ -150,7 +150,7 @@ pub struct PreferenceQueryBudgetFrontierReportV1 {
     pub fixture_version: String,
     /// Root seed for the seeded-random query selector.
     pub seed: u64,
-    /// Highest query budget included; all limits from zero through this value are reported.
+    /// Highest additional-query budget included; all limits from zero through this value are reported.
     pub max_query_budget: u64,
     /// Scenario count used at every budget.
     pub scenario_count: usize,
@@ -660,9 +660,9 @@ fn score_frontier_point(
 }
 
 /// Evaluate three query policies over every *additional-query* budget from zero to the configured
-/// maximum. Prior questions already used in the source episode remain counted. The evaluation
-/// oracle is omitted from policy views; it acts only as a simulated respondent after each question
-/// has been selected and as a post-decision scorer.
+/// maximum. Prior questions already used in the source episode remain counted; overflow in prior
+/// plus additional budget fails closed. The evaluation oracle is omitted from policy views; it acts
+/// only as a simulated respondent after each question has been selected and as a post-decision scorer.
 pub fn evaluate_preference_query_budget_frontier(
     input: &str,
     max_query_budget: u64,
