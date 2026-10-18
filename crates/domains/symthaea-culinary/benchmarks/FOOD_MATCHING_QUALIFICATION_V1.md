@@ -26,7 +26,7 @@ The system exposes four outcomes:
 | `review_required` | Key attributes are missing, conflicted or not reliably mapped; obtain source evidence or an expert/local review. |
 | `no_match` | A conflict is known, or no defensible mapping is available for the declared purpose. |
 
-Approximate matches are forbidden for price comparison, product lookup and allergen screening in this contract. A food-identity match does **not** prove a packaged product is free from an allergen, has no cross-contact risk, or is safe to consume. Those claims require their own source/label/lot evidence and domain-specific policy.
+Approximate matches are forbidden for price comparison, product lookup and allergen screening in this contract. An `exact_match` here means identity attributes match for the declared task; it does **not** by itself establish price comparability. Price comparisons separately require package/SKU or weight normalization, currency and conversion provenance where applicable, market and observation time, and comparable availability basis. A food-identity match also does **not** prove a packaged product is free from an allergen, has no cross-contact risk, or is safe to consume. Those claims require their own source/label/lot evidence and domain-specific policy.
 
 ## Implemented contract
 
