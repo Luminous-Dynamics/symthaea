@@ -69,6 +69,26 @@ Relevant references:
 
 These references guide the protocol; linking them is not evidence of compliance or endorsement.
 
+## Research update (reviewed 2026-10-18)
+
+The current evidence supports a measurement-first, uncertainty-aware benchmark rather than a single learned quality score.
+
+- **Standards boundary:** ISO/ASTM 52902:2023 defines AM test-artifact geometry and the quantities/qualities used to characterize geometric capability, including measurement-uncertainty considerations. It does not prescribe a universal slicer recipe or a particular manufacturing procedure. Our artifact and measurement plan should be explicitly versioned independently from candidate calibration policies. [ISO/ASTM 52902:2023](https://www.iso.org/standard/79683.html).
+- **Integrated calibration artifacts:** a 2025 PLA FFF study presents a test artifact combining defect identification, measurement, evaluation and compensation, together with a fit kit for tolerance evaluation. This is a useful baseline direction: our benchmark should test whether a workflow's measurements and compensation improve on an integrated conventional artifact, not merely on uncalibrated defaults. [He et al., *Polymer Testing* (2025), DOI 10.1016/j.polymertesting.2025.108834](https://doi.org/10.1016/j.polymertesting.2025.108834).
+- **Layer-wise measurement lineage:** a September 2025 study describes calibrated imaging, a G-code-derived digital reference, contour-error quantification in physical units, and synchronized process/thermal measurements. This motivates retaining measurement calibration, reference geometry, process state and source identity together. Vision can be a useful low-cost observation channel, but its calibration and measurement uncertainty must be validated against physical artifacts before its output is treated as dimensional evidence. [Haseltalab et al., *International Journal of Advanced Manufacturing Technology* (2025), DOI 10.1007/s00170-025-16429-3](https://doi.org/10.1007/s00170-025-16429-3).
+- **Calibrated prediction, not just high accuracy:** a 2025 FFF modeling paper reports calibrated prediction intervals and multi-objective optimization across PLA, ABS, PETG and TPU using a hybrid synthetic/literature-anchored dataset. Its reported results motivate uncertainty calibration and material-specific profiles, but do not establish cross-printer transfer or the performance of this repository. Require held-out profiles/lots and physical confirmatory runs before transfer claims. [Aquisman Asare et al., *Measurement* (2025), DOI 10.1016/j.measurement.2025.119350](https://www.sciencedirect.com/science/article/abs/pii/S0263224125027095).
+- **Digital-twin credibility:** NIST's 2026 manufacturing digital-twin workshop summary identifies interoperability, verification/validation/uncertainty quantification (VVUQ), cybersecurity and workforce readiness as persistent priorities. A visually convincing twin is not evidence of model validity. [NIST, *Digital Twins Workshops Summary Report*, published July 21, 2026](https://www.nist.gov/publications/digital-twins-workshops-summary-report).
+
+### Consequences for this protocol
+
+1. Keep the geometry/artifact identity, process recipe, observed machine behavior and measurement system as separate versioned identities.
+2. Score the measurement system itself: repeatability, reproducibility where feasible, bias against a reference, resolution, uncertainty and missingness.
+3. Preserve both signed error (to reveal systematic bias) and absolute error (to measure magnitude); do not let positive and negative deviations cancel in one aggregate.
+4. Separate model training, adaptive discovery and held-out confirmation by run/profile/material-lot identity. Randomly splitting individual measurements from the same print across train and test is not sufficient evidence of generalization.
+5. Treat camera/vision observations as a distinct measurement method with its own calibration and error model. They may provide fine-grained layer-wise trends, but visual plausibility alone cannot certify dimensions, interlayer strength or internal defects.
+6. Report calibration effort and waste alongside quality. A predictor that reduces a statistical loss but does not reduce the resource cost of reaching conforming parts has not demonstrated the desired operational benefit.
+7. Do not assert that these research papers validate our system; their methods motivate the experiment design only.
+
 ## 5. Benchmark artifact family
 
 Create or select openly licensed, revision-pinned artifacts that cover distinct failure modes. Do not optimize all decisions against one decorative test print.
