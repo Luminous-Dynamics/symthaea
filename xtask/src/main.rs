@@ -9,6 +9,7 @@ mod twowheeler_benchmark;
 mod two_wheeler_wheel_demand;
 mod two_wheeler_trace_energy;
 mod powertrain_energy_ledger;
+mod two_wheeler_validation_scorecard;
 
 #[derive(Parser)]
 struct Cli {
@@ -102,6 +103,14 @@ enum Commands {
         #[arg(long)]
         out: Option<PathBuf>,
     },
+    /// Score matched, identity-checked two-wheeler energy pairs; synthetic conformance is not physical validation.
+    TwoWheelerValidationScorecard {
+        #[arg(long, default_value = "docs/research/data/two_wheeler_validation_scorecard_v0_1.json")]
+        input: PathBuf,
+        /// Optional path for a JSON report; otherwise report to stdout.
+        #[arg(long)]
+        out: Option<PathBuf>,
+    },
     GenerateManifest {
         #[arg(long, default_value = ".")]
         root: PathBuf,
@@ -185,6 +194,15 @@ fn main() -> anyhow::Result<()> {
             let input = if input.is_absolute() { input } else { root.join(input) };
             let out = out.map(|path| if path.is_absolute() { path } else { root.join(path) });
             two_wheeler_trace_energy::run(&input, out.as_deref())?;
+        }
+        Commands::TwoWheelerValidationScorecard { input, out } => {
+            let root = PathBuf::from(env!("CARGO_MANIFEST_DIR"))
+                .parent()
+                .expect("xtask lives one level below the workspace root")
+                .to_path_buf();
+            let input = if input.is_absolute() { input } else { root.join(input) };
+            let out = out.map(|path| if path.is_absolute() { path } else { root.join(path) });
+            two_wheeler_validation_scorecard::run(&input, out.as_deref())?;
         }
         Commands::GenerateManifest { root } => {
             let files = vec!["Cargo.toml", "src/lib.rs", "symthaea-core/Cargo.toml"];
