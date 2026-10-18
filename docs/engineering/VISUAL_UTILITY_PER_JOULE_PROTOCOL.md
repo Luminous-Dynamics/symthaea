@@ -95,6 +95,10 @@ Each negative must either be rejected or explicitly marked NOT EVALUATED. Unknow
 
 Connect to [VIS-EXP-001 #7871](https://github.com/Luminous-Dynamics/symthaea/issues/7871) and the shared selector benchmark. Prefer the next measurement with highest expected decision value per cost, not merely highest model uncertainty. Examples include validating power meter bias, measuring a stratum near an optical-floor boundary, or collecting a repeated run that could reverse a Pareto ranking. Permit abstention when no affordable measurement can change the decision.
 
+For every confirmatory metric, freeze a minimum decision effect (MDE) before examining treatment results and construct a documented uncertainty budget for that same measurand. As a proposed project gate, require expanded uncertainty `U95_total <= MDE / 3` before the metric can rank candidates. The factor of three is a local planning criterion, not a universal display-metrology standard. If the gate is not met, choose a higher-value calibration/replication step or mark that metric `INSTRUMENT_CAPABILITY_INADEQUATE` / `NOT_EVALUATED`; do not weaken the threshold after seeing the outcomes.
+
+The Rust `decision_capability_gate` helper in `tools/visual-energy-reference` checks the arithmetic relation, rejects nonfinite/negative uncertainty and nonpositive decision effects, and reports capability without claiming that the uncertainty budget or instrument calibration is itself valid. See [ODRH-MET-001 #8049](https://github.com/Luminous-Dynamics/symthaea/issues/8049) and [the display metrology reproducibility protocol](DISPLAY_METROLOGY_REPRODUCIBILITY_PROTOCOL.md).
+
 ## 9. First reproducible milestone
 
 1. Select one physical display and write its immutable profile/device record.
