@@ -176,13 +176,24 @@ pub fn audit_shift_robustness(
         let comparison = compare_paired_trials(
             &b, &c, bootstrap_replicates, derived_seed(seed, family, severity, &digest),
         ).map_err(|_| ShiftAuditError::InvalidPairedTrials)?;
+        let mut scored_by_task: BTreeMap<String, usize> = BTreeMap::new();
+        for (base_row, candidate_row) in b.iter().zip(&c) {
+            if base_row.progress.is_some() && candidate_row.progress.is_some() {
+                *scored_by_task.entry(base_row.task_id.clone()).or_default() += 1;
+            }
+        }
+        // A single observation per task gives a degenerate within-task bootstrap;
+        // suppress that interval rather than presenting false precision as certainty.
+        let interval_supported = !scored_by_task.is_empty()
+            && scored_by_task.values().all(|count| *count >= 2)
+            && bootstrap_replicates >= 100;
         summaries.push(ShiftStratumSummary {
             family, severity, perturbation_spec_sha256: digest,
             condition_count: conditions.len(),
             pairs: comparison.total_pairs,
             scored_pairs: comparison.scored_pairs,
             mean_progress_delta: comparison.mean_progress_delta,
-            progress_delta_ci95: comparison.progress_delta_ci95,
+            progress_delta_ci95: if interval_supported { comparison.progress_delta_ci95 } else { None },
             completion_rate_delta: comparison.completion_rate_delta,
             valid_run_rate_delta: comparison.valid_run_rate_delta,
             mean_elapsed_seconds_delta: comparison.mean_elapsed_seconds_delta,
@@ -260,6 +271,17 @@ mod tests {
         p.push(p[0].clone());
         assert_eq!(audit_shift_robustness(&b, &c, &p, 0, 7), Err(ShiftAuditError::DuplicateAssignment));
     }
+    #[test]
+    fn suppresses_degenerate_interval_when_task_has_only_one_scored_pair() {
+        let (mut b, mut c, mut p) = rows();
+        b.retain(|r| r.trial_id == "seed-01");
+        c.retain(|r| r.trial_id == "seed-01");
+        p.retain(|r| r.trial_id == "seed-01");
+        let s = audit_shift_robustness(&b, &c, &p, 500, 7).unwrap();
+        assert_eq!(s[0].pairs, 2);
+        assert!(s[0].progress_delta_ci95.is_none());
+    }
+
     #[test]
     fn rejects_bad_spec_digest() {
         let (b, c, mut p) = rows();
