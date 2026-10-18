@@ -46,6 +46,16 @@ Sol-Atlas owns the shared-resource, water/energy service, time-conservation and 
 
 The adapter contract is not implemented and no cross-project integration is claimed. The boundary must preserve scenario digests, units, time scope, capacity bounds, uncertainty, protected-service floors and indeterminate states.
 
+## Adaptive capital-policy comparison
+
+The `policy.rs` module compares four explicit synthetic policy templates: abandon, commit the full amount now, wait for a demand signal and invest only when continuation value is positive, or commit a stage now and expand only when the signal supports continuation.
+
+The case probabilities, cashflows, discount factor and waiting cost are inputs to the synthetic scenario—not empirically calibrated parameters. All money is represented in integer minor units, the probability mass must total exactly 10,000 basis points, negative-value continuation branches are clamped to zero only when the policy has an actual option to stop, and arithmetic uses conservative fixed-point rounding. The best policy is selected only among this finite catalog, with a deterministic tie-break in favor of abandoning at exact zero-value ties.
+
+Tests intentionally include scenarios where staging wins, waiting wins, one-shot investment wins, and capital limits make abandonment the only feasible policy. This prevents the benchmark from baking in the assumption that more reversibility is always better.
+
+This is an exhaustive comparison of four named policy templates, **not** a general dynamic-programming oracle or a validated real-options model. The next benchmark step is to independently enumerate small state/action trees with a reference oracle and compare the policy catalog against that upper bound.
+
 ## Staged commitments and reversibility
 
 The staged-capital protocol is described in [REVERSIBILITY_AND_STAGED_CAPITAL.md](REVERSIBILITY_AND_STAGED_CAPITAL.md). The `staging.rs` module is a fail-closed tranche authorization gate, **not** a real-options valuation model. It makes required evidence, milestone satisfaction, delegated authority, and cumulative commitment limits explicit. The prototype also reports a cash-maximizing feasible baseline and a Pareto frontier without compressing outcomes into one score.
