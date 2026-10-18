@@ -122,8 +122,8 @@ fn validate_input(input: &WheelDemandInput) -> Result<(), &'static str> {
     if input.speed_mps < 0.0 {
         return Err("negative_speed");
     }
-    if !(-std::f64::consts::FRAC_PI_2..std::f64::consts::FRAC_PI_2)
-        .contains(&input.grade_rad)
+    if input.grade_rad <= -std::f64::consts::FRAC_PI_2
+        || input.grade_rad >= std::f64::consts::FRAC_PI_2
     {
         return Err("grade_out_of_domain");
     }
@@ -452,6 +452,13 @@ mod tests {
         let mut input = manifest().cases[0].input;
         input.wind_speed_mps = f64::NAN;
         assert_eq!(calculate(&input).unwrap_err(), "non_finite_input");
+    }
+
+    #[test]
+    fn negative_vertical_grade_boundary_is_rejected() {
+        let mut input = manifest().cases[0].input;
+        input.grade_rad = -std::f64::consts::FRAC_PI_2;
+        assert_eq!(calculate(&input).unwrap_err(), "grade_out_of_domain");
     }
 
     #[test]
