@@ -17,7 +17,8 @@
     "RCG-012": "invalid-report",
     "RCG-013": "reject",
     "RCG-014": "reject",
-    "RCG-015": "accept"
+    "RCG-015": "accept",
+    "RCG-016": "invalid-report"
   },
   "claim_limits": [
     "An accepted fixture means only that this synthetic normalized-report contract is internally consistent.",
