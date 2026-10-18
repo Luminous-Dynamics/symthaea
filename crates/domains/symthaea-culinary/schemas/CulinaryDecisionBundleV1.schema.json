@@ -341,7 +341,8 @@
                   ]
                 }
               }
-            }
+            },
+            "minItems": 1
           },
           "scenario_results": {
             "type": "array",
@@ -458,7 +459,8 @@
                         "uniqueItems": true
                       }
                     }
-                  }
+                  },
+                  "minItems": 1
                 }
               }
             }
