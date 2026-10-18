@@ -150,6 +150,7 @@ Field usability tests should cover gloves, hearing protection, noisy machinery, 
 ## 9. Integration and sequence
 
 - Link to Symtropy [MINE-SYSTEM-001 #1933](https://github.com/Luminous-Dynamics/symtropy/issues/1933) and [FLOOD-EGRESS-001 #1963](https://github.com/Luminous-Dynamics/symtropy/issues/1963) for shared underground fault scenarios, flood/inrush alarms and safe-egress messaging.
+- [MINE-TTE-CHAR-001 #8047](https://github.com/Luminous-Dynamics/symthaea/issues/8047) defines the separate calibrated physical-measurement programme for TTE link traces and held-out validation; it is not a deployment authorization.
 - Use Sol Atlas only as the existing spatial/topology evidence authority; do not create a duplicate authoritative mine layout or escape map.
 - Use Mycelix for provenance and receipt distribution where interfaces are available, while preserving an offline local safety path.
 - First freeze synthetic traces and implement a deterministic software harness. Then compare baselines and measure model error. Only after that should hardware-in-the-loop and supervised field testing be proposed with instrumented fixtures, electrical/RF review and independently approved plans.
