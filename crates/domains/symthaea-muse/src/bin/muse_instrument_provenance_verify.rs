@@ -835,6 +835,465 @@ fn verify_root_evidence(
     true
 }
 
+fn source_terms_policy(source_library: &str) -> Option<SourceTermsPolicy> {
+    match source_library {
+        "vcsl" => Some(SourceTermsPolicy {
+            source_library: "vcsl",
+            upstream_repository_url: "https://github.com/sgossner/VCSL",
+            expected_remote: "sgossner/vcsl",
+            declared_license_spdx: "CC0-1.0",
+            readme_relative_path: "README.md",
+            upstream_readme_request: "No attribution required according to the upstream README; preserve its license/readme bytes for review.",
+        }),
+        "vsco2_ce" => Some(SourceTermsPolicy {
+            source_library: "vsco2_ce",
+            upstream_repository_url: "https://github.com/sgossner/VSCO-2-CE",
+            expected_remote: "sgossner/vsco-2-ce",
+            declared_license_spdx: "CC0-1.0",
+            readme_relative_path: "Readme.txt",
+            upstream_readme_request: "Upstream README asks for courtesy/author credit; keep this request distinct from the declared SPDX license and review the source terms rather than silently discarding the request.",
+        }),
+        _ => None,
+    }
+}
+
+fn verify_source_terms_evidence(
+    inventory: &Value,
+    vcsl_root: &RootObservation,
+    vsco2_root: &RootObservation,
+    findings: &mut Vec<Finding>,
+) -> SourceTermsAudit {
+    let mut audit = SourceTermsAudit::default();
+    let Some(entries) = inventory.get("source_terms_evidence").and_then(Value::as_array) else {
+        push_incomplete(
+            findings,
+            "source_terms_evidence_missing",
+            "capability matrix v4 must contain source_terms_evidence".into(),
+        );
+        return audit;
+    };
+    if entries.len() != 2 {
+        push_incomplete(
+            findings,
+            "source_terms_row_count_incomplete",
+            format!("expected exactly two source-terms rows, found {}", entries.len()),
+        );
+    }
+
+    for (source_library, label, root) in [
+        ("vcsl", "VCSL", vcsl_root),
+        ("vsco2_ce", "VSCO-2-CE", vsco2_root),
+    ] {
+        let matching: Vec<&Value> = entries
+            .iter()
+            .filter(|row| string_field(row, "source_library") == Some(source_library))
+            .collect();
+        match matching.as_slice() {
+            [entry] => {
+                if verify_one_source_terms_entry(entry, source_terms_policy(source_library).unwrap(), label, root, findings) {
+                    audit.roots_verified += 1;
+                    audit.license_documents_verified += 1;
+                    audit.readme_documents_verified += 1;
+                    audit.clean_upstream_checkouts_verified += 1;
+                } else {
+                    // Count independently verified document hashes even when another
+                    // lineage dimension (for example, upstream checkout identity) is incomplete.
+                    if source_terms_document_matches(entry, "license_document_relative_path", "license_document_sha256", "license_document_status", "LICENSE", root, label, findings) {
+                        audit.license_documents_verified += 1;
+                    }
+                    let policy = source_terms_policy(source_library).unwrap();
+                    if source_terms_document_matches(entry, "readme_document_relative_path", "readme_document_sha256", "readme_document_status", policy.readme_relative_path, root, label, findings) {
+                        audit.readme_documents_verified += 1;
+                    }
+                    if source_terms_checkout_matches(entry, policy, label, root, findings) {
+                        audit.clean_upstream_checkouts_verified += 1;
+                    }
+                }
+            }
+            [] => push_incomplete(
+                findings,
+                "source_terms_row_missing",
+                format!("{label} source-terms evidence row is missing"),
+            ),
+            _ => push_error(
+                findings,
+                "source_terms_row_duplicate",
+                format!("{label} has multiple source-terms rows"),
+            ),
+        }
+    }
+
+    for entry in entries {
+        let source_library = string_field(entry, "source_library").unwrap_or("");
+        if source_terms_policy(source_library).is_none() {
+            push_error(
+                findings,
+                "source_terms_library_unknown",
+                format!("source-terms row has an unknown source library {source_library:?}"),
+            );
+        }
+    }
+    audit
+}
+
+fn verify_one_source_terms_entry(
+    entry: &Value,
+    policy: SourceTermsPolicy,
+    label: &str,
+    root: &RootObservation,
+    findings: &mut Vec<Finding>,
+) -> bool {
+    let declaration_matches =
+        string_field(entry, "upstream_repository_url") == Some(policy.upstream_repository_url)
+            && string_field(entry, "declared_license_spdx") == Some(policy.declared_license_spdx)
+            && string_field(entry, "license_document_relative_path") == Some("LICENSE")
+            && string_field(entry, "readme_document_relative_path") == Some(policy.readme_relative_path)
+            && string_field(entry, "upstream_readme_request") == Some(policy.upstream_readme_request)
+            && string_field(entry, "license_declaration_boundary")
+                .is_some_and(|value| value.contains("not a legal opinion"));
+    if !declaration_matches {
+        push_error(
+            findings,
+            "source_terms_declaration_mismatch",
+            format!("{label} source-terms declaration differs from the verifier's explicit policy"),
+        );
+    }
+
+    let license_matches = source_terms_document_matches(
+        entry,
+        "license_document_relative_path",
+        "license_document_sha256",
+        "license_document_status",
+        "LICENSE",
+        root,
+        label,
+        findings,
+    );
+    let readme_matches = source_terms_document_matches(
+        entry,
+        "readme_document_relative_path",
+        "readme_document_sha256",
+        "readme_document_status",
+        policy.readme_relative_path,
+        root,
+        label,
+        findings,
+    );
+    let checkout_matches = source_terms_checkout_matches(entry, policy, label, root, findings);
+    declaration_matches && license_matches && readme_matches && checkout_matches
+}
+
+fn source_terms_document_matches(
+    entry: &Value,
+    path_field: &str,
+    digest_field: &str,
+    status_field: &str,
+    expected_relative_path: &str,
+    root: &RootObservation,
+    label: &str,
+    findings: &mut Vec<Finding>,
+) -> bool {
+    if string_field(entry, path_field) != Some(expected_relative_path) {
+        push_error(
+            findings,
+            "source_terms_document_path_mismatch",
+            format!("{label} {path_field} differs from the required relative path"),
+        );
+        return false;
+    }
+    if string_field(entry, status_field) != Some("hashed") {
+        push_incomplete(
+            findings,
+            "source_terms_document_not_hashed",
+            format!("{label} {expected_relative_path} is not marked hashed"),
+        );
+        return false;
+    }
+    let Some(expected_digest) = string_field(entry, digest_field) else {
+        push_incomplete(
+            findings,
+            "source_terms_document_digest_missing",
+            format!("{label} {expected_relative_path} has no content digest"),
+        );
+        return false;
+    };
+    if !valid_sha256(expected_digest) {
+        push_error(
+            findings,
+            "source_terms_document_digest_invalid",
+            format!("{label} {expected_relative_path} has a malformed SHA-256"),
+        );
+        return false;
+    }
+    let Some(root_path) = root.canonical_path.as_ref() else {
+        push_incomplete(
+            findings,
+            "source_terms_root_unavailable",
+            format!("{label} source root is unavailable for document verification"),
+        );
+        return false;
+    };
+    match hash_relative_source_document(root_path, expected_relative_path) {
+        Ok(actual_digest) if actual_digest == expected_digest => true,
+        Ok(_) => {
+            push_error(
+                findings,
+                "source_terms_document_digest_mismatch",
+                format!("{label} {expected_relative_path} bytes do not match the capability-matrix digest"),
+            );
+            false
+        }
+        Err(error) => {
+            push_incomplete(
+                findings,
+                "source_terms_document_unavailable",
+                format!("{label} {expected_relative_path} cannot be independently read: {error}"),
+            );
+            false
+        }
+    }
+}
+
+fn source_terms_checkout_matches(
+    entry: &Value,
+    policy: SourceTermsPolicy,
+    label: &str,
+    root: &RootObservation,
+    findings: &mut Vec<Finding>,
+) -> bool {
+    let Some(root_path) = root.canonical_path.as_ref() else {
+        push_incomplete(
+            findings,
+            "source_checkout_root_unavailable",
+            format!("{label} source root is unavailable for Git lineage verification"),
+        );
+        return false;
+    };
+    let observed = inspect_upstream_checkout(root_path, policy.expected_remote);
+    if string_field(entry, "source_revision_status") != Some(observed.status) {
+        // A claimed clean checkout that no longer has the recorded state is an
+        // inconsistency; other non-clean states remain incomplete evidence.
+        if string_field(entry, "source_revision_status") == Some("clean_upstream_checkout") {
+            push_error(
+                findings,
+                "source_checkout_status_mismatch",
+                format!("{label} source checkout no longer matches its reported clean upstream status"),
+            );
+        } else {
+            push_incomplete(
+                findings,
+                "source_checkout_not_clean_upstream",
+                format!("{label} checkout status is {}", observed.status),
+            );
+        }
+        return false;
+    }
+    if bool_field(entry, "upstream_origin_matches_expected") != Some(observed.origin_matches_expected) {
+        push_error(
+            findings,
+            "source_checkout_origin_status_mismatch",
+            format!("{label} reported origin-match status differs from the actual Git remote"),
+        );
+        return false;
+    }
+    if observed.origin_matches_expected != true {
+        push_incomplete(
+            findings,
+            "source_checkout_origin_unverified",
+            format!("{label} Git origin does not match the expected upstream repository"),
+        );
+        return false;
+    }
+    if bool_field(entry, "source_checkout_clean") != observed.clean {
+        push_error(
+            findings,
+            "source_checkout_clean_status_mismatch",
+            format!("{label} reported clean-worktree status differs from actual Git status"),
+        );
+        return false;
+    }
+    if observed.clean != Some(true) {
+        push_incomplete(
+            findings,
+            "source_checkout_dirty_or_unknown",
+            format!("{label} upstream checkout is dirty or its status could not be read"),
+        );
+        return false;
+    }
+    let Some(reported_revision) = string_field(entry, "upstream_revision") else {
+        push_incomplete(
+            findings,
+            "source_checkout_revision_missing",
+            format!("{label} has no upstream commit revision"),
+        );
+        return false;
+    };
+    if !valid_git_revision(reported_revision) {
+        push_error(
+            findings,
+            "source_checkout_revision_invalid",
+            format!("{label} upstream revision is not a valid Git object ID"),
+        );
+        return false;
+    }
+    if observed.upstream_revision.as_deref() != Some(reported_revision) {
+        push_error(
+            findings,
+            "source_checkout_revision_mismatch",
+            format!("{label} upstream commit differs from the revision recorded in the matrix"),
+        );
+        return false;
+    }
+    true
+}
+
+fn hash_relative_source_document(root: &Path, relative_path: &str) -> Result<String, String> {
+    let relative = Path::new(relative_path);
+    if relative.as_os_str().is_empty()
+        || relative.is_absolute()
+        || relative_path.contains('\\')
+        || relative
+            .components()
+            .any(|part| !matches!(part, std::path::Component::Normal(_)))
+    {
+        return Err("document path is not a normalized relative path".into());
+    }
+    let joined = root.join(relative);
+    let canonical = std::fs::canonicalize(&joined).map_err(|error| error.to_string())?;
+    if !canonical.starts_with(root) || !canonical.is_file() {
+        return Err("document path escaped its source root or is not a regular file".into());
+    }
+    file_sha256(&canonical)
+        .map(|(digest, _)| digest)
+        .map_err(|error| error.to_string())
+}
+
+fn inspect_upstream_checkout(root: &Path, expected_remote: &str) -> GitCheckoutObservation {
+    let canonical_root = match std::fs::canonicalize(root) {
+        Ok(path) if path.is_dir() => path,
+        _ => {
+            return GitCheckoutObservation {
+                upstream_revision: None,
+                origin_matches_expected: false,
+                clean: None,
+                status: "root_unavailable",
+            };
+        }
+    };
+    let git = |arguments: &[&str]| {
+        Command::new("git")
+            .arg("-C")
+            .arg(root)
+            .args(arguments)
+            .output()
+    };
+    let top_level = match git(&["rev-parse", "--show-toplevel"]) {
+        Ok(output) if output.status.success() => {
+            let output = String::from_utf8_lossy(&output.stdout).trim().to_owned();
+            match std::fs::canonicalize(output) {
+                Ok(path) if path == canonical_root => path,
+                Ok(_) => {
+                    return GitCheckoutObservation {
+                        upstream_revision: None,
+                        origin_matches_expected: false,
+                        clean: None,
+                        status: "asset_root_is_not_repository_root",
+                    };
+                }
+                Err(_) => {
+                    return GitCheckoutObservation {
+                        upstream_revision: None,
+                        origin_matches_expected: false,
+                        clean: None,
+                        status: "git_root_unreadable",
+                    };
+                }
+            }
+        }
+        Ok(_) => {
+            return GitCheckoutObservation {
+                upstream_revision: None,
+                origin_matches_expected: false,
+                clean: None,
+                status: "not_a_git_checkout",
+            };
+        }
+        Err(_) => {
+            return GitCheckoutObservation {
+                upstream_revision: None,
+                origin_matches_expected: false,
+                clean: None,
+                status: "git_unavailable",
+            };
+        }
+    };
+    let _ = top_level;
+
+    let upstream_revision = match git(&["rev-parse", "HEAD"]) {
+        Ok(output) if output.status.success() => {
+            let revision = String::from_utf8_lossy(&output.stdout).trim().to_owned();
+            if valid_git_revision(&revision) {
+                Some(revision)
+            } else {
+                return GitCheckoutObservation {
+                    upstream_revision: None,
+                    origin_matches_expected: false,
+                    clean: None,
+                    status: "invalid_git_revision",
+                };
+            }
+        }
+        _ => {
+            return GitCheckoutObservation {
+                upstream_revision: None,
+                origin_matches_expected: false,
+                clean: None,
+                status: "git_revision_unavailable",
+            };
+        }
+    };
+
+    let remote = match git(&["remote", "get-url", "origin"]) {
+        Ok(output) if output.status.success() => Some(String::from_utf8_lossy(&output.stdout).trim().to_owned()),
+        _ => None,
+    };
+    let origin_matches_expected = remote
+        .as_deref()
+        .and_then(normalize_github_remote)
+        .is_some_and(|remote| remote == expected_remote.to_ascii_lowercase());
+    let clean = match git(&["status", "--porcelain", "--untracked-files=all"]) {
+        Ok(output) if output.status.success() => Some(String::from_utf8_lossy(&output.stdout).trim().is_empty()),
+        _ => None,
+    };
+    let status = match (origin_matches_expected, clean) {
+        (true, Some(true)) => "clean_upstream_checkout",
+        (false, _) => "upstream_origin_mismatch",
+        (true, Some(false)) => "dirty_worktree",
+        (true, None) => "git_status_unavailable",
+    };
+    GitCheckoutObservation {
+        upstream_revision,
+        origin_matches_expected,
+        clean,
+        status,
+    }
+}
+
+fn normalize_github_remote(remote: &str) -> Option<String> {
+    let remote = remote.trim().trim_end_matches('/');
+    let path = remote
+        .strip_prefix("https://github.com/")
+        .or_else(|| remote.strip_prefix("http://github.com/"))
+        .or_else(|| remote.strip_prefix("ssh://git@github.com/"))
+        .or_else(|| remote.strip_prefix("git@github.com:"))?;
+    let path = path.split(['?', '#']).next().unwrap_or(path).trim_end_matches('/');
+    let path = path.strip_suffix(".git").unwrap_or(path);
+    if path.is_empty() || path.contains(':') || path.contains('@') || path.contains("..") {
+        return None;
+    }
+    Some(path.to_ascii_lowercase())
+}
+
 fn verify_selected_sample_file(
     sample: &Value,
     source_library: &str,
