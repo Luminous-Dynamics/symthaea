@@ -146,6 +146,7 @@ cargo run -p symthaea-muse --bin muse_instrument_qualification -- > mel-instrume
 - A selected sample path means the renderer picked and rendered a compatible sample; it does not prove pitch fidelity, full source-bank coverage, authentic technique, or perceptual quality.
 - The pitch estimator searches a target-relative band (approximately half-to-double the requested pitch), capped below the sample-rate Nyquist region and by available window length. Out-of-band requests return an explicit unavailable status; low-periodicity or inharmonic tones must not be assigned a false pass or treated as a calibrated pitch failure. No pitch metric changes the current render outcome gate.
 - Schema revision is `melothaea.instrument-probe.v4`. Run-level provenance records the running probe executable's SHA-256, byte length, and basename (never its absolute path), plus the source revision and the source of that revision value. The pitch calibration report uses `melothaea.pitch-estimator-calibration.v2` and carries the same run-level identity fields.
+- The capability matrix now uses schema `melothaea.instrument-capability-matrix.v3` and emits each additional sample style's identity and bank evidence, including its indexed-content digest when hashing is enabled. This makes the matrix usable for bank-path cross-checks instead of only summarizing style counts.
 - The binary digest is computed by streaming the executable bytes in bounded memory. Hash failures are explicit (`hash_failed` or `unavailable`) and do not get disguised as valid digests. Source revision values supplied through environment variables are caller-supplied metadata, not authenticated proof of the source tree used to build that binary.
 - The MIDI-sweep feature creates per-note diagnostic coverage but does not yet enforce source-derived ranges or per-family calibration.
 - The tool makes no network calls and performs no heavyweight asset download by default.
@@ -197,7 +198,27 @@ SYMTHAEA_SOURCE_REV="$(git rev-parse HEAD)" cargo run -p symthaea-muse --bin mus
 
 The report records `source_revision_status` as `runtime_symthaea_source_rev`, `runtime_github_sha`, `compile_time_embedded`, or `unavailable`. Values supplied at runtime are assertions by the caller; they are not verified against the executable's source tree and are not signed. The binary identity records the basename, SHA-256, byte length, and a state of `hashed`, `hash_failed`, or `unavailable`. The absolute executable path is deliberately omitted to avoid leaking local usernames/workspace paths. Hashing the process executable does not yet capture dynamically linked libraries, the OS/runtime, environment variables, asset licensing, or source authenticity.
 
-These hashes and receipts are integrity evidence rather than a signature or authenticated attestation: they say what bytes were observed, not who supplied them or whether the source was trustworthy. Then add instrument-specific range, pitch-accuracy, and gesture tests. Keep a per-note evidence record linking requested instrument, selected renderer, selected source sample, signal checks, and exact asset/renderer digests. Do not collapse these fields into a pooled “instrument score.”
+These hashes and receipts are integrity evidence rather than a signature or authenticated attestation: they say what bytes were observed, not who supplied them or whether the source was trustworthy.
+
+### P2b — Cross-report provenance verifier
+
+The new `muse_instrument_provenance_verify` CLI cross-checks the run-level executable digest against a separately supplied binary file, plus source revision, root manifests, selected WAV hashes, and each selected sample's bank manifest against the matching instrument/library/relative-directory entry in the capability matrix. It streams and hashes the exact JSON bytes consumed by the parser so a report digest cannot silently refer to a different on-disk version. The matrix schema v3 includes detailed additional-style bank evidence so those selected banks can be checked too. The executable path is supplied as a command-line argument but is not written into the report.
+
+Generate both inputs from a clean source checkout and preserve the outputs outside the checkout, so report generation itself does not make the recorded source revision ambiguous:
+
+```sh
+test -z "$(git status --porcelain)" || { echo "Use a clean checkout for provenance runs." >&2; exit 2; }
+REV="$(git rev-parse HEAD)"
+OUT="$(mktemp -d "${TMPDIR:-/tmp}/melothaea-provenance.XXXXXX")"
+SYMTHAEA_SOURCE_REV="$REV" cargo run -p symthaea-muse --bin muse_instrument_qualification -- --hash-indexed-samples --hash-root-wav-contents > "$OUT/mel-instrument-capability-matrix.json"
+SYMTHAEA_SOURCE_REV="$REV" SYMTHAEA_MUSE_HASH_SOURCE_BANK_MANIFEST=1 cargo run -p symthaea-muse --bin muse_instrument_probe -- --instrument recorder > "$OUT/recorder-probe.json"
+cargo run -p symthaea-muse --bin muse_instrument_provenance_verify -- --probe "$OUT/recorder-probe.json" --inventory "$OUT/mel-instrument-capability-matrix.json" --renderer-binary target/debug/muse_instrument_probe > "$OUT/provenance-verification.json"
+printf 'Evidence reports retained in %s\n' "$OUT"
+```
+
+The verifier streams SHA-256 over both input-report files and the supplied renderer executable, compares executable digest, basename, and byte length against the probe report, and writes a JSON report with those artifact digests plus pass/incomplete/error counts and mismatch findings. Adjust the `--renderer-binary` path to the exact executable file used for the probe if the build uses a non-default Cargo target directory. Exit code 0 means `consistent`; exit 1 means provenance is incomplete or inconsistent; exit 2 means the command or an input file could not be processed. An absent asset root, disabled hashing, schema mismatch, missing selected-bank mapping, or malformed digest cannot silently pass. The verifier's result proves only report consistency: it does not authenticate the claimed source revision, verify the build that produced the executable, validate licensing, or qualify audio quality. Run it for each probe report and keep the two source reports plus verification JSON together.
+
+Then add instrument-specific range, pitch-accuracy, and gesture tests. Keep a per-note evidence record linking requested instrument, selected renderer, selected source sample, signal checks, and exact asset/renderer digests. Do not collapse these fields into a pooled “instrument score.”
 
 ### P2a — Calibrate the measurement instrument first
 - Run MEL-PITCH-CAL-001 on the default synthetic-tone sweep (MIDI 36–96) before interpreting instrument pitch errors.
@@ -234,7 +255,7 @@ This plan is designed to let source work and local evaluation proceed without wa
 
 ## 8. Provisional performance gates (not yet achieved)
 
-These are engineering targets to adopt after the new v2 measurements are locally run and calibrated; they are not results.
+These are engineering targets to adopt after the v3/v4 measurement reports are locally run and calibrated; they are not results.
 
 | Dimension | Proposed target | Qualification note |
 |---|---:|---|
@@ -245,6 +266,7 @@ These are engineering targets to adopt after the new v2 measurements are locally
 | Instrument pitch accuracy | For calibrated, pitched instruments: median absolute error ≤ 5 cents and p95 ≤ 15 cents over supported range | Exclude or separately model inharmonic/percussive timbres and report low-confidence cells |
 | Velocity controllability | ≥95% of declared velocity-sensitive cells show expected loudness direction; exceptions explicitly documented | Treat this as a target only after per-instrument baseline and within-velocity repeatability are measured |
 | Source coverage | 100% of sample-backed cells trace to a relative source path, source WAV byte hash, source root pitch, and source rate; with bank hashing enabled every sample-backed cell carries a bank digest; root content digest captures all discovered .wav assets when enabled | Digests must match for identical assets, roots, and indexer revision; digest ≠ signature, source authenticity, licensing clearance, or renderer identity |
+| Provenance consistency | 100% of selected sample-bank digests match the inventory bank at the same instrument/library/relative path; source revision matches; renderer and existing-root manifests have valid digests | The verifier must return exit 0 only for complete, internally consistent evidence; incomplete or conflicting reports return nonzero and do not imply audio quality |
 | Gesture semantics | 100% of marketed gestures have positive controls, negative controls, and renderer receipts | Untested gestures remain unavailable |
 | Human preference | Paired preference accuracy reported with confidence intervals; target ≥60% preference for improved vs matched baseline with lower 95% CI >50% | Separate instrumental identity, musicality, prompt alignment and production quality; blind review is required |
 

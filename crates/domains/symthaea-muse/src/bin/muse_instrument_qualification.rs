@@ -49,6 +49,9 @@ struct InstrumentQualificationRowV1 {
     short_articulation_samples: Option<SampleBankQualificationV1>,
     additional_style_count: usize,
     additional_styles_with_non_silent_decoded_samples: usize,
+    /// Detailed style-bank identity so render receipts can be cross-checked
+    /// against the exact selected source bank.
+    additional_sample_styles: Vec<SampleStyleQualificationV1>,
     soundfont_bank0_program_matches: Option<Vec<String>>,
     observed_filename_pitch_bounds_midi: Option<(u8, u8)>,
     playable_range_status: &'static str,
@@ -72,6 +75,13 @@ struct SampleBankQualificationV1 {
     indexed_pitch_count: usize,
     distinct_filename_dynamic_strength_count: usize,
     indexed_sample_content_manifest_sha256: Option<String>,
+}
+
+#[derive(Debug, Serialize)]
+struct SampleStyleQualificationV1 {
+    style_name: &'static str,
+    style_kind: &'static str,
+    evidence: SampleBankQualificationV1,
 }
 
 #[derive(Debug, Serialize)]
@@ -108,7 +118,7 @@ fn run() -> Result<(), String> {
         .map(qualification_row)
         .collect::<Vec<_>>();
     let report = QualificationMatrixV1 {
-        schema_version: "melothaea.instrument-capability-matrix.v2",
+        schema_version: "melothaea.instrument-capability-matrix.v3",
         benchmark: "MEL-INST-CAP-001",
         qualification_result: "not_qualified_by_source_inventory_alone",
         evidence_boundary: "source inventory, filename pitch coverage, WAV decode and silence audit only; optional root content manifests hash all WAVs found by the root walker, including files outside the pitch indexer; no render-grid, gesture, or human-preference result is implied",
@@ -163,6 +173,15 @@ fn qualification_row(instrument: &InstrumentCapabilityV1) -> InstrumentQualifica
         short_articulation_samples,
         additional_style_count: instrument.additional_sample_styles.len(),
         additional_styles_with_non_silent_decoded_samples,
+        additional_sample_styles: instrument
+            .additional_sample_styles
+            .iter()
+            .map(|style| SampleStyleQualificationV1 {
+                style_name: style.style_name,
+                style_kind: style.style_kind,
+                evidence: sample_bank_row(&style.evidence),
+            })
+            .collect(),
         soundfont_bank0_program_matches: instrument.soundfont_bank0_program_matches.clone(),
         observed_filename_pitch_bounds_midi,
         playable_range_status: "not_established_by_filename_inventory",
