@@ -66,6 +66,8 @@ pub struct UncertaintyRoutingReceipt {
     pub scenario_id: String,
     /// Version of the producer that emitted the referenced uncertainty assessment.
     pub producer_version: String,
+    /// Full typed input is retained; route/evidence_reference alone are lossy summaries.
+    pub evidence_kind: UncertaintyEvidenceKind,
     pub route: CompatibleAnalysisRoute,
     /// The evidence/qualification reference used for routing.
     pub evidence_reference: String,
@@ -167,6 +169,7 @@ impl UncertaintyAssessmentRef {
         Ok(UncertaintyRoutingReceipt {
             scenario_id: self.scenario_id.clone(),
             producer_version: self.producer_version.clone(),
+            evidence_kind: self.evidence_kind.clone(),
             route,
             evidence_reference,
             source_manifest_digest: self.source_manifest_digest.clone(),
@@ -205,6 +208,7 @@ mod tests {
         );
         assert!(receipt.limitation.contains("does not validate calibration"));
         assert_eq!(receipt.producer_version, "fixture-producer-v1");
+        assert_eq!(receipt.evidence_kind, reference.evidence_kind);
     }
 
     #[test]
