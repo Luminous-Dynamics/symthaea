@@ -13,7 +13,7 @@ Symtropy's Physics Experiment Atlas supplies deterministic experiment/simulation
 - This crate validates the design contract and ranks candidates using a prior-free, maximin standardized-separation heuristic.
 - The simulation or laboratory produces observations later. An independent scorer compares those observations to frozen predictions.
 
-The first cross-project fixture is Galileo's ideal inclined-plane question: constant acceleration and constant velocity are matched at a two-second observation, so that observation cannot discriminate between the models. Under the fixture's declared idealized equations, a four-second displacement differs by about 19.61 m and ranks ahead of the matched-time candidate.
+The first cross-project fixture is Galileo's ideal inclined-plane question: constant acceleration and constant velocity are matched at a two-second observation, so that observation cannot discriminate between the models. The candidate settings explicitly say observation_time=2 s and observation_time=4 s; they are included in the ranked output, not hidden in an experiment ID. Under the fixture's declared idealized equations, a four-second displacement differs by about 19.61 m and ranks ahead of the matched-time candidate.
 
 This is a pedagogical synthetic demonstration, not a reconstruction of Galileo's historic apparatus or his source data.
 
@@ -30,7 +30,7 @@ Rank a JSON design provided on stdin:
 The strict physics-experiment-design-v0.1 input includes:
 - a target question;
 - at least two uniquely named rival hypotheses;
-- candidate experiments with unique IDs, positive relative cost units and non-negative duration;
+- candidate experiments with a human-readable intervention description, unique IDs, positive relative cost units, non-negative duration and at least one explicit numeric parameter setting (parameter ID + value + unit);
 - at least one observable per candidate, with a non-empty unit;
 - exactly one finite predicted mean and positive finite predictive standard uncertainty for every hypothesis/observable pair;
 - a non-empty model descriptor and uncertainty descriptor per prediction, each carrying a lowercase 64-character SHA-256 digest matching the exact descriptor UTF-8 bytes.
@@ -39,7 +39,7 @@ Missing hypotheses, duplicate IDs, unknown hypotheses, empty prediction sets, mi
 
 The digests verify only that the supplied descriptor text matches its fingerprint. They do **not** attest that an executable produced the prediction, that the source code matches the descriptor, or that the uncertainty is calibrated. Those claims require higher-level evidence receipts containing source revision, run configuration, input/output digests and calibration provenance.
 
-The output is a deterministic ranked JSON receipt. It identifies the hypothesis pair that is hardest to distinguish for each candidate, reports standardized separation, cost-adjusted score and measurement count, and discloses limitations. Input-order changes should not alter scores or ranking.
+The output is a deterministic ranked JSON receipt. It identifies the hypothesis pair that is hardest to distinguish for each candidate, reports the actionable settings, standardized separation, cost-adjusted score and measurement count, and discloses limitations. Returned settings are sorted by parameter ID. Input-order changes should not alter scores or ranking.
 
 ## What the score means—and does not
 
@@ -65,7 +65,7 @@ This is **not** Bayesian expected information gain, a Bayes factor, a posterior 
 
 | Gate | Benchmark | Proposed acceptance |
 |---|---|---|
-| Contract integrity | missing/duplicate hypotheses and observations; wrong schema; missing unit; altered model/uncertainty descriptor without digest update; NaN/infinite mean or uncertainty; zero cost | 100% of malformed fixtures rejected |
+| Contract integrity | missing/duplicate hypotheses, observations or intervention settings; wrong schema; missing unit; altered model/uncertainty descriptor without digest update; NaN/infinite mean, uncertainty or parameter; zero cost | 100% of malformed fixtures rejected |
 | Determinism | same input repeated; permutations of candidate and prediction order | exact same rank, metrics and hypothesis pair |
 | Discriminating power | toy rival models equal at one control value and different at another | select the non-degenerate intervention; identical predictions score exactly zero |
 | Robustness | increase predictive uncertainty, change relative cost, and make the hardest pair overlap | score must fall or not improve spuriously; ranking recomputed from declared inputs |
