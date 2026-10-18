@@ -64,6 +64,8 @@ Compare on identical scenarios, candidate feasibility, initial observations, and
 
 On exact utility ties, deterministic metric-based selectors use a stable documented tie-break (candidate ID), not serialized candidate order. Seeded-random baselines sort candidate IDs before applying the seed/scenario selector.
 
+The synthetic interaction-budget prototype is in `preference_drift_frontier.rs`. For every budget from zero through a caller-bounded maximum, it compares canonical lexicographic and seeded-random selection of previously unasked eligible candidate pairs. A query is frozen before an offline synthetic responder consults the evaluation oracle; the response is then added as explicitly synthetic feedback, or recorded as unanswered when the oracle supplies no ranking. The frontier reports query counts, unanswered questions, final recommendations, acceptable/unacceptable choices, abstentions, reject-all handling, and per-family slices. The oracle is not present in the policy-view or question-selector inputs. This qualifies the interaction protocol and cost bookkeeping, not a learned preference policy or real wearer response/time.
+
 The frozen fixed-weight engineering comparator uses task success (0.40), stability margin (0.20), normalized wearer-borne mass (0.15), normalized energy per task (0.10), and movement freedom (0.15). Its weights and scales are constants, not fitted to evaluation-oracle labels. It is an engineering-metric proxy, not a model of subjective preference.
 
 A context-aware preference method is an additional baseline only after its interface, provenance, calibration, and training/test isolation are qualified. Do not implement another generic preference model or active-learning engine just to run this domain benchmark; adapt the existing qualified interfaces.
@@ -78,6 +80,7 @@ Report raw numerators/denominators, uncertainty intervals, excluded episodes, an
 | Preference regret / top-choice agreement | Evaluate only where the evaluation oracle explicitly supplies a ranking; do not manufacture a ranking for “insufficient evidence” or “reject all” episodes |
 | Reversal-detection latency | Query/feedback steps from a scripted context change until policy flags stale preference or updates its recommendation; distinguish no-feedback detection from actual preference confirmation |
 | Query burden | Number of queries, cost budget, and answerable decisions; report query-budget exhaustion separately |
+| Query budget frontier | For each budget, report selected pairs, answered/unanswered questions, final acceptable choices, abstentions, and per-family counts; report synthetic responder assumptions separately |
 | Abstention behavior | Correct abstention/query on missing, contradictory, expired, rejected-all, and budget-exhausted controls; useful coverage on positive controls |
 | Preference freshness | Zero expired observations used in recommendations; zero future-dated records accepted; report expiration separately from context mismatch |
 | Order invariance | The same logical candidate/observation sets yield the same normalized choices regardless of array order; seeded random selection hashes a scenario identity and indexes canonical candidate IDs |
@@ -103,7 +106,8 @@ The initial fixture should be implemented as deterministic contract tests. Propo
 - **100%** of over-age preference records are excluded from policy decisions, with expiry visible in the decision receipt.
 - Future-dated feedback and missing/invalid freshness metadata fail closed.
 - **100%** of missing/contradictory/reject-all controls trigger explicit uncertainty, query, or abstention behavior consistent with available query budget.
-- **0** evaluation-oracle fields reach policy features, model fitting, active query ranking, or calibration.
+- **0** evaluation-oracle fields reach policy features, model fitting, query-pair selection, or calibration; use the oracle only after the question is frozen to simulate a response, and after the episode to score outcomes.
+- Candidate/observation permutations preserve normalized replay receipts and baseline choices; query-pair selectors are invariant to candidate array ordering.
 - **0** synthetic preference records are reported as actual wearer input or clinical evidence.
 - Same canonical fixture + same policy revision/parameters produces byte-identical replay artifacts.
 - Reordering an eligible-candidate list or the same set of preference observations must not change the normalized decision receipt; ordering is not preference evidence.
@@ -167,8 +171,8 @@ A passing deterministic fixture can establish only that a particular implementat
 Sequence:
 1. Freeze the freshness-bounded fixture v2 contract and expected behavior.
 2. Run the Rust unit tests and workspace checks on an environment with the Rust toolchain; record exact source revision and actual output.
-3. Expand the factorized generator beyond template replication into explicit, versioned wearer/session-stratum, task, fatigue, terrain/transition, and preference-reversal axes; retain grouped wearer/session and whole-family holdouts and report which axes were actually varied.
-4. Use the generator's seed/config/split/count manifest and content digest in the paired baseline runner; do not treat repeated templates as independent scenarios.
-5. Implement/compare a Pareto-plus-query/abstention baseline and a decision-relevant query-selection baseline; freeze query selection without oracle access and do not connect to actuation.
-6. Qualify grouped generated-suite metrics and only then design a separate human study with suitable protocol, consent/ethics, safety review, and calibrated instrumentation.
-5. Only after offline benchmark qualification, design any human study separately with appropriate protocol, consent/ethics, safety review and calibrated instrumentation.
+3. Expand the source corpus with independently authored task and environment families and more wearer/session strata; preserve grouped holdouts and publish factor coverage so repeated template variants are not mistaken for independent conditions.
+4. Run the interaction-budget frontier over the generated suite and publish the exact seed/config/digest with per-family counts; compare the two question selectors without treating synthetic response counts as human interaction-time estimates.
+5. Add a Pareto-plus-query/abstention baseline that reuses the existing engineering feasibility/Pareto interfaces and never uses evaluation-oracle labels to rank questions.
+6. Run Rust/workspace tests on an environment with the toolchain and preserve exact-head execution evidence.
+7. Only after offline qualification, design a separate human study with appropriate protocol, consent/ethics, safety review, calibrated instrumentation, and real measures of task utility, comfort, exertion, and interaction burden.
