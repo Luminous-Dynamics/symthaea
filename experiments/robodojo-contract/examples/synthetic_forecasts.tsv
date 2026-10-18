@@ -1,0 +1,13 @@
+task_id	variant_id	trial_id	predicted_success_probability	success	valid_run
+stack_bowls	baseline	seed-01	0.55	false	true
+stack_bowls	baseline	seed-02	0.70	false	true
+stack_bowls	baseline	seed-03	0.65	false	false
+stack_bowls	symthaea_sidecar	seed-01	0.60	false	true
+stack_bowls	symthaea_sidecar	seed-02	0.80	false	true
+stack_bowls	symthaea_sidecar	seed-03	0.70	false	false
+store_in_safe	baseline	seed-01	0.30	false	true
+store_in_safe	baseline	seed-02	0.55	false	true
+store_in_safe	baseline	seed-03	0.40	false	false
+store_in_safe	symthaea_sidecar	seed-01	0.60	false	true
+store_in_safe	symthaea_sidecar	seed-02	0.90	true	true
+store_in_safe	symthaea_sidecar	seed-03	0.60	false	false
