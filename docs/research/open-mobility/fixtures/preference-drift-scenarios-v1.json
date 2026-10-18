@@ -125,7 +125,8 @@
       "expected_guardrails": [
         "do_not_infer_preference_from_engineering_metrics",
         "do_not_overstate_pairwise_feedback_as_full_cardinal_utility"
-      ]
+      ],
+      "current_context_id": "level-rested"
     },
     {
       "scenario_id": "DEV-WALK-002",
@@ -183,7 +184,8 @@
       "expected_guardrails": [
         "support_wearer_heterogeneity",
         "do_not_assume_one_preference_profile_for_all_wearers"
-      ]
+      ],
+      "current_context_id": "level-rested"
     },
     {
       "scenario_id": "HOLD-SHIFT-001",
@@ -245,7 +247,8 @@
         "detect_context_mismatch",
         "do_not_reuse_stale_preference_as_current_truth",
         "query_or_abstain_before_claiming_current_preference"
-      ]
+      ],
+      "current_context_id": "level-fatigued"
     },
     {
       "scenario_id": "HOLD-TRANSFER-001",
@@ -307,7 +310,8 @@
         "held_out_task_not_same_task_replay",
         "context_mismatch_requires_query_or_abstention",
         "engineering_task_success_is_not_preference"
-      ]
+      ],
+      "current_context_id": "chair-rise"
     },
     {
       "scenario_id": "HOLD-ENV-001",
@@ -371,7 +375,8 @@
         "detect_environment_shift",
         "do_not_claim_zero_shot_preference_transfer_without_evidence",
         "respect_query_budget"
-      ]
+      ],
+      "current_context_id": "ramp-transition"
     },
     {
       "scenario_id": "HOLD-GATE-001",
@@ -440,7 +445,8 @@
         "zero_hard_gate_violations",
         "preference_must_not_re_admit_ineligible_candidate",
         "choose_best_evidenced_eligible_option_or_abstain"
-      ]
+      ],
+      "current_context_id": "constrained-low-capacity"
     },
     {
       "scenario_id": "HOLD-UNKNOWN-001",
@@ -473,7 +479,8 @@
         "abstain_or_ask",
         "never_fabricate_total_order",
         "no_feedback_means_no_preference_claim"
-      ]
+      ],
+      "current_context_id": "level-unknown"
     },
     {
       "scenario_id": "HOLD-CONFLICT-001",
@@ -525,7 +532,8 @@
         "preserve_conflict",
         "do_not_average_opposing_pairwise_labels_into_false_certainty",
         "ask_if_budget_remains"
-      ]
+      ],
+      "current_context_id": "level-rested-current"
     },
     {
       "scenario_id": "HOLD-REJECT-001",
@@ -571,7 +579,8 @@
         "do_not_force_a_recommendation",
         "abstain_when_all_options_rejected",
         "query_budget_must_not_be_exceeded"
-      ]
+      ],
+      "current_context_id": "chair-rise-current"
     },
     {
       "scenario_id": "HOLD-BUDGET-001",
@@ -621,7 +630,8 @@
         "no_extra_query",
         "abstain_when_context_specific_evidence_is_absent",
         "report_budget_exhaustion_separately_from_model_error"
-      ]
+      ],
+      "current_context_id": "slope-current"
     },
     {
       "scenario_id": "HOLD-NOISE-001",
@@ -689,7 +699,8 @@
         "expose_feedback_disagreement",
         "calibrate_or_lower_confidence",
         "do_not_treat_majority_vote_as_a_calibrated_probability"
-      ]
+      ],
+      "current_context_id": "level-rested-current"
     },
     {
       "scenario_id": "HOLD-ENGINEERING-001",
@@ -746,7 +757,8 @@
       "expected_guardrails": [
         "preference_evidence_beats_inferred_preference_from_metric_proxy",
         "keep_engineering_merit_and_subjective_preference_separate"
-      ]
+      ],
+      "current_context_id": "level-rested-current"
     }
   ]
 }
