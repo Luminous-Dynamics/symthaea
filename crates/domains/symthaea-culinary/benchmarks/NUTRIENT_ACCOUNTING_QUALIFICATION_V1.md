@@ -11,6 +11,15 @@ Separate three things which recipe calculators often blur:
 
 The final recipe mass and nutrient amount are distinct physical quantities. A yield factor changes concentration via the denominator; it must not be applied a second time to nutrient total. Added ingredients must be represented explicitly. Unknown composition is not zero. An evidence-qualified result must be based on versioned composition, mass, final-yield and retention evidence; arithmetic self-consistency alone cannot qualify scientific truth.
 
+## Research basis
+
+- FAO's procedure for calculating multi-ingredient food composition explicitly separates edible-portion corrections, cooked-ingredient/yield adjustments, nutrient totals, recipe-level weight and retention adjustments, and final values per 100 g or serving: [FAO Food Composition Data](https://www.fao.org/4/y4705e/y4705e23.htm).
+- FAO's discussion of composite prepared dishes notes that calculated results depend on known raw-to-cooked yield and that retention-factor estimates should carry lower confidence than representative analytical values: [FAO: Calculation of composition of composite prepared dishes](https://www.fao.org/4/y4705e/y4705e15.htm).
+- EuroFIR distinguishes a weight yield factor from a nutrient retention factor, recommends recipe-level yield adjustment and ingredient-level retention factors, and emphasizes detailed documentation of recipe, source data, factors and calculation method: [EuroFIR recipe calculation method](https://www.eurofir.org/how-do-recipes-and-composite-foods-come-to-their-nutritional-values/) and [guideline paper](https://pubmed.ncbi.nlm.nih.gov/28867099/).
+- The EuroFIR guideline also recommends checking sums of major components plus water for plausible closure around 100 g per 100 g edible portion. This contract does not yet implement that composition-closure diagnostic; it is a planned independent consistency check, not a substitute for nutrient-specific laboratory validation: [EuroFIR recipe guideline PDF](https://www.eurofir.eu/bacchus/wp-content/uploads/2015/12/EUROFIR-RECIPE-GUIDELINE_FINAL.pdf).
+
+These sources motivate a source-pinned calculation chain, but the v1 contract is not a claim of complete implementation or formal compliance with the cited guidance.
+
 ## Synthetic conformance targets
 
 - 100% agreement with independently enumerated exact arithmetic and interval arithmetic.
