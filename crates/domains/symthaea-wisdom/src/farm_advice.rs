@@ -12,7 +12,7 @@
 use std::collections::BTreeSet;
 
 use crate::accountability::{AccountabilityCase, AccountabilityCaseId, RepairKind, RepairStatus};
-use crate::evidence_ledger::{DecisionId, DeliberationEvidenceLedger, FactClaimId};
+use crate::evidence_ledger::{DecisionId, DeliberationEvidenceLedger, EvidenceRelation, FactClaimId};
 
 #[derive(Debug, Clone, PartialEq, Eq, PartialOrd, Ord, Hash)]
 pub struct AdviceEpisodeId(String);
@@ -413,6 +413,29 @@ impl FarmAdviceProfile {
         evidence: &DeliberationEvidenceLedger,
     ) -> Result<(), FarmAdviceError> {
         validate_fact_references(&premise.fact_claims, evidence)?;
+        match premise.kind {
+            AdviceEvidenceKind::Unknown => {}
+            AdviceEvidenceKind::Conflicting => {
+                let conflict_is_recorded = evidence.facts().conflicts().iter().any(|conflict| {
+                    premise.fact_claims.contains(&conflict.left)
+                        && premise.fact_claims.contains(&conflict.right)
+                });
+                if !conflict_is_recorded {
+                    return Err(FarmAdviceError::ConflictNotRecordedInLedger);
+                }
+            }
+            _ => {
+                for id in &premise.fact_claims {
+                    let claim = evidence.facts().get(id)
+                        .ok_or_else(|| FarmAdviceError::FactReferenceNotFound(id.clone()))?;
+                    if !claim.evidence.iter().any(|observation| {
+                        observation.relation == EvidenceRelation::Supports
+                    }) {
+                        return Err(FarmAdviceError::PremiseSupportEvidenceRequired(id.clone()));
+                    }
+                }
+            }
+        }
         for existing in &self.premises {
             if existing.fact_claims.iter().any(|id| premise.fact_claims.contains(id)) {
                 return Err(FarmAdviceError::DuplicatePremiseReference);
@@ -492,6 +515,8 @@ pub enum FarmAdviceError {
     PremiseClaimRequired,
     PremiseAsOfRequired,
     DuplicatePremiseReference,
+    PremiseSupportEvidenceRequired(FactClaimId),
+    ConflictNotRecordedInLedger,
     FactReferenceNotFound(FactClaimId),
     DecisionReferenceNotFound,
     AccountabilityCaseMismatch,
@@ -507,7 +532,7 @@ mod tests {
     use super::*;
     use crate::accountability::AccountabilityCase;
     use crate::authority_envelope::RelationalAuthorityAssessment;
-    use crate::evidence_ledger::NormativeClaimId;
+    use crate::evidence_ledger::{EvidenceObservation, EvidenceRelation, NormativeClaimId};
     use crate::ontology::ActionAuthority;
     use crate::perspective::StakeholderId;
 
@@ -527,6 +552,19 @@ mod tests {
         evidence.add_fact(fact("conflict-a"), "sensor reports low flow", 0.8).unwrap();
         evidence.add_fact(fact("conflict-b"), "farmer observation reports normal flow", 0.75).unwrap();
         evidence.add_fact(fact("replacement-premise"), "replacement premise", 0.9).unwrap();
+        for (id, source, confidence) in [
+            ("premise-measured", "sensor:demo-flow", 0.9),
+            ("forecast-flow", "model:irrigation-demo-v1", 0.7),
+            ("observed-flow", "sensor:follow-up-flow", 0.95),
+            ("conflict-a", "sensor:flow-a", 0.8),
+            ("conflict-b", "farmer:observation-b", 0.75),
+        ] {
+            evidence.add_fact_evidence(
+                &fact(id),
+                EvidenceObservation::new(source, EvidenceRelation::Supports, confidence).unwrap(),
+            ).unwrap();
+        }
+        evidence.record_fact_conflict(&fact("conflict-a"), &fact("conflict-b"), "sensor-farmer-disagreement").unwrap();
         evidence.add_normative_claim(NormativeClaimId::new("goal").unwrap(), "farmer-stated goal", 0.9).unwrap();
         evidence.register_decision(decision("decision-1"), [fact("premise-measured")], [NormativeClaimId::new("goal").unwrap()]).unwrap();
         evidence
@@ -594,6 +632,41 @@ mod tests {
             AdvicePremise::new(AdviceEvidenceKind::Reported, [fact("missing")], Some(1_800_000_000)).unwrap(),
             &e,
         ).is_err());
+    }
+
+    #[test]
+    fn measured_claim_without_supporting_evidence_is_rejected() {
+        let mut e = DeliberationEvidenceLedger::new();
+        e.add_fact(fact("unbacked-measurement"), "sensor reports a value", 0.7).unwrap();
+        e.add_normative_claim(NormativeClaimId::new("goal").unwrap(), "farmer goal", 0.9).unwrap();
+        e.register_decision(decision("decision-1"), [fact("unbacked-measurement")], [NormativeClaimId::new("goal").unwrap()]).unwrap();
+        let case = wcare_case(&e);
+        let mut p = profile(&e, &case);
+        let premise = AdvicePremise::new(
+            AdviceEvidenceKind::Measured,
+            [fact("unbacked-measurement")],
+            Some(1_800_000_000),
+        ).unwrap();
+        assert_eq!(
+            p.add_premise(premise, &e),
+            Err(FarmAdviceError::PremiseSupportEvidenceRequired(fact("unbacked-measurement")))
+        );
+    }
+
+    #[test]
+    fn conflicting_label_requires_a_recorded_ledger_conflict() {
+        let e = evidence();
+        let case = wcare_case(&e);
+        let mut p = profile(&e, &case);
+        let not_actually_conflicting = AdvicePremise::new(
+            AdviceEvidenceKind::Conflicting,
+            [fact("premise-measured"), fact("forecast-flow")],
+            Some(1_800_000_000),
+        ).unwrap();
+        assert_eq!(
+            p.add_premise(not_actually_conflicting, &e),
+            Err(FarmAdviceError::ConflictNotRecordedInLedger)
+        );
     }
 
     #[test]
