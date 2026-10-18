@@ -1,0 +1,286 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://github.com/Luminous-Dynamics/symthaea/blob/main/docs/research/bioprotein/fixtures/bioprotein-gate-schema-v1.json",
+  "title": "Synthetic-first bioprotein feasibility case",
+  "description": "Test-contract schema only. Values are not biological data, food composition data, feeding advice, or proof of product safety.",
+  "type": "object",
+  "required": [
+    "case_id",
+    "request",
+    "candidate",
+    "expected",
+    "rationale"
+  ],
+  "properties": {
+    "case_id": {
+      "type": "string",
+      "pattern": "^BIOP-GATE[0-9]-[0-9]{3}$"
+    },
+    "request": {
+      "type": "object",
+      "required": [
+        "target_species",
+        "life_stage",
+        "intended_use",
+        "requested_claim",
+        "scenario_digest"
+      ],
+      "properties": {
+        "target_species": {
+          "type": "string",
+          "minLength": 1
+        },
+        "life_stage": {
+          "type": "string",
+          "minLength": 1
+        },
+        "intended_use": {
+          "enum": [
+            "ingredient_screen",
+            "complementary_food_screen",
+            "complete_diet_screen",
+            "feed_screen",
+            "cultivated_process_screen"
+          ]
+        },
+        "requested_claim": {
+          "enum": [
+            "evidence_eligibility",
+            "nutrition_feasibility",
+            "lca_comparison",
+            "scenario_feasibility"
+          ]
+        },
+        "scenario_digest": {
+          "type": "string",
+          "minLength": 1
+        }
+      },
+      "additionalProperties": false
+    },
+    "candidate": {
+      "type": "object",
+      "required": [
+        "candidate_id",
+        "ingredient_class",
+        "source",
+        "identity_match",
+        "target_match",
+        "source_freshness",
+        "basis_state",
+        "nutrition_gate",
+        "safety_gate",
+        "authorization_gate",
+        "availability",
+        "evidence_kind",
+        "cost"
+      ],
+      "properties": {
+        "candidate_id": {
+          "type": "string",
+          "minLength": 1
+        },
+        "ingredient_class": {
+          "enum": [
+            "conventional",
+            "microbial",
+            "fungal",
+            "algae",
+            "fermentation_derived",
+            "cultivated_cell",
+            "hybrid",
+            "synthetic_control"
+          ]
+        },
+        "source": {
+          "type": "object",
+          "required": [
+            "source_id",
+            "rights_status",
+            "permission_evidence_present",
+            "attribution_required",
+            "attribution_present"
+          ],
+          "properties": {
+            "source_id": {
+              "type": "string",
+              "minLength": 1
+            },
+            "rights_status": {
+              "enum": [
+                "permitted",
+                "attribution_required",
+                "restricted",
+                "unknown",
+                "expired",
+                "revoked"
+              ]
+            },
+            "permission_evidence_present": {
+              "type": "boolean"
+            },
+            "attribution_required": {
+              "type": "boolean"
+            },
+            "attribution_present": {
+              "type": "boolean"
+            }
+          },
+          "additionalProperties": false
+        },
+        "identity_match": {
+          "enum": [
+            "match",
+            "mismatch",
+            "unknown"
+          ]
+        },
+        "target_match": {
+          "enum": [
+            "match",
+            "mismatch",
+            "unknown"
+          ]
+        },
+        "source_freshness": {
+          "enum": [
+            "current",
+            "stale",
+            "unknown"
+          ]
+        },
+        "basis_state": {
+          "enum": [
+            "normalized",
+            "mixed_without_conversion",
+            "unknown",
+            "incompatible_units"
+          ]
+        },
+        "nutrition_gate": {
+          "enum": [
+            "pass",
+            "fail",
+            "unknown",
+            "not_requested"
+          ]
+        },
+        "safety_gate": {
+          "enum": [
+            "pass",
+            "fail",
+            "unknown",
+            "not_assessed"
+          ]
+        },
+        "authorization_gate": {
+          "enum": [
+            "pass",
+            "fail",
+            "unknown",
+            "not_applicable"
+          ]
+        },
+        "availability": {
+          "enum": [
+            "available",
+            "unavailable",
+            "seasonal_unknown"
+          ]
+        },
+        "evidence_kind": {
+          "enum": [
+            "measured",
+            "estimated",
+            "synthetic",
+            "simulated"
+          ]
+        },
+        "cost": {
+          "type": "object",
+          "required": [
+            "value",
+            "currency_or_unit",
+            "basis"
+          ],
+          "properties": {
+            "value": {
+              "type": "number",
+              "minimum": 0
+            },
+            "currency_or_unit": {
+              "type": "string",
+              "minLength": 1
+            },
+            "basis": {
+              "type": "string",
+              "minLength": 1
+            }
+          },
+          "additionalProperties": false
+        },
+        "lca_state": {
+          "enum": [
+            "complete",
+            "incomplete",
+            "not_requested"
+          ]
+        },
+        "scenario_digest": {
+          "type": "string",
+          "minLength": 1
+        }
+      },
+      "additionalProperties": false
+    },
+    "expected": {
+      "type": "object",
+      "required": [
+        "disposition",
+        "reason_codes"
+      ],
+      "properties": {
+        "disposition": {
+          "enum": [
+            "eligible_for_declared_comparison",
+            "blocked",
+            "indeterminate",
+            "not_comparable",
+            "invalid_evidence"
+          ]
+        },
+        "reason_codes": {
+          "type": "array",
+          "minItems": 1,
+          "items": {
+            "type": "string",
+            "minLength": 1
+          }
+        },
+        "claims_allowed": {
+          "type": "array",
+          "items": {
+            "enum": [
+              "evidence_eligibility",
+              "nutrition_feasibility",
+              "lca_comparison",
+              "scenario_feasibility"
+            ]
+          }
+        },
+        "claims_not_established": {
+          "type": "array",
+          "items": {
+            "type": "string"
+          }
+        }
+      },
+      "additionalProperties": false
+    },
+    "rationale": {
+      "type": "string",
+      "minLength": 1
+    }
+  },
+  "additionalProperties": false
+}
