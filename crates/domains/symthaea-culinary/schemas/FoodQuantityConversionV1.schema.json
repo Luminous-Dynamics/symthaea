@@ -50,6 +50,16 @@
             "known_at": { "type": "string", "format": "date-time" },
             "evidence_status": { "enum": ["synthetic", "unreviewed", "reviewed", "qualified"] }
           }
+        },
+        {
+          "if": {
+            "properties": {
+              "evidence_status": { "const": "qualified" },
+              "source_ref": { "pattern": "^urn:synthetic:" }
+            },
+            "required": ["evidence_status", "source_ref"]
+          },
+          "then": false
         }
       ]
     },
@@ -73,7 +83,19 @@
         "source_version": { "type": "string", "minLength": 1 },
         "known_at": { "type": "string", "format": "date-time" },
         "evidence_status": { "enum": ["synthetic", "unreviewed", "reviewed", "qualified"] }
-      }
+      },
+      "allOf": [
+        {
+          "if": {
+            "properties": {
+              "evidence_status": { "const": "qualified" },
+              "source_ref": { "pattern": "^urn:synthetic:" }
+            },
+            "required": ["evidence_status", "source_ref"]
+          },
+          "then": false
+        }
+      ]
     },
     "output": {
       "type": "object",
