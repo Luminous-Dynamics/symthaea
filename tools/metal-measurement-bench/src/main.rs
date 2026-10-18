@@ -1302,6 +1302,12 @@ mod tests {
     }
 
     #[test]
+    fn csv_inventory_rejects_unterminated_quoted_fields() {
+        let input = b"id,note\n1,\"unterminated\n";
+        assert!(inspect_csv_bytes(input, "fixture.csv").is_err());
+    }
+
+    #[test]
     fn csv_inventory_handles_quoted_newlines_as_one_record() {
         let input = b"id,note\n1,\"line one\nline two\"\n2,ok\n";
         let inventory = inspect_csv_bytes(input, "fixture.csv").unwrap();
