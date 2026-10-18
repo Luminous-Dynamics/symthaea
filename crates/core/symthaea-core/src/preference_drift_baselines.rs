@@ -454,6 +454,153 @@ pub fn evaluate_preference_selection_baselines(
     })
 }
 
+/// Compact result for one seed in a deterministic random-baseline sweep.
+#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
+#[serde(deny_unknown_fields)]
+pub struct PreferenceRandomSeedSweepPointV1 {
+    /// Root seed for this replicate.
+    pub seed: u64,
+    /// Acceptable selections among scenarios with a ranking oracle.
+    pub acceptable_selection_count: usize,
+    /// Unacceptable selections among scenarios with a ranking oracle.
+    pub unacceptable_selection_count: usize,
+    /// Selections when the oracle provides no ranking or explicitly rejects all options.
+    pub selection_without_ranking_count: usize,
+    /// Selections in explicit reject-all scenarios.
+    pub selection_on_reject_all_count: usize,
+    /// Selections made with at least one stale/mismatched preference observation present.
+    pub stale_context_selection_count: usize,
+}
+
+/// Reproducible multi-seed diagnostic for the random eligible-candidate baseline.
+#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
+#[serde(deny_unknown_fields)]
+pub struct PreferenceRandomSeedSweepReportV1 {
+    /// Report schema.
+    pub schema_version: u64,
+    /// Version of the synthetic fixture.
+    pub fixture_version: String,
+    /// First seed in the inclusive sequence.
+    pub first_seed: u64,
+    /// Number of seeds evaluated.
+    pub seed_count: usize,
+    /// Number of scenarios per seed.
+    pub scenario_count_per_seed: usize,
+    /// Number of scenarios with ranking oracles per seed.
+    pub ranking_scenarios_per_seed: usize,
+    /// Total ranked selection opportunities across every seed.
+    pub ranked_selection_opportunities: usize,
+    /// Acceptable selections across ranked opportunities.
+    pub acceptable_selection_count: usize,
+    /// Unacceptable selections across ranked opportunities.
+    pub unacceptable_selection_count: usize,
+    /// Selections emitted with insufficient preference evidence or a reject-all oracle.
+    pub selection_without_ranking_count: usize,
+    /// Selections emitted in explicit reject-all cases.
+    pub selection_on_reject_all_count: usize,
+    /// Selections with stale/mismatched preference observations in the episode.
+    pub stale_context_selection_count: usize,
+    /// Minimum acceptable selections in any one seed replicate.
+    pub min_acceptable_per_seed: usize,
+    /// Maximum acceptable selections in any one seed replicate.
+    pub max_acceptable_per_seed: usize,
+    /// Per-seed diagnostics, ordered by seed.
+    pub per_seed: Vec<PreferenceRandomSeedSweepPointV1>,
+    /// Explicit limitation of the sweep.
+    pub claim_ceiling: String,
+}
+
+/// Evaluate a contiguous seed sequence for the random baseline.
+///
+/// The default comparison corpus remains the same for every seed; this sweep characterizes
+/// sensitivity to random selection order, not generalization across independent scenarios.
+/// Seed range and maximum count are validated to prevent overflow and accidental huge runs.
+pub fn evaluate_seeded_random_seed_sweep(
+    input: &str,
+    first_seed: u64,
+    seed_count: usize,
+) -> Result<PreferenceRandomSeedSweepReportV1, Vec<PreferenceDriftFixtureFindingV1>> {
+    const MAX_SEEDS: usize = 10_000;
+    validate_preference_drift_fixture(input)?;
+    if seed_count == 0 || seed_count > MAX_SEEDS {
+        return Err(vec![finding(
+            "$.seed_count",
+            format!("seed_count must be between 1 and {MAX_SEEDS}"),
+        )]);
+    }
+    let seed_offset = u64::try_from(seed_count - 1)
+        .map_err(|_| vec![finding("$.seed_count", "seed count does not fit u64")])?;
+    let last_seed = first_seed.checked_add(seed_offset).ok_or_else(|| {
+        vec![finding("$.first_seed", "seed sequence would overflow u64")]
+    })?;
+
+    let root: Value = serde_json::from_str(input)
+        .map_err(|error| vec![finding("$", format!("invalid JSON: {error}"))])?;
+    let fixture_version = root
+        .get("fixture_version")
+        .and_then(Value::as_str)
+        .map(str::to_owned)
+        .ok_or_else(|| vec![finding("$.fixture_version", "missing fixture version")])?;
+    let scenarios = root
+        .get("scenarios")
+        .and_then(Value::as_array)
+        .ok_or_else(|| vec![finding("$.scenarios", "missing scenario list")])?;
+
+    let mut per_seed = Vec::with_capacity(seed_count);
+    let mut acceptable_total = 0usize;
+    let mut unacceptable_total = 0usize;
+    let mut no_ranking_total = 0usize;
+    let mut reject_all_total = 0usize;
+    let mut stale_total = 0usize;
+    let mut min_acceptable = usize::MAX;
+    let mut max_acceptable = 0usize;
+    let mut ranking_scenarios_per_seed = 0usize;
+
+    for offset in 0..seed_count {
+        let seed = first_seed + offset as u64;
+        let mut assessments = Vec::with_capacity(scenarios.len());
+        for scenario in scenarios {
+            assessments.push(choose_seeded_random(scenario, seed)?);
+        }
+        let scored = score_selections(scenarios, &assessments, "seeded_random", Some(seed));
+        ranking_scenarios_per_seed = scored.oracle_ranking_scenario_count;
+        acceptable_total += scored.acceptable_selection_count;
+        unacceptable_total += scored.unacceptable_selection_count;
+        no_ranking_total += scored.selection_without_ranking_count;
+        reject_all_total += scored.selection_on_reject_all_count;
+        stale_total += scored.stale_context_selection_count;
+        min_acceptable = min_acceptable.min(scored.acceptable_selection_count);
+        max_acceptable = max_acceptable.max(scored.acceptable_selection_count);
+        per_seed.push(PreferenceRandomSeedSweepPointV1 {
+            seed,
+            acceptable_selection_count: scored.acceptable_selection_count,
+            unacceptable_selection_count: scored.unacceptable_selection_count,
+            selection_without_ranking_count: scored.selection_without_ranking_count,
+            selection_on_reject_all_count: scored.selection_on_reject_all_count,
+            stale_context_selection_count: scored.stale_context_selection_count,
+        });
+    }
+
+    Ok(PreferenceRandomSeedSweepReportV1 {
+        schema_version: PREFERENCE_SELECTION_BASELINES_SCHEMA_VERSION_V1,
+        fixture_version,
+        first_seed,
+        seed_count,
+        scenario_count_per_seed: scenarios.len(),
+        ranking_scenarios_per_seed,
+        ranked_selection_opportunities: ranking_scenarios_per_seed * seed_count,
+        acceptable_selection_count: acceptable_total,
+        unacceptable_selection_count: unacceptable_total,
+        selection_without_ranking_count: no_ranking_total,
+        selection_on_reject_all_count: reject_all_total,
+        stale_context_selection_count: stale_total,
+        min_acceptable_per_seed: min_acceptable,
+        max_acceptable_per_seed: max_acceptable,
+        per_seed,
+        claim_ceiling: "Finite seed-sensitivity diagnostic on one fixed synthetic corpus; not independent-scenario generalization or human preference accuracy.".to_owned(),
+    })
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;
@@ -516,6 +663,36 @@ mod tests {
         {
             assert_eq!(before.selected_candidate_id, after.selected_candidate_id);
         }
+    }
+
+    #[test]
+    fn seed_sweep_aggregates_every_ranked_opportunity() {
+        let report = evaluate_seeded_random_seed_sweep(FIXTURE, 1000, 100).unwrap();
+        assert_eq!(report.seed_count, 100);
+        assert_eq!(report.scenario_count_per_seed, 12);
+        assert_eq!(report.ranking_scenarios_per_seed, 9);
+        assert_eq!(report.ranked_selection_opportunities, 900);
+        assert_eq!(
+            report.acceptable_selection_count + report.unacceptable_selection_count,
+            report.ranked_selection_opportunities
+        );
+        assert_eq!(report.per_seed.len(), 100);
+        assert_eq!(report.per_seed.first().unwrap().seed, 1000);
+        assert_eq!(report.per_seed.last().unwrap().seed, 1099);
+    }
+
+    #[test]
+    fn seed_sweep_is_byte_stable_for_identical_range() {
+        let first = evaluate_seeded_random_seed_sweep(FIXTURE, 50, 25).unwrap();
+        let second = evaluate_seeded_random_seed_sweep(FIXTURE, 50, 25).unwrap();
+        assert_eq!(serde_json::to_vec(&first).unwrap(), serde_json::to_vec(&second).unwrap());
+    }
+
+    #[test]
+    fn seed_sweep_rejects_empty_oversized_and_overflowing_ranges() {
+        assert!(evaluate_seeded_random_seed_sweep(FIXTURE, 0, 0).is_err());
+        assert!(evaluate_seeded_random_seed_sweep(FIXTURE, 0, 10_001).is_err());
+        assert!(evaluate_seeded_random_seed_sweep(FIXTURE, u64::MAX, 2).is_err());
     }
 
     #[test]
