@@ -3,8 +3,8 @@
   "validation_id": "ODRH-CAD-CHECK-001",
   "source_path": "hardware/open-display-reference/cad/odrh_sensor_interface_plate.scad",
   "source_revision": {
-    "git_blob_sha1": "60976ea6fc4879cfeccf5d01c0763094e8978551",
-    "sha256": "ac13e253beb90077183c89b9ca86b1dee8aecb33c05221a4fc0e20a2aeb0d1a4"
+    "git_blob_sha1": "3875786acca8f71d64880b839486b9163a3a6cb5",
+    "sha256": "7e5145a7417900f1b106f053b44632e54fd187e74a843ce2f94d9936455527f7"
   },
   "tool": {
     "name": "OpenSCAD",
@@ -31,16 +31,24 @@
     {
       "id": "ODRH-CAD-DEFAULT-EXPORT",
       "status": "PASS",
-      "detail": "OpenSCAD successfully generated a 3D STL from the default design.",
+      "detail": "OpenSCAD successfully generated a 3D STL from the default design with the illustrative sensor outline disabled by default.",
       "output_format": "ASCII STL",
-      "output_sha256": "44f887ac77461fe193812ddc3fbd00ea6c09495363fc640f00300c4821bad0b5",
+      "output_sha256": "c1fad59ba81cea2891973c23c1557b4aab38eefa91b55af2709b4b2383132585",
       "triangle_count": 2872
     },
     {
       "id": "ODRH-CAD-DEFAULT-BOUNDS",
       "status": "PASS",
-      "expected_extents_mm": [80, 5, 80],
-      "observed_extents_mm": [80, 5, 80],
+      "expected_extents_mm": [
+        80,
+        5,
+        80
+      ],
+      "observed_extents_mm": [
+        80,
+        5,
+        80
+      ],
       "absolute_tolerance_mm": 0.02,
       "detail": "Bounding box computed from exported mesh vertex coordinates."
     },
@@ -53,6 +61,15 @@
       "expected": "Reject invalid aperture-to-mounting-hole clearance.",
       "observed": "OpenSCAD exited nonzero and emitted the assertion 'Sensor aperture overlaps the diagonal mounting-hole envelope'.",
       "exit_code": 1
+    },
+    {
+      "id": "ODRH-CAD-PREVIEW-DEFAULT",
+      "status": "PASS",
+      "detail": "The default preview leaves the optical-axis aperture visually open; the hypothetical sensor-outline overlay is disabled by default to avoid making the aperture look blocked.",
+      "output_format": "PNG preview",
+      "width_px": 1200,
+      "height_px": 900,
+      "output_sha256": "b3e3aee57574f83fff18197d7cd66d30333b82cf7770b4e2c9f2ee3e1129275e"
     }
   ],
   "claim_boundaries": {
