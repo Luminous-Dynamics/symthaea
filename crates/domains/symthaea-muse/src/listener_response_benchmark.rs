@@ -50,6 +50,9 @@ pub struct ChannelBenchmarkMetrics {
     pub population_training_mean_delta: Option<f64>,
     pub no_change_mae: Option<f64>,
     pub population_delta_mae: Option<f64>,
+    /// Matched-subset errors for a fair comparison with personal_history_mae.
+    pub no_change_mae_on_personal_history: Option<f64>,
+    pub population_delta_mae_on_personal_history: Option<f64>,
     /// Only test episodes with at least one earlier session from this listener.
     pub personal_history_mae: Option<f64>,
     /// Population mean shrunk toward personal history; no-change is the fallback
@@ -226,6 +229,8 @@ pub fn evaluate_temporal_holdout(
         let mut no_change_errors = Vec::new();
         let mut population_errors = Vec::new();
         let mut personal_errors = Vec::new();
+        let mut no_change_on_personal_errors = Vec::new();
+        let mut population_on_personal_errors = Vec::new();
         let mut shrinkage_errors = Vec::new();
         let mut personal_history_observations = 0usize;
         let mut scored_test_observations = 0usize;
@@ -256,6 +261,11 @@ pub fn evaluate_temporal_holdout(
                 Some(personal_mean) => {
                     personal_history_observations += 1;
                     personal_errors.push((actual_delta - personal_mean).abs());
+                    no_change_on_personal_errors.push(actual_delta.abs());
+                    if let Some(population_prior) = population_mean {
+                        population_on_personal_errors
+                            .push((actual_delta - population_prior).abs());
+                    }
                     let weight =
                         history.len() as f64 / (history.len() as f64 + prior_strength);
                     prior + weight * (personal_mean - prior)
@@ -271,6 +281,8 @@ pub fn evaluate_temporal_holdout(
             population_training_mean_delta: population_mean,
             no_change_mae: mean(&no_change_errors),
             population_delta_mae: mean(&population_errors),
+            no_change_mae_on_personal_history: mean(&no_change_on_personal_errors),
+            population_delta_mae_on_personal_history: mean(&population_on_personal_errors),
             personal_history_mae: mean(&personal_errors),
             shrunk_personal_mae: mean(&shrinkage_errors),
             personal_history_observations,
@@ -391,6 +403,9 @@ mod tests {
         assert!((valence.no_change_mae.unwrap() - 0.4).abs() < 1e-6);
         assert_eq!(valence.personal_history_observations, 1);
         assert_eq!(valence.personal_history_coverage, 0.5);
+        assert_eq!(valence.no_change_mae_on_personal_history, Some(0.4));
+        assert_eq!(valence.population_delta_mae_on_personal_history, Some(0.0));
+        assert_eq!(valence.personal_history_mae, Some(0.0));
     }
 
     #[test]
