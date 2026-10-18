@@ -390,6 +390,11 @@ mod tests {
         value["components"][0]["value"] = json!(65.0);
         value["components"][0]["lower"] = json!(65.0);
         value["components"][0]["upper"] = json!(65.0);
+        for component in value["components"].as_array_mut().unwrap().iter_mut().skip(1) {
+            let point = component["value"].as_f64().unwrap();
+            component["lower"] = json!(point);
+            component["upper"] = json!(point);
+        }
         let result = check_proximate_composition_closure_v1(&value).unwrap();
         assert_eq!(result.point_sum_g_per_100g, Some(104.0));
         assert_eq!(result.disposition, CompositionClosureDispositionV1::WithinAcceptable);
