@@ -234,6 +234,322 @@ impl EpisodeGuard {
     }
 }
 
+
+/// One trial from an adapted or official robot benchmark. A valid partial score
+/// is still a valid trial; a run without a final judge score uses progress=None
+/// and remains in reliability/timeout denominators rather than disappearing.
+#[derive(Debug, Clone, PartialEq)]
+pub struct TrialRecord {
+    pub task_id: String,
+    pub variant_id: String,
+    /// Stable matched-trial key, normally a preregistered trial/seed identifier.
+    pub trial_id: String,
+    pub progress: Option<f64>,
+    pub completed: bool,
+    pub valid_run: bool,
+    pub timed_out: bool,
+    pub elapsed_seconds: f64,
+    pub model_calls: u32,
+    pub action_steps: u32,
+    pub estimated_cost_usd: f64,
+    pub safety_events: u32,
+}
+
+impl TrialRecord {
+    pub fn validate(&self) -> Result<(), MetricError> {
+        if self.task_id.trim().is_empty()
+            || self.variant_id.trim().is_empty()
+            || self.trial_id.trim().is_empty()
+        {
+            return Err(MetricError::EmptyIdentifier);
+        }
+        if !self.elapsed_seconds.is_finite() || self.elapsed_seconds < 0.0 {
+            return Err(MetricError::InvalidDuration);
+        }
+        if !self.estimated_cost_usd.is_finite() || self.estimated_cost_usd < 0.0 {
+            return Err(MetricError::InvalidCost);
+        }
+        if self.valid_run != self.progress.is_some() {
+            return Err(MetricError::ValidityScoreMismatch);
+        }
+        match self.progress {
+            Some(score) if !score.is_finite() || !(0.0..=1.0).contains(&score) => {
+                Err(MetricError::InvalidProgress)
+            }
+            Some(score) if self.completed != (score >= 1.0) => {
+                Err(MetricError::CompletionScoreMismatch)
+            }
+            None if self.completed => Err(MetricError::CompletionScoreMismatch),
+            _ => Ok(()),
+        }
+    }
+}
+
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub enum MetricError {
+    EmptyRecords,
+    EmptyIdentifier,
+    InvalidProgress,
+    CompletionScoreMismatch,
+    ValidityScoreMismatch,
+    InvalidDuration,
+    InvalidCost,
+    DuplicateTrial,
+    MixedVariants,
+    MismatchedPairedTrials,
+    TooFewBootstrapSamples,
+}
+
+#[derive(Debug, Clone, PartialEq)]
+pub struct TaskSummary {
+    pub task_id: String,
+    pub variant_id: String,
+    pub total_trials: usize,
+    pub valid_trials: usize,
+    pub invalid_trials: usize,
+    pub completions: usize,
+    /// Full completions divided by all attempted trials; invalid runs count as
+    /// non-completions instead of silently vanishing from the denominator.
+    pub completion_rate_all_trials: f64,
+    /// Full completions divided by trials with a usable final score.
+    pub completion_rate_valid_trials: Option<f64>,
+    pub mean_progress: Option<f64>,
+    pub progress_ci95: Option<(f64, f64)>,
+    pub mean_elapsed_seconds: f64,
+    pub mean_model_calls: f64,
+    pub mean_action_steps: f64,
+    pub mean_estimated_cost_usd: f64,
+    pub timeout_count: usize,
+    pub safety_event_count: u64,
+}
+
+/// Summarize every task × variant independently. This does not aggregate tasks
+/// with different difficulty into one score. Bootstrap intervals are
+/// deterministic for a given input, replicate count, and seed.
+pub fn summarize_trials(
+    records: &[TrialRecord],
+    bootstrap_replicates: usize,
+    seed: u64,
+) -> Result<Vec<TaskSummary>, MetricError> {
+    if records.is_empty() { return Err(MetricError::EmptyRecords); }
+    if bootstrap_replicates > 0 && bootstrap_replicates < 100 {
+        return Err(MetricError::TooFewBootstrapSamples);
+    }
+
+    use std::collections::{BTreeMap, BTreeSet};
+    let mut groups: BTreeMap<(String, String), Vec<&TrialRecord>> = BTreeMap::new();
+    let mut seen = BTreeSet::new();
+    for record in records {
+        record.validate()?;
+        let trial_key = (record.task_id.clone(), record.variant_id.clone(), record.trial_id.clone());
+        if !seen.insert(trial_key) { return Err(MetricError::DuplicateTrial); }
+        groups.entry((record.task_id.clone(), record.variant_id.clone())).or_default().push(record);
+    }
+
+    let mut summaries = Vec::with_capacity(groups.len());
+    for ((task_id, variant_id), trials) in groups {
+        let total = trials.len();
+        let valid_scores: Vec<f64> = trials.iter().filter_map(|r| r.progress).collect();
+        let valid = valid_scores.len();
+        let completions = trials.iter().filter(|r| r.completed).count();
+        let progress_ci95 = if valid_scores.len() >= 2 && bootstrap_replicates > 0 {
+            Some(bootstrap_mean_ci(&valid_scores, bootstrap_replicates, derive_seed(seed, &task_id, &variant_id)))
+        } else {
+            None
+        };
+        let sum = |f: fn(&TrialRecord) -> f64| trials.iter().map(|r| f(r)).sum::<f64>() / total as f64;
+        summaries.push(TaskSummary {
+            task_id,
+            variant_id,
+            total_trials: total,
+            valid_trials: valid,
+            invalid_trials: total - valid,
+            completions,
+            completion_rate_all_trials: completions as f64 / total as f64,
+            completion_rate_valid_trials: (valid > 0).then(|| completions as f64 / valid as f64),
+            mean_progress: if valid > 0 { Some(valid_scores.iter().sum::<f64>() / valid as f64) } else { None },
+            progress_ci95,
+            mean_elapsed_seconds: sum(|r| r.elapsed_seconds),
+            mean_model_calls: sum(|r| r.model_calls as f64),
+            mean_action_steps: sum(|r| r.action_steps as f64),
+            mean_estimated_cost_usd: sum(|r| r.estimated_cost_usd),
+            timeout_count: trials.iter().filter(|r| r.timed_out).count(),
+            safety_event_count: trials.iter().map(|r| r.safety_events as u64).sum(),
+        });
+    }
+    Ok(summaries)
+}
+
+#[derive(Debug, Clone, PartialEq)]
+pub struct PairedComparison {
+    pub baseline_variant: String,
+    pub candidate_variant: String,
+    pub total_pairs: usize,
+    pub scored_pairs: usize,
+    pub tasks_with_scored_pairs: usize,
+    /// Candidate minus baseline; macro-averaged over tasks, each task weighted equally.
+    pub mean_progress_delta: Option<f64>,
+    /// Stratified paired bootstrap interval for the task-macro progress delta.
+    pub progress_delta_ci95: Option<(f64, f64)>,
+    /// Candidate minus baseline over all matched attempts; invalid attempts count as incomplete.
+    pub completion_rate_delta: f64,
+    pub valid_run_rate_delta: f64,
+    pub mean_elapsed_seconds_delta: f64,
+    pub mean_cost_usd_delta: f64,
+    pub safety_event_count_delta: i64,
+}
+
+/// Compare two conditions only when each task/trial key is present exactly once
+/// on both sides. Paired score differences use only pairs with two valid graded
+/// scores, while validity/completion/runtime/cost/fault deltas retain all pairs.
+pub fn compare_paired_trials(
+    baseline: &[TrialRecord],
+    candidate: &[TrialRecord],
+    bootstrap_replicates: usize,
+    seed: u64,
+) -> Result<PairedComparison, MetricError> {
+    use std::collections::{BTreeMap, BTreeSet};
+    if baseline.is_empty() || candidate.is_empty() { return Err(MetricError::EmptyRecords); }
+    if bootstrap_replicates > 0 && bootstrap_replicates < 100 {
+        return Err(MetricError::TooFewBootstrapSamples);
+    }
+
+    fn index(records: &[TrialRecord]) -> Result<(String, BTreeMap<(String, String), &TrialRecord>), MetricError> {
+        let mut variant: Option<String> = None;
+        let mut map = BTreeMap::new();
+        for r in records {
+            r.validate()?;
+            if let Some(v) = &variant {
+                if v != &r.variant_id { return Err(MetricError::MixedVariants); }
+            } else {
+                variant = Some(r.variant_id.clone());
+            }
+            let key = (r.task_id.clone(), r.trial_id.clone());
+            if map.insert(key, r).is_some() { return Err(MetricError::DuplicateTrial); }
+        }
+        Ok((variant.ok_or(MetricError::EmptyRecords)?, map))
+    }
+
+    let (baseline_variant, base) = index(baseline)?;
+    let (candidate_variant, cand) = index(candidate)?;
+    if baseline_variant == candidate_variant || base.len() != cand.len() {
+        return Err(MetricError::MismatchedPairedTrials);
+    }
+    let base_keys: BTreeSet<_> = base.keys().cloned().collect();
+    let cand_keys: BTreeSet<_> = cand.keys().cloned().collect();
+    if base_keys != cand_keys { return Err(MetricError::MismatchedPairedTrials); }
+
+    let mut per_task_deltas: BTreeMap<String, Vec<f64>> = BTreeMap::new();
+    let mut scored_pairs = 0usize;
+    let mut candidate_completions = 0usize;
+    let mut baseline_completions = 0usize;
+    let mut candidate_valid = 0usize;
+    let mut baseline_valid = 0usize;
+    let mut elapsed_delta = 0.0;
+    let mut cost_delta = 0.0;
+    let mut safety_delta = 0i64;
+    for (key, b) in &base {
+        let c = cand.get(key).expect("paired key sets were checked");
+        candidate_completions += usize::from(c.completed);
+        baseline_completions += usize::from(b.completed);
+        candidate_valid += usize::from(c.valid_run);
+        baseline_valid += usize::from(b.valid_run);
+        elapsed_delta += c.elapsed_seconds - b.elapsed_seconds;
+        cost_delta += c.estimated_cost_usd - b.estimated_cost_usd;
+        safety_delta += c.safety_events as i64 - b.safety_events as i64;
+        if let (Some(bp), Some(cp)) = (b.progress, c.progress) {
+            per_task_deltas.entry(key.0.clone()).or_default().push(cp - bp);
+            scored_pairs += 1;
+        }
+    }
+    let tasks_with_scored_pairs = per_task_deltas.len();
+    let mean_progress_delta = if tasks_with_scored_pairs == 0 {
+        None
+    } else {
+        Some(per_task_deltas.values()
+            .map(|d| d.iter().sum::<f64>() / d.len() as f64)
+            .sum::<f64>() / tasks_with_scored_pairs as f64)
+    };
+    let progress_delta_ci95 = if scored_pairs >= 2 && bootstrap_replicates > 0 {
+        Some(bootstrap_macro_delta_ci(&per_task_deltas, bootstrap_replicates, seed))
+    } else {
+        None
+    };
+    let n = base.len() as f64;
+    Ok(PairedComparison {
+        baseline_variant,
+        candidate_variant,
+        total_pairs: base.len(),
+        scored_pairs,
+        tasks_with_scored_pairs,
+        mean_progress_delta,
+        progress_delta_ci95,
+        completion_rate_delta: (candidate_completions as f64 - baseline_completions as f64) / n,
+        valid_run_rate_delta: (candidate_valid as f64 - baseline_valid as f64) / n,
+        mean_elapsed_seconds_delta: elapsed_delta / n,
+        mean_cost_usd_delta: cost_delta / n,
+        safety_event_count_delta: safety_delta,
+    })
+}
+
+fn derive_seed(seed: u64, task: &str, variant: &str) -> u64 {
+    let mut h = 0xcbf29ce484222325u64 ^ seed;
+    for byte in task.bytes().chain([0xff]).chain(variant.bytes()) {
+        h ^= byte as u64;
+        h = h.wrapping_mul(0x100000001b3);
+    }
+    if h == 0 { 0x9e3779b97f4a7c15 } else { h }
+}
+
+fn next_random(state: &mut u64) -> u64 {
+    *state ^= *state >> 12;
+    *state ^= *state << 25;
+    *state ^= *state >> 27;
+    state.wrapping_mul(0x2545f4914f6cdd1d)
+}
+
+fn percentile(sorted: &[f64], numerator: usize, denominator: usize) -> f64 {
+    let index = ((sorted.len() - 1) * numerator) / denominator;
+    sorted[index]
+}
+
+fn bootstrap_mean_ci(values: &[f64], replicates: usize, seed: u64) -> (f64, f64) {
+    let mut rng = seed;
+    let n = values.len();
+    let mut means = Vec::with_capacity(replicates);
+    for _ in 0..replicates {
+        let mut total = 0.0;
+        for _ in 0..n {
+            total += values[(next_random(&mut rng) as usize) % n];
+        }
+        means.push(total / n as f64);
+    }
+    means.sort_by(f64::total_cmp);
+    (percentile(&means, 25, 1000), percentile(&means, 975, 1000))
+}
+
+fn bootstrap_macro_delta_ci(
+    by_task: &std::collections::BTreeMap<String, Vec<f64>>,
+    replicates: usize,
+    seed: u64,
+) -> (f64, f64) {
+    let mut rng = seed.max(1);
+    let mut estimates = Vec::with_capacity(replicates);
+    for _ in 0..replicates {
+        let mut task_means = 0.0;
+        for deltas in by_task.values() {
+            let mut total = 0.0;
+            for _ in 0..deltas.len() {
+                total += deltas[(next_random(&mut rng) as usize) % deltas.len()];
+            }
+            task_means += total / deltas.len() as f64;
+        }
+        estimates.push(task_means / by_task.len() as f64);
+    }
+    estimates.sort_by(f64::total_cmp);
+    (percentile(&estimates, 25, 1000), percentile(&estimates, 975, 1000))
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;
