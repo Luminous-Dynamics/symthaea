@@ -156,19 +156,34 @@ pub fn validate_preference_drift_fixture(
             "fixture must remain explicitly synthetic",
         );
     }
-    if root
+    let generation_method = root
+        .pointer("/generation/method")
+        .and_then(Value::as_str);
+    let random_generator_used = root
         .pointer("/generation/random_generator_used")
-        .and_then(Value::as_bool)
-        != Some(false)
-        || root
-            .pointer("/generation/empirical_data_used")
-            .and_then(Value::as_bool)
-            != Some(false)
-    {
+        .and_then(Value::as_bool);
+    let empirical_data_used = root
+        .pointer("/generation/empirical_data_used")
+        .and_then(Value::as_bool);
+    let is_hand_authored = generation_method == Some("hand_authored_deterministic")
+        && random_generator_used == Some(false);
+    let is_factorized_generated = generation_method == Some("factorized_seeded_generator_v1")
+        && random_generator_used == Some(true)
+        && root
+            .pointer("/generation/seed")
+            .and_then(Value::as_u64)
+            .is_some()
+        && nonempty_string(root.get("generation").unwrap_or(&Value::Null), "generator_version")
+            .is_some()
+        && root
+            .pointer("/generation/config")
+            .and_then(Value::as_object)
+            .is_some();
+    if !(is_hand_authored || is_factorized_generated) || empirical_data_used != Some(false) {
         finding(
             &mut findings,
             "$.generation",
-            "hand-authored fixture must not claim random generation or empirical data",
+            "generation provenance must identify a supported synthetic generator and cannot claim empirical data",
         );
     }
     if root
