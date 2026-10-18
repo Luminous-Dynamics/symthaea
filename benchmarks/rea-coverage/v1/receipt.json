@@ -34,7 +34,7 @@
       "git_blob_sha1": "cce1b5f76b23aec37d2c2f58b83d7ea9ffd4ba5b"
     },
     "README.md": {
-      "git_blob_sha1": "7417e3224e720c49e26c05ae290115be9d3f4bff"
+      "git_blob_sha1": "483c15ccfeec04e49eb209a4e6a9305002d03cc9"
     },
     "property-sweep.sh": {
       "sha256": "4ddd3d3a737242735447aea83d272f8b88ef9aae2d110ea2c9a4ebe1ed8748c7",
@@ -44,6 +44,9 @@
       "sha256": "9119a8eea7969413efc1b132807d57259834ccd9a916cda56ed6c720d96daac7",
       "git_blob_sha1": "4b0dfc1d96ff503d91ba204ad16068cb6898079d",
       "bytes": 2868
+    },
+    "verify-receipt.sh": {
+      "git_blob_sha1": "fadec74dd33303856327d1285a04855cf20c3b47"
     }
   },
   "upstream_observation": {
