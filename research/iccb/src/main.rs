@@ -1,6 +1,8 @@
 use iccb_evaluator::{
     CandidateScenario, DecisionOption, EvidenceClaim, EvidenceState, Mandate,
-    cash_maximizing_feasible_baseline, pareto_frontier, staging::TrancheRequest,
+    cash_maximizing_feasible_baseline, pareto_frontier,
+    policy::{CapitalPolicyScenario, DemandCase},
+    staging::TrancheRequest,
 };
 use std::collections::BTreeSet;
 
@@ -105,4 +107,53 @@ fn main() {
         "Next tranche approved: {}, reasons: {:?}",
         tranche.approved, tranche.rejection_reasons
     );
+
+    // These probabilities and cashflows are synthetic and exist only to
+    // demonstrate that the best policy changes with delay costs and demand.
+    let policy_scenario = CapitalPolicyScenario {
+        id: "synthetic-stage-vs-wait-policy".into(),
+        capital_budget_minor: 120,
+        full_commitment_minor: 100,
+        staged_commitment_minor: 15,
+        expansion_commitment_minor: 90,
+        wait_cost_minor: 70,
+        discount_factor_bps: 9_000,
+        demand_cases: vec![
+            DemandCase {
+                id: "high-demand".into(),
+                probability_bps: 5_000,
+                full_capacity_cashflow_period1_minor: 40,
+                full_capacity_cashflow_period2_minor: 200,
+                staged_cashflow_period1_minor: 30,
+                expanded_cashflow_period2_minor: 180,
+            },
+            DemandCase {
+                id: "low-demand".into(),
+                probability_bps: 5_000,
+                full_capacity_cashflow_period1_minor: 10,
+                full_capacity_cashflow_period2_minor: 20,
+                staged_cashflow_period1_minor: 10,
+                expanded_cashflow_period2_minor: 20,
+            },
+        ],
+    };
+    match policy_scenario.evaluate() {
+        Ok(comparison) => {
+            println!(
+                "Synthetic policy comparison: best={:?}, improvement_vs_one_shot_minor={:?}",
+                comparison.best_policy_within_catalog,
+                comparison.improvement_vs_one_shot_minor,
+            );
+            for assessment in comparison.assessments {
+                println!(
+                    "  policy={:?}, feasible={}, expected_npv_minor={:?}, max_commitment_minor={}",
+                    assessment.policy,
+                    assessment.feasible,
+                    assessment.expected_npv_minor,
+                    assessment.maximum_authorized_commitment_minor,
+                );
+            }
+        }
+        Err(error) => eprintln!("Synthetic policy comparison rejected invalid input: {error:?}"),
+    }
 }
