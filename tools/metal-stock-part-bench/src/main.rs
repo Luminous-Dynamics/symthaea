@@ -405,10 +405,7 @@ fn source_commit_from_args(args: &[String]) -> Check<String> {
 fn run() -> Check<ExitCode> {
     let args: Vec<String> = env::args().collect();
     if args.len() != 4 {
-        return Err(
-            "usage: metal-stock-part-bench <corpus.json> --source-commit <40-hex-sha>"
-                .to_owned(),
-        );
+        return Err("usage: metal-stock-part-bench <corpus.json> --source-commit <40-hex-sha>".to_owned());
     }
     let source_commit = source_commit_from_args(&args)?;
     let bytes = fs::read(&args[1]).map_err(|error| format!("cannot read corpus: {error}"))?;
