@@ -1243,7 +1243,7 @@ impl DifferentialEquationsEngine {
     }
 
     /// Internal full-Newton solve with explicit characteristic state scales
-    /// for finite-difference perturbations.
+    /// for finite-difference perturbations and normalized residual checks.
     fn try_solve_implicit_euler_with_state_scales(
         system: &ODESystem,
         t0: f64,
@@ -1418,7 +1418,7 @@ impl DifferentialEquationsEngine {
                             total_corrections, rhs_evaluations, step_residual_norm
                         ));
                     }
-                    let scale = 1.0 + y_next[i].abs().max(y[i].abs());
+                    let scale = state_scales[i] + y_next[i].abs().max(y[i].abs());
                     let normalized = value.abs() / scale;
                     if !normalized.is_finite() {
                         return Err(ImplicitEulerError::new(
@@ -2739,14 +2739,18 @@ mod tests {
 
     #[test]
     fn test_adaptive_implicit_euler_tolerances_are_unit_rescaling_consistent() {
-        fn growth(_t: f64, y: &[f64]) -> Vec<f64> {
-            vec![y[0], y[1]]
+        fn nonlinear_native(_t: f64, y: &[f64]) -> Vec<f64> {
+            vec![y[0] * y[0], 1e12 * y[1] * y[1]]
         }
-        let system = ODESystem { f: growth, dim: 2 };
+        fn nonlinear_rescaled(_t: f64, y: &[f64]) -> Vec<f64> {
+            vec![y[0] * y[0], y[1] * y[1]]
+        }
+        let native_system = ODESystem { f: nonlinear_native, dim: 2 };
+        let rescaled_system = ODESystem { f: nonlinear_rescaled, dim: 2 };
         let native = DifferentialEquationsEngine::try_solve_implicit_euler_adaptive(
-            &system,
+            &native_system,
             0.0,
-            1.0,
+            0.2,
             &[1.0, 1e-12],
             &[1e-3, 1e-14],
             0.0,
@@ -2754,11 +2758,11 @@ mod tests {
             10_000,
             12,
         )
-        .expect("mixed-scale state should integrate");
+        .expect("nonlinear mixed-scale state should integrate");
         let rescaled = DifferentialEquationsEngine::try_solve_implicit_euler_adaptive(
-            &system,
+            &rescaled_system,
             0.0,
-            1.0,
+            0.2,
             &[1.0, 1.0],
             &[1e-3, 1e-2],
             0.0,
@@ -2766,9 +2770,9 @@ mod tests {
             10_000,
             12,
         )
-        .expect("equivalently rescaled state should integrate");
-        assert_eq!(native.trajectory.t_end(), 1.0);
-        assert_eq!(rescaled.trajectory.t_end(), 1.0);
+        .expect("equivalently rescaled nonlinear state should integrate");
+        assert_eq!(native.trajectory.t_end(), 0.2);
+        assert_eq!(rescaled.trajectory.t_end(), 0.2);
         assert!(
             native.accepted_steps.abs_diff(rescaled.accepted_steps) <= 1,
             "Unit rescaling should preserve step decisions: native={}, rescaled={}",
@@ -2778,7 +2782,7 @@ mod tests {
         let native_scaled = native.trajectory.final_state()[1] / 1e-12;
         let rescaled_value = rescaled.trajectory.final_state()[1];
         assert!(
-            (native_scaled - rescaled_value).abs() < 1e-9,
+            (native_scaled - rescaled_value).abs() < 1e-8,
             "Normalized final states differ: native={native_scaled}, rescaled={rescaled_value}",
         );
     }
