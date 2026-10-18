@@ -4,18 +4,34 @@ This dependency-free Rust crate is the first runnable, simulator-independent tes
 
 ## Run without Isaac Sim or the root workspace
 
-```sh
+~~~sh
 cargo test --locked --manifest-path experiments/robodojo-contract/Cargo.toml
 cargo run --locked --manifest-path experiments/robodojo-contract/Cargo.toml
-```
+cargo run --locked --manifest-path experiments/robodojo-contract/Cargo.toml -- --summarize experiments/robodojo-contract/examples/synthetic_trials.tsv
+cargo run --locked --manifest-path experiments/robodojo-contract/Cargo.toml -- --compare experiments/robodojo-contract/examples/synthetic_trials.tsv baseline symthaea_sidecar
+~~~
 
-The nested workspace and lockfile are intentional: contract tests should not have to resolve or compile Symthaea's large workspace, download a policy checkpoint, start Isaac Sim, or wait for its runners.
+The last two commands demonstrate the analysis CLI using **synthetic fixture data only**. They are not RoboDojo-RC measurements. The nested workspace and lockfile are intentional: contract tests should not have to resolve or compile Symthaea's large workspace, download a policy checkpoint, start Isaac Sim, or wait for its runners.
 
 ## What approval means
 
 An approved proposal is only valid against this crate's declared vector dimensions and per-coordinate numeric limits, for the current episode and latest accepted observation. It is **not** a kinematics check, collision check, workspace guarantee, policy-quality measure, or physical safety certificate. Robot-specific adapters must add those constraints where the appropriate state/telemetry is available.
 
 Prediction error is a caller-defined scalar and must be calibrated for the selected policy. A high value suppresses action approval and requests replanning; repeated high values latch a stop. It is not used as proof of safety, consciousness, or task competence.
+
+## Trial TSV schema
+
+The CLI requires this exact tab-separated header, in this order:
+
+~~~text
+task_id variant_id trial_id progress completed valid_run timed_out elapsed_seconds model_calls action_steps estimated_cost_usd safety_events
+~~~
+
+Fields are separated by tabs (the display above uses spaces). IDs should be stable slugs/identifiers without tabs. The progress field is a number in [0,1], or NA when no valid final judge score exists. Booleans must be true or false. An attempt with progress=NA must set valid_run=false and completed=false; it still counts as an attempted trial, timeout/runtime/cost observation, and non-completion.
+
+- --summarize emits task-by-variant rows with attempts, validity, full completions, rubric mean and bootstrap interval, elapsed time, model calls, action steps, estimated cost, timeouts and safety events.
+- --compare requires exactly matching task/trial IDs across the chosen baseline and candidate; unpaired runs are rejected. It reports paired progress delta with a task-stratified bootstrap interval, plus completion/valid-run-rate deltas and runtime/cost/safety deltas.
+- Bootstrap count defaults to 2,000 and seed to 42. Reuse the same input and seed to reproduce the interval.
 
 ## Scope boundary
 
