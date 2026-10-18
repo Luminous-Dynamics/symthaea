@@ -564,7 +564,9 @@ mod tests {
                 .as_array()
                 .unwrap()
                 .iter()
-                .find(|scenario| scenario["scenario_id"] == assessment.scenario_id)
+                .find(|scenario| {
+                    scenario["scenario_id"].as_str() == Some(assessment.scenario_id.as_str())
+                })
                 .unwrap();
             assert!(assessment.selected_candidate_id.as_ref().is_none_or(|candidate| {
                 scenario["eligible_candidate_ids"]
