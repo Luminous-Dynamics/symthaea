@@ -10,7 +10,7 @@ use serde::Serialize;
 use sha2::{Digest, Sha256};
 use std::env;
 use std::fs;
-use std::path::PathBuf;
+use std::path::{Path, PathBuf};
 use std::process;
 
 use symthaea_muse::listener_response::{
@@ -180,6 +180,16 @@ fn source_digest(bytes: &[u8]) -> String {
     hex_lower(&Sha256::digest(bytes))
 }
 
+fn paths_refer_to_same_file(input: &Path, output: &Path) -> bool {
+    if input == output {
+        return true;
+    }
+    match (fs::canonicalize(input), fs::canonicalize(output)) {
+        (Ok(input), Ok(output)) => input == output,
+        _ => false,
+    }
+}
+
 fn demo_records() -> Vec<ListenerResponseRecord> {
     vec![
         demo_episode("demo-01", "demo-listener-a", 1, 1, 1, -0.2, 0.1),
@@ -259,6 +269,15 @@ fn run(options: Options) -> Result<String, String> {
         (raw.into_bytes(), records, "synthetic_fixture")
     } else {
         let input_path = options.input.as_ref().ok_or("--input is required")?;
+        if options
+            .output
+            .as_ref()
+            .is_some_and(|output| paths_refer_to_same_file(input_path, output))
+        {
+            return Err(
+                "refusing to overwrite the source JSONL with the benchmark report".to_owned(),
+            );
+        }
         let raw_bytes = fs::read(input_path)
             .map_err(|error| format!("read {}: {error}", input_path.display()))?;
         let raw_text = std::str::from_utf8(&raw_bytes)
@@ -364,6 +383,18 @@ mod tests {
         let options = parse_options(["--demo".to_owned()]).unwrap().unwrap();
         let second = run(options).unwrap();
         assert_eq!(first, second);
+    }
+
+    #[test]
+    fn identical_input_and_output_paths_are_rejected() {
+        assert!(paths_refer_to_same_file(
+            std::path::Path::new("responses.jsonl"),
+            std::path::Path::new("responses.jsonl"),
+        ));
+        assert!(!paths_refer_to_same_file(
+            std::path::Path::new("responses.jsonl"),
+            std::path::Path::new("report.json"),
+        ));
     }
 
     #[test]
