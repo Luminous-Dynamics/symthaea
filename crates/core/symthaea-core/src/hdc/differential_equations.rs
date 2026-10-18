@@ -1678,10 +1678,6 @@ impl DifferentialEquationsEngine {
                             jacobian_matrix[row * dimension + column] = entry;
                         }
                     }
-
-
-                    }
-
                 }
                 let mut correction: Vec<f64> = residual.iter().map(|value| -*value).collect();
                 if let Err((column, pivot_magnitude)) =
