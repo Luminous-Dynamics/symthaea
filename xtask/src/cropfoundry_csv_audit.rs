@@ -51,6 +51,7 @@ struct CsvAuditReceipt {
     header_field_count: usize,
     data_record_count: usize,
     duplicate_header_names: Vec<String>,
+    blank_header_positions: Vec<usize>,
     missing_required_columns: Vec<String>,
     rows_with_width_mismatch: usize,
     rows_with_extra_fields: usize,
@@ -145,6 +146,12 @@ fn audit_csv_bytes(
         .iter()
         .filter_map(|(name, count)| (*count > 1).then_some(name.clone()))
         .collect();
+
+    let blank_header_positions = headers
+        .iter()
+        .enumerate()
+        .filter_map(|(index, header)| header.is_empty().then_some(index + 1))
+        .collect::<Vec<_>>();
 
     let missing_required_columns = REQUIRED_COLUMNS
         .iter()
@@ -290,6 +297,7 @@ fn audit_csv_bytes(
         header_field_count: headers.len(),
         data_record_count,
         duplicate_header_names,
+        blank_header_positions,
         missing_required_columns,
         rows_with_width_mismatch,
         rows_with_extra_fields,
@@ -343,6 +351,12 @@ pub fn run(
     let mut failures = Vec::new();
     if !receipt.duplicate_header_names.is_empty() {
         failures.push(format!("duplicate headers: {:?}", receipt.duplicate_header_names));
+    }
+    if !receipt.blank_header_positions.is_empty() {
+        failures.push(format!(
+            "unnamed header fields at 1-based positions {:?}; map only with source-backed documentation",
+            receipt.blank_header_positions
+        ));
     }
     if !receipt.missing_required_columns.is_empty() {
         failures.push(format!(
@@ -444,6 +458,13 @@ mod tests {
         let input = "Date;Plant;Plant\n01/01/2024;P1;P1\n";
         let receipt = audit(input, None);
         assert_eq!(receipt.duplicate_header_names, vec!["Plant".to_owned()]);
+    }
+
+    #[test]
+    fn unnamed_header_is_reported_not_silently_renamed() {
+        let input = ";Date;Plant;Treatment\n0;01/01/2024;P1;T1\n";
+        let receipt = audit(input, None);
+        assert_eq!(receipt.blank_header_positions, vec![1]);
     }
 
     #[test]
