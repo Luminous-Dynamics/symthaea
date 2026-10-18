@@ -137,6 +137,49 @@ This is a deterministic baseline evaluator, not a learned model and not a causal
 
 A 2025 RecSys paper, “Time to Split: Exploring Data Splitting Strategies for Offline Evaluation of Sequential Recommenders,” reports that split design can change offline model rankings and that global temporal splitting protects against future-data leakage. We adopt an explicit global ordinal and separate future holdout to make the evaluation task auditable: https://doi.org/10.1145/3705328.3748164
 
+## Runnable deterministic CLI
+
+The binary \`muse_listener_response_benchmark\` consumes JSONL records (one ListenerResponseRecord per non-empty line) and emits a machine-readable report bound to the SHA-256 of the exact input bytes.
+
+Synthetic smoke test (no participant data required):
+
+\`\`\`sh
+cargo run -p symthaea-muse --bin muse_listener_response_benchmark -- --demo
+\`\`\`
+
+Evaluate an explicitly prepared dataset:
+
+\`\`\`sh
+cargo run -p symthaea-muse --bin muse_listener_response_benchmark -- \
+  --input responses.jsonl \
+  --training-through 800 \
+  --testing-from 1001 \
+  --prior-strength 3.0 \
+  --output report.json
+\`\`\`
+
+The interval between the training and testing cutoffs is embargoed. A whole participant-session must fit within one partition. The report includes training, embargo and test counts; a source digest; channel-wise MAE for baseline predictors; personal-history coverage; and matched-subset baseline errors so a personal predictor is compared with the baselines on the same test episodes. The demo uses synthetic placeholder audio identities and is explicitly tagged as synthetic; it is never human-listener evidence.
+
+The CLI and synthetic tests are authored but not locally run in this environment. Exact-head Cargo formatting, tests, and a real-input smoke run remain required before promotion.
+
+## Dataset strategy: don't confuse the tasks
+
+A credible benchmark should use existing open work without pretending every dataset measures the same outcome:
+
+| Track | Candidate source | What it can establish | Important limitation |
+|---|---|---|---|
+| Perceived-affect baseline | MERGE audio/lyrics dataset (Zenodo record 13939205; 3,554 audio clips, 2,568 lyric records, with balanced and bimodal subsets) | Audio-only, lyrics-only and fused prediction of music's perceived valence/arousal | Static labels are not measurements of a person's pre/post state change. Check rights for each audio/lyric item before redistribution. |
+| Personalized judgments | TROMPA-MER (181 participants, 4,721 annotations, 1,161 excerpts) | Personalization of perceived and induced emotion annotations, familiarity/preferences, and active-learning strategies | Its annotations do not replace a prospective, paired pre/post listening-response study. Extracted features/models may need to be obtained from the authors; the project describes the dataset as publicly viewable. |
+| Domain-specific retrieval | CalmSet, subject to its own data/license and governance review | Graded relevance for an affective music retrieval task in its target domain | Does not represent the general population and must not be used to claim universal effects. |
+| Personalized response change | MLRB self-report records collected under a consented protocol | Whether prior-session data predicts a listener's reported pre/post change in a future session | Observational change is not a causal music effect. Causal claims require randomized/counterbalanced interventions. |
+
+MERGE supplies dataset-provided splits, but MLRB must still create and record its own splits aligned to the intended question. Never assume an ordinary 70/15/15 random split is adequate for longitudinal personalization. Do not mirror third-party audio, lyrics, profile data, or derived personal records until their individual licenses and permitted uses are confirmed.
+
+Sources:
+- MERGE dataset record and available subsets: https://zenodo.org/records/13939205
+- TROMPA-MER study, annotations and data availability: https://doi.org/10.1007/s10844-022-00746-0
+- CalmSet dataset / intended-use description: https://github.com/Sensify-Lab/CalmSet
+
 ## Execution plan
 
 1. **Schema tranche (this PR):** land the Rust record, fail-closed range/digest validation, JSON round-trip tests, and tests proving missing responses remain missing.
