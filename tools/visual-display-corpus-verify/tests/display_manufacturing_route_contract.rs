@@ -83,6 +83,7 @@ fn validate_contract(manifest_text: &str, schema_text: &str) -> Vec<String> {
     }
 
     let mut route_ids = BTreeSet::new();
+    let mut component_ids = BTreeSet::new();
     for route in routes {
         let route_id = route.get("route_id").and_then(Value::as_str).unwrap_or("<missing>");
         if !route_ids.insert(route_id.to_owned()) {
@@ -100,6 +101,52 @@ fn validate_contract(manifest_text: &str, schema_text: &str) -> Vec<String> {
             || route_sources.iter().any(|source_id| !sources.contains(*source_id))
         {
             errors.push(format!("route {route_id} has empty or unresolved source references"));
+        }
+
+        let Some(components) = route.get("component_interfaces").and_then(Value::as_array) else {
+            errors.push(format!("route {route_id} component_interfaces must be an array"));
+            continue;
+        };
+        if components.len() < 4 {
+            errors.push(format!("route {route_id} has too few component interface contracts"));
+        }
+        for component in components {
+            let component_id = component
+                .get("component_id")
+                .and_then(Value::as_str)
+                .unwrap_or("<missing>");
+            if !component_ids.insert(component_id.to_owned()) {
+                errors.push(format!("duplicate global component ID: {component_id}"));
+            }
+            if component.get("evidence_status").and_then(Value::as_str) != Some("UNQUALIFIED") {
+                errors.push(format!("component {component_id} cannot self-promote evidence status"));
+            }
+            let component_sources: Vec<&str> = component
+                .get("reference_source_ids")
+                .and_then(Value::as_array)
+                .into_iter()
+                .flatten()
+                .filter_map(Value::as_str)
+                .collect();
+            if component_sources.is_empty()
+                || component_sources.iter().any(|source_id| !sources.contains(*source_id))
+            {
+                errors.push(format!("component {component_id} has empty or unresolved source references"));
+            }
+            let owners: Vec<&str> = component
+                .get("process_semantics_owners")
+                .and_then(Value::as_array)
+                .into_iter()
+                .flatten()
+                .filter_map(Value::as_str)
+                .collect();
+            if owners.is_empty()
+                || owners.iter().any(|owner| {
+                    !owner.starts_with("https://github.com/Luminous-Dynamics/symthaea/issues/")
+                })
+            {
+                errors.push(format!("component {component_id} lacks canonical process owners"));
+            }
         }
 
         let Some(stages) = route.get("stages").and_then(Value::as_array) else {
@@ -208,6 +255,21 @@ fn rejects_promoted_route_or_stage_status() {
     manifest["routes"][0]["stages"][0]["evidence_status"] = Value::String("QUALIFIED".to_owned());
     let text = serde_json::to_string(&manifest).expect("mutated manifest serializes");
     assert!(!validate_contract(&text, SCHEMA_TEXT).is_empty());
+}
+
+#[test]
+fn rejects_promoted_component_status_and_unresolved_component_source() {
+    let mut promoted: Value = serde_json::from_str(MANIFEST_TEXT).expect("fixture manifest JSON");
+    promoted["routes"][0]["component_interfaces"][0]["evidence_status"] =
+        Value::String("QUALIFIED".to_owned());
+    let promoted_text = serde_json::to_string(&promoted).expect("promoted fixture serializes");
+    assert!(!validate_contract(&promoted_text, SCHEMA_TEXT).is_empty());
+
+    let mut unresolved: Value = serde_json::from_str(MANIFEST_TEXT).expect("fixture manifest JSON");
+    unresolved["routes"][0]["component_interfaces"][0]["reference_source_ids"][0] =
+        Value::String("SRC-NOT-DEFINED".to_owned());
+    let unresolved_text = serde_json::to_string(&unresolved).expect("unresolved fixture serializes");
+    assert!(!validate_contract(&unresolved_text, SCHEMA_TEXT).is_empty());
 }
 
 #[test]
