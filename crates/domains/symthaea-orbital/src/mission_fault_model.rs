@@ -1065,8 +1065,8 @@ mod tests {
                     expected_fault_effect:
                         "false for steps 4 through 6; geometry remains unchanged".to_owned(),
                     signature_value: Some("unavailable".to_owned()),
-$3temporal_samples: vec![],
-$3}],
+                    temporal_samples: vec![],
+                }],
                 monitor: Some(MonitorContract {
                     id: "MON-COMM-001".to_owned(),
                     required_alarm: "COMM_LINK_UNAVAILABLE".to_owned(),
@@ -1263,15 +1263,15 @@ $3}],
             unit: "categorical".to_owned(),
             expected_fault_effect: "radio self-test result".to_owned(),
             signature_value: Some("failed".to_owned()),
-$3temporal_samples: vec![],
-$3});
+            temporal_samples: vec![],
+        });
         second.observable_signals.push(ObservableSignal {
             id: "radio_self_test".to_owned(),
             unit: "categorical".to_owned(),
             expected_fault_effect: "radio self-test result".to_owned(),
             signature_value: Some("passed".to_owned()),
-$3temporal_samples: vec![],
-$3});
+            temporal_samples: vec![],
+        });
         model.failure_modes.push(second);
 
         let report = model
@@ -1295,15 +1295,15 @@ $3});
             unit: "categorical".to_owned(),
             expected_fault_effect: "radio self-test result".to_owned(),
             signature_value: Some("failed".to_owned()),
-$3temporal_samples: vec![],
-$3});
+            temporal_samples: vec![],
+        });
         second.observable_signals.push(ObservableSignal {
             id: "radio_self_test".to_owned(),
             unit: "categorical".to_owned(),
             expected_fault_effect: "radio self-test result".to_owned(),
             signature_value: None,
-$3temporal_samples: vec![],
-$3});
+            temporal_samples: vec![],
+        });
         model.failure_modes.push(second);
 
         let report = model
