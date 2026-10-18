@@ -1,0 +1,353 @@
+{
+  "suite_id": "WOOD_MATERIAL_PROFILE_BENCHMARK",
+  "suite_version": "0.1.0",
+  "evidence_class": "synthetic",
+  "claim_ceiling": "Synthetic profile-contract validation only; no species identification, wood grading, structural allowable, kiln schedule, or product qualification.",
+  "scenarios": [
+    {
+      "scenario_id": "SYNTHETIC_SPECIES_DENSITY_FOR_CANDIDATE_RANKING",
+      "expected_disposition": "pass",
+      "expected_reason_codes": [],
+      "profile": {
+        "profile_id": "wood-profile-001",
+        "accepted_scientific_name": "Pinus radiata",
+        "taxon_resolution": "resolved",
+        "identification_method": "scientific_name_reference",
+        "profile_level": "species_aggregate",
+        "source_record_id": "source-synthetic-001",
+        "source_kind": "synthetic_reference",
+        "source_license_ref": null,
+        "specimen_id": null,
+        "lot_id": null,
+        "properties": [
+          {
+            "property_id": "wood_density",
+            "value": 520,
+            "unit": "kilograms_per_cubic_metre",
+            "basis": "oven_dry",
+            "direction": "not_applicable",
+            "evidence_level": "species_estimate",
+            "property_source_id": "synthetic-property-source-001",
+            "measurement_record_id": null
+          }
+        ]
+      },
+      "query": {
+        "purpose": "candidate_ranking",
+        "required_property_id": "wood_density",
+        "required_unit": "kilograms_per_cubic_metre",
+        "required_basis": "oven_dry",
+        "required_direction": "not_applicable",
+        "minimum_value": null
+      },
+      "expected_assertions": [
+        "A resolved species aggregate can inform candidate ranking when its source, basis, unit and scope remain explicit."
+      ],
+      "negative_control": "positive known-answer: species estimate used only for candidate ranking"
+    },
+    {
+      "scenario_id": "SYNTHETIC_COMMON_NAME_NOT_STRUCTURAL_QUALIFICATION",
+      "expected_disposition": "reject",
+      "expected_reason_codes": [
+        "EVIDENCE_SCOPE_MISMATCH",
+        "STRUCTURAL_VALUE_NOT_QUALIFIED",
+        "TAXON_IDENTITY_UNRESOLVED"
+      ],
+      "profile": {
+        "profile_id": "wood-profile-ambiguous-oak",
+        "accepted_scientific_name": "Quercus sp. (unresolved)",
+        "taxon_resolution": "ambiguous",
+        "identification_method": "common_name_only",
+        "profile_level": "species_aggregate",
+        "source_record_id": "source-synthetic-001",
+        "source_kind": "synthetic_reference",
+        "source_license_ref": null,
+        "specimen_id": null,
+        "lot_id": null,
+        "properties": [
+          {
+            "property_id": "longitudinal_modulus",
+            "value": 9200,
+            "unit": "megapascal",
+            "basis": "conditioned",
+            "direction": "longitudinal",
+            "evidence_level": "literature_reported",
+            "property_source_id": "synthetic-literature-source",
+            "measurement_record_id": null
+          }
+        ]
+      },
+      "query": {
+        "purpose": "structural_use",
+        "required_property_id": "longitudinal_modulus",
+        "required_unit": "megapascal",
+        "required_basis": "conditioned",
+        "required_direction": "longitudinal",
+        "minimum_value": null
+      },
+      "expected_assertions": [
+        "A common-name-only ambiguous taxon and literature-reported modulus do not qualify a specific structural product."
+      ],
+      "negative_control": "negative: aggregate literature value used as structural design evidence"
+    },
+    {
+      "scenario_id": "SYNTHETIC_SPECIES_MEAN_NOT_LOT_PROPERTY",
+      "expected_disposition": "reject",
+      "expected_reason_codes": [
+        "EVIDENCE_SCOPE_MISMATCH",
+        "LOT_ID_MISSING"
+      ],
+      "profile": {
+        "profile_id": "wood-profile-001",
+        "accepted_scientific_name": "Pinus radiata",
+        "taxon_resolution": "resolved",
+        "identification_method": "scientific_name_reference",
+        "profile_level": "species_aggregate",
+        "source_record_id": "source-synthetic-001",
+        "source_kind": "synthetic_reference",
+        "source_license_ref": null,
+        "specimen_id": null,
+        "lot_id": null,
+        "properties": [
+          {
+            "property_id": "wood_density",
+            "value": 520,
+            "unit": "kilograms_per_cubic_metre",
+            "basis": "oven_dry",
+            "direction": "not_applicable",
+            "evidence_level": "species_estimate",
+            "property_source_id": "synthetic-property-source-001",
+            "measurement_record_id": null
+          }
+        ]
+      },
+      "query": {
+        "purpose": "lot_selection",
+        "required_property_id": "wood_density",
+        "required_unit": "kilograms_per_cubic_metre",
+        "required_basis": "oven_dry",
+        "required_direction": "not_applicable",
+        "minimum_value": null
+      },
+      "expected_assertions": [
+        "Species-average density cannot substitute for lot-specific condition and property evidence."
+      ],
+      "negative_control": "negative: species aggregate directly used for lot-specific selection"
+    },
+    {
+      "scenario_id": "SYNTHETIC_GRAIN_DIRECTION_MISMATCH",
+      "expected_disposition": "reject",
+      "expected_reason_codes": [
+        "PROPERTY_DIRECTION_MISMATCH"
+      ],
+      "profile": {
+        "profile_id": "wood-profile-lot-004",
+        "accepted_scientific_name": "Pinus radiata",
+        "taxon_resolution": "resolved",
+        "identification_method": "scientific_name_reference",
+        "profile_level": "lot",
+        "source_record_id": "source-synthetic-001",
+        "source_kind": "synthetic_reference",
+        "source_license_ref": null,
+        "specimen_id": null,
+        "lot_id": "lot-004",
+        "properties": [
+          {
+            "property_id": "longitudinal_modulus",
+            "value": 8500,
+            "unit": "megapascal",
+            "basis": "conditioned",
+            "direction": "radial",
+            "evidence_level": "lot_measured",
+            "property_source_id": "measurement-source-004",
+            "measurement_record_id": "measurement-004"
+          }
+        ]
+      },
+      "query": {
+        "purpose": "lot_selection",
+        "required_property_id": "longitudinal_modulus",
+        "required_unit": "megapascal",
+        "required_basis": "conditioned",
+        "required_direction": "longitudinal",
+        "minimum_value": 8000
+      },
+      "expected_assertions": [
+        "Radial modulus evidence cannot satisfy a longitudinal modulus query."
+      ],
+      "negative_control": "negative: orthotropic wood property direction is substituted"
+    },
+    {
+      "scenario_id": "SYNTHETIC_MOISTURE_BASIS_MISMATCH",
+      "expected_disposition": "reject",
+      "expected_reason_codes": [
+        "PROPERTY_CONDITION_MISMATCH"
+      ],
+      "profile": {
+        "profile_id": "wood-profile-lot-005",
+        "accepted_scientific_name": "Pinus radiata",
+        "taxon_resolution": "resolved",
+        "identification_method": "scientific_name_reference",
+        "profile_level": "lot",
+        "source_record_id": "source-synthetic-001",
+        "source_kind": "synthetic_reference",
+        "source_license_ref": null,
+        "specimen_id": null,
+        "lot_id": "lot-005",
+        "properties": [
+          {
+            "property_id": "wood_density",
+            "value": 650,
+            "unit": "kilograms_per_cubic_metre",
+            "basis": "green",
+            "direction": "not_applicable",
+            "evidence_level": "lot_measured",
+            "property_source_id": "measurement-source-005",
+            "measurement_record_id": "measurement-005"
+          }
+        ]
+      },
+      "query": {
+        "purpose": "lot_selection",
+        "required_property_id": "wood_density",
+        "required_unit": "kilograms_per_cubic_metre",
+        "required_basis": "oven_dry",
+        "required_direction": "not_applicable",
+        "minimum_value": null
+      },
+      "expected_assertions": [
+        "Green-state density cannot be silently reused as oven-dry density."
+      ],
+      "negative_control": "negative: property moisture/conditioning basis differs from query"
+    },
+    {
+      "scenario_id": "SYNTHETIC_EXTERNAL_SOURCE_LICENSE_UNRESOLVED",
+      "expected_disposition": "reject",
+      "expected_reason_codes": [
+        "DATA_LICENSE_UNRESOLVED"
+      ],
+      "profile": {
+        "profile_id": "wood-profile-public-006",
+        "accepted_scientific_name": "Pinus radiata",
+        "taxon_resolution": "resolved",
+        "identification_method": "scientific_name_reference",
+        "profile_level": "species_aggregate",
+        "source_record_id": "public-source-reference-006",
+        "source_kind": "public_reference",
+        "source_license_ref": null,
+        "specimen_id": null,
+        "lot_id": null,
+        "properties": [
+          {
+            "property_id": "wood_density",
+            "value": 520,
+            "unit": "kilograms_per_cubic_metre",
+            "basis": "oven_dry",
+            "direction": "not_applicable",
+            "evidence_level": "species_estimate",
+            "property_source_id": "synthetic-property-source-001",
+            "measurement_record_id": null
+          }
+        ]
+      },
+      "query": {
+        "purpose": "candidate_ranking",
+        "required_property_id": "wood_density",
+        "required_unit": "kilograms_per_cubic_metre",
+        "required_basis": "oven_dry",
+        "required_direction": "not_applicable",
+        "minimum_value": null
+      },
+      "expected_assertions": [
+        "An external reference without a reviewed source-license reference cannot be admitted as a reusable dataset profile."
+      ],
+      "negative_control": "negative: external source has no resolved data-use reference"
+    },
+    {
+      "scenario_id": "SYNTHETIC_MEASURED_PROPERTY_REFERENCE_MISSING",
+      "expected_disposition": "reject",
+      "expected_reason_codes": [
+        "PROPERTY_MEASUREMENT_REFERENCE_MISSING"
+      ],
+      "profile": {
+        "profile_id": "wood-profile-specimen-007",
+        "accepted_scientific_name": "Pinus radiata",
+        "taxon_resolution": "resolved",
+        "identification_method": "scientific_name_reference",
+        "profile_level": "specimen",
+        "source_record_id": "source-synthetic-001",
+        "source_kind": "synthetic_reference",
+        "source_license_ref": null,
+        "specimen_id": "specimen-007",
+        "lot_id": "lot-007",
+        "properties": [
+          {
+            "property_id": "wood_density",
+            "value": 520,
+            "unit": "kilograms_per_cubic_metre",
+            "basis": "oven_dry",
+            "direction": "not_applicable",
+            "evidence_level": "sample_measured",
+            "property_source_id": "synthetic-measurement-source",
+            "measurement_record_id": null
+          }
+        ]
+      },
+      "query": {
+        "purpose": "lot_selection",
+        "required_property_id": "wood_density",
+        "required_unit": "kilograms_per_cubic_metre",
+        "required_basis": "oven_dry",
+        "required_direction": "not_applicable",
+        "minimum_value": null
+      },
+      "expected_assertions": [
+        "A measured sample property needs an exact measurement record reference."
+      ],
+      "negative_control": "negative: measured property has no measurement record identity"
+    },
+    {
+      "scenario_id": "SYNTHETIC_PROPERTY_UNIT_MISMATCH",
+      "expected_disposition": "reject",
+      "expected_reason_codes": [
+        "PROPERTY_UNIT_MISMATCH"
+      ],
+      "profile": {
+        "profile_id": "wood-profile-lot-008",
+        "accepted_scientific_name": "Pinus radiata",
+        "taxon_resolution": "resolved",
+        "identification_method": "scientific_name_reference",
+        "profile_level": "lot",
+        "source_record_id": "source-synthetic-001",
+        "source_kind": "synthetic_reference",
+        "source_license_ref": null,
+        "specimen_id": null,
+        "lot_id": "lot-008",
+        "properties": [
+          {
+            "property_id": "longitudinal_modulus",
+            "value": 8500,
+            "unit": "megapascal",
+            "basis": "conditioned",
+            "direction": "longitudinal",
+            "evidence_level": "lot_measured",
+            "property_source_id": "measurement-source-008",
+            "measurement_record_id": "measurement-008"
+          }
+        ]
+      },
+      "query": {
+        "purpose": "lot_selection",
+        "required_property_id": "longitudinal_modulus",
+        "required_unit": "gigapascal",
+        "required_basis": "conditioned",
+        "required_direction": "longitudinal",
+        "minimum_value": null
+      },
+      "expected_assertions": [
+        "Numerically similar values cannot be compared across incompatible units without an explicit conversion and normalized value."
+      ],
+      "negative_control": "negative: property is reported in MPa but requirement is in GPa"
+    }
+  ]
+}
