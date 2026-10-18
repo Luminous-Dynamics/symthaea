@@ -15,6 +15,18 @@ const OUTCOMES: [&str; 7] = [
 
 const CONTRACT_SHA256: &str =
     "c7ffbabaca875faf066ee63e5d12acf7e46d36001cf36c9590799bffbea61577";
+const CONTRACT_PREIMAGE: &str = concat!(
+    "HUMAN-TOOL-CONTRACT-v0.1\n",
+    "arms=A0,A1,A2\n",
+    "success=verified_restoration AND function_gate=pass AND safety_gate=pass AND distinct_function_safety_receipts\n",
+    "unknown_cost=null_never_zero\n",
+    "critical_fault_safe_to_operate=forbidden\n",
+    "recurrence_claim=verified_restoration AND positive_follow_up_use_exposure_hours\n",
+    "A2_claim=hypothesis_or_abstain_only\n",
+    "advisory_evidence_refs=nonempty_subset_of_episode_observation_refs\n",
+    "all_started_episodes=require_observation_refs\n",
+    "currency=single_root_currency\n"
+);
 
 fn string_field<'a>(value: &'a Value, key: &str, where_: &str) -> Result<&'a str, String> {
     value
@@ -82,13 +94,17 @@ fn enum_field<'a>(
 }
 
 fn audit(root: &Value, input_sha256: &str) -> Result<Value, String> {
+    let computed_contract_sha256 = format!("{:x}", Sha256::digest(CONTRACT_PREIMAGE.as_bytes()));
+    if computed_contract_sha256 != CONTRACT_SHA256 {
+        return Err("auditor's contract digest does not match its canonical preimage".into());
+    }
     if string_field(root, "schema_version", "root")? != "human-tool-bench-v0.1" {
         return Err("root.schema_version must equal human-tool-bench-v0.1".into());
     }
     if string_field(root, "evidence_class", "root")? != "synthetic_contract_fixture" {
         return Err("root.evidence_class must remain synthetic_contract_fixture".into());
     }
-    if string_field(root, "contract_sha256", "root")? != CONTRACT_SHA256 {
+    if string_field(root, "contract_sha256", "root")? != computed_contract_sha256 {
         return Err("root.contract_sha256 does not match the frozen v0.1 contract".into());
     }
     if string_field(root, "protocol_id", "root")? != "human-tool-protocol-v0.1" {
@@ -546,6 +562,12 @@ mod tests {
 
     fn run(value: &Value) -> Result<Value, String> {
         audit(value, "test-input-digest")
+    }
+
+    #[test]
+    fn frozen_contract_digest_matches_its_canonical_preimage() {
+        let computed = format!("{:x}", Sha256::digest(CONTRACT_PREIMAGE.as_bytes()));
+        assert_eq!(computed, CONTRACT_SHA256);
     }
 
     #[test]
