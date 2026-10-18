@@ -1083,7 +1083,7 @@ mod tests {
             ],
             required_assumptions: vec!["rigid_tube_proxy".into()],
             required_evidence: vec![EvidenceRequirement {
-                source_id: "q0-fixture-corpus".into(),
+                source_id: "synthetic-fixture-source".into(),
                 sha256: "a".repeat(64),
             }],
             baseline_candidate_id: "baseline-simple-tree".into(),
@@ -1129,7 +1129,7 @@ mod tests {
                 resolved: true,
             }],
             evidence: vec![EvidenceObservation {
-                source_id: "q0-fixture-corpus".into(),
+                source_id: "synthetic-fixture-source".into(),
                 sha256: "a".repeat(64),
                 status: EvidenceStatus::Current,
             }],
@@ -1276,11 +1276,11 @@ mod tests {
         let receipt = evaluate_candidates(&p, &candidates).unwrap();
         assert!(matches!(decision(&receipt, "design-a"), CandidateDecision::Rejected { reasons, .. }
             if reasons.contains(&CandidateRejectionReason::EvidenceStale(
-                "q0-fixture-corpus".into()
+                "synthetic-fixture-source".into()
             ))));
         assert!(matches!(decision(&receipt, "design-b"), CandidateDecision::Rejected { reasons, .. }
             if reasons.contains(&CandidateRejectionReason::EvidenceContradictory(
-                "q0-fixture-corpus".into()
+                "synthetic-fixture-source".into()
             ))));
         assert!(matches!(
             decision(&receipt, "design-unverified"),
@@ -1395,7 +1395,7 @@ mod tests {
         let receipt = evaluate_candidates(&p, &candidates).unwrap();
         assert!(matches!(decision(&receipt, "design-a"), CandidateDecision::Rejected { reasons, .. }
             if reasons.contains(&CandidateRejectionReason::EvidenceDigestMismatch(
-                "q0-fixture-corpus".into()
+                "synthetic-fixture-source".into()
             ))));
     }
 
@@ -1430,7 +1430,7 @@ mod tests {
         let receipt = evaluate_candidates(&p, &candidates).unwrap();
         assert!(matches!(decision(&receipt, "design-a"), CandidateDecision::Rejected { reasons, .. }
             if reasons.contains(&CandidateRejectionReason::MissingEvidence(
-                "q0-fixture-corpus".into()
+                "synthetic-fixture-source".into()
             ))));
     }
 
