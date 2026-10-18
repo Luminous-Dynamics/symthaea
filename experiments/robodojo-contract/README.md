@@ -9,9 +9,10 @@ cargo test --locked --manifest-path experiments/robodojo-contract/Cargo.toml
 cargo run --locked --manifest-path experiments/robodojo-contract/Cargo.toml
 cargo run --locked --manifest-path experiments/robodojo-contract/Cargo.toml -- --summarize experiments/robodojo-contract/examples/synthetic_trials.tsv
 cargo run --locked --manifest-path experiments/robodojo-contract/Cargo.toml -- --compare experiments/robodojo-contract/examples/synthetic_trials.tsv baseline symthaea_sidecar
+cargo run --locked --manifest-path experiments/robodojo-contract/Cargo.toml -- --calibrate experiments/robodojo-contract/examples/synthetic_forecasts.tsv
 ~~~
 
-The last two commands demonstrate the analysis CLI using **synthetic fixture data only**. They are not RoboDojo-RC measurements. The nested workspace and lockfile are intentional: contract tests should not have to resolve or compile Symthaea's large workspace, download a policy checkpoint, start Isaac Sim, or wait for its runners.
+The analysis commands demonstrate the CLI using **synthetic fixture data only**. They are not RoboDojo-RC measurements. The nested workspace and lockfile are intentional: contract tests should not have to resolve or compile Symthaea's large workspace, download a policy checkpoint, start Isaac Sim, or wait for its runners.
 
 ## What approval means
 
@@ -32,6 +33,20 @@ Fields are separated by tabs (the display above uses spaces). IDs should be stab
 - --summarize emits task-by-variant rows with attempts, validity, full completions, rubric mean and bootstrap interval, elapsed time, model calls, action steps, estimated cost, timeouts and safety events.
 - --compare requires exactly matching task/trial IDs across the chosen baseline and candidate; unpaired runs are rejected. It reports paired progress delta with a task-stratified bootstrap interval, plus completion/valid-run-rate deltas and runtime/cost/safety deltas.
 - Bootstrap count defaults to 2,000 and seed to 42. Reuse the same input and seed to reproduce the interval.
+
+## Probability forecasts and calibration
+
+The optional forecast TSV uses this exact header:
+
+~~~text
+task_id variant_id trial_id predicted_success_probability success valid_run
+~~~
+
+The probability must be emitted **before** the task outcome is known. success=true means the benchmark's full completion criterion was achieved; partial rubric progress remains in the trial TSV and is not silently relabeled as binary success. An invalid, interrupted, or timed-out run uses success=false and valid_run=false, so confidence in a task is judged against end-to-end reliability.
+
+Run --calibrate FORECASTS.tsv [BIN_COUNT] [HIGH_CONFIDENCE_THRESHOLD]. It reports Brier score, log loss, fixed-bin expected calibration error (ECE), failure rate among forecasts above the chosen confidence threshold, and area under a confidence-ranked risk/coverage curve. Lower Brier, log loss, ECE, and risk/coverage area are generally better. The high-confidence failure rate is especially relevant to a recovery gate: a system that predicts 90% success should not fail often on the trials it labels that confidently.
+
+Do not tune the confidence threshold on held-out test data. Split calibration and evaluation by scenes/tasks or a preregistered trial set where feasible; report both the ungated base policy and the gated system. These are decision-quality diagnostics, **not** safety certificates or proof of consciousness. The synthetic forecast fixture exists only to test file parsing and metric arithmetic.
 
 ## Scope boundary
 
