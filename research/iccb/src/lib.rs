@@ -6,6 +6,7 @@
 
 use std::collections::BTreeSet;
 
+pub mod decision_receipt;
 pub mod fixtures;
 pub mod policy;
 pub mod robust_decision;
