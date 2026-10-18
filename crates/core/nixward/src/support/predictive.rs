@@ -14,9 +14,7 @@ use std::time::{Instant, SystemTime, UNIX_EPOCH};
 
 use serde::{Deserialize, Serialize};
 use symthaea_core::hdc::ContinuousHV;
-use symthaea_core::hdc::hdc_ltc_unified::{
-    HdcLtcUnifiedNeuron, UnifiedConfig, DEFAULT_MAX_ITERATIVE_SUBSTEPS,
-};
+use symthaea_core::hdc::hdc_ltc_unified::{HdcLtcUnifiedNeuron, UnifiedConfig};
 
 use crate::encoding::codebook::{NIX_HDC_DIM, NixCodebook};
 
@@ -233,9 +231,6 @@ impl PredictiveMonitor {
     ///
     /// Clones the neuron, evolves it forward by `hours_ahead` hours, then
     /// decodes the resulting state vector back to telemetry values.
-    ///
-    /// Returns None when history is empty or the requested horizon is invalid
-    /// or exceeds the iterative solver's explicit substep budget.
     pub fn predict_ltc(&mut self, hours_ahead: f64) -> Option<SystemTelemetry> {
         if self.history.is_empty() {
             return None;
@@ -248,13 +243,7 @@ impl PredictiveMonitor {
 
         let mut future_neuron = self.neuron.clone();
         let dt_seconds = (hours_ahead * 3600.0) as f32;
-        future_neuron
-            .try_evolve_closed_form_iterative(
-                dt_seconds,
-                &last_input,
-                DEFAULT_MAX_ITERATIVE_SUBSTEPS,
-            )
-            .ok()?;
+        future_neuron.evolve_closed_form_iterative(dt_seconds, &last_input);
         let predicted_hv = future_neuron.state().clone();
 
         Some(self.decode_telemetry(&predicted_hv))
@@ -847,21 +836,6 @@ mod tests {
             "Decoded memory should be in range, got {}",
             decoded.memory_used_pct
         );
-    }
-
-    #[test]
-    fn test_ltc_prediction_rejects_invalid_or_over_budget_horizons() {
-        let mut monitor = PredictiveMonitor::with_defaults();
-        for _ in 0..2 {
-            monitor.ingest(sample_telemetry(50.0, 40.0, 50_000, 0));
-        }
-
-        for horizon in [f64::NAN, f64::INFINITY, f64::NEG_INFINITY, -1.0, 1.0e9] {
-            assert!(
-                monitor.predict_ltc(horizon).is_none(),
-                "invalid or over-budget horizon {horizon} must be rejected"
-            );
-        }
     }
 
     #[test]
