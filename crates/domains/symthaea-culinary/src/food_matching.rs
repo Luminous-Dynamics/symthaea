@@ -274,6 +274,13 @@ pub fn validate_food_identity_match_v1(assessment: &Value) -> Result<(), Vec<Str
         .filter(|(_, relation)| matches!(relation.as_str(), "different" | "unknown"))
         .map(|(attribute, _)| attribute.clone())
         .collect();
+    for deviation_id in &deviation_ids {
+        if !all_differences_or_unknowns.contains(deviation_id) {
+            errors.push(format!(
+                "deviation {deviation_id:?} has no matching different/unknown attribute relation"
+            ));
+        }
+    }
     let query_identity = query.get("identity");
     let candidate_identity = candidate.get("identity");
     let branded_without_identity = [
