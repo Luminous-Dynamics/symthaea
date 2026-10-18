@@ -237,3 +237,43 @@ fn run_contract_smoke() -> Result<(), Box<dyn Error>> {
     println!("contract_smoke=PASS accepted_actions=1 replan_requests=2 stop_latched=1 official_robodojo_result=false");
     Ok(())
 }
+
+
+#[cfg(test)]
+mod cli_tests {
+    use super::*;
+
+    fn fixture_path() -> std::path::PathBuf {
+        Path::new(env!("CARGO_MANIFEST_DIR"))
+            .join("examples")
+            .join("synthetic_trials.tsv")
+    }
+
+    #[test]
+    fn synthetic_rc_fixture_parses_and_summarizes() {
+        let records = read_trials(fixture_path()).expect("synthetic fixture must parse");
+        assert_eq!(records.len(), 12);
+        let summaries = summarize_trials(&records, 200, 42).expect("fixture must summarize");
+        assert_eq!(summaries.len(), 4);
+        assert!(summaries.iter().all(|row| row.total_trials == 3));
+        assert!(summaries.iter().all(|row| row.valid_trials == 2));
+        assert!(summaries.iter().all(|row| row.invalid_trials == 1));
+        assert!(summaries.iter().all(|row| row.timeout_count == 1));
+    }
+
+    #[test]
+    fn synthetic_fixture_paired_comparison_keeps_invalid_trials_in_reliability_delta() {
+        let records = read_trials(fixture_path()).expect("synthetic fixture must parse");
+        let baseline: Vec<_> = records.iter()
+            .filter(|row| row.variant_id == "baseline").cloned().collect();
+        let candidate: Vec<_> = records.iter()
+            .filter(|row| row.variant_id == "symthaea_sidecar").cloned().collect();
+        let comparison = compare_paired_trials(&baseline, &candidate, 200, 42)
+            .expect("fixture variants are paired");
+        assert_eq!(comparison.total_pairs, 6);
+        assert_eq!(comparison.scored_pairs, 4);
+        assert_eq!(comparison.tasks_with_scored_pairs, 2);
+        assert_eq!(comparison.valid_run_rate_delta, 0.0);
+        assert_eq!(comparison.progress_delta_ci95, Some((0.125, 0.25)));
+    }
+}
