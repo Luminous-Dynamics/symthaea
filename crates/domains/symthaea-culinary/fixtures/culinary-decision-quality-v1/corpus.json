@@ -1,0 +1,224 @@
+{
+  "corpus_id": "culinary-decision-quality-voi-v1",
+  "corpus_version": "1.0.0",
+  "evidence_class": "synthetic_contract_fixture",
+  "not_real_world_data": true,
+  "warning": "This corpus defines deterministic contract behavior only. Values, markets, candidates, and hidden truths are synthetic; it establishes no nutritional adequacy, food safety, calibration, or household benefit claim.",
+  "policy_input_boundary": "A benchmark runner MUST pass only each case's policy_input to the candidate policy. The oracle_only_expected object and all oracle-only fields are scorer data and MUST NOT be exposed to the policy under evaluation.",
+  "objective_policy": {
+    "hard_constraints_noncompensatory": true,
+    "missing_values_are_not_zero": true,
+    "scenario_lists_are_not_probabilities": true,
+    "currentness_uses_known_at_and_valid_at": true,
+    "simulation_is_not_observation": true
+  },
+  "cases": [
+    {
+      "id": "DQ-001-stale-price-can-flip-choice",
+      "family": "freshness_and_measurement_value",
+      "policy_input": {
+        "decision_time": "2026-10-18T09:00:00+02:00",
+        "candidates": [
+          {"id": "basket_alpha", "hard_gates": "pass", "cost": {"value": 80, "currency": "ZAR", "status": "observed", "known_at": "2026-10-17T15:00:00+02:00", "valid_at": "2026-10-17", "freshness": "fresh"}},
+          {"id": "basket_beta", "hard_gates": "pass", "cost": {"value": 95, "currency": "ZAR", "status": "observed", "known_at": "2026-10-18T08:00:00+02:00", "valid_at": "2026-10-18", "freshness": "fresh"}},
+          {"id": "basket_gamma", "hard_gates": "pass", "cost": {"value": 74, "currency": "ZAR", "status": "observed", "known_at": "2026-07-01T10:00:00+02:00", "valid_at": "2026-07-01", "freshness": "stale"}}
+        ],
+        "uncertainty": {"description": "gamma's current price is unknown and could reverse the apparent price ordering", "probability_model": "none"},
+        "available_measurements": [{"id": "remeasure_gamma_item_prices", "scope": "current package-normalized gamma basket prices", "cost_units": 1}]
+      },
+      "oracle_only_expected": {
+        "disposition": "request_measurement",
+        "measurement_id": "remeasure_gamma_item_prices",
+        "required_flags": ["stale_evidence"],
+        "must_not": ["treat_stale_74_as_current_price", "invent_price_probability"]
+      }
+    },
+    {
+      "id": "DQ-002-unknown-allergen-gate",
+      "family": "noncompensatory_gates",
+      "policy_input": {
+        "decision_time": "2026-10-18T09:00:00+02:00",
+        "candidates": [
+          {"id": "meal_alpha", "hard_gates": {"food_safety": "pass", "allergen": "unknown"}, "soft_objectives": {"cost": 1, "taste": 10}},
+          {"id": "meal_beta", "hard_gates": {"food_safety": "pass", "allergen": "unknown"}, "soft_objectives": {"cost": 0.5, "taste": 7}}
+        ],
+        "available_measurements": [],
+        "policy_constraint": "allergen gate must be resolved before recommendation"
+      },
+      "oracle_only_expected": {
+        "disposition": "human_review",
+        "selected_candidate_ids": [],
+        "must_not": ["rank_unknown_gate_as_feasible", "trade_unknown_allergen_against_cost_or_taste"]
+      }
+    },
+    {
+      "id": "DQ-003-missing-nutrient-not-zero",
+      "family": "missing_data",
+      "policy_input": {
+        "candidates": [
+          {"id": "meal_alpha", "hard_gates": "pass", "nutrition": {"iron_mg": {"value": 4.2, "status": "derived", "source_ref": "synthetic:composition-a"}, "sodium_mg": {"value": null, "status": "missing", "source_ref": null}}},
+          {"id": "meal_beta", "hard_gates": "pass", "nutrition": {"iron_mg": {"value": 3.8, "status": "observed", "source_ref": "synthetic:composition-b"}, "sodium_mg": {"value": 580, "status": "observed", "source_ref": "synthetic:composition-c"}}}
+        ],
+        "policy_constraint": "sodium limit cannot be evaluated when sodium is missing"
+      },
+      "oracle_only_expected": {
+        "disposition": "request_measurement",
+        "measurement_scope": "resolve meal_alpha sodium content or choose an adequately evidenced alternative",
+        "must_not": ["coerce_missing_sodium_to_zero", "claim_meal_alpha_meets_sodium_limit"]
+      }
+    },
+    {
+      "id": "DQ-004-stable-dominance-do-not-overquery",
+      "family": "unnecessary_measurement",
+      "policy_input": {
+        "candidates": [
+          {"id": "basket_alpha", "hard_gates": "pass", "scenario_metrics": {"baseline": {"cost": 80, "prep_minutes": 30}, "staple_shock": {"cost": 86, "prep_minutes": 30}, "produce_shift": {"cost": 82, "prep_minutes": 28}}},
+          {"id": "basket_beta", "hard_gates": "pass", "scenario_metrics": {"baseline": {"cost": 92, "prep_minutes": 40}, "staple_shock": {"cost": 98, "prep_minutes": 42}, "produce_shift": {"cost": 96, "prep_minutes": 40}}}
+        ],
+        "objective_directions": {"cost": "minimize", "prep_minutes": "minimize"},
+        "available_measurements": [{"id": "extra_market_survey", "cost_units": 5}],
+        "scenario_probabilities": null
+      },
+      "oracle_only_expected": {
+        "disposition": "recommend",
+        "selected_candidate_ids": ["basket_alpha"],
+        "measurement_id": null,
+        "must_not": ["request_measurement_without_decision_relevance"]
+      }
+    },
+    {
+      "id": "DQ-005-scenario-rank-reversal-preserve-options",
+      "family": "robustness",
+      "policy_input": {
+        "candidates": [
+          {"id": "basket_alpha", "hard_gates": "pass", "scenario_metrics": {"baseline": {"cost": 80, "nutrition_adequacy": 8}, "staple_shock": {"cost": 110, "nutrition_adequacy": 8}}},
+          {"id": "basket_beta", "hard_gates": "pass", "scenario_metrics": {"baseline": {"cost": 90, "nutrition_adequacy": 9}, "staple_shock": {"cost": 92, "nutrition_adequacy": 9}}}
+        ],
+        "objective_directions": {"cost": "minimize", "nutrition_adequacy": "maximize"},
+        "scenario_probabilities": null
+      },
+      "oracle_only_expected": {
+        "disposition": "preserve_choice_set",
+        "selected_candidate_ids": ["basket_alpha", "basket_beta"],
+        "required_flags": ["scenario_sensitive"],
+        "must_not": ["claim_universal_winner", "infer_scenario_probability_from_count"]
+      }
+    },
+    {
+      "id": "DQ-006-worst-group-floor-not-average",
+      "family": "distributional_fairness",
+      "policy_input": {
+        "candidates": [
+          {"id": "portfolio_alpha", "hard_gates": "pass", "group_costs_zar": {"group_a": 65, "group_b": 112}, "maximum_per_group_zar": {"group_a": 100, "group_b": 100}},
+          {"id": "portfolio_beta", "hard_gates": "pass", "group_costs_zar": {"group_a": 84, "group_b": 96}, "maximum_per_group_zar": {"group_a": 100, "group_b": 100}}
+        ],
+        "policy_constraint": "every declared group must meet the per-group maximum; aggregate mean cannot offset a group's violation"
+      },
+      "oracle_only_expected": {
+        "disposition": "recommend",
+        "selected_candidate_ids": ["portfolio_beta"],
+        "must_not": ["select_portfolio_alpha_by_aggregate_average", "hide_group_b_constraint_failure"]
+      }
+    },
+    {
+      "id": "DQ-007-simulated-stock-is-not-observed-stock",
+      "family": "evidence_class_boundary",
+      "policy_input": {
+        "candidates": [
+          {"id": "meal_alpha", "hard_gates": "pass", "ingredient_availability": {"tomato": {"value": "in_stock", "status": "simulated", "source_ref": "synthetic:symtropy-run"}}}
+        ],
+        "available_measurements": [{"id": "check_authorized_current_stock", "cost_units": 1}]
+      },
+      "oracle_only_expected": {
+        "disposition": "request_measurement",
+        "measurement_id": "check_authorized_current_stock",
+        "must_not": ["label_simulated_stock_as_observed", "claim_order_fulfilled"]
+      }
+    },
+    {
+      "id": "DQ-008-conflicting-current-price-sources",
+      "family": "source_conflict",
+      "policy_input": {
+        "candidates": [
+          {"id": "basket_alpha", "hard_gates": "pass", "cost_claims": [
+            {"value": 82, "currency": "ZAR", "known_at": "2026-10-18T08:00:00+02:00", "source_ref": "synthetic:retailer-a", "status": "observed"},
+            {"value": 109, "currency": "ZAR", "known_at": "2026-10-18T08:10:00+02:00", "source_ref": "synthetic:retailer-b", "status": "observed"}
+          ]}
+        ],
+        "available_measurements": [{"id": "reconcile_product_pack_market", "cost_units": 1}],
+        "identity_resolution": "package size and product match not yet established"
+      },
+      "oracle_only_expected": {
+        "disposition": "request_measurement",
+        "measurement_id": "reconcile_product_pack_market",
+        "required_flags": ["source_conflict"],
+        "must_not": ["blindly_average_noncomparable_quotes", "discard_conflict_without_reason"]
+      }
+    },
+    {
+      "id": "DQ-009-known-at-cutoff-prevents-time-travel",
+      "family": "temporal_validity",
+      "policy_input": {
+        "replay_cutoff": "2026-09-01T12:00:00+02:00",
+        "price_records": [
+          {"value": 70, "valid_at": "2026-09-01", "known_at": "2026-09-01T11:00:00+02:00", "source_ref": "synthetic:known-then"},
+          {"value": 95, "valid_at": "2026-09-01", "known_at": "2026-09-02T09:00:00+02:00", "source_ref": "synthetic:received-later"}
+        ],
+        "objective": "replay what could legitimately have been known at the cutoff"
+      },
+      "oracle_only_expected": {
+        "disposition": "preserve_choice_set",
+        "eligible_source_refs": ["synthetic:known-then"],
+        "ineligible_source_refs": ["synthetic:received-later"],
+        "must_not": ["use_future_known_at_record_in_historical_decision"]
+      }
+    },
+    {
+      "id": "DQ-010-privacy-limited-geography",
+      "family": "privacy",
+      "policy_input": {
+        "incoming_spatial_fields": {"market_area": "synthetic:area-7", "exact_household_coordinates": {"latitude": -26.2, "longitude": 28.0}},
+        "allowed_geography": "market-area aggregate only",
+        "source_consent": "aggregate-only"
+      },
+      "oracle_only_expected": {
+        "disposition": "human_review",
+        "consumer_output_allowed_fields": ["market_area"],
+        "must_not": ["emit_exact_household_coordinates", "infer_consent_for_precision_increase"]
+      }
+    },
+    {
+      "id": "DQ-011-revoked-or-recalled-source",
+      "family": "revocation_and_correction",
+      "policy_input": {
+        "candidates": [
+          {"id": "meal_alpha", "hard_gates": "pass", "ingredient_lot_ref": "synthetic:lot-9", "evidence_state": "previously_valid"},
+          {"id": "meal_beta", "hard_gates": "pass", "ingredient_lot_ref": "synthetic:lot-10", "evidence_state": "current"}
+        ],
+        "source_update": {"lot_ref": "synthetic:lot-9", "state": "recalled", "known_at": "2026-10-18T08:30:00+02:00"}
+      },
+      "oracle_only_expected": {
+        "disposition": "recommend",
+        "selected_candidate_ids": ["meal_beta"],
+        "must_not": ["retain_recalled_lot_as_eligible", "assume_cached_receipt_is_current"]
+      }
+    },
+    {
+      "id": "DQ-012-input-permutation-invariance",
+      "family": "reproducibility",
+      "policy_input": {
+        "permutation_group": "DQ-012",
+        "equivalent_inputs": [
+          {"candidate_ids": ["a", "b"], "objective_keys": ["cost", "prep_minutes"], "scenario_ids": ["baseline", "shock"]},
+          {"candidate_ids": ["b", "a"], "objective_keys": ["prep_minutes", "cost"], "scenario_ids": ["shock", "baseline"]}
+        ],
+        "all_values_and_digests_identical": true
+      },
+      "oracle_only_expected": {
+        "disposition": "preserve_choice_set",
+        "canonical_output_equality": true,
+        "must_not": ["change_decision_due_to_input_array_order"]
+      }
+    }
+  ]
+}
