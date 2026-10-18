@@ -178,6 +178,72 @@ impl CandidateScenario {
     }
 }
 
+/// Select the highest expected-cash option among options that already pass
+/// all hard gates. This intentionally simple policy is a baseline to beat, not
+/// a recommendation policy for real investments. Ties resolve by lexical ID.
+pub fn cash_maximizing_feasible_baseline(evaluations: &[OptionEvaluation]) -> Option<String> {
+    let mut best: Option<&OptionEvaluation> = None;
+
+    for current in evaluations.iter().filter(|evaluation| evaluation.accepted) {
+        let replace = match best {
+            None => true,
+            Some(previous) => {
+                current.outcomes.expected_net_cash_minor
+                    > previous.outcomes.expected_net_cash_minor
+                    || (current.outcomes.expected_net_cash_minor
+                        == previous.outcomes.expected_net_cash_minor
+                        && current.option_id < previous.option_id)
+            }
+        };
+
+        if replace {
+            best = Some(current);
+        }
+    }
+
+    best.map(|evaluation| evaluation.option_id.clone())
+}
+
+/// Returns IDs of non-dominated, feasible options under a declared outcome
+/// vector. Cash, liquidity, capacity, maintenance burden, and critical-dependency
+/// overlap are compared coordinate-by-coordinate with no arbitrary weights.
+/// Reported valuation change is deliberately excluded from dominance: it remains
+/// visible in the outcome vector, but cannot substitute for cash flow or capacity.
+pub fn pareto_frontier(evaluations: &[OptionEvaluation]) -> Vec<String> {
+    let mut frontier = evaluations
+        .iter()
+        .enumerate()
+        .filter(|(_, candidate)| candidate.accepted)
+        .filter(|(candidate_index, candidate)| {
+            !evaluations.iter().enumerate().any(|(other_index, other)| {
+                *candidate_index != other_index
+                    && other.accepted
+                    && dominates(&other.outcomes, &candidate.outcomes)
+            })
+        })
+        .map(|(_, evaluation)| evaluation.option_id.clone())
+        .collect::<Vec<_>>();
+
+    frontier.sort();
+    frontier
+}
+
+fn dominates(left: &OutcomeVector, right: &OutcomeVector) -> bool {
+    let no_worse = left.expected_net_cash_minor >= right.expected_net_cash_minor
+        && left.available_liquidity_after_minor >= right.available_liquidity_after_minor
+        && left.productive_capacity_delta >= right.productive_capacity_delta
+        && left.maintenance_backlog_delta_minor <= right.maintenance_backlog_delta_minor
+        && left.critical_dependency_count <= right.critical_dependency_count;
+
+    let strictly_better = left.expected_net_cash_minor > right.expected_net_cash_minor
+        || left.available_liquidity_after_minor > right.available_liquidity_after_minor
+        || left.productive_capacity_delta > right.productive_capacity_delta
+        || left.maintenance_backlog_delta_minor < right.maintenance_backlog_delta_minor
+        || left.critical_dependency_count < right.critical_dependency_count;
+
+    no_worse && strictly_better
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;
@@ -343,6 +409,73 @@ mod tests {
         assert_eq!(metrics.reported_valuation_change_minor, 900_000);
         assert_eq!(metrics.expected_net_cash_minor, 1_000);
         assert_eq!(metrics.productive_capacity_delta, 0);
+    }
+
+    #[test]
+    fn cash_baseline_selects_highest_cash_among_feasible_options_only() {
+        let mut low_cash = option("a-low-cash");
+        low_cash.expected_net_cash_minor = 3_000;
+        let mut high_cash = option("z-high-cash");
+        high_cash.expected_net_cash_minor = 5_000;
+        let mut forbidden = option("m-forbidden-highest-cash");
+        forbidden.expected_net_cash_minor = 9_000_000;
+        forbidden.authority_granted = false;
+
+        let result = scenario(vec![low_cash, high_cash, forbidden]).evaluate();
+        assert_eq!(
+            cash_maximizing_feasible_baseline(&result.evaluated_options),
+            Some("z-high-cash".to_owned())
+        );
+    }
+
+    #[test]
+    fn pareto_frontier_preserves_cash_capacity_tradeoff_and_removes_dominated_option() {
+        let mut cash = option("cash");
+        cash.expected_net_cash_minor = 4_000;
+        cash.productive_capacity_delta = 10;
+
+        let mut capacity = option("capacity");
+        capacity.expected_net_cash_minor = 3_500;
+        capacity.productive_capacity_delta = 20;
+        capacity.maintenance_backlog_delta_minor = 50;
+
+        let mut dominated = option("dominated");
+        dominated.expected_net_cash_minor = 3_000;
+        dominated.productive_capacity_delta = 5;
+
+        let result = scenario(vec![cash, capacity, dominated]).evaluate();
+        assert_eq!(
+            pareto_frontier(&result.evaluated_options),
+            vec!["capacity".to_owned(), "cash".to_owned()]
+        );
+    }
+
+    #[test]
+    fn reported_valuation_does_not_rescue_a_dominated_option() {
+        let mut productive = option("productive");
+        productive.expected_net_cash_minor = 4_000;
+        productive.productive_capacity_delta = 10;
+
+        let mut valuation_only = option("valuation-only");
+        valuation_only.expected_net_cash_minor = 3_000;
+        valuation_only.productive_capacity_delta = 5;
+        valuation_only.reported_valuation_change_minor = 9_000_000;
+
+        let result = scenario(vec![productive, valuation_only]).evaluate();
+        assert_eq!(
+            pareto_frontier(&result.evaluated_options),
+            vec!["productive".to_owned()]
+        );
+    }
+
+    #[test]
+    fn no_feasible_options_yield_no_baseline_choice_or_frontier() {
+        let mut unauthorized = option("blocked");
+        unauthorized.authority_granted = false;
+
+        let result = scenario(vec![unauthorized]).evaluate();
+        assert_eq!(cash_maximizing_feasible_baseline(&result.evaluated_options), None);
+        assert!(pareto_frontier(&result.evaluated_options).is_empty());
     }
 
     #[test]
