@@ -92,6 +92,7 @@ fn main() {
         let context = DecisionRunContext {
             producer_commit,
             evaluator_version: env!("CARGO_PKG_VERSION").into(),
+            input_manifest_encoding_version: "utf8-synthetic-demo-v1".into(),
             input_manifest_bytes: manifest_bytes,
             routing,
             claim_ceiling:
