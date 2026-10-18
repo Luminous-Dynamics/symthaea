@@ -175,20 +175,33 @@ const FE_ADJUST: f64 = 0.1;
 /// FEP agent for design-production loop stability.
 pub struct DesignLoopFepAgent {
     reference_state: ContinuousHV,
+    /// The random storage initializer is not a qualified engineering baseline.
+    reference_calibrated: bool,
 }
 
 impl DesignLoopFepAgent {
     pub fn new() -> Self {
         Self {
             reference_state: ContinuousHV::random(HDC_DIMENSION, 0xD91_BEEF),
+            reference_calibrated: false,
         }
     }
 
     pub fn set_reference(&mut self, reference: ContinuousHV) {
         self.reference_state = reference;
+        self.reference_calibrated = true;
     }
 
+    pub fn is_reference_calibrated(&self) -> bool {
+        self.reference_calibrated
+    }
+
+    /// Returns the conservative sentinel 1.0 until an explicit baseline is
+    /// installed; callers must not treat that sentinel as a measured anomaly.
     pub fn compute_free_energy(&self, observed: &ContinuousHV) -> f64 {
+        if !self.reference_calibrated {
+            return 1.0;
+        }
         let sim = observed.similarity(&self.reference_state) as f64;
         if !sim.is_finite() {
             return 1.0;
@@ -232,10 +245,13 @@ pub enum DesignLoopSafetyLevel {
 /// Output from a design-production loop prediction cycle.
 #[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct DesignLoopOutput {
+    /// Equals the conservative sentinel 1.0 before a valid reference is installed.
     pub free_energy: f64,
     pub recommended_action: DesignLoopFepAction,
     pub safety_level: DesignLoopSafetyLevel,
     pub prediction_similarities: Vec<(f32, f32)>,
+    /// True only after an explicit reference has been installed.
+    pub reference_calibrated: bool,
 }
 
 impl DesignLoopOutput {
@@ -276,9 +292,14 @@ impl DesignLoopTwin {
         }
     }
 
+    /// Install a reference from an appropriate, reviewed design/manufacturing baseline.
     pub fn set_reference(&mut self, reading: &DesignLoopReading) {
         let hv = self.encoder.encode(reading);
         self.agent.set_reference(hv);
+    }
+
+    pub fn is_reference_calibrated(&self) -> bool {
+        self.agent.is_reference_calibrated()
     }
 
     pub fn step(&mut self, reading: &DesignLoopReading, dt_seconds: f32) -> DesignLoopOutput {
@@ -296,7 +317,10 @@ impl DesignLoopTwin {
             })
             .collect();
 
+        let reference_calibrated = self.agent.is_reference_calibrated();
         let fe = self.agent.compute_free_energy(&hv);
+        // Stay fail-closed until a reviewed baseline exists, while exposing that
+        // the high free-energy value is a calibration sentinel, not a diagnosis.
         let action = self.agent.select_action(&hv);
         let level = if fe > FE_RECALL {
             DesignLoopSafetyLevel::Red
@@ -313,6 +337,7 @@ impl DesignLoopTwin {
             recommended_action: action,
             safety_level: level,
             prediction_similarities: sims,
+            reference_calibrated,
         }
     }
 
@@ -408,11 +433,33 @@ mod tests {
     }
 
     #[test]
+    fn test_twin_requires_explicit_reference() {
+        let reading = healthy_reading();
+        let mut twin = DesignLoopTwin::new();
+
+        let uncalibrated = twin.step(&reading, 1.0);
+        assert!(!uncalibrated.reference_calibrated);
+        assert_eq!(uncalibrated.free_energy, 1.0);
+        assert_eq!(uncalibrated.safety_level, DesignLoopSafetyLevel::Red);
+        assert_eq!(uncalibrated.recommended_action, DesignLoopFepAction::EmergencyRecall);
+
+        twin.set_reference(&reading);
+        let calibrated = twin.step(&reading, 1.0);
+        assert!(calibrated.reference_calibrated);
+        assert_eq!(calibrated.safety_level, DesignLoopSafetyLevel::Green);
+        assert_eq!(
+            calibrated.recommended_action,
+            DesignLoopFepAction::ContinueProduction
+        );
+    }
+
+    #[test]
     fn test_twin_healthy() {
         let reading = healthy_reading();
         let mut twin = DesignLoopTwin::new();
         twin.set_reference(&reading);
         let output = twin.step(&reading, 1.0);
+        assert!(output.reference_calibrated);
         assert_eq!(output.safety_level, DesignLoopSafetyLevel::Green);
         assert_eq!(
             output.recommended_action,
@@ -452,6 +499,7 @@ mod tests {
         let reading = healthy_reading();
         let mut twin = DesignLoopTwin::new();
         let output = twin.step(&reading, 1.0);
+        assert!(!output.reference_calibrated);
         let (consciousness, error, coherence) = output.to_safety_tuple();
         assert!(
             (0.0..=1.0).contains(&consciousness),
