@@ -117,7 +117,9 @@ fn audit_csv_bytes(
     }
     if let Some(expected) = expected_sha256 {
         if expected.len() != 64 || !expected.bytes().all(|byte| byte.is_ascii_hexdigit()) {
-            return Err(anyhow!("expected SHA-256 must be exactly 64 hexadecimal characters"));
+            return Err(anyhow!(
+                "expected SHA-256 must be exactly 64 hexadecimal characters"
+            ));
         }
     }
 
@@ -260,8 +262,13 @@ fn audit_csv_bytes(
                 field: name.clone(),
                 present: header_index(&headers, field).is_some(),
                 unique_nonblank_values: values.len(),
-                missing_rows: *group_missing.get(&name).expect("group field initialized"),
-                example_values: group_examples.get(&name).expect("group field initialized").clone(),
+                missing_rows: *group_missing
+                    .get(&name)
+                    .expect("group field initialized"),
+                example_values: group_examples
+                    .get(&name)
+                    .expect("group field initialized")
+                    .clone(),
             }
         })
         .collect();
@@ -350,7 +357,10 @@ pub fn run(
     )?;
     let mut failures = Vec::new();
     if !receipt.duplicate_header_names.is_empty() {
-        failures.push(format!("duplicate headers: {:?}", receipt.duplicate_header_names));
+        failures.push(format!(
+            "duplicate headers: {:?}",
+            receipt.duplicate_header_names
+        ));
     }
     if !receipt.blank_header_positions.is_empty() {
         failures.push(format!(
@@ -379,7 +389,8 @@ pub fn run(
     }
     if receipt.digest_matches_expected == Some(false) {
         failures.push(
-            "local file SHA-256 does not match the independently supplied expected digest".to_owned(),
+            "local file SHA-256 does not match the independently supplied expected digest"
+                .to_owned(),
         );
     }
 
