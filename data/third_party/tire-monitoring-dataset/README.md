@@ -13,8 +13,10 @@ This dataset copy is split into ordered text shards solely because the repositor
 ## Verification notes
 - Upstream blob SHA-1: `0029b6f156847ecc052f57ae45fd025ad032d086` (this is GitHub's Git object SHA-1, not a SHA-256 digest).
 - Retrieved content length before sharding: 7808266 JavaScript characters.
-- Shards: 9; row/header count: 210128 newline-terminated records plus final-line accounting per original content.
-- Full-file SHA-256 is not asserted by this intake note. Compute it over the reconstructed bytes on the validation host.
+- Shards: 9; 210128 data rows plus one header were counted during source-side inspection.
+- All nine committed shards were fetched back and their concatenation exactly matched the upstream content string (7808266 characters); no row filtering/reordering was performed.
+- Source-side schema scan: 210128 rows; 1755 distinct Unit_ID segments; 196260 label-0 rows; 13868 label-1 rows; zero malformed rows/empty fields; row ranges Pressure 197.37–289.31 kPa, Temperature 1.6–45.94 °C, Speed 2.84–144.94 km/h.
+- Full-file SHA-256 is not asserted by this note. The added Rust intake command will compute it on a Rust-capable checkout.
 - Use `Unit_ID` as the group/split unit; never randomly mix samples from one acquisition segment across train and test.
 - Vehicle scope: passenger-car 205/55 R16 pressure/temperature/speed monitoring, not motorcycle tire force, wet grip, wear, impact, or structural safety.
 
