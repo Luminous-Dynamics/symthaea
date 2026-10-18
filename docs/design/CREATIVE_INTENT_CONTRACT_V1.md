@@ -19,7 +19,7 @@ The contract initially measures:
 - onset coverage across equal-duration windows;
 - share of notes occupying the dominant pitch.
 
-Malformed contracts, durations, and notes fail closed. Invalid notes are reported by index and cannot be silently discarded to make a candidate pass. The module deliberately leaves the legacy CreativeQualityScore and live reward loop unchanged until the new seam has been calibrated and integrated in a separately reviewed change.
+Malformed contracts, durations, and notes fail closed. Invalid notes are reported by index and cannot be silently discarded to make a candidate pass. Zero-velocity note events are rejected as inaudible in this synthesis representation, so they cannot satisfy note-count, pitch-diversity, or temporal-support constraints. The module deliberately leaves the legacy CreativeQualityScore and live reward loop unchanged until the new seam has been calibrated and integrated in a separately reviewed change.
 
 ## How this generalizes to games and cross-modal creative work
 
