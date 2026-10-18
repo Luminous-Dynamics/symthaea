@@ -10,7 +10,8 @@ use crate::listener_response::{ListenerResponseIssue, ListenerResponseRecord, Se
 use serde::{Deserialize, Serialize};
 use std::collections::{BTreeMap, BTreeSet};
 
-pub const LISTENER_RESPONSE_BENCHMARK_VERSION: &str = "muse-listener-response-benchmark-v1";
+pub const LISTENER_RESPONSE_BENCHMARK_VERSION: &str = "muse-listener-response-benchmark-v2";
+pub const PARTICIPANT_BOOTSTRAP_REPLICATES: usize = 2_000;
 pub const DEFAULT_PERSONAL_PRIOR_STRENGTH: f64 = 3.0;
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, Deserialize)]
@@ -43,6 +44,37 @@ impl ResponseChannel {
 }
 
 /// Mean absolute error on the reported change (after minus before).
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, Deserialize)]
+pub enum BaselineComparator {
+    NoChange,
+    PopulationDelta,
+}
+
+/// Equal-participant-weighted improvement of personal-history prediction over a
+/// comparator, restricted to the exact same eligible test episodes.
+/// Positive improvement means the personal-history predictor has lower MAE.
+#[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
+pub struct ParticipantClusterComparison {
+    pub comparator: BaselineComparator,
+    pub participants: usize,
+    pub matched_test_observations: usize,
+    pub mean_participant_mae_improvement: Option<f64>,
+    pub median_participant_mae_improvement: Option<f64>,
+    pub participants_improved_fraction: Option<f64>,
+    /// Percentile interval from participant-resampled cluster bootstrap.
+    /// Absent for fewer than two eligible participants.
+    pub bootstrap_confidence_interval_95: Option<[f64; 2]>,
+    pub bootstrap_replicates: usize,
+    pub bootstrap_seed: u64,
+}
+
+#[derive(Debug, Default)]
+struct ParticipantErrors {
+    no_change: Vec<f64>,
+    population_delta: Vec<f64>,
+    personal_history: Vec<f64>,
+}
+
 #[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
 pub struct ChannelBenchmarkMetrics {
     pub channel: ResponseChannel,
@@ -60,6 +92,8 @@ pub struct ChannelBenchmarkMetrics {
     pub shrunk_personal_mae: Option<f64>,
     pub personal_history_observations: usize,
     pub personal_history_coverage: f64,
+    /// Participant-clustered, equal-participant-weighted comparison on matched episodes.
+    pub participant_cluster_comparisons: Vec<ParticipantClusterComparison>,
 }
 
 #[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
@@ -234,6 +268,7 @@ pub fn evaluate_temporal_holdout(
         let mut shrinkage_errors = Vec::new();
         let mut personal_history_observations = 0usize;
         let mut scored_test_observations = 0usize;
+        let mut participant_errors: BTreeMap<String, ParticipantErrors> = BTreeMap::new();
 
         for test_record in &testing {
             let Some(actual_delta) = reported_delta(test_record, channel) else {
@@ -260,11 +295,19 @@ pub fn evaluate_temporal_holdout(
             let prediction = match mean(&history) {
                 Some(personal_mean) => {
                     personal_history_observations += 1;
-                    personal_errors.push((actual_delta - personal_mean).abs());
-                    no_change_on_personal_errors.push(actual_delta.abs());
+                    let personal_error = (actual_delta - personal_mean).abs();
+                    let no_change_error = actual_delta.abs();
+                    personal_errors.push(personal_error);
+                    no_change_on_personal_errors.push(no_change_error);
+                    let errors = participant_errors
+                        .entry(test_record.participant_token.clone())
+                        .or_default();
+                    errors.personal_history.push(personal_error);
+                    errors.no_change.push(no_change_error);
                     if let Some(population_prior) = population_mean {
-                        population_on_personal_errors
-                            .push((actual_delta - population_prior).abs());
+                        let population_error = (actual_delta - population_prior).abs();
+                        population_on_personal_errors.push(population_error);
+                        errors.population_delta.push(population_error);
                     }
                     let weight =
                         history.len() as f64 / (history.len() as f64 + prior_strength);
@@ -275,6 +318,18 @@ pub fn evaluate_temporal_holdout(
             shrinkage_errors.push((actual_delta - prediction).abs());
         }
 
+        let participant_cluster_comparisons = vec![
+            participant_cluster_comparison(
+                &participant_errors,
+                BaselineComparator::NoChange,
+                0x4d4c_5242_u64 ^ channel_seed(channel) ^ 0x01,
+            ),
+            participant_cluster_comparison(
+                &participant_errors,
+                BaselineComparator::PopulationDelta,
+                0x4d4c_5242_u64 ^ channel_seed(channel) ^ 0x02,
+            ),
+        ];
         channels.push(ChannelBenchmarkMetrics {
             channel,
             scored_test_observations,
@@ -291,6 +346,7 @@ pub fn evaluate_temporal_holdout(
             } else {
                 personal_history_observations as f64 / scored_test_observations as f64
             },
+            participant_cluster_comparisons,
         });
     }
 
@@ -304,6 +360,131 @@ pub fn evaluate_temporal_holdout(
         prior_strength,
         channels,
     })
+}
+
+fn channel_seed(channel: ResponseChannel) -> u64 {
+    match channel {
+        ResponseChannel::Valence => 0x11,
+        ResponseChannel::Arousal => 0x22,
+        ResponseChannel::Tension => 0x33,
+        ResponseChannel::Energy => 0x44,
+    }
+}
+
+fn participant_cluster_comparison(
+    grouped: &BTreeMap<String, ParticipantErrors>,
+    comparator: BaselineComparator,
+    seed: u64,
+) -> ParticipantClusterComparison {
+    let mut improvements = Vec::new();
+    let mut matched_observations = 0usize;
+    for errors in grouped.values() {
+        let baseline = match comparator {
+            BaselineComparator::NoChange => &errors.no_change,
+            BaselineComparator::PopulationDelta => &errors.population_delta,
+        };
+        let common = baseline.len().min(errors.personal_history.len());
+        if common == 0 {
+            continue;
+        }
+        let baseline_mae = mean(&baseline[..common]).expect("non-empty matched baseline");
+        let personal_mae =
+            mean(&errors.personal_history[..common]).expect("non-empty personal history");
+        improvements.push(baseline_mae - personal_mae);
+        matched_observations += common;
+    }
+
+    let mean_improvement = mean(&improvements);
+    let mut ordered = improvements.clone();
+    ordered.sort_by(f64::total_cmp);
+    let median_improvement = median_sorted(&ordered);
+    let improved_fraction = if improvements.is_empty() {
+        None
+    } else {
+        Some(
+            improvements.iter().filter(|&&effect| effect > 0.0).count() as f64
+                / improvements.len() as f64,
+        )
+    };
+    let (bootstrap_replicates, confidence_interval) = if improvements.len() >= 2 {
+        (
+            PARTICIPANT_BOOTSTRAP_REPLICATES,
+            Some(participant_bootstrap_ci(
+                &improvements,
+                PARTICIPANT_BOOTSTRAP_REPLICATES,
+                seed,
+            )),
+        )
+    } else {
+        (0, None)
+    };
+
+    ParticipantClusterComparison {
+        comparator,
+        participants: improvements.len(),
+        matched_test_observations: matched_observations,
+        mean_participant_mae_improvement: mean_improvement,
+        median_participant_mae_improvement: median_improvement,
+        participants_improved_fraction: improved_fraction,
+        bootstrap_confidence_interval_95: confidence_interval,
+        bootstrap_replicates,
+        bootstrap_seed: seed,
+    }
+}
+
+fn median_sorted(sorted: &[f64]) -> Option<f64> {
+    match sorted.len() {
+        0 => None,
+        n if n % 2 == 1 => Some(sorted[n / 2]),
+        n => Some((sorted[n / 2 - 1] + sorted[n / 2]) / 2.0),
+    }
+}
+
+fn participant_bootstrap_ci(values: &[f64], replicates: usize, seed: u64) -> [f64; 2] {
+    debug_assert!(values.len() >= 2);
+    debug_assert!(replicates > 0);
+    let mut rng = SplitMix64::new(seed);
+    let mut draws = Vec::with_capacity(replicates);
+    for _ in 0..replicates {
+        let mut total = 0.0;
+        for _ in 0..values.len() {
+            total += values[rng.next_index(values.len())];
+        }
+        draws.push(total / values.len() as f64);
+    }
+    draws.sort_by(f64::total_cmp);
+    [
+        percentile_sorted(&draws, 0.025),
+        percentile_sorted(&draws, 0.975),
+    ]
+}
+
+fn percentile_sorted(sorted: &[f64], p: f64) -> f64 {
+    debug_assert!(!sorted.is_empty());
+    let index = ((sorted.len() - 1) as f64 * p).round() as usize;
+    sorted[index]
+}
+
+/// Small fixed SplitMix64 generator keeps resampling reproducible without
+/// relying on platform RNG defaults or external state.
+struct SplitMix64(u64);
+
+impl SplitMix64 {
+    fn new(seed: u64) -> Self {
+        Self(seed)
+    }
+
+    fn next_u64(&mut self) -> u64 {
+        self.0 = self.0.wrapping_add(0x9e37_79b9_7f4a_7c15);
+        let mut value = self.0;
+        value = (value ^ (value >> 30)).wrapping_mul(0xbf58_476d_1ce4_e5b9);
+        value = (value ^ (value >> 27)).wrapping_mul(0x94d0_49bb_1331_11eb);
+        value ^ (value >> 31)
+    }
+
+    fn next_index(&mut self, upper: usize) -> usize {
+        (self.next_u64() % upper as u64) as usize
+    }
 }
 
 fn reported_delta(record: &ListenerResponseRecord, channel: ResponseChannel) -> Option<f64> {
@@ -476,6 +657,54 @@ mod tests {
                 session_index: 1
             } if participant_token == "p1"
         )));
+    }
+
+    #[test]
+    fn participant_bootstrap_counts_listeners_not_just_episodes() {
+        let records = vec![
+            episode("train-a", "p1", 1, 1, 1, 0.0, 0.1),
+            episode("train-b", "p2", 1, 1, 2, 0.0, 0.2),
+            episode("train-c", "p3", 1, 1, 3, 0.0, 0.3),
+            episode("train-d", "p4", 1, 1, 4, 0.0, 0.4),
+            episode("test-a", "p1", 2, 1, 5, 0.0, 0.1),
+            episode("test-b", "p2", 2, 1, 6, 0.0, 0.2),
+            episode("test-c", "p3", 2, 1, 7, 0.0, 0.3),
+            episode("test-d", "p4", 2, 1, 8, 0.0, 0.4),
+        ];
+        let split = TemporalHoldoutSplit {
+            training_through_sequence: 4,
+            testing_from_sequence: 5,
+        };
+        let report = evaluate_temporal_holdout(&records, split, 3.0).unwrap();
+        let valence = report.channels.iter()
+            .find(|row| row.channel == ResponseChannel::Valence).unwrap();
+        let no_change = valence.participant_cluster_comparisons.iter()
+            .find(|comparison| comparison.comparator == BaselineComparator::NoChange).unwrap();
+        assert_eq!(no_change.participants, 4);
+        assert_eq!(no_change.matched_test_observations, 4);
+        assert_eq!(no_change.participants_improved_fraction, Some(1.0));
+        assert!(no_change.bootstrap_confidence_interval_95.unwrap()[0] > 0.0);
+        assert_eq!(no_change.bootstrap_replicates, PARTICIPANT_BOOTSTRAP_REPLICATES);
+        assert_eq!(no_change.bootstrap_seed,
+            valence.participant_cluster_comparisons[0].bootstrap_seed);
+    }
+
+    #[test]
+    fn bootstrap_is_deterministic_and_empty_clusters_have_no_interval() {
+        let values = [0.1, 0.2, 0.3, 0.4];
+        let first = participant_bootstrap_ci(&values, 500, 1234);
+        let second = participant_bootstrap_ci(&values, 500, 1234);
+        assert_eq!(first, second);
+
+        let empty = BTreeMap::new();
+        let result = participant_cluster_comparison(
+            &empty,
+            BaselineComparator::NoChange,
+            1234,
+        );
+        assert_eq!(result.participants, 0);
+        assert_eq!(result.bootstrap_confidence_interval_95, None);
+        assert_eq!(result.bootstrap_replicates, 0);
     }
 
     #[test]
