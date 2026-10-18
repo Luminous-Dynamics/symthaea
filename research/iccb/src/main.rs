@@ -3,6 +3,10 @@ use iccb_evaluator::{
     cash_maximizing_feasible_baseline, pareto_frontier,
     policy::{CapitalPolicyScenario, DemandCase},
     staging::TrancheRequest,
+    value_of_information::{
+        DecisionPayoff, InformationSignal, InformationState, SignalLikelihood,
+        ValueOfInformationScenario,
+    },
 };
 use std::collections::BTreeSet;
 
@@ -155,5 +159,83 @@ fn main() {
             }
         }
         Err(error) => eprintln!("Synthetic policy comparison rejected invalid input: {error:?}"),
+    }
+
+    let voi_scenario = ValueOfInformationScenario {
+        id: "synthetic-diligence-survey".into(),
+        information_cost_minor: 20,
+        states: vec![
+            InformationState {
+                id: "high-demand".into(),
+                prior_probability_bps: 5_000,
+            },
+            InformationState {
+                id: "low-demand".into(),
+                prior_probability_bps: 5_000,
+            },
+        ],
+        signals: vec![
+            InformationSignal {
+                id: "survey-says-high".into(),
+                likelihoods: vec![
+                    SignalLikelihood {
+                        state_id: "high-demand".into(),
+                        likelihood_bps: 10_000,
+                    },
+                    SignalLikelihood {
+                        state_id: "low-demand".into(),
+                        likelihood_bps: 0,
+                    },
+                ],
+            },
+            InformationSignal {
+                id: "survey-says-low".into(),
+                likelihoods: vec![
+                    SignalLikelihood {
+                        state_id: "high-demand".into(),
+                        likelihood_bps: 0,
+                    },
+                    SignalLikelihood {
+                        state_id: "low-demand".into(),
+                        likelihood_bps: 10_000,
+                    },
+                ],
+            },
+        ],
+        action_ids: vec!["build".into(), "avoid".into()],
+        payoffs: vec![
+            DecisionPayoff {
+                action_id: "build".into(),
+                state_id: "high-demand".into(),
+                net_value_minor: 100,
+            },
+            DecisionPayoff {
+                action_id: "build".into(),
+                state_id: "low-demand".into(),
+                net_value_minor: -100,
+            },
+            DecisionPayoff {
+                action_id: "avoid".into(),
+                state_id: "high-demand".into(),
+                net_value_minor: 0,
+            },
+            DecisionPayoff {
+                action_id: "avoid".into(),
+                state_id: "low-demand".into(),
+                net_value_minor: 0,
+            },
+        ],
+    };
+    match voi_scenario.evaluate() {
+        Ok(report) => println!(
+            "Synthetic diligence value: baseline={:?}, gross_evsi_minor={}, cost_minor={}, net_evsi_minor={}, evpi_minor={}, worthwhile={}",
+            report.baseline_action_id,
+            report.gross_evsi_minor,
+            report.information_cost_minor,
+            report.net_evsi_minor,
+            report.evpi_minor,
+            report.worthwhile_at_declared_cost,
+        ),
+        Err(error) => eprintln!("Synthetic value-of-information scenario rejected: {error:?}"),
     }
 }
