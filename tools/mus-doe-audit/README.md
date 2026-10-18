@@ -18,7 +18,7 @@ The default binary checks Draft 2020-12 schema meta-validity and corpus conforma
 Run from the repository root:
 
 ```sh
-cargo run --manifest-path tools/mus-doe-audit/Cargo.toml -- \
+cargo run --manifest-path tools/mus-doe-audit/Cargo.toml --bin mus-doe-audit -- \
   --schema schemas/instrument-engineering/mus_doe_split_corpus_v0_1.schema.json \
   --corpus fixtures/instrument-engineering/mus_doe_split_corpus_v0_1.json
 cargo test --manifest-path tools/mus-doe-audit/Cargo.toml
