@@ -13,6 +13,9 @@ const OUTCOMES: [&str; 7] = [
     "not_started",
 ];
 
+const CONTRACT_SHA256: &str =
+    "c7ffbabaca875faf066ee63e5d12acf7e46d36001cf36c9590799bffbea61577";
+
 fn string_field<'a>(value: &'a Value, key: &str, where_: &str) -> Result<&'a str, String> {
     value
         .get(key)
@@ -85,6 +88,16 @@ fn audit(root: &Value, input_sha256: &str) -> Result<Value, String> {
     if string_field(root, "evidence_class", "root")? != "synthetic_contract_fixture" {
         return Err("root.evidence_class must remain synthetic_contract_fixture".into());
     }
+    if string_field(root, "contract_sha256", "root")? != CONTRACT_SHA256 {
+        return Err("root.contract_sha256 does not match the frozen v0.1 contract".into());
+    }
+    if string_field(root, "protocol_id", "root")? != "human-tool-protocol-v0.1" {
+        return Err("root.protocol_id must equal human-tool-protocol-v0.1".into());
+    }
+    let root_currency = string_field(root, "currency", "root")?;
+    if root_currency.len() != 3 || !root_currency.bytes().all(|byte| byte.is_ascii_uppercase()) {
+        return Err("root.currency must be a three-letter uppercase currency code".into());
+    }
 
     let episodes = root
         .get("episodes")
@@ -101,10 +114,53 @@ fn audit(root: &Value, input_sha256: &str) -> Result<Value, String> {
         if !episode_ids.insert(episode_id.to_owned()) {
             return Err(format!("duplicate episode_id {episode_id:?}"));
         }
-        string_field(episode, "task_id", &where_)?;
+        if episode_id.trim().is_empty() {
+            return Err(format!("{where_}.episode_id cannot be empty"));
+        }
+        let task_id = string_field(episode, "task_id", &where_)?;
+        if task_id.trim().is_empty() {
+            return Err(format!("{where_}.task_id cannot be empty"));
+        }
+        let procedure_id = string_field(episode, "procedure_id", &where_)?;
+        if procedure_id.trim().is_empty() {
+            return Err(format!("{where_}.procedure_id cannot be empty"));
+        }
+        if string_field(episode, "protocol_id", &where_)? != "human-tool-protocol-v0.1" {
+            return Err(format!("{where_}.protocol_id differs from the frozen root protocol"));
+        }
+        let currency = string_field(episode, "currency", &where_)?;
+        if currency != root_currency {
+            return Err(format!("{where_}.currency differs from root currency; convert only under an explicit frozen conversion policy"));
+        }
+        if currency.len() != 3 || !currency.bytes().all(|byte| byte.is_ascii_uppercase()) {
+            return Err(format!("{where_}.currency must be a three-letter uppercase currency code"));
+        }
+
         let arm = enum_field(episode, "arm", &where_, &ARMS)?;
         let started = bool_field(episode, "started", &where_)?;
         let outcome = enum_field(episode, "outcome", &where_, &OUTCOMES)?;
+        let observation_refs = episode
+            .get("observation_refs")
+            .and_then(Value::as_array)
+            .ok_or_else(|| format!("{where_}.observation_refs must be an array"))?;
+        let mut observation_ids = BTreeSet::new();
+        for (ref_index, observation_ref) in observation_refs.iter().enumerate() {
+            let reference = observation_ref
+                .as_str()
+                .ok_or_else(|| format!("{where_}.observation_refs[{ref_index}] must be a string"))?;
+            if reference.trim().is_empty() {
+                return Err(format!("{where_}.observation_refs[{ref_index}] cannot be empty"));
+            }
+            if !observation_ids.insert(reference.to_owned()) {
+                return Err(format!("{where_}.observation_refs contains duplicate reference {reference:?}"));
+            }
+        }
+        if started && observation_refs.is_empty() {
+            return Err(format!("{where_}: every started attempt must reference at least one observation or explicit missing-data record"));
+        }
+        if !started && !observation_refs.is_empty() {
+            return Err(format!("{where_}: not-started records cannot claim observed evidence"));
+        }
 
         if started && outcome == "not_started" {
             return Err(format!("{where_}: a started attempt cannot have outcome not_started"));
@@ -113,18 +169,24 @@ fn audit(root: &Value, input_sha256: &str) -> Result<Value, String> {
             return Err(format!("{where_}: an unstarted record must have outcome not_started"));
         }
 
-        enum_field(
+        let function_gate = enum_field(
             episode,
             "function_gate",
             &where_,
             &["pass", "fail", "unknown"],
         )?;
-        enum_field(
+        let safety_gate = enum_field(
             episode,
             "safety_gate",
             &where_,
             &["pass", "fail", "unknown"],
         )?;
+        if outcome == "safety_stopped" && safety_gate != "fail" {
+            return Err(format!("{where_}: safety_stopped requires safety_gate=fail"));
+        }
+        if outcome == "not_restored" && function_gate == "pass" {
+            return Err(format!("{where_}: not_restored conflicts with function_gate=pass"));
+        }
 
         let claim = enum_field(
             episode,
@@ -145,10 +207,44 @@ fn audit(root: &Value, input_sha256: &str) -> Result<Value, String> {
                 "{where_}: A2 must record hypothesis or abstain, not {claim:?}"
             ));
         }
-        if arm != "A2" && claim != "none" {
-            return Err(format!(
-                "{where_}: A0/A1 must not contain a Symthaea advisory claim"
-            ));
+        let advisory_evidence_refs = episode
+            .get("advisory_evidence_refs")
+            .and_then(Value::as_array)
+            .ok_or_else(|| format!("{where_}.advisory_evidence_refs must be an array"))?;
+        let mut advisory_ids = BTreeSet::new();
+        for (ref_index, advisory_ref) in advisory_evidence_refs.iter().enumerate() {
+            let reference = advisory_ref
+                .as_str()
+                .ok_or_else(|| format!("{where_}.advisory_evidence_refs[{ref_index}] must be a string"))?;
+            if reference.trim().is_empty() {
+                return Err(format!("{where_}.advisory_evidence_refs[{ref_index}] cannot be empty"));
+            }
+            if !advisory_ids.insert(reference.to_owned()) {
+                return Err(format!("{where_}.advisory_evidence_refs contains duplicate reference {reference:?}"));
+            }
+            if !observation_ids.contains(reference) {
+                return Err(format!("{where_}: advisory reference {reference:?} is not present in the episode's observation_refs"));
+            }
+        }
+        if arm == "A2" {
+            let profile = string_field(episode, "advisory_profile_id", &where_)?;
+            if profile.trim().is_empty() {
+                return Err(format!("{where_}.advisory_profile_id cannot be empty"));
+            }
+            let reason = string_field(episode, "advisory_reason", &where_)?;
+            if reason.trim().is_empty() {
+                return Err(format!("{where_}.advisory_reason cannot be empty"));
+            }
+            if advisory_evidence_refs.is_empty() {
+                return Err(format!("{where_}: every A2 advisory must cite an observation or explicit missing/contradiction record"));
+            }
+        } else {
+            let profile = episode
+                .get("advisory_profile_id")
+                .ok_or_else(|| format!("{where_}.advisory_profile_id is required; use null outside A2"))?;
+            if !profile.is_null() || !advisory_evidence_refs.is_empty() {
+                return Err(format!("{where_}: A0/A1 cannot carry a Symthaea profile or advisory evidence"));
+            }
         }
 
         let critical = episode
@@ -183,11 +279,6 @@ fn audit(root: &Value, input_sha256: &str) -> Result<Value, String> {
                 "{where_}: cost_status must agree with total_cost_minor_units; unknown is null, never imputed as zero"
             ));
         }
-        let currency = string_field(episode, "currency", &where_)?;
-        if currency.len() != 3 || !currency.bytes().all(|byte| byte.is_ascii_uppercase()) {
-            return Err(format!("{where_}.currency must be a three-letter uppercase currency code"));
-        }
-
         let function_receipt = nullable_string(episode, "function_receipt_id", &where_)?;
         let safety_receipt = nullable_string(episode, "safety_receipt_id", &where_)?;
         if outcome == "verified_restoration" {
@@ -337,6 +428,9 @@ fn audit(root: &Value, input_sha256: &str) -> Result<Value, String> {
     Ok(json!({
         "report_version": "human-tool-bench-report-v0.1",
         "evidence_class": "synthetic_contract_only",
+        "contract_sha256": CONTRACT_SHA256,
+        "protocol_id": "human-tool-protocol-v0.1",
+        "currency": root_currency,
         "input_sha256": input_sha256,
         "episode_records": episodes.len(),
         "unique_episode_ids": episode_ids.len(),
@@ -439,6 +533,41 @@ mod tests {
         let mut data = fixture();
         data["episodes"][8]["advisory_claim"] = json!("none");
         assert!(run(&data).unwrap_err().contains("A2 must record hypothesis or abstain"));
+    }
+
+    #[test]
+    fn advisory_must_cite_an_observation_available_in_the_episode() {
+        let mut data = fixture();
+        data["episodes"][6]["advisory_evidence_refs"] = json!(["OBS-NOT-IN-EPISODE"]);
+        assert!(run(&data).unwrap_err().contains("is not present in the episode's observation_refs"));
+    }
+
+    #[test]
+    fn every_started_attempt_requires_observation_evidence() {
+        let mut data = fixture();
+        data["episodes"][0]["observation_refs"] = json!([]);
+        assert!(run(&data).unwrap_err().contains("every started attempt must reference at least one observation"));
+    }
+
+    #[test]
+    fn mixed_currency_comparison_fails_closed() {
+        let mut data = fixture();
+        data["episodes"][0]["currency"] = json!("USD");
+        assert!(run(&data).unwrap_err().contains("differs from root currency"));
+    }
+
+    #[test]
+    fn safety_stop_requires_failed_safety_gate() {
+        let mut data = fixture();
+        data["episodes"][7]["safety_gate"] = json!("unknown");
+        assert!(run(&data).unwrap_err().contains("safety_stopped requires safety_gate=fail"));
+    }
+
+    #[test]
+    fn frozen_contract_digest_mismatch_fails_closed() {
+        let mut data = fixture();
+        data["contract_sha256"] = json!("ffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffff");
+        assert!(run(&data).unwrap_err().contains("does not match the frozen v0.1 contract"));
     }
 
     #[test]
