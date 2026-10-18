@@ -948,8 +948,16 @@ mod tests {
             let report = input.evaluate().unwrap();
             for (index, action_id) in actions.iter().enumerate() {
                 let actual = envelope(&report, action_id);
-                assert_eq!(actual.lower_expected_value_numerator, oracle_min[index], "seed={seed}, action={action_id}, lower");
-                assert_eq!(actual.upper_expected_value_numerator, oracle_max[index], "seed={seed}, action={action_id}, upper");
+                assert_eq!(
+                    actual.lower_expected_value_numerator,
+                    oracle_min[index],
+                    "seed={seed}, action={action_id}, lower"
+                );
+                assert_eq!(
+                    actual.upper_expected_value_numerator,
+                    oracle_max[index],
+                    "seed={seed}, action={action_id}, upper"
+                );
                 assert_eq!(
                     actual.worst_case_expected_regret_numerator,
                     oracle_regret[index],
