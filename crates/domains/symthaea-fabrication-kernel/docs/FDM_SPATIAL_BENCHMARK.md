@@ -12,8 +12,8 @@ A position-varying dynamic response has also been studied for delta-printer vibr
 
 ## Corpus contract
 
-- Schema: \`symthaea.fdm-spatial-synthetic.v1\`.
-- Evidence class: \`synthetic\`, always.
+- Schema: `symthaea.fdm-spatial-synthetic.v1`.
+- Evidence class: `synthetic`, always.
 - Discovery data: a 3 x 3 normalized grid with deterministic, seed-controlled synthetic perturbations.
 - Confirmation data: off-grid interior points plus deliberate probes outside the measured discovery rectangle.
 - Response law: versioned smooth quadratic surface; this is a test fixture, not a fitted or validated physical model.
