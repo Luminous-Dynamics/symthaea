@@ -234,7 +234,7 @@ fn validate_contract(manifest_text: &str, schema_text: &str) -> Vec<String> {
                         )),
                         Some(predecessor_sequence) if *predecessor_sequence >= current_sequence => {
                             errors.push(format!(
-                                "stage {stage_id} predecessor {predecessor} is not earlier in the route"
+                                "stage {stage_id} has a forward dependency on {predecessor}"
                             ));
                         }
                         Some(_) => {}
