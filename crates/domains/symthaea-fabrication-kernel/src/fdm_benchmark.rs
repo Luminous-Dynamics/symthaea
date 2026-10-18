@@ -184,12 +184,10 @@ impl FdmBenchmarkManifest {
         if self.discovery_observation_ids.iter().any(|id| id.trim().is_empty()) {
             issues.push("discovery observation IDs may not be empty".to_owned());
         }
-        if self.phase == BenchmarkPhase::Confirmatory {
-            let mut seen = HashSet::new();
-            for id in &self.discovery_observation_ids {
-                if !seen.insert(id) {
-                    issues.push(format!("duplicate discovery observation ID: {id}"));
-                }
+        let mut seen = HashSet::new();
+        for id in &self.discovery_observation_ids {
+            if !seen.insert(id) {
+                issues.push(format!("duplicate discovery observation ID: {id}"));
             }
         }
         issues
@@ -563,6 +561,18 @@ mod tests {
         assert_eq!(result.disposition, GeometryDisposition::NotEvaluable);
         assert!(result.issues.iter().any(|issue| issue.contains("no instrument identity")));
         assert!(result.issues.iter().any(|issue| issue.contains("no calibration reference")));
+    }
+
+    #[test]
+    fn duplicate_discovery_observation_ids_are_rejected() {
+        let mut input = case(EvidenceClass::Synthetic, Some(10.0), Some(0.0));
+        input.manifest.discovery_observation_ids = vec![
+            "discovery-001".to_owned(),
+            "discovery-001".to_owned(),
+        ];
+        let result = evaluate_fdm_case(&input);
+        assert_eq!(result.disposition, GeometryDisposition::NotEvaluable);
+        assert!(result.issues.iter().any(|issue| issue.contains("duplicate discovery observation ID")));
     }
 
     #[test]
