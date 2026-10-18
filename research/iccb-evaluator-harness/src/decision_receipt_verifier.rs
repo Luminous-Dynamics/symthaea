@@ -236,7 +236,12 @@ fn encode_output(output: &EvaluationReceipt) -> Result<Vec<u8>, ReceiptVerificat
     for option in options {
         put_str(&mut bytes, &option.option_id);
         put_bool(&mut bytes, option.accepted);
-        let mut reasons: Vec<u8> = option.rejection_reasons.iter().copied().map(rejection_tag).collect();
+        let mut reasons: Vec<u8> = option
+            .rejection_reasons
+            .iter()
+            .copied()
+            .map(rejection_tag)
+            .collect();
         reasons.sort_unstable();
         let count = reasons.len();
         reasons.dedup();
@@ -435,17 +440,27 @@ mod tests {
             evaluation_day: 5,
             producer_commit: "0123456789abcdef0123456789abcdef01234567".into(),
             evaluator_version: "iccb-evaluator-0.1.0".into(),
-            input_manifest_sha256: "118603a03fa97d3a84dfbf7bc3ec10fcd02b72abce596f74e70cbcdb93cc8980".into(),
-            scenario_sha256: "b1cc79675e9d7c0b2d7fdf41ae90f134c7985053d024d4ad608b432974373a58".into(),
+            input_manifest_sha256:
+                "118603a03fa97d3a84dfbf7bc3ec10fcd02b72abce596f74e70cbcdb93cc8980"
+                    .into(),
+            scenario_sha256:
+                "b1cc79675e9d7c0b2d7fdf41ae90f134c7985053d024d4ad608b432974373a58"
+                    .into(),
             uncertainty_route: CompatibleAnalysisRoute::RobustProbabilityRanking,
             uncertainty_evidence_kind: UncertaintyEvidenceKind::BoundedStateProbabilities {
                 bounds_receipt_id: "bounds-receipt-1".into(),
             },
             evidence_reference: "bounds-receipt-1".into(),
-            output_sha256: "5f05afb631afd0d8977742c232ddcf91f2ac59b0c571de0c2684be8f0a227e87".into(),
+            output_sha256:
+                "5f05afb631afd0d8977742c232ddcf91f2ac59b0c571de0c2684be8f0a227e87"
+                    .into(),
             claim_ceiling: "synthetic rule evaluation; not a forecast or authorization".into(),
-            limitation: "Only probability-mass ambiguity is routed here; payoff/model discrepancy and out-of-domain states require separate treatment.".into(),
-            receipt_sha256: "28460a3267a62079c0aabd350b87c8050a58d10bcd40423514ed9d9e7856d5d4".into(),
+            limitation:
+                "Only probability-mass ambiguity is routed here; payoff/model discrepancy and out-of-domain states require separate treatment."
+                    .into(),
+            receipt_sha256:
+                "28460a3267a62079c0aabd350b87c8050a58d10bcd40423514ed9d9e7856d5d4"
+                    .into(),
         }
     }
 
@@ -453,7 +468,8 @@ mod tests {
     fn independent_verifier_accepts_frozen_golden_receipt() {
         let scenario = scenario();
         let context = context(b"canonical-manifest-v1", &scenario.id);
-        verify_decision_receipt_independently(&context, &scenario, &frozen_golden_receipt()).unwrap();
+        verify_decision_receipt_independently(&context, &scenario, &frozen_golden_receipt())
+            .unwrap();
     }
 
     #[test]
