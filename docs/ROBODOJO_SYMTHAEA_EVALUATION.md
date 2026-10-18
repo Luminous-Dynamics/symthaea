@@ -134,9 +134,20 @@ Do not commit large licensed assets or checkpoints. Keep experiment scripts and 
 4. **Treat internal claims as hypotheses.** Use ablations and baseline controls; do not infer robotics competence from a high internal metric, a synthetic simulator run, or a correlation.
 5. **Make the benchmark falsifiable.** Pin versions, preregister tasks and thresholds, retain failure artifacts, and publish negative findings.
 
-## Immediate code note
+## Immediate runnable work
 
-The existing **examples/robotics_benchmark_suite.rs** is a platform timing/stability microbenchmark, not a RoboDojo task-success evaluation. Its current implementation also had two compile blockers: it pushed into an immutable **results** binding and used **Instant** without importing it. This branch applies the minimal source correction. It has **not** been compiled or run in this environment; CI or a local feature-matrix build must verify it before the fix is treated as passing.
+A dependency-free nested Rust crate now lives at **experiments/robodojo-contract/**. Its 11 unit tests cover episode identity/reset, state dimensions and finiteness, step ordering, stale action rejection, action dimensions and range checks, prediction-error replanning, latched stops, configuration rejection, and deterministic trace behavior. A small executable exercises accepted action → replan request → latched stop.
+
+Run locally with:
+
+```sh
+cargo test --locked --manifest-path experiments/robodojo-contract/Cargo.toml
+cargo run --locked --manifest-path experiments/robodojo-contract/Cargo.toml
+```
+
+This nested workspace is intentionally independent of the main Symthaea workspace and Isaac Sim, so these contract tests can be run before GPU/simulator provisioning. Passing them would show only that the contract gate behaves as specified; it would not demonstrate RoboDojo task competence or physical safety. The action validator is a bounded boundary check, not a kinematics or collision checker.
+
+The existing **examples/robotics_benchmark_suite.rs** is a platform timing/stability microbenchmark, not a RoboDojo task-success evaluation. Its current implementation also had two compile blockers: it pushed into an immutable **results** binding and used **Instant** without importing it. This branch applies the minimal source correction. Neither the crate nor the root example has been compiled in this tool session because a local Rust toolchain is unavailable; their run status remains unverified and no test pass is claimed.
 
 ## Upstream references
 
