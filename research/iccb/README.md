@@ -31,6 +31,10 @@ The EvidenceState::Qualified label is supplied by the fixture; it does not indep
 
 The demo should not be interpreted as proving superior decisions or a real investment result. A clean local test run and independent review are still required before treating the code as validated. The current authoring environment did not have rustc or cargo installed, so no local compile/test result is claimed in this change.
 
+## Market validation
+
+The buyer-side falsification plan is in [BUYER_WORKFLOW_VALIDATION.md](BUYER_WORKFLOW_VALIDATION.md). It recommends testing one asset-heavy operating-company capital-planning workflow rather than positioning ICCB as a replacement for incumbent family-office reporting or accounting products. No customer interviews or paid-pilot commitments are claimed.
+
 ## Next steps
 
 1. Run cargo test and fix any compiler or contract issues.
