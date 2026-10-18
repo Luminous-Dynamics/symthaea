@@ -4,6 +4,7 @@
 #![deny(unsafe_code)]
 pub mod controller;
 pub mod embodiment;
+pub mod mission_fault_model;
 pub mod encoder;
 pub mod fep_agent;
 pub mod perturbations;

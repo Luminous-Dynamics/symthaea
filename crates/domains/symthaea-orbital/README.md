@@ -360,3 +360,12 @@ wiring, hardware/qualification/institutional-adoption tracks). This crate
 sits at tier 4-5 in the robotics roadmap priority (behind subterranean,
 infrastructure) — treat this README and the plan as ready-to-go, not as
 signaling active development.
+
+
+## Design-derived mission fault campaigns (prototype)
+
+The `mission_fault_model` module adds the initial SPACE-FDIR-MBSE-001 typed intermediate representation. The checked-in synthetic source/model pair lives under `fixtures/space_fdir_mbse_001/`; it binds the design source by SHA-256, maps a communications-blackout hypothesis to the deterministic perturbation adapter, and links its expected telemetry label, monitor deadline, negative controls, mitigation constraints, and protected invariants.
+
+Missing engineering links become explicit `CoverageGap` entries. A generated simulator schedule is not treated as proof of fault detection or complete coverage. The structural gate requires a non-empty critical-mode denominator and zero declared gaps, but does not authenticate referenced artifacts or establish physical-model correctness.
+
+Focused tests are authored, including fixture deserialization, event mapping, explicit missing-monitor/sensor gaps, duplicate IDs, invalid timing/non-finite inputs, source binding, and deterministic manifest generation. This source has not been compiled or executed in the current authoring environment; do not report these tests as passing until exact-head Cargo evidence is available.

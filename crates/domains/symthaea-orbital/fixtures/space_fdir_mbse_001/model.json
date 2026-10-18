@@ -1,0 +1,65 @@
+{
+  "schema_version": "0.1",
+  "model_id": "synthetic-communications-resilience",
+  "model_revision": "0.1.0",
+  "source_design": {
+    "system_id": "synthetic-cubesat-communications",
+    "revision": "v0.1",
+    "sha256": "748da4fc495778c2b46ef7397ea4a3f435637f837b2aa8e61d10ef4b4d996656"
+  },
+  "failure_modes": [
+    {
+      "id": "FM-COMM-001",
+      "component_id": "comms_transceiver",
+      "interface_id": "ground_comm_link",
+      "description": "Synthetic total radio-link blackout",
+      "criticality": "critical",
+      "requirement_refs": [
+        "REQ-COMM-001"
+      ],
+      "assumption_refs": [
+        "ASSUMP-COMM-UPLINK-AVAILABLE-AT-START"
+      ],
+      "telemetry_label_semantics": "radio_transceiver_blackout_injected",
+      "injection": {
+        "kind": "communication_blackout",
+        "at_step": 4,
+        "duration_steps": 3
+      },
+      "observable_signals": [
+        {
+          "id": "ground_link_available",
+          "unit": "boolean",
+          "expected_fault_effect": "false during zero-based simulator steps 4, 5, and 6; orbital line-of-sight state does not change"
+        }
+      ],
+      "monitor": {
+        "id": "MON-COMM-001",
+        "required_alarm": "RADIO_BLACKOUT_SUSPECTED",
+        "response_deadline_steps": 1,
+        "false_alarm_controls": [
+          "nominal_link_up_without_injection",
+          "line_of_sight_loss_without_radio_blackout"
+        ]
+      },
+      "mitigation": {
+        "id": "MIT-COMM-001",
+        "allowed_actions": [
+          "buffer_noncritical_telemetry",
+          "retry_after_link_recovery"
+        ],
+        "protected_invariant_refs": [
+          "INV-COMMAND-AUTHORITY",
+          "INV-POWER-BUDGET"
+        ]
+      },
+      "safety_invariant_refs": [
+        "INV-COMMAND-AUTHORITY",
+        "INV-POWER-BUDGET"
+      ],
+      "evidence_refs": [
+        "EVID-SYNTHETIC-SOURCE-001"
+      ]
+    }
+  ]
+}
