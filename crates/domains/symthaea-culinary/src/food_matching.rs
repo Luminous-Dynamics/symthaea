@@ -258,7 +258,7 @@ pub fn validate_food_identity_match_v1(assessment: &Value) -> Result<(), Vec<Str
         .iter()
         .filter(|(attribute, relation)| {
             REQUIRED_IDENTITY_ATTRIBUTES.contains(&attribute.as_str())
-                && relation.as_str() != "match"
+                && matches!(relation.as_str(), "unknown" | "not_applicable")
         })
         .map(|(attribute, _)| attribute.clone())
         .collect();
@@ -317,7 +317,7 @@ pub fn validate_food_identity_match_v1(assessment: &Value) -> Result<(), Vec<Str
         }
         if !hard_unknowns.is_empty() {
             errors.push(format!(
-                "exact_match cannot leave required identity attributes unknown/different: {hard_unknowns:?}"
+                "exact_match cannot leave required identity attributes unknown/not-applicable: {hard_unknowns:?}"
             ));
         }
         for (attribute, relation) in &relation_by_attribute {
@@ -354,7 +354,7 @@ pub fn validate_food_identity_match_v1(assessment: &Value) -> Result<(), Vec<Str
         }
         if !hard_unknowns.is_empty() {
             errors.push(format!(
-                "qualified_approximation cannot leave required identity attributes unknown/different: {hard_unknowns:?}"
+                "qualified_approximation cannot leave required identity attributes unknown/not-applicable: {hard_unknowns:?}"
             ));
         }
         if !hard_block_unknowns.is_empty() {
