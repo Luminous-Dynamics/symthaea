@@ -87,6 +87,7 @@ jobs:
               "pass", "reject", "reject", "reject", "reject",
               "reject", "reject", "reject", "reject", "reject",
               "pass", "reject", "reject", "reject", "reject",
-              "reject", "pass", "reject", "reject", "reject"
+              "reject", "pass", "reject", "reject", "reject",
+              "reject", "reject", "reject", "reject"
             ])
           ' metal-stock-part-receipt.json
