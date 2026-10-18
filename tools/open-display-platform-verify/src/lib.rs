@@ -107,6 +107,391 @@ pub fn validate_platform_str(
     })
 }
 
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub struct MeasurementRunValidationReport {
+    pub record_id: String,
+    pub record_state: String,
+    pub observation_count: usize,
+    pub instrument_count: usize,
+    pub raw_artifact_count: usize,
+    pub manifest_sha256: String,
+    pub schema_sha256: String,
+}
+
+impl MeasurementRunValidationReport {
+    /// Stable JSON report. Contract validity does not imply a physical result passed.
+    #[must_use]
+    pub fn to_json(&self) -> Value {
+        serde_json::json!({
+            "verifier": "open-display-platform-verify",
+            "verifier_version": env!("CARGO_PKG_VERSION"),
+            "record_id": self.record_id,
+            "record_state": self.record_state,
+            "contract_state": "RUN_CONTRACT_VALID_UNQUALIFIED",
+            "observation_count": self.observation_count,
+            "instrument_count": self.instrument_count,
+            "raw_artifact_count": self.raw_artifact_count,
+            "manifest_sha256": self.manifest_sha256,
+            "schema_sha256": self.schema_sha256,
+            "physical_validation": "NOT_PERFORMED_OR_REPORTED_SEPARATELY",
+            "claim_ceiling": "The run record conforms to its schema/semantic contract; physical accuracy, safety and qualification require separate evidence."
+        })
+    }
+}
+
+/// Validate a run record and apply the cross-reference, calibration, uncertainty,
+/// and status-promotion checks that cannot be expressed safely by schema alone.
+///
+/// # Errors
+///
+/// Returns a sorted, deduplicated set of schema and semantic violations.
+pub fn validate_measurement_run_str(
+    record_text: &str,
+    schema_text: &str,
+) -> Result<MeasurementRunValidationReport, Vec<String>> {
+    let schema: Value = match serde_json::from_str(schema_text) {
+        Ok(value) => value,
+        Err(error) => return Err(vec![format!("run schema JSON parse error: {error}")]),
+    };
+    let record: Value = match serde_json::from_str(record_text) {
+        Ok(value) => value,
+        Err(error) => return Err(vec![format!("run record JSON parse error: {error}")]),
+    };
+
+    let mut errors = Vec::new();
+    if schema.get("$schema").and_then(Value::as_str) != Some(EXPECTED_SCHEMA_DRAFT) {
+        errors.push(format!("run schema must declare {EXPECTED_SCHEMA_DRAFT}"));
+    }
+    match jsonschema::draft202012::new(&schema) {
+        Ok(validator) => {
+            for error in validator.iter_errors(&record) {
+                errors.push(format!("run JSON Schema violation: {error}"));
+            }
+        }
+        Err(error) => errors.push(format!("run schema compilation failed: {error}")),
+    }
+    errors.extend(validate_measurement_run_semantics(&record));
+    errors.sort();
+    errors.dedup();
+    if !errors.is_empty() {
+        return Err(errors);
+    }
+
+    Ok(MeasurementRunValidationReport {
+        record_id: record
+            .get("record_id")
+            .and_then(Value::as_str)
+            .expect("schema validates record_id")
+            .to_owned(),
+        record_state: record
+            .get("record_state")
+            .and_then(Value::as_str)
+            .expect("schema validates record_state")
+            .to_owned(),
+        observation_count: count_array(&record, "observations"),
+        instrument_count: count_array(&record, "instruments"),
+        raw_artifact_count: count_array(&record, "raw_artifacts"),
+        manifest_sha256: sha256_hex(record_text.as_bytes()),
+        schema_sha256: sha256_hex(schema_text.as_bytes()),
+    })
+}
+
+fn validate_measurement_run_semantics(record: &Value) -> Vec<String> {
+    let mut errors = Vec::new();
+    let record_state = record
+        .get("record_state")
+        .and_then(Value::as_str)
+        .unwrap_or("INVALID");
+    let physical_state = record
+        .get("physical_validation")
+        .and_then(Value::as_str)
+        .unwrap_or("INVALID");
+    let acquired_at = record.get("acquired_at").and_then(Value::as_str);
+    let run_date = acquired_at.and_then(|timestamp| timestamp.get(..10));
+
+    let instruments = record
+        .get("instruments")
+        .and_then(Value::as_array)
+        .map(Vec::as_slice)
+        .unwrap_or(&[]);
+    let observations = record
+        .get("observations")
+        .and_then(Value::as_array)
+        .map(Vec::as_slice)
+        .unwrap_or(&[]);
+    let artifacts = record
+        .get("raw_artifacts")
+        .and_then(Value::as_array)
+        .map(Vec::as_slice)
+        .unwrap_or(&[]);
+    let exclusions = record
+        .get("exclusions")
+        .and_then(Value::as_array)
+        .map(Vec::as_slice)
+        .unwrap_or(&[]);
+
+    validate_unique_ids(instruments, "run instrument", &mut errors);
+    validate_unique_ids(observations, "run observation", &mut errors);
+    validate_unique_ids(artifacts, "raw artifact", &mut errors);
+    validate_unique_ids(exclusions, "observation exclusion", &mut errors);
+
+    let instrument_ids: BTreeSet<String> = instruments
+        .iter()
+        .filter_map(|item| item.get("instrument_id").and_then(Value::as_str))
+        .map(str::to_owned)
+        .collect();
+    let artifact_ids: BTreeSet<String> = artifacts
+        .iter()
+        .filter_map(|item| item.get("artifact_id").and_then(Value::as_str))
+        .map(str::to_owned)
+        .collect();
+    let observation_ids: BTreeSet<String> = observations
+        .iter()
+        .filter_map(|item| item.get("observation_id").and_then(Value::as_str))
+        .map(str::to_owned)
+        .collect();
+
+    for instrument in instruments {
+        let instrument_id = instrument
+            .get("instrument_id")
+            .and_then(Value::as_str)
+            .unwrap_or("<missing>");
+        if instrument.get("calibration_state").and_then(Value::as_str) == Some("VALID") {
+            if instrument
+                .get("calibration_record_digest")
+                .and_then(Value::as_str)
+                .is_none()
+                || instrument
+                    .get("calibration_valid_through")
+                    .and_then(Value::as_str)
+                    .is_none()
+            {
+                errors.push(format!(
+                    "instrument {instrument_id} cannot claim VALID calibration without record digest and expiry"
+                ));
+            }
+        }
+    }
+
+    let mut measured_count = 0_usize;
+    let mut independently_reviewed_count = 0_usize;
+    for observation in observations {
+        let observation_id = observation
+            .get("observation_id")
+            .and_then(Value::as_str)
+            .unwrap_or("<missing>");
+        let measurand = observation
+            .get("measurand")
+            .and_then(Value::as_str)
+            .unwrap_or("<missing>");
+        let status = observation
+            .get("status")
+            .and_then(Value::as_str)
+            .unwrap_or("INVALID");
+        let used_instruments: Vec<&str> = observation
+            .get("instrument_ids")
+            .and_then(Value::as_array)
+            .into_iter()
+            .flatten()
+            .filter_map(Value::as_str)
+            .collect();
+        let raw_ids: Vec<&str> = observation
+            .get("raw_artifact_ids")
+            .and_then(Value::as_array)
+            .into_iter()
+            .flatten()
+            .filter_map(Value::as_str)
+            .collect();
+
+        for id in &used_instruments {
+            if !instrument_ids.contains(*id) {
+                errors.push(format!(
+                    "observation {observation_id} references unresolved instrument {id}"
+                ));
+            }
+        }
+        for id in &raw_ids {
+            if !artifact_ids.contains(*id) {
+                errors.push(format!(
+                    "observation {observation_id} references unresolved raw artifact {id}"
+                ));
+            }
+        }
+
+        if status == "NOT_EVALUATED" {
+            if observation.get("value").is_some_and(|value| !value.is_null())
+                || observation
+                    .get("expanded_uncertainty")
+                    .is_some_and(|value| !value.is_null())
+                || observation
+                    .get("minimum_decision_effect")
+                    .is_some_and(|value| !value.is_null())
+                || observation
+                    .get("decision_capability")
+                    .and_then(Value::as_str)
+                    != Some("NOT_EVALUATED")
+                || !used_instruments.is_empty()
+                || !raw_ids.is_empty()
+            {
+                errors.push(format!(
+                    "NOT_EVALUATED observation {observation_id} cannot contain a value, uncertainty, instrument, or raw-artifact claim"
+                ));
+            }
+            continue;
+        }
+
+        measured_count += 1;
+        if status == "INDEPENDENTLY_REVIEWED" {
+            independently_reviewed_count += 1;
+        }
+        let value = observation.get("value").and_then(Value::as_f64);
+        let uncertainty = observation
+            .get("expanded_uncertainty")
+            .and_then(Value::as_f64);
+        let effect = observation
+            .get("minimum_decision_effect")
+            .and_then(Value::as_f64);
+        if value.is_none_or(|number| !number.is_finite()) {
+            errors.push(format!(
+                "measured observation {observation_id} needs a finite numeric value"
+            ));
+        }
+        if uncertainty.is_none_or(|number| !number.is_finite() || number < 0.0) {
+            errors.push(format!(
+                "measured observation {observation_id} needs finite nonnegative expanded uncertainty"
+            ));
+        }
+        if effect.is_none_or(|number| !number.is_finite() || number <= 0.0) {
+            errors.push(format!(
+                "measured observation {observation_id} needs a finite positive minimum decision effect"
+            ));
+        }
+        if used_instruments.is_empty() {
+            errors.push(format!(
+                "measured observation {observation_id} must name its instruments"
+            ));
+        }
+        if raw_ids.is_empty() {
+            errors.push(format!(
+                "measured observation {observation_id} must link raw artifacts"
+            ));
+        }
+
+        for id in &used_instruments {
+            if let Some(instrument) = instruments.iter().find(|instrument| {
+                instrument.get("instrument_id").and_then(Value::as_str) == Some(*id)
+            }) {
+                if instrument.get("calibration_state").and_then(Value::as_str) != Some("VALID") {
+                    errors.push(format!(
+                        "measured observation {observation_id} uses instrument {id} without VALID calibration state"
+                    ));
+                }
+                if instrument.get("calibration_valid_through").and_then(Value::as_str)
+                    .zip(run_date)
+                    .is_some_and(|(expiry, date)| expiry < date)
+                {
+                    errors.push(format!(
+                        "measured observation {observation_id} uses instrument {id} after its calibration expiry"
+                    ));
+                }
+                let supports_measurand = instrument
+                    .get("supported_measurands")
+                    .and_then(Value::as_array)
+                    .is_some_and(|measurands| measurands.iter().any(|item| item.as_str() == Some(measurand)));
+                if !supports_measurand {
+                    errors.push(format!(
+                        "instrument {id} does not declare support for measurand {measurand}"
+                    ));
+                }
+            }
+        }
+
+        match (
+            uncertainty,
+            effect,
+            observation.get("decision_capability").and_then(Value::as_str),
+        ) {
+            (Some(u), Some(mde), Some("CAPABLE")) if u > mde / 3.0 => errors.push(format!(
+                "observation {observation_id} claims CAPABLE despite uncertainty exceeding MDE/3"
+            )),
+            (Some(u), Some(mde), Some("INADEQUATE")) if u <= mde / 3.0 => errors.push(format!(
+                "observation {observation_id} claims INADEQUATE despite meeting uncertainty <= MDE/3"
+            )),
+            (_, _, Some("NOT_EVALUATED")) => errors.push(format!(
+                "measured observation {observation_id} cannot leave decision capability NOT_EVALUATED"
+            )),
+            _ => {}
+        }
+
+        if status == "INDEPENDENTLY_REVIEWED" && record_state != "INDEPENDENTLY_REVIEWED" {
+            errors.push(format!(
+                "observation {observation_id} cannot be independently reviewed in record state {record_state}"
+            ));
+        }
+    }
+
+    for exclusion in exclusions {
+        let exclusion_id = exclusion
+            .get("exclusion_id")
+            .and_then(Value::as_str)
+            .unwrap_or("<missing>");
+        let observation_id = exclusion
+            .get("observation_id")
+            .and_then(Value::as_str)
+            .unwrap_or("<missing>");
+        if !observation_ids.contains(observation_id) {
+            errors.push(format!(
+                "exclusion {exclusion_id} references unresolved observation {observation_id}"
+            ));
+        }
+    }
+
+    match record_state {
+        "PLAN_ONLY" => {
+            if physical_state != "NOT_PERFORMED"
+                || acquired_at.is_some()
+                || measured_count != 0
+                || !artifacts.is_empty()
+                || !exclusions.is_empty()
+                || record.get("review").is_some_and(|value| !value.is_null())
+            {
+                errors.push(
+                    "PLAN_ONLY record must have no acquisition time, measured observations, artifacts, exclusions, or review".to_owned(),
+                );
+            }
+        }
+        "ACQUIRED_UNQUALIFIED" => {
+            if physical_state != "MEASURED_UNQUALIFIED" || acquired_at.is_none() || measured_count == 0 {
+                errors.push(
+                    "ACQUIRED_UNQUALIFIED record needs acquisition time, measured data, and MEASURED_UNQUALIFIED physical state".to_owned(),
+                );
+            }
+        }
+        "INDEPENDENTLY_REVIEWED" => {
+            if physical_state != "INDEPENDENTLY_REVIEWED"
+                || acquired_at.is_none()
+                || measured_count == 0
+                || independently_reviewed_count == 0
+                || record.get("review").is_none_or(Value::is_null)
+            {
+                errors.push(
+                    "INDEPENDENTLY_REVIEWED record needs acquisition, reviewed observations, a review record, and matching physical state".to_owned(),
+                );
+            }
+        }
+        "ABORTED" => {
+            if measured_count == 0 && artifacts.is_empty() && acquired_at.is_some() {
+                errors.push(
+                    "ABORTED record with no acquired data must not claim an acquisition timestamp".to_owned(),
+                );
+            }
+        }
+        _ => errors.push(format!("unknown run record state: {record_state}")),
+    }
+
+    errors
+}
+
 fn validate_semantics(manifest: &Value) -> Vec<String> {
     let mut errors = Vec::new();
 
