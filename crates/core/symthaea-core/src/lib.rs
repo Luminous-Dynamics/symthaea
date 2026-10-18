@@ -82,6 +82,9 @@ pub mod measurement_triage;
 /// Deterministic synthetic preference-drift benchmark fixture validation.
 #[allow(missing_docs)]
 pub mod preference_drift_benchmark;
+/// Frozen engineering-weight and seeded-random baselines for preference-drift replay.
+#[allow(missing_docs)]
+pub mod preference_drift_baselines;
 /// Report-only lifecycle and wearability evidence evaluator for exosuit research.
 #[allow(missing_docs)]
 pub mod wearability;
