@@ -206,6 +206,11 @@ fn evaluate_scenario(scenario: &Scenario, tolerance_ppm: u32) -> ScenarioReceipt
     let mut phase_totals = BTreeMap::<AssayBasis, u64>::new();
 
     for assay in &sample.assays {
+        if assay.quantity_kind == QuantityKind::MineralPhaseMassFraction
+            && assay.basis != AssayBasis::DryMass
+        {
+            reasons.insert("MINERAL_PHASE_BASIS_UNSUPPORTED".to_owned());
+        }
         if !nonempty(&assay.analyte_id) || !nonempty(&assay.expressed_as) {
             reasons.insert("ASSAY_IDENTITY_MISSING".to_owned());
         }
@@ -540,6 +545,31 @@ mod tests {
         let result = evaluate_scenario(scenario, tolerance);
         assert_eq!(result.actual_disposition, Disposition::Pass);
         assert_eq!(result.effective_grade_ppm, Some(650_000));
+    }
+
+    #[test]
+    fn mineral_phase_fraction_requires_dry_mass_basis() {
+        let mut corpus = corpus();
+        let tolerance = corpus.mass_tolerance_ppm;
+        let scenario = &mut corpus.scenarios[0];
+        scenario.sample.assays[1].basis = AssayBasis::WetMass;
+        let result = evaluate_scenario(scenario, tolerance);
+        assert!(result
+            .actual_reason_codes
+            .contains(&"MINERAL_PHASE_BASIS_UNSUPPORTED".to_owned()));
+    }
+
+    #[test]
+    fn below_detection_requires_a_positive_detection_limit() {
+        let mut corpus = corpus();
+        let tolerance = corpus.mass_tolerance_ppm;
+        let scenario = &mut corpus.scenarios[1];
+        scenario.sample.assays[0].value_ppm = None;
+        scenario.sample.assays[0].detection_limit_ppm = None;
+        let result = evaluate_scenario(scenario, tolerance);
+        assert!(result
+            .actual_reason_codes
+            .contains(&"DETECTION_LIMIT_MISSING_OR_INVALID".to_owned()));
     }
 
     #[test]
