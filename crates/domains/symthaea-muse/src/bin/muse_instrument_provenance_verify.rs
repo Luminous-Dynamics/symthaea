@@ -246,7 +246,7 @@ fn verify_reports(
         (Some("hashed"), Some(digest), Some(name), Some(size))
             if valid_sha256(digest) && !name.trim().is_empty() && size > 0 =>
         {
-            if digest != renderer_binary_file_sha256 {
+            if digest != renderer_binary_file_sha256.as_str() {
                 push_error(
                     &mut findings,
                     "renderer_binary_digest_mismatch",
@@ -469,7 +469,9 @@ fn verify_reports(
         }
         let source_library = string_field(sample, "source_library");
         let relative_path = string_field(sample, "source_relative_path");
-        if source_library.is_none_or(str::is_empty) || relative_path.is_none_or(str::is_empty) {
+        if source_library.is_none_or(|value| value.is_empty())
+            || relative_path.is_none_or(|value| value.is_empty())
+        {
             push_incomplete(
                 &mut findings,
                 "source_location_incomplete",
