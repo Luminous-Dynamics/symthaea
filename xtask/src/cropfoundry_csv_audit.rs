@@ -195,7 +195,8 @@ fn audit_csv_bytes(
     let mut total_extra_fields = 0usize;
 
     for (record_index, row) in reader.records().enumerate() {
-        let row = row.with_context(|| format!("invalid CSV record at data row {}", record_index + 1))?;
+        let row =
+            row.with_context(|| format!("invalid CSV record at data row {}", record_index + 1))?;
         data_record_count += 1;
 
         if row.len() != headers.len() {
@@ -227,7 +228,9 @@ fn audit_csv_bytes(
             };
             let value = row.get(index).unwrap_or("").trim();
             if value.is_empty() {
-                *group_missing.get_mut(*field).expect("group field initialized") += 1;
+                *group_missing
+                    .get_mut(*field)
+                    .expect("group field initialized") += 1;
             } else {
                 group_values
                     .get_mut(*field)
@@ -339,8 +342,8 @@ pub fn run(
     if !delimiter.is_ascii() {
         return Err(anyhow!("CSV delimiter must be a single ASCII character"));
     }
-    let bytes = fs::read(&input)
-        .with_context(|| format!("cannot read local CSV {}", input.display()))?;
+    let bytes =
+        fs::read(&input).with_context(|| format!("cannot read local CSV {}", input.display()))?;
     let file_name = input
         .file_name()
         .and_then(|name| name.to_str())
@@ -397,7 +400,10 @@ pub fn run(
     let rendered = serde_json::to_string_pretty(&receipt)?;
     println!("{rendered}");
     if let Some(path) = out {
-        if let Some(parent) = path.parent().filter(|parent| !parent.as_os_str().is_empty()) {
+        if let Some(parent) = path
+            .parent()
+            .filter(|parent| !parent.as_os_str().is_empty())
+        {
             fs::create_dir_all(parent)
                 .with_context(|| format!("cannot create output directory {}", parent.display()))?;
         }
@@ -482,8 +488,16 @@ mod tests {
     fn source_profile_reports_missing_required_fields() {
         let input = "date;plant;yield\n01/01/2024;P1;1\n";
         let receipt = audit(input, None);
-        assert!(receipt.missing_required_columns.contains(&"Date".to_owned()));
-        assert!(receipt.missing_required_columns.contains(&"Treatment".to_owned()));
+        assert!(
+            receipt
+                .missing_required_columns
+                .contains(&"Date".to_owned())
+        );
+        assert!(
+            receipt
+                .missing_required_columns
+                .contains(&"Treatment".to_owned())
+        );
     }
 
     #[test]
@@ -505,10 +519,12 @@ mod tests {
     fn unitless_physical_quantity_headers_are_flagged_for_review() {
         let input = "Plant;Date;Treatment;Total Weight of Harvest Fruits\nP1;01/01/2024;T1;12\n";
         let receipt = audit(input, None);
-        assert!(receipt
-            .unit_review_warnings
-            .iter()
-            .any(|warning| warning.contains("Total Weight of Harvest Fruits")));
+        assert!(
+            receipt
+                .unit_review_warnings
+                .iter()
+                .any(|warning| warning.contains("Total Weight of Harvest Fruits"))
+        );
     }
 
     #[test]
