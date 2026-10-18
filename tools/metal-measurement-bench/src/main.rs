@@ -1269,6 +1269,42 @@ mod tests {
     }
 
     #[test]
+    fn inspect_csv_operation_binds_verified_artifact_to_receipt() {
+        let temp = tempdir().unwrap();
+        let artifact_root = temp.path().join("artifacts");
+        fs::create_dir_all(&artifact_root).unwrap();
+        let artifact_bytes = b"record_id,stress_mpa\nS-01,920\nS-02,940\n";
+        fs::write(artifact_root.join("fixture.csv"), artifact_bytes).unwrap();
+
+        let mut value = record_manifest();
+        value.artifacts[0].sha256 = sha256_hex(artifact_bytes);
+        value.artifacts[0].size_bytes = artifact_bytes.len() as u64;
+        let manifest_path = temp.path().join("manifest.json");
+        fs::write(&manifest_path, serde_json::to_vec(&value).unwrap()).unwrap();
+
+        let args = vec![
+            "metal-measurement-bench".to_string(),
+            "inspect-csv".to_string(),
+            manifest_path.display().to_string(),
+            artifact_root.display().to_string(),
+            "fixture.csv".to_string(),
+        ];
+        let receipt = run(&args).unwrap();
+        assert_eq!(receipt.operation, "inspect-csv");
+        assert_eq!(receipt.status, "CSV_SHAPE_INVENTORIED_NOT_SEMANTICALLY_MAPPED");
+        assert_eq!(receipt.record_count, 2);
+        assert_eq!(receipt.evidence_input_sha256.as_deref(), Some(sha256_hex(artifact_bytes).as_str()));
+        let inventory = receipt.csv_inventory.unwrap();
+        assert_eq!(inventory.artifact_sha256, sha256_hex(artifact_bytes));
+        assert_eq!(inventory.data_row_count, 2);
+        assert_eq!(inventory.columns[0].source_header, "record_id");
+
+        let mut unmanifested_args = args;
+        unmanifested_args[4] = "not-declared.csv".to_string();
+        assert!(run(&unmanifested_args).is_err());
+    }
+
+    #[test]
     fn csv_inventory_counts_rows_and_empty_cells_without_inferencing_units() {
         let input = b"specimen,stress MPa,note\r\nA,950,\"necked, early\"\r\nB,, ok \r\nC,1020,\r\n";
         let inventory = inspect_csv_bytes(input, "synthetic-fixture.csv").unwrap();
