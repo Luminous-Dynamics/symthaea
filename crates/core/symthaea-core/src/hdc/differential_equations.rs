@@ -2285,6 +2285,42 @@ mod tests {
     }
 
     #[test]
+    fn test_rk45_componentwise_tolerances_are_unit_rescaling_consistent() {
+        fn growth(_t: f64, y: &[f64]) -> Vec<f64> {
+            vec![y[0], y[1]]
+        }
+        let system = ODESystem { f: growth, dim: 2 };
+        let native_units = DifferentialEquationsEngine::try_solve_rk45_with_tolerances(
+            &system,
+            0.0,
+            1.0,
+            &[1.0, 1e-12],
+            &[1e-2, 1e-14],
+            0.0,
+        )
+        .expect("mixed-unit state should integrate");
+        let rescaled_units = DifferentialEquationsEngine::try_solve_rk45_with_tolerances(
+            &system,
+            0.0,
+            1.0,
+            &[1.0, 1.0],
+            &[1e-2, 1e-2],
+            0.0,
+        )
+        .expect("equivalently rescaled state should integrate");
+
+        assert!(native_units.converged && rescaled_units.converged);
+        assert_eq!(native_units.steps_taken, rescaled_units.steps_taken);
+        assert_eq!(native_units.rejected_steps, rescaled_units.rejected_steps);
+        let normalized_native = native_units.y_final[1] / 1e-12;
+        assert!(
+            (normalized_native - rescaled_units.y_final[1]).abs() <= 1e-10,
+            "Unit rescaling should preserve the normalized trajectory: native={normalized_native}, rescaled={}",
+            rescaled_units.y_final[1],
+        );
+    }
+
+    #[test]
     fn test_rk45_componentwise_tolerances_reject_invalid_contracts() {
         fn growth(_t: f64, y: &[f64]) -> Vec<f64> {
             vec![y[0], y[1]]
@@ -2309,7 +2345,15 @@ mod tests {
             RK45ErrorKind::InvalidAbsoluteTolerance { index: 1 }
         ));
         assert!(matches!(
+            solve(&[1e-6, f64::INFINITY], 1e-3).unwrap_err().kind,
+            RK45ErrorKind::InvalidAbsoluteTolerance { index: 1 }
+        ));
+        assert!(matches!(
             solve(&[1e-6, 1e-6], -1.0).unwrap_err().kind,
+            RK45ErrorKind::InvalidRelativeTolerance
+        ));
+        assert!(matches!(
+            solve(&[1e-6, 1e-6], f64::NAN).unwrap_err().kind,
             RK45ErrorKind::InvalidRelativeTolerance
         ));
         assert!(matches!(
