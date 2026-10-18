@@ -95,12 +95,15 @@ pub struct ListenerResponseRecord {
     pub enjoyment_1_to_7: Option<u8>,
     pub goal_attainment_1_to_7: Option<u8>,
     pub playback_completed: bool,
+    pub consent_confirmed: bool,
     pub consent_protocol_version: String,
 }
 
 #[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
 pub enum ListenerResponseIssue {
     EmptyField { field: String },
+    UnsupportedSchemaVersion { found: String },
+    ConsentNotConfirmed,
     InvalidSha256 { field: String },
     InvalidAffectValue { field: String },
     InvalidOrdinal { field: String },
@@ -114,6 +117,14 @@ impl ListenerResponseRecord {
     pub fn validate(&self) -> Vec<ListenerResponseIssue> {
         let mut issues = Vec::new();
         check_nonempty("schema_version", &self.schema_version, &mut issues);
+        if self.schema_version != LISTENER_RESPONSE_SCHEMA_VERSION {
+            issues.push(ListenerResponseIssue::UnsupportedSchemaVersion {
+                found: self.schema_version.clone(),
+            });
+        }
+        if !self.consent_confirmed {
+            issues.push(ListenerResponseIssue::ConsentNotConfirmed);
+        }
         check_nonempty("episode_id", &self.episode_id, &mut issues);
         check_nonempty("participant_token", &self.participant_token, &mut issues);
         check_nonempty("presentation_token", &self.presentation_token, &mut issues);
@@ -265,6 +276,7 @@ mod tests {
             enjoyment_1_to_7: Some(6),
             goal_attainment_1_to_7: Some(5),
             playback_completed: true,
+            consent_confirmed: true,
             consent_protocol_version: "pilot-consent-v1".to_owned(),
         }
     }
@@ -329,6 +341,23 @@ mod tests {
         let mut record = valid_record();
         record.during[1].elapsed_ms = record.during[0].elapsed_ms;
         assert!(record.validate().contains(&ListenerResponseIssue::NonIncreasingCheckpointTime));
+    }
+
+    #[test]
+    fn consent_must_be_confirmed() {
+        let mut record = valid_record();
+        record.consent_confirmed = false;
+        assert!(record.validate().contains(&ListenerResponseIssue::ConsentNotConfirmed));
+    }
+
+    #[test]
+    fn unknown_schema_versions_are_rejected() {
+        let mut record = valid_record();
+        record.schema_version = "future-unrecognized-version".to_owned();
+        assert!(record.validate().iter().any(|issue| matches!(
+            issue, ListenerResponseIssue::UnsupportedSchemaVersion { found }
+                if found == "future-unrecognized-version"
+        )));
     }
 
     #[test]
