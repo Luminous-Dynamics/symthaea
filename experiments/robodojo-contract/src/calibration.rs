@@ -208,6 +208,136 @@ pub fn summarize_calibration(
     Ok(summaries)
 }
 
+/// Costs expressed in one consistent utility unit (for example, estimated
+/// failure loss, or a declared normalized proxy). Do not mix dollars, seconds,
+/// and arbitrary scores without an explicit conversion.
+#[derive(Debug, Clone, Copy, PartialEq)]
+pub struct InterventionPolicy {
+    pub failure_cost: f64,
+    pub intervention_cost: f64,
+    pub minimum_expected_benefit: f64,
+    pub minimum_continue_probability: f64,
+    pub max_replans: u32,
+}
+
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub enum InterventionConfigError {
+    InvalidFailureCost,
+    InvalidInterventionCost,
+    InvalidMinimumBenefit,
+    InvalidContinueProbability,
+}
+
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub enum InterventionError {
+    InvalidCurrentProbability,
+    InvalidPostInterventionProbability,
+}
+
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub enum EscalationReason {
+    ConfidenceBelowContinueThreshold,
+    ReplanBudgetExhausted,
+}
+
+#[derive(Debug, Clone, Copy, PartialEq)]
+pub enum InterventionDecision {
+    Continue {
+        expected_benefit: f64,
+    },
+    RequestReplan {
+        expected_benefit: f64,
+        replans_remaining: u32,
+    },
+    StopAndEscalate {
+        expected_benefit: f64,
+        reason: EscalationReason,
+    },
+}
+
+impl InterventionPolicy {
+    pub fn new(
+        failure_cost: f64,
+        intervention_cost: f64,
+        minimum_expected_benefit: f64,
+        minimum_continue_probability: f64,
+        max_replans: u32,
+    ) -> Result<Self, InterventionConfigError> {
+        if !failure_cost.is_finite() || failure_cost <= 0.0 {
+            return Err(InterventionConfigError::InvalidFailureCost);
+        }
+        if !intervention_cost.is_finite() || intervention_cost < 0.0 {
+            return Err(InterventionConfigError::InvalidInterventionCost);
+        }
+        if !minimum_expected_benefit.is_finite() || minimum_expected_benefit < 0.0 {
+            return Err(InterventionConfigError::InvalidMinimumBenefit);
+        }
+        if !minimum_continue_probability.is_finite()
+            || !(0.0..=1.0).contains(&minimum_continue_probability)
+        {
+            return Err(InterventionConfigError::InvalidContinueProbability);
+        }
+        Ok(Self {
+            failure_cost,
+            intervention_cost,
+            minimum_expected_benefit,
+            minimum_continue_probability,
+            max_replans,
+        })
+    }
+
+    /// Choose whether to continue, replan, or stop for review.
+    ///
+    /// expected_benefit = (p_success_after_replan - p_success_now) * failure_cost
+    ///                    - intervention_cost
+    ///
+    /// The probabilities must be calibrated on held-out data and describe the
+    /// same task/condition. This simple expected-value rule is a research
+    /// baseline: it does not account for unmodelled hazards or physical dynamics.
+    pub fn decide(
+        &self,
+        current_success_probability: f64,
+        post_replan_success_probability: f64,
+        replans_used: u32,
+    ) -> Result<InterventionDecision, InterventionError> {
+        if !current_success_probability.is_finite()
+            || !(0.0..=1.0).contains(&current_success_probability)
+        {
+            return Err(InterventionError::InvalidCurrentProbability);
+        }
+        if !post_replan_success_probability.is_finite()
+            || !(0.0..=1.0).contains(&post_replan_success_probability)
+        {
+            return Err(InterventionError::InvalidPostInterventionProbability);
+        }
+
+        let expected_benefit =
+            (post_replan_success_probability - current_success_probability) * self.failure_cost
+                - self.intervention_cost;
+        let can_replan = replans_used < self.max_replans;
+        if can_replan && expected_benefit > self.minimum_expected_benefit {
+            return Ok(InterventionDecision::RequestReplan {
+                expected_benefit,
+                replans_remaining: self.max_replans - replans_used,
+            });
+        }
+
+        if current_success_probability < self.minimum_continue_probability {
+            let reason = if can_replan {
+                EscalationReason::ConfidenceBelowContinueThreshold
+            } else {
+                EscalationReason::ReplanBudgetExhausted
+            };
+            return Ok(InterventionDecision::StopAndEscalate {
+                expected_benefit,
+                reason,
+            });
+        }
+
+        Ok(InterventionDecision::Continue { expected_benefit })
+    }
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;
