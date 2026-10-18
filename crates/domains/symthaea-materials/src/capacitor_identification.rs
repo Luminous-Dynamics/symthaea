@@ -256,6 +256,8 @@ pub enum CapacitorIdentificationLimitation {
     EsrDispersionAboveMaximum,
     /// Imaginary impedance does not fit the capacitance-plus-series-inductance model.
     ImaginaryFitResidualAboveMaximum,
+    /// The unconstrained best-fit inductance is negative and cannot be a physical ESL estimate.
+    NegativeInductanceEstimate,
 }
 
 /// Fit and gate report for one phasor campaign.
@@ -477,9 +479,17 @@ pub fn assess_capacitor_identification(
     if !numerator.is_finite() || !denominator.is_finite() || denominator <= 0.0 {
         return Err(CapacitorIdentificationError::NonFiniteCalculatedMetric);
     }
-    let estimated_series_inductance_h = numerator / denominator;
-    if !estimated_series_inductance_h.is_finite() || estimated_series_inductance_h < 0.0 {
+    let fitted_series_inductance_h = numerator / denominator;
+    if !fitted_series_inductance_h.is_finite() {
         return Err(CapacitorIdentificationError::NonFiniteCalculatedMetric);
+    }
+    let negative_inductance_estimate = fitted_series_inductance_h < 0.0;
+    // A negative unconstrained estimate is evidence against this passive series-RLC
+    // model. Use the physical boundary for residual reporting, but do not publish a
+    // negative ESL as a component estimate.
+    let physical_model_inductance_h = fitted_series_inductance_h.max(0.0);
+    if negative_inductance_estimate {
+        limitations.push(CapacitorIdentificationLimitation::NegativeInductanceEstimate);
     }
 
     let esr_squared_residual = impedance
@@ -495,7 +505,7 @@ pub fn assess_capacitor_identification(
     for ((_, measured_imaginary_ohm), (omega, xc)) in
         impedance.iter().zip(&imaginary_component_scales)
     {
-        let inductive_reactance = omega * estimated_series_inductance_h;
+        let inductive_reactance = omega * physical_model_inductance_h;
         let predicted_imaginary_ohm = inductive_reactance - xc;
         let residual = measured_imaginary_ohm - predicted_imaginary_ohm;
         let scale = inductive_reactance
@@ -537,6 +547,7 @@ pub fn assess_capacitor_identification(
             limitation,
             CapacitorIdentificationLimitation::EsrDispersionAboveMaximum
                 | CapacitorIdentificationLimitation::ImaginaryFitResidualAboveMaximum
+                | CapacitorIdentificationLimitation::NegativeInductanceEstimate
         )
     }) {
         CapacitorIdentificationDisposition::SeriesRlcModelMismatch
@@ -553,7 +564,8 @@ pub fn assess_capacitor_identification(
         frequency_span_ratio,
         minimum_observed_current_rms_a,
         estimated_esr_ohm: Some(estimated_esr_ohm),
-        estimated_series_inductance_h: Some(estimated_series_inductance_h),
+        estimated_series_inductance_h: (!negative_inductance_estimate)
+            .then_some(fitted_series_inductance_h),
         esr_rmse_ohm: Some(esr_rmse_ohm),
         relative_esr_rmse: Some(relative_esr_rmse),
         imaginary_fit_rmse_ohm: Some(imaginary_fit_rmse_ohm),
@@ -724,6 +736,25 @@ mod tests {
         let report = assess_capacitor_identification(&sample, &req).unwrap();
         assert_eq!(report.disposition, CapacitorIdentificationDisposition::SeriesRlcModelMismatch);
         assert!(report.limitations.contains(&CapacitorIdentificationLimitation::EsrDispersionAboveMaximum));
+    }
+
+    #[test]
+    fn negative_unconstrained_inductance_is_a_model_mismatch_not_a_published_esl() {
+        let mut sample = campaign();
+        for observation in &mut sample.observations {
+            let omega = TAU * observation.frequency_hz;
+            let imaginary_ohm = -1.0 / (omega * CAPACITANCE_F) - omega * INDUCTANCE_H;
+            let real_current = observation.current_real_rms_a;
+            let imaginary_current = observation.current_imaginary_rms_a;
+            observation.voltage_real_rms_v =
+                ESR_OHM * real_current - imaginary_ohm * imaginary_current;
+            observation.voltage_imaginary_rms_v =
+                ESR_OHM * imaginary_current + imaginary_ohm * real_current;
+        }
+        let report = assess_capacitor_identification(&sample, &requirements()).unwrap();
+        assert_eq!(report.disposition, CapacitorIdentificationDisposition::SeriesRlcModelMismatch);
+        assert_eq!(report.estimated_series_inductance_h, None);
+        assert!(report.limitations.contains(&CapacitorIdentificationLimitation::NegativeInductanceEstimate));
     }
 
     #[test]
