@@ -751,6 +751,7 @@ mod tests {
             completed: progress == Some(1.0),
             valid_run: progress.is_some(),
             timed_out: false,
+            failure_class: if progress.is_some() { FailureClass::None } else { FailureClass::Other },
             elapsed_seconds: elapsed,
             model_calls: 12,
             action_steps: 80,
@@ -763,6 +764,7 @@ mod tests {
     fn partial_progress_and_invalid_runs_are_reported_separately() {
         let mut invalid = trial("stack-bowls", "base", "03", None, 5.0);
         invalid.timed_out = true;
+        invalid.failure_class = FailureClass::Timeout;
         let rows = vec![
             trial("stack-bowls", "base", "01", Some(0.5), 4.0),
             trial("stack-bowls", "base", "02", Some(1.0), 6.0),
@@ -840,6 +842,7 @@ mod tests {
     fn task_summaries_do_not_silently_drop_all_invalid_trials() {
         let mut x = trial("store-safe", "baseline", "t1", None, 12.0);
         x.timed_out = true;
+        x.failure_class = FailureClass::Timeout;
         let s = summarize_trials(&[x], 0, 1).unwrap();
         assert_eq!(s[0].valid_trials, 0);
         assert_eq!(s[0].invalid_trials, 1);
