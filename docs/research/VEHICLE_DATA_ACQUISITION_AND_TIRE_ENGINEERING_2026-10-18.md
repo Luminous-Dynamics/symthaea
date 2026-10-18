@@ -9,9 +9,10 @@
 
 We found useful open or potentially licensable material, but did **not** find a clearly licensed downloadable raw Roam Air motorcycle dataset with its original motor, inverter and battery maps. The 2026 papers say data are available on request; the rights of underlying data and Roam-owned components must be cleared separately from the published article.
 
-The best immediate rights-cleared tire-data inputs are:
-- Aalto's CC BY 4.0 raw intelligent-tire strain test data (low/high speed and load, slip angle 0 degrees). This supports strain/model methodology but **not** wet grip or tire-force maps.
-- A CC BY 4.0 tire pressure/temperature/speed dataset with 210,128 passenger-car observations and gradual-deflation/natural-leak segments. It supports pressure-health monitoring, not motorcycle grip, wear or structural qualification.
+One rights-cleared dataset has now been **acquired into the public branch**: the full CC BY 4.0 passenger-car tire pressure/temperature/speed CSV is preserved as nine ordered text shards, with the original README and license. All shards were fetched back from the branch and concatenated; the result exactly matched the upstream blob content. The first source-side integrity scan counted 210,128 samples across 1,755 segments, with 196,260 normal and 13,868 anomalous labels and no malformed rows or empty fields. This is a pressure-health dataset, not a motorcycle tire-force or powertrain dataset.
+
+Other useful rights-cleared sources remain external, not claimed as downloaded:
+- Aalto's CC BY 4.0 raw intelligent-tire strain test data (low/high speed and load, slip angle 0 degrees). This supports strain/model methodology but **not** wet grip or tire-force maps; retrieval was blocked through the available path in this session.
 - A CC BY 4.0 high-fidelity motorcycle simulation dataset for simulated sensor-pipeline tests only.
 
 The raw motorcycle race-telemetry deposits on Zenodo are promising for wheel speed, lean, braking, suspension and throttle, with both reported wet and dry days. Their record pages expose downloadable files but do not display a dataset license in the rights section. Visibility is not a reuse license, so obtain explicit written permission or a clear open license before ingestion or derivation. Full results and rights status are recorded in the JSON source register.
@@ -75,7 +76,7 @@ Build a small instrumented campaign around one serviceable electric motorcycle a
 - Publish uncertainty and all poor fits; do not alter exclusions after inspecting holdout.
 - Preserve only rights-cleared raw data; publish benchmark subsets where participant/owner rights allow.
 
-The first self-generated data should be an auditable small grid and repeated routes, not a fabricated full map. Until measurements exist, unmeasured values stay unknown or are marked as explicit priors.
+The new Rust `xtask tire-monitoring-intake` command checks the reconstructed CSV schema, data counts, label/method counts, numeric ranges and SHA-256. Its code and tests are authored but have not been compiled or run in this environment. The source-side scan is not a substitute for that exact-head Rust run. For motor/inverter/battery maps, the first self-generated reference set should be an auditable small grid and repeated instrumented routes, not a fabricated full map. Until measurements exist, unmeasured values stay unknown or are marked as explicit priors.
 
 ## Can Symthaea engineer better tires?
 
@@ -134,9 +135,9 @@ Standards need not be copied into the repository. Record the applicable edition,
 ## Immediate work order
 
 1. Request Roam Air/Stellenbosch raw maps and traces under explicit use/redistribution terms, and request a clear license for the racing motorcycle deposits.
-2. Retrieve the two CC BY 4.0 tire datasets from their canonical upstream sources, with hashes/licenses/metadata preserved.
-3. Build a compact Rust-first intake/decoder under existing xtask and vehicle owners; avoid a production Python dependency.
-4. If data access is declined, instrument a reference vehicle or arrange a research-lab/dynamometer partner.
-5. Use the tire datasets only for the narrow scopes they support, then commission tire-force, rolling-resistance, wet-grip, endurance and wear testing before claiming improved tire performance.
+2. Run the new Rust intake command on the vendored passenger-car tire-health data; keep all samples from each `Unit_ID` inside one split and report false alarms/missed gradual leaks, not tire grip.
+3. Retrieve the Aalto CC BY strain files via a working download route and retain their hashes/licenses/metadata.
+4. Build a compact Rust-first measured-data intake and map fitter under the existing xtask and vehicle owners; do not introduce production Python.
+5. If raw motorcycle maps are declined, instrument a reference electric motorcycle at a lab/dyno and use a conventional ICE vehicle as a second comparison. Commission qualified tire-force, rolling-resistance, wet-grip, endurance and wear testing before claiming improved tire performance.
 
 No data access requests were sent from an authenticated mailbox in this session; the source requests still need to be sent to the data owners. No raw binary data were downloaded into this repository during this work.
