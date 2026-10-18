@@ -2,9 +2,9 @@
 // SPDX-License-Identifier: AGPL-3.0-or-later
 //! Deterministic instrument signal-health probe for Melothaea.
 //!
-//! This measures whether the arrangement renderer produced finite, non-silent
-//! audio for a small common pitch/velocity grid and records the path selected
-//! by the renderer's own dispatch logic. It does NOT prove pitch accuracy or
+//! This measures signal health and selected renderer/source evidence for
+//! either a common smoke grid or a user-selected inclusive MIDI semitone sweep.
+//! Exploratory pitch/velocity metrics do not prove instrument range or
 //! perceptual fidelity of the timbre/source.
 
 use serde::Serialize;
