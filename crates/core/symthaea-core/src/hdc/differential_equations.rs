@@ -825,7 +825,12 @@ impl DifferentialEquationsEngine {
 
         if system.dim == 0 {
             return Err(RK45Error::new(
-                RK45ErrorKind::EmptySystem, t, &y, accepted_steps, rejected_steps, error_estimate
+                RK45ErrorKind::EmptySystem,
+                t,
+                &y,
+                accepted_steps,
+                rejected_steps,
+                error_estimate,
             ));
         }
         if y0.len() != system.dim {
@@ -836,12 +841,22 @@ impl DifferentialEquationsEngine {
         }
         if !t0.is_finite() || !t_end.is_finite() || t_end < t0 {
             return Err(RK45Error::new(
-                RK45ErrorKind::InvalidTimeSpan, t, &y, accepted_steps, rejected_steps, error_estimate
+                RK45ErrorKind::InvalidTimeSpan,
+                t,
+                &y,
+                accepted_steps,
+                rejected_steps,
+                error_estimate,
             ));
         }
         if !tol.is_finite() || tol <= 0.0 {
             return Err(RK45Error::new(
-                RK45ErrorKind::InvalidTolerance, t, &y, accepted_steps, rejected_steps, error_estimate
+                RK45ErrorKind::InvalidTolerance,
+                t,
+                &y,
+                accepted_steps,
+                rejected_steps,
+                error_estimate,
             ));
         }
         if let Some(index) = y0.iter().position(|value| !value.is_finite()) {
@@ -854,7 +869,12 @@ impl DifferentialEquationsEngine {
         let span = t_end - t0;
         if !span.is_finite() || span < 0.0 {
             return Err(RK45Error::new(
-                RK45ErrorKind::InvalidTimeSpan, t, &y, accepted_steps, rejected_steps, error_estimate
+                RK45ErrorKind::InvalidTimeSpan,
+                t,
+                &y,
+                accepted_steps,
+                rejected_steps,
+                error_estimate,
             ));
         }
         if span == 0.0 {
@@ -936,7 +956,12 @@ impl DifferentialEquationsEngine {
             let remaining = t_end - t;
             if !remaining.is_finite() || remaining <= 0.0 {
                 return Err(RK45Error::new(
-                    RK45ErrorKind::InvalidTimeSpan, t, &y, accepted_steps, rejected_steps, error_estimate
+                    RK45ErrorKind::InvalidTimeSpan,
+                t,
+                &y,
+                accepted_steps,
+                rejected_steps,
+                error_estimate,
                 ));
             }
             h = h.min(h_max).min(remaining);
@@ -956,70 +981,178 @@ impl DifferentialEquationsEngine {
 
             let k1 = match eval("k1", t, &y) {
                 Ok(value) => value,
-                Err(kind) => return Err(RK45Error::new(kind, t, &y, accepted_steps, rejected_steps, error_estimate)),
+                Err(kind) => {
+                    return Err(RK45Error::new(
+                        kind,
+                        t,
+                        &y,
+                        accepted_steps,
+                        rejected_steps,
+                        error_estimate,
+                    ));
+                },
             };
             let y2: Vec<f64> = (0..system.dim).map(|i| y[i] + h * a21 * k1[i]).collect();
             let k2 = match eval("k2", t + h / 5.0, &y2) {
                 Ok(value) => value,
-                Err(kind) => return Err(RK45Error::new(kind, t, &y, accepted_steps, rejected_steps, error_estimate)),
+                Err(kind) => {
+                    return Err(RK45Error::new(
+                        kind,
+                        t,
+                        &y,
+                        accepted_steps,
+                        rejected_steps,
+                        error_estimate,
+                    ));
+                },
             };
             let y3: Vec<f64> = (0..system.dim)
                 .map(|i| y[i] + h * (a31 * k1[i] + a32 * k2[i])).collect();
             let k3 = match eval("k3", t + 3.0 * h / 10.0, &y3) {
                 Ok(value) => value,
-                Err(kind) => return Err(RK45Error::new(kind, t, &y, accepted_steps, rejected_steps, error_estimate)),
+                Err(kind) => {
+                    return Err(RK45Error::new(
+                        kind,
+                        t,
+                        &y,
+                        accepted_steps,
+                        rejected_steps,
+                        error_estimate,
+                    ));
+                },
             };
             let y4: Vec<f64> = (0..system.dim)
                 .map(|i| y[i] + h * (a41 * k1[i] + a42 * k2[i] + a43 * k3[i])).collect();
             let k4 = match eval("k4", t + 4.0 * h / 5.0, &y4) {
                 Ok(value) => value,
-                Err(kind) => return Err(RK45Error::new(kind, t, &y, accepted_steps, rejected_steps, error_estimate)),
+                Err(kind) => {
+                    return Err(RK45Error::new(
+                        kind,
+                        t,
+                        &y,
+                        accepted_steps,
+                        rejected_steps,
+                        error_estimate,
+                    ));
+                },
             };
             let y5: Vec<f64> = (0..system.dim)
-                .map(|i| y[i] + h * (a51 * k1[i] + a52 * k2[i] + a53 * k3[i] + a54 * k4[i])).collect();
+                .map(|i| {
+                    y[i] + h * (a51 * k1[i] + a52 * k2[i] + a53 * k3[i] + a54 * k4[i])
+                })
+                .collect();
             let k5 = match eval("k5", t + 8.0 * h / 9.0, &y5) {
                 Ok(value) => value,
-                Err(kind) => return Err(RK45Error::new(kind, t, &y, accepted_steps, rejected_steps, error_estimate)),
+                Err(kind) => {
+                    return Err(RK45Error::new(
+                        kind,
+                        t,
+                        &y,
+                        accepted_steps,
+                        rejected_steps,
+                        error_estimate,
+                    ));
+                },
             };
             let y6: Vec<f64> = (0..system.dim)
-                .map(|i| y[i] + h * (a61 * k1[i] + a62 * k2[i] + a63 * k3[i] + a64 * k4[i] + a65 * k5[i])).collect();
+                .map(|i| {
+                    y[i]
+                        + h * (a61 * k1[i]
+                            + a62 * k2[i]
+                            + a63 * k3[i]
+                            + a64 * k4[i]
+                            + a65 * k5[i])
+                })
+                .collect();
             let k6 = match eval("k6", t + h, &y6) {
                 Ok(value) => value,
-                Err(kind) => return Err(RK45Error::new(kind, t, &y, accepted_steps, rejected_steps, error_estimate)),
+                Err(kind) => {
+                    return Err(RK45Error::new(
+                        kind,
+                        t,
+                        &y,
+                        accepted_steps,
+                        rejected_steps,
+                        error_estimate,
+                    ));
+                },
             };
             let y_new: Vec<f64> = (0..system.dim)
-                .map(|i| y[i] + h * (b1 * k1[i] + b3 * k3[i] + b4 * k4[i] + b5 * k5[i] + b6 * k6[i])).collect();
+                .map(|i| {
+                    y[i]
+                        + h * (b1 * k1[i]
+                            + b3 * k3[i]
+                            + b4 * k4[i]
+                            + b5 * k5[i]
+                            + b6 * k6[i])
+                })
+                .collect();
             let k7 = match eval("k7", t + h, &y_new) {
                 Ok(value) => value,
-                Err(kind) => return Err(RK45Error::new(kind, t, &y, accepted_steps, rejected_steps, error_estimate)),
+                Err(kind) => {
+                    return Err(RK45Error::new(
+                        kind,
+                        t,
+                        &y,
+                        accepted_steps,
+                        rejected_steps,
+                        error_estimate,
+                    ));
+                },
             };
 
             let mut scaled_squared_sum = 0.0_f64;
             for i in 0..system.dim {
-                let e = h * (e1 * k1[i] + e3 * k3[i] + e4 * k4[i] + e5 * k5[i] + e6 * k6[i] + e7 * k7[i]);
+                let e = h
+                    * (e1 * k1[i]
+                        + e3 * k3[i]
+                        + e4 * k4[i]
+                        + e5 * k5[i]
+                        + e6 * k6[i]
+                        + e7 * k7[i]);
                 if !e.is_finite() {
                     return Err(RK45Error::new(
-                        RK45ErrorKind::NonFiniteErrorEstimate, t, &y, accepted_steps, rejected_steps, error_estimate
+                        RK45ErrorKind::NonFiniteErrorEstimate,
+                        t,
+                        &y,
+                        accepted_steps,
+                        rejected_steps,
+                        error_estimate,
                     ));
                 }
                 let scale = tol * (1.0 + y[i].abs().max(y_new[i].abs()));
                 if !scale.is_finite() || scale <= 0.0 {
                     return Err(RK45Error::new(
-                        RK45ErrorKind::InvalidErrorScale { index: i }, t, &y, accepted_steps, rejected_steps, error_estimate
+                        RK45ErrorKind::InvalidErrorScale { index: i },
+                        t,
+                        &y,
+                        accepted_steps,
+                        rejected_steps,
+                        error_estimate,
                     ));
                 }
                 let scaled_error = e / scale;
                 scaled_squared_sum += scaled_error * scaled_error;
                 if !scaled_squared_sum.is_finite() {
                     return Err(RK45Error::new(
-                        RK45ErrorKind::NonFiniteErrorEstimate, t, &y, accepted_steps, rejected_steps, error_estimate
+                        RK45ErrorKind::NonFiniteErrorEstimate,
+                        t,
+                        &y,
+                        accepted_steps,
+                        rejected_steps,
+                        error_estimate,
                     ));
                 }
             }
             let err = scaled_squared_sum.sqrt() / (system.dim as f64).sqrt();
             if !err.is_finite() {
                 return Err(RK45Error::new(
-                    RK45ErrorKind::NonFiniteErrorEstimate, t, &y, accepted_steps, rejected_steps, error_estimate
+                    RK45ErrorKind::NonFiniteErrorEstimate,
+                        t,
+                        &y,
+                        accepted_steps,
+                        rejected_steps,
+                        error_estimate,
                 ));
             }
             error_estimate = err;
