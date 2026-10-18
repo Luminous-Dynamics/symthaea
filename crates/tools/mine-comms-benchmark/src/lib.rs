@@ -301,12 +301,8 @@ pub fn find_route(
             let improves = match distance.get(&link.to) {
                 None => true,
                 Some(old_cost) if candidate_cost < *old_cost => true,
-                Some(old_cost) if candidate_cost == *old_cost => {
-                    previous
-                        .get(&link.to)
-                        .map(|(_, old_index)| link.id < links[*old_index].id)
-                        .unwrap_or(true)
-                }
+                // Equal scores keep the first path discovered from sorted
+                // nodes and sorted link IDs, making ties deterministic.
                 _ => false,
             };
             if improves {
@@ -767,7 +763,7 @@ mod tests {
         let route = find_route(&links, "a", "z", 100, RoutePolicy::FixedChannelPreference)
             .expect("valid graph")
             .expect("route exists");
-        assert_eq!(route.nodes, vec!["a", "b", "z"]);
+        assert_eq!(route.nodes.iter().map(String::as_str).collect::<Vec<_>>(), vec!["a", "b", "z"]);
     }
 
     #[test]
