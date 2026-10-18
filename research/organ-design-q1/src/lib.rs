@@ -4,7 +4,7 @@
 //! infer unmeasured physiology, or authorize experiments or clinical decisions.
 //! Hard constraints and evidence admission are evaluated before Pareto ranking.
 
-use std::collections::{BTreeMap, BTreeSet, HashMap, HashSet};
+use std::collections::{BTreeMap, HashMap, HashSet};
 use std::fmt::Write as _;
 
 pub const CONTRACT_VERSION: &str = "organ-design-q1-v0.1.0";
@@ -1143,7 +1143,7 @@ mod tests {
             .iter()
             .map(|case| case["id"].as_str().expect("case ID must be a string"))
             .collect();
-        assert_eq!(ids, HOSTILE_CASE_IDS);
+        assert_eq!(ids.as_slice(), HOSTILE_CASE_IDS);
         assert_eq!(ids.iter().collect::<HashSet<_>>().len(), ids.len());
     }
 
