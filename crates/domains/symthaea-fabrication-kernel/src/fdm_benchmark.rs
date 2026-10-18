@@ -10,6 +10,7 @@
 //! about strength, fatigue, material properties, or standards conformity.
 
 use crate::crypto_digest::sha256;
+use crate::machine::MachineProfile;
 use serde::{Deserialize, Serialize};
 use std::collections::{HashMap, HashSet};
 
@@ -45,13 +46,9 @@ pub struct FdmBenchmarkManifest {
     pub build_position_mm: [f64; 3],
     /// Nominal specimen orientation in the declared frame, degrees.
     pub build_orientation_deg: [f64; 3],
-    /// Declared build envelope for specimen-origin coordinates in the same frame.
-    /// This bounds the origin only; it does not prove the full specimen fits.
-    pub build_envelope_min_mm: [f64; 3],
-    pub build_envelope_max_mm: [f64; 3],
-    /// Reference to the machine-profile record supplying these bounds.
-    /// Presence is checked here; source authenticity is an external trust decision.
-    pub build_envelope_ref: String,
+    /// Canonical machine-profile owner. Its inclusive build bounds are used
+    /// directly; this avoids a second, potentially divergent envelope model.
+    pub machine_profile: MachineProfile,
     pub phase: BenchmarkPhase,
     pub evidence_class: EvidenceClass,
     /// SHA-256 hex digests are identities, not signatures or safety approvals.
@@ -158,6 +155,16 @@ pub struct FdmBenchmarkEvaluation {
     pub energy_wh: Option<f64>,
 }
 
+/// Domain-separated SHA-256 binding to the exact serialized canonical machine profile.
+fn machine_profile_sha256(profile: &MachineProfile) -> Option<String> {
+    let serialized = serde_json::to_vec(profile).ok()?;
+    let domain = b"symthaea.fdm-benchmark.machine-profile.v1\0";
+    let mut bytes = Vec::with_capacity(domain.len() + serialized.len());
+    bytes.extend_from_slice(domain);
+    bytes.extend_from_slice(&serialized);
+    Some(sha256(&bytes).to_hex())
+}
+
 impl FdmBenchmarkManifest {
     fn validate(&self) -> Vec<String> {
         let mut issues = Vec::new();
@@ -177,25 +184,34 @@ impl FdmBenchmarkManifest {
         if self.build_orientation_deg.iter().any(|value| !value.is_finite()) {
             issues.push("build orientation must contain only finite angles".to_owned());
         }
-        let envelope_valid = (0..3).all(|axis| {
-            self.build_envelope_min_mm[axis].is_finite()
-                && self.build_envelope_max_mm[axis].is_finite()
-                && self.build_envelope_min_mm[axis] < self.build_envelope_max_mm[axis]
-        });
-        if !envelope_valid {
-            issues.push(
-                "build envelope bounds must be finite with min < max on every axis".to_owned(),
-            );
-        } else if self.build_position_mm.iter().enumerate().any(|(axis, position)| {
-            *position < self.build_envelope_min_mm[axis]
-                || *position > self.build_envelope_max_mm[axis]
-        }) {
-            issues.push(
-                "specimen origin is outside the declared build envelope".to_owned(),
-            );
+        let machine_profile_valid = match self.machine_profile.validate() {
+            Ok(()) => true,
+            Err(reason) => {
+                issues.push(format!("embedded machine profile is invalid: {reason}"));
+                false
+            }
+        };
+        match machine_profile_sha256(&self.machine_profile) {
+            Some(actual) if actual == self.machine_profile_digest => {}
+            Some(_) => issues.push(
+                "machine profile digest does not match the embedded canonical MachineProfile"
+                    .to_owned(),
+            ),
+            None => issues.push(
+                "embedded machine profile could not be serialized for SHA-256 binding".to_owned(),
+            ),
         }
-        if self.build_envelope_ref.trim().is_empty() {
-            issues.push("build envelope reference is empty".to_owned());
+        if machine_profile_valid
+            && self.build_position_mm.iter().all(|value| value.is_finite())
+            && (0..3).any(|axis| {
+                let position = self.build_position_mm[axis];
+                position < self.machine_profile.build_min_mm[axis] as f64
+                    || position > self.machine_profile.build_max_mm[axis] as f64
+            })
+        {
+            issues.push(
+                "specimen origin is outside the canonical MachineProfile build bounds".to_owned(),
+            );
         }
         for (name, value) in [
             ("protocol_digest", self.protocol_digest.as_str()),
@@ -471,6 +487,7 @@ mod tests {
     }
 
     fn manifest(evidence_class: EvidenceClass, phase: BenchmarkPhase) -> FdmBenchmarkManifest {
+        let machine_profile = MachineProfile::default();
         FdmBenchmarkManifest {
             protocol_version: "fdm-quality-v0.1".to_owned(),
             run_id: "run-001".to_owned(),
@@ -478,14 +495,13 @@ mod tests {
             build_frame_id: "machine_base_frame".to_owned(),
             build_position_mm: [100.0, 100.0, 0.0],
             build_orientation_deg: [0.0, 0.0, 0.0],
-            build_envelope_min_mm: [0.0, 0.0, 0.0],
-            build_envelope_max_mm: [220.0, 220.0, 250.0],
-            build_envelope_ref: "machine-profile:envelope-v1".to_owned(),
             phase,
             evidence_class,
             protocol_digest: digest('a'),
             artifact_digest: digest('b'),
-            machine_profile_digest: digest('c'),
+            machine_profile_digest: machine_profile_sha256(&machine_profile)
+                .expect("default machine profile serializes"),
+            machine_profile,
             process_profile_digest: digest('d'),
             split_digest: digest('e'),
             discovery_observation_ids: Vec::new(),
@@ -625,26 +641,28 @@ mod tests {
 
 
     #[test]
-    fn specimen_origin_outside_declared_build_envelope_blocks_evaluation() {
+    fn specimen_origin_outside_canonical_machine_profile_bounds_blocks_evaluation() {
         let mut input = case(EvidenceClass::Synthetic, Some(10.0), Some(0.0));
         input.manifest.build_position_mm[0] = 220.001;
         let result = evaluate_fdm_case(&input);
         assert_eq!(result.disposition, GeometryDisposition::NotEvaluable);
-        assert!(result.issues.iter().any(|issue| issue.contains("outside the declared build envelope")));
+        assert!(result.issues.iter().any(|issue| issue.contains("outside the canonical MachineProfile build bounds")));
     }
 
     #[test]
-    fn invalid_build_envelope_blocks_evaluation() {
+    fn invalid_canonical_machine_profile_bounds_block_evaluation() {
         let mut input = case(EvidenceClass::Synthetic, Some(10.0), Some(0.0));
-        input.manifest.build_envelope_min_mm[1] = 220.0;
-        input.manifest.build_envelope_max_mm[1] = 220.0;
+        input.manifest.machine_profile.build_min_mm[1] = 220.0;
+        input.manifest.machine_profile.build_max_mm[1] = 220.0;
+        input.manifest.machine_profile_digest =
+            machine_profile_sha256(&input.manifest.machine_profile).unwrap();
         let result = evaluate_fdm_case(&input);
         assert_eq!(result.disposition, GeometryDisposition::NotEvaluable);
-        assert!(result.issues.iter().any(|issue| issue.contains("build envelope bounds")));
+        assert!(result.issues.iter().any(|issue| issue.contains("embedded machine profile is invalid")));
     }
 
     #[test]
-    fn specimen_origin_on_inclusive_build_envelope_boundary_is_accepted() {
+    fn specimen_origin_on_inclusive_machine_profile_boundary_is_accepted() {
         let mut input = case(EvidenceClass::Synthetic, Some(10.0), Some(0.0));
         input.manifest.build_position_mm = [220.0, 220.0, 250.0];
         let result = evaluate_fdm_case(&input);
@@ -652,12 +670,12 @@ mod tests {
     }
 
     #[test]
-    fn missing_build_envelope_source_reference_blocks_evaluation() {
+    fn changed_machine_profile_without_matching_digest_blocks_evaluation() {
         let mut input = case(EvidenceClass::Synthetic, Some(10.0), Some(0.0));
-        input.manifest.build_envelope_ref.clear();
+        input.manifest.machine_profile.build_max_mm[0] = 210.0;
         let result = evaluate_fdm_case(&input);
         assert_eq!(result.disposition, GeometryDisposition::NotEvaluable);
-        assert!(result.issues.iter().any(|issue| issue.contains("build envelope reference is empty")));
+        assert!(result.issues.iter().any(|issue| issue.contains("digest does not match")));
     }
 
     #[test]
