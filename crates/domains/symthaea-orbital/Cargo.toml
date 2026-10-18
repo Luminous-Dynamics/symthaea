@@ -31,3 +31,4 @@ nalgebra = "0.32"
 default = []
 [dev-dependencies]
 serde_json = { workspace = true }
+sha2 = { workspace = true }
