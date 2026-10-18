@@ -126,3 +126,33 @@ fn ingredient_order_does_not_change_result() {
     let actual = validate_nutrient_accounting_v1(&value).unwrap();
     assert_eq!(expected, actual);
 }
+
+#[test]
+fn retention_factor_must_be_pinned_to_the_same_process() {
+    let mut value = fixture();
+    value["nutrient_retention"][0]["process_id"] = json!("frying-v1");
+    assert!(validate_nutrient_accounting_v1(&value)
+        .unwrap_err()
+        .iter()
+        .any(|error| error.contains("does not match the recipe process_id")));
+}
+
+#[test]
+fn retention_factor_input_state_must_match_composition_state() {
+    let mut value = fixture();
+    value["nutrient_retention"][0]["input_state"] = json!("fried");
+    assert!(validate_nutrient_accounting_v1(&value)
+        .unwrap_err()
+        .iter()
+        .any(|error| error.contains("does not match the ingredient composition_state")));
+}
+
+#[test]
+fn retention_factor_output_state_must_match_final_recipe_state() {
+    let mut value = fixture();
+    value["nutrient_retention"][0]["output_state"] = json!("raw");
+    assert!(validate_nutrient_accounting_v1(&value)
+        .unwrap_err()
+        .iter()
+        .any(|error| error.contains("does not match final_food_state")));
+}
