@@ -163,7 +163,7 @@ fn run() -> Result<(), String> {
         schema_version: "melothaea.instrument-capability-matrix.v4",
         benchmark: "MEL-INST-CAP-001",
         qualification_result: "not_qualified_by_source_inventory_alone",
-        evidence_boundary: "source inventory, filename pitch coverage, WAV decode and silence audit only; optional root content manifests hash all WAVs found by the root walker, including files outside the pitch indexer; no render-grid, gesture, or human-preference result is implied",
+        evidence_boundary: "source inventory, filename pitch coverage, WAV decode and silence audit only; optional root content manifests hash all WAVs found by the root walker, including files outside the pitch indexer; license/readme hashes and Git origin/HEAD/clean-worktree status are source-term evidence, not legal clearance or a signed upstream attestation; no render-grid, gesture, or human-preference result is implied",
         source_revision: inventory.source_revision.clone(),
         vcsl_root: inventory.vcsl_root,
         vsco2_root: inventory.vsco2_root,
