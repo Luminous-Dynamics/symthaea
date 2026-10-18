@@ -1016,7 +1016,8 @@ fn print_help() {
          JSON is written to stdout. Redirect it to a file if a local report is desired.\n\
          Per-note render/source receipts are included; they do not prove perceptual fidelity.\n\
          The default pitch grid is a smoke test; a user-selected sweep tests rendered cells, not certified playability.\n\
-         Calibration defaults to MIDI 36:96 and is capped at 22050 Hz and 100 ms; it does not qualify instruments."
+         Calibration defaults to MIDI 36:96 and is capped at 22050 Hz and 100 ms; it does not qualify instruments.\n\
+         Set SYMTHAEA_MUSE_HASH_SOURCE_BANK_MANIFEST=1 before starting to hash every indexed WAV in a selected bank; this can be I/O-intensive."
     );
 }
 
