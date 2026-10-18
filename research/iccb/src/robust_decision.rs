@@ -507,6 +507,31 @@ mod tests {
     }
 
     #[test]
+    fn minimax_regret_breaks_tie_without_faking_a_robust_winner() {
+        let mut input = scenario();
+        for payoff in &mut input.payoffs {
+            payoff.payoff_minor = match (payoff.action_id.as_str(), payoff.state_id.as_str()) {
+                ("build", "high-demand") => 10,
+                ("build", "low-demand") => -5,
+                ("avoid", _) => 0,
+                _ => unreachable!(),
+            };
+        }
+
+        let report = input.evaluate().unwrap();
+        assert_eq!(report.status, RobustDecisionStatus::NoUniqueRobustWinner);
+        assert_eq!(report.minimax_regret_action_ids, vec!["build".to_owned()]);
+        assert_eq!(
+            envelope(&report, "build").worst_case_expected_regret_upper_minor,
+            4
+        );
+        assert_eq!(
+            envelope(&report, "avoid").worst_case_expected_regret_upper_minor,
+            7
+        );
+    }
+
+    #[test]
     fn point_probability_bounds_match_expected_value_ordering() {
         let mut input = scenario();
         input.state_probability_bounds = vec![
@@ -699,6 +724,7 @@ mod tests {
             for allocation in [
                 &action.worst_case_probability_allocation,
                 &action.best_case_probability_allocation,
+                &action.worst_case_regret_probability_allocation,
             ] {
                 assert_eq!(
                     allocation
