@@ -19,6 +19,9 @@ Related AMB2022-01 source publications listed by NIST include the 3D-build model
 Primary links:
 - DOI and citation instructions: https://doi.org/10.18434/mds2-3735
 - NIST PDR discovery link: https://data.nist.gov/od/id/mds2-3735
+- Official calibration archive: https://data.nist.gov/od/ds/mds2-3735/calibration%20data.zip
+- Official prediction submission template: https://data.nist.gov/od/ds/mds2-3735/prediction%20submission%20template.xlsx
+- NIST fair-use, licensing and citation policy: https://www.nist.gov/open/copyright-fair-use-and-licensing-statements-srd-data-software-and-technical-series-publications
 - NIST AMB2025-02 challenge README: https://www.nist.gov/system/files/documents/2025/03/05/readme%20AMB2025-02%20Macroscale%20Quasi-Static%20Tensile%20Tests%20of%20PBF-L%20IN718.pdf
 - Upstream AMB2022-01 microstructure dataset DOI: https://doi.org/10.18434/mds2-2767
 - NIST direct-link and citation guidance: https://www.nist.gov/ambench/direct-am-bench-data-links-and-referencing-guidance
@@ -27,7 +30,7 @@ The challenge is not eight independent builds. The source records one parent spe
 
 ## Source and rights gate
 
-The committed profile is metadata-only. It contains no dataset bytes and has no invented artifact hashes. Artifact-specific terms, local use and redistribution permissions remain unreviewed. Before files may be used:
+The committed profile is metadata-only. It contains no dataset bytes and has no invented artifact hashes. NIST's general fair-use policy states that data/works created by NIST employees and not covered by the Standard Reference Data Act are generally not subject to U.S. copyright under 17 U.S.C. §105, while warning that third-party/extramural material and foreign rights may differ. That general policy is useful context but does not, by itself, resolve the authorship/rights status of every file in this particular archive. The exact PDR record and archive/template attribution statements still need to be reviewed before populating artifact-specific permissions. Artifact-specific terms, local use and redistribution permissions therefore remain unreviewed. Before files may be used:
 1. Inspect the actual DOI landing page attribution/citation instructions and the terms applying to each downloadable artifact.
 2. Record source object ID/revision, access date, artifact URL/path, terms URL, media type, byte count and SHA-256 from the exact lawfully obtained bytes. Record local-use and repository-bundling permissions per artifact as well as in the dataset policy.
 3. Set terms and local-use flags only when the evidence supports those choices. Repository bundling has its own separate permission flag.
@@ -53,7 +56,7 @@ Unknown metadata must remain explicit. The validator rejects placeholder IDs suc
 
 ## Benchmark protocol and proposed gates
 
-The first stage is data integrity—not model competition. CLI record validation must verify artifact bytes before accepting observation rows; the contract preserves row IDs, while a future raw-file parser must additionally prove each declared row/field is actually present in the exact hashed artifact.
+The first stage is data integrity—not model competition. CLI record validation verifies artifact bytes before accepting observation rows. The new `inspect-csv` command inventories the exact hashed CSV's parsed record count, headers and per-column empty/nonempty counts, and rejects duplicate/ambiguous headers and inconsistent record widths. It parses the already rechecked byte buffer and binds the inventory to the exact SHA-256 to avoid a verify-then-reopen time-of-check/time-of-use gap. This is a structural inventory only: it does not infer units, row identities or variable semantics. The next mapper must prove each declared source row/field is actually present in the exact artifact bytes and produce explicit counts/reasons for exclusions.
 
 **Source integrity**
 - 100% of declared local artifacts match byte count and SHA-256.
@@ -61,6 +64,7 @@ The first stage is data integrity—not model competition. CLI record validation
 - No artifact is imported before artifact-specific terms and local-use permissions are reviewed.
 
 **Parser integrity**
+- The structural CSV inventory rejects blank or case/whitespace-colliding headers, inconsistent row widths and malformed quoting, and accounts for empty versus nonempty cells by column.
 - 100% of duplicate IDs, undeclared source identities, unsafe file paths, missing stable lineage, inconsistent source-field units/variable mappings, unjustified conversion, invalid/non-finite values, fabricated censored point values and malformed censoring bounds are rejected.
 - Independent count reconciliation: every input row is either represented or listed with a reason for exclusion; no silent drops.
 - Raw source values and units survive every normalization.
