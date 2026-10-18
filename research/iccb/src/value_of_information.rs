@@ -422,6 +422,44 @@ mod tests {
     }
 
     #[test]
+    fn noisy_signal_has_lower_value_than_perfect_information() {
+        let mut input = perfect_signal_scenario(0);
+        input.signals = vec![
+            InformationSignal {
+                id: "survey-high".into(),
+                likelihoods: vec![
+                    SignalLikelihood {
+                        state_id: "high-demand".into(),
+                        likelihood_bps: 7_500,
+                    },
+                    SignalLikelihood {
+                        state_id: "low-demand".into(),
+                        likelihood_bps: 2_500,
+                    },
+                ],
+            },
+            InformationSignal {
+                id: "survey-low".into(),
+                likelihoods: vec![
+                    SignalLikelihood {
+                        state_id: "high-demand".into(),
+                        likelihood_bps: 2_500,
+                    },
+                    SignalLikelihood {
+                        state_id: "low-demand".into(),
+                        likelihood_bps: 7_500,
+                    },
+                ],
+            },
+        ];
+
+        let report = input.evaluate().unwrap();
+        assert_eq!(report.gross_evsi_minor, 25);
+        assert_eq!(report.evpi_minor, 50);
+        assert!(report.gross_evsi_minor < report.evpi_minor);
+    }
+
+    #[test]
     fn information_cost_can_exceed_gross_value() {
         let report = perfect_signal_scenario(101).evaluate().unwrap();
         assert_eq!(report.gross_evsi_minor, 50);
