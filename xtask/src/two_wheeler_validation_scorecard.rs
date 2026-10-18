@@ -26,6 +26,9 @@ struct Pair {
     predicted_energy_boundary: String,
     observed_trace_sha256: String,
     model_input_trace_sha256: String,
+    observed_source_record_id: String,
+    source_rights_receipt_id: String,
+    split_manifest_id: String,
     observed_distance_km: f64,
     predicted_distance_km: f64,
     observed_energy_wh: f64,
@@ -133,6 +136,9 @@ fn validate_pair(pair: &Pair) -> Result<(), &'static str> {
         pair.observed_energy_boundary.as_str(),
         pair.predicted_energy_boundary.as_str(),
         pair.measurement_protocol_id.as_str(),
+        pair.observed_source_record_id.as_str(),
+        pair.source_rights_receipt_id.as_str(),
+        pair.split_manifest_id.as_str(),
     ];
     if identities.iter().any(|value| value.trim().is_empty()) {
         return Err("missing_identity");
@@ -210,6 +216,17 @@ fn eligibility_reasons(pair: &Pair) -> Vec<String> {
     }
     if pair.measurement_protocol_id.trim().is_empty() {
         reasons.push("missing_measurement_protocol".into());
+    }
+    if [pair.observed_source_record_id.as_str(), pair.source_rights_receipt_id.as_str(), pair.split_manifest_id.as_str()]
+        .iter()
+        .any(|value| value.trim().is_empty())
+    {
+        reasons.push("missing_source_rights_or_split_provenance".into());
+    }
+    if [pair.observed_source_record_id.as_str(), pair.source_rights_receipt_id.as_str(), pair.split_manifest_id.as_str()]
+        .contains(&"SYNTHETIC_PLACEHOLDER")
+    {
+        reasons.push("synthetic_placeholder_provenance".into());
     }
     if pair.evidence_class == "InstrumentedPhysical"
         && pair.calibration_receipt_id.as_deref().is_none_or(str::is_empty)
@@ -525,6 +542,9 @@ mod tests {
         let mut pair = manifest().cases[0].pair.clone();
         pair.evidence_class = "InstrumentedPhysical".into();
         pair.split = "HOLDOUT".into();
+        pair.observed_source_record_id = "physical-run-001".into();
+        pair.source_rights_receipt_id = "rights-receipt-001".into();
+        pair.split_manifest_id = "holdout-split-manifest-001".into();
         pair.measurement_protocol_id = "protocol-v1".into();
         pair.calibration_receipt_id = None;
         assert!(eligibility_reasons(&pair).contains(&"missing_calibration_receipt".into()));
@@ -549,6 +569,19 @@ mod tests {
             case.must_not_claim.clear();
         }
         validate_manifest(&manifest).expect("measured-dataset mode is structurally valid");
+    }
+
+    #[test]
+    fn synthetic_placeholder_receipts_cannot_qualify_a_physical_holdout() {
+        let mut pair = manifest().cases[0].pair.clone();
+        pair.evidence_class = "InstrumentedPhysical".into();
+        pair.split = "HOLDOUT".into();
+        pair.observed_source_record_id = "physical-run-001".into();
+        pair.source_rights_receipt_id = "SYNTHETIC_PLACEHOLDER".into();
+        pair.split_manifest_id = "holdout-split-manifest-001".into();
+        pair.measurement_protocol_id = "protocol-v1".into();
+        pair.calibration_receipt_id = Some("calibration-receipt-001".into());
+        assert!(eligibility_reasons(&pair).contains(&"synthetic_placeholder_provenance".into()));
     }
 
     #[test]
