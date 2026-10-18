@@ -35,6 +35,14 @@
           ],
           "unit": "m"
         }
+      ],
+      "description": "Measure displacement after two seconds; this control time makes the two idealized hypotheses predict the same result.",
+      "settings": [
+        {
+          "parameter_id": "observation_time",
+          "value": 2,
+          "unit": "s"
+        }
       ]
     },
     {
@@ -65,6 +73,14 @@
             }
           ],
           "unit": "m"
+        }
+      ],
+      "description": "Measure displacement after four seconds; the longer observation separates the constant-acceleration and constant-velocity predictions.",
+      "settings": [
+        {
+          "parameter_id": "observation_time",
+          "value": 4,
+          "unit": "s"
         }
       ]
     }
