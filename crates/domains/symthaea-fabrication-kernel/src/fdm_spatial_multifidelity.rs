@@ -920,11 +920,8 @@ fn evaluate_metrics(
         spent_budget_units: spent,
         unused_budget_units: (schedule.budget_units - spent).max(0.0),
         setup_cost_units: sum_component(|cost| cost.setup_units),
-        fast_screen_cost_units: sum_component(|cost| {
-            // Component totals include method acquisition separately below; return zero here.
-            let _ = cost;
-            0.0
-        }) + observations.iter().filter(|item| item.observation.method == MetrologyMethod::FastScreen)
+        fast_screen_cost_units: observations.iter()
+            .filter(|item| item.observation.method == MetrologyMethod::FastScreen)
             .map(|item| item.cost.acquisition_units).sum::<f64>(),
         reference_metrology_cost_units: observations.iter()
             .filter(|item| item.observation.method == MetrologyMethod::ReferenceMetrology)
