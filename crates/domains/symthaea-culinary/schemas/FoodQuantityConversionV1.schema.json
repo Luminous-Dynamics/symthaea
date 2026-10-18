@@ -1,0 +1,103 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://luminousdynamics.io/schemas/FoodQuantityConversionV1.schema.json",
+  "title": "FoodQuantityConversionV1",
+  "description": "Auditable food mass/volume transformation chain with source-versioned factors and interval propagation. Structural validation does not authenticate external evidence.",
+  "type": "object",
+  "additionalProperties": false,
+  "required": ["schema_version", "conversion_id", "quantity_kind", "claim_status", "input", "steps", "expected_output", "rationale"],
+  "properties": {
+    "schema_version": { "const": "1.0.0" },
+    "conversion_id": { "type": "string", "minLength": 1 },
+    "quantity_kind": { "const": "food_quantity" },
+    "claim_status": { "enum": ["calculation_only", "review_required", "qualified"] },
+    "input": { "$ref": "#/$defs/measurement" },
+    "steps": {
+      "type": "array",
+      "minItems": 1,
+      "items": { "$ref": "#/$defs/step" }
+    },
+    "expected_output": { "$ref": "#/$defs/output" },
+    "rationale": { "type": "string", "minLength": 1 }
+  },
+  "$defs": {
+    "evidence": {
+      "type": "object",
+      "required": ["source_ref", "source_version", "known_at", "evidence_status"],
+      "properties": {
+        "source_ref": { "type": "string", "minLength": 1 },
+        "source_version": { "type": "string", "minLength": 1 },
+        "known_at": { "type": "string", "format": "date-time" },
+        "evidence_status": { "enum": ["synthetic", "unreviewed", "reviewed", "qualified"] }
+      }
+    },
+    "measurement": {
+      "allOf": [
+        { "$ref": "#/$defs/evidence" },
+        {
+          "type": "object",
+          "additionalProperties": false,
+          "required": ["amount", "lower", "upper", "unit", "basis", "food_state", "source_ref", "source_version", "known_at", "evidence_status"],
+          "properties": {
+            "amount": { "type": "number", "minimum": 0 },
+            "lower": { "type": "number", "minimum": 0 },
+            "upper": { "type": "number", "minimum": 0 },
+            "unit": { "type": "string", "minLength": 1 },
+            "basis": { "type": "string", "pattern": "^[a-z][a-z0-9_]{0,63}$" },
+            "food_state": { "type": "string", "pattern": "^[a-z][a-z0-9_]{0,63}$" },
+            "source_ref": { "type": "string", "minLength": 1 },
+            "source_version": { "type": "string", "minLength": 1 },
+            "known_at": { "type": "string", "format": "date-time" },
+            "evidence_status": { "enum": ["synthetic", "unreviewed", "reviewed", "qualified"] }
+          }
+        }
+      ]
+    },
+    "step": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["step_id", "kind", "input_unit", "output_unit", "input_basis", "output_basis", "input_state", "output_state", "factor", "factor_lower", "factor_upper", "source_ref", "source_version", "known_at", "evidence_status"],
+      "properties": {
+        "step_id": { "type": "string", "minLength": 1 },
+        "kind": { "enum": ["unit_scale", "edible_fraction", "process_yield", "density"] },
+        "input_unit": { "type": "string", "minLength": 1 },
+        "output_unit": { "type": "string", "minLength": 1 },
+        "input_basis": { "type": "string", "pattern": "^[a-z][a-z0-9_]{0,63}$" },
+        "output_basis": { "type": "string", "pattern": "^[a-z][a-z0-9_]{0,63}$" },
+        "input_state": { "type": "string", "pattern": "^[a-z][a-z0-9_]{0,63}$" },
+        "output_state": { "type": "string", "pattern": "^[a-z][a-z0-9_]{0,63}$" },
+        "factor": { "type": "number", "exclusiveMinimum": 0 },
+        "factor_lower": { "type": "number", "exclusiveMinimum": 0 },
+        "factor_upper": { "type": "number", "exclusiveMinimum": 0 },
+        "source_ref": { "type": "string", "minLength": 1 },
+        "source_version": { "type": "string", "minLength": 1 },
+        "known_at": { "type": "string", "format": "date-time" },
+        "evidence_status": { "enum": ["synthetic", "unreviewed", "reviewed", "qualified"] }
+      }
+    },
+    "output": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["amount", "lower", "upper", "unit", "basis", "food_state"],
+      "properties": {
+        "amount": { "type": "number", "minimum": 0 },
+        "lower": { "type": "number", "minimum": 0 },
+        "upper": { "type": "number", "minimum": 0 },
+        "unit": { "type": "string", "minLength": 1 },
+        "basis": { "type": "string", "pattern": "^[a-z][a-z0-9_]{0,63}$" },
+        "food_state": { "type": "string", "pattern": "^[a-z][a-z0-9_]{0,63}$" }
+      }
+    }
+  },
+  "allOf": [
+    {
+      "if": { "properties": { "claim_status": { "const": "qualified" } } },
+      "then": {
+        "properties": {
+          "input": { "properties": { "evidence_status": { "const": "qualified" } } },
+          "steps": { "items": { "properties": { "evidence_status": { "const": "qualified" } } }
+        }
+      }
+    }
+  ]
+}
