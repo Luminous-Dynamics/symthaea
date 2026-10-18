@@ -182,12 +182,14 @@ Every negative case needs a stable ID, input fixture, expected disposition, inva
 
 ## Implementation sequence — runners are not a research dependency
 
-1. **R0, now:** merge this research contract after review; keep the first evidence corpus synthetic.
-2. **R1:** link the contract to NUTRI-SOURCE-001 and CULINARY-BENCH-001; freeze 20–30 synthetic candidate/constraint fixtures and independent expected results.
-3. **R2:** implement a read-only candidate profile adapter that composes existing source-registry and Symtropy accounting contracts. Do not duplicate the calculator.
-4. **R3:** add adversarial checks and machine-readable receipts with exact repository commit, source/scenario manifest digest, fixture counts, expected/actual dispositions and status.
-5. **R4:** add public or permission-cleared ingredient data; publish source rights and held-out evaluation design before measuring model skill.
-6. **R5:** design a partner-led lab/pilot study only after the simulation identifies a specific decision-sensitive uncertainty and qualified collaborators review safety, ethics, sample size and stopping criteria.
+1. **R0 — contract review:** review the project boundaries and non-compensatory gates before expanding implementation.
+2. **R1 — synthetic contract artifacts drafted:** this PR includes [a JSON Schema](bioprotein/fixtures/bioprotein-gate-schema-v1.json) and a [26-case synthetic gate corpus](bioprotein/fixtures/bioprotein-gate-corpus-v1.json). These fixtures cover permission/freshness, species/identity matching, nutrient basis/unknowns, safety/authorization, availability, scenario alignment and evidence-kind misuse. They are design artifacts; no runtime evaluator has validated them yet.
+3. **R2 — validate independently:** check JSON parsing/schema conformance and implement a separate small oracle for the declared gate semantics. The oracle must not import the production evaluator's own decision function.
+4. **R3 — compose, don't duplicate:** add a read-only candidate profile adapter on top of the existing nutrition source registry and Symtropy accounting contracts; do not create a second calculator.
+5. **R4 — receipts and adversarial tests:** bind exact repository commit, source/scenario manifest digest, fixture counts, expected/actual dispositions and run status. Add permutation/replay invariance and malformed-data cases.
+6. **R5 — evidence-backed expansion:** add public or permission-cleared ingredient data; publish source rights and held-out evaluation design before measuring model skill.
+7. **R6 — partner-led experiments:** only design a lab/pilot study after modeling identifies a decision-sensitive uncertainty and qualified collaborators review safety, ethics, sample size and stopping criteria.
+
 
 ## Evidence references
 
