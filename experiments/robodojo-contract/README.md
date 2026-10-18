@@ -20,6 +20,8 @@ An approved proposal is only valid against this crate's declared vector dimensio
 
 Prediction error is a caller-defined scalar and must be calibrated for the selected policy. A high value suppresses action approval and requests replanning; repeated high values latch a stop. It is not used as proof of safety, consciousness, or task competence.
 
+The calibration module also exposes an expected-value intervention rule: it compares the estimated success-probability improvement from replanning, multiplied by an explicit failure-cost estimate, against the intervention cost. If the current success probability is below a declared continue threshold and no justified intervention remains, it returns StopAndEscalate rather than authorizing continuation. All costs must use the same utility unit and probabilities must be calibrated on held-out data. This is a research primitive, not a safety controller, and it has no direct actuator authority.
+
 ## Trial TSV schema
 
 The CLI requires this exact tab-separated header, in this order:
