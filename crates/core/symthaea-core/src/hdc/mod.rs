@@ -655,9 +655,8 @@ pub use unified_cognitive_core::{
 
 // Re-export unified HDC-LTC types (revolutionary closed-form dynamics)
 pub use hdc_ltc_unified::{
-    HdcLtcUnifiedNetwork, HdcLtcUnifiedNeuron, IterativeEvolutionError,
-    UnifiedActivation, UnifiedConfig, UnifiedNetworkConfig, UnifiedNetworkStats,
-    UnifiedNeuronStats, DEFAULT_MAX_ITERATIVE_SUBSTEPS,
+    HdcLtcUnifiedNetwork, HdcLtcUnifiedNeuron, UnifiedActivation, UnifiedConfig,
+    UnifiedNetworkConfig, UnifiedNetworkStats, UnifiedNeuronStats,
 };
 
 pub use liquid_holocell::LiquidHolocell;
