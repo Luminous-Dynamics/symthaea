@@ -718,7 +718,7 @@ fn sha256_hex(bytes: &[u8]) -> String {
 
 #[cfg(test)]
 mod tests {
-    use super::{sha256_hex, validate_platform_str};
+    use super::{sha256_hex, validate_measurement_run_str, validate_platform_str};
     use serde_json::Value;
 
     const MANIFEST_TEXT: &str =
@@ -727,6 +727,10 @@ mod tests {
         include_str!("../../../docs/engineering/open-display-reference-platform.schema.json");
     const CAD_SOURCE: &str =
         include_str!("../../../hardware/open-display-reference/cad/odrh_sensor_interface_plate.scad");
+    const RUN_TEXT: &str =
+        include_str!("../../../docs/engineering/display-measurement-run-template-v0.1.json");
+    const RUN_SCHEMA_TEXT: &str =
+        include_str!("../../../docs/engineering/display-measurement-run.schema.json");
 
     fn parse_manifest() -> Value {
         serde_json::from_str(MANIFEST_TEXT).expect("fixture manifest must parse")
@@ -734,6 +738,87 @@ mod tests {
 
     fn encoded(value: &Value) -> String {
         serde_json::to_string(value).expect("mutated fixture must serialize")
+    }
+
+    fn parse_run() -> Value {
+        serde_json::from_str(RUN_TEXT).expect("run template must parse")
+    }
+
+    #[test]
+    fn measurement_run_template_validates_but_remains_unexecuted() {
+        let report = validate_measurement_run_str(RUN_TEXT, RUN_SCHEMA_TEXT)
+            .expect("the unexecuted run template should satisfy the run contract");
+        assert_eq!(report.record_id, "ODRH-RUN-V0-TEMPLATE");
+        assert_eq!(report.record_state, "PLAN_ONLY");
+        assert_eq!(report.observation_count, 4);
+        assert_eq!(report.instrument_count, 0);
+        assert_eq!(report.raw_artifact_count, 0);
+    }
+
+    #[test]
+    fn plan_only_run_cannot_smuggle_a_measured_result() {
+        let mut record = parse_run();
+        record["observations"][0]["status"] = Value::String("MEASURED_UNQUALIFIED".to_owned());
+        record["observations"][0]["value"] = serde_json::json!(10.0);
+        record["observations"][0]["expanded_uncertainty"] = serde_json::json!(1.0);
+        record["observations"][0]["minimum_decision_effect"] = serde_json::json!(3.0);
+        record["observations"][0]["decision_capability"] = Value::String("CAPABLE".to_owned());
+        let errors = validate_measurement_run_str(&encoded(&record), RUN_SCHEMA_TEXT)
+            .expect_err("a plan-only record cannot contain measured values");
+        assert!(errors.iter().any(|error| error.contains("PLAN_ONLY record")));
+    }
+
+    #[test]
+    fn measurement_run_rejects_inconsistent_uncertainty_capability_claim() {
+        let mut record = parse_run();
+        record["record_state"] = Value::String("ACQUIRED_UNQUALIFIED".to_owned());
+        record["physical_validation"] = Value::String("MEASURED_UNQUALIFIED".to_owned());
+        record["acquired_at"] = Value::String("2026-10-18T10:00:00Z".to_owned());
+        record["instruments"] = serde_json::json!([{
+            "instrument_id":"ODRH-RUN-INS-POWER-001",
+            "instrument_class":"POWER_METER",
+            "manufacturer":"Example",
+            "model":"Synthetic fixture",
+            "serial_or_stable_id":"SYNTHETIC-NOT-A-PHYSICAL-INSTRUMENT",
+            "calibration_state":"VALID",
+            "calibration_record_digest":"aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
+            "calibration_valid_through":"2026-12-31",
+            "supported_measurands":["task-window input energy"]
+        }]);
+        record["raw_artifacts"] = serde_json::json!([{
+            "artifact_id":"ODRH-ART-POWER-TRACE-001",
+            "sha256":"bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb",
+            "media_type":"text/csv",
+            "storage_uri":"https://example.invalid/synthetic-trace.csv",
+            "byte_length":100,
+            "role":"POWER_TRACE"
+        }]);
+        record["observations"][0]["status"] = Value::String("MEASURED_UNQUALIFIED".to_owned());
+        record["observations"][0]["value"] = serde_json::json!(10.0);
+        record["observations"][0]["expanded_uncertainty"] = serde_json::json!(1.1);
+        record["observations"][0]["minimum_decision_effect"] = serde_json::json!(3.0);
+        record["observations"][0]["decision_capability"] = Value::String("CAPABLE".to_owned());
+        record["observations"][0]["instrument_ids"] =
+            serde_json::json!(["ODRH-RUN-INS-POWER-001"]);
+        record["observations"][0]["raw_artifact_ids"] =
+            serde_json::json!(["ODRH-ART-POWER-TRACE-001"]);
+
+        let errors = validate_measurement_run_str(&encoded(&record), RUN_SCHEMA_TEXT)
+            .expect_err("uncertainty of 1.1 cannot pass MDE 3.0 under the one-third gate");
+        assert!(errors
+            .iter()
+            .any(|error| error.contains("claims CAPABLE despite uncertainty")));
+    }
+
+    #[test]
+    fn run_record_rejects_duplicate_observation_ids() {
+        let mut record = parse_run();
+        record["observations"][1]["observation_id"] =
+            record["observations"][0]["observation_id"].clone();
+        assert!(validate_measurement_run_str(&encoded(&record), RUN_SCHEMA_TEXT)
+            .expect_err("duplicate observation identities must fail")
+            .iter()
+            .any(|error| error.contains("duplicate run observation ID")));
     }
 
     #[test]
