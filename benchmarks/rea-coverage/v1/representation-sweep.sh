@@ -33,7 +33,7 @@ jq -ner '
       (p2($all | length)) as $limit |
       reduce range(0; $limit) as $mask (.; 
         ([$all | to_entries[] | select(((($mask / p2(.key)) | floor) % 2) == 1) | .value]) as $selected |
-        ([$selected, ($selected | reverse), ($selected + $selected)]) as $variants |
+        ([$selected, ($selected | reverse), ($selected + $selected), ($selected | sort_by(.length, .offset)), ($selected | sort_by(.length, .offset) | reverse)]) as $variants |
         .patterns += 1 |
         reduce $variants[] as $chunks (.; 
           (union_gaps($n; $chunks)) as $u |
@@ -43,11 +43,11 @@ jq -ner '
         )
       )
     )
-  | if .patterns != 33866 or .representations != (33866 * 3) or .mismatches != 0 then
+  | if .patterns != 33866 or .representations != (33866 * 5) or .mismatches != 0 then
       error("unexpected exhaustive sweep result: \(.patterns) sets, \(.representations) representations, \(.mismatches) mismatches")
     else
       "PASS: \(.patterns) exhaustive interval subsets for lengths 1..5",
-      "PASS: \(.representations) representations (original, reversed, duplicate intervals)",
+      "PASS: \(.representations) representations (original, reversed, duplicated, ascending-length, descending-length)",
       "PASS: interval-union gaps exactly match independent bytewise gap runs",
       "NOTE: synthetic contract property test only; REA/Unblob and hardware not exercised."
     end
