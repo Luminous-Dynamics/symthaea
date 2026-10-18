@@ -151,7 +151,7 @@ The binary \`muse_listener_response_benchmark\` consumes JSONL records (one List
 Synthetic smoke test (no participant data required):
 
 \`\`\`sh
-cargo run -p symthaea-muse --bin muse_listener_response_benchmark -- --demo
+GIT_COMMIT_SHA="$(git rev-parse HEAD)" cargo run -p symthaea-muse --bin muse_listener_response_benchmark -- --demo
 \`\`\`
 
 Evaluate an explicitly prepared dataset:
@@ -166,6 +166,8 @@ cargo run -p symthaea-muse --bin muse_listener_response_benchmark -- \
 \`\`\`
 
 The interval between the training and testing cutoffs is embargoed. A whole participant-session must fit within one partition. The report includes training, embargo and test counts; a source digest; channel-wise MAE for baseline predictors; personal-history coverage; and matched-subset baseline errors so a personal predictor is compared with the baselines on the same test episodes. The demo uses synthetic placeholder audio identities and is explicitly tagged as synthetic; it is never human-listener evidence.
+
+The output records the source JSONL SHA-256, runner version, and compile-time runner revision when the build environment provides GIT_COMMIT_SHA or GITHUB_SHA. If the revision is emitted as "unbound-at-build-time", the artifact is not fully source-revision-bound; use a build environment that sets GIT_COMMIT_SHA to the checked-out commit. The input digest identifies the exact JSONL bytes but does not prove that the underlying participant consent, media rights, or audio-byte claims are valid.
 
 The CLI and synthetic tests are authored but not locally run in this environment. Exact-head Cargo formatting, tests, and a real-input smoke run remain required before promotion.
 
