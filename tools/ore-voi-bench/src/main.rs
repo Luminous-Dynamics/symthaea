@@ -338,7 +338,7 @@ fn evaluate_scenario(scenario: &Scenario) -> ScenarioReceipt {
             scenario
                 .actions
                 .iter()
-                .find(|action| action.action_id == ***id)
+                .find(|action| action.action_id == **id)
                 .is_some_and(|action| !action.available)
         })
         .count();
@@ -349,7 +349,7 @@ fn evaluate_scenario(scenario: &Scenario) -> ScenarioReceipt {
             scenario
                 .actions
                 .iter()
-                .find(|action| action.action_id == ***id)
+                .find(|action| action.action_id == **id)
                 .is_some_and(|action| action.cost_units > scenario.budget_units)
         })
         .count();
@@ -534,7 +534,7 @@ mod tests {
     #[test]
     fn unknown_json_fields_fail_closed() {
         let raw = include_str!("../../../docs/tech/ore-voi-benchmark-corpus-v0.1.json")
-            .replacen("\\"suite_id\\":", "\\"unexpected_authority\\":true,\\"suite_id\\":", 1);
+            .replacen("\"suite_id\":", "\"unexpected_authority\":true,\"suite_id\":", 1);
         assert!(serde_json::from_str::<Corpus>(&raw).is_err());
     }
 }
