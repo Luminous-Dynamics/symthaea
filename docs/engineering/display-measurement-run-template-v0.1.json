@@ -43,7 +43,17 @@
       "method_id": "TRAPEZOIDAL-INTEGRATION",
       "method_revision": "0.1.0",
       "raw_artifact_ids": [],
-      "notes": "No instrument, power boundary, or sampling contract has been selected."
+      "notes": "No instrument, power boundary, or sampling contract has been selected.",
+      "uncertainty_budget": {
+        "status": "NOT_EVALUATED",
+        "method": "NOT_EVALUATED",
+        "terms": [],
+        "covariance_terms": [],
+        "combined_standard_uncertainty": null,
+        "coverage_factor": null,
+        "expanded_uncertainty": null,
+        "notes": "No instrument/setup uncertainty budget is available because this run template has not been executed."
+      }
     },
     {
       "observation_id": "ODRH-OBS-LUMINANCE-001",
@@ -58,7 +68,17 @@
       "method_id": "IDMS-METHOD-TO-BE-SELECTED",
       "method_revision": "0.1.0",
       "raw_artifact_ids": [],
-      "notes": "Requires a suitable calibrated photometric instrument and frozen geometry."
+      "notes": "Requires a suitable calibrated photometric instrument and frozen geometry.",
+      "uncertainty_budget": {
+        "status": "NOT_EVALUATED",
+        "method": "NOT_EVALUATED",
+        "terms": [],
+        "covariance_terms": [],
+        "combined_standard_uncertainty": null,
+        "coverage_factor": null,
+        "expanded_uncertainty": null,
+        "notes": "No instrument/setup uncertainty budget is available because this run template has not been executed."
+      }
     },
     {
       "observation_id": "ODRH-OBS-CHROMATICITY-001",
@@ -73,7 +93,17 @@
       "method_id": "IDMS-METHOD-TO-BE-SELECTED",
       "method_revision": "0.1.0",
       "raw_artifact_ids": [],
-      "notes": "No colorimetric claim until instrument spectral response/calibration and method are qualified."
+      "notes": "No colorimetric claim until instrument spectral response/calibration and method are qualified.",
+      "uncertainty_budget": {
+        "status": "NOT_EVALUATED",
+        "method": "NOT_EVALUATED",
+        "terms": [],
+        "covariance_terms": [],
+        "combined_standard_uncertainty": null,
+        "coverage_factor": null,
+        "expanded_uncertainty": null,
+        "notes": "No instrument/setup uncertainty budget is available because this run template has not been executed."
+      }
     },
     {
       "observation_id": "ODRH-OBS-LATENCY-001",
@@ -88,7 +118,17 @@
       "method_id": "OPTICAL-THRESHOLD-TO-BE-FROZEN",
       "method_revision": "0.1.0",
       "raw_artifact_ids": [],
-      "notes": "Requires a validated trigger/optical acquisition clock and a frozen onset/reducer rule."
+      "notes": "Requires a validated trigger/optical acquisition clock and a frozen onset/reducer rule.",
+      "uncertainty_budget": {
+        "status": "NOT_EVALUATED",
+        "method": "NOT_EVALUATED",
+        "terms": [],
+        "covariance_terms": [],
+        "combined_standard_uncertainty": null,
+        "coverage_factor": null,
+        "expanded_uncertainty": null,
+        "notes": "No instrument/setup uncertainty budget is available because this run template has not been executed."
+      }
     }
   ],
   "raw_artifacts": [],
