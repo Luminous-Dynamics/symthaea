@@ -9,7 +9,7 @@
 use serde::{Deserialize, Serialize};
 use serde_json::Value;
 use sha2::{Digest, Sha256};
-use std::collections::HashSet;
+use std::collections::{HashMap, HashSet};
 use std::fs::File;
 use std::io::{self, Read, Write};
 use std::path::{Path, PathBuf};
@@ -55,6 +55,7 @@ struct VerificationReport {
     selected_samples_with_valid_file_digest: usize,
     selected_samples_with_valid_bank_digest: usize,
     selected_samples_with_matching_inventory_bank_digest: usize,
+    selected_samples_with_matching_actual_bank_digest: usize,
     cases_total: usize,
     error_count: usize,
     incomplete_count: usize,
@@ -207,6 +208,9 @@ fn verify_reports(
     let mut selected_samples_with_valid_file_digest = 0_usize;
     let mut selected_samples_with_valid_bank_digest = 0_usize;
     let mut selected_samples_with_matching_inventory_bank_digest = 0_usize;
+    let mut selected_samples_with_matching_actual_bank_digest = 0_usize;
+    let mut actual_bank_manifest_cache: HashMap<(String, String), Result<String, String>> =
+        HashMap::new();
 
     if string_field(probe, "schema_version") != Some("melothaea.instrument-probe.v4") {
         push_error(
@@ -525,30 +529,96 @@ fn verify_reports(
                     relative_path,
                 );
                 match matching_banks.as_slice() {
-                    [bank] => match string_field(bank, "indexed_sample_content_manifest_sha256") {
-                        Some(inventory_digest) if valid_sha256(inventory_digest) => {
-                            if source_bank_digest == Some(inventory_digest) {
-                                selected_samples_with_matching_inventory_bank_digest += 1;
-                            } else {
-                                push_error(
-                                    &mut findings,
-                                    "source_bank_manifest_mismatch",
-                                    format!(
-                                        "{case_label} selected-bank digest differs from the inventory bank for the same instrument/library/path"
-                                    ),
-                                );
+                    [bank] => {
+                        let inventory_digest =
+                            string_field(bank, "indexed_sample_content_manifest_sha256");
+                        match inventory_digest {
+                            Some(digest) if valid_sha256(digest) => {
+                                if source_bank_digest == Some(digest) {
+                                    selected_samples_with_matching_inventory_bank_digest += 1;
+                                } else {
+                                    push_error(
+                                        &mut findings,
+                                        "source_bank_manifest_mismatch",
+                                        format!(
+                                            "{case_label} selected-bank digest differs from the inventory bank for the same instrument/library/path"
+                                        ),
+                                    );
+                                }
+
+                                let bank_directory = string_field(bank, "relative_directory");
+                                if let Some(bank_directory) = bank_directory {
+                                    let cache_key = (
+                                        source_library.unwrap_or_default().to_owned(),
+                                        bank_directory.to_owned(),
+                                    );
+                                    let observation = actual_bank_manifest_cache
+                                        .entry(cache_key)
+                                        .or_insert_with(|| {
+                                            indexed_bank_content_manifest_sha256(
+                                                match source_library.unwrap_or_default() {
+                                                    "vcsl" => vcsl_root_observation,
+                                                    "vsco2_ce" => vsco2_root_observation,
+                                                    _ => return Err("unknown sample library".into()),
+                                                },
+                                                bank_directory,
+                                            )
+                                        });
+                                    match observation {
+                                        Ok(actual_digest) => {
+                                            let sample_digest_matches =
+                                                source_bank_digest == Some(actual_digest.as_str());
+                                            let inventory_digest_matches =
+                                                digest == actual_digest.as_str();
+                                            if !sample_digest_matches {
+                                                push_error(
+                                                    &mut findings,
+                                                    "selected_bank_actual_digest_mismatch",
+                                                    format!(
+                                                        "{case_label} selected bank manifest does not match independently hashed bank bytes"
+                                                    ),
+                                                );
+                                            }
+                                            if !inventory_digest_matches {
+                                                push_error(
+                                                    &mut findings,
+                                                    "inventory_bank_actual_digest_mismatch",
+                                                    format!(
+                                                        "{case_label} inventory bank digest does not match independently hashed bank bytes"
+                                                    ),
+                                                );
+                                            }
+                                            if sample_digest_matches && inventory_digest_matches {
+                                                selected_samples_with_matching_actual_bank_digest += 1;
+                                            }
+                                        }
+                                        Err(error) => push_incomplete(
+                                            &mut findings,
+                                            "indexed_bank_recompute_failed",
+                                            format!(
+                                                "{case_label} selected bank manifest could not be recomputed from disk: {error}"
+                                            ),
+                                        ),
+                                    }
+                                } else {
+                                    push_incomplete(
+                                        &mut findings,
+                                        "inventory_bank_path_missing",
+                                        format!("{case_label} matching inventory bank has no relative_directory"),
+                                    );
+                                }
                             }
+                            Some(_) => push_error(
+                                &mut findings,
+                                "inventory_bank_digest_invalid",
+                                format!("{case_label} matching inventory bank has a malformed digest"),
+                            ),
+                            None => push_incomplete(
+                                &mut findings,
+                                "inventory_bank_digest_missing",
+                                format!("{case_label} matching inventory bank was not content-hashed"),
+                            ),
                         }
-                        Some(_) => push_error(
-                            &mut findings,
-                            "inventory_bank_digest_invalid",
-                            format!("{case_label} matching inventory bank has a malformed digest"),
-                        ),
-                        None => push_incomplete(
-                            &mut findings,
-                            "inventory_bank_digest_missing",
-                            format!("{case_label} matching inventory bank was not content-hashed"),
-                        ),
                     },
                     [] => push_incomplete(
                         &mut findings,
@@ -597,6 +667,7 @@ fn verify_reports(
         selected_samples_with_valid_file_digest,
         selected_samples_with_valid_bank_digest,
         selected_samples_with_matching_inventory_bank_digest,
+        selected_samples_with_matching_actual_bank_digest,
         selected_samples_with_matching_actual_file_digest,
         cases_total,
         error_count,
@@ -973,6 +1044,125 @@ fn asset_root_content_manifest_sha256(
         manifest.update(&file_hasher.finalize()[..]);
     }
     Ok(format!("{:x}", manifest.finalize()))
+}
+
+fn indexed_bank_content_manifest_sha256(
+    root: &RootObservation,
+    relative_directory: &str,
+) -> Result<String, String> {
+    let root_path = root
+        .canonical_path
+        .as_ref()
+        .ok_or_else(|| root.error.clone().unwrap_or_else(|| "asset root is unavailable".into()))?;
+    let relative = Path::new(relative_directory);
+    if relative.as_os_str().is_empty()
+        || relative.is_absolute()
+        || relative_directory.contains('\\')
+        || relative
+            .components()
+            .any(|part| !matches!(part, std::path::Component::Normal(_)))
+    {
+        return Err("inventory bank path is not a safe normalized relative directory".into());
+    }
+    let joined = root_path.join(relative);
+    let canonical_directory =
+        std::fs::canonicalize(&joined).map_err(|error| error.to_string())?;
+    if !canonical_directory.starts_with(root_path) || !canonical_directory.is_dir() {
+        return Err("inventory bank directory resolves outside the supplied root".into());
+    }
+
+    let entries = std::fs::read_dir(&canonical_directory)
+        .map_err(|error| error.to_string())?
+        .collect::<Result<Vec<_>, _>>()
+        .map_err(|error| error.to_string())?;
+    let mut indexed_paths = Vec::new();
+    for entry in entries {
+        let path = entry.path();
+        if path.extension().and_then(|extension| extension.to_str()) != Some("wav") {
+            continue;
+        }
+        let stem = path
+            .file_stem()
+            .and_then(|value| value.to_str())
+            .ok_or_else(|| "indexed WAV has a non-UTF-8 file stem".to_string())?;
+        let contains_midi_token = stem.split('_').any(|token| parse_note_token(token).is_some());
+        if contains_midi_token {
+            indexed_paths.push(path);
+        }
+    }
+    // InstrumentBank::index path-sorts accepted samples so the content manifest
+    // is independent of the filesystem's read_dir order.
+    indexed_paths.sort_unstable();
+    if indexed_paths.is_empty() {
+        return Err("bank contains no WAV filenames accepted by the instrument pitch indexer".into());
+    }
+
+    let mut manifest = Sha256::new();
+    manifest.update(b"muse-indexed-sample-content-manifest-v1\\0");
+    let mut buffer = [0_u8; 64 * 1024];
+    for path in indexed_paths {
+        let name = path
+            .file_name()
+            .unwrap_or_default()
+            .to_string_lossy()
+            .into_owned();
+        let name_bytes = name.as_bytes();
+        manifest.update((name_bytes.len() as u64).to_be_bytes());
+
+        let mut file = File::open(&path).map_err(|error| error.to_string())?;
+        let expected_size = file.metadata().map_err(|error| error.to_string())?.len();
+        manifest.update(expected_size.to_be_bytes());
+        let mut read_size = 0_u64;
+        let mut file_hasher = Sha256::new();
+        loop {
+            let count = file.read(&mut buffer).map_err(|error| error.to_string())?;
+            if count == 0 {
+                break;
+            }
+            read_size = read_size
+                .checked_add(count as u64)
+                .ok_or_else(|| "indexed WAV length overflow while hashing".to_string())?;
+            file_hasher.update(&buffer[..count]);
+        }
+        if read_size != expected_size {
+            return Err(format!("indexed WAV changed size while hashing: {name}"));
+        }
+        manifest.update(&file_hasher.finalize()[..]);
+    }
+    Ok(format!("{:x}", manifest.finalize()))
+}
+
+fn parse_note_token(token: &str) -> Option<u8> {
+    let bytes = token.as_bytes();
+    let letter = *bytes.first()?;
+    if !(b'A'..=b'G').contains(&letter) {
+        return None;
+    }
+    let mut semitones: i32 = match letter {
+        b'C' => 0,
+        b'D' => 2,
+        b'E' => 4,
+        b'F' => 5,
+        b'G' => 7,
+        b'A' => 9,
+        b'B' => 11,
+        _ => return None,
+    };
+    let mut index = 1;
+    match bytes.get(index) {
+        Some(b'#') => {
+            semitones += 1;
+            index += 1;
+        }
+        Some(b'b') => {
+            semitones -= 1;
+            index += 1;
+        }
+        _ => {}
+    }
+    let octave: i32 = token.get(index..)?.parse().ok()?;
+    let midi = (octave + 1) * 12 + semitones;
+    u8::try_from(midi).ok().filter(|&note| note <= 127)
 }
 
 fn matching_inventory_banks<'a>(
