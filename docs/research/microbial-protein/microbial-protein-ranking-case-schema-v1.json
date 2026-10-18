@@ -1,0 +1,297 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://github.com/Luminous-Dynamics/symthaea/blob/main/docs/research/microbial-protein/microbial-protein-ranking-case-schema-v1.json",
+  "title": "Synthetic microbial-protein candidate ranking case",
+  "type": "object",
+  "required": [
+    "case_id",
+    "claim_scope",
+    "scenario_digest",
+    "objective_profile",
+    "candidates",
+    "expected",
+    "rationale"
+  ],
+  "additionalProperties": false,
+  "properties": {
+    "case_id": {
+      "type": "string",
+      "pattern": "^MPS-[0-9]{3}$"
+    },
+    "claim_scope": {
+      "type": "object",
+      "required": [
+        "target_species",
+        "life_stage",
+        "intended_use"
+      ],
+      "additionalProperties": false,
+      "properties": {
+        "target_species": {
+          "enum": [
+            "dog",
+            "cat",
+            "poultry",
+            "pig",
+            "ruminant",
+            "aquaculture",
+            "other"
+          ]
+        },
+        "life_stage": {
+          "type": "string",
+          "minLength": 1
+        },
+        "intended_use": {
+          "enum": [
+            "ingredient_screen",
+            "feed_screen",
+            "pet_food_screen",
+            "research_only"
+          ]
+        }
+      }
+    },
+    "scenario_digest": {
+      "type": "string",
+      "minLength": 1
+    },
+    "objective_profile": {
+      "type": "array",
+      "minItems": 1,
+      "uniqueItems": true,
+      "items": {
+        "type": "object",
+        "required": [
+          "metric_id",
+          "direction",
+          "unit"
+        ],
+        "additionalProperties": false,
+        "properties": {
+          "metric_id": {
+            "type": "string",
+            "minLength": 1
+          },
+          "direction": {
+            "enum": [
+              "minimize",
+              "maximize"
+            ]
+          },
+          "unit": {
+            "type": "string",
+            "minLength": 1
+          }
+        }
+      }
+    },
+    "candidates": {
+      "type": "array",
+      "minItems": 1,
+      "items": {
+        "type": "object",
+        "required": [
+          "candidate_id",
+          "scenario_digest",
+          "source_rights",
+          "permission_evidence_present",
+          "target_scope_match",
+          "safety_gate",
+          "authorization_gate",
+          "nutrition_gate",
+          "metrics"
+        ],
+        "additionalProperties": false,
+        "properties": {
+          "candidate_id": {
+            "type": "string",
+            "minLength": 1
+          },
+          "scenario_digest": {
+            "type": "string",
+            "minLength": 1
+          },
+          "source_rights": {
+            "enum": [
+              "permitted",
+              "restricted",
+              "unknown",
+              "expired",
+              "revoked"
+            ]
+          },
+          "permission_evidence_present": {
+            "type": "boolean"
+          },
+          "target_scope_match": {
+            "enum": [
+              "match",
+              "mismatch",
+              "unknown"
+            ]
+          },
+          "safety_gate": {
+            "enum": [
+              "pass",
+              "fail",
+              "unknown",
+              "not_assessed"
+            ]
+          },
+          "authorization_gate": {
+            "enum": [
+              "pass",
+              "fail",
+              "unknown",
+              "not_applicable"
+            ]
+          },
+          "nutrition_gate": {
+            "enum": [
+              "pass",
+              "fail",
+              "unknown",
+              "not_assessed"
+            ]
+          },
+          "metrics": {
+            "type": "array",
+            "items": {
+              "type": "object",
+              "required": [
+                "metric_id",
+                "state",
+                "evidence_kind",
+                "lower_bound",
+                "upper_bound",
+                "unit",
+                "source_ref"
+              ],
+              "additionalProperties": false,
+              "properties": {
+                "metric_id": {
+                  "type": "string",
+                  "minLength": 1
+                },
+                "state": {
+                  "enum": [
+                    "available",
+                    "missing",
+                    "conflicting",
+                    "stale"
+                  ]
+                },
+                "evidence_kind": {
+                  "enum": [
+                    "measured",
+                    "literature_derived",
+                    "estimated",
+                    "synthetic",
+                    "simulated"
+                  ]
+                },
+                "lower_bound": {
+                  "type": [
+                    "number",
+                    "null"
+                  ]
+                },
+                "upper_bound": {
+                  "type": [
+                    "number",
+                    "null"
+                  ]
+                },
+                "unit": {
+                  "type": "string",
+                  "minLength": 1
+                },
+                "source_ref": {
+                  "type": "string",
+                  "minLength": 1
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "expected": {
+      "type": "object",
+      "required": [
+        "cohort_disposition",
+        "candidate_states",
+        "frontier_candidate_ids",
+        "dominated_candidate_ids",
+        "reason_codes"
+      ],
+      "additionalProperties": false,
+      "properties": {
+        "cohort_disposition": {
+          "enum": [
+            "robust_frontier",
+            "incomplete",
+            "abstain_no_eligible_candidates",
+            "abstain_insufficient_evidence",
+            "not_comparable"
+          ]
+        },
+        "candidate_states": {
+          "type": "array",
+          "items": {
+            "type": "object",
+            "required": [
+              "candidate_id",
+              "state",
+              "reason_codes"
+            ],
+            "additionalProperties": false,
+            "properties": {
+              "candidate_id": {
+                "type": "string"
+              },
+              "state": {
+                "enum": [
+                  "eligible",
+                  "blocked",
+                  "indeterminate",
+                  "not_comparable"
+                ]
+              },
+              "reason_codes": {
+                "type": "array",
+                "items": {
+                  "type": "string"
+                }
+              }
+            }
+          }
+        },
+        "frontier_candidate_ids": {
+          "type": "array",
+          "items": {
+            "type": "string"
+          }
+        },
+        "dominated_candidate_ids": {
+          "type": "array",
+          "items": {
+            "type": "string"
+          }
+        },
+        "reason_codes": {
+          "type": "array",
+          "minItems": 1,
+          "items": {
+            "type": "string"
+          }
+        }
+      }
+    },
+    "rationale": {
+      "type": "string",
+      "minLength": 1
+    }
+  }
+}
