@@ -50,6 +50,23 @@ pub struct BatchCounts {
     pub final_calibrated_good_units: u64,
 }
 
+/// Identity of accounting scope and product/protocol assumptions for a batch.
+#[derive(Clone, Debug, PartialEq, Eq)]
+pub struct CostAccountingBasis {
+    /// Stable batch or lot identifier.
+    pub batch_id: String,
+    /// Three-letter uppercase currency code; conversion is out of scope.
+    pub currency_code: String,
+    /// Identity of included cost categories and allocation boundary.
+    pub accounting_boundary_id: String,
+    /// Identity/digest of the target calibrated-good module profile.
+    pub target_module_profile_digest: String,
+    /// Identity/digest of the comparison protocol and denominator semantics.
+    pub comparison_protocol_digest: String,
+    /// Explicit class such as SYNTHETIC_SCENARIO or BENCH_MEASURED.
+    pub evidence_class: String,
+}
+
 /// Explicit summary vector. No stage independence or yield-product assumption is used.
 #[derive(Clone, Copy, Debug, PartialEq)]
 pub struct BatchEconomics {
@@ -66,6 +83,13 @@ pub struct BatchEconomics {
     pub final_calibrated_good_units: u64,
 }
 
+/// Batch metrics bound to an explicit product, accounting and evidence identity.
+#[derive(Clone, Debug, PartialEq)]
+pub struct EvidencedBatchEconomics {
+    pub basis: CostAccountingBasis,
+    pub metrics: BatchEconomics,
+}
+
 /// A route's conservative metric bounds under a pinned target and protocol.
 ///
 /// The supplied values are bounds/summary estimates, not raw production truth.
@@ -77,6 +101,10 @@ pub struct RouteFrontierCandidate {
     pub candidate_id: String,
     pub target_module_profile_digest: String,
     pub comparison_protocol_digest: String,
+    /// Three-letter uppercase currency code, e.g. ZAR or USD.
+    pub currency_code: String,
+    /// Identity of the included cost categories and allocation boundary.
+    pub accounting_boundary_id: String,
     pub evidence_class: String,
     /// Upper bound for cost per calibrated-good module in one declared currency.
     pub cost_per_good_unit_upper: f64,
@@ -98,7 +126,13 @@ fn validate_frontier_candidate(
     if candidate.candidate_id.trim().is_empty()
         || candidate.target_module_profile_digest.trim().is_empty()
         || candidate.comparison_protocol_digest.trim().is_empty()
+        || candidate.accounting_boundary_id.trim().is_empty()
         || candidate.evidence_class.trim().is_empty()
+        || candidate.currency_code.len() != 3
+        || !candidate
+            .currency_code
+            .bytes()
+            .all(|byte| byte.is_ascii_uppercase())
     {
         return Err(ManufacturingMetricError::InvalidRouteCandidate);
     }
@@ -140,6 +174,8 @@ pub fn route_pareto_dominates(
 
     if candidate.target_module_profile_digest != competitor.target_module_profile_digest
         || candidate.comparison_protocol_digest != competitor.comparison_protocol_digest
+        || candidate.currency_code != competitor.currency_code
+        || candidate.accounting_boundary_id != competitor.accounting_boundary_id
         || candidate.evidence_class != competitor.evidence_class
     {
         return Err(ManufacturingMetricError::MismatchedRouteComparison);
@@ -199,6 +235,7 @@ pub enum ManufacturingMetricError {
     NonFiniteResult,
     InspectedExceedsEligible,
     InspectionCountsExceedPopulation,
+    InvalidAccountingBasis,
     InvalidRouteCandidate,
     UnqualifiedRouteCandidate,
     MismatchedRouteComparison,
@@ -217,6 +254,9 @@ impl fmt::Display for ManufacturingMetricError {
             }
             Self::InspectionCountsExceedPopulation => {
                 formatter.write_str("inspection contingency counts exceed their population")
+            }
+            Self::InvalidAccountingBasis => {
+                formatter.write_str("batch accounting identity is incomplete or invalid")
             }
             Self::InvalidRouteCandidate => {
                 formatter.write_str("route candidate bounds must be finite and valid")
@@ -267,6 +307,41 @@ impl CostLedger {
 /// The caller must declare a matched product/quality profile and a consistent
 /// cost boundary. Stage yields are not multiplied; correlated/clustered defects
 /// remain visible in the observed final-good denominator or a separate scenario.
+fn validate_accounting_basis(
+    basis: &CostAccountingBasis,
+) -> Result<(), ManufacturingMetricError> {
+    let text_fields = [
+        basis.batch_id.as_str(),
+        basis.accounting_boundary_id.as_str(),
+        basis.target_module_profile_digest.as_str(),
+        basis.comparison_protocol_digest.as_str(),
+        basis.evidence_class.as_str(),
+    ];
+    if text_fields.iter().any(|value| value.trim().is_empty()) {
+        return Err(ManufacturingMetricError::InvalidAccountingBasis);
+    }
+    if basis.currency_code.len() != 3
+        || !basis
+            .currency_code
+            .bytes()
+            .all(|byte| byte.is_ascii_uppercase())
+    {
+        return Err(ManufacturingMetricError::InvalidAccountingBasis);
+    }
+    Ok(())
+}
+
+/// Batch summary with required accounting/evidence identity attached.
+pub fn summarize_batch_with_basis(
+    basis: CostAccountingBasis,
+    costs: CostLedger,
+    counts: BatchCounts,
+) -> Result<EvidencedBatchEconomics, ManufacturingMetricError> {
+    validate_accounting_basis(&basis)?;
+    let metrics = summarize_batch(costs, counts)?;
+    Ok(EvidencedBatchEconomics { basis, metrics })
+}
+
 pub fn summarize_batch(
     costs: CostLedger,
     counts: BatchCounts,
@@ -411,6 +486,49 @@ mod tests {
     }
 
     #[test]
+    fn batch_economics_preserve_validated_currency_and_accounting_identity() {
+        let basis = CostAccountingBasis {
+            batch_id: "LOT-2026-001".to_owned(),
+            currency_code: "ZAR".to_owned(),
+            accounting_boundary_id: "sha256:boundary".to_owned(),
+            target_module_profile_digest: "sha256:target".to_owned(),
+            comparison_protocol_digest: "sha256:protocol".to_owned(),
+            evidence_class: "SYNTHETIC_SCENARIO".to_owned(),
+        };
+        let result = summarize_batch_with_basis(
+            basis.clone(),
+            costs(),
+            BatchCounts {
+                input_units: 10,
+                first_pass_good_units: 6,
+                final_calibrated_good_units: 8,
+            },
+        )
+        .expect("complete accounting identity");
+        assert_eq!(result.basis, basis);
+        close(
+            result.metrics.cost_per_calibrated_good_unit.expect("good units"),
+            25.0,
+            1e-12,
+        );
+
+        let mut invalid = basis;
+        invalid.currency_code = "zar".to_owned();
+        assert_eq!(
+            summarize_batch_with_basis(
+                invalid,
+                costs(),
+                BatchCounts {
+                    input_units: 10,
+                    first_pass_good_units: 6,
+                    final_calibrated_good_units: 8,
+                },
+            ),
+            Err(ManufacturingMetricError::InvalidAccountingBasis)
+        );
+    }
+
+    #[test]
     fn zero_final_good_units_keep_cost_per_good_undefined_but_preserve_yield() {
         let result = summarize_batch(
             costs(),
@@ -512,6 +630,8 @@ mod tests {
             candidate_id: id.to_owned(),
             target_module_profile_digest: "sha256:target-profile".to_owned(),
             comparison_protocol_digest: "sha256:comparison-protocol".to_owned(),
+            currency_code: "ZAR".to_owned(),
+            accounting_boundary_id: "sha256:cost-boundary".to_owned(),
             evidence_class: "SYNTHETIC_SCENARIO".to_owned(),
             cost_per_good_unit_upper: cost,
             energy_per_good_unit_upper_joules: energy,
@@ -531,6 +651,18 @@ mod tests {
         assert_eq!(route_pareto_dominates(&a, &b), Ok(true));
 
         b.comparison_protocol_digest = "sha256:different-protocol".to_owned();
+        assert_eq!(
+            route_pareto_dominates(&a, &b),
+            Err(ManufacturingMetricError::MismatchedRouteComparison)
+        );
+        b.comparison_protocol_digest = a.comparison_protocol_digest.clone();
+        b.currency_code = "USD".to_owned();
+        assert_eq!(
+            route_pareto_dominates(&a, &b),
+            Err(ManufacturingMetricError::MismatchedRouteComparison)
+        );
+        b.currency_code = a.currency_code.clone();
+        b.accounting_boundary_id = "sha256:different-boundary".to_owned();
         assert_eq!(
             route_pareto_dominates(&a, &b),
             Err(ManufacturingMetricError::MismatchedRouteComparison)
