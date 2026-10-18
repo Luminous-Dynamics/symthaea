@@ -163,3 +163,30 @@ fn qualified_approximation_cannot_hide_an_unknown_taxon() {
     let errors = violations(&value);
     assert!(errors.iter().any(|error| error.contains("cannot leave required identity attributes unknown/different")));
 }
+
+#[test]
+fn approximate_match_cannot_hide_unknown_preparation_state() {
+    let mut value = fixture();
+    value["use_scope"] = serde_json::json!("recipe_substitution");
+    value["outcome"] = serde_json::json!("qualified_approximation");
+    value["candidate_record"]["identity"]["preparation_state"] = Value::Null;
+    value["attribute_checks"][3]["candidate_value"] = Value::Null;
+    value["attribute_checks"][3]["relation"] = serde_json::json!("unknown");
+    value["deviations"] = serde_json::json!([{
+        "attribute_id":"preparation_state",
+        "reason":"Preparation state is unknown."
+    }]);
+    let errors = violations(&value);
+    assert!(errors.iter().any(|error| error.contains("cannot leave hard-block identity attributes unknown")));
+}
+
+#[test]
+fn branded_product_cannot_claim_exact_identity_without_brand_id() {
+    let mut value = fixture();
+    value["query_record"]["identity"]["product_kind"] = serde_json::json!("branded_product");
+    value["candidate_record"]["identity"]["product_kind"] = serde_json::json!("branded_product");
+    value["attribute_checks"][4]["query_value"] = serde_json::json!("branded_product");
+    value["attribute_checks"][4]["candidate_value"] = serde_json::json!("branded_product");
+    let errors = violations(&value);
+    assert!(errors.iter().any(|error| error.contains("requires a known brand_id")));
+}
