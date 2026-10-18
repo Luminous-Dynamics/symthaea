@@ -395,6 +395,18 @@ mod tests {
     }
 
     #[test]
+    fn scenario_order_does_not_change_policy_comparison() {
+        let input = scenario();
+        let baseline = input.evaluate().unwrap();
+
+        let mut permuted = input;
+        permuted.demand_cases.reverse();
+        let reordered = permuted.evaluate().unwrap();
+
+        assert_eq!(baseline, reordered);
+    }
+
+    #[test]
     fn same_input_produces_identical_policy_comparison() {
         let input = scenario();
         assert_eq!(input.evaluate(), input.evaluate());
