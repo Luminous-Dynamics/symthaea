@@ -116,11 +116,6 @@ pub enum PlanError {
         observable_id: String,
         hypothesis_id: String,
     },
-    MissingPrediction {
-        experiment_id: String,
-        observable_id: String,
-        hypothesis_id: String,
-    },
     InvalidPrediction {
         experiment_id: String,
         observable_id: String,
@@ -166,10 +161,6 @@ impl Display for PlanError {
             Self::DuplicatePrediction { experiment_id, observable_id, hypothesis_id } => write!(
                 f,
                 "experiment {experiment_id}, observable {observable_id}: duplicate prediction for {hypothesis_id}"
-            ),
-            Self::MissingPrediction { experiment_id, observable_id, hypothesis_id } => write!(
-                f,
-                "experiment {experiment_id}, observable {observable_id}: missing prediction for {hypothesis_id}"
             ),
             Self::InvalidPrediction {
                 experiment_id, observable_id, hypothesis_id, reason,
@@ -411,15 +402,6 @@ fn validate_input(input: &ExperimentDesignInput) -> Result<(), PlanError> {
                 }
             }
 
-            for hypothesis_id in &hypotheses {
-                if !prediction_ids.contains(hypothesis_id) {
-                    return Err(PlanError::MissingPrediction {
-                        experiment_id: experiment.experiment_id.clone(),
-                        observable_id: observable.observable_id.clone(),
-                        hypothesis_id: hypothesis_id.clone(),
-                    });
-                }
-            }
         }
     }
     Ok(())
