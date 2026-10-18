@@ -513,6 +513,40 @@ mod tests {
     }
 
     #[test]
+    fn independent_verifier_rejects_uncertainty_descriptor_mutation() {
+        let scenario = scenario();
+        let context = context(b"canonical-manifest-v1", &scenario.id);
+        let mut recorded = frozen_golden_receipt();
+        recorded.uncertainty_evidence_kind =
+            UncertaintyEvidenceKind::BoundedStateProbabilities {
+                bounds_receipt_id: "different-bounds-receipt".into(),
+            };
+        assert_eq!(
+            verify_decision_receipt_independently(&context, &scenario, &recorded),
+            Err(ReceiptVerificationError::ReceiptMetadataMismatch)
+        );
+    }
+
+    #[test]
+    fn independent_verifier_rejects_unsupported_wire_versions() {
+        let scenario = scenario();
+        let context = context(b"canonical-manifest-v1", &scenario.id);
+        let mut recorded = frozen_golden_receipt();
+        recorded.schema_version = "iccb-decision-receipt-v2".into();
+        assert_eq!(
+            verify_decision_receipt_independently(&context, &scenario, &recorded),
+            Err(ReceiptVerificationError::UnsupportedReceiptSchema)
+        );
+
+        let mut recorded = frozen_golden_receipt();
+        recorded.canonicalization_version = "iccb-canonical-binary-v2".into();
+        assert_eq!(
+            verify_decision_receipt_independently(&context, &scenario, &recorded),
+            Err(ReceiptVerificationError::UnsupportedCanonicalizationVersion)
+        );
+    }
+
+    #[test]
     fn independent_verifier_rejects_manifest_mutation() {
         let scenario = scenario();
         let context = context(b"canonical-manifest-v2", &scenario.id);
