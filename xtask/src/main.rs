@@ -61,6 +61,9 @@ enum Commands {
         /// Optional expected data-record count from a pinned file-level source note.
         #[arg(long)]
         expected_data_records: Option<usize>,
+        /// Optional SHA-256 from an independently trusted source listing or checksum file.
+        #[arg(long)]
+        expected_sha256: Option<String>,
         /// Optional path to write the JSON audit receipt.
         #[arg(long)]
         out: Option<PathBuf>,
@@ -118,6 +121,7 @@ fn main() -> anyhow::Result<()> {
             source_uri,
             delimiter,
             expected_data_records,
+            expected_sha256,
             out,
         } => {
             cropfoundry_csv_audit::run(
@@ -126,6 +130,7 @@ fn main() -> anyhow::Result<()> {
                 source_uri,
                 delimiter,
                 expected_data_records,
+                expected_sha256,
                 out,
             )?;
         }
