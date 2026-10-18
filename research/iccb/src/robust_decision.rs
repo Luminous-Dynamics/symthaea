@@ -642,6 +642,66 @@ mod tests {
     }
 
     #[test]
+    fn incomplete_payoff_table_fails_closed() {
+        let mut input = scenario();
+        input.payoffs.pop();
+        assert_eq!(
+            input.evaluate(),
+            Err(RobustDecisionError::IncompletePayoffTable)
+        );
+    }
+
+    #[test]
+    fn unknown_state_or_action_reference_fails_closed() {
+        let mut input = scenario();
+        input.payoffs[0].state_id = "unknown-state".into();
+        assert_eq!(
+            input.evaluate(),
+            Err(RobustDecisionError::UnknownStateOrActionReference)
+        );
+
+        let mut input = scenario();
+        input.payoffs[0].action_id = "unknown-action".into();
+        assert_eq!(
+            input.evaluate(),
+            Err(RobustDecisionError::UnknownStateOrActionReference)
+        );
+    }
+
+    #[test]
+    fn duplicate_state_or_action_ids_fail_closed() {
+        let mut input = scenario();
+        input.action_ids.push("build".into());
+        assert_eq!(
+            input.evaluate(),
+            Err(RobustDecisionError::DuplicateIdentifier)
+        );
+
+        let mut input = scenario();
+        input.state_probability_bounds[1].state_id = "high-demand".into();
+        assert_eq!(
+            input.evaluate(),
+            Err(RobustDecisionError::DuplicateIdentifier)
+        );
+    }
+
+    #[test]
+    fn excessive_number_of_states_fails_closed() {
+        let mut input = scenario();
+        input.state_probability_bounds = (0..=MAX_STATES)
+            .map(|index| StateProbabilityBound {
+                state_id: format!("state-{index}"),
+                lower_bps: 0,
+                upper_bps: 10_000,
+            })
+            .collect();
+        assert_eq!(
+            input.evaluate(),
+            Err(RobustDecisionError::ScenarioTooLarge)
+        );
+    }
+
+    #[test]
     fn permutation_of_states_actions_and_payoff_rows_preserves_result() {
         let input = scenario();
         let baseline = input.evaluate().unwrap();
