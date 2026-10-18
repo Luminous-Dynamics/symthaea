@@ -58,6 +58,8 @@ fn validate_benchmark_contract(root: &Value) -> std::result::Result<usize, Vec<S
         "not_evaluable_until_imagery_snapshot_and_splits_pinned",
         "not_evaluable_until_experimental_design_documented",
         "not_evaluable_until_time_series_metadata_pinned",
+        "not_evaluable_until_paired_stress_sensor_data_pinned",
+        "not_evaluable_until_calibration_reference_and_site_metadata_pinned",
     ];
     let mut ids = BTreeSet::new();
 
@@ -369,7 +371,7 @@ mod tests {
     fn committed_benchmark_contract_is_well_formed_and_non_passing() {
         let fixture: Value = serde_json::from_str(BENCHMARK_FIXTURE).unwrap();
         let count = validate_benchmark_contract(&fixture).unwrap();
-        assert_eq!(count, 19);
+        assert_eq!(count, 21);
     }
 
     #[test]
@@ -500,7 +502,9 @@ mod tests {
         let mut fixture: Value = serde_json::from_str(SOURCE_FIXTURE).unwrap();
         fixture["policy"]["no_source_is_training_authorized"] = json!(false);
         let errors = validate_source_manifest(&fixture).unwrap_err();
-        assert!(errors.iter().any(|error| error.contains("must equal whether all source records are non-trainable")));
+        assert!(errors
+            .iter()
+            .any(|error| error.contains("must equal whether all source records are non-trainable")));
     }
 
     #[test]
