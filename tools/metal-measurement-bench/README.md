@@ -26,7 +26,7 @@ For a normalized observation set:
 The machine-readable observation contract is at
 `tools/metal-measurement-bench/schemas/observation-set-v0.1.schema.json`.
 
-Record rows preserve raw numeric values and units. A normalized value requires a normalized unit and explicit conversion note. Uncertainty, censoring, missingness, specimen lineage, source DOI, and calibration/held-out outcome role stay explicit. The validator rejects undeclared source DOIs, duplicate record IDs, unjustified normalization, unexplained unknown censoring, and calibration target outcomes from the held-out target lineage.
+Record rows preserve the source-field identity, raw numeric values and units, and censoring bounds without replacing censored values with made-up point estimates. A normalized value requires a normalized unit and explicit conversion note. Repeated source fields must maintain one variable identity and raw unit; each normalized variable uses a consistent normalized unit. Uncertainty, censoring, missingness, specimen lineage, source DOI, and calibration/held-out outcome role stay explicit. The validator rejects undeclared source DOIs, duplicate record IDs, unjustified normalization, unexplained unknown censoring, and calibration target outcomes from the held-out target lineage.
 
 ## What a successful receipt means
 
