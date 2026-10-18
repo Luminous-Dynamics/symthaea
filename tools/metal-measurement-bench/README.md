@@ -27,8 +27,12 @@ For a normalized observation set:
 
     cargo run --manifest-path tools/metal-measurement-bench/Cargo.toml -- validate-records MANIFEST.json OBSERVATIONS.json ARTIFACT_DIR
 
-The machine-readable observation contract is at
-`tools/metal-measurement-bench/schemas/observation-set-v0.1.schema.json`.
+Machine-readable contracts:
+- `tools/metal-measurement-bench/schemas/measurement-manifest-v0.1.schema.json`
+- `tools/metal-measurement-bench/schemas/observation-set-v0.1.schema.json`
+- `tools/metal-measurement-bench/schemas/audit-receipt-v0.1.schema.json`
+
+The CSV inventory is deliberately structural: it records the exact CSV digest, parsed-record count, ordered header names and per-column empty/nonempty counts. It rejects blank/colliding headers and inconsistent row widths. It does not infer measurement units, semantics, specimen IDs or upstream record IDs, and must not be reported as a complete row-level reconciliation.
 
 The `inspect-csv` command parses the verified byte buffer (after rechecking its declared size and digest) and emits a source-bound CSV structure inventory: exact artifact SHA-256, record count, header names/positions, empty/nonempty cell counts, and duplicate/ambiguous header rejection. It does not infer units, semantic meaning, specimen identity, or upstream row IDs. Parsed row ordinals are not claimed to be source-native identifiers. This is an intermediate reconciliation step, not a full data adapter.
 
