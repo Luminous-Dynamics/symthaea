@@ -363,7 +363,10 @@ mod cli_tests {
         assert!(summaries.iter().all(|row| row.total_trials == 3));
         assert!(summaries.iter().all(|row| row.valid_trials == 2));
         assert!(summaries.iter().all(|row| row.invalid_trials == 1));
-        assert!(summaries.iter().all(|row| row.timeout_count == 1));
+        assert_eq!(summaries.iter().map(|row| row.timeout_count).sum::<usize>(), 1);
+        assert_eq!(summaries.iter().map(|row| row.thermal_stop_count).sum::<usize>(), 1);
+        assert_eq!(summaries.iter().map(|row| row.server_error_count).sum::<usize>(), 1);
+        assert_eq!(summaries.iter().map(|row| row.safety_stop_count).sum::<usize>(), 1);
     }
 
     #[test]
@@ -379,6 +382,10 @@ mod cli_tests {
         assert_eq!(comparison.scored_pairs, 4);
         assert_eq!(comparison.tasks_with_scored_pairs, 2);
         assert_eq!(comparison.valid_run_rate_delta, 0.0);
+        assert_eq!(comparison.timeout_count_delta, -1);
+        assert_eq!(comparison.thermal_stop_count_delta, -1);
+        assert_eq!(comparison.server_error_count_delta, 1);
+        assert_eq!(comparison.safety_stop_count_delta, 1);
         assert_eq!(comparison.mean_progress_delta, Some(0.3125));
         let (lower, upper) = comparison.progress_delta_ci95.expect("four scored pairs yield a bootstrap interval");
         assert!(lower >= 0.25 && upper <= 0.375 && lower <= upper);
