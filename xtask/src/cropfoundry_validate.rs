@@ -153,7 +153,9 @@ fn validate_source_manifest(root: &Value) -> std::result::Result<usize, Vec<Stri
     {
         Some(value) => value,
         None => {
-            errors.push("policy.no_source_is_training_authorized must be an explicit boolean".to_owned());
+            errors.push(
+                "policy.no_source_is_training_authorized must be an explicit boolean".to_owned(),
+            );
             true
         }
     };
@@ -502,9 +504,9 @@ mod tests {
         let mut fixture: Value = serde_json::from_str(SOURCE_FIXTURE).unwrap();
         fixture["policy"]["no_source_is_training_authorized"] = json!(false);
         let errors = validate_source_manifest(&fixture).unwrap_err();
-        assert!(errors
-            .iter()
-            .any(|error| error.contains("must equal whether all source records are non-trainable")));
+        assert!(errors.iter().any(|error| {
+            error.contains("must equal whether all source records are non-trainable")
+        }));
     }
 
     #[test]
