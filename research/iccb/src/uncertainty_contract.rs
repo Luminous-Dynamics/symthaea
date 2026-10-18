@@ -204,6 +204,7 @@ mod tests {
             CompatibleAnalysisRoute::ExpectedValueOrValueOfInformation
         );
         assert!(receipt.limitation.contains("does not validate calibration"));
+        assert_eq!(receipt.producer_version, "fixture-producer-v1");
     }
 
     #[test]
