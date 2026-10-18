@@ -241,6 +241,18 @@ mod tests {
     }
 
     #[test]
+    fn point_probability_route_requires_validation_corpus_digest() {
+        let reference = base(UncertaintyEvidenceKind::PointProbabilityDistribution {
+            qualification_receipt_id: "qual-03".into(),
+            validation_corpus_digest: " ".into(),
+        });
+        assert_eq!(
+            reference.route(),
+            Err(UncertaintyRoutingError::MissingValidationCorpusDigest)
+        );
+    }
+
+    #[test]
     fn missing_compatibility_envelope_or_out_of_domain_reason_fails_closed() {
         let missing_compatibility = base(UncertaintyEvidenceKind::OutcomeCompatibilitySet {
             compatibility_receipt_id: String::new(),
