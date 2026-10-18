@@ -3,7 +3,7 @@
   "suite_version": "0.1.0",
   "evidence_class": "synthetic",
   "claim_ceiling": "Synthetic stock-to-part contract validation only; no physical material qualification, machine qualification, production capability, safety case, or industrial savings claim.",
-  "mass_tolerance_ppm": 5000,
+  "mass_tolerance_ppm": 0,
   "scenarios": [
     {
       "stock": {
@@ -60,7 +60,8 @@
         "chips_mass_g": 100,
         "mixed_scrap_mass_g": 30,
         "residue_mass_g": 20,
-        "claimed_clean_offcut_recovery_g": 100
+        "claimed_clean_offcut_recovery_g": 100,
+        "process_loss_mass_g": 0
       },
       "inspection": {
         "source": "physical_measurement",
@@ -69,7 +70,9 @@
         "measurement_record_ref": "inspection-record-001",
         "nominal_dimension_um": 10000,
         "measured_dimension_um": 10020,
-        "tolerance_um": 50
+        "tolerance_um": 50,
+        "calibration_record_ref": "calibration-record-001",
+        "measurement_uncertainty_um": 5
       },
       "scenario_id": "SYNTHETIC_VALID_VIRGIN_STOCK_TO_MACHINED_PART",
       "expected_disposition": "pass",
@@ -134,7 +137,8 @@
         "chips_mass_g": 100,
         "mixed_scrap_mass_g": 30,
         "residue_mass_g": 20,
-        "claimed_clean_offcut_recovery_g": 100
+        "claimed_clean_offcut_recovery_g": 100,
+        "process_loss_mass_g": 0
       },
       "inspection": {
         "source": "physical_measurement",
@@ -143,7 +147,9 @@
         "measurement_record_ref": "inspection-record-001",
         "nominal_dimension_um": 10000,
         "measured_dimension_um": 10020,
-        "tolerance_um": 50
+        "tolerance_um": 50,
+        "calibration_record_ref": "calibration-record-001",
+        "measurement_uncertainty_um": 5
       },
       "scenario_id": "SYNTHETIC_MIXED_SCRAP_CANNOT_SATISFY_EXACT_ALLOY",
       "expected_disposition": "reject",
@@ -210,7 +216,8 @@
         "chips_mass_g": 100,
         "mixed_scrap_mass_g": 30,
         "residue_mass_g": 20,
-        "claimed_clean_offcut_recovery_g": 100
+        "claimed_clean_offcut_recovery_g": 100,
+        "process_loss_mass_g": 0
       },
       "inspection": {
         "source": "physical_measurement",
@@ -219,7 +226,9 @@
         "measurement_record_ref": "inspection-record-001",
         "nominal_dimension_um": 10000,
         "measured_dimension_um": 10020,
-        "tolerance_um": 50
+        "tolerance_um": 50,
+        "calibration_record_ref": "calibration-record-001",
+        "measurement_uncertainty_um": 5
       },
       "scenario_id": "SYNTHETIC_LOT_LINEAGE_MISMATCH",
       "expected_disposition": "reject",
@@ -252,7 +261,8 @@
         "output_material_state": "heat_treated",
         "planned_operations": [
           "cut",
-          "mill"
+          "mill",
+          "heat_treat"
         ],
         "executed_operations": [
           "cut",
@@ -287,7 +297,8 @@
         "chips_mass_g": 100,
         "mixed_scrap_mass_g": 30,
         "residue_mass_g": 20,
-        "claimed_clean_offcut_recovery_g": 100
+        "claimed_clean_offcut_recovery_g": 100,
+        "process_loss_mass_g": 0
       },
       "inspection": {
         "source": "physical_measurement",
@@ -296,7 +307,9 @@
         "measurement_record_ref": "inspection-record-001",
         "nominal_dimension_um": 10000,
         "measured_dimension_um": 10020,
-        "tolerance_um": 50
+        "tolerance_um": 50,
+        "calibration_record_ref": "calibration-record-001",
+        "measurement_uncertainty_um": 5
       },
       "scenario_id": "SYNTHETIC_REQUIRED_HEAT_TREATMENT_NOT_EXECUTED",
       "expected_disposition": "reject",
@@ -363,7 +376,8 @@
         "chips_mass_g": 100,
         "mixed_scrap_mass_g": 30,
         "residue_mass_g": 20,
-        "claimed_clean_offcut_recovery_g": 100
+        "claimed_clean_offcut_recovery_g": 100,
+        "process_loss_mass_g": 0
       },
       "inspection": {
         "source": "simulation_only",
@@ -372,7 +386,9 @@
         "measurement_record_ref": "inspection-record-001",
         "nominal_dimension_um": 10000,
         "measured_dimension_um": 10020,
-        "tolerance_um": 50
+        "tolerance_um": 50,
+        "calibration_record_ref": "calibration-record-001",
+        "measurement_uncertainty_um": 5
       },
       "scenario_id": "SYNTHETIC_SIMULATION_IS_NOT_INSPECTION",
       "expected_disposition": "reject",
@@ -439,7 +455,8 @@
         "chips_mass_g": 100,
         "mixed_scrap_mass_g": 30,
         "residue_mass_g": 20,
-        "claimed_clean_offcut_recovery_g": 100
+        "claimed_clean_offcut_recovery_g": 100,
+        "process_loss_mass_g": 0
       },
       "inspection": {
         "source": "physical_measurement",
@@ -448,7 +465,9 @@
         "measurement_record_ref": "inspection-record-001",
         "nominal_dimension_um": 10000,
         "measured_dimension_um": 10020,
-        "tolerance_um": 50
+        "tolerance_um": 50,
+        "calibration_record_ref": "calibration-record-001",
+        "measurement_uncertainty_um": 5
       },
       "scenario_id": "SYNTHETIC_STALE_METROLOGY_CALIBRATION",
       "expected_disposition": "reject",
@@ -515,7 +534,8 @@
         "chips_mass_g": 150,
         "mixed_scrap_mass_g": 30,
         "residue_mass_g": 20,
-        "claimed_clean_offcut_recovery_g": 100
+        "claimed_clean_offcut_recovery_g": 100,
+        "process_loss_mass_g": 0
       },
       "inspection": {
         "source": "physical_measurement",
@@ -524,7 +544,9 @@
         "measurement_record_ref": "inspection-record-001",
         "nominal_dimension_um": 10000,
         "measured_dimension_um": 10020,
-        "tolerance_um": 50
+        "tolerance_um": 50,
+        "calibration_record_ref": "calibration-record-001",
+        "measurement_uncertainty_um": 5
       },
       "scenario_id": "SYNTHETIC_MASS_CREATION",
       "expected_disposition": "reject",
@@ -591,7 +613,8 @@
         "chips_mass_g": 150,
         "mixed_scrap_mass_g": 30,
         "residue_mass_g": 20,
-        "claimed_clean_offcut_recovery_g": 150
+        "claimed_clean_offcut_recovery_g": 150,
+        "process_loss_mass_g": 0
       },
       "inspection": {
         "source": "physical_measurement",
@@ -600,7 +623,9 @@
         "measurement_record_ref": "inspection-record-001",
         "nominal_dimension_um": 10000,
         "measured_dimension_um": 10020,
-        "tolerance_um": 50
+        "tolerance_um": 50,
+        "calibration_record_ref": "calibration-record-001",
+        "measurement_uncertainty_um": 5
       },
       "scenario_id": "SYNTHETIC_CHIPS_NOT_CLEAN_OFFCUT_CREDIT",
       "expected_disposition": "reject",
@@ -668,7 +693,8 @@
         "chips_mass_g": 100,
         "mixed_scrap_mass_g": 30,
         "residue_mass_g": 20,
-        "claimed_clean_offcut_recovery_g": 100
+        "claimed_clean_offcut_recovery_g": 100,
+        "process_loss_mass_g": 0
       },
       "inspection": {
         "source": "physical_measurement",
@@ -677,7 +703,9 @@
         "measurement_record_ref": "inspection-record-001",
         "nominal_dimension_um": 10000,
         "measured_dimension_um": 10020,
-        "tolerance_um": 50
+        "tolerance_um": 50,
+        "calibration_record_ref": "calibration-record-001",
+        "measurement_uncertainty_um": 5
       },
       "scenario_id": "SYNTHETIC_REQUIRED_MACHINE_CAPABILITY_UNAVAILABLE",
       "expected_disposition": "reject",
@@ -744,7 +772,8 @@
         "chips_mass_g": 100,
         "mixed_scrap_mass_g": 30,
         "residue_mass_g": 20,
-        "claimed_clean_offcut_recovery_g": 100
+        "claimed_clean_offcut_recovery_g": 100,
+        "process_loss_mass_g": 0
       },
       "inspection": {
         "source": "physical_measurement",
@@ -753,7 +782,9 @@
         "measurement_record_ref": "inspection-record-001",
         "nominal_dimension_um": 10000,
         "measured_dimension_um": 10080,
-        "tolerance_um": 50
+        "tolerance_um": 50,
+        "calibration_record_ref": "calibration-record-001",
+        "measurement_uncertainty_um": 5
       },
       "scenario_id": "SYNTHETIC_PART_OUT_OF_TOLERANCE",
       "expected_disposition": "reject",
@@ -820,7 +851,8 @@
         "chips_mass_g": 100,
         "mixed_scrap_mass_g": 30,
         "residue_mass_g": 20,
-        "claimed_clean_offcut_recovery_g": 100
+        "claimed_clean_offcut_recovery_g": 100,
+        "process_loss_mass_g": 0
       },
       "inspection": {
         "source": "physical_measurement",
@@ -829,7 +861,9 @@
         "measurement_record_ref": "inspection-record-001",
         "nominal_dimension_um": 10000,
         "measured_dimension_um": 10020,
-        "tolerance_um": 50
+        "tolerance_um": 50,
+        "calibration_record_ref": "calibration-record-001",
+        "measurement_uncertainty_um": 5
       },
       "scenario_id": "SYNTHETIC_QUALIFIED_SECONDARY_FEEDSTOCK",
       "expected_disposition": "pass",
@@ -894,7 +928,8 @@
         "chips_mass_g": 100,
         "mixed_scrap_mass_g": 30,
         "residue_mass_g": 20,
-        "claimed_clean_offcut_recovery_g": 100
+        "claimed_clean_offcut_recovery_g": 100,
+        "process_loss_mass_g": 0
       },
       "inspection": {
         "source": "physical_measurement",
@@ -903,7 +938,9 @@
         "measurement_record_ref": "inspection-record-001",
         "nominal_dimension_um": 10000,
         "measured_dimension_um": 10020,
-        "tolerance_um": 50
+        "tolerance_um": 50,
+        "calibration_record_ref": "calibration-record-001",
+        "measurement_uncertainty_um": 5
       },
       "scenario_id": "SYNTHETIC_SECONDARY_CONTAMINATION_UNKNOWN",
       "expected_disposition": "reject",
@@ -970,7 +1007,8 @@
         "chips_mass_g": 100,
         "mixed_scrap_mass_g": 30,
         "residue_mass_g": 20,
-        "claimed_clean_offcut_recovery_g": 100
+        "claimed_clean_offcut_recovery_g": 100,
+        "process_loss_mass_g": 0
       },
       "inspection": {
         "source": "physical_measurement",
@@ -979,7 +1017,9 @@
         "measurement_record_ref": "inspection-record-001",
         "nominal_dimension_um": 10000,
         "measured_dimension_um": 10020,
-        "tolerance_um": 50
+        "tolerance_um": 50,
+        "calibration_record_ref": "calibration-record-001",
+        "measurement_uncertainty_um": 5
       },
       "scenario_id": "SYNTHETIC_STOCK_SOURCE_REFERENCE_MISSING",
       "expected_disposition": "reject",
@@ -1046,7 +1086,8 @@
         "chips_mass_g": 100,
         "mixed_scrap_mass_g": 30,
         "residue_mass_g": 20,
-        "claimed_clean_offcut_recovery_g": 100
+        "claimed_clean_offcut_recovery_g": 100,
+        "process_loss_mass_g": 0
       },
       "inspection": {
         "source": "physical_measurement",
@@ -1055,7 +1096,9 @@
         "measurement_record_ref": "inspection-record-001",
         "nominal_dimension_um": 10000,
         "measured_dimension_um": 10020,
-        "tolerance_um": 50
+        "tolerance_um": 50,
+        "calibration_record_ref": "calibration-record-001",
+        "measurement_uncertainty_um": 5
       },
       "scenario_id": "SYNTHETIC_GRADE_EVIDENCE_MISSING",
       "expected_disposition": "reject",
@@ -1122,7 +1165,8 @@
         "chips_mass_g": 100,
         "mixed_scrap_mass_g": 30,
         "residue_mass_g": 20,
-        "claimed_clean_offcut_recovery_g": 100
+        "claimed_clean_offcut_recovery_g": 100,
+        "process_loss_mass_g": 0
       },
       "inspection": {
         "source": "physical_measurement",
@@ -1131,7 +1175,9 @@
         "measurement_record_ref": "inspection-record-001",
         "nominal_dimension_um": 10000,
         "measured_dimension_um": 10020,
-        "tolerance_um": 50
+        "tolerance_um": 50,
+        "calibration_record_ref": "calibration-record-001",
+        "measurement_uncertainty_um": 5
       },
       "scenario_id": "SYNTHETIC_MATERIAL_STATE_MISMATCH",
       "expected_disposition": "reject",
@@ -1198,7 +1244,8 @@
         "chips_mass_g": 100,
         "mixed_scrap_mass_g": 30,
         "residue_mass_g": 20,
-        "claimed_clean_offcut_recovery_g": 100
+        "claimed_clean_offcut_recovery_g": 100,
+        "process_loss_mass_g": 0
       },
       "inspection": {
         "source": "physical_measurement",
@@ -1207,7 +1254,9 @@
         "measurement_record_ref": "inspection-record-001",
         "nominal_dimension_um": 10000,
         "measured_dimension_um": 10020,
-        "tolerance_um": 50
+        "tolerance_um": 50,
+        "calibration_record_ref": "calibration-record-001",
+        "measurement_uncertainty_um": 5
       },
       "scenario_id": "SYNTHETIC_PROCESS_RUN_RECORD_MISSING",
       "expected_disposition": "reject",
@@ -1274,7 +1323,8 @@
         "chips_mass_g": 100,
         "mixed_scrap_mass_g": 30,
         "residue_mass_g": 20,
-        "claimed_clean_offcut_recovery_g": 100
+        "claimed_clean_offcut_recovery_g": 100,
+        "process_loss_mass_g": 0
       },
       "inspection": {
         "source": "physical_measurement",
@@ -1283,7 +1333,9 @@
         "measurement_record_ref": "inspection-record-001",
         "nominal_dimension_um": 10000,
         "measured_dimension_um": 10020,
-        "tolerance_um": 50
+        "tolerance_um": 50,
+        "calibration_record_ref": "calibration-record-001",
+        "measurement_uncertainty_um": 5
       },
       "scenario_id": "SYNTHETIC_VALID_REPAIR_REMANUFACTURE",
       "expected_disposition": "pass",
@@ -1348,7 +1400,8 @@
         "chips_mass_g": 100,
         "mixed_scrap_mass_g": 30,
         "residue_mass_g": 20,
-        "claimed_clean_offcut_recovery_g": 100
+        "claimed_clean_offcut_recovery_g": 100,
+        "process_loss_mass_g": 0
       },
       "inspection": {
         "source": "physical_measurement",
@@ -1357,7 +1410,9 @@
         "measurement_record_ref": "inspection-record-001",
         "nominal_dimension_um": 10000,
         "measured_dimension_um": 10020,
-        "tolerance_um": 50
+        "tolerance_um": 50,
+        "calibration_record_ref": "calibration-record-001",
+        "measurement_uncertainty_um": 5
       },
       "scenario_id": "SYNTHETIC_REPAIR_SCOPE_MISSING",
       "expected_disposition": "reject",
@@ -1424,7 +1479,8 @@
         "chips_mass_g": 100,
         "mixed_scrap_mass_g": 30,
         "residue_mass_g": 20,
-        "claimed_clean_offcut_recovery_g": 100
+        "claimed_clean_offcut_recovery_g": 100,
+        "process_loss_mass_g": 0
       },
       "inspection": {
         "source": "physical_measurement",
@@ -1433,7 +1489,9 @@
         "measurement_record_ref": null,
         "nominal_dimension_um": 10000,
         "measured_dimension_um": 10020,
-        "tolerance_um": 50
+        "tolerance_um": 50,
+        "calibration_record_ref": "calibration-record-001",
+        "measurement_uncertainty_um": 5
       },
       "scenario_id": "SYNTHETIC_INSPECTION_RECORD_MISSING",
       "expected_disposition": "reject",
@@ -1500,7 +1558,8 @@
         "chips_mass_g": 100,
         "mixed_scrap_mass_g": 30,
         "residue_mass_g": 20,
-        "claimed_clean_offcut_recovery_g": 100
+        "claimed_clean_offcut_recovery_g": 100,
+        "process_loss_mass_g": 0
       },
       "inspection": {
         "source": "physical_measurement",
@@ -1509,7 +1568,9 @@
         "measurement_record_ref": "inspection-record-001",
         "nominal_dimension_um": 10000,
         "measured_dimension_um": 10020,
-        "tolerance_um": 50
+        "tolerance_um": 50,
+        "calibration_record_ref": "calibration-record-001",
+        "measurement_uncertainty_um": 5
       },
       "scenario_id": "SYNTHETIC_FEEDSTOCK_KIND_UNKNOWN",
       "expected_disposition": "reject",
@@ -1520,6 +1581,325 @@
         "Unclassified feedstock cannot enter a strict alloy route merely because other records look valid."
       ],
       "negative_control": "negative control: expected fail-closed disposition"
+    },
+    {
+      "stock": {
+        "lot_id": "lot-001",
+        "alloy_id": "A-TEST",
+        "material_identity": "resolved",
+        "material_state": "annealed",
+        "feedstock_kind": "virgin",
+        "contamination_state": "clear",
+        "grade_evidence_ref": "grade-evidence-lot-001",
+        "source_record_ref": "source-stock-lot-001",
+        "custody_evidence_ref": null,
+        "requalification_ref": null
+      },
+      "route": {
+        "route_id": "route-001",
+        "route_kind": "new_part",
+        "input_lot_id": "lot-001",
+        "input_material_state": "annealed",
+        "output_material_state": "annealed",
+        "planned_operations": [
+          "cut",
+          "mill"
+        ],
+        "executed_operations": [
+          "cut",
+          "mill"
+        ],
+        "required_operations": [
+          "cut",
+          "mill"
+        ],
+        "required_capabilities": [
+          "cutting",
+          "milling"
+        ],
+        "available_capabilities": [
+          "cutting",
+          "milling"
+        ],
+        "process_record_ref": "process-run-001",
+        "repair_scope_ref": null
+      },
+      "part": {
+        "part_id": "part-001",
+        "requirements_ref": "requirements-001",
+        "required_alloy_id": "A-TEST",
+        "required_material_state": "annealed"
+      },
+      "flow": {
+        "input_mass_g": 1000,
+        "part_mass_g": 700,
+        "clean_offcut_mass_g": 150,
+        "chips_mass_g": 100,
+        "mixed_scrap_mass_g": 30,
+        "residue_mass_g": 20,
+        "claimed_clean_offcut_recovery_g": 100,
+        "process_loss_mass_g": 0
+      },
+      "inspection": {
+        "source": "physical_measurement",
+        "calibration": "current",
+        "method_id": "CMM-01",
+        "measurement_record_ref": "inspection-record-001",
+        "nominal_dimension_um": 10000,
+        "measured_dimension_um": 10020,
+        "tolerance_um": 50,
+        "calibration_record_ref": null,
+        "measurement_uncertainty_um": 5
+      },
+      "scenario_id": "SYNTHETIC_CURRENT_CALIBRATION_WITHOUT_RECORD",
+      "expected_disposition": "reject",
+      "expected_reason_codes": [
+        "METROLOGY_CALIBRATION_REFERENCE_MISSING"
+      ],
+      "expected_assertions": [
+        "A current calibration label must reference the calibration record that supports it."
+      ],
+      "negative_control": "negative control: calibration status asserted without a record"
+    },
+    {
+      "stock": {
+        "lot_id": "lot-001",
+        "alloy_id": "A-TEST",
+        "material_identity": "resolved",
+        "material_state": "annealed",
+        "feedstock_kind": "virgin",
+        "contamination_state": "clear",
+        "grade_evidence_ref": "grade-evidence-lot-001",
+        "source_record_ref": "source-stock-lot-001",
+        "custody_evidence_ref": null,
+        "requalification_ref": null
+      },
+      "route": {
+        "route_id": "route-001",
+        "route_kind": "new_part",
+        "input_lot_id": "lot-001",
+        "input_material_state": "annealed",
+        "output_material_state": "annealed",
+        "planned_operations": [
+          "cut",
+          "mill"
+        ],
+        "executed_operations": [
+          "cut",
+          "mill"
+        ],
+        "required_operations": [
+          "cut",
+          "mill"
+        ],
+        "required_capabilities": [
+          "cutting",
+          "milling"
+        ],
+        "available_capabilities": [
+          "cutting",
+          "milling"
+        ],
+        "process_record_ref": "process-run-001",
+        "repair_scope_ref": null
+      },
+      "part": {
+        "part_id": "part-001",
+        "requirements_ref": "requirements-001",
+        "required_alloy_id": "A-TEST",
+        "required_material_state": "annealed"
+      },
+      "flow": {
+        "input_mass_g": 1000,
+        "part_mass_g": 700,
+        "clean_offcut_mass_g": 150,
+        "chips_mass_g": 100,
+        "mixed_scrap_mass_g": 30,
+        "residue_mass_g": 20,
+        "claimed_clean_offcut_recovery_g": 100,
+        "process_loss_mass_g": 0
+      },
+      "inspection": {
+        "source": "physical_measurement",
+        "calibration": "current",
+        "method_id": "CMM-01",
+        "measurement_record_ref": "inspection-record-001",
+        "nominal_dimension_um": 10000,
+        "measured_dimension_um": 10020,
+        "tolerance_um": 50,
+        "calibration_record_ref": "calibration-record-001",
+        "measurement_uncertainty_um": null
+      },
+      "scenario_id": "SYNTHETIC_MEASUREMENT_UNCERTAINTY_MISSING",
+      "expected_disposition": "reject",
+      "expected_reason_codes": [
+        "INSPECTION_UNCERTAINTY_MISSING"
+      ],
+      "expected_assertions": [
+        "A measured value cannot be promoted to tolerance conformance while its measurement uncertainty is missing."
+      ],
+      "negative_control": "negative control: reading provided without uncertainty"
+    },
+    {
+      "stock": {
+        "lot_id": "lot-001",
+        "alloy_id": "A-TEST",
+        "material_identity": "resolved",
+        "material_state": "annealed",
+        "feedstock_kind": "virgin",
+        "contamination_state": "clear",
+        "grade_evidence_ref": "grade-evidence-lot-001",
+        "source_record_ref": "source-stock-lot-001",
+        "custody_evidence_ref": null,
+        "requalification_ref": null
+      },
+      "route": {
+        "route_id": "route-001",
+        "route_kind": "new_part",
+        "input_lot_id": "lot-001",
+        "input_material_state": "annealed",
+        "output_material_state": "annealed",
+        "planned_operations": [
+          "cut",
+          "mill"
+        ],
+        "executed_operations": [
+          "cut",
+          "mill"
+        ],
+        "required_operations": [
+          "cut",
+          "mill"
+        ],
+        "required_capabilities": [
+          "cutting",
+          "milling"
+        ],
+        "available_capabilities": [
+          "cutting",
+          "milling"
+        ],
+        "process_record_ref": "process-run-001",
+        "repair_scope_ref": null
+      },
+      "part": {
+        "part_id": "part-001",
+        "requirements_ref": "requirements-001",
+        "required_alloy_id": "A-TEST",
+        "required_material_state": "annealed"
+      },
+      "flow": {
+        "input_mass_g": 1000,
+        "part_mass_g": 700,
+        "clean_offcut_mass_g": 150,
+        "chips_mass_g": 100,
+        "mixed_scrap_mass_g": 30,
+        "residue_mass_g": 20,
+        "claimed_clean_offcut_recovery_g": 100,
+        "process_loss_mass_g": 0
+      },
+      "inspection": {
+        "source": "physical_measurement",
+        "calibration": "current",
+        "method_id": "CMM-01",
+        "measurement_record_ref": "inspection-record-001",
+        "nominal_dimension_um": 10000,
+        "measured_dimension_um": 10030,
+        "tolerance_um": 50,
+        "calibration_record_ref": "calibration-record-001",
+        "measurement_uncertainty_um": 25
+      },
+      "scenario_id": "SYNTHETIC_UNCERTAINTY_EXCEEDS_TOLERANCE_MARGIN",
+      "expected_disposition": "reject",
+      "expected_reason_codes": [
+        "INSPECTION_UNCERTAINTY_EXCEEDS_MARGIN"
+      ],
+      "expected_assertions": [
+        "A nominal reading inside tolerance is not a conformance pass if its declared uncertainty crosses the tolerance boundary."
+      ],
+      "negative_control": "negative control: uncertainty interval overlaps the failure boundary"
+    },
+    {
+      "stock": {
+        "lot_id": "lot-001",
+        "alloy_id": "A-TEST",
+        "material_identity": "resolved",
+        "material_state": "annealed",
+        "feedstock_kind": "virgin",
+        "contamination_state": "clear",
+        "grade_evidence_ref": "grade-evidence-lot-001",
+        "source_record_ref": "source-stock-lot-001",
+        "custody_evidence_ref": null,
+        "requalification_ref": null
+      },
+      "route": {
+        "route_id": "route-001",
+        "route_kind": "new_part",
+        "input_lot_id": "lot-001",
+        "input_material_state": "annealed",
+        "output_material_state": "heat_treated",
+        "planned_operations": [
+          "cut",
+          "mill"
+        ],
+        "executed_operations": [
+          "cut",
+          "mill",
+          "heat_treat"
+        ],
+        "required_operations": [
+          "cut",
+          "mill",
+          "heat_treat"
+        ],
+        "required_capabilities": [
+          "cutting",
+          "milling"
+        ],
+        "available_capabilities": [
+          "cutting",
+          "milling"
+        ],
+        "process_record_ref": "process-run-001",
+        "repair_scope_ref": null
+      },
+      "part": {
+        "part_id": "part-001",
+        "requirements_ref": "requirements-001",
+        "required_alloy_id": "A-TEST",
+        "required_material_state": "heat_treated"
+      },
+      "flow": {
+        "input_mass_g": 1000,
+        "part_mass_g": 700,
+        "clean_offcut_mass_g": 150,
+        "chips_mass_g": 100,
+        "mixed_scrap_mass_g": 30,
+        "residue_mass_g": 20,
+        "claimed_clean_offcut_recovery_g": 100,
+        "process_loss_mass_g": 0
+      },
+      "inspection": {
+        "source": "physical_measurement",
+        "calibration": "current",
+        "method_id": "CMM-01",
+        "measurement_record_ref": "inspection-record-001",
+        "nominal_dimension_um": 10000,
+        "measured_dimension_um": 10020,
+        "tolerance_um": 50,
+        "calibration_record_ref": "calibration-record-001",
+        "measurement_uncertainty_um": 5
+      },
+      "scenario_id": "SYNTHETIC_REQUIRED_OPERATION_NOT_PLANNED_BUT_EXECUTED",
+      "expected_disposition": "reject",
+      "expected_reason_codes": [
+        "PROCESS_OPERATION_NOT_PLANNED",
+        "UNPLANNED_OPERATION_EXECUTED"
+      ],
+      "expected_assertions": [
+        "An executed operation outside the frozen plan is a route inconsistency even when the required operation happened."
+      ],
+      "negative_control": "negative control: operation history differs from planned route"
     }
   ]
 }
