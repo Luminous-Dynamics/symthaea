@@ -311,7 +311,7 @@ pub fn validate_preference_drift_fixture(
                         &mut findings,
                         format!("{path}.scenario_family"),
                         format!(
-                            "scenario family `{family}` leaks across {previous_split} and {split} splits"
+                            "scenario family `{}` leaks across `{}` and `{}` splits", family, previous_split, split
                         ),
                     );
                 }
@@ -474,7 +474,7 @@ pub fn validate_preference_drift_fixture(
                 _ => finding(
                     &mut findings,
                     &observation_path,
-                    "observation must be one pairwise preference or an explicit non-empty reject-all record",
+                    "observation must be a pairwise preference or a non-empty explicit reject-all record",
                 ),
             }
         }
@@ -539,7 +539,7 @@ pub fn validate_preference_drift_fixture(
                             finding(
                                 &mut findings,
                                 format!("{path}.evaluation_oracle.acceptable_candidate_ids"),
-                                format!("oracle marks ineligible candidate `{candidate_id}` acceptable"),
+                                format!("ineligible oracle candidate `{candidate_id}` is marked acceptable"),
                             );
                         }
                     }
@@ -584,7 +584,9 @@ pub fn validate_preference_drift_fixture(
                         == Some("wearer_borne_mass_kg")
                 {
                     let maximum = constraint.get("max_value").and_then(Value::as_f64);
-                    if let Some(maximum) = maximum.filter(|value| value.is_finite() && *value >= 0.0)
+                    if let Some(maximum) = maximum.filter(|value| {
+                        value.is_finite() && *value >= 0.0
+                    })
                     {
                         for candidate_id in &eligible {
                             if candidate_mass_kg
@@ -634,8 +636,10 @@ pub fn validate_preference_drift_fixture(
 mod tests {
     use super::*;
 
-    const FIXTURE: &str =
-        include_str!("../../../../docs/research/open-mobility/fixtures/preference-drift-scenarios-v1.json");
+    const FIXTURE: &str = include_str!(concat!(
+        "../../../../docs/research/open-mobility/fixtures/",
+        "preference-drift-scenarios-v1.json"
+    ));
 
     fn parse_fixture() -> Value {
         serde_json::from_str(FIXTURE).expect("checked-in preference fixture must be valid JSON")
@@ -743,8 +747,10 @@ mod tests {
             .unwrap()
             .push(serde_json::json!("assist"));
         let findings = validate_preference_drift_fixture(&encode(&value)).unwrap_err();
-        assert!(findings.iter().any(|item| item.reason.contains("violates the declared mass ceiling")
-            || item.reason.contains("hard-ineligible candidate")));
+        assert!(findings.iter().any(|item| {
+            item.reason.contains("violates the declared mass ceiling")
+                || item.reason.contains("hard-ineligible candidate")
+        }));
     }
 
     #[test]
