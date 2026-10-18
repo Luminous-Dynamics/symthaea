@@ -34,6 +34,9 @@ jobs:
       - name: Install pinned Rust toolchain
         uses: dtolnay/rust-toolchain@1.96.0
 
+      - name: Check xtask formatting
+        run: cargo fmt -p xtask -- --check
+
       - name: Test fail-closed contract validator
         run: cargo test -p xtask cropfoundry_validate
 
