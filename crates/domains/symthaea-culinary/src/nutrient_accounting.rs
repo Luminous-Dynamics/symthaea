@@ -461,7 +461,7 @@ pub fn validate_nutrient_accounting_v1(
                 complete = false;
                 continue;
             };
-            let Some(factor) = retention_by_key.get(&(ingredient_id.clone(), nutrient_id.to_owned())).copied() else {
+            let Some(factor) = retention_by_key.get(&(ingredient_id.as_str().to_owned(), nutrient_id.to_owned())).copied() else {
                 errors.push(format!(
                     "missing retention factor for ingredient {ingredient_id:?}, nutrient {nutrient_id:?}"
                 ));
