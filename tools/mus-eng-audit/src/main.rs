@@ -15,13 +15,14 @@ struct CaseResult {
     case_id: String,
     case_type: String,
     candidate_claim: String,
-    expected_disposition: String,
-    evaluated: bool,
+    declared_disposition: String,
 }
 
 #[derive(Debug, Serialize)]
 struct AuditReport {
     report_version: &'static str,
+    tool_version: &'static str,
+    schema_draft: &'static str,
     report_status: &'static str,
     claim_ceiling: &'static str,
     schema_sha256: String,
@@ -208,12 +209,13 @@ fn audit(schema_path: &PathBuf, corpus_path: &PathBuf) -> Result<AuditReport, St
         case_id: string_at(case, "case_id").to_owned(),
         case_type: string_at(case, "case_type").to_owned(),
         candidate_claim: string_at(case, "candidate_claim").to_owned(),
-        expected_disposition: string_at(case, "expected_disposition").to_owned(),
-        evaluated: true,
+        declared_disposition: string_at(case, "expected_disposition").to_owned(),
     }).collect();
 
     Ok(AuditReport {
         report_version: "mus-eng-audit-report/0.1",
+        tool_version: env!("CARGO_PKG_VERSION"),
+        schema_draft: "https://json-schema.org/draft/2020-12/schema",
         report_status: if findings.is_empty() { "CONSISTENT_UNQUALIFIED" } else { "REJECTED" },
         claim_ceiling: "SYNTHETIC_FIXTURE_CONSISTENCY_ONLY",
         schema_sha256: sha256(&schema_bytes),
