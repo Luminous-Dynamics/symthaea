@@ -1,0 +1,457 @@
+// Copyright (C) 2024-2026 Tristan Stoltz / Luminous Dynamics
+// SPDX-License-Identifier: AGPL-3.0-or-later
+// Commercial licensing: see COMMERCIAL_LICENSE.md at repository root
+//! Deterministic factorized scenario expansion for the synthetic mobility benchmark.
+//!
+//! This creates synthetic benchmark cases from the reviewed v2 control corpus. It is not a
+//! simulator of human physiology, a preference model, or evidence about real wearers.
+
+use std::collections::{BTreeMap, BTreeSet};
+
+use serde::{Deserialize, Serialize};
+use serde_json::{json, Value};
+
+use crate::preference_drift_benchmark::{
+    validate_preference_drift_fixture, PreferenceDriftFixtureFindingV1,
+};
+
+/// Schema version for generator configuration and manifest receipts.
+pub const PREFERENCE_DRIFT_GENERATOR_SCHEMA_VERSION_V1: u64 = 1;
+/// Generator identity recorded in generated fixture provenance.
+pub const PREFERENCE_DRIFT_GENERATOR_ID_V1: &str = "factorized_seeded_generator_v1";
+const MAX_GENERATED_SCENARIOS_V1: usize = 50_000;
+const MAX_WEARER_SESSIONS_V1: usize = 2_000;
+const MAX_REPETITIONS_PER_FAMILY_V1: usize = 100;
+
+/// Configuration for deterministic expansion of reviewed scenario templates.
+#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
+#[serde(deny_unknown_fields)]
+pub struct PreferenceDriftGeneratorConfigV1 {
+    /// Root seed for reproducible synthetic axis variation.
+    pub seed: u64,
+    /// Number of synthetic wearer/session groups generated.
+    pub wearer_session_count: usize,
+    /// Disjoint wearer/session groups reserved for development.
+    pub development_wearer_session_count: usize,
+    /// Repetitions for each held-out template/wearer pair; development cases are emitted once.
+    pub held_out_repetitions_per_family: usize,
+}
+
+impl Default for PreferenceDriftGeneratorConfigV1 {
+    fn default() -> Self {
+        Self {
+            seed: 20_261_018,
+            wearer_session_count: 50,
+            development_wearer_session_count: 10,
+            held_out_repetitions_per_family: 3,
+        }
+    }
+}
+
+/// Auditable manifest for one generated suite.
+#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
+#[serde(deny_unknown_fields)]
+pub struct PreferenceDriftGenerationManifestV1 {
+    /// Manifest schema version.
+    pub schema_version: u64,
+    /// Version label stored in the generated fixture.
+    pub fixture_version: String,
+    /// Version of the scenario generator.
+    pub generator_version: String,
+    /// Root seed for all generated choices.
+    pub seed: u64,
+    /// Number of distinct synthetic wearer/session groups.
+    pub wearer_session_count: usize,
+    /// Number of development-only wearer/session groups.
+    pub development_wearer_session_count: usize,
+    /// Number of held-out-only wearer/session groups.
+    pub held_out_wearer_session_count: usize,
+    /// Number of source scenario-family groups held out from development.
+    pub held_out_family_count: usize,
+    /// Number of generated development cases.
+    pub development_scenario_count: usize,
+    /// Number of generated held-out cases.
+    pub held_out_scenario_count: usize,
+    /// Total generated scenario count.
+    pub scenario_count: usize,
+    /// Number of candidates in the shared synthetic catalog.
+    pub candidate_count: usize,
+    /// BLAKE3 digest of the exact serialized fixture bytes, including trailing newline.
+    pub fixture_blake3_hex: String,
+    /// Explicit limitation on interpretation.
+    pub claim_ceiling: String,
+}
+
+/// Generated synthetic suite plus its detached content-digest manifest.
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub struct GeneratedPreferenceDriftSuiteV1 {
+    /// Pretty-printed generated fixture, with one trailing newline.
+    pub fixture_json: String,
+    /// Counts, seed, split provenance, and content digest.
+    pub manifest: PreferenceDriftGenerationManifestV1,
+}
+
+#[derive(Debug, Clone)]
+struct SplitMix64V1(u64);
+
+impl SplitMix64V1 {
+    fn new(seed: u64) -> Self {
+        Self(seed)
+    }
+
+    fn next_u64(&mut self) -> u64 {
+        self.0 = self.0.wrapping_add(0x9E37_79B9_7F4A_7C15);
+        let mut value = self.0;
+        value = (value ^ (value >> 30)).wrapping_mul(0xBF58_476D_1CE4_E5B9);
+        value = (value ^ (value >> 27)).wrapping_mul(0x94D0_49BB_1331_11EB);
+        value ^ (value >> 31)
+    }
+
+    fn bounded(&mut self, upper_exclusive: usize) -> usize {
+        debug_assert!(upper_exclusive > 0);
+        (self.next_u64() % upper_exclusive as u64) as usize
+    }
+
+    fn shuffle<T>(&mut self, values: &mut [T]) {
+        for index in (1..values.len()).rev() {
+            let other = self.bounded(index + 1);
+            values.swap(index, other);
+        }
+    }
+}
+
+fn finding(path: impl Into<String>, reason: impl Into<String>) -> Vec<PreferenceDriftFixtureFindingV1> {
+    vec![PreferenceDriftFixtureFindingV1 {
+        path: path.into(),
+        reason: reason.into(),
+    }]
+}
+
+fn checked_scenario_count(
+    development_wearers: usize,
+    development_template_count: usize,
+    held_out_wearers: usize,
+    held_out_template_count: usize,
+    held_out_repetitions: usize,
+) -> Result<(usize, usize, usize), Vec<PreferenceDriftFixtureFindingV1>> {
+    let development_count = development_wearers
+        .checked_mul(development_template_count)
+        .ok_or_else(|| finding("$.config", "development scenario count overflow"))?;
+    let held_out_count = held_out_wearers
+        .checked_mul(held_out_template_count)
+        .and_then(|count| count.checked_mul(held_out_repetitions))
+        .ok_or_else(|| finding("$.config", "held-out scenario count overflow"))?;
+    let total = development_count
+        .checked_add(held_out_count)
+        .ok_or_else(|| finding("$.config", "total scenario count overflow"))?;
+    if total > MAX_GENERATED_SCENARIOS_V1 {
+        return Err(finding(
+            "$.config",
+            format!(
+                "generated scenario count {total} exceeds safety limit {}",
+                MAX_GENERATED_SCENARIOS_V1
+            ),
+        ));
+    }
+    Ok((development_count, held_out_count, total))
+}
+
+fn apply_axis_variation(
+    mut scenario: Value,
+    template_id: &str,
+    wearer_session_index: usize,
+    repetition: usize,
+    rng: &mut SplitMix64V1,
+) -> Result<Value, Vec<PreferenceDriftFixtureFindingV1>> {
+    let scenario_id = format!("GEN-{template_id}-W{wearer_session_index:04}-R{repetition:03}");
+    scenario["scenario_id"] = json!(scenario_id);
+    scenario["synthetic_wearer_id"] = json!(format!("synthetic-session-{wearer_session_index:04}"));
+
+    let base_step = scenario
+        .get("current_step")
+        .and_then(Value::as_u64)
+        .ok_or_else(|| finding("$.scenarios.current_step", "template lacks current_step"))?;
+    let time_offset = rng.bounded(6) as u64;
+    let current_step = base_step.checked_add(time_offset).ok_or_else(|| {
+        finding("$.scenarios.current_step", "current-step variation overflow")
+    })?;
+    scenario["current_step"] = json!(current_step);
+    // Steps are relative synthetic ticks. Varying now without moving the old observation
+    // timestamps creates controlled fresh/expired cases while keeping causal order valid.
+    scenario["preference_max_age_steps"] = json!(rng.bounded(4) as u64);
+
+    let query_budget = rng.bounded(3) as u64;
+    let queries_used = if query_budget == 0 {
+        0
+    } else {
+        rng.bounded(query_budget as usize + 1) as u64
+    };
+    scenario["query_budget_total"] = json!(query_budget);
+    scenario["queries_already_used"] = json!(queries_used);
+
+    let observations = scenario
+        .get_mut("preference_observations")
+        .and_then(Value::as_array_mut)
+        .ok_or_else(|| {
+            finding(
+                "$.scenarios.preference_observations",
+                "template lacks observation array",
+            )
+        })?;
+    for (index, observation) in observations.iter_mut().enumerate() {
+        observation["observation_id"] = json!(format!("{scenario_id}-O{index:02}"));
+    }
+    rng.shuffle(observations);
+
+    let eligible = scenario
+        .get_mut("eligible_candidate_ids")
+        .and_then(Value::as_array_mut)
+        .ok_or_else(|| {
+            finding(
+                "$.scenarios.eligible_candidate_ids",
+                "template lacks eligible-candidate array",
+            )
+        })?;
+    rng.shuffle(eligible);
+
+    Ok(scenario)
+}
+
+/// Generate a reproducible suite from a validated v2 hand-authored control fixture.
+///
+/// Development and held-out wearer/session IDs are disjoint. Whole scenario families retain
+/// their declared split. The generator varies feedback age, freshness horizon, query budget,
+/// candidate ordering, observation ordering, wearer/session identity, and repetition. The
+/// generator's pseudo-random choices are deterministic and are not cryptographic.
+pub fn generate_preference_drift_suite(
+    source_fixture_json: &str,
+    config: &PreferenceDriftGeneratorConfigV1,
+) -> Result<GeneratedPreferenceDriftSuiteV1, Vec<PreferenceDriftFixtureFindingV1>> {
+    validate_preference_drift_fixture(source_fixture_json)?;
+
+    if config.wearer_session_count < 2
+        || config.wearer_session_count > MAX_WEARER_SESSIONS_V1
+        || config.development_wearer_session_count == 0
+        || config.development_wearer_session_count >= config.wearer_session_count
+        || config.held_out_repetitions_per_family == 0
+        || config.held_out_repetitions_per_family > MAX_REPETITIONS_PER_FAMILY_V1
+    {
+        return Err(finding(
+            "$.config",
+            format!(
+                "require 2..={MAX_WEARER_SESSIONS_V1} wearer/session groups, at least one but fewer than all groups reserved for development, and 1..={MAX_REPETITIONS_PER_FAMILY_V1} held-out repetitions"
+            ),
+        ));
+    }
+
+    let mut root: Value = serde_json::from_str(source_fixture_json)
+        .map_err(|error| finding("$", format!("invalid source fixture JSON: {error}")))?;
+    let source_scenarios = root
+        .get("scenarios")
+        .and_then(Value::as_array)
+        .ok_or_else(|| finding("$.scenarios", "source scenario array is missing"))?
+        .clone();
+    let development_templates: Vec<Value> = source_scenarios
+        .iter()
+        .filter(|scenario| scenario.get("split").and_then(Value::as_str) == Some("development"))
+        .cloned()
+        .collect();
+    let held_out_templates: Vec<Value> = source_scenarios
+        .iter()
+        .filter(|scenario| scenario.get("split").and_then(Value::as_str) == Some("held_out"))
+        .cloned()
+        .collect();
+    if development_templates.is_empty() || held_out_templates.is_empty() {
+        return Err(finding(
+            "$.scenarios",
+            "source fixture needs both development and held-out templates",
+        ));
+    }
+
+    let held_out_families: BTreeSet<String> = held_out_templates
+        .iter()
+        .filter_map(|scenario| scenario.get("scenario_family").and_then(Value::as_str))
+        .map(str::to_owned)
+        .collect();
+    if held_out_families.is_empty() {
+        return Err(finding(
+            "$.scenarios",
+            "held-out templates need at least one named scenario family",
+        ));
+    }
+
+    let held_out_wearer_count =
+        config.wearer_session_count - config.development_wearer_session_count;
+    let (development_count, held_out_count, _) = checked_scenario_count(
+        config.development_wearer_session_count,
+        development_templates.len(),
+        held_out_wearer_count,
+        held_out_templates.len(),
+        config.held_out_repetitions_per_family,
+    )?;
+
+    let mut rng = SplitMix64V1::new(config.seed);
+    let mut generated_scenarios = Vec::with_capacity(development_count + held_out_count);
+
+    // Development sessions see only development templates.
+    for wearer_index in 0..config.development_wearer_session_count {
+        for template in &development_templates {
+            let template_id = template
+                .get("scenario_id")
+                .and_then(Value::as_str)
+                .unwrap_or("development-template");
+            generated_scenarios.push(apply_axis_variation(
+                template.clone(),
+                template_id,
+                wearer_index,
+                0,
+                &mut rng,
+            )?);
+        }
+    }
+
+    // Held-out sessions see only held-out families. No wearer/session identity crosses splits.
+    for wearer_index in config.development_wearer_session_count..config.wearer_session_count {
+        for template in &held_out_templates {
+            let template_id = template
+                .get("scenario_id")
+                .and_then(Value::as_str)
+                .unwrap_or("heldout-template");
+            for repetition in 0..config.held_out_repetitions_per_family {
+                generated_scenarios.push(apply_axis_variation(
+                    template.clone(),
+                    template_id,
+                    wearer_index,
+                    repetition,
+                    &mut rng,
+                )?);
+            }
+        }
+    }
+
+    root["fixture_version"] = json!("0.3.0");
+    root["generation"] = json!({
+        "method": PREFERENCE_DRIFT_GENERATOR_ID_V1,
+        "generator_version": "0.1.0",
+        "random_generator_used": true,
+        "empirical_data_used": false,
+        "seed": config.seed,
+        "config": config,
+        "note": "Deterministic seeded synthetic factorization of hand-authored control templates. Wearer/session splits are disjoint and scenario families remain within one split. No empirical or human-subject data is used."
+    });
+    root["scenarios"] = Value::Array(generated_scenarios);
+
+    let candidate_count = root
+        .get("candidate_catalog")
+        .and_then(Value::as_array)
+        .map(Vec::len)
+        .ok_or_else(|| finding("$.candidate_catalog", "candidate catalog is missing"))?;
+    let generated_root_json = serde_json::to_string_pretty(&root)
+        .map_err(|error| finding("$", format!("cannot serialize generated fixture: {error}")))?;
+    let fixture_json = format!("{generated_root_json}\n");
+
+    // Validate the generated suite with the same contract used by the replay and baseline tools.
+    let validated = validate_preference_drift_fixture(&fixture_json)?;
+    if validated.development_scenario_count != development_count
+        || validated.held_out_scenario_count != held_out_count
+        || validated.scenario_count != development_count + held_out_count
+    {
+        return Err(finding(
+            "$.scenarios",
+            "generated split counts disagree with the manifest calculation",
+        ));
+    }
+
+    let fixture_blake3_hex = blake3::hash(fixture_json.as_bytes()).to_hex().to_string();
+    let manifest = PreferenceDriftGenerationManifestV1 {
+        schema_version: PREFERENCE_DRIFT_GENERATOR_SCHEMA_VERSION_V1,
+        fixture_version: "0.3.0".to_owned(),
+        generator_version: "0.1.0".to_owned(),
+        seed: config.seed,
+        wearer_session_count: config.wearer_session_count,
+        development_wearer_session_count: config.development_wearer_session_count,
+        held_out_wearer_session_count: held_out_wearer_count,
+        held_out_family_count: held_out_families.len(),
+        development_scenario_count: development_count,
+        held_out_scenario_count: held_out_count,
+        scenario_count: validated.scenario_count,
+        candidate_count,
+        fixture_blake3_hex,
+        claim_ceiling: "Synthetic scenario-generator determinism, structural validity, split isolation, and policy-contract stress only. No real-wearer preference, safety, clinical, or deployment claim.".to_owned(),
+    };
+
+    Ok(GeneratedPreferenceDriftSuiteV1 {
+        fixture_json,
+        manifest,
+    })
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    const SOURCE_FIXTURE: &str =
+        include_str!("../../../../docs/research/open-mobility/fixtures/preference-drift-scenarios-v2.json");
+
+    #[test]
+    fn generated_suite_is_reproducible_and_digest_matches_exact_bytes() {
+        let config = PreferenceDriftGeneratorConfigV1::default();
+        let first = generate_preference_drift_suite(SOURCE_FIXTURE, &config).unwrap();
+        let second = generate_preference_drift_suite(SOURCE_FIXTURE, &config).unwrap();
+        assert_eq!(first.fixture_json, second.fixture_json);
+        assert_eq!(first.manifest, second.manifest);
+        assert_eq!(
+            blake3::hash(first.fixture_json.as_bytes()).to_hex().to_string(),
+            first.manifest.fixture_blake3_hex
+        );
+    }
+
+    #[test]
+    fn default_suite_has_disjoint_wearers_and_grouped_family_splits() {
+        let suite = generate_preference_drift_suite(
+            SOURCE_FIXTURE,
+            &PreferenceDriftGeneratorConfigV1::default(),
+        )
+        .unwrap();
+        let fixture: Value = serde_json::from_str(&suite.fixture_json).unwrap();
+        let scenarios = fixture["scenarios"].as_array().unwrap();
+        assert_eq!(suite.manifest.wearer_session_count, 50);
+        assert_eq!(suite.manifest.development_wearer_session_count, 10);
+        assert_eq!(suite.manifest.held_out_wearer_session_count, 40);
+        assert_eq!(suite.manifest.held_out_family_count, 10);
+        assert_eq!(suite.manifest.development_scenario_count, 20);
+        assert_eq!(suite.manifest.held_out_scenario_count, 1200);
+        assert_eq!(suite.manifest.scenario_count, 1220);
+        assert_eq!(scenarios.len(), 1220);
+
+        let mut split_by_family = BTreeMap::<String, String>::new();
+        let mut split_by_wearer = BTreeMap::<String, String>::new();
+        for scenario in scenarios {
+            let split = scenario["split"].as_str().unwrap().to_owned();
+            let family = scenario["scenario_family"].as_str().unwrap().to_owned();
+            let wearer = scenario["synthetic_wearer_id"].as_str().unwrap().to_owned();
+            if let Some(previous) = split_by_family.insert(family.clone(), split.clone()) {
+                assert_eq!(previous, split, "scenario family crosses splits: {family}");
+            }
+            if let Some(previous) = split_by_wearer.insert(wearer.clone(), split.clone()) {
+                assert_eq!(previous, split, "wearer/session crosses splits: {wearer}");
+            }
+        }
+        assert_eq!(split_by_wearer.len(), 50);
+    }
+
+    #[test]
+    fn generator_rejects_invalid_split_and_runaway_size_configuration() {
+        let invalid_split = PreferenceDriftGeneratorConfigV1 {
+            development_wearer_session_count: 50,
+            ..PreferenceDriftGeneratorConfigV1::default()
+        };
+        assert!(generate_preference_drift_suite(SOURCE_FIXTURE, &invalid_split).is_err());
+
+        let oversized = PreferenceDriftGeneratorConfigV1 {
+            held_out_repetitions_per_family: MAX_REPETITIONS_PER_FAMILY_V1,
+            ..PreferenceDriftGeneratorConfigV1::default()
+        };
+        assert!(generate_preference_drift_suite(SOURCE_FIXTURE, &oversized).is_err());
+    }
+}
