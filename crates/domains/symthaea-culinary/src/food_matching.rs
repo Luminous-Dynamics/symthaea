@@ -58,6 +58,7 @@ fn language_tag_is_well_formed(tag: &str) -> bool {
                 && part.bytes().all(|byte| byte.is_ascii_alphanumeric())
         })
 }
+
 fn identity_record_errors(record: &Value, label: &str, errors: &mut Vec<String>) {
     for field in ["record_id", "source_ref", "source_version"] {
         if non_empty(record, field).is_none() {
