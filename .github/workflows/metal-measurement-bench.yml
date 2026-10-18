@@ -26,8 +26,6 @@ jobs:
         uses: actions/checkout@v4
       - name: Install stable Rust
         uses: dtolnay/rust-toolchain@stable
-        with:
-          components: rustfmt
       - name: Run adapter tests
         run: cargo test --manifest-path tools/metal-measurement-bench/Cargo.toml
       - name: Validate committed NIST source manifest
