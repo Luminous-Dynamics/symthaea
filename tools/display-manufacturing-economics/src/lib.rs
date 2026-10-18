@@ -66,6 +66,102 @@ pub struct BatchEconomics {
     pub final_calibrated_good_units: u64,
 }
 
+/// A route's conservative metric bounds under a pinned target and protocol.
+///
+/// The supplied values are bounds/summary estimates, not raw production truth.
+/// Both candidates must share target-profile, comparison-protocol and evidence-class
+/// identity. Pareto comparison will not trade away mandatory quality/reliability/
+—yield floors or missing evidence for a cheaper cost.
+#[derive(Clone, Debug, PartialEq)]
+pub struct RouteFrontierCandidate {
+    pub candidate_id: String,
+    pub target_module_profile_digest: String,
+    pub comparison_protocol_digest: String,
+    pub evidence_class: String,
+    /// Upper bound for cost per calibrated-good module in one declared currency.
+    pub cost_per_good_unit_upper: f64,
+    /// Upper bound for energy per calibrated-good module in joules.
+    pub energy_per_good_unit_upper_joules: f64,
+    /// Upper bound for elapsed line-cycle time per calibrated-good module, in seconds.
+    pub cycle_time_per_good_unit_upper_seconds: f64,
+    /// Lower bound for final calibrated-good yield, as a fraction.
+    pub final_good_yield_lower: f64,
+    pub optical_floors_passed: bool,
+    pub reliability_floors_passed: bool,
+    pub minimum_yield_floor_passed: bool,
+    pub evidence_complete: bool,
+}
+
+fn validate_frontier_candidate(
+    candidate: &RouteFrontierCandidate,
+) -> Result<(), ManufacturingMetricError> {
+    if candidate.candidate_id.trim().is_empty()
+        || candidate.target_module_profile_digest.trim().is_empty()
+        || candidate.comparison_protocol_digest.trim().is_empty()
+        || candidate.evidence_class.trim().is_empty()
+    {
+        return Err(ManufacturingMetricError::InvalidRouteCandidate);
+    }
+    if !candidate.cost_per_good_unit_upper.is_finite()
+        || candidate.cost_per_good_unit_upper < 0.0
+        || !candidate.energy_per_good_unit_upper_joules.is_finite()
+        || candidate.energy_per_good_unit_upper_joules < 0.0
+        || !candidate.cycle_time_per_good_unit_upper_seconds.is_finite()
+        || candidate.cycle_time_per_good_unit_upper_seconds <= 0.0
+        || !candidate.final_good_yield_lower.is_finite()
+        || candidate.final_good_yield_lower <= 0.0
+        || candidate.final_good_yield_lower > 1.0
+    {
+        return Err(ManufacturingMetricError::InvalidRouteCandidate);
+    }
+    if !candidate.optical_floors_passed
+        || !candidate.reliability_floors_passed
+        || !candidate.minimum_yield_floor_passed
+        || !candidate.evidence_complete
+    {
+        return Err(ManufacturingMetricError::UnqualifiedRouteCandidate);
+    }
+    Ok(())
+}
+
+/// Tests whether candidate dominates competitor without collapsing metrics into a score.
+///
+/// Lower cost/energy/cycle-time upper bounds and a higher final-yield lower bound
+/// must be no worse in every dimension, and strictly better in at least one.
+/// The target module, comparison protocol and evidence class must match; incomparable
+/// candidates remain on the Pareto frontier. Inputs must already reflect the declared
+/// uncertainty method. This function cannot validate those uncertainty bounds itself.
+pub fn route_pareto_dominates(
+    candidate: &RouteFrontierCandidate,
+    competitor: &RouteFrontierCandidate,
+) -> Result<bool, ManufacturingMetricError> {
+    validate_frontier_candidate(candidate)?;
+    validate_frontier_candidate(competitor)?;
+
+    if candidate.target_module_profile_digest != competitor.target_module_profile_digest
+        || candidate.comparison_protocol_digest != competitor.comparison_protocol_digest
+        || candidate.evidence_class != competitor.evidence_class
+    {
+        return Err(ManufacturingMetricError::MismatchedRouteComparison);
+    }
+
+    let no_worse = candidate.cost_per_good_unit_upper <= competitor.cost_per_good_unit_upper
+        && candidate.energy_per_good_unit_upper_joules
+            <= competitor.energy_per_good_unit_upper_joules
+        && candidate.cycle_time_per_good_unit_upper_seconds
+            <= competitor.cycle_time_per_good_unit_upper_seconds
+        && candidate.final_good_yield_lower >= competitor.final_good_yield_lower;
+    let strictly_better =
+        candidate.cost_per_good_unit_upper < competitor.cost_per_good_unit_upper
+            || candidate.energy_per_good_unit_upper_joules
+                < competitor.energy_per_good_unit_upper_joules
+            || candidate.cycle_time_per_good_unit_upper_seconds
+                < competitor.cycle_time_per_good_unit_upper_seconds
+            || candidate.final_good_yield_lower > competitor.final_good_yield_lower;
+
+    Ok(no_worse && strictly_better)
+}
+
 /// Counts from a defect-inspection study using a declared reference-review method.
 #[derive(Clone, Copy, Debug, PartialEq, Eq)]
 pub struct InspectionCounts {
@@ -103,6 +199,9 @@ pub enum ManufacturingMetricError {
     NonFiniteResult,
     InspectedExceedsEligible,
     InspectionCountsExceedPopulation,
+    InvalidRouteCandidate,
+    UnqualifiedRouteCandidate,
+    MismatchedRouteComparison,
 }
 
 impl fmt::Display for ManufacturingMetricError {
@@ -118,6 +217,15 @@ impl fmt::Display for ManufacturingMetricError {
             }
             Self::InspectionCountsExceedPopulation => {
                 formatter.write_str("inspection contingency counts exceed their population")
+            }
+            Self::InvalidRouteCandidate => {
+                formatter.write_str("route candidate metrics must be finite and within declared bounds")
+            }
+            Self::UnqualifiedRouteCandidate => {
+                formatter.write_str("route candidate does not meet mandatory quality, reliability, yield or evidence gates")
+            }
+            Self::MismatchedRouteComparison => {
+                formatter.write_str("route candidates do not share the same target, protocol and evidence class")
             }
         }
     }
@@ -391,6 +499,68 @@ mod tests {
         assert_eq!(metrics.precision, None);
         assert_eq!(metrics.recall, None);
         assert_eq!(metrics.false_negative_rate, None);
+    }
+
+    fn route_candidate(
+        id: &str,
+        cost: f64,
+        energy: f64,
+        cycle: f64,
+        yield_lower: f64,
+    ) -> RouteFrontierCandidate {
+        RouteFrontierCandidate {
+            candidate_id: id.to_owned(),
+            target_module_profile_digest: "sha256:target-profile".to_owned(),
+            comparison_protocol_digest: "sha256:comparison-protocol".to_owned(),
+            evidence_class: "SYNTHETIC_SCENARIO".to_owned(),
+            cost_per_good_unit_upper: cost,
+            energy_per_good_unit_upper_joules: energy,
+            cycle_time_per_good_unit_upper_seconds: cycle,
+            final_good_yield_lower: yield_lower,
+            optical_floors_passed: true,
+            reliability_floors_passed: true,
+            minimum_yield_floor_passed: true,
+            evidence_complete: true,
+        }
+    }
+
+    #[test]
+    fn route_pareto_comparison_requires_compatible_target_protocol_and_evidence() {
+        let a = route_candidate("A", 10.0, 20.0, 100.0, 0.90);
+        let mut b = route_candidate("B", 11.0, 21.0, 110.0, 0.85);
+        assert_eq!(route_pareto_dominates(&a, &b), Ok(true));
+
+        b.comparison_protocol_digest = "sha256:different-protocol".to_owned();
+        assert_eq!(
+            route_pareto_dominates(&a, &b),
+            Err(ManufacturingMetricError::MismatchedRouteComparison)
+        );
+    }
+
+    #[test]
+    fn route_tradeoffs_remain_incomparable_without_a_weighted_score() {
+        let lower_cost = route_candidate("lower-cost", 8.0, 30.0, 105.0, 0.92);
+        let lower_energy = route_candidate("lower-energy", 10.0, 20.0, 95.0, 0.90);
+        assert_eq!(route_pareto_dominates(&lower_cost, &lower_energy), Ok(false));
+        assert_eq!(route_pareto_dominates(&lower_energy, &lower_cost), Ok(false));
+    }
+
+    #[test]
+    fn route_pareto_refuses_quality_floor_failures_and_invalid_bounds() {
+        let a = route_candidate("A", 10.0, 20.0, 100.0, 0.90);
+        let mut failed_floor = route_candidate("failed", 1.0, 1.0, 1.0, 1.0);
+        failed_floor.optical_floors_passed = false;
+        assert_eq!(
+            route_pareto_dominates(&failed_floor, &a),
+            Err(ManufacturingMetricError::UnqualifiedRouteCandidate)
+        );
+
+        let mut invalid = route_candidate("invalid", 10.0, 20.0, 100.0, 0.90);
+        invalid.final_good_yield_lower = f64::NAN;
+        assert_eq!(
+            route_pareto_dominates(&invalid, &a),
+            Err(ManufacturingMetricError::InvalidRouteCandidate)
+        );
     }
 
     #[test]
