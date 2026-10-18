@@ -50,6 +50,7 @@
       "expected_disposition": "reject",
       "expected_reason_codes": [
         "EVIDENCE_SCOPE_MISMATCH",
+        "LOT_ID_MISSING",
         "STRUCTURAL_VALUE_NOT_QUALIFIED",
         "TAXON_IDENTITY_UNRESOLVED"
       ],
