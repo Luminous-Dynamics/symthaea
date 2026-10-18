@@ -5,7 +5,9 @@
 //! JSON or claim the manifest's contents are true. Verification re-evaluates the
 //! supplied scenario using this evaluator. A valid receipt is not spending authority.
 
-use crate::{CandidateScenario, EvaluationReceipt, EvidenceState, OptionEvaluation, RejectionReason};
+use crate::{
+    CandidateScenario, EvaluationReceipt, EvidenceState, OptionEvaluation, RejectionReason,
+};
 use crate::uncertainty_contract::{CompatibleAnalysisRoute, UncertaintyRoutingReceipt};
 use sha2::{Digest, Sha256};
 use std::collections::BTreeSet;
@@ -81,7 +83,10 @@ fn valid_git_id(value: &str) -> bool {
 }
 
 fn digest_matches(reported: &str, computed: &str) -> bool {
-    reported.strip_prefix("sha256:").unwrap_or(reported).eq_ignore_ascii_case(computed)
+    reported
+        .strip_prefix("sha256:")
+        .unwrap_or(reported)
+        .eq_ignore_ascii_case(computed)
 }
 
 /// Append a length-prefixed byte field. Fixed field order and a domain tag make
@@ -194,7 +199,11 @@ fn canonical_scenario_bytes(
         put_i64(&mut bytes, option.maintenance_backlog_delta_minor);
         put_bool(&mut bytes, option.authority_granted);
 
-        let mut dependencies: Vec<_> = option.dependency_ids.iter().map(String::as_str).collect();
+        let mut dependencies: Vec<_> = option
+            .dependency_ids
+            .iter()
+            .map(String::as_str)
+            .collect();
         dependencies.sort_unstable();
         dependencies.dedup();
         put_u64(&mut bytes, dependencies.len() as u64);
@@ -259,7 +268,12 @@ fn canonical_output_bytes(output: &EvaluationReceipt) -> Result<Vec<u8>, Decisio
     for option in options {
         put_str(&mut bytes, &option.option_id);
         put_bool(&mut bytes, option.accepted);
-        let mut reasons: Vec<u8> = option.rejection_reasons.iter().copied().map(rejection_tag).collect();
+        let mut reasons: Vec<u8> = option
+            .rejection_reasons
+            .iter()
+            .copied()
+            .map(rejection_tag)
+            .collect();
         reasons.sort_unstable();
         let reason_count = reasons.len();
         reasons.dedup();
@@ -507,7 +521,7 @@ mod tests {
         let receipt = create_decision_receipt(&context, &original).unwrap();
         let mut reordered = original.clone();
         reordered.options.reverse();
-        reordered.options[0].dependency_ids.reverse();
+        reordered.options[1].dependency_ids.reverse();
         let reordered_receipt = create_decision_receipt(&context, &reordered).unwrap();
         assert_eq!(receipt, reordered_receipt);
     }
@@ -515,7 +529,8 @@ mod tests {
     #[test]
     fn duplicate_option_ids_are_rejected() {
         let mut scenario = scenario();
-        scenario.options[1].id = scenario.options[0].id.clone();
+        let duplicate_id = scenario.options[0].id.clone();
+        scenario.options[1].id = duplicate_id;
         let context = context(b"canonical-manifest-v1", &scenario.id);
         assert_eq!(
             create_decision_receipt(&context, &scenario),
@@ -538,11 +553,37 @@ mod tests {
     #[test]
     fn duplicate_evidence_ids_are_rejected() {
         let mut scenario = scenario();
-        scenario.options[0].evidence.push(scenario.options[0].evidence[0].clone());
+        let duplicate_claim = scenario.options[0].evidence[0].clone();
+        scenario.options[0].evidence.push(duplicate_claim);
         let context = context(b"canonical-manifest-v1", &scenario.id);
         assert_eq!(
             create_decision_receipt(&context, &scenario),
             Err(DecisionReceiptError::DuplicateEvidenceId)
+        );
+    }
+
+    #[test]
+    fn evaluator_version_mutation_invalidates_old_receipt() {
+        let scenario = scenario();
+        let original_context = context(b"canonical-manifest-v1", &scenario.id);
+        let receipt = create_decision_receipt(&original_context, &scenario).unwrap();
+        let mut changed_context = original_context.clone();
+        changed_context.evaluator_version = "iccb-evaluator-0.1.1".into();
+        assert_eq!(
+            verify_decision_receipt(&changed_context, &scenario, &receipt),
+            Err(DecisionReceiptError::ReceiptMismatch)
+        );
+    }
+
+    #[test]
+    fn tampered_receipt_output_digest_is_rejected() {
+        let scenario = scenario();
+        let context = context(b"canonical-manifest-v1", &scenario.id);
+        let mut receipt = create_decision_receipt(&context, &scenario).unwrap();
+        receipt.output_sha256 = "0".repeat(64);
+        assert_eq!(
+            verify_decision_receipt(&context, &scenario, &receipt),
+            Err(DecisionReceiptError::ReceiptMismatch)
         );
     }
 
