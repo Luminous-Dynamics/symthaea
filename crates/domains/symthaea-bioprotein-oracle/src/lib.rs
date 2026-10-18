@@ -897,6 +897,27 @@ mod tests {
         assert_eq!(receipt.counts.passed, 29);
         assert_eq!(receipt.counts.failed, 0);
         assert_eq!(receipt.counts.skipped, 0);
+        assert_eq!(receipt.corpus_status.as_deref(), Some("synthetic_design_fixture_only"));
+        assert!(receipt.claim_ceiling.contains("no biological outcome"));
+    }
+
+
+    #[test]
+    fn malformed_json_is_incomplete_not_pass() {
+        let receipt = run_corpus(b"{", Some("head-a"), Some("head-a"));
+        assert_eq!(receipt.status, RunStatus::Incomplete);
+        assert_eq!(receipt.counts.attempted, 0);
+        assert!(receipt.errors.iter().any(|error| error.starts_with("CORPUS_PARSE_FAILED:")));
+    }
+
+    #[test]
+    fn schema_version_mismatch_is_incomplete_not_pass() {
+        let mut corpus = fixture_corpus();
+        corpus.schema_version = "99.0.0".to_owned();
+        let raw = serde_json::to_vec(&corpus).unwrap();
+        let receipt = run_corpus(&raw, Some("head-a"), Some("head-a"));
+        assert_eq!(receipt.status, RunStatus::Incomplete);
+        assert!(receipt.errors.iter().any(|error| error == "CORPUS_SCHEMA_VERSION_MISMATCH"));
     }
 
     #[test]
@@ -907,7 +928,7 @@ mod tests {
         case.candidate.source.permission_evidence_ref = None;
         let actual = evaluate_case(case);
         assert_eq!(actual.disposition, Disposition::Blocked);
-        assert_eq!(actual.reason_codes, ["RIGHTS_EVIDENCE_MISSING"]);
+        assert_eq!(actual.reason_codes, vec!["RIGHTS_EVIDENCE_MISSING".to_owned()]);
     }
 
     #[test]
@@ -917,7 +938,7 @@ mod tests {
         case.candidate.source.rights_status = RightsStatus::Revoked;
         let actual = evaluate_case(case);
         assert_eq!(actual.disposition, Disposition::Blocked);
-        assert_eq!(actual.reason_codes, ["RIGHTS_REVOKED"]);
+        assert_eq!(actual.reason_codes, vec!["RIGHTS_REVOKED".to_owned()]);
     }
 
     #[test]
@@ -926,7 +947,7 @@ mod tests {
         let case = corpus.cases.iter_mut().find(|c| c.case_id == "BIOP-GATE1-003").unwrap();
         let actual = evaluate_case(case);
         assert_eq!(actual.disposition, Disposition::Indeterminate);
-        assert_eq!(actual.reason_codes, ["REQUIRED_NUTRITION_UNKNOWN"]);
+        assert_eq!(actual.reason_codes, vec!["REQUIRED_NUTRITION_UNKNOWN".to_owned()]);
     }
 
     #[test]
@@ -941,6 +962,7 @@ mod tests {
         let ids_a: Vec<_> = receipt_a.cases.iter().map(|c| c.case_id.as_str()).collect();
         let ids_b: Vec<_> = receipt_b.cases.iter().map(|c| c.case_id.as_str()).collect();
         assert_eq!(ids_a, ids_b);
+        assert_eq!(receipt_a.cases, receipt_b.cases);
         assert_eq!(receipt_a.counts, receipt_b.counts);
         assert_eq!(receipt_a.status, receipt_b.status);
     }
@@ -980,7 +1002,7 @@ mod tests {
         case.candidate.reported_as = Some(EvidenceKind::Measured);
         let actual = evaluate_case(case);
         assert_eq!(actual.disposition, Disposition::InvalidEvidence);
-        assert_eq!(actual.reason_codes, ["SIMULATED_REPORTED_AS_MEASURED"]);
+        assert_eq!(actual.reason_codes, vec!["SIMULATED_REPORTED_AS_MEASURED".to_owned()]);
     }
 
     #[test]
@@ -994,7 +1016,7 @@ mod tests {
         cost_case.request.requested_claim = Claim::CostComparison;
         let cost = evaluate_case(&cost_case);
         assert_eq!(cost.disposition, Disposition::InvalidEvidence);
-        assert_eq!(cost.reason_codes, ["INVALID_COST_BASIS"]);
+        assert_eq!(cost.reason_codes, vec!["INVALID_COST_BASIS".to_owned()]);
     }
 
     #[test]
