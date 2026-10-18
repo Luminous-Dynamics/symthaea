@@ -17,7 +17,10 @@ use std::process::Command;
 pub const RUNNER_VERSION: &str = "0.1.0";
 pub const EXPECTED_CORPUS_ID: &str = "BIOPROTEIN-GATE-CORPUS-V1";
 pub const EXPECTED_CORPUS_SCHEMA_VERSION: &str = "1.0.0";
-const CLAIM_CEILING: &str = "Synthetic decision-semantics only; no biological outcome, nutritional adequacy, safety, regulatory clearance, real cost, or lifecycle superiority is established.";
+const CLAIM_CEILING: &str = concat!(
+    "Synthetic decision-semantics only; no biological outcome, nutritional adequacy, safety, ",
+    "regulatory clearance, real cost, or lifecycle superiority is established."
+);
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, Deserialize)]
 #[serde(rename_all = "snake_case")]
@@ -505,7 +508,7 @@ pub fn evaluate_case(fixture: &CaseFixture) -> OracleOutcome {
         Claim::NutritionFeasibility => evaluate_nutrition(candidate),
         Claim::ScenarioFeasibility => evaluate_scenario(candidate, request),
         Claim::LcaComparison => evaluate_lca(candidate, request),
-        Claim::CostComparison => evaluate_cost(candidate),
+        Claim::CostComparison => evaluate_cost(candidate, request),
         Claim::AnimalOutcome => evaluate_animal_outcome(candidate),
     }
 }
@@ -632,7 +635,10 @@ fn evaluate_lca(candidate: &Candidate, request: &Request) -> OracleOutcome {
     }
 }
 
-fn evaluate_cost(candidate: &Candidate) -> OracleOutcome {
+fn evaluate_cost(candidate: &Candidate, request: &Request) -> OracleOutcome {
+    if candidate.scenario_digest != request.scenario_digest {
+        return outcome(Disposition::NotComparable, "SCENARIO_DIGEST_MISMATCH");
+    }
     if !nonempty(&candidate.cost.currency_or_unit) || !nonempty(&candidate.cost.basis) {
         return outcome(Disposition::InvalidEvidence, "INVALID_COST_BASIS");
     }
@@ -1082,6 +1088,25 @@ mod tests {
         let cost = evaluate_case(&cost_case);
         assert_eq!(cost.disposition, Disposition::InvalidEvidence);
         assert_eq!(cost.reason_codes, vec!["INVALID_COST_BASIS".to_owned()]);
+    }
+
+
+    #[test]
+    fn cost_comparison_requires_scenario_alignment() {
+        let mut corpus = fixture_corpus();
+        let case = corpus
+            .cases
+            .iter_mut()
+            .find(|c| c.case_id == "BIOP-GATE1-006")
+            .unwrap();
+        case.request.requested_claim = Claim::CostComparison;
+        case.candidate.scenario_digest = "sha256:other-scenario".to_owned();
+        let actual = evaluate_case(case);
+        assert_eq!(actual.disposition, Disposition::NotComparable);
+        assert_eq!(
+            actual.reason_codes,
+            vec!["SCENARIO_DIGEST_MISMATCH".to_owned()]
+        );
     }
 
     #[test]
