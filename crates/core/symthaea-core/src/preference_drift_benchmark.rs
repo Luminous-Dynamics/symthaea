@@ -60,12 +60,9 @@ fn nonempty_string(value: &Value, field: &str) -> Option<String> {
 }
 
 fn string_array(value: &Value, field: &str) -> Option<Vec<String>> {
-    value.get(field).and_then(Value::as_array).map(|items| {
-        items
-            .iter()
-            .filter_map(Value::as_str)
-            .map(str::to_owned)
-            .collect()
+    value.get(field).and_then(Value::as_array).and_then(|items| {
+        let strings = items.iter().map(Value::as_str).collect::<Option<Vec<_>>>()?;
+        Some(strings.into_iter().map(str::to_owned).collect())
     })
 }
 
@@ -283,6 +280,17 @@ pub fn validate_preference_drift_fixture(
                 &mut findings,
                 format!("{path}.task_id"),
                 "missing task identity",
+            );
+        }
+        if scenario
+            .get("current_context")
+            .and_then(Value::as_object)
+            .is_none_or(|context| context.is_empty())
+        {
+            finding(
+                &mut findings,
+                format!("{path}.current_context"),
+                "missing non-empty current context",
             );
         }
 
@@ -542,6 +550,13 @@ pub fn validate_preference_drift_fixture(
                             "ranking oracle must contain an order",
                         );
                     }
+                    if status != Some("ranking") && !accepted.is_empty() {
+                        finding(
+                            &mut findings,
+                            format!("{path}.evaluation_oracle.acceptable_candidate_ids"),
+                            "non-ranking oracle must not mark candidates acceptable",
+                        );
+                    }
                     if status != Some("ranking") && !order.is_empty() {
                         finding(
                             &mut findings,
@@ -753,6 +768,20 @@ mod tests {
             .as_array()
             .unwrap()
             .is_empty());
+    }
+
+    #[test]
+    fn mixed_type_candidate_arrays_fail_closed() {
+        let mut value = parse_fixture();
+        value["scenarios"][0]["eligible_candidate_ids"]
+            .as_array_mut()
+            .unwrap()
+            .push(serde_json::json!(false));
+        let findings = validate_preference_drift_fixture(&encode(&value)).unwrap_err();
+        assert!(has_path_error(
+            &findings,
+            "$.scenarios[0].eligible_candidate_ids"
+        ));
     }
 
     #[test]
