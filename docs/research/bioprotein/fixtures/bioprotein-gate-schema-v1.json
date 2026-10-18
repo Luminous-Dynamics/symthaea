@@ -76,7 +76,8 @@
         "availability",
         "evidence_kind",
         "cost",
-        "nutrition_evidence_state"
+        "nutrition_evidence_state",
+        "outcome_evidence_state"
       ],
       "properties": {
         "candidate_id": {
@@ -254,6 +255,14 @@
             "missing_required",
             "not_assessed",
             "not_applicable"
+          ]
+        },
+        "outcome_evidence_state": {
+          "enum": [
+            "not_requested",
+            "observed",
+            "modeled",
+            "missing"
           ]
         }
       },
