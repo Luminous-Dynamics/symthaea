@@ -1080,6 +1080,86 @@ mod tests {
     }
 
     #[test]
+    fn linearized_uncertainty_budget_recomputes_covariance_and_rejects_mutation() {
+        let mut record = parse_run();
+        let combined = (0.3_f64.powi(2) + 0.4_f64.powi(2) + 2.0 * 0.02).sqrt();
+        let expanded = 2.0 * combined;
+        record["record_state"] = Value::String("ACQUIRED_UNQUALIFIED".to_owned());
+        record["physical_validation"] = Value::String("MEASURED_UNQUALIFIED".to_owned());
+        record["acquired_at"] = Value::String("2026-10-18T10:00:00Z".to_owned());
+        record["instruments"] = serde_json::json!([{
+            "instrument_id":"ODRH-RUN-INS-POWER-001",
+            "instrument_class":"POWER_METER",
+            "manufacturer":"Example",
+            "model":"Synthetic test reference",
+            "serial_or_stable_id":"SYNTHETIC-POWER-001",
+            "calibration_state":"VALID",
+            "calibration_record_digest":"aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
+            "calibration_valid_through":"2026-12-31",
+            "supported_measurands":["task-window input energy"]
+        }]);
+        record["raw_artifacts"] = serde_json::json!([{
+            "artifact_id":"ODRH-ART-POWER-TRACE-001",
+            "sha256":"bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb",
+            "media_type":"text/csv",
+            "storage_uri":"https://example.invalid/uncertainty-power.csv",
+            "byte_length":100,
+            "role":"POWER_TRACE"
+        }]);
+        record["observations"][0]["status"] = Value::String("MEASURED_UNQUALIFIED".to_owned());
+        record["observations"][0]["value"] = serde_json::json!(10.0);
+        record["observations"][0]["expanded_uncertainty"] = serde_json::json!(expanded);
+        record["observations"][0]["minimum_decision_effect"] = serde_json::json!(4.0);
+        record["observations"][0]["decision_capability"] = Value::String("CAPABLE".to_owned());
+        record["observations"][0]["instrument_ids"] =
+            serde_json::json!(["ODRH-RUN-INS-POWER-001"]);
+        record["observations"][0]["raw_artifact_ids"] =
+            serde_json::json!(["ODRH-ART-POWER-TRACE-001"]);
+        record["observations"][0]["uncertainty_budget"] = serde_json::json!({
+            "status":"CALCULATED_UNREVIEWED",
+            "method":"LINEARIZED_COVARIANCE",
+            "terms":[
+                {
+                    "term_id":"METER_BIAS",
+                    "label":"meter contribution",
+                    "standard_uncertainty":0.3,
+                    "sensitivity_coefficient":1.0,
+                    "notes":"synthetic test term"
+                },
+                {
+                    "term_id":"SESSION_REPEATABILITY",
+                    "label":"session contribution",
+                    "standard_uncertainty":0.4,
+                    "sensitivity_coefficient":1.0,
+                    "notes":"synthetic test term"
+                }
+            ],
+            "covariance_terms":[{
+                "term_a_id":"METER_BIAS",
+                "term_b_id":"SESSION_REPEATABILITY",
+                "covariance_contribution":0.02,
+                "notes":"already sensitivity-projected covariance contribution"
+            }],
+            "combined_standard_uncertainty":combined,
+            "coverage_factor":2.0,
+            "expanded_uncertainty":expanded,
+            "notes":"Synthetic known-answer budget only; not a physical uncertainty estimate."
+        });
+
+        validate_measurement_run_str(&encoded(&record), RUN_SCHEMA_TEXT)
+            .expect("well-formed linearized covariance budget should validate");
+
+        let mut mutated = record;
+        mutated["observations"][0]["uncertainty_budget"]["covariance_terms"][0]
+            ["covariance_contribution"] = serde_json::json!(0.2);
+        let errors = validate_measurement_run_str(&encoded(&mutated), RUN_SCHEMA_TEXT)
+            .expect_err("mutated covariance must disagree with the frozen combined uncertainty");
+        assert!(errors.iter().any(|error| {
+            error.contains("reported combined standard uncertainty")
+        }));
+    }
+
+    #[test]
     fn not_evaluated_observation_can_retain_raw_evidence_without_derived_claim() {
         let mut record = parse_run();
         record["record_state"] = Value::String("ACQUIRED_UNQUALIFIED".to_owned());
