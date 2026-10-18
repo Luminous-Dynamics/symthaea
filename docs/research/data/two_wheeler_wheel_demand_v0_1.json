@@ -1,0 +1,397 @@
+{
+  "manifest_id": "TWO-WHEELER-WHEEL-DEMAND-001",
+  "schema_version": "0.1.0",
+  "created_date": "2026-10-18",
+  "status": "frozen_expected_cases_not_yet_executed",
+  "model_version": "wheel_demand_screen_v0_1",
+  "evidence_class": "Synthetic",
+  "gravity_mps2": 9.80665,
+  "assumptions": {
+    "direction": "forward-only ground speed; wind_speed_mps > 0 is a tailwind",
+    "grade": "positive grade_rad is uphill; radians",
+    "rolling_resistance": "opposes forward movement, using acceleration direction at a launch from rest",
+    "aerodynamics": "signed drag based on relative air speed speed_mps - wind_speed_mps",
+    "rotating_inertia": "rotating_equivalent_mass_kg adds only to the inertial force term",
+    "power": "signed_wheel_power_w = wheel_force_required_n * speed_mps; negative wheel power is not credited as recovered energy"
+  },
+  "execution": {
+    "compiled_or_executed": false,
+    "independent_verifier_connected": true,
+    "result": null,
+    "note": "Synthetic pointwise wheel-demand oracle fixture only; not measured vehicle data, a trace simulator, or an energy-efficiency prediction."
+  },
+  "cases": [
+    {
+      "id": "WD-POS-001",
+      "title": "Flat steady cruise",
+      "input": {
+        "mass_kg": 180,
+        "rotating_equivalent_mass_kg": 0,
+        "speed_mps": 10,
+        "acceleration_mps2": 0,
+        "grade_rad": 0,
+        "rolling_resistance_coefficient": 0.015,
+        "air_density_kg_m3": 1.225,
+        "drag_area_m2": 0.6,
+        "wind_speed_mps": 0
+      },
+      "expected_status": "COMPUTED",
+      "evidence_class": "Synthetic",
+      "expected_output": {
+        "inertial_force_n": 0,
+        "rolling_resistance_force_n": 26.477955,
+        "grade_force_n": 0,
+        "aerodynamic_force_n": 36.75,
+        "wheel_force_required_n": 63.227955,
+        "signed_wheel_power_w": 632.27955,
+        "positive_traction_power_w": 632.27955,
+        "negative_wheel_power_w": 0
+      },
+      "absolute_tolerance": 0.0001,
+      "relative_tolerance": 0.000001,
+      "must_not_claim": [
+        "validated_real_world_accuracy",
+        "battery_power",
+        "energy_consumption",
+        "regenerative_energy_recovered",
+        "vehicle_qualification"
+      ]
+    },
+    {
+      "id": "WD-POS-002",
+      "title": "Steady climb",
+      "input": {
+        "mass_kg": 180,
+        "rotating_equivalent_mass_kg": 0,
+        "speed_mps": 5,
+        "acceleration_mps2": 0,
+        "grade_rad": 0.05,
+        "rolling_resistance_coefficient": 0.015,
+        "air_density_kg_m3": 1.225,
+        "drag_area_m2": 0.6,
+        "wind_speed_mps": 0
+      },
+      "expected_status": "COMPUTED",
+      "evidence_class": "Synthetic",
+      "expected_output": {
+        "inertial_force_n": 0,
+        "rolling_resistance_force_n": 26.444864,
+        "grade_force_n": 88.22308,
+        "aerodynamic_force_n": 9.1875,
+        "wheel_force_required_n": 123.855444,
+        "signed_wheel_power_w": 619.277221,
+        "positive_traction_power_w": 619.277221,
+        "negative_wheel_power_w": 0
+      },
+      "absolute_tolerance": 0.0001,
+      "relative_tolerance": 0.000001,
+      "must_not_claim": [
+        "validated_real_world_accuracy",
+        "battery_power",
+        "energy_consumption",
+        "regenerative_energy_recovered",
+        "vehicle_qualification"
+      ]
+    },
+    {
+      "id": "WD-POS-003",
+      "title": "Flat acceleration with equivalent rotating inertia",
+      "input": {
+        "mass_kg": 180,
+        "rotating_equivalent_mass_kg": 5,
+        "speed_mps": 8,
+        "acceleration_mps2": 1.5,
+        "grade_rad": 0,
+        "rolling_resistance_coefficient": 0.015,
+        "air_density_kg_m3": 1.225,
+        "drag_area_m2": 0.6,
+        "wind_speed_mps": 0
+      },
+      "expected_status": "COMPUTED",
+      "evidence_class": "Synthetic",
+      "expected_output": {
+        "inertial_force_n": 277.5,
+        "rolling_resistance_force_n": 26.477955,
+        "grade_force_n": 0,
+        "aerodynamic_force_n": 23.52,
+        "wheel_force_required_n": 327.497955,
+        "signed_wheel_power_w": 2619.98364,
+        "positive_traction_power_w": 2619.98364,
+        "negative_wheel_power_w": 0
+      },
+      "absolute_tolerance": 0.0001,
+      "relative_tolerance": 0.000001,
+      "must_not_claim": [
+        "validated_real_world_accuracy",
+        "battery_power",
+        "energy_consumption",
+        "regenerative_energy_recovered",
+        "vehicle_qualification"
+      ]
+    },
+    {
+      "id": "WD-POS-004",
+      "title": "Tailwind reduces aerodynamic load",
+      "input": {
+        "mass_kg": 180,
+        "rotating_equivalent_mass_kg": 0,
+        "speed_mps": 10,
+        "acceleration_mps2": 0,
+        "grade_rad": 0,
+        "rolling_resistance_coefficient": 0.015,
+        "air_density_kg_m3": 1.225,
+        "drag_area_m2": 0.6,
+        "wind_speed_mps": 3
+      },
+      "expected_status": "COMPUTED",
+      "evidence_class": "Synthetic",
+      "expected_output": {
+        "inertial_force_n": 0,
+        "rolling_resistance_force_n": 26.477955,
+        "grade_force_n": 0,
+        "aerodynamic_force_n": 18.0075,
+        "wheel_force_required_n": 44.485455,
+        "signed_wheel_power_w": 444.85455,
+        "positive_traction_power_w": 444.85455,
+        "negative_wheel_power_w": 0
+      },
+      "absolute_tolerance": 0.0001,
+      "relative_tolerance": 0.000001,
+      "must_not_claim": [
+        "validated_real_world_accuracy",
+        "battery_power",
+        "energy_consumption",
+        "regenerative_energy_recovered",
+        "vehicle_qualification"
+      ]
+    },
+    {
+      "id": "WD-POS-005",
+      "title": "Headwind increases aerodynamic load",
+      "input": {
+        "mass_kg": 180,
+        "rotating_equivalent_mass_kg": 0,
+        "speed_mps": 10,
+        "acceleration_mps2": 0,
+        "grade_rad": 0,
+        "rolling_resistance_coefficient": 0.015,
+        "air_density_kg_m3": 1.225,
+        "drag_area_m2": 0.6,
+        "wind_speed_mps": -5
+      },
+      "expected_status": "COMPUTED",
+      "evidence_class": "Synthetic",
+      "expected_output": {
+        "inertial_force_n": 0,
+        "rolling_resistance_force_n": 26.477955,
+        "grade_force_n": 0,
+        "aerodynamic_force_n": 82.6875,
+        "wheel_force_required_n": 109.165455,
+        "signed_wheel_power_w": 1091.65455,
+        "positive_traction_power_w": 1091.65455,
+        "negative_wheel_power_w": 0
+      },
+      "absolute_tolerance": 0.0001,
+      "relative_tolerance": 0.000001,
+      "must_not_claim": [
+        "validated_real_world_accuracy",
+        "battery_power",
+        "energy_consumption",
+        "regenerative_energy_recovered",
+        "vehicle_qualification"
+      ]
+    },
+    {
+      "id": "WD-POS-006",
+      "title": "Downhill overrun remains signed negative power",
+      "input": {
+        "mass_kg": 180,
+        "rotating_equivalent_mass_kg": 0,
+        "speed_mps": 10,
+        "acceleration_mps2": 0,
+        "grade_rad": -0.08,
+        "rolling_resistance_coefficient": 0.015,
+        "air_density_kg_m3": 1.225,
+        "drag_area_m2": 0.6,
+        "wind_speed_mps": 0
+      },
+      "expected_status": "COMPUTED",
+      "evidence_class": "Synthetic",
+      "expected_output": {
+        "inertial_force_n": 0,
+        "rolling_resistance_force_n": 26.393271,
+        "grade_force_n": -141.065178,
+        "aerodynamic_force_n": 36.75,
+        "wheel_force_required_n": -77.921907,
+        "signed_wheel_power_w": -779.219073,
+        "positive_traction_power_w": 0,
+        "negative_wheel_power_w": 779.219073
+      },
+      "absolute_tolerance": 0.0001,
+      "relative_tolerance": 0.000001,
+      "must_not_claim": [
+        "validated_real_world_accuracy",
+        "battery_power",
+        "energy_consumption",
+        "regenerative_energy_recovered",
+        "vehicle_qualification"
+      ]
+    },
+    {
+      "id": "WD-POS-007",
+      "title": "From-rest force without fabricated power",
+      "input": {
+        "mass_kg": 180,
+        "rotating_equivalent_mass_kg": 5,
+        "speed_mps": 0,
+        "acceleration_mps2": 1.5,
+        "grade_rad": 0,
+        "rolling_resistance_coefficient": 0.015,
+        "air_density_kg_m3": 1.225,
+        "drag_area_m2": 0.6,
+        "wind_speed_mps": 0
+      },
+      "expected_status": "COMPUTED",
+      "evidence_class": "Synthetic",
+      "expected_output": {
+        "inertial_force_n": 277.5,
+        "rolling_resistance_force_n": 26.477955,
+        "grade_force_n": 0,
+        "aerodynamic_force_n": 0,
+        "wheel_force_required_n": 303.977955,
+        "signed_wheel_power_w": 0,
+        "positive_traction_power_w": 0,
+        "negative_wheel_power_w": 0
+      },
+      "absolute_tolerance": 0.0001,
+      "relative_tolerance": 0.000001,
+      "must_not_claim": [
+        "validated_real_world_accuracy",
+        "battery_power",
+        "energy_consumption",
+        "regenerative_energy_recovered",
+        "vehicle_qualification"
+      ]
+    },
+    {
+      "id": "WD-POS-008",
+      "title": "Zero-demand stationary control",
+      "input": {
+        "mass_kg": 100,
+        "rotating_equivalent_mass_kg": 0,
+        "speed_mps": 0,
+        "acceleration_mps2": 0,
+        "grade_rad": 0,
+        "rolling_resistance_coefficient": 0,
+        "air_density_kg_m3": 1.2,
+        "drag_area_m2": 0,
+        "wind_speed_mps": 0
+      },
+      "expected_status": "COMPUTED",
+      "evidence_class": "Synthetic",
+      "expected_output": {
+        "inertial_force_n": 0,
+        "rolling_resistance_force_n": 0,
+        "grade_force_n": 0,
+        "aerodynamic_force_n": 0,
+        "wheel_force_required_n": 0,
+        "signed_wheel_power_w": 0,
+        "positive_traction_power_w": 0,
+        "negative_wheel_power_w": 0
+      },
+      "absolute_tolerance": 0.0001,
+      "relative_tolerance": 0.000001,
+      "must_not_claim": [
+        "validated_real_world_accuracy",
+        "battery_power",
+        "energy_consumption",
+        "regenerative_energy_recovered",
+        "vehicle_qualification"
+      ]
+    },
+    {
+      "id": "WD-NEG-001",
+      "title": "Negative physical mass rejected",
+      "input": {
+        "mass_kg": -1,
+        "rotating_equivalent_mass_kg": 0,
+        "speed_mps": 10,
+        "acceleration_mps2": 0,
+        "grade_rad": 0,
+        "rolling_resistance_coefficient": 0.015,
+        "air_density_kg_m3": 1.225,
+        "drag_area_m2": 0.6,
+        "wind_speed_mps": 0
+      },
+      "expected_error": "invalid_mass",
+      "expected_status": "REJECT_INPUT",
+      "evidence_class": "Synthetic",
+      "must_not_claim": [
+        "physical_vehicle_performance"
+      ]
+    },
+    {
+      "id": "WD-NEG-002",
+      "title": "Reverse/negative speed outside v0 model contract",
+      "input": {
+        "mass_kg": 180,
+        "rotating_equivalent_mass_kg": 0,
+        "speed_mps": -1,
+        "acceleration_mps2": 0,
+        "grade_rad": 0,
+        "rolling_resistance_coefficient": 0.015,
+        "air_density_kg_m3": 1.225,
+        "drag_area_m2": 0.6,
+        "wind_speed_mps": 0
+      },
+      "expected_error": "negative_speed",
+      "expected_status": "REJECT_INPUT",
+      "evidence_class": "Synthetic",
+      "must_not_claim": [
+        "physical_vehicle_performance"
+      ]
+    },
+    {
+      "id": "WD-NEG-003",
+      "title": "Vertical wall is outside road-grade model scope",
+      "input": {
+        "mass_kg": 180,
+        "rotating_equivalent_mass_kg": 0,
+        "speed_mps": 5,
+        "acceleration_mps2": 0,
+        "grade_rad": 1.5707963267948966,
+        "rolling_resistance_coefficient": 0.015,
+        "air_density_kg_m3": 1.225,
+        "drag_area_m2": 0.6,
+        "wind_speed_mps": 0
+      },
+      "expected_error": "grade_out_of_domain",
+      "expected_status": "REJECT_INPUT",
+      "evidence_class": "Synthetic",
+      "must_not_claim": [
+        "physical_vehicle_performance"
+      ]
+    },
+    {
+      "id": "WD-NEG-004",
+      "title": "Negative drag area rejected",
+      "input": {
+        "mass_kg": 180,
+        "rotating_equivalent_mass_kg": 0,
+        "speed_mps": 10,
+        "acceleration_mps2": 0,
+        "grade_rad": 0,
+        "rolling_resistance_coefficient": 0.015,
+        "air_density_kg_m3": 1.225,
+        "drag_area_m2": -0.6,
+        "wind_speed_mps": 0
+      },
+      "expected_error": "invalid_drag_area",
+      "expected_status": "REJECT_INPUT",
+      "evidence_class": "Synthetic",
+      "must_not_claim": [
+        "physical_vehicle_performance"
+      ]
+    }
+  ]
+}
