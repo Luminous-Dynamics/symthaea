@@ -808,10 +808,10 @@ pub fn replay_preference_episode(
         ));
     }
 
-    let eligible_set: HashSet<&str> = eligible.iter().map(String::as_str).collect();
+    let eligible_set: HashSet<String> = eligible.iter().cloned().collect();
     for observation in &matched {
         if let Some(rejected) = string_array(observation, "rejected_candidate_ids") {
-            let rejected_set: HashSet<&str> = rejected.iter().map(String::as_str).collect();
+            let rejected_set: HashSet<String> = rejected.iter().cloned().collect();
             if eligible_set.iter().all(|candidate| rejected_set.contains(candidate)) {
                 return Ok(build(
                     PreferenceReplayActionV1::RejectAll,
@@ -829,8 +829,7 @@ pub fn replay_preference_episode(
         let rejected = nonempty_string(observation, "rejected_candidate_id");
         match (preferred, rejected) {
             (Some(winner), Some(loser)) if winner != loser => {
-                if eligible_set.contains(winner.as_str())
-                    && eligible_set.contains(loser.as_str())
+                if eligible_set.contains(&winner) && eligible_set.contains(&loser)
                 {
                     directed_pairs.insert((winner, loser));
                 }
@@ -928,7 +927,7 @@ mod tests {
         assert_eq!(summary.scenario_count, 12);
         assert_eq!(summary.development_scenario_count, 2);
         assert_eq!(summary.held_out_scenario_count, 10);
-        assert_eq!(summary.observation_count, 18);
+        assert_eq!(summary.observation_count, 19);
     }
 
     #[test]
@@ -1087,7 +1086,39 @@ mod tests {
             PreferenceReplayReasonV1::NoContextMatchedPreferenceEvidence
         );
         assert_eq!(report.context_matched_observation_count, 0);
-        assert_eq!(report.stale_or_mismatched_observation_count, 1);
+        assert_eq!(report.stale_or_mismatched_observation_count, 2);
+    }
+
+    #[test]
+    fn context_blind_baseline_fails_the_fatigue_shift_control() {
+        let fixture = parse_fixture();
+        let scenario = scenario_by_id(&fixture, "HOLD-SHIFT-001");
+        let task = nonempty_string(scenario, "task_id").unwrap();
+        let eligible = string_array(scenario, "eligible_candidate_ids").unwrap();
+        let observations = scenario["preference_observations"]
+            .as_array()
+            .expect("observation array");
+        let mut task_only_pairs = HashSet::<(String, String)>::new();
+        for observation in observations {
+            if nonempty_string(observation, "task_id").as_deref() == Some(task.as_str()) {
+                if let (Some(preferred), Some(rejected)) = (
+                    nonempty_string(observation, "preferred_candidate_id"),
+                    nonempty_string(observation, "rejected_candidate_id"),
+                ) {
+                    task_only_pairs.insert((preferred, rejected));
+                }
+            }
+        }
+        let context_blind_winner = eligible.iter().find(|candidate| {
+            eligible.iter().filter(|other| *other != *candidate).all(|other| {
+                task_only_pairs.contains(&(candidate.clone(), other.clone()))
+            })
+        });
+        assert_eq!(context_blind_winner.map(String::as_str), Some("flex"));
+
+        let context_aware = replay_preference_episode(scenario).unwrap();
+        assert_eq!(context_aware.action, PreferenceReplayActionV1::Query);
+        assert_eq!(context_aware.recommended_candidate_id, None);
     }
 
     #[test]
