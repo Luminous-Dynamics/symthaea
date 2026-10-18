@@ -1,0 +1,248 @@
+{
+  "suite": "CropFoundry",
+  "suite_version": "0.1.0-proposal",
+  "created": "2026-10-18",
+  "status": "proposed_not_run",
+  "owner_project": "Luminous-Dynamics/symthaea",
+  "partner_projects": [
+    "Luminous-Dynamics/symtropy",
+    "Luminous-Dynamics/mycelix",
+    "Luminous-Dynamics/sol-atlas-leptos"
+  ],
+  "scope": {
+    "initial_region": "South Africa; begin with a defined Gauteng-relevant target population, not an assumption of province-wide representativeness",
+    "pilot_crops": [
+      {
+        "role": "comparatively_well_studied_reference",
+        "candidate": "tomato",
+        "selection_gate": "Choose only after a rights-aware source inventory confirms sufficient harmonized trial observations for at least one predeclared trait."
+      },
+      {
+        "role": "local_underutilized_crop",
+        "candidates": [
+          "amaranth",
+          "Cleome",
+          "Corchorus",
+          "Vigna"
+        ],
+        "selection_gate": "Select exactly one initial species after checking local relevance, partner input, seed/germplasm access, trait definitions, observation coverage, and material-transfer/access conditions."
+      },
+      {
+        "role": "next_stage",
+        "candidates": [
+          "sweet potato",
+          "fruit trees"
+        ],
+        "selection_gate": "Do not use the initial vegetable benchmark to claim perennial crop performance."
+      }
+    ],
+    "excluded_claims": [
+      "No claim of a new or improved cultivar based only on simulation.",
+      "No food-safety conclusion based only on species name or model output.",
+      "No unreviewed laboratory or field intervention."
+    ]
+  },
+  "interoperability": [
+    {
+      "standard": "MIAPPE",
+      "purpose": "Plant phenotyping experiment metadata",
+      "url": "https://www.miappe.org/overview/",
+      "policy": "Map fields and validate applicability; do not replace the standard with a proprietary schema."
+    },
+    {
+      "standard": "BrAPI v2.1",
+      "purpose": "Breeding, germplasm, trial, phenotyping, and genotyping exchange",
+      "url": "https://brapi.org/specification",
+      "policy": "Implement only the modules required by the use case and version-pin mappings."
+    },
+    {
+      "standard": "Crop Ontology",
+      "purpose": "Trait + method + scale definitions",
+      "url": "https://cropontology.org/about",
+      "policy": "Persist ontology identifiers and versions; do not map traits by name alone."
+    },
+    {
+      "standard": "FAO Genebank Standards",
+      "purpose": "Germplasm stewardship and documentation",
+      "url": "https://www.fao.org/agriculture/crops/thematic-sitemap/theme/seeds-pgr/gbs/en/",
+      "policy": "Respect collection-specific access terms and material transfer requirements."
+    }
+  ],
+  "data_provenance_minimum": [
+    "source_uri_or_stable_identifier",
+    "retrieval_date",
+    "source_version_or_content_digest_when_available",
+    "license_or_access_terms",
+    "biological_material_identity_when_applicable",
+    "trait_identifier_and_definition",
+    "method_and_scale",
+    "unit",
+    "environment_and_time_metadata_when_applicable",
+    "transformation_lineage",
+    "missingness_and_exclusion_reason"
+  ],
+  "invariants": [
+    {
+      "id": "INV-01",
+      "rule": "Proposed thresholds are not achieved scores.",
+      "fail_behavior": "Keep status proposed_not_run or not_evaluable until evidence and run receipts exist."
+    },
+    {
+      "id": "INV-02",
+      "rule": "Every reported result must bind to an immutable dataset snapshot, code/model version, split definition, baseline, and evaluation receipt.",
+      "fail_behavior": "Reject result publication."
+    },
+    {
+      "id": "INV-03",
+      "rule": "No forbidden sample/site-year/genotype leakage across split boundaries for the declared generalization question.",
+      "fail_behavior": "Invalidate the run; do not repair the score by post-hoc split changes."
+    },
+    {
+      "id": "INV-04",
+      "rule": "Missing data, inaccessible runners, and unmeasured outcomes are not passes.",
+      "fail_behavior": "Report blocked or not_evaluable."
+    },
+    {
+      "id": "INV-05",
+      "rule": "No cultivar improvement claim without pre-registered physical comparison and uncertainty reporting.",
+      "fail_behavior": "Allow only hypothesis/candidate language."
+    },
+    {
+      "id": "INV-06",
+      "rule": "Data licensing, material access, privacy, consent, and appropriate biosafety/ethics approvals must be checked before ingestion, redistribution, or experiment.",
+      "fail_behavior": "Quarantine the data or block the intervention."
+    }
+  ],
+  "benchmarks": [
+    {
+      "id": "CF-001",
+      "category": "data_integrity",
+      "name": "Evidence lineage completeness",
+      "question": "Can each scored observation be traced to an authorized source and interpretable measurement context?",
+      "primary_metric": "fraction of scored records satisfying the applicable provenance minimum",
+      "proposed_target": "100% of records used to train, validate, test, or support a released claim have required provenance fields or an explicitly justified not_applicable value; 0 fabricated source references",
+      "split_protocol": "Audit every data partition and a reproducible sample of raw-to-derived transformations.",
+      "status": "proposed_not_run"
+    },
+    {
+      "id": "CF-002",
+      "category": "data_integrity",
+      "name": "Leakage-resistant evaluation",
+      "question": "Are results genuinely out of the intended generalization regime?",
+      "primary_metric": "count of prohibited overlapping group keys across partitions",
+      "proposed_target": "0 prohibited overlap for the declared split policy; publish separate site-year-held-out and genotype-held-out evaluations when data supports both",
+      "split_protocol": "Split by site-year before fitting or selecting models; additionally hold out genotypes for a distinct transfer test where sample size supports it. Keep a final test set untouched.",
+      "status": "proposed_not_run"
+    },
+    {
+      "id": "CF-003",
+      "category": "prediction",
+      "name": "Held-out agronomic prediction",
+      "question": "Does the model predict a selected trait better than relevant simple and established baselines?",
+      "primary_metric": "pre-registered primary error metric, such as normalized MAE, reported with bootstrap confidence interval",
+      "proposed_target": "Aim for at least 10% relative error reduction versus the strongest eligible baseline on held-out site-years; do not advance if the difference is indistinguishable from noise or material subgroup harm is hidden",
+      "split_protocol": "Define target population, trait, unit, baseline set, missingness policy, and metric before examining final test results. Report each held-out site-year.",
+      "status": "proposed_not_run"
+    },
+    {
+      "id": "CF-004",
+      "category": "uncertainty",
+      "name": "Predictive interval calibration",
+      "question": "Do stated intervals represent uncertainty usefully across environments?",
+      "primary_metric": "empirical coverage and average width of nominal 90% prediction intervals",
+      "proposed_target": "Initial target: 85%-95% aggregate coverage for nominal 90% intervals, plus per-site-year coverage and interval width; investigate poor subgroup calibration even if aggregate passes",
+      "split_protocol": "Calibration must use training/validation data only; assess once on untouched test data and by environment subgroup.",
+      "status": "proposed_not_run"
+    },
+    {
+      "id": "CF-005",
+      "category": "robustness",
+      "name": "Out-of-domain detection and abstention",
+      "question": "Does the system recognize conditions outside its validated applicability domain?",
+      "primary_metric": "OOD AUROC plus risk-versus-coverage curve at predeclared abstention thresholds",
+      "proposed_target": "Initial target AUROC >= 0.80 on documented shift scenarios and lower error among retained predictions as coverage decreases; any safety-critical unsupported claim is a failure regardless of AUROC",
+      "split_protocol": "Design shifts involving unseen site-years, cultivar groups, and climate/management ranges; avoid random-row splits as the sole test.",
+      "status": "proposed_not_run"
+    },
+    {
+      "id": "CF-006",
+      "category": "active_learning",
+      "name": "Trial-selection sample efficiency",
+      "question": "Can model-guided selection reach a decision-quality threshold with fewer observations than random selection?",
+      "primary_metric": "number and cost of trials required to reach a pre-registered error or decision-regret threshold",
+      "proposed_target": "In simulation/replay, aim for >=25% fewer trial observations than random selection at the same threshold across repeated seeds and multiple response surfaces; no real-world efficiency claim until validated prospectively",
+      "split_protocol": "Compare random, uncertainty sampling, and decision-focused expected-value-of-information selection under identical budgets and held-out scenarios.",
+      "status": "proposed_not_run"
+    },
+    {
+      "id": "CF-007",
+      "category": "multi_objective",
+      "name": "Pareto quality and hard-constraint integrity",
+      "question": "Does optimization expose meaningful trade-offs without violating hard constraints?",
+      "primary_metric": "hypervolume or other predeclared Pareto metric plus count of constraint violations",
+      "proposed_target": "Beat random/naive candidate selection on predeclared synthetic and replay cases; 0 violations of hard safety, rights, and feasibility constraints in every scored recommendation",
+      "split_protocol": "Use fixed objective definitions, reference point, constraint tests, and sensitivity analysis; retain all non-dominated alternatives instead of hiding them behind one score.",
+      "status": "proposed_not_run"
+    },
+    {
+      "id": "CF-008",
+      "category": "mechanistic_consistency",
+      "name": "Physical and dimensional invariants",
+      "question": "Are units, ranges, and conservation relationships handled consistently?",
+      "primary_metric": "fraction of deterministic invariant/property tests passing",
+      "proposed_target": "100% of unit-conversion, dimensional, non-negative-domain, and enabled water/mass-balance invariants pass; all exceptions documented and bounded",
+      "split_protocol": "Use hand-computed test cases, boundary conditions, unit round trips, and metamorphic tests independent of model fitting.",
+      "status": "proposed_not_run"
+    },
+    {
+      "id": "CF-009",
+      "category": "physical_validation",
+      "name": "Independent crop improvement gate",
+      "question": "Does a candidate improve a real, farmer-relevant outcome against a local reference?",
+      "primary_metric": "pre-registered effect size and confidence interval for marketable yield, irrigation water productivity, or another farmer-approved primary endpoint",
+      "proposed_target": "Candidate target for suitable annual crops: >=10% more marketable yield at comparable irrigation, or >=15% less irrigation at non-inferior marketable yield; require a powered, replicated, pre-registered physical trial across representative environments/seasons, no unresolved food-safety issue, and no unacceptable predeclared nutrition/sensory/economic regression",
+      "split_protocol": "Use qualified local partners, reference cultivars, randomization and replication appropriate to the design, calibrated measures, and an independent analysis plan. Crop-specific duration and power analysis supersede generic site/season counts.",
+      "status": "not_evaluable_until_physical_trials"
+    },
+    {
+      "id": "CF-010",
+      "category": "nutrition_and_quality",
+      "name": "Independent food-quality evaluation",
+      "question": "Are claimed nutrition and eating-quality changes measured instead of inferred?",
+      "primary_metric": "laboratory nutrient measurements and pre-registered sensory/post-harvest endpoints",
+      "proposed_target": "0 claims based solely on predicted composition; use suitable lab methods and blinded sensory protocols where feasible; report preparation/storage context and uncertainty",
+      "split_protocol": "Compare against references grown and handled under comparable conditions; specify target nutrients, safety endpoints, sensory method, and non-inferiority margins before data collection.",
+      "status": "not_evaluable_until_physical_trials"
+    },
+    {
+      "id": "CF-011",
+      "category": "transfer",
+      "name": "Environment and crop transfer",
+      "question": "Does performance persist across intended environments and locally relevant crops?",
+      "primary_metric": "per-environment error, worst-group error, and coverage of the stated target population",
+      "proposed_target": "Publish per-environment results; no claim of South Africa-wide transfer from one site or season; measure coverage gaps for the selected local/underutilized crop separately from reference-crop results",
+      "split_protocol": "Report dataset coverage before modelling. Add sites/seasons/crops only through versioned evaluations; missing data is not evidence of low biological potential.",
+      "status": "proposed_not_run"
+    },
+    {
+      "id": "CF-012",
+      "category": "decision_value",
+      "name": "Farmer and food-system utility",
+      "question": "Does the recommendation improve a real decision under locally stated constraints?",
+      "primary_metric": "net margin or cost per marketable edible unit plus water/input use, labor, loss, and farmer-defined utility",
+      "proposed_target": "No universal percentage threshold before the local reference economics and priorities are established; require transparent absolute units, sensitivity analysis, distribution of benefits/costs, and grower review",
+      "split_protocol": "Use local prices and season-specific input assumptions with dates; run sensitivity analyses and include non-financial constraints such as seed access and labor.",
+      "status": "not_evaluable_until_local_cost_and_partner_data"
+    }
+  ],
+  "first_milestone_exit_criteria": [
+    "Rights-aware source inventory for one reference crop and one selected local/underutilized crop",
+    "Immutable data snapshot identifiers/digests and documented reuse terms",
+    "One trait selected based on actual coverage, not prior preference",
+    "Group split created and audited before model selection",
+    "Simple baseline reproduced with uncertainty intervals",
+    "Benchmark run receipt contains code/model version, source digest, split digest, metrics, and exclusions",
+    "Any physical trial has an accountable partner, protocol, reference, power rationale, and approval path"
+  ],
+  "scientific_caveat": "All numerical performance thresholds in this file are provisional engineering targets. They are not established universal standards, measured Symthaea results, or evidence of crop improvement. Revise them only prospectively with a recorded rationale; never after inspecting the held-out outcome."
+}
