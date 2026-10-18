@@ -980,6 +980,10 @@ mod tests {
     const CAD_CHECK_TEXT: &str = include_str!(
         "../../../hardware/open-display-reference/validation/odrh_sensor_plate_cad_check-v0.1.json"
     );
+    const HARDWARE_LICENSE_TEXT: &str =
+        include_str!("../../../hardware/open-display-reference/LICENSE");
+    const HARDWARE_README_TEXT: &str =
+        include_str!("../../../hardware/open-display-reference/README.md");
     const RUN_TEXT: &str =
         include_str!("../../../docs/engineering/display-measurement-run-template-v0.1.json");
     const RUN_SCHEMA_TEXT: &str =
@@ -1002,6 +1006,12 @@ mod tests {
         let receipt: Value =
             serde_json::from_str(CAD_CHECK_TEXT).expect("CAD validation receipt must parse");
         let source_hash = sha256_hex(CAD_SOURCE.as_bytes());
+
+        assert!(CAD_SOURCE.contains("SPDX-License-Identifier: CERN-OHL-S-2.0"));
+        assert!(HARDWARE_LICENSE_TEXT.contains(
+            "CERN Open Hardware Licence Version 2 - Strongly Reciprocal"
+        ));
+        assert!(HARDWARE_README_TEXT.contains("[LICENSE](LICENSE)"));
 
         assert_eq!(
             receipt
