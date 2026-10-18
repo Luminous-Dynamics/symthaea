@@ -50,9 +50,21 @@ Keep simulator assets and external checkpoints optional for this test layer.
 
 ### Stage 2 — a small, preregistered simulation pilot
 
-Select at least two tasks from each of RoboDojo's five capability dimensions after reviewing the current task definitions. Use common task instances and paired seeds for baseline versus sidecar. Start with 10 seeds per task for screening; expand the sample if confidence intervals are inconclusive. Do not choose tasks after observing which ones favor Symthaea.
+Use this candidate matrix for the pilot, then pin the official task/config revision and verify each capability label before running:
 
-First confirm that the chosen pretrained policy is supported, its checkpoint is available under the license terms, its resource needs fit the available machine, and the environment uses a pinned XPolicyLab revision. Then run baseline-only and sidecar variants under the same budget.
+| Capability | Candidate tasks | What it probes |
+|---|---|---|
+| Generalization | Stack Bowls; Sweep Blocks | Standardized placement versus tool handoff and scene/task variation |
+| Memory | Imitate Sorting Sequence; Press By Number | Retaining an observed sequence or numbers while executing later actions |
+| Precision | Insert Tubes; Insert Key | Alignment and insertion tolerance |
+| Long-Horizon | Organize Table; Put Bottles Into Dustbin | Multi-step completion and accumulated-error sensitivity |
+| Open-vocabulary | Stack Blocks by Language; Classify Objects by Language | Grounding instruction phrases into object selection and action |
+
+The smallest useful preflight is **Stack Bowls** for task/action wiring, then **Imitate Sorting Sequence** for an explicitly memory-dependent task, then **Insert Tubes** for precision. The XPolicyLab demo adapter documents Stack Bowls as a wiring example but emits zero actions, so it validates the protocol only; it is not a success-rate baseline. Verify the current task taxonomy before freezing the matrix because benchmark tasks and variants can evolve.
+
+Use common task instances and paired seeds for baseline versus sidecar. Start with 10 seeds per task for screening; expand the sample if confidence intervals are inconclusive. Do not choose tasks after observing which ones favor Symthaea.
+
+First confirm that the chosen pretrained policy is supported, its checkpoint is available under the license terms, its resource needs fit the available machine, and the environment uses a pinned XPolicyLab revision. Choose the strongest reproducible compatible baseline with available checkpoint/config artifacts—not necessarily the highest aggregate leaderboard entry, since policy scores can vary substantially by task and capability dimension. Then run baseline-only and sidecar variants under the same budget.
 
 ### Stage 3 — full simulation sweep
 
