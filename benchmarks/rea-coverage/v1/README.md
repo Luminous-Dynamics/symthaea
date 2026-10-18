@@ -35,6 +35,7 @@ For a nonempty selection of length `L`:
 | Invalid input, fractional byte ranges and malformed chunk ranges | 100% fail closed |
 | Full known-chunk coverage | No spurious `unreported-input-region` gap |
 | Determinism | Same manifest + oracle yields the same case dispositions and file digests |
+| Small-domain exhaustive coverage | All 510 byte masks for lengths 1–8 agree with an independent bytewise-gap oracle |
 
 These are contract targets and the current public fixture results, not measurements of a real REA provider.
 
@@ -44,9 +45,10 @@ Requires `jq` and `sha256sum` only; it does not require Node, Binwalk, Unblob, a
 
 ```sh
 benchmarks/rea-coverage/v1/verify.sh
+benchmarks/rea-coverage/v1/property-sweep.sh
 ```
 
-Recorded local result: 16/16 case dispositions matched the oracle: 5 internally consistent reports accepted, 8 inconsistent reports rejected, 1 empty input marked invalid, and 2 malformed reports rejected. Exact corpus digests and file identities are in `receipt.json`.
+Recorded fixed-corpus result: 16/16 case dispositions matched the oracle: 5 internally consistent reports accepted, 8 inconsistent reports rejected, 1 empty input marked invalid, and 2 malformed reports rejected. The independent `property-sweep.sh` also passed all 510 coverage masks for selected-input lengths 1–8, using a bytewise gap oracle and varying source offsets to check root-range mapping. Exact fixture and verifier identities are in `receipt.json`.
 
 ## Next evidence gate
 
