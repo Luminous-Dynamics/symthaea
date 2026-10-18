@@ -176,12 +176,15 @@ impl ImplicitEulerError {
             &kind,
             ImplicitEulerErrorKind::EmptySystem
                 | ImplicitEulerErrorKind::DimensionMismatch { .. }
-                | ImplicitEulerErrorKind::InvalidTimeSpan
                 | ImplicitEulerErrorKind::InvalidStepCount { .. }
                 | ImplicitEulerErrorKind::InvalidNewtonIterationBudget { .. }
                 | ImplicitEulerErrorKind::SystemTooLargeForDenseNewton { .. }
                 | ImplicitEulerErrorKind::NonFiniteInitialState { .. }
-        );
+        ) || (matches!(&kind, ImplicitEulerErrorKind::InvalidTimeSpan)
+            && steps_completed == 0
+            && newton_corrections == 0
+            && rhs_evaluations == 0
+            && residual_norm == 0.0);
         let failed_step = if validation_failure {
             0
         } else {
@@ -1380,15 +1383,17 @@ impl DifferentialEquationsEngine {
         })
     }
 
-    /// Implicit Euler (backward Euler) for stiff ODEs via Newton iteration.
+    /// Legacy compatibility API for backward Euler.
     ///
-    /// Solves the nonlinear system G(y_{n+1}) = y_{n+1} - y_n - h·f(t_{n+1}, y_{n+1}) = 0
-    /// using simplified Newton iteration with diagonal Jacobian approximation:
-    ///   J_ii ≈ 1 - h · ∂f_i/∂y_i  (finite differences)
-    ///   Δy = -G / J  (component-wise)
+    /// This implementation uses simplified Newton iteration with a diagonal
+    /// Jacobian approximation and its result type cannot report failed Newton
+    /// convergence. New callers should prefer `try_solve_implicit_euler`,
+    /// which uses a full dense Jacobian, checks each nonlinear residual, and
+    /// returns typed failure receipts.
     ///
-    /// This is L-stable: unconditionally damps fast modes regardless of step size.
-    /// Suitable for stiff systems with eigenvalue ratios > 10^6.
+    /// Backward Euler is L-stable as a mathematical method, but this legacy
+    /// diagonal approximation does not guarantee that coupled nonlinear
+    /// systems converge.
     pub fn solve_implicit_euler(
         system: &ODESystem,
         t0: f64,
