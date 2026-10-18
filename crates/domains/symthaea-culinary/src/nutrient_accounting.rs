@@ -176,6 +176,11 @@ pub fn validate_nutrient_accounting_v1(
     if non_empty(assessment, "process_id").is_none() {
         errors.push("process_id is required to scope retention evidence".to_owned());
     }
+    if non_empty(assessment, "final_food_state").is_none() {
+        errors.push("final_food_state is required to scope the prepared dish".to_owned());
+    }
+    let final_food_state = non_empty(assessment, "final_food_state");
+    let process_id = non_empty(assessment, "process_id");
     let claim_status = non_empty(assessment, "claim_status");
     if !matches!(claim_status, Some("calculation_only" | "review_required" | "qualified")) {
         errors.push("claim_status must be calculation_only, review_required, or qualified".to_owned());
@@ -224,6 +229,9 @@ pub fn validate_nutrient_accounting_v1(
         }
         if non_empty(ingredient, "composition_basis") != Some("per_100g_edible") {
             errors.push(format!("{label}.composition_basis must be per_100g_edible"));
+        }
+        if non_empty(ingredient, "composition_state").is_none() {
+            errors.push(format!("{label}.composition_state is required to bind composition data to a food state"));
         }
         if !validate_evidence(
             ingredient.get("composition_source").unwrap_or(&null),
@@ -301,6 +309,24 @@ pub fn validate_nutrient_accounting_v1(
             errors.push(format!("{label}.nutrient_id is required"));
             continue;
         };
+        if non_empty(retention, "process_id") != process_id {
+            errors.push(format!("{label}.process_id does not match the recipe process_id"));
+        }
+        let retention_input_state = non_empty(retention, "input_state");
+        let retention_output_state = non_empty(retention, "output_state");
+        if retention_input_state.is_none() || retention_output_state.is_none() {
+            errors.push(format!("{label} requires explicit input_state and output_state"));
+        }
+        if let Some(ingredient) = ingredients.iter().find(|candidate| {
+            non_empty(candidate, "ingredient_id") == Some(ingredient_id)
+        }) {
+            if retention_input_state != non_empty(ingredient, "composition_state") {
+                errors.push(format!("{label}.input_state does not match the ingredient composition_state"));
+            }
+        }
+        if retention_output_state != final_food_state {
+            errors.push(format!("{label}.output_state does not match final_food_state"));
+        }
         let key = (ingredient_id.to_owned(), nutrient_id.to_owned());
         if !ingredient_ids.contains(ingredient_id) {
             errors.push(format!("{label} references unknown ingredient {ingredient_id:?}"));
