@@ -4,7 +4,7 @@
 **Tracker:** https://github.com/Luminous-Dynamics/symthaea/issues/8056  
 **Parent program:** https://github.com/Luminous-Dynamics/symthaea/issues/8044  
 **Review date:** 2026-10-18  
-**Evidence status:** Literature/source review plus proposed benchmark design. No powertrain has been modelled, built, or tested by this document.
+**Evidence status:** Literature/source review plus proposed benchmark design. No powertrain has been modelled, built, or tested by this document. The machine-readable candidate register is [`two_wheeler_powertrain_candidates_v0_1.json`](data/two_wheeler_powertrain_candidates_v0_1.json); it defines screening roles and required evidence but contains no measured performance ranking.
 
 ## Executive decision
 
@@ -46,7 +46,7 @@ No design may claim “engine efficiency” while omitting the energy source, ge
 | MHD/atmospheric plasma propulsion | Speculative screening only | Electromagnetic force on ionized gas in principle | Ionization energy, achievable force density, power electronics, hot/reactive gas materials, mass, exhaust/ambient coupling; no road-vehicle advantage assumed |
 | Lattice-confinement fusion (Spark Engine context) | **Excluded from the viable vehicle frontier**; hypothesis tracking only | If a controllable net-energy process were independently established, an entirely different energy pathway could follow | Current Spark Engine baseline does not establish net energy. Require independent replication, complete energy accounting, nuclear-product accounting and useful conversion before reconsideration |
 
-The register is a hypothesis screen, not a ranking based on measured candidates. Lack of evidence means “not established,” not “zero performance” and not proof that something is impossible.
+The [machine-readable register](data/two_wheeler_powertrain_candidates_v0_1.json) is a hypothesis screen, not a ranking based on measured candidates. Lack of evidence means “not established,” not “zero performance” and not proof that something is impossible.
 
 ## 3. Physics gates for exotic concepts
 
