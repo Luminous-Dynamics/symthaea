@@ -31,9 +31,10 @@ A second binary compares four selection policies under equal experiment budgets 
 - `fixed_grid`;
 - `seeded_random`;
 - `maximin_coverage`;
-- `model_disagreement` (global linear trend versus local piecewise-linear interpolation).
+- `model_disagreement` (global linear trend versus local piecewise-linear interpolation);
+- `coverage_guarded_disagreement` (the same disagreement signal, with a minimum spacing constraint based on the declared experiment budget).
 
-Each policy begins from the same endpoint/midpoint observations, has the same experiment budget, and sees the same deterministic per-location noise for a given seed. Evaluation error is computed on a dense synthetic oracle grid excluding sampled positions. Reports include mean absolute error, p90 absolute error, mean RMSE and worst per-trial maximum absolute error. The comparison is deliberately not called Bayesian optimization or calibrated information gain.
+Each policy begins from the same endpoint/midpoint observations, has the same experiment budget, and sees the same deterministic per-location noise for a given seed. Evaluation error is computed on a dense synthetic oracle grid excluding sampled positions. Reports include the selected grid indices per trial, mean absolute error, p90 absolute error, mean RMSE and worst per-trial maximum absolute error. The comparison is deliberately not called Bayesian optimization or calibrated information gain.
 
 Run the reproducible default tournament (100 seeds, 11 observations per policy/surface):
 
