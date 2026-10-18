@@ -556,6 +556,12 @@ mod tests {
                         unit: "USD/serving".to_owned(),
                         value: observed_cost,
                         evidence_ref: observed_cost.map(|_| format!("price:{id}:observed:v1")),
+                    }, ScenarioObjective {
+                        key: "nutrition_adequacy".to_owned(),
+                        direction: ObjectiveDirection::Maximize,
+                        unit: "adequacy_points".to_owned(),
+                        value: Some(8.0),
+                        evidence_ref: Some(format!("nutrition:{id}:observed:v1")),
                     }],
                 },
                 CandidateScenarioMetrics {
@@ -567,6 +573,12 @@ mod tests {
                         unit: "USD/serving".to_owned(),
                         value: shock_cost,
                         evidence_ref: shock_cost.map(|_| format!("price:{id}:shock:v1")),
+                    }, ScenarioObjective {
+                        key: "nutrition_adequacy".to_owned(),
+                        direction: ObjectiveDirection::Maximize,
+                        unit: "adequacy_points".to_owned(),
+                        value: Some(8.0),
+                        evidence_ref: Some(format!("nutrition:{id}:shock:v1")),
                     }],
                 },
             ],
@@ -680,6 +692,43 @@ mod tests {
         .unwrap();
 
         assert_eq!(forward, reverse);
+    }
+
+    #[test]
+    fn unknown_gate_never_enters_scenario_or_robust_frontier() {
+        let mut unknown = candidate("unknown", Some(0.0), Some(0.0));
+        unknown.gates[0] = GateEvidence::unknown("allergen_reviewed");
+
+        let report = evaluate_robust_frontier(
+            &scenarios(),
+            &[candidate("eligible", Some(5.0), Some(5.0)), unknown],
+        )
+        .unwrap();
+
+        assert!(report
+            .scenarios
+            .iter()
+            .all(|scenario| !scenario.pareto.frontier_ids.contains(&"unknown".to_owned())));
+        assert_eq!(
+            report.candidates.iter().find(|item| item.id == "unknown").unwrap()
+                .indeterminate_scenario_count,
+            2
+        );
+        assert!(!report.robust_frontier_ids.contains(&"unknown".to_owned()));
+    }
+
+    #[test]
+    fn objective_declaration_order_does_not_change_scenario_report() {
+        let ordered = vec![candidate("a", Some(5.0), Some(5.0)), candidate("b", Some(6.0), Some(6.0))];
+        let expected = evaluate_robust_frontier(&scenarios(), &ordered).unwrap();
+        let mut reordered = ordered.clone();
+        for candidate in &mut reordered {
+            for metrics in &mut candidate.scenario_metrics {
+                metrics.objectives.reverse();
+            }
+        }
+
+        assert_eq!(expected, evaluate_robust_frontier(&scenarios(), &reordered).unwrap());
     }
 
     #[test]
