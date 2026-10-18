@@ -535,6 +535,41 @@ mod tests {
     }
 
     #[test]
+    fn increasing_predictive_uncertainty_reduces_discrimination_score() {
+        let mut input = galileo_demo_input();
+        let baseline = rank_experiments(&input).unwrap();
+        let baseline_score = baseline.ranked_experiments[0].worst_case_separation_sigma;
+
+        for experiment in &mut input.experiments {
+            for observable in &mut experiment.observables {
+                for prediction in &mut observable.predictions {
+                    prediction.standard_uncertainty *= 10.0;
+                }
+            }
+        }
+        let degraded = rank_experiments(&input).unwrap();
+        let degraded_score = degraded.ranked_experiments[0].worst_case_separation_sigma;
+        assert!((degraded_score * 10.0 - baseline_score).abs() < 1.0e-10);
+    }
+
+    #[test]
+    fn unsupported_schema_and_duplicate_hypotheses_are_rejected() {
+        let mut input = galileo_demo_input();
+        input.schema_version = "physics-experiment-design-v9".to_owned();
+        assert!(matches!(
+            rank_experiments(&input),
+            Err(PlanError::UnsupportedSchema(_))
+        ));
+
+        let mut input = galileo_demo_input();
+        input.hypothesis_ids[1] = input.hypothesis_ids[0].clone();
+        assert!(matches!(
+            rank_experiments(&input),
+            Err(PlanError::DuplicateIdentifier { .. })
+        ));
+    }
+
+    #[test]
     fn serialized_report_discloses_method_and_limitations() {
         let report = rank_experiments(&galileo_demo_input()).unwrap();
         let serialized = serde_json::to_string(&report).unwrap();
