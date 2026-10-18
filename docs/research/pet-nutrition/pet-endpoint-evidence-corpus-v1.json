@@ -286,7 +286,7 @@
       "case_id": "PNE-006",
       "claim": {
         "endpoint": "digestibility",
-        "target_species": "dog",
+        "target_species": "cat",
         "life_stage": "adult",
         "inclusion_percent": 10,
         "minimum_horizon_days": null
@@ -802,7 +802,7 @@
         "observed_endpoints": [
           "food_preference"
         ],
-        "scope_match": "match",
+        "scope_match": "mismatch",
         "metric_definition_complete": true,
         "methods_reported": true,
         "comparator_defined": true,
