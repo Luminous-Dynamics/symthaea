@@ -1,7 +1,7 @@
 {
   "schema_id": "org.luminousdynamics.symthaea.chemical-process-tier-b-candidates",
-  "schema_version": "1.1.0",
-  "record_date": "2026-10-17",
+  "schema_version": "1.2.0",
+  "record_date": "2026-10-18",
   "parent_issue": "https://github.com/Luminous-Dynamics/symthaea/issues/7869",
   "design_document": "docs/engineering/CHEMICAL_PROCESS_TIER_B_REFERENCE_CASES_2026-10-17.md",
   "purpose": "Machine-readable inventory of candidate Tier-B process-engineering benchmarks. This file is a selection and freeze checklist, not a record of executed simulations or validated plant models.",
@@ -68,29 +68,57 @@
         "compound": "water",
         "property_package": "Steam Tables (IAPWS-IF97)",
         "inlet_1": {
-          "temperature": {"value": 300, "unit": "K"},
-          "pressure": {"value": 101325, "unit": "Pa"},
-          "mass_flow": {"value": 100, "unit": "kg/s"}
+          "temperature": {
+            "value": 300,
+            "unit": "K"
+          },
+          "pressure": {
+            "value": 101325,
+            "unit": "Pa"
+          },
+          "mass_flow": {
+            "value": 100,
+            "unit": "kg/s"
+          }
         },
         "inlet_2": {
-          "temperature": {"value": 348, "unit": "K"},
-          "pressure": {"value": 101325, "unit": "Pa"},
-          "mass_flow": {"value": 50, "unit": "kg/s"}
+          "temperature": {
+            "value": 348,
+            "unit": "K"
+          },
+          "pressure": {
+            "value": 101325,
+            "unit": "Pa"
+          },
+          "mass_flow": {
+            "value": 50,
+            "unit": "kg/s"
+          }
         }
       },
       "analytic_invariants": [
         {
           "id": "MASS-FLOW-SUM",
           "quantity": "outlet_total_mass_flow",
-          "expected": {"value": 150, "unit": "kg/s"},
-          "tolerance": {"value": 0, "unit": "kg/s", "basis": "exact arithmetic for the declared input values"},
+          "expected": {
+            "value": 150,
+            "unit": "kg/s"
+          },
+          "tolerance": {
+            "value": 0,
+            "unit": "kg/s",
+            "basis": "exact arithmetic for the declared input values"
+          },
           "status": "FROZEN_ANALYTIC_INVARIANT"
         }
       ],
       "source_hints_not_gold": [
         {
           "quantity": "outlet_temperature",
-          "reported_value": {"value": 316, "unit": "K"},
+          "reported_value": {
+            "value": 316,
+            "unit": "K"
+          },
           "qualifier": "approximately",
           "use": "sanity_hint_only"
         },
@@ -104,7 +132,8 @@
       "reference_outputs": {
         "state": "PARTIAL_ANALYTIC_ONLY",
         "exact_simulator_outputs_frozen": false,
-        "output_digest": null
+        "output_digest": null,
+        "freeze_receipt_sha256": null
       },
       "freeze_blockers": [
         "capture an exact native DWSIM input/project file",
@@ -136,19 +165,46 @@
         "compound": "water",
         "property_package": "Steam Tables (IAPWS-IF97)",
         "feed": {
-          "temperature": {"value": 298.15, "unit": "K"},
-          "pressure": {"value": 101325, "unit": "Pa"},
-          "mass_flow": {"value": 1, "unit": "kg/s"}
+          "temperature": {
+            "value": 298.15,
+            "unit": "K"
+          },
+          "pressure": {
+            "value": 101325,
+            "unit": "Pa"
+          },
+          "mass_flow": {
+            "value": 1,
+            "unit": "kg/s"
+          }
         },
         "heater": {
-          "target_outlet_temperature": {"value": 353.15, "unit": "K"},
-          "pressure_drop": {"value": 0, "unit": "Pa"},
-          "efficiency": {"value": 100, "unit": "%"}
+          "target_outlet_temperature": {
+            "value": 353.15,
+            "unit": "K"
+          },
+          "pressure_drop": {
+            "value": 0,
+            "unit": "Pa"
+          },
+          "efficiency": {
+            "value": 100,
+            "unit": "%"
+          }
         },
         "cooler": {
-          "target_outlet_temperature": {"value": 298.15, "unit": "K"},
-          "pressure_drop": {"value": 0, "unit": "Pa"},
-          "efficiency": {"value": 100, "unit": "%"}
+          "target_outlet_temperature": {
+            "value": 298.15,
+            "unit": "K"
+          },
+          "pressure_drop": {
+            "value": 0,
+            "unit": "Pa"
+          },
+          "efficiency": {
+            "value": 100,
+            "unit": "%"
+          }
         },
         "duty_convention": "Q = mass_flow * (h_out - h_in); simulator sign convention must be captured explicitly"
       },
@@ -173,13 +229,19 @@
       "source_hints_not_gold": [
         {
           "quantity": "heater_duty",
-          "reported_value": {"value": 230, "unit": "kW"},
+          "reported_value": {
+            "value": 230,
+            "unit": "kW"
+          },
           "qualifier": "about; tutorial sign convention",
           "use": "sanity_hint_only"
         },
         {
           "quantity": "cooler_duty",
-          "reported_value": {"value": -230, "unit": "kW"},
+          "reported_value": {
+            "value": -230,
+            "unit": "kW"
+          },
           "qualifier": "about; tutorial sign convention",
           "use": "sanity_hint_only"
         }
@@ -187,7 +249,8 @@
       "reference_outputs": {
         "state": "NOT_FROZEN",
         "exact_simulator_outputs_frozen": false,
-        "output_digest": null
+        "output_digest": null,
+        "freeze_receipt_sha256": null
       },
       "freeze_blockers": [
         "capture exact simulator and property-package versions",
@@ -216,19 +279,43 @@
         "source_values_are_exact_golden_outputs": false
       },
       "configuration": {
-        "components": ["water", "ethanol"],
+        "components": [
+          "water",
+          "ethanol"
+        ],
         "composition_basis": "mass_fraction",
         "property_package": "NRTL",
         "feed": {
-          "temperature": {"value": 300, "unit": "K"},
-          "pressure": {"value": 101325, "unit": "Pa"},
-          "mass_flow": {"value": 1, "unit": "kg/s"},
-          "mass_fractions": {"water": 0.5, "ethanol": 0.5}
+          "temperature": {
+            "value": 300,
+            "unit": "K"
+          },
+          "pressure": {
+            "value": 101325,
+            "unit": "Pa"
+          },
+          "mass_flow": {
+            "value": 1,
+            "unit": "kg/s"
+          },
+          "mass_fractions": {
+            "water": 0.5,
+            "ethanol": 0.5
+          }
         },
         "heater": {
-          "target_outlet_temperature": {"value": 360, "unit": "K"},
-          "pressure_drop": {"value": 0, "unit": "Pa"},
-          "efficiency": {"value": 100, "unit": "%"}
+          "target_outlet_temperature": {
+            "value": 360,
+            "unit": "K"
+          },
+          "pressure_drop": {
+            "value": 0,
+            "unit": "Pa"
+          },
+          "efficiency": {
+            "value": 100,
+            "unit": "%"
+          }
         },
         "flash": {
           "exact_model_settings_captured": false
@@ -238,7 +325,10 @@
         {
           "id": "TOTAL-MASS-CLOSURE",
           "quantity": "vapor_mass_flow_plus_liquid_mass_flow",
-          "expected": {"value": 1, "unit": "kg/s"},
+          "expected": {
+            "value": 1,
+            "unit": "kg/s"
+          },
           "tolerance": null,
           "status": "EQUATION_FROZEN_TOLERANCE_NOT_FROZEN",
           "definition": "Compare the sum of outlet phase mass flows with the declared feed mass flow using a pre-registered tolerance."
@@ -255,13 +345,31 @@
       "source_hints_not_gold": [
         {
           "quantity": "vapor_mass_flow",
-          "reported_range": [{"value": 0.4, "unit": "kg/s"}, {"value": 0.8, "unit": "kg/s"}],
+          "reported_range": [
+            {
+              "value": 0.4,
+              "unit": "kg/s"
+            },
+            {
+              "value": 0.8,
+              "unit": "kg/s"
+            }
+          ],
           "qualifier": "around; tutorial range",
           "use": "broad_sanity_bound_only"
         },
         {
           "quantity": "liquid_mass_flow",
-          "reported_range": [{"value": 0.2, "unit": "kg/s"}, {"value": 0.6, "unit": "kg/s"}],
+          "reported_range": [
+            {
+              "value": 0.2,
+              "unit": "kg/s"
+            },
+            {
+              "value": 0.6,
+              "unit": "kg/s"
+            }
+          ],
           "qualifier": "around; tutorial range",
           "use": "broad_sanity_bound_only"
         },
@@ -278,7 +386,8 @@
       "reference_outputs": {
         "state": "NOT_FROZEN",
         "exact_simulator_outputs_frozen": false,
-        "output_digest": null
+        "output_digest": null,
+        "freeze_receipt_sha256": null
       },
       "freeze_blockers": [
         "identify and hash the exact NRTL interaction parameter source and values",
@@ -321,7 +430,8 @@
       "reference_outputs": {
         "state": "REFERENCE_UNAVAILABLE",
         "exact_simulator_outputs_frozen": false,
-        "output_digest": null
+        "output_digest": null,
+        "freeze_receipt_sha256": null
       },
       "freeze_blockers": [
         "choose one exact public example with a redistributable, source-controlled mechanism",
@@ -363,7 +473,8 @@
       "reference_outputs": {
         "state": "CONTRACT_NOT_IMPLEMENTED",
         "exact_simulator_outputs_frozen": false,
-        "output_digest": null
+        "output_digest": null,
+        "freeze_receipt_sha256": null
       },
       "freeze_blockers": [
         "define a versioned dependency-manifest schema",
@@ -375,14 +486,55 @@
     }
   ],
   "acceptance_targets": {
-    "frozen_case_provenance_coverage": {"target": 1.0, "unit": "fraction", "hard_gate": true},
-    "shared_dependency_declaration_coverage": {"target": 1.0, "unit": "fraction", "hard_gate": true},
-    "missing_or_skipped_results_counted_as_pass": {"target": 0, "unit": "count", "hard_gate": true},
-    "negative_control_false_accepts": {"target": 0, "unit": "count", "hard_gate": true},
-    "transitive_shared_dependency_mutation_detection": {"target": 1.0, "unit": "fraction", "hard_gate": true},
-    "malformed_lineage_graph_detection": {"target": 1.0, "unit": "fraction", "hard_gate": true},
-    "frozen_matched_condition_cases_before_advanced_flowsheet_optimization": {"target": 3, "unit": "cases", "hard_gate": true},
+    "frozen_case_provenance_coverage": {
+      "target": 1,
+      "unit": "fraction",
+      "hard_gate": true
+    },
+    "shared_dependency_declaration_coverage": {
+      "target": 1,
+      "unit": "fraction",
+      "hard_gate": true
+    },
+    "missing_or_skipped_results_counted_as_pass": {
+      "target": 0,
+      "unit": "count",
+      "hard_gate": true
+    },
+    "negative_control_false_accepts": {
+      "target": 0,
+      "unit": "count",
+      "hard_gate": true
+    },
+    "transitive_shared_dependency_mutation_detection": {
+      "target": 1,
+      "unit": "fraction",
+      "hard_gate": true
+    },
+    "malformed_lineage_graph_detection": {
+      "target": 1,
+      "unit": "fraction",
+      "hard_gate": true
+    },
+    "frozen_matched_condition_cases_before_advanced_flowsheet_optimization": {
+      "target": 3,
+      "unit": "cases",
+      "hard_gate": true
+    },
     "aggregate_scores_may_mask_a_failed_hard_invariant": false,
-    "tolerance_policy": "Case-specific, preregistered and justified from reference precision, numerical error and the context of use; no universal tolerance."
+    "tolerance_policy": "Case-specific, preregistered and justified from reference precision, numerical error and the context of use; no universal tolerance.",
+    "frozen_receipt_digest_mutation_detection": {
+      "target": 1,
+      "unit": "fraction of seeded receipt mutations detected",
+      "hard_gate": true
+    }
+  },
+  "freeze_receipt_digest_policy": {
+    "field": "reference_outputs.freeze_receipt_sha256",
+    "algorithm": "SHA-256",
+    "domain_separator": "symthaea:chemical-process-tier-b-freeze-receipt:v1\n",
+    "canonicalization": "Symthaea repository-local canonical JSON v1: object keys sorted lexicographically; array order preserved; strings serialized by serde_json; numbers emitted by serde_json::Number::to_string().",
+    "digest_scope": "The freeze_receipt JSON value only; the sibling freeze_receipt_sha256 field is excluded.",
+    "security_boundary": "Detects stale or accidental receipt mutation. It is not a signature, does not authenticate an author, and does not prove scientific claims true; an actor able to rewrite both receipt and digest can recompute the pair."
   }
 }
