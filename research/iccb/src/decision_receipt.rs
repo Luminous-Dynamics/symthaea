@@ -10,7 +10,8 @@ use crate::{
     CandidateScenario, EvaluationReceipt, EvidenceState, OptionEvaluation, RejectionReason,
 };
 use crate::uncertainty_contract::{
-    CompatibleAnalysisRoute, UncertaintyAssessmentRef, UncertaintyRoutingReceipt,
+    CompatibleAnalysisRoute, UncertaintyAssessmentRef, UncertaintyEvidenceKind,
+    UncertaintyRoutingReceipt,
 };
 use sha2::{Digest, Sha256};
 use std::collections::BTreeSet;
@@ -48,6 +49,8 @@ pub struct DecisionReceipt {
     pub input_manifest_sha256: String,
     pub scenario_sha256: String,
     pub uncertainty_route: CompatibleAnalysisRoute,
+    /// Full typed uncertainty input, retained so route summaries do not erase evidence fields.
+    pub uncertainty_evidence_kind: UncertaintyEvidenceKind,
     pub evidence_reference: String,
     pub output_sha256: String,
     pub claim_ceiling: String,
@@ -302,6 +305,35 @@ fn canonical_output_bytes(output: &EvaluationReceipt) -> Result<Vec<u8>, Decisio
     Ok(bytes)
 }
 
+fn put_evidence_kind(target: &mut Vec<u8>, kind: &UncertaintyEvidenceKind) {
+    match kind {
+        UncertaintyEvidenceKind::PointProbabilityDistribution {
+            qualification_receipt_id,
+            validation_corpus_digest,
+        } => {
+            target.push(0);
+            put_str(target, qualification_receipt_id);
+            put_str(target, validation_corpus_digest);
+        }
+        UncertaintyEvidenceKind::BoundedStateProbabilities { bounds_receipt_id } => {
+            target.push(1);
+            put_str(target, bounds_receipt_id);
+        }
+        UncertaintyEvidenceKind::OutcomeCompatibilitySet { compatibility_receipt_id } => {
+            target.push(2);
+            put_str(target, compatibility_receipt_id);
+        }
+        UncertaintyEvidenceKind::ModelDiscrepancyEnvelope { envelope_receipt_id } => {
+            target.push(3);
+            put_str(target, envelope_receipt_id);
+        }
+        UncertaintyEvidenceKind::OutOfDomain { reason } => {
+            target.push(4);
+            put_str(target, reason);
+        }
+    }
+}
+
 fn canonical_receipt_bytes(receipt: &DecisionReceipt) -> Vec<u8> {
     let mut bytes = Vec::new();
     put_str(&mut bytes, &receipt.schema_version);
@@ -315,6 +347,7 @@ fn canonical_receipt_bytes(receipt: &DecisionReceipt) -> Vec<u8> {
     put_str(&mut bytes, &receipt.input_manifest_sha256);
     put_str(&mut bytes, &receipt.scenario_sha256);
     bytes.push(route_tag(receipt.uncertainty_route));
+    put_evidence_kind(&mut bytes, &receipt.uncertainty_evidence_kind);
     put_str(&mut bytes, &receipt.evidence_reference);
     put_str(&mut bytes, &receipt.output_sha256);
     put_str(&mut bytes, &receipt.claim_ceiling);
@@ -392,6 +425,7 @@ pub fn create_decision_receipt(
         input_manifest_sha256: manifest_digest,
         scenario_sha256: scenario_digest,
         uncertainty_route: routing.route,
+        uncertainty_evidence_kind: routing.evidence_kind.clone(),
         evidence_reference: routing.evidence_reference.clone(),
         output_sha256: output_digest,
         claim_ceiling: context.claim_ceiling.clone(),
