@@ -87,10 +87,17 @@ struct ReusePolicy {
 #[serde(deny_unknown_fields)]
 struct SourceArtifact {
     relative_path: String,
+    source_object_id: String,
+    artifact_revision: String,
+    accessed_on: String,
+    source_url: String,
+    terms_url: String,
+    terms_reviewed: bool,
+    local_use_authorized: bool,
+    repository_bundling_authorized: bool,
     sha256: String,
     size_bytes: u64,
     media_type: String,
-    source_url: String,
 }
 
 #[derive(Debug, Clone, Serialize, Deserialize)]
@@ -336,6 +343,43 @@ fn validate_manifest(manifest: &SourceManifest) -> Result<()> {
                 "duplicate artifact path {:?}", artifact.relative_path
             )));
         }
+        for (field, value) in [
+            ("source_object_id", artifact.source_object_id.as_str()),
+            ("artifact_revision", artifact.artifact_revision.as_str()),
+        ] {
+            if !nonblank(value) {
+                return Err(AdapterError::Validation(format!(
+                    "artifact {:?} {field} must not be blank",
+                    artifact.relative_path
+                )));
+            }
+        }
+        if !is_iso_date_shape(&artifact.accessed_on) {
+            return Err(AdapterError::Validation(format!(
+                "artifact {:?} accessed_on must use YYYY-MM-DD syntax",
+                artifact.relative_path
+            )));
+        }
+        if !is_http_url(&artifact.terms_url) {
+            return Err(AdapterError::Validation(format!(
+                "artifact {:?} terms_url must be HTTP(S)",
+                artifact.relative_path
+            )));
+        }
+        if artifact.local_use_authorized && !artifact.terms_reviewed {
+            return Err(AdapterError::Validation(format!(
+                "artifact {:?} local use is authorized without terms review",
+                artifact.relative_path
+            )));
+        }
+        if artifact.repository_bundling_authorized
+            && (!artifact.terms_reviewed || !artifact.local_use_authorized)
+        {
+            return Err(AdapterError::Validation(format!(
+                "artifact {:?} bundling requires terms review and local-use authorization",
+                artifact.relative_path
+            )));
+        }
         if !is_hex_sha256(&artifact.sha256) {
             return Err(AdapterError::Validation(format!(
                 "artifact {:?} must declare a lowercase 64-character SHA-256 digest",
@@ -364,10 +408,20 @@ fn validate_manifest(manifest: &SourceManifest) -> Result<()> {
 
     if !manifest.artifacts.is_empty()
         && (!manifest.reuse_policy.artifact_terms_reviewed
-            || !manifest.reuse_policy.local_use_authorized)
+            || !manifest.reuse_policy.local_use_authorized
+            || manifest.artifacts.iter().any(|artifact| {
+                !artifact.terms_reviewed || !artifact.local_use_authorized
+            }))
     {
         return Err(AdapterError::Validation(
-            "artifacts are declared but source terms/local-use authorization are not reviewed".into(),
+            "artifacts are declared but manifest and per-artifact terms/local-use permissions are not reviewed".into(),
+        ));
+    }
+    if manifest.reuse_policy.repository_bundling_authorized
+        && manifest.artifacts.iter().any(|artifact| !artifact.repository_bundling_authorized)
+    {
+        return Err(AdapterError::Validation(
+            "manifest enables bundling but at least one artifact forbids or has not approved it".into(),
         ));
     }
     Ok(())
@@ -771,10 +825,17 @@ mod tests {
         let mut value = manifest();
         value.artifacts.push(SourceArtifact {
             relative_path: "results.csv".into(),
+            source_object_id: "artifact-001".into(),
+            artifact_revision: "source-revision-pending".into(),
+            accessed_on: "2026-10-18".into(),
+            source_url: "https://data.nist.gov/example.csv".into(),
+            terms_url: "https://data.nist.gov/terms".into(),
+            terms_reviewed: false,
+            local_use_authorized: false,
+            repository_bundling_authorized: false,
             sha256: "a".repeat(64),
             size_bytes: 12,
             media_type: "text/csv".into(),
-            source_url: "https://data.nist.gov/example.csv".into(),
         });
         assert!(validate_manifest(&value).is_err());
     }
@@ -795,10 +856,17 @@ mod tests {
         value.reuse_policy.local_use_authorized = true;
         value.artifacts.push(SourceArtifact {
             relative_path: "sample.csv".into(),
+            source_object_id: "sample-file-001".into(),
+            artifact_revision: "fixture-v1".into(),
+            accessed_on: "2026-10-18".into(),
+            source_url: "https://data.nist.gov/example.csv".into(),
+            terms_url: "https://data.nist.gov/terms".into(),
+            terms_reviewed: true,
+            local_use_authorized: true,
+            repository_bundling_authorized: false,
             sha256: sha256_hex(content),
             size_bytes: content.len() as u64,
             media_type: "text/csv".into(),
-            source_url: "https://data.nist.gov/example.csv".into(),
         });
         validate_manifest(&value).unwrap();
         verify_artifacts(&value, tmp.path()).unwrap();
