@@ -64,7 +64,7 @@ enum SelectionPolicy {
 }
 
 impl SelectionPolicy {
-    const ALL: [Self; 4] = [
+    const ALL: [Self; 5] = [
         Self::FixedGrid,
         Self::SeededRandom,
         Self::MaximinCoverage,
