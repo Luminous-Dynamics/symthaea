@@ -42,7 +42,7 @@ fn registry_is_versioned_and_case_ids_are_unique() {
         root["schema_id"].as_str(),
         Some("org.luminousdynamics.symthaea.chemical-process-tier-b-candidates")
     );
-    assert_eq!(root["schema_version"].as_str(), Some("1.2.0"));
+    assert_eq!(root["schema_version"].as_str(), Some("1.3.0"));
     let candidates = root["candidates"]
         .as_array()
         .expect("registry candidates must be an array");
@@ -91,6 +91,10 @@ fn no_unexecuted_candidate_claims_frozen_simulator_outputs() {
         assert!(
             candidate["reference_outputs"]["freeze_receipt_sha256"].is_null(),
             "{id}: no receipt digest may be claimed before a freeze"
+        );
+        assert!(
+            candidate["reference_outputs"]["frozen_evidence_envelope_sha256"].is_null(),
+            "{id}: no evidence envelope digest may be claimed before a freeze"
         );
     }
 }
@@ -212,5 +216,7 @@ fn assurance_targets_remain_hard_gates() {
     assert_eq!(targets["frozen_receipt_digest_mutation_detection"]["hard_gate"].as_bool(), Some(true));
     assert_eq!(targets["freeze_receipt_digest_policy_mutation_detection"]["target"].as_f64(), Some(1.0));
     assert_eq!(targets["freeze_receipt_digest_policy_mutation_detection"]["hard_gate"].as_bool(), Some(true));
+    assert_eq!(targets["frozen_evidence_envelope_mutation_detection"]["target"].as_f64(), Some(1.0));
+    assert_eq!(targets["frozen_evidence_envelope_mutation_detection"]["hard_gate"].as_bool(), Some(true));
     assert_eq!(targets["aggregate_scores_may_mask_a_failed_hard_invariant"].as_bool(), Some(false));
 }
