@@ -230,11 +230,6 @@ fn validate_source_manifest(root: &Value) -> std::result::Result<usize, Vec<Stri
         let declares_training_use = permitted_uses.contains(&"model_training")
             || permitted_uses.contains(&"training")
             || permitted_uses.contains(&"fine_tuning");
-        let global_training_disabled = root
-            .get("policy")
-            .and_then(|policy| policy.get("no_source_is_training_authorized"))
-            .and_then(Value::as_bool)
-            == Some(true);
         any_training_authorized |= training_authorized;
         if declared_no_training && training_authorized {
             errors.push(format!(
