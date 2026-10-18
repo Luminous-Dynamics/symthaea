@@ -146,10 +146,11 @@ impl EpisodeGuard {
 
     pub fn observe(&mut self, frame: &ObservationFrame) -> ObservationDecision {
         if let Some(reason) = self.fault.clone() { return ObservationDecision::SafeStop(reason); }
-        let Some(active) = self.episode_id.as_deref() else {
-            return self.stop(StopReason::NoActiveEpisode);
+        let episode_matches = match self.episode_id.as_deref() {
+            Some(active) => active == frame.episode_id.as_str(),
+            None => return self.stop(StopReason::NoActiveEpisode),
         };
-        if active != frame.episode_id { return self.stop(StopReason::EpisodeMismatch); }
+        if !episode_matches { return self.stop(StopReason::EpisodeMismatch); }
         if frame.state_values.len() != self.config.state_dim {
             return self.stop(StopReason::StateDimensionMismatch {
                 expected: self.config.state_dim, actual: frame.state_values.len(),
@@ -192,10 +193,11 @@ impl EpisodeGuard {
     /// Approval means only that this contract's checks passed.
     pub fn approve_action(&mut self, proposal: &ActionProposal) -> Result<Vec<f64>, ActionRejection> {
         if let Some(reason) = self.fault.clone() { return Err(ActionRejection::SafeStop(reason)); }
-        let Some(active) = self.episode_id.as_deref() else {
-            return self.stop_action(StopReason::NoActiveEpisode);
+        let episode_matches = match self.episode_id.as_deref() {
+            Some(active) => active == proposal.episode_id.as_str(),
+            None => return self.stop_action(StopReason::NoActiveEpisode),
         };
-        if active != proposal.episode_id { return self.stop_action(StopReason::EpisodeMismatch); }
+        if !episode_matches { return self.stop_action(StopReason::EpisodeMismatch); }
         let Some(observed_step) = self.last_step else { return Err(ActionRejection::NoObservation); };
         if proposal.based_on_step != observed_step {
             return Err(ActionRejection::StaleObservation {
@@ -205,19 +207,24 @@ impl EpisodeGuard {
         if !self.observation_permits_action {
             return Err(ActionRejection::ReplanRequired { observed_step });
         }
-        if proposal.values.len() != self.config.action_limits.len() {
-            return self.stop_action(StopReason::ActionDimensionMismatch {
+        let invalid_action = if proposal.values.len() != self.config.action_limits.len() {
+            Some(StopReason::ActionDimensionMismatch {
                 expected: self.config.action_limits.len(), actual: proposal.values.len(),
-            });
-        }
-        for (index, (&value, limit)) in proposal.values.iter().zip(&self.config.action_limits).enumerate() {
-            if !value.is_finite() { return self.stop_action(StopReason::NonFiniteAction { index }); }
-            if !limit.contains(value) {
-                return self.stop_action(StopReason::ActionOutOfBounds {
-                    index, value, min: limit.min, max: limit.max,
-                });
-            }
-        }
+            })
+        } else {
+            proposal.values.iter().zip(&self.config.action_limits).enumerate().find_map(|(index, (&value, limit))| {
+                if !value.is_finite() {
+                    Some(StopReason::NonFiniteAction { index })
+                } else if !limit.contains(value) {
+                    Some(StopReason::ActionOutOfBounds {
+                        index, value, min: limit.min, max: limit.max,
+                    })
+                } else {
+                    None
+                }
+            })
+        };
+        if let Some(reason) = invalid_action { return self.stop_action(reason); }
         Ok(proposal.values.clone())
     }
 
@@ -414,7 +421,7 @@ pub fn compare_paired_trials(
         return Err(MetricError::TooFewBootstrapSamples);
     }
 
-    fn index(records: &[TrialRecord]) -> Result<(String, BTreeMap<(String, String), &TrialRecord>), MetricError> {
+    fn index<'a>(records: &'a [TrialRecord]) -> Result<(String, BTreeMap<(String, String), &'a TrialRecord>), MetricError> {
         let mut variant: Option<String> = None;
         let mut map = BTreeMap::new();
         for r in records {
