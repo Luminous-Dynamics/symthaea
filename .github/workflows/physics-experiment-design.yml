@@ -32,7 +32,7 @@ jobs:
           toolchain: "1.96.0"
           components: clippy, rustfmt
       - name: Verify shared Galileo handoff fixture fingerprint
-        run: test "$(git hash-object crates/domains/symthaea-experiment-design/fixtures/galileo-discrimination-v0.1.json)" = "1b2a9862498722619c2259688d4557eb2dac9cef"
+        run: test "$(git hash-object crates/domains/symthaea-experiment-design/fixtures/galileo-discrimination-v0.1.json)" = "0548cf58562517e69c93e5f810bfee822acee1a2"
       - name: Check planner formatting
         run: cargo fmt --package symthaea-experiment-design -- --check
       - name: Run planner tests with locked dependencies
