@@ -1062,6 +1062,53 @@ mod tests {
     }
 
     #[test]
+    fn rejects_inconsistent_normalized_units_for_same_variable() {
+        let value = manifest();
+        let mut first = record("target-1", "AMB2022-718-AMMT-B7-P4", "aggregate-target", RecordRole::TargetOutcome, Split::HeldOut, "yield_strength", 920.0);
+        first.normalized_value = Some(0.92);
+        first.normalized_unit = Some("GPa".into());
+        first.conversion_note = Some("MPa to GPa".into());
+
+        let mut second = record("target-2", "AMB2022-718-AMMT-B7-P4", "aggregate-target", RecordRole::TargetOutcome, Split::HeldOut, "yield_strength", 920.0);
+        second.source_field = "yield_strength_2".into();
+        second.normalized_value = Some(920.0);
+        second.normalized_unit = Some("MPa".into());
+        second.conversion_note = Some("identity conversion".into());
+        let observations = ObservationSet { schema_version: "0.1.0".into(), records: vec![first, second] };
+        assert!(validate_records(&value, &observations).is_err());
+    }
+
+    #[cfg(unix)]
+    #[test]
+    fn artifact_verifier_rejects_symlink_escape_from_declared_root() {
+        use std::os::unix::fs::symlink;
+        let root = tempdir().unwrap();
+        let outside = tempdir().unwrap();
+        let bytes = b"outside data";
+        let external = outside.path().join("external.csv");
+        fs::write(&external, bytes).unwrap();
+        symlink(&external, root.path().join("linked.csv")).unwrap();
+
+        let mut value = manifest();
+        value.reuse_policy.artifact_terms_reviewed = true;
+        value.reuse_policy.local_use_authorized = true;
+        value.artifacts.push(SourceArtifact {
+            relative_path: "linked.csv".into(),
+            source_object_id: "external-object".into(),
+            artifact_revision: "v1".into(),
+            accessed_on: "2026-10-18".into(),
+            source_url: "https://data.nist.gov/external.csv".into(),
+            terms_url: "https://data.nist.gov/terms".into(),
+            terms_reviewed: true,
+            local_use_authorized: true,
+            repository_bundling_authorized: false,
+            sha256: sha256_hex(bytes),
+            size_bytes: bytes.len() as u64,
+            media_type: "text/csv".into(),
+        });
+        assert!(verify_artifacts(&value, root.path()).is_err());
+    }
+    #[test]
     fn raw_value_and_unit_survive_normalization() {
         let value = manifest();
         let mut row = record("target", "AMB2022-718-AMMT-B7-P4", "aggregate-target", RecordRole::TargetOutcome, Split::HeldOut, "yield_strength", 920.0);
