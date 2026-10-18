@@ -237,7 +237,7 @@ fn validate_uncertainty_budget(
         .map(Vec::as_slice)
         .unwrap_or(&[]);
 
-    validate_unique_ids(terms, "uncertainty component", &mut errors);
+    validate_unique_field(terms, "uncertainty component", "term_id", &mut errors);
 
     let term_ids: BTreeSet<String> = terms
         .iter()
@@ -1051,6 +1051,22 @@ mod tests {
         record["observations"][0]["expanded_uncertainty"] = serde_json::json!(1.1);
         record["observations"][0]["minimum_decision_effect"] = serde_json::json!(3.0);
         record["observations"][0]["decision_capability"] = Value::String("CAPABLE".to_owned());
+        record["observations"][0]["uncertainty_budget"] = serde_json::json!({
+            "status":"CALCULATED_UNREVIEWED",
+            "method":"LINEARIZED_COVARIANCE",
+            "terms":[{
+                "term_id":"POWER_METER",
+                "label":"synthetic power-meter contribution",
+                "standard_uncertainty":0.55,
+                "sensitivity_coefficient":1.0,
+                "notes":"synthetic test-only component"
+            }],
+            "covariance_terms":[],
+            "combined_standard_uncertainty":0.55,
+            "coverage_factor":2.0,
+            "expanded_uncertainty":1.1,
+            "notes":"synthetic test-only uncertainty budget"
+        });
         record["observations"][0]["instrument_ids"] =
             serde_json::json!(["ODRH-RUN-INS-POWER-001"]);
         record["observations"][0]["raw_artifact_ids"] =
@@ -1116,6 +1132,22 @@ mod tests {
         record["observations"][0]["expanded_uncertainty"] = serde_json::json!(0.5);
         record["observations"][0]["minimum_decision_effect"] = serde_json::json!(3.0);
         record["observations"][0]["decision_capability"] = Value::String("CAPABLE".to_owned());
+        record["observations"][0]["uncertainty_budget"] = serde_json::json!({
+            "status":"CALCULATED_UNREVIEWED",
+            "method":"LINEARIZED_COVARIANCE",
+            "terms":[{
+                "term_id":"POWER_METER",
+                "label":"synthetic power-meter contribution",
+                "standard_uncertainty":0.25,
+                "sensitivity_coefficient":1.0,
+                "notes":"synthetic test-only component"
+            }],
+            "covariance_terms":[],
+            "combined_standard_uncertainty":0.25,
+            "coverage_factor":2.0,
+            "expanded_uncertainty":0.5,
+            "notes":"synthetic test-only uncertainty budget"
+        });
         record["observations"][0]["instrument_ids"] = serde_json::json!(["ODRH-RUN-INS-POWER-001"]);
         record["observations"][0]["raw_artifact_ids"] = serde_json::json!(["ODRH-ART-POWER-001"]);
         record["observations"][1]["instrument_ids"] =
