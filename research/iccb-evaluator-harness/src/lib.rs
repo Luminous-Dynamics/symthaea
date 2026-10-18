@@ -8,6 +8,7 @@
 //! separation is an architectural boundary for data flow, not a security sandbox.
 
 pub mod decision_receipt_verifier;
+pub mod policy_oracle;
 
 use std::collections::BTreeSet;
 
