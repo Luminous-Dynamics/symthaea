@@ -34,12 +34,14 @@ A DOI, a public PDR record or a source link is not itself a license grant.
 ## Record contract
 
 Every observation carries:
-- unique record ID and declared source DOI;
+- unique record ID, declared source DOI and exact upstream source-field identity;
+- consistent variable identity/raw unit for each repeated source field and a consistent normalized unit for each normalized variable;
 - specimen ID and parent/lineage group ID;
 - variable ID, raw value and raw unit;
 - optional normalized value/unit plus a conversion note, while preserving raw value/unit;
 - reported measurement uncertainty and its unit, if supplied;
-- censoring semantics, including explicit unknown status and explanation;
+- censoring semantics and explicit finite lower/upper bounds for left-, right- and interval-censored records; never substitute a point estimate for a censored value;
+- explicit unknown status and explanation;
 - record role (predictor vs target outcome) and split (calibration vs held out).
 
 Unknown metadata must remain explicit. The validator rejects placeholder IDs such as “unknown” where a stable record/lineage identity is necessary to establish split integrity. It never coerces censored or missing measurements to zero. It rejects undeclared source DOIs, duplicate record IDs, unjustified normalization, unexplained unknown censoring and calibration target outcomes from the held-out target lineage.
@@ -54,7 +56,7 @@ The first stage is data integrity—not model competition.
 - No artifact is imported before artifact-specific terms and local-use permissions are reviewed.
 
 **Parser integrity**
-- 100% of duplicate IDs, undeclared source identities, unsafe file paths, missing stable lineage, invalid units, unjustified conversion, invalid/non-finite values and malformed censoring controls are rejected.
+- 100% of duplicate IDs, undeclared source identities, unsafe file paths, missing stable lineage, inconsistent source-field units/variable mappings, unjustified conversion, invalid/non-finite values, fabricated censored point values and malformed censoring bounds are rejected.
 - Independent count reconciliation: every input row is either represented or listed with a reason for exclusion; no silent drops.
 - Raw source values and units survive every normalization.
 
