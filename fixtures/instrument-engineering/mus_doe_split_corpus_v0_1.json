@@ -812,6 +812,124 @@
       ],
       "expected_disposition": "REJECT_POSTHOC_CHANGE",
       "rationale": "Policy version or stopping rule is changed after inspecting outcomes without creating a new preregistered campaign."
+    },
+    {
+      "case_id": "NEG-009",
+      "case_type": "negative_control",
+      "source_class": "synthetic_fixture",
+      "independence_axes": [
+        "physical_unit_id",
+        "builder_id"
+      ],
+      "observations": [
+        {
+          "observation_id": "fit-901",
+          "partition": "fit",
+          "source_class": "synthetic_fixture",
+          "group_ids": {
+            "physical_unit_id": "unit-A",
+            "build_batch_id": "batch-A",
+            "builder_id": "builder-A",
+            "environment_id": "room-A",
+            "measurement_session_id": "session-A",
+            "material_lot_id": "lot-A"
+          }
+        },
+        {
+          "observation_id": "test-901",
+          "partition": "locked_test",
+          "source_class": "synthetic_fixture",
+          "group_ids": {
+            "physical_unit_id": "unit-B",
+            "build_batch_id": "batch-B",
+            "builder_id": "builder-A",
+            "environment_id": "room-B",
+            "measurement_session_id": "session-B",
+            "material_lot_id": "lot-B"
+          }
+        }
+      ],
+      "selection": {
+        "policy": "fixed_grid",
+        "policy_version": "0.1.0",
+        "random_seed": 314159,
+        "experiment_budget": 6,
+        "candidate_count": 24,
+        "selected_candidate_ids": [
+          "candidate-03",
+          "candidate-11"
+        ],
+        "selected_candidates_admissible": true,
+        "data_partitions_consumed": [
+          "fit"
+        ],
+        "locked_test_outcomes_used": false,
+        "posthoc_policy_change": false
+      },
+      "fault_modes": [
+        "builder_cross_partition"
+      ],
+      "expected_disposition": "REJECT_GROUP_LEAKAGE",
+      "rationale": "Different physical units cross fit and locked test but share the same builder on a declared independence axis, so builder generalization cannot be claimed."
+    },
+    {
+      "case_id": "NEG-010",
+      "case_type": "negative_control",
+      "source_class": "synthetic_fixture",
+      "independence_axes": [
+        "physical_unit_id",
+        "material_lot_id"
+      ],
+      "observations": [
+        {
+          "observation_id": "fit-1001",
+          "partition": "fit",
+          "source_class": "synthetic_fixture",
+          "group_ids": {
+            "physical_unit_id": "unit-A",
+            "build_batch_id": "batch-A",
+            "builder_id": "builder-A",
+            "environment_id": "room-A",
+            "measurement_session_id": "session-A",
+            "material_lot_id": "lot-A"
+          }
+        },
+        {
+          "observation_id": "test-1001",
+          "partition": "locked_test",
+          "source_class": "synthetic_fixture",
+          "group_ids": {
+            "physical_unit_id": "unit-B",
+            "build_batch_id": "batch-B",
+            "builder_id": "builder-B",
+            "environment_id": "room-B",
+            "measurement_session_id": "session-B",
+            "material_lot_id": "lot-A"
+          }
+        }
+      ],
+      "selection": {
+        "policy": "fixed_grid",
+        "policy_version": "0.1.0",
+        "random_seed": 314159,
+        "experiment_budget": 6,
+        "candidate_count": 24,
+        "selected_candidate_ids": [
+          "candidate-03",
+          "candidate-11"
+        ],
+        "selected_candidates_admissible": true,
+        "data_partitions_consumed": [
+          "fit"
+        ],
+        "locked_test_outcomes_used": false,
+        "posthoc_policy_change": false
+      },
+      "fault_modes": [
+        "material_lot_cross_partition"
+      ],
+      "expected_disposition": "REJECT_GROUP_LEAKAGE",
+      "rationale": "Different physical units share the same material lot across fit and locked test on a declared independence axis, so lot-generalization cannot be claimed."
     }
   ]
 }
