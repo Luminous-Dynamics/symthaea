@@ -1,4 +1,7 @@
-use iccb_evaluator::{CandidateScenario, DecisionOption, EvidenceClaim, EvidenceState, Mandate};
+use iccb_evaluator::{
+    cash_maximizing_feasible_baseline, pareto_frontier, CandidateScenario, DecisionOption,
+    EvidenceClaim, EvidenceState, Mandate,
+};
 use std::collections::BTreeSet;
 
 fn main() {
@@ -48,8 +51,13 @@ fn main() {
     };
 
     let receipt = scenario.evaluate();
+    let baseline = cash_maximizing_feasible_baseline(&receipt.evaluated_options);
+    let frontier = pareto_frontier(&receipt.evaluated_options);
+
     println!("ICCB synthetic evaluation: {}", receipt.scenario_id);
     println!("No composite score is calculated; hard-gate failures cannot be offset by return.");
+    println!("Cash-maximizing feasible baseline: {:?}", baseline);
+    println!("Constraint-gated Pareto frontier: {:?}", frontier);
     for evaluated in receipt.evaluated_options {
         println!(
             "{}: accepted={}, rejection_reasons={:?}, net_cash_minor={}, valuation_change_minor={}, capacity_delta={}, maintenance_delta_minor={}, critical_dependencies={}",
