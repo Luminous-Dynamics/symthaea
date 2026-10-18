@@ -6,6 +6,9 @@
 
 const BPS: i128 = 10_000;
 const BPS_SQUARED: i128 = 100_000_000;
+const MAX_STATES: usize = 16;
+const MAX_SIGNALS: usize = 16;
+const MAX_ACTIONS: usize = 16;
 
 #[derive(Clone, Debug, PartialEq, Eq)]
 pub struct InformationState {
@@ -49,6 +52,7 @@ pub enum ValueOfInformationError {
     EmptyIdentifier,
     DuplicateIdentifier,
     EmptyStatesSignalsOrActions,
+    ScenarioTooLarge,
     PriorProbabilitiesDoNotSumTo10000,
     SignalLikelihoodsDoNotSumTo10000,
     IncompleteLikelihoodTable,
@@ -204,6 +208,13 @@ impl ValueOfInformationScenario {
         }
         if self.states.is_empty() || self.signals.is_empty() || self.action_ids.is_empty() {
             return Err(ValueOfInformationError::EmptyStatesSignalsOrActions);
+        }
+        if self.states.len() > MAX_STATES
+            || self.signals.len() > MAX_SIGNALS
+            || self.action_ids.len() > MAX_ACTIONS
+            || self.payoffs.len() > MAX_STATES * MAX_ACTIONS
+        {
+            return Err(ValueOfInformationError::ScenarioTooLarge);
         }
         ensure_unique(self.states.iter().map(|state| state.id.as_str()))?;
         ensure_unique(self.signals.iter().map(|signal| signal.id.as_str()))?;
@@ -492,6 +503,21 @@ mod tests {
     fn sample_information_value_does_not_exceed_perfect_information_ceiling() {
         let report = perfect_signal_scenario(0).evaluate().unwrap();
         assert!(report.gross_evsi_minor <= report.evpi_minor);
+    }
+
+    #[test]
+    fn oversized_state_space_fails_closed() {
+        let mut input = perfect_signal_scenario(0);
+        input.states = (0..=MAX_STATES)
+            .map(|index| InformationState {
+                id: format!("state-{index}"),
+                prior_probability_bps: 0,
+            })
+            .collect();
+        assert_eq!(
+            input.evaluate(),
+            Err(ValueOfInformationError::ScenarioTooLarge)
+        );
     }
 
     #[test]
