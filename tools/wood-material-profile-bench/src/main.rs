@@ -223,9 +223,8 @@ fn evaluate_scenario(scenario: &Scenario) -> ScenarioReceipt {
         reasons.insert("REQUIRED_PROPERTY_ID_MISSING".to_owned());
     }
 
-    if query.purpose != QueryPurpose::CandidateRanking
-        && (profile.taxon_resolution != TaxonResolution::Resolved
-            || profile.identification_method == IdentificationMethod::CommonNameOnly)
+    if profile.taxon_resolution != TaxonResolution::Resolved
+        || profile.identification_method == IdentificationMethod::CommonNameOnly
     {
         reasons.insert("TAXON_IDENTITY_UNRESOLVED".to_owned());
     }
@@ -443,6 +442,17 @@ mod tests {
         assert_eq!(receipt.scenario_count, 8);
         assert_eq!(receipt.expected_controls_matched, 8);
         assert_eq!(receipt.scenarios[0].actual_disposition, Disposition::Pass);
+    }
+
+    #[test]
+    fn unresolved_common_name_cannot_be_treated_as_resolved_for_ranking() {
+        let mut corpus = corpus();
+        let scenario = &mut corpus.scenarios[0];
+        scenario.profile.taxon_resolution = TaxonResolution::Ambiguous;
+        let result = evaluate_scenario(scenario);
+        assert!(result
+            .actual_reason_codes
+            .contains(&"TAXON_IDENTITY_UNRESOLVED".to_owned()));
     }
 
     #[test]
