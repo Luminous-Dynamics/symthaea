@@ -216,6 +216,11 @@ fn validate_source_manifest(root: &Value) -> std::result::Result<usize, Vec<Stri
                 "{prefix} is training-authorized while the manifest globally forbids training"
             ));
         }
+        if string_at(root, "status") == Some("discovery_only") && training_authorized {
+            errors.push(format!(
+                "{prefix} cannot be training-authorized while the manifest status is discovery_only"
+            ));
+        }
 
         if !training_authorized {
             if ingestion_status == Some("ingestion_authorized") {
@@ -400,6 +405,25 @@ mod tests {
             json!(["public_metadata_review", "training"]);
         let errors = validate_source_manifest(&fixture).unwrap_err();
         assert!(errors.iter().any(|error| error.contains("permits training")));
+    }
+
+    #[test]
+    fn missing_training_authorization_flag_fails_closed() {
+        let mut fixture: Value = serde_json::from_str(SOURCE_FIXTURE).unwrap();
+        fixture["sources"][0]
+            .as_object_mut()
+            .unwrap()
+            .remove("training_authorized");
+        let errors = validate_source_manifest(&fixture).unwrap_err();
+        assert!(errors.iter().any(|error| error.contains("training_authorized must be an explicit boolean")));
+    }
+
+    #[test]
+    fn discovery_only_manifest_cannot_authorize_training() {
+        let mut fixture: Value = serde_json::from_str(SOURCE_FIXTURE).unwrap();
+        fixture["sources"][0]["training_authorized"] = json!(true);
+        let errors = validate_source_manifest(&fixture).unwrap_err();
+        assert!(errors.iter().any(|error| error.contains("manifest status is discovery_only")));
     }
 
     #[test]
