@@ -37,6 +37,7 @@ enum CorpusKind {
     Random,
     Clustered,
     Mixed,
+    TieHeavy,
 }
 impl CorpusKind {
     fn as_str(self) -> &'static str {
@@ -44,6 +45,7 @@ impl CorpusKind {
             Self::Random => "random",
             Self::Clustered => "clustered",
             Self::Mixed => "mixed",
+            Self::TieHeavy => "tie-heavy",
         }
     }
 }
@@ -97,7 +99,7 @@ impl Default for Config {
             vectors: 4_096,
             queries: 8,
             top_ks: vec![1, 10, 100],
-            corpora: vec![CorpusKind::Random, CorpusKind::Clustered, CorpusKind::Mixed],
+            corpora: vec![CorpusKind::Random, CorpusKind::Clustered, CorpusKind::Mixed, CorpusKind::TieHeavy],
             chunk_sizes: vec![32, 64, 128, 256],
             rounds: 5,
             write_batch_size: 128,
@@ -184,6 +186,11 @@ fn run() -> Result<(), Box<dyn Error>> {
         let queries: Vec<BinaryHV> = (0..config.queries)
             .map(|index| make_query(corpus_kind, index, config.seed, &centers))
             .collect();
+
+        // Edge-contract checks are outside timed measurements.
+        if let Some(query) = queries.first() {
+            validate_edge_contract(&reader, query, &config.chunk_sizes, config.vectors)?;
+        }
 
         println!(
             "corpus={},store_generation={},store_checksum={},build_ns={},reader_open_ns={},vectors={},queries={}",
@@ -419,6 +426,24 @@ fn finish_heap(mut heap: BinaryHeap<Candidate>) -> Vec<(u64, f32)> {
         .collect()
 }
 
+fn validate_edge_contract(
+    reader: &HdcStoreReader,
+    query: &BinaryHV,
+    chunk_sizes: &[usize],
+    vector_count: usize,
+) -> Result<(), Box<dyn Error>> {
+    for top_k in [0, vector_count] {
+        let expected = reader.scan_similar(query, top_k);
+        let (heap_result, _, _) = bounded_heap_search(reader, query, top_k)?;
+        validate_top_k(&heap_result, &expected)?;
+        for &chunk_bytes in chunk_sizes {
+            let (early_result, _, _) = early_abandon_search(reader, query, top_k, chunk_bytes)?;
+            validate_top_k(&early_result, &expected)?;
+        }
+    }
+    Ok(())
+}
+
 fn validate_top_k(
     observed: &[(u64, f32)],
     expected: &[(u64, f32)],
@@ -451,14 +476,19 @@ fn make_corpus_vector(
         }
         CorpusKind::Mixed => {
             if id % 4 == 0 {
-                // The every-fourth-vector stream must rotate across all four
-                // centers; (id - 1) % 4 would always select center 3 here.
+                // The every-fourth-vector stream rotates across all centers.
                 let cluster = (id / 4).wrapping_sub(1) as usize % centers.len();
                 let radius = 16 + ((id as usize * 13) % 65);
                 perturb(&centers[cluster], seed.wrapping_add(id), radius)
             } else {
                 BinaryHV::random(seed.wrapping_add(id))
             }
+        }
+        CorpusKind::TieHeavy => {
+            // Repeated pattern seeds deliberately create duplicate payloads.
+            const RADII: [usize; 8] = [16, 16, 32, 32, 48, 48, 64, 64];
+            let pattern = id.wrapping_sub(1) as usize % RADII.len();
+            perturb(&centers[0], seed.wrapping_add(pattern as u64), RADII[pattern])
         }
     }
 }
@@ -467,6 +497,7 @@ fn make_query(kind: CorpusKind, index: usize, seed: u64, centers: &[BinaryHV; 4]
     match kind {
         CorpusKind::Random => BinaryHV::random(seed ^ 0xD1B5_4A32_D192_ED03_u64.wrapping_add(index as u64)),
         CorpusKind::Clustered | CorpusKind::Mixed => centers[index % centers.len()],
+        CorpusKind::TieHeavy => centers[0],
     }
 }
 
@@ -615,6 +646,7 @@ fn parse_args() -> Result<Config, Box<dyn Error>> {
                         "random" => CorpusKind::Random,
                         "clustered" => CorpusKind::Clustered,
                         "mixed" => CorpusKind::Mixed,
+                        "tie-heavy" => CorpusKind::TieHeavy,
                         other => return Err(format!("unknown corpus kind: {other}").into()),
                     };
                     if !config.corpora.contains(&kind) { config.corpora.push(kind); }
@@ -623,7 +655,7 @@ fn parse_args() -> Result<Config, Box<dyn Error>> {
             "--csv" => config.csv_path = Some(PathBuf::from(args.next().ok_or("--csv requires a path")?)),
             "--help" | "-h" => {
                 println!(
-                    "Usage: exact_topk_pruning_bench [--vectors N] [--queries N] [--top-ks 1,10,100] [--corpora random,clustered,mixed] [--chunk-sizes 32,64,128,256] [--rounds N] [--write-batch-size N] [--seed N] [--csv PATH]\nDefaults: vectors=4096, queries=8, top-ks=1,10,100, corpora=random,clustered,mixed, chunk-sizes=32,64,128,256, rounds=5, seed=7"
+                    "Usage: exact_topk_pruning_bench [--vectors N] [--queries N] [--top-ks 1,10,100] [--corpora random,clustered,mixed,tie-heavy] [--chunk-sizes 32,64,128,256] [--rounds N] [--write-batch-size N] [--seed N] [--csv PATH]\nDefaults: vectors=4096, queries=8, top-ks=1,10,100, corpora=random,clustered,mixed,tie-heavy, chunk-sizes=32,64,128,256, rounds=5, seed=7"
                 );
                 std::process::exit(0);
             }
