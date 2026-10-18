@@ -51,6 +51,8 @@ jobs:
           jq -e '
             .report_version == "human-tool-bench-report-v0.1" and
             .evidence_class == "synthetic_contract_only" and
+            .contract_sha256 == "c7ffbabaca875faf066ee63e5d12acf7e46d36001cf36c9590799bffbea61577" and
+            .protocol_id == "human-tool-protocol-v0.1" and
             .episode_records == 9 and
             .unique_episode_ids == 9 and
             .arms.A0.attempts_started == 3 and
