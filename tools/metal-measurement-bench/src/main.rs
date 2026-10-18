@@ -190,12 +190,13 @@ fn is_http_url(value: &str) -> bool {
 }
 
 fn is_iso_date_shape(value: &str) -> bool {
-    value.len() == 10
-        && value.as_bytes()[4] == b'-'
-        && value.as_bytes()[7] == b'-'
-        && value[..4].bytes().all(|byte| byte.is_ascii_digit())
-        && value[5..7].bytes().all(|byte| byte.is_ascii_digit())
-        && value[8..10].bytes().all(|byte| byte.is_ascii_digit())
+    let bytes = value.as_bytes();
+    bytes.len() == 10
+        && bytes[4] == b'-'
+        && bytes[7] == b'-'
+        && bytes[..4].iter().all(|byte| byte.is_ascii_digit())
+        && bytes[5..7].iter().all(|byte| byte.is_ascii_digit())
+        && bytes[8..10].iter().all(|byte| byte.is_ascii_digit())
 }
 
 fn is_hex_sha256(value: &str) -> bool {
