@@ -58,9 +58,11 @@ Compare on identical scenarios, candidate feasibility, initial observations, and
 1. **Fixed-weight scalar objective:** weights and metric normalization preregistered on development data; never tune weights after seeing held-out results.
 2. **Single-objective selection:** show each objective's result or a preregistered rotation, rather than selecting the best-performing objective post hoc.
 3. **Pareto + explicit query/abstention:** preserve all feasible candidates not robustly dominated; use context-matched preference observations and query or abstain when evidence cannot resolve a context-specific choice.
-4. **Seeded-random eligible selection:** reproducible, seed-controlled selection from the declared eligible set, with no preference or metric ranking.
+4. **Seeded-random eligible selection:** reproducible, seed-controlled selection from the declared eligible set sorted by stable candidate ID; reordering the input array must not change a choice.
 5. **Context-blind preference replay:** an ablation that ignores context matching while preserving task identity and the same freshness horizon.
 6. **Context-aware explicit-feedback replay:** the conservative policy that requires fresh, task- and context-matched ordinal evidence, then queries or abstains under uncertainty.
+
+On exact utility ties, deterministic metric-based selectors use a stable documented tie-break (candidate ID), not serialized candidate order. Seeded-random baselines sort candidate IDs before applying the seed/scenario selector.
 
 The frozen fixed-weight engineering comparator uses task success (0.40), stability margin (0.20), normalized wearer-borne mass (0.15), normalized energy per task (0.10), and movement freedom (0.15). Its weights and scales are constants, not fitted to evaluation-oracle labels. It is an engineering-metric proxy, not a model of subjective preference.
 
@@ -78,6 +80,8 @@ Report raw numerators/denominators, uncertainty intervals, excluded episodes, an
 | Query burden | Number of queries, cost budget, and answerable decisions; report query-budget exhaustion separately |
 | Abstention behavior | Correct abstention/query on missing, contradictory, expired, rejected-all, and budget-exhausted controls; useful coverage on positive controls |
 | Preference freshness | Zero expired observations used in recommendations; zero future-dated records accepted; report expiration separately from context mismatch |
+| Order invariance | The same logical candidate/observation sets yield the same normalized choices regardless of array order; seeded random selection hashes a scenario identity and indexes canonical candidate IDs |
+| Expired-evidence exposure | Separately count baseline selections made while same-task, same-context feedback has expired; do not blend expiry with task/context mismatch counts |
 | Selective decision quality | Plot recommendation coverage against unacceptable-selection rate and query/abstention burden; do not collapse them into one scalar |
 | Held-out task transfer | Pairwise/top-choice behavior on task families absent from policy fitting; report by task/context shift, never as same-task replay |
 | Feasible Pareto recall | Fraction of known feasible non-dominated candidates preserved; use upstream comparator semantics and its declared intervals |
