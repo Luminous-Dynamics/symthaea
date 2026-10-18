@@ -347,7 +347,7 @@ pub fn digest_spatial_corpus(
     validate_spatial_corpus(corpus)?;
     let serialized =
         serde_json::to_vec(corpus).map_err(|_| SpatialBenchmarkError::SerializationFailure)?;
-    let domain = b"symthaea.fdm-spatial-synthetic-corpus.v1\\0";
+    let domain = b"symthaea.fdm-spatial-synthetic-corpus.v1\0";
     let mut bytes = Vec::with_capacity(domain.len() + serialized.len());
     bytes.extend_from_slice(domain);
     bytes.extend_from_slice(&serialized);
