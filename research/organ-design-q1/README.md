@@ -19,14 +19,14 @@ Internal confidence is metadata only. It is neither an objective nor a tie-break
 
 ## Isolated execution
 
-The crate has its own Cargo workspace and no runtime dependencies. JSON parsing is a development-only dependency for validating the named hostile-case catalog.
+The crate has its own Cargo workspace and no runtime dependencies. JSON parsing and test-only SHA-256 helpers are development-only dependencies for validating the hostile-case catalog and synthetic design identity tokens.
 
 ```sh
 cargo fmt --manifest-path research/organ-design-q1/Cargo.toml -- --check
 cargo test --manifest-path research/organ-design-q1/Cargo.toml
 ```
 
-The public Rust API is in `src/lib.rs`. `hostile-cases.v0.json` names sixteen adversarial cases; the Rust test module checks the fixture catalog and separately executes matching typed cases. The canonical identity function creates deterministic, length-prefixed UTF-8 material from the profile, exact candidate fields, admitted evidence digests, and outcome decisions. A runner can SHA-256 the material to produce a digest; the crate intentionally avoids a runtime hashing dependency.
+The public Rust API is in `src/lib.rs`. `hostile-cases.v0.json` names eighteen adversarial cases; the Rust test module checks the fixture catalog and separately executes matching typed cases. The canonical identity function creates deterministic, length-prefixed UTF-8 material from the profile, exact candidate fields, admitted evidence digests, and outcome decisions. A runner can SHA-256 the material to produce a digest; the crate intentionally avoids a runtime hashing dependency.
 
 ## Input contract
 
@@ -38,7 +38,7 @@ Every profile pins:
 - a baseline and at least the declared ablation set;
 - data split, evaluation mode, and evidence tier.
 
-Every candidate must provide exactly one finite metric with the declared unit per objective, every declared hard-constraint result, every assumption resolution, and every required evidence reference with a matching digest and `current` status. Any constraint failure, missing item, contradictory evidence, stale source, profile/split mismatch or claim-ceiling promotion makes the candidate ineligible.
+Every candidate must provide a SHA-256 digest for its exact design/topology artifact, exactly one finite metric with the declared unit per objective, every declared hard-constraint result, every assumption resolution, and every required evidence reference with a matching digest and `current` status. The test suite hashes explicit synthetic identity tokens; production callers must hash the actual canonical design artifact bytes. Any constraint failure, missing item, contradictory evidence, stale source, profile/split mismatch or claim-ceiling promotion makes the candidate ineligible.
 
 For baseline/ablation comparisons, if the baseline or any required ablation is absent or rejected, the receipt is `BLOCKED` even though other candidate rejection records are preserved. A `READY` receipt is a software contract result, not a physical result.
 
