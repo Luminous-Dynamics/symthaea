@@ -451,19 +451,19 @@ pub fn evaluate_case(fixture: &CaseFixture) -> OracleOutcome {
     let candidate = &fixture.candidate;
     let request = &fixture.request;
 
-    if let Some(reported) = &candidate.reported_as {
-        if reported != &candidate.evidence_kind {
-            return outcome(
-                Disposition::InvalidEvidence,
-                if candidate.evidence_kind == EvidenceKind::Simulated
-                    && reported == &EvidenceKind::Measured
-                {
-                    "SIMULATED_REPORTED_AS_MEASURED"
-                } else {
-                    "EVIDENCE_KIND_MISMATCH"
-                },
-            );
-        }
+    if let Some(reported) = &candidate.reported_as
+        && reported != &candidate.evidence_kind
+    {
+        return outcome(
+            Disposition::InvalidEvidence,
+            if candidate.evidence_kind == EvidenceKind::Simulated
+                && reported == &EvidenceKind::Measured
+            {
+                "SIMULATED_REPORTED_AS_MEASURED"
+            } else {
+                "EVIDENCE_KIND_MISMATCH"
+            },
+        );
     }
 
     if let Some(result) = check_source_rights(&candidate.source) {
