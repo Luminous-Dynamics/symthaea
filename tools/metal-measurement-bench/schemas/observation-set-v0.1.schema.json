@@ -25,7 +25,9 @@
           "variable_id",
           "role",
           "split",
-          "censoring"
+          "censoring",
+          "source_field",
+          "raw_unit"
         ],
         "properties": {
           "record_id": {
@@ -67,10 +69,8 @@
             ]
           },
           "raw_unit": {
-            "type": [
-              "string",
-              "null"
-            ]
+            "type": "string",
+            "minLength": 1
           },
           "normalized_value": {
             "type": [
@@ -115,6 +115,22 @@
           "metadata_note": {
             "type": [
               "string",
+              "null"
+            ]
+          },
+          "source_field": {
+            "type": "string",
+            "minLength": 1
+          },
+          "censor_lower_bound": {
+            "type": [
+              "number",
+              "null"
+            ]
+          },
+          "censor_upper_bound": {
+            "type": [
+              "number",
               "null"
             ]
           }
@@ -172,6 +188,109 @@
               "required": [
                 "metadata_note"
               ]
+            }
+          },
+          {
+            "if": {
+              "properties": {
+                "censoring": {
+                  "const": "uncensored"
+                }
+              },
+              "required": [
+                "censoring"
+              ]
+            },
+            "then": {
+              "required": [
+                "raw_value"
+              ],
+              "properties": {
+                "raw_value": {
+                  "type": "number"
+                },
+                "censor_lower_bound": {
+                  "type": "null"
+                },
+                "censor_upper_bound": {
+                  "type": "null"
+                }
+              }
+            }
+          },
+          {
+            "if": {
+              "properties": {
+                "censoring": {
+                  "const": "left_censored"
+                }
+              },
+              "required": [
+                "censoring"
+              ]
+            },
+            "then": {
+              "properties": {
+                "raw_value": {
+                  "type": "null"
+                },
+                "censor_lower_bound": {
+                  "type": "null"
+                },
+                "censor_upper_bound": {
+                  "type": "number"
+                }
+              }
+            }
+          },
+          {
+            "if": {
+              "properties": {
+                "censoring": {
+                  "const": "right_censored"
+                }
+              },
+              "required": [
+                "censoring"
+              ]
+            },
+            "then": {
+              "properties": {
+                "raw_value": {
+                  "type": "null"
+                },
+                "censor_lower_bound": {
+                  "type": "number"
+                },
+                "censor_upper_bound": {
+                  "type": "null"
+                }
+              }
+            }
+          },
+          {
+            "if": {
+              "properties": {
+                "censoring": {
+                  "const": "interval_censored"
+                }
+              },
+              "required": [
+                "censoring"
+              ]
+            },
+            "then": {
+              "properties": {
+                "raw_value": {
+                  "type": "null"
+                },
+                "censor_lower_bound": {
+                  "type": "number"
+                },
+                "censor_upper_bound": {
+                  "type": "number"
+                }
+              }
             }
           }
         ]
