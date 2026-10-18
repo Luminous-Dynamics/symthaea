@@ -153,7 +153,7 @@ Do not commit large licensed assets or checkpoints. Keep experiment scripts and 
 
 ## Immediate runnable work
 
-A dependency-free nested Rust crate now lives at **experiments/robodojo-contract/**. Its 11 unit tests cover episode identity/reset, state dimensions and finiteness, step ordering, stale action rejection, action dimensions and range checks, prediction-error replanning, latched stops, configuration rejection, and deterministic trace behavior. A small executable exercises accepted action → replan request → latched stop.
+A dependency-free nested Rust crate now lives at **experiments/robodojo-contract/**. Its 18 unit tests cover episode identity/reset, state dimensions and finiteness, step ordering, stale action rejection, action dimensions and range checks, prediction-error replanning, latched stops, configuration rejection, and deterministic trace behavior. A small executable exercises accepted action → replan request → latched stop.
 
 Run locally with:
 
