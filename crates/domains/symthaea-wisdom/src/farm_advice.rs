@@ -11,7 +11,7 @@
 
 use std::collections::BTreeSet;
 
-use crate::accountability::AccountabilityCaseId;
+use crate::accountability::{AccountabilityCase, AccountabilityCaseId, RepairKind, RepairStatus};
 use crate::evidence_ledger::{DecisionId, DeliberationEvidenceLedger, FactClaimId};
 
 #[derive(Debug, Clone, PartialEq, Eq, PartialOrd, Ord, Hash)]
@@ -258,7 +258,7 @@ pub enum AdviceReviewState {
     Active,
     RequiresReview,
     Superseded,
-    Retracted,
+    CorrectionOrRetractionCompleted,
 }
 
 /// Farm-specific context bound to the existing WCARE-08 accountability case.
@@ -277,24 +277,29 @@ pub struct FarmAdviceProfile {
     predicted_metric_claims: BTreeSet<FactClaimId>,
     observed_metric_claims: BTreeSet<FactClaimId>,
     disposition: Option<FarmerAdviceDisposition>,
-    review_state: AdviceReviewState,
 }
 
 impl FarmAdviceProfile {
     pub fn new(
         episode_id: AdviceEpisodeId,
-        accountability_case_id: AccountabilityCaseId,
-        decision_id: DecisionId,
+        accountability_case: &AccountabilityCase,
         context: FarmAdviceContext,
         objective: FarmerObjective,
         evidence: &DeliberationEvidenceLedger,
     ) -> Result<Self, FarmAdviceError> {
-        if evidence.decisions().get(&decision_id).is_none() {
-            return Err(FarmAdviceError::DecisionReferenceNotFound);
+        let decision_id = accountability_case.decision.clone();
+        let decision_record = evidence
+            .decisions()
+            .get(&decision_id)
+            .ok_or(FarmAdviceError::DecisionReferenceNotFound)?;
+        if decision_record.fact_premises != accountability_case.premise_snapshot_facts
+            || decision_record.normative_premises != accountability_case.premise_snapshot_normative
+        {
+            return Err(FarmAdviceError::AccountabilityPremiseMismatch);
         }
         Ok(Self {
             episode_id,
-            accountability_case_id,
+            accountability_case_id: accountability_case.id.clone(),
             decision_id,
             context,
             objective,
@@ -302,7 +307,6 @@ impl FarmAdviceProfile {
             predicted_metric_claims: BTreeSet::new(),
             observed_metric_claims: BTreeSet::new(),
             disposition: None,
-            review_state: AdviceReviewState::Active,
         })
     }
 
@@ -342,8 +346,65 @@ impl FarmAdviceProfile {
         self.disposition
     }
 
-    pub fn review_state(&self) -> AdviceReviewState {
-        self.review_state
+    /// Derive review state from the bound WCARE case and canonical evidence.
+    /// This profile cannot independently declare advice "retracted" or mark a
+    /// premise "superseded"; those states must be supported by the owning ledger.
+    pub fn review_state(
+        &self,
+        accountability_case: &AccountabilityCase,
+        evidence: &DeliberationEvidenceLedger,
+    ) -> Result<AdviceReviewState, FarmAdviceError> {
+        self.validate_case_binding(accountability_case, evidence)?;
+
+        if accountability_case.repairs().iter().any(|repair| {
+            repair.kind() == RepairKind::RetractOrCorrectAdvice
+                && repair.status() == RepairStatus::Completed
+        }) {
+            return Ok(AdviceReviewState::CorrectionOrRetractionCompleted);
+        }
+
+        let premise_superseded = self.premises.iter().any(|premise| {
+            premise.fact_claims.iter().any(|id| {
+                evidence
+                    .facts()
+                    .get(id)
+                    .is_some_and(|claim| claim.superseded_by.is_some())
+            })
+        });
+        if premise_superseded {
+            return Ok(AdviceReviewState::Superseded);
+        }
+
+        let assessment = accountability_case
+            .assess(evidence)
+            .map_err(|_| FarmAdviceError::DecisionReferenceNotFound)?;
+        if assessment.requires_followup() {
+            Ok(AdviceReviewState::RequiresReview)
+        } else {
+            Ok(AdviceReviewState::Active)
+        }
+    }
+
+    fn validate_case_binding(
+        &self,
+        accountability_case: &AccountabilityCase,
+        evidence: &DeliberationEvidenceLedger,
+    ) -> Result<(), FarmAdviceError> {
+        if accountability_case.id != self.accountability_case_id
+            || accountability_case.decision != self.decision_id
+        {
+            return Err(FarmAdviceError::AccountabilityCaseMismatch);
+        }
+        let decision_record = evidence
+            .decisions()
+            .get(&self.decision_id)
+            .ok_or(FarmAdviceError::DecisionReferenceNotFound)?;
+        if decision_record.fact_premises != accountability_case.premise_snapshot_facts
+            || decision_record.normative_premises != accountability_case.premise_snapshot_normative
+        {
+            return Err(FarmAdviceError::AccountabilityPremiseMismatch);
+        }
+        Ok(())
     }
 
     pub fn add_premise(
@@ -395,20 +456,6 @@ impl FarmAdviceProfile {
     pub fn record_disposition(&mut self, disposition: FarmerAdviceDisposition) {
         self.disposition = Some(disposition);
     }
-
-    /// This projection only marks that advice needs review. WCARE-08 remains
-    /// responsible for durable correction, retraction, supersession and repair.
-    pub fn mark_requires_review(&mut self) {
-        self.review_state = AdviceReviewState::RequiresReview;
-    }
-
-    pub fn mark_superseded(&mut self) {
-        self.review_state = AdviceReviewState::Superseded;
-    }
-
-    pub fn mark_retracted(&mut self) {
-        self.review_state = AdviceReviewState::Retracted;
-    }
 }
 
 fn require_fact(
@@ -447,14 +494,22 @@ pub enum FarmAdviceError {
     DuplicatePremiseReference,
     FactReferenceNotFound(FactClaimId),
     DecisionReferenceNotFound,
+    AccountabilityCaseMismatch,
+    AccountabilityPremiseMismatch,
     PredictionObservationMustBeSeparate,
     DuplicateMetricReference(FactClaimId),
 }
 
 #[cfg(test)]
 mod tests {
+    use std::collections::BTreeSet;
+
     use super::*;
+    use crate::accountability::AccountabilityCase;
+    use crate::authority_envelope::RelationalAuthorityAssessment;
     use crate::evidence_ledger::NormativeClaimId;
+    use crate::ontology::ActionAuthority;
+    use crate::perspective::StakeholderId;
 
     fn fact(value: &str) -> FactClaimId {
         FactClaimId::new(value).unwrap()
@@ -464,11 +519,40 @@ mod tests {
         DecisionId::new(value).unwrap()
     }
 
-    fn profile(evidence: &DeliberationEvidenceLedger) -> FarmAdviceProfile {
-        FarmAdviceProfile::new(
-            AdviceEpisodeId::new("episode-1").unwrap(),
+    fn evidence() -> DeliberationEvidenceLedger {
+        let mut evidence = DeliberationEvidenceLedger::new();
+        evidence.add_fact(fact("premise-measured"), "reported flow measurement", 0.9).unwrap();
+        evidence.add_fact(fact("forecast-flow"), "modelled flow forecast", 0.7).unwrap();
+        evidence.add_fact(fact("observed-flow"), "subsequent measured flow", 0.95).unwrap();
+        evidence.add_fact(fact("conflict-a"), "sensor reports low flow", 0.8).unwrap();
+        evidence.add_fact(fact("conflict-b"), "farmer observation reports normal flow", 0.75).unwrap();
+        evidence.add_fact(fact("replacement-premise"), "replacement premise", 0.9).unwrap();
+        evidence.add_normative_claim(NormativeClaimId::new("goal").unwrap(), "farmer-stated goal", 0.9).unwrap();
+        evidence.register_decision(decision("decision-1"), [fact("premise-measured")], [NormativeClaimId::new("goal").unwrap()]).unwrap();
+        evidence
+    }
+
+    fn wcare_case(evidence: &DeliberationEvidenceLedger) -> AccountabilityCase {
+        let authority = RelationalAuthorityAssessment::for_test(
+            ActionAuthority::ActReversible,
+            ActionAuthority::Recommend,
+            BTreeSet::new(),
+            false,
+        );
+        AccountabilityCase::try_new(
             AccountabilityCaseId::new("wcare-case-1").unwrap(),
             decision("decision-1"),
+            [StakeholderId::new("farmer-1").unwrap()],
+            &authority,
+            true,
+            evidence,
+        ).unwrap()
+    }
+
+    fn profile(evidence: &DeliberationEvidenceLedger, case: &AccountabilityCase) -> FarmAdviceProfile {
+        FarmAdviceProfile::new(
+            AdviceEpisodeId::new("episode-1").unwrap(),
+            case,
             FarmAdviceContext::new(
                 "opaque-site-a",
                 FarmOperation::Irrigation,
@@ -484,23 +568,13 @@ mod tests {
         ).unwrap()
     }
 
-    fn evidence() -> DeliberationEvidenceLedger {
-        let mut evidence = DeliberationEvidenceLedger::new();
-        evidence.add_fact(fact("premise-measured"), "reported flow measurement", 0.9).unwrap();
-        evidence.add_fact(fact("forecast-flow"), "modelled flow forecast", 0.7).unwrap();
-        evidence.add_fact(fact("observed-flow"), "subsequent measured flow", 0.95).unwrap();
-        evidence.add_fact(fact("conflict-a"), "sensor reports low flow", 0.8).unwrap();
-        evidence.add_fact(fact("conflict-b"), "farmer observation reports normal flow", 0.75).unwrap();
-        evidence.add_normative_claim(NormativeClaimId::new("goal").unwrap(), "farmers choose their own goals", 0.9).unwrap();
-        evidence.register_decision(decision("decision-1"), [fact("premise-measured")], [NormativeClaimId::new("goal").unwrap()]).unwrap();
-        evidence
-    }
-
     #[test]
     fn unknown_premise_is_not_fabricated_into_a_fact() {
-        let mut p = profile(&evidence());
+        let e = evidence();
+        let case = wcare_case(&e);
+        let mut p = profile(&e, &case);
         let premise = AdvicePremise::new(AdviceEvidenceKind::Unknown, [], None).unwrap();
-        p.add_premise(premise, &evidence()).unwrap();
+        p.add_premise(premise, &e).unwrap();
         assert_eq!(p.premises()[0].kind(), AdviceEvidenceKind::Unknown);
         assert!(p.premises()[0].fact_claims().is_empty());
     }
@@ -511,12 +585,14 @@ mod tests {
             AdvicePremise::new(AdviceEvidenceKind::Measured, [fact("premise-measured")], None),
             Err(FarmAdviceError::PremiseAsOfRequired)
         );
-        let mut p = profile(&evidence());
+        let e = evidence();
+        let case = wcare_case(&e);
+        let mut p = profile(&e, &case);
         let premise = AdvicePremise::new(AdviceEvidenceKind::Measured, [fact("premise-measured")], Some(1_800_000_000)).unwrap();
-        p.add_premise(premise, &evidence()).unwrap();
+        p.add_premise(premise, &e).unwrap();
         assert!(p.add_premise(
             AdvicePremise::new(AdviceEvidenceKind::Reported, [fact("missing")], Some(1_800_000_000)).unwrap(),
-            &evidence(),
+            &e,
         ).is_err());
     }
 
@@ -538,7 +614,8 @@ mod tests {
     #[test]
     fn predicted_and_observed_metric_refs_cannot_be_the_same_claim() {
         let e = evidence();
-        let mut p = profile(&e);
+        let case = wcare_case(&e);
+        let mut p = profile(&e, &case);
         p.record_predicted_metric(fact("forecast-flow"), &e).unwrap();
         assert_eq!(
             p.record_observed_metric(fact("forecast-flow"), &e),
@@ -550,25 +627,73 @@ mod tests {
     }
 
     #[test]
-    fn farmer_declining_advice_is_a_valid_disposition() {
+    fn farmer_declining_advice_is_valid_and_not_a_failure_state() {
         let e = evidence();
-        let mut p = profile(&e);
+        let case = wcare_case(&e);
+        let mut p = profile(&e, &case);
         p.record_disposition(FarmerAdviceDisposition::Declined);
         assert_eq!(p.disposition(), Some(FarmerAdviceDisposition::Declined));
-        assert_eq!(p.review_state(), AdviceReviewState::Active);
+        assert_eq!(p.review_state(&case, &e), Ok(AdviceReviewState::Active));
     }
 
     #[test]
-    fn premise_review_does_not_silently_rewrite_the_episode() {
-        let e = evidence();
-        let mut p = profile(&e);
+    fn superseded_premise_derives_review_state_without_rewriting_snapshot() {
+        let mut e = evidence();
+        let case = wcare_case(&e);
+        let mut p = profile(&e, &case);
         p.add_premise(
             AdvicePremise::new(AdviceEvidenceKind::Measured, [fact("premise-measured")], Some(1_800_000_000)).unwrap(),
             &e,
         ).unwrap();
-        p.mark_requires_review();
-        assert_eq!(p.review_state(), AdviceReviewState::RequiresReview);
+        e.supersede_fact(&fact("premise-measured"), &fact("replacement-premise")).unwrap();
+        assert_eq!(p.review_state(&case, &e), Ok(AdviceReviewState::Superseded));
         assert_eq!(p.premises()[0].fact_claims().iter().next(), Some(&fact("premise-measured")));
+    }
+
+    #[test]
+    fn wrong_accountability_case_cannot_be_substituted() {
+        let e = evidence();
+        let case = wcare_case(&e);
+        let p = profile(&e, &case);
+        let authority = RelationalAuthorityAssessment::for_test(
+            ActionAuthority::ActReversible,
+            ActionAuthority::Recommend,
+            BTreeSet::new(),
+            false,
+        );
+        let other_case = AccountabilityCase::try_new(
+            AccountabilityCaseId::new("different-case").unwrap(),
+            decision("decision-1"),
+            [StakeholderId::new("farmer-1").unwrap()],
+            &authority,
+            true,
+            &e,
+        ).unwrap();
+        assert_eq!(
+            p.review_state(&other_case, &e),
+            Err(FarmAdviceError::AccountabilityCaseMismatch)
+        );
+    }
+
+    #[test]
+    fn mismatched_premise_snapshot_is_rejected() {
+        let e = evidence();
+        let case = wcare_case(&e);
+        let mut changed = DeliberationEvidenceLedger::new();
+        changed.add_fact(fact("different-premise"), "different premise", 0.9).unwrap();
+        changed.add_normative_claim(NormativeClaimId::new("goal").unwrap(), "farmer-stated goal", 0.9).unwrap();
+        changed.register_decision(decision("decision-1"), [fact("different-premise")], [NormativeClaimId::new("goal").unwrap()]).unwrap();
+        assert_eq!(
+            FarmAdviceProfile::new(
+                AdviceEpisodeId::new("episode-other").unwrap(),
+                &case,
+                FarmAdviceContext::new("site", FarmOperation::Irrigation, None, None).unwrap(),
+                FarmerObjective::new(ObjectiveSource::NotSupplied, None, None).unwrap(),
+                &changed,
+            ),
+            Err(FarmAdviceError::AccountabilityPremiseMismatch)
+        );
+        let _ = e;
     }
 
     #[test]
