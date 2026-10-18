@@ -860,6 +860,114 @@ mod tests {
     }
 
     #[test]
+    fn generated_three_state_cases_match_grid_oracles_for_value_and_regret() {
+        for seed in 0_i64..48 {
+            let mut input = scenario();
+            input.id = format!("generated-robust-grid-{seed}");
+            input.state_probability_bounds = vec![
+                StateProbabilityBound {
+                    state_id: "alpha".into(),
+                    lower_bps: 0,
+                    upper_bps: 7_500,
+                },
+                StateProbabilityBound {
+                    state_id: "beta".into(),
+                    lower_bps: 0,
+                    upper_bps: 7_500,
+                },
+                StateProbabilityBound {
+                    state_id: "gamma".into(),
+                    lower_bps: 2_500,
+                    upper_bps: 10_000,
+                },
+            ];
+            input.action_ids = vec!["A".into(), "B".into(), "C".into()];
+            let states = ["alpha", "beta", "gamma"];
+            let actions = ["A", "B", "C"];
+            input.payoffs.clear();
+            let mut matrix = [[0_i128; 3]; 3];
+            for (action_index, action_id) in actions.iter().enumerate() {
+                for (state_index, state_id) in states.iter().enumerate() {
+                    let value = ((seed * 7
+                        + (action_index as i64) * 11
+                        + (state_index as i64) * 13)
+                        % 23) - 11;
+                    matrix[action_index][state_index] = i128::from(value);
+                    input.payoffs.push(RobustPayoff {
+                        action_id: (*action_id).into(),
+                        state_id: (*state_id).into(),
+                        payoff_minor: value,
+                    });
+                }
+            }
+
+            let mut oracle_min = [i128::MAX; 3];
+            let mut oracle_max = [i128::MIN; 3];
+            let mut oracle_regret = [i128::MIN; 3];
+            for alpha in (0_u32..=7_500).step_by(2_500) {
+                for beta in (0_u32..=7_500).step_by(2_500) {
+                    let used = u64::from(alpha) + u64::from(beta);
+                    if used > TOTAL_BPS {
+                        continue;
+                    }
+                    let gamma = TOTAL_BPS - used;
+                    if !(2_500..=10_000).contains(&gamma) || gamma % 2_500 != 0 {
+                        continue;
+                    }
+                    let probabilities = [
+                        i128::from(alpha),
+                        i128::from(beta),
+                        i128::from(gamma),
+                    ];
+                    let best_by_state = [
+                        matrix.iter().map(|row| row[0]).max().unwrap(),
+                        matrix.iter().map(|row| row[1]).max().unwrap(),
+                        matrix.iter().map(|row| row[2]).max().unwrap(),
+                    ];
+                    for action_index in 0..actions.len() {
+                        let value_numerator = (0..3)
+                            .map(|state_index| {
+                                probabilities[state_index] * matrix[action_index][state_index]
+                            })
+                            .sum::<i128>();
+                        let regret_numerator = (0..3)
+                            .map(|state_index| {
+                                probabilities[state_index]
+                                    * (best_by_state[state_index]
+                                        - matrix[action_index][state_index])
+                            })
+                            .sum::<i128>();
+                        oracle_min[action_index] = oracle_min[action_index].min(value_numerator);
+                        oracle_max[action_index] = oracle_max[action_index].max(value_numerator);
+                        oracle_regret[action_index] =
+                            oracle_regret[action_index].max(regret_numerator);
+                    }
+                }
+            }
+
+            let report = input.evaluate().unwrap();
+            for (index, action_id) in actions.iter().enumerate() {
+                let actual = envelope(&report, action_id);
+                assert_eq!(actual.lower_expected_value_numerator, oracle_min[index], "seed={seed}, action={action_id}, lower");
+                assert_eq!(actual.upper_expected_value_numerator, oracle_max[index], "seed={seed}, action={action_id}, upper");
+                assert_eq!(
+                    actual.worst_case_expected_regret_numerator,
+                    oracle_regret[index],
+                    "seed={seed}, action={action_id}, regret"
+                );
+            }
+            let oracle_minimax = oracle_regret.iter().min().unwrap();
+            let expected_minimax = actions
+                .iter()
+                .enumerate()
+                .filter(|(index, _)| oracle_regret[*index] == *oracle_minimax)
+                .map(|(_, action)| (*action).to_owned())
+                .collect::<Vec<_>>();
+            assert_eq!(report.minimax_regret_action_ids, expected_minimax, "seed={seed}");
+        }
+    }
+
+    #[test]
     fn extreme_allocations_respect_bounds_and_sum_to_one() {
         let input = scenario();
         let report = input.evaluate().unwrap();
