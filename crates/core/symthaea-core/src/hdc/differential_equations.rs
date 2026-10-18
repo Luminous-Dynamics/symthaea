@@ -1194,7 +1194,7 @@ impl DifferentialEquationsEngine {
                 )),
             };
             let mut y_next: Vec<f64> = y.iter().zip(f_current.iter())
-                .map(|(state, derivative)| state + h * derivative)
+                .map(|(state, derivative)| *state + h * *derivative)
                 .collect();
             if let Some(index) = y_next.iter().position(|value| !value.is_finite()) {
                 return Err(ImplicitEulerError::new(
