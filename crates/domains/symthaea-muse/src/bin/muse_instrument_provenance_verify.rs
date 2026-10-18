@@ -18,6 +18,7 @@ use std::process::ExitCode;
 struct Options {
     probe_path: PathBuf,
     inventory_path: PathBuf,
+    renderer_binary_path: PathBuf,
 }
 
 #[derive(Debug, Serialize)]
@@ -30,6 +31,9 @@ struct VerificationReport {
     source_revision: Option<String>,
     source_revision_match: bool,
     renderer_binary_sha256: Option<String>,
+    renderer_binary_file_sha256: String,
+    renderer_binary_file_size_bytes: u64,
+    renderer_binary_file_name_matches_report: bool,
     renderer_binary_identity_verified: bool,
     root_content_manifests_verified: usize,
     selected_samples_total: usize,
@@ -64,6 +68,14 @@ fn run() -> Result<ExitCode, String> {
     let options = parse_args()?;
     // Hash bytes through the same reader used by the JSON parser, so the
     // reported input digest binds the exact document that was actually parsed.
+    let (renderer_binary_file_sha256, renderer_binary_file_size_bytes) =
+        file_sha256(&options.renderer_binary_path)
+            .map_err(|error| format!("cannot hash supplied renderer binary: {error}"))?;
+    let renderer_binary_file_name = options
+        .renderer_binary_path
+        .file_name()
+        .map(|name| name.to_string_lossy().into_owned())
+        .ok_or_else(|| "renderer binary path has no filename".to_string())?;
     let (probe, probe_report_sha256) = read_json_with_sha256(&options.probe_path)
         .map_err(|error| format!("cannot read probe report: {error}"))?;
     let (inventory, capability_report_sha256) =
@@ -75,6 +87,9 @@ fn run() -> Result<ExitCode, String> {
         &inventory,
         probe_report_sha256,
         capability_report_sha256,
+        renderer_binary_file_sha256,
+        renderer_binary_file_size_bytes,
+        &renderer_binary_file_name,
     );
     let stdout = io::stdout();
     let mut lock = stdout.lock();
@@ -94,6 +109,7 @@ fn run() -> Result<ExitCode, String> {
 fn parse_args() -> Result<Options, String> {
     let mut probe_path = None;
     let mut inventory_path = None;
+    let mut renderer_binary_path = None;
     let mut args = std::env::args().skip(1);
 
     while let Some(arg) = args.next() {
@@ -112,6 +128,11 @@ fn parse_args() -> Result<Options, String> {
                     args.next().ok_or_else(|| "--inventory requires a JSON file path".to_string())?,
                 ));
             }
+            "--renderer-binary" => {
+                renderer_binary_path = Some(PathBuf::from(
+                    args.next().ok_or_else(|| "--renderer-binary requires a file path".to_string())?,
+                ));
+            }
             _ => return Err(format!("unknown argument: {arg} (use --help)")),
         }
     }
@@ -119,17 +140,19 @@ fn parse_args() -> Result<Options, String> {
     Ok(Options {
         probe_path: probe_path.ok_or_else(|| "--probe is required".to_string())?,
         inventory_path: inventory_path.ok_or_else(|| "--inventory is required".to_string())?,
+        renderer_binary_path: renderer_binary_path
+            .ok_or_else(|| "--renderer-binary is required".to_string())?,
     })
 }
 
 fn print_help() {
     println!(
         "MEL-PROV-VERIFY-001: fail-closed provenance consistency check\n\
-         Usage: cargo run -p symthaea-muse --bin muse_instrument_provenance_verify -- --probe REPORT.json --inventory MATRIX.json\n\
-         Required evidence: same Git source revision, hashed probe executable, complete root WAV manifests,\n\
+         Usage: cargo run -p symthaea-muse --bin muse_instrument_provenance_verify -- --probe REPORT.json --inventory MATRIX.json --renderer-binary /path/to/muse_instrument_probe\n\
+         Required evidence: same Git source revision, supplied executable bytes matching the probe claim, complete root WAV manifests,\n\
          indexed-bank manifests, and selected-sample bank digests matching the inventory mapping.\n\
          JSON findings are written to stdout. Exit 0 means consistent; exit 1 means incomplete or inconsistent;\n\
-         exit 2 means invocation or input JSON could not be processed. This is not instrument qualification."
+         exit 2 means invocation or input files could not be processed. This is not instrument qualification."
     );
 }
 
@@ -138,6 +161,9 @@ fn verify_reports(
     inventory: &Value,
     probe_report_sha256: String,
     capability_report_sha256: String,
+    renderer_binary_file_sha256: String,
+    renderer_binary_file_size_bytes: u64,
+    renderer_binary_file_name: &str,
 ) -> VerificationReport {
     let mut findings = Vec::new();
     let mut root_content_manifests_verified = 0_usize;
@@ -209,6 +235,8 @@ fn verify_reports(
     };
 
     let renderer_binary_sha256 = string_field(probe, "renderer_binary_sha256").map(str::to_owned);
+    let renderer_binary_file_name_matches_report =
+        string_field(probe, "renderer_binary_name") == Some(renderer_binary_file_name);
     let renderer_binary_identity_verified = match (
         string_field(probe, "renderer_binary_identity_status"),
         renderer_binary_sha256.as_deref(),
@@ -218,7 +246,30 @@ fn verify_reports(
         (Some("hashed"), Some(digest), Some(name), Some(size))
             if valid_sha256(digest) && !name.trim().is_empty() && size > 0 =>
         {
-            true
+            if digest != renderer_binary_file_sha256 {
+                push_error(
+                    &mut findings,
+                    "renderer_binary_digest_mismatch",
+                    "supplied executable bytes do not match renderer_binary_sha256 in the probe report".into(),
+                );
+                false
+            } else if size != renderer_binary_file_size_bytes {
+                push_error(
+                    &mut findings,
+                    "renderer_binary_size_mismatch",
+                    "supplied executable byte length does not match the probe report".into(),
+                );
+                false
+            } else if !renderer_binary_file_name_matches_report {
+                push_error(
+                    &mut findings,
+                    "renderer_binary_name_mismatch",
+                    "supplied executable basename does not match the probe report".into(),
+                );
+                false
+            } else {
+                true
+            }
         }
         (Some("hashed"), Some(digest), _, _) if !valid_sha256(digest) => {
             push_error(
@@ -530,6 +581,9 @@ fn verify_reports(
         source_revision,
         source_revision_match,
         renderer_binary_sha256,
+        renderer_binary_file_sha256,
+        renderer_binary_file_size_bytes,
+        renderer_binary_file_name_matches_report,
         renderer_binary_identity_verified,
         root_content_manifests_verified,
         selected_samples_total,
@@ -649,6 +703,31 @@ fn read_json_with_sha256(path: &Path) -> Result<(Value, String), String> {
     Ok((value, digest))
 }
 
+fn file_sha256(path: &Path) -> io::Result<(String, u64)> {
+    let mut file = File::open(path)?;
+    let expected_size = file.metadata()?.len();
+    let mut hasher = Sha256::new();
+    let mut buffer = [0_u8; 64 * 1024];
+    let mut bytes_read = 0_u64;
+    loop {
+        let count = file.read(&mut buffer)?;
+        if count == 0 {
+            break;
+        }
+        bytes_read = bytes_read
+            .checked_add(count as u64)
+            .ok_or_else(|| io::Error::new(io::ErrorKind::InvalidData, "file length overflow while hashing"))?;
+        hasher.update(&buffer[..count]);
+    }
+    if bytes_read != expected_size {
+        return Err(io::Error::new(
+            io::ErrorKind::InvalidData,
+            "file size changed while hashing",
+        ));
+    }
+    Ok((format!("{:x}", hasher.finalize()), bytes_read))
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;
@@ -714,7 +793,15 @@ mod tests {
     }
 
     fn test_report(probe: &Value, inventory: &Value) -> VerificationReport {
-        verify_reports(probe, inventory, "0".repeat(64), "1".repeat(64))
+        verify_reports(
+            probe,
+            inventory,
+            "0".repeat(64),
+            "1".repeat(64),
+            "d".repeat(64),
+            4096,
+            "muse_instrument_probe",
+        )
     }
 
     #[test]
@@ -729,6 +816,16 @@ mod tests {
         assert_eq!(report.selected_samples_with_matching_inventory_bank_digest, 1);
         assert_eq!(report.error_count, 0);
         assert_eq!(report.incomplete_count, 0);
+    }
+
+    #[test]
+    fn mismatched_supplied_binary_is_rejected_even_when_report_sha_is_well_formed() {
+        let (mut probe, inventory) = fixtures();
+        probe["renderer_binary_sha256"] = serde_json::json!("9".repeat(64));
+        let report = test_report(&probe, &inventory);
+        assert_eq!(report.verdict, "inconsistent");
+        assert!(!report.renderer_binary_identity_verified);
+        assert!(report.findings.iter().any(|finding| finding.code == "renderer_binary_digest_mismatch"));
     }
 
     #[test]
