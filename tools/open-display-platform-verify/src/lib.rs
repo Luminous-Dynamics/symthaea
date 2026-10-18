@@ -457,7 +457,12 @@ fn validate_measurement_run_semantics(record: &Value) -> Vec<String> {
         .unwrap_or(&[]);
 
     validate_unique_field(instruments, "run instrument", "instrument_id", &mut errors);
-    validate_unique_field(observations, "run observation", "observation_id", &mut errors);
+    validate_unique_field(
+        observations,
+        "run observation",
+        "observation_id",
+        &mut errors,
+    );
     validate_unique_field(artifacts, "raw artifact", "artifact_id", &mut errors);
     validate_unique_field(
         exclusions,
