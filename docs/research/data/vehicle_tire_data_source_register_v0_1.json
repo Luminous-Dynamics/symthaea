@@ -114,7 +114,7 @@
       "vehicle_scope": "Passenger-car 205/55 R16 tires; not motorcycle tires",
       "data_available": "Full upstream CSV preserved byte-for-byte as nine ordered text shards; 210128 samples; 1755 Unit_ID segments; pressure, temperature, speed and anomaly labels. Original README and CC BY 4.0 license are preserved alongside the shards.",
       "rights_status": "CC-BY-4.0 explicitly stated by upstream repository",
-      "evidence_class": "FieldObserved",
+      "evidence_class": "mixed: InstrumentedPhysical (controlled deflation) and FieldObserved (normal driving / natural leakage)",
       "readiness": "rights_cleared_vendored_in_public_branch",
       "useful_for": [
         "pressure/temperature anomaly detection",
@@ -125,7 +125,8 @@
         "passenger-car 205/55 R16 data, not motorcycle data",
         "not tire-force, grip, puncture-resistance, compound, tread-wear or structural qualification data",
         "upstream says blowouts/instantaneous failures are not included",
-        "formal academic citation is not yet supplied in upstream README; preserve repository citation and attribution"
+        "formal academic citation is not yet supplied in upstream README; preserve repository citation and attribution",
+        "dataset combines controlled experimental deflation segments with natural leak and normal-driving segments; retain Collection_Method in all analysis"
       ],
       "next_action": "Run cargo test -p xtask tire_monitoring_intake and cargo run -p xtask -- tire-monitoring-intake on the exact PR head; then use whole-Unit_ID holdouts for pressure/temp/speed anomaly research only.",
       "repository_paths": [
