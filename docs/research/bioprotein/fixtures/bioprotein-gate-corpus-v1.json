@@ -1321,7 +1321,7 @@
         "target_species": "synthetic-companion-animal-target",
         "life_stage": "synthetic-life-stage-01",
         "intended_use": "ingredient_screen",
-        "requested_claim": "nutrition_feasibility",
+        "requested_claim": "cost_comparison",
         "scenario_digest": "sha256:synthetic-scenario-a"
       },
       "candidate": {
