@@ -1047,6 +1047,55 @@ mod tests {
     }
 
     #[test]
+    fn batch_replay_emits_complete_deterministic_receipt() {
+        let report = replay_preference_fixture(FIXTURE)
+            .expect("checked-in fixture should replay");
+        assert_eq!(report.schema_version, 1);
+        assert_eq!(report.fixture_version, "0.1.0");
+        assert_eq!(report.candidate_count, 3);
+        assert_eq!(report.scenario_count, 12);
+        assert_eq!(report.development_scenario_count, 2);
+        assert_eq!(report.held_out_scenario_count, 10);
+        assert_eq!(report.observation_count, 19);
+        assert_eq!(report.assessments.len(), 12);
+        assert_eq!(report.recommendation_count, 4);
+        assert_eq!(report.query_count, 6);
+        assert_eq!(report.abstention_count, 1);
+        assert_eq!(report.reject_all_count, 1);
+        assert_eq!(report.no_feasible_candidate_count, 0);
+    }
+
+    #[test]
+    fn batch_policy_receipt_is_invariant_to_oracle_ranking_changes() {
+        let mut fixture = parse_fixture();
+        let expected = replay_preference_fixture(&encode(&fixture)).unwrap();
+        fixture["scenarios"][0]["evaluation_oracle"]["preferred_order"] =
+            serde_json::json!(["assist", "stable", "flex"]);
+        let changed = replay_preference_fixture(&encode(&fixture)).unwrap();
+        assert_eq!(changed, expected);
+    }
+
+    #[test]
+    fn batch_replay_report_is_byte_stable_for_one_hundred_repeats() {
+        let expected = serde_json::to_vec(&replay_preference_fixture(FIXTURE).unwrap()).unwrap();
+        for _ in 0..100 {
+            let actual =
+                serde_json::to_vec(&replay_preference_fixture(FIXTURE).unwrap()).unwrap();
+            assert_eq!(actual, expected);
+        }
+    }
+
+    #[test]
+    fn empty_eligible_set_returns_no_feasible_candidate() {
+        let fixture = parse_fixture();
+        let mut scenario = scenario_by_id(&fixture, "DEV-WALK-001").clone();
+        scenario["eligible_candidate_ids"] = serde_json::json!([]);
+        let report = replay_preference_episode(&scenario).unwrap();
+        assert_eq!(report.action, PreferenceReplayActionV1::NoFeasibleCandidate);
+        assert_eq!(report.recommended_candidate_id, None);
+    }
+
+    #[test]
     fn versioned_fixture_validates_and_reports_expected_counts() {
         let summary = validate_preference_drift_fixture(FIXTURE)
             .expect("the versioned fixture must satisfy its contract");
