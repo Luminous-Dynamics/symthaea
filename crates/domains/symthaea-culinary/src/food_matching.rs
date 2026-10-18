@@ -355,7 +355,8 @@ mod tests {
                 {"attribute_id":"product_kind","query_value":"whole_food","candidate_value":"whole_food","relation":"match"},
                 {"attribute_id":"edible_basis","query_value":"edible_portion_100g","candidate_value":"edible_portion_100g","relation":"match"},
                 {"attribute_id":"preservation","query_value":"fresh","candidate_value":"fresh","relation":"match"},
-                {"attribute_id":"brand_id","query_value":null,"candidate_value":null,"relation":"not_applicable"}
+                {"attribute_id":"brand_id","query_value":null,"candidate_value":null,"relation":"not_applicable"},
+                {"attribute_id":"fortification","query_value":null,"candidate_value":null,"relation":"not_applicable"}
             ],
             "deviations": [],
             "component_claims": [
