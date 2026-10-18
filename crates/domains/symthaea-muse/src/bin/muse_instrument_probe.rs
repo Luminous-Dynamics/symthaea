@@ -567,11 +567,23 @@ fn estimate_pitch_yin(
         return unavailable("near_silent_window");
     }
 
-    let min_frequency = 60.0_f64;
-    let max_frequency = 1_500.0_f64.min(f64::from(sample_rate) * 0.24);
+    if !target_hz.is_finite() || target_hz <= 0.0 {
+        return unavailable("invalid_target_frequency");
+    }
+    // Search near the requested pitch rather than a single global frequency
+    // ceiling. This reduces wasted work in pitch sweeps and avoids presenting
+    // a high note's subharmonic as if the analysis covered its fundamental.
+    // A low-confidence octave error is still possible and remains diagnostic.
+    let target = f64::from(target_hz);
+    let min_frequency = (target * 0.5).max(20.0);
+    let max_frequency = (target * 2.0).min(f64::from(sample_rate) * 0.24);
+    if max_frequency <= min_frequency {
+        return unavailable("target_outside_pitch_analysis_band");
+    }
     let min_lag = (f64::from(sample_rate) / max_frequency).floor().max(2.0) as usize;
-    let max_lag = ((f64::from(sample_rate) / min_frequency).floor() as usize)
-        .min(mono.len() / 2);
+    let max_lag = (f64::from(sample_rate) / min_frequency)
+        .ceil()
+        .min((mono.len() / 2) as f64) as usize;
     if max_lag <= min_lag + 1 {
         return unavailable("window_too_short_for_period_range");
     }
@@ -903,6 +915,25 @@ mod tests {
             "{result:?}"
         );
         assert!(result.periodicity_confidence.unwrap() >= 0.60);
+    }
+
+    #[test]
+    fn yin_reports_when_target_is_outside_the_analysis_band() {
+        let sample_rate = 22_050_u32;
+        let frames = sample_rate as usize / 10;
+        let samples: Vec<f32> = (0..frames)
+            .flat_map(|index| {
+                let sample = (2.0 * std::f64::consts::PI * 12_000.0 * index as f64
+                    / sample_rate as f64)
+                    .sin() as f32
+                    * 0.5;
+                [sample, sample]
+            })
+            .collect();
+        let result = estimate_pitch_yin(&samples, sample_rate, 2, 100, 12_000.0);
+        assert_eq!(result.status, "target_outside_pitch_analysis_band");
+        assert!(result.estimated_pitch_hz.is_none());
+        assert!(result.error_cents.is_none());
     }
 
     #[test]
