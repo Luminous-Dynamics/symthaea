@@ -56,7 +56,9 @@ A failed condition rejects the next release. This is **a rule gate**, not an eco
 
 The main evaluator also exposes:
 - a cash-maximizing feasible baseline, using only options that pass hard constraints; and
-- a Pareto frontier over expected cash, liquidity, productive capacity, maintenance burden, and critical-dependency overlap.
+- a Pareto frontier over expected cash, liquidity, productive capacity, and maintenance burden.
+
+The candidate contract counts distinct declared dependency IDs only. It does not label any dependency as critical. Criticality scoring belongs in the separate evaluator harness, and physical critical-dependency assessments should ultimately come from a qualified Sol-Atlas result. A smaller raw count of declared links is not automatically safer and is not a Pareto advantage.
 
 Reported valuation change remains observable but is deliberately excluded from Pareto dominance. No one metric should automatically substitute for productive capacity, and no weighted total should silently compensate for a hard-gate failure.
 
