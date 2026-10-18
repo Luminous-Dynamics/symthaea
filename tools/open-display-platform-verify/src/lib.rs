@@ -199,8 +199,7 @@ pub fn validate_measurement_run_str(
 fn approximately_equal(actual: f64, expected: f64) -> bool {
     actual.is_finite()
         && expected.is_finite()
-        && (actual - expected).abs()
-            <= 1e-12_f64.max(actual.abs().max(expected.abs()) * 1e-9)
+        && (actual - expected).abs() <= 1e-12_f64.max(actual.abs().max(expected.abs()) * 1e-9)
 }
 
 /// Checks nested uncertainty-budget provenance and, for a linearized budget,
@@ -319,9 +318,7 @@ fn validate_uncertainty_budget(
         ));
     }
 
-    let budget_expanded = budget
-        .get("expanded_uncertainty")
-        .and_then(Value::as_f64);
+    let budget_expanded = budget.get("expanded_uncertainty").and_then(Value::as_f64);
     let top_level_expanded = observation
         .get("expanded_uncertainty")
         .and_then(Value::as_f64);
@@ -330,9 +327,7 @@ fn validate_uncertainty_budget(
             "uncertainty budget for {observation_id} needs a finite nonnegative expanded uncertainty"
         ));
     }
-    if let (Some(budget_value), Some(top_level_value)) =
-        (budget_expanded, top_level_expanded)
-    {
+    if let (Some(budget_value), Some(top_level_value)) = (budget_expanded, top_level_expanded) {
         if !approximately_equal(budget_value, top_level_value) {
             errors.push(format!(
                 "uncertainty budget expanded uncertainty disagrees with observation {observation_id}"
@@ -363,9 +358,7 @@ fn validate_uncertainty_budget(
                 .and_then(Value::as_str)
                 .unwrap_or("<missing>");
             let standard = term.get("standard_uncertainty").and_then(Value::as_f64);
-            let sensitivity = term
-                .get("sensitivity_coefficient")
-                .and_then(Value::as_f64);
+            let sensitivity = term.get("sensitivity_coefficient").and_then(Value::as_f64);
             match (standard, sensitivity) {
                 (Some(u), Some(coefficient))
                     if u.is_finite() && u >= 0.0 && coefficient.is_finite() =>
@@ -466,7 +459,12 @@ fn validate_measurement_run_semantics(record: &Value) -> Vec<String> {
     validate_unique_ids(instruments, "run instrument", &mut errors);
     validate_unique_ids(observations, "run observation", &mut errors);
     validate_unique_ids(artifacts, "raw artifact", &mut errors);
-    validate_unique_field(exclusions, "observation exclusion", "exclusion_id", &mut errors);
+    validate_unique_field(
+        exclusions,
+        "observation exclusion",
+        "exclusion_id",
+        &mut errors,
+    );
 
     let instrument_ids: BTreeSet<String> = instruments
         .iter()
@@ -558,7 +556,9 @@ fn validate_measurement_run_semantics(record: &Value) -> Vec<String> {
         }
 
         if status == "NOT_EVALUATED" {
-            if observation.get("value").is_some_and(|value| !value.is_null())
+            if observation
+                .get("value")
+                .is_some_and(|value| !value.is_null())
                 || observation
                     .get("expanded_uncertainty")
                     .is_some_and(|value| !value.is_null())
@@ -623,7 +623,9 @@ fn validate_measurement_run_semantics(record: &Value) -> Vec<String> {
                         "measured observation {observation_id} uses instrument {id} without VALID calibration state"
                     ));
                 }
-                if instrument.get("calibration_valid_through").and_then(Value::as_str)
+                if instrument
+                    .get("calibration_valid_through")
+                    .and_then(Value::as_str)
                     .zip(run_date)
                     .is_some_and(|(expiry, date)| expiry < date)
                 {
@@ -726,7 +728,8 @@ fn validate_measurement_run_semantics(record: &Value) -> Vec<String> {
         "ABORTED" => {
             if measured_count == 0 && artifacts.is_empty() && acquired_at.is_some() {
                 errors.push(
-                    "ABORTED record with no acquired data must not claim an acquisition timestamp".to_owned(),
+                    "ABORTED record with no acquired data must not claim an acquisition timestamp"
+                        .to_owned(),
                 );
             }
         }
@@ -838,10 +841,8 @@ fn validate_semantics(manifest: &Value) -> Vec<String> {
                             "module design parameter name must be unique: {name}"
                         ));
                     }
-                    if manifest.get("status").and_then(Value::as_str)
-                        == Some("SPECIFICATION_ONLY")
-                        && parameter.get("status").and_then(Value::as_str)
-                            != Some("EXAMPLE_ONLY")
+                    if manifest.get("status").and_then(Value::as_str) == Some("SPECIFICATION_ONLY")
+                        && parameter.get("status").and_then(Value::as_str) != Some("EXAMPLE_ONLY")
                     {
                         errors.push(format!(
                             "specification-only design parameter {name} must remain EXAMPLE_ONLY"
@@ -937,12 +938,7 @@ fn validate_unique_ids(records: &[Value], category: &str, errors: &mut Vec<Strin
     validate_unique_field(records, category, "id", errors);
 }
 
-fn validate_unique_field(
-    records: &[Value],
-    category: &str,
-    field: &str,
-    errors: &mut Vec<String>,
-) {
+fn validate_unique_field(records: &[Value], category: &str, field: &str, errors: &mut Vec<String>) {
     let mut seen = BTreeSet::new();
     for record in records {
         let id = record
@@ -978,8 +974,9 @@ mod tests {
         include_str!("../../../docs/engineering/open-display-reference-platform-v0.1.json");
     const SCHEMA_TEXT: &str =
         include_str!("../../../docs/engineering/open-display-reference-platform.schema.json");
-    const CAD_SOURCE: &str =
-        include_str!("../../../hardware/open-display-reference/cad/odrh_sensor_interface_plate.scad");
+    const CAD_SOURCE: &str = include_str!(
+        "../../../hardware/open-display-reference/cad/odrh_sensor_interface_plate.scad"
+    );
     const RUN_TEXT: &str =
         include_str!("../../../docs/engineering/display-measurement-run-template-v0.1.json");
     const RUN_SCHEMA_TEXT: &str =
@@ -1018,7 +1015,11 @@ mod tests {
         record["observations"][0]["decision_capability"] = Value::String("CAPABLE".to_owned());
         let errors = validate_measurement_run_str(&encoded(&record), RUN_SCHEMA_TEXT)
             .expect_err("a plan-only record cannot contain measured values");
-        assert!(errors.iter().any(|error| error.contains("PLAN_ONLY record")));
+        assert!(
+            errors
+                .iter()
+                .any(|error| error.contains("PLAN_ONLY record"))
+        );
     }
 
     #[test]
@@ -1067,16 +1068,17 @@ mod tests {
             "expanded_uncertainty":1.1,
             "notes":"synthetic test-only uncertainty budget"
         });
-        record["observations"][0]["instrument_ids"] =
-            serde_json::json!(["ODRH-RUN-INS-POWER-001"]);
+        record["observations"][0]["instrument_ids"] = serde_json::json!(["ODRH-RUN-INS-POWER-001"]);
         record["observations"][0]["raw_artifact_ids"] =
             serde_json::json!(["ODRH-ART-POWER-TRACE-001"]);
 
         let errors = validate_measurement_run_str(&encoded(&record), RUN_SCHEMA_TEXT)
             .expect_err("uncertainty of 1.1 cannot pass MDE 3.0 under the one-third gate");
-        assert!(errors
-            .iter()
-            .any(|error| error.contains("claims CAPABLE despite uncertainty")));
+        assert!(
+            errors
+                .iter()
+                .any(|error| error.contains("claims CAPABLE despite uncertainty"))
+        );
     }
 
     #[test]
@@ -1111,8 +1113,7 @@ mod tests {
         record["observations"][0]["expanded_uncertainty"] = serde_json::json!(expanded);
         record["observations"][0]["minimum_decision_effect"] = serde_json::json!(4.0);
         record["observations"][0]["decision_capability"] = Value::String("CAPABLE".to_owned());
-        record["observations"][0]["instrument_ids"] =
-            serde_json::json!(["ODRH-RUN-INS-POWER-001"]);
+        record["observations"][0]["instrument_ids"] = serde_json::json!(["ODRH-RUN-INS-POWER-001"]);
         record["observations"][0]["raw_artifact_ids"] =
             serde_json::json!(["ODRH-ART-POWER-TRACE-001"]);
         record["observations"][0]["uncertainty_budget"] = serde_json::json!({
@@ -1150,13 +1151,15 @@ mod tests {
             .expect("well-formed linearized covariance budget should validate");
 
         let mut mutated = record;
-        mutated["observations"][0]["uncertainty_budget"]["covariance_terms"][0]
-            ["covariance_contribution"] = serde_json::json!(0.2);
+        mutated["observations"][0]["uncertainty_budget"]["covariance_terms"][0]["covariance_contribution"] =
+            serde_json::json!(0.2);
         let errors = validate_measurement_run_str(&encoded(&mutated), RUN_SCHEMA_TEXT)
             .expect_err("mutated covariance must disagree with the frozen combined uncertainty");
-        assert!(errors.iter().any(|error| {
-            error.contains("reported combined standard uncertainty")
-        }));
+        assert!(
+            errors
+                .iter()
+                .any(|error| { error.contains("reported combined standard uncertainty") })
+        );
     }
 
     #[test]
@@ -1232,8 +1235,7 @@ mod tests {
         record["observations"][0]["raw_artifact_ids"] = serde_json::json!(["ODRH-ART-POWER-001"]);
         record["observations"][1]["instrument_ids"] =
             serde_json::json!(["ODRH-RUN-INS-CAMERA-001"]);
-        record["observations"][1]["raw_artifact_ids"] =
-            serde_json::json!(["ODRH-ART-CAMERA-001"]);
+        record["observations"][1]["raw_artifact_ids"] = serde_json::json!(["ODRH-ART-CAMERA-001"]);
 
         let report = validate_measurement_run_str(&encoded(&record), RUN_SCHEMA_TEXT)
             .expect("unsupported metric may retain raw evidence without claiming a result");
@@ -1246,10 +1248,12 @@ mod tests {
         let mut record = parse_run();
         let first_id = record["observations"][0]["observation_id"].clone();
         record["observations"][1]["observation_id"] = first_id;
-        assert!(validate_measurement_run_str(&encoded(&record), RUN_SCHEMA_TEXT)
-            .expect_err("duplicate observation identities must fail")
-            .iter()
-            .any(|error| error.contains("duplicate run observation ID")));
+        assert!(
+            validate_measurement_run_str(&encoded(&record), RUN_SCHEMA_TEXT)
+                .expect_err("duplicate observation identities must fail")
+                .iter()
+                .any(|error| error.contains("duplicate run observation ID"))
+        );
     }
 
     #[test]
