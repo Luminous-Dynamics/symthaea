@@ -54,7 +54,7 @@ The case probabilities, cashflows, discount factor and waiting cost are inputs t
 
 Tests intentionally include scenarios where staging wins, waiting wins, one-shot investment wins, and capital limits make abandonment the only feasible policy. This prevents the benchmark from baking in the assumption that more reversibility is always better.
 
-This is an exhaustive comparison of four named policy templates, **not** a general dynamic-programming oracle or a validated real-options model. The next benchmark step is to independently enumerate small state/action trees with a reference oracle and compare the policy catalog against that upper bound.
+This is an exhaustive comparison of four named policy templates, **not** a general dynamic-programming oracle or a validated real-options model. The evaluator-harness now includes `policy_oracle.rs`, a separately written arithmetic verifier that independently recomputes all four named-template outcomes, feasibility, best-policy tie-break and improvement-vs-one-shot fields. Its authored tests include a deterministic 100-scenario sweep, tampered-value/best-policy negatives and missing/duplicate assessment rejection. This checks the present finite-template implementation; it does not establish optimality over all possible adaptive policies. The next benchmark step is still to independently enumerate small state/action trees and compare the four-policy catalog's regret against that larger feasible-policy reference.
 
 ## Robust decisions when probabilities are uncertain
 
@@ -111,5 +111,6 @@ A frozen V1 golden receipt exercises manifest bytes `canonical-manifest-v1` and 
 1. Run cargo test and cargo fmt against this exact head; fix any compiler, formatting or contract issues.
 2. Implement a simple spreadsheet-equivalent baseline over the public fixtures.
 3. Move larger fixture definitions into versioned data files and separate candidate-visible observations from a separately controlled holdout evaluator.
-4. Expand the independent verifier over generated scenarios and mutation corpora; keep the V1 golden vector immutable, and add a separate evaluation algorithm only where it reduces meaningful common-mode risk.
-5. Add adversarial fixtures and compare per-dimension outcomes against simple baselines, then extend only where results justify it.
+4. Run the new independent four-policy arithmetic oracle and receipt verifier on the exact head; then expand their generated scenario/mutation corpora while keeping V1 golden vectors immutable.
+5. Add an exhaustive tiny-state adaptive-policy tree oracle and report policy regret against the catalog, spreadsheet baseline and seeded simple policies.
+6. Add adversarial fixtures and compare per-dimension outcomes against simple baselines, then extend only where results justify it.
