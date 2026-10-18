@@ -73,6 +73,7 @@ The 90% intent-recognition target is an engineering aspiration, not a literature
 ## Research basis
 
 - Khalifa et al., The Procedural Content Generation Benchmark: An Open-source Testbed for Generative Challenges in Games (FDG 2025). It explicitly separates quality, diversity and controllability over 12 game-content problems: https://arxiv.org/abs/2503.21474
+- MIREX 2026 Symbolic Music Generation uses double-blind subjective ratings for prompt coherence, creativity, structuredness and overall musicality, and separates an eight-candidate generation/selection budget: https://www.music-ir.org/mirex/wiki/2026%3ASymbolic_Music_Generation
 - Ding et al., Quality Diversity through Human Feedback (ICML 2024). It explores inferring diversity dimensions from human similarity judgments instead of relying only on hand-authored descriptors: https://proceedings.mlr.press/v235/ding24h.html
 - Bradley et al., Quality-Diversity through AI Feedback (ICLR 2024). It studies combining AI-based critique with diversity-driven search for qualitative generation tasks: https://proceedings.iclr.cc/paper_files/paper/2024/hash/5b9bef4eae0f574cedbf9f4bf29d8ae7-Abstract-Conference.html
 - Doshi & Hauser, Generative AI enhances individual creativity but reduces the collective diversity of novel content (Science Advances, 2024): https://doi.org/10.1126/sciadv.adn5290

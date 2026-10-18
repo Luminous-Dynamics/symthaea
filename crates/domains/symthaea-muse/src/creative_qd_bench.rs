@@ -62,9 +62,9 @@ pub struct CreativeIntentBenchmarkCandidateV1 {
 pub struct CreativeArchiveDescriptorCellV1 {
     /// 0 = no valid pitches; 1–4 = exact count; 5 = five or more.
     pub pitch_diversity_bin: usize,
-    /// Rounded coverage of eight equally sized windows, in bins 0–4.
+    /// Normalized active-window coverage ratio, rounded into bins 0–4.
     pub active_window_coverage_bin: usize,
-    /// Onset density (valid notes/second): <=0.5, <=1.5, <=3, >3.
+    /// Distinct onset events per second: <=0.5, <=1.5, <=3, >3.
     pub onset_density_bin: usize,
     /// Inter-onset interval CV: <=0.1, <=0.4, <=0.8, <=1.5, >1.5.
     pub onset_interval_cv_bin: usize,
@@ -323,7 +323,7 @@ fn descriptor_cell(
     audit: &CreativeCandidateAuditV1,
     duration_secs: f32,
 ) -> CreativeArchiveDescriptorCellV1 {
-    let density_per_second = audit.valid_note_count as f64 / f64::from(duration_secs);
+    let density_per_second = audit.distinct_onset_count as f64 / f64::from(duration_secs);
     let onset_density_bin = if density_per_second <= 0.5 {
         0
     } else if density_per_second <= 1.5 {
