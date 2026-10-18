@@ -213,6 +213,14 @@ impl CapacitorMagnitudeEsrSweep {
         frequency_hz: f64,
     ) -> Result<MagnitudeEsrEvaluation, MagnitudeEsrSweepError> {
         self.validate()?;
+        self.evaluate_validated(frequency_hz)
+    }
+
+    /// Evaluate after the caller has validated the entire sweep.
+    fn evaluate_validated(
+        &self,
+        frequency_hz: f64,
+    ) -> Result<MagnitudeEsrEvaluation, MagnitudeEsrSweepError> {
         if !frequency_hz.is_finite() || frequency_hz <= 0.0 {
             return Err(MagnitudeEsrSweepError::InvalidEvaluationFrequency);
         }
@@ -589,7 +597,7 @@ pub fn calculate_magnitude_esr_spectrum_metrics(
     let mut max_impedance: f64 = 0.0;
 
     for component in &spectrum.components {
-        let evaluated = sweep.evaluate(component.frequency_hz)?;
+        let evaluated = sweep.evaluate_validated(component.frequency_hz)?;
         let ripple_voltage = component.current_rms_a * evaluated.impedance_magnitude_ohm;
         let dissipated_power = component.current_rms_a.powi(2) * evaluated.esr_ohm;
         current_squared += component.current_rms_a.powi(2);
