@@ -10,7 +10,11 @@ The adapter establishes source and data-contract integrity before any model comp
 
 ## Selected profile
 
+**Historical challenge:** the original AMB2025-02 submission deadline was August 29, 2025. This protocol treats the publication as a retrospective public evaluation profile, not an open challenge entry.
+
 NIST AMB2025-02 describes macroscale quasi-static tensile testing of PBF-L IN718 in the as-built condition. The official README says eight miniature tensile specimens were excised from the same parent specimen, AMB2022-718-AMMT-B7-P4; testing followed ASTM E8 at a strain rate of 1×10^-3 s^-1 and a 3 mm gauge length. The requested target is average tensile properties across those eight specimens, with processing and microstructure data from AMB2022-01 used as calibration inputs.
+
+Related AMB2022-01 source publications listed by NIST include the 3D-build modeling-description data (DOI 10.18434/mds2-2607), in-situ thermography/processing scripts (10.18434/mds2-2715), microstructure measurements (10.18434/mds2-2692), residual strain/stress/deflection measurements (10.18434/mds2-2711), and serial-sectioning/X-ray CT measurements (10.18434/mds2-2767). The 2025 challenge README explicitly links the latter DOI for EBSD-related calibration data. These are cataloged as candidate related sources only; the official submission template and artifact-level fields still determine which source objects are actually needed.
 
 Primary links:
 - DOI and citation instructions: https://doi.org/10.18434/mds2-3735
