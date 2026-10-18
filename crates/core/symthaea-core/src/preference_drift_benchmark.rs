@@ -1,10 +1,11 @@
 // Copyright (C) 2024-2026 Tristan Stoltz / Luminous Dynamics
 // SPDX-License-Identifier: AGPL-3.0-or-later
 // Commercial licensing: see COMMERCIAL_LICENSE.md at repository root
-//! Deterministic contract validation for the Open Mobility preference-drift fixture.
+//! Deterministic contract validation for Open Mobility synthetic preference-drift fixtures.
 //!
-//! This module validates the hand-authored synthetic corpus only. It does not fit a preference
-//! model, rank candidates, estimate calibration, operate hardware, or establish human evidence.
+//! This module validates the hand-authored v2 controls and versioned factorized-generator output.
+//! It does not fit a preference model, rank candidates, estimate calibration, operate hardware, or
+//! establish human evidence. Generated records remain synthetic, template-derived test inputs.
 
 use std::collections::{HashMap, HashSet};
 
