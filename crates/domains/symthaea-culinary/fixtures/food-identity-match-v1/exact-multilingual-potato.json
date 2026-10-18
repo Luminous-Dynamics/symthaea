@@ -1,0 +1,122 @@
+{
+  "schema_version": "1.0.0",
+  "assessment_id": "synthetic:exact-multilingual-potato-v1",
+  "use_scope": "nutrition_estimation",
+  "outcome": "exact_match",
+  "query_record": {
+    "record_id": "synthetic:query-potato",
+    "source_ref": "synthetic:source-a",
+    "source_version": "fixture-v1",
+    "names": [
+      {
+        "text": "potato",
+        "language_tag": "en-ZA"
+      },
+      {
+        "text": "izambane",
+        "language_tag": "zu-ZA"
+      }
+    ],
+    "identity": {
+      "taxon_id": "taxon:solanum-tuberosum",
+      "food_part": "tuber",
+      "processing_state": "whole",
+      "preparation_state": "raw",
+      "product_kind": "whole_food",
+      "edible_basis": "edible_portion_100g",
+      "preservation": "fresh",
+      "brand_id": null,
+      "fortification": null,
+      "cultivar": null,
+      "origin_region": null
+    }
+  },
+  "candidate_record": {
+    "record_id": "synthetic:candidate-potato",
+    "source_ref": "synthetic:source-b",
+    "source_version": "fixture-v1",
+    "names": [
+      {
+        "text": "potato",
+        "language_tag": "en-US"
+      },
+      {
+        "text": "potato, flesh and skin, raw",
+        "language_tag": "en-US"
+      }
+    ],
+    "identity": {
+      "taxon_id": "taxon:solanum-tuberosum",
+      "food_part": "tuber",
+      "processing_state": "whole",
+      "preparation_state": "raw",
+      "product_kind": "whole_food",
+      "edible_basis": "edible_portion_100g",
+      "preservation": "fresh",
+      "brand_id": null,
+      "fortification": null,
+      "cultivar": null,
+      "origin_region": null
+    }
+  },
+  "attribute_checks": [
+    {
+      "attribute_id": "taxon_id",
+      "query_value": "taxon:solanum-tuberosum",
+      "candidate_value": "taxon:solanum-tuberosum",
+      "relation": "match"
+    },
+    {
+      "attribute_id": "food_part",
+      "query_value": "tuber",
+      "candidate_value": "tuber",
+      "relation": "match"
+    },
+    {
+      "attribute_id": "processing_state",
+      "query_value": "whole",
+      "candidate_value": "whole",
+      "relation": "match"
+    },
+    {
+      "attribute_id": "preparation_state",
+      "query_value": "raw",
+      "candidate_value": "raw",
+      "relation": "match"
+    },
+    {
+      "attribute_id": "product_kind",
+      "query_value": "whole_food",
+      "candidate_value": "whole_food",
+      "relation": "match"
+    },
+    {
+      "attribute_id": "edible_basis",
+      "query_value": "edible_portion_100g",
+      "candidate_value": "edible_portion_100g",
+      "relation": "match"
+    },
+    {
+      "attribute_id": "preservation",
+      "query_value": "fresh",
+      "candidate_value": "fresh",
+      "relation": "match"
+    },
+    {
+      "attribute_id": "brand_id",
+      "query_value": null,
+      "candidate_value": null,
+      "relation": "not_applicable"
+    }
+  ],
+  "deviations": [],
+  "component_claims": [
+    {
+      "component_id": "component:protein",
+      "query_basis": "g/100g edible portion",
+      "candidate_basis": "g/100g edible portion",
+      "comparability": "same_basis"
+    }
+  ],
+  "rationale": "Synthetic exact-identity contract fixture; no real nutrition values."
+}
