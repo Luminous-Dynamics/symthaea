@@ -84,7 +84,7 @@ fn actual_group_faults(case: &Value) -> BTreeSet<String> {
         for observation in observations {
             let partition = str_at(observation, "partition").to_owned();
             let group_id = observation.get("group_ids")
-                .and_then(|g| g.get(&axis))
+                .and_then(|g| g.get(axis.as_str()))
                 .and_then(Value::as_str);
             if let Some(group_id) = group_id {
                 partitions_by_group.entry(group_id.to_owned()).or_default().insert(partition);
@@ -110,7 +110,7 @@ fn actual_policy_faults(case: &Value) -> BTreeSet<String> {
         faults.insert("inadmissible_experiment_selected".to_owned());
     }
     if str_at(selection, "policy") == "seeded_random"
-        && selection.get("random_seed").is_some_and(Value::is_null)
+        && !selection.get("random_seed").is_some_and(|seed| !seed.is_null())
     {
         faults.insert("random_seed_missing".to_owned());
     }
@@ -157,12 +157,14 @@ fn semantic_findings(corpus: &Value) -> (Vec<String>, Vec<CaseResult>) {
         }
 
         let case_type = str_at(case, "case_type");
-        let declared: BTreeSet<String> = strings_at(case, "fault_modes")
-            .into_iter().filter(|fault| fault != "none").collect();
+        let fault_entries = strings_at(case, "fault_modes");
+        let declared: BTreeSet<String> = fault_entries.iter()
+            .filter(|fault| fault.as_str() != "none").cloned().collect();
         seen_fault_coverage.extend(declared.iter().cloned());
-        if declared.len() != strings_at(case, "fault_modes").len().saturating_sub(
-            usize::from(strings_at(case, "fault_modes").iter().any(|f| f == "none"))
-        ) {
+        let active_entry_count = fault_entries.iter().filter(|fault| fault.as_str() != "none").count();
+        if declared.len() != active_entry_count
+            || (fault_entries.iter().any(|fault| fault == "none") && fault_entries.len() != 1)
+        {
             findings.push(format!("{path}.fault_modes: duplicate or conflicting fault declaration"));
         }
 
@@ -184,6 +186,9 @@ fn semantic_findings(corpus: &Value) -> (Vec<String>, Vec<CaseResult>) {
                 findings.push(format!("{path}: positive control must be a valid split with no policy faults"));
             }
         } else if case_type == "negative_control" {
+            if declared.len() != 1 {
+                findings.push(format!("{path}: each negative control must isolate exactly one fault"));
+            }
             if actual.is_empty() {
                 findings.push(format!("{path}: negative control declares no effective policy violation"));
             }
