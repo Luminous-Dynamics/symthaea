@@ -115,6 +115,12 @@ Every metric declares unit, numerator/denominator, measurement window, topology/
 
 Do not collapse these into one score. A throughput gain cannot compensate for reduced distress delivery, stale locations, hidden outage states or an unsafe power envelope.
 
+## 6.2 Failure-domain diversity, not just route diversity
+
+The Rust kernel now includes a bounded path-pair search that only reports two routes as diverse when their declared link failure domains and internal relay nodes are disjoint. A link declares both a list of common-cause domains (e.g. shared cable route, power feed, shaft or inundation zone) and whether that inventory is complete. Incomplete or absent inventories do not support a diversity claim. The search has explicit hop and candidate-path caps so the reference harness fails clearly rather than exploring an unbounded graph.
+
+This improves upon merely checking that two paths have different link IDs: two routes can share an upstream switch, power supply, shaft, conduit, or flood zone. The result is still only as complete as the scenario's dependency inventory; it cannot certify real infrastructure independence without engineering evidence. Test shared-domain negative controls and include relay/node dependencies, not just link identity.
+
 ## 6.1 Executable airtime model: current boundary
 
 The Rust crate now includes a one-channel serialized airtime queue alongside graph route selection, message receipts and the packet-count queue planner. It consumes explicit payload bytes, framing-overhead bytes, bitrate in bit/s, propagation delay, maximum attempts, and a deterministic per-attempt receiver-outcome trace. It reports frame airtime, queue wait, failed attempts, receiver arrival, expiry and total airtime.
@@ -134,7 +140,7 @@ These are targets for test design; none are yet measured:
 2. **Typed delivery semantics:** no successful end-to-end status without receiver-side evidence; no response becomes “delivered” solely because the local transmitter accepted a packet.
 3. **Single-fault alert delivery:** aim for at least 99.9% delivery over the explicitly defined test set; publish numerator, denominator, confidence interval, conditions and every miss. This is not a guarantee of real-mine reliability.
 4. **Connected local path:** initial lab target of p95 time-to-first-SOS ≤ 5 s, measured from event creation to receiver acknowledgement. Test TTE cold-start and long-range cases separately rather than assigning them an unrealistic shared deadline.
-5. **Redundancy:** demonstrate critical messaging across at least two independent failure domains when feasible; run common-cause faults so a claimed redundant pair is not simply two nodes sharing a single vulnerable feed/route.
+5. **Redundancy:** demonstrate critical messaging across at least two independent failure domains when feasible; run common-cause faults so a claimed redundant pair is not simply two nodes sharing a single vulnerable feed/route. Software may report diversity only when every participating link has an explicit complete failure-domain inventory and the proposed paths share neither a declared domain nor an internal relay; physical independence still requires independent engineering review.
 6. **No learned-policy regression:** C3/C4 may not reduce delivery or violate resource/fallback constraints compared with C2 on the frozen test set; improvement must hold on held-out topology/fault families.
 7. **Energy/autonomy:** report a complete declared traffic schedule and measured energy; set a product-specific autonomy target only after hardware and rescue requirements are known.
 8. **Local fallback:** if Symthaea or its prediction is absent/invalid, the baseline alerting and routing policy still operates within its separately measured envelope.

@@ -28,6 +28,8 @@ fn add_pair(
             max_observation_age_ms: 60_000,
             one_way_latency_ms: latency_ms,
             energy_millijoules,
+            failure_domains: vec![format!("physical-link:{id}")],
+            failure_domains_complete: true,
         });
     }
 }

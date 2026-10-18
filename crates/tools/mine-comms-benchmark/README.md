@@ -23,6 +23,7 @@ cargo run --offline --manifest-path crates/tools/mine-comms-benchmark/Cargo.toml
 - The CLI prints synthetic comparisons for nominal routing, backbone severance, local-relay loss, stale TTE observations, a missing acknowledgement path and an expired message.
 - Bounded queue planning puts distress/evacuation messages ahead of telemetry/bulk and removes expired entries; this is message-count prioritization only, not a radio airtime or contention model.
 - A single-channel airtime model serializes frame bytes from an explicit bit rate, adds propagation delay, consumes airtime for bounded injected failed attempts, enforces message expiry, and reports queue wait and receiver-arrival time. It uses deterministic attempt traces, not random loss or physical propagation. It assumes a single strict-priority sender with no contention, backoff or acknowledgement airtime.
+- Bounded failure-domain-diverse route search accounts for declared cable/shaft/power/water dependencies and shared internal relays. Missing/incomplete domain evidence cannot support a redundancy claim; candidate enumeration is explicitly capped.
 
 ## Claim ceiling and next step
 

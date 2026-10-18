@@ -49,6 +49,12 @@ pub struct Link {
     pub max_observation_age_ms: u64,
     pub one_way_latency_ms: u64,
     pub energy_millijoules: u64,
+    /// Complete set of known shared-cause domains capable of disabling this
+    /// link (e.g. cable route, power feed, shaft or inundation zone).
+    pub failure_domains: Vec<String>,
+    /// True only when the scenario author asserts that the domain list is
+    /// complete for this link. Diversity claims require this evidence.
+    pub failure_domains_complete: bool,
 }
 
 impl Link {
@@ -79,6 +85,18 @@ impl Link {
         }
         if self.observed_at_ms > now_ms {
             return Err("link observation timestamp is in the future");
+        }
+        let mut domains = BTreeSet::new();
+        for domain in &self.failure_domains {
+            if domain.trim().is_empty() {
+                return Err("failure domain identifiers must not be empty");
+            }
+            if !domains.insert(domain.as_str()) {
+                return Err("failure domain identifiers must be unique per link");
+            }
+        }
+        if self.failure_domains_complete && self.failure_domains.is_empty() {
+            return Err("complete failure-domain coverage requires at least one domain");
         }
         Ok(())
     }
@@ -352,6 +370,221 @@ pub fn find_route(
         energy_millijoules,
         bottleneck_quality_permille,
         score,
+    }))
+}
+
+/// A pair of routes with disjoint declared failure domains.
+/// Their shared source/destination are expected endpoints; internal relay-node
+/// domains are included automatically in the disjointness check.
+#[derive(Clone, Debug, Eq, PartialEq)]
+pub struct FailureDomainDiverseRoutes {
+    pub primary: Route,
+    pub secondary: Route,
+    pub combined_score: u64,
+}
+
+const MAX_DIVERSITY_CANDIDATE_PATHS: usize = 4096;
+const MAX_DIVERSITY_HOPS: usize = 64;
+
+/// Find two simple source-to-destination routes that do not share any declared
+/// link failure domain or internal relay node.
+///
+/// A route is eligible only when every link explicitly marks its failure-domain
+/// coverage complete. Missing domain knowledge cannot be interpreted as
+/// independence. This bounded exhaustive search is intended for small
+/// benchmark topologies, not operational network routing.
+pub fn find_failure_domain_diverse_routes(
+    links: &[Link],
+    source: &str,
+    destination: &str,
+    now_ms: u64,
+    policy: RoutePolicy,
+    max_hops: usize,
+    max_candidate_paths: usize,
+) -> Result<Option<FailureDomainDiverseRoutes>, &'static str> {
+    if source.trim().is_empty() || destination.trim().is_empty() {
+        return Err("route endpoints must not be empty");
+    }
+    if source == destination {
+        return Ok(None);
+    }
+    if max_hops == 0 || max_hops > MAX_DIVERSITY_HOPS {
+        return Err("max_hops must be within 1..=64");
+    }
+    if max_candidate_paths == 0 || max_candidate_paths > MAX_DIVERSITY_CANDIDATE_PATHS {
+        return Err("max_candidate_paths must be within 1..=4096");
+    }
+
+    let mut link_ids = BTreeSet::new();
+    let mut node_names = BTreeSet::new();
+    node_names.insert(source.to_owned());
+    node_names.insert(destination.to_owned());
+    for link in links {
+        link.validate(now_ms)?;
+        if !link_ids.insert(link.id.as_str()) {
+            return Err("link ids must be unique");
+        }
+        node_names.insert(link.from.clone());
+        node_names.insert(link.to.clone());
+    }
+
+    fn visit_paths(
+        current: &str,
+        destination: &str,
+        links: &[Link],
+        ordered_links: &[usize],
+        now_ms: u64,
+        policy: RoutePolicy,
+        max_hops: usize,
+        max_candidate_paths: usize,
+        visited_nodes: &mut BTreeSet<String>,
+        path_indices: &mut Vec<usize>,
+        paths: &mut Vec<Vec<usize>>,
+    ) -> Result<(), &'static str> {
+        if current == destination {
+            if paths.len() >= max_candidate_paths {
+                return Err("candidate path cap exceeded; narrow the topology or hop bound");
+            }
+            paths.push(path_indices.clone());
+            return Ok(());
+        }
+        if path_indices.len() >= max_hops {
+            return Ok(());
+        }
+
+        for index in ordered_links {
+            let link = &links[*index];
+            if link.from != current
+                || link.health(now_ms) != LinkHealth::Healthy
+                || !link.failure_domains_complete
+                || link.failure_domains.is_empty()
+                || visited_nodes.contains(&link.to)
+            {
+                continue;
+            }
+
+            visited_nodes.insert(link.to.clone());
+            path_indices.push(*index);
+            visit_paths(
+                &link.to,
+                destination,
+                links,
+                ordered_links,
+                now_ms,
+                policy,
+                max_hops,
+                max_candidate_paths,
+                visited_nodes,
+                path_indices,
+                paths,
+            )?;
+            path_indices.pop();
+            visited_nodes.remove(&link.to);
+        }
+        Ok(())
+    }
+
+    let mut ordered_links: Vec<usize> = (0..links.len()).collect();
+    ordered_links.sort_by(|a, b| links[*a].id.cmp(&links[*b].id));
+    let mut paths = Vec::new();
+    let mut visited_nodes = BTreeSet::new();
+    visited_nodes.insert(source.to_owned());
+    visit_paths(
+        source,
+        destination,
+        links,
+        &ordered_links,
+        now_ms,
+        policy,
+        max_hops,
+        max_candidate_paths,
+        &mut visited_nodes,
+        &mut Vec::new(),
+        &mut paths,
+    )?;
+
+    struct Candidate {
+        route: Route,
+        domains: BTreeSet<String>,
+    }
+
+    let mut candidates = Vec::with_capacity(paths.len());
+    for path in paths {
+        let mut route_nodes = vec![source.to_owned()];
+        let mut route_link_ids = Vec::with_capacity(path.len());
+        let mut route_latencies = Vec::with_capacity(path.len());
+        let mut latency_ms = 0u64;
+        let mut energy_millijoules = 0u64;
+        let mut bottleneck_quality_permille = 1000u16;
+        let mut score = 0u64;
+        let mut domains = BTreeSet::new();
+
+        for index in &path {
+            let link = &links[*index];
+            route_nodes.push(link.to.clone());
+            route_link_ids.push(link.id.clone());
+            route_latencies.push(link.one_way_latency_ms);
+            latency_ms = latency_ms.saturating_add(link.one_way_latency_ms);
+            energy_millijoules = energy_millijoules.saturating_add(link.energy_millijoules);
+            bottleneck_quality_permille = bottleneck_quality_permille.min(link.quality_permille);
+            score = score.saturating_add(link.route_cost(policy));
+            domains.extend(link.failure_domains.iter().cloned());
+        }
+
+        // Two routes sharing an internal relay are not independent even if
+        // their physical links have distinct identifiers.
+        for relay in route_nodes.iter().skip(1).take(route_nodes.len().saturating_sub(2)) {
+            domains.insert(format!("relay-node:{relay}"));
+        }
+
+        candidates.push(Candidate {
+            route: Route {
+                nodes: route_nodes,
+                link_ids: route_link_ids,
+                link_latencies_ms: route_latencies,
+                latency_ms,
+                energy_millijoules,
+                bottleneck_quality_permille,
+                score,
+            },
+            domains,
+        });
+    }
+
+    candidates.sort_by(|a, b| {
+        a.route
+            .score
+            .cmp(&b.route.score)
+            .then_with(|| a.route.link_ids.cmp(&b.route.link_ids))
+    });
+
+    let mut best: Option<(u64, usize, usize)> = None;
+    for i in 0..candidates.len() {
+        for j in (i + 1)..candidates.len() {
+            if !candidates[i].domains.is_disjoint(&candidates[j].domains) {
+                continue;
+            }
+            let combined_score = candidates[i]
+                .route
+                .score
+                .saturating_add(candidates[j].route.score);
+            let is_better = match best {
+                None => true,
+                Some((old_score, old_i, old_j)) => {
+                    combined_score < old_score
+                        || (combined_score == old_score && (i, j) < (old_i, old_j))
+                }
+            };
+            if is_better {
+                best = Some((combined_score, i, j));
+            }
+        }
+    }
+
+    Ok(best.map(|(combined_score, i, j)| FailureDomainDiverseRoutes {
+        primary: candidates[i].route.clone(),
+        secondary: candidates[j].route.clone(),
+        combined_score,
     }))
 }
 
@@ -859,6 +1092,11 @@ mod tests {
             max_observation_age_ms: 10_000,
             one_way_latency_ms: latency,
             energy_millijoules: energy,
+            failure_domains: vec![format!(
+                "physical-link:{}",
+                id.strip_suffix("-ab").or_else(|| id.strip_suffix("-ba")).unwrap_or(id)
+            )],
+            failure_domains_complete: true,
         }
     }
 
@@ -1096,6 +1334,82 @@ mod tests {
         let fallback = evaluate_message(&damaged, &message, 1_000, RoutePolicy::AdaptiveLatencyEnergy).unwrap();
         assert_eq!(fallback.disposition, ReceiptDisposition::Acknowledged);
         assert!(fallback.forward_route.unwrap().link_ids.iter().any(|id| id.starts_with("tte")));
+    }
+
+    fn diversity_network() -> Vec<Link> {
+        vec![
+            link("sa", "s", "a", ChannelKind::Backbone, 10, 990, 5),
+            link("ad", "a", "d", ChannelKind::Backbone, 10, 990, 5),
+            link("sb", "s", "b", ChannelKind::LocalRadio, 20, 980, 8),
+            link("bd", "b", "d", ChannelKind::LocalRadio, 20, 980, 8),
+        ]
+    }
+
+    #[test]
+    fn two_paths_are_accepted_only_when_declared_failure_domains_are_disjoint() {
+        let links = diversity_network();
+        let pair = find_failure_domain_diverse_routes(
+            &links, "s", "d", 100, RoutePolicy::AdaptiveLatencyEnergy, 4, 100,
+        )
+        .expect("valid bounded graph")
+        .expect("two independent paths");
+        assert!(pair.primary.link_ids.iter().all(|id| pair.secondary.link_ids.iter().all(|other| other != id)));
+        assert_ne!(pair.primary.nodes, pair.secondary.nodes);
+    }
+
+    #[test]
+    fn shared_power_domain_invalidates_apparent_link_diversity() {
+        let mut links = diversity_network();
+        for item in &mut links {
+            if item.id == "ad" || item.id == "bd" {
+                item.failure_domains.push("power-feed:shared".to_owned());
+            }
+        }
+        assert!(find_failure_domain_diverse_routes(
+            &links, "s", "d", 100, RoutePolicy::AdaptiveLatencyEnergy, 4, 100,
+        )
+        .expect("valid bounded graph")
+        .is_none());
+    }
+
+    #[test]
+    fn incomplete_domain_inventory_cannot_claim_independence() {
+        let mut links = diversity_network();
+        links[2].failure_domains_complete = false;
+        assert!(find_failure_domain_diverse_routes(
+            &links, "s", "d", 100, RoutePolicy::AdaptiveLatencyEnergy, 4, 100,
+        )
+        .expect("valid graph with incomplete evidence")
+        .is_none());
+    }
+
+    #[test]
+    fn stale_links_are_excluded_from_independent_route_claims() {
+        let mut links = diversity_network();
+        links[2].observed_at_ms = 1;
+        links[2].max_observation_age_ms = 1;
+        assert!(find_failure_domain_diverse_routes(
+            &links, "s", "d", 100, RoutePolicy::AdaptiveLatencyEnergy, 4, 100,
+        )
+        .expect("valid graph")
+        .is_none());
+    }
+
+    #[test]
+    fn diverse_route_search_is_bounded_and_validates_domain_manifest() {
+        let links = diversity_network();
+        assert!(find_failure_domain_diverse_routes(
+            &links, "s", "d", 100, RoutePolicy::AdaptiveLatencyEnergy, 0, 100,
+        ).is_err());
+        assert!(find_failure_domain_diverse_routes(
+            &links, "s", "d", 100, RoutePolicy::AdaptiveLatencyEnergy, 4, 0,
+        ).is_err());
+        let mut malformed = links;
+        malformed[0].failure_domains_complete = true;
+        malformed[0].failure_domains.clear();
+        assert!(find_failure_domain_diverse_routes(
+            &malformed, "s", "d", 100, RoutePolicy::AdaptiveLatencyEnergy, 4, 100,
+        ).is_err());
     }
 
     fn airtime_profile(rate: u64, overhead: u64, propagation: u64, attempts: u8) -> AirtimeProfile {
