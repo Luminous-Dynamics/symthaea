@@ -114,3 +114,12 @@ Add exact negative controls for:
 - scenario-local frontier membership where another scenario is missing (valid locally, but not robustly rankable).
 
 The distinction between scenario-local rankability and all-scenario robust rankability is required: an incomplete candidate can be honestly shown on a frontier for the scenarios where its full metric vector is present, while remaining excluded from robust comparisons.
+
+The conformance checker also recomputes the four `rank_instability` counts rather than trusting them:
+- `ranked_scenarios`: scenarios where the candidate has passing hard gates and a complete, referenced metric vector;
+- `frontier_scenarios`: such scenarios where the candidate is independently verified non-dominated;
+- `dominated_scenarios`: such scenarios where at least one eligible candidate dominates it;
+- `incomplete_scenarios`: scenarios where gates are feasible but required metrics are not rankable.
+
+Blocked or indeterminate candidates do not contribute to ranked/frontier/dominated counts. A candidate can be frontier-eligible in a fully evidenced scenario while remaining incomplete and robustly ineligible overall. A claimed count that disagrees with recomputation is a conformance failure.
+
