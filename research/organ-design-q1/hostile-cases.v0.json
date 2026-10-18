@@ -64,6 +64,26 @@
       "id": "duplicate-identities-are-rejected",
       "threat": "Candidate IDs or required records are duplicated.",
       "expected": "ranking stops or the candidate is rejected; duplicate identity never silently overwrites prior data"
+    },
+    {
+      "id": "nonfinite-metric-fails-closed",
+      "threat": "A candidate metric is NaN or infinite.",
+      "expected": "candidate rejected with non_finite_metric"
+    },
+    {
+      "id": "missing-metric-fails-closed",
+      "threat": "A candidate omits a declared objective metric.",
+      "expected": "candidate rejected with missing_metric"
+    },
+    {
+      "id": "evidence-digest-mismatch-fails-closed",
+      "threat": "An evidence ID is current but its digest differs from the required source digest.",
+      "expected": "candidate rejected with evidence_digest_mismatch"
+    },
+    {
+      "id": "profile-tier-cannot-exceed-synthetic",
+      "threat": "A profile attempts to configure Q1 as physical, tissue-specific, or translational evidence.",
+      "expected": "profile rejected; Q1 remains synthetic-only"
     }
   ]
 }
