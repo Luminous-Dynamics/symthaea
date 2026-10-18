@@ -1,6 +1,6 @@
 use iccb_evaluator::{
-    cash_maximizing_feasible_baseline, pareto_frontier, staging::TrancheRequest,
     CandidateScenario, DecisionOption, EvidenceClaim, EvidenceState, Mandate,
+    cash_maximizing_feasible_baseline, pareto_frontier, staging::TrancheRequest,
 };
 use std::collections::BTreeSet;
 
