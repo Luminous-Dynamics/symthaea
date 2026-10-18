@@ -2019,6 +2019,33 @@ mod tests {
     }
 
     #[test]
+    fn modified_license_document_is_rejected_even_when_wav_assets_are_unchanged() {
+        let (probe, inventory, assets) = fixtures();
+        std::fs::write(assets.vcsl_root.join("LICENSE"), b"different license bytes\\n")
+            .expect("modified license should be written");
+        let report = test_report(&probe, &inventory, &assets);
+        assert_eq!(report.verdict, "inconsistent");
+        assert!(report.findings.iter().any(|finding| finding.code == "source_terms_document_digest_mismatch"));
+        assert!(report.findings.iter().any(|finding| finding.code == "source_checkout_status_mismatch"));
+    }
+
+    #[test]
+    fn changed_upstream_origin_is_not_accepted_as_clean_source_lineage() {
+        let (probe, inventory, assets) = fixtures();
+        let output = Command::new("git")
+            .arg("-C")
+            .arg(&assets.vcsl_root)
+            .args(["remote", "set-url", "origin", "https://example.com/sgossner/VCSL.git"])
+            .output()
+            .expect("git must be available");
+        assert!(output.status.success());
+        let report = test_report(&probe, &inventory, &assets);
+        assert_eq!(report.verdict, "inconsistent");
+        assert!(report.findings.iter().any(|finding| finding.code == "source_checkout_status_mismatch"));
+        assert!(report.findings.iter().any(|finding| finding.code == "source_checkout_origin_status_mismatch"));
+    }
+
+    #[test]
     fn mismatched_supplied_binary_is_rejected_even_when_report_sha_is_well_formed() {
         let (mut probe, inventory, assets) = fixtures();
         probe["renderer_binary_sha256"] = serde_json::json!("9".repeat(64));
