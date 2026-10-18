@@ -27,7 +27,9 @@
           "split",
           "censoring",
           "source_field",
-          "raw_unit"
+          "raw_unit",
+          "source_object_id",
+          "source_row_id"
         ],
         "properties": {
           "record_id": {
@@ -133,6 +135,14 @@
               "number",
               "null"
             ]
+          },
+          "source_object_id": {
+            "type": "string",
+            "minLength": 1
+          },
+          "source_row_id": {
+            "type": "string",
+            "minLength": 1
           }
         },
         "allOf": [
