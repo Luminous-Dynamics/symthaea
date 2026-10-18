@@ -717,6 +717,89 @@ mod tests {
     }
 
     #[test]
+    fn minimax_regret_matches_independent_grid_oracle_on_three_states() {
+        let mut input = scenario();
+        input.state_probability_bounds = vec![
+            StateProbabilityBound {
+                state_id: "alpha".into(),
+                lower_bps: 2_000,
+                upper_bps: 6_000,
+            },
+            StateProbabilityBound {
+                state_id: "beta".into(),
+                lower_bps: 2_000,
+                upper_bps: 6_000,
+            },
+            StateProbabilityBound {
+                state_id: "gamma".into(),
+                lower_bps: 2_000,
+                upper_bps: 6_000,
+            },
+        ];
+        input.action_ids = vec!["A".into(), "B".into(), "C".into()];
+        input.payoffs = vec![
+            RobustPayoff { action_id: "A".into(), state_id: "alpha".into(), payoff_minor: 10 },
+            RobustPayoff { action_id: "A".into(), state_id: "beta".into(), payoff_minor: 0 },
+            RobustPayoff { action_id: "A".into(), state_id: "gamma".into(), payoff_minor: 5 },
+            RobustPayoff { action_id: "B".into(), state_id: "alpha".into(), payoff_minor: 0 },
+            RobustPayoff { action_id: "B".into(), state_id: "beta".into(), payoff_minor: 8 },
+            RobustPayoff { action_id: "B".into(), state_id: "gamma".into(), payoff_minor: 3 },
+            RobustPayoff { action_id: "C".into(), state_id: "alpha".into(), payoff_minor: 4 },
+            RobustPayoff { action_id: "C".into(), state_id: "beta".into(), payoff_minor: 4 },
+            RobustPayoff { action_id: "C".into(), state_id: "gamma".into(), payoff_minor: 4 },
+        ];
+
+        let state_payoffs = [
+            [10_i128, 0, 5],
+            [0_i128, 8, 3],
+            [4_i128, 4, 4],
+        ];
+        let action_ids = ["A", "B", "C"];
+        let mut oracle_worst_regrets = [i128::MIN; 3];
+        for alpha in (2_000_u32..=6_000).step_by(1_000) {
+            for beta in (2_000_u32..=6_000).step_by(1_000) {
+                if u64::from(alpha) + u64::from(beta) > TOTAL_BPS {
+                    continue;
+                }
+                let gamma = TOTAL_BPS - u64::from(alpha) - u64::from(beta);
+                if !(2_000..=6_000).contains(&gamma) || gamma % 1_000 != 0 {
+                    continue;
+                }
+                let probabilities = [
+                    i128::from(alpha),
+                    i128::from(beta),
+                    i128::from(gamma),
+                ];
+                let best_by_state = [
+                    state_payoffs.iter().map(|row| row[0]).max().unwrap(),
+                    state_payoffs.iter().map(|row| row[1]).max().unwrap(),
+                    state_payoffs.iter().map(|row| row[2]).max().unwrap(),
+                ];
+                for action_index in 0..action_ids.len() {
+                    let expected_regret = (0..3)
+                        .map(|state_index| {
+                            probabilities[state_index]
+                                * (best_by_state[state_index]
+                                    - state_payoffs[action_index][state_index])
+                        })
+                        .sum::<i128>();
+                    oracle_worst_regrets[action_index] =
+                        oracle_worst_regrets[action_index].max(expected_regret);
+                }
+            }
+        }
+
+        let report = input.evaluate().unwrap();
+        for (action_id, expected_numerator) in action_ids.iter().zip(oracle_worst_regrets) {
+            assert_eq!(
+                envelope(&report, action_id).worst_case_expected_regret_numerator,
+                expected_numerator
+            );
+        }
+        assert_eq!(report.minimax_regret_action_ids, vec!["C".to_owned()]);
+    }
+
+    #[test]
     fn extreme_allocations_respect_bounds_and_sum_to_one() {
         let input = scenario();
         let report = input.evaluate().unwrap();
