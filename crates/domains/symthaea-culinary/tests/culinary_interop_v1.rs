@@ -149,6 +149,8 @@ fn semantic_violations(bundle: &Value) -> Vec<String> {
                     _ => errors.push(format!("{id}: gate {key} has unknown status {status}")),
                 }
             }
+        } else {
+            errors.push(format!("{id}: gate_evidence must be an array"));
         }
         let expected_gate_disposition = if has_failed_gate {
             "blocked"
@@ -289,6 +291,47 @@ fn semantic_violations(bundle: &Value) -> Vec<String> {
                 .is_some_and(Vec::is_empty)
         {
             robust_frontier_calculated.insert(id.to_owned());
+        }
+    }
+
+    let candidate_by_id: BTreeMap<String, &Value> = candidates
+        .iter()
+        .filter_map(|candidate| {
+            Some((
+                candidate.get("candidate_id")?.as_str()?.to_owned(),
+                candidate,
+            ))
+        })
+        .collect();
+    for candidate in candidates {
+        let id = candidate.get("candidate_id").and_then(Value::as_str).unwrap_or("");
+        for (field, reciprocal_field) in [
+            ("robust_dominates", "robust_dominated_by"),
+            ("robust_dominated_by", "robust_dominates"),
+        ] {
+            let related = candidate.get(field).and_then(Value::as_array);
+            if let Some(related) = related {
+                for related_id in related.iter().filter_map(Value::as_str) {
+                    if related_id == id {
+                        errors.push(format!("{id}: robust dominance relation cannot reference itself"));
+                        continue;
+                    }
+                    let Some(other) = candidate_by_id.get(related_id) else {
+                        errors.push(format!("{id}: robust relation references unknown candidate {related_id}"));
+                        continue;
+                    };
+                    if other.get("robustly_rankable").and_then(Value::as_bool) != Some(true) {
+                        errors.push(format!("{id}: robust relation references non-rankable candidate {related_id}"));
+                    }
+                    let reciprocal_contains_id = other
+                        .get(reciprocal_field)
+                        .and_then(Value::as_array)
+                        .is_some_and(|values| values.iter().any(|value| value.as_str() == Some(id)));
+                    if !reciprocal_contains_id {
+                        errors.push(format!("{id}: robust relation with {related_id} is not reciprocal"));
+                    }
+                }
+            }
         }
     }
 
