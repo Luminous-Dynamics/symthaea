@@ -33,6 +33,8 @@ E = \sqrt{\frac{1}{N}\sum_{i=1}^{N}
 
 Accept the two-half-step endpoint when (E \leq 1). For a first-order method the controller uses an error exponent of (-1/2) with bounded growth/shrink factors. This estimator is an error-control signal, not a rigorous global-error bound; discontinuities, nonsmooth right-hand sides, ill-conditioned systems and inaccurate nonlinear solves require separate qualification.
 
+For the adaptive API, the inner Newton solve also receives the per-component absolute tolerances as characteristic state scales. Its finite-difference perturbation is proportional to `sqrt(f64::EPSILON) * max(abs(z[i]), atol[i])`, and its normalized residual uses `atol[i] + max(abs(z[i]), abs(y[i]))`. This makes the nonlinear solve more consistent under a change of units when the component scale is converted too. The existing fixed-step API uses a unit characteristic scale to preserve its previous behavior. Overflowed residual scales are rejected rather than allowing division by infinity to appear as a zero residual.
+
 ## Distinct acceptance criteria
 
 1. **Nonlinear-solve convergence:** each backward-Euler substep must satisfy the full-Newton residual contract.
