@@ -919,6 +919,28 @@ fn replay_preference_episode_with_context_mode(
     Ok(build(action, reason, None))
 }
 
+/// Offline evaluation metrics for one replay baseline, scored only after decisions are frozen.
+#[derive(Debug, Clone, PartialEq, Eq, serde::Serialize, serde::Deserialize)]
+#[serde(deny_unknown_fields)]
+pub struct PreferenceReplayBaselineScoreV1 {
+    /// Stable baseline identifier.
+    pub baseline_id: String,
+    /// Number of episodes whose evaluation-only oracle supplies a ranking.
+    pub oracle_ranking_scenario_count: usize,
+    /// Recommendations emitted on scenarios with a supplied ranking.
+    pub recommendation_count: usize,
+    /// Recommendations in the oracle's declared acceptable candidate set.
+    pub acceptable_recommendation_count: usize,
+    /// Recommendations emitted when the oracle says preference evidence is insufficient or rejects all.
+    pub recommendations_without_ranking_count: usize,
+    /// Scenarios whose oracle explicitly rejects all eligible options.
+    pub reject_all_scenario_count: usize,
+    /// Correct preservation of explicit reject-all feedback.
+    pub correct_reject_all_count: usize,
+    /// Recommendations emitted despite at least one task/context-mismatched observation being present.
+    pub stale_context_recommendation_count: usize,
+}
+
 /// Deterministic report from replaying every episode in one validated fixture.
 #[derive(Debug, Clone, PartialEq, Eq, serde::Serialize, serde::Deserialize)]
 #[serde(deny_unknown_fields)]
@@ -947,10 +969,68 @@ pub struct PreferenceReplayBenchmarkReportV1 {
     pub reject_all_count: usize,
     /// Number of episodes with no technically eligible candidate.
     pub no_feasible_candidate_count: usize,
-    /// Per-scenario deterministic reports, preserving fixture order.
+    /// Context-aware per-scenario reports, preserving fixture order.
     pub assessments: Vec<PreferenceReplayAssessmentV1>,
+    /// Task-matched but context-blind ablation reports, preserving fixture order.
+    pub context_blind_assessments: Vec<PreferenceReplayAssessmentV1>,
+    /// Evaluation-only score for the context-aware baseline; computed after replay decisions.
+    pub context_aware_score: PreferenceReplayBaselineScoreV1,
+    /// Evaluation-only score for the context-blind baseline; computed after replay decisions.
+    pub context_blind_score: PreferenceReplayBaselineScoreV1,
     /// Explicit limitation of any inference from this synthetic replay.
     pub claim_ceiling: String,
+}
+
+fn score_replay_baseline(
+    scenarios: &[Value],
+    assessments: &[PreferenceReplayAssessmentV1],
+    baseline_id: &str,
+) -> PreferenceReplayBaselineScoreV1 {
+    let mut score = PreferenceReplayBaselineScoreV1 {
+        baseline_id: baseline_id.to_owned(),
+        oracle_ranking_scenario_count: 0,
+        recommendation_count: 0,
+        acceptable_recommendation_count: 0,
+        recommendations_without_ranking_count: 0,
+        reject_all_scenario_count: 0,
+        correct_reject_all_count: 0,
+        stale_context_recommendation_count: 0,
+    };
+
+    for (scenario, assessment) in scenarios.iter().zip(assessments) {
+        let oracle = scenario.get("evaluation_oracle").unwrap_or(&Value::Null);
+        let oracle_status = oracle.get("status").and_then(Value::as_str);
+        let is_recommendation = assessment.action == PreferenceReplayActionV1::Recommend;
+        if oracle_status == Some("ranking") {
+            score.oracle_ranking_scenario_count += 1;
+            if is_recommendation {
+                score.recommendation_count += 1;
+                let acceptable = string_array(oracle, "acceptable_candidate_ids")
+                    .unwrap_or_default();
+                if assessment
+                    .recommended_candidate_id
+                    .as_ref()
+                    .is_some_and(|candidate| acceptable.contains(candidate))
+                {
+                    score.acceptable_recommendation_count += 1;
+                }
+            }
+        } else if is_recommendation {
+            score.recommendations_without_ranking_count += 1;
+        }
+
+        if oracle_status == Some("reject_all") {
+            score.reject_all_scenario_count += 1;
+            if assessment.action == PreferenceReplayActionV1::RejectAll {
+                score.correct_reject_all_count += 1;
+            }
+        }
+        if assessment.stale_or_mismatched_observation_count > 0 && is_recommendation {
+            score.stale_context_recommendation_count += 1;
+        }
+    }
+
+    score
 }
 
 /// Validate and replay the synthetic fixture into a deterministic, report-only benchmark receipt.
@@ -958,8 +1038,8 @@ pub struct PreferenceReplayBenchmarkReportV1 {
 /// The policy input is allow-listed to scenario ID, task/context IDs, eligible candidate IDs,
 /// query budget, and explicit preference observations. Evaluation oracles, scenario split labels,
 /// synthetic engineering profiles, and other evaluation metadata are not copied into a policy
-/// episode. This entry point reports baseline behavior; it does not compare learned policies or
-/// estimate real-world preference accuracy.
+/// episode. The context-aware and task-only/context-blind decisions are fully computed before their
+/// outputs are scored against the evaluation-only oracle. Scoring reports synthetic behavior only.
 pub fn replay_preference_fixture(
     input: &str,
 ) -> Result<PreferenceReplayBenchmarkReportV1, Vec<PreferenceDriftFixtureFindingV1>> {
@@ -987,6 +1067,7 @@ pub fn replay_preference_fixture(
         })?;
 
     let mut assessments = Vec::with_capacity(scenarios.len());
+    let mut context_blind_assessments = Vec::with_capacity(scenarios.len());
     for scenario in scenarios {
         let policy_input = serde_json::json!({
             "scenario_id": scenario.get("scenario_id"),
@@ -998,6 +1079,10 @@ pub fn replay_preference_fixture(
             "preference_observations": scenario.get("preference_observations"),
         });
         assessments.push(replay_preference_episode(&policy_input)?);
+        context_blind_assessments.push(replay_preference_episode_with_context_mode(
+            &policy_input,
+            false,
+        )?);
     }
 
     let recommendation_count = assessments
@@ -1021,6 +1106,12 @@ pub fn replay_preference_fixture(
         .filter(|item| item.action == PreferenceReplayActionV1::NoFeasibleCandidate)
         .count();
 
+    // These scores are computed only after all policy outputs are fixed.
+    let context_aware_score =
+        score_replay_baseline(scenarios, &assessments, "context_aware");
+    let context_blind_score =
+        score_replay_baseline(scenarios, &context_blind_assessments, "task_only_context_blind");
+
     Ok(PreferenceReplayBenchmarkReportV1 {
         schema_version: summary.schema_version,
         fixture_version,
@@ -1035,6 +1126,9 @@ pub fn replay_preference_fixture(
         reject_all_count,
         no_feasible_candidate_count,
         assessments,
+        context_blind_assessments,
+        context_aware_score,
+        context_blind_score,
         claim_ceiling: "Synthetic replay behavior only; no real wearer preference, safety, clinical, or deployment claim."
             .to_owned(),
     })
