@@ -527,6 +527,11 @@
       "target": 1,
       "unit": "fraction of seeded receipt mutations detected",
       "hard_gate": true
+    },
+    "freeze_receipt_digest_policy_mutation_detection": {
+      "target": 1,
+      "unit": "fraction of seeded policy mutations rejected",
+      "hard_gate": true
     }
   },
   "freeze_receipt_digest_policy": {
