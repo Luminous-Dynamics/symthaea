@@ -223,6 +223,30 @@ These are targets to pre-register, not results:
 - Before any free-flight claim, collect at least 20 consecutively logged contained/approved mission attempts, counting failures and aborted runs, then seek independent replication.
 
 If the hybrid cannot outperform the best simple mode under matched boundaries, prefer the simpler design. A failed hybrid hypothesis is useful engineering evidence.
+## OWL-004: choose the next observation by expected information gain
+
+Information-driven audio-visual source localization has been demonstrated on a mobile robot: the robot uses a belief over source positions and predicts how candidate movements and follow-on measurements reduce uncertainty, rather than moving independently of the perception task. Reference: Correa et al., “Information-Driven Active Audio-Visual Source Localization,” PLOS ONE (2015), https://doi.org/10.1371/journal.pone.0137057.
+
+### New control primitive
+
+The new Rust module, active_sensing, accepts a normalized discrete hypothesis prior and candidate actions. Each action supplies a model of observation likelihoods P(o | hypothesis, action), estimated energy / latency costs, and a safety-eligibility flag provided by an upstream checker. It computes expected entropy reduction in nats and selects the largest-gain action only if the action is marked safe, fits both hard budgets, and exceeds a minimum gain threshold. Exact ties use lower energy, lower latency, then lexical action ID. If nothing qualifies, it returns no selected action rather than inventing a move.
+
+This is a planner arithmetic primitive, not an autonomous controller. Predicted likelihoods must be fitted or calibrated from held-out evidence; the flag labelled safe must come from a verified safety-envelope checker; the caller must specify an independent safe hold/stop response. The code cannot validate any of those upstream claims.
+
+### Proposed benchmark suite
+
+- **Known-answer information gain:** for two equally likely hypotheses, a perfect binary observation should provide ln(2) nats; an observation with identical likelihoods under both hypotheses should provide zero.
+- **Resource-constrained decision:** verify that a more informative action is rejected when it exceeds the energy/latency limit, and an unsafe action is never selected.
+- **Choice stability:** permuting the action list should not change the selected ID when scores tie; ties prefer lower resource cost and stable IDs.
+- **No-op decision:** no action is selected when all available actions yield zero information gain or fail the minimum gain threshold.
+- **Robustness:** stress priors / likelihood rows near 0 and 1, missing evidence, model miscalibration, correlated modalities and action-cost prediction error. Report sensitivity instead of presenting the model as perfectly known.
+- **Baselines:** fixed head, random feasible movement, entropy-only greedy without costs, and a simple conservative policy. Compare localization error / dense-map metrics, information gain realized after the action, action count, energy, latency, abstention, and worst-case regret on locked synthetic scenes then real recordings.
+- **Safety gate:** if the only informative actions fall outside the validated operating envelope, planner output remains no action; no learned/high-level policy may override actuator constraints or emergency stop.
+
+### DCASE 2026 evaluation context
+
+The challenge completed on 15 June 2026 and official results were published on 1 July 2026. Task 3's best reported audio-only result was Macro mAP 0.1080 and Macro Pearson r 0.3962; the top reported audiovisual submission had Macro mAP 0.0131 and Pearson r 0.4002. This shows why audiovisual fusion is a hypothesis to test, not an assumed improvement. See the official ranking and metric definition: https://dcase.community/challenge2026/task-semantic-acoustic-imaging-for-sound-event-localization-and-detection-from-spatial-audio-and-audiovisual-scenes-results.
+
 ## Related work
 
 - OWL-001 issue: https://github.com/Luminous-Dynamics/symthaea/issues/7912

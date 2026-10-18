@@ -20,6 +20,7 @@
 //! provide elevation; reverberation, calibration error and finite range need
 //! separate treatment.
 
+pub mod active_sensing;
 pub mod hybrid_evidence;
 pub mod spatial_likelihood;
 
