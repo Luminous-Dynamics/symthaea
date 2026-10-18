@@ -692,6 +692,9 @@ pub struct FabricationInfo {
     /// Defect prediction confidence (0.0-1.0).
     #[serde(default)]
     pub defect_confidence: f32,
+    /// Whether the defect prediction fields currently carry a valid prediction.
+    #[serde(default)]
+    pub defect_prediction_available: bool,
 }
 
 /// CfC-HDC neuroevolution snapshot.
@@ -1705,6 +1708,7 @@ fn build_snapshot(
             mrp_work_order_count: m.fabrication_mrp_work_orders,
             defect_prediction: m.fabrication_defect_prediction,
             defect_confidence: m.fabrication_defect_confidence,
+            defect_prediction_available: m.fabrication_defect_prediction_available,
         },
     }
 }
