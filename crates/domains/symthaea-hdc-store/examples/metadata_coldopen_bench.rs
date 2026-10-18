@@ -90,8 +90,16 @@ fn run() -> Result<(), Box<dyn Error>> {
     let v2 = workspace.path.join("v2-interleaved.synthetic");
     let soa = workspace.path.join("soa-metadata-first.synthetic");
     if let Some(csv) = c.csv.as_ref() {
-        if csv.exists() { return Err(format!("refusing to overwrite CSV: {}", csv.display()).into()); }
+        let metadata_path = csv.with_extension("meta.txt");
+        if csv.exists() || metadata_path.exists() {
+            return Err(format!("refusing to overwrite CSV or metadata sidecar: {}", csv.display()).into());
+        }
         if csv.starts_with(&workspace.path) { return Err("--csv must be outside the temporary workspace".into()); }
+        if let Some(parent) = csv.parent() {
+            if !parent.as_os_str().is_empty() && !parent.is_dir() {
+                return Err(format!("CSV parent directory does not exist: {}", parent.display()).into());
+            }
+        }
     }
 
     let v2_ranges = write_v2(&v2, c.vectors, c.seed)?;
@@ -118,7 +126,11 @@ fn run() -> Result<(), Box<dyn Error>> {
 
     println!("synthetic_metadata_scan=true; production_format_changed=false");
     println!("vectors={},rounds_per_layout={},seed={}", c.vectors, c.rounds, c.seed);
-    println!("os={},arch={},page_size_bytes={page},page_size_source={page_source}", env::consts::OS, env::consts::ARCH);
+    println!("os={},arch={},kernel_release={},page_size_bytes={page},page_size_source={page_source}", env::consts::OS, env::consts::ARCH, kernel_release());
+    println!("source_sha={}", env::var("SYMTHAEA_SOURCE_SHA").unwrap_or_else(|_| "not-injected".to_string()));
+    println!("rustc_version={}", env::var("RUSTC_VERSION").unwrap_or_else(|_| "not-injected".to_string()));
+    println!("host_profile={}", env::var("HOST_PROFILE").unwrap_or_else(|_| "not-injected".to_string()));
+    println!("storage_profile={}", env::var("STORAGE_PROFILE").unwrap_or_else(|_| "not-injected".to_string()));
     println!("v2_file_bytes={v2_bytes},soa_file_bytes={soa_bytes}");
     println!("metadata_bytes_read_per_scan={}", c.vectors * META_BYTES_READ);
     println!("metadata_checksum={:016x}", expected.unwrap_or(0));
@@ -140,7 +152,33 @@ fn run() -> Result<(), Box<dyn Error>> {
         );
     }
     let csv = render_csv(&rows);
-    if let Some(path) = c.csv.as_ref() { fs::write(path, &csv)?; eprintln!("raw_samples_csv={}", path.display()); }
+    if let Some(path) = c.csv.as_ref() {
+        let metadata_path = path.with_extension("meta.txt");
+        fs::write(path, &csv)?;
+        let metadata = format!(
+            "benchmark=metadata_coldopen_bench\nsource_sha={}\nrustc_version={}\nhost_os={}\nhost_arch={}\nkernel_release={}\npage_size_bytes={}\npage_size_source={}\nhost_profile={}\nstorage_profile={}\nvectors={}\nrounds_per_layout={}\nseed={}\nv2_file_bytes={}\nsoa_file_bytes={}\nmetadata_checksum={:016x}\ncache_hint=POSIX_FADV_DONTNEED_best_effort\nfault_counters={}\nmincore_residency={}\nphysical_device_io=not_measured\nenergy=not_measured\n",
+            env::var("SYMTHAEA_SOURCE_SHA").unwrap_or_else(|_| "not-injected".to_string()),
+            env::var("RUSTC_VERSION").unwrap_or_else(|_| "not-injected".to_string()),
+            env::consts::OS,
+            env::consts::ARCH,
+            kernel_release(),
+            page,
+            page_source,
+            env::var("HOST_PROFILE").unwrap_or_else(|_| "not-injected".to_string()),
+            env::var("STORAGE_PROFILE").unwrap_or_else(|_| "not-injected".to_string()),
+            c.vectors,
+            c.rounds,
+            c.seed,
+            v2_bytes,
+            soa_bytes,
+            expected.unwrap_or(0),
+            if cfg!(target_os = "linux") { "proc_self_stat" } else { "unavailable" },
+            if cfg!(target_os = "linux") { "mincore" } else { "unavailable" },
+        );
+        fs::write(&metadata_path, metadata)?;
+        eprintln!("raw_samples_csv={}", path.display());
+        eprintln!("run_metadata={}", metadata_path.display());
+    }
     println!("RAW_SAMPLE_CSV_BEGIN");
     print!("{csv}");
     println!("RAW_SAMPLE_CSV_END");
@@ -269,6 +307,19 @@ fn page_size() -> (usize, &'static str) {
     }
     (4096, "fallback_4096_assumed")
 }
+fn kernel_release() -> String {
+    #[cfg(target_os = "linux")]
+    {
+        return fs::read_to_string("/proc/sys/kernel/osrelease")
+            .map(|value| value.trim().to_string())
+            .unwrap_or_else(|_| "unavailable".to_string());
+    }
+    #[cfg(not(target_os = "linux"))]
+    {
+        "unavailable".to_string()
+    }
+}
+
 fn faults() -> Option<Faults> {
     #[cfg(target_os = "linux")]
     {
