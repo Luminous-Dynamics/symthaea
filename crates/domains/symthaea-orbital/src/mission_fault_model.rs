@@ -1603,6 +1603,109 @@ mod tests {
         assert!(!one_mode.all_critical_pairs_timely());
     }
 
+
+    #[test]
+    fn frozen_temporal_known_answer_corpus_matches_the_typed_analyzer() {
+        let fixture: serde_json::Value = serde_json::from_str(include_str!(
+            "../fixtures/space_fdir_mbse_001/temporal_diagnosability_cases.json"
+        ))
+        .expect("temporal known-answer fixture is valid JSON");
+        let default_policy: TemporalDiagnosabilityPolicy =
+            serde_json::from_value(fixture["default_policy"].clone())
+                .expect("default policy matches its typed schema");
+        let default_signal_id = fixture["default_signal"]["id"]
+            .as_str()
+            .expect("default signal ID")
+            .to_owned();
+        let default_signal_unit = fixture["default_signal"]["unit"]
+            .as_str()
+            .expect("default signal unit")
+            .to_owned();
+        let cases = fixture["cases"].as_array().expect("cases array");
+        assert!(!cases.is_empty());
+
+        for case in cases {
+            let case_id = case["case_id"].as_str().expect("case ID");
+            let left_samples: Vec<TemporalSignatureSample> =
+                serde_json::from_value(case["left_samples"].clone())
+                    .expect("left sample trace");
+            let right_samples: Vec<TemporalSignatureSample> =
+                serde_json::from_value(case["right_samples"].clone())
+                    .expect("right sample trace");
+            let policy = case
+                .get("policy")
+                .map(|value| serde_json::from_value(value.clone()).expect("case policy"))
+                .unwrap_or_else(|| default_policy.clone());
+
+            let mut model = temporal_pair(left_samples, right_samples);
+            model.failure_modes[0].observable_signals[0].id = case
+                .get("left_signal_id")
+                .and_then(serde_json::Value::as_str)
+                .unwrap_or(&default_signal_id)
+                .to_owned();
+            model.failure_modes[1].observable_signals[0].id = case
+                .get("right_signal_id")
+                .and_then(serde_json::Value::as_str)
+                .unwrap_or(&default_signal_id)
+                .to_owned();
+            model.failure_modes[0].observable_signals[0].unit = case
+                .get("left_unit")
+                .and_then(serde_json::Value::as_str)
+                .unwrap_or(&default_signal_unit)
+                .to_owned();
+            model.failure_modes[1].observable_signals[0].unit = case
+                .get("right_unit")
+                .and_then(serde_json::Value::as_str)
+                .unwrap_or(&default_signal_unit)
+                .to_owned();
+
+            let report = model
+                .analyze_temporal_fault_signatures(policy)
+                .unwrap_or_else(|error| panic!("case {case_id}: {error}"));
+            let finding = report.findings.first()
+                .unwrap_or_else(|| panic!("case {case_id}: expected one critical pair"));
+            let (actual_disposition, actual_step) = match &finding.disposition {
+                TemporalFaultPairDisposition::TimelyDistinguishable {
+                    first_divergence_step,
+                    ..
+                } => ("timely_distinguishable", Some(*first_divergence_step)),
+                TemporalFaultPairDisposition::LateDivergence {
+                    first_divergence_step,
+                    ..
+                } => ("late_divergence", Some(*first_divergence_step)),
+                TemporalFaultPairDisposition::IndistinguishableThroughHorizon { .. } => {
+                    ("indistinguishable_through_horizon", None)
+                }
+                TemporalFaultPairDisposition::NotDemonstrated { reason, .. } => {
+                    let label = match reason {
+                        TemporalFaultPairIndeterminacy::NoComparableSignals =>
+                            "not_demonstrated_no_comparable_signals",
+                        TemporalFaultPairIndeterminacy::NoSharedSampleOffsets =>
+                            "not_demonstrated_no_shared_sample_offsets",
+                        TemporalFaultPairIndeterminacy::MissingOutcomeOrConfidence =>
+                            "not_demonstrated_missing_outcome_or_confidence",
+                        TemporalFaultPairIndeterminacy::BelowConfidenceThreshold =>
+                            "not_demonstrated_below_confidence",
+                        TemporalFaultPairIndeterminacy::IncompleteSignalCoverage =>
+                            "not_demonstrated_incomplete_signal_coverage",
+                    };
+                    (label, None)
+                }
+            };
+
+            assert_eq!(
+                actual_disposition,
+                case["expected_disposition"].as_str().expect("expected disposition"),
+                "case {case_id}"
+            );
+            let expected_step = case["expected_step"]
+                .as_u64()
+                .map(|step| usize::try_from(step).expect("expected step fits usize"));
+            assert_eq!(actual_step, expected_step, "case {case_id}");
+        }
+    }
+
+
     #[test]
     fn identical_source_model_compiles_deterministically() {
         let model = valid_model();
