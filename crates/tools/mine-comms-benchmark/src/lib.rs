@@ -624,7 +624,7 @@ mod tests {
         )
         .expect("valid graph")
         .expect("route exists");
-        assert_eq!(route.nodes, vec!["surface", "junction", "level-4", "refuge"]);
+        assert_eq!(route.nodes.iter().map(String::as_str).collect::<Vec<_>>(), vec!["surface", "junction", "level-4", "refuge"]);
         assert!(route.link_ids.iter().all(|id| !id.starts_with("tte")));
     }
 
