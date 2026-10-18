@@ -1,0 +1,146 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "title": "CulinaryRegionalPackV1",
+  "description": "Versioned regional capability manifest. It declares scope, source rights, unit conventions and coverage status; it does not assert that referenced data is true or that a regional diet is clinically appropriate.",
+  "type": "object",
+  "additionalProperties": false,
+  "required": [
+    "schema_version",
+    "pack_id",
+    "profile_status",
+    "region",
+    "conventions",
+    "sources",
+    "verticals",
+    "fallback_policy"
+  ],
+  "properties": {
+    "schema_version": {"const": "1.0.0"},
+    "pack_id": {"type": "string", "minLength": 1},
+    "profile_status": {"enum": ["synthetic_example", "draft", "qualified"]},
+    "region": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["country_code", "market_scope", "locale_tag", "language_tags"],
+      "properties": {
+        "country_code": {"type": "string", "pattern": "^[A-Z]{2}$"},
+        "subnational_scope": {"type": ["string", "null"]},
+        "market_scope": {"type": "string", "minLength": 1},
+        "locale_tag": {"type": "string", "minLength": 2},
+        "language_tags": {
+          "type": "array",
+          "minItems": 1,
+          "uniqueItems": true,
+          "items": {"type": "string", "minLength": 2}
+        }
+      }
+    },
+    "conventions": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "currency",
+        "mass_unit",
+        "volume_unit",
+        "temperature_unit",
+        "conversion_evidence_required",
+        "density_required_for_mass_volume_conversion",
+        "source_native_nutrient_basis_required"
+      ],
+      "properties": {
+        "currency": {"type": "string", "pattern": "^[A-Z]{3}$"},
+        "mass_unit": {"enum": ["g", "kg", "oz", "lb"]},
+        "volume_unit": {"enum": ["mL", "L", "US_fl_oz", "US_cup", "metric_cup", "imperial_cup"]},
+        "temperature_unit": {"enum": ["C", "F"]},
+        "conversion_evidence_required": {"const": true},
+        "density_required_for_mass_volume_conversion": {"const": true},
+        "source_native_nutrient_basis_required": {"const": true},
+        "decimal_separator": {"enum": [".", ","]},
+        "date_format_hint": {"type": "string"}
+      }
+    },
+    "sources": {
+      "type": "array",
+      "items": {"$ref": "#/$defs/source"}
+    },
+    "verticals": {
+      "type": "array",
+      "items": {"$ref": "#/$defs/vertical"}
+    },
+    "fallback_policy": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "missing_values",
+        "cross_region_substitution",
+        "infer_food_culture_from_country_code",
+        "infer_probabilities_from_scenario_counts",
+        "allow_restricted_data_in_public_pack",
+        "require_known_at_for_replay"
+      ],
+      "properties": {
+        "missing_values": {"type": "string", "minLength": 1},
+        "cross_region_substitution": {"type": "string", "minLength": 1},
+        "infer_food_culture_from_country_code": {"const": false},
+        "infer_probabilities_from_scenario_counts": {"const": false},
+        "allow_restricted_data_in_public_pack": {"const": false},
+        "require_known_at_for_replay": {"const": true}
+      }
+    }
+  },
+  "$defs": {
+    "source": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "source_id",
+        "publisher",
+        "reference",
+        "source_kind",
+        "access_class",
+        "license_reference",
+        "redistribution_permitted",
+        "status",
+        "known_at",
+        "valid_from"
+      ],
+      "properties": {
+        "source_id": {"type": "string", "minLength": 1},
+        "publisher": {"type": "string", "minLength": 1},
+        "reference": {"type": "string", "minLength": 1},
+        "source_kind": {"type": "string", "minLength": 1},
+        "access_class": {"enum": ["open_reuse", "attribution_required", "permission_required", "restricted", "unknown"]},
+        "license_reference": {"type": "string", "minLength": 1},
+        "redistribution_permitted": {"type": "boolean"},
+        "status": {"enum": ["active", "expired", "withdrawn", "unknown"]},
+        "known_at": {"type": "string", "format": "date-time"},
+        "valid_from": {"type": "string", "format": "date-time"},
+        "valid_until": {"type": ["string", "null"], "format": "date-time"}
+      }
+    },
+    "vertical": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["vertical_id", "status", "source_refs", "coverage_notes"],
+      "properties": {
+        "vertical_id": {
+          "enum": [
+            "ingredient_composition",
+            "dietary_guidance",
+            "price_affordability",
+            "product_identity",
+            "food_safety_requirements",
+            "cultural_acceptability",
+            "seasonality",
+            "availability_logistics",
+            "cooking_measurements",
+            "energy_and_waste"
+          ]
+        },
+        "status": {"enum": ["supported", "partial", "not_configured", "license_blocked"]},
+        "source_refs": {"type": "array", "uniqueItems": true, "items": {"type": "string"}},
+        "coverage_notes": {"type": "string", "minLength": 1}
+      }
+    }
+  }
+}

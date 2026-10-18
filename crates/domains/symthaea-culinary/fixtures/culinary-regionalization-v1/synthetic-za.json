@@ -1,0 +1,97 @@
+{
+  "schema_version": "1.0.0",
+  "pack_id": "fixture:synthetic-regionalization-za-v1",
+  "profile_status": "synthetic_example",
+  "region": {
+    "country_code": "ZA",
+    "subnational_scope": null,
+    "market_scope": "synthetic demonstration scope; not a configured South African market",
+    "locale_tag": "en-ZA",
+    "language_tags": [
+      "en-ZA",
+      "zu-ZA"
+    ]
+  },
+  "conventions": {
+    "currency": "ZAR",
+    "mass_unit": "g",
+    "volume_unit": "mL",
+    "temperature_unit": "C",
+    "conversion_evidence_required": true,
+    "density_required_for_mass_volume_conversion": true,
+    "source_native_nutrient_basis_required": true,
+    "decimal_separator": ".",
+    "date_format_hint": "ISO-8601 in machine interfaces; local display may differ"
+  },
+  "sources": [],
+  "verticals": [
+    {
+      "vertical_id": "ingredient_composition",
+      "status": "not_configured",
+      "source_refs": [],
+      "coverage_notes": "Synthetic profile only: no region-specific facts, datasets, regulatory rules, prices, or cultural preferences are configured."
+    },
+    {
+      "vertical_id": "dietary_guidance",
+      "status": "not_configured",
+      "source_refs": [],
+      "coverage_notes": "Synthetic profile only: no region-specific facts, datasets, regulatory rules, prices, or cultural preferences are configured."
+    },
+    {
+      "vertical_id": "price_affordability",
+      "status": "not_configured",
+      "source_refs": [],
+      "coverage_notes": "Synthetic profile only: no region-specific facts, datasets, regulatory rules, prices, or cultural preferences are configured."
+    },
+    {
+      "vertical_id": "product_identity",
+      "status": "not_configured",
+      "source_refs": [],
+      "coverage_notes": "Synthetic profile only: no region-specific facts, datasets, regulatory rules, prices, or cultural preferences are configured."
+    },
+    {
+      "vertical_id": "food_safety_requirements",
+      "status": "not_configured",
+      "source_refs": [],
+      "coverage_notes": "Synthetic profile only: no region-specific facts, datasets, regulatory rules, prices, or cultural preferences are configured."
+    },
+    {
+      "vertical_id": "cultural_acceptability",
+      "status": "not_configured",
+      "source_refs": [],
+      "coverage_notes": "Synthetic profile only: no region-specific facts, datasets, regulatory rules, prices, or cultural preferences are configured."
+    },
+    {
+      "vertical_id": "seasonality",
+      "status": "not_configured",
+      "source_refs": [],
+      "coverage_notes": "Synthetic profile only: no region-specific facts, datasets, regulatory rules, prices, or cultural preferences are configured."
+    },
+    {
+      "vertical_id": "availability_logistics",
+      "status": "not_configured",
+      "source_refs": [],
+      "coverage_notes": "Synthetic profile only: no region-specific facts, datasets, regulatory rules, prices, or cultural preferences are configured."
+    },
+    {
+      "vertical_id": "cooking_measurements",
+      "status": "not_configured",
+      "source_refs": [],
+      "coverage_notes": "Synthetic profile only: no region-specific facts, datasets, regulatory rules, prices, or cultural preferences are configured."
+    },
+    {
+      "vertical_id": "energy_and_waste",
+      "status": "not_configured",
+      "source_refs": [],
+      "coverage_notes": "Synthetic profile only: no region-specific facts, datasets, regulatory rules, prices, or cultural preferences are configured."
+    }
+  ],
+  "fallback_policy": {
+    "missing_values": "unknown_not_zero",
+    "cross_region_substitution": "explicitly_label_source_region_and_uncertainty",
+    "infer_food_culture_from_country_code": false,
+    "infer_probabilities_from_scenario_counts": false,
+    "allow_restricted_data_in_public_pack": false,
+    "require_known_at_for_replay": true
+  }
+}
