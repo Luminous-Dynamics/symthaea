@@ -219,6 +219,57 @@
       "training_authorized": false,
       "content_sha256": null,
       "next_gate": "Crosswalk canonical types and invariant IDs; never count these contracts as crop-performance data."
+    },
+    {
+      "id": "DS-010",
+      "title": "Mobile and Manual Dataset for Greenhouse Tomato Crop (UdeA)",
+      "source_uri": "https://zenodo.org/records/16745911",
+      "source_type": "structured_repeated_measures_greenhouse_trial",
+      "reported_content": [
+        "weekly observations of 135 tomato plants",
+        "27 treatment combinations",
+        "20 weekly collection sessions",
+        "environmental sensor measurements",
+        "manual measurements",
+        "yield-related variables",
+        "CSV record"
+      ],
+      "observed_metadata": "Zenodo record identifies CC BY 4.0 and describes 2,666 rows and 40 columns. The related GitHub mirror README describes 2,664 records and 44 columns and its GitHub license badge differs from the README's CC BY claim. Use the canonical Zenodo artifact only for initial discovery; resolve artifact version and metadata discrepancy with file-level inspection before pinning.",
+      "license_status": "verified_cc-by-4.0_from_zenodo_record",
+      "access_status": "public_open_record_artifact_not_downloaded",
+      "ingestion_status": "quarantined",
+      "permitted_current_use": [
+        "public_metadata_review",
+        "citation"
+      ],
+      "training_authorized": false,
+      "content_sha256": null,
+      "next_gate": "Review exact Zenodo artifact, compute its SHA-256, inspect columns/units/plant/treatment/time identifiers, reconcile the published row/column discrepancy, assess missingness and leakage groups, and keep geographic transfer to South Africa out of scope."
+    },
+    {
+      "id": "DS-011",
+      "title": "AerialYield-T2M dual-modality greenhouse tomato ripeness, masks and fruit-count dataset",
+      "source_uri": "https://zenodo.org/records/22071809",
+      "source_type": "annotated_phenotyping_imagery",
+      "reported_content": [
+        "677 RGB greenhouse tomato frames: 535 close-range and 142 drone frames",
+        "14,303 annotated tomato instances across six ripeness stages",
+        "binary and semantic masks, polygons, bounding boxes and image-level visible-fruit counts",
+        "metadata archive and SHA-256 checksums file",
+        "deterministic block-grouped train/validation/test split",
+        "COCO and YOLO exports"
+      ],
+      "observed_metadata": "Zenodo record published 2026-08-23 and identifies a 3.6 GB package. Its separately listed LICENSE file states Creative Commons Attribution 4.0 International and permits sharing/adaptation with attribution. Images were collected in one commercial indoor greenhouse in the UAE; this is a phenotyping/vision task candidate, not yield, breeding, or South African geographic-transfer evidence.",
+      "license_status": "verified_cc-by-4.0_from_bundled_license_file",
+      "access_status": "public_open_artifact_not_downloaded",
+      "ingestion_status": "quarantined",
+      "permitted_current_use": [
+        "public_metadata_review",
+        "citation"
+      ],
+      "training_authorized": false,
+      "content_sha256": null,
+      "next_gate": "Review README and artifact terms; download only selected authorized components; verify provided SHA-256 checksums against bytes; inspect split grouping, duplicate/near-duplicate frames, annotation audit, and privacy; then pin exact artifact digests before any model training."
     }
   ]
 }
