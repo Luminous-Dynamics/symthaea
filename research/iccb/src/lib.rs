@@ -450,6 +450,21 @@ mod tests {
     }
 
     #[test]
+    fn fewer_declared_dependency_links_do_not_create_pareto_dominance() {
+        let mut one_link = option("one-link");
+        one_link.dependency_ids = vec!["grid-west".to_owned()];
+
+        let mut two_links = option("two-links");
+        two_links.dependency_ids = vec!["grid-west".to_owned(), "water-east".to_owned()];
+
+        let result = scenario(vec![one_link, two_links]).evaluate();
+        assert_eq!(
+            pareto_frontier(&result.evaluated_options),
+            vec!["one-link".to_owned(), "two-links".to_owned()]
+        );
+    }
+
+    #[test]
     fn reported_valuation_does_not_rescue_a_dominated_option() {
         let mut productive = option("productive");
         productive.expected_net_cash_minor = 4_000;
