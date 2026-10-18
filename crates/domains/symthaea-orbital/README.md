@@ -383,3 +383,6 @@ The design IR supports optional time-indexed categorical samples per observable 
 Per-pair outputs distinguish timely divergence, late divergence, indistinguishability through the stated horizon, and unresolved comparisons. This prevents a fault that becomes distinguishable only after the response deadline from being called timely, and prevents unknown/low-confidence samples from manufacturing separation. PPM is not an empirical probability without calibration evidence. Step counts are not converted to wall-clock time here.
 
 Additional temporal regressions cover early/late divergence, low confidence, missing outcome/confidence, equal high-confidence traces, nonmatching sample offsets, and invalid policy/sample data. As above, this is authored structural code only; no compilation, physical sensor performance, diagnosis accuracy, or flight safety is claimed.
+
+
+The frozen temporal known-answer fixture is `fixtures/space_fdir_mbse_001/temporal_diagnosability_cases.json`. It covers early/late divergence, low confidence, missing outcome/confidence, identical traces, nonmatching offsets, horizon truncation, and incompatible units. The typed test reads each case and checks the expected disposition; it remains authored, unexecuted Rust until exact-head build evidence exists.
