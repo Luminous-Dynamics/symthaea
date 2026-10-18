@@ -1144,6 +1144,22 @@ mod tests {
         );
     }
 
+    #[test]
+    fn canonical_receipt_digest_matches_pinned_bytes_and_sha256_vector() {
+        let value = json!({"z": 9, "a": {"y": true, "b": null}});
+        let mut canonical = FREEZE_RECEIPT_DIGEST_DOMAIN.to_vec();
+        append_canonical_json(&value, &mut canonical).unwrap();
+
+        assert_eq!(
+            std::str::from_utf8(&canonical).unwrap(),
+            "symthaea:chemical-process-tier-b-freeze-receipt:v1\\n{\\"a\\":{\\"b\\":null,\\"y\\":true},\\"z\\":9}"
+        );
+        assert_eq!(
+            freeze_receipt_digest(&value).unwrap(),
+            "sha256:c079af8d156bf4a916161157b016c59934a4419cd24f41e54c64417f93d85279"
+        );
+    }
+
 
 
     #[test]
