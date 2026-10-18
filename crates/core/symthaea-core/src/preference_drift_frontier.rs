@@ -30,6 +30,8 @@ pub enum PreferenceQuerySelectionStrategyV1 {
     LexicographicUnaskedPair,
     /// Select an unobserved eligible pair using a stable seed/scenario/query-index hash.
     SeededRandomUnaskedPair,
+    /// Prefer a pair whose candidates have the largest number of unresolved direct comparisons.
+    MaximizeUncomparedCandidateCoverage,
 }
 
 /// One simulated query and its synthetic response disposition.
@@ -156,6 +158,8 @@ pub struct PreferenceQueryBudgetFrontierReportV1 {
     pub lexicographic_unasked_pair: Vec<PreferenceQueryBudgetFrontierPointV1>,
     /// Seeded-random query-selector frontier.
     pub seeded_random_unasked_pair: Vec<PreferenceQueryBudgetFrontierPointV1>,
+    /// Coverage-deficit query-selector frontier.
+    pub coverage_deficit_unasked_pair: Vec<PreferenceQueryBudgetFrontierPointV1>,
     /// Explicit separation between policy input, simulated responses, and scoring.
     pub oracle_separation_contract: String,
     /// Limit on all claims made by this synthetic interaction simulation.
@@ -298,6 +302,25 @@ fn select_next_pair(
                 hash = hash.wrapping_mul(0x100000001b3);
             }
             candidates.get((hash % candidates.len() as u64) as usize).cloned()
+        }
+        PreferenceQuerySelectionStrategyV1::MaximizeUncomparedCandidateCoverage => {
+            // Count only directly observed, fresh comparisons. No transitive preference inference.
+            let mut compared_per_candidate = BTreeMap::<String, usize>::new();
+            for pair in &known {
+                *compared_per_candidate.entry(pair.0.clone()).or_default() += 1;
+                *compared_per_candidate.entry(pair.1.clone()).or_default() += 1;
+            }
+            let mut best_pair: Option<(usize, (String, String))> = None;
+            for pair in candidates {
+                let left_coverage = compared_per_candidate.get(&pair.0).copied().unwrap_or_default();
+                let right_coverage = compared_per_candidate.get(&pair.1).copied().unwrap_or_default();
+                let unresolved_score = eligible.len().saturating_sub(1 + left_coverage)
+                    + eligible.len().saturating_sub(1 + right_coverage);
+                if best_pair.as_ref().is_none_or(|(best_score, _)| unresolved_score > *best_score) {
+                    best_pair = Some((unresolved_score, pair));
+                }
+            }
+            best_pair.map(|(_, pair)| pair)
         }
     }
 }
@@ -654,9 +677,11 @@ pub fn evaluate_preference_query_budget_frontier(
 
     let mut lexicographic_points = Vec::with_capacity(max_query_budget as usize + 1);
     let mut seeded_random_points = Vec::with_capacity(max_query_budget as usize + 1);
+    let mut coverage_deficit_points = Vec::with_capacity(max_query_budget as usize + 1);
     for budget in 0..=max_query_budget {
         let mut lexicographic_assessments = Vec::with_capacity(scenarios.len());
         let mut random_assessments = Vec::with_capacity(scenarios.len());
+        let mut coverage_assessments = Vec::with_capacity(scenarios.len());
         for scenario in scenarios {
             lexicographic_assessments.push(run_interactive_episode(
                 scenario,
@@ -668,6 +693,12 @@ pub fn evaluate_preference_query_budget_frontier(
                 scenario,
                 budget,
                 PreferenceQuerySelectionStrategyV1::SeededRandomUnaskedPair,
+                seed,
+            )?);
+            coverage_assessments.push(run_interactive_episode(
+                scenario,
+                budget,
+                PreferenceQuerySelectionStrategyV1::MaximizeUncomparedCandidateCoverage,
                 seed,
             )?);
         }
@@ -682,6 +713,11 @@ pub fn evaluate_preference_query_budget_frontier(
             &random_assessments,
             budget,
         ));
+        coverage_deficit_points.push(score_frontier_point(
+            scenarios,
+            &coverage_assessments,
+            budget,
+        ));
     }
 
     Ok(PreferenceQueryBudgetFrontierReportV1 {
@@ -692,6 +728,7 @@ pub fn evaluate_preference_query_budget_frontier(
         scenario_count: summary.scenario_count,
         lexicographic_unasked_pair: lexicographic_points,
         seeded_random_unasked_pair: seeded_random_points,
+        coverage_deficit_unasked_pair: coverage_deficit_points,
         oracle_separation_contract: concat!(
             "Candidate-pair selection reads only task/context-scoped observations, the eligible ",
             "candidate set, prior asked-pair receipts, the selector strategy, and the seed. ",
@@ -733,10 +770,12 @@ mod tests {
         assert_eq!(first.scenario_count, 12);
         assert_eq!(first.lexicographic_unasked_pair.len(), 4);
         assert_eq!(first.seeded_random_unasked_pair.len(), 4);
+        assert_eq!(first.coverage_deficit_unasked_pair.len(), 4);
 
         for points in [
             &first.lexicographic_unasked_pair,
             &first.seeded_random_unasked_pair,
+            &first.coverage_deficit_unasked_pair,
         ] {
             for pair in points.windows(2) {
                 assert!(
@@ -778,7 +817,22 @@ mod tests {
             55,
             0,
         );
+        let before_coverage = select_next_pair(
+            &policy,
+            &asked,
+            PreferenceQuerySelectionStrategyV1::MaximizeUncomparedCandidateCoverage,
+            55,
+            0,
+        );
+        let after_coverage = select_next_pair(
+            &changed_policy,
+            &asked,
+            PreferenceQuerySelectionStrategyV1::MaximizeUncomparedCandidateCoverage,
+            55,
+            0,
+        );
         assert_eq!(before, after);
+        assert_eq!(before_coverage, after_coverage);
         assert_eq!(policy, changed_policy);
     }
 
