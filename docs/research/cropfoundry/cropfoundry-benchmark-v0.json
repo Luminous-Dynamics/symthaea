@@ -141,7 +141,7 @@
       "question": "Does the model predict a selected trait better than relevant simple and established baselines?",
       "primary_metric": "pre-registered primary error metric, such as normalized MAE, reported with bootstrap confidence interval",
       "proposed_target": "Aim for at least 10% relative error reduction versus the strongest eligible baseline on held-out site-years; do not advance if the difference is indistinguishable from noise or material subgroup harm is hidden",
-      "split_protocol": "Define target population, trait, unit, baseline set, missingness policy, and metric before examining final test results. Report each held-out site-year.",
+      "split_protocol": "Define target population, trait, unit, baseline set, missingness policy, and metric before examining final test results. Split by site-year or the strongest valid experimental grouping. If only one site exists, label the result as temporal/within-site evaluation and explicitly prohibit geographic-transfer claims.",
       "status": "proposed_not_run"
     },
     {
@@ -220,7 +220,7 @@
       "name": "Environment and crop transfer",
       "question": "Does performance persist across intended environments and locally relevant crops?",
       "primary_metric": "per-environment error, worst-group error, and coverage of the stated target population",
-      "proposed_target": "Publish per-environment results; no claim of South Africa-wide transfer from one site or season; measure coverage gaps for the selected local/underutilized crop separately from reference-crop results",
+      "proposed_target": "Publish per-environment results and the number of independent sites, site-years, cultivars and management regimes. No claim of South Africa-wide or cross-region transfer from a single site, season, or foreign growing environment; measure coverage gaps for the selected local/underutilized crop separately. Missing data is not evidence of low biological potential.",
       "split_protocol": "Report dataset coverage before modelling. Add sites/seasons/crops only through versioned evaluations; missing data is not evidence of low biological potential.",
       "status": "proposed_not_run"
     },
