@@ -328,7 +328,7 @@ mod tests {
         assert_eq!(report.contract_state, "CONTRACT_VALID_UNQUALIFIED");
         assert_eq!(report.module_count, 8);
         assert_eq!(report.measurement_channel_count, 4);
-        assert_eq!(report.reference_count, 9);
+        assert_eq!(report.reference_count, 10);
     }
 
     #[test]
