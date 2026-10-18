@@ -145,7 +145,8 @@ fn hard_gate_or_missing_data_violations(case: &Value, output: &Value) -> Vec<Str
             if disposition == "recommend"
                 && candidate
                     .get("cost")
-                    .is_some_and(|cost| (recursively_has_key_value(cost, "status", "stale")\n                    || recursively_has_key_value(cost, "freshness", "stale")))
+                    .is_some_and(|cost| (recursively_has_key_value(cost, "status", "stale")
+                    || recursively_has_key_value(cost, "freshness", "stale")))
             {
                 violations.push(format!(
                     "{case_id}: recommendation selects {id} with stale cost evidence"
