@@ -24,6 +24,8 @@ pub enum CapacitorDeviceEvidenceKind {
     FittedEquivalentCircuit,
     /// Estimated parameters not yet validated on the target device.
     Estimated,
+    /// Synthetic deterministic fixture for software tests; never physical-device evidence.
+    SyntheticFixture,
 }
 
 /// A single series-RLC capacitor model with an explicitly declared applicability domain.
@@ -497,7 +499,7 @@ mod tests {
             characterization_temperature_k: 298.15,
             valid_frequency_min_hz: 1.0e3,
             valid_frequency_max_hz: 10.0e6,
-            evidence_kind: CapacitorDeviceEvidenceKind::FittedEquivalentCircuit,
+            evidence_kind: CapacitorDeviceEvidenceKind::SyntheticFixture,
             source_reference: "test-fixture://not-real-component-data".to_string(),
         }
     }
@@ -513,7 +515,7 @@ mod tests {
             thermal_resistance_k_per_w: Some(10.0),
             max_temperature_rise_k: Some(0.3),
             min_self_resonant_frequency_hz: Some(1.0e6),
-            accepted_evidence_kinds: vec![CapacitorDeviceEvidenceKind::FittedEquivalentCircuit],
+            accepted_evidence_kinds: vec![CapacitorDeviceEvidenceKind::SyntheticFixture],
         }
     }
 
