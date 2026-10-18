@@ -60,6 +60,14 @@ sha256sum /tmp/rea-debounce-o0 /tmp/rea-debounce-o2 /tmp/rea-debounce-20
 
 The hash output must be retained as execution evidence. RDB-001 requires that the two same-threshold binaries actually have different SHA-256 values **and** identical outputs over the full vector set. The build flags make a difference likely; they do not replace checking the resulting artifacts. Capture compiler identity, exact argv, binary digests, exit status, stdout/stderr, and all test vectors/results.
 
+Run the corpus's executable contract verifier with an existing C compiler, `jq`, and `sha256sum`:
+
+```sh
+benchmarks/rea-differential/v1/verify.sh
+```
+
+The verifier compiles all four declared profiles in a fresh temporary directory, checks their binary identities, derives expected outputs from `oracle.json`, evaluates RDB-001 through RDB-006, and verifies malformed-input rejection. It prints the actual generated hashes and compiler identity. It does not invoke REA or test real hardware. This script has been authored but **has not yet been executed** in the present work session.
+
 For each physical pulse width in a case, the fixture model converts `pulse_width_microseconds` to `pulse_ticks = floor(width / timer_tick_us)`. The host program receives the resulting integer ticks. This conversion is a **synthetic experimental model**, not a model of any particular MCU timer, oscillator tolerance, interrupt latency or signal conditioning circuit.
 
 ## Required negative and interpretation controls
