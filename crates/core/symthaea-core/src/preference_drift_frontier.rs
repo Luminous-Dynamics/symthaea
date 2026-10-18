@@ -46,7 +46,7 @@ pub struct PreferenceQueryReceiptV1 {
     pub asked_at_step: u64,
     /// Synthetic time step when the response was simulated.
     pub answered_at_step: u64,
-    /// One of pairwise_feedback, reject_all, or no_synthetic_answer_available.
+    /// One of simulated_pairwise_feedback, simulated_reject_all, or no_synthetic_answer_available.
     pub response_kind: String,
 }
 
@@ -365,7 +365,7 @@ fn append_simulated_response(
                 "preferred_candidate_id": preferred,
                 "rejected_candidate_id": rejected
             }));
-            "pairwise_feedback".to_owned()
+            "simulated_pairwise_feedback".to_owned()
         }
         SimulatedPreferenceResponseV1::RejectAll => {
             observations.push(json!({
@@ -376,7 +376,7 @@ fn append_simulated_response(
                 "source": "explicit_synthetic_simulated_query_reject_all",
                 "rejected_candidate_ids": eligible
             }));
-            "reject_all".to_owned()
+            "simulated_reject_all".to_owned()
         }
         SimulatedPreferenceResponseV1::Unanswered => {
             "no_synthetic_answer_available".to_owned()
@@ -815,7 +815,7 @@ mod tests {
         .unwrap();
         assert_eq!(report.final_action, PreferenceReplayActionV1::RejectAll);
         assert_eq!(report.query_count, 1);
-        assert_eq!(report.queries[0].response_kind, "reject_all");
+        assert_eq!(report.queries[0].response_kind, "simulated_reject_all");
         assert_eq!(report.unanswered_query_count, 0);
     }
 
