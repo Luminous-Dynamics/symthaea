@@ -219,6 +219,22 @@ The Symtropy regression fixture with 12,000 operations on distinct resources is 
 - Dense-overlap tests must validate exact conflict-pair completeness on a smaller declared corpus and report *k* explicitly. Do not demand sub-second runtime for 100k operations if the API is required to materialize billions of conflict pairs; introduce a separately specified summary/witness API if bounded-size diagnostics become a requirement.
 - Hard correctness gates: zero mismatch against the independent oracle on the pinned tiny-corpus family; zero silent capacity-overflow or unknown-capacity acceptance; stable normalized output for input permutations; and no regression in half-open back-to-back semantics. Benchmark output must separately label synthetic results and externally measured production evidence.
 
+### SC3 — Duration uncertainty and robust schedule feasibility
+
+A schedule may be feasible under nominal durations but infeasible when machining, fit-up, welding, cooling, inspection, lifting or rework takes longer than planned. The reference API `validate_schedule_with_duration_bounds` (and its capacity-aware counterpart) therefore treats every operation's declared upper duration bound as the conservative duration for modeled precedence and resource-occupancy checks.
+
+**Contract and cases:**
+- Every scheduled operation has exactly one duration envelope with finite positive minimum and maximum, minimum ≤ nominal duration ≤ maximum; missing, duplicate, empty-ID, unknown-ID, malformed or nominal-inconsistent envelopes fail closed.
+- Include nominally back-to-back operations that overlap at the upper bound, upper-bound predecessor completion after a successor's start, capacity-N inspection/crane pools, robustly back-to-back upper-bound intervals, and maximum-duration end-time overflow.
+- Keep interval-robust feasibility distinct from chance-constrained planning. A min/max envelope is not a calibrated probability interval by itself. A P90/P95 claim requires pinned, held-out duration observations, calibration/coverage results by relevant process class and operating regime, and documented treatment of correlated disruptions.
+- Add disruption scenarios for machine downtime, late materials, NDT backlog, weather/port access restrictions and rework. Correlated disruptions must be explicit scenario inputs; independently widening each operation's duration does not model a common-cause event.
+
+**Hard gates:** zero robust-feasibility false accepts in the pinned adversarial suite against an independent oracle; no operation receives robust pass eligibility without one valid envelope; upper-bound resource overflow and predecessor violations are rejected; deterministic normalized reports remain invariant to input ordering. The current implementation validates feasibility against declared deterministic bounds only; it does not estimate duration distributions or prove that bounds cover all real outcomes.
+
+**Measures:** nominal and upper-bound feasibility rate, worst-case makespan, minimum critical-path slack, due-date miss count under named scenarios, schedule repair/churn after observations change, recovery time, resource overload duration and the number of scenarios causing a hard-gate rejection. Report every failed case and the full scenario seed/corpus digest, not only mean makespan.
+
+**Initial measurable targets (proposed, not achieved):** 100% of operations have unambiguous bounds before a robust-pass result; zero false robust-feasible results against the small exact oracle; 100% rejection of malformed/missing bounds and upper-bound precedence/resource violations. For predictive models introduced later, report interval coverage and calibration by process/shift/material family; do not claim probabilistic reliability from synthetic interval tests alone.
+
 ### External data policy
 
 Use the [NIST Smart Manufacturing Systems Test Bed](https://www.nist.gov/laboratories/tools-instruments/smart-manufacturing-systems-sms-test-bed) and its [public repository](https://github.com/usnistgov/smstestbed) as candidate sources for CNC/MTConnect and product-lifecycle/inspection evidence. Before importing any subset, record the exact artifact URI, revision or retrieval date, content digest, license/usage conditions, schema, machine/product identity and permitted benchmark role. These resources support CNC and digital-thread studies; they are not, by themselves, a shipyard scheduling ground truth.
