@@ -36,7 +36,7 @@ For a nonempty selection of length `L`:
 | Full known-chunk coverage | No spurious `unreported-input-region` gap |
 | Determinism | Same manifest + oracle yields the same case dispositions and file digests |
 | Small-domain exhaustive coverage | All 510 byte masks for lengths 1–8 agree with an independent bytewise-gap oracle |
-| Interval representation invariance | All 33,866 interval subsets for lengths 1–5 pass in original, reversed and duplicated forms (101,598 representations) |
+| Interval representation invariance | All 33,866 interval subsets for lengths 1–5 pass in five representations each: original, reversed, duplicated, ascending-length and descending-length (169,330 representations) |
 
 These are contract targets and the current public fixture results, not measurements of a real REA provider.
 
@@ -50,7 +50,7 @@ benchmarks/rea-coverage/v1/property-sweep.sh
 benchmarks/rea-coverage/v1/representation-sweep.sh
 ```
 
-Recorded fixed-corpus result: 16/16 case dispositions matched the oracle: 5 internally consistent reports accepted, 8 inconsistent reports rejected, 1 empty input marked invalid, and 2 malformed reports rejected. The independent `property-sweep.sh` passed all 510 coverage masks for selected-input lengths 1–8, with source-offset checks. `representation-sweep.sh` then exhaustively checked all 33,866 possible subsets of byte intervals for lengths 1–5 in three representations each: original order, reversed order, and duplicate intervals. All 101,598 representations matched the independent bytewise gap-run oracle. Exact tested file identities and run limits are recorded in `receipt.json`.
+Recorded fixed-corpus result: 16/16 case dispositions matched the oracle: 5 internally consistent reports accepted, 8 inconsistent reports rejected, 1 empty input marked invalid, and 2 malformed reports rejected. The independent `property-sweep.sh` passed all 510 coverage masks for selected-input lengths 1–8, with source-offset checks. `representation-sweep.sh` exhaustively checked all 33,866 possible subsets of byte intervals for lengths 1–5 in five representations each: original order, reversed order, duplicated intervals, ascending interval length, and descending interval length. All 169,330 representations matched the independent bytewise gap-run oracle. Exact tested file identities and run limits are recorded in `receipt.json`.
 
 ## Next evidence gate
 
