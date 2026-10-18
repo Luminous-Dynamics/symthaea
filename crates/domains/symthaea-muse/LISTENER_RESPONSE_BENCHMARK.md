@@ -196,6 +196,8 @@ Run from repository root:
 - cargo fmt --manifest-path crates/domains/symthaea-muse/Cargo.toml -- --check
 - cargo test -p symthaea-muse --lib listener_response::tests
 - cargo test -p symthaea-muse --lib listener_response_benchmark::tests
+- cargo test -p symthaea-muse --bin muse_listener_response_benchmark
+- cargo run -p symthaea-muse --bin muse_listener_response_benchmark -- --demo
 - cargo test -p symthaea-muse --lib
 
 These commands have not been run in the authoring environment. Passing CI or a workflow that is pending/queued is not a pass. Schema tests cannot establish model accuracy or positive listener outcomes.
