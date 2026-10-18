@@ -46,6 +46,8 @@ struct DatasetIdentity {
     repository_url: String,
     descriptive_readme_url: String,
     citation_policy: String,
+    source_revision: String,
+    metadata_accessed_on: String,
 }
 
 #[derive(Debug, Clone, Serialize, Deserialize)]
@@ -149,6 +151,7 @@ struct AuditReceipt {
     operation: &'static str,
     status: &'static str,
     manifest_sha256: String,
+    evidence_input_sha256: Option<String>,
     artifact_count: usize,
     record_count: usize,
     held_out_outcome_groups: Vec<String>,
@@ -219,6 +222,8 @@ fn validate_manifest(manifest: &SourceManifest) -> Result<()> {
         ("dataset.repository_url", manifest.dataset.repository_url.as_str()),
         ("dataset.descriptive_readme_url", manifest.dataset.descriptive_readme_url.as_str()),
         ("dataset.citation_policy", manifest.dataset.citation_policy.as_str()),
+        ("dataset.source_revision", manifest.dataset.source_revision.as_str()),
+        ("dataset.metadata_accessed_on", manifest.dataset.metadata_accessed_on.as_str()),
         ("challenge_context.material", manifest.challenge_context.material.as_str()),
         ("challenge_context.process", manifest.challenge_context.process.as_str()),
         ("challenge_context.condition", manifest.challenge_context.condition.as_str()),
@@ -490,9 +495,23 @@ fn verify_artifacts(manifest: &SourceManifest, root: &Path) -> Result<()> {
             "artifact verification blocked until artifact terms and local-use permissions are reviewed".into(),
         ));
     }
+    let canonical_root = fs::canonicalize(root).map_err(|error| io_error(root, error))?;
     for artifact in &manifest.artifacts {
         let relative = safe_relative_path(&artifact.relative_path)?;
-        let path = root.join(relative);
+        let requested_path = canonical_root.join(relative);
+        let path = fs::canonicalize(&requested_path).map_err(|error| io_error(&requested_path, error))?;
+        if !path.starts_with(&canonical_root) {
+            return Err(AdapterError::Validation(format!(
+                "artifact {:?} resolves outside the declared artifact root",
+                artifact.relative_path
+            )));
+        }
+        if !path.is_file() {
+            return Err(AdapterError::Validation(format!(
+                "artifact {:?} is not a regular file",
+                artifact.relative_path
+            )));
+        }
         let bytes = fs::read(&path).map_err(|error| io_error(&path, error))?;
         if bytes.len() as u64 != artifact.size_bytes {
             return Err(AdapterError::Validation(format!(
@@ -515,6 +534,7 @@ fn manifest_receipt(
     operation: &'static str,
     status: &'static str,
     manifest_bytes: &[u8],
+    evidence_input_sha256: Option<String>,
     artifact_count: usize,
     record_count: usize,
     groups: Vec<String>,
@@ -524,6 +544,7 @@ fn manifest_receipt(
         operation,
         status,
         manifest_sha256: sha256_hex(manifest_bytes),
+        evidence_input_sha256,
         artifact_count,
         record_count,
         held_out_outcome_groups: groups,
@@ -553,7 +574,7 @@ fn run(args: &[String]) -> Result<AuditReceipt> {
                 "VALID_MANIFEST_ARTIFACTS_DECLARED_NOT_HASH_CHECKED"
             };
             Ok(manifest_receipt(
-                "validate-manifest", status, &manifest_bytes, manifest.artifacts.len(), 0, Vec::new(),
+                "validate-manifest", status, &manifest_bytes, None, manifest.artifacts.len(), 0, Vec::new(),
             ))
         }
         "verify-artifacts" => {
@@ -563,18 +584,20 @@ fn run(args: &[String]) -> Result<AuditReceipt> {
             verify_artifacts(&manifest, Path::new(&args[3]))?;
             Ok(manifest_receipt(
                 "verify-artifacts", "ARTIFACT_BYTES_AND_DIGESTS_VERIFIED",
-                &manifest_bytes, manifest.artifacts.len(), 0, Vec::new(),
+                &manifest_bytes, None, manifest.artifacts.len(), 0, Vec::new(),
             ))
         }
         "validate-records" => {
             if args.len() != 4 {
                 return Err(AdapterError::Validation("validate-records requires an observation JSON path".into()));
             }
-            let (observations, _): (ObservationSet, Vec<u8>) = read_json(Path::new(&args[3]))?;
+            let (observations, observation_bytes): (ObservationSet, Vec<u8>) =
+                read_json(Path::new(&args[3]))?;
             let groups = validate_records(&manifest, &observations)?;
             Ok(manifest_receipt(
                 "validate-records", "RECORD_CONTRACT_AND_OUTCOME_GROUP_SPLIT_VALID",
-                &manifest_bytes, manifest.artifacts.len(), observations.records.len(), groups,
+                &manifest_bytes, Some(sha256_hex(&observation_bytes)), manifest.artifacts.len(),
+                observations.records.len(), groups,
             ))
         }
         _ => Err(AdapterError::Validation(format!("unknown operation {operation:?}"))),
@@ -618,6 +641,8 @@ mod tests {
                 repository_url: "https://data.nist.gov/od/id/mds2-3735".into(),
                 descriptive_readme_url: "https://www.nist.gov/ambench".into(),
                 citation_policy: "Use DOI landing citation verbatim".into(),
+                source_revision: "DOI record 10.18434/mds2-3735; artifact inventory pending".into(),
+                metadata_accessed_on: "2026-10-18".into(),
             },
             related_sources: vec![RelatedSource {
                 id: "AMB2022-01".into(),
@@ -668,6 +693,15 @@ mod tests {
             censoring: Censoring::Uncensored,
             metadata_note: None,
         }
+    }
+
+    #[test]
+    fn committed_amb2025_profile_deserializes_and_validates() {
+        let raw = include_str!("../schemas/amb2025-02-source-manifest-v0.1.json");
+        let profile: SourceManifest = serde_json::from_str(raw).unwrap();
+        validate_manifest(&profile).unwrap();
+        assert_eq!(profile.dataset.doi, "10.18434/mds2-3735");
+        assert!(profile.artifacts.is_empty());
     }
 
     #[test]
