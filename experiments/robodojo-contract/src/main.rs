@@ -111,7 +111,7 @@ fn parse_optional<T: std::str::FromStr>(
 }
 
 fn read_trials(path: impl AsRef<Path>) -> Result<Vec<TrialRecord>, Box<dyn Error>> {
-    let contents = fs::read_to_string(path)?;
+    let contents = fs::read_to_string(path.as_ref())?;
     let mut lines = contents.lines();
     let header = lines.next().ok_or_else(|| invalid_input("trial file is empty"))?;
     if header.trim_end_matches('\r') != TRIALS_HEADER {
@@ -200,8 +200,10 @@ fn run_contract_smoke() -> Result<(), Box<dyn Error>> {
     let config = GateConfig::new(
         3,
         vec![
-            AxisLimit::new(-1.0, 1.0)?,
-            AxisLimit::new(0.0, 0.08)?,
+            AxisLimit::new(-1.0, 1.0)
+                .map_err(|error| invalid_input(format!("invalid smoke axis limit: {error:?}")))?,
+            AxisLimit::new(0.0, 0.08)
+                .map_err(|error| invalid_input(format!("invalid smoke axis limit: {error:?}")))?,
         ],
         0.5,
         3,
