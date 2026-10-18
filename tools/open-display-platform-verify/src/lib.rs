@@ -977,6 +977,9 @@ mod tests {
     const CAD_SOURCE: &str = include_str!(
         "../../../hardware/open-display-reference/cad/odrh_sensor_interface_plate.scad"
     );
+    const CAD_CHECK_TEXT: &str = include_str!(
+        "../../../hardware/open-display-reference/validation/odrh_sensor_plate_cad_check-v0.1.json"
+    );
     const RUN_TEXT: &str =
         include_str!("../../../docs/engineering/display-measurement-run-template-v0.1.json");
     const RUN_SCHEMA_TEXT: &str =
@@ -992,6 +995,47 @@ mod tests {
 
     fn parse_run() -> Value {
         serde_json::from_str(RUN_TEXT).expect("run template must parse")
+    }
+
+    #[test]
+    fn cad_receipt_binds_exact_native_source_and_preserves_physical_claim_ceiling() {
+        let receipt: Value =
+            serde_json::from_str(CAD_CHECK_TEXT).expect("CAD validation receipt must parse");
+        let source_hash = sha256_hex(CAD_SOURCE.as_bytes());
+
+        assert_eq!(
+            receipt
+                .pointer("/source_revision/sha256")
+                .and_then(Value::as_str),
+            Some(source_hash.as_str())
+        );
+        assert_eq!(
+            receipt
+                .pointer("/source_path")
+                .and_then(Value::as_str),
+            Some("hardware/open-display-reference/cad/odrh_sensor_interface_plate.scad")
+        );
+        assert_eq!(
+            receipt
+                .pointer("/claim_boundaries/physical_validation")
+                .and_then(Value::as_str),
+            Some("NOT_PERFORMED")
+        );
+        assert_eq!(
+            receipt
+                .pointer("/claim_boundaries/overall_disposition")
+                .and_then(Value::as_str),
+            Some("GEOMETRY_EXPORT_CHECKED_NOT_PHYSICALLY_QUALIFIED")
+        );
+
+        let checks = receipt
+            .get("checks")
+            .and_then(Value::as_array)
+            .expect("CAD receipt must declare checks");
+        assert!(!checks.is_empty());
+        assert!(checks.iter().all(|check| {
+            check.get("status").and_then(Value::as_str) == Some("PASS")
+        }));
     }
 
     #[test]
