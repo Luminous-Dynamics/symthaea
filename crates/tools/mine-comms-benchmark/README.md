@@ -17,7 +17,7 @@ cargo run --offline --manifest-path crates/tools/mine-comms-benchmark/Cargo.toml
 - A fixed channel-preference baseline compared with a link-quality/latency/energy-weighted adaptive policy.
 - Down, unknown, zero-quality and stale observations are not routed as healthy.
 - Receiver acknowledgement requires a usable return path; local transmitter acceptance is never reported as end-to-end delivery.
-- Message expiry is evaluated against modelled arrival time.
+- Message expiry is evaluated against modelled arrival time; messages already expired at evaluation are not sent, deliveries are never timestamped before evaluation time, and ACK routes are rechecked for freshness at receiver arrival.
 - Unauthenticated-origin distress can still be received and acknowledged, but its origin remains explicitly unverified.
 - Each receipt carries a typed lifecycle trace; missing routes and unacknowledged reception are distinct outcomes.
 - The CLI prints synthetic comparisons for nominal routing, backbone severance, local-relay loss, stale TTE observations, a missing acknowledgement path and an expired message.

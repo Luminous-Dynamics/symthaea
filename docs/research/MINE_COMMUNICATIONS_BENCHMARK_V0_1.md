@@ -115,6 +115,12 @@ Every metric declares unit, numerator/denominator, measurement window, topology/
 
 Do not collapse these into one score. A throughput gain cannot compensate for reduced distress delivery, stale locations, hidden outage states or an unsafe power envelope.
 
+## 6.3 Time-causal delivery receipts
+
+The message evaluator interprets its `now_ms` argument as the time when the queued message is evaluated, not as a replay of a transmission at creation time. A message already expired at evaluation is rejected before route selection; otherwise its modeled transmission starts at `max(created_at_ms, now_ms)`. Receiver arrival is computed from that start time and the selected path latency. The return acknowledgement path is re-evaluated against link-evidence freshness at receiver-arrival time, because observations can become stale while a message is in flight.
+
+These rules prevent retroactive delivery timestamps and prevent an acknowledgement from being credited using a return path that was healthy only at an earlier time. The harness still uses supplied deterministic link data and does not simulate queue races or actual channel access; the rules are accounting/casuality contracts rather than a physical reliability claim.
+
 ## 6.2 Failure-domain diversity, not just route diversity
 
 The Rust kernel now includes a bounded path-pair search that only reports two routes as diverse when their declared link failure domains and internal relay nodes are disjoint. A link declares both a list of common-cause domains (e.g. shared cable route, power feed, shaft or inundation zone) and whether that inventory is complete. Incomplete or absent inventories do not support a diversity claim. The search has explicit hop and candidate-path caps so the reference harness fails clearly rather than exploring an unbounded graph.

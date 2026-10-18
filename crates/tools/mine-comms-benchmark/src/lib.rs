@@ -654,7 +654,7 @@ pub fn evaluate_message(
         policy,
     )? else {
         events.push(MessageEvent {
-            at_ms: message.created_at_ms,
+            at_ms: transmission_start_ms,
             kind: MessageEventKind::NoRoute,
             node: message.source.clone(),
         });
