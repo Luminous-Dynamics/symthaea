@@ -85,17 +85,18 @@
       "id": "ODRH-FIXTURE-001",
       "name": "Mechanical carrier, datum and sensor fixture",
       "role": "Set repeatable display position, sensor location and measurement geometry.",
-      "current_openness_class": "NOT_SELECTED",
+      "current_openness_class": "PROJECT_CONTROLLED_OPEN",
       "target_openness_class": "PROJECT_CONTROLLED_OPEN",
-      "module_status": "NOT_DESIGNED",
+      "module_status": "DESIGN_IN_PROGRESS",
       "selection_requirements": [
-        "Publish editable native CAD plus STEP/STL exports.",
-        "Document datums, dimensions, tolerance assumptions, fasteners, and assembly.",
-        "Provide an independent geometry check."
+        "A parametric OpenSCAD sensor interface plate has been published under CERN-OHL-S-2.0.",
+        "Publish native CAD plus derived manufacturing exports only after rendering and dimensional review.",
+        "Document datums, actual sensor mounting dimensions, fasteners, process tolerances, and assembly.",
+        "Provide an independent geometry/fit check before build qualification."
       ],
-      "design_source": null,
+      "design_source": "https://github.com/Luminous-Dynamics/symthaea/blob/research/odrh-001-open-display-hardware-2026-10-18/hardware/open-display-reference/cad/odrh_sensor_interface_plate.scad",
       "datasheet_or_interface_source": null,
-      "license_status": "NOT_RELEASED",
+      "license_status": "OPEN_VERIFIED",
       "lifecycle_check_date": null,
       "substitute_policy": "Use common fasteners and printable/machinable parts where the measured tolerance permits."
     },
