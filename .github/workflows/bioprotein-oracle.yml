@@ -1,0 +1,70 @@
+name: Bioprotein Oracle Contract
+
+on:
+  pull_request:
+    paths:
+      - "crates/domains/symthaea-bioprotein-oracle/**"
+      - "docs/research/bioprotein/fixtures/**"
+      - ".github/workflows/bioprotein-oracle.yml"
+
+permissions:
+  contents: read
+
+concurrency:
+  group: bioprotein-oracle-${{ github.event.pull_request.number || github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  contract:
+    name: Exact-head synthetic gate contract
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    env:
+      EXPECTED_HEAD: ${{ github.event.pull_request.head.sha || github.sha }}
+    steps:
+      - name: Checkout exact PR head
+        uses: actions/checkout@11bd71901bbe5b1630ceea73d27597364c9af683
+        with:
+          ref: ${{ github.event.pull_request.head.sha || github.sha }}
+          fetch-depth: 0
+          persist-credentials: false
+
+      - name: Install pinned Rust toolchain
+        uses: dtolnay/rust-toolchain@e97e2d8cc328f1b50210efc529dca0028893a2d9
+        with:
+          toolchain: "1.96.0"
+          components: rustfmt, clippy
+
+      - name: Confirm checkout is exact requested head
+        shell: bash
+        run: |
+          set -euo pipefail
+          actual="$(git rev-parse HEAD)"
+          test "$actual" = "$EXPECTED_HEAD"
+          printf 'expected_head=%s\nactual_head=%s\n' "$EXPECTED_HEAD" "$actual"
+
+      - name: Format focused crate
+        run: cargo fmt --manifest-path crates/domains/symthaea-bioprotein-oracle/Cargo.toml --package symthaea-bioprotein-oracle -- --check
+
+      - name: Test focused crate
+        run: cargo test --manifest-path Cargo.toml -p symthaea-bioprotein-oracle
+
+      - name: Clippy focused crate
+        run: cargo clippy --manifest-path Cargo.toml -p symthaea-bioprotein-oracle --all-targets -- -D warnings
+
+      - name: Produce exact-head evidence receipt
+        shell: bash
+        run: |
+          set -euo pipefail
+          mkdir -p target
+          cargo run --manifest-path Cargo.toml -p symthaea-bioprotein-oracle -- --expected-head "$EXPECTED_HEAD" --receipt target/bioprotein-oracle-receipt.json
+          cat target/bioprotein-oracle-receipt.json
+
+      - name: Preserve receipt artifact
+        if: ${{ always() && hashFiles('target/bioprotein-oracle-receipt.json') != '' }}
+        uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02
+        with:
+          name: bioprotein-oracle-receipt
+          path: target/bioprotein-oracle-receipt.json
+          if-no-files-found: error
+          retention-days: 30
