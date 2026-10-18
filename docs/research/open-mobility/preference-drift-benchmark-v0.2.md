@@ -1,6 +1,6 @@
 # Open Mobility — Preference Drift, Freshness, and Held-Out Task Transfer v0.2
 
-**Status:** research benchmark protocol draft; fixture v2; software tests authored, execution pending  
+**Status:** research benchmark protocol draft; fixture v2; factorized generator prototype added; Rust execution pending  
 **Tracking issue:** [MOBILITY-ASSIST-011 / #7921](https://github.com/Luminous-Dynamics/symthaea/issues/7921)  
 **Upstream comparison:** [interval-aware architecture robustness / PR #7892](https://github.com/Luminous-Dynamics/symthaea/pull/7892)  
 **Decision-sensitive evidence gathering:** [PR #7907](https://github.com/Luminous-Dynamics/symthaea/pull/7907)  
@@ -26,7 +26,9 @@ A preference score must never re-admit a candidate rejected by a hard feasibilit
 
 ## 3. Fixture contract and limitations
 
-The versioned JSON fixture v2 contains three synthetic candidate profiles and 12 hand-authored scenario records: two development examples and ten held-out negative/shift controls. It covers steady-context explicit feedback, fatigue-related preference reversal, transfer from level walking to sit-to-stand, an environment transition, a hard feasibility gate, no preference evidence, contradictory feedback, rejection of all eligible options, exhausted query budget, noisy feedback, and explicit preference that disagrees with an engineering metric proxy. Each scenario now declares `current_step` and `preference_max_age_steps`; schema validation rejects missing freshness metadata and observations dated after the episode's current step. The corpus still has only 12 scenarios and is not statistically powered.
+The versioned JSON fixture v2 contains three synthetic candidate profiles and 12 hand-authored scenario records: two development examples and ten held-out negative/shift controls. It covers steady-context explicit feedback, fatigue-related preference reversal, transfer from level walking to sit-to-stand, an environment transition, a hard feasibility gate, no preference evidence, contradictory feedback, rejection of all eligible options, exhausted query budget, noisy feedback, and explicit preference that disagrees with an engineering metric proxy. Each scenario now declares `current_step` and `preference_max_age_steps`; schema validation rejects missing freshness metadata and observations dated after the episode's current step. The corpus still has only 12 source cases and is not statistically powered.
+
+The first Rust generator prototype is in `preference_drift_generator.rs`. With default configuration it expands the reviewed source templates into 1,220 synthetic episodes: 20 development episodes and 1,200 held-out episodes, with disjoint development/held-out wearer-session identifiers and ten held-out scenario families. It varies observation age, freshness horizon, query budgets, and candidate/observation order, and emits a seed/config/split/count manifest plus a BLAKE3 digest of the exact serialized fixture bytes. **The 1,220 records are repetitions/variations of the original templates, not 1,220 independent task or physiology conditions.** Count-based qualification is not a substitute for richer factor coverage, independent family holdouts, or empirical evidence.
 
 All candidate metrics, preference records, contexts, and evaluation oracles in this file are synthetic and illustrative. They are not measured biomechanics, human-subject data, inferred preferences, or performance results. The small fixture is a contract/smoke corpus, **not a statistically powered benchmark**. The evaluation oracle is evaluation-only: it must never be passed into a policy, query selector, calibration stage, feature builder, or model-fitting call.
 
@@ -136,7 +138,9 @@ Use matched seeds for every baseline. Split by wearer/session and full trajector
 - [ISO 18646-6:2026](https://www.iso.org/standard/88497.html) specifies performance indices and tests using an anthropomorphic test dummy for lower-limb wearable robots. It is relevant to technical assistance/enhancement measurement, not a substitute for explicit human preference evidence; the published scope excludes robots operated based on biosignals such as EMG.
 - [ASTM F3474-25](https://store.astm.org/f3474-25.html) provides practice for choosing functional ergonomic parameters and metrics across exoskeleton contexts and time horizons.
 
-These references reinforce a system-level benchmark that keeps assistance, feasibility, wearer interaction, context and time in view. They do not validate the synthetic fixture or set its numerical gates.
+- A recent 2026 interdisciplinary perspective argues that human-in-the-loop exoskeleton optimization should account for individual capabilities, clinical expertise, and structured training—not only optimize a device parameter vector: [PubMed record](https://pubmed.ncbi.nlm.nih.gov/42657862/).
+
+These references reinforce a system-level benchmark that keeps assistance, feasibility, wearer interaction, context, time, and clinical/training context in view. They do not validate the synthetic fixture or set its numerical gates.
 
 ## 10. Proposed benchmark targets
 
@@ -159,7 +163,8 @@ A passing deterministic fixture can establish only that a particular implementat
 Sequence:
 1. Freeze the freshness-bounded fixture v2 contract and expected behavior.
 2. Run the Rust unit tests and workspace checks on an environment with the Rust toolchain; record exact source revision and actual output.
-3. Add a versioned factorized scenario generator, grouped wearer/session and shift-family manifest, and paired baseline runner.
-4. Implement/compare a Pareto-plus-query/abstention baseline and a decision-relevant query-selection baseline; do not connect to actuation.
-5. Qualify generated-suite metrics and only then design a separate human study with suitable protocol, consent/ethics, safety review, and calibrated instrumentation.
+3. Expand the factorized generator beyond template replication into explicit, versioned wearer/session-stratum, task, fatigue, terrain/transition, and preference-reversal axes; retain grouped wearer/session and whole-family holdouts and report which axes were actually varied.
+4. Use the generator's seed/config/split/count manifest and content digest in the paired baseline runner; do not treat repeated templates as independent scenarios.
+5. Implement/compare a Pareto-plus-query/abstention baseline and a decision-relevant query-selection baseline; freeze query selection without oracle access and do not connect to actuation.
+6. Qualify grouped generated-suite metrics and only then design a separate human study with suitable protocol, consent/ethics, safety review, and calibrated instrumentation.
 5. Only after offline benchmark qualification, design any human study separately with appropriate protocol, consent/ethics, safety review and calibrated instrumentation.
