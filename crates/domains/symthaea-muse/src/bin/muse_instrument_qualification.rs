@@ -213,7 +213,7 @@ fn sample_bank_status(
         "no_indexed_samples_decoded"
     } else if silent_samples >= decoded_samples {
         "no_non_silent_decoded_samples"
-    } else if failed_decodes > 0 || silent_samples > 0 {
+    } else if failed_decodes > 0 || decoded_samples < indexed_samples || silent_samples > 0 {
         "partial_sample_audio_evidence"
     } else {
         "indexed_samples_decoded_non_silent"
@@ -231,7 +231,7 @@ fn planned_gestures(instrument: &str) -> Vec<PlannedGestureV1> {
     gestures
         .iter()
         .map(|gesture| PlannedGestureV1 {
-            gesture,
+            gesture: *gesture,
             status: "planned_unvalidated",
         })
         .collect()
@@ -291,7 +291,8 @@ fn print_help() {
            --soundfont PATH        Optional SoundFont header inventory (no FluidSynth rendering)\n\
            --hash-indexed-samples  Hash all indexed WAV contents (can be I/O intensive)\n\
            -h, --help              Show this help\n\
-         Writes JSON to stdout. Source inventory does not certify playable range or instrument proficiency."
+         Writes JSON to stdout. Source inventory does not certify playable range or instrument proficiency.\n\
+         The inventory reads indexed WAV files for decode/silence audit; content hashing is opt-in."
     );
 }
 
@@ -319,6 +320,10 @@ mod tests {
         );
         assert_eq!(
             sample_bank_status(true, 5, 5, 1, 0),
+            "partial_sample_audio_evidence"
+        );
+        assert_eq!(
+            sample_bank_status(true, 6, 5, 0, 0),
             "partial_sample_audio_evidence"
         );
         assert_eq!(
