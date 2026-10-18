@@ -512,13 +512,7 @@ fn main() -> anyhow::Result<()> {
 
     println!("================================================================");
 
-    let valid_aucs: Vec<f64> = results.iter().filter_map(|r| r.auc).collect();
-    if valid_aucs.is_empty() {
-        println!("\nMean ROC-AUC: N/A (no domain had both positive and negative test labels)");
-    } else {
-        let mean_auc = valid_aucs.iter().sum::<f64>() / valid_aucs.len() as f64;
-        println!("\nMean ROC-AUC across {} valid domains: {:.4}", valid_aucs.len(), mean_auc);
-    }
+    println!("Metrics are reported per domain; no cross-domain aggregate is computed.");
 
     Ok(())
 }
