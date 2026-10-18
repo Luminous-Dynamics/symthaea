@@ -603,6 +603,350 @@ fn verify_reports(
     }
 }
 
+fn verify_root_evidence(
+    expected: Option<&Value>,
+    label: &str,
+    observed: &RootObservation,
+    findings: &mut Vec<Finding>,
+) -> bool {
+    let Some(expected) = expected else {
+        push_incomplete(
+            findings,
+            "root_evidence_missing",
+            format!("{label} root evidence is missing from the inventory"),
+        );
+        return false;
+    };
+
+    let expected_present = expected.get("root_present").and_then(Value::as_bool);
+    let Some(actual_root) = observed.canonical_path.as_ref() else {
+        push_incomplete(
+            findings,
+            "asset_root_unreadable",
+            format!(
+                "{label} root could not be independently inspected: {}",
+                observed.error.as_deref().unwrap_or("unknown root access error")
+            ),
+        );
+        return false;
+    };
+    if expected_present == Some(false) {
+        push_error(
+            findings,
+            "root_presence_mismatch",
+            format!(
+                "{label} inventory claims this root is absent, but supplied root {} exists",
+                actual_root.display()
+            ),
+        );
+        return false;
+    }
+    if expected_present != Some(true) {
+        push_incomplete(
+            findings,
+            "root_presence_unknown",
+            format!("{label} inventory has no valid root_present=true claim"),
+        );
+        return false;
+    }
+
+    let Some(actual_digest) = observed.content_manifest_sha256.as_deref() else {
+        push_incomplete(
+            findings,
+            "root_content_manifest_unavailable",
+            format!(
+                "{label} supplied root could not be fully hashed: {}",
+                observed.error.as_deref().unwrap_or("unknown manifest error")
+            ),
+        );
+        return false;
+    };
+    if string_field(expected, "content_manifest_status") != Some("hashed") {
+        push_incomplete(
+            findings,
+            "root_manifest_incomplete",
+            format!("{label} inventory does not claim a completed root content manifest"),
+        );
+        return false;
+    }
+    let Some(expected_digest) = string_field(expected, "content_manifest_sha256") else {
+        push_incomplete(
+            findings,
+            "root_manifest_digest_missing",
+            format!("{label} inventory has no root content digest"),
+        );
+        return false;
+    };
+    if !valid_sha256(expected_digest) {
+        push_error(
+            findings,
+            "root_manifest_digest_invalid",
+            format!("{label} inventory has a malformed root content digest"),
+        );
+        return false;
+    }
+    if expected_digest != actual_digest {
+        push_error(
+            findings,
+            "root_manifest_content_mismatch",
+            format!("{label} supplied root bytes do not match the inventory root content manifest"),
+        );
+        return false;
+    }
+    match (
+        expected.get("wav_file_count").and_then(Value::as_u64),
+        observed.wav_file_count,
+    ) {
+        (Some(expected_count), Some(actual_count)) if expected_count == actual_count as u64 => {}
+        (Some(expected_count), Some(actual_count)) => {
+            push_error(
+                findings,
+                "root_wav_file_count_mismatch",
+                format!(
+                    "{label} inventory declares {expected_count} WAV files but supplied root contains {actual_count}"
+                ),
+            );
+            return false;
+        }
+        _ => {
+            push_incomplete(
+                findings,
+                "root_wav_file_count_missing",
+                format!("{label} WAV file count is unavailable or malformed"),
+            );
+            return false;
+        }
+    }
+    true
+}
+
+fn verify_selected_sample_file(
+    sample: &Value,
+    source_library: &str,
+    relative_path: &str,
+    vcsl_root: &RootObservation,
+    vsco2_root: &RootObservation,
+    case_label: &str,
+    findings: &mut Vec<Finding>,
+) -> bool {
+    let root = match source_library {
+        "vcsl" => vcsl_root,
+        "vsco2_ce" => vsco2_root,
+        other => {
+            push_error(
+                findings,
+                "source_library_unknown",
+                format!("{case_label} uses unrecognized source library {other:?}"),
+            );
+            return false;
+        }
+    };
+    let Some(root_path) = root.canonical_path.as_ref() else {
+        push_incomplete(
+            findings,
+            "selected_sample_root_unavailable",
+            format!(
+                "{case_label} source root is unavailable: {}",
+                root.error.as_deref().unwrap_or("unknown root access error")
+            ),
+        );
+        return false;
+    };
+
+    let relative = Path::new(relative_path);
+    if relative.as_os_str().is_empty()
+        || relative.is_absolute()
+        || relative_path.contains('\\')
+        || relative
+            .components()
+            .any(|part| !matches!(part, std::path::Component::Normal(_)))
+    {
+        push_error(
+            findings,
+            "selected_sample_path_unsafe",
+            format!("{case_label} selected source path is not a safe normalized relative path"),
+        );
+        return false;
+    }
+    let joined = root_path.join(relative);
+    let resolved = match std::fs::canonicalize(&joined) {
+        Ok(path) => path,
+        Err(error) => {
+            push_error(
+                findings,
+                "selected_sample_file_unavailable",
+                format!("{case_label} selected source file cannot be opened under the supplied root: {error}"),
+            );
+            return false;
+        }
+    };
+    if !resolved.starts_with(root_path) || !resolved.is_file() {
+        push_error(
+            findings,
+            "selected_sample_path_escape",
+            format!("{case_label} selected source resolves outside its supplied root or is not a regular file"),
+        );
+        return false;
+    }
+    let actual_digest = match file_sha256(&resolved) {
+        Ok((digest, _)) => digest,
+        Err(error) => {
+            push_error(
+                findings,
+                "selected_sample_file_hash_failed",
+                format!("{case_label} selected source bytes could not be hashed: {error}"),
+            );
+            return false;
+        }
+    };
+    let Some(expected_digest) = string_field(sample, "source_file_sha256") else {
+        push_incomplete(
+            findings,
+            "selected_sample_digest_missing",
+            format!("{case_label} selected source has no claimed exact-file SHA-256"),
+        );
+        return false;
+    };
+    if !valid_sha256(expected_digest) {
+        push_error(
+            findings,
+            "source_file_digest_invalid",
+            format!("{case_label} selected source file digest is malformed"),
+        );
+        return false;
+    }
+    if expected_digest != actual_digest {
+        push_error(
+            findings,
+            "selected_sample_file_digest_mismatch",
+            format!("{case_label} selected source WAV bytes do not match source_file_sha256"),
+        );
+        return false;
+    }
+    true
+}
+
+fn observe_asset_root(path: &Path) -> RootObservation {
+    let canonical_path = match std::fs::canonicalize(path) {
+        Ok(path) if path.is_dir() => path,
+        Ok(_) => {
+            return RootObservation {
+                canonical_path: None,
+                content_manifest_sha256: None,
+                wav_file_count: None,
+                error: Some("supplied asset root is not a directory".into()),
+            };
+        }
+        Err(error) => {
+            return RootObservation {
+                canonical_path: None,
+                content_manifest_sha256: None,
+                wav_file_count: None,
+                error: Some(error.to_string()),
+            };
+        }
+    };
+
+    let mut entries = Vec::new();
+    if let Err(error) = collect_wav_manifest(&canonical_path, &canonical_path, &mut entries) {
+        return RootObservation {
+            canonical_path: Some(canonical_path),
+            content_manifest_sha256: None,
+            wav_file_count: None,
+            error: Some(error.to_string()),
+        };
+    }
+    match asset_root_content_manifest_sha256(&canonical_path, &entries) {
+        Ok(digest) => RootObservation {
+            canonical_path: Some(canonical_path),
+            content_manifest_sha256: Some(digest),
+            wav_file_count: Some(entries.len()),
+            error: None,
+        },
+        Err(error) => RootObservation {
+            canonical_path: Some(canonical_path),
+            content_manifest_sha256: None,
+            wav_file_count: Some(entries.len()),
+            error: Some(error.to_string()),
+        },
+    }
+}
+
+/// Match the capability-inventory root walker exactly: sorted entries within each
+/// directory, depth-first traversal, skipping .git/.svn and non-regular WAV links.
+fn collect_wav_manifest(
+    root: &Path,
+    current: &Path,
+    output: &mut Vec<(String, u64)>,
+) -> io::Result<()> {
+    let mut entries = std::fs::read_dir(current)?.collect::<Result<Vec<_>, _>>()?;
+    entries.sort_unstable_by_key(|entry| entry.file_name());
+    for entry in entries {
+        let file_type = entry.file_type()?;
+        let name = entry.file_name();
+        if file_type.is_dir() {
+            if name == ".git" || name == ".svn" {
+                continue;
+            }
+            collect_wav_manifest(root, &entry.path(), output)?;
+        } else if file_type.is_file()
+            && entry.path().extension().and_then(|extension| extension.to_str()) == Some("wav")
+        {
+            let path = entry.path();
+            let relative = path.strip_prefix(root).unwrap_or(&path);
+            let relative_path = relative
+                .components()
+                .map(|component| component.as_os_str().to_string_lossy())
+                .collect::<Vec<_>>()
+                .join("/");
+            output.push((relative_path, entry.metadata()?.len()));
+        }
+    }
+    Ok(())
+}
+
+fn asset_root_content_manifest_sha256(
+    root: &Path,
+    entries: &[(String, u64)],
+) -> io::Result<String> {
+    let mut manifest = Sha256::new();
+    manifest.update(b"muse-asset-root-content-manifest-v1\\0");
+    let mut buffer = [0_u8; 64 * 1024];
+    for (relative_path, expected_size) in entries {
+        manifest.update((relative_path.len() as u64).to_le_bytes());
+        manifest.update(relative_path.as_bytes());
+        manifest.update(expected_size.to_le_bytes());
+        let path = root.join(relative_path);
+        let mut file = File::open(&path)?;
+        if file.metadata()?.len() != *expected_size {
+            return Err(io::Error::new(
+                io::ErrorKind::InvalidData,
+                format!("asset size changed before hashing: {relative_path}"),
+            ));
+        }
+        let mut file_hasher = Sha256::new();
+        let mut bytes_read = 0_u64;
+        loop {
+            let count = file.read(&mut buffer)?;
+            if count == 0 {
+                break;
+            }
+            bytes_read = bytes_read
+                .checked_add(count as u64)
+                .ok_or_else(|| io::Error::new(io::ErrorKind::InvalidData, "asset length overflow"))?;
+            file_hasher.update(&buffer[..count]);
+        }
+        if bytes_read != *expected_size {
+            return Err(io::Error::new(
+                io::ErrorKind::InvalidData,
+                format!("asset size changed while hashing: {relative_path}"),
+            ));
+        }
+        manifest.update(&file_hasher.finalize()[..]);
+    }
+    Ok(format!("{:x}", manifest.finalize()))
+}
+
 fn matching_inventory_banks<'a>(
     inventory: &'a Value,
     instrument: Option<&str>,
