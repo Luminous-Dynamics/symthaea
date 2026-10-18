@@ -1,0 +1,73 @@
+name: Ore Value-of-Information Benchmark
+
+on:
+  push:
+    branches: ["feat/ore-voi-bench-v0-1"]
+    paths:
+      - "docs/tech/ORE_VOI_BENCHMARK_V0_1.md"
+      - "docs/tech/ore-voi-benchmark-corpus-v0.1.json"
+      - "tools/ore-voi-bench/**"
+      - ".github/workflows/ore-voi-bench.yml"
+  pull_request:
+    types: [opened, synchronize, reopened, ready_for_review]
+    paths:
+      - "docs/tech/ORE_VOI_BENCHMARK_V0_1.md"
+      - "docs/tech/ore-voi-benchmark-corpus-v0.1.json"
+      - "tools/ore-voi-bench/**"
+      - ".github/workflows/ore-voi-bench.yml"
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+concurrency:
+  group: ore-voi-bench-${{ github.event.pull_request.number || github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  validate-contract:
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          ref: ${{ github.event.pull_request.head.sha || github.sha }}
+          persist-credentials: false
+      - name: Install pinned Rust toolchain
+        uses: dtolnay/rust-toolchain@stable
+        with:
+          toolchain: 1.96.0
+          components: rustfmt
+      - name: Check formatting
+        run: cargo fmt --manifest-path tools/ore-voi-bench/Cargo.toml -- --check
+      - name: Run contract and adversarial tests
+        run: cargo test --manifest-path tools/ore-voi-bench/Cargo.toml
+      - name: Validate corpus at exact source commit
+        shell: bash
+        run: |
+          set -euo pipefail
+          source_commit="$(git rev-parse HEAD)"
+          test "$source_commit" = "${{ github.event.pull_request.head.sha || github.sha }}"
+          cargo run --quiet --manifest-path tools/ore-voi-bench/Cargo.toml -- \
+            docs/tech/ore-voi-benchmark-corpus-v0.1.json \
+            --source-commit "$source_commit" > ore-voi-benchmark-receipt.json
+          jq -e '
+            .result == "validated"
+            and .scenario_count == 8
+            and .expected_controls_matched == 8
+            and .blocked_action_selections == 0
+            and .budget_violations == 0
+            and (.corpus_sha256 | test("^[0-9a-f]{64}$"))
+            and (.source_commit | test("^[0-9a-f]{40}$"))
+            and ([.scenarios[].scenario_id] == [
+              "UNCERTAINTY_IS_NOT_DECISION_VALUE",
+              "OUT_OF_BUDGET_TEST_IS_NOT_SELECTABLE",
+              "TEST_COST_CAN_DOMINATE_INFORMATION",
+              "ESTIMATOR_MISCALIBRATION_MUST_REMAIN_VISIBLE",
+              "UNQUALIFIED_SAMPLE_MUST_BE_BLOCKED",
+              "NO_POSITIVE_NET_DECISION_VALUE",
+              "NO_EVIDENCE_ADMISSIBLE_TEST_WITHIN_BUDGET",
+              "TIES_MUST_BE_DETERMINISTIC"
+            ])
+            and ([.scenarios[].expected_control_matched] | all)
+          ' ore-voi-benchmark-receipt.json
