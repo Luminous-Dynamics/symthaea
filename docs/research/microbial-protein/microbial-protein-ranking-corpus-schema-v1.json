@@ -1,0 +1,50 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://github.com/Luminous-Dynamics/symthaea/blob/main/docs/research/microbial-protein/microbial-protein-ranking-corpus-schema-v1.json",
+  "title": "Synthetic microbial-protein ranking corpus",
+  "type": "object",
+  "required": [
+    "corpus_id",
+    "schema_version",
+    "status",
+    "created_at",
+    "disclaimer",
+    "case_schema_file",
+    "case_count",
+    "cases"
+  ],
+  "additionalProperties": false,
+  "properties": {
+    "corpus_id": {
+      "const": "MICROBIAL-PROTEIN-RANKING-CORPUS-V1"
+    },
+    "schema_version": {
+      "type": "string",
+      "pattern": "^[0-9]+\\.[0-9]+\\.[0-9]+$"
+    },
+    "status": {
+      "const": "synthetic_design_fixture_only"
+    },
+    "created_at": {
+      "type": "string",
+      "format": "date"
+    },
+    "disclaimer": {
+      "type": "string",
+      "minLength": 1
+    },
+    "case_schema_file": {
+      "const": "microbial-protein-ranking-case-schema-v1.json"
+    },
+    "case_count": {
+      "type": "integer",
+      "minimum": 1
+    },
+    "cases": {
+      "type": "array",
+      "items": {
+        "$ref": "microbial-protein-ranking-case-schema-v1.json"
+      }
+    }
+  }
+}
