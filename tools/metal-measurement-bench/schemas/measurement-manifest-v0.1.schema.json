@@ -26,7 +26,9 @@
         "source_url",
         "repository_url",
         "descriptive_readme_url",
-        "citation_policy"
+        "citation_policy",
+        "source_revision",
+        "metadata_accessed_on"
       ],
       "properties": {
         "id": {
@@ -60,6 +62,14 @@
         "citation_policy": {
           "type": "string",
           "minLength": 1
+        },
+        "source_revision": {
+          "type": "string",
+          "minLength": 1
+        },
+        "metadata_accessed_on": {
+          "type": "string",
+          "pattern": "^\\d{4}-\\d{2}-\\d{2}$"
         }
       }
     },
