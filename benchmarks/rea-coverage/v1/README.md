@@ -46,13 +46,16 @@ These are contract targets and the current public fixture results, not measureme
 Requires `jq` and `sha256sum` only; it does not require Node, Binwalk, Unblob, a decompiler, or a repository build.
 
 ```sh
-benchmarks/rea-coverage/v1/verify.sh
-benchmarks/rea-coverage/v1/property-sweep.sh
-benchmarks/rea-coverage/v1/representation-sweep.sh
-benchmarks/rea-coverage/v1/verify-receipt.sh
+sh benchmarks/rea-coverage/v1/verify.sh
+sh benchmarks/rea-coverage/v1/property-sweep.sh
+sh benchmarks/rea-coverage/v1/representation-sweep.sh
+sh benchmarks/rea-coverage/v1/verify-receipt.sh
+sh benchmarks/rea-coverage/v1/mutation-controls.sh
 ```
 
 Recorded fixed-corpus result: 16/16 case dispositions matched the oracle: 5 internally consistent reports accepted, 8 inconsistent reports rejected, 1 empty input marked invalid, and 2 malformed reports rejected. The independent `property-sweep.sh` passed all 510 coverage masks for selected-input lengths 1–8, with source-offset checks. `representation-sweep.sh` exhaustively checked all 33,866 possible subsets of byte intervals for lengths 1–5 in five representations each: original order, reversed order, duplicated intervals, ascending interval length, and descending interval length. All 169,330 representations matched the independent bytewise gap-run oracle. Run `verify-receipt.sh` after the other tests to verify that the receipt's Git blob identities and recorded SHA-256 values match the exact corpus files. The receipt does not hash itself. Exact tested file identities and run limits are recorded in `receipt.json`.
+
+The focused [REA Coverage Contract workflow](../../../.github/workflows/rea-coverage-contract.yml) runs all four verification lanes plus mutation controls on benchmark-file changes, including draft pull requests. The scripts are invoked through `sh`, so they do not depend on executable-bit metadata.
 
 ## Next evidence gate
 
