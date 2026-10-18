@@ -914,6 +914,10 @@ mod tests {
             &value["candidates"][0]["reference_outputs"]["freeze_receipt"],
         ).expect("synthetic freeze receipt should canonicalize");
         value["candidates"][0]["reference_outputs"]["freeze_receipt_sha256"] = json!(digest);
+        let envelope_digest = frozen_evidence_envelope_digest(value, &value["candidates"][0])
+            .expect("synthetic frozen evidence envelope should canonicalize");
+        value["candidates"][0]["reference_outputs"]["frozen_evidence_envelope_sha256"] =
+            json!(envelope_digest);
     }
 
     fn frozen_receipt_registry() -> Value {
