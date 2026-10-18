@@ -2,6 +2,7 @@ use clap::{Parser, Subcommand};
 use std::path::PathBuf;
 
 mod crate_status;
+mod cropfoundry_validate;
 mod duplicate_scan;
 mod manifest;
 mod rhn_sweep;
@@ -35,6 +36,12 @@ enum Commands {
         strict: bool,
         #[arg(long, default_value = "docs/crate-status.toml")]
         registry: PathBuf,
+    },
+    /// Validate the CropFoundry research benchmark and data-source contracts without running crop models.
+    CropfoundryValidate {
+        /// Workspace root to validate.
+        #[arg(long, default_value = ".")]
+        root: PathBuf,
     },
     RhnSweep {
         #[arg(long, default_value = "1024")]
@@ -71,6 +78,18 @@ enum Commands {
 fn main() -> anyhow::Result<()> {
     let cli = Cli::parse();
     match cli.command {
+        Commands::CropfoundryValidate { root } => {
+            let workspace_root = PathBuf::from(env!("CARGO_MANIFEST_DIR"))
+                .parent()
+                .expect("xtask lives one level below the workspace root")
+                .to_path_buf();
+            let root = if root.is_absolute() {
+                root
+            } else {
+                workspace_root.join(root)
+            };
+            cropfoundry_validate::run(&root)?;
+        }
         Commands::RhnSweep {
             dims,
             objects,
