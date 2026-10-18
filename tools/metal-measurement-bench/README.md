@@ -21,12 +21,12 @@ After artifact-specific local-use terms have been reviewed and exact file identi
 
 For a normalized observation set:
 
-    cargo run --manifest-path tools/metal-measurement-bench/Cargo.toml -- validate-records MANIFEST.json OBSERVATIONS.json
+    cargo run --manifest-path tools/metal-measurement-bench/Cargo.toml -- validate-records MANIFEST.json OBSERVATIONS.json ARTIFACT_DIR
 
 The machine-readable observation contract is at
 `tools/metal-measurement-bench/schemas/observation-set-v0.1.schema.json`.
 
-Record rows preserve the source-field identity, raw numeric values and units, and censoring bounds without replacing censored values with made-up point estimates. A normalized value requires a normalized unit and explicit conversion note. Repeated source fields must maintain one variable identity and raw unit; each normalized variable uses a consistent normalized unit. Uncertainty, censoring, missingness, specimen lineage, source DOI, and calibration/held-out outcome role stay explicit. The validator rejects undeclared source DOIs, duplicate record IDs, unjustified normalization, unexplained unknown censoring, and calibration target outcomes from the held-out target lineage.
+Record rows must bind the manifest's source-object ID and upstream row ID as well as the DOI and source-field identity. The exact source object must be declared, term-reviewed, locally authorized, and linked to a declared artifact whose byte count and SHA-256 are verified before record validation. Row IDs are preserved by the contract; the raw CSV parser that proves each row exists in the bytes is a later tranche. Raw numeric values and units, and censoring bounds, are preserved without replacing censored values with made-up point estimates. A normalized value requires a normalized unit and explicit conversion note. Repeated source fields must maintain one variable identity and raw unit; each normalized variable uses a consistent normalized unit. Uncertainty, censoring, missingness, specimen lineage, source DOI, and calibration/held-out outcome role stay explicit. The validator rejects undeclared source DOIs, duplicate record IDs, unjustified normalization, unexplained unknown censoring, and calibration target outcomes from the held-out target lineage.
 
 ## What a successful receipt means
 
