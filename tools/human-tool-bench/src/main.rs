@@ -130,7 +130,9 @@ fn audit(root: &Value, input_sha256: &str) -> Result<Value, String> {
         }
         let currency = string_field(episode, "currency", &where_)?;
         if currency != root_currency {
-            return Err(format!("{where_}.currency differs from root currency; convert only under an explicit frozen conversion policy"));
+            return Err(format!(
+                "{where_}.currency differs from root currency; convert only under an explicit frozen conversion policy"
+            ));
         }
         if currency.len() != 3 || !currency.bytes().all(|byte| byte.is_ascii_uppercase()) {
             return Err(format!("{where_}.currency must be a three-letter uppercase currency code"));
@@ -152,11 +154,15 @@ fn audit(root: &Value, input_sha256: &str) -> Result<Value, String> {
                 return Err(format!("{where_}.observation_refs[{ref_index}] cannot be empty"));
             }
             if !observation_ids.insert(reference.to_owned()) {
-                return Err(format!("{where_}.observation_refs contains duplicate reference {reference:?}"));
+                return Err(format!(
+                    "{where_}.observation_refs contains duplicate reference {reference:?}"
+                ));
             }
         }
         if started && observation_refs.is_empty() {
-            return Err(format!("{where_}: every started attempt must reference at least one observation or explicit missing-data record"));
+            return Err(format!(
+                "{where_}: every started attempt must reference at least one observation or explicit missing-data record"
+            ));
         }
         if !started && !observation_refs.is_empty() {
             return Err(format!("{where_}: not-started records cannot claim observed evidence"));
@@ -215,15 +221,21 @@ fn audit(root: &Value, input_sha256: &str) -> Result<Value, String> {
         for (ref_index, advisory_ref) in advisory_evidence_refs.iter().enumerate() {
             let reference = advisory_ref
                 .as_str()
-                .ok_or_else(|| format!("{where_}.advisory_evidence_refs[{ref_index}] must be a string"))?;
+                .ok_or_else(|| {
+                    format!("{where_}.advisory_evidence_refs[{ref_index}] must be a string")
+                })?;
             if reference.trim().is_empty() {
                 return Err(format!("{where_}.advisory_evidence_refs[{ref_index}] cannot be empty"));
             }
             if !advisory_ids.insert(reference.to_owned()) {
-                return Err(format!("{where_}.advisory_evidence_refs contains duplicate reference {reference:?}"));
+                return Err(format!(
+                    "{where_}.advisory_evidence_refs contains duplicate reference {reference:?}"
+                ));
             }
             if !observation_ids.contains(reference) {
-                return Err(format!("{where_}: advisory reference {reference:?} is not present in the episode's observation_refs"));
+                return Err(format!(
+                    "{where_}: advisory reference {reference:?} is not present in the episode's observation_refs"
+                ));
             }
         }
         if arm == "A2" {
@@ -236,17 +248,28 @@ fn audit(root: &Value, input_sha256: &str) -> Result<Value, String> {
                 return Err(format!("{where_}.advisory_reason cannot be empty"));
             }
             if advisory_evidence_refs.is_empty() {
-                return Err(format!("{where_}: every A2 advisory must cite an observation or explicit missing/contradiction record"));
+                return Err(format!(
+                    "{where_}: every A2 advisory must cite an observation or explicit missing/contradiction record"
+                ));
             }
         } else {
             let profile = episode
                 .get("advisory_profile_id")
-                .ok_or_else(|| format!("{where_}.advisory_profile_id is required; use null outside A2"))?;
+                .ok_or_else(|| {
+                    format!("{where_}.advisory_profile_id is required; use null outside A2")
+                })?;
             let advisory_reason = episode
                 .get("advisory_reason")
-                .ok_or_else(|| format!("{where_}.advisory_reason is required; use null outside A2"))?;
-            if !profile.is_null() || !advisory_evidence_refs.is_empty() || !advisory_reason.is_null() {
-                return Err(format!("{where_}: A0/A1 cannot carry a Symthaea profile, reason, or advisory evidence"));
+                .ok_or_else(|| {
+                    format!("{where_}.advisory_reason is required; use null outside A2")
+                })?;
+            if !profile.is_null()
+                || !advisory_evidence_refs.is_empty()
+                || !advisory_reason.is_null()
+            {
+                return Err(format!(
+                    "{where_}: A0/A1 cannot carry a Symthaea profile, reason, or advisory evidence"
+                ));
             }
         }
 
@@ -319,11 +342,15 @@ fn audit(root: &Value, input_sha256: &str) -> Result<Value, String> {
             Some(
                 exposure
                     .as_f64()
-                    .ok_or_else(|| format!("{where_}.follow_up_exposure_hours must be numeric or null"))?,
+                    .ok_or_else(|| {
+                        format!("{where_}.follow_up_exposure_hours must be numeric or null")
+                    })?,
             )
         };
         if exposure_hours.is_some_and(|hours| !hours.is_finite() || hours < 0.0) {
-            return Err(format!("{where_}.follow_up_exposure_hours must be finite and non-negative"));
+            return Err(format!(
+                "{where_}.follow_up_exposure_hours must be finite and non-negative"
+            ));
         }
         if ["recurrence", "no_recurrence"].contains(&follow_up) {
             if outcome != "verified_restoration" {
@@ -364,9 +391,14 @@ fn audit(root: &Value, input_sha256: &str) -> Result<Value, String> {
             .iter()
             .filter(|episode| {
                 episode.get("started").and_then(Value::as_bool) == Some(true)
-                    && episode.get("outcome").and_then(Value::as_str) == Some("verified_restoration")
+                    && episode.get("outcome").and_then(Value::as_str)
+                        == Some("verified_restoration")
             })
-            .filter_map(|episode| episode.get("elapsed_minutes_to_terminal").and_then(Value::as_i64))
+            .filter_map(|episode| {
+                episode
+                    .get("elapsed_minutes_to_terminal")
+                    .and_then(Value::as_i64)
+            })
             .collect();
         restoration_minutes.sort_unstable();
         let n = restoration_minutes.len();
@@ -401,11 +433,15 @@ fn audit(root: &Value, input_sha256: &str) -> Result<Value, String> {
             .count();
         let advisory_hypotheses = selected
             .iter()
-            .filter(|episode| episode.get("advisory_claim").and_then(Value::as_str) == Some("hypothesis"))
+            .filter(|episode| {
+                episode.get("advisory_claim").and_then(Value::as_str) == Some("hypothesis")
+            })
             .count();
         let advisory_abstentions = selected
             .iter()
-            .filter(|episode| episode.get("advisory_claim").and_then(Value::as_str) == Some("abstain"))
+            .filter(|episode| {
+                episode.get("advisory_claim").and_then(Value::as_str) == Some("abstain")
+            })
             .count();
         let advisory_evidence_bound_count = selected
             .iter()
@@ -432,7 +468,10 @@ fn audit(root: &Value, input_sha256: &str) -> Result<Value, String> {
                     "n": n,
                     "median": median,
                     "p90_nearest_rank": p90,
-                    "interpretation": "conditional on verified restorations; not a replacement for all-attempt outcome accounting"
+                    "interpretation": concat!(
+                        "conditional on verified restorations; not a replacement for ",
+                        "all-attempt outcome accounting"
+                    )
                 }
             }),
         );
@@ -448,7 +487,10 @@ fn audit(root: &Value, input_sha256: &str) -> Result<Value, String> {
         "episode_records": episodes.len(),
         "unique_episode_ids": episode_ids.len(),
         "arms": arm_reports,
-        "claim_ceiling": "This audit validates the synthetic data contract and arithmetic only. It does not estimate real repair performance, product safety, or human-study effects."
+        "claim_ceiling": concat!(
+            "This audit validates the synthetic data contract and arithmetic only. It does not ",
+            "estimate real repair performance, product safety, or human-study effects."
+        )
     }))
 }
 
@@ -553,14 +595,18 @@ mod tests {
     fn advisory_must_cite_an_observation_available_in_the_episode() {
         let mut data = fixture();
         data["episodes"][6]["advisory_evidence_refs"] = json!(["OBS-NOT-IN-EPISODE"]);
-        assert!(run(&data).unwrap_err().contains("is not present in the episode's observation_refs"));
+        assert!(run(&data)
+            .unwrap_err()
+            .contains("is not present in the episode's observation_refs"));
     }
 
     #[test]
     fn every_started_attempt_requires_observation_evidence() {
         let mut data = fixture();
         data["episodes"][0]["observation_refs"] = json!([]);
-        assert!(run(&data).unwrap_err().contains("every started attempt must reference at least one observation"));
+        assert!(run(&data)
+            .unwrap_err()
+            .contains("every started attempt must reference at least one observation"));
     }
 
     #[test]
@@ -587,7 +633,9 @@ mod tests {
     #[test]
     fn frozen_contract_digest_mismatch_fails_closed() {
         let mut data = fixture();
-        data["contract_sha256"] = json!("ffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffff");
+        data["contract_sha256"] = json!(
+            "ffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffff"
+        );
         assert!(run(&data).unwrap_err().contains("does not match the frozen v0.1 contract"));
     }
 
