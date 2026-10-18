@@ -1,0 +1,375 @@
+{
+  "schema_version": "symthaea.chemical-process-attestation-conformance.v1",
+  "corpus_version": 1,
+  "status": "DESIGN_ONLY_NOT_EXECUTABLE",
+  "related_issue": "https://github.com/Luminous-Dynamics/symthaea/issues/7978",
+  "related_design": "docs/engineering/CHEMICAL_PROCESS_EVIDENCE_ATTESTATION_DESIGN_V1.md",
+  "intent": "Stable adversarial challenge IDs and expected classification for a future verifier test harness. This file is a test plan, not evidence that tests exist, run, or pass.",
+  "accepted_outcomes": [
+    "AUTHENTIC_ENDORSEMENT",
+    "REJECT",
+    "CRYPTOGRAPHICALLY_VALID_CURRENT_AUTHORIZATION_DENIED",
+    "VALID_SIGNATURE_TIMESTAMP_NOT_TRUSTED",
+    "REJECT_ONLINE_ACTION_REPLAY"
+  ],
+  "stage_statuses": [
+    "PASS",
+    "FAIL",
+    "NOT_EVALUATED",
+    "UNRESOLVED",
+    "NOT_APPLICABLE"
+  ],
+  "invariants": [
+    "A valid attestation cannot change or improve the scientific status recorded in its subject envelope.",
+    "Envelope integrity, subject binding, signature validity, signer authorization, trust freshness, scientific validity, and decision qualification are separate stages.",
+    "Unknown, skipped, malformed, or unrun challenge cases do not count as passes.",
+    "Expected outcomes are checked against the exported verifier entrypoint, not only private helper functions."
+  ],
+  "hard_gate_targets": {
+    "false_accepts_in_seeded_invalid_attestations": 0,
+    "detection_rate_each_required_negative_control_family": 1,
+    "unexpected_not_run_or_invalid_status_promotions": 0,
+    "missing_or_unaccounted_for_corpus_cases": 0
+  },
+  "cases": [
+    {
+      "id": "CPAE-001",
+      "class": "positive_control",
+      "setup": "Valid statement, eligible signer, matching dedicated evidence purpose, fresh approved trust snapshot, matching envelope digest.",
+      "mutation": "none",
+      "expected_outcome": "AUTHENTIC_ENDORSEMENT",
+      "expected_stages": {
+        "envelope_integrity": "PASS",
+        "subject_binding": "PASS",
+        "signature": "PASS",
+        "signer_lifecycle": "PASS",
+        "trust_freshness": "PASS"
+      },
+      "hard_gate": true,
+      "scientific_status": "UNCHANGED_FROM_SUBJECT",
+      "rationale": "Proves the fixture and verifier can reach an expected positive result."
+    },
+    {
+      "id": "CPAE-002",
+      "class": "envelope_integrity",
+      "setup": "Valid signed statement references the original candidate.",
+      "mutation": "Change a candidate field without refreshing the envelope digest.",
+      "expected_outcome": "REJECT",
+      "expected_stages": {
+        "envelope_integrity": "FAIL",
+        "signature": "NOT_EVALUATED"
+      },
+      "hard_gate": true,
+      "scientific_status": "UNCHANGED_FROM_SUBJECT",
+      "rationale": "Stale envelope digest must fail before signature-based authority is granted."
+    },
+    {
+      "id": "CPAE-003",
+      "class": "digest_rewrite",
+      "setup": "Valid signature over envelope A.",
+      "mutation": "Edit candidate and recompute the envelope digest as envelope B, but retain A's signature.",
+      "expected_outcome": "REJECT",
+      "expected_stages": {
+        "envelope_integrity": "PASS",
+        "subject_binding": "FAIL",
+        "signature": "FAIL"
+      },
+      "hard_gate": true,
+      "scientific_status": "UNCHANGED_FROM_SUBJECT",
+      "rationale": "Demonstrates why digest integrity is not signer authentication."
+    },
+    {
+      "id": "CPAE-004",
+      "class": "subject_transplant",
+      "setup": "Valid attestation for candidate A.",
+      "mutation": "Present the statement with candidate B while preserving A's digest or ID.",
+      "expected_outcome": "REJECT",
+      "expected_stages": {
+        "subject_binding": "FAIL"
+      },
+      "hard_gate": true,
+      "scientific_status": "UNCHANGED_FROM_SUBJECT",
+      "rationale": "An endorsement cannot be transplanted across candidate identity."
+    },
+    {
+      "id": "CPAE-005",
+      "class": "schema_binding",
+      "setup": "Valid attestation for a supported registry schema/version.",
+      "mutation": "Change the bound registry schema ID or version.",
+      "expected_outcome": "REJECT",
+      "expected_stages": {
+        "subject_binding": "FAIL"
+      },
+      "hard_gate": true,
+      "scientific_status": "UNCHANGED_FROM_SUBJECT",
+      "rationale": "Schema identity is part of the signed subject."
+    },
+    {
+      "id": "CPAE-006",
+      "class": "purpose_confusion",
+      "setup": "Signer has authority for a different purpose only.",
+      "mutation": "Ask the verifier to accept the statement as chemical-process evidence.",
+      "expected_outcome": "REJECT",
+      "expected_stages": {
+        "signer_lifecycle": "FAIL",
+        "policy": "FAIL"
+      },
+      "hard_gate": true,
+      "scientific_status": "UNCHANGED_FROM_SUBJECT",
+      "rationale": "Purpose-specific authority must not be borrowed from fabrication or unrelated use."
+    },
+    {
+      "id": "CPAE-007",
+      "class": "signature_corruption",
+      "setup": "Valid statement and signature.",
+      "mutation": "Flip one bit in signature bytes.",
+      "expected_outcome": "REJECT",
+      "expected_stages": {
+        "signature": "FAIL"
+      },
+      "hard_gate": true,
+      "scientific_status": "UNCHANGED_FROM_SUBJECT",
+      "rationale": "Byte-level signature corruption must be detected."
+    },
+    {
+      "id": "CPAE-008",
+      "class": "signature_substitution",
+      "setup": "Valid attestation created for the declared algorithm.",
+      "mutation": "Replace algorithm metadata without producing a matching signature under the bound algorithm tag.",
+      "expected_outcome": "REJECT",
+      "expected_stages": {
+        "signature": "FAIL"
+      },
+      "hard_gate": true,
+      "scientific_status": "UNCHANGED_FROM_SUBJECT",
+      "rationale": "Algorithm identity is bound to the signed payload and accepted policy."
+    },
+    {
+      "id": "CPAE-009",
+      "class": "duplicate_signer",
+      "setup": "Attestation contains a signer identity once.",
+      "mutation": "Duplicate the same algorithm/key identity to inflate apparent quorum.",
+      "expected_outcome": "REJECT",
+      "expected_stages": {
+        "policy": "FAIL"
+      },
+      "hard_gate": true,
+      "scientific_status": "UNCHANGED_FROM_SUBJECT",
+      "rationale": "Duplicate signatures cannot satisfy independent-signer or quorum requirements."
+    },
+    {
+      "id": "CPAE-010",
+      "class": "unknown_signer",
+      "setup": "Signature is structurally valid.",
+      "mutation": "Use a key ID absent from the approved trust snapshot.",
+      "expected_outcome": "REJECT",
+      "expected_stages": {
+        "signer_lifecycle": "FAIL"
+      },
+      "hard_gate": true,
+      "scientific_status": "UNCHANGED_FROM_SUBJECT",
+      "rationale": "A signature by an unknown key is not authorized evidence."
+    },
+    {
+      "id": "CPAE-011",
+      "class": "signer_not_yet_valid",
+      "setup": "Key appears in otherwise valid trust snapshot.",
+      "mutation": "Evaluate before the key's not-before time.",
+      "expected_outcome": "REJECT",
+      "expected_stages": {
+        "signer_lifecycle": "FAIL"
+      },
+      "hard_gate": true,
+      "scientific_status": "UNCHANGED_FROM_SUBJECT",
+      "rationale": "Key validity is evaluated at the explicit verifier time."
+    },
+    {
+      "id": "CPAE-012",
+      "class": "signer_expired",
+      "setup": "Key appears in otherwise valid trust snapshot.",
+      "mutation": "Evaluate at or after the exclusive not-after time.",
+      "expected_outcome": "REJECT",
+      "expected_stages": {
+        "signer_lifecycle": "FAIL"
+      },
+      "hard_gate": true,
+      "scientific_status": "UNCHANGED_FROM_SUBJECT",
+      "rationale": "Expired keys cannot authorize under current lifecycle policy."
+    },
+    {
+      "id": "CPAE-013",
+      "class": "signer_retired",
+      "setup": "Signature is mathematically valid.",
+      "mutation": "Set current trust status to retired.",
+      "expected_outcome": "REJECT",
+      "expected_stages": {
+        "signature": "PASS",
+        "signer_lifecycle": "FAIL"
+      },
+      "hard_gate": true,
+      "scientific_status": "UNCHANGED_FROM_SUBJECT",
+      "rationale": "Cryptographic validity and present authority are reported separately."
+    },
+    {
+      "id": "CPAE-014",
+      "class": "signer_revoked",
+      "setup": "Signature is mathematically valid.",
+      "mutation": "Set current trust status to revoked.",
+      "expected_outcome": "REJECT",
+      "expected_stages": {
+        "signature": "PASS",
+        "signer_lifecycle": "FAIL"
+      },
+      "hard_gate": true,
+      "scientific_status": "UNCHANGED_FROM_SUBJECT",
+      "rationale": "A revoked signer must not pass current authorization."
+    },
+    {
+      "id": "CPAE-015",
+      "class": "missing_usage",
+      "setup": "Known active signer within validity window.",
+      "mutation": "Remove the dedicated chemical-process evidence usage.",
+      "expected_outcome": "REJECT",
+      "expected_stages": {
+        "signer_lifecycle": "FAIL"
+      },
+      "hard_gate": true,
+      "scientific_status": "UNCHANGED_FROM_SUBJECT",
+      "rationale": "Key authority is purpose-scoped."
+    },
+    {
+      "id": "CPAE-016",
+      "class": "stale_trust_snapshot",
+      "setup": "Valid signature and lifecycle snapshot.",
+      "mutation": "Evaluate using a snapshot outside its validity window.",
+      "expected_outcome": "REJECT",
+      "expected_stages": {
+        "trust_freshness": "FAIL"
+      },
+      "hard_gate": true,
+      "scientific_status": "UNCHANGED_FROM_SUBJECT",
+      "rationale": "A valid signature cannot make stale policy state trustworthy."
+    },
+    {
+      "id": "CPAE-017",
+      "class": "trust_sequence_rollback",
+      "setup": "Verifier has durably accepted a higher trust-snapshot sequence.",
+      "mutation": "Supply a lower sequence snapshot.",
+      "expected_outcome": "REJECT",
+      "expected_stages": {
+        "trust_freshness": "FAIL"
+      },
+      "hard_gate": true,
+      "scientific_status": "UNCHANGED_FROM_SUBJECT",
+      "rationale": "Detects replay of older trust policy relative to a known checkpoint."
+    },
+    {
+      "id": "CPAE-018",
+      "class": "trust_sequence_collision",
+      "setup": "Verifier has accepted snapshot sequence N with digest D1.",
+      "mutation": "Supply a different valid-looking snapshot at sequence N with digest D2.",
+      "expected_outcome": "REJECT",
+      "expected_stages": {
+        "trust_freshness": "FAIL"
+      },
+      "hard_gate": true,
+      "scientific_status": "UNCHANGED_FROM_SUBJECT",
+      "rationale": "Sequence equality with changed contents is equivocation, not freshness."
+    },
+    {
+      "id": "CPAE-019",
+      "class": "malformed_or_oversized_input",
+      "setup": "Verifier receives an attestation document.",
+      "mutation": "Supply malformed digest bytes, empty/noncanonical key ID, unsupported schema/algorithm, or over-limit fields; split into independently identified subcases during implementation.",
+      "expected_outcome": "REJECT",
+      "expected_stages": {
+        "statement_schema": "FAIL"
+      },
+      "hard_gate": true,
+      "scientific_status": "UNCHANGED_FROM_SUBJECT",
+      "rationale": "The final executable corpus must materialize each listed mutation as an independently counted case."
+    },
+    {
+      "id": "CPAE-020",
+      "class": "untrusted_issuer_timestamp",
+      "setup": "Signature binds an issuer-declared issue time.",
+      "mutation": "Issuer claims a timestamp without a trusted timestamp service or independent timestamp evidence.",
+      "expected_outcome": "VALID_SIGNATURE_TIMESTAMP_NOT_TRUSTED",
+      "expected_stages": {
+        "signature": "PASS",
+        "trusted_timestamp": "NOT_EVALUATED"
+      },
+      "hard_gate": true,
+      "scientific_status": "UNCHANGED_FROM_SUBJECT",
+      "rationale": "A signed timestamp is still a signer assertion, not proof of external time."
+    },
+    {
+      "id": "CPAE-021",
+      "class": "revocation_after_signature",
+      "setup": "Signature is valid; trusted chronology suggests a signature predates a later revocation.",
+      "mutation": "Evaluate using the newer trust snapshot after revocation.",
+      "expected_outcome": "CRYPTOGRAPHICALLY_VALID_CURRENT_AUTHORIZATION_DENIED",
+      "expected_stages": {
+        "signature": "PASS",
+        "signer_lifecycle": "FAIL"
+      },
+      "hard_gate": true,
+      "scientific_status": "UNCHANGED_FROM_SUBJECT",
+      "rationale": "Historical authenticity and present authorization must not be collapsed. If compromise timing is unclear, a separate unresolved result is required."
+    },
+    {
+      "id": "CPAE-022",
+      "class": "not_run_promotion",
+      "setup": "Envelope accurately declares candidate status NOT_RUN.",
+      "mutation": "Attach a valid authorized signature endorsing the envelope.",
+      "expected_outcome": "AUTHENTIC_ENDORSEMENT",
+      "expected_stages": {
+        "signature": "PASS",
+        "signer_lifecycle": "PASS",
+        "scientific_status": "PASS"
+      },
+      "hard_gate": true,
+      "scientific_status": "NOT_RUN",
+      "rationale": "A valid signature may endorse the bytes but cannot promote an unexecuted simulator case."
+    },
+    {
+      "id": "CPAE-023",
+      "class": "online_nonce_replay",
+      "setup": "Online action authorization is explicitly implemented separately from durable attestation.",
+      "mutation": "Repeat a previously consumed challenge/nonce for the same audience/action.",
+      "expected_outcome": "REJECT_ONLINE_ACTION_REPLAY",
+      "expected_stages": {
+        "online_nonce": "FAIL"
+      },
+      "hard_gate": true,
+      "scientific_status": "UNCHANGED_FROM_SUBJECT",
+      "rationale": "Only an online, one-time authorization flow needs consumed nonce tracking; durable evidence signatures remain repeat-verifiable."
+    },
+    {
+      "id": "CPAE-024",
+      "class": "policy_digest_mismatch",
+      "setup": "Attestation binds the intended policy digest.",
+      "mutation": "Present an altered or unexpected policy digest, or verify under a policy other than the locally expected policy.",
+      "expected_outcome": "REJECT",
+      "expected_stages": {
+        "policy": "FAIL"
+      },
+      "hard_gate": true,
+      "scientific_status": "UNCHANGED_FROM_SUBJECT",
+      "rationale": "A subject cannot select the policy that grants it authority."
+    },
+    {
+      "id": "CPAE-025",
+      "class": "stateless_rollback_limit",
+      "setup": "Verifier has no durable trust checkpoint and receives a fresh valid snapshot.",
+      "mutation": "Ask the verifier to assert it has proved non-rollback despite having no remembered checkpoint or external checkpoint.",
+      "expected_outcome": "AUTHENTIC_ENDORSEMENT",
+      "expected_stages": {
+        "trust_freshness": "UNRESOLVED"
+      },
+      "hard_gate": true,
+      "scientific_status": "UNCHANGED_FROM_SUBJECT",
+      "rationale": "Do not claim monotonicity without a checkpoint; final policy determines whether this limitation allows endorsement."
+    }
+  ]
+}
