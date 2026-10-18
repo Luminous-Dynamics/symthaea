@@ -236,6 +236,13 @@ pub fn validate_food_identity_match_v1(assessment: &Value) -> Result<(), Vec<Str
         })
         .map(|(attribute, _)| attribute.clone())
         .collect();
+    let hard_block_unknowns: BTreeSet<String> = relation_by_attribute
+        .iter()
+        .filter(|(attribute, relation)| {
+            HARD_BLOCK_ATTRIBUTES.contains(&attribute.as_str()) && relation.as_str() == "unknown"
+        })
+        .map(|(attribute, _)| attribute.clone())
+        .collect();
     let all_differences_or_unknowns: BTreeSet<String> = relation_by_attribute
         .iter()
         .filter(|(_, relation)| matches!(relation.as_str(), "different" | "unknown"))
@@ -281,6 +288,21 @@ pub fn validate_food_identity_match_v1(assessment: &Value) -> Result<(), Vec<Str
         }
         if !hard_unknowns.is_empty() {
             errors.push(format!("qualified_approximation cannot leave required identity attributes unknown/different: {hard_unknowns:?}"));
+        }
+        if !hard_block_unknowns.is_empty() {
+            errors.push(format!("qualified_approximation cannot leave hard-block identity attributes unknown: {hard_block_unknowns:?}"));
+        }
+        let query_identity = query.get("identity");
+        let candidate_identity = candidate.get("identity");
+        let branded_without_identity = [
+            query_identity,
+            candidate_identity,
+        ].iter().any(|identity| {
+            identity.and_then(|value| value.get("product_kind")).and_then(Value::as_str) == Some("branded_product")
+                && identity.and_then(|value| value.get("brand_id")).and_then(Value::as_str).is_none()
+        });
+        if branded_without_identity {
+            errors.push("exact/approximate identity of a branded product requires a known brand_id".to_owned());
         }
         if scope == Some("nutrition_estimation") && !hard_differences.is_empty() {
             errors.push(format!("nutrition_estimation cannot silently use hard-block identity differences as a nutrient proxy: {hard_differences:?}"));
