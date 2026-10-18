@@ -64,6 +64,8 @@ For each action, the evaluator starts all state probabilities at their lower bou
 
 This first version bounds **probability mass only**. Payoffs are fixed inputs. It does not yet account for uncertain engineering outputs, model-discrepancy envelopes, unknown/out-of-domain states, or correlations between separate survey actions. Those values must be bounded/qualified upstream; do not conflate this probability-ambiguity layer with Symtropy's model-discrepancy work.
 
+The current test module also sweeps 48 deterministic three-state payoff tables and compares exact worst/best payoff numerators and minimax-regret numerators against a separate coarse probability-grid oracle. This broadens the sanity check beyond one hand-picked fixture but is still a bounded synthetic verification set, not proof for arbitrary instances.
+
 The design complements [Symtropy #1769](https://github.com/Luminous-Dynamics/symtropy/issues/1769) on robust design under uncertainty and decision-focused surveys, [Symtropy #1812](https://github.com/Luminous-Dynamics/symtropy/issues/1812) on evidence-derived model-discrepancy envelopes, and is tracked in [ICCB-004](https://github.com/Luminous-Dynamics/symthaea/issues/8024). Proposed gates include separately implemented brute-force probability-grid oracles for both payoff extrema and minimax regret on small cases, exact input-permutation invariance, fail-closed infeasible intervals, conservative rounding for negative expectations, bound-valid extremizing allocations, and no robust-winner claim when action envelopes overlap.
 
 ## Value of information: deciding which uncertainty to reduce
