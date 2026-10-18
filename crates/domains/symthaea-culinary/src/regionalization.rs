@@ -250,11 +250,13 @@ pub fn validate_regional_pack_v1(pack: &Value) -> Result<(), Vec<String>> {
     }
 
     let fallback = pack.get("fallback_policy").unwrap_or(&null);
-    if non_empty_string(fallback, "missing_values").is_none() {
-        errors.push("fallback_policy.missing_values must be explicit".to_owned());
+    if non_empty_string(fallback, "missing_values") != Some("unknown_not_zero") {
+        errors.push("fallback_policy.missing_values must preserve missing as unknown_not_zero".to_owned());
     }
-    if non_empty_string(fallback, "cross_region_substitution").is_none() {
-        errors.push("fallback_policy.cross_region_substitution must be explicit".to_owned());
+    if non_empty_string(fallback, "cross_region_substitution")
+        != Some("explicitly_label_source_region_and_uncertainty")
+    {
+        errors.push("cross-region substitutions must be explicitly labelled with source region and uncertainty".to_owned());
     }
     if fallback.get("infer_food_culture_from_country_code").and_then(Value::as_bool) != Some(false) {
         errors.push("country code must not be used to infer food culture".to_owned());
@@ -375,4 +377,30 @@ mod tests {
         let errors = validate_regional_pack_v1(&pack).unwrap_err();
         assert!(errors.iter().any(|error| error.contains("undeclared source_id")));
     }
+    #[test]
+    fn qualified_pack_cannot_hide_unconfigured_verticals() {
+        let mut pack = valid_pack();
+        pack["profile_status"] = json!("qualified");
+        let errors = validate_regional_pack_v1(&pack).unwrap_err();
+        assert!(errors.iter().any(|error| error.contains("qualified regional pack")));
+    }
+
+    #[test]
+    fn default_locale_must_be_in_the_declared_language_tags() {
+        let mut pack = valid_pack();
+        pack["region"]["language_tags"] = json!(["zu-ZA"]);
+        let errors = validate_regional_pack_v1(&pack).unwrap_err();
+        assert!(errors.iter().any(|error| error.contains("locale_tag must also appear")));
+    }
+
+    #[test]
+    fn fallbacks_cannot_silently_guess_missing_values_or_foreign_sources() {
+        let mut pack = valid_pack();
+        pack["fallback_policy"]["missing_values"] = json!("use_zero");
+        pack["fallback_policy"]["cross_region_substitution"] = json!("automatic");
+        let errors = validate_regional_pack_v1(&pack).unwrap_err();
+        assert!(errors.iter().any(|error| error.contains("unknown_not_zero")));
+        assert!(errors.iter().any(|error| error.contains("source region and uncertainty")));
+    }
+
 }
