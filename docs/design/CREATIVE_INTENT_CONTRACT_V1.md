@@ -70,6 +70,19 @@ For a playable prototype, require:
 
 The 90% intent-recognition target is an engineering aspiration, not a literature standard. Calibrate the task and reviewer protocol before confirmatory trials.
 
+## Additive temporal-support measurements
+
+The separate module `src/creative_temporal_support.rs` addresses a known blind spot without changing `CreativeIntentContractV1` acceptance semantics or the existing QD archive:
+
+- **Onset-window coverage**: how many windows contain attacks.
+- **Sustain-window coverage**: how many windows overlap at least one sounding note.
+- **Occupied-time ratio**: the union of sounding note intervals divided by clip duration, so overlapping notes are not double-counted.
+- **Maximum silent gap**: the longest silent interval, including leading and trailing silence.
+
+This separates a single sustained drone from a sequence of staccato attacks that happens to touch every window. Notes are fully validated; note tails crossing the declared clip end are clipped only for these measurements. Empty scores are representable and report zero occupancy with the full clip duration as silence. Excessive window counts fail before allocation.
+
+The measurements are descriptive and are **not** currently used to accept/reject V1 candidates, rank outputs, or modify production selection. They should become QD dimensions only after calibration against human judgments. The tests cover long sustain, short attacks, interval union, clip-edge clipping, malformed notes, empty scores, window limits, note-order invariance, and duplicate-note invariance.
+
 ## Research basis
 
 - Khalifa et al., The Procedural Content Generation Benchmark: An Open-source Testbed for Generative Challenges in Games (FDG 2025). It explicitly separates quality, diversity and controllability over 12 game-content problems: https://arxiv.org/abs/2503.21474
