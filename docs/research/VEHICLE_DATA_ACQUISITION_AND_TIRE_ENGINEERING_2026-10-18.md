@@ -192,6 +192,11 @@ We will not redistribute the raw files or create a derivative benchmark from the
 Thank you,  
 Luminous Dynamics research team
 
+
+### NLR DriveCAT — public drive-cycle candidates for other vehicle classes
+
+The National Laboratory of the Rockies (formerly NREL) documents DriveCAT as a tool providing downloadable high-resolution certification and real-world commercial vehicle cycles, including delivery-truck and refuse-truck profiles. It is useful for testing shared trace ingestion, longitudinal-energy methods and large-vehicle mission profiles. It is **not** motorcycle raw telemetry or a source of component efficiency maps, and its commercial-vehicle traces cannot be used to infer motorcycle behavior. The page requires users to accept an NLR data disclaimer; review that exact disclaimer and redistribution terms before copying a cycle into the repository. Source: https://www.nlr.gov/transportation/drive-cycle-tool/.
+
 ### NLR Fleet DNA / FleetREDI — representative road-duty-cycle data
 
 **Subject:** Research access request — vehicle duty-cycle traces for mobility-energy benchmarks
