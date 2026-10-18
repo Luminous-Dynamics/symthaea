@@ -966,9 +966,9 @@ mod tests {
                 metadata_accessed_on: "2026-10-18".into(),
             },
             related_sources: vec![RelatedSource {
-                id: "AMB2022-01".into(),
+                id: "AMB2022-01-serial-sectioning-xct".into(),
                 doi: "10.18434/mds2-2767".into(),
-                role: "upstream microstructure".into(),
+                role: "serial-sectioning and XCT; EBSD-related calibration source".into(),
                 url: "https://doi.org/10.18434/mds2-2767".into(),
             }],
             source_objects: Vec::new(),
