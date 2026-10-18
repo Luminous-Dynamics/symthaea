@@ -1027,6 +1027,12 @@ mod tests {
                 .and_then(Value::as_str),
             Some("GEOMETRY_EXPORT_CHECKED_NOT_PHYSICALLY_QUALIFIED")
         );
+        assert_eq!(
+            receipt
+                .pointer("/execution/tested_commit_sha")
+                .and_then(Value::as_str),
+            Some("c417ef92a60309c7f4647b524c4f00a6fd91bfd1")
+        );
 
         let checks = receipt
             .get("checks")
@@ -1036,6 +1042,15 @@ mod tests {
         assert!(checks.iter().all(|check| {
             check.get("status").and_then(Value::as_str) == Some("PASS")
         }));
+        for check in checks {
+            if let Some(hash) = check.get("output_sha256").and_then(Value::as_str) {
+                assert_eq!(hash.len(), 64, "output SHA-256 must be 64 hex digits");
+                assert!(
+                    hash.bytes().all(|byte| byte.is_ascii_hexdigit()),
+                    "output SHA-256 must use hexadecimal digits"
+                );
+            }
+        }
     }
 
     #[test]
