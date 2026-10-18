@@ -9,7 +9,9 @@
 use crate::{
     CandidateScenario, EvaluationReceipt, EvidenceState, OptionEvaluation, RejectionReason,
 };
-use crate::uncertainty_contract::{CompatibleAnalysisRoute, UncertaintyRoutingReceipt};
+use crate::uncertainty_contract::{
+    CompatibleAnalysisRoute, UncertaintyAssessmentRef, UncertaintyRoutingReceipt,
+};
 use sha2::{Digest, Sha256};
 use std::collections::BTreeSet;
 use std::fmt::Write as _;
@@ -27,8 +29,8 @@ pub struct DecisionRunContext {
     pub input_manifest_encoding_version: String,
     /// Exact bytes of that manifest. These bytes are hashed verbatim.
     pub input_manifest_bytes: Vec<u8>,
-    /// Must be derived from these same manifest bytes via UncertaintyAssessmentRef::route.
-    pub routing: UncertaintyRoutingReceipt,
+    /// The assessment whose route is validated by the receipt builder itself.
+    pub uncertainty_assessment: UncertaintyAssessmentRef,
     /// Explicit ceiling on what the receipt's result may claim.
     pub claim_ceiling: String,
 }
@@ -66,6 +68,7 @@ pub enum DecisionReceiptError {
     MissingClaimCeiling,
     RoutingScenarioMismatch,
     MissingRoutingEvidence,
+    InvalidUncertaintyAssessment,
     RoutingManifestDigestMismatch,
     EmptyOptionId,
     DuplicateOptionId,
@@ -322,7 +325,7 @@ fn canonical_receipt_bytes(receipt: &DecisionReceipt) -> Vec<u8> {
 fn validate_context(
     context: &DecisionRunContext,
     scenario: &CandidateScenario,
-) -> Result<String, DecisionReceiptError> {
+) -> Result<(String, UncertaintyRoutingReceipt), DecisionReceiptError> {
     if context.producer_commit.trim().is_empty() {
         return Err(DecisionReceiptError::MissingProducerCommit);
     }
@@ -338,26 +341,27 @@ fn validate_context(
     if context.input_manifest_encoding_version.trim().is_empty() {
         return Err(DecisionReceiptError::MissingInputManifestEncodingVersion);
     }
-    if context.routing.producer_version.trim().is_empty() {
-        return Err(DecisionReceiptError::MissingUpstreamProducerVersion);
-    }
     if context.claim_ceiling.trim().is_empty() {
         return Err(DecisionReceiptError::MissingClaimCeiling);
     }
-    if context.routing.scenario_id != scenario.id {
+    let manifest_digest = sha256_hex(&context.input_manifest_bytes);
+    let routing = context
+        .uncertainty_assessment
+        .route()
+        .map_err(|_| DecisionReceiptError::InvalidUncertaintyAssessment)?;
+    if routing.scenario_id != scenario.id {
         return Err(DecisionReceiptError::RoutingScenarioMismatch);
     }
-    if context.routing.evidence_reference.trim().is_empty()
-        || context.routing.limitation.trim().is_empty()
+    if routing.evidence_reference.trim().is_empty()
+        || routing.limitation.trim().is_empty()
+        || routing.producer_version.trim().is_empty()
     {
         return Err(DecisionReceiptError::MissingRoutingEvidence);
     }
-
-    let manifest_digest = sha256_hex(&context.input_manifest_bytes);
-    if !digest_matches(&context.routing.source_manifest_digest, &manifest_digest) {
+    if !digest_matches(&routing.source_manifest_digest, &manifest_digest) {
         return Err(DecisionReceiptError::RoutingManifestDigestMismatch);
     }
-    Ok(manifest_digest)
+    Ok((manifest_digest, routing))
 }
 
 /// Build a receipt around the scenario's actual output. The manifest digest is
@@ -368,7 +372,7 @@ pub fn create_decision_receipt(
     context: &DecisionRunContext,
     scenario: &CandidateScenario,
 ) -> Result<DecisionReceipt, DecisionReceiptError> {
-    let manifest_digest = validate_context(context, scenario)?;
+    let (manifest_digest, routing) = validate_context(context, scenario)?;
     let scenario_digest = sha256_hex(&canonical_scenario_bytes(scenario)?);
     let output = scenario.evaluate();
     let output_digest = sha256_hex(&canonical_output_bytes(&output)?);
@@ -377,18 +381,18 @@ pub fn create_decision_receipt(
         schema_version: DECISION_RECEIPT_SCHEMA.to_owned(),
         canonicalization_version: CANONICALIZATION_VERSION.to_owned(),
         input_manifest_encoding_version: context.input_manifest_encoding_version.clone(),
-        upstream_producer_version: context.routing.producer_version.clone(),
+        upstream_producer_version: routing.producer_version.clone(),
         scenario_id: scenario.id.clone(),
         evaluation_day: output.evaluation_day,
         producer_commit: context.producer_commit.clone(),
         evaluator_version: context.evaluator_version.clone(),
         input_manifest_sha256: manifest_digest,
         scenario_sha256: scenario_digest,
-        uncertainty_route: context.routing.route,
-        evidence_reference: context.routing.evidence_reference.clone(),
+        uncertainty_route: routing.route,
+        evidence_reference: routing.evidence_reference.clone(),
         output_sha256: output_digest,
         claim_ceiling: context.claim_ceiling.clone(),
-        limitation: context.routing.limitation.clone(),
+        limitation: routing.limitation.clone(),
         receipt_sha256: String::new(),
     };
     receipt.receipt_sha256 = sha256_hex(&canonical_receipt_bytes(&receipt));
@@ -470,22 +474,20 @@ mod tests {
 
     fn context(manifest: &[u8], scenario_id: &str) -> DecisionRunContext {
         let manifest_digest = sha256_hex(manifest);
-        let routing = UncertaintyAssessmentRef {
+        let uncertainty_assessment = UncertaintyAssessmentRef {
             scenario_id: scenario_id.into(),
             producer_version: "fixture-producer-v1".into(),
             source_manifest_digest: format!("sha256:{manifest_digest}"),
             evidence_kind: UncertaintyEvidenceKind::BoundedStateProbabilities {
                 bounds_receipt_id: "bounds-receipt-1".into(),
             },
-        }
-        .route()
-        .unwrap();
+        };
         DecisionRunContext {
             producer_commit: "0123456789abcdef0123456789abcdef01234567".into(),
             evaluator_version: "iccb-evaluator-0.1.0".into(),
             input_manifest_encoding_version: "utf8-synthetic-fixture-v1".into(),
             input_manifest_bytes: manifest.to_vec(),
-            routing,
+            uncertainty_assessment,
             claim_ceiling: "synthetic rule evaluation; not a forecast or authorization".into(),
         }
     }
@@ -561,7 +563,7 @@ mod tests {
     fn manifest_digest_must_match_routing_receipt() {
         let scenario = scenario();
         let mut context = context(b"canonical-manifest-v1", &scenario.id);
-        context.routing.source_manifest_digest =
+        context.uncertainty_assessment.source_manifest_digest =
             "sha256:937a22712ea5c20073d2c8a226f1f4a9c2c30aba40a497f2412a34426f986535".into();
         assert_eq!(
             create_decision_receipt(&context, &scenario),
@@ -612,7 +614,7 @@ mod tests {
         let original_context = context(b"canonical-manifest-v1", &scenario.id);
         let receipt = create_decision_receipt(&original_context, &scenario).unwrap();
         let mut changed_context = original_context.clone();
-        changed_context.routing.producer_version = "fixture-producer-v2".into();
+        changed_context.uncertainty_assessment.producer_version = "fixture-producer-v2".into();
         assert_eq!(
             verify_decision_receipt(&changed_context, &scenario, &receipt),
             Err(DecisionReceiptError::ReceiptMismatch)
@@ -630,7 +632,7 @@ mod tests {
         );
 
         let mut context = context(b"canonical-manifest-v1", &scenario.id);
-        context.routing.producer_version.clear();
+        context.uncertainty_assessment.producer_version.clear();
         assert_eq!(
             create_decision_receipt(&context, &scenario),
             Err(DecisionReceiptError::MissingUpstreamProducerVersion)
