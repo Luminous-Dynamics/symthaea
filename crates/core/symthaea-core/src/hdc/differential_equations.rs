@@ -844,13 +844,12 @@ impl DifferentialEquationsEngine {
         tol: f64,
         max_attempts: usize,
     ) -> Result<RK45Result, RK45Error> {
-        let absolute_tolerances = vec![tol; system.dim];
         Self::try_solve_rk45_core(
             system,
             t0,
             t_end,
             y0,
-            &absolute_tolerances,
+            &[],
             tol,
             max_attempts,
             Some(tol),
@@ -1267,8 +1266,11 @@ impl DifferentialEquationsEngine {
                         error_estimate,
                     ));
                 }
-                let scale = absolute_tolerances[i]
-                    + relative_tolerance * y[i].abs().max(y_new[i].abs());
+                let state_magnitude = y[i].abs().max(y_new[i].abs());
+                let scale = match legacy_tolerance {
+                    Some(tol) => tol * (1.0 + state_magnitude),
+                    None => absolute_tolerances[i] + relative_tolerance * state_magnitude,
+                };
                 if !scale.is_finite() || scale <= 0.0 {
                     return Err(RK45Error::new(
                         RK45ErrorKind::InvalidErrorScale { index: i },
