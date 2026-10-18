@@ -48,6 +48,13 @@ Do not use session length, compulsion, replay count, or inferred vulnerability a
 
 Do not assume an identical acoustic feature means the same thing across traditions or people. Record only optional, coarse, participant-supplied context. Evaluate culture/genre slices when sample size permits and call underpowered slices non-estimable rather than reporting universal performance.
 
+### 8. Learn what to ask next, not just what to predict
+
+Use active learning to select the next optional rating or musical contrast when it is expected to reduce uncertainty or distinguish competing predictions. Compare uncertainty/disagreement sampling with random prompts at equal participant burden. TROMPA-MER reports prior work using collective judgment and active learning for personalized music-emotion annotation, so MLRB should compete with rather than ignore this baseline. The objective is useful information per prompt, not maximizing time spent interacting.
+
+Provisional efficiency target: reach the same prespecified held-out MAE with at least 30% fewer feedback prompts than random sampling, with the target frozen from pilot results before confirmation. Report prompt count, completion, skipped feedback, and subgroup coverage alongside the accuracy curve. This is a proposal, not an observed result.
+
+
 ## Proposed data contract
 
 The new Rust module, **src/listener_response.rs**, defines a versioned ListenerResponseRecord for one presentation:
@@ -171,6 +178,7 @@ A credible benchmark should use existing open work without pretending every data
 | Perceived-affect baseline | MERGE audio/lyrics dataset (Zenodo record 13939205; 3,554 audio clips, 2,568 lyric records, with balanced and bimodal subsets) | Audio-only, lyrics-only and fused prediction of music's perceived valence/arousal | Static labels are not measurements of a person's pre/post state change. Check rights for each audio/lyric item before redistribution. |
 | Personalized judgments | TROMPA-MER (181 participants, 4,721 annotations, 1,161 excerpts) | Personalization of perceived and induced emotion annotations, familiarity/preferences, and active-learning strategies | Its annotations do not replace a prospective, paired pre/post listening-response study. Extracted features/models may need to be obtained from the authors; the project describes the dataset as publicly viewable. |
 | Domain-specific retrieval | CalmSet, subject to its own data/license and governance review | Graded relevance for an affective music retrieval task in its target domain | Does not represent the general population and must not be used to claim universal effects. |
+| Optional physiological research track | FEEL: AfNIRS–EEG benchmark (34 participants, 38 affective music clips) | External study of subject-dependent, cross-subject, and cross-music emotion recognition | Different task; multimodal fusion did not consistently outperform single modalities across scenarios. Not required for MLRB v1; any physiological data use needs separate privacy/ethics review. |
 | Personalized response change | MLRB self-report records collected under a consented protocol | Whether prior-session data predicts a listener's reported pre/post change in a future session | Observational change is not a causal music effect. Causal claims require randomized/counterbalanced interventions. |
 
 MERGE supplies dataset-provided splits, but MLRB must still create and record its own splits aligned to the intended question. Never assume an ordinary 70/15/15 random split is adequate for longitudinal personalization. Do not mirror third-party audio, lyrics, profile data, or derived personal records until their individual licenses and permitted uses are confirmed.
@@ -179,6 +187,7 @@ Sources:
 - MERGE dataset record and available subsets: https://zenodo.org/records/13939205
 - TROMPA-MER study, annotations and data availability: https://doi.org/10.1007/s10844-022-00746-0
 - CalmSet dataset / intended-use description: https://github.com/Sensify-Lab/CalmSet
+- FEEL: AfNIRS–EEG Emotion Dataset and Benchmark Library (2026): https://doi.org/10.1109/TAFFC.2026.3733456
 
 ## Execution plan
 
