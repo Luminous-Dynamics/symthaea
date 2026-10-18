@@ -2,6 +2,7 @@ use iccb_evaluator::{
     CandidateScenario, DecisionOption, EvidenceClaim, EvidenceState, Mandate,
     cash_maximizing_feasible_baseline, pareto_frontier,
     policy::{CapitalPolicyScenario, DemandCase},
+    robust_decision::{RobustDecisionScenario, RobustPayoff, StateProbabilityBound},
     staging::TrancheRequest,
     value_of_information::{
         DecisionPayoff, SignalOutcome, InformationState, SignalLikelihood,
@@ -240,5 +241,64 @@ fn main() {
             report.worthwhile_at_declared_cost,
         ),
         Err(error) => eprintln!("Synthetic value-of-information scenario rejected: {error:?}"),
+    }
+
+    // Probability bounds are deliberately broad enough to make the action
+    // ranking ambiguous; minimax regret is printed separately, not executed.
+    let robust_scenario = RobustDecisionScenario {
+        id: "synthetic-ambiguous-capital-choice".into(),
+        state_probability_bounds: vec![
+            StateProbabilityBound {
+                state_id: "high-demand".into(),
+                lower_bps: 3_000,
+                upper_bps: 7_000,
+            },
+            StateProbabilityBound {
+                state_id: "low-demand".into(),
+                lower_bps: 3_000,
+                upper_bps: 7_000,
+            },
+        ],
+        action_ids: vec!["build".into(), "avoid".into()],
+        payoffs: vec![
+            RobustPayoff {
+                action_id: "build".into(),
+                state_id: "high-demand".into(),
+                payoff_minor: 10,
+            },
+            RobustPayoff {
+                action_id: "build".into(),
+                state_id: "low-demand".into(),
+                payoff_minor: -5,
+            },
+            RobustPayoff {
+                action_id: "avoid".into(),
+                state_id: "high-demand".into(),
+                payoff_minor: 0,
+            },
+            RobustPayoff {
+                action_id: "avoid".into(),
+                state_id: "low-demand".into(),
+                payoff_minor: 0,
+            },
+        ],
+    };
+    match robust_scenario.evaluate() {
+        Ok(report) => {
+            println!(
+                "Synthetic robust choice: status={:?}, minimax_regret_actions={:?}",
+                report.status, report.minimax_regret_action_ids
+            );
+            for action in report.action_envelopes {
+                println!(
+                    "  action={}, expected_value_bounds=[{}, {}], worst_case_regret_upper={}",
+                    action.action_id,
+                    action.lower_expected_value_minor,
+                    action.upper_expected_value_minor,
+                    action.worst_case_expected_regret_upper_minor,
+                );
+            }
+        }
+        Err(error) => eprintln!("Synthetic robust decision scenario rejected: {error:?}"),
     }
 }
