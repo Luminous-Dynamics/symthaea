@@ -155,6 +155,74 @@ These are **relative likelihood weights**, not calibrated posterior probabilitie
 
 A future controller can use the spatial map to choose a head movement with the largest expected reduction in ambiguity, subject to latency, energy and safe joint limits. The active-sensing claim must be measured against a fixed-head baseline using the same sources, sensor package, compute budget and trial order randomization. This follows a perception-action loop; it does not presume that motion always helps.
 
+## OWL-003: hybrid regimes are a coupled perception–action–propulsion problem
+
+**Core hypothesis:** the best synthetic owl is not a fixed sensor stack attached to a fixed propulsion design. Its acoustic observability changes with movement, head pose, rotor/flapping self-noise, vibration and wind. Sensing and mobility modes should be co-designed, but scored first in isolation and then at mission level.
+
+### Evidence that hybrid mechanisms deserve investigation—not automatic adoption
+
+The open-access paper [A bio-inspired hybrid flapping wing rotor for high-efficiency micro rotorcraft](https://link.springer.com/article/10.1007/s13272-026-00973-z), published 18 June 2026, studies a rotor with controlled flapping superposed on rotation. It reports more than 200 bench-top trials, a useful intermediate hybridisation ratio near 0.7–0.8 for its prototype, and up to 2.148-fold power-efficiency improvement relative to pure rotation under comparable lift conditions. The reported validation is propulsion-bench level, not complete free-flight endurance. Treat the mechanism and its optimum as replication hypotheses, not parameters to copy directly into the owl.
+
+The DCASE 2026 Semantic Acoustic Imaging task similarly represents a measurement-regime shift: its evaluation moves beyond direction vectors toward dense semantic energy maps. The official metrics include Mask mAP, Pearson correlation of acoustic energy maps, and Relative Distance Error. The LOCATA corpus supplies dynamic-array/source cases and tracked ground truth.
+
+### Candidate sensing regimes
+
+- **S0 — passive listening:** fixed head, calibrated array, low computation baseline.
+- **S1 — active auditory search:** controlled head/neck motion selected to reduce localization ambiguity.
+- **S2 — audio-visual fusion:** acoustic field plus visual bearing/object evidence, with disagreement retained.
+- **S3 — pose-compensated listening:** account for head motion / IMU pose before converting local-frame bearings into world-frame hypotheses.
+- **S4 — self-noise-aware listening:** compare sound observability in idle, rotor, flapping and hybrid-propulsion operation; choose a measurement window or change mode when self-noise makes the task unobservable.
+- **S5 — degraded sensing:** explicitly remove failed/drifting sensors and widen uncertainty or abstain. Never reuse stale readings as if available.
+- **S6 — perched watch:** use static low-power observation and opportunistic listening windows instead of hover when the mission allows it.
+
+### Candidate mobility / propulsion regimes
+
+- **P0:** stationary / perched, no propulsion energy.
+- **P1:** conventional rotor baseline, including hover and translation.
+- **P2:** fixed-wing / glide or glide-like forward flight where airspeed and mission permit.
+- **P3:** powered flapping and morphology changes.
+- **P4:** hybrid flapping–rotary propulsion, validated first on a contained bench.
+- **P5:** transitions between modes, including abort, landing / perching and low-energy recovery.
+
+Not every combination is physically feasible. The regime planner must consume validated operating envelopes, not freely mix mode labels.
+
+### New regime: observability-aware locomotion
+
+A new testable idea is to choose movement using two coupled predictions: (1) expected mission progress and energy cost, and (2) expected quality of the next acoustic / visual observation. For example, a noisy propulsion regime might be acceptable for transit but poor for source localization; the system could perch, coast/glide if aerodynamically safe, or change head orientation before acquiring the next observation.
+
+This is not “quiet flight by assertion.” The controller should be allowed to reject an observation as contaminated, change regime, and re-measure. Count the energy and time spent acquiring data; do not compare a fused policy to a fixed baseline unless useful task, payload, route, safety boundary and operating conditions are matched.
+
+### Implemented software boundary
+
+The new `hybrid_evidence` module fuses candidate-aligned modality log-likelihood fields with explicit, caller-supplied tempering weights. It rejects mismatched candidate counts, duplicate modality identities, invalid or missing evidence states, non-finite values, and all-impossible outputs. It makes unavailable modalities explicit rather than inferring a value.
+
+This is only the arithmetic kernel for a product-of-experts style fusion policy. It assumes conditional independence of supplied modality likelihoods, and its normalized output depends on candidate-grid sampling. Those outputs are relative weights, **not calibrated probabilities**. It does not choose operating modes, detect faults from sensor signals, calibrate visual/audio estimators, handle delay alignment, or control actuators.
+
+### Hybrid benchmark programme
+
+**H1 — fusion correctness.** Use synthetic likelihood grids with known agreement, conflict, missing inputs, explicit negative-infinity exclusions, mismatched candidate counts and duplicate channels. Test order invariance, normalization, and correct fail-closed behavior. Add correlated-modality counterexamples before claiming the independence approximation is adequate.
+
+**H2 — real audio / visual localization.** Compare S0, S1, S2 and S3 on locked LOCATA tasks covering static and moving arrays/sources. Then evaluate dense map output against DCASE 2026 Task 3 / STAIRS26 without tuning on evaluation labels. Report angular error, track continuity, map Mask mAP, map Pearson r, RDE, latency, abstention and sensor-dropout results.
+
+**H3 — self-noise versus information value.** At matched mission progress and useful observation count, record electrical energy, propulsion force/thrust, spectra and calibrated SPL plus acoustic localization quality / SNR for perched, rotor, flapping and candidate hybrid regimes. Separate (a) sound emitted by the vehicle, (b) impact on source observability, and (c) useful environmental information per joule.
+
+**H4 — reproduce a propulsion mechanism.** Sweep hybridisation ratio under the published prototype's comparable-lift test conditions where specifications permit; disclose deviations from that setup. Log total system mass, electrical input, shaft/motor power, lift/thrust, temperature, vibration, sound spectra and trial-to-trial variation. The published 0.7–0.8 region is a comparison point, not a universal target. Then test the strongest non-hybrid baseline under identical boundaries.
+
+**H5 — mission-level co-design.** Compare each fixed mode against a hybrid policy on the same held-out route, payload, observation goal and failure-recovery requirement. Plot Pareto fronts across energy per useful observation, observation latency, localization/map error, self-noise contamination, mission completion, mass and safety interventions.
+
+**H6 — transition stability.** Test mode boundaries under battery depletion, microphone dropout, timing drift, wind / disturbance, low SNR, and model uncertainty. Any mode transition not covered by the validated envelope must fall back to a documented safe state. Include every failure and abort in the denominator.
+
+### Proposed benchmark acceptance targets
+
+These are targets to pre-register, not results:
+
+- Hybrid evidence-fusion tests all pass on the exact PR head; no candidate-order dependence and normalized candidate weights sum to one within (10^{-12}) for finite valid inputs.
+- On held-out acoustic/visual scenarios, multimodal fusion improves median localization error by at least 20% over the best single-modality baseline **without reducing scored-case coverage**; publish uncertainty, false positives and missed detections as well.
+- On a held-out mission benchmark, a hybrid sensing/mobility policy improves useful correctly localized observations per joule by at least 10% over the strongest fixed-mode baseline, while localization quality and mission success remain within pre-registered non-inferiority margins. Do not claim a win from an arbitrary weighted average alone.
+- A propulsion hybrid is promoted only if an independent bench replication shows improvement exceeding combined measurement uncertainty at a matched useful-force condition, with added mechanism mass and power fully charged.
+- Before any free-flight claim, collect at least 20 consecutively logged contained/approved mission attempts, counting failures and aborted runs, then seek independent replication.
+
+If the hybrid cannot outperform the best simple mode under matched boundaries, prefer the simpler design. A failed hybrid hypothesis is useful engineering evidence.
 ## Related work
 
 - OWL-001 issue: https://github.com/Luminous-Dynamics/symthaea/issues/7912
