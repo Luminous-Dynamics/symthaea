@@ -4,7 +4,7 @@
   "status": "synthetic_design_fixture_only",
   "created_at": "2026-10-18",
   "disclaimer": "Every candidate, source, amount, gate and digest is synthetic. These fixtures test decision semantics only and must never be interpreted as food composition, formulation advice, biological results, safety evidence, regulatory status, price data, or lifecycle assessment.",
-  "schema_file": "bioprotein-gate-schema-v1.json",
+  "schema_file": "bioprotein-gate-corpus-schema-v1.json",
   "case_count": 29,
   "cases": [
     {
@@ -1554,5 +1554,6 @@
       },
       "rationale": "Attribution does not substitute for evidence that the source grants the intended right."
     }
-  ]
+  ],
+  "case_schema_file": "bioprotein-gate-schema-v1.json"
 }
