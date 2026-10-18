@@ -78,6 +78,9 @@ pub struct ObservableSignal {
     pub id: String,
     pub unit: String,
     pub expected_fault_effect: String,
+    /// Canonical categorical value used only for structural signature comparison.
+    /// None means unknown; unknown never counts as a distinguishing observation.
+    pub signature_value: Option<String>,
 }
 
 #[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
@@ -105,6 +108,7 @@ pub enum CoverageGap {
     MissingTelemetryLabelSemantics,
     MissingInjection,
     MissingObservableSignal,
+    MissingCanonicalSignalOutcome,
     MissingMonitorContract,
     MissingMonitorNegativeControl,
     MissingMitigationContract,
@@ -140,6 +144,68 @@ pub struct FaultObligation {
     /// It does not mean the associated failure mode is fully covered.
     pub scenario: Option<FaultScenario>,
     pub gaps: Vec<CoverageGap>,
+}
+
+#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
+#[serde(rename_all = "snake_case")]
+pub enum FaultPairIndeterminacy {
+    MissingCanonicalOutcome,
+    NoComparableSignals,
+    SignalSetsNotEquivalent,
+}
+
+#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
+#[serde(tag = "disposition", rename_all = "snake_case")]
+pub enum FaultPairDisposition {
+    Distinguishable { separating_signal_ids: Vec<String> },
+    Indistinguishable { identical_signal_ids: Vec<String> },
+    NotDemonstrated {
+        reason: FaultPairIndeterminacy,
+        comparable_signal_ids: Vec<String>,
+    },
+}
+
+#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
+pub struct FaultPairFinding {
+    pub left_failure_mode_id: String,
+    pub right_failure_mode_id: String,
+    pub disposition: FaultPairDisposition,
+}
+
+#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
+pub struct FaultDiagnosabilityReport {
+    pub model_id: String,
+    pub model_revision: String,
+    pub source_design_revision: String,
+    pub source_design_sha256: String,
+    pub critical_failure_mode_ids: Vec<String>,
+    /// One result for each unordered pair among declared critical modes.
+    pub findings: Vec<FaultPairFinding>,
+}
+
+impl FaultDiagnosabilityReport {
+    pub fn critical_pair_denominator(&self) -> usize {
+        self.findings.len()
+    }
+
+    pub fn unresolved_or_indistinguishable_pair_count(&self) -> usize {
+        self.findings
+            .iter()
+            .filter(|finding| {
+                !matches!(finding.disposition, FaultPairDisposition::Distinguishable { .. })
+            })
+            .count()
+    }
+
+    /// Structural only: needs >= 2 critical modes and every pair separated by
+    /// at least one common signal with two explicit, different canonical values.
+    pub fn all_critical_pairs_distinguishable(&self) -> bool {
+        self.critical_failure_mode_ids.len() >= 2
+            && !self.findings.is_empty()
+            && self.findings.iter().all(|finding| {
+                matches!(finding.disposition, FaultPairDisposition::Distinguishable { .. })
+            })
+    }
 }
 
 #[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
@@ -271,6 +337,9 @@ impl MissionFaultModel {
                     &signal.expected_fault_effect,
                     "observable_signal.expected_fault_effect",
                 )?;
+                if let Some(value) = &signal.signature_value {
+                    require_nonblank(value, "observable_signal.signature_value")?;
+                }
                 if !signal_ids.insert(signal.id.as_str()) {
                     return Err(MissionFaultModelError::DuplicateSignalId {
                         failure_mode_id: mode.id.clone(),
@@ -311,6 +380,42 @@ impl MissionFaultModel {
         }
 
         Ok(())
+    }
+
+    /// Compare declared critical-mode observation signatures. This is a
+    /// conservative design-time lint, not a physical diagnosability proof or
+    /// a minimum-sensor-set/cut-set oracle. Unknown values never distinguish.
+    pub fn analyze_critical_fault_signatures(
+        &self,
+    ) -> Result<FaultDiagnosabilityReport, MissionFaultModelError> {
+        self.validate()?;
+        let critical: Vec<&FailureMode> = self
+            .failure_modes
+            .iter()
+            .filter(|mode| mode.criticality == FailureCriticality::Critical)
+            .collect();
+
+        let mut findings = Vec::new();
+        for left_index in 0..critical.len() {
+            for right_index in (left_index + 1)..critical.len() {
+                let left = critical[left_index];
+                let right = critical[right_index];
+                findings.push(FaultPairFinding {
+                    left_failure_mode_id: left.id.clone(),
+                    right_failure_mode_id: right.id.clone(),
+                    disposition: classify_fault_pair(left, right),
+                });
+            }
+        }
+
+        Ok(FaultDiagnosabilityReport {
+            model_id: self.model_id.clone(),
+            model_revision: self.model_revision.clone(),
+            source_design_revision: self.source_design.revision.clone(),
+            source_design_sha256: self.source_design.sha256.clone(),
+            critical_failure_mode_ids: critical.iter().map(|mode| mode.id.clone()).collect(),
+            findings,
+        })
     }
 
     /// Project the design IR into a deterministic scenario manifest and the
@@ -424,6 +529,92 @@ fn has_reference(references: &[String]) -> bool {
     references.iter().any(|reference| !reference.trim().is_empty())
 }
 
+fn classify_fault_pair(left: &FailureMode, right: &FailureMode) -> FaultPairDisposition {
+    let mut separating_signal_ids = Vec::new();
+    let mut comparable_signal_ids = Vec::new();
+
+    for left_signal in &left.observable_signals {
+        let Some(right_signal) = right
+            .observable_signals
+            .iter()
+            .find(|signal| signal.id == left_signal.id && signal.unit == left_signal.unit)
+        else {
+            continue;
+        };
+        comparable_signal_ids.push(left_signal.id.clone());
+
+        if let (Some(left_value), Some(right_value)) =
+            (&left_signal.signature_value, &right_signal.signature_value)
+        {
+            if !left_value.trim().is_empty()
+                && !right_value.trim().is_empty()
+                && left_value != right_value
+            {
+                separating_signal_ids.push(left_signal.id.clone());
+            }
+        }
+    }
+
+    separating_signal_ids.sort();
+    separating_signal_ids.dedup();
+    comparable_signal_ids.sort();
+    comparable_signal_ids.dedup();
+
+    if !separating_signal_ids.is_empty() {
+        return FaultPairDisposition::Distinguishable {
+            separating_signal_ids,
+        };
+    }
+
+    let left_complete = !left.observable_signals.is_empty()
+        && left.observable_signals.iter().all(|signal| {
+            signal
+                .signature_value
+                .as_ref()
+                .is_some_and(|value| !value.trim().is_empty())
+        });
+    let right_complete = !right.observable_signals.is_empty()
+        && right.observable_signals.iter().all(|signal| {
+            signal
+                .signature_value
+                .as_ref()
+                .is_some_and(|value| !value.trim().is_empty())
+        });
+    let identical_complete_signatures = left_complete
+        && right_complete
+        && left.observable_signals.len() == right.observable_signals.len()
+        && left.observable_signals.iter().all(|left_signal| {
+            right.observable_signals.iter().any(|right_signal| {
+                right_signal.id == left_signal.id
+                    && right_signal.unit == left_signal.unit
+                    && right_signal.signature_value == left_signal.signature_value
+            })
+        });
+
+    if identical_complete_signatures {
+        return FaultPairDisposition::Indistinguishable {
+            identical_signal_ids: left
+                .observable_signals
+                .iter()
+                .map(|signal| signal.id.clone())
+                .collect(),
+        };
+    }
+
+    let reason = if !left_complete || !right_complete {
+        FaultPairIndeterminacy::MissingCanonicalOutcome
+    } else if comparable_signal_ids.is_empty() {
+        FaultPairIndeterminacy::NoComparableSignals
+    } else {
+        FaultPairIndeterminacy::SignalSetsNotEquivalent
+    };
+
+    FaultPairDisposition::NotDemonstrated {
+        reason,
+        comparable_signal_ids,
+    }
+}
+
 fn coverage_gaps(mode: &FailureMode) -> Vec<CoverageGap> {
     let mut gaps = Vec::new();
 
@@ -445,6 +636,13 @@ fn coverage_gaps(mode: &FailureMode) -> Vec<CoverageGap> {
     }
     if mode.observable_signals.is_empty() {
         gaps.push(CoverageGap::MissingObservableSignal);
+    } else if mode.observable_signals.iter().any(|signal| {
+        signal
+            .signature_value
+            .as_ref()
+            .is_none_or(|value| value.trim().is_empty())
+    }) {
+        gaps.push(CoverageGap::MissingCanonicalSignalOutcome);
     }
     match &mode.monitor {
         None => gaps.push(CoverageGap::MissingMonitorContract),
@@ -507,6 +705,7 @@ mod tests {
                     unit: "boolean".to_owned(),
                     expected_fault_effect:
                         "false for steps 4 through 6; geometry remains unchanged".to_owned(),
+                    signature_value: Some("unavailable".to_owned()),
                 }],
                 monitor: Some(MonitorContract {
                     id: "MON-COMM-001".to_owned(),
