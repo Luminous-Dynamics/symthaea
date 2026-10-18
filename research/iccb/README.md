@@ -19,6 +19,8 @@ The prototype intentionally has no third-party dependencies. Its manifest define
 - Five named, stable-ID public development fixtures: productive expansion, asset-price-only boom, hidden maintenance burden, critical-dependency overlap, and stale evidence.
 - Evidence usability checks for explicit source, observation time, validity window and qualification state.
 - Hard gates for budget, liquidity, maintenance burden and delegated authority.
+- A feasible cash-maximizing baseline and coordinate-wise Pareto frontier; valuation change is observable but does not dominate real capacity or cash-flow dimensions.
+- An evidence-gated staged-tranche release contract that refuses release on failed milestones, stale evidence, unauthorized requests, commitment-cap breaches or arithmetic overflow.
 - Reported valuation change, expected net cash, productive-capacity delta, maintenance burden and critical dependency overlap are separate dimensions.
 - An outcome vector that keeps net cash, liquidity, productive capacity, maintenance burden and dependency exposure separate.
 - Unit tests for negative controls, stale/expired/missing-source evidence, repeated dependency IDs, constraints and deterministic equality.
@@ -31,6 +33,10 @@ This is a **prototype contract and rule kernel**, not an investment model. It ha
 The EvidenceState::Qualified label is supplied by the fixture; it does not independently validate a source's truth. The current day fields are synthetic integer day indices. The dependency counter reports overlap with a supplied list of known critical dependencies; it does not compute cascades or infer dependency criticality. expected_net_cash_minor is an input value, not a modeled or validated forecast.
 
 The demo should not be interpreted as proving superior decisions or a real investment result. A clean local test run and independent review are still required before treating the code as validated. The current authoring environment did not have rustc or cargo installed, so no local compile/test result is claimed in this change.
+
+## Staged commitments and reversibility
+
+The staged-capital protocol is described in [REVERSIBILITY_AND_STAGED_CAPITAL.md](REVERSIBILITY_AND_STAGED_CAPITAL.md). The `staging.rs` module is a fail-closed tranche authorization gate, **not** a real-options valuation model. It makes required evidence, milestone satisfaction, delegated authority, and cumulative commitment limits explicit. The prototype also reports a cash-maximizing feasible baseline and a Pareto frontier without compressing outcomes into one score.
 
 ## Market validation
 
