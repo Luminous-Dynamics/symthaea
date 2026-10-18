@@ -407,7 +407,8 @@ fn participant_cluster_comparison(
                 / improvements.len() as f64,
         )
     };
-    let (bootstrap_replicates, confidence_interval) = if improvements.len() >= MIN_PARTICIPANTS_FOR_BOOTSTRAP {
+    let (bootstrap_replicates, confidence_interval) =
+        if improvements.len() >= MIN_PARTICIPANTS_FOR_BOOTSTRAP {
         (
             PARTICIPANT_BOOTSTRAP_REPLICATES,
             Some(participant_bootstrap_ci(
@@ -705,6 +706,38 @@ mod tests {
         assert_eq!(no_change.participants_improved_fraction, Some(1.0));
         assert!(no_change.bootstrap_confidence_interval_95.unwrap()[0] > 0.0);
         assert_eq!(no_change.bootstrap_replicates, PARTICIPANT_BOOTSTRAP_REPLICATES);
+        let population = valence
+            .participant_cluster_comparisons
+            .iter()
+            .find(|comparison| comparison.comparator == BaselineComparator::PopulationDelta)
+            .unwrap();
+        assert_eq!(population.participants, 12);
+        assert!(population.bootstrap_confidence_interval_95.unwrap()[0] > 0.0);
+    }
+
+    #[test]
+    fn equal_participant_weight_prevents_frequent_listener_domination() {
+        let grouped = BTreeMap::from([
+            ("frequent".to_owned(), ParticipantErrors {
+                no_change: vec![1.0; 100],
+                population_delta: vec![1.0; 100],
+                personal_history: vec![0.0; 100],
+            }),
+            ("occasional".to_owned(), ParticipantErrors {
+                no_change: vec![0.1],
+                population_delta: vec![0.1],
+                personal_history: vec![0.0],
+            }),
+        ]);
+        let result = participant_cluster_comparison(
+            &grouped,
+            BaselineComparator::NoChange,
+            7,
+        );
+        assert_eq!(result.participants, 2);
+        assert_eq!(result.matched_test_observations, 101);
+        assert!((result.mean_participant_mae_improvement.unwrap() - 0.55).abs() < 1e-12);
+        assert_eq!(result.bootstrap_confidence_interval_95, None);
     }
 
     #[test]
