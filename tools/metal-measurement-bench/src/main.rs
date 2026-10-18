@@ -1,0 +1,798 @@
+use serde::{Deserialize, Serialize};
+use sha2::{Digest, Sha256};
+use std::{
+    collections::BTreeSet,
+    env, fs,
+    path::{Component, Path, PathBuf},
+    process::ExitCode,
+};
+use thiserror::Error;
+
+type Result<T> = std::result::Result<T, AdapterError>;
+
+#[derive(Debug, Error)]
+enum AdapterError {
+    #[error("I/O error at {path}: {source}")]
+    Io {
+        path: String,
+        #[source]
+        source: std::io::Error,
+    },
+    #[error("JSON error: {0}")]
+    Json(#[from] serde_json::Error),
+    #[error("validation failed: {0}")]
+    Validation(String),
+}
+
+#[derive(Debug, Clone, Serialize, Deserialize)]
+#[serde(deny_unknown_fields)]
+struct SourceManifest {
+    schema_version: String,
+    dataset: DatasetIdentity,
+    related_sources: Vec<RelatedSource>,
+    challenge_context: ChallengeContext,
+    reuse_policy: ReusePolicy,
+    artifacts: Vec<SourceArtifact>,
+}
+
+#[derive(Debug, Clone, Serialize, Deserialize)]
+#[serde(deny_unknown_fields)]
+struct DatasetIdentity {
+    id: String,
+    doi: String,
+    title: String,
+    publisher: String,
+    source_url: String,
+    repository_url: String,
+    descriptive_readme_url: String,
+    citation_policy: String,
+}
+
+#[derive(Debug, Clone, Serialize, Deserialize)]
+#[serde(deny_unknown_fields)]
+struct RelatedSource {
+    id: String,
+    doi: String,
+    role: String,
+    url: String,
+}
+
+#[derive(Debug, Clone, Serialize, Deserialize)]
+#[serde(deny_unknown_fields)]
+struct ChallengeContext {
+    material: String,
+    process: String,
+    condition: String,
+    test_method: String,
+    strain_rate_per_second: f64,
+    gauge_length_mm: f64,
+    target_specimen_count: usize,
+    target_parent_specimen_id: String,
+    target_definition: String,
+    split_policy: String,
+}
+
+#[derive(Debug, Clone, Serialize, Deserialize)]
+#[serde(deny_unknown_fields)]
+struct ReusePolicy {
+    artifact_terms_reviewed: bool,
+    local_use_authorized: bool,
+    repository_bundling_authorized: bool,
+    status_note: String,
+}
+
+#[derive(Debug, Clone, Serialize, Deserialize)]
+#[serde(deny_unknown_fields)]
+struct SourceArtifact {
+    relative_path: String,
+    sha256: String,
+    size_bytes: u64,
+    media_type: String,
+    source_url: String,
+}
+
+#[derive(Debug, Clone, Serialize, Deserialize)]
+#[serde(deny_unknown_fields)]
+struct ObservationSet {
+    schema_version: String,
+    records: Vec<Observation>,
+}
+
+#[derive(Debug, Clone, Serialize, Deserialize)]
+#[serde(deny_unknown_fields)]
+struct Observation {
+    record_id: String,
+    source_doi: String,
+    specimen_id: String,
+    lineage_group_id: String,
+    variable_id: String,
+    role: RecordRole,
+    split: Split,
+    raw_value: Option<f64>,
+    raw_unit: Option<String>,
+    normalized_value: Option<f64>,
+    normalized_unit: Option<String>,
+    conversion_note: Option<String>,
+    reported_uncertainty: Option<f64>,
+    uncertainty_unit: Option<String>,
+    censoring: Censoring,
+    metadata_note: Option<String>,
+}
+
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, Deserialize)]
+#[serde(rename_all = "snake_case")]
+enum RecordRole {
+    Predictor,
+    TargetOutcome,
+}
+
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, Deserialize)]
+#[serde(rename_all = "snake_case")]
+enum Split {
+    Calibration,
+    HeldOut,
+}
+
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, Deserialize)]
+#[serde(rename_all = "snake_case")]
+enum Censoring {
+    Uncensored,
+    LeftCensored,
+    RightCensored,
+    IntervalCensored,
+    Unknown,
+}
+
+#[derive(Debug, Clone, Serialize)]
+struct AuditReceipt {
+    receipt_schema_version: &'static str,
+    operation: &'static str,
+    status: &'static str,
+    manifest_sha256: String,
+    artifact_count: usize,
+    record_count: usize,
+    held_out_outcome_groups: Vec<String>,
+    claim_ceiling: &'static str,
+}
+
+fn io_error(path: &Path, source: std::io::Error) -> AdapterError {
+    AdapterError::Io {
+        path: path.display().to_string(),
+        source,
+    }
+}
+
+fn read_json<T: for<'de> Deserialize<'de>>(path: &Path) -> Result<(T, Vec<u8>)> {
+    let bytes = fs::read(path).map_err(|error| io_error(path, error))?;
+    let value = serde_json::from_slice(&bytes)?;
+    Ok((value, bytes))
+}
+
+fn sha256_hex(bytes: &[u8]) -> String {
+    let digest = Sha256::digest(bytes);
+    let mut out = String::with_capacity(64);
+    for byte in digest {
+        use std::fmt::Write as _;
+        let _ = write!(&mut out, "{byte:02x}");
+    }
+    out
+}
+
+fn nonblank(value: &str) -> bool {
+    !value.trim().is_empty()
+}
+
+fn is_hex_sha256(value: &str) -> bool {
+    value.len() == 64
+        && value
+            .bytes()
+            .all(|byte| byte.is_ascii_digit() || (b'a'..=b'f').contains(&byte))
+}
+
+fn safe_relative_path(raw: &str) -> Result<PathBuf> {
+    let path = Path::new(raw);
+    if raw.is_empty()
+        || path.is_absolute()
+        || path.components().any(|component| !matches!(component, Component::Normal(_)))
+    {
+        return Err(AdapterError::Validation(format!(
+            "artifact path must be a safe relative path: {raw:?}"
+        )));
+    }
+    Ok(path.to_path_buf())
+}
+
+fn validate_manifest(manifest: &SourceManifest) -> Result<()> {
+    if manifest.schema_version != "0.1.0" {
+        return Err(AdapterError::Validation(format!(
+            "unsupported manifest schema_version {:?}",
+            manifest.schema_version
+        )));
+    }
+
+    for (name, value) in [
+        ("dataset.id", manifest.dataset.id.as_str()),
+        ("dataset.doi", manifest.dataset.doi.as_str()),
+        ("dataset.title", manifest.dataset.title.as_str()),
+        ("dataset.publisher", manifest.dataset.publisher.as_str()),
+        ("dataset.source_url", manifest.dataset.source_url.as_str()),
+        ("dataset.repository_url", manifest.dataset.repository_url.as_str()),
+        ("dataset.descriptive_readme_url", manifest.dataset.descriptive_readme_url.as_str()),
+        ("dataset.citation_policy", manifest.dataset.citation_policy.as_str()),
+        ("challenge_context.material", manifest.challenge_context.material.as_str()),
+        ("challenge_context.process", manifest.challenge_context.process.as_str()),
+        ("challenge_context.condition", manifest.challenge_context.condition.as_str()),
+        ("challenge_context.test_method", manifest.challenge_context.test_method.as_str()),
+        ("challenge_context.target_parent_specimen_id", manifest.challenge_context.target_parent_specimen_id.as_str()),
+        ("challenge_context.target_definition", manifest.challenge_context.target_definition.as_str()),
+        ("challenge_context.split_policy", manifest.challenge_context.split_policy.as_str()),
+        ("reuse_policy.status_note", manifest.reuse_policy.status_note.as_str()),
+    ] {
+        if !nonblank(value) {
+            return Err(AdapterError::Validation(format!("{name} must not be blank")));
+        }
+    }
+
+    let context = &manifest.challenge_context;
+    if !context.strain_rate_per_second.is_finite() || context.strain_rate_per_second <= 0.0 {
+        return Err(AdapterError::Validation(
+            "strain_rate_per_second must be finite and positive".into(),
+        ));
+    }
+    if !context.gauge_length_mm.is_finite() || context.gauge_length_mm <= 0.0 {
+        return Err(AdapterError::Validation(
+            "gauge_length_mm must be finite and positive".into(),
+        ));
+    }
+    if context.target_specimen_count == 0 {
+        return Err(AdapterError::Validation("target_specimen_count must be positive".into()));
+    }
+    if manifest.reuse_policy.repository_bundling_authorized
+        && !manifest.reuse_policy.artifact_terms_reviewed
+    {
+        return Err(AdapterError::Validation(
+            "repository bundling cannot be authorized before artifact-specific terms review".into(),
+        ));
+    }
+    if manifest.reuse_policy.local_use_authorized
+        && !manifest.reuse_policy.artifact_terms_reviewed
+    {
+        return Err(AdapterError::Validation(
+            "local use cannot be authorized before artifact-specific terms review".into(),
+        ));
+    }
+
+    let mut source_ids = BTreeSet::new();
+    source_ids.insert(manifest.dataset.id.clone());
+    for source in &manifest.related_sources {
+        if !nonblank(&source.id)
+            || !nonblank(&source.doi)
+            || !nonblank(&source.role)
+            || !nonblank(&source.url)
+        {
+            return Err(AdapterError::Validation(
+                "related source id, DOI/status, role, and URL must be explicit".into(),
+            ));
+        }
+        if !source_ids.insert(source.id.clone()) {
+            return Err(AdapterError::Validation(format!(
+                "duplicate source id {:?}", source.id
+            )));
+        }
+    }
+
+    let mut artifact_paths = BTreeSet::new();
+    for artifact in &manifest.artifacts {
+        safe_relative_path(&artifact.relative_path)?;
+        if !artifact_paths.insert(artifact.relative_path.clone()) {
+            return Err(AdapterError::Validation(format!(
+                "duplicate artifact path {:?}", artifact.relative_path
+            )));
+        }
+        if !is_hex_sha256(&artifact.sha256) {
+            return Err(AdapterError::Validation(format!(
+                "artifact {:?} must declare a lowercase 64-character SHA-256 digest",
+                artifact.relative_path
+            )));
+        }
+        if artifact.size_bytes == 0 {
+            return Err(AdapterError::Validation(format!(
+                "artifact {:?} size_bytes must be positive",
+                artifact.relative_path
+            )));
+        }
+        for (field, value) in [
+            ("media_type", artifact.media_type.as_str()),
+            ("source_url", artifact.source_url.as_str()),
+        ] {
+            if !nonblank(value) {
+                return Err(AdapterError::Validation(format!(
+                    "artifact {:?} {field} must not be blank",
+                    artifact.relative_path
+                )));
+            }
+        }
+    }
+
+    if !manifest.artifacts.is_empty()
+        && (!manifest.reuse_policy.artifact_terms_reviewed
+            || !manifest.reuse_policy.local_use_authorized)
+    {
+        return Err(AdapterError::Validation(
+            "artifacts are declared but source terms/local-use authorization are not reviewed".into(),
+        ));
+    }
+    Ok(())
+}
+
+fn validate_records(
+    manifest: &SourceManifest,
+    observations: &ObservationSet,
+) -> Result<Vec<String>> {
+    if observations.schema_version != "0.1.0" {
+        return Err(AdapterError::Validation(format!(
+            "unsupported observation schema_version {:?}", observations.schema_version
+        )));
+    }
+    if observations.records.is_empty() {
+        return Err(AdapterError::Validation("observation set must not be empty".into()));
+    }
+
+    let mut declared_dois = BTreeSet::new();
+    declared_dois.insert(manifest.dataset.doi.as_str());
+    for source in &manifest.related_sources {
+        if !source.doi.starts_with("not_applicable_") {
+            declared_dois.insert(source.doi.as_str());
+        }
+    }
+
+    let target_group = manifest.challenge_context.target_parent_specimen_id.as_str();
+    let mut record_ids = BTreeSet::new();
+    let mut calibration_outcome_groups = BTreeSet::new();
+    let mut held_out_outcome_groups = BTreeSet::new();
+
+    for record in &observations.records {
+        for (name, value) in [
+            ("record_id", record.record_id.as_str()),
+            ("source_doi", record.source_doi.as_str()),
+            ("specimen_id", record.specimen_id.as_str()),
+            ("lineage_group_id", record.lineage_group_id.as_str()),
+            ("variable_id", record.variable_id.as_str()),
+        ] {
+            if !nonblank(value) {
+                return Err(AdapterError::Validation(format!("record field {name} must not be blank")));
+            }
+            if matches!(value.trim().to_ascii_lowercase().as_str(), "unknown" | "n/a" | "null") {
+                return Err(AdapterError::Validation(format!(
+                    "record field {name} must use a stable identity; preserve unknown metadata separately"
+                )));
+            }
+        }
+        if !record_ids.insert(record.record_id.as_str()) {
+            return Err(AdapterError::Validation(format!(
+                "duplicate record_id {:?}", record.record_id
+            )));
+        }
+        if !declared_dois.contains(record.source_doi.as_str()) {
+            return Err(AdapterError::Validation(format!(
+                "record {:?} references undeclared source DOI {:?}",
+                record.record_id, record.source_doi
+            )));
+        }
+
+        if let Some(value) = record.raw_value {
+            if !value.is_finite() {
+                return Err(AdapterError::Validation(format!(
+                    "record {:?} raw_value must be finite", record.record_id
+                )));
+            }
+            if record.raw_unit.as_deref().is_none_or(|unit| !nonblank(unit)) {
+                return Err(AdapterError::Validation(format!(
+                    "record {:?} has a raw value without an explicit raw unit", record.record_id
+                )));
+            }
+        } else if record.censoring == Censoring::Uncensored {
+            return Err(AdapterError::Validation(format!(
+                "record {:?} is uncensored but has no raw value", record.record_id
+            )));
+        }
+
+        if let Some(value) = record.normalized_value {
+            if !value.is_finite() {
+                return Err(AdapterError::Validation(format!(
+                    "record {:?} normalized_value must be finite", record.record_id
+                )));
+            }
+            if record.raw_value.is_none()
+                || record.normalized_unit.as_deref().is_none_or(|unit| !nonblank(unit))
+                || record.conversion_note.as_deref().is_none_or(|note| !nonblank(note))
+            {
+                return Err(AdapterError::Validation(format!(
+                    "record {:?} normalized value requires preserved raw value, normalized unit, and explicit conversion note",
+                    record.record_id
+                )));
+            }
+        } else if record.normalized_unit.is_some() || record.conversion_note.is_some() {
+            return Err(AdapterError::Validation(format!(
+                "record {:?} declares conversion metadata without a normalized value", record.record_id
+            )));
+        }
+
+        if let Some(uncertainty) = record.reported_uncertainty {
+            if !uncertainty.is_finite() || uncertainty < 0.0 {
+                return Err(AdapterError::Validation(format!(
+                    "record {:?} uncertainty must be finite and non-negative", record.record_id
+                )));
+            }
+            if record.uncertainty_unit.as_deref().is_none_or(|unit| !nonblank(unit)) {
+                return Err(AdapterError::Validation(format!(
+                    "record {:?} uncertainty requires an explicit unit", record.record_id
+                )));
+            }
+        } else if record.uncertainty_unit.is_some() {
+            return Err(AdapterError::Validation(format!(
+                "record {:?} declares uncertainty unit without uncertainty value", record.record_id
+            )));
+        }
+
+        if record.role == RecordRole::TargetOutcome {
+            if record.split == Split::Calibration {
+                if record.lineage_group_id == target_group {
+                    return Err(AdapterError::Validation(format!(
+                        "target lineage {:?} appears in calibration outcomes", target_group
+                    )));
+                }
+                calibration_outcome_groups.insert(record.lineage_group_id.clone());
+            } else {
+                if record.lineage_group_id != target_group {
+                    return Err(AdapterError::Validation(format!(
+                        "held-out target outcome must belong to declared target lineage {:?}",
+                        target_group
+                    )));
+                }
+                held_out_outcome_groups.insert(record.lineage_group_id.clone());
+            }
+        }
+        if record.censoring == Censoring::Unknown
+            && record.metadata_note.as_deref().is_none_or(|note| !nonblank(note))
+        {
+            return Err(AdapterError::Validation(format!(
+                "record {:?} has unknown censoring without an explanatory metadata note",
+                record.record_id
+            )));
+        }
+    }
+
+    if calibration_outcome_groups
+        .iter()
+        .any(|group| held_out_outcome_groups.contains(group))
+    {
+        return Err(AdapterError::Validation(
+            "outcome lineage group leakage between calibration and held-out splits".into(),
+        ));
+    }
+    if held_out_outcome_groups.is_empty() {
+        return Err(AdapterError::Validation(
+            "no held-out target outcomes found; do not emit predictive metrics".into(),
+        ));
+    }
+    Ok(held_out_outcome_groups.into_iter().collect())
+}
+
+fn verify_artifacts(manifest: &SourceManifest, root: &Path) -> Result<()> {
+    if manifest.artifacts.is_empty() {
+        return Err(AdapterError::Validation(
+            "manifest is metadata-only: no source artifacts are declared or verified".into(),
+        ));
+    }
+    if !manifest.reuse_policy.artifact_terms_reviewed || !manifest.reuse_policy.local_use_authorized {
+        return Err(AdapterError::Validation(
+            "artifact verification blocked until artifact terms and local-use permissions are reviewed".into(),
+        ));
+    }
+    for artifact in &manifest.artifacts {
+        let relative = safe_relative_path(&artifact.relative_path)?;
+        let path = root.join(relative);
+        let bytes = fs::read(&path).map_err(|error| io_error(&path, error))?;
+        if bytes.len() as u64 != artifact.size_bytes {
+            return Err(AdapterError::Validation(format!(
+                "artifact {:?} size mismatch: manifest {}, actual {}",
+                artifact.relative_path, artifact.size_bytes, bytes.len()
+            )));
+        }
+        let actual = sha256_hex(&bytes);
+        if actual != artifact.sha256 {
+            return Err(AdapterError::Validation(format!(
+                "artifact {:?} SHA-256 mismatch: expected {}, actual {}",
+                artifact.relative_path, artifact.sha256, actual
+            )));
+        }
+    }
+    Ok(())
+}
+
+fn manifest_receipt(
+    operation: &'static str,
+    status: &'static str,
+    manifest_bytes: &[u8],
+    artifact_count: usize,
+    record_count: usize,
+    groups: Vec<String>,
+) -> AuditReceipt {
+    AuditReceipt {
+        receipt_schema_version: "0.1.0",
+        operation,
+        status,
+        manifest_sha256: sha256_hex(manifest_bytes),
+        artifact_count,
+        record_count,
+        held_out_outcome_groups: groups,
+        claim_ceiling: "source/contract integrity only; not evidence of model accuracy or physical qualification",
+    }
+}
+
+fn run(args: &[String]) -> Result<AuditReceipt> {
+    if args.len() < 3 {
+        return Err(AdapterError::Validation(
+            "usage: metal-measurement-bench <validate-manifest|verify-artifacts|validate-records> <manifest.json> [artifact-dir|observations.json]".into(),
+        ));
+    }
+    let operation = args[1].as_str();
+    let manifest_path = Path::new(&args[2]);
+    let (manifest, manifest_bytes): (SourceManifest, Vec<u8>) = read_json(manifest_path)?;
+    validate_manifest(&manifest)?;
+
+    match operation {
+        "validate-manifest" => {
+            if args.len() != 3 {
+                return Err(AdapterError::Validation("validate-manifest accepts exactly one path".into()));
+            }
+            let status = if manifest.artifacts.is_empty() {
+                "VALID_METADATA_ONLY_NO_ARTIFACTS"
+            } else {
+                "VALID_MANIFEST_ARTIFACTS_DECLARED_NOT_HASH_CHECKED"
+            };
+            Ok(manifest_receipt(
+                "validate-manifest", status, &manifest_bytes, manifest.artifacts.len(), 0, Vec::new(),
+            ))
+        }
+        "verify-artifacts" => {
+            if args.len() != 4 {
+                return Err(AdapterError::Validation("verify-artifacts requires an artifact directory".into()));
+            }
+            verify_artifacts(&manifest, Path::new(&args[3]))?;
+            Ok(manifest_receipt(
+                "verify-artifacts", "ARTIFACT_BYTES_AND_DIGESTS_VERIFIED",
+                &manifest_bytes, manifest.artifacts.len(), 0, Vec::new(),
+            ))
+        }
+        "validate-records" => {
+            if args.len() != 4 {
+                return Err(AdapterError::Validation("validate-records requires an observation JSON path".into()));
+            }
+            let (observations, _): (ObservationSet, Vec<u8>) = read_json(Path::new(&args[3]))?;
+            let groups = validate_records(&manifest, &observations)?;
+            Ok(manifest_receipt(
+                "validate-records", "RECORD_CONTRACT_AND_OUTCOME_GROUP_SPLIT_VALID",
+                &manifest_bytes, manifest.artifacts.len(), observations.records.len(), groups,
+            ))
+        }
+        _ => Err(AdapterError::Validation(format!("unknown operation {operation:?}"))),
+    }
+}
+
+fn main() -> ExitCode {
+    let args: Vec<String> = env::args().collect();
+    match run(&args) {
+        Ok(receipt) => match serde_json::to_string_pretty(&receipt) {
+            Ok(json) => {
+                println!("{json}");
+                ExitCode::SUCCESS
+            }
+            Err(error) => {
+                eprintln!("could not serialize receipt: {error}");
+                ExitCode::FAILURE
+            }
+        },
+        Err(error) => {
+            eprintln!("{error}");
+            ExitCode::FAILURE
+        }
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+    use tempfile::tempdir;
+
+    fn manifest() -> SourceManifest {
+        SourceManifest {
+            schema_version: "0.1.0".into(),
+            dataset: DatasetIdentity {
+                id: "AMB2025-02".into(),
+                doi: "10.18434/mds2-3735".into(),
+                title: "AMB2025-02 tensile profile".into(),
+                publisher: "NIST".into(),
+                source_url: "https://doi.org/10.18434/mds2-3735".into(),
+                repository_url: "https://data.nist.gov/od/id/mds2-3735".into(),
+                descriptive_readme_url: "https://www.nist.gov/ambench".into(),
+                citation_policy: "Use DOI landing citation verbatim".into(),
+            },
+            related_sources: vec![RelatedSource {
+                id: "AMB2022-01".into(),
+                doi: "10.18434/mds2-2767".into(),
+                role: "upstream microstructure".into(),
+                url: "https://doi.org/10.18434/mds2-2767".into(),
+            }],
+            challenge_context: ChallengeContext {
+                material: "IN718".into(),
+                process: "PBF-LB".into(),
+                condition: "as-built; no heat treatment".into(),
+                test_method: "ASTM E8".into(),
+                strain_rate_per_second: 0.001,
+                gauge_length_mm: 3.0,
+                target_specimen_count: 8,
+                target_parent_specimen_id: "AMB2022-718-AMMT-B7-P4".into(),
+                target_definition: "average tensile properties".into(),
+                split_policy: "hold target lineage outcome records out as one group".into(),
+            },
+            reuse_policy: ReusePolicy {
+                artifact_terms_reviewed: false,
+                local_use_authorized: false,
+                repository_bundling_authorized: false,
+                status_note: "link only until reviewed".into(),
+            },
+            artifacts: Vec::new(),
+        }
+    }
+
+    fn record(
+        record_id: &str, group: &str, specimen: &str, role: RecordRole,
+        split: Split, variable: &str, value: f64,
+    ) -> Observation {
+        Observation {
+            record_id: record_id.into(),
+            source_doi: "10.18434/mds2-3735".into(),
+            specimen_id: specimen.into(),
+            lineage_group_id: group.into(),
+            variable_id: variable.into(),
+            role, split,
+            raw_value: Some(value),
+            raw_unit: Some("MPa".into()),
+            normalized_value: None,
+            normalized_unit: None,
+            conversion_note: None,
+            reported_uncertainty: None,
+            uncertainty_unit: None,
+            censoring: Censoring::Uncensored,
+            metadata_note: None,
+        }
+    }
+
+    #[test]
+    fn metadata_only_manifest_is_valid_without_claiming_data_verification() {
+        let value = manifest();
+        validate_manifest(&value).unwrap();
+        assert!(value.artifacts.is_empty());
+        assert!(!value.reuse_policy.artifact_terms_reviewed);
+    }
+
+    #[test]
+    fn rejects_local_artifacts_until_terms_reviewed() {
+        let mut value = manifest();
+        value.artifacts.push(SourceArtifact {
+            relative_path: "results.csv".into(),
+            sha256: "a".repeat(64),
+            size_bytes: 12,
+            media_type: "text/csv".into(),
+            source_url: "https://data.nist.gov/example.csv".into(),
+        });
+        assert!(validate_manifest(&value).is_err());
+    }
+
+    #[test]
+    fn rejects_path_traversal_in_artifact_paths() {
+        assert!(safe_relative_path("../private.csv").is_err());
+        assert!(safe_relative_path("nested/data.csv").is_ok());
+    }
+
+    #[test]
+    fn artifact_verifier_checks_both_bytes_and_digest() {
+        let tmp = tempdir().unwrap();
+        let content = b"source-bound bytes\n";
+        fs::write(tmp.path().join("sample.csv"), content).unwrap();
+        let mut value = manifest();
+        value.reuse_policy.artifact_terms_reviewed = true;
+        value.reuse_policy.local_use_authorized = true;
+        value.artifacts.push(SourceArtifact {
+            relative_path: "sample.csv".into(),
+            sha256: sha256_hex(content),
+            size_bytes: content.len() as u64,
+            media_type: "text/csv".into(),
+            source_url: "https://data.nist.gov/example.csv".into(),
+        });
+        validate_manifest(&value).unwrap();
+        verify_artifacts(&value, tmp.path()).unwrap();
+        value.artifacts[0].sha256 = "0".repeat(64);
+        assert!(verify_artifacts(&value, tmp.path()).is_err());
+    }
+
+    #[test]
+    fn rejects_target_lineage_in_calibration_outcomes() {
+        let value = manifest();
+        let observations = ObservationSet {
+            schema_version: "0.1.0".into(),
+            records: vec![
+                record("r1", "AMB2022-718-AMMT-B7-P4", "specimen-a", RecordRole::TargetOutcome, Split::Calibration, "yield_strength", 900.0),
+                record("r2", "AMB2022-718-AMMT-B7-P4", "aggregate-target", RecordRole::TargetOutcome, Split::HeldOut, "ultimate_strength", 1100.0),
+            ],
+        };
+        assert!(validate_records(&value, &observations).is_err());
+    }
+
+    #[test]
+    fn accepts_disjoint_calibration_and_held_out_outcome_groups() {
+        let value = manifest();
+        let observations = ObservationSet {
+            schema_version: "0.1.0".into(),
+            records: vec![
+                record("cal-1", "calibration-build-a", "specimen-cal-a", RecordRole::TargetOutcome, Split::Calibration, "yield_strength", 900.0),
+                record("target-1", "AMB2022-718-AMMT-B7-P4", "aggregate-target", RecordRole::TargetOutcome, Split::HeldOut, "yield_strength", 920.0),
+                record("target-2", "AMB2022-718-AMMT-B7-P4", "aggregate-target", RecordRole::TargetOutcome, Split::HeldOut, "ultimate_strength", 1100.0),
+            ],
+        };
+        let groups = validate_records(&value, &observations).unwrap();
+        assert_eq!(groups, vec!["AMB2022-718-AMMT-B7-P4"]);
+    }
+
+    #[test]
+    fn rejects_normalization_without_preserved_source_and_conversion_note() {
+        let value = manifest();
+        let mut row = record("target", "AMB2022-718-AMMT-B7-P4", "aggregate-target", RecordRole::TargetOutcome, Split::HeldOut, "yield_strength", 920.0);
+        row.normalized_value = Some(0.92);
+        row.normalized_unit = Some("GPa".into());
+        let observations = ObservationSet { schema_version: "0.1.0".into(), records: vec![row] };
+        assert!(validate_records(&value, &observations).is_err());
+    }
+
+    #[test]
+    fn rejects_unknown_source_doi() {
+        let value = manifest();
+        let mut row = record("target", "AMB2022-718-AMMT-B7-P4", "aggregate-target", RecordRole::TargetOutcome, Split::HeldOut, "yield_strength", 920.0);
+        row.source_doi = "10.0000/not-declared".into();
+        let observations = ObservationSet { schema_version: "0.1.0".into(), records: vec![row] };
+        assert!(validate_records(&value, &observations).is_err());
+    }
+
+    #[test]
+    fn rejects_duplicate_record_ids() {
+        let value = manifest();
+        let row1 = record("dup", "AMB2022-718-AMMT-B7-P4", "aggregate-target", RecordRole::TargetOutcome, Split::HeldOut, "yield_strength", 920.0);
+        let row2 = record("dup", "AMB2022-718-AMMT-B7-P4", "aggregate-target", RecordRole::TargetOutcome, Split::HeldOut, "ultimate_strength", 1100.0);
+        let observations = ObservationSet { schema_version: "0.1.0".into(), records: vec![row1, row2] };
+        assert!(validate_records(&value, &observations).is_err());
+    }
+
+    #[test]
+    fn rejects_unknown_censoring_without_explanation() {
+        let value = manifest();
+        let mut row = record("target", "AMB2022-718-AMMT-B7-P4", "aggregate-target", RecordRole::TargetOutcome, Split::HeldOut, "yield_strength", 920.0);
+        row.censoring = Censoring::Unknown;
+        let observations = ObservationSet { schema_version: "0.1.0".into(), records: vec![row] };
+        assert!(validate_records(&value, &observations).is_err());
+    }
+
+    #[test]
+    fn raw_value_and_unit_survive_normalization() {
+        let value = manifest();
+        let mut row = record("target", "AMB2022-718-AMMT-B7-P4", "aggregate-target", RecordRole::TargetOutcome, Split::HeldOut, "yield_strength", 920.0);
+        row.normalized_value = Some(0.92);
+        row.normalized_unit = Some("GPa".into());
+        row.conversion_note = Some("1 MPa = 0.001 GPa; deterministic unit conversion".into());
+        let observations = ObservationSet { schema_version: "0.1.0".into(), records: vec![row] };
+        validate_records(&value, &observations).unwrap();
+        assert_eq!(observations.records[0].raw_value, Some(920.0));
+        assert_eq!(observations.records[0].raw_unit.as_deref(), Some("MPa"));
+    }
+}
