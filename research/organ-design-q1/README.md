@@ -55,6 +55,18 @@ The result tier is hard-coded by profile validation to `synthetic_simulation`; c
 - vessel compliance, pulsatile flow, barrier permeability or oxygen delivery;
 - tissue viability, disease-model validity, whole-organ function or transplant readiness.
 
+## Exact-head verifier receipt
+
+Use the receipt-producing entrypoint (from the repository root):
+
+```sh
+bash research/organ-design-q1/verify-q1.sh \
+  target/organ-design-q1-receipt.json \
+  "$(git rev-parse HEAD)"
+```
+
+The receipt binds the exact source commit, isolated manifest, ranking implementation source, and hostile-case catalog hashes, plus formatting/test command outcomes and the synthetic-only claim ceiling. The dedicated `Organ Design Q1` workflow checks out the exact pull-request head, pins Rust 1.96.0, runs the verifier, and uploads the receipt even when verification fails. A previous-head result or a queued/cancelled workflow is not a pass.
+
 ## Current validation status
 
 This editing environment has not run Cargo/Rust. The source and fixtures must be checked out and executed on the exact branch SHA. A queued/cancelled/skipped workflow is not a passing receipt. The Q1 tranche should stay separate from Symtropy's Q0 gate and must not be described as qualified until an exact-head run completes.
