@@ -672,6 +672,13 @@ mod tests {
         assert_eq!(report.scenario_count_per_seed, 12);
         assert_eq!(report.ranking_scenarios_per_seed, 9);
         assert_eq!(report.ranked_selection_opportunities, 900);
+        assert_eq!(report.acceptable_selection_count, 550);
+        assert_eq!(report.unacceptable_selection_count, 350);
+        assert_eq!(report.selection_without_ranking_count, 300);
+        assert_eq!(report.selection_on_reject_all_count, 100);
+        assert_eq!(report.stale_context_selection_count, 400);
+        assert_eq!(report.min_acceptable_per_seed, 2);
+        assert_eq!(report.max_acceptable_per_seed, 9);
         assert_eq!(
             report.acceptable_selection_count + report.unacceptable_selection_count,
             report.ranked_selection_opportunities
