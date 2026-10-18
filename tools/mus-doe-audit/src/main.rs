@@ -325,8 +325,8 @@ mod tests {
         ];
         for (axis, expected_fault) in axes {
             let mut data = corpus();
-            data["cases"][0]["observations"][4]["group_ids"][axis] =
-                data["cases"][0]["observations"][0]["group_ids"][axis].clone();
+            let fit_group_id = data["cases"][0]["observations"][0]["group_ids"][axis].clone();
+            data["cases"][0]["observations"][4]["group_ids"][axis] = fit_group_id;
             data["cases"][0]["independence_axes"] = json!([axis]);
             data["cases"][0]["fault_modes"] = json!(["none"]);
             let findings = semantic_findings(&data).0;
