@@ -855,6 +855,44 @@ mod tests {
     }
 
     #[test]
+    fn generated_factorized_suite_runs_through_query_budget_frontier() {
+        use crate::preference_drift_generator::{
+            generate_preference_drift_suite, PreferenceDriftGeneratorConfigV1,
+        };
+
+        let config = PreferenceDriftGeneratorConfigV1 {
+            seed: 42,
+            wearer_session_count: 10,
+            development_wearer_session_count: 2,
+            held_out_repetitions_per_family: 1,
+        };
+        let suite = generate_preference_drift_suite(FIXTURE, &config)
+            .expect("factorized suite should validate");
+        let report = evaluate_preference_query_budget_frontier(
+            &suite.fixture_json,
+            2,
+            config.seed,
+        )
+        .expect("generated suite should evaluate in the query frontier");
+
+        assert_eq!(report.scenario_count, 84);
+        assert_eq!(report.lexicographic_unasked_pair.len(), 3);
+        assert_eq!(report.seeded_random_unasked_pair.len(), 3);
+        assert_eq!(
+            report.lexicographic_unasked_pair[2].family_scores.len(),
+            11
+        );
+        assert_eq!(
+            report.lexicographic_unasked_pair[2]
+                .family_scores
+                .values()
+                .map(|score| score.scenario_count)
+                .sum::<usize>(),
+            84
+        );
+    }
+
+    #[test]
     fn query_budget_limit_is_validated() {
         assert!(evaluate_preference_query_budget_frontier(FIXTURE, 9, 1).is_err());
     }
