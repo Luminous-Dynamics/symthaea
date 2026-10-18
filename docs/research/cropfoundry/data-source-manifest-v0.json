@@ -78,7 +78,7 @@
         "phenotypic records",
         "yield and management records"
       ],
-      "observed_metadata": "The 2026 article describes a public dataset and states research/educational reuse; verify the Zenodo artifact's own license, subfile terms, and third-party content before processing or redistribution.",
+      "observed_metadata": "The 2026 article describes a public dataset and states research/educational reuse; verify the Zenodo artifact's own license, subfile terms, and third-party content before processing or redistribution. The 2026 paper describes the source as a greenhouse study in Northeast China with one integrated monitoring station; treat it as a temporal/multimodal evaluation candidate, not independent geographic replication or evidence of South African transfer.",
       "license_status": "publication_reports_research_educational_reuse_dataset_terms_not_pinned",
       "access_status": "public_landing_page_artifact_terms_not_pinned",
       "ingestion_status": "quarantined",
@@ -88,7 +88,8 @@
       ],
       "training_authorized": false,
       "content_sha256": null,
-      "next_gate": "Fetch dataset-specific API metadata, inspect files/licenses/README, and record exact terms and SHA-256 digests for the authorized subset."
+      "next_gate": "Fetch dataset-specific API metadata, inspect files/licenses/README, and record exact terms and SHA-256 digests for the authorized subset.",
+      "initial_intended_role": "Multimodal sensor/image/phenotype alignment; assess held-out planting cycles or seasons only if experimental grouping supports it. Geography-transfer claim is out of scope."
     },
     {
       "id": "DS-004",
