@@ -48,7 +48,8 @@
             "evidence_eligibility",
             "nutrition_feasibility",
             "lca_comparison",
-            "scenario_feasibility"
+            "scenario_feasibility",
+            "cost_comparison"
           ]
         },
         "scenario_digest": {
@@ -271,7 +272,8 @@
               "evidence_eligibility",
               "nutrition_feasibility",
               "lca_comparison",
-              "scenario_feasibility"
+              "scenario_feasibility",
+              "cost_comparison"
             ]
           }
         },
