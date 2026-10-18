@@ -2086,6 +2086,42 @@ mod tests {
     }
 
     #[test]
+    fn test_rk45_tighter_tolerance_reduces_exponential_global_error() {
+        fn growth(_t: f64, y: &[f64]) -> Vec<f64> {
+            vec![y[0]]
+        }
+        let system = ODESystem { f: growth, dim: 1 };
+        let loose = DifferentialEquationsEngine::try_solve_rk45(
+            &system, 0.0, 10.0, &[1.0], 1e-2,
+        )
+        .expect("looser tolerance should reach the endpoint");
+        let tight = DifferentialEquationsEngine::try_solve_rk45(
+            &system, 0.0, 10.0, &[1.0], 1e-10,
+        )
+        .expect("tighter tolerance should reach the endpoint");
+        let exact = 10.0_f64.exp();
+        let loose_relative_error = (loose.y_final[0] - exact).abs() / exact;
+        let tight_relative_error = (tight.y_final[0] - exact).abs() / exact;
+
+        assert!(loose.converged && tight.converged);
+        assert!(
+            tight_relative_error < loose_relative_error,
+            "Tighter tolerance should reduce error: loose={loose_relative_error:.3e}, tight={tight_relative_error:.3e}"
+        );
+        assert!(
+            tight_relative_error < 1e-8,
+            "Tight-tolerance relative error {:.3e} exceeds 1e-8",
+            tight_relative_error
+        );
+        assert!(
+            tight.steps_taken > loose.steps_taken,
+            "Tighter tolerance should spend more accepted steps: loose={}, tight={}",
+            loose.steps_taken,
+            tight.steps_taken
+        );
+    }
+
+    #[test]
     fn test_rk45_legacy_wrapper_marks_invalid_solve_not_converged() {
         fn decay(_t: f64, y: &[f64]) -> Vec<f64> {
             vec![-y[0]]
