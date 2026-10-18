@@ -91,6 +91,7 @@ pub fn validate_fixture(root: &Value) -> ValidationReport {
     validate_unique_ids(root, "synthetic_process_graph", "operation_id", &mut issues);
     validate_unique_ids(root, "proposed_targets", "id", &mut issues);
     validate_unique_ids(root, "synthetic_cost_scenarios", "scenario_id", &mut issues);
+    validate_unique_ids(root, "synthetic_material_balance_cases", "case_id", &mut issues);
     validate_unique_ids(root, "metric_definitions", "id", &mut issues);
     validate_unique_ids(root, "disruptions", "id", &mut issues);
     validate_unique_ids(root, "negative_controls", "case_id", &mut issues);
@@ -107,6 +108,7 @@ pub fn validate_fixture(root: &Value) -> ValidationReport {
     validate_disruptions(root, &mut issues);
     validate_required_target_ranges(root, &mut issues);
     validate_cost_scenarios(root, &mut issues);
+    validate_material_balance_cases(root, &mut issues);
     validate_verification_status(root, &mut issues);
 
     issues.sort_by(|left, right| {
@@ -1077,6 +1079,42 @@ fn validate_cost_scenarios(root: &Value, issues: &mut Vec<ValidationIssue>) {
     }
 }
 
+fn validate_material_balance_cases(root: &Value, issues: &mut Vec<ValidationIssue>) {
+    let Some(cases) = root
+        .get("synthetic_material_balance_cases")
+        .and_then(Value::as_array)
+    else {
+        push(
+            issues,
+            "MATERIAL_BALANCE_CASES_MISSING",
+            "synthetic_material_balance_cases",
+            "an explicit material-balance known-answer array is required",
+        );
+        return;
+    };
+    if cases.is_empty() {
+        push(
+            issues,
+            "MATERIAL_BALANCE_CASES_EMPTY",
+            "synthetic_material_balance_cases",
+            "at least one material-balance known-answer case is required",
+        );
+        return;
+    }
+    for case in cases {
+        if let Some(id) = case.get("case_id").and_then(Value::as_str) {
+            if let Err(error) = accounting::calculate_material_balance(root, id) {
+                push(
+                    issues,
+                    "MATERIAL_BALANCE_INVALID",
+                    format!("synthetic_material_balance_cases[{id}]"),
+                    error,
+                );
+            }
+        }
+    }
+}
+
 fn validate_verification_status(root: &Value, issues: &mut Vec<ValidationIssue>) {
     let Some(status) = root.get("verification_status") else {
         push(
@@ -1374,6 +1412,53 @@ mod tests {
         value["synthetic_cost_scenarios"][1]["expected_total_minor_units"] =
             serde_json::json!(200_000);
         assert!(has_code(&validate_fixture(&value), "COST_SCENARIO_INVALID"));
+    }
+
+    #[test]
+    fn material_balance_known_answer_closes_exactly() {
+        let value = fixture();
+        let report = accounting::calculate_material_balance(
+            &value,
+            "MASS-BALANCE-ARITHMETIC-01",
+        )
+        .unwrap();
+        assert_eq!(report.input_mass_mg, 10_000_000);
+        assert_eq!(report.accounted_mass_mg, 10_000_000);
+        assert_eq!(report.unaccounted_mass_mg, 0);
+        assert_eq!(report.closure_basis_points_floor, 10_000);
+        assert_eq!(report.accepted_yield_basis_points_floor, 8_500);
+    }
+
+    #[test]
+    fn missing_material_mass_is_blocked() {
+        let mut value = fixture();
+        value["synthetic_material_balance_cases"][0]["scrap_mass_mg"] =
+            serde_json::json!(500_000);
+        assert!(has_code(&validate_fixture(&value), "MATERIAL_BALANCE_INVALID"));
+    }
+
+    #[test]
+    fn reported_mass_residual_must_match_computed_residual() {
+        let mut value = fixture();
+        value["synthetic_material_balance_cases"][0]["reported_unaccounted_mass_mg"] =
+            serde_json::json!(100);
+        assert!(has_code(&validate_fixture(&value), "MATERIAL_BALANCE_INVALID"));
+    }
+
+    #[test]
+    fn double_counted_material_mass_is_blocked() {
+        let mut value = fixture();
+        value["synthetic_material_balance_cases"][0]["accepted_output_mass_mg"] =
+            serde_json::json!(9_000_000);
+        assert!(has_code(&validate_fixture(&value), "MATERIAL_BALANCE_INVALID"));
+    }
+
+    #[test]
+    fn zero_input_mass_is_blocked() {
+        let mut value = fixture();
+        value["synthetic_material_balance_cases"][0]["input_mass_mg"] =
+            serde_json::json!(0);
+        assert!(has_code(&validate_fixture(&value), "MATERIAL_BALANCE_INVALID"));
     }
 
     #[test]
