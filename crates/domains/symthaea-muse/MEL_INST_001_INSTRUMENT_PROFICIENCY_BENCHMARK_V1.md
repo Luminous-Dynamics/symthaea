@@ -118,10 +118,19 @@ Report listener counts, uncertainty, per-class confusion, source/baseline and fa
 - Route the actual VCSL recorder bank to Recorder instead of treating it as Ney.
 - Add roster and parameter-integrity regressions.
 
-### P1 — Inventory on the target machine
-- Run the existing instrument-capability inventory when local VCSL/VSCO-2-CE assets and a soundfont are available.
-- Pin the asset manifest and identify uncovered instruments, pitch ranges, dynamics and articulations.
-- Treat missing roots as unavailable evidence, not empty-but-supported coverage.
+### P1 — Instrument capability matrix (implemented as a new local tool)
+Run:
+
+```sh
+cargo run -p symthaea-muse --bin muse_instrument_qualification -- > mel-instrument-capability-matrix.json
+```
+
+- The tool consumes the existing VCSL / VSCO-2-CE inventory and emits 46 explicit per-instrument rows.
+- It distinguishes no source mapping, missing directories, no pitch-indexed samples, decode failures, silence-only decoded assets, partial sample evidence and indexed non-silent source samples.
+- It preserves filename-observed MIDI bounds and internal pitch holes but labels the usable/playable range as **not established**. These are source-file observations, not measured instrument capabilities.
+- Four instrument-specific gesture queues (Recorder, Ocarina, Harmonica, DanTranh) are emitted as `planned_unvalidated`; this is a worklist, not an implemented capability claim.
+- The inventory reads indexed WAVs for decode/silence evidence. `--hash-indexed-samples` additionally hashes the contents of every accepted WAV and may be I/O intensive.
+- Missing roots remain unavailable evidence, not empty-but-supported coverage. No instrument is marked qualified by the source inventory alone.
 
 ### P2 — Per-instrument render receipts and probe grid
 - First increment now exists as `src/bin/muse_instrument_probe.rs` and is auto-discovered by Cargo as `muse_instrument_probe`.
@@ -150,7 +159,9 @@ cargo run -p symthaea-muse --bin muse_instrument_probe -- --instrument all > mel
 cargo run -p symthaea-muse --bin muse_instrument_probe -- --instrument harmonica --repeats 1
 ```
 
-Use `cargo test -p symthaea-muse --bin muse_instrument_probe` for roster/bounds checks, synthetic sine pitch-estimator sanity tests, silence rejection and velocity-response summary tests. These tests and commands are authored/documented but are not marked as executed by this change.
+Use `cargo test -p symthaea-muse --bin muse_instrument_probe` for roster/bounds checks, synthetic sine pitch-estimator sanity tests, silence rejection and velocity-response summary tests.
+Use `cargo test -p symthaea-muse --bin muse_instrument_qualification` for fail-closed source-status classification and the explicit unvalidated-gesture worklist.
+These tests and commands are authored/documented but are not marked as executed by these changes.
 
 The next increment should couple each selected-file hash to a pinned library/root manifest and add instrument-specific range, pitch-accuracy, and gesture tests. Keep a per-note evidence record linking the requested instrument, selected renderer, selected source sample, signal checks, and exact renderer/asset digests. Do not collapse these fields into a pooled “instrument score.”
 
@@ -173,9 +184,9 @@ This plan is designed to let source work and local evaluation proceed without wa
 
 ## 7. Research anchors for evaluation design
 
-- [MIREX 2026 Music Evaluation via CMI-RewardBench](https://www.music-ir.org/mirex/wiki/2026%3AMusic_Evaluation_via_CMI-RewardBench) uses pairwise comparisons to evaluate automatic metrics against human preference; the lesson for Melothaea is to publish signal measurements and human ratings as separate evidence channels.
+- [MIREX 2026 Music Evaluation via CMI-RewardBench](https://www.music-ir.org/mirex/wiki/2026%3AMusic_Evaluation_via_CMI-RewardBench) explicitly focuses on the gap between automatic acoustic metrics and listener preference. In the [published 2026 results](https://www.music-ir.org/mirex/wiki/2026%3AMusic_Evaluation_via_CMI-RewardBench_Results), leading preference-prediction systems scored in the low-to-mid 70% range on the core pairwise task. That is a *judge-versus-human agreement metric*, not a target score for the generated audio itself.
 - The [YIN fundamental-frequency method](https://pubmed.ncbi.nlm.nih.gov/12002874/) provides a computationally efficient F0 diagnostic. Melothaea's first implementation is deliberately labelled exploratory, with confidence/status visible; it still needs instrument-family calibration and independent tests against known reference tones and acoustically inharmonic instruments.
-- [MIREX 2026 Symbolic Music Generation](https://www.music-ir.org/mirex/wiki/2026%3ASymbolic_Music_Generation) evaluates blind listener judgements along separate dimensions such as prompt coherence, creativity, structuredness, and musicality. These can guide later music-level studies, but they do not replace isolated instrument tests.
+- [MIREX 2026 Symbolic Music Generation](https://www.music-ir.org/mirex/wiki/2026%3ASymbolic_Music_Generation) uses a double-blind subjective evaluation across prompt coherence, creativity, structuredness and musicality; its [audio-generation evaluation protocol](https://www.music-ir.org/mirex/wiki/2026%3AMusic_Audio_Generation) separately scores melody, harmony, key consistency, style consistency, and arrangement/production. Melothaea should follow the same separation rather than masking a broken instrument inside a high overall music score.
 - [ITU-R BS.1770-5](https://www.itu.int/rec/R-REC-BS.1770-5-202311-I) is the in-force recommendation for programme loudness and true-peak measurement. The initial probe only measures raw sample peak/RMS/DC and therefore must not label these as LUFS or true-peak compliance.
 
 
