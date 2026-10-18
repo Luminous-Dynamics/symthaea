@@ -56,6 +56,7 @@ All targets below are goals. Only the structural controls already encoded in the
 | NOT_RUN / SKIPPED / REFERENCE_UNAVAILABLE / OUT_OF_DOMAIN promoted to PASS | **0** | Hard |
 | Frozen receipts with all required provenance/context fields | **100%** | Hard |
 | Seeded changes to a frozen receipt without digest update are detected | **100%** | Hard |
+| Digest policy drift from the compiled implementation is rejected | **100%** | Hard |
 | Planted transitive shared-dependency challenge detected | **100%** of seeded cases | Hard |
 | Malformed lineage graph challenge detected | **100%** of seeded cases | Hard |
 | Analytic material/element/energy invariant escape | **0** for registered negative controls | Hard |
