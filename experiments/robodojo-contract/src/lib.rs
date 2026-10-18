@@ -283,7 +283,9 @@ impl TrialRecord {
         if self.valid_run != self.progress.is_some() {
             return Err(MetricError::ValidityScoreMismatch);
         }
-        if self.timed_out != (self.failure_class == FailureClass::Timeout) {
+        if self.timed_out != (self.failure_class == FailureClass::Timeout)
+            || (!self.valid_run && self.failure_class == FailureClass::None)
+        {
             return Err(MetricError::FailureClassMismatch);
         }
         match self.progress {
@@ -810,6 +812,37 @@ mod tests {
         assert_eq!(a.progress_delta_ci95, Some((0.25, 0.25)));
         assert_eq!(a.mean_elapsed_seconds_delta, -1.0);
         assert!((a.mean_cost_usd_delta + 0.20).abs() < 1e-12);
+    }
+
+    #[test]
+    fn failure_class_parser_is_closed_over_documented_values() {
+        assert_eq!(FailureClass::parse("none"), Some(FailureClass::None));
+        assert_eq!(FailureClass::parse("timeout"), Some(FailureClass::Timeout));
+        assert_eq!(FailureClass::parse("thermal_stop"), Some(FailureClass::ThermalStop));
+        assert_eq!(FailureClass::parse("server_error"), Some(FailureClass::ServerError));
+        assert_eq!(FailureClass::parse("invalid_action"), Some(FailureClass::InvalidAction));
+        assert_eq!(FailureClass::parse("safety_stop"), Some(FailureClass::SafetyStop));
+        assert_eq!(FailureClass::parse("other"), Some(FailureClass::Other));
+        assert_eq!(FailureClass::parse("overheated_maybe"), None);
+    }
+
+    #[test]
+    fn a_timeout_can_retain_a_valid_partial_grade() {
+        let mut row = trial("cap-pen", "baseline", "timeout-with-score", Some(0.5), 12.0);
+        row.timed_out = true;
+        row.failure_class = FailureClass::Timeout;
+        assert_eq!(row.validate(), Ok(()));
+        let summary = summarize_trials(&[row], 0, 1).unwrap();
+        assert_eq!(summary[0].valid_trials, 1);
+        assert_eq!(summary[0].timeout_count, 1);
+        assert_eq!(summary[0].mean_progress, Some(0.5));
+    }
+
+    #[test]
+    fn missing_grade_requires_an_explicit_failure_class() {
+        let mut row = trial("cap-pen", "baseline", "no-grade", None, 10.0);
+        row.failure_class = FailureClass::None;
+        assert_eq!(row.validate(), Err(MetricError::FailureClassMismatch));
     }
 
     #[test]
