@@ -213,3 +213,34 @@ Natural mineral extraction is not a continuation flag on debris recovery. It wou
 A green synthetic fixture can establish that a particular software contract behaved as specified under the fixture's assumptions. It cannot establish that a sensor detects every species, that the ocean model is faithful, that the robot is seaworthy, that an intervention is ecologically safe, or that a mission is legally permitted. Claims must name the exact environment level: synthetic, replay, tank/pool, sheltered water, or field-measured.
 
 The target is a system that learns what it needs to know, obtains evidence, refuses to act beyond that evidence, and makes its effects independently auditable—not a system that mistakes autonomy for authority.
+
+
+## 11. Real-data intake: resolution-aware, rights-aware, and never “map = truth”
+
+Use a small, versioned source registry rather than hard-coding one supposedly authoritative ocean map. The data product must carry its fitness-for-purpose and uncertainty with it.
+
+### Initial source families
+
+- **GEBCO_2026 Grid + Type Identifier (TID) Grid** ([official grid page](https://www.gebco.net/data-products-gridded-bathymetry-data/gebco2026-grid)): a useful global context and coarse planning prior. The grid is a 15-arc-second global terrain model; the TID layer identifies source-data type. GEBCO documents heterogeneous inputs and notes that some shallow-water data may use a vertical datum other than mean sea level. Therefore this product must not be treated as close-range obstacle-clearance truth, high-resolution habitat inventory, or proof that a passage is safe. Pin grid version, TID version, subset, attribution, datum assumptions and exact content digest.
+- **IHO S-100 product adapters** ([standards list](https://iho.int/standards-and-specifications)): design versioned adapters for S-102 bathymetric surfaces, S-111 surface-current information, and S-122 marine protected areas as suitable data become available. IHO reports that Phase 1 product specifications entered into force in January 2026 ([S-100 operational status](https://iho.int/en/the-s-100-framework-is-now-operational)). Product version, producer, coverage, update time, licensing, coordinate/vertical reference and validity must be checked for every imported dataset; the existence of a standard does not mean every needed local product exists or is current.
+- **EMODnet** ([data and terms](https://emodnet.ec.europa.eu/en/terms-use-emodnet-online-services-data-and-data-products)): a discovery/adapter source across bathymetry, biology, chemistry, geology, human activities, physics and seabed habitats. Its portal aggregates inputs from many providers. Preserve originator metadata and check each dataset's terms; EMODnet says its own generated data products are generally CC BY 4.0, while individual source datasets can carry different terms.
+- **OBIS** ([data access](https://portal.obis.org/data/access/)): marine biodiversity occurrence records suitable for positive observation evidence, survey-prior construction and benchmark strata. Preserve provider-supplied Darwin Core fields and provenance. Occurrence data are not a complete seabed census; an absence of records cannot establish species absence. Choose an export/API suited to subset size and follow the provider's usage guidance.
+
+These are starting source families, not already ingested or validated datasets. Exact product retrieval, license verification, schema mapping and content digests are a separate intake step. The benchmark must not claim real-data coverage until those artifacts exist.
+
+### Intake manifest
+
+Every source snapshot should record:
+- canonical source/product name, provider, dataset/version/DOI or stable identifier, retrieval timestamp and exact URL;
+- raw artifact digest, license/terms, required attribution, redistribution limits and any sensitive-location restrictions;
+- spatial and temporal coverage/resolution, coordinate reference and vertical datum;
+- for gridded bathymetry, source/TID identity where available and declared known datum/resolution caveats;
+- calibration/quality metadata, sampling effort where available, uncertainty/coverage limitations and explicit missingness;
+- transformation code/version, output digest and exact lineage from input bytes to derived tiles/features;
+- declared allowed use: display, regional planning, scientific prior, navigation support, habitat constraint, or another specific purpose.
+
+The allowed-use classification is a reviewed capability, not a model-generated confidence score. For example, coarse bathymetry might be admissible for regional context while remaining inadmissible for final approach clearance. A source with missing rights, mismatched datum, insufficient resolution, stale time coverage or unbounded uncertainty is retained as evidence of a gap and cannot quietly become a safety constraint or clearance guarantee.
+
+### Benchmark leakage controls
+
+Geographic and source leakage can make perception or habitat classifiers look better than they generalize. Split by survey site/region, cruise or survey campaign, source dataset and time where those identifiers exist—not only by random image tile. Freeze the split before tuning. Report performance by source family, visibility/turbidity, depth range, habitat type and survey effort. Use positive/negative labels only where the sampling method justifies them; unobserved cells are unlabeled, not automatic negatives.
