@@ -9,8 +9,8 @@
   "tool": {
     "name": "OpenSCAD",
     "version": "2021.01",
-    "environment": "tooling_container",
-    "validation_scope": "native CAD parse, CSG render/export, and mesh bounding-box arithmetic only"
+    "environment": "github-hosted-runner-ubuntu-24.04",
+    "validation_scope": "native CAD parse, CSG render/export and per-run STL hashes; bounds and parameter negatives are asserted by CI. STL bytes are retained as run provenance, not assumed byte-identical across OpenSCAD build environments."
   },
   "default_configuration": {
     "plate_width_mm": 80,
@@ -33,7 +33,7 @@
       "status": "PASS",
       "detail": "OpenSCAD successfully generated a 3D STL from the default design with the illustrative sensor outline disabled by default.",
       "output_format": "ASCII STL",
-      "output_sha256": "c1fad59ba81cea2891973c23c1557b4aab38eefa91b55af2709b4b2383132585",
+      "output_sha256": "9a3dbcb80ab7f48a0e7c3a21dc5810420bf79a4c01c2a292057f2c639c16fced",
       "triangle_count": 2872
     },
     {
@@ -70,7 +70,7 @@
         60
       ],
       "absolute_tolerance_mm": 0.02,
-      "output_sha256": "6016796d3cfd386a11d658c90f8b94f8d969397f2defc3ee5b4fbb129eb222e2",
+      "output_sha256": "038bf5e49019acbceb1b6477fee02a87ebb05277eeb0748289f8cf96ad6ee764",
       "triangle_count": 2872,
       "detail": "A second dimensional configuration rendered successfully and exported bounds matching its overridden parameters."
     },
@@ -105,5 +105,11 @@
     "optical_or_metrology_performance_validated": false,
     "physical_validation": "NOT_PERFORMED",
     "overall_disposition": "GEOMETRY_EXPORT_CHECKED_NOT_PHYSICALLY_QUALIFIED"
+  },
+  "execution": {
+    "workflow_run_id": 39147889097,
+    "workflow_run_url": "https://github.com/Luminous-Dynamics/symthaea/actions/runs/39147889097",
+    "tested_commit_sha": "c417ef92a60309c7f4647b524c4f00a6fd91bfd1",
+    "scope_note": "CAD export, alternate-parameter render, mesh bounds and aperture assertion completed successfully in this run. The overall workflow later failed at cargo fmt; this receipt is only for the listed CAD-specific checks."
   }
 }
