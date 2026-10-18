@@ -37,3 +37,6 @@ See [the MINE-COMMS-001 specification](../../../docs/research/MINE_COMMUNICATION
 ## Physical TTE characterization
 
 [MINE-TTE-CHAR-001 #8047](https://github.com/Luminous-Dynamics/symthaea/issues/8047) defines calibrated bench measurements and held-out physical validation to replace purely synthetic channel assumptions. It is a research/test protocol, not permission to operate unapproved transmitters in a mine.
+
+
+Time semantics: the message evaluator rejects messages already expired when evaluated, never assigns retroactive transmission/arrival times, and rechecks ACK-link freshness when the receiver gets the message.
