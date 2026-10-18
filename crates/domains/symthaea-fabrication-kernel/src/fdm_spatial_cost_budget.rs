@@ -496,7 +496,7 @@ pub fn run_cost_budget_arm(
     }
 
     let mut candidates = candidate_positions();
-    let mut stop_reason = CostBudgetStopReason::ObservationCapReached;
+    let mut stop_reason: CostBudgetStopReason;
     loop {
         if trace.len() >= INITIAL_OBSERVATION_COUNT + ADDITIONAL_OBSERVATION_BUDGET {
             stop_reason = CostBudgetStopReason::ObservationCapReached;
@@ -624,6 +624,18 @@ pub fn verify_cost_budget_report(report: &CostBudgetReport) -> Result<(), CostBu
         if !unique.insert(key) {
             return Err(CostBudgetError::InvalidTrace("duplicate observation position".to_owned()));
         }
+        let on_lattice = (observation.position.x * 10.0 - (observation.position.x * 10.0).round()).abs() <= 1.0e-9
+            && (observation.position.y * 10.0 - (observation.position.y * 10.0).round()).abs() <= 1.0e-9
+            && (1.0..=9.0).contains(&(observation.position.x * 10.0))
+            && (1.0..=9.0).contains(&(observation.position.y * 10.0));
+        if !on_lattice {
+            return Err(CostBudgetError::InvalidTrace("measurement is outside the frozen candidate lattice".to_owned()));
+        }
+        if index >= INITIAL_OBSERVATION_COUNT
+            && !candidate_positions().iter().any(|candidate| same_position(*candidate, observation.position))
+        {
+            return Err(CostBudgetError::InvalidTrace("additional measurement is not a candidate-grid location".to_owned()));
+        }
         let expected = incremental_cost(previous, observation.position, &report.cost_schedule, index == 0);
         let close = |actual: f64, wanted: f64| actual.is_finite() && (actual - wanted).abs() <= 1.0e-9;
         if !close(item.cost.setup_units, expected.setup)
@@ -643,12 +655,14 @@ pub fn verify_cost_budget_report(report: &CostBudgetReport) -> Result<(), CostBu
     if cumulative > report.cost_schedule.budget_units + EPSILON {
         return Err(CostBudgetError::InvalidTrace("reported trace exceeds its cost budget".to_owned()));
     }
-    if !close_f64(report.metrics.spent_budget_units, cumulative)
+    let recomputed_metrics = evaluate_costed_design(report.surface, &report.observations, &report.cost_schedule);
+    if recomputed_metrics != report.metrics
+        || !close_f64(report.metrics.spent_budget_units, cumulative)
         || !close_f64(report.metrics.unused_budget_units, (report.cost_schedule.budget_units - cumulative).max(0.0))
         || report.metrics.observation_count != report.observations.len()
         || report.metrics.additional_observation_count != report.observations.len() - INITIAL_OBSERVATION_COUNT
     {
-        return Err(CostBudgetError::InvalidTrace("summary totals do not match cost ledger".to_owned()));
+        return Err(CostBudgetError::InvalidTrace("summary metrics do not recompute from the trace and cost ledger".to_owned()));
     }
     if report.report_digest_sha256 != report_digest(report)? {
         return Err(CostBudgetError::InvalidTrace("report digest mismatch".to_owned()));
