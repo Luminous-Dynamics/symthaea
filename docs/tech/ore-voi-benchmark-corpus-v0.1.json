@@ -1,0 +1,94 @@
+{
+  "suite_id": "ORE-VOI-001",
+  "suite_version": "0.1.0",
+  "evidence_class": "synthetic_contract",
+  "claim_ceiling": "Known-answer acquisition-policy semantics only; no claim about measured assay value, mine performance, recovery, economics, or real-world decision quality.",
+  "scenarios": [
+    {
+      "scenario_id": "UNCERTAINTY_IS_NOT_DECISION_VALUE",
+      "budget_units": 4,
+      "actions": [
+        {"action_id":"HIGH_UNCERTAINTY","measurement_kind":"assay","available":true,"availability_reason":"available","cost_units":1,"uncertainty_reduction_units":90,"estimated_gross_decision_gain_units":7,"fixed_priority":1},
+        {"action_id":"DECISION_TARGETED","measurement_kind":"recovery_test","available":true,"availability_reason":"available","cost_units":2,"uncertainty_reduction_units":20,"estimated_gross_decision_gain_units":25,"fixed_priority":2},
+        {"action_id":"LOW_VALUE_CHECK","measurement_kind":"moisture_check","available":true,"availability_reason":"available","cost_units":1,"uncertainty_reduction_units":15,"estimated_gross_decision_gain_units":5,"fixed_priority":3}
+      ],
+      "evaluation_only":{"realized_gross_decision_gain_units":[{"action_id":"HIGH_UNCERTAINTY","gross_gain_units":8},{"action_id":"DECISION_TARGETED","gross_gain_units":30},{"action_id":"LOW_VALUE_CHECK","gross_gain_units":5}]},
+      "expected":{"fixed_order_action_id":"HIGH_UNCERTAINTY","uncertainty_first_action_id":"HIGH_UNCERTAINTY","decision_aware_action_id":"DECISION_TARGETED","oracle_action_id":"DECISION_TARGETED"}
+    },
+    {
+      "scenario_id": "OUT_OF_BUDGET_TEST_IS_NOT_SELECTABLE",
+      "budget_units": 2,
+      "actions": [
+        {"action_id":"OVER_BUDGET","measurement_kind":"comminution_energy","available":true,"availability_reason":"available","cost_units":5,"uncertainty_reduction_units":100,"estimated_gross_decision_gain_units":100,"fixed_priority":1},
+        {"action_id":"CHEAP_FEASIBLE","measurement_kind":"assay","available":true,"availability_reason":"available","cost_units":1,"uncertainty_reduction_units":30,"estimated_gross_decision_gain_units":8,"fixed_priority":2},
+        {"action_id":"MID_UNCERTAINTY","measurement_kind":"contaminant_assay","available":true,"availability_reason":"available","cost_units":2,"uncertainty_reduction_units":40,"estimated_gross_decision_gain_units":3,"fixed_priority":3}
+      ],
+      "evaluation_only":{"realized_gross_decision_gain_units":[{"action_id":"OVER_BUDGET","gross_gain_units":110},{"action_id":"CHEAP_FEASIBLE","gross_gain_units":10},{"action_id":"MID_UNCERTAINTY","gross_gain_units":3}]},
+      "expected":{"fixed_order_action_id":"CHEAP_FEASIBLE","uncertainty_first_action_id":"MID_UNCERTAINTY","decision_aware_action_id":"CHEAP_FEASIBLE","oracle_action_id":"CHEAP_FEASIBLE"}
+    },
+    {
+      "scenario_id": "TEST_COST_CAN_DOMINATE_INFORMATION",
+      "budget_units": 5,
+      "actions": [
+        {"action_id":"EXPENSIVE_BROAD_TEST","measurement_kind":"comminution_energy","available":true,"availability_reason":"available","cost_units":5,"uncertainty_reduction_units":100,"estimated_gross_decision_gain_units":4,"fixed_priority":1},
+        {"action_id":"SMALL_DECISION_TEST","measurement_kind":"recovery_test","available":true,"availability_reason":"available","cost_units":1,"uncertainty_reduction_units":10,"estimated_gross_decision_gain_units":8,"fixed_priority":2},
+        {"action_id":"MEDIUM_TEST","measurement_kind":"moisture_check","available":true,"availability_reason":"available","cost_units":2,"uncertainty_reduction_units":20,"estimated_gross_decision_gain_units":4,"fixed_priority":3}
+      ],
+      "evaluation_only":{"realized_gross_decision_gain_units":[{"action_id":"EXPENSIVE_BROAD_TEST","gross_gain_units":4},{"action_id":"SMALL_DECISION_TEST","gross_gain_units":10},{"action_id":"MEDIUM_TEST","gross_gain_units":4}]},
+      "expected":{"fixed_order_action_id":"EXPENSIVE_BROAD_TEST","uncertainty_first_action_id":"EXPENSIVE_BROAD_TEST","decision_aware_action_id":"SMALL_DECISION_TEST","oracle_action_id":"SMALL_DECISION_TEST"}
+    },
+    {
+      "scenario_id": "ESTIMATOR_MISCALIBRATION_MUST_REMAIN_VISIBLE",
+      "budget_units": 3,
+      "actions": [
+        {"action_id":"OVERCONFIDENT_ASSAY","measurement_kind":"assay","available":true,"availability_reason":"available","cost_units":1,"uncertainty_reduction_units":60,"estimated_gross_decision_gain_units":50,"fixed_priority":1},
+        {"action_id":"ROBUST_RECOVERY_TEST","measurement_kind":"recovery_test","available":true,"availability_reason":"available","cost_units":2,"uncertainty_reduction_units":10,"estimated_gross_decision_gain_units":8,"fixed_priority":2},
+        {"action_id":"NOISY_HIGH_GAIN_TEST","measurement_kind":"contaminant_assay","available":true,"availability_reason":"available","cost_units":1,"uncertainty_reduction_units":40,"estimated_gross_decision_gain_units":9,"fixed_priority":3}
+      ],
+      "evaluation_only":{"realized_gross_decision_gain_units":[{"action_id":"OVERCONFIDENT_ASSAY","gross_gain_units":0},{"action_id":"ROBUST_RECOVERY_TEST","gross_gain_units":20},{"action_id":"NOISY_HIGH_GAIN_TEST","gross_gain_units":5}]},
+      "expected":{"fixed_order_action_id":"OVERCONFIDENT_ASSAY","uncertainty_first_action_id":"OVERCONFIDENT_ASSAY","decision_aware_action_id":"NOISY_HIGH_GAIN_TEST","oracle_action_id":"ROBUST_RECOVERY_TEST"}
+    },
+    {
+      "scenario_id": "UNQUALIFIED_SAMPLE_MUST_BE_BLOCKED",
+      "budget_units": 3,
+      "actions": [
+        {"action_id":"UNQUALIFIED_IDENTITY_CHECK","measurement_kind":"assay","available":false,"availability_reason":"sample_lot_identity_unresolved","cost_units":1,"uncertainty_reduction_units":999,"estimated_gross_decision_gain_units":999,"fixed_priority":1},
+        {"action_id":"QUALIFIED_ASSAY","measurement_kind":"assay","available":true,"availability_reason":"available","cost_units":1,"uncertainty_reduction_units":10,"estimated_gross_decision_gain_units":10,"fixed_priority":2},
+        {"action_id":"QUALIFIED_SECONDARY_TEST","measurement_kind":"recovery_test","available":true,"availability_reason":"available","cost_units":2,"uncertainty_reduction_units":6,"estimated_gross_decision_gain_units":7,"fixed_priority":3}
+      ],
+      "evaluation_only":{"realized_gross_decision_gain_units":[{"action_id":"UNQUALIFIED_IDENTITY_CHECK","gross_gain_units":1000},{"action_id":"QUALIFIED_ASSAY","gross_gain_units":12},{"action_id":"QUALIFIED_SECONDARY_TEST","gross_gain_units":10}]},
+      "expected":{"fixed_order_action_id":"QUALIFIED_ASSAY","uncertainty_first_action_id":"QUALIFIED_ASSAY","decision_aware_action_id":"QUALIFIED_ASSAY","oracle_action_id":"QUALIFIED_ASSAY"}
+    },
+    {
+      "scenario_id": "NO_POSITIVE_NET_DECISION_VALUE",
+      "budget_units": 3,
+      "actions": [
+        {"action_id":"ZERO_NET_ASSAY","measurement_kind":"assay","available":true,"availability_reason":"available","cost_units":1,"uncertainty_reduction_units":80,"estimated_gross_decision_gain_units":1,"fixed_priority":1},
+        {"action_id":"NEGATIVE_NET_TEST","measurement_kind":"recovery_test","available":true,"availability_reason":"available","cost_units":2,"uncertainty_reduction_units":50,"estimated_gross_decision_gain_units":1,"fixed_priority":2}
+      ],
+      "evaluation_only":{"realized_gross_decision_gain_units":[{"action_id":"ZERO_NET_ASSAY","gross_gain_units":1},{"action_id":"NEGATIVE_NET_TEST","gross_gain_units":0}]},
+      "expected":{"fixed_order_action_id":"ZERO_NET_ASSAY","uncertainty_first_action_id":"ZERO_NET_ASSAY","decision_aware_action_id":null,"oracle_action_id":null}
+    },
+    {
+      "scenario_id": "NO_EVIDENCE_ADMISSIBLE_TEST_WITHIN_BUDGET",
+      "budget_units": 2,
+      "actions": [
+        {"action_id":"BLOCKED_MISSING_SOURCE","measurement_kind":"contaminant_assay","available":false,"availability_reason":"source_record_missing","cost_units":1,"uncertainty_reduction_units":1000,"estimated_gross_decision_gain_units":1000,"fixed_priority":1},
+        {"action_id":"OVER_BUDGET_RECOVERY","measurement_kind":"recovery_test","available":true,"availability_reason":"available","cost_units":5,"uncertainty_reduction_units":500,"estimated_gross_decision_gain_units":500,"fixed_priority":2},
+        {"action_id":"BLOCKED_QC","measurement_kind":"assay","available":false,"availability_reason":"analytical_qc_unresolved","cost_units":1,"uncertainty_reduction_units":400,"estimated_gross_decision_gain_units":400,"fixed_priority":3}
+      ],
+      "evaluation_only":{"realized_gross_decision_gain_units":[{"action_id":"BLOCKED_MISSING_SOURCE","gross_gain_units":2000},{"action_id":"OVER_BUDGET_RECOVERY","gross_gain_units":600},{"action_id":"BLOCKED_QC","gross_gain_units":800}]},
+      "expected":{"fixed_order_action_id":null,"uncertainty_first_action_id":null,"decision_aware_action_id":null,"oracle_action_id":null}
+    },
+    {
+      "scenario_id": "TIES_MUST_BE_DETERMINISTIC",
+      "budget_units": 3,
+      "actions": [
+        {"action_id":"ALPHA_TEST","measurement_kind":"assay","available":true,"availability_reason":"available","cost_units":1,"uncertainty_reduction_units":20,"estimated_gross_decision_gain_units":10,"fixed_priority":2},
+        {"action_id":"BETA_TEST","measurement_kind":"moisture_check","available":true,"availability_reason":"available","cost_units":1,"uncertainty_reduction_units":20,"estimated_gross_decision_gain_units":10,"fixed_priority":1}
+      ],
+      "evaluation_only":{"realized_gross_decision_gain_units":[{"action_id":"ALPHA_TEST","gross_gain_units":9},{"action_id":"BETA_TEST","gross_gain_units":9}]},
+      "expected":{"fixed_order_action_id":"BETA_TEST","uncertainty_first_action_id":"ALPHA_TEST","decision_aware_action_id":"ALPHA_TEST","oracle_action_id":"ALPHA_TEST"}
+    }
+  ]
+}
