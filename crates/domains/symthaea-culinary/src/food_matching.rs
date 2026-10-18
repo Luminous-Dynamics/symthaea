@@ -45,6 +45,19 @@ fn non_empty<'a>(value: &'a Value, key: &str) -> Option<&'a str> {
     value.get(key).and_then(Value::as_str).filter(|s| !s.trim().is_empty())
 }
 
+fn language_tag_is_well_formed(tag: &str) -> bool {
+    let mut parts = tag.split('-');
+    let Some(language) = parts.next() else {
+        return false;
+    };
+    (2..=8).contains(&language.len())
+        && language.bytes().all(|byte| byte.is_ascii_alphabetic())
+        && parts.all(|part| {
+            !part.is_empty()
+                && part.len() <= 8
+                && part.bytes().all(|byte| byte.is_ascii_alphanumeric())
+        })
+}
 fn identity_record_errors(record: &Value, label: &str, errors: &mut Vec<String>) {
     for field in ["record_id", "source_ref", "source_version"] {
         if non_empty(record, field).is_none() {
@@ -56,6 +69,8 @@ fn identity_record_errors(record: &Value, label: &str, errors: &mut Vec<String>)
             for (index, name) in names.iter().enumerate() {
                 if non_empty(name, "text").is_none() || non_empty(name, "language_tag").is_none() {
                     errors.push(format!("{label}.names[{index}] requires text and language_tag"));
+                } else if !language_tag_is_well_formed(non_empty(name, "language_tag").unwrap()) {
+                    errors.push(format!("{label}.names[{index}].language_tag is not a valid-looking BCP 47 tag"));
                 }
             }
         }
@@ -80,7 +95,7 @@ fn identity_record_errors(record: &Value, label: &str, errors: &mut Vec<String>)
 
 fn value_string_or_null(value: Option<&Value>) -> Option<Option<&str>> {
     match value {
-        Some(Value::String(text)) => Some(Some(text.as_str())),
+        Some(Value::String(text)) if !text.trim().is_empty() => Some(Some(text.as_str())),
         Some(Value::Null) => Some(None),
         _ => None,
     }
