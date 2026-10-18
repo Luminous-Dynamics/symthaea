@@ -26,8 +26,8 @@ jq -e '.schema_version == "symthaea.rea-differential-manifest.v1" and (.cases | 
     fail "invalid manifest schema or unexpected case count"
 jq -e '.schema_version == "symthaea.rea-differential-oracle.v1" and (.expected_cases | keys | length) == 6' "$ORACLE" >/dev/null ||
     fail "invalid oracle schema or unexpected case count"
-manifest_ids=$(jq -r '.cases[].id' "$MANIFEST" | sort | tr '\\n' ' ')
-oracle_ids=$(jq -r '.expected_cases | keys[]' "$ORACLE" | sort | tr '\\n' ' ')
+manifest_ids=$(jq -er '.cases | map(.id) | sort | join(",")' "$MANIFEST")
+oracle_ids=$(jq -er '.expected_cases | keys | sort | join(",")' "$ORACLE")
 [ "$manifest_ids" = "$oracle_ids" ] || fail "manifest case IDs do not match oracle case IDs"
 
 work=$(mktemp -d "${TMPDIR:-/tmp}/rea-differential-v1.XXXXXX")
