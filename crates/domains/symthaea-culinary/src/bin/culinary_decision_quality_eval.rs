@@ -106,13 +106,13 @@ fn candidate_by_id<'a>(case: &'a Value, id: &str) -> Option<&'a Value> {
 
 fn recursively_has_key_value(value: &Value, key_name: &str, expected_value: &str) -> bool {
     match value {
-        Value::Object(map) => {
-            map.iter().any(|(key, child)| {
-                (key == "status" && child.as_str() == Some(status))
-                    || recursively_has_status(child, status)
-            })
-        }
-        Value::Array(items) => items.iter().any(|child| recursively_has_status(child, status)),
+        Value::Object(map) => map.iter().any(|(key, child)| {
+            (key == key_name && child.as_str() == Some(expected_value))
+                || recursively_has_key_value(child, key_name, expected_value)
+        }),
+        Value::Array(items) => items
+            .iter()
+            .any(|child| recursively_has_key_value(child, key_name, expected_value)),
         _ => false,
     }
 }
