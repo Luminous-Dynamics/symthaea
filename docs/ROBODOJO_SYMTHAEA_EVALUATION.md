@@ -2,11 +2,15 @@
 
 **Status:** research plan; no RoboDojo score or performance improvement has been measured by this document.
 
-**Working target:** the official RoboDojo benchmark at https://github.com/RoboDojo-Benchmark/RoboDojo. A separate project or release specifically called “RoboDojo-RC” has not been independently identified. If RC names a different repository or task suite, pin that source before implementation.
+**Primary target:** [RoboDojo-RC Tier 1](https://robocurve.org/opus-5-5-robodojo-rc-tier-1/) — Robocurve's adapted, physical-robot evaluation of six RoboDojo tasks. It changes physical setups and instructions and uses task-specific partial-progress rubrics, so its scores must not be treated as interchangeable with scores from the original RoboDojo benchmark.
+
+**Complementary target:** the [official RoboDojo benchmark](https://github.com/RoboDojo-Benchmark/RoboDojo) and [XPolicyLab](https://github.com/XPolicyLab/XPolicyLab) for simulator-scale evaluation, adapter plumbing, and broader generalization/memory/precision/long-horizon/open-instruction coverage.
 
 ## Why this is worth doing
 
-RoboDojo separates an evaluation client from policy integration. Its published benchmark contains 42 simulation tasks and 18 real-robot tasks, organized around generalization, memory, precision, long-horizon execution, and open-vocabulary instructions. XPolicyLab owns the policy-side adapter contract and supports the RoboDojo client.
+RoboDojo-RC Tier 1 uses bimanual I2RT YAM arms with parallel-jaw grippers, absolute end-effector pose control, three camera views (top and both wrists), 224×224 frames, a recorded 10 Hz control frequency, a 40-model-call budget, a 900-step cap, and a 25% speed cap. Its six tasks are Pack And Pour Fruit, Stack Bowls, Store In Safe, Cap Pen, Stand Up Bottles, and Sort Objects. The published September cohort used 20 trials per task and model and human-scored progress from 0 to 1. See the [RC methodology and results](https://robocurve.org/opus-5-5-robodojo-rc-tier-1/) for its exact rubrics and stated limitations.
+
+Robocurve's October 15 [Robotics Capability Index analysis](https://robocurve.org/rci/) pooled 1,055 graded trials across 11 configurations on five tasks; Stand Up Bottles was excluded from that fit because later cohorts had many invalid trials related to overheating and API timeouts. That exclusion must not hide the reliability issue from Symthaea's report: retain all six tasks and report task-specific valid-run rate, timeouts, thermal stops, and missing grades separately.
 
 Symthaea already has a robotics bridge and a platform microbenchmark example. Those are useful starting points, but neither by itself establishes general-purpose tabletop manipulation competence. The current bridge consumes proprioceptive-style observations and modulates a hypervector; RoboDojo policies must update state from observation dictionaries, reset episode state, and emit robot-specific action chunks with valid arm and gripper dimensions. We must prove that mapping instead of assuming it.
 
@@ -29,9 +33,9 @@ Do not use Phi or an unvalidated “consciousness level” as a safety certifica
 
 ### Stage 0 — pin the benchmark and adapters
 
-Record the exact RoboDojo commit, XPolicyLab commit, Symthaea commit, benchmark task/config revisions, checkpoint digest, and simulator/runtime versions. Read the current official task and configuration docs before choosing tasks. “RoboDojo-RC” remains an unresolved name until a canonical URL or revision is supplied.
+For RoboDojo-RC, record the exact task rubric/revision, Inspect Robots harness version, model/tool configuration, action budget, speed cap, setup photographs or placement annotations, robot/camera/software versions, and any run artifact IDs. The published Tier 1 report is a useful reference cohort, not a matched baseline for Symthaea unless the same robot, setup, rubric, policy budget, and conditions can be reproduced.
 
-Use XPolicyLab's demo policy only for the documented offline/debug wiring check. It returns correctly shaped zero actions and is a protocol smoke test, **not** a useful manipulation-success baseline.
+Use the XPolicyLab demo policy only for the official RoboDojo offline/debug wiring check. It returns correctly shaped zero actions and is a protocol smoke test, **not** a useful manipulation-success baseline. For physical RoboDojo-RC execution, first confirm access to an I2RT YAM/compatible rig through an authorized operator or remote evaluation service. The contract harness can be developed without that access, but cannot itself generate physical benchmark evidence.
 
 ### Stage 1 — contract tests with no simulator
 
@@ -48,23 +52,34 @@ Create small deterministic tests for the policy boundary and Rust-side state log
 
 Keep simulator assets and external checkpoints optional for this test layer.
 
-### Stage 2 — a small, preregistered simulation pilot
+### Stage 2 — RoboDojo-RC Tier 1 evaluation plan
 
-Use this candidate matrix for the pilot, then pin the official task/config revision and verify each capability label before running:
+The RC-specific task matrix is:
 
-| Capability | Candidate tasks | What it probes |
+| RC Tier 1 task | Critical partial-progress signals | Symthaea hypothesis to test |
 |---|---|---|
-| Generalization | [Stack Bowls](https://robodojo-benchmark.com/doc/sim-tasks/stack-bowls/); [Sweep Blocks](https://robodojo-benchmark.com/doc/sim-tasks/sweep-blocks/) | Placement versus coordinated tool handoff and scene/task variation |
-| Memory | [Imitate Sorting Sequence](https://robodojo-benchmark.com/doc/sim-tasks/imitate-sorting-sequence/); [Press By Number](https://robodojo-benchmark.com/doc/sim-tasks/press-by-number/) | Retaining an observed sequence or numbers while executing later actions |
-| Precision | [Insert Tubes](https://robodojo-benchmark.com/doc/sim-tasks/insert-tubes/); [Insert Key](https://robodojo-benchmark.com/doc/sim-tasks/insert-key/) | Alignment and insertion tolerance |
-| Long-Horizon | [Organize Table](https://robodojo-benchmark.com/doc/sim-tasks/organize-table/); [Put Bottles Into Dustbin](https://robodojo-benchmark.com/doc/sim-tasks/put-bottles-into-dustbin/) | Multi-step completion and accumulated-error sensitivity |
-| Open-vocabulary | [Stack Blocks by Language](https://robodojo-benchmark.com/doc/sim-tasks/stack-blocks-by-language/); [Classify Objects by Language](https://robodojo-benchmark.com/doc/sim-tasks/classify-objects-by-language/) | Grounding instruction phrases into object selection and action |
+| Pack And Pour Fruit | Objects contained at once; bowl lifted with contents; fruit retained in target bowl | Persistent subgoal/mass-containment state reduces loss of earlier task progress |
+| Stack Bowls | Overlap versus stable two-/three-bowl stack | Action-chunk length control and post-contact recovery improve final stable completion |
+| Store In Safe | Objects stored and safe lid closed | Episode memory and subgoal tracking reduce omitted-object/unfinished-closure failures |
+| Cap Pen | Both objects grasped; contact; actual cap attached and retained | Precision/recovery policy separates contact from success and retries only under bounded conditions |
+| Stand Up Bottles | Grasp/lift and number standing upright | Uncertainty-aware grasp/reorientation reduces failed attempts; report thermal/timeouts explicitly |
+| Sort Objects | Correct objects in each of two baskets; no cross-contamination | Persistent category-to-container bindings reduce swap/memory errors |
 
-The smallest useful preflight is **Stack Bowls** for task/action wiring, then **Imitate Sorting Sequence** for an explicitly memory-dependent task, then **Insert Tubes** for precision. The XPolicyLab demo adapter documents Stack Bowls as a wiring example but emits zero actions, so it validates the protocol only; it is not a success-rate baseline. Verify the current task taxonomy before freezing the matrix because benchmark tasks and variants can evolve.
+Keep each task's published rubric as discrete, observable milestones; do not replace it with a model's self-reported completion. The score is partial credit on a 0–1 scale. Also report exact completion rate (score 1.0), valid-run rate, timeouts, safety/thermal stops, model-call count, wall-clock duration, action steps, and estimated cost. These explain why a partial-progress mean changed.
+
+The published September 2026 cohort provides context—not a guaranteed matched baseline: across 120 trials per model, GPT-6 Astra averaged 36.7% progress with 5 full completions, Opus 5.5 averaged 36.0% with 1, and Opus 5 averaged 19.9% with 2. The [October RCI analysis](https://robocurve.org/rci/) later excluded Stand Up Bottles from its capability fit because of invalid trials in later cohorts. We should not optimize against those historical means without matched setups, versions, and budgets.
+
+The first useful experiment is not a six-task full run. First create a deterministic trace/contract test, then run a small task pilot using the same underlying vision/action model with and without Symthaea. Prioritize **Store In Safe** for persistent subgoals and **Cap Pen** for a genuine precision/contact distinction; include Stack Bowls as a simpler calibration task. Include Stand Up Bottles in reliability reporting even if some trials are invalid.
+
+Use paired physical trials where setup resets are repeatable, but randomize run order and blind the grader to the condition. A practical screening target is at least 20 trials per condition per task to line up with the published cohort; treat this as a starting floor, not a guarantee of adequate statistical power. Bootstrap confidence intervals by task and report the cross-task macro-average. If robot access is unavailable, finish and test offline contract/evaluation tooling and label RC physical results as not run; do not substitute simulator progress for physical RC scores.
+
+### Stage 2b — complementary official simulation pilot
+
+Separately use official RoboDojo's [Stack Bowls](https://robodojo-benchmark.com/doc/sim-tasks/stack-bowls/) and task definitions for generalization, memory, precision, long-horizon, and open-vocabulary coverage. Pin the exact official task/config revision. Keep these results in a separate section from RoboDojo-RC, because adapted physical tasks, rubrics, and hardware are not directly comparable to simulation tasks.
 
 Use common task instances and paired seeds for baseline versus sidecar. Start with 10 seeds per task for screening; expand the sample if confidence intervals are inconclusive. Do not choose tasks after observing which ones favor Symthaea.
 
-First confirm that the chosen pretrained policy is supported, its checkpoint is available under the license terms, its resource needs fit the available machine, and the environment uses a pinned XPolicyLab revision. Choose the strongest reproducible compatible baseline with available checkpoint/config artifacts—not necessarily the highest aggregate leaderboard entry, since policy scores can vary substantially by task and capability dimension. Then run baseline-only and sidecar variants under the same budget.
+First confirm that the chosen pretrained policy is supported, its checkpoint is available under the license terms, its resource needs fit the available machine, and the environment uses a pinned XPolicyLab revision. Choose the strongest reproducible compatible baseline with available checkpoint/config artifacts—not necessarily the highest aggregate leaderboard entry. Then run baseline-only and sidecar variants under the same budget.
 
 ### Stage 3 — full simulation sweep
 
