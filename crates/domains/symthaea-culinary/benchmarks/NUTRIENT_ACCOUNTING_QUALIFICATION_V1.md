@@ -17,6 +17,7 @@ The final recipe mass and nutrient amount are distinct physical quantities. A yi
 - Zero silently omitted ingredients, missing nutrient values, inconsistent nutrient units, duplicate ingredient/nutrient IDs or duplicate retention factors.
 - Zero accepted output tampering, invalid bounds or source chain gaps.
 - Zero qualification from synthetic, unreviewed or merely reviewed inputs; never infer evidence quality from matching numbers.
+- Zero retention factors applied across a mismatched process ID or incompatible input/output food state.
 - Zero double-application of recipe yield to retained nutrient total.
 - Deterministic outputs under ingredient, nutrient and JSON property order permutations.
 - All tested nutrient outputs include a traceable input contribution for every ingredient. A zero contribution must be explicit and evidence-backed, not implied by a missing row.
