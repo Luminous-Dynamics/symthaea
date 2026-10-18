@@ -534,6 +534,71 @@ mod tests {
     use super::*;
 
     #[test]
+    fn upstream_remote_normalization_accepts_expected_github_forms() {
+        assert_eq!(
+            normalize_github_remote("https://github.com/sgossner/VCSL.git"),
+            Some("sgossner/vcsl".into())
+        );
+        assert_eq!(
+            normalize_github_remote("git@github.com:sgossner/VSCO-2-CE.git"),
+            Some("sgossner/vsco-2-ce".into())
+        );
+        assert_eq!(
+            normalize_github_remote("ssh://git@github.com/sgossner/VCSL"),
+            Some("sgossner/vcsl".into())
+        );
+    }
+
+    #[test]
+    fn upstream_remote_normalization_rejects_unknown_hosts_and_paths() {
+        assert_eq!(normalize_github_remote("https://example.com/sgossner/VCSL"), None);
+        assert_eq!(normalize_github_remote("https://github.com/sgossner/../VCSL"), None);
+        assert_eq!(normalize_github_remote("git@github.com:sgossner/VCSL:other.git"), None);
+    }
+
+    #[test]
+    fn source_document_hashing_reports_missing_files_explicitly() {
+        let nonce = std::time::SystemTime::now()
+            .duration_since(std::time::UNIX_EPOCH)
+            .unwrap_or_default()
+            .as_nanos();
+        let root = std::env::temp_dir().join(format!(
+            "muse-source-terms-{}-{nonce}",
+            std::process::id()
+        ));
+        std::fs::create_dir_all(&root).expect("temporary source root should be created");
+        let (digest, status) = hash_local_source_document(&root, "LICENSE");
+        assert_eq!(digest, None);
+        assert_eq!(status, "missing");
+
+        std::fs::write(root.join("LICENSE"), b"CC0 fixture document")
+            .expect("license fixture should be written");
+        let (digest, status) = hash_local_source_document(&root, "LICENSE");
+        assert_eq!(status, "hashed");
+        assert_eq!(
+            digest,
+            Some(sha256_file(&root.join("LICENSE")).expect("fixture should hash"))
+        );
+        std::fs::remove_dir_all(&root).expect("temporary source root should be removed");
+    }
+
+    #[test]
+    fn source_license_and_readme_requests_are_separate_fields() {
+        let source = inspect_asset_source_terms(
+            Path::new("/path/that/does/not/exist"),
+            "vsco2_ce",
+            "https://github.com/sgossner/VSCO-2-CE",
+            "sgossner/VSCO-2-CE",
+            "Readme.txt",
+            "Upstream README asks for courtesy/author credit; keep this request distinct from the declared SPDX license and review the source terms rather than silently discarding the request.",
+        );
+        assert_eq!(source.declared_license_spdx, "CC0-1.0");
+        assert!(source.upstream_readme_request.contains("courtesy/author credit"));
+        assert_eq!(source.license_document_status, "root_unavailable");
+        assert_ne!(source.upstream_readme_request, source.license_declaration_boundary);
+    }
+
+    #[test]
     fn source_bank_status_never_promotes_inventory_to_playability() {
         assert_eq!(
             sample_bank_status(false, 0, 0, 0, 0),
