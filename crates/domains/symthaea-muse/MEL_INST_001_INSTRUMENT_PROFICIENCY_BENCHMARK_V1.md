@@ -174,16 +174,17 @@ cargo run -p symthaea-muse --bin muse_instrument_probe -- --instrument harmonica
 # in every selected-sample receipt. Must be set before the process starts.
 SYMTHAEA_MUSE_HASH_SOURCE_BANK_MANIFEST=1 cargo run -p symthaea-muse --bin muse_instrument_probe -- --instrument harp > harp-probe-with-bank-manifest.json
 
-# Generate the inventory-side digest for comparison. Use the same VCSL/VSCO2
-# asset roots and code/indexer revision as the render probe above.
-cargo run -p symthaea-muse --bin muse_instrument_qualification -- --hash-indexed-samples > mel-instrument-capability-matrix.json
+# Generate indexed-bank and whole-root content digests for comparison.
+# Root hashing streams every .wav found under both roots, including files
+# rejected by the pitch indexer; enable only when the I/O cost is acceptable.
+cargo run -p symthaea-muse --bin muse_instrument_qualification -- --hash-indexed-samples --hash-root-wav-contents > mel-instrument-capability-matrix.json
 ```
 
 Use `cargo test -p symthaea-muse --bin muse_instrument_probe` for roster/bounds checks, synthetic sine pitch-estimator sanity tests, silence rejection and velocity-response summary tests.
 Use `cargo test -p symthaea-muse --bin muse_instrument_qualification` for fail-closed source-status classification and the explicit unvalidated-gesture worklist.
 These tests and commands are authored/documented but are not marked as executed by these changes.
 
-The probe can now optionally add the indexed-content digest for the selected mapped bank beside the selected-WAV byte hash. Compare `selected_sample.source_bank_content_manifest_sha256` in the render report against `indexed_sample_content_manifest_sha256` for the corresponding instrument/bank in the qualification matrix, using the same asset roots and code/indexer revision. This bank manifest covers only WAVs accepted by the bank indexer; a complete root-level manifest (including unindexed assets) and an explicit renderer-binary digest remain separate follow-ups. Then add instrument-specific range, pitch-accuracy, and gesture tests. Keep a per-note evidence record linking requested instrument, selected renderer, selected source sample, signal checks, and exact asset/renderer digests. Do not collapse these fields into a pooled “instrument score.”
+The probe can optionally add the indexed-content digest for the selected mapped bank beside the selected-WAV byte hash. Compare `selected_sample.source_bank_content_manifest_sha256` in the render report against `indexed_sample_content_manifest_sha256` for the corresponding bank in the qualification matrix, using the same asset roots and code/indexer revision. The inventory can now also emit a complete root-content digest via `--hash-root-wav-contents`; this streams all lowercase `.wav` files found by the root walker, including files rejected by the pitch indexer. Each root report explicitly distinguishes `not_requested`, `root_missing`, and `hashed`. The root digest uses a versioned, deterministic record encoding over sorted root-relative paths, sizes, and exact file-byte hashes. This is still not a signature or authenticated attestation: it says what bytes were observed, not who supplied them or whether the source was trustworthy. An explicit renderer-binary digest in the Melothaea renderer receipt remains follow-up work. Then add instrument-specific range, pitch-accuracy, and gesture tests. Keep a per-note evidence record linking requested instrument, selected renderer, selected source sample, signal checks, and exact asset/renderer digests. Do not collapse these fields into a pooled “instrument score.”
 
 ### P2a — Calibrate the measurement instrument first
 - Run MEL-PITCH-CAL-001 on the default synthetic-tone sweep (MIDI 36–96) before interpreting instrument pitch errors.
@@ -214,6 +215,7 @@ This plan is designed to let source work and local evaluation proceed without wa
 - The [YIN fundamental-frequency method](https://pubmed.ncbi.nlm.nih.gov/12002874/) provides a computationally efficient F0 diagnostic. Melothaea's first implementation is deliberately labelled exploratory, with confidence/status visible; it still needs instrument-family calibration and independent tests against known reference tones and acoustically inharmonic instruments.
 - [MIREX 2026 Symbolic Music Generation](https://www.music-ir.org/mirex/wiki/2026%3ASymbolic_Music_Generation) uses a double-blind subjective evaluation across prompt coherence, creativity, structuredness and musicality; its [audio-generation evaluation protocol](https://www.music-ir.org/mirex/wiki/2026%3AMusic_Audio_Generation) separately scores melody, harmony, key consistency, style consistency, and arrangement/production. Melothaea should follow the same separation rather than masking a broken instrument inside a high overall music score.
 - [ITU-R BS.1770-5](https://www.itu.int/rec/R-REC-BS.1770-5-202311-I) is the in-force recommendation for programme loudness and true-peak measurement. The initial probe only measures raw sample peak/RMS/DC and therefore must not label these as LUFS or true-peak compliance.
+- [SLSA Provenance](https://slsa.dev/spec/v1.2/provenance) models evidence about how an artifact was produced and which inputs it consumed; [in-toto Statements](https://github.com/in-toto/attestation/blob/main/spec/v1/statement.md) bind metadata to subjects by digest. Melothaea's current root manifest is an integrity digest, not yet a signed SLSA/in-toto attestation or a complete renderer-and-environment provenance record.
 
 
 
@@ -229,7 +231,7 @@ These are engineering targets to adopt after the new v2 measurements are locally
 | Periodic-tone pitch accuracy | Synthetic sine fixtures: median absolute error ≤ 2 cents; p95 ≤ 5 cents | Run MEL-PITCH-CAL-001; report coverage, median, p95, maximum, and counts beyond 2/5/15 cents before interpreting instrument pitch results |
 | Instrument pitch accuracy | For calibrated, pitched instruments: median absolute error ≤ 5 cents and p95 ≤ 15 cents over supported range | Exclude or separately model inharmonic/percussive timbres and report low-confidence cells |
 | Velocity controllability | ≥95% of declared velocity-sensitive cells show expected loudness direction; exceptions explicitly documented | Treat this as a target only after per-instrument baseline and within-velocity repeatability are measured |
-| Source coverage | 100% of sample-backed cells trace to a relative source path, source WAV byte hash, source root pitch, and source rate; with bank hashing enabled, every sample-backed cell carries the indexed-bank content digest | The selected-bank digest is opt-in and must match the qualification matrix for the same assets and indexer revision; complete root coverage remains open |
+| Source coverage | 100% of sample-backed cells trace to a relative source path, source WAV byte hash, source root pitch, and source rate; with bank hashing enabled every sample-backed cell carries a bank digest; root content digest captures all discovered .wav assets when enabled | Digests must match for identical assets, roots, and indexer revision; digest ≠ signature, source authenticity, licensing clearance, or renderer identity |
 | Gesture semantics | 100% of marketed gestures have positive controls, negative controls, and renderer receipts | Untested gestures remain unavailable |
 | Human preference | Paired preference accuracy reported with confidence intervals; target ≥60% preference for improved vs matched baseline with lower 95% CI >50% | Separate instrumental identity, musicality, prompt alignment and production quality; blind review is required |
 
