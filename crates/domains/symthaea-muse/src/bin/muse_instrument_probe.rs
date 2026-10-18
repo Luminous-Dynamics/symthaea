@@ -2,9 +2,9 @@
 // SPDX-License-Identifier: AGPL-3.0-or-later
 //! Deterministic instrument signal-health probe for Melothaea.
 //!
-//! This measures whether the arrangement renderer produced finite, non-silent
-//! audio for a small common pitch/velocity grid and records the path selected
-//! by the renderer's own dispatch logic. It does NOT prove pitch accuracy or
+//! This measures signal health and selected renderer/source evidence for
+//! either a common smoke grid or a user-selected inclusive MIDI semitone sweep.
+//! Exploratory pitch/velocity metrics do not prove instrument range or
 //! perceptual fidelity of the timbre/source.
 
 use serde::Serialize;
@@ -22,7 +22,6 @@ const SAMPLE_RATE: u32 = 22_050;
 const NOTE_MS: u64 = 100;
 const TAIL_MS: u64 = 100;
 const REPEATS: usize = 2;
-const PITCH_GRID_HZ: [f32; 3] = [220.0, 440.0, 880.0];
 const VELOCITY_GRID: [f32; 3] = [0.2, 0.5, 0.9];
 
 const ALL_INSTRUMENTS: [Instrument; 46] = [
@@ -81,6 +80,7 @@ struct Options {
     note_ms: u64,
     tail_ms: u64,
     repeats: usize,
+    midi_range: Option<(u8, u8)>,
 }
 
 #[derive(Debug, Serialize)]
@@ -93,6 +93,8 @@ struct ProbeReport {
     tail_duration_ms: u64,
     repeat_count: usize,
     pitch_grid_hz: Vec<f32>,
+    pitch_grid_midi: Vec<u8>,
+    pitch_grid_definition: &'static str,
     velocity_grid: Vec<f32>,
     cases_total: usize,
     cases_with_non_finite_samples: usize,
@@ -114,6 +116,7 @@ struct ProbeCase {
     instrument: String,
     gm_program_0_based: u8,
     declared_procedural_family: &'static str,
+    midi_note: u8,
     frequency_hz: f32,
     velocity: f32,
     frames: usize,
@@ -173,6 +176,15 @@ fn main() -> ExitCode {
 
 fn run() -> Result<(), String> {
     let options = parse_args()?;
+    let pitch_cells = build_pitch_cells(options.midi_range);
+    let cases_expected =
+        options.instruments.len() * pitch_cells.len() * VELOCITY_GRID.len();
+    let render_attempts = cases_expected.saturating_mul(options.repeats);
+    if render_attempts > 2_000 {
+        return Err(format!(
+            "requested sweep creates {render_attempts} render attempts; choose one instrument, reduce repeats, or narrow --midi-range (limit: 2000 render attempts)"
+        ));
+    }
     let duration_secs = options.note_ms as f32 / 1_000.0;
     let total_ms = options
         .note_ms
@@ -193,10 +205,9 @@ fn run() -> Result<(), String> {
         ..MuseConfig::default()
     };
 
-    let cases_expected = options.instruments.len() * PITCH_GRID_HZ.len() * VELOCITY_GRID.len();
     let mut cases = Vec::with_capacity(cases_expected);
     for instrument in &options.instruments {
-        for frequency_hz in PITCH_GRID_HZ {
+        for (midi_note, frequency_hz) in pitch_cells.iter().copied() {
             for velocity in VELOCITY_GRID {
                 let note = Note {
                     frequency: frequency_hz,
@@ -313,6 +324,7 @@ fn run() -> Result<(), String> {
                     instrument: format!("{instrument:?}"),
                     gm_program_0_based: instrument.gm_program(),
                     declared_procedural_family: procedural_family(*instrument),
+                    midi_note,
                     frequency_hz,
                     velocity,
                     frames: metrics.frames,
@@ -351,14 +363,20 @@ fn run() -> Result<(), String> {
         .filter(|group| !group.rms_is_monotonic_non_decreasing)
         .count();
     let report = ProbeReport {
-        schema_version: "melothaea.instrument-probe.v2",
+        schema_version: "melothaea.instrument-probe.v3",
         benchmark: "MEL-INST-PROBE-001",
         code_revision: option_env!("MEL_INSTRUMENT_PROBE_REV").unwrap_or("not_embedded"),
         sample_rate_hz: options.sample_rate,
         note_duration_ms: options.note_ms,
         tail_duration_ms: options.tail_ms,
         repeat_count: options.repeats,
-        pitch_grid_hz: PITCH_GRID_HZ.to_vec(),
+        pitch_grid_hz: pitch_cells.iter().map(|(_, frequency)| *frequency).collect(),
+        pitch_grid_midi: pitch_cells.iter().map(|(midi, _)| *midi).collect(),
+        pitch_grid_definition: if options.midi_range.is_some() {
+            "user_selected_inclusive_midi_semitone_sweep"
+        } else {
+            "fixed_A3_A4_A5_signal_health_smoke_grid"
+        },
         velocity_grid: VELOCITY_GRID.to_vec(),
         cases_total: cases.len(),
         cases_with_non_finite_samples: cases
@@ -549,11 +567,23 @@ fn estimate_pitch_yin(
         return unavailable("near_silent_window");
     }
 
-    let min_frequency = 60.0_f64;
-    let max_frequency = 1_500.0_f64.min(f64::from(sample_rate) * 0.24);
+    if !target_hz.is_finite() || target_hz <= 0.0 {
+        return unavailable("invalid_target_frequency");
+    }
+    // Search near the requested pitch rather than a single global frequency
+    // ceiling. This reduces wasted work in pitch sweeps and avoids presenting
+    // a high note's subharmonic as if the analysis covered its fundamental.
+    // A low-confidence octave error is still possible and remains diagnostic.
+    let target = f64::from(target_hz);
+    let min_frequency = (target * 0.5).max(20.0);
+    let max_frequency = (target * 2.0).min(f64::from(sample_rate) * 0.24);
+    if max_frequency <= min_frequency {
+        return unavailable("target_outside_pitch_analysis_band");
+    }
     let min_lag = (f64::from(sample_rate) / max_frequency).floor().max(2.0) as usize;
-    let max_lag = ((f64::from(sample_rate) / min_frequency).floor() as usize)
-        .min(mono.len() / 2);
+    let max_lag = (f64::from(sample_rate) / min_frequency)
+        .ceil()
+        .min((mono.len() / 2) as f64) as usize;
     if max_lag <= min_lag + 1 {
         return unavailable("window_too_short_for_period_range");
     }
@@ -682,6 +712,7 @@ fn parse_args() -> Result<Options, String> {
         note_ms: NOTE_MS,
         tail_ms: TAIL_MS,
         repeats: REPEATS,
+        midi_range: None,
     };
     let mut args = std::env::args().skip(1);
     while let Some(arg) = args.next() {
@@ -730,6 +761,12 @@ fn parse_args() -> Result<Options, String> {
                     1_000,
                 )?;
             }
+            "--midi-range" => {
+                let value = args
+                    .next()
+                    .ok_or_else(|| "--midi-range requires MIN:MAX".to_string())?;
+                options.midi_range = Some(parse_midi_range(&value)?);
+            }
             "--repeats" => {
                 options.repeats = args
                     .next()
@@ -744,6 +781,35 @@ fn parse_args() -> Result<Options, String> {
         }
     }
     Ok(options)
+}
+
+fn parse_midi_range(value: &str) -> Result<(u8, u8), String> {
+    let (minimum, maximum) = value
+        .split_once(':')
+        .ok_or_else(|| "--midi-range must have the form MIN:MAX".to_string())?;
+    let minimum = minimum
+        .parse::<u8>()
+        .map_err(|_| "MIDI minimum must be an integer in 0..=127".to_string())?;
+    let maximum = maximum
+        .parse::<u8>()
+        .map_err(|_| "MIDI maximum must be an integer in 0..=127".to_string())?;
+    if minimum > maximum {
+        return Err("--midi-range minimum must be <= maximum".into());
+    }
+    Ok((minimum, maximum))
+}
+
+fn build_pitch_cells(midi_range: Option<(u8, u8)>) -> Vec<(u8, f32)> {
+    match midi_range {
+        Some((minimum, maximum)) => (minimum..=maximum)
+            .map(|midi| (midi, midi_to_hz(midi)))
+            .collect(),
+        None => vec![(57, 220.0), (69, 440.0), (81, 880.0)],
+    }
+}
+
+fn midi_to_hz(midi: u8) -> f32 {
+    440.0 * 2.0_f32.powf((f32::from(midi) - 69.0) / 12.0)
 }
 
 fn parse_bounded_u64(value: String, label: &str, min: u64, max: u64) -> Result<u64, String> {
@@ -766,10 +832,11 @@ fn print_help() {
            --note-ms MS           Note duration, 20..1000 (default: 100)\n\
            --tail-ms MS           Rendered tail, 0..1000 (default: 100)\n\
            --repeats N            Exact rerenders, 1..5 (default: 2)\n\
+           --midi-range MIN:MAX   Inclusive semitone sweep, MIDI 0..127 (default: A3/A4/A5)\n\
            -h, --help             Show this help\n\
          JSON is written to stdout. Redirect it to a file if a local report is desired.\n\
-         Per-note render-path receipts are included; they do not prove perceptual fidelity.\n\
-         The pitch grid (220/440/880 Hz) is a common smoke grid, not a declared range test."
+         Per-note render/source receipts are included; they do not prove perceptual fidelity.\n\
+         The default pitch grid is a smoke test; a user-selected sweep tests rendered cells, not certified playability."
     );
 }
 
@@ -785,6 +852,29 @@ mod tests {
             .collect();
         assert_eq!(ALL_INSTRUMENTS.len(), 46);
         assert_eq!(unique.len(), ALL_INSTRUMENTS.len());
+    }
+
+    #[test]
+    fn midi_range_is_inclusive_and_validates_bounds() {
+        assert_eq!(parse_midi_range("48:72").unwrap(), (48, 72));
+        assert_eq!(build_pitch_cells(Some((48, 50))).len(), 3);
+        assert_eq!(
+            build_pitch_cells(Some((48, 50))).iter().map(|(midi, _)| *midi).collect::<Vec<_>>(),
+            vec![48, 49, 50]
+        );
+        assert!(parse_midi_range("73:60").is_err());
+        assert!(parse_midi_range("0:128").is_err());
+        assert!(parse_midi_range("C3:72").is_err());
+        assert!(parse_midi_range("48").is_err());
+    }
+
+    #[test]
+    fn default_grid_is_explicitly_a3_a4_a5() {
+        assert_eq!(
+            build_pitch_cells(None),
+            vec![(57, 220.0), (69, 440.0), (81, 880.0)]
+        );
+        assert!((midi_to_hz(69) - 440.0).abs() < 1.0e-4);
     }
 
     #[test]
@@ -828,6 +918,25 @@ mod tests {
     }
 
     #[test]
+    fn yin_reports_when_target_is_outside_the_analysis_band() {
+        let sample_rate = 22_050_u32;
+        let frames = sample_rate as usize / 10;
+        let samples: Vec<f32> = (0..frames)
+            .flat_map(|index| {
+                let sample = (2.0 * std::f64::consts::PI * 12_000.0 * index as f64
+                    / sample_rate as f64)
+                    .sin() as f32
+                    * 0.5;
+                [sample, sample]
+            })
+            .collect();
+        let result = estimate_pitch_yin(&samples, sample_rate, 2, 100, 12_000.0);
+        assert_eq!(result.status, "target_outside_pitch_analysis_band");
+        assert!(result.estimated_pitch_hz.is_none());
+        assert!(result.error_cents.is_none());
+    }
+
+    #[test]
     fn yin_never_claims_pitch_from_silence() {
         let result = estimate_pitch_yin(&vec![0.0; 4_410], 22_050, 2, 100, 440.0);
         assert_eq!(result.status, "near_silent_window");
@@ -842,6 +951,7 @@ mod tests {
                 instrument: "Harmonica".into(),
                 gm_program_0_based: 22,
                 declared_procedural_family: "additive_declared",
+                midi_note: 69,
                 frequency_hz: 440.0,
                 velocity,
                 frames: 2_205,

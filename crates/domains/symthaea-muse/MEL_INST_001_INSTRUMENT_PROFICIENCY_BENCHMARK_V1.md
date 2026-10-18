@@ -134,16 +134,18 @@ cargo run -p symthaea-muse --bin muse_instrument_qualification -- > mel-instrume
 
 ### P2 — Per-instrument render receipts and probe grid
 - First increment now exists as `src/bin/muse_instrument_probe.rs` and is auto-discovered by Cargo as `muse_instrument_probe`.
-- It probes all 46 registered instrument variants on a common 3-pitch × 3-velocity grid (220/440/880 Hz; velocities 0.2/0.5/0.9), with two exact rerenders by default.
+- It probes all 46 registered instrument variants on a default A3/A4/A5 × 3-velocity smoke grid, with two exact rerenders by default.
+- For range-focused qualification, `--midi-range MIN:MAX` builds an inclusive semitone grid. For example, MIDI 60:84 probes 25 notes across three velocities for the selected instrument. JSON records both MIDI note and exact frequency for every case.
+- Work is bounded to 2,000 render attempts per invocation to keep local sweeps responsive; wide sweeps should target one instrument and use source-inventory bounds as an investigation hint, not as proof of the playable range.
 - Per-case JSON reports peak, RMS, DC mean, non-finite count, near-silence classification, clipped sample count, SHA-256 of the actual rendered float samples, whether repeated hashes match, and an exploratory YIN-periodicity pitch estimate with signed cents error and confidence when measurable.
 - The probe aggregates RMS across the 0.2 / 0.5 / 0.9 velocity cells for each instrument/pitch, including adjacent level changes in dB and an RMS-monotonicity flag. This is a diagnostic—not a universal requirement that all sample layers or percussive timbres be strictly monotonic.
 - The new `render_arrangement_with_evidence` API attaches the selected per-note renderer path and sample-selection outcome. The probe checks that receipts match the requested note controls and remain stable across repeated renders.
 - Receipt paths distinguish named/default sample rendering, Karplus–Strong, FM, ordinary additive synthesis, and the legacy mood-derived path when no instrument identity is assigned. Sample fallback status differentiates a missing library from an unavailable bank, pitch/velocity selection, or short articulation.
 - When an actual WAV is selected, the receipt includes source library, exact source-root-relative path, SHA-256 over the exact source WAV bytes, recorded root MIDI pitch, sample rate, filename-derived dynamic layer, and applied pitch shift in semitones. The absolute machine-specific asset root is excluded.
-- The common pitch grid is a **signal-health smoke grid, not a valid range claim for every instrument**. Use a future source-derived capability-range manifest to choose each instrument's real test register.
+- The default pitch grid is a **signal-health smoke grid, not a valid range claim for every instrument**. A user-selected MIDI sweep measures the requested render cells, not whether the entire range is musically valid. Source filename bounds may guide the sweep but cannot certify playability.
 - A selected sample path means the renderer picked and rendered a compatible sample; it does not prove pitch fidelity, full source-bank coverage, authentic technique, or perceptual quality.
-- The pitch estimator searches 60–1500 Hz on a post-onset window. Status and periodicity confidence remain part of the output: low-periodicity or inharmonic tones must not be assigned a false pass or treated as a calibrated pitch failure. No pitch metric changes the current render outcome gate.
-- Schema revision is `melothaea.instrument-probe.v2`. The shared grid remains a smoke test; once source-derived ranges and per-family calibration are added, use those instead of scoring all 46 instruments with one generic range.
+- The pitch estimator searches a target-relative band (approximately half-to-double the requested pitch), capped below the sample-rate Nyquist region and by available window length. Out-of-band requests return an explicit unavailable status; low-periodicity or inharmonic tones must not be assigned a false pass or treated as a calibrated pitch failure. No pitch metric changes the current render outcome gate.
+- Schema revision is `melothaea.instrument-probe.v3`. The MIDI-sweep feature creates per-note diagnostic coverage but does not yet enforce source-derived ranges or per-family calibration.
 - The tool makes no network calls and performs no heavyweight asset download by default.
 
 Example commands:
@@ -154,6 +156,9 @@ cargo run -p symthaea-muse --bin muse_instrument_probe -- --instrument recorder
 
 # Full registered-variant grid; redirect the machine-readable report.
 cargo run -p symthaea-muse --bin muse_instrument_probe -- --instrument all > mel-instrument-probe.json
+
+# One instrument over 25 semitones, with per-cell source and renderer receipts.
+cargo run -p symthaea-muse --bin muse_instrument_probe -- --instrument recorder --midi-range 60:84 > recorder-semitone-sweep.json
 
 # Keep runtime lower while inspecting signal health.
 cargo run -p symthaea-muse --bin muse_instrument_probe -- --instrument harmonica --repeats 1
