@@ -254,13 +254,16 @@ fn validate_manifest(manifest: &Manifest) -> Result<()> {
     let mut ids = BTreeSet::new();
     let mut computed_count = 0;
     let mut rejected_count = 0;
+    let mut positive_controls = 0;
+    let mut negative_controls = 0;
     for case in &manifest.cases {
         if case.scenario_id.trim().is_empty() || !ids.insert(case.scenario_id.as_str()) {
             bail!("empty or duplicate scenario ID: {}", case.scenario_id);
         }
-        if !case.input.mass_kg.is_finite() {
-            // Non-finite inputs are rejected by calculate(); this check only
-            // verifies the fixture itself does not rely on non-JSON numbers.
+        match case.class.as_str() {
+            "positive_control" => positive_controls += 1,
+            "negative_control" => negative_controls += 1,
+            other => bail!("unknown case class {other} in {}", case.scenario_id),
         }
         if !ALLOWED_STATUS.contains(&case.expected_status.as_str()) {
             bail!("unknown expected status in {}", case.scenario_id);
@@ -291,6 +294,9 @@ fn validate_manifest(manifest: &Manifest) -> Result<()> {
     }
     if computed_count == 0 || rejected_count == 0 {
         bail!("fixture needs both computed and rejected-input controls");
+    }
+    if positive_controls == 0 || negative_controls == 0 {
+        bail!("fixture needs both positive and negative controls");
     }
     Ok(())
 }
