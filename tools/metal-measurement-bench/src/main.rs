@@ -1219,7 +1219,7 @@ mod tests {
     #[test]
     fn rejects_path_traversal_in_artifact_paths() {
         assert!(safe_relative_path("../private.csv").is_err());
-        assert!(safe_relative_path(r"..\\private.csv").is_err());
+        assert!(safe_relative_path(r"..\private.csv").is_err());
         assert!(safe_relative_path("nested/data.csv").is_ok());
     }
 
