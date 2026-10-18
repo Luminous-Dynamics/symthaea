@@ -69,6 +69,8 @@ pub enum SamplingStrategy {
     FixedStratified,
     FarthestPoint,
     ModelDisagreement,
+    /// Alternate space-filling exploration with model-disagreement exploitation.
+    CoverageGuardedDisagreement,
     SeededRandom,
 }
 
@@ -78,6 +80,7 @@ impl SamplingStrategy {
             Self::FixedStratified => "fixed_stratified",
             Self::FarthestPoint => "farthest_point",
             Self::ModelDisagreement => "model_disagreement",
+            Self::CoverageGuardedDisagreement => "coverage_guarded_disagreement",
             Self::SeededRandom => "seeded_random",
         }
     }
@@ -87,6 +90,7 @@ impl SamplingStrategy {
             Self::FixedStratified,
             Self::FarthestPoint,
             Self::ModelDisagreement,
+            Self::CoverageGuardedDisagreement,
             Self::SeededRandom,
         ]
     }
@@ -276,6 +280,25 @@ pub fn choose_next_location(
                 .then_with(|| right.y.total_cmp(&left.y))
                 .then_with(|| right.x.total_cmp(&left.x))
         }),
+        SamplingStrategy::CoverageGuardedDisagreement => {
+            if selection_step % 2 == 0 {
+                choose_next_location(
+                    SamplingStrategy::FarthestPoint,
+                    candidates,
+                    observations,
+                    seed,
+                    selection_step,
+                )
+            } else {
+                choose_next_location(
+                    SamplingStrategy::ModelDisagreement,
+                    candidates,
+                    observations,
+                    seed,
+                    selection_step,
+                )
+            }
+        }
         SamplingStrategy::ModelDisagreement => candidates.iter().copied().max_by(|left, right| {
             let score = |target| {
                 match (predict_nearest(observations, target), predict_idw(observations, target)) {
@@ -315,8 +338,10 @@ fn latent_surface(surface: SyntheticSpatialSurface, p: NormalizedPosition) -> f6
             0.22 * (1.0 - (edge_distance / 0.5).clamp(0.0, 1.0))
         }
         SyntheticSpatialSurface::LocalizedHotspot => {
-            let dx = (p.x - 0.73) / 0.07;
-            let dy = (p.y - 0.27) / 0.07;
+            // Deliberately offset from the fixed-stratified sample lattice: a
+            // coarse grid should be able to miss this localized anomaly.
+            let dx = (p.x - 0.82) / 0.05;
+            let dy = (p.y - 0.32) / 0.05;
             0.30 * (-0.5 * (dx * dx + dy * dy)).exp()
         }
         SyntheticSpatialSurface::PiecewiseBoundary => {
@@ -540,7 +565,10 @@ mod tests {
     #[test]
     fn complete_panel_has_equal_budgets_and_distinct_report_digests() {
         let reports = run_spatial_experiment_design_benchmark(42).unwrap();
-        assert_eq!(reports.len(), 7 * 4);
+        assert_eq!(
+            reports.len(),
+            SyntheticSpatialSurface::all().len() * SamplingStrategy::all().len()
+        );
         assert!(reports.iter().all(|report| {
             report.evidence_class == "synthetic"
                 && report.metrics.observation_count == TOTAL_OBSERVATION_BUDGET
@@ -589,6 +617,31 @@ mod tests {
         ).unwrap();
         assert!(hotspot.metrics.critical_region_evaluation_points > 0);
         assert!(boundary.metrics.critical_region_evaluation_points > 0);
+    }
+
+    #[test]
+    fn fixed_stratified_design_misses_the_off_lattice_hotspot() {
+        let report = run_spatial_design_arm(
+            SyntheticSpatialSurface::LocalizedHotspot,
+            SamplingStrategy::FixedStratified,
+            42,
+        ).unwrap();
+        assert!(report.metrics.critical_region_evaluation_points > 0);
+        assert_eq!(report.metrics.critical_region_recall, Some(0.0));
+        assert!(report.observations.iter().all(|observation| {
+            observation.measured_error_mm.abs() < CRITICAL_ERROR_THRESHOLD_MM
+        }));
+    }
+
+    #[test]
+    fn guarded_adaptive_policy_keeps_equal_budget_and_unique_positions() {
+        let report = run_spatial_design_arm(
+            SyntheticSpatialSurface::LocalizedHotspot,
+            SamplingStrategy::CoverageGuardedDisagreement,
+            42,
+        ).unwrap();
+        assert_eq!(report.observations.len(), TOTAL_OBSERVATION_BUDGET);
+        assert_eq!(report.metrics.additional_observation_budget, ADDITIONAL_OBSERVATION_BUDGET);
     }
 
     #[test]
