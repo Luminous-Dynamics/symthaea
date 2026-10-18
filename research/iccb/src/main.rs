@@ -8,7 +8,6 @@ use iccb_evaluator::{
         ValueOfInformationScenario,
     },
 };
-use std::collections::BTreeSet;
 
 fn main() {
     let claim = EvidenceClaim {
@@ -27,7 +26,6 @@ fn main() {
             evaluation_day: 12,
             required_evidence: true,
         },
-        known_critical_dependency_ids: ["grid-a".to_owned()].into_iter().collect::<BTreeSet<_>>(),
         options: vec![
             DecisionOption {
                 id: "high-return-defers-maintenance".into(),
@@ -78,7 +76,7 @@ fn main() {
     println!("Constraint-gated Pareto frontier: {:?}", frontier);
     for evaluated in receipt.evaluated_options {
         println!(
-            "{}: accepted={}, rejection_reasons={:?}, net_cash_minor={}, valuation_change_minor={}, capacity_delta={}, maintenance_delta_minor={}, critical_dependencies={}",
+            "{}: accepted={}, rejection_reasons={:?}, net_cash_minor={}, valuation_change_minor={}, capacity_delta={}, maintenance_delta_minor={}, declared_dependencies={}",
             evaluated.option_id,
             evaluated.accepted,
             evaluated.rejection_reasons,
@@ -86,7 +84,7 @@ fn main() {
             evaluated.outcomes.reported_valuation_change_minor,
             evaluated.outcomes.productive_capacity_delta,
             evaluated.outcomes.maintenance_backlog_delta_minor,
-            evaluated.outcomes.critical_dependency_count,
+            evaluated.outcomes.declared_dependency_count,
         );
     }
 
