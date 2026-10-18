@@ -1419,6 +1419,13 @@ impl DifferentialEquationsEngine {
                         ));
                     }
                     let scale = state_scales[i] + y_next[i].abs().max(y[i].abs());
+                    if !scale.is_finite() || scale <= 0.0 {
+                        return Err(ImplicitEulerError::new(
+                            ImplicitEulerErrorKind::NonFiniteResidual { index: i },
+                            *t_values.last().unwrap_or(&t0), &y, step,
+                            total_corrections, rhs_evaluations, step_residual_norm
+                        ));
+                    }
                     let normalized = value.abs() / scale;
                     if !normalized.is_finite() {
                         return Err(ImplicitEulerError::new(
