@@ -526,6 +526,23 @@ impl DifferentialEquationsEngine {
         if !dx.is_finite() || dx <= 0.0 {
             return Err(WaveEquationError::InvalidCflStep);
         }
+        if t_end == 0.0 {
+            // A zero-duration solve is the identity map; do not divide by dt
+            // while computing the finite-difference kinetic-energy estimate.
+            let x_grid: Vec<f64> = (1..=n_x).map(|i| i as f64 * dx).collect();
+            let initial_state = u0.to_vec();
+            let encoding = Self::encode_pde_result(&initial_state, "WAVE_EQ");
+            return Ok(PDEResult {
+                x_grid,
+                t_start: 0.0,
+                t_end,
+                u_initial: initial_state.clone(),
+                u_final: initial_state,
+                time_steps: 0,
+                phi: 0.9,
+                encoding,
+            });
+        }
         let dt_max = 0.9 * dx / c;
         if !dt_max.is_finite() || dt_max <= 0.0 {
             return Err(WaveEquationError::InvalidCflStep);
@@ -1944,6 +1961,19 @@ mod tests {
             DifferentialEquationsEngine::try_wave_equation_1d(1.0, 1.0, 0.1, 4, &huge, &v0),
             Err(WaveEquationError::NonFiniteSolution { .. })
         ));
+    }
+
+    #[test]
+    fn test_wave_1d_zero_duration_returns_initial_state() {
+        let u0 = vec![1.0, -0.5, 0.25, 0.0];
+        let v0 = vec![0.0; 4];
+        let result = DifferentialEquationsEngine::try_wave_equation_1d(
+            1.0, 1.0, 0.0, 4, &u0, &v0,
+        )
+        .expect("zero-duration wave solve is the identity map");
+        assert_eq!(result.time_steps, 0);
+        assert_eq!(result.u_final, u0);
+        assert!(result.phi.is_finite());
     }
 
     #[test]
