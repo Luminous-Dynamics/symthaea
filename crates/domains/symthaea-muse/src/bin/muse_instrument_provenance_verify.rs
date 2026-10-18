@@ -213,10 +213,10 @@ fn print_help() {
     println!(
         "MEL-PROV-VERIFY-001: fail-closed provenance consistency check\n\
          Usage: cargo run -p symthaea-muse --bin muse_instrument_provenance_verify -- --probe REPORT.json --inventory MATRIX.json --renderer-binary /path/to/muse_instrument_probe --vcsl-root /assets/VCSL --vsco2-root /assets/VSCO2-CE\n\
-         Required evidence: supplied executable bytes, independently rehashed root WAV manifests and selected WAV files, matching source revision,\n\
-         indexed-bank manifests, and selected-sample bank digests matching the inventory mapping.\n\
+         Required evidence: same code source revision, supplied executable bytes, rehashed root WAV manifests, selected WAV and indexed-bank digests,\n\
+         matching instrument inventory, hashed LICENSE/README bytes, and clean Git checkouts with expected upstream origins.\n\
          JSON findings are written to stdout. Exit 0 means consistent; exit 1 means incomplete or inconsistent;\n\
-         exit 2 means invocation or input reports could not be processed. This is not instrument qualification."
+         exit 2 means invocation or input files could not be processed. This is not a legal opinion or instrument qualification."
     );
 }
 
