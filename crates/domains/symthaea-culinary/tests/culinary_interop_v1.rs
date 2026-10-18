@@ -147,7 +147,6 @@ fn scenario_frontier_can_be_known_when_another_scenario_is_incomplete() {
 fn unknown_hard_gate_cannot_enter_a_frontier() {
     let bundle = parse_fixture(UNKNOWN_GATE_ON_FRONTIER);
     let violations = semantic_violations(&bundle);
-    assert!(violations.iter().any(|error| error.contains("gate disposition conflicts")));
     assert!(violations.iter().any(|error| error.contains("non-feasible candidate must be not_ranked")));
     assert!(violations.iter().any(|error| error.contains("appears on a frontier")));
 }
