@@ -1830,6 +1830,22 @@ mod tests {
         std::fs::create_dir_all(&vsco2_root).expect("VSCO2 fixture should be created");
         std::fs::write(&sample_wav, b"sample-WAV-content-for-provenance-test")
             .expect("source sample fixture should be written");
+        std::fs::write(vcsl_root.join("LICENSE"), b"CC0 1.0 Universal test license\n")
+            .expect("VCSL license fixture should be written");
+        std::fs::write(
+            vcsl_root.join("README.md"),
+            b"VCSL fixture README: CC0; no attribution required.\n",
+        )
+        .expect("VCSL README fixture should be written");
+        std::fs::write(vsco2_root.join("LICENSE"), b"CC0 1.0 Universal test license\n")
+            .expect("VSCO-2-CE license fixture should be written");
+        std::fs::write(
+            vsco2_root.join("Readme.txt"),
+            b"VSCO-2-CE fixture README: use allowed; credit requested.\n",
+        )
+        .expect("VSCO-2-CE README fixture should be written");
+        initialize_git_fixture(&vcsl_root, "https://github.com/sgossner/VCSL.git");
+        initialize_git_fixture(&vsco2_root, "https://github.com/sgossner/VSCO-2-CE.git");
 
         let source_file_sha256 = file_sha256(&sample_wav)
             .expect("source sample fixture should hash")
@@ -1878,8 +1894,12 @@ mod tests {
             "indexed_sample_content_manifest_sha256": bank_digest
         });
         let inventory = json!({
-            "schema_version": "melothaea.instrument-capability-matrix.v3",
+            "schema_version": "melothaea.instrument-capability-matrix.v4",
             "source_revision": revision,
+            "source_terms_evidence": [
+                fixture_source_terms(&vcsl_root, "vcsl"),
+                fixture_source_terms(&vsco2_root, "vsco2_ce")
+            ],
             "indexed_sample_content_hashing_enabled": true,
             "root_content_manifest_hashing_enabled": true,
             "vcsl_root": {
@@ -1908,6 +1928,56 @@ mod tests {
         )
     }
 
+    fn initialize_git_fixture(root: &Path, origin: &str) {
+        let run = |arguments: &[&str]| {
+            let output = Command::new("git")
+                .arg("-C")
+                .arg(root)
+                .args(arguments)
+                .output()
+                .expect("git must be available for upstream provenance fixtures");
+            assert!(
+                output.status.success(),
+                "git {:?} failed: {}",
+                arguments,
+                String::from_utf8_lossy(&output.stderr)
+            );
+        };
+        run(&["init", "-q"]);
+        run(&["config", "user.name", "Melothaea verifier fixture"]);
+        run(&["config", "user.email", "muse-provenance-fixture@example.invalid"]);
+        run(&["remote", "add", "origin", origin]);
+        run(&["add", "--all"]);
+        run(&["commit", "-q", "-m", "fixture source terms"]);
+    }
+
+    fn fixture_source_terms(root: &Path, source_library: &str) -> Value {
+        let policy = source_terms_policy(source_library).expect("known fixture source");
+        let canonical = std::fs::canonicalize(root).expect("source root should canonicalize");
+        let license_digest =
+            hash_relative_source_document(&canonical, "LICENSE").expect("license should hash");
+        let readme_digest = hash_relative_source_document(&canonical, policy.readme_relative_path)
+            .expect("README should hash");
+        let checkout = inspect_upstream_checkout(&canonical, policy.expected_remote);
+        json!({
+            "source_library": policy.source_library,
+            "upstream_repository_url": policy.upstream_repository_url,
+            "declared_license_spdx": policy.declared_license_spdx,
+            "license_declaration_boundary": "Declared from the upstream repository license metadata; this field is not a legal opinion and does not replace inspection of the hashed license/readme bytes.",
+            "license_document_relative_path": "LICENSE",
+            "license_document_sha256": license_digest,
+            "license_document_status": "hashed",
+            "readme_document_relative_path": policy.readme_relative_path,
+            "readme_document_sha256": readme_digest,
+            "readme_document_status": "hashed",
+            "upstream_readme_request": policy.upstream_readme_request,
+            "upstream_revision": checkout.upstream_revision,
+            "upstream_origin_matches_expected": checkout.origin_matches_expected,
+            "source_checkout_clean": checkout.clean,
+            "source_revision_status": checkout.status
+        })
+    }
+
     fn test_report(
         probe: &Value,
         inventory: &Value,
@@ -1934,6 +2004,10 @@ mod tests {
         let report = test_report(&probe, &inventory, &assets);
         assert_eq!(report.verdict, "consistent");
         assert_eq!(report.root_content_manifests_verified, 2);
+        assert_eq!(report.source_terms_roots_verified, 2);
+        assert_eq!(report.source_license_documents_verified, 2);
+        assert_eq!(report.source_readme_documents_verified, 2);
+        assert_eq!(report.clean_upstream_checkouts_verified, 2);
         assert_eq!(report.selected_samples_total, 1);
         assert_eq!(report.selected_samples_with_matching_actual_file_digest, 1);
         assert_eq!(report.selected_samples_with_valid_file_digest, 1);
