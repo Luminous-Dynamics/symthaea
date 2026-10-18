@@ -7,6 +7,9 @@ on:
       - "tools/visual-display-corpus-verify/**"
       - "docs/engineering/visual-display-workload-corpus-v0.1.json"
       - "docs/engineering/visual-display-workload-corpus.schema.json"
+      - "docs/engineering/DISPLAY_MANUFACTURING_ROUTE_PROTOCOL.md"
+      - "docs/engineering/display-manufacturing-route-profiles-v0.1.json"
+      - "docs/engineering/display-manufacturing-route-profiles.schema.json"
       - ".github/workflows/visual-display-corpus-verify.yml"
   push:
     branches: ["main"]
@@ -14,6 +17,9 @@ on:
       - "tools/visual-display-corpus-verify/**"
       - "docs/engineering/visual-display-workload-corpus-v0.1.json"
       - "docs/engineering/visual-display-workload-corpus.schema.json"
+      - "docs/engineering/DISPLAY_MANUFACTURING_ROUTE_PROTOCOL.md"
+      - "docs/engineering/display-manufacturing-route-profiles-v0.1.json"
+      - "docs/engineering/display-manufacturing-route-profiles.schema.json"
       - ".github/workflows/visual-display-corpus-verify.yml"
   workflow_dispatch:
 
