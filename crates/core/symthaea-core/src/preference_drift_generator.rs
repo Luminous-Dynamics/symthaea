@@ -80,6 +80,10 @@ pub struct PreferenceDriftGenerationManifestV1 {
     pub scenario_counts_by_family: BTreeMap<String, usize>,
     /// Split assignment keyed by scenario-family ID, in canonical key order.
     pub scenario_family_splits: BTreeMap<String, String>,
+    /// Counts for each categorical generator axis, keyed by axis then value.
+    pub variation_counts_by_axis: BTreeMap<String, BTreeMap<String, usize>>,
+    /// Episodes with an applied synthetic preference reversal and reversed evaluation order.
+    pub preference_reversal_scenario_count: usize,
     /// BLAKE3 digest of the exact serialized fixture bytes, including trailing newline.
     pub fixture_blake3_hex: String,
     /// Explicit limitation on interpretation.
@@ -469,6 +473,9 @@ pub fn generate_preference_drift_suite(
 
     let mut scenario_counts_by_family = BTreeMap::<String, usize>::new();
     let mut scenario_family_splits = BTreeMap::<String, String>::new();
+    let mut variation_counts_by_axis =
+        BTreeMap::<String, BTreeMap<String, usize>>::new();
+    let mut preference_reversal_scenario_count = 0usize;
     for scenario in &generated_scenarios {
         let family = scenario
             .get("scenario_family")
@@ -481,6 +488,28 @@ pub fn generate_preference_drift_suite(
             .ok_or_else(|| finding("$.scenarios.split", "generated scenario lacks split"))?
             .to_owned();
         *scenario_counts_by_family.entry(family.clone()).or_default() += 1;
+        let variation = scenario
+            .get("generator_variation")
+            .and_then(Value::as_object)
+            .ok_or_else(|| finding("$.scenarios.generator_variation", "generated scenario lacks axis receipt"))?;
+        for axis in ["terrain", "fatigue", "payload_class", "time_window", "feedback_mode"] {
+            let value = variation
+                .get(axis)
+                .and_then(Value::as_str)
+                .ok_or_else(|| finding("$.scenarios.generator_variation", format!("missing axis {axis}")))?;
+            *variation_counts_by_axis
+                .entry(axis.to_owned())
+                .or_default()
+                .entry(value.to_owned())
+                .or_default() += 1;
+        }
+        if variation
+            .get("preference_reversed")
+            .and_then(Value::as_bool)
+            == Some(true)
+        {
+            preference_reversal_scenario_count += 1;
+        }
         if let Some(previous) = scenario_family_splits.insert(family.clone(), split.clone()) {
             if previous != split {
                 return Err(finding(
@@ -540,6 +569,8 @@ pub fn generate_preference_drift_suite(
         candidate_count,
         scenario_counts_by_family,
         scenario_family_splits,
+        variation_counts_by_axis,
+        preference_reversal_scenario_count,
         fixture_blake3_hex,
         claim_ceiling: "Synthetic scenario-generator determinism, structural validity, split isolation, and policy-contract stress only. No real-wearer preference, safety, clinical, or deployment claim.".to_owned(),
     };
@@ -596,6 +627,23 @@ mod tests {
             suite.manifest.scenario_counts_by_family.values().sum::<usize>(),
             1220
         );
+        assert_eq!(
+            suite.manifest.variation_counts_by_axis["terrain"].values().sum::<usize>(),
+            1220
+        );
+        assert_eq!(
+            suite.manifest.variation_counts_by_axis["fatigue"].len(),
+            3
+        );
+        assert_eq!(
+            suite.manifest.variation_counts_by_axis["payload_class"].len(),
+            3
+        );
+        assert_eq!(
+            suite.manifest.variation_counts_by_axis["time_window"].len(),
+            3
+        );
+        assert!(suite.manifest.preference_reversal_scenario_count > 0);
 
         let mut split_by_family = BTreeMap::<String, String>::new();
         let mut split_by_wearer = BTreeMap::<String, String>::new();
