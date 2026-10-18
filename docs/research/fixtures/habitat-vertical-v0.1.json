@@ -727,6 +727,12 @@
       "scenario": "Candidate and reference costs use different unconverted currencies.",
       "expected_disposition": "comparison_not_evaluable",
       "invariant": "A ratio requires the same currency and declared time/price basis."
+    },
+    {
+      "case_id": "NC-22-MASS-BALANCE-UNACCOUNTED",
+      "scenario": "A mass-balance case omits 2 percent of input mass but claims zero unaccounted mass.",
+      "expected_disposition": "mass_balance_invalid",
+      "invariant": "Input mass must reconcile to accepted output, scrap, WIP, residue and explicitly reported unaccounted mass within a declared tolerance."
     }
   ],
   "verification_status": {
@@ -1206,5 +1212,23 @@
     "expected_target_met": false,
     "status": "synthetic_known_answer_only",
     "note": "The arithmetic example deliberately does not meet the proposed 80% delivered-cost target. It demonstrates calculation only and establishes no real-world cost comparison."
-  }
+  },
+  "synthetic_material_balance_cases": [
+    {
+      "case_id": "MASS-BALANCE-ARITHMETIC-01",
+      "stream_id": "SYN-TEXTILE-STREAM-01",
+      "mass_unit": "mg",
+      "accounting_boundary": "one synthetic material stream across a frozen operation cohort",
+      "input_mass_mg": 10000000,
+      "accepted_output_mass_mg": 8500000,
+      "scrap_mass_mg": 700000,
+      "rework_wip_mass_mg": 500000,
+      "process_residue_mass_mg": 300000,
+      "reported_unaccounted_mass_mg": 0,
+      "tolerance_mg": 1000,
+      "expected_closure_basis_points_floor": 10000,
+      "status": "synthetic_known_answer_only",
+      "note": "Arithmetic control only. Not a measured plant mass balance or a claim about textile process yields."
+    }
+  ]
 }
