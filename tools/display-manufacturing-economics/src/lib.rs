@@ -219,13 +219,13 @@ impl fmt::Display for ManufacturingMetricError {
                 formatter.write_str("inspection contingency counts exceed their population")
             }
             Self::InvalidRouteCandidate => {
-                formatter.write_str("route candidate metrics must be finite and within declared bounds")
+                formatter.write_str("route candidate bounds must be finite and valid")
             }
             Self::UnqualifiedRouteCandidate => {
-                formatter.write_str("route candidate does not meet mandatory quality, reliability, yield or evidence gates")
+                formatter.write_str("route candidate fails a mandatory gate")
             }
             Self::MismatchedRouteComparison => {
-                formatter.write_str("route candidates do not share the same target, protocol and evidence class")
+                formatter.write_str("route comparison identities do not match")
             }
         }
     }
