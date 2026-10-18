@@ -510,6 +510,25 @@ mod tests {
         let first = create_decision_receipt(&context, &scenario).unwrap();
         let second = create_decision_receipt(&context, &scenario).unwrap();
         assert_eq!(first, second);
+
+        // Frozen V1 golden vector, derived by a separate straight-line reference
+        // encoder using the documented field order and standard SHA-256.
+        assert_eq!(
+            first.input_manifest_sha256,
+            "118603a03fa97d3a84dfbf7bc3ec10fcd02b72abce596f74e70cbcdb93cc8980"
+        );
+        assert_eq!(
+            first.scenario_sha256,
+            "b1cc79675e9d7c0b2d7fdf41ae90f134c7985053d024d4ad608b432974373a58"
+        );
+        assert_eq!(
+            first.output_sha256,
+            "5f05afb631afd0d8977742c232ddcf91f2ac59b0c571de0c2684be8f0a227e87"
+        );
+        assert_eq!(
+            first.receipt_sha256,
+            "4ff2e7847648ea997288d731644ba070bcb514f9efa8734042a04e5b122ab364"
+        );
         verify_decision_receipt(&context, &scenario, &first).unwrap();
     }
 
