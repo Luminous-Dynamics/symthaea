@@ -700,9 +700,9 @@
     }
   ],
   "verification_status": {
-    "schema_parse": "to_be_checked_before_commit",
+    "schema_parse": "json_parse_checked; Rust test suite not run",
     "process_plan_execution": "not_run",
-    "independent_qualifier": "not_implemented",
+    "independent_qualifier": "implemented_not_executed",
     "physical_measurements": "none",
     "facility_commissioning": "not_started",
     "human_evaluation": "none",
