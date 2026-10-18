@@ -27,6 +27,8 @@ The default fixture is embedded at compile time from `docs/research/fixtures/hab
 - every process operation's input lots, required resource, qualified resource skills and predecessors resolve;
 - positive integer operation durations and non-empty output-state labels;
 - directed acyclic process-predecessor graph using the existing `symthaea-graph-theory` crate;
+- directed material-lot containment queries from lot → operation → work-in-process → accepted article → packed unit;
+- exact known-answer descendant sets, including two affected packed units and an unrelated control unit;
 - exactly one final inspection, requiring inspection and measurement skills and a required hold point;
 - complete negative-control and disruption descriptions;
 - proposed target status and the delivered-cost ratio range;
@@ -34,7 +36,7 @@ The default fixture is embedded at compile time from `docs/research/fixtures/hab
 
 ## Deliberate limits
 
-This is a schema/consistency qualifier, not a scheduler, optimizer, production-execution engine, supplier verifier, material-property validator, factory code/safety reviewer, costing audit, LCA engine or product qualification system. It does not execute the negative-control scenarios, prove lot genealogy completeness, test cost formulas against observed books, verify a real factory layout, or show that any proposed target is achieved. Those require separate known-answer tests, exact current owner APIs, and eventually measured evidence.
+This is a schema/consistency and synthetic reachability qualifier, not a scheduler, optimizer, production-execution engine, supplier verifier, material-property validator, factory code/safety reviewer, costing audit, LCA engine or product qualification system. It checks the frozen graph's exact known-answer descendant sets; it does not prove physical lot-genealogy completeness, quarantine a real article, execute the declared disruption scenarios, test cost formulas against observed books, verify a real factory layout, or show that any proposed target is achieved. Those require separate known-answer tests, exact current owner APIs, and eventually measured evidence.
 
 The crate uses the existing graph-theory implementation rather than adding another graph engine. It is a research/benchmark consumer and must not be treated as physical execution authority.
 
