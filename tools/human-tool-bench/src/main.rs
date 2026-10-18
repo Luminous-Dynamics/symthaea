@@ -96,7 +96,7 @@ fn enum_field<'a>(
 
 fn audit(root: &Value, input_sha256: &str) -> Result<Value, String> {
     let computed_contract_sha256 = format!("{:x}", Sha256::digest(CONTRACT_PREIMAGE.as_bytes()));
-    if computed_contract_sha256 != CONTRACT_SHA256 {
+    if computed_contract_sha256.as_str() != CONTRACT_SHA256 {
         return Err("auditor's contract digest does not match its canonical preimage".into());
     }
     if string_field(root, "schema_version", "root")? != "human-tool-bench-v0.1" {
@@ -105,7 +105,7 @@ fn audit(root: &Value, input_sha256: &str) -> Result<Value, String> {
     if string_field(root, "evidence_class", "root")? != "synthetic_contract_fixture" {
         return Err("root.evidence_class must remain synthetic_contract_fixture".into());
     }
-    if string_field(root, "contract_sha256", "root")? != computed_contract_sha256 {
+    if string_field(root, "contract_sha256", "root")? != computed_contract_sha256.as_str() {
         return Err("root.contract_sha256 does not match the frozen v0.1 contract".into());
     }
     if string_field(root, "protocol_id", "root")? != "human-tool-protocol-v0.1" {
@@ -568,7 +568,7 @@ mod tests {
     #[test]
     fn frozen_contract_digest_matches_its_canonical_preimage() {
         let computed = format!("{:x}", Sha256::digest(CONTRACT_PREIMAGE.as_bytes()));
-        assert_eq!(computed, CONTRACT_SHA256);
+        assert_eq!(computed.as_str(), CONTRACT_SHA256);
     }
 
     #[test]
