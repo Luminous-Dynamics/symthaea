@@ -231,7 +231,9 @@
           }
         ],
         "claim_kind": "conversion_efficiency",
-        "requested_claim": "ledger_closes"
+        "requested_claim": "ledger_closes",
+        "boundary_id": "SYNTHETIC-COMPLETE-BALANCE",
+        "boundary_definition": "Synthetic complete energy-inventory boundary including every stated input and output stream."
       },
       "expected_decision": "BLOCK",
       "expected_reasons": [
