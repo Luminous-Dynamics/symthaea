@@ -428,6 +428,47 @@ mod tests {
     }
 
     #[test]
+    fn wider_probability_bounds_can_turn_a_winner_into_ambiguity() {
+        let mut tight = scenario();
+        tight.state_probability_bounds = vec![
+            StateProbabilityBound {
+                state_id: "high-demand".into(),
+                lower_bps: 6_000,
+                upper_bps: 6_000,
+            },
+            StateProbabilityBound {
+                state_id: "low-demand".into(),
+                lower_bps: 4_000,
+                upper_bps: 4_000,
+            },
+        ];
+        assert_eq!(
+            tight.evaluate().unwrap().status,
+            RobustDecisionStatus::UniqueRobustWinner {
+                action_id: "build".into()
+            }
+        );
+
+        let mut wide = tight;
+        wide.state_probability_bounds = vec![
+            StateProbabilityBound {
+                state_id: "high-demand".into(),
+                lower_bps: 4_000,
+                upper_bps: 7_000,
+            },
+            StateProbabilityBound {
+                state_id: "low-demand".into(),
+                lower_bps: 3_000,
+                upper_bps: 6_000,
+            },
+        ];
+        assert_eq!(
+            wide.evaluate().unwrap().status,
+            RobustDecisionStatus::NoUniqueRobustWinner
+        );
+    }
+
+    #[test]
     fn impossible_probability_mass_fails_closed() {
         let mut input = scenario();
         input.state_probability_bounds[0].lower_bps = 6_000;
