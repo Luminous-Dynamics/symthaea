@@ -116,6 +116,23 @@ pub fn render_midi_to_wav(
     sample_rate: u32,
     color: Option<RenderColor>,
 ) -> Option<Vec<u8>> {
+    render_midi_to_wav_with_mastering(
+        midi_path,
+        sample_rate,
+        color,
+        &crate::auto_master::MasteringConfig::default(),
+    )
+}
+
+/// Render MIDI with an explicit mastering profile. Composition paths should
+/// pass the same dialect-derived profile used by the native renderer; neutral
+/// previews and imported-work audition may keep using render_midi_to_wav.
+pub fn render_midi_to_wav_with_mastering(
+    midi_path: &Path,
+    sample_rate: u32,
+    color: Option<RenderColor>,
+    mastering: &crate::auto_master::MasteringConfig,
+) -> Option<Vec<u8>> {
     let (binary, soundfont) = available()?;
     let out = std::env::temp_dir().join(format!(
         "muse_fluid_{}_{}.wav",
@@ -171,7 +188,7 @@ pub fn render_midi_to_wav(
         let _ = std::fs::remove_file(&out);
         return None;
     }
-    let result = master_wav(&out);
+    let result = master_wav(&out, mastering);
     let _ = std::fs::remove_file(&out);
     result
 }
@@ -208,7 +225,7 @@ pub fn render_midi_to_wav(
 /// What remains genuinely untested is narrower: now that both arms share one
 /// mastering chain, the comparison is FAIR for the first time (it was previously
 /// unfair AGAINST FluidSynth), so re-running it measures renderer timbre alone.
-fn master_wav(path: &Path) -> Option<Vec<u8>> {
+fn master_wav(path: &Path, mastering: &crate::auto_master::MasteringConfig) -> Option<Vec<u8>> {
     let mut reader = hound::WavReader::open(path).ok()?;
     let spec_in = reader.spec();
     let samples: Vec<f32> = match spec_in.sample_format {
@@ -240,7 +257,7 @@ fn master_wav(path: &Path) -> Option<Vec<u8>> {
     crate::auto_master::auto_master(
         &mut frames,
         spec_in.sample_rate,
-        &crate::auto_master::MasteringConfig::default(),
+        mastering,
     );
 
     // Re-encode as stereo regardless of input channel count: `frames` is always
@@ -345,7 +362,7 @@ mod tests {
             w.write_sample((s * 32767.0) as i16).unwrap();
         }
         w.finalize().unwrap();
-        let bytes = master_wav(&quiet).expect("real audio masters");
+        let bytes = master_wav(&quiet, &crate::auto_master::MasteringConfig::default()).expect("real audio masters");
         let mut r = hound::WavReader::new(std::io::Cursor::new(bytes)).unwrap();
         let out_spec = r.spec();
         // `master_wav` always emits stereo: it upmixes mono before mastering,
@@ -385,7 +402,7 @@ mod tests {
             w.write_sample(0i16).unwrap();
         }
         w.finalize().unwrap();
-        assert!(master_wav(&silent).is_none());
+        assert!(master_wav(&silent, &crate::auto_master::MasteringConfig::default()).is_none());
         std::fs::remove_file(&silent).ok();
     }
 }
