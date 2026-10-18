@@ -2913,6 +2913,71 @@ mod tests {
     }
 
     #[test]
+    fn test_adaptive_implicit_euler_analytic_jacobian_matches_finite_difference_with_fewer_rhs_calls() {
+        fn growth(_t: f64, y: &[f64]) -> Vec<f64> {
+            vec![y[0]]
+        }
+        fn growth_jacobian(_t: f64, _y: &[f64]) -> Vec<f64> {
+            vec![1.0]
+        }
+        let system = ODESystem { f: growth, dim: 1 };
+        let finite_difference = DifferentialEquationsEngine::try_solve_implicit_euler_adaptive(
+            &system, 0.0, 1.0, &[1.0], &[1e-3], 1e-3, 0.2, 10_000, 12,
+        )
+        .expect("finite-difference adaptive solve should reach the endpoint");
+        let analytical = DifferentialEquationsEngine::try_solve_implicit_euler_adaptive_with_jacobian(
+            &system, growth_jacobian, 0.0, 1.0, &[1.0], &[1e-3], 1e-3, 0.2, 10_000, 12,
+        )
+        .expect("analytical-Jacobian adaptive solve should reach the endpoint");
+
+        assert_eq!(finite_difference.trajectory.t_end(), 1.0);
+        assert_eq!(analytical.trajectory.t_end(), 1.0);
+        assert!(
+            (finite_difference.trajectory.final_state()[0]
+                - analytical.trajectory.final_state()[0]).abs() < 1e-8,
+            "Adaptive trajectories differ: finite={}, analytical={}",
+            finite_difference.trajectory.final_state()[0],
+            analytical.trajectory.final_state()[0],
+        );
+        assert_eq!(finite_difference.jacobian_evaluations, 0);
+        assert!(analytical.jacobian_evaluations > 0);
+        assert!(
+            analytical.rhs_evaluations < finite_difference.rhs_evaluations,
+            "Analytical Jacobian should save RHS calls across step-doubling solves: analytical={}, finite={}",
+            analytical.rhs_evaluations,
+            finite_difference.rhs_evaluations,
+        );
+    }
+
+    #[test]
+    fn test_adaptive_implicit_euler_reports_analytical_jacobian_contract_failures() {
+        fn decay(_t: f64, y: &[f64]) -> Vec<f64> {
+            vec![-y[0]]
+        }
+        fn wrong_shape(_t: f64, _y: &[f64]) -> Vec<f64> {
+            vec![]
+        }
+        let system = ODESystem { f: decay, dim: 1 };
+        let error = DifferentialEquationsEngine::try_solve_implicit_euler_adaptive_with_jacobian(
+            &system, wrong_shape, 0.0, 1.0, &[1.0], &[1e-3], 1e-3, 0.1, 100, 8,
+        )
+        .unwrap_err();
+        assert!(matches!(
+            error.kind,
+            AdaptiveImplicitEulerErrorKind::StepSolveFailed {
+                cause: ImplicitEulerErrorKind::JacobianDimensionMismatch {
+                    expected: 1,
+                    actual: 0,
+                }
+            }
+        ));
+        assert!(error.jacobian_evaluations > 0);
+        assert_eq!(error.accepted_steps, 0);
+        assert_eq!(error.time, 0.0);
+        assert_eq!(error.last_state, vec![1.0]);
+    }
+
+    #[test]
     fn test_adaptive_implicit_euler_step_doubling_reduces_exponential_error() {
         fn growth(_t: f64, y: &[f64]) -> Vec<f64> {
             vec![y[0]]
