@@ -106,6 +106,10 @@ pub struct RouteFrontierCandidate {
     /// Identity of the included cost categories and allocation boundary.
     pub accounting_boundary_id: String,
     pub evidence_class: String,
+    /// Digest/identifier for the evidence bundle supporting these candidate bounds.
+    pub evidence_bundle_digest: String,
+    /// Digest/identifier for the method used to construct the uncertainty bounds.
+    pub uncertainty_method_digest: String,
     /// Upper bound for cost per calibrated-good module in one declared currency.
     pub cost_per_good_unit_upper: f64,
     /// Upper bound for energy per calibrated-good module in joules.
@@ -128,6 +132,8 @@ fn validate_frontier_candidate(
         || candidate.comparison_protocol_digest.trim().is_empty()
         || candidate.accounting_boundary_id.trim().is_empty()
         || candidate.evidence_class.trim().is_empty()
+        || candidate.evidence_bundle_digest.trim().is_empty()
+        || candidate.uncertainty_method_digest.trim().is_empty()
         || candidate.currency_code.len() != 3
         || !candidate
             .currency_code
@@ -633,6 +639,8 @@ mod tests {
             currency_code: "ZAR".to_owned(),
             accounting_boundary_id: "sha256:cost-boundary".to_owned(),
             evidence_class: "SYNTHETIC_SCENARIO".to_owned(),
+            evidence_bundle_digest: "sha256:synthetic-evidence-bundle".to_owned(),
+            uncertainty_method_digest: "sha256:synthetic-interval-method".to_owned(),
             cost_per_good_unit_upper: cost,
             energy_per_good_unit_upper_joules: energy,
             cycle_time_per_good_unit_upper_seconds: cycle,
@@ -678,6 +686,36 @@ mod tests {
     }
 
     #[test]
+    fn near_perfect_transfer_and_repair_capable_routes_remain_pareto_incomparable() {
+        // Synthetic values only: route A spends more to reduce transfer defects;
+        // route B accepts more first-pass defects and recovers good units via repair.
+        // Neither dominates because their cost/energy/cycle/yield trade-offs differ.
+        let near_perfect_transfer =
+            route_candidate("near-perfect-transfer", 120.0, 40.0, 60.0, 0.9999);
+        let repair_capable =
+            route_candidate("repair-capable", 90.0, 50.0, 80.0, 0.9985);
+        assert_eq!(
+            route_pareto_dominates(&near_perfect_transfer, &repair_capable),
+            Ok(false)
+        );
+        assert_eq!(
+            route_pareto_dominates(&repair_capable, &near_perfect_transfer),
+            Ok(false)
+        );
+
+        let integrated_inspection =
+            route_candidate("integrated-inspection", 88.0, 39.0, 58.0, 0.9999);
+        assert_eq!(
+            route_pareto_dominates(&integrated_inspection, &near_perfect_transfer),
+            Ok(true)
+        );
+        assert_eq!(
+            route_pareto_dominates(&integrated_inspection, &repair_capable),
+            Ok(true)
+        );
+    }
+
+    #[test]
     fn route_pareto_refuses_quality_floor_failures_and_invalid_bounds() {
         let a = route_candidate("A", 10.0, 20.0, 100.0, 0.90);
         let mut failed_floor = route_candidate("failed", 1.0, 1.0, 1.0, 1.0);
@@ -691,6 +729,13 @@ mod tests {
         invalid.final_good_yield_lower = f64::NAN;
         assert_eq!(
             route_pareto_dominates(&invalid, &a),
+            Err(ManufacturingMetricError::InvalidRouteCandidate)
+        );
+
+        let mut missing_uncertainty = route_candidate("missing-uncertainty", 10.0, 20.0, 100.0, 0.90);
+        missing_uncertainty.uncertainty_method_digest.clear();
+        assert_eq!(
+            route_pareto_dominates(&missing_uncertainty, &a),
             Err(ManufacturingMetricError::InvalidRouteCandidate)
         );
     }
