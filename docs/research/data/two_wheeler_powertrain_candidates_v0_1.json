@@ -260,7 +260,7 @@
         "calorimetry_and_uncertainty",
         "nuclear_product_accounting",
         "radiation_and_containment_assessment",
-        "useful_conversion_and_reciculating_loads"
+        "useful_conversion_and_recirculating_loads"
       ],
       "primary_falsifiers": [
         "neutron_signal_mistaken_for_net_energy",
