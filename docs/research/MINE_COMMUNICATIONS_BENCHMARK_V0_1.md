@@ -119,7 +119,7 @@ Do not collapse these into one score. A throughput gain cannot compensate for re
 
 The Rust kernel now includes a bounded path-pair search that only reports two routes as diverse when their declared link failure domains and internal relay nodes are disjoint. A link declares both a list of common-cause domains (e.g. shared cable route, power feed, shaft or inundation zone) and whether that inventory is complete. Incomplete or absent inventories do not support a diversity claim. The search has explicit hop and candidate-path caps so the reference harness fails clearly rather than exploring an unbounded graph.
 
-This improves upon merely checking that two paths have different link IDs: two routes can share an upstream switch, power supply, shaft, conduit, or flood zone. The result is still only as complete as the scenario's dependency inventory; it cannot certify real infrastructure independence without engineering evidence. Test shared-domain negative controls and include relay/node dependencies, not just link identity.
+This improves upon merely checking that two paths have different link IDs: two routes can share an upstream switch, power supply, shaft, conduit, or flood zone. The CLI demonstrates a synthetic pair of separate routes and a counterexample where both apparent routes share a power feed. Unit tests also reject a common internal relay and an incomplete failure-domain inventory. The result is still only as complete as the scenario's dependency inventory; it cannot certify real infrastructure independence without engineering evidence. Test shared-domain negative controls and include relay/node dependencies, not just link identity.
 
 ## 6.1 Executable airtime model: current boundary
 

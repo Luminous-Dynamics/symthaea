@@ -2,8 +2,9 @@
 // SPDX-License-Identifier: Apache-2.0 OR MIT
 
 use mine_comms_benchmark::{
-    evaluate_message, plan_queue, simulate_airtime_queue, AirtimeProfile, ChannelKind, Link,
-    LinkState, Message, MessageClass, QueuedTransmission, RoutePolicy,
+    evaluate_message, find_failure_domain_diverse_routes, plan_queue,
+    simulate_airtime_queue, AirtimeProfile, ChannelKind, Link, LinkState, Message,
+    MessageClass, QueuedTransmission, RoutePolicy,
 };
 
 fn add_pair(
@@ -159,6 +160,53 @@ fn main() {
             plan.expired.join(",")
         ),
         Err(error) => println!("case=alarm_storm error={error}"),
+    }
+
+    let mut diverse_links = Vec::new();
+    add_pair(&mut diverse_links, "primary-1", "surface", "relay-a", ChannelKind::Backbone, 15, 990, 4);
+    add_pair(&mut diverse_links, "primary-2", "relay-a", "refuge", ChannelKind::Backbone, 15, 990, 4);
+    add_pair(&mut diverse_links, "alternate-1", "surface", "relay-b", ChannelKind::LocalRadio, 20, 980, 6);
+    add_pair(&mut diverse_links, "alternate-2", "relay-b", "refuge", ChannelKind::LocalRadio, 20, 980, 6);
+
+    match find_failure_domain_diverse_routes(
+        &diverse_links,
+        "surface",
+        "refuge",
+        1_000,
+        RoutePolicy::AdaptiveLatencyEnergy,
+        8,
+        100,
+    ) {
+        Ok(Some(pair)) => println!(
+            "case=failure_domain_diversity primary={} secondary={} combined_score={}",
+            pair.primary.nodes.join("->"),
+            pair.secondary.nodes.join("->"),
+            pair.combined_score
+        ),
+        Ok(None) => println!("case=failure_domain_diversity result=no_independent_pair"),
+        Err(error) => println!("case=failure_domain_diversity error={error}"),
+    }
+
+    let mut common_cause_links = diverse_links.clone();
+    for link in &mut common_cause_links {
+        if link.id.starts_with("primary-2") || link.id.starts_with("alternate-2") {
+            link.failure_domains.push("power-feed:shared".to_owned());
+        }
+    }
+    match find_failure_domain_diverse_routes(
+        &common_cause_links,
+        "surface",
+        "refuge",
+        1_000,
+        RoutePolicy::AdaptiveLatencyEnergy,
+        8,
+        100,
+    ) {
+        Ok(pair) => println!(
+            "case=shared_power_feed result={}",
+            if pair.is_some() { "independent_pair" } else { "no_independent_pair" }
+        ),
+        Err(error) => println!("case=shared_power_feed error={error}"),
     }
 
     let airtime_profile = AirtimeProfile {

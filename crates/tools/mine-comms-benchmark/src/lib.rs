@@ -1412,6 +1412,32 @@ mod tests {
         ).is_err());
     }
 
+    #[test]
+    fn shared_internal_relay_invalidates_apparently_distinct_paths() {
+        let links = vec![
+            link("sa", "s", "a", ChannelKind::Backbone, 10, 990, 5),
+            link("ac", "a", "c", ChannelKind::Backbone, 10, 990, 5),
+            link("sb", "s", "b", ChannelKind::LocalRadio, 20, 980, 8),
+            link("bc", "b", "c", ChannelKind::LocalRadio, 20, 980, 8),
+            link("cd-a", "c", "d", ChannelKind::Backbone, 10, 990, 5),
+            link("cd-b", "c", "d", ChannelKind::LocalRadio, 20, 980, 8),
+        ];
+        assert!(find_failure_domain_diverse_routes(
+            &links, "s", "d", 100, RoutePolicy::AdaptiveLatencyEnergy, 5, 100,
+        )
+        .expect("valid graph")
+        .is_none());
+    }
+
+    #[test]
+    fn candidate_path_cap_fails_explicitly_instead_of_silently_truncating() {
+        let links = diversity_network();
+        assert!(find_failure_domain_diverse_routes(
+            &links, "s", "d", 100, RoutePolicy::AdaptiveLatencyEnergy, 4, 1,
+        )
+        .is_err());
+    }
+
     fn airtime_profile(rate: u64, overhead: u64, propagation: u64, attempts: u8) -> AirtimeProfile {
         AirtimeProfile {
             id: "SYNTHETIC-CHANNEL".to_owned(),
