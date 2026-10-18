@@ -534,6 +534,78 @@ pub fn evaluate_message(
     })
 }
 
+/// A bounded scheduling-window decision. This planner orders whole messages;
+/// it does not model payload size, airtime, retransmissions or contention.
+#[derive(Clone, Debug, Eq, PartialEq)]
+pub struct QueuePlan {
+    pub dispatched: Vec<String>,
+    pub deferred: Vec<String>,
+    pub expired: Vec<String>,
+}
+
+/// Plan a bounded dispatch window with explicit priority, age and expiry.
+/// Higher-priority classes dispatch first; ties use creation time then message
+/// id. Duplicate ids and malformed timestamps are errors, never silent drops.
+pub fn plan_queue(
+    messages: &[Message],
+    now_ms: u64,
+    service_slots: usize,
+) -> Result<QueuePlan, &'static str> {
+    let mut seen_ids = BTreeSet::new();
+    let mut live: Vec<&Message> = Vec::new();
+    let mut expired: Vec<&Message> = Vec::new();
+
+    for message in messages {
+        if message.id.trim().is_empty() {
+            return Err("queued message id must not be empty");
+        }
+        if message.source.trim().is_empty() || message.destination.trim().is_empty() {
+            return Err("queued message endpoints must not be empty");
+        }
+        if message.created_at_ms > now_ms {
+            return Err("queued message creation timestamp is in the future");
+        }
+        if message.expires_at_ms < message.created_at_ms {
+            return Err("queued message expiry precedes creation");
+        }
+        if !seen_ids.insert(message.id.as_str()) {
+            return Err("queued message ids must be unique");
+        }
+
+        if message.expires_at_ms < now_ms {
+            expired.push(message);
+        } else {
+            live.push(message);
+        }
+    }
+
+    live.sort_by(|a, b| {
+        a.class
+            .priority_rank()
+            .cmp(&b.class.priority_rank())
+            .then_with(|| a.created_at_ms.cmp(&b.created_at_ms))
+            .then_with(|| a.id.cmp(&b.id))
+    });
+    expired.sort_by(|a, b| a.id.cmp(&b.id));
+
+    let split_at = service_slots.min(live.len());
+    let dispatched = live[..split_at]
+        .iter()
+        .map(|message| message.id.clone())
+        .collect();
+    let deferred = live[split_at..]
+        .iter()
+        .map(|message| message.id.clone())
+        .collect();
+    let expired = expired.iter().map(|message| message.id.clone()).collect();
+
+    Ok(QueuePlan {
+        dispatched,
+        deferred,
+        expired,
+    })
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;
@@ -795,6 +867,37 @@ mod tests {
         let fallback = evaluate_message(&damaged, &message, 1_000, RoutePolicy::AdaptiveLatencyEnergy).unwrap();
         assert_eq!(fallback.disposition, ReceiptDisposition::Acknowledged);
         assert!(fallback.forward_route.unwrap().link_ids.iter().any(|id| id.starts_with("tte")));
+    }
+
+    #[test]
+    fn alarm_storm_dispatches_distress_before_bulk_and_excludes_expired() {
+        let make_message = |id: &str, class: MessageClass, expires_at_ms: u64| Message {
+            id: id.to_owned(),
+            class,
+            source: "surface".to_owned(),
+            destination: "refuge".to_owned(),
+            created_at_ms: 900,
+            expires_at_ms,
+            origin_authenticated: true,
+        };
+        let messages = vec![
+            make_message("bulk", MessageClass::Bulk, 5_000),
+            make_message("telemetry", MessageClass::Telemetry, 5_000),
+            make_message("evacuate", MessageClass::Evacuation, 5_000),
+            make_message("sos", MessageClass::Distress, 5_000),
+            make_message("expired-sos", MessageClass::Distress, 999),
+        ];
+        let plan = plan_queue(&messages, 1_000, 2).expect("valid queue");
+        assert_eq!(plan.dispatched, vec!["sos", "evacuate"]);
+        assert_eq!(plan.deferred, vec!["telemetry", "bulk"]);
+        assert_eq!(plan.expired, vec!["expired-sos"]);
+    }
+
+    #[test]
+    fn queue_rejects_duplicate_ids_instead_of_merging_messages() {
+        let first = distress_message();
+        let second = first.clone();
+        assert!(plan_queue(&[first, second], 1_000, 1).is_err());
     }
 
     #[test]

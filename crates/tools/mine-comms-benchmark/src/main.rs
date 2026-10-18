@@ -2,7 +2,8 @@
 // SPDX-License-Identifier: Apache-2.0 OR MIT
 
 use mine_comms_benchmark::{
-    evaluate_message, ChannelKind, Link, LinkState, Message, MessageClass, RoutePolicy,
+    evaluate_message, plan_queue, ChannelKind, Link, LinkState, Message, MessageClass,
+    RoutePolicy,
 };
 
 fn add_pair(
@@ -130,6 +131,32 @@ fn main() {
     short_deadline.expires_at_ms = 1_020;
     for policy in policies {
         report("expires_before_arrival", &baseline, &short_deadline, policy);
+    }
+
+    let make_message = |id: &str, class: MessageClass, expires_at_ms: u64| Message {
+        id: id.to_owned(),
+        class,
+        source: "surface".to_owned(),
+        destination: "refuge".to_owned(),
+        created_at_ms: 900,
+        expires_at_ms,
+        origin_authenticated: true,
+    };
+    let alarm_storm = vec![
+        make_message("BULK-001", MessageClass::Bulk, 5_000),
+        make_message("TELEMETRY-001", MessageClass::Telemetry, 5_000),
+        make_message("EVACUATION-001", MessageClass::Evacuation, 5_000),
+        make_message("SOS-002", MessageClass::Distress, 5_000),
+        make_message("EXPIRED-SOS-001", MessageClass::Distress, 999),
+    ];
+    match plan_queue(&alarm_storm, 1_000, 2) {
+        Ok(plan) => println!(
+            "case=alarm_storm service_slots=2 dispatched={} deferred={} expired={}",
+            plan.dispatched.join(","),
+            plan.deferred.join(","),
+            plan.expired.join(",")
+        ),
+        Err(error) => println!("case=alarm_storm error={error}"),
     }
 
     println!("claim_ceiling=synthetic routing semantics only; no radio, mine-safety, or field-reliability claim");
