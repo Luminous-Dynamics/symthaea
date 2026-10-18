@@ -13,6 +13,7 @@
 
 pub mod aging;
 pub mod capacitor_device;
+pub mod capacitor_spectrum;
 pub mod compound_stability;
 pub mod database;
 pub mod encoder;
@@ -28,6 +29,14 @@ pub use capacitor_device::{
     CapacitorDeviceScreeningLimitation, CapacitorDeviceScreeningReport,
     CapacitorDeviceScreeningRequirements, SeriesRlcCapacitorModel,
     calculate_capacitor_device_metrics, screen_capacitor_device,
+};
+pub use capacitor_spectrum::{
+    calculate_capacitor_spectrum_metrics, screen_capacitor_spectrum,
+    CapacitorCurrentSpectrum, CapacitorImpedanceSweep, CapacitorSpectrumComponentResult,
+    CapacitorSpectrumConstraintViolation, CapacitorSpectrumDisposition, CapacitorSpectrumError,
+    CapacitorSpectrumLimitation, CapacitorSpectrumMetrics, CapacitorSpectrumScreeningReport,
+    CapacitorSpectrumScreeningRequirements, CurrentSpectrumComponent, EvaluatedImpedance,
+    ImpedanceEvaluationKind, ImpedanceSweepPoint,
 };
 pub use database::{MaterialDatabase, MaterialSearchResult};
 pub use encoder::MaterialHdcEncoder;
