@@ -32,6 +32,7 @@
 //!
 //! No external dependencies; all data is embedded (see `data/PROVENANCE.md`).
 
+pub mod composition_closure;
 pub mod balance;
 pub mod data;
 pub mod dynamics;
