@@ -370,4 +370,51 @@ mod tests {
             final_energy
         );
     }
+    #[test]
+    fn test_heat_mode_refinement_observed_order() {
+        // This tests the convergence trend, not just one hand-picked resolution.
+        // The explicit solver chooses dt from dx, so the refinement schedule is
+        // coupled; all parameters and resulting step counts remain deterministic.
+        let mut relative_errors = Vec::new();
+        for n_x in [20usize, 40, 80] {
+            let length = 1.0_f64;
+            let alpha = 0.01_f64;
+            let t_end = 0.5_f64;
+            let u0 = sine_mode_ic(n_x, length);
+            let pde =
+                DifferentialEquationsEngine::heat_equation_1d(alpha, length, t_end, n_x, &u0);
+            let decay = (-alpha * (std::f64::consts::PI / length).powi(2) * t_end).exp();
+            let exact: Vec<f64> = pde
+                .x_grid
+                .iter()
+                .map(|&x| decay * (std::f64::consts::PI * x / length).sin())
+                .collect();
+            let exact_norm_squared: f64 = exact.iter().map(|value| value * value).sum();
+            let squared_error: f64 = pde
+                .u_final
+                .iter()
+                .zip(&exact)
+                .map(|(actual, expected)| (actual - expected).powi(2))
+                .sum();
+            relative_errors.push((squared_error / exact_norm_squared).sqrt());
+        }
+
+        assert!(
+            relative_errors[1] < relative_errors[0]
+                && relative_errors[2] < relative_errors[1],
+            "Heat-mode errors must decrease under refinement: {:?}",
+            relative_errors
+        );
+
+        let order_20_40 = (relative_errors[0] / relative_errors[1]).log2();
+        let order_40_80 = (relative_errors[1] / relative_errors[2]).log2();
+        assert!(
+            order_20_40 >= 1.7 && order_40_80 >= 1.7,
+            "Expected observed order >= 1.7 over both refinement intervals; errors={:?}, orders=({:.3}, {:.3})",
+            relative_errors,
+            order_20_40,
+            order_40_80
+        );
+    }
+
 }
