@@ -560,6 +560,9 @@ mod tests {
         for case in &mut manifest.cases {
             case.class = "measurement".into();
             case.pair.evidence_class = "InstrumentedPhysical".into();
+            case.pair.observed_source_record_id = "test-source-record-001".into();
+            case.pair.source_rights_receipt_id = "test-rights-receipt-001".into();
+            case.pair.split_manifest_id = "test-holdout-manifest-001".into();
             case.pair.calibration_receipt_id = Some("test-calibration-receipt".into());
             case.expected_status = None;
             case.expected_error = None;
