@@ -1,0 +1,186 @@
+{
+  "schema_version": "symthaea.rea-coverage-manifest.v1",
+  "benchmark_id": "ENG-REA-003",
+  "corpus_status": "public-development-known-answer",
+  "interval_convention": "All chunk and gap offsets are zero-based half-open byte ranges relative to the selected input; root_file_range offsets are relative to the original source file.",
+  "cases": [
+    {
+      "id": "RCG-001",
+      "description": "A nonempty whole input produces no chunks, but the report falsely says complete and lists no gap.",
+      "selection_offset": 0,
+      "selection_length": 64,
+      "chunks": [],
+      "coverage": "complete",
+      "partial_signals": [],
+      "extraction_gaps": []
+    },
+    {
+      "id": "RCG-002",
+      "description": "An unrecognized selected subrange reports no chunks, complete coverage, and no gap.",
+      "selection_offset": 256,
+      "selection_length": 32,
+      "chunks": [],
+      "coverage": "complete",
+      "partial_signals": [],
+      "extraction_gaps": []
+    },
+    {
+      "id": "RCG-003",
+      "description": "Two known adjacent chunks cover the entire selected input, but arrive out of order.",
+      "selection_offset": 64,
+      "selection_length": 16,
+      "chunks": [
+        {"range": {"offset": 8, "length": 8}, "handler": "archive", "encrypted": false},
+        {"range": {"offset": 0, "length": 8}, "handler": "header", "encrypted": false}
+      ],
+      "coverage": "complete",
+      "partial_signals": [],
+      "extraction_gaps": []
+    },
+    {
+      "id": "RCG-004",
+      "description": "Chunks leave an interior four-byte hole that is absent from extraction_gaps.",
+      "selection_offset": 100,
+      "selection_length": 16,
+      "chunks": [
+        {"range": {"offset": 0, "length": 8}, "handler": "header", "encrypted": false},
+        {"range": {"offset": 12, "length": 4}, "handler": "payload", "encrypted": false}
+      ],
+      "coverage": "complete",
+      "partial_signals": [],
+      "extraction_gaps": []
+    },
+    {
+      "id": "RCG-005",
+      "description": "The same interior hole is explicitly reported with both selected-input and root-file ranges.",
+      "selection_offset": 100,
+      "selection_length": 16,
+      "chunks": [
+        {"range": {"offset": 0, "length": 8}, "handler": "header", "encrypted": false},
+        {"range": {"offset": 12, "length": 4}, "handler": "payload", "encrypted": false}
+      ],
+      "coverage": "partial",
+      "partial_signals": [],
+      "extraction_gaps": [
+        {"kind": "unreported-input-region", "range": {"offset": 8, "length": 4}, "root_file_range": {"offset": 108, "length": 4}}
+      ]
+    },
+    {
+      "id": "RCG-006",
+      "description": "A full-range unknown-handler chunk is accounted for as a chunk and as a typed gap; coverage is partial.",
+      "selection_offset": 0,
+      "selection_length": 16,
+      "chunks": [
+        {"range": {"offset": 0, "length": 16}, "handler": null, "encrypted": false}
+      ],
+      "coverage": "partial",
+      "partial_signals": [],
+      "extraction_gaps": [
+        {"kind": "unknown-chunk-handler", "range": {"offset": 0, "length": 16}, "root_file_range": {"offset": 0, "length": 16}}
+      ]
+    },
+    {
+      "id": "RCG-007",
+      "description": "A full-range unknown-handler chunk is incorrectly reported complete.",
+      "selection_offset": 0,
+      "selection_length": 16,
+      "chunks": [
+        {"range": {"offset": 0, "length": 16}, "handler": null, "encrypted": false}
+      ],
+      "coverage": "complete",
+      "partial_signals": [],
+      "extraction_gaps": []
+    },
+    {
+      "id": "RCG-008",
+      "description": "A fully ranged encrypted chunk is incorrectly reported complete.",
+      "selection_offset": 0,
+      "selection_length": 16,
+      "chunks": [
+        {"range": {"offset": 0, "length": 16}, "handler": "container", "encrypted": true}
+      ],
+      "coverage": "complete",
+      "partial_signals": [],
+      "extraction_gaps": []
+    },
+    {
+      "id": "RCG-009",
+      "description": "The full input has a known chunk, but a reported depth limit is ignored by coverage.",
+      "selection_offset": 0,
+      "selection_length": 16,
+      "chunks": [
+        {"range": {"offset": 0, "length": 16}, "handler": "archive", "encrypted": false}
+      ],
+      "coverage": "complete",
+      "partial_signals": ["depth-limited"],
+      "extraction_gaps": []
+    },
+    {
+      "id": "RCG-010",
+      "description": "A nonempty input is correctly partial when the missing tail and missing extractor are both explained.",
+      "selection_offset": 512,
+      "selection_length": 16,
+      "chunks": [
+        {"range": {"offset": 0, "length": 8}, "handler": "header", "encrypted": false}
+      ],
+      "coverage": "partial",
+      "partial_signals": ["missing-extractor-dependency"],
+      "extraction_gaps": [
+        {"kind": "missing-extractor-dependency", "range": {"offset": 0, "length": 8}, "root_file_range": {"offset": 512, "length": 8}},
+        {"kind": "unreported-input-region", "range": {"offset": 8, "length": 8}, "root_file_range": {"offset": 520, "length": 8}}
+      ]
+    },
+    {
+      "id": "RCG-011",
+      "description": "A zero-length selected input is outside the accepted nonempty-input contract.",
+      "selection_offset": 0,
+      "selection_length": 0,
+      "chunks": [],
+      "coverage": "complete",
+      "partial_signals": [],
+      "extraction_gaps": []
+    },
+    {
+      "id": "RCG-012",
+      "description": "A chunk that extends beyond the selected input is a malformed report, not evidence of coverage.",
+      "selection_offset": 0,
+      "selection_length": 16,
+      "chunks": [
+        {"range": {"offset": 14, "length": 4}, "handler": "payload", "encrypted": false}
+      ],
+      "coverage": "partial",
+      "partial_signals": [],
+      "extraction_gaps": []
+    },
+    {
+      "id": "RCG-013",
+      "description": "A gap has the correct local range but an incorrect original-file offset.",
+      "selection_offset": 100,
+      "selection_length": 16,
+      "chunks": [
+        {"range": {"offset": 0, "length": 8}, "handler": "header", "encrypted": false},
+        {"range": {"offset": 12, "length": 4}, "handler": "payload", "encrypted": false}
+      ],
+      "coverage": "partial",
+      "partial_signals": [],
+      "extraction_gaps": [
+        {"kind": "unreported-input-region", "range": {"offset": 8, "length": 4}, "root_file_range": {"offset": 8, "length": 4}}
+      ]
+    },
+    {
+      "id": "RCG-014",
+      "description": "The reported unreported-input gap is spurious because known chunks cover every selected byte.",
+      "selection_offset": 0,
+      "selection_length": 16,
+      "chunks": [
+        {"range": {"offset": 0, "length": 8}, "handler": "header", "encrypted": false},
+        {"range": {"offset": 8, "length": 8}, "handler": "payload", "encrypted": false}
+      ],
+      "coverage": "partial",
+      "partial_signals": [],
+      "extraction_gaps": [
+        {"kind": "unreported-input-region", "range": {"offset": 8, "length": 1}, "root_file_range": {"offset": 8, "length": 1}}
+      ]
+    }
+  ]
+}
