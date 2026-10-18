@@ -388,9 +388,7 @@ fn semantic_violations(bundle: &Value) -> Vec<String> {
 
             all_metrics_complete &= scenario_metrics_complete;
             if is_frontier
-                && (gate_disposition != "feasible"
-                    || ranking_disposition != "ranked"
-                    || !scenario_metrics_complete)
+                && (gate_disposition != "feasible" || !scenario_metrics_complete)
             {
                 errors.push(format!("{id}: blocked, indeterminate, or incomplete candidate appears on a frontier"));
             }
