@@ -841,6 +841,57 @@ mod tests {
     }
 
     #[test]
+    fn coverage_selector_targets_less_compared_candidates_without_transitivity() {
+        let policy = json!({
+            "scenario_id": "coverage-control",
+            "task_id": "walk",
+            "current_context_id": "level-rested",
+            "current_step": 0,
+            "preference_max_age_steps": 2,
+            "eligible_candidate_ids": ["A", "B", "C", "D"],
+            "query_budget_total": 2,
+            "queries_already_used": 0,
+            "preference_observations": [
+                {
+                    "observation_id": "AB",
+                    "step": 0,
+                    "task_id": "walk",
+                    "context_id": "level-rested",
+                    "source": "explicit_synthetic_ordinal_feedback",
+                    "preferred_candidate_id": "A",
+                    "rejected_candidate_id": "B"
+                },
+                {
+                    "observation_id": "AC",
+                    "step": 0,
+                    "task_id": "walk",
+                    "context_id": "level-rested",
+                    "source": "explicit_synthetic_ordinal_feedback",
+                    "preferred_candidate_id": "A",
+                    "rejected_candidate_id": "C"
+                }
+            ]
+        });
+        let asked = HashSet::new();
+        let lexicographic = select_next_pair(
+            &policy,
+            &asked,
+            PreferenceQuerySelectionStrategyV1::LexicographicUnaskedPair,
+            1,
+            0,
+        );
+        let coverage = select_next_pair(
+            &policy,
+            &asked,
+            PreferenceQuerySelectionStrategyV1::MaximizeUncomparedCandidateCoverage,
+            1,
+            0,
+        );
+        assert_eq!(lexicographic, Some(("A".to_owned(), "D".to_owned())));
+        assert_eq!(coverage, Some(("B".to_owned(), "D".to_owned())));
+    }
+
+    #[test]
     fn candidate_and_observation_order_do_not_change_query_frontier_receipts() {
         let original = evaluate_preference_query_budget_frontier(FIXTURE, 2, 20261018).unwrap();
         let mut fixture: Value = serde_json::from_str(FIXTURE).unwrap();
