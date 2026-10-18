@@ -247,7 +247,9 @@ fn validate_semantics(manifest: &Value) -> Vec<String> {
         .and_then(Value::as_str)
         != Some("NOT_CLAIMED")
     {
-        errors.push("OSHWA certification must remain NOT_CLAIMED until separately reviewed".to_owned());
+        errors.push(
+            "OSHWA certification must remain NOT_CLAIMED until separately reviewed".to_owned(),
+        );
     }
 
     errors
