@@ -23,6 +23,9 @@ For a normalized observation set:
 
     cargo run --manifest-path tools/metal-measurement-bench/Cargo.toml -- validate-records MANIFEST.json OBSERVATIONS.json
 
+The machine-readable observation contract is at
+`tools/metal-measurement-bench/schemas/observation-set-v0.1.schema.json`.
+
 Record rows preserve raw numeric values and units. A normalized value requires a normalized unit and explicit conversion note. Uncertainty, censoring, missingness, specimen lineage, source DOI, and calibration/held-out outcome role stay explicit. The validator rejects undeclared source DOIs, duplicate record IDs, unjustified normalization, unexplained unknown censoring, and calibration target outcomes from the held-out target lineage.
 
 ## What a successful receipt means
