@@ -530,7 +530,7 @@ pub fn evaluate_seeded_random_seed_sweep(
     }
     let seed_offset = u64::try_from(seed_count - 1)
         .map_err(|_| vec![finding("$.seed_count", "seed count does not fit u64")])?;
-    let last_seed = first_seed.checked_add(seed_offset).ok_or_else(|| {
+    let _last_seed = first_seed.checked_add(seed_offset).ok_or_else(|| {
         vec![finding("$.first_seed", "seed sequence would overflow u64")]
     })?;
 
@@ -554,7 +554,7 @@ pub fn evaluate_seeded_random_seed_sweep(
     let mut stale_total = 0usize;
     let mut min_acceptable = usize::MAX;
     let mut max_acceptable = 0usize;
-    let mut ranking_scenarios_per_seed = 0usize;
+    let mut ranking_scenarios_per_seed: Option<usize> = None;
 
     for offset in 0..seed_count {
         let seed = first_seed + offset as u64;
@@ -563,7 +563,7 @@ pub fn evaluate_seeded_random_seed_sweep(
             assessments.push(choose_seeded_random(scenario, seed)?);
         }
         let scored = score_selections(scenarios, &assessments, "seeded_random", Some(seed));
-        ranking_scenarios_per_seed = scored.oracle_ranking_scenario_count;
+        ranking_scenarios_per_seed = Some(scored.oracle_ranking_scenario_count);
         acceptable_total += scored.acceptable_selection_count;
         unacceptable_total += scored.unacceptable_selection_count;
         no_ranking_total += scored.selection_without_ranking_count;
@@ -587,8 +587,8 @@ pub fn evaluate_seeded_random_seed_sweep(
         first_seed,
         seed_count,
         scenario_count_per_seed: scenarios.len(),
-        ranking_scenarios_per_seed,
-        ranked_selection_opportunities: ranking_scenarios_per_seed * seed_count,
+        ranking_scenarios_per_seed: ranking_scenarios_per_seed.unwrap_or_default(),
+        ranked_selection_opportunities: ranking_scenarios_per_seed.unwrap_or_default() * seed_count,
         acceptable_selection_count: acceptable_total,
         unacceptable_selection_count: unacceptable_total,
         selection_without_ranking_count: no_ranking_total,
