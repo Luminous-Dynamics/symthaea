@@ -61,7 +61,7 @@ jobs:
           set -euo pipefail
           cad="hardware/open-display-reference/cad/odrh_sensor_interface_plate.scad"
           openscad -o "$RUNNER_TEMP/odrh-default.stl" "$cad"
-          openscad -D 'plate_width_mm=100' -D 'plate_height_mm=60' \\
+          openscad -D 'plate_width_mm=100' -D 'plate_height_mm=60' \
             -o "$RUNNER_TEMP/odrh-alternate.stl" "$cad"
           echo "Default STL SHA-256:"
           sha256sum "$RUNNER_TEMP/odrh-default.stl"
@@ -88,7 +88,7 @@ jobs:
               END {
                 if (!seen) { print "STL contains no vertices"; exit 2 }
                 dx=maxx-minx; dy=maxy-miny; dz=maxz-minz
-                printf "Observed extents: %.3f x %.3f x %.3f mm\\n", dx, dy, dz
+                printf "Observed extents: %.3f x %.3f x %.3f mm\n", dx, dy, dz
                 if (abs(dx-ex) > 0.02 || abs(dy-ey) > 0.02 || abs(dz-ez) > 0.02) exit 1
               }
             ' "$file"
@@ -97,13 +97,13 @@ jobs:
           check_bounds "$RUNNER_TEMP/odrh-alternate.stl" 100 5 60
 
           cad="hardware/open-display-reference/cad/odrh_sensor_interface_plate.scad"
-          if openscad -D 'sensor_aperture_d_mm=100' \\
-            -o "$RUNNER_TEMP/odrh-invalid.stl" "$cad" \\
+          if openscad -D 'sensor_aperture_d_mm=100' \
+            -o "$RUNNER_TEMP/odrh-invalid.stl" "$cad" \
             > "$RUNNER_TEMP/odrh-invalid.log" 2>&1; then
             echo "Oversized aperture override unexpectedly rendered"
             exit 1
           fi
-          grep -F "Sensor aperture overlaps the diagonal mounting-hole envelope" \\
+          grep -F "Sensor aperture overlaps the diagonal mounting-hole envelope" \
             "$RUNNER_TEMP/odrh-invalid.log"
 
       - name: Check formatting
