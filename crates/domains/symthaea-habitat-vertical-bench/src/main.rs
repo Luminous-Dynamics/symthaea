@@ -34,9 +34,45 @@ fn main() {
     };
 
     if report.is_valid() {
+        let value: serde_json::Value = match serde_json::from_str(input) {
+            Ok(value) => value,
+            Err(error) => {
+                eprintln!("fixture changed between validation and summary parsing: {error}");
+                process::exit(2);
+            }
+        };
+        let cost = match symthaea_habitat_vertical_bench::accounting::calculate_cost_comparison(&value) {
+            Ok(report) => report,
+            Err(error) => {
+                eprintln!("cost known-answer calculation failed after structural pass: {error}");
+                process::exit(1);
+            }
+        };
+        let mass = match symthaea_habitat_vertical_bench::accounting::calculate_material_balance(
+            &value,
+            "MASS-BALANCE-ARITHMETIC-01",
+        ) {
+            Ok(report) => report,
+            Err(error) => {
+                eprintln!("material-balance known-answer calculation failed after structural pass: {error}");
+                process::exit(1);
+            }
+        };
+
         println!("STRUCTURAL FIXTURE VALIDATION: PASS");
-        println!("scope: synthetic structure only; no physical or product qualification");
-        println!("negative controls are declared, not executed by this binary");
+        println!(
+            "synthetic known-answer candidate/reference cost ratio: {} basis points; target_met={}",
+            cost.ratio_basis_points_floor, cost.target_met
+        );
+        println!(
+            "synthetic material-balance closure: {} basis points; accepted mass yield: {} basis points; unaccounted={} {}",
+            mass.closure_basis_points_floor,
+            mass.accepted_yield_basis_points_floor,
+            mass.unaccounted_mass_mg,
+            mass.mass_unit
+        );
+        println!("scope: synthetic arithmetic and structure only; no physical or product qualification");
+        println!("negative controls are declared, not all executed by this binary");
         return;
     }
 
