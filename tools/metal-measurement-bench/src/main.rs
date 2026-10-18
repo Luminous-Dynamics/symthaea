@@ -1199,6 +1199,23 @@ mod tests {
     }
 
     #[test]
+    fn rejects_record_from_an_undeclared_source_object() {
+        let value = record_manifest();
+        let mut row = record("target", "AMB2022-718-AMMT-B7-P4", "aggregate-target", RecordRole::TargetOutcome, Split::HeldOut, "yield_strength", 920.0);
+        row.source_object_id = "invented-object-id".into();
+        let observations = ObservationSet { schema_version: "0.1.0".into(), records: vec![row] };
+        assert!(validate_records(&value, &observations).is_err());
+    }
+
+    #[test]
+    fn rejects_record_whose_known_doi_does_not_match_its_source_object() {
+        let value = record_manifest();
+        let mut row = record("target", "AMB2022-718-AMMT-B7-P4", "aggregate-target", RecordRole::TargetOutcome, Split::HeldOut, "yield_strength", 920.0);
+        row.source_doi = "10.18434/mds2-2767".into();
+        let observations = ObservationSet { schema_version: "0.1.0".into(), records: vec![row] };
+        assert!(validate_records(&value, &observations).is_err());
+    }
+    #[test]
     fn rejects_record_when_its_source_object_has_no_artifact_digest() {
         let mut value = record_manifest();
         value.artifacts.clear();
