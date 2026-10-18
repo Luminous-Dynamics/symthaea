@@ -330,9 +330,7 @@ fn nonempty(value: &str) -> bool {
 
 fn check_source_rights(source: &SourceEvidence) -> Option<OracleOutcome> {
     match source.rights_status {
-        RightsStatus::Restricted => {
-            Some(outcome(Disposition::Blocked, "RIGHTS_RESTRICTED"))
-        }
+        RightsStatus::Restricted => Some(outcome(Disposition::Blocked, "RIGHTS_RESTRICTED")),
         RightsStatus::Unknown => Some(outcome(Disposition::Blocked, "RIGHTS_UNKNOWN")),
         RightsStatus::Expired => Some(outcome(Disposition::Blocked, "RIGHTS_EXPIRED")),
         RightsStatus::Revoked => Some(outcome(Disposition::Blocked, "RIGHTS_REVOKED")),
@@ -379,8 +377,7 @@ fn validate_case_shell(fixture: &CaseFixture) -> Vec<String> {
     {
         errors.push("REQUEST_FIELD_EMPTY".to_owned());
     }
-    if !nonempty(&fixture.candidate.candidate_id)
-        || !nonempty(&fixture.candidate.source.source_id)
+    if !nonempty(&fixture.candidate.candidate_id) || !nonempty(&fixture.candidate.source.source_id)
     {
         errors.push("CANDIDATE_OR_SOURCE_ID_EMPTY".to_owned());
     }
@@ -476,29 +473,25 @@ pub fn evaluate_case(fixture: &CaseFixture) -> OracleOutcome {
 
     match &candidate.source_freshness {
         FreshnessState::Current => {}
-        FreshnessState::Stale => {
-            return outcome(Disposition::Indeterminate, "SOURCE_STALE")
-        }
+        FreshnessState::Stale => return outcome(Disposition::Indeterminate, "SOURCE_STALE"),
         FreshnessState::Unknown => {
-            return outcome(Disposition::Indeterminate, "SOURCE_FRESHNESS_UNKNOWN")
+            return outcome(Disposition::Indeterminate, "SOURCE_FRESHNESS_UNKNOWN");
         }
     }
 
     match candidate.identity_match {
         MatchState::Mismatch => {
-            return outcome(Disposition::Blocked, "INGREDIENT_IDENTITY_MISMATCH")
+            return outcome(Disposition::Blocked, "INGREDIENT_IDENTITY_MISMATCH");
         }
         MatchState::Unknown => {
-            return outcome(Disposition::Indeterminate, "INGREDIENT_IDENTITY_UNKNOWN")
+            return outcome(Disposition::Indeterminate, "INGREDIENT_IDENTITY_UNKNOWN");
         }
         MatchState::Match => {}
     }
     match candidate.target_match {
-        MatchState::Mismatch => {
-            return outcome(Disposition::Blocked, "TARGET_SPECIES_MISMATCH")
-        }
+        MatchState::Mismatch => return outcome(Disposition::Blocked, "TARGET_SPECIES_MISMATCH"),
         MatchState::Unknown => {
-            return outcome(Disposition::Indeterminate, "TARGET_SPECIES_UNKNOWN")
+            return outcome(Disposition::Indeterminate, "TARGET_SPECIES_UNKNOWN");
         }
         MatchState::Match => {}
     }
@@ -516,10 +509,10 @@ pub fn evaluate_case(fixture: &CaseFixture) -> OracleOutcome {
 fn evaluate_nutrition(candidate: &Candidate) -> OracleOutcome {
     match candidate.basis_state {
         BasisState::MixedWithoutConversion => {
-            return outcome(Disposition::NotComparable, "BASIS_MIXED_WITHOUT_CONVERSION")
+            return outcome(Disposition::NotComparable, "BASIS_MIXED_WITHOUT_CONVERSION");
         }
         BasisState::IncompatibleUnits => {
-            return outcome(Disposition::NotComparable, "UNITS_INCOMPATIBLE")
+            return outcome(Disposition::NotComparable, "UNITS_INCOMPATIBLE");
         }
         BasisState::Unknown => return outcome(Disposition::Indeterminate, "BASIS_UNKNOWN"),
         BasisState::Normalized => {}
@@ -527,29 +520,30 @@ fn evaluate_nutrition(candidate: &Candidate) -> OracleOutcome {
 
     match candidate.nutrition_evidence_state {
         NutritionEvidenceState::MissingRequired => {
-            return outcome(Disposition::Indeterminate, "REQUIRED_NUTRITION_UNKNOWN")
+            return outcome(Disposition::Indeterminate, "REQUIRED_NUTRITION_UNKNOWN");
         }
         NutritionEvidenceState::Partial => {
-            return outcome(Disposition::Indeterminate, "NUTRITION_EVIDENCE_PARTIAL")
+            return outcome(Disposition::Indeterminate, "NUTRITION_EVIDENCE_PARTIAL");
         }
         NutritionEvidenceState::NotAssessed => {
-            return outcome(Disposition::Indeterminate, "NUTRITION_EVIDENCE_NOT_ASSESSED")
+            return outcome(
+                Disposition::Indeterminate,
+                "NUTRITION_EVIDENCE_NOT_ASSESSED",
+            );
         }
         NutritionEvidenceState::NotApplicable => {
-            return outcome(Disposition::Indeterminate, "NUTRITION_NOT_APPLICABLE")
+            return outcome(Disposition::Indeterminate, "NUTRITION_NOT_APPLICABLE");
         }
         NutritionEvidenceState::Complete => {}
     }
 
     match candidate.nutrition_gate {
-        NutritionGate::Fail => {
-            return outcome(Disposition::Blocked, "NUTRITION_GATE_FAILED")
-        }
+        NutritionGate::Fail => return outcome(Disposition::Blocked, "NUTRITION_GATE_FAILED"),
         NutritionGate::Unknown => {
-            return outcome(Disposition::Indeterminate, "NUTRITION_GATE_UNKNOWN")
+            return outcome(Disposition::Indeterminate, "NUTRITION_GATE_UNKNOWN");
         }
         NutritionGate::NotRequested => {
-            return outcome(Disposition::Indeterminate, "NUTRITION_GATE_NOT_REQUESTED")
+            return outcome(Disposition::Indeterminate, "NUTRITION_GATE_NOT_REQUESTED");
         }
         NutritionGate::Pass => {}
     }
@@ -557,30 +551,24 @@ fn evaluate_nutrition(candidate: &Candidate) -> OracleOutcome {
     match candidate.safety_gate {
         SafetyGate::Fail => return outcome(Disposition::Blocked, "SAFETY_GATE_FAILED"),
         SafetyGate::NotAssessed => {
-            return outcome(Disposition::Indeterminate, "SAFETY_NOT_ASSESSED")
+            return outcome(Disposition::Indeterminate, "SAFETY_NOT_ASSESSED");
         }
-        SafetyGate::Unknown => {
-            return outcome(Disposition::Indeterminate, "SAFETY_GATE_UNKNOWN")
-        }
+        SafetyGate::Unknown => return outcome(Disposition::Indeterminate, "SAFETY_GATE_UNKNOWN"),
         SafetyGate::Pass => {}
     }
 
     match candidate.authorization_gate {
-        AuthorizationGate::Fail => {
-            return outcome(Disposition::Blocked, "AUTHORIZATION_FAILED")
-        }
+        AuthorizationGate::Fail => return outcome(Disposition::Blocked, "AUTHORIZATION_FAILED"),
         AuthorizationGate::Unknown => {
-            return outcome(Disposition::Indeterminate, "AUTHORIZATION_UNKNOWN")
+            return outcome(Disposition::Indeterminate, "AUTHORIZATION_UNKNOWN");
         }
         AuthorizationGate::Pass | AuthorizationGate::NotApplicable => {}
     }
 
     match candidate.availability {
-        Availability::Unavailable => {
-            return outcome(Disposition::Blocked, "RESOURCE_UNAVAILABLE")
-        }
+        Availability::Unavailable => return outcome(Disposition::Blocked, "RESOURCE_UNAVAILABLE"),
         Availability::SeasonalUnknown => {
-            return outcome(Disposition::Indeterminate, "SEASONAL_AVAILABILITY_UNKNOWN")
+            return outcome(Disposition::Indeterminate, "SEASONAL_AVAILABILITY_UNKNOWN");
         }
         Availability::Available => {}
     }
@@ -595,28 +583,22 @@ fn evaluate_scenario(candidate: &Candidate, request: &Request) -> OracleOutcome 
     match candidate.safety_gate {
         SafetyGate::Fail => return outcome(Disposition::Blocked, "SAFETY_GATE_FAILED"),
         SafetyGate::NotAssessed => {
-            return outcome(Disposition::Indeterminate, "SAFETY_NOT_ASSESSED")
+            return outcome(Disposition::Indeterminate, "SAFETY_NOT_ASSESSED");
         }
-        SafetyGate::Unknown => {
-            return outcome(Disposition::Indeterminate, "SAFETY_GATE_UNKNOWN")
-        }
+        SafetyGate::Unknown => return outcome(Disposition::Indeterminate, "SAFETY_GATE_UNKNOWN"),
         SafetyGate::Pass => {}
     }
     match candidate.authorization_gate {
-        AuthorizationGate::Fail => {
-            return outcome(Disposition::Blocked, "AUTHORIZATION_FAILED")
-        }
+        AuthorizationGate::Fail => return outcome(Disposition::Blocked, "AUTHORIZATION_FAILED"),
         AuthorizationGate::Unknown => {
-            return outcome(Disposition::Indeterminate, "AUTHORIZATION_UNKNOWN")
+            return outcome(Disposition::Indeterminate, "AUTHORIZATION_UNKNOWN");
         }
         AuthorizationGate::Pass | AuthorizationGate::NotApplicable => {}
     }
     match candidate.availability {
-        Availability::Unavailable => {
-            return outcome(Disposition::Blocked, "RESOURCE_UNAVAILABLE")
-        }
+        Availability::Unavailable => return outcome(Disposition::Blocked, "RESOURCE_UNAVAILABLE"),
         Availability::SeasonalUnknown => {
-            return outcome(Disposition::Indeterminate, "SEASONAL_AVAILABILITY_UNKNOWN")
+            return outcome(Disposition::Indeterminate, "SEASONAL_AVAILABILITY_UNKNOWN");
         }
         Availability::Available => {}
     }
@@ -690,7 +672,12 @@ fn incomplete_receipt(
         git_head: actual_head.map(str::to_owned),
         expected_git_head: expected_head.map(str::to_owned),
         corpus_sha256: sha256_hex(raw),
-        counts: RunCounts { attempted: 0, passed: 0, failed: 0, skipped: 0 },
+        counts: RunCounts {
+            attempted: 0,
+            passed: 0,
+            failed: 0,
+            skipped: 0,
+        },
         status: RunStatus::Incomplete,
         errors: vec![error],
         cases: Vec::new(),
@@ -747,7 +734,11 @@ pub fn run_corpus(
             && actual.reason_codes == fixture.expected.reason_codes;
         results.push(CaseResult {
             case_id: fixture.case_id.clone(),
-            status: if pass { RunStatus::Pass } else { RunStatus::Fail },
+            status: if pass {
+                RunStatus::Pass
+            } else {
+                RunStatus::Fail
+            },
             expected_disposition: fixture.expected.disposition,
             actual_disposition: actual.disposition,
             expected_reason_codes: fixture.expected.reason_codes.clone(),
@@ -756,7 +747,10 @@ pub fn run_corpus(
     }
     results.sort_by(|a, b| a.case_id.cmp(&b.case_id));
 
-    let passed = results.iter().filter(|item| item.status == RunStatus::Pass).count();
+    let passed = results
+        .iter()
+        .filter(|item| item.status == RunStatus::Pass)
+        .count();
     let failed = results.len() - passed;
     let mut errors = Vec::new();
     if failed > 0 {
@@ -807,7 +801,10 @@ pub fn run_corpus(
 }
 
 fn git_head() -> Option<String> {
-    let output = Command::new("git").args(["rev-parse", "HEAD"]).output().ok()?;
+    let output = Command::new("git")
+        .args(["rev-parse", "HEAD"])
+        .output()
+        .ok()?;
     if !output.status.success() {
         return None;
     }
@@ -820,9 +817,8 @@ fn git_head() -> Option<String> {
 /// CLI invocation: cargo run -p symthaea-bioprotein-oracle -- --expected-head <sha>
 pub fn run_cli() -> i32 {
     let mut args = std::env::args().skip(1);
-    let mut corpus_path = PathBuf::from(
-        "docs/research/bioprotein/fixtures/bioprotein-gate-corpus-v1.json",
-    );
+    let mut corpus_path =
+        PathBuf::from("docs/research/bioprotein/fixtures/bioprotein-gate-corpus-v1.json");
     let mut receipt_path: Option<PathBuf> = None;
     let mut expected_head: Option<String> = None;
 
@@ -917,17 +913,24 @@ mod tests {
         assert_eq!(receipt.counts.passed, 29);
         assert_eq!(receipt.counts.failed, 0);
         assert_eq!(receipt.counts.skipped, 0);
-        assert_eq!(receipt.corpus_status.as_deref(), Some("synthetic_design_fixture_only"));
+        assert_eq!(
+            receipt.corpus_status.as_deref(),
+            Some("synthetic_design_fixture_only")
+        );
         assert!(receipt.claim_ceiling.contains("no biological outcome"));
     }
-
 
     #[test]
     fn malformed_json_is_incomplete_not_pass() {
         let receipt = run_corpus(b"{", Some("head-a"), Some("head-a"));
         assert_eq!(receipt.status, RunStatus::Incomplete);
         assert_eq!(receipt.counts.attempted, 0);
-        assert!(receipt.errors.iter().any(|error| error.starts_with("CORPUS_PARSE_FAILED:")));
+        assert!(
+            receipt
+                .errors
+                .iter()
+                .any(|error| error.starts_with("CORPUS_PARSE_FAILED:"))
+        );
     }
 
     #[test]
@@ -937,24 +940,40 @@ mod tests {
         let raw = serde_json::to_vec(&corpus).unwrap();
         let receipt = run_corpus(&raw, Some("head-a"), Some("head-a"));
         assert_eq!(receipt.status, RunStatus::Incomplete);
-        assert!(receipt.errors.iter().any(|error| error == "CORPUS_SCHEMA_VERSION_MISMATCH"));
+        assert!(
+            receipt
+                .errors
+                .iter()
+                .any(|error| error == "CORPUS_SCHEMA_VERSION_MISMATCH")
+        );
     }
 
     #[test]
     fn missing_scoped_rights_evidence_fails_closed() {
         let mut corpus = fixture_corpus();
-        let case = corpus.cases.iter_mut().find(|c| c.case_id == "BIOP-GATE0-001").unwrap();
+        let case = corpus
+            .cases
+            .iter_mut()
+            .find(|c| c.case_id == "BIOP-GATE0-001")
+            .unwrap();
         case.candidate.source.permission_evidence_present = false;
         case.candidate.source.permission_evidence_ref = None;
         let actual = evaluate_case(case);
         assert_eq!(actual.disposition, Disposition::Blocked);
-        assert_eq!(actual.reason_codes, vec!["RIGHTS_EVIDENCE_MISSING".to_owned()]);
+        assert_eq!(
+            actual.reason_codes,
+            vec!["RIGHTS_EVIDENCE_MISSING".to_owned()]
+        );
     }
 
     #[test]
     fn revoked_rights_override_other_positive_gates() {
         let mut corpus = fixture_corpus();
-        let case = corpus.cases.iter_mut().find(|c| c.case_id == "BIOP-GATE0-001").unwrap();
+        let case = corpus
+            .cases
+            .iter_mut()
+            .find(|c| c.case_id == "BIOP-GATE0-001")
+            .unwrap();
         case.candidate.source.rights_status = RightsStatus::Revoked;
         let actual = evaluate_case(case);
         assert_eq!(actual.disposition, Disposition::Blocked);
@@ -964,10 +983,17 @@ mod tests {
     #[test]
     fn unknown_nutrition_does_not_become_zero_or_pass() {
         let mut corpus = fixture_corpus();
-        let case = corpus.cases.iter_mut().find(|c| c.case_id == "BIOP-GATE1-003").unwrap();
+        let case = corpus
+            .cases
+            .iter_mut()
+            .find(|c| c.case_id == "BIOP-GATE1-003")
+            .unwrap();
         let actual = evaluate_case(case);
         assert_eq!(actual.disposition, Disposition::Indeterminate);
-        assert_eq!(actual.reason_codes, vec!["REQUIRED_NUTRITION_UNKNOWN".to_owned()]);
+        assert_eq!(
+            actual.reason_codes,
+            vec!["REQUIRED_NUTRITION_UNKNOWN".to_owned()]
+        );
     }
 
     #[test]
@@ -995,16 +1021,25 @@ mod tests {
             Some("expected-sha"),
         );
         assert_eq!(receipt.status, RunStatus::Fail);
-        assert!(receipt.errors.iter().any(|error| error == "GIT_HEAD_MISMATCH"));
+        assert!(
+            receipt
+                .errors
+                .iter()
+                .any(|error| error == "GIT_HEAD_MISMATCH")
+        );
     }
 
     #[test]
     fn missing_head_never_passes() {
         let receipt = run_corpus(FIXTURE_CORPUS.as_bytes(), None, Some("expected-sha"));
         assert_eq!(receipt.status, RunStatus::Incomplete);
-        assert!(receipt.errors.iter().any(|error| error == "GIT_HEAD_IDENTITY_MISSING"));
+        assert!(
+            receipt
+                .errors
+                .iter()
+                .any(|error| error == "GIT_HEAD_IDENTITY_MISSING")
+        );
     }
-
 
     #[test]
     fn permitted_source_with_missing_required_attribution_is_blocked() {
@@ -1043,7 +1078,12 @@ mod tests {
         let raw = serde_json::to_vec(&corpus).unwrap();
         let receipt = run_corpus(&raw, Some("actual-sha"), Some("expected-sha"));
         assert_eq!(receipt.status, RunStatus::Fail);
-        assert!(receipt.errors.iter().any(|error| error == "GIT_HEAD_MISMATCH"));
+        assert!(
+            receipt
+                .errors
+                .iter()
+                .any(|error| error == "GIT_HEAD_MISMATCH")
+        );
         assert!(
             receipt
                 .errors
@@ -1062,34 +1102,52 @@ mod tests {
         let raw = serde_json::to_vec(&corpus).unwrap();
         let receipt = run_corpus(&raw, Some("head-a"), Some("head-a"));
         assert_eq!(receipt.status, RunStatus::Incomplete);
-        assert!(receipt.errors.iter().any(|error| error.starts_with("DUPLICATE_CASE_ID:")));
+        assert!(
+            receipt
+                .errors
+                .iter()
+                .any(|error| error.starts_with("DUPLICATE_CASE_ID:"))
+        );
     }
 
     #[test]
     fn simulated_result_cannot_be_reported_as_measured() {
         let mut corpus = fixture_corpus();
-        let case = corpus.cases.iter_mut().find(|c| c.case_id == "BIOP-GATE4-002").unwrap();
+        let case = corpus
+            .cases
+            .iter_mut()
+            .find(|c| c.case_id == "BIOP-GATE4-002")
+            .unwrap();
         case.candidate.evidence_kind = EvidenceKind::Simulated;
         case.candidate.reported_as = Some(EvidenceKind::Measured);
         let actual = evaluate_case(case);
         assert_eq!(actual.disposition, Disposition::InvalidEvidence);
-        assert_eq!(actual.reason_codes, vec!["SIMULATED_REPORTED_AS_MEASURED".to_owned()]);
+        assert_eq!(
+            actual.reason_codes,
+            vec!["SIMULATED_REPORTED_AS_MEASURED".to_owned()]
+        );
     }
 
     #[test]
     fn cost_basis_failure_is_scoped_to_cost_claim() {
         let mut corpus = fixture_corpus();
-        let case = corpus.cases.iter_mut().find(|c| c.case_id == "BIOP-GATE1-006").unwrap();
+        let case = corpus
+            .cases
+            .iter_mut()
+            .find(|c| c.case_id == "BIOP-GATE1-006")
+            .unwrap();
         case.candidate.cost.basis.clear();
         let nutrition = evaluate_case(case);
-        assert_eq!(nutrition.disposition, Disposition::EligibleForDeclaredComparison);
+        assert_eq!(
+            nutrition.disposition,
+            Disposition::EligibleForDeclaredComparison
+        );
         let mut cost_case = case.clone();
         cost_case.request.requested_claim = Claim::CostComparison;
         let cost = evaluate_case(&cost_case);
         assert_eq!(cost.disposition, Disposition::InvalidEvidence);
         assert_eq!(cost.reason_codes, vec!["INVALID_COST_BASIS".to_owned()]);
     }
-
 
     #[test]
     fn cost_comparison_requires_scenario_alignment() {
@@ -1112,11 +1170,21 @@ mod tests {
     #[test]
     fn missing_lca_does_not_change_the_distinct_nutrition_claim() {
         let mut corpus = fixture_corpus();
-        let case = corpus.cases.iter_mut().find(|c| c.case_id == "BIOP-GATE1-006").unwrap();
+        let case = corpus
+            .cases
+            .iter_mut()
+            .find(|c| c.case_id == "BIOP-GATE1-006")
+            .unwrap();
         case.candidate.lca_state = Some(LcaState::Incomplete);
         let mut lca_case = case.clone();
         lca_case.request.requested_claim = Claim::LcaComparison;
-        assert_eq!(evaluate_case(&lca_case).disposition, Disposition::NotComparable);
-        assert_eq!(evaluate_case(case).disposition, Disposition::EligibleForDeclaredComparison);
+        assert_eq!(
+            evaluate_case(&lca_case).disposition,
+            Disposition::NotComparable
+        );
+        assert_eq!(
+            evaluate_case(case).disposition,
+            Disposition::EligibleForDeclaredComparison
+        );
     }
 }
