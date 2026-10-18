@@ -354,6 +354,25 @@ mod tests {
     }
 
     #[test]
+    fn jsonl_parser_round_trips_multiple_records_and_ignores_blank_lines() {
+        let records = demo_records();
+        let first = serde_json::to_string(&records[0]).unwrap();
+        let second = serde_json::to_string(&records[1]).unwrap();
+        let input = format!("{first}\n\n{second}\n");
+        let parsed = parse_jsonl(&input).unwrap();
+        assert_eq!(parsed, records[..2]);
+    }
+
+    #[test]
+    fn jsonl_parser_reports_the_bad_line_number() {
+        let records = demo_records();
+        let first = serde_json::to_string(&records[0]).unwrap();
+        let input = format!("{first}\nnot-json\n");
+        let error = parse_jsonl(&input).unwrap_err();
+        assert!(error.contains("line 2"));
+    }
+
+    #[test]
     fn output_path_is_parsed_as_an_option() {
         let options = parse_options([
             "--input".to_owned(), "responses.jsonl".to_owned(),
