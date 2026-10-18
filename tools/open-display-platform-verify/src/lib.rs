@@ -384,7 +384,11 @@ mod tests {
                 .map(str::trim)
                 .find(|line| line.starts_with(&prefix))
                 .unwrap_or_else(|| panic!("CAD source is missing parameter {name}"));
-            let source_value = line
+            let assignment = line
+                .split("//")
+                .next()
+                .expect("CAD parameter line must exist");
+            let source_value = assignment
                 .split_once('=')
                 .expect("CAD parameter line must contain an assignment")
                 .1
