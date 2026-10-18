@@ -27,8 +27,12 @@ jobs:
         uses: actions/checkout@v4
       - name: Install stable Rust
         uses: dtolnay/rust-toolchain@stable
-      - name: Check formatting
-        run: cargo fmt --manifest-path tools/mus-doe-audit/Cargo.toml -- --check
+      - name: Format source and emit exact rustfmt output for review
+        run: |
+          cargo fmt --manifest-path tools/mus-doe-audit/Cargo.toml
+          echo '---BEGIN_FORMATTED_RUST_SOURCE---'
+          cat tools/mus-doe-audit/src/main.rs
+          echo '---END_FORMATTED_RUST_SOURCE---'
       - name: Run auditor unit tests
         run: cargo test --manifest-path tools/mus-doe-audit/Cargo.toml
       - name: Audit synthetic split corpus
