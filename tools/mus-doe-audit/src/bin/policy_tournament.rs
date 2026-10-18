@@ -226,10 +226,7 @@ fn minimum_spacing(budget: usize) -> usize {
     (GRID_STEPS / (budget - 1) / 2).max(1)
 }
 
-fn disagreement_candidate(
-    observations: &[(usize, f64)],
-    minimum_distance: Option<usize>,
-) -> usize {
+fn disagreement_candidate(observations: &[(usize, f64)], minimum_distance: Option<usize>) -> usize {
     let mut best_index = None;
     let mut best_disagreement = f64::NEG_INFINITY;
     for candidate in 0..=GRID_STEPS {
@@ -557,7 +554,10 @@ mod tests {
             41,
             11,
         );
-        let indices = observations.iter().map(|(index, _)| *index).collect::<Vec<_>>();
+        let indices = observations
+            .iter()
+            .map(|(index, _)| *index)
+            .collect::<Vec<_>>();
         let minimum = minimum_spacing(11);
         assert!(indices.windows(2).all(|pair| pair[1] - pair[0] >= minimum));
     }
