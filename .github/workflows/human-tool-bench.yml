@@ -60,6 +60,7 @@ jobs:
             .arms.A2.attempts_started == 3 and
             .arms.A2.outcome_counts.safety_stopped == 1 and
             .arms.A2.advisory_abstentions == 1 and
+            .arms.A2.advisory_evidence_bound_count == 3 and
             .arms.A2.verified_restoration_time_minutes.median == 12
           ' human-tool-report.json
           jq '{report_version, evidence_class, input_sha256, episode_records, arms}' human-tool-report.json
