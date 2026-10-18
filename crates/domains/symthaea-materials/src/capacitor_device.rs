@@ -231,6 +231,8 @@ pub enum CapacitorDeviceScreeningLimitation {
     EvidenceKindNotAllowed,
     /// A required resonance constraint cannot be calculated because ESL is absent/zero.
     SelfResonanceUnavailable,
+    /// Calculated resonance lies outside the declared model validation band.
+    SelfResonanceOutsideModelDomain,
 }
 
 /// A hard device-level screening constraint violated by model-derived metrics.
@@ -421,17 +423,27 @@ pub fn screen_capacitor_device(
         requirements.ripple_current_rms_a,
         requirements.thermal_resistance_k_per_w,
     )?;
-    if requirements.min_self_resonant_frequency_hz.is_some()
-        && metrics.ideal_self_resonant_frequency_hz.is_none()
-    {
-        return Ok(CapacitorDeviceScreeningReport {
-            model: model.clone(),
-            requirements: requirements.clone(),
-            disposition: CapacitorDeviceScreeningDisposition::NotEvaluable,
-            limitations: vec![CapacitorDeviceScreeningLimitation::SelfResonanceUnavailable],
-            violations: Vec::new(),
-            metrics: Some(metrics),
-        });
+    if requirements.min_self_resonant_frequency_hz.is_some() {
+        let resonance_limitation = match metrics.ideal_self_resonant_frequency_hz {
+            None => Some(CapacitorDeviceScreeningLimitation::SelfResonanceUnavailable),
+            Some(frequency)
+                if frequency < model.valid_frequency_min_hz
+                    || frequency > model.valid_frequency_max_hz =>
+            {
+                Some(CapacitorDeviceScreeningLimitation::SelfResonanceOutsideModelDomain)
+            }
+            Some(_) => None,
+        };
+        if let Some(limitation) = resonance_limitation {
+            return Ok(CapacitorDeviceScreeningReport {
+                model: model.clone(),
+                requirements: requirements.clone(),
+                disposition: CapacitorDeviceScreeningDisposition::NotEvaluable,
+                limitations: vec![limitation],
+                violations: Vec::new(),
+                metrics: Some(metrics),
+            });
+        }
     }
 
     let mut violations = Vec::new();
@@ -578,6 +590,20 @@ mod tests {
         assert_eq!(report.disposition, CapacitorDeviceScreeningDisposition::NotEvaluable);
         assert!(report.limitations.contains(
             &CapacitorDeviceScreeningLimitation::SelfResonanceUnavailable
+        ));
+    }
+
+    #[test]
+    fn resonance_outside_validated_band_is_not_used_for_a_pass() {
+        let mut sample = model();
+        sample.valid_frequency_max_hz = 100.0e3;
+        let mut req = requirements(&sample);
+        req.operating_frequency_hz = 80.0e3;
+        req.min_self_resonant_frequency_hz = Some(500.0e3);
+        let report = screen_capacitor_device(&sample, &req).unwrap();
+        assert_eq!(report.disposition, CapacitorDeviceScreeningDisposition::NotEvaluable);
+        assert!(report.limitations.contains(
+            &CapacitorDeviceScreeningLimitation::SelfResonanceOutsideModelDomain
         ));
     }
 
