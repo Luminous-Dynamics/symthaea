@@ -888,9 +888,9 @@ mod tests {
             make_message("expired-sos", MessageClass::Distress, 999),
         ];
         let plan = plan_queue(&messages, 1_000, 2).expect("valid queue");
-        assert_eq!(plan.dispatched, vec!["sos", "evacuate"]);
-        assert_eq!(plan.deferred, vec!["telemetry", "bulk"]);
-        assert_eq!(plan.expired, vec!["expired-sos"]);
+        assert_eq!(plan.dispatched.iter().map(String::as_str).collect::<Vec<_>>(), vec!["sos", "evacuate"]);
+        assert_eq!(plan.deferred.iter().map(String::as_str).collect::<Vec<_>>(), vec!["telemetry", "bulk"]);
+        assert_eq!(plan.expired.iter().map(String::as_str).collect::<Vec<_>>(), vec!["expired-sos"]);
     }
 
     #[test]
