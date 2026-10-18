@@ -14,6 +14,7 @@
 pub mod aging;
 pub mod capacitor_device;
 pub mod capacitor_spectrum;
+pub mod capacitor_spectrum_bounds;
 pub mod compound_stability;
 pub mod database;
 pub mod encoder;
@@ -37,6 +38,13 @@ pub use capacitor_spectrum::{
     CapacitorSpectrumLimitation, CapacitorSpectrumMetrics, CapacitorSpectrumScreeningReport,
     CapacitorSpectrumScreeningRequirements, CurrentSpectrumComponent, EvaluatedImpedance,
     ImpedanceEvaluationKind, ImpedanceSweepPoint,
+};
+pub use capacitor_spectrum_bounds::{
+    calculate_bounded_capacitor_spectrum_metrics, screen_capacitor_spectrum_bounded,
+    BoundedCapacitorSpectrumMetrics, BoundedCapacitorSpectrumScreeningReport,
+    BoundedSpectrumComponentMetrics, BoundedSpectrumConstraintViolation,
+    BoundedSpectrumDisposition, BoundedSpectrumLimitation, CapacitorSpectrumBoundsError,
+    ComplexImpedanceHardBounds, CurrentRmsHardBounds, DeclaredHardInterval, NumericInterval,
 };
 pub use database::{MaterialDatabase, MaterialSearchResult};
 pub use encoder::MaterialHdcEncoder;
