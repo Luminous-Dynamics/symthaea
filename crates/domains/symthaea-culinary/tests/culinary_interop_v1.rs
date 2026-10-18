@@ -78,6 +78,18 @@ fn semantic_violations(bundle: &Value) -> Vec<String> {
     };
     let mut candidate_ids = BTreeSet::new();
     let mut robust_frontier_calculated = BTreeSet::new();
+    let objective_definitions = bundle
+        .get("objective_definitions")
+        .and_then(Value::as_array)
+        .cloned()
+        .unwrap_or_default();
+    let mut objective_keys = BTreeSet::new();
+    for definition in &objective_definitions {
+        let key = definition.get("key").and_then(Value::as_str).unwrap_or("");
+        if key.trim().is_empty() || !objective_keys.insert(key.to_owned()) {
+            errors.push(format!("objective definition key is empty or duplicated: {key}"));
+        }
+    }
     let declared_objectives: BTreeMap<String, (String, String)> = bundle
         .get("objective_definitions")
         .and_then(Value::as_array)
@@ -114,6 +126,9 @@ fn semantic_violations(bundle: &Value) -> Vec<String> {
         let mut has_failed_gate = false;
         let mut has_unknown_gate = false;
         if let Some(gates) = candidate.get("gate_evidence").and_then(Value::as_array) {
+            if gates.is_empty() {
+                errors.push(format!("{id}: at least one hard-gate evidence row is required"));
+            }
             for gate in gates {
                 let key = gate.get("key").and_then(Value::as_str).unwrap_or("");
                 let status = gate.get("status").and_then(Value::as_str).unwrap_or("");
@@ -164,6 +179,7 @@ fn semantic_violations(bundle: &Value) -> Vec<String> {
         }
 
         let mut all_scenarios_rankable = gate_disposition == "feasible";
+        let mut all_metrics_complete = true;
         for result in results {
             let scenario_id = result.get("scenario_id").and_then(Value::as_str).unwrap_or("");
             let recorded_digest = result
@@ -179,6 +195,10 @@ fn semantic_violations(bundle: &Value) -> Vec<String> {
             let mut seen_keys = BTreeSet::new();
 
             if let Some(objectives) = result.get("objectives").and_then(Value::as_array) {
+                if objectives.is_empty() {
+                    scenario_metrics_complete = false;
+                    errors.push(format!("{id}: scenario {scenario_id} has no objective values"));
+                }
                 for objective in objectives {
                     let key = objective.get("key").and_then(Value::as_str).unwrap_or("");
                     let direction = objective.get("direction").and_then(Value::as_str).unwrap_or("");
@@ -224,11 +244,20 @@ fn semantic_violations(bundle: &Value) -> Vec<String> {
                         errors.push(format!("{id}: objective {key} relabels synthetic/simulated evidence as observed"));
                     }
                 }
+                let expected_keys: BTreeSet<String> =
+                    declared_objectives.keys().cloned().collect();
+                if seen_keys != expected_keys {
+                    scenario_metrics_complete = false;
+                    errors.push(format!(
+                        "{id}: objective keys do not match the declared objective schema in {scenario_id}"
+                    ));
+                }
             } else {
                 scenario_metrics_complete = false;
                 errors.push(format!("{id}: objectives must be an array"));
             }
 
+            all_metrics_complete &= scenario_metrics_complete;
             if is_frontier
                 && (gate_disposition != "feasible"
                     || ranking_disposition != "ranked"
@@ -239,8 +268,18 @@ fn semantic_violations(bundle: &Value) -> Vec<String> {
             all_scenarios_rankable &= scenario_metrics_complete;
         }
 
+        let expected_ranking_disposition = if gate_disposition != "feasible" {
+            "not_ranked"
+        } else if all_metrics_complete {
+            "ranked"
+        } else {
+            "incomplete_metrics"
+        };
+        if ranking_disposition != expected_ranking_disposition {
+            errors.push(format!("{id}: ranking disposition conflicts with gate/metric completeness"));
+        }
         let robustly_rankable = candidate.get("robustly_rankable").and_then(Value::as_bool) == Some(true);
-        if robustly_rankable != all_scenarios_rankable {
+        if robustly_rankable != (all_scenarios_rankable && all_metrics_complete) {
             errors.push(format!("{id}: robustly_rankable conflicts with gate/scenario completeness"));
         }
         if robustly_rankable
@@ -269,6 +308,17 @@ fn semantic_violations(bundle: &Value) -> Vec<String> {
 }
 
 #[test]
+fn schema_document_is_parseable_and_declares_v1() {
+    let schema = parse_fixture(SCHEMA);
+    assert_eq!(schema["title"], "CulinaryDecisionBundleV1");
+    assert_eq!(schema["properties"]["schema_version"]["const"], "1.0.0");
+    assert_eq!(
+        schema["$schema"],
+        "https://json-schema.org/draft/2020-12/schema"
+    );
+}
+
+#[test]
 fn positive_synthetic_rank_reversal_fixture_is_semantically_valid() {
     let bundle = parse_fixture(VALID);
     assert!(
@@ -277,10 +327,10 @@ fn positive_synthetic_rank_reversal_fixture_is_semantically_valid() {
         semantic_violations(&bundle)
     );
     let candidates = bundle["candidate_results"].as_array().unwrap();
-    assert_eq!(candidates[0]["scenario_results"][0]["frontier"], true);
-    assert_eq!(candidates[0]["scenario_results"][1]["frontier"], false);
-    assert_eq!(candidates[1]["scenario_results"][0]["frontier"], false);
-    assert_eq!(candidates[1]["scenario_results"][1]["frontier"], true);
+    assert!(candidates[0]["scenario_results"][0]["frontier"].as_bool().unwrap());
+    assert!(!candidates[0]["scenario_results"][1]["frontier"].as_bool().unwrap());
+    assert!(!candidates[1]["scenario_results"][0]["frontier"].as_bool().unwrap());
+    assert!(candidates[1]["scenario_results"][1]["frontier"].as_bool().unwrap());
     assert_eq!(bundle["robust_frontier_ids"], serde_json::json!(["alpha", "beta"]));
 }
 
