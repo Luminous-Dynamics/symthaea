@@ -58,6 +58,7 @@ where (g=9.80665\,\mathrm{m/s^2}). At standstill, rolling direction is set to th
 ## Files and execution
 
 - Synthetic reference fixture: [`two_wheeler_wheel_demand_v0_1.json`](data/two_wheeler_wheel_demand_v0_1.json)
+- Published validation-summary transcription (not raw traces): [`published_sa_electric_motorcycle_validation_summary_v0_1.json`](data/published_sa_electric_motorcycle_validation_summary_v0_1.json)
 - Rust source: [`xtask/src/two_wheeler_wheel_demand.rs`](../../xtask/src/two_wheeler_wheel_demand.rs)
 - CLI dispatch: [`xtask/src/main.rs`](../../xtask/src/main.rs)
 
