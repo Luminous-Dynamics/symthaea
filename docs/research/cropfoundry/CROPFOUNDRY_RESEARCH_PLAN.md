@@ -106,6 +106,24 @@ Map rather than replace relevant standards:
 
 The ingestion layer must record source URI/identifier, retrieval date, version/digest, license or terms, units, method, geographic/temporal coverage, and transformation lineage. If provenance or reuse rights cannot be established, quarantine the record from training and redistribution.
 
+## Concrete dataset footholds found on 2026-10-18
+
+### DS-010: small repeated-measures tomato dataset
+
+The canonical [UdeA Zenodo record](https://zenodo.org/records/16745911) reports CC BY 4.0 and provides a 303 kB CSV. The web-accessible CSV preview exposes 40 columns including date, plant identifier, treatment, environmental/manual measurements, fruit counts, harvested-fruit count and total harvest weight. Its record describes 135 plants, 27 treatment combinations and 20 weekly sessions (2,666 rows). The related GitHub mirror README reports a different 2,664-row / 44-column shape and inconsistent repository-level license metadata; therefore use only the canonical Zenodo artifact as the first candidate and resolve the exact file/version before claiming schema or model results.
+
+**Split design:** decide whether the first scientific question is (a) generalization to plants not seen during training or (b) prediction at later dates. These are different questions and need different group-aware splits. Random row splitting is not an acceptable sole evaluation because repeated observations from the same plants and treatment setup can cross train/test partitions. Dataset QA must inspect missingness and semantics; for example, the preview shows fields with blanks and the initial dates with zero fruit/harvest values, so zeros must not be automatically interpreted as sensor failures or missing data.
+
+This dataset is a pipeline and within-site benchmark candidate from Colombia, not validation for Gauteng climate, current cultivars, or treatment recommendations.
+
+### DS-011: tomato image phenotyping
+
+[AerialYield-T2M](https://zenodo.org/records/22071809) has an included LICENSE file stating CC BY 4.0. The record describes 677 frames (535 close-range, 142 drone), 14,303 tomato annotations across six ripeness stages, mask and count labels, a SHA-256 checksum list, and a deterministic block-grouped train/validation/test split. The dataset is approximately 3.6 GB and covers one commercial greenhouse in the UAE.
+
+CF-017 creates a separate perception benchmark for ripeness classification, fruit detection/segmentation and visible-fruit counting. These outputs are plant-phenotyping signals only: **ripeness prediction or visible-fruit counts do not establish marketable yield, harvest quality, disease resistance, crop genetics, nutritional quality, or food safety.** Before fitting models, verify the dataset README, bundled checksums, split grouping and annotation conventions; preserve close-range versus drone performance as separate results and check for near-duplicate frames.
+
+These dataset advances make it possible to start a deterministic schema/split pipeline and a separate computer-vision baseline without inventing data. They do not remove the need for local South African observations or physical crop trials.
+
 ## Proposed first proof
 
 ### P0 — Evidence and schema inventory
