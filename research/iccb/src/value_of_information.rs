@@ -479,6 +479,73 @@ mod tests {
     }
 
     #[test]
+    fn informative_signal_has_zero_value_when_it_cannot_change_the_best_action() {
+        let mut input = perfect_signal_scenario(0);
+        for payoff in &mut input.payoffs {
+            if payoff.action_id == "build" {
+                payoff.net_value_minor = match payoff.state_id.as_str() {
+                    "high-demand" => 100,
+                    "low-demand" => 10,
+                    _ => unreachable!(),
+                };
+            }
+        }
+
+        let report = input.evaluate().unwrap();
+        assert_eq!(report.baseline_action_id, "build");
+        assert_eq!(report.gross_evsi_minor, 0);
+        assert_eq!(report.evpi_minor, 0);
+    }
+
+    #[test]
+    fn zero_probability_signal_does_not_change_expected_value() {
+        let mut input = perfect_signal_scenario(20);
+        input.signals.push(InformationSignal {
+            id: "impossible-signal".into(),
+            likelihoods: vec![
+                SignalLikelihood {
+                    state_id: "high-demand".into(),
+                    likelihood_bps: 0,
+                },
+                SignalLikelihood {
+                    state_id: "low-demand".into(),
+                    likelihood_bps: 0,
+                },
+            ],
+        });
+
+        let report = input.evaluate().unwrap();
+        assert_eq!(report.gross_evsi_minor, 50);
+        assert_eq!(report.decisions_by_signal.len(), 3);
+        assert_eq!(
+            report
+                .decisions_by_signal
+                .iter()
+                .find(|decision| decision.signal_id == "impossible-signal")
+                .unwrap()
+                .signal_probability_numerator_bp2,
+            0
+        );
+    }
+
+    #[test]
+    fn permuting_states_signals_actions_and_payoffs_preserves_results() {
+        let input = perfect_signal_scenario(20);
+        let baseline = input.evaluate().unwrap();
+
+        let mut permuted = input;
+        permuted.states.reverse();
+        permuted.signals.reverse();
+        for signal in &mut permuted.signals {
+            signal.likelihoods.reverse();
+        }
+        permuted.action_ids.reverse();
+        permuted.payoffs.reverse();
+
+        assert_eq!(baseline, permuted.evaluate().unwrap());
+    }
+
+    #[test]
     fn evaluation_is_deterministic() {
         let input = perfect_signal_scenario(20);
         assert_eq!(input.evaluate(), input.evaluate());
