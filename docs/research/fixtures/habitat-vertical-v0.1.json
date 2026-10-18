@@ -709,6 +709,24 @@
       "scenario": "Synthetic values are presented as real production or physical measurements.",
       "expected_disposition": "evidence_integrity_failure",
       "invariant": "Synthetic, modeled, measured, human-evaluated and replicated statuses remain distinct."
+    },
+    {
+      "case_id": "NC-19-COST-CATEGORY-MISSING",
+      "scenario": "A synthetic cost scenario omits a mandatory cost category.",
+      "expected_disposition": "not_evaluable_for_delivered_cost",
+      "invariant": "A scenario cannot pass on a partial cost stack."
+    },
+    {
+      "case_id": "NC-20-COST-ZERO-OUTPUT",
+      "scenario": "A scenario reports zero accepted units.",
+      "expected_disposition": "invalid_cost_denominator",
+      "invariant": "Cost per accepted unit is undefined without a positive accepted-unit count."
+    },
+    {
+      "case_id": "NC-21-COST-CURRENCY-MISMATCH",
+      "scenario": "Candidate and reference costs use different unconverted currencies.",
+      "expected_disposition": "comparison_not_evaluable",
+      "invariant": "A ratio requires the same currency and declared time/price basis."
     }
   ],
   "verification_status": {
@@ -1059,5 +1077,134 @@
       ],
       "status": "synthetic_known_answer_not_measurement"
     }
-  ]
+  ],
+  "synthetic_cost_scenarios": [
+    {
+      "scenario_id": "COST-REF-ARITHMETIC-01",
+      "role": "reference",
+      "currency": "SYNTHETIC_MINOR_UNIT",
+      "accepted_units": 10,
+      "cost_components": [
+        {
+          "category": "materials",
+          "amount_minor_units": 100000
+        },
+        {
+          "category": "yield_loss_scrap_rework",
+          "amount_minor_units": 20000
+        },
+        {
+          "category": "inbound_freight_duties",
+          "amount_minor_units": 8000
+        },
+        {
+          "category": "labor_training",
+          "amount_minor_units": 40000
+        },
+        {
+          "category": "consumables_tooling",
+          "amount_minor_units": 10000
+        },
+        {
+          "category": "equipment_capacity_depreciation",
+          "amount_minor_units": 18000
+        },
+        {
+          "category": "qa_metrology_calibration",
+          "amount_minor_units": 8000
+        },
+        {
+          "category": "facility_utilities",
+          "amount_minor_units": 10000
+        },
+        {
+          "category": "packaging_warehousing",
+          "amount_minor_units": 8000
+        },
+        {
+          "category": "outbound_freight_returns_warranty",
+          "amount_minor_units": 10000
+        },
+        {
+          "category": "maintenance_spares",
+          "amount_minor_units": 5000
+        },
+        {
+          "category": "reverse_logistics_end_of_life",
+          "amount_minor_units": 13000
+        }
+      ],
+      "expected_total_minor_units": 250000,
+      "status": "synthetic_known_answer_only",
+      "note": "Arbitrary arithmetic-control data; not a quote, forecast, measured production cost, or target achievement."
+    },
+    {
+      "scenario_id": "COST-CANDIDATE-ARITHMETIC-01",
+      "role": "candidate",
+      "currency": "SYNTHETIC_MINOR_UNIT",
+      "accepted_units": 10,
+      "cost_components": [
+        {
+          "category": "materials",
+          "amount_minor_units": 82000
+        },
+        {
+          "category": "yield_loss_scrap_rework",
+          "amount_minor_units": 18000
+        },
+        {
+          "category": "inbound_freight_duties",
+          "amount_minor_units": 8000
+        },
+        {
+          "category": "labor_training",
+          "amount_minor_units": 32000
+        },
+        {
+          "category": "consumables_tooling",
+          "amount_minor_units": 8000
+        },
+        {
+          "category": "equipment_capacity_depreciation",
+          "amount_minor_units": 14000
+        },
+        {
+          "category": "qa_metrology_calibration",
+          "amount_minor_units": 8000
+        },
+        {
+          "category": "facility_utilities",
+          "amount_minor_units": 8000
+        },
+        {
+          "category": "packaging_warehousing",
+          "amount_minor_units": 8000
+        },
+        {
+          "category": "outbound_freight_returns_warranty",
+          "amount_minor_units": 8000
+        },
+        {
+          "category": "maintenance_spares",
+          "amount_minor_units": 4000
+        },
+        {
+          "category": "reverse_logistics_end_of_life",
+          "amount_minor_units": 12000
+        }
+      ],
+      "expected_total_minor_units": 210000,
+      "status": "synthetic_known_answer_only",
+      "note": "Arbitrary arithmetic-control data; not a quote, forecast, measured production cost, or target achievement."
+    }
+  ],
+  "synthetic_cost_comparison": {
+    "candidate_scenario_id": "COST-CANDIDATE-ARITHMETIC-01",
+    "reference_scenario_id": "COST-REF-ARITHMETIC-01",
+    "target_ratio_basis_points": 8000,
+    "expected_ratio_basis_points_floor": 8400,
+    "expected_target_met": false,
+    "status": "synthetic_known_answer_only",
+    "note": "The arithmetic example deliberately does not meet the proposed 80% delivered-cost target. It demonstrates calculation only and establishes no real-world cost comparison."
+  }
 }
