@@ -4,7 +4,7 @@ use iccb_evaluator::{
     policy::{CapitalPolicyScenario, DemandCase},
     staging::TrancheRequest,
     value_of_information::{
-        DecisionPayoff, InformationSignal, InformationState, SignalLikelihood,
+        DecisionPayoff, SignalOutcome, InformationState, SignalLikelihood,
         ValueOfInformationScenario,
     },
 };
@@ -174,8 +174,8 @@ fn main() {
                 prior_probability_bps: 5_000,
             },
         ],
-        signals: vec![
-            InformationSignal {
+        signal_outcomes: vec![
+            SignalOutcome {
                 id: "survey-says-high".into(),
                 likelihoods: vec![
                     SignalLikelihood {
@@ -188,7 +188,7 @@ fn main() {
                     },
                 ],
             },
-            InformationSignal {
+            SignalOutcome {
                 id: "survey-says-low".into(),
                 likelihoods: vec![
                     SignalLikelihood {
