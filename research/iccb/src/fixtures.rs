@@ -55,9 +55,6 @@ fn scenario(id: &str, candidate_option: DecisionOption) -> CandidateScenario {
     CandidateScenario {
         id: id.to_owned(),
         mandate: mandate(),
-        known_critical_dependency_ids: ["grid-west".to_owned(), "water-east".to_owned()]
-            .into_iter()
-            .collect::<BTreeSet<_>>(),
         options: vec![candidate_option],
     }
 }
@@ -116,10 +113,10 @@ pub fn hidden_maintenance_burden() -> CandidateScenario {
     )
 }
 
-/// Shared critical dependencies are visible as their own dimension, not a score.
-pub fn critical_dependency_overlap() -> CandidateScenario {
+/// Declared dependency links are reported without inferring criticality.
+pub fn declared_dependency_links() -> CandidateScenario {
     scenario(
-        "ICCB-PUBLIC-004-critical-dependency-overlap",
+        "ICCB-PUBLIC-004-declared-dependency-links",
         option(
             "shared-utilities",
             30_000,
@@ -158,7 +155,7 @@ pub fn all() -> Vec<CandidateScenario> {
         productive_expansion(),
         asset_price_only_boom(),
         hidden_maintenance_burden(),
-        critical_dependency_overlap(),
+        declared_dependency_links(),
         stale_evidence(),
     ]
 }
@@ -207,12 +204,12 @@ mod tests {
     }
 
     #[test]
-    fn critical_dependency_overlap_is_deduplicated() {
-        let result = critical_dependency_overlap().evaluate();
+    fn declared_dependency_links_is_deduplicated() {
+        let result = declared_dependency_links().evaluate();
         assert_eq!(
             result.evaluated_options[0]
                 .outcomes
-                .critical_dependency_count,
+                .declared_dependency_count,
             2
         );
     }
