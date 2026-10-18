@@ -6,6 +6,8 @@
 //! enforced by an adapter with access to the robot and simulator telemetry.
 #![forbid(unsafe_code)]
 
+pub mod calibration;
+
 #[derive(Debug, Clone, Copy, PartialEq)]
 pub struct AxisLimit { pub min: f64, pub max: f64 }
 
