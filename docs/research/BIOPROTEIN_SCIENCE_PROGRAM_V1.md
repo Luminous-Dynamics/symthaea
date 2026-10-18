@@ -76,7 +76,9 @@ Reuse the referenced work's types and evidence identities. Do not fork its data 
 
 Start with a narrowly bounded ingredient comparison or complementary product, not an automatically prescribed complete diet. Benchmark a selected microbial/fungal ingredient against a feasible conventional reference within a declared species, life stage, inclusion range, and feeding purpose. Candidate species include dogs/cats, poultry, pigs, ruminants, and aquaculture—but each target requires its own requirements, evidence and evaluation protocol. Do not transfer a result across species without evidence.
 
-A safe first computational case is a **synthetic, clearly labelled feed-formulation cohort**. Advance to actual data only when their source, license, species match, measurement method, unit basis and limitations are recorded. Feeding trials, health outcomes, or commercial formulation remain outside the computational proof boundary.
+A 2026 *npj Science of Food* review compares 57 bacterial single-cell-protein candidates across safety, protein quality and production efficiency, using safety indicators such as QPS/GRAS and risk groups, amino-acid scores / EAAI, generation time and protein content: https://www.nature.com/articles/s41538-026-00828-1. For its exploratory PCA, the authors median-imputed missing values. Our operational candidate-selection benchmark should not silently inherit that exploratory choice: **missingness is a first-class output**, and candidate ranking should report evidence coverage, uncertainty and rank changes under defensible assumptions. A high protein-content estimate or short generation time must never compensate for an unresolved safety/authorization gate. Do not reuse human reference amino-acid scores as evidence of adequacy for dogs, cats or livestock.
+
+A safe first computational case is a **synthetic, clearly labelled candidate-selection cohort**. Advance to actual organism/strain data only when their source, license, taxonomy, strain identity, intended use, jurisdiction, assay method, unit basis and limitations are recorded. Feeding trials, animal-health outcomes, and commercial formulation remain outside the computational proof boundary.
 
 ### Track B — engineered protein and cultivated/hybrid meat (longer-term)
 
@@ -201,6 +203,7 @@ Every negative case needs a stable ID, input fixture, expected disposition, inva
 - “Biomass and precision fermentation inputs for cultivated meat: Advances, sustainability, food safety, and techno-economic perspectives,” *Food Research International* (2026): https://www.sciencedirect.com/science/article/pii/S0963996926005818
 - “Hybrid cultured meat as an integrated food production system: Recent advances and commercialization challenges” (2026): https://www.sciencedirect.com/science/article/pii/S0963996926015188
 - FEDIAF, Nutritional Guidelines 2025: https://europeanpetfood.org/self-regulation/nutritional-guidelines/
+- Takegawa & Kono, “Species selection criteria for sustainable bacterial single cell protein,” *npj Science of Food* (14 May 2026): https://www.nature.com/articles/s41538-026-00828-1
 - US FDA, Animal Food Ingredient Consultation and premarket animal-food review program (updated 2026): https://www.fda.gov/animal-veterinary/animal-foods-feeds/evaluation-fda-pre-market-animal-food-programs-and-plan-consultations
 - EFSA, Qualified Presumption of Safety (reviewed 2026): https://www.efsa.europa.eu/en/topics/topic/qualified-presumption-safety-qps
 - FAO, “Sources of feedborne hazards” (hazards vary by ingredient origin and processing): https://www.fao.org/4/w8901e/w8901e07.htm
