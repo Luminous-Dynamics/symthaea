@@ -6,8 +6,8 @@
   "execution": {
     "date": "2026-10-18",
     "command": "benchmarks/rea-coverage/v1/verify.sh",
-    "case_count": 14,
-    "accepted_consistent_reports": 4,
+    "case_count": 15,
+    "accepted_consistent_reports": 5,
     "rejected_inconsistent_reports": 8,
     "invalid_input_cases": 1,
     "malformed_report_cases": 1,
@@ -22,20 +22,20 @@
   },
   "files": {
     "cases.json": {
-      "sha256": "4da7e05a6aa10364934efba0ff271ea027b80319e26f2c3c4b3215db965f32e2",
-      "git_blob_sha1": "0c9bb7a96b20d596e2e1621d294971a0f8dd7eed"
+      "sha256": "6b0fb4bf8926d25c2398d608ab9484f960e2cc4d7212e014972412fa66da6f53",
+      "git_blob_sha1": "ca9504dc6383a8411e2ca839188723bd90825a88"
     },
     "oracle.json": {
-      "sha256": "c64b15f0575de3d2037385dbed8d09ba8ddac39eb053576ab73e4907672c44b8",
-      "git_blob_sha1": "e473df45ab15bb7be058f20252b60043a89eb582"
+      "sha256": "5912f38b5ba58c7af4cccfd0c57e7b7d8dc7c136029a4d7938442ee9772fd82d",
+      "git_blob_sha1": "ed82eddbb4309e39b76bbe34e9160658a59c9667"
     },
     "verify.sh": {
-      "sha256": "ecd90cf8d695e1bdf93e9f1a475558446bc746d907a9673c89f0590809814c6e",
-      "git_blob_sha1": "a65889d16cf2a5aed21170427026f51062697b1e"
+      "sha256": "cc0a03aee18170fcb5a1913daca3ac666dc85c09d0a0b5127f8419a6f742cffb",
+      "git_blob_sha1": "e7458fdc4ef082473daf22bedcf1f0cfb1d61aea"
     },
     "README.md": {
-      "sha256": "a101bdbb1d44bbfef288c31374c18f27701421bb5b0b932859483684a0238cac",
-      "git_blob_sha1": "6b2da5fa5c2d9ce587fba380490da9ccd53aee8c"
+      "sha256": "90b1e2ac6e455d89a03747fbc06b8a3953a9de55eef7183695d9bdf14b7bfc3e",
+      "git_blob_sha1": "59f185014f0a3650ff538e913ebcfbf617554dd6"
     }
   },
   "upstream_observation": {
