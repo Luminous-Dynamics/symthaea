@@ -9,6 +9,8 @@
 
 use std::collections::{HashMap, HashSet};
 
+pub mod accounting;
+
 use serde_json::Value;
 use symthaea_graph_theory::Graph;
 
@@ -88,6 +90,7 @@ pub fn validate_fixture(root: &Value) -> ValidationReport {
     validate_unique_ids(root, "synthetic_resources", "resource_id", &mut issues);
     validate_unique_ids(root, "synthetic_process_graph", "operation_id", &mut issues);
     validate_unique_ids(root, "proposed_targets", "id", &mut issues);
+    validate_unique_ids(root, "synthetic_cost_scenarios", "scenario_id", &mut issues);
     validate_unique_ids(root, "metric_definitions", "id", &mut issues);
     validate_unique_ids(root, "disruptions", "id", &mut issues);
     validate_unique_ids(root, "negative_controls", "case_id", &mut issues);
@@ -103,6 +106,7 @@ pub fn validate_fixture(root: &Value) -> ValidationReport {
     validate_negative_controls(root, &mut issues);
     validate_disruptions(root, &mut issues);
     validate_required_target_ranges(root, &mut issues);
+    validate_cost_scenarios(root, &mut issues);
     validate_verification_status(root, &mut issues);
 
     issues.sort_by(|left, right| {
@@ -1030,6 +1034,49 @@ fn validate_required_target_ranges(root: &Value, issues: &mut Vec<ValidationIssu
     }
 }
 
+fn validate_cost_scenarios(root: &Value, issues: &mut Vec<ValidationIssue>) {
+    let Some(scenarios) = root
+        .get("synthetic_cost_scenarios")
+        .and_then(Value::as_array)
+    else {
+        push(
+            issues,
+            "COST_SCENARIOS_MISSING",
+            "synthetic_cost_scenarios",
+            "an explicit synthetic cost-scenario array is required",
+        );
+        return;
+    };
+    if scenarios.len() < 2 {
+        push(
+            issues,
+            "COST_SCENARIOS_INSUFFICIENT",
+            "synthetic_cost_scenarios",
+            "at least a reference and candidate cost scenario are required",
+        );
+    }
+    for scenario in scenarios {
+        if let Some(id) = scenario.get("scenario_id").and_then(Value::as_str) {
+            if let Err(error) = accounting::calculate_cost_scenario(root, id) {
+                push(
+                    issues,
+                    "COST_SCENARIO_INVALID",
+                    format!("synthetic_cost_scenarios[{id}]"),
+                    error,
+                );
+            }
+        }
+    }
+    if let Err(error) = accounting::calculate_cost_comparison(root) {
+        push(
+            issues,
+            "COST_COMPARISON_INVALID",
+            "synthetic_cost_comparison",
+            error,
+        );
+    }
+}
+
 fn validate_verification_status(root: &Value, issues: &mut Vec<ValidationIssue>) {
     let Some(status) = root.get("verification_status") else {
         push(
@@ -1251,6 +1298,82 @@ mod tests {
             &validate_fixture(&value),
             "CONTAINMENT_KNOWN_ANSWER_MISMATCH"
         ));
+    }
+
+    #[test]
+    fn synthetic_cost_scenarios_match_frozen_totals() {
+        let value = fixture();
+        let reference = accounting::calculate_cost_scenario(
+            &value,
+            "COST-REF-ARITHMETIC-01",
+        )
+        .unwrap();
+        let candidate = accounting::calculate_cost_scenario(
+            &value,
+            "COST-CANDIDATE-ARITHMETIC-01",
+        )
+        .unwrap();
+        assert_eq!(reference.total_cost_minor_units, 250_000);
+        assert_eq!(candidate.total_cost_minor_units, 210_000);
+        assert_eq!(reference.accepted_units, 10);
+        assert_eq!(candidate.accepted_units, 10);
+    }
+
+    #[test]
+    fn synthetic_cost_comparison_is_exact_and_does_not_meet_80_percent_target() {
+        let value = fixture();
+        let report = accounting::calculate_cost_comparison(&value).unwrap();
+        assert_eq!(report.ratio_basis_points_floor, 8_400);
+        assert_eq!(report.target_ratio_basis_points, 8_000);
+        assert!(!report.target_met);
+    }
+
+    #[test]
+    fn missing_cost_category_fails_closed() {
+        let mut value = fixture();
+        value["synthetic_cost_scenarios"][1]["cost_components"]
+            .as_array_mut()
+            .unwrap()
+            .pop();
+        assert!(has_code(&validate_fixture(&value), "COST_SCENARIO_INVALID"));
+        assert!(accounting::calculate_cost_scenario(
+            &value,
+            "COST-CANDIDATE-ARITHMETIC-01"
+        ).is_err());
+    }
+
+    #[test]
+    fn zero_accepted_units_is_rejected() {
+        let mut value = fixture();
+        value["synthetic_cost_scenarios"][0]["accepted_units"] = serde_json::json!(0);
+        assert!(has_code(&validate_fixture(&value), "COST_SCENARIO_INVALID"));
+    }
+
+    #[test]
+    fn mixed_currency_cost_comparison_is_rejected() {
+        let mut value = fixture();
+        value["synthetic_cost_scenarios"][1]["currency"] =
+            serde_json::json!("ANOTHER_SYNTHETIC_CURRENCY");
+        assert!(has_code(&validate_fixture(&value), "COST_COMPARISON_INVALID"));
+    }
+
+    #[test]
+    fn cost_sum_overflow_is_rejected() {
+        let mut value = fixture();
+        value["synthetic_cost_scenarios"][1]["cost_components"][0]["amount_minor_units"] =
+            serde_json::json!(u64::MAX);
+        assert!(accounting::calculate_cost_scenario(
+            &value,
+            "COST-CANDIDATE-ARITHMETIC-01"
+        ).is_err());
+    }
+
+    #[test]
+    fn modified_cost_known_answer_is_rejected() {
+        let mut value = fixture();
+        value["synthetic_cost_scenarios"][1]["expected_total_minor_units"] =
+            serde_json::json!(200_000);
+        assert!(has_code(&validate_fixture(&value), "COST_SCENARIO_INVALID"));
     }
 
     #[test]
