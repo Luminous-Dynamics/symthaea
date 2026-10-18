@@ -324,7 +324,7 @@ fn main() {
         let reference = UncertaintyAssessmentRef {
             scenario_id: "synthetic-uncertainty-router".into(),
             producer_version: "synthetic-producer-v1".into(),
-            source_manifest_digest: "sha256:synthetic-manifest".into(),
+            source_manifest_digest: "sha256:937a22712ea5c20073d2c8a226f1f4a9c2c30aba40a497f2412a34426f986535".into(),
             evidence_kind,
         };
         match reference.route() {
