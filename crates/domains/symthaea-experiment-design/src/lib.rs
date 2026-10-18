@@ -448,9 +448,8 @@ mod tests {
             "matched_at_two_seconds"
         );
         assert!(report.ranked_experiments[0].worst_case_separation_sigma > 60.0);
-        assert_eq!(
-            report.ranked_experiments[1].worst_case_separation_sigma,
-            0.0
+        assert!(
+            report.ranked_experiments[1].worst_case_separation_sigma.abs() < 1.0e-12
         );
     }
 
@@ -514,7 +513,7 @@ mod tests {
         assert!(report
             .ranked_experiments
             .iter()
-            .all(|experiment| experiment.worst_case_separation_sigma == 0.0));
+            .all(|experiment| experiment.worst_case_separation_sigma.abs() < 1.0e-12));
     }
 
     #[test]
