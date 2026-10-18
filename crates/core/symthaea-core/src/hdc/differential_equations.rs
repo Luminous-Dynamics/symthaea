@@ -2627,6 +2627,41 @@ mod tests {
     /// Eigenvalue ratio = 1000. Forward Euler requires h < 0.002.
     /// Implicit Euler should handle h = 0.01 (5× beyond explicit stability).
     #[test]
+    fn test_adaptive_implicit_euler_zero_duration_is_identity() {
+        fn growth(_t: f64, y: &[f64]) -> Vec<f64> {
+            vec![y[0]]
+        }
+        let system = ODESystem { f: growth, dim: 1 };
+        let report = DifferentialEquationsEngine::try_solve_implicit_euler_adaptive(
+            &system, 2.0, 2.0, &[3.5], &[1e-6], 1e-3, 0.1, 100, 8,
+        )
+        .expect("zero-duration solve should be an identity");
+        assert_eq!(report.trajectory.t_values, vec![2.0]);
+        assert_eq!(report.trajectory.y_values, vec![vec![3.5]]);
+        assert_eq!(report.accepted_steps, 0);
+        assert_eq!(report.rejected_steps, 0);
+        assert_eq!(report.attempts, 0);
+    }
+
+    #[test]
+    fn test_adaptive_implicit_euler_non_finite_initial_state_is_rejected() {
+        fn decay(_t: f64, y: &[f64]) -> Vec<f64> {
+            vec![-y[0]]
+        }
+        let system = ODESystem { f: decay, dim: 1 };
+        let error = DifferentialEquationsEngine::try_solve_implicit_euler_adaptive(
+            &system, 0.0, 1.0, &[f64::INFINITY], &[1e-6], 1e-3, 0.1, 100, 8,
+        )
+        .unwrap_err();
+        assert!(matches!(
+            error.kind,
+            AdaptiveImplicitEulerErrorKind::NonFiniteInitialState { index: 0 }
+        ));
+        assert_eq!(error.accepted_steps, 0);
+        assert_eq!(error.time, 0.0);
+    }
+
+    #[test]
     fn test_adaptive_implicit_euler_step_doubling_reduces_exponential_error() {
         fn growth(_t: f64, y: &[f64]) -> Vec<f64> {
             vec![y[0]]
