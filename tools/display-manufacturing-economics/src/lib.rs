@@ -293,7 +293,13 @@ mod tests {
         close(result.total_batch_cost, 200.0, 1e-12);
         close(result.first_pass_yield, 0.6, 1e-12);
         close(result.final_calibrated_good_yield, 0.8, 1e-12);
-        close(result.cost_per_calibrated_good_unit.expect("positive final-good count"), 25.0, 1e-12);
+        close(
+            result
+                .cost_per_calibrated_good_unit
+                .expect("positive final-good count"),
+            25.0,
+            1e-12,
+        );
     }
 
     #[test]
