@@ -96,6 +96,28 @@ Use the applicable World Motorcycle Test Cycle and legal requirements for the sp
 
 For every mission, freeze payload, vehicle utility, route/speed trace, environment, temperature, reserve, tire generation, rider/machine loading and accessory state. Calculate or measure the required wheel-work trace first; feed that exact demand to each candidate. Candidate-specific gearing and thermal management may vary but must be recorded.
 
+### Common wheel-demand calculation
+
+Use one declared road-load trace to derive the wheel demand every candidate must meet. As a first screening model, with no wind and a stated road grade:
+
+```text
+F_required = m_equiv * a
+           + m * g * C_rr * cos(theta)
+           + m * g * sin(theta)
+           + 0.5 * rho * C_d * A * v^2
+
+P_wheel = F_required * v
+E_wheel_positive = integral(max(P_wheel, 0), dt)
+```
+
+where `m_equiv` includes vehicle/payload mass and modeled rotating inertia, `C_rr` is the declared rolling-resistance parameter, `C_d A` is the aerodynamic drag-area input, `theta` is road grade, and `v` is ground speed. The implementation must state whether wind, tire-temperature effects, transients, drivetrain inertia and accessory loads are included. Treat the result as a screening demand model until it has been checked against an instrumented wheel-force/dynamometer trace.
+
+Do not bury braking in a negative “consumption” number. Record positive traction energy, braking energy available, recovered energy, and actual recovered energy returned to storage as separate quantities. Regen is limited by tire grip, battery acceptance, temperature, motor/inverter limits and control policy.
+
+For an electric candidate, meter wall-plug energy and (where useful) battery-terminal energy separately; this exposes charger and storage-path losses. For an ICE, use the declared fuel amount and lower heating value for tank-to-wheel, and add independently sourced upstream stages for well-to-wheel. Sum every required auxiliary load—cooling, pumps, controls and any plasma ignition supply—at the same declared boundary. Use measured operating maps rather than multiplying peak component-efficiency numbers.
+
+For Spark Engine/LCF, separately distinguish driver energy coupled to a target, total facility electricity, measured nuclear/thermal output, useful converted output, and net exported electricity. These are different claims and must not be substituted for one another.
+
 ## 5. Required metrics—never collapse them prematurely
 
 | Layer | Metrics |
@@ -184,6 +206,6 @@ cargo run -p xtask -- powertrain-energy-ledger \
   --out reports/two_wheeler_powertrain_ledger_report.json
 ```
 
-The fixture has one positive control and eight negative controls. Its numeric streams are deliberately synthetic and exist only to exercise accounting rules. The Rust source/command are present but have **not** been compiled or executed in this environment; no verifier pass is claimed. This module is not a vehicle model or net-energy oracle.
+The fixture has one positive control and eight negative controls; ten Rust unit tests are authored for the verifier, including frozen-case replay and boundary/uncertainty controls. Its numeric streams are deliberately synthetic and exist only to exercise accounting rules. The Rust source/command are present but have **not** been compiled or executed in this environment; no verifier pass is claimed. This module is not a vehicle model or net-energy oracle.
 
 Do not start with exotic plasma hardware, create a competing physics engine, or conflate Spark Engine's LCF hypothesis toolkit with a vehicle prime mover.
