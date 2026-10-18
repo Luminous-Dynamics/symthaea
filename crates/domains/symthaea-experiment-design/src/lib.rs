@@ -39,11 +39,23 @@ pub struct ExperimentDesignInput {
 #[serde(deny_unknown_fields)]
 pub struct CandidateExperiment {
     pub experiment_id: String,
+    /// Actionable instruction describing which physical or simulated control to change.
+    pub description: String,
+    /// Numeric intervention settings are explicit and unit-bearing, never hidden in an ID.
+    pub settings: Vec<ParameterSetting>,
     /// Caller-defined positive relative resource cost. It is not assumed to be USD.
     pub cost_units: f64,
     /// Planned duration in hours; zero is permitted for purely computational designs.
     pub duration_hours: f64,
     pub observables: Vec<ObservablePrediction>,
+}
+
+#[derive(Clone, Debug, PartialEq, Serialize, Deserialize)]
+#[serde(deny_unknown_fields)]
+pub struct ParameterSetting {
+    pub parameter_id: String,
+    pub value: f64,
+    pub unit: String,
 }
 
 #[derive(Clone, Debug, PartialEq, Serialize, Deserialize)]
@@ -86,6 +98,8 @@ pub struct DesignReport {
 pub struct RankedExperiment {
     pub rank: usize,
     pub experiment_id: String,
+    pub description: String,
+    pub settings: Vec<ParameterSetting>,
     pub cost_units: f64,
     pub duration_hours: f64,
     /// Worst (least separated) pair of hypotheses, in combined standard-uncertainty units.
@@ -104,6 +118,14 @@ pub enum PlanError {
     InvalidIdentifier { kind: String },
     DuplicateIdentifier { kind: String, id: String },
     NoExperiments,
+    InvalidExperimentDescription { experiment_id: String },
+    NoSettings { experiment_id: String },
+    DuplicateSetting { experiment_id: String, parameter_id: String },
+    InvalidParameterSetting {
+        experiment_id: String,
+        parameter_id: String,
+        reason: String,
+    },
     InvalidCost { experiment_id: String },
     InvalidDuration { experiment_id: String },
     NoObservables { experiment_id: String },
@@ -157,6 +179,23 @@ impl Display for PlanError {
                 write!(f, "duplicate {kind} identifier: {id}")
             }
             Self::NoExperiments => write!(f, "at least one candidate experiment is required"),
+            Self::InvalidExperimentDescription { experiment_id } => {
+                write!(f, "experiment {experiment_id} needs a non-empty intervention description")
+            }
+            Self::NoSettings { experiment_id } => {
+                write!(f, "experiment {experiment_id} needs at least one explicit setting")
+            }
+            Self::DuplicateSetting { experiment_id, parameter_id } => {
+                write!(f, "experiment {experiment_id} repeats setting {parameter_id}")
+            }
+            Self::InvalidParameterSetting {
+                experiment_id,
+                parameter_id,
+                reason,
+            } => write!(
+                f,
+                "experiment {experiment_id}, setting {parameter_id}: invalid setting ({reason})"
+            ),
             Self::InvalidCost { experiment_id } => {
                 write!(f, "experiment {experiment_id} needs finite positive cost_units")
             }
@@ -300,6 +339,8 @@ pub fn rank_experiments(input: &ExperimentDesignInput) -> Result<DesignReport, P
         ranked.push(RankedExperiment {
             rank: 0,
             experiment_id: experiment.experiment_id.clone(),
+            description: experiment.description.clone(),
+            settings: experiment.settings.clone(),
             cost_units: experiment.cost_units,
             duration_hours: experiment.duration_hours,
             worst_case_separation_sigma: worst_distance,
@@ -393,6 +434,44 @@ fn validate_input(input: &ExperimentDesignInput) -> Result<(), PlanError> {
                 kind: "experiment".to_owned(),
                 id: experiment.experiment_id.clone(),
             });
+        }
+        if experiment.description.trim().is_empty() {
+            return Err(PlanError::InvalidExperimentDescription {
+                experiment_id: experiment.experiment_id.clone(),
+            });
+        }
+        if experiment.settings.is_empty() {
+            return Err(PlanError::NoSettings {
+                experiment_id: experiment.experiment_id.clone(),
+            });
+        }
+        let mut setting_ids = BTreeSet::new();
+        for setting in &experiment.settings {
+            if setting.parameter_id.trim().is_empty() {
+                return Err(PlanError::InvalidIdentifier {
+                    kind: "parameter".to_owned(),
+                });
+            }
+            if !setting_ids.insert(setting.parameter_id.clone()) {
+                return Err(PlanError::DuplicateSetting {
+                    experiment_id: experiment.experiment_id.clone(),
+                    parameter_id: setting.parameter_id.clone(),
+                });
+            }
+            if !setting.value.is_finite() {
+                return Err(PlanError::InvalidParameterSetting {
+                    experiment_id: experiment.experiment_id.clone(),
+                    parameter_id: setting.parameter_id.clone(),
+                    reason: "value must be finite".to_owned(),
+                });
+            }
+            if setting.unit.trim().is_empty() {
+                return Err(PlanError::InvalidParameterSetting {
+                    experiment_id: experiment.experiment_id.clone(),
+                    parameter_id: setting.parameter_id.clone(),
+                    reason: "unit must not be empty".to_owned(),
+                });
+            }
         }
         if !experiment.cost_units.is_finite() || experiment.cost_units <= 0.0 {
             return Err(PlanError::InvalidCost {
@@ -629,6 +708,40 @@ mod tests {
         let degraded = rank_experiments(&input).unwrap();
         let degraded_score = degraded.ranked_experiments[0].worst_case_separation_sigma;
         assert!((degraded_score * 10.0 - baseline_score).abs() < 1.0e-10);
+    }
+
+    #[test]
+    fn intervention_description_and_unit_bearing_settings_are_required() {
+        let mut input = galileo_demo_input();
+        let ranked = rank_experiments(&input).unwrap();
+        assert_eq!(
+            ranked.ranked_experiments[0].settings[0].parameter_id,
+            "observation_time"
+        );
+        assert_eq!(ranked.ranked_experiments[0].settings[0].value, 4.0);
+        assert_eq!(ranked.ranked_experiments[0].settings[0].unit, "s");
+        assert!(ranked.ranked_experiments[0].description.contains("four seconds"));
+
+        let mut input = galileo_demo_input();
+        input.experiments[0].settings.clear();
+        assert!(matches!(
+            rank_experiments(&input),
+            Err(PlanError::NoSettings { .. })
+        ));
+
+        let mut input = galileo_demo_input();
+        input.experiments[0].settings[0].value = f64::NAN;
+        assert!(matches!(
+            rank_experiments(&input),
+            Err(PlanError::InvalidParameterSetting { .. })
+        ));
+
+        let mut input = galileo_demo_input();
+        input.experiments[0].settings[0].unit.clear();
+        assert!(matches!(
+            rank_experiments(&input),
+            Err(PlanError::InvalidParameterSetting { .. })
+        ));
     }
 
     #[test]
