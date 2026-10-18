@@ -89,6 +89,11 @@
       "id": "missing-evidence-fails-closed",
       "threat": "A candidate omits a source required by its evaluation profile.",
       "expected": "candidate rejected with missing_evidence"
+    },
+    {
+      "id": "malformed-design-digest-fails-closed",
+      "threat": "A candidate omits or supplies a malformed digest for the exact design/topology artifact.",
+      "expected": "candidate rejected with invalid_design_digest"
     }
   ]
 }
