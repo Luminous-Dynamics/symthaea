@@ -51,8 +51,10 @@ where (g=9.80665\,\mathrm{m/s^2}). At standstill, rolling direction is set to th
 - `F_wheel > 0` means positive wheel traction force is demanded.
 - `P_wheel < 0` is a mechanical overrun/braking opportunity in this single-point screening model. It is **not** measured braking performance and is **not** credited as battery-regenerated energy.
 - Regenerative recovery depends on battery charge acceptance, SoC, temperature, power electronics, motor/control limits, tire grip, and braking policy. It requires a separate qualified subsystem model.
-- This is a pointwise force/power calculation, not a drive-cycle simulator. It does not integrate energy over time, predict battery power, or establish motor/fuel conversion efficiency.
-- It does not model suspension load transfer, tire slip, transient tire dynamics, drivetrain backlash, braking, rider control, aerodynamic yaw, thermal behaviour, component degradation or real road surfaces.
+- The pointwise kernel is complemented by [`two_wheeler_trace_energy.rs`](../../xtask/src/two_wheeler_trace_energy.rs), which integrates signed wheel power and ground distance across timestamped samples. Its [six-case fixture](data/two_wheeler_trace_energy_v0_1.json) uses piecewise-linear power and explicitly locates zero crossings before splitting positive and negative mechanical work.
+- The trace integrator reports positive mechanical wheel work and negative/overrun wheel work separately. It never converts negative wheel work into recovered battery energy; regeneration must be a separate qualified model.
+- Neither module predicts battery power, fuel use, range, or motor/combustion conversion efficiency. The time integration does not model actual tire contact, braking actuators, or a controller; it integrates the simplified model's pointwise output.
+- These kernels do not model suspension load transfer, tire slip, transient tire dynamics, drivetrain backlash, braking performance, rider control, aerodynamic yaw, thermal behaviour, component degradation or real road surfaces.
 - All fixture values are synthetic and are not measured parameters for the Roam Air or any other physical vehicle.
 
 ## Files and execution
@@ -60,6 +62,10 @@ where (g=9.80665\,\mathrm{m/s^2}). At standstill, rolling direction is set to th
 - Synthetic reference fixture: [`two_wheeler_wheel_demand_v0_1.json`](data/two_wheeler_wheel_demand_v0_1.json)
 - Published validation-summary transcription (not raw traces): [`published_sa_electric_motorcycle_validation_summary_v0_1.json`](data/published_sa_electric_motorcycle_validation_summary_v0_1.json)
 - Rust source: [`xtask/src/two_wheeler_wheel_demand.rs`](../../xtask/src/two_wheeler_wheel_demand.rs)
+- Trace integrator: [`xtask/src/two_wheeler_trace_energy.rs`](../../xtask/src/two_wheeler_trace_energy.rs)
+- Pointwise fixture: [`two_wheeler_wheel_demand_v0_1.json`](data/two_wheeler_wheel_demand_v0_1.json)
+- Time-series fixture: [`two_wheeler_trace_energy_v0_1.json`](data/two_wheeler_trace_energy_v0_1.json)
+- Source-reported South African baseline summary, not raw data: [`published_sa_electric_motorcycle_validation_summary_v0_1.json`](data/published_sa_electric_motorcycle_validation_summary_v0_1.json)
 - CLI dispatch: [`xtask/src/main.rs`](../../xtask/src/main.rs)
 
 On a Rust-capable checkout:
@@ -69,9 +75,14 @@ cargo test -p xtask two_wheeler_wheel_demand
 cargo run -p xtask -- two-wheeler-wheel-demand \
   --input docs/research/data/two_wheeler_wheel_demand_v0_1.json \
   --out reports/two_wheeler_wheel_demand_report.json
+
+cargo test -p xtask two_wheeler_trace_energy
+cargo run -p xtask -- two-wheeler-trace-energy \
+  --input docs/research/data/two_wheeler_trace_energy_v0_1.json \
+  --out reports/two_wheeler_trace_energy_report.json
 ```
 
-The fixture contains eight computed positive controls and four invalid-input controls. It exercises steady cruise, grade, acceleration, headwind/tailwind, downhill negative power, standstill power, zero demand and fail-closed validation for invalid mass, reverse speed, a vertical/out-of-domain grade and negative drag area.
+The pointwise fixture contains eight computed positive controls and five invalid-input controls. The trace fixture contains four computed controls and two invalid-trace controls. It exercises steady cruise, grade, acceleration, headwind/tailwind, downhill negative power, standstill power, zero demand and fail-closed validation for invalid mass, reverse speed, a vertical/out-of-domain grade and negative drag area.
 
 The Rust source and command are authored but have not been compiled/executed in the current environment. A source-side formula replay can check fixture arithmetic only; it is not Rust test evidence or physical validation.
 
