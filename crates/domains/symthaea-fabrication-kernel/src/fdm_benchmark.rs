@@ -33,7 +33,7 @@ pub enum BenchmarkPhase {
 }
 
 /// Identity of the exact applicability envelope for one benchmark run.
-#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
+#[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
 pub struct FdmBenchmarkManifest {
     pub protocol_version: String,
     pub run_id: String,
