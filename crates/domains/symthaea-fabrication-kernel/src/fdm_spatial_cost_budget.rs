@@ -689,7 +689,34 @@ pub fn verify_cost_budget_report(report: &CostBudgetReport) -> Result<(), CostBu
             None => CostBudgetStopReason::CandidatePoolExhausted,
         }
     } else {
-        CostBudgetStopReason::BudgetConstraintReached
+        let taken: Vec<_> = report.observations.iter()
+            .map(|item| item.observation.position).collect();
+        let remaining_candidates: Vec<_> = candidate_positions().into_iter()
+            .filter(|candidate| !taken.iter().any(|position| same_position(*position, *candidate)))
+            .collect();
+        if remaining_candidates.is_empty() {
+            CostBudgetStopReason::CandidatePoolExhausted
+        } else {
+            let raw: Vec<_> = report.observations.iter()
+                .map(|item| item.observation.clone()).collect();
+            let last = report.observations.last()
+                .ok_or_else(|| CostBudgetError::InvalidTrace("empty observation trace".to_owned()))?
+                .observation.position;
+            let step = report.observations.len().saturating_sub(INITIAL_OBSERVATION_COUNT);
+            match select_candidate(
+                report.strategy, &remaining_candidates, &raw, last, &report.cost_schedule, report.seed, step,
+            ) {
+                Some(next_position) => {
+                    let next_cost = incremental_cost(last, next_position, &report.cost_schedule, false).total;
+                    if next_cost > report.cost_schedule.budget_units - cumulative + EPSILON {
+                        CostBudgetStopReason::BudgetConstraintReached
+                    } else {
+                        return Err(CostBudgetError::InvalidTrace("selector stopped despite an affordable next point".to_owned()));
+                    }
+                }
+                None => CostBudgetStopReason::CandidatePoolExhausted,
+            }
+        }
     };
     if report.stop_reason != expected_stop {
         return Err(CostBudgetError::InvalidTrace("stopping reason does not match the trace and budget".to_owned()));
