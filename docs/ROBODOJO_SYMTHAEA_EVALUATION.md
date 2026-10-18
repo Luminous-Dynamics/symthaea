@@ -139,7 +139,7 @@ Write one machine-readable record per episode, plus an aggregate summary. Preser
 - task identifier, capability dimension, embodiment, action mode, and seed;
 - environment/runtime/software versions and available hardware identifiers;
 - baseline/variant/ablation label and exact configuration digest;
-- success outcome, termination reason, explicit failure class (timeout, thermal stop, server error, invalid action, safety stop, other), elapsed simulated time, action count, and recovery count where defined;
+- pre-trial full-success probability and calibration version where available; success outcome, termination reason, explicit failure class (timeout, thermal stop, server error, invalid action, safety stop, other), elapsed simulated time, action count, and recovery count where defined;
 - policy latency p50/p95, deadline misses, resource measurements, and safety events when available;
 - output artifact paths and SHA-256 hashes.
 
@@ -155,14 +155,14 @@ Do not commit large licensed assets or checkpoints. Keep experiment scripts and 
 
 ## New research slice: calibrated event-triggered replanning
 
-A threshold on raw prediction error is an initial contract test, not yet a trustworthy decision policy. Add a separate full-completion probability forecast emitted before the outcome is known, then evaluate its calibration and its ability to rank failures. The standalone crate now implements Brier score, log loss, fixed-bin expected calibration error, high-confidence failure rate, and a confidence-ranked risk/coverage curve, with operationally invalid attempts counted as failures for end-to-end completion.
+A threshold on raw prediction error is an initial contract test, not yet a trustworthy decision policy. Add a separate full-completion probability forecast emitted before the outcome is known, then evaluate its calibration and its ability to rank failures. The standalone crate now implements Brier score, log loss, fixed-bin expected calibration error, high-confidence failure rate, and a confidence-ranked risk/coverage curve, with operationally invalid attempts counted as failures for end-to-end completion. The calibration CLI takes probabilities from a separate pre-trial forecast file and joins them to the trial ledger by task/variant/trial identity; the forecast file cannot override the outcome label, and missing, extra, or duplicate identities are rejected.
 
 Use an explicit baseline/control ladder:
 
 1. Frozen policy with no gate.
 2. Same policy with a fixed, uncalibrated threshold.
 3. Same policy with calibration fitted only on a designated calibration split.
-4. Calibrated gate using uncertainty to request fresh observation, shorten the open-loop action chunk, or replan when the supported serving interface allows it.
+4. Calibrated event-triggered gate using uncertainty and the expected value of information to request fresh observation, shorten the open-loop action chunk, replan, or continue when the expected gain justifies the extra model-call, wall-clock, and safety cost.
 5. Ablation/placebo controls to quantify intervention overhead.
 
 Report success/progress, high-confidence failure rate, intervention frequency, extra model calls, median and p95 latency, cost, and all invalid/timeout/safety events. The gate is useful only if its calibration improves on held-out data and its physical trade-off is favorable. Never treat confidence or HDC/Phi metrics as a safety proof. The threshold must not be tuned on held-out task results.
@@ -173,13 +173,14 @@ The rationale is supported by two useful external observations: Robocurve's RCI 
 
 ## Immediate runnable work
 
-A dependency-free nested Rust crate now lives at **experiments/robodojo-contract/**. Its 28 library tests cover episode identity/reset, state dimensions and finiteness, step ordering, stale action rejection, action dimensions and range checks, prediction-error replanning, latched stops, configuration rejection, deterministic trace behavior, and trial statistics. The binary adds three CLI tests for parsing and comparing the synthetic TSV fixture. A small executable exercises accepted action → replan request → latched stop.
+A dependency-free nested Rust crate now lives at **experiments/robodojo-contract/**. Its 28 library tests cover episode identity/reset, state dimensions and finiteness, step ordering, stale action rejection, action dimensions and range checks, prediction-error replanning, latched stops, configuration rejection, deterministic trace behavior, and trial statistics. The binary adds four CLI tests for trial parsing/comparison, probability calibration, and rejecting missing or duplicate forecast-to-trial identities. A small executable exercises accepted action → replan request → latched stop.
 
 Run locally with:
 
 ```sh
 cargo test --locked --manifest-path experiments/robodojo-contract/Cargo.toml
 cargo run --locked --manifest-path experiments/robodojo-contract/Cargo.toml
+cargo run --locked --manifest-path experiments/robodojo-contract/Cargo.toml -- --calibrate experiments/robodojo-contract/examples/synthetic_forecasts.tsv experiments/robodojo-contract/examples/synthetic_trials.tsv
 ```
 
 This nested workspace is intentionally independent of the main Symthaea workspace and Isaac Sim, so these contract tests can be run before GPU/simulator provisioning. Passing them would show only that the contract gate behaves as specified; it would not demonstrate RoboDojo task competence or physical safety. The action validator is a bounded boundary check, not a kinematics or collision checker.
