@@ -19,6 +19,10 @@ After artifact-specific local-use terms have been reviewed and exact file identi
 
     cargo run --manifest-path tools/metal-measurement-bench/Cargo.toml -- verify-artifacts MANIFEST.json /path/to/lawfully-obtained/files
 
+Inspect a specific manifest-declared CSV after every artifact in the manifest has been placed under the artifact root:
+
+    cargo run --manifest-path tools/metal-measurement-bench/Cargo.toml -- inspect-csv MANIFEST.json ARTIFACT_DIR relative/path.csv
+
 For a normalized observation set:
 
     cargo run --manifest-path tools/metal-measurement-bench/Cargo.toml -- validate-records MANIFEST.json OBSERVATIONS.json ARTIFACT_DIR
@@ -26,7 +30,9 @@ For a normalized observation set:
 The machine-readable observation contract is at
 `tools/metal-measurement-bench/schemas/observation-set-v0.1.schema.json`.
 
-Record rows must bind the manifest's source-object ID and upstream row ID as well as the DOI and source-field identity. The exact source object must be declared, term-reviewed, locally authorized, and linked to a declared artifact whose byte count and SHA-256 are verified before record validation. Row IDs are preserved by the contract; the raw CSV parser that proves each row exists in the bytes is a later tranche. Raw numeric values and units, and censoring bounds, are preserved without replacing censored values with made-up point estimates. A normalized value requires a normalized unit and explicit conversion note. Repeated source fields must maintain one variable identity and raw unit; each normalized variable uses a consistent normalized unit. Uncertainty, censoring, missingness, specimen lineage, source DOI, and calibration/held-out outcome role stay explicit. The validator rejects undeclared source DOIs, duplicate record IDs, unjustified normalization, unexplained unknown censoring, and calibration target outcomes from the held-out target lineage.
+The `inspect-csv` command parses the verified byte buffer (after rechecking its declared size and digest) and emits a source-bound CSV structure inventory: exact artifact SHA-256, record count, header names/positions, empty/nonempty cell counts, and duplicate/ambiguous header rejection. It does not infer units, semantic meaning, specimen identity, or upstream row IDs. Parsed row ordinals are not claimed to be source-native identifiers. This is an intermediate reconciliation step, not a full data adapter.
+
+Record rows must bind the manifest's source-object ID and upstream row ID as well as the DOI and source-field identity. The exact source object must be declared, term-reviewed, locally authorized, and linked to a declared artifact whose byte count and SHA-256 are verified before record validation. A later mapping/reconciliation stage must prove every declared source row/field exists in the verified bytes and account for every exclusion. Raw numeric values and units, and censoring bounds, are preserved without replacing censored values with made-up point estimates. A normalized value requires a normalized unit and explicit conversion note. Repeated source fields must maintain one variable identity and raw unit; each normalized variable uses a consistent normalized unit. Uncertainty, censoring, missingness, specimen lineage, source DOI, and calibration/held-out outcome role stay explicit. The validator rejects undeclared source DOIs, duplicate record IDs, unjustified normalization, unexplained unknown censoring, and calibration target outcomes from the held-out target lineage.
 
 ## What a successful receipt means
 
