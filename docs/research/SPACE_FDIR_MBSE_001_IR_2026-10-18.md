@@ -60,3 +60,22 @@ These are internal engineering targets, not aerospace certification criteria. Do
 This tranche does not parse SysML v2, resolve external requirement/evidence references, calculate fault probabilities, model radio physics, establish diagnosability for unmodeled failure modes, prove mitigation safety, control real hardware, or authorize flight operations. An ID's presence is not proof that the referenced artifact exists or is authoritative.
 
 Next: add independent external-reference resolution and dependency digests, add an explicit reviewed-exclusion state, generate paired positive/negative scenario manifests, and connect monitor/telemetry evaluation without collapsing simulator injection receipts into detection results. A SysML v2 adapter should be admitted only after a precise exported source form and tool version are pinned.
+
+
+## Follow-on: pairwise critical fault-signature preflight
+
+The adjacent SPACE-FDIR-DIAG-001 work adds optional canonical `signature_value` labels to observable signals and produces one pairwise finding for every unordered pair of declared critical fault modes:
+
+- `Distinguishable`: at least one shared signal ID and unit has explicit, non-empty, different canonical values;
+- `Indistinguishable`: the two complete declared signature sets are exactly equal;
+- `NotDemonstrated`: no valid separator is found and missing outcomes, incomparable units, or different signal sets prevent a stronger conclusion.
+
+Unknown outcomes never count as separators. Different signal IDs or units do not count as evidence of a distinguishing observation. The report binds the model revision and source-design digest. This is conservative structural lint over declared categorical signatures only; it does not prove physical observability or classifier accuracy.
+
+### Additional proposed benchmarks
+
+- Pair denominator is exactly (n(n-1)/2) for (n) critical modes; the zero/one-mode report does not claim pairwise diagnosability.
+- Zero complete-signature collisions go unreported.
+- Every pair that lacks a verified structural separator remains visibly unresolved or indistinguishable until explicitly reviewed.
+- Sensor recommendations name the fault pair separated and are evaluated against fixed mass, power, cost, bandwidth, calibration, independence, and compute assumptions.
+- Full minimum-sensor-set and common-mode cut-set analysis continues to belong to the existing decision-specific PIE-009N diagnosability/sensor-cut oracle (#2032); this module intentionally does not implement another generic cut-set algorithm.
