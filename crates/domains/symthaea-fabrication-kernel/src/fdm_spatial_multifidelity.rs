@@ -630,6 +630,11 @@ fn choose_reference_promotion(
 ) -> Option<MeasurementAction> {
     observations.iter()
         .filter(|item| item.observation.method == MetrologyMethod::FastScreen)
+        .filter(|item| {
+            item.observation.mean_mm.abs() >= CRITICAL_ERROR_THRESHOLD_MM
+                || (item.observation.mean_mm.abs() - CRITICAL_ERROR_THRESHOLD_MM).abs()
+                    <= (2.0 * item.observation.reported_standard_uncertainty_mm).max(0.025)
+        })
         .filter(|item| action_available(
             item.observation.position,
             MetrologyMethod::ReferenceMetrology,
@@ -1169,6 +1174,26 @@ pub fn verify_multifidelity_report(report: &MultiFidelityReport) -> Result<(), M
         }) {
             return Err(MultiFidelityError::InvalidReport("duplicate location/method; use a repeat plan".to_owned()));
         }
+        if index >= INITIAL_OBSERVATION_COUNT {
+            let step = index - INITIAL_OBSERVATION_COUNT;
+            let expected_action = choose_multifidelity_action(
+                report.strategy,
+                &report.observations[..index],
+                &report.cost_schedule,
+                report.seed,
+                step,
+            ).ok_or_else(|| MultiFidelityError::InvalidReport(
+                "trace contains an action after the policy was exhausted".to_owned()
+            ))?;
+            if !same_position(expected_action.position, observation.position)
+                || expected_action.method != observation.method
+                || expected_action.repeat_count != observation.readings_mm.len()
+            {
+                return Err(MultiFidelityError::InvalidReport(
+                    "acquisition trace does not replay the declared strategy".to_owned()
+                ));
+            }
+        }
         validate_observation_values(report.surface, report.stress_case, report.seed, observation)?;
         let action = MeasurementAction {
             position: observation.position,
@@ -1376,6 +1401,26 @@ mod tests {
         ).unwrap();
         metric_changed.metrics.false_safe_point_count += 1;
         assert!(verify_multifidelity_report(&metric_changed).is_err());
+    }
+
+    #[test]
+    fn verifier_rejects_reordered_strategy_actions_even_with_recomputed_digest() {
+        let mut report = run_multifidelity_arm(
+            SyntheticSpatialSurface::Anisotropic,
+            MetrologyStressCase::UnbiasedIndependent,
+            MultiFidelityStrategy::FarthestPoint,
+            8,
+            MultiFidelityCostSchedule::demo(48.0),
+        ).unwrap();
+        if report.observations.len() > INITIAL_OBSERVATION_COUNT + 1 {
+            report.observations.swap(INITIAL_OBSERVATION_COUNT, INITIAL_OBSERVATION_COUNT + 1);
+            for (index, item) in report.observations.iter_mut().enumerate() {
+                item.observation.acquisition_step = index;
+                item.observation.observation_id = format!("mf-obs-{index:03}");
+            }
+            report.report_digest_sha256 = report_digest(&report).unwrap();
+            assert!(verify_multifidelity_report(&report).is_err());
+        }
     }
 
     #[test]
