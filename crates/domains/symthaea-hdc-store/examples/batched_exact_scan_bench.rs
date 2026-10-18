@@ -184,31 +184,33 @@ fn run() -> Result<(), Box<dyn Error>> {
             for (batch_index, batch_queries) in &groups {
                 // Alternate algorithm order across rounds/groups to limit
                 // systematic order bias. Cache is not forcibly flushed.
-                let baseline_first = (round + batch_index) % 2 == 0;
+                let baseline_first = (round + *batch_index) % 2 == 0;
+                let reference_start = *batch_index * batch_size;
+                let reference_end = reference_start + batch_queries.len();
                 if baseline_first {
                     let row = time_baseline(
                         &reader, batch_queries, *batch_index, round, batch_size,
                         config.vectors, config.top_k, &reference,
-                        (batch_index * batch_size)..((batch_index * batch_size) + batch_queries.len()),
+                        reference_start..reference_end,
                     )?;
                     samples.push(row);
                     let row = time_fused(
                         &reader, batch_queries, *batch_index, round, batch_size,
                         config.vectors, config.top_k, &reference,
-                        (batch_index * batch_size)..((batch_index * batch_size) + batch_queries.len()),
+                        reference_start..reference_end,
                     )?;
                     samples.push(row);
                 } else {
                     let row = time_fused(
                         &reader, batch_queries, *batch_index, round, batch_size,
                         config.vectors, config.top_k, &reference,
-                        (batch_index * batch_size)..((batch_index * batch_size) + batch_queries.len()),
+                        reference_start..reference_end,
                     )?;
                     samples.push(row);
                     let row = time_baseline(
                         &reader, batch_queries, *batch_index, round, batch_size,
                         config.vectors, config.top_k, &reference,
-                        (batch_index * batch_size)..((batch_index * batch_size) + batch_queries.len()),
+                        reference_start..reference_end,
                     )?;
                     samples.push(row);
                 }
