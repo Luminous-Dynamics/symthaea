@@ -409,17 +409,17 @@ fn participant_cluster_comparison(
     };
     let (bootstrap_replicates, confidence_interval) =
         if improvements.len() >= MIN_PARTICIPANTS_FOR_BOOTSTRAP {
-        (
-            PARTICIPANT_BOOTSTRAP_REPLICATES,
-            Some(participant_bootstrap_ci(
-                &improvements,
+            (
                 PARTICIPANT_BOOTSTRAP_REPLICATES,
-                seed,
-            )),
-        )
-    } else {
-        (0, None)
-    };
+                Some(participant_bootstrap_ci(
+                    &improvements,
+                    PARTICIPANT_BOOTSTRAP_REPLICATES,
+                    seed,
+                )),
+            )
+        } else {
+            (0, None)
+        };
 
     ParticipantClusterComparison {
         comparator,
@@ -463,8 +463,11 @@ fn participant_bootstrap_ci(values: &[f64], replicates: usize, seed: u64) -> [f6
 
 fn percentile_sorted(sorted: &[f64], p: f64) -> f64 {
     debug_assert!(!sorted.is_empty());
-    let index = ((sorted.len() - 1) as f64 * p).round() as usize;
-    sorted[index]
+    let position = (sorted.len() - 1) as f64 * p;
+    let lower = position.floor() as usize;
+    let upper = position.ceil() as usize;
+    let fraction = position - lower as f64;
+    sorted[lower] * (1.0 - fraction) + sorted[upper] * fraction
 }
 
 /// Small fixed SplitMix64 generator keeps resampling reproducible without
@@ -485,7 +488,14 @@ impl SplitMix64 {
     }
 
     fn next_index(&mut self, upper: usize) -> usize {
-        (self.next_u64() % upper as u64) as usize
+        let bound = upper as u64;
+        let rejection_threshold = bound.wrapping_neg() % bound;
+        loop {
+            let candidate = self.next_u64();
+            if candidate >= rejection_threshold {
+                return (candidate % bound) as usize;
+            }
+        }
     }
 }
 
