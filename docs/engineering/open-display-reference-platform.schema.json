@@ -127,7 +127,8 @@
       "required": ["spdx_id", "status"],
       "properties": {
         "spdx_id": {"type": "string", "minLength": 1},
-        "status": {"type": "string", "enum": ["PROPOSED", "UNREVIEWED", "ACCEPTED", "BLOCKED"]}
+        "status": {"type": "string", "enum": ["PROPOSED", "UNREVIEWED", "ACCEPTED", "BLOCKED"]},
+        "note": {"type": "string", "minLength": 1}
       }
     },
     "opennessClass": {
