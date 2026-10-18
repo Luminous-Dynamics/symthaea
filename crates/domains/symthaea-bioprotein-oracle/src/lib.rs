@@ -17,6 +17,7 @@ use std::process::Command;
 pub const RUNNER_VERSION: &str = "0.1.0";
 pub const EXPECTED_CORPUS_ID: &str = "BIOPROTEIN-GATE-CORPUS-V1";
 pub const EXPECTED_CORPUS_SCHEMA_VERSION: &str = "1.0.0";
+const CLAIM_CEILING: &str = "Synthetic decision-semantics only; no biological outcome, nutritional adequacy, safety, regulatory clearance, real cost, or lifecycle superiority is established.";
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, Deserialize)]
 #[serde(rename_all = "snake_case")]
@@ -340,6 +341,8 @@ fn check_source_rights(source: &SourceEvidence) -> Option<OracleOutcome> {
                     .is_none_or(|value| !nonempty(value))
             {
                 Some(outcome(Disposition::Blocked, "RIGHTS_EVIDENCE_MISSING"))
+            } else if source.attribution_required && !source.attribution_present {
+                Some(outcome(Disposition::Blocked, "ATTRIBUTION_MISSING"))
             } else {
                 None
             }
@@ -424,10 +427,13 @@ pub fn validate_corpus(corpus: &Corpus) -> Vec<String> {
         if !case_ids.insert(fixture.case_id.clone()) {
             errors.push(format!("DUPLICATE_CASE_ID:{}", fixture.case_id));
         }
-        if !fixture.case_id.starts_with("BIOP-GATE")
-            || fixture.case_id.len() != "BIOP-GATE0-001".len()
-            || !fixture.case_id.chars().all(|c| c.is_ascii_alphanumeric() || c == '-')
-        {
+        let case_id_bytes = fixture.case_id.as_bytes();
+        let valid_case_id = case_id_bytes.len() == "BIOP-GATE0-001".len()
+            && fixture.case_id.starts_with("BIOP-GATE")
+            && case_id_bytes.get(9).is_some_and(u8::is_ascii_digit)
+            && case_id_bytes.get(10) == Some(&b'-')
+            && case_id_bytes[11..].iter().all(u8::is_ascii_digit);
+        if !valid_case_id {
             errors.push(format!("CASE_ID_FORMAT_INVALID:{}", fixture.case_id));
         }
         errors.extend(
@@ -674,7 +680,7 @@ fn incomplete_receipt(
         corpus_schema_version: None,
         corpus_status: None,
         corpus_disclaimer: None,
-        claim_ceiling: "Synthetic decision-semantics only; no biological outcome, nutritional adequacy, safety, regulatory clearance, real cost, or lifecycle superiority is established.".to_owned(),
+        claim_ceiling: CLAIM_CEILING.to_owned(),
         git_head: actual_head.map(str::to_owned),
         expected_git_head: expected_head.map(str::to_owned),
         corpus_sha256: sha256_hex(raw),
@@ -712,7 +718,7 @@ pub fn run_corpus(
             corpus_schema_version: Some(corpus.schema_version),
             corpus_status: Some(corpus.status),
             corpus_disclaimer: Some(corpus.disclaimer),
-            claim_ceiling: "Synthetic decision-semantics only; no biological outcome, nutritional adequacy, safety, regulatory clearance, real cost, or lifecycle superiority is established.".to_owned(),
+            claim_ceiling: CLAIM_CEILING.to_owned(),
             git_head: actual_head.map(str::to_owned),
             expected_git_head: expected_head.map(str::to_owned),
             corpus_sha256: sha256_hex(raw),
@@ -751,20 +757,24 @@ pub fn run_corpus(
         errors.push(format!("EXPECTED_ACTUAL_MISMATCHES:{failed}"));
     }
 
-    let status = if failed > 0 {
+    let head_mismatch = matches!(
+        (actual_head, expected_head),
+        (Some(actual), Some(expected)) if actual != expected
+    );
+    let head_missing = actual_head.is_none() || expected_head.is_none();
+    if head_mismatch {
+        errors.push("GIT_HEAD_MISMATCH".to_owned());
+    }
+    if head_missing {
+        errors.push("GIT_HEAD_IDENTITY_MISSING".to_owned());
+    }
+
+    let status = if failed > 0 || head_mismatch {
         RunStatus::Fail
+    } else if head_missing {
+        RunStatus::Incomplete
     } else {
-        match (actual_head, expected_head) {
-            (Some(actual), Some(expected)) if actual == expected => RunStatus::Pass,
-            (Some(_), Some(_)) => {
-                errors.push("GIT_HEAD_MISMATCH".to_owned());
-                RunStatus::Fail
-            }
-            _ => {
-                errors.push("GIT_HEAD_IDENTITY_MISSING".to_owned());
-                RunStatus::Incomplete
-            }
-        }
+        RunStatus::Pass
     };
 
     RunReceipt {
@@ -774,7 +784,7 @@ pub fn run_corpus(
         corpus_schema_version: Some(corpus.schema_version),
         corpus_status: Some(corpus.status),
         corpus_disclaimer: Some(corpus.disclaimer),
-        claim_ceiling: "Synthetic decision-semantics only; no biological outcome, nutritional adequacy, safety, regulatory clearance, real cost, or lifecycle superiority is established.".to_owned(),
+        claim_ceiling: CLAIM_CEILING.to_owned(),
         git_head: actual_head.map(str::to_owned),
         expected_git_head: expected_head.map(str::to_owned),
         corpus_sha256: sha256_hex(raw),
@@ -834,7 +844,10 @@ pub fn run_cli() -> i32 {
                 }
             },
             "-h" | "--help" => {
-                println!("Usage: symthaea-bioprotein-oracle --expected-head <sha> [--corpus <path>] [--receipt <path>]");
+                println!(
+                    "Usage: symthaea-bioprotein-oracle --expected-head <sha> \
+                     [--corpus <path>] [--receipt <path>]"
+                );
                 return 0;
             }
             other => {
@@ -882,8 +895,9 @@ pub fn run_cli() -> i32 {
 mod tests {
     use super::*;
 
-    const FIXTURE_CORPUS: &str =
-        include_str!("../../../../docs/research/bioprotein/fixtures/bioprotein-gate-corpus-v1.json");
+    const FIXTURE_CORPUS: &str = include_str!(
+        "../../../../docs/research/bioprotein/fixtures/bioprotein-gate-corpus-v1.json"
+    );
 
     fn fixture_corpus() -> Corpus {
         serde_json::from_str(FIXTURE_CORPUS).expect("typed synthetic corpus should parse")
@@ -969,7 +983,11 @@ mod tests {
 
     #[test]
     fn wrong_head_never_passes() {
-        let receipt = run_corpus(FIXTURE_CORPUS.as_bytes(), Some("actual-sha"), Some("expected-sha"));
+        let receipt = run_corpus(
+            FIXTURE_CORPUS.as_bytes(),
+            Some("actual-sha"),
+            Some("expected-sha"),
+        );
         assert_eq!(receipt.status, RunStatus::Fail);
         assert!(receipt.errors.iter().any(|error| error == "GIT_HEAD_MISMATCH"));
     }
