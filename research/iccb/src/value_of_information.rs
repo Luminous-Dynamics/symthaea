@@ -117,7 +117,7 @@ impl ValueOfInformationScenario {
         for outcome in outcomes {
             let mut marginal_probability_numerator = 0_i128;
             for state in &self.states {
-                let likelihood = self.likelihood_bps(signal, &state.id);
+                let likelihood = self.likelihood_bps(outcome, &state.id);
                 marginal_probability_numerator +=
                     i128::from(state.prior_probability_bps) * i128::from(likelihood);
             }
@@ -128,7 +128,7 @@ impl ValueOfInformationScenario {
                 let mut conditional_numerator = 0_i128;
                 for state in &self.states {
                     let prior = i128::from(state.prior_probability_bps);
-                    let likelihood = i128::from(self.likelihood_bps(signal, &state.id));
+                    let likelihood = i128::from(self.likelihood_bps(outcome, &state.id));
                     let payoff = i128::from(self.payoff(action_id, &state.id));
                     conditional_numerator += prior * likelihood * payoff;
                 }
@@ -212,7 +212,7 @@ impl ValueOfInformationScenario {
     fn validate(&self) -> Result<(), ValueOfInformationError> {
         if self.id.trim().is_empty()
             || self.states.iter().any(|state| state.id.trim().is_empty())
-            || self.signal_outcomes.iter().any(|signal| outcome.id.trim().is_empty())
+            || self.signal_outcomes.iter().any(|outcome| outcome.id.trim().is_empty())
             || self.action_ids.iter().any(|action| action.trim().is_empty())
             || self.payoffs.iter().any(|payoff| {
                 payoff.action_id.trim().is_empty() || payoff.state_id.trim().is_empty()
@@ -241,7 +241,7 @@ impl ValueOfInformationScenario {
             return Err(ValueOfInformationError::ScenarioTooLarge);
         }
         ensure_unique(self.states.iter().map(|state| state.id.as_str()))?;
-        ensure_unique(self.signal_outcomes.iter().map(|signal| outcome.id.as_str()))?;
+        ensure_unique(self.signal_outcomes.iter().map(|outcome| outcome.id.as_str()))?;
         ensure_unique(self.action_ids.iter().map(String::as_str))?;
 
         if self
