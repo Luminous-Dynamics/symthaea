@@ -96,27 +96,34 @@ Use the applicable World Motorcycle Test Cycle and legal requirements for the sp
 
 For every mission, freeze payload, vehicle utility, route/speed trace, environment, temperature, reserve, tire generation, rider/machine loading and accessory state. Calculate or measure the required wheel-work trace first; feed that exact demand to each candidate. Candidate-specific gearing and thermal management may vary but must be recorded.
 
-### Common wheel-demand calculation
+### Common wheel-demand calculation — first executable slice
 
-Use one declared road-load trace to derive the wheel demand every candidate must meet. As a first screening model, with no wind and a stated road grade:
+The initial pointwise Rust screening kernel now lives in [`two_wheeler_wheel_demand.rs`](../../xtask/src/two_wheeler_wheel_demand.rs), with [13 synthetic oracle cases](data/two_wheeler_wheel_demand_v0_1.json). The full contract and limitations are in [TWO-WHEELER-WHEEL-DEMAND-001](TWO_WHEELER_WHEEL_DEMAND_BENCHMARK_2026-10-18.md). It computes signed wheel-force demand from:
 
 ```text
-F_required = m_equiv * a
-           + m * g * C_rr * cos(theta)
-           + m * g * sin(theta)
-           + 0.5 * rho * C_d * A * v^2
-
-P_wheel = F_required * v
-E_wheel_positive = integral(max(P_wheel, 0), dt)
+F_inertial = (mass + rotating_equivalent_mass) * acceleration
+F_rolling  = Crr * mass * g * cos(grade) * rolling_direction
+F_grade    = mass * g * sin(grade)
+u_air      = ground_speed - along_track_wind
+F_aero     = 0.5 * air_density * CdA * u_air * abs(u_air)
+F_wheel    = F_inertial + F_rolling + F_grade + F_aero
+P_wheel    = F_wheel * ground_speed
 ```
 
-where `m_equiv` includes vehicle/payload mass and modeled rotating inertia, `C_rr` is the declared rolling-resistance parameter, `C_d A` is the aerodynamic drag-area input, `theta` is road grade, and `v` is ground speed. The implementation must state whether wind, tire-temperature effects, transients, drivetrain inertia and accessory loads are included. Treat the result as a screening demand model until it has been checked against an instrumented wheel-force/dynamometer trace.
+Positive wheel power is traction demand. Negative wheel power is overrun/braking opportunity only; it is not credited as battery-regenerated energy. The v0.1 kernel is instantaneous: it does **not** integrate drive-cycle energy and does not predict battery power or vehicle efficiency. It is a shared demand input, not a competing full-powertrain digital twin.
 
-Do not bury braking in a negative “consumption” number. Record positive traction energy, braking energy available, recovered energy, and actual recovered energy returned to storage as separate quantities. Regen is limited by tire grip, battery acceptance, temperature, motor/inverter limits and control policy.
+### Recent validation evidence that should set the bar
 
-For an electric candidate, meter wall-plug energy and (where useful) battery-terminal energy separately; this exposes charger and storage-path losses. For an ICE, use the declared fuel amount and lower heating value for tank-to-wheel, and add independently sourced upstream stages for well-to-wheel. Sum every required auxiliary load—cooling, pumps, controls and any plasma ignition supply—at the same declared boundary. Use measured operating maps rather than multiplying peak component-efficiency numbers.
+The research register [freezes source-reported summaries](data/published_sa_electric_motorcycle_validation_summary_v0_1.json), not raw traces, from two relevant studies:
 
-For Spark Engine/LCF, separately distinguish driver energy coupled to a target, total facility electricity, measured nuclear/thermal output, useful converted output, and net exported electricity. These are different claims and must not be substituted for one another.
+- Adams, Botha & Booysen (10 February 2026) used dynamometer-derived motor/inverter maps and six Nairobi trips; their published energy-per-distance errors range from 0.4% to 11.3%. Their study discusses gradient estimation, surface, rider posture and payload effects: https://doi.org/10.3390/wevj1702090.
+- The same group’s full-powertrain digital twin (20 August 2026) was validated on six Stellenbosch trips. It reports battery-power correlations of 0.905–0.981, motor-speed correlations of 0.912–0.996, and energy predictions within 2.71% for five trips; a short downhill/high-throttle-transient trip had 10.65% error: https://doi.org/10.3390/wevj1708432. The reported limitations include omitted mechanical braking/auxiliary load and unmodelled battery temperature/ageing, with estimated rather than directly measured wind.
+
+These results mean the next contribution should **not** be a redundant full twin. We should develop the portable Rust force-demand contract, then seek permitted raw telemetry and component-map data to independently cross-check it and extend validation across braking, wind, thermal state, degradation, surface and payload. The papers’ summary tables are not enough to claim exact reproduction.
+
+For an electric candidate, meter wall-plug energy and battery-terminal energy separately; for ICE, meter fuel and declare its heating-value source; for hybrids/fuel cells, include every generator, storage and converter stage. Measure required auxiliaries such as cooling, pumps, controls and plasma ignition supply at the same boundary. Use measured operating maps rather than multiplying peak component-efficiency numbers.
+
+For Spark Engine/LCF, distinguish energy used by the radiation/beam source, total facility electricity, measured nuclear/thermal output, useful converted output, and net exported electricity. Neutron counts do not establish useful energy gain.
 
 ## 5. Required metrics—never collapse them prematurely
 
