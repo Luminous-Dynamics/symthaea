@@ -515,7 +515,6 @@ mod tests {
     }
 }
 
-
 /// Common BAO distance observables at a single redshift.
 ///
 /// Distances are reported in units of the supplied sound horizon r_d. This
@@ -585,15 +584,25 @@ impl std::fmt::Display for ExpansionHistoryError {
         let message = match self {
             Self::NonFiniteParameter => "cosmological parameters must be finite",
             Self::NonPositiveHubbleConstant => "H0 must be positive",
-            Self::NegativeDensityParameter => "matter, radiation, and dark-energy densities must be non-negative",
+            Self::NegativeDensityParameter => {
+                "matter, radiation, and dark-energy densities must be non-negative"
+            }
             Self::ClosureViolation => "density parameters must satisfy Ωr + Ωm + Ωk + Ωde = 1",
             Self::InvalidRedshift => "redshift must be finite and >= 0",
-            Self::InvalidIntegrationIntervals => "Simpson integration requires an even interval count in 2..=1_000_000",
-            Self::InvalidIntegrationTolerance => "absolute tolerance must be positive; relative tolerance must be finite and in (0, 1)",
+            Self::InvalidIntegrationIntervals => {
+                "Simpson integration requires an even interval count in 2..=1_000_000"
+            }
+            Self::InvalidIntegrationTolerance => {
+                "absolute tolerance must be positive; relative tolerance must be finite and in (0, 1)"
+            }
             Self::InvalidIntegrationDepth => "adaptive integration depth must be in 1..=20",
-            Self::IntegrationDidNotConverge => "adaptive Simpson integration did not meet its tolerance before the depth limit",
+            Self::IntegrationDidNotConverge => {
+                "adaptive Simpson integration did not meet its tolerance before the depth limit"
+            }
             Self::InvalidSoundHorizon => "sound horizon r_d must be finite and positive",
-            Self::NonPhysicalExpansionRate => "the model produced a non-positive or non-finite H(z)^2",
+            Self::NonPhysicalExpansionRate => {
+                "the model produced a non-positive or non-finite H(z)^2"
+            }
             Self::NumericalOverflow => "the requested cosmology calculation overflowed",
         };
         f.write_str(message)
@@ -867,8 +876,8 @@ impl ExpansionHistory {
         let transverse_distance = self.transverse_comoving_distance_mpc(z, intervals)?;
         let hubble_rate = self.hubble_km_s_mpc(z)?;
         let hubble_distance = C_KM_S / hubble_rate;
-        let volume_distance = (z * transverse_distance * transverse_distance * hubble_distance)
-            .cbrt();
+        let volume_distance =
+            (z * transverse_distance * transverse_distance * hubble_distance).cbrt();
 
         let dm_over_rd = transverse_distance / sound_horizon_mpc;
         let dh_over_rd = hubble_distance / sound_horizon_mpc;
@@ -971,8 +980,7 @@ impl ExpansionHistory {
             let weight = if i % 2 == 0 { 2.0 } else { 4.0 };
             sum += weight * integrand(step * i as f64)?;
         }
-        let lookback_gyr =
-            (HUBBLE_TIME_CONVERSION_GYR / self.h0_km_s_mpc) * step * sum / 3.0;
+        let lookback_gyr = (HUBBLE_TIME_CONVERSION_GYR / self.h0_km_s_mpc) * step * sum / 3.0;
         if lookback_gyr.is_finite() && lookback_gyr >= 0.0 {
             Ok(lookback_gyr)
         } else {
@@ -1011,7 +1019,7 @@ mod expansion_history_tests {
     fn comoving_distance_matches_einstein_de_sitter_analytic_solution() {
         // χ(z) = 2c/H0 * (1 - 1/sqrt(1+z)) for a matter-only flat universe.
         let model = einstein_de_sitter();
-        let z = 1.0;
+        let z: f64 = 1.0;
         let expected = 2.0 * C_KM_S / 70.0 * (1.0 - 1.0 / (1.0 + z).sqrt());
         let actual = model.line_of_sight_comoving_distance_mpc(z, 4096).unwrap();
         assert!(
@@ -1039,10 +1047,9 @@ mod expansion_history_tests {
     #[test]
     fn lookback_time_matches_einstein_de_sitter_analytic_solution() {
         let model = einstein_de_sitter();
-        let z = 1.0;
+        let z: f64 = 1.0;
         let hubble_time_gyr = 977.792_221_680_789_2 / 70.0;
-        let expected =
-            (2.0 / 3.0) * hubble_time_gyr * (1.0 - (1.0 + z).powf(-1.5));
+        let expected = (2.0 / 3.0) * hubble_time_gyr * (1.0 - (1.0 + z).powf(-1.5));
         let actual = model.lookback_time_gyr(z, 4096).unwrap();
         assert!(
             (actual - expected).abs() / expected < 1e-9,
@@ -1089,8 +1096,7 @@ mod expansion_history_tests {
         );
 
         let hubble_time_gyr = 977.792_221_680_789_2 / 70.0;
-        let lookback_expected =
-            0.5 * hubble_time_gyr * (1.0 - (1.0 + z).powi(-2));
+        let lookback_expected = 0.5 * hubble_time_gyr * (1.0 - (1.0 + z).powi(-2));
         let lookback = model.lookback_time_gyr(z, 4096).unwrap();
         assert!(
             (lookback - lookback_expected).abs() / lookback_expected < 1e-9,
@@ -1117,8 +1123,7 @@ mod expansion_history_tests {
             Err(ExpansionHistoryError::InvalidRedshift)
         );
         assert_eq!(
-            ExpansionHistory::flat_lcdm_approx()
-                .line_of_sight_comoving_distance_mpc(1.0, 3),
+            ExpansionHistory::flat_lcdm_approx().line_of_sight_comoving_distance_mpc(1.0, 3),
             Err(ExpansionHistoryError::InvalidIntegrationIntervals)
         );
 
@@ -1142,8 +1147,6 @@ mod expansion_history_tests {
             Err(ExpansionHistoryError::NonPhysicalExpansionRate)
         );
     }
-
-
 
     #[test]
     fn bao_distance_observables_match_flat_de_sitter_analytic_limit() {
@@ -1188,17 +1191,13 @@ mod expansion_history_tests {
     fn adaptive_integrals_match_analytic_matter_and_radiation_limits() {
         let eds = einstein_de_sitter();
         let z: f64 = 1.0;
-        let expected_distance =
-            2.0 * C_KM_S / 70.0 * (1.0 - 1.0 / (1.0 + z).sqrt());
-        let expected_time = (977.792_221_680_789_2 / 70.0)
-            * (2.0 / 3.0)
-            * (1.0 - (1.0 + z).powf(-1.5));
+        let expected_distance = 2.0 * C_KM_S / 70.0 * (1.0 - 1.0 / (1.0 + z).sqrt());
+        let expected_time =
+            (977.792_221_680_789_2 / 70.0) * (2.0 / 3.0) * (1.0 - (1.0 + z).powf(-1.5));
         let adaptive_distance = eds
             .line_of_sight_comoving_distance_mpc_adaptive(z, 1e-8, 1e-10, 20)
             .unwrap();
-        let adaptive_time = eds
-            .lookback_time_gyr_adaptive(z, 1e-10, 1e-10, 20)
-            .unwrap();
+        let adaptive_time = eds.lookback_time_gyr_adaptive(z, 1e-10, 1e-10, 20).unwrap();
         assert!((adaptive_distance - expected_distance).abs() / expected_distance < 1e-9);
         assert!((adaptive_time - expected_time).abs() / expected_time < 1e-9);
 
@@ -1212,9 +1211,7 @@ mod expansion_history_tests {
         };
         let z: f64 = 3.0;
         let expected_distance = C_KM_S / 70.0 * z / (1.0 + z);
-        let expected_time = (977.792_221_680_789_2 / 70.0)
-            * 0.5
-            * (1.0 - (1.0 + z).powi(-2));
+        let expected_time = (977.792_221_680_789_2 / 70.0) * 0.5 * (1.0 - (1.0 + z).powi(-2));
         let adaptive_distance = radiation
             .line_of_sight_comoving_distance_mpc_adaptive(z, 1e-8, 1e-10, 20)
             .unwrap();
@@ -1297,7 +1294,6 @@ mod expansion_history_tests {
     }
 }
 
-
 fn validate_adaptive_options(
     absolute_tolerance: f64,
     relative_tolerance: f64,
@@ -1376,8 +1372,10 @@ where
     let midpoint = a + (b - a) * 0.5;
     let left_midpoint = a + (midpoint - a) * 0.5;
     let right_midpoint = midpoint + (b - midpoint) * 0.5;
-    if left_midpoint <= a || left_midpoint >= midpoint
-        || right_midpoint <= midpoint || right_midpoint >= b
+    if left_midpoint <= a
+        || left_midpoint >= midpoint
+        || right_midpoint <= midpoint
+        || right_midpoint >= b
     {
         return Err(ExpansionHistoryError::IntegrationDidNotConverge);
     }
