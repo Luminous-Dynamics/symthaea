@@ -623,6 +623,29 @@ pub fn evaluate_message(
         },
     ];
 
+    if message.expires_at_ms < now_ms {
+        events.push(MessageEvent {
+            at_ms: message.expires_at_ms,
+            kind: MessageEventKind::Expired,
+            node: message.source.clone(),
+        });
+        return Ok(MessageReceipt {
+            message_id: message.id.clone(),
+            class: message.class,
+            disposition: ReceiptDisposition::ExpiredBeforeDelivery,
+            forward_route: None,
+            acknowledgement_route: None,
+            delivered_at_ms: None,
+            acknowledged_at_ms: None,
+            total_energy_millijoules: 0,
+            events,
+        });
+    }
+
+    // This evaluator runs at now_ms. An older queued message cannot be
+    // transmitted retroactively at its original creation timestamp.
+    let transmission_start_ms = now_ms.max(message.created_at_ms);
+
     let Some(forward_route) = find_route(
         links,
         &message.source,
@@ -648,8 +671,7 @@ pub fn evaluate_message(
         });
     };
 
-    let delivered_at_ms = message
-        .created_at_ms
+    let delivered_at_ms = transmission_start_ms
         .checked_add(forward_route.latency_ms)
         .ok_or("delivery timestamp overflow")?;
     if delivered_at_ms > message.expires_at_ms {
@@ -673,13 +695,13 @@ pub fn evaluate_message(
 
     if !forward_route.link_ids.is_empty() {
         events.push(MessageEvent {
-            at_ms: message.created_at_ms,
+            at_ms: transmission_start_ms,
             kind: MessageEventKind::Transmitted,
             node: message.source.clone(),
         });
     }
 
-    let mut event_time = message.created_at_ms;
+    let mut event_time = transmission_start_ms;
     if forward_route.link_ids.is_empty() {
         events.push(MessageEvent {
             at_ms: delivered_at_ms,
@@ -714,11 +736,13 @@ pub fn evaluate_message(
         node: message.destination.clone(),
     });
 
+    // Re-evaluate the return path at receiver-arrival time. Link evidence
+    // can age out while the message is in flight.
     let Some(acknowledgement_route) = find_route(
         links,
         &message.destination,
         &message.source,
-        now_ms,
+        delivered_at_ms,
         policy,
     )? else {
         events.push(MessageEvent {
@@ -1226,6 +1250,65 @@ mod tests {
         zero[0].quality_permille = 0;
         assert_eq!(zero[0].health(100), LinkHealth::ZeroQuality);
         assert!(find_route(&zero, "a", "b", 100, RoutePolicy::FixedChannelPreference).unwrap().is_none());
+    }
+
+    #[test]
+    fn delayed_queue_does_not_receive_retroactive_delivery_timestamps() {
+        let links = vec![
+            link("ab", "a", "b", ChannelKind::Backbone, 10, 1000, 3),
+            link("ba", "b", "a", ChannelKind::Backbone, 10, 1000, 3),
+        ];
+        let mut message = distress_message();
+        message.source = "a".to_owned();
+        message.destination = "b".to_owned();
+        message.created_at_ms = 100;
+        message.expires_at_ms = 1_000;
+        let receipt = evaluate_message(&links, &message, 500, RoutePolicy::FixedChannelPreference)
+            .expect("valid delayed message");
+        assert_eq!(receipt.delivered_at_ms, Some(510));
+        assert_eq!(receipt.acknowledged_at_ms, Some(520));
+        assert!(receipt.events.iter().any(|event| {
+            event.kind == MessageEventKind::Transmitted && event.at_ms == 500
+        }));
+    }
+
+    #[test]
+    fn message_already_expired_at_evaluation_is_not_transmitted() {
+        let links = vec![
+            link("ab", "a", "b", ChannelKind::Backbone, 10, 1000, 3),
+            link("ba", "b", "a", ChannelKind::Backbone, 10, 1000, 3),
+        ];
+        let mut message = distress_message();
+        message.source = "a".to_owned();
+        message.destination = "b".to_owned();
+        message.created_at_ms = 100;
+        message.expires_at_ms = 200;
+        let receipt = evaluate_message(&links, &message, 201, RoutePolicy::FixedChannelPreference)
+            .expect("expired message is a typed outcome");
+        assert_eq!(receipt.disposition, ReceiptDisposition::ExpiredBeforeDelivery);
+        assert!(receipt.forward_route.is_none());
+        assert!(receipt.delivered_at_ms.is_none());
+        assert!(!receipt.events.iter().any(|event| event.kind == MessageEventKind::Transmitted));
+    }
+
+    #[test]
+    fn acknowledgement_path_must_still_be_fresh_when_receiver_gets_message() {
+        let mut forward = link("ab", "a", "b", ChannelKind::Backbone, 10, 1000, 3);
+        forward.max_observation_age_ms = 100;
+        let mut reverse = link("ba", "b", "a", ChannelKind::Backbone, 10, 1000, 3);
+        reverse.max_observation_age_ms = 5;
+        let links = vec![forward, reverse];
+        let mut message = distress_message();
+        message.source = "a".to_owned();
+        message.destination = "b".to_owned();
+        message.created_at_ms = 100;
+        message.expires_at_ms = 1_000;
+        let receipt = evaluate_message(&links, &message, 100, RoutePolicy::FixedChannelPreference)
+            .expect("valid message, return path ages out in flight");
+        assert_eq!(receipt.delivered_at_ms, Some(110));
+        assert_eq!(receipt.disposition, ReceiptDisposition::ReceivedUnacknowledged);
+        assert!(receipt.acknowledgement_route.is_none());
+        assert!(receipt.acknowledged_at_ms.is_none());
     }
 
     #[test]
