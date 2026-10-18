@@ -360,7 +360,7 @@ mod tests {
         let second = serde_json::to_string(&records[1]).unwrap();
         let input = format!("{first}\n\n{second}\n");
         let parsed = parse_jsonl(&input).unwrap();
-        assert_eq!(parsed, records[..2]);
+        assert_eq!(parsed.as_slice(), &records[..2]);
     }
 
     #[test]
