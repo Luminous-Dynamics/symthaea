@@ -37,6 +37,7 @@ const DEFAULT_TOL: f64 = 1e-8;
 const MAX_STEPS: usize = 100_000;
 const MAX_DENSE_NEWTON_DIM: usize = 64;
 const MAX_IMPLICIT_RHS_EVALUATIONS: usize = 1_000_000;
+const MAX_IMPLICIT_JACOBIAN_EVALUATIONS: usize = 1_000_000;
 const MAX_IMPLICIT_NEWTON_WORK_UNITS: usize = 100_000_000;
 const MAX_NEWTON_ITERATIONS_PER_STEP: usize = 100;
 
@@ -78,6 +79,12 @@ pub struct ODESystem {
     pub dim: usize,
 }
 
+/// Optional analytical Jacobian callback for an ODE system.
+///
+/// Return the row-major flattened matrix df_i/dy_j with exactly dim * dim
+/// finite entries. Supplying a Jacobian avoids finite-difference RHS probes.
+pub type ODEJacobian = fn(f64, &[f64]) -> Vec<f64>;
+
 /// Result of an initial-value-problem solve.
 #[derive(Debug, Clone)]
 pub struct ODEResult {
@@ -116,8 +123,11 @@ pub struct ImplicitEulerSolveReport {
     pub trajectory: ODEResult,
     /// Number of Newton corrections applied across all accepted steps.
     pub newton_corrections: usize,
-    /// Number of right-hand-side evaluations, including finite-difference probes.
+    /// Number of RHS evaluations. With the finite-difference path, this includes
+    /// RHS probes used to approximate the Jacobian.
     pub rhs_evaluations: usize,
+    /// Number of analytical Jacobian callback evaluations (zero for finite differences).
+    pub jacobian_evaluations: usize,
     /// Largest normalized nonlinear residual among accepted steps.
     pub max_normalized_residual: f64,
     /// Estimated dense linear-algebra work units (dimension cubed per correction).
@@ -140,6 +150,9 @@ pub enum ImplicitEulerErrorKind {
     RhsDimensionMismatch { stage: &'static str, expected: usize, actual: usize },
     NonFiniteRhs { stage: &'static str, index: usize },
     RhsEvaluationBudgetExceeded { max_evaluations: usize },
+    JacobianEvaluationBudgetExceeded { max_evaluations: usize },
+    JacobianDimensionMismatch { expected: usize, actual: usize },
+    NonFiniteProvidedJacobian { index: usize },
     NonFinitePredictor { index: usize },
     NonFiniteResidual { index: usize },
     NonFiniteJacobian { row: usize, column: usize },
@@ -162,6 +175,7 @@ pub struct ImplicitEulerError {
     pub failed_step: usize,
     pub newton_corrections: usize,
     pub rhs_evaluations: usize,
+    pub jacobian_evaluations: usize,
     pub residual_norm: f64,
 }
 
@@ -203,6 +217,7 @@ impl ImplicitEulerError {
             failed_step,
             newton_corrections,
             rhs_evaluations,
+            jacobian_evaluations: 0,
             residual_norm,
         }
     }
@@ -341,6 +356,7 @@ pub struct AdaptiveImplicitEulerReport {
     pub max_normalized_newton_residual: f64,
     pub newton_corrections: usize,
     pub rhs_evaluations: usize,
+    pub jacobian_evaluations: usize,
     pub estimated_dense_work_units: usize,
     /// Number of attempted macro-steps, accepted or rejected.
     pub attempts: usize,
@@ -365,6 +381,9 @@ pub enum AdaptiveImplicitEulerErrorKind {
     DenseWorkBudgetExceeded { max_work_units: usize },
     StepSolveFailed { cause: ImplicitEulerErrorKind },
     NonFiniteToleranceScale { index: usize },
+    JacobianEvaluationBudgetExceeded { max_evaluations: usize },
+    JacobianDimensionMismatch { expected: usize, actual: usize },
+    NonFiniteProvidedJacobian { index: usize },
     NonFiniteStepDoublingError,
     StepSizeUnderflow { attempted_step: f64 },
 }
@@ -380,6 +399,7 @@ pub struct AdaptiveImplicitEulerError {
     pub attempts: usize,
     pub newton_corrections: usize,
     pub rhs_evaluations: usize,
+    pub jacobian_evaluations: usize,
     pub estimated_dense_work_units: usize,
     pub max_normalized_newton_residual: f64,
 }
@@ -404,6 +424,7 @@ impl AdaptiveImplicitEulerError {
             attempts,
             newton_corrections: work.newton_corrections,
             rhs_evaluations: work.rhs_evaluations,
+            jacobian_evaluations: work.jacobian_evaluations,
             estimated_dense_work_units: work.estimated_dense_work_units,
             max_normalized_newton_residual,
         }
@@ -426,6 +447,7 @@ impl std::error::Error for AdaptiveImplicitEulerError {}
 struct AdaptiveImplicitEulerWork {
     newton_corrections: usize,
     rhs_evaluations: usize,
+    jacobian_evaluations: usize,
     estimated_dense_work_units: usize,
 }
 
@@ -433,6 +455,8 @@ impl AdaptiveImplicitEulerWork {
     fn record_report(&mut self, report: &ImplicitEulerSolveReport) {
         self.newton_corrections = self.newton_corrections.saturating_add(report.newton_corrections);
         self.rhs_evaluations = self.rhs_evaluations.saturating_add(report.rhs_evaluations);
+        self.jacobian_evaluations = self.jacobian_evaluations
+            .saturating_add(report.jacobian_evaluations);
         self.estimated_dense_work_units = self
             .estimated_dense_work_units
             .saturating_add(report.estimated_dense_work_units);
@@ -441,6 +465,8 @@ impl AdaptiveImplicitEulerWork {
     fn record_error(&mut self, error: &ImplicitEulerError, dimension: usize) {
         self.newton_corrections = self.newton_corrections.saturating_add(error.newton_corrections);
         self.rhs_evaluations = self.rhs_evaluations.saturating_add(error.rhs_evaluations);
+        self.jacobian_evaluations = self.jacobian_evaluations
+            .saturating_add(error.jacobian_evaluations);
         let per_correction = dimension.saturating_mul(dimension).saturating_mul(dimension);
         self.estimated_dense_work_units = self
             .estimated_dense_work_units
@@ -451,6 +477,10 @@ impl AdaptiveImplicitEulerWork {
         if self.rhs_evaluations > MAX_IMPLICIT_RHS_EVALUATIONS {
             Some(AdaptiveImplicitEulerErrorKind::RhsEvaluationBudgetExceeded {
                 max_evaluations: MAX_IMPLICIT_RHS_EVALUATIONS,
+            })
+        } else if self.jacobian_evaluations > MAX_IMPLICIT_JACOBIAN_EVALUATIONS {
+            Some(AdaptiveImplicitEulerErrorKind::JacobianEvaluationBudgetExceeded {
+                max_evaluations: MAX_IMPLICIT_JACOBIAN_EVALUATIONS,
             })
         } else if self.estimated_dense_work_units > MAX_IMPLICIT_NEWTON_WORK_UNITS {
             Some(AdaptiveImplicitEulerErrorKind::DenseWorkBudgetExceeded {
@@ -1242,6 +1272,35 @@ impl DifferentialEquationsEngine {
         )
     }
 
+    /// Solve backward Euler using a caller-supplied analytical RHS Jacobian.
+    ///
+    /// The callback returns the row-major flattened matrix df_i/dy_j with
+    /// exactly `system.dim * system.dim` finite entries. Supplying this
+    /// callback avoids the `system.dim` extra RHS evaluations normally needed
+    /// to construct a finite-difference Jacobian at each Newton iteration.
+    /// RHS and Jacobian callback evaluations are reported separately.
+    pub fn try_solve_implicit_euler_with_jacobian(
+        system: &ODESystem,
+        jacobian: ODEJacobian,
+        t0: f64,
+        t_end: f64,
+        y0: &[f64],
+        n_steps: usize,
+        newton_iters: usize,
+    ) -> Result<ImplicitEulerSolveReport, ImplicitEulerError> {
+        let state_scales = vec![1.0; system.dim];
+        Self::try_solve_implicit_euler_with_jacobian_and_state_scales(
+            system,
+            t0,
+            t_end,
+            y0,
+            n_steps,
+            newton_iters,
+            &state_scales,
+            Some(jacobian),
+        )
+    }
+
     /// Internal full-Newton solve with explicit characteristic state scales
     /// for finite-difference perturbations and normalized residual checks.
     fn try_solve_implicit_euler_with_state_scales(
@@ -1252,6 +1311,58 @@ impl DifferentialEquationsEngine {
         n_steps: usize,
         newton_iters: usize,
         state_scales: &[f64],
+    ) -> Result<ImplicitEulerSolveReport, ImplicitEulerError> {
+        Self::try_solve_implicit_euler_with_jacobian_and_state_scales(
+            system, t0, t_end, y0, n_steps, newton_iters, state_scales, None,
+        )
+    }
+
+    /// Call the full-Newton core and attach accurate Jacobian-callback work to
+    /// both success and failure receipts.
+    fn try_solve_implicit_euler_with_jacobian_and_state_scales(
+        system: &ODESystem,
+        t0: f64,
+        t_end: f64,
+        y0: &[f64],
+        n_steps: usize,
+        newton_iters: usize,
+        state_scales: &[f64],
+        jacobian: Option<ODEJacobian>,
+    ) -> Result<ImplicitEulerSolveReport, ImplicitEulerError> {
+        let mut jacobian_evaluations = 0usize;
+        let result = Self::try_solve_implicit_euler_with_state_scales_core(
+            system,
+            t0,
+            t_end,
+            y0,
+            n_steps,
+            newton_iters,
+            state_scales,
+            jacobian,
+            &mut jacobian_evaluations,
+        );
+        match result {
+            Ok(mut report) => {
+                report.jacobian_evaluations = jacobian_evaluations;
+                Ok(report)
+            }
+            Err(mut error) => {
+                error.jacobian_evaluations = jacobian_evaluations;
+                Err(error)
+            }
+        }
+    }
+
+    fn try_solve_implicit_euler_with_state_scales_core(
+        system: &ODESystem,
+        t0: f64,
+        t_end: f64,
+        y0: &[f64],
+        n_steps: usize,
+        newton_iters: usize,
+        state_scales: &[f64],
+        jacobian: Option<ODEJacobian>,
+        jacobian_evaluations: &mut usize,
     ) -> Result<ImplicitEulerSolveReport, ImplicitEulerError> {
         let mut y = y0.to_vec();
         let mut rhs_evaluations = 0usize;
@@ -1341,6 +1452,7 @@ impl DifferentialEquationsEngine {
                 trajectory,
                 newton_corrections: 0,
                 rhs_evaluations: 0,
+                jacobian_evaluations: 0,
                 max_normalized_residual: 0.0,
                 estimated_dense_work_units: 0,
             });
@@ -1469,62 +1581,107 @@ impl DifferentialEquationsEngine {
                     ));
                 }
 
-                let mut jacobian = vec![0.0_f64; matrix_len];
-                for column in 0..dimension {
-                    let original = y_next[column];
-                    let perturbation_scale = original.abs().max(state_scales[column]);
-                    let raw_delta = f64::EPSILON.sqrt() * perturbation_scale;
-                    let delta = if raw_delta > 0.0 { raw_delta } else { perturbation_scale };
-                    let mut perturbed = original + delta;
-                    let mut signed_delta = delta;
-                    if !perturbed.is_finite() || perturbed == original {
-                        perturbed = original - delta;
-                        signed_delta = -delta;
-                    }
-                    if !perturbed.is_finite() || perturbed == original || signed_delta == 0.0 {
+                let mut jacobian_matrix = vec![0.0_f64; matrix_len];
+                if let Some(jacobian_fn) = jacobian {
+                    if *jacobian_evaluations >= MAX_IMPLICIT_JACOBIAN_EVALUATIONS {
                         return Err(ImplicitEulerError::new(
-                            ImplicitEulerErrorKind::NonFiniteJacobian { row: 0, column },
+                            ImplicitEulerErrorKind::JacobianEvaluationBudgetExceeded {
+                                max_evaluations: MAX_IMPLICIT_JACOBIAN_EVALUATIONS,
+                            },
                             *t_values.last().unwrap_or(&t0), &y, step,
                             total_corrections, rhs_evaluations, step_residual_norm
                         ));
                     }
-                    y_next[column] = perturbed;
-                    let f_perturbed = implicit_euler_eval_rhs(
-                        system, "jacobian", t_next, &y_next, &mut rhs_evaluations
-                    );
-                    y_next[column] = original;
-                    let f_perturbed = match f_perturbed {
-                        Ok(value) => value,
-                        Err(kind) => return Err(ImplicitEulerError::new(
-                            kind, *t_values.last().unwrap_or(&t0), &y, step,
+                    *jacobian_evaluations += 1;
+                    let rhs_jacobian = jacobian_fn(t_next, &y_next);
+                    if rhs_jacobian.len() != matrix_len {
+                        return Err(ImplicitEulerError::new(
+                            ImplicitEulerErrorKind::JacobianDimensionMismatch {
+                                expected: matrix_len,
+                                actual: rhs_jacobian.len(),
+                            },
+                            *t_values.last().unwrap_or(&t0), &y, step,
                             total_corrections, rhs_evaluations, step_residual_norm
-                        )),
-                    };
-
+                        ));
+                    }
+                    if let Some(index) = rhs_jacobian.iter().position(|value| !value.is_finite()) {
+                        return Err(ImplicitEulerError::new(
+                            ImplicitEulerErrorKind::NonFiniteProvidedJacobian { index },
+                            *t_values.last().unwrap_or(&t0), &y, step,
+                            total_corrections, rhs_evaluations, step_residual_norm
+                        ));
+                    }
                     for row in 0..dimension {
-                        let candidate_component = if row == column {
-                            perturbed
-                        } else {
-                            y_next[row]
-                        };
-                        let g_perturbed =
-                            candidate_component - y[row] - h * f_perturbed[row];
-                        let g_base = residual[row];
-                        let entry = (g_perturbed - g_base) / signed_delta;
-                        if !entry.is_finite() {
+                        for column in 0..dimension {
+                            let index = row * dimension + column;
+                            let identity = if row == column { 1.0 } else { 0.0 };
+                            let entry = identity - h * rhs_jacobian[index];
+                            if !entry.is_finite() {
+                                return Err(ImplicitEulerError::new(
+                                    ImplicitEulerErrorKind::NonFiniteJacobian { row, column },
+                                    *t_values.last().unwrap_or(&t0), &y, step,
+                                    total_corrections, rhs_evaluations, step_residual_norm
+                                ));
+                            }
+                            jacobian_matrix[index] = entry;
+                        }
+                    }
+                } else {
+                    for column in 0..dimension {
+                        let original = y_next[column];
+                        let perturbation_scale = original.abs().max(state_scales[column]);
+                        let raw_delta = f64::EPSILON.sqrt() * perturbation_scale;
+                        let delta = if raw_delta > 0.0 { raw_delta } else { perturbation_scale };
+                        let mut perturbed = original + delta;
+                        let mut signed_delta = delta;
+                        if !perturbed.is_finite() || perturbed == original {
+                            perturbed = original - delta;
+                            signed_delta = -delta;
+                        }
+                        if !perturbed.is_finite() || perturbed == original || signed_delta == 0.0 {
                             return Err(ImplicitEulerError::new(
-                                ImplicitEulerErrorKind::NonFiniteJacobian { row, column },
+                                ImplicitEulerErrorKind::NonFiniteJacobian { row: 0, column },
                                 *t_values.last().unwrap_or(&t0), &y, step,
                                 total_corrections, rhs_evaluations, step_residual_norm
                             ));
                         }
-                        jacobian[row * dimension + column] = entry;
+                        y_next[column] = perturbed;
+                        let f_perturbed = implicit_euler_eval_rhs(
+                            system, "jacobian", t_next, &y_next, &mut rhs_evaluations
+                        );
+                        y_next[column] = original;
+                        let f_perturbed = match f_perturbed {
+                            Ok(value) => value,
+                            Err(kind) => return Err(ImplicitEulerError::new(
+                                kind, *t_values.last().unwrap_or(&t0), &y, step,
+                                total_corrections, rhs_evaluations, step_residual_norm
+                            )),
+                        };
+
+                        for row in 0..dimension {
+                            let candidate_component = if row == column {
+                                perturbed
+                            } else {
+                                y_next[row]
+                            };
+                            let g_perturbed =
+                                candidate_component - y[row] - h * f_perturbed[row];
+                            let g_base = residual[row];
+                            let entry = (g_perturbed - g_base) / signed_delta;
+                            if !entry.is_finite() {
+                                return Err(ImplicitEulerError::new(
+                                    ImplicitEulerErrorKind::NonFiniteJacobian { row, column },
+                                    *t_values.last().unwrap_or(&t0), &y, step,
+                                    total_corrections, rhs_evaluations, step_residual_norm
+                                ));
+                            }
+                            jacobian_matrix[row * dimension + column] = entry;
+                        }
                     }
                 }
-
                 let mut correction: Vec<f64> = residual.iter().map(|value| -*value).collect();
                 if let Err((column, pivot_magnitude)) =
-                    implicit_euler_solve_dense(&mut jacobian, &mut correction, dimension)
+                    implicit_euler_solve_dense(&mut jacobian_matrix, &mut correction, dimension)
                 {
                     let kind = if pivot_magnitude.is_finite() {
                         ImplicitEulerErrorKind::SingularJacobian { column, pivot_magnitude }
@@ -1578,6 +1735,7 @@ impl DifferentialEquationsEngine {
             trajectory,
             newton_corrections: total_corrections,
             rhs_evaluations,
+            jacobian_evaluations: *jacobian_evaluations,
             max_normalized_residual,
             estimated_dense_work_units: dense_work_units,
         })
@@ -1609,6 +1767,44 @@ impl DifferentialEquationsEngine {
         initial_step: f64,
         max_attempts: usize,
         newton_iters: usize,
+    ) -> Result<AdaptiveImplicitEulerReport, AdaptiveImplicitEulerError> {
+        Self::try_solve_implicit_euler_adaptive_core(
+            system, t0, t_end, y0, absolute_tolerances, relative_tolerance,
+            initial_step, max_attempts, newton_iters, None,
+        )
+    }
+
+    /// Adaptive step-doubling integration with a caller-supplied analytical Jacobian.
+    /// The callback contract matches the fixed-step analytical-Jacobian API.
+    pub fn try_solve_implicit_euler_adaptive_with_jacobian(
+        system: &ODESystem,
+        jacobian: ODEJacobian,
+        t0: f64,
+        t_end: f64,
+        y0: &[f64],
+        absolute_tolerances: &[f64],
+        relative_tolerance: f64,
+        initial_step: f64,
+        max_attempts: usize,
+        newton_iters: usize,
+    ) -> Result<AdaptiveImplicitEulerReport, AdaptiveImplicitEulerError> {
+        Self::try_solve_implicit_euler_adaptive_core(
+            system, t0, t_end, y0, absolute_tolerances, relative_tolerance,
+            initial_step, max_attempts, newton_iters, Some(jacobian),
+        )
+    }
+
+    fn try_solve_implicit_euler_adaptive_core(
+        system: &ODESystem,
+        t0: f64,
+        t_end: f64,
+        y0: &[f64],
+        absolute_tolerances: &[f64],
+        relative_tolerance: f64,
+        initial_step: f64,
+        max_attempts: usize,
+        newton_iters: usize,
+        jacobian: Option<ODEJacobian>,
     ) -> Result<AdaptiveImplicitEulerReport, AdaptiveImplicitEulerError> {
         let mut y = y0.to_vec();
         let mut t = t0;
@@ -1714,6 +1910,7 @@ impl DifferentialEquationsEngine {
                 max_normalized_newton_residual: 0.0,
                 newton_corrections: 0,
                 rhs_evaluations: 0,
+                jacobian_evaluations: 0,
                 estimated_dense_work_units: 0,
                 attempts: 0,
             });
@@ -1741,8 +1938,8 @@ impl DifferentialEquationsEngine {
                 ));
             }
 
-            let full = Self::try_solve_implicit_euler_with_state_scales(
-                system, t, trial_end, &y, 1, newton_iters, absolute_tolerances
+            let full = Self::try_solve_implicit_euler_with_jacobian_and_state_scales(
+                system, t, trial_end, &y, 1, newton_iters, absolute_tolerances, jacobian
             );
             let full_state = match full {
                 Ok(report) => {
@@ -1781,8 +1978,8 @@ impl DifferentialEquationsEngine {
                 }
             };
 
-            let first_half = Self::try_solve_implicit_euler_with_state_scales(
-                system, t, midpoint, &y, 1, newton_iters, absolute_tolerances
+            let first_half = Self::try_solve_implicit_euler_with_jacobian_and_state_scales(
+                system, t, midpoint, &y, 1, newton_iters, absolute_tolerances, jacobian
             );
             let midpoint_state = match first_half {
                 Ok(report) => {
@@ -1821,8 +2018,8 @@ impl DifferentialEquationsEngine {
                 }
             };
 
-            let second_half = Self::try_solve_implicit_euler_with_state_scales(
-                system, midpoint, trial_end, &midpoint_state, 1, newton_iters, absolute_tolerances
+            let second_half = Self::try_solve_implicit_euler_with_jacobian_and_state_scales(
+                system, midpoint, trial_end, &midpoint_state, 1, newton_iters, absolute_tolerances, jacobian
             );
             let fine_state = match second_half {
                 Ok(report) => {
@@ -1936,6 +2133,7 @@ impl DifferentialEquationsEngine {
             max_normalized_newton_residual: max_newton_residual,
             newton_corrections: work.newton_corrections,
             rhs_evaluations: work.rhs_evaluations,
+            jacobian_evaluations: work.jacobian_evaluations,
             estimated_dense_work_units: work.estimated_dense_work_units,
             attempts,
         })
@@ -2713,6 +2911,71 @@ mod tests {
     }
 
     #[test]
+    fn test_adaptive_implicit_euler_analytic_jacobian_matches_finite_difference_with_fewer_rhs_calls() {
+        fn growth(_t: f64, y: &[f64]) -> Vec<f64> {
+            vec![y[0]]
+        }
+        fn growth_jacobian(_t: f64, _y: &[f64]) -> Vec<f64> {
+            vec![1.0]
+        }
+        let system = ODESystem { f: growth, dim: 1 };
+        let finite_difference = DifferentialEquationsEngine::try_solve_implicit_euler_adaptive(
+            &system, 0.0, 1.0, &[1.0], &[1e-3], 1e-3, 0.2, 10_000, 12,
+        )
+        .expect("finite-difference adaptive solve should reach the endpoint");
+        let analytical = DifferentialEquationsEngine::try_solve_implicit_euler_adaptive_with_jacobian(
+            &system, growth_jacobian, 0.0, 1.0, &[1.0], &[1e-3], 1e-3, 0.2, 10_000, 12,
+        )
+        .expect("analytical-Jacobian adaptive solve should reach the endpoint");
+
+        assert_eq!(finite_difference.trajectory.t_end(), 1.0);
+        assert_eq!(analytical.trajectory.t_end(), 1.0);
+        assert!(
+            (finite_difference.trajectory.final_state()[0]
+                - analytical.trajectory.final_state()[0]).abs() < 1e-6,
+            "Adaptive trajectories differ: finite={}, analytical={}",
+            finite_difference.trajectory.final_state()[0],
+            analytical.trajectory.final_state()[0],
+        );
+        assert_eq!(finite_difference.jacobian_evaluations, 0);
+        assert!(analytical.jacobian_evaluations > 0);
+        assert!(
+            analytical.rhs_evaluations < finite_difference.rhs_evaluations,
+            "Analytical Jacobian should save RHS calls across step-doubling solves: analytical={}, finite={}",
+            analytical.rhs_evaluations,
+            finite_difference.rhs_evaluations,
+        );
+    }
+
+    #[test]
+    fn test_adaptive_implicit_euler_reports_analytical_jacobian_contract_failures() {
+        fn decay(_t: f64, y: &[f64]) -> Vec<f64> {
+            vec![-y[0]]
+        }
+        fn wrong_shape(_t: f64, _y: &[f64]) -> Vec<f64> {
+            vec![]
+        }
+        let system = ODESystem { f: decay, dim: 1 };
+        let error = DifferentialEquationsEngine::try_solve_implicit_euler_adaptive_with_jacobian(
+            &system, wrong_shape, 0.0, 1.0, &[1.0], &[1e-3], 1e-3, 0.1, 100, 8,
+        )
+        .unwrap_err();
+        assert!(matches!(
+            error.kind,
+            AdaptiveImplicitEulerErrorKind::StepSolveFailed {
+                cause: ImplicitEulerErrorKind::JacobianDimensionMismatch {
+                    expected: 1,
+                    actual: 0,
+                }
+            }
+        ));
+        assert!(error.jacobian_evaluations > 0);
+        assert_eq!(error.accepted_steps, 0);
+        assert_eq!(error.time, 0.0);
+        assert_eq!(error.last_state, vec![1.0]);
+    }
+
+    #[test]
     fn test_adaptive_implicit_euler_step_doubling_reduces_exponential_error() {
         fn growth(_t: f64, y: &[f64]) -> Vec<f64> {
             vec![y[0]]
@@ -2884,6 +3147,86 @@ mod tests {
         assert_eq!(error.time, 0.0);
         assert_eq!(error.last_state, vec![1.0]);
         assert_eq!(error.accepted_steps, 0);
+    }
+
+    #[test]
+    fn test_implicit_euler_analytic_jacobian_matches_finite_difference_with_fewer_rhs_calls() {
+        fn coupled(_t: f64, y: &[f64]) -> Vec<f64> {
+            vec![10.0 * y[1], 10.0 * y[0]]
+        }
+        fn coupled_jacobian(_t: f64, _y: &[f64]) -> Vec<f64> {
+            // Row-major df_i/dy_j.
+            vec![0.0, 10.0, 10.0, 0.0]
+        }
+        let system = ODESystem { f: coupled, dim: 2 };
+        let finite_difference = DifferentialEquationsEngine::try_solve_implicit_euler(
+            &system, 0.0, 0.04, &[1.0, 0.0], 1, 8,
+        )
+        .expect("finite-difference full Newton should solve the linear system");
+        let analytical = DifferentialEquationsEngine::try_solve_implicit_euler_with_jacobian(
+            &system, coupled_jacobian, 0.0, 0.04, &[1.0, 0.0], 1, 8,
+        )
+        .expect("supplied analytical Jacobian should solve the same system");
+
+        for (actual, expected) in analytical
+            .trajectory
+            .final_state()
+            .iter()
+            .zip(finite_difference.trajectory.final_state())
+        {
+            assert!(
+                (actual - expected).abs() < 1e-9,
+                "Analytic and finite-difference trajectories differ: {actual} != {expected}",
+            );
+        }
+        assert!(analytical.jacobian_evaluations > 0);
+        assert_eq!(finite_difference.jacobian_evaluations, 0);
+        assert!(
+            analytical.rhs_evaluations < finite_difference.rhs_evaluations,
+            "Analytical Jacobian should save RHS probes: analytic={}, finite-difference={}",
+            analytical.rhs_evaluations,
+            finite_difference.rhs_evaluations,
+        );
+
+        let exact = [1.0 / 0.84, 0.4 / 0.84];
+        for (actual, expected) in analytical.trajectory.final_state().iter().zip(exact) {
+            assert!((actual - expected).abs() < 1e-9, "state={:?}", analytical.trajectory.final_state());
+        }
+    }
+
+    #[test]
+    fn test_implicit_euler_analytic_jacobian_rejects_wrong_shape_and_non_finite_values() {
+        fn decay(_t: f64, y: &[f64]) -> Vec<f64> {
+            vec![-y[0]]
+        }
+        fn wrong_shape(_t: f64, _y: &[f64]) -> Vec<f64> {
+            vec![]
+        }
+        fn non_finite(_t: f64, _y: &[f64]) -> Vec<f64> {
+            vec![f64::NAN]
+        }
+        let system = ODESystem { f: decay, dim: 1 };
+        let shape_error = DifferentialEquationsEngine::try_solve_implicit_euler_with_jacobian(
+            &system, wrong_shape, 0.0, 1.0, &[1.0], 1, 8,
+        )
+        .unwrap_err();
+        assert!(matches!(
+            shape_error.kind,
+            ImplicitEulerErrorKind::JacobianDimensionMismatch { expected: 1, actual: 0 }
+        ));
+        assert_eq!(shape_error.jacobian_evaluations, 1);
+        assert_eq!(shape_error.last_state, vec![1.0]);
+
+        let non_finite_error = DifferentialEquationsEngine::try_solve_implicit_euler_with_jacobian(
+            &system, non_finite, 0.0, 1.0, &[1.0], 1, 8,
+        )
+        .unwrap_err();
+        assert!(matches!(
+            non_finite_error.kind,
+            ImplicitEulerErrorKind::NonFiniteProvidedJacobian { index: 0 }
+        ));
+        assert_eq!(non_finite_error.jacobian_evaluations, 1);
+        assert_eq!(non_finite_error.last_state, vec![1.0]);
     }
 
     #[test]
