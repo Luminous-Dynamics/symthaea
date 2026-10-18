@@ -145,3 +145,64 @@ Standards need not be copied into the repository. Record the applicable edition,
 5. If raw motorcycle maps are declined, instrument a reference electric motorcycle at a lab/dyno and use a conventional ICE vehicle as a second comparison. Commission qualified tire-force, rolling-resistance, wet-grip, endurance and wear testing before claiming improved tire performance.
 
 No data access requests were sent from an authenticated mailbox in this session; the source requests still need to be sent to the data owners. No raw binary data were downloaded into this repository during this work.
+
+
+## Permission-request templates (not yet sent)
+
+### Roam Air / Stellenbosch University — raw electric-motorcycle component data
+
+**Subject:** Research data access and reuse request — Roam Air electric-motorcycle validation dataset
+
+Dear research team,
+
+I am working on an open, reproducible vehicle-engineering benchmark focused on South African/African two-wheeler duty cycles. Your 2026 electric-motorcycle powertrain studies are the closest directly relevant published reference we have found. We would like to request access to the underlying, rights-cleared data needed to independently reproduce a subset of the published validation.
+
+The most useful package would include, where available:
+
+- the raw synchronized drive-cycle telemetry and channel dictionary;
+- the experimentally measured motor/inverter efficiency map and dyno point files, including torque, speed, electrical input, temperature and interpolation conventions;
+- battery HPPC traces and identified parameter maps by state of charge and temperature;
+- controller limits, regenerative-braking maps and configuration/firmware identifiers;
+- coast-down, rolling-resistance and braking measurements used by the model;
+- calibration certificates, uncertainty, test conditions, preprocessing code and the exact model/vehicle configuration.
+
+Could you tell us which items may be shared and what license or written permission applies? Our preferred permission allows private local research, reproducible derived measurements/model coefficients, academic/open-science publication, and redistribution of permitted benchmark subsets with attribution. We will not redistribute any material outside the agreed scope, and we can keep source data private if that is the only permitted option. Please identify any separate permissions required from Roam, funders or other rights holders, and the attribution/citation text you prefer.
+
+We will label all source data separately from our model outputs, preserve original hashes and uncertainty, and report failed fits and outliers rather than claim reproduction before we have the necessary inputs.
+
+Thank you for considering the request.
+
+Best regards,  
+Luminous Dynamics research team
+
+### Andrei García Cuadra / Universidad Politécnica de Madrid — motorcycle telemetry permission
+
+**Subject:** Permission request for research reuse of Kawasaki Ninja 400 telemetry deposits
+
+Dear Andrei,
+
+I found your Kawasaki Ninja 400 raw telemetry deposits for Circuito de Navarra (DOI 10.5281/zenodo.22755547) and Cartagena (DOI 10.5281/zenodo.23034519). They appear unusually useful for building a provenance-aware motorcycle dynamics benchmark, particularly because they preserve raw CAN logs, decodes, integrity manifests and known data limitations.
+
+The Zenodo record pages available to us display no license value in their Rights/License fields. Before importing or deriving features from the data, could you confirm the intended dataset license or grant written permission for our proposed use? Ideally this would cover commercial and non-commercial engineering research, derived feature/model use, and distribution of appropriately attributed benchmark extracts. If you prefer a more limited grant, please specify the allowed uses and any redistribution restrictions.
+
+It would also help to know whether you can provide (where known) tire make/model/size, pressure and wear state, tire changes between sessions, road-surface/wetness metadata, sensor calibration and preferred attribution. We will retain the data's documented caveats, including absent wall-clock timestamps and saturated/outlier channels, and will not treat track logs as direct tire-force or electric-powertrain data.
+
+We will not redistribute the raw files or create a derivative benchmark from them before rights are clarified.
+
+Thank you,  
+Luminous Dynamics research team
+
+### NLR Fleet DNA / FleetREDI — representative road-duty-cycle data
+
+**Subject:** Research access request — vehicle duty-cycle traces for mobility-energy benchmarks
+
+Dear NLR Fleet DNA/FleetREDI team,
+
+We are building a reproducible engineering benchmark for mobility energy and service-life performance. We would like to understand the access and reuse terms for representative anonymized vehicle duty-cycle data, particularly urban, delivery and mixed-road cycles, and any accompanying vehicle/ambient metadata that can be lawfully shared.
+
+We are interested in time-aligned speed/acceleration, route grade or road-load information if available, payload classes, vehicle category/powertrain identity, ambient conditions and energy/fuel measurements. We would preserve access controls and would not republish raw records unless the license or agreement permits it. Could you point us to the appropriate data request or researcher access process and the terms governing derived/public benchmark outputs?
+
+Best regards,  
+Luminous Dynamics research team
+
+**Dispatch status:** These are prepared templates only. No authenticated mailbox was available in this task, so they have not been sent; do not record them as sent or as permission granted.
