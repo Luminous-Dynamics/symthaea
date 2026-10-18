@@ -12,7 +12,7 @@ use std::path::{Path, PathBuf};
 use std::process::ExitCode;
 use symthaea_muse::vcsl::{
     AssetRootEvidenceV1, InstrumentCapabilityV1, InstrumentCapabilityInventoryV1,
-    SampleDirectoryEvidenceV1, capability_inventory_with_options,
+    SampleDirectoryEvidenceV1, capability_inventory_with_provenance_options,
 };
 
 #[derive(Debug)]
@@ -21,6 +21,7 @@ struct Options {
     vsco2_dir: PathBuf,
     soundfont: Option<PathBuf>,
     hash_indexed_samples: bool,
+    hash_root_wav_contents: bool,
 }
 
 #[derive(Debug, Serialize)]
@@ -29,9 +30,11 @@ struct QualificationMatrixV1 {
     benchmark: &'static str,
     qualification_result: &'static str,
     evidence_boundary: &'static str,
+    source_revision: Option<String>,
     vcsl_root: AssetRootEvidenceV1,
     vsco2_root: AssetRootEvidenceV1,
     indexed_sample_content_hashing_enabled: bool,
+    root_content_manifest_hashing_enabled: bool,
     instruments: Vec<InstrumentQualificationRowV1>,
     next_evidence_gates: Vec<&'static str>,
 }
@@ -89,12 +92,13 @@ fn main() -> ExitCode {
 
 fn run() -> Result<(), String> {
     let options = parse_args()?;
-    let inventory = capability_inventory_with_options(
+    let inventory = capability_inventory_with_provenance_options(
         &options.vcsl_dir,
         &options.vsco2_dir,
         options.soundfont.as_deref(),
         None,
         options.hash_indexed_samples,
+        options.hash_root_wav_contents,
     )
     .map_err(|error| format!("could not inspect sample inventory: {error}"))?;
 
@@ -104,13 +108,15 @@ fn run() -> Result<(), String> {
         .map(qualification_row)
         .collect::<Vec<_>>();
     let report = QualificationMatrixV1 {
-        schema_version: "melothaea.instrument-capability-matrix.v1",
+        schema_version: "melothaea.instrument-capability-matrix.v2",
         benchmark: "MEL-INST-CAP-001",
         qualification_result: "not_qualified_by_source_inventory_alone",
-        evidence_boundary: "source inventory, filename pitch coverage, WAV decode and silence audit only; no render-grid, independently measured pitch, gesture, or human-preference result is implied",
+        evidence_boundary: "source inventory, filename pitch coverage, WAV decode and silence audit only; optional root content manifests hash all WAVs found by the root walker, including files outside the pitch indexer; no render-grid, gesture, or human-preference result is implied",
+        source_revision: inventory.source_revision.clone(),
         vcsl_root: inventory.vcsl_root,
         vsco2_root: inventory.vsco2_root,
         indexed_sample_content_hashing_enabled: inventory.indexed_sample_content_hashing_enabled,
+        root_content_manifest_hashing_enabled: inventory.root_content_manifest_hashing_enabled,
         instruments: rows,
         next_evidence_gates: vec![
             "instrument-specific render sweep with per-note renderer/source receipts",
@@ -250,6 +256,7 @@ fn parse_args() -> Result<Options, String> {
         vsco2_dir: default_vsco2,
         soundfont: None,
         hash_indexed_samples: false,
+        hash_root_wav_contents: false,
     };
 
     let mut args = std::env::args().skip(1);
@@ -275,6 +282,7 @@ fn parse_args() -> Result<Options, String> {
                 ));
             }
             "--hash-indexed-samples" => options.hash_indexed_samples = true,
+            "--hash-root-wav-contents" => options.hash_root_wav_contents = true,
             _ => return Err(format!("unknown argument: {arg} (use --help)")),
         }
     }
@@ -290,9 +298,10 @@ fn print_help() {
            --vsco2-dir PATH        VSCO2-CE sample root (default: SYMTHAEA_VSCO2_DIR or data/samples/vsco2-ce)\n\
            --soundfont PATH        Optional SoundFont header inventory (no FluidSynth rendering)\n\
            --hash-indexed-samples  Hash all indexed WAV contents (can be I/O intensive)\n\
+           --hash-root-wav-contents Hash all WAV bytes under each complete root (very I/O intensive)\n\
            -h, --help              Show this help\n\
          Writes JSON to stdout. Source inventory does not certify playable range or instrument proficiency.\n\
-         The inventory reads indexed WAV files for decode/silence audit; content hashing is opt-in."
+         Indexed-bank and root-wide content hashing are independently opt-in; root hashing includes WAVs rejected by the pitch indexer."
     );
 }
 

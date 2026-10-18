@@ -1069,6 +1069,8 @@ pub struct InstrumentCapabilityInventoryV1 {
     pub instrument_count: usize,
     /// True when indexed sample bytes were content-hashed during this inventory run.
     pub indexed_sample_content_hashing_enabled: bool,
+    /// True when all WAV files found by the root walker were content-hashed.
+    pub root_content_manifest_hashing_enabled: bool,
     pub vcsl_root: AssetRootEvidenceV1,
     pub vsco2_root: AssetRootEvidenceV1,
     pub soundfont: Option<SoundFontEvidenceV1>,
@@ -1123,13 +1125,18 @@ pub struct FluidSynthProgramProbeV1 {
     pub rms: Option<f32>,
 }
 
-/// Evidence for one library root. The digest binds sorted relative WAV paths
-/// and file sizes, not file contents; it is a lightweight asset-layout seal.
+/// Evidence for one library root. The path/size digest is a lightweight layout
+/// seal; the optional content digest additionally binds bytes of every WAV file
+/// accepted by the root walker (including WAVs rejected by the pitch indexer).
 #[derive(Debug, Clone, Serialize)]
 pub struct AssetRootEvidenceV1 {
     pub root_present: bool,
     pub wav_file_count: usize,
     pub path_size_manifest_sha256: Option<String>,
+    /// Optional SHA-256 over sorted relative paths, file sizes, and exact WAV bytes.
+    pub content_manifest_sha256: Option<String>,
+    /// "not_requested", "root_missing", or "hashed".
+    pub content_manifest_status: &'static str,
 }
 
 /// Evidence for an optional SoundFont file. Unlike the path/size manifest
@@ -1296,14 +1303,34 @@ pub fn capability_inventory_with_fluidsynth(
 }
 
 /// Build a capability inventory with explicit controls for external probes and
-/// expensive sample-byte hashing. Content hashing is opt-in because it reads
-/// every WAV accepted by the sample indexer a second time.
+/// expensive sample-byte hashing. Content hashing is opt-in because it streams
+/// asset bytes and may cause substantial additional I/O.
 pub fn capability_inventory_with_options(
     vcsl_root: &Path,
     vsco2_root: &Path,
     soundfont_path: Option<&Path>,
     fluidsynth_path: Option<&Path>,
     hash_indexed_samples: bool,
+) -> std::io::Result<InstrumentCapabilityInventoryV1> {
+    capability_inventory_with_provenance_options(
+        vcsl_root,
+        vsco2_root,
+        soundfont_path,
+        fluidsynth_path,
+        hash_indexed_samples,
+        false,
+    )
+}
+
+/// Build an inventory with independent controls for per-bank indexed WAV hashes
+/// and content hashes over every WAV found under each complete asset root.
+pub fn capability_inventory_with_provenance_options(
+    vcsl_root: &Path,
+    vsco2_root: &Path,
+    soundfont_path: Option<&Path>,
+    fluidsynth_path: Option<&Path>,
+    hash_indexed_samples: bool,
+    hash_root_wav_contents: bool,
 ) -> std::io::Result<InstrumentCapabilityInventoryV1> {
     if fluidsynth_path.is_some() && soundfont_path.is_none() {
         return Err(std::io::Error::new(
@@ -1361,8 +1388,8 @@ pub fn capability_inventory_with_options(
         Instrument::Xylophone,
     ];
 
-    let vcsl_evidence = asset_root_evidence(vcsl_root)?;
-    let vsco2_evidence = asset_root_evidence(vsco2_root)?;
+    let vcsl_evidence = asset_root_evidence(vcsl_root, hash_root_wav_contents)?;
+    let vsco2_evidence = asset_root_evidence(vsco2_root, hash_root_wav_contents)?;
     let soundfont = soundfont_path.map(soundfont_evidence).transpose()?;
     let mut sample_directory_cache =
         HashMap::<(SampleSource, String, bool), Option<SampleDirectoryEvidenceV1>>::new();
@@ -1442,10 +1469,11 @@ pub fn capability_inventory_with_options(
     };
 
     Ok(InstrumentCapabilityInventoryV1 {
-        schema_version: "muse-instrument-capability-inventory-v1",
+        schema_version: "muse-instrument-capability-inventory-v2",
         source_revision,
         instrument_count: instruments.len(),
         indexed_sample_content_hashing_enabled: hash_indexed_samples,
+        root_content_manifest_hashing_enabled: hash_root_wav_contents,
         vcsl_root: vcsl_evidence,
         vsco2_root: vsco2_evidence,
         soundfont,
@@ -2177,7 +2205,10 @@ fn probe_fluidsynth_programs(
     })
 }
 
-fn asset_root_evidence(root: &Path) -> std::io::Result<AssetRootEvidenceV1> {
+fn asset_root_evidence(
+    root: &Path,
+    hash_root_wav_contents: bool,
+) -> std::io::Result<AssetRootEvidenceV1> {
     let metadata = match std::fs::metadata(root) {
         Ok(metadata) => metadata,
         Err(error) if error.kind() == std::io::ErrorKind::NotFound => {
@@ -2185,6 +2216,12 @@ fn asset_root_evidence(root: &Path) -> std::io::Result<AssetRootEvidenceV1> {
                 root_present: false,
                 wav_file_count: 0,
                 path_size_manifest_sha256: None,
+                content_manifest_sha256: None,
+                content_manifest_status: if hash_root_wav_contents {
+                    "root_missing"
+                } else {
+                    "not_requested"
+                },
             });
         }
         Err(error) => return Err(error),
@@ -2209,11 +2246,68 @@ fn asset_root_evidence(root: &Path) -> std::io::Result<AssetRootEvidenceV1> {
         hasher.update(size_bytes.to_le_bytes());
     }
     let digest = hasher.finalize();
+    let content_manifest_sha256 = if hash_root_wav_contents {
+        Some(asset_root_content_manifest_sha256(root, &entries)?)
+    } else {
+        None
+    };
     Ok(AssetRootEvidenceV1 {
         root_present: true,
         wav_file_count: entries.len(),
         path_size_manifest_sha256: Some(hex_digest(&digest[..])),
+        content_manifest_status: if hash_root_wav_contents { "hashed" } else { "not_requested" },
+        content_manifest_sha256,
     })
+}
+
+/// Hash every WAV discovered by collect_wav_manifest, including files whose
+/// names are rejected by the pitch-sample indexer. Records are sorted and
+/// length-prefixed; each exact file is streamed to bound memory use.
+fn asset_root_content_manifest_sha256(
+    root: &Path,
+    entries: &[(String, u64)],
+) -> std::io::Result<String> {
+    use std::io::Read as _;
+
+    let mut manifest = Sha256::new();
+    manifest.update(b"muse-asset-root-content-manifest-v1\0");
+    let mut buffer = [0u8; 64 * 1024];
+
+    for (relative_path, expected_size) in entries {
+        manifest.update((relative_path.len() as u64).to_le_bytes());
+        manifest.update(relative_path.as_bytes());
+        manifest.update(expected_size.to_le_bytes());
+
+        let mut file = std::fs::File::open(root.join(relative_path))?;
+        let metadata_size = file.metadata()?.len();
+        if metadata_size != *expected_size {
+            return Err(std::io::Error::new(
+                std::io::ErrorKind::InvalidData,
+                format!("asset changed size before root hashing: {relative_path}"),
+            ));
+        }
+        let mut bytes_read = 0u64;
+        let mut file_hasher = Sha256::new();
+        loop {
+            let count = file.read(&mut buffer)?;
+            if count == 0 {
+                break;
+            }
+            bytes_read += count as u64;
+            file_hasher.update(&buffer[..count]);
+        }
+        if bytes_read != *expected_size {
+            return Err(std::io::Error::new(
+                std::io::ErrorKind::InvalidData,
+                format!("asset changed size during root hashing: {relative_path}"),
+            ));
+        }
+        let file_digest = file_hasher.finalize();
+        manifest.update(&file_digest[..]);
+    }
+
+    let digest = manifest.finalize();
+    Ok(hex_digest(&digest[..]))
 }
 
 fn collect_wav_manifest(
@@ -3669,6 +3763,19 @@ mod tests {
     }
 
     #[test]
+    fn absent_asset_root_is_explicit_when_content_hashing_is_requested() {
+        let root = std::env::temp_dir().join(format!(
+            "muse-missing-root-manifest-{}",
+            std::process::id()
+        ));
+        let _ = std::fs::remove_dir_all(&root);
+        let evidence = asset_root_evidence(&root, true).unwrap();
+        assert!(!evidence.root_present);
+        assert_eq!(evidence.content_manifest_status, "root_missing");
+        assert!(evidence.content_manifest_sha256.is_none());
+    }
+
+    #[test]
     fn indexed_sample_content_hash_detects_same_size_audio_changes() {
         let root = std::env::temp_dir().join(format!(
             "muse-instrument-inventory-content-hash-{}",
@@ -3682,6 +3789,10 @@ mod tests {
         std::fs::create_dir_all(&harp_dir).unwrap();
         std::fs::create_dir_all(&vsco2_root).unwrap();
         let sample_path = harp_dir.join("Harp_A4_vl1.wav");
+        let unindexed_path = vcsl_root.join("misc/unindexed-placeholder.wav");
+        std::fs::create_dir_all(unindexed_path.parent().unwrap()).unwrap();
+        // Root hashing must cover WAV files that the scientific-pitch indexer rejects.
+        std::fs::write(&unindexed_path, b"unindexed-placeholder-payload-A").unwrap();
 
         fn write_wav(path: &Path, amplitude: i16) {
             let spec = hound::WavSpec {
@@ -3705,15 +3816,23 @@ mod tests {
 
         write_wav(&sample_path, 4000);
         let original_sample_size = std::fs::metadata(&sample_path).unwrap().len();
-        let first = capability_inventory_with_options(
+        let first = capability_inventory_with_provenance_options(
             &vcsl_root,
             &vsco2_root,
             None,
             None,
             true,
+            true,
         )
         .unwrap();
         assert!(first.indexed_sample_content_hashing_enabled);
+        assert!(first.root_content_manifest_hashing_enabled);
+        assert_eq!(first.vcsl_root.content_manifest_status, "hashed");
+        let first_root_content_hash = first
+            .vcsl_root
+            .content_manifest_sha256
+            .clone()
+            .expect("explicit root content hashing should produce a digest");
         let harp = first
             .instruments
             .iter()
@@ -3728,11 +3847,12 @@ mod tests {
             .expect("explicit content hashing should produce a manifest digest");
         let layout_hash = first.vcsl_root.path_size_manifest_sha256.clone().unwrap();
 
-        let repeated = capability_inventory_with_options(
+        let repeated = capability_inventory_with_provenance_options(
             &vcsl_root,
             &vsco2_root,
             None,
             None,
+            true,
             true,
         )
         .unwrap();
@@ -3751,6 +3871,11 @@ mod tests {
             Some(first_hash.as_str()),
             "same indexed sample bytes must yield a stable content manifest"
         );
+        assert_eq!(
+            repeated.vcsl_root.content_manifest_sha256.as_deref(),
+            Some(first_root_content_hash.as_str()),
+            "same root WAV bytes must yield a stable content manifest"
+        );
 
         // Keep the WAV frame count and byte length fixed while changing audio.
         write_wav(&sample_path, 9000);
@@ -3759,11 +3884,12 @@ mod tests {
             original_sample_size,
             "fixture changes audio payload without changing file size"
         );
-        let changed = capability_inventory_with_options(
+        let changed = capability_inventory_with_provenance_options(
             &vcsl_root,
             &vsco2_root,
             None,
             None,
+            true,
             true,
         )
         .unwrap();
@@ -3789,8 +3915,41 @@ mod tests {
             Some(layout_hash.as_str()),
             "the legacy path/size manifest is intentionally content-agnostic"
         );
+        assert_ne!(
+            changed.vcsl_root.content_manifest_sha256.as_deref(),
+            Some(first_root_content_hash.as_str()),
+            "root content manifest must catch same-size WAV byte changes"
+        );
+
+        // Alter only a WAV rejected by the pitch-sample indexer. Its equal-size
+        // payload change must affect the root digest but not the path/size seal.
+        let unindexed_size = std::fs::metadata(&unindexed_path).unwrap().len();
+        std::fs::write(&unindexed_path, b"unindexed-placeholder-payload-B").unwrap();
+        assert_eq!(std::fs::metadata(&unindexed_path).unwrap().len(), unindexed_size);
+        let changed_unindexed = capability_inventory_with_provenance_options(
+            &vcsl_root,
+            &vsco2_root,
+            None,
+            None,
+            false,
+            true,
+        )
+        .unwrap();
+        assert_ne!(
+            changed_unindexed.vcsl_root.content_manifest_sha256.as_deref(),
+            changed.vcsl_root.content_manifest_sha256.as_deref(),
+            "root manifest must cover WAV files rejected by the sample indexer"
+        );
+        assert_eq!(
+            changed_unindexed.vcsl_root.path_size_manifest_sha256.as_deref(),
+            Some(layout_hash.as_str()),
+            "same-size unindexed payload changes leave path/size digest unchanged"
+        );
 
         let default_inventory = capability_inventory(&vcsl_root, &vsco2_root, None).unwrap();
+        assert!(!default_inventory.root_content_manifest_hashing_enabled);
+        assert_eq!(default_inventory.vcsl_root.content_manifest_status, "not_requested");
+        assert!(default_inventory.vcsl_root.content_manifest_sha256.is_none());
         let default_harp = default_inventory
             .instruments
             .iter()
