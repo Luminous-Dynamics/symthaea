@@ -25,7 +25,7 @@ The challenge is not eight independent builds. The source records one parent spe
 
 The committed profile is metadata-only. It contains no dataset bytes and has no invented artifact hashes. Artifact-specific terms, local use and redistribution permissions remain unreviewed. Before files may be used:
 1. Inspect the actual DOI landing page attribution/citation instructions and the terms applying to each downloadable artifact.
-2. Record access date, artifact URL/path, media type, byte count and SHA-256 from the exact lawfully obtained bytes.
+2. Record source object ID/revision, access date, artifact URL/path, terms URL, media type, byte count and SHA-256 from the exact lawfully obtained bytes. Record local-use and repository-bundling permissions per artifact as well as in the dataset policy.
 3. Set terms and local-use flags only when the evidence supports those choices. Repository bundling has its own separate permission flag.
 4. Keep artifact files external to the repository unless bundling is explicitly permitted and reviewed.
 
