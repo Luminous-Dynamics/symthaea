@@ -66,7 +66,8 @@ pub fn measure_temporal_support(
             && end.is_finite()
             && end > note.start_time
             && note.velocity.is_finite()
-            && (0.0..=1.0).contains(&note.velocity);
+            && note.velocity > 0.0
+            && note.velocity <= 1.0;
         if !valid {
             return Err(CreativeTemporalSupportError::InvalidNote { index });
         }
@@ -213,6 +214,17 @@ mod tests {
         assert_eq!(
             error,
             CreativeTemporalSupportError::InvalidNote { index: 1 }
+        );
+    }
+
+    #[test]
+    fn zero_velocity_silent_notes_cannot_claim_temporal_support() {
+        let mut silent = note(0.0, 1.0);
+        silent.velocity = 0.0;
+
+        assert_eq!(
+            measure_temporal_support(&[silent], 1.0, 4),
+            Err(CreativeTemporalSupportError::InvalidNote { index: 0 })
         );
     }
 
