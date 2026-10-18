@@ -66,7 +66,9 @@ Run the corpus's executable contract verifier with an existing C compiler, `jq`,
 benchmarks/rea-differential/v1/verify.sh
 ```
 
-The verifier compiles all four declared profiles in a fresh temporary directory, checks their binary identities, derives expected outputs from `oracle.json`, evaluates RDB-001 through RDB-006, and verifies malformed-input rejection. It prints the actual generated hashes and compiler identity. It does not invoke REA or test real hardware. This script has been authored but **has not yet been executed** in the present work session.
+The verifier compiles all four declared profiles in a fresh temporary directory, checks their binary identities, derives expected outputs from `oracle.json`, evaluates RDB-001 through RDB-006, and verifies malformed-input rejection. It prints the actual generated hashes and compiler identity. It does not invoke REA or test real hardware.
+
+**Recorded execution:** [local verification receipt](receipts/local-debian13-gcc14-2026-10-18.json). The verifier passed with Debian GNU/Linux 13, GCC 14.2.0-19 and jq 1.7. The source, case manifest, oracle and verifier were each checked to have the exact Git blob IDs on the tested branch before running from a temporary mirror. This is a local synthetic-fixture pass, not a GitHub CI pass, REA/provider qualification, or a physical-hardware result.
 
 For each physical pulse width in a case, the fixture model converts `pulse_width_microseconds` to `pulse_ticks = floor(width / timer_tick_us)`. The host program receives the resulting integer ticks. This conversion is a **synthetic experimental model**, not a model of any particular MCU timer, oscillator tolerance, interrupt latency or signal conditioning circuit.
 
