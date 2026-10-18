@@ -124,7 +124,9 @@ fn validate_semantics(manifest: &Value) -> Vec<String> {
     }
 
     let modules = manifest.get("modules").and_then(Value::as_array);
-    let channels = manifest.get("measurement_channels").and_then(Value::as_array);
+    let channels = manifest
+        .get("measurement_channels")
+        .and_then(Value::as_array);
     let benchmarks = manifest.get("benchmarks").and_then(Value::as_array);
     let gates = manifest.get("gates").and_then(Value::as_array);
     let references = manifest.get("references").and_then(Value::as_array);
@@ -154,7 +156,10 @@ fn validate_semantics(manifest: &Value) -> Vec<String> {
             if matches!(openness, "PROJECT_CONTROLLED_OPEN" | "THIRD_PARTY_OPEN")
                 && (license_status != "OPEN_VERIFIED" || !has_design_source)
             {
-                let id = module.get("id").and_then(Value::as_str).unwrap_or("<missing>");
+                let id = module
+                    .get("id")
+                    .and_then(Value::as_str)
+                    .unwrap_or("<missing>");
                 errors.push(format!(
                     "module {id} cannot claim {openness} without OPEN_VERIFIED license and design source"
                 ));
@@ -162,13 +167,18 @@ fn validate_semantics(manifest: &Value) -> Vec<String> {
 
             if openness == "THIRD_PARTY_DOCUMENTED" {
                 let has_interface_source =
-                    module.get("datasheet_or_interface_source").is_some_and(|value| {
-                        value
-                            .as_str()
-                            .is_some_and(|source| !source.trim().is_empty())
-                    });
+                    module
+                        .get("datasheet_or_interface_source")
+                        .is_some_and(|value| {
+                            value
+                                .as_str()
+                                .is_some_and(|source| !source.trim().is_empty())
+                        });
                 if !has_interface_source {
-                    let id = module.get("id").and_then(Value::as_str).unwrap_or("<missing>");
+                    let id = module
+                        .get("id")
+                        .and_then(Value::as_str)
+                        .unwrap_or("<missing>");
                     errors.push(format!(
                         "module {id} cannot claim THIRD_PARTY_DOCUMENTED without a source URL"
                     ));
@@ -178,15 +188,23 @@ fn validate_semantics(manifest: &Value) -> Vec<String> {
             if manifest.get("status").and_then(Value::as_str) == Some("SPECIFICATION_ONLY")
                 && module.get("module_status").and_then(Value::as_str) == Some("QUALIFIED")
             {
-                let id = module.get("id").and_then(Value::as_str).unwrap_or("<missing>");
-                errors.push(format!("specification-only module {id} cannot be QUALIFIED"));
+                let id = module
+                    .get("id")
+                    .and_then(Value::as_str)
+                    .unwrap_or("<missing>");
+                errors.push(format!(
+                    "specification-only module {id} cannot be QUALIFIED"
+                ));
             }
         }
 
         if let Some(channels) = channels {
             validate_unique_ids(channels, "measurement channel", &mut errors);
             for channel in channels {
-                let channel_id = channel.get("id").and_then(Value::as_str).unwrap_or("<missing>");
+                let channel_id = channel
+                    .get("id")
+                    .and_then(Value::as_str)
+                    .unwrap_or("<missing>");
                 let source = channel
                     .get("source_module_id")
                     .and_then(Value::as_str)
@@ -208,10 +226,12 @@ fn validate_semantics(manifest: &Value) -> Vec<String> {
         validate_unique_ids(benchmarks, "benchmark", &mut errors);
         if manifest.get("status").and_then(Value::as_str) == Some("SPECIFICATION_ONLY") {
             for benchmark in benchmarks {
-                if benchmark.get("evidence_status").and_then(Value::as_str)
-                    != Some("NOT_MEASURED")
+                if benchmark.get("evidence_status").and_then(Value::as_str) != Some("NOT_MEASURED")
                 {
-                    let id = benchmark.get("id").and_then(Value::as_str).unwrap_or("<missing>");
+                    let id = benchmark
+                        .get("id")
+                        .and_then(Value::as_str)
+                        .unwrap_or("<missing>");
                     errors.push(format!(
                         "specification-only benchmark {id} must remain NOT_MEASURED"
                     ));
@@ -227,8 +247,13 @@ fn validate_semantics(manifest: &Value) -> Vec<String> {
         if manifest.get("status").and_then(Value::as_str) == Some("SPECIFICATION_ONLY") {
             for gate in gates {
                 if gate.get("status").and_then(Value::as_str) != Some("NOT_STARTED") {
-                    let id = gate.get("id").and_then(Value::as_str).unwrap_or("<missing>");
-                    errors.push(format!("specification-only gate {id} must remain NOT_STARTED"));
+                    let id = gate
+                        .get("id")
+                        .and_then(Value::as_str)
+                        .unwrap_or("<missing>");
+                    errors.push(format!(
+                        "specification-only gate {id} must remain NOT_STARTED"
+                    ));
                 }
             }
         }
@@ -258,7 +283,10 @@ fn validate_semantics(manifest: &Value) -> Vec<String> {
 fn validate_unique_ids(records: &[Value], category: &str, errors: &mut Vec<String>) {
     let mut seen = BTreeSet::new();
     for record in records {
-        let id = record.get("id").and_then(Value::as_str).unwrap_or("<missing>");
+        let id = record
+            .get("id")
+            .and_then(Value::as_str)
+            .unwrap_or("<missing>");
         if !seen.insert(id.to_owned()) {
             errors.push(format!("duplicate {category} ID: {id}"));
         }
@@ -321,10 +349,12 @@ mod tests {
         let mut manifest = parse_manifest();
         let first_id = manifest["modules"][0]["id"].clone();
         manifest["modules"][1]["id"] = first_id;
-        assert!(validate_platform_str(&encoded(&manifest), SCHEMA_TEXT)
-            .expect_err("duplicate IDs must fail")
-            .iter()
-            .any(|error| error.contains("duplicate module ID")));
+        assert!(
+            validate_platform_str(&encoded(&manifest), SCHEMA_TEXT)
+                .expect_err("duplicate IDs must fail")
+                .iter()
+                .any(|error| error.contains("duplicate module ID"))
+        );
     }
 
     #[test]
@@ -332,10 +362,12 @@ mod tests {
         let mut manifest = parse_manifest();
         manifest["measurement_channels"][0]["source_module_id"] =
             Value::String("ODRH-MISSING-999".to_owned());
-        assert!(validate_platform_str(&encoded(&manifest), SCHEMA_TEXT)
-            .expect_err("dangling source must fail")
-            .iter()
-            .any(|error| error.contains("unresolved source module")));
+        assert!(
+            validate_platform_str(&encoded(&manifest), SCHEMA_TEXT)
+                .expect_err("dangling source must fail")
+                .iter()
+                .any(|error| error.contains("unresolved source module"))
+        );
     }
 
     #[test]
@@ -343,21 +375,24 @@ mod tests {
         let mut manifest = parse_manifest();
         manifest["modules"][0]["current_openness_class"] =
             Value::String("PROJECT_CONTROLLED_OPEN".to_owned());
-        assert!(validate_platform_str(&encoded(&manifest), SCHEMA_TEXT)
-            .expect_err("open claim needs verified license and design source")
-            .iter()
-            .any(|error| error.contains("cannot claim PROJECT_CONTROLLED_OPEN")));
+        assert!(
+            validate_platform_str(&encoded(&manifest), SCHEMA_TEXT)
+                .expect_err("open claim needs verified license and design source")
+                .iter()
+                .any(|error| error.contains("cannot claim PROJECT_CONTROLLED_OPEN"))
+        );
     }
 
     #[test]
     fn specification_cannot_self_promote_physical_validation() {
         let mut manifest = parse_manifest();
-        manifest["physical_validation"] =
-            Value::String("INDEPENDENTLY_REVIEWED".to_owned());
-        assert!(validate_platform_str(&encoded(&manifest), SCHEMA_TEXT)
-            .expect_err("physical evidence requires actual independent review")
-            .iter()
-            .any(|error| error.contains("physical_validation cannot be promoted")));
+        manifest["physical_validation"] = Value::String("INDEPENDENTLY_REVIEWED".to_owned());
+        assert!(
+            validate_platform_str(&encoded(&manifest), SCHEMA_TEXT)
+                .expect_err("physical evidence requires actual independent review")
+                .iter()
+                .any(|error| error.contains("physical_validation cannot be promoted"))
+        );
     }
 
     #[test]
@@ -367,14 +402,20 @@ mod tests {
             Value::String("INDEPENDENTLY_REVIEWED".to_owned());
         let errors = validate_platform_str(&encoded(&manifest), SCHEMA_TEXT)
             .expect_err("benchmark evidence cannot be promoted by editing the manifest");
-        assert!(errors.iter().any(|error| error.contains("must remain NOT_MEASURED")));
+        assert!(
+            errors
+                .iter()
+                .any(|error| error.contains("must remain NOT_MEASURED"))
+        );
 
         let mut manifest = parse_manifest();
         manifest["gates"][0]["status"] = Value::String("PASSED_WITH_EVIDENCE".to_owned());
-        assert!(validate_platform_str(&encoded(&manifest), SCHEMA_TEXT)
-            .expect_err("gate status cannot be self-promoted")
-            .iter()
-            .any(|error| error.contains("must remain NOT_STARTED")));
+        assert!(
+            validate_platform_str(&encoded(&manifest), SCHEMA_TEXT)
+                .expect_err("gate status cannot be self-promoted")
+                .iter()
+                .any(|error| error.contains("must remain NOT_STARTED"))
+        );
     }
 
     #[test]
@@ -382,9 +423,11 @@ mod tests {
         let mut manifest = parse_manifest();
         let first_id = manifest["references"][0]["id"].clone();
         manifest["references"][1]["id"] = first_id;
-        assert!(validate_platform_str(&encoded(&manifest), SCHEMA_TEXT)
-            .expect_err("duplicate source IDs must fail")
-            .iter()
-            .any(|error| error.contains("duplicate reference ID")));
+        assert!(
+            validate_platform_str(&encoded(&manifest), SCHEMA_TEXT)
+                .expect_err("duplicate source IDs must fail")
+                .iter()
+                .any(|error| error.contains("duplicate reference ID"))
+        );
     }
 }
