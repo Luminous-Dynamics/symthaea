@@ -619,13 +619,16 @@ mod tests {
 
     #[test]
     fn checked_in_fixture_deserializes_and_compiles_with_source_binding() {
+        use sha2::{Digest, Sha256};
+
         let source_design = include_str!("../fixtures/space_fdir_mbse_001/source_design.txt");
         let model: MissionFaultModel = serde_json::from_str(include_str!(
             "../fixtures/space_fdir_mbse_001/model.json"
         ))
         .expect("versioned JSON fixture must deserialize into the typed IR");
 
-        assert_eq!(model.source_design.sha256, "748da4fc495778c2b46ef7397ea4a3f435637f837b2aa8e61d10ef4b4d996656");
+        let actual_sha256 = format!("{:x}", Sha256::digest(source_design.as_bytes()));
+        assert_eq!(actual_sha256, model.source_design.sha256);
         assert!(source_design.starts_with("Synthetic spacecraft communications design"));
         let manifest = model.compile_campaign().expect("fixture model compiles");
         assert!(manifest.critical_coverage_closed());
