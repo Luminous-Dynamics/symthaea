@@ -193,13 +193,12 @@ pub fn route_pareto_dominates(
         && candidate.cycle_time_per_good_unit_upper_seconds
             <= competitor.cycle_time_per_good_unit_upper_seconds
         && candidate.final_good_yield_lower >= competitor.final_good_yield_lower;
-    let strictly_better =
-        candidate.cost_per_good_unit_upper < competitor.cost_per_good_unit_upper
-            || candidate.energy_per_good_unit_upper_joules
-                < competitor.energy_per_good_unit_upper_joules
-            || candidate.cycle_time_per_good_unit_upper_seconds
-                < competitor.cycle_time_per_good_unit_upper_seconds
-            || candidate.final_good_yield_lower > competitor.final_good_yield_lower;
+    let strictly_better = candidate.cost_per_good_unit_upper < competitor.cost_per_good_unit_upper
+        || candidate.energy_per_good_unit_upper_joules
+            < competitor.energy_per_good_unit_upper_joules
+        || candidate.cycle_time_per_good_unit_upper_seconds
+            < competitor.cycle_time_per_good_unit_upper_seconds
+        || candidate.final_good_yield_lower > competitor.final_good_yield_lower;
 
     Ok(no_worse && strictly_better)
 }
@@ -313,9 +312,7 @@ impl CostLedger {
 /// The caller must declare a matched product/quality profile and a consistent
 /// cost boundary. Stage yields are not multiplied; correlated/clustered defects
 /// remain visible in the observed final-good denominator or a separate scenario.
-fn validate_accounting_basis(
-    basis: &CostAccountingBasis,
-) -> Result<(), ManufacturingMetricError> {
+fn validate_accounting_basis(basis: &CostAccountingBasis) -> Result<(), ManufacturingMetricError> {
     let text_fields = [
         basis.batch_id.as_str(),
         basis.accounting_boundary_id.as_str(),
@@ -513,7 +510,10 @@ mod tests {
         .expect("complete accounting identity");
         assert_eq!(result.basis, basis);
         close(
-            result.metrics.cost_per_calibrated_good_unit.expect("good units"),
+            result
+                .metrics
+                .cost_per_calibrated_good_unit
+                .expect("good units"),
             25.0,
             1e-12,
         );
@@ -578,11 +578,19 @@ mod tests {
     #[test]
     fn cost_ledger_rejects_negative_nonfinite_and_overflowed_costs() {
         assert_eq!(
-            CostLedger { materials_consumables: -1.0, ..CostLedger::default() }.total_cost(),
+            CostLedger {
+                materials_consumables: -1.0,
+                ..CostLedger::default()
+            }
+            .total_cost(),
             Err(ManufacturingMetricError::NegativeCost)
         );
         assert_eq!(
-            CostLedger { process_labor: f64::NAN, ..CostLedger::default() }.total_cost(),
+            CostLedger {
+                process_labor: f64::NAN,
+                ..CostLedger::default()
+            }
+            .total_cost(),
             Err(ManufacturingMetricError::NonFiniteCost)
         );
         assert_eq!(
@@ -590,7 +598,8 @@ mod tests {
                 materials_consumables: f64::MAX,
                 process_labor: f64::MAX,
                 ..CostLedger::default()
-            }.total_cost(),
+            }
+            .total_cost(),
             Err(ManufacturingMetricError::NonFiniteResult)
         );
     }
@@ -603,12 +612,17 @@ mod tests {
             true_positive: 18,
             false_positive: 2,
             false_negative: 6,
-        }).expect("valid inspection counts");
+        })
+        .expect("valid inspection counts");
 
         close(metrics.coverage, 0.8, 1e-12);
         close(metrics.precision.expect("positive calls"), 0.9, 1e-12);
         close(metrics.recall.expect("represented defects"), 0.75, 1e-12);
-        close(metrics.false_negative_rate.expect("represented defects"), 0.25, 1e-12);
+        close(
+            metrics.false_negative_rate.expect("represented defects"),
+            0.25,
+            1e-12,
+        );
     }
 
     #[test]
@@ -619,7 +633,8 @@ mod tests {
             true_positive: 0,
             false_positive: 0,
             false_negative: 0,
-        }).expect("valid no-defect/no-call sample");
+        })
+        .expect("valid no-defect/no-call sample");
         assert_eq!(metrics.precision, None);
         assert_eq!(metrics.recall, None);
         assert_eq!(metrics.false_negative_rate, None);
@@ -681,8 +696,14 @@ mod tests {
     fn route_tradeoffs_remain_incomparable_without_a_weighted_score() {
         let lower_cost = route_candidate("lower-cost", 8.0, 30.0, 105.0, 0.92);
         let lower_energy = route_candidate("lower-energy", 10.0, 20.0, 95.0, 0.90);
-        assert_eq!(route_pareto_dominates(&lower_cost, &lower_energy), Ok(false));
-        assert_eq!(route_pareto_dominates(&lower_energy, &lower_cost), Ok(false));
+        assert_eq!(
+            route_pareto_dominates(&lower_cost, &lower_energy),
+            Ok(false)
+        );
+        assert_eq!(
+            route_pareto_dominates(&lower_energy, &lower_cost),
+            Ok(false)
+        );
     }
 
     #[test]
@@ -692,8 +713,7 @@ mod tests {
         // Neither dominates because their cost/energy/cycle/yield trade-offs differ.
         let near_perfect_transfer =
             route_candidate("near-perfect-transfer", 120.0, 40.0, 60.0, 0.9999);
-        let repair_capable =
-            route_candidate("repair-capable", 90.0, 50.0, 80.0, 0.9985);
+        let repair_capable = route_candidate("repair-capable", 90.0, 50.0, 80.0, 0.9985);
         assert_eq!(
             route_pareto_dominates(&near_perfect_transfer, &repair_capable),
             Ok(false)
