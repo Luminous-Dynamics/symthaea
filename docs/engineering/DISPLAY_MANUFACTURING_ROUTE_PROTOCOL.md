@@ -150,6 +150,20 @@ Inspection should generally be evaluated early enough to prevent adding value to
 
 Percent improvement gates only become qualification results after the exact baseline, device/process profile, sample size, uncertainties and raw evidence are available.
 
+## 7A. Executable manufacturing-economics reference
+
+The isolated Rust crate [`tools/display-manufacturing-economics`](../../tools/display-manufacturing-economics/src/lib.rs) supplies auditable arithmetic for:
+
+- summing an explicitly scoped batch-cost ledger (materials/consumables, labor, equipment/facility, energy/utilities, inspection/test, rework/retest, packaging/logistics and incremental scrap handling);
+- calculating first-pass yield and final calibrated-good yield from unique unit counts;
+- calculating cost per calibrated-good unit only when the final-good denominator is positive;
+- computing inspection coverage, precision, recall and false-negative rate from declared contingency counts;
+- rejecting negative/non-finite costs, impossible denominators, inspection counts beyond the observed population and integer overflow.
+
+The crate is dependency-free at runtime and has a focused pinned-Rust workflow. It intentionally does **not** estimate manufacturing cost from literature, combine stage yields under independence assumptions, establish reference-label truth, or decide that an optical/reliability profile passed. Zero final-good output returns a valid zero-yield summary with cost-per-good explicitly undefined; it must never be reported as zero cost per unit.
+
+All values are arithmetic over caller-supplied, same-batch counts/costs under a declared accounting boundary. The physical completeness of those inputs remains an evidence/measurement question.
+
 ## 8. Adversarial controls
 
 At minimum, verify rejection or downgrade when:
