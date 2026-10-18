@@ -42,3 +42,15 @@ The silence threshold is a declared diagnostic, not a universal audibility stand
 ## Recommended next gates
 
 First require 100% success on these 12 matrix cases, then repeat the matrix on supported operating systems/toolchains if cross-platform determinism is a product requirement. Keep musical acceptance separate: use blinded, matched-budget comparisons on held-out briefs, and report intent adherence, preference, diversity/coverage, novelty, and listenability independently. The prospective target of greater than 60% pairwise preference with a 95% confidence-interval lower bound above 50%, replicated on a held-out split, is a proposed research gate—not a result of this audio matrix.
+
+
+## External benchmark alignment
+
+The matrix above is the deterministic engineering gate, not the perceptual evaluation. The subsequent human study should align with current external practice without mistaking it for ground truth:
+
+- MIREX 2026 Music Audio Generation separates expert listening dimensions (melody, harmony, key consistency, style consistency, arrangement/production); acoustic features are diagnostic, not used to rank systems: https://www.music-ir.org/mirex/wiki/2026%3AMusic_Audio_Generation
+- MIREX 2026 Symbolic Music Generation uses blinded subjective ratings and lets systems generate eight continuations per test sample before selection: https://www.music-ir.org/mirex/wiki/2026%3ASymbolic_Music_Generation
+- MIREX 2026 CMI-RewardBench evaluates reward/evaluation models by agreement with human pairwise preferences, reporting a 249-example core set and vocal/instrumental slices of a 618-example extended set. Its published table lists 73.9% core accuracy for the top entry but also 59.0% for an always-choose-B baseline; this is a practical reason to randomize candidate position and report position/label baselines and slices rather than assume empirical chance is 50%: https://music-ir.org/mirex/wiki/2026%3AMusic_Evaluation_via_CMI-RewardBench_Results
+- A 2025 human-preference study evaluated 6,000 songs from 12 systems using 15,000 pairwise comparisons from 2,500 participants, illustrating why claims about automatic music metrics should be calibrated and evaluated on human judgments rather than self-reported by the metric: https://arxiv.org/abs/2506.19085
+
+For Symthaea/Muse, keep two results separate: (1) **generation quality**—what blinded listeners prefer among matched-budget candidates; and (2) **evaluator validity**—how well an automated judge predicts held-out human choices, including calibration, balanced accuracy, and genre/voice/instrumental slices. Neither result implies the other.
