@@ -9,7 +9,8 @@
     "related_sources",
     "challenge_context",
     "reuse_policy",
-    "artifacts"
+    "artifacts",
+    "source_objects"
   ],
   "properties": {
     "schema_version": {
@@ -204,7 +205,8 @@
           "terms_url",
           "terms_reviewed",
           "local_use_authorized",
-          "repository_bundling_authorized"
+          "repository_bundling_authorized",
+          "source_doi"
         ],
         "properties": {
           "relative_path": {
@@ -251,8 +253,82 @@
           },
           "repository_bundling_authorized": {
             "type": "boolean"
+          },
+          "source_doi": {
+            "type": "string",
+            "minLength": 1
           }
         }
+      }
+    },
+    "source_objects": {
+      "type": "array",
+      "items": {
+        "type": "object",
+        "additionalProperties": false,
+        "required": [
+          "id",
+          "source_doi",
+          "source_url",
+          "source_revision",
+          "accessed_on",
+          "terms_url",
+          "terms_reviewed",
+          "local_use_authorized"
+        ],
+        "properties": {
+          "id": {
+            "type": "string",
+            "minLength": 1
+          },
+          "source_doi": {
+            "type": "string",
+            "minLength": 1
+          },
+          "source_url": {
+            "type": "string",
+            "format": "uri"
+          },
+          "source_revision": {
+            "type": "string",
+            "minLength": 1
+          },
+          "accessed_on": {
+            "type": "string",
+            "pattern": "^\\d{4}-\\d{2}-\\d{2}$"
+          },
+          "terms_url": {
+            "type": "string",
+            "format": "uri"
+          },
+          "terms_reviewed": {
+            "type": "boolean"
+          },
+          "local_use_authorized": {
+            "type": "boolean"
+          }
+        },
+        "allOf": [
+          {
+            "if": {
+              "properties": {
+                "local_use_authorized": {
+                  "const": true
+                }
+              },
+              "required": [
+                "local_use_authorized"
+              ]
+            },
+            "then": {
+              "properties": {
+                "terms_reviewed": {
+                  "const": true
+                }
+              }
+            }
+          }
+        ]
       }
     }
   }
