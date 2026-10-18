@@ -169,4 +169,21 @@ This is a comparative protocol, not a design for a functioning engine. It provid
 
 ## First implementation task
 
-Implement the static energy-ledger contract and its negative controls first, using the same mission manifest as the two-wheeler A0 work. Run it queue-neutrally when a toolchain is available. Do not start with an exotic plasma hardware design, do not create a competing physics engine, and do not conflate Spark Engine's LCF hypothesis toolkit with a vehicle prime mover.
+The first static ledger verifier and synthetic fixture have now been added to the two-wheeler research branch:
+
+- Fixture: [`two_wheeler_powertrain_energy_ledger_v0_1.json`](data/two_wheeler_powertrain_energy_ledger_v0_1.json)
+- Rust source: [`xtask/src/powertrain_energy_ledger.rs`](../../xtask/src/powertrain_energy_ledger.rs)
+- CLI entry point: [`xtask/src/main.rs`](../../xtask/src/main.rs)
+
+On a Rust-capable checkout, the intended commands are:
+
+```sh
+cargo test -p xtask powertrain_energy_ledger
+cargo run -p xtask -- powertrain-energy-ledger \
+  --input docs/research/data/two_wheeler_powertrain_energy_ledger_v0_1.json \
+  --out reports/two_wheeler_powertrain_ledger_report.json
+```
+
+The fixture has one positive control and eight negative controls. Its numeric streams are deliberately synthetic and exist only to exercise accounting rules. The Rust source/command are present but have **not** been compiled or executed in this environment; no verifier pass is claimed. This module is not a vehicle model or net-energy oracle.
+
+Do not start with exotic plasma hardware, create a competing physics engine, or conflate Spark Engine's LCF hypothesis toolkit with a vehicle prime mover.
