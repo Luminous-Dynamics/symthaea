@@ -100,7 +100,8 @@
             "rights_status",
             "permission_evidence_present",
             "attribution_required",
-            "attribution_present"
+            "attribution_present",
+            "permission_evidence_ref"
           ],
           "properties": {
             "source_id": {
@@ -125,6 +126,12 @@
             },
             "attribution_present": {
               "type": "boolean"
+            },
+            "permission_evidence_ref": {
+              "type": [
+                "string",
+                "null"
+              ]
             }
           },
           "additionalProperties": false
