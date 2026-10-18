@@ -1,0 +1,10 @@
+[package]
+name = "iccb-evaluator"
+version = "0.1.0"
+edition = "2024"
+license = "AGPL-3.0-or-later"
+description = "Deterministic synthetic reference kernel for intergenerational capability-compounding decisions"
+
+# Keep the first protocol prototype isolated from the large Symthaea workspace.
+# Promote it into a workspace crate only after its contracts stabilize.
+[workspace]
