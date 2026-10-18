@@ -3,7 +3,7 @@
   "schema_version": "0.1.0",
   "review_date": "2026-10-18",
   "status": "rights_triage_with_one_cc_by_dataset_vendored_and_reconstruction_checked",
-  "claim_ceiling": "One passenger-car tire-health dataset is vendored under its upstream CC BY 4.0 license and its ordered shard concatenation was checked against the upstream GitHub blob content. Other records remain rights requests, external references or proxy-only sources. No motorcycle component maps are yet acquired; no tire performance is physically validated.",
+  "claim_ceiling": "One passenger-car tire-health dataset is vendored under its upstream CC BY 4.0 license and its ordered shard concatenation was checked against the upstream GitHub blob content. Other records remain rights requests, external references or proxy-only sources. No motorcycle component maps are yet acquired; no tire performance is physically validated. NLR Fleet DNA/FleetREDI is a candidate for vehicle-duty-cycle access, not an acquired dataset; confirm rights before importing raw vehicle traces.",
   "sources": [
     {
       "source_id": "ROAM_AIR_POWERTRAIN_2026_01",
@@ -205,6 +205,29 @@
         "not powertrain maps; reported non-commercial/no-derivatives license is unsuitable for unrestricted commercial engineering reuse"
       ],
       "next_action": "Do not incorporate into derivative/product datasets unless rights holder grants suitable permission."
+    },
+    {
+      "source_id": "NLR_FLEETDNA_DUTY_CYCLES",
+      "title": "Fleet DNA / FleetREDI commercial fleet operating data",
+      "uri": "https://www.nlr.gov/transportation/fleettest-fleet-dna.html",
+      "vehicle_scope": "Commercial duty-cycle data for delivery vans, delivery trucks and bus vocations; primarily US fleet usage",
+      "data_available": "Public portal documents 974 days of operation from 94 delivery vans and 553 days from 36 delivery trucks; raw/complete trace package access and redistribution terms require confirmation",
+      "rights_status": "public summaries confirmed; raw dataset license/access terms must be confirmed directly with NLR before mirroring or redistributing raw observations",
+      "evidence_class": "FieldObserved",
+      "readiness": "P0_access_and_license_request",
+      "useful_for": [
+        "delivery mission and duty-cycle profiles",
+        "vehicle-class comparison",
+        "range/payload/speed/stop-duration envelope design",
+        "commercial vehicle scenario generation after licensed trace access"
+      ],
+      "limitations": [
+        "not motorcycle telemetry",
+        "not motor/inverter/battery component efficiency maps",
+        "portal summaries do not prove full raw trace availability or rights to re-host",
+        "US fleets may not represent South African roads/loads/operations"
+      ],
+      "next_action": "Request the downloadable raw/composite traces, dictionaries/units, metadata, license and commercial/public redistribution terms from fleetdna@nlr.gov. If only summary data are available, use only within portal/source terms and label as summary-derived."
     }
   ]
 }
