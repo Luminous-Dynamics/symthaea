@@ -19,6 +19,16 @@ struct Options {
     probe_path: PathBuf,
     inventory_path: PathBuf,
     renderer_binary_path: PathBuf,
+    vcsl_root: PathBuf,
+    vsco2_root: PathBuf,
+}
+
+#[derive(Debug)]
+struct RootObservation {
+    canonical_path: Option<PathBuf>,
+    content_manifest_sha256: Option<String>,
+    wav_file_count: Option<usize>,
+    error: Option<String>,
 }
 
 #[derive(Debug, Serialize)]
@@ -35,8 +45,11 @@ struct VerificationReport {
     renderer_binary_file_size_bytes: u64,
     renderer_binary_file_name_matches_report: bool,
     renderer_binary_identity_verified: bool,
+    vcsl_root_content_manifest_sha256: Option<String>,
+    vsco2_root_content_manifest_sha256: Option<String>,
     root_content_manifests_verified: usize,
     selected_samples_total: usize,
+    selected_samples_with_matching_actual_file_digest: usize,
     selected_samples_with_valid_file_digest: usize,
     selected_samples_with_valid_bank_digest: usize,
     selected_samples_with_matching_inventory_bank_digest: usize,
@@ -81,6 +94,8 @@ fn run() -> Result<ExitCode, String> {
     let (inventory, capability_report_sha256) =
         read_json_with_sha256(&options.inventory_path)
             .map_err(|error| format!("cannot read capability report: {error}"))?;
+    let vcsl_root_observation = observe_asset_root(&options.vcsl_root);
+    let vsco2_root_observation = observe_asset_root(&options.vsco2_root);
 
     let report = verify_reports(
         &probe,
@@ -90,6 +105,8 @@ fn run() -> Result<ExitCode, String> {
         renderer_binary_file_sha256,
         renderer_binary_file_size_bytes,
         &renderer_binary_file_name,
+        &vcsl_root_observation,
+        &vsco2_root_observation,
     );
     let stdout = io::stdout();
     let mut lock = stdout.lock();
@@ -110,6 +127,8 @@ fn parse_args() -> Result<Options, String> {
     let mut probe_path = None;
     let mut inventory_path = None;
     let mut renderer_binary_path = None;
+    let mut vcsl_root = None;
+    let mut vsco2_root = None;
     let mut args = std::env::args().skip(1);
 
     while let Some(arg) = args.next() {
@@ -133,6 +152,16 @@ fn parse_args() -> Result<Options, String> {
                     args.next().ok_or_else(|| "--renderer-binary requires a file path".to_string())?,
                 ));
             }
+            "--vcsl-root" => {
+                vcsl_root = Some(PathBuf::from(
+                    args.next().ok_or_else(|| "--vcsl-root requires an asset-root path".to_string())?,
+                ));
+            }
+            "--vsco2-root" => {
+                vsco2_root = Some(PathBuf::from(
+                    args.next().ok_or_else(|| "--vsco2-root requires an asset-root path".to_string())?,
+                ));
+            }
             _ => return Err(format!("unknown argument: {arg} (use --help)")),
         }
     }
@@ -142,17 +171,19 @@ fn parse_args() -> Result<Options, String> {
         inventory_path: inventory_path.ok_or_else(|| "--inventory is required".to_string())?,
         renderer_binary_path: renderer_binary_path
             .ok_or_else(|| "--renderer-binary is required".to_string())?,
+        vcsl_root: vcsl_root.ok_or_else(|| "--vcsl-root is required".to_string())?,
+        vsco2_root: vsco2_root.ok_or_else(|| "--vsco2-root is required".to_string())?,
     })
 }
 
 fn print_help() {
     println!(
         "MEL-PROV-VERIFY-001: fail-closed provenance consistency check\n\
-         Usage: cargo run -p symthaea-muse --bin muse_instrument_provenance_verify -- --probe REPORT.json --inventory MATRIX.json --renderer-binary /path/to/muse_instrument_probe\n\
-         Required evidence: same Git source revision, supplied executable bytes matching the probe claim, complete root WAV manifests,\n\
+         Usage: cargo run -p symthaea-muse --bin muse_instrument_provenance_verify -- --probe REPORT.json --inventory MATRIX.json --renderer-binary /path/to/muse_instrument_probe --vcsl-root /assets/VCSL --vsco2-root /assets/VSCO2-CE\n\
+         Required evidence: supplied executable bytes, independently rehashed root WAV manifests and selected WAV files, matching source revision,\n\
          indexed-bank manifests, and selected-sample bank digests matching the inventory mapping.\n\
          JSON findings are written to stdout. Exit 0 means consistent; exit 1 means incomplete or inconsistent;\n\
-         exit 2 means invocation or input files could not be processed. This is not instrument qualification."
+         exit 2 means invocation or input reports could not be processed. This is not instrument qualification."
     );
 }
 
@@ -164,6 +195,8 @@ fn verify_reports(
     renderer_binary_file_sha256: String,
     renderer_binary_file_size_bytes: u64,
     renderer_binary_file_name: &str,
+    vcsl_root_observation: &RootObservation,
+    vsco2_root_observation: &RootObservation,
 ) -> VerificationReport {
     let mut findings = Vec::new();
     let mut root_content_manifests_verified = 0_usize;
