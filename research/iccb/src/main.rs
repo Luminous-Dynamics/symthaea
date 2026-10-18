@@ -1,6 +1,4 @@
-use iccb_evaluator::{
-    CandidateScenario, DecisionOption, EvidenceClaim, EvidenceState, Mandate,
-};
+use iccb_evaluator::{CandidateScenario, DecisionOption, EvidenceClaim, EvidenceState, Mandate};
 use std::collections::BTreeSet;
 
 fn main() {
