@@ -102,6 +102,27 @@ Targets are provisional and need preregistration before final evaluation.
 
 No aggregate score should hide an unauthorized tranche release or an accounting error. Report the costs of waiting as carefully as the benefits of preserving the option to stop.
 
+## Value-of-information budgeting: decide which uncertainty to buy down
+
+Capital allocation should include a fourth decision class: **fund evidence acquisition**. A geotechnical survey, independent condition inspection, demand experiment, source confirmation, or small pilot can change the subsequent decision. The relevant question is not “would more data be useful?” but “what is the expected improvement in the decision after observing the result, and is that improvement worth the full cost and delay?”
+
+For a decision with uncertain state \(s\), action \(a\), and payoff \(U(a,s)\):
+
+- Baseline expected value is the value of the best action under the current state probabilities.
+- Expected value of sample information (EVSI) is the expected value of selecting an action after observing the proposed noisy signal, minus the baseline value.
+- Net EVSI subtracts the evidence-acquisition cost plus any modeled delay, financing or opportunity cost.
+- Expected value of perfect information (EVPI) is the ceiling on gross value from perfectly resolving the modeled state uncertainty. A specified signal should not exceed this ceiling under the same action/payoff model.
+
+This is established decision-analysis methodology, not a claimed invention. See [Strong et al. (2015)](https://journals.sagepub.com/doi/10.1177/0272989X15575286), [Jackson et al. (2019)](https://www.tandfonline.com/doi/full/10.1080/01621459.2018.1562932), and the infrastructure engineering review [Value of information analysis in civil and infrastructure engineering](https://link.springer.com/article/10.1186/s43065-021-00027-0).
+
+The Rust prototype in `value_of_information.rs` accepts explicit priors, conditional signal likelihoods, action payoffs and acquisition cost. It is a deterministic finite-state calculation, not a probability-calibration system. Its parameters are assumptions unless supported by qualified external evidence and validated against outcomes. It intentionally does not make a “buy the survey” recommendation merely because the signal is informative.
+
+**Benchmark cases:** (1) the signal changes the selected action and its net EVSI is positive; (2) the signal is uninformative and EVSI is zero; (3) the signal changes beliefs but not the preferred action and EVSI is zero; (4) an informative survey costs more than its EVSI; (5) two signals overlap and joint value is less than the sum of separate values; (6) a hard legal/safety constraint requires evidence independent of monetary EVSI; (7) source uncertainty makes signal likelihoods too weakly identified to support a point estimate; and (8) the same scenario run with permuted state/signal/action order yields the same canonical result.
+
+**Proposed acceptance gates:** exact hand-oracle agreement on small fixtures; probability and likelihood masses valid and complete; gross EVSI nonnegative and no greater than EVPI under the declared model; zero gross value where no signal outcome changes the action's expected-value ranking; and net EVSI negative when declared information cost exceeds gross value. Do not claim an empirically calibrated EVSI until priors, likelihoods, payoffs, costs and delay are qualified and sensitivity ranges are reported.
+
+Cross-project boundary: Sol-Atlas already tracks value-of-information for site investigation in [issue #131](https://github.com/Luminous-Dynamics/sol-atlas-leptos/issues/131). ICCB should consume its qualified assessment rather than duplicate the spatial investigation engine. Further finite-state method validation is tracked in [ICCB-003](https://github.com/Luminous-Dynamics/symthaea/issues/8020); an evidence-bounded capital-assessment export contract is proposed in [Sol-Atlas #162](https://github.com/Luminous-Dynamics/sol-atlas-leptos/issues/162).
+
 ## Cross-project architecture boundary
 
 Sol-Atlas already has adjacent work for the physical-resource side of this problem: [PR #116](https://github.com/Luminous-Dynamics/sol-atlas-leptos/pull/116) develops evidence-aware spatial-economic resilience analysis, while [issue #152](https://github.com/Luminous-Dynamics/sol-atlas-leptos/issues/152) covers shared-resource constrained allocation, [#153](https://github.com/Luminous-Dynamics/sol-atlas-leptos/issues/153) adds inventory conservation across time, [#155](https://github.com/Luminous-Dynamics/sol-atlas-leptos/issues/155) proposes independent sparse-allocation oracle validation, and [#131](https://github.com/Luminous-Dynamics/sol-atlas-leptos/issues/131) covers Pareto, sensitivity and value-of-information analysis.
