@@ -29,3 +29,5 @@ nalgebra = "0.32"
 
 [features]
 default = []
+[dev-dependencies]
+serde_json = { workspace = true }
