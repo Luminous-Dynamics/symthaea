@@ -95,6 +95,12 @@ pub fn validate_regional_pack_v1(pack: &Value) -> Result<(), Vec<String>> {
         _ => errors.push("region.language_tags must be a non-empty array".to_owned()),
     }
 
+    if let Some(locale) = non_empty_string(region, "locale_tag") {
+        if !language_tags.contains(locale) {
+            errors.push("region.locale_tag must also appear in region.language_tags".to_owned());
+        }
+    }
+
     let conventions = pack.get("conventions").unwrap_or(&null);
     if !non_empty_string(conventions, "currency").is_some_and(|s| is_upper_ascii_code(s, 3)) {
         errors.push("conventions.currency must be a three-letter uppercase code".to_owned());
@@ -226,6 +232,17 @@ pub fn validate_regional_pack_v1(pack: &Value) -> Result<(), Vec<String>> {
             }
         }
     }
+    if pack.get("profile_status").and_then(Value::as_str) == Some("qualified")
+        && verticals.iter().any(|vertical| {
+            matches!(
+                non_empty_string(vertical, "status"),
+                Some("not_configured" | "license_blocked")
+            )
+        })
+    {
+        errors.push("a qualified regional pack cannot include not_configured or license_blocked verticals".to_owned());
+    }
+
     for required in REQUIRED_VERTICALS {
         if !vertical_ids.contains(*required) {
             errors.push(format!("regional pack must explicitly declare vertical {required:?}"));
