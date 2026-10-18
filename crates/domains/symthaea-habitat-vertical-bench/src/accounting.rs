@@ -176,6 +176,158 @@ pub fn calculate_cost_scenario(
     })
 }
 
+/// Exact result for one synthetic material stream and accounting boundary.
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub struct MaterialBalanceReport {
+    pub case_id: String,
+    pub stream_id: String,
+    pub mass_unit: String,
+    pub input_mass_mg: u64,
+    pub accounted_mass_mg: u64,
+    pub unaccounted_mass_mg: u64,
+    pub tolerance_mg: u64,
+    /// Floor of accounted / input × 10,000. 10,000 means 100% closure.
+    pub closure_basis_points_floor: u64,
+    /// Accepted product mass / input mass, in basis points.
+    pub accepted_yield_basis_points_floor: u64,
+}
+
+/// Reconcile one material stream exactly; refuse missing mass, double-counting,
+/// overflow, inconsistent reported residuals, or non-synthetic inputs.
+///
+/// Mass unit is fixed to milligrams in schema v0.1. A future unit/boundary
+/// change requires a schema revision; unrelated materials must not be combined
+/// across incompatible process boundaries merely because their numbers add.
+pub fn calculate_material_balance(
+    root: &Value,
+    case_id: &str,
+) -> Result<MaterialBalanceReport, String> {
+    if case_id.trim().is_empty() {
+        return Err("case_id must be a non-empty string".to_owned());
+    }
+    let cases = root
+        .get("synthetic_material_balance_cases")
+        .and_then(Value::as_array)
+        .ok_or_else(|| "synthetic_material_balance_cases must be an array".to_owned())?;
+    let matches: Vec<_> = cases
+        .iter()
+        .filter(|case| case.get("case_id").and_then(Value::as_str) == Some(case_id))
+        .collect();
+    let case = match matches.as_slice() {
+        [one] => *one,
+        [] => return Err(format!("material-balance case {case_id:?} not found")),
+        _ => return Err(format!("material-balance case {case_id:?} is duplicated")),
+    };
+    if case.get("status").and_then(Value::as_str) != Some("synthetic_known_answer_only") {
+        return Err(format!(
+            "material-balance case {case_id:?} must be marked synthetic_known_answer_only"
+        ));
+    }
+
+    let stream_id = case
+        .get("stream_id")
+        .and_then(Value::as_str)
+        .filter(|value| !value.trim().is_empty())
+        .ok_or_else(|| format!("material-balance case {case_id:?} has no stream_id"))?
+        .to_owned();
+    let mass_unit = case
+        .get("mass_unit")
+        .and_then(Value::as_str)
+        .filter(|value| *value == "mg")
+        .ok_or_else(|| {
+            format!("material-balance case {case_id:?} must use explicit schema-v0.1 unit \"mg\"")
+        })?
+        .to_owned();
+    if case
+        .get("accounting_boundary")
+        .and_then(Value::as_str)
+        .is_none_or(str::is_empty)
+    {
+        return Err(format!(
+            "material-balance case {case_id:?} has no accounting_boundary"
+        ));
+    }
+
+    let read_mass = |field: &str| -> Result<u64, String> {
+        case.get(field)
+            .and_then(Value::as_u64)
+            .ok_or_else(|| format!("material-balance case {case_id:?} requires non-negative integer {field}"))
+    };
+    let input_mass_mg = read_mass("input_mass_mg")?;
+    if input_mass_mg == 0 {
+        return Err(format!(
+            "material-balance case {case_id:?} input mass must be positive"
+        ));
+    }
+    let accepted_output_mass_mg = read_mass("accepted_output_mass_mg")?;
+    let scrap_mass_mg = read_mass("scrap_mass_mg")?;
+    let rework_wip_mass_mg = read_mass("rework_wip_mass_mg")?;
+    let process_residue_mass_mg = read_mass("process_residue_mass_mg")?;
+    let reported_unaccounted_mass_mg = read_mass("reported_unaccounted_mass_mg")?;
+    let tolerance_mg = read_mass("tolerance_mg")?;
+
+    let accounted_mass_mg = [
+        accepted_output_mass_mg,
+        scrap_mass_mg,
+        rework_wip_mass_mg,
+        process_residue_mass_mg,
+    ]
+    .into_iter()
+    .try_fold(0_u64, |sum, part| sum.checked_add(part))
+    .ok_or_else(|| format!("material-balance case {case_id:?} accounted mass overflows u64"))?;
+
+    if accounted_mass_mg > input_mass_mg {
+        return Err(format!(
+            "material-balance case {case_id:?} accounts for {accounted_mass_mg} mg from only {input_mass_mg} mg input"
+        ));
+    }
+    let computed_unaccounted = input_mass_mg - accounted_mass_mg;
+    if reported_unaccounted_mass_mg != computed_unaccounted {
+        return Err(format!(
+            "material-balance case {case_id:?} residual mismatch: reported {reported_unaccounted_mass_mg} mg, computed {computed_unaccounted} mg"
+        ));
+    }
+    if computed_unaccounted > tolerance_mg {
+        return Err(format!(
+            "material-balance case {case_id:?} unaccounted mass {computed_unaccounted} mg exceeds tolerance {tolerance_mg} mg"
+        ));
+    }
+
+    let expected_closure = case
+        .get("expected_closure_basis_points_floor")
+        .and_then(Value::as_u64)
+        .filter(|value| *value <= 10_000)
+        .ok_or_else(|| {
+            format!("material-balance case {case_id:?} expected_closure_basis_points_floor must be 0..=10000")
+        })?;
+    let accounted_scaled = (accounted_mass_mg as u128)
+        .checked_mul(10_000)
+        .ok_or_else(|| format!("material-balance case {case_id:?} closure ratio overflow"))?;
+    let closure_basis_points_floor = (accounted_scaled / input_mass_mg as u128) as u64;
+    if closure_basis_points_floor != expected_closure {
+        return Err(format!(
+            "material-balance case {case_id:?} closure known-answer mismatch: expected {expected_closure}, computed {closure_basis_points_floor}"
+        ));
+    }
+
+    let accepted_scaled = (accepted_output_mass_mg as u128)
+        .checked_mul(10_000)
+        .ok_or_else(|| format!("material-balance case {case_id:?} accepted-yield ratio overflow"))?;
+    let accepted_yield_basis_points_floor = (accepted_scaled / input_mass_mg as u128) as u64;
+
+    Ok(MaterialBalanceReport {
+        case_id: case_id.to_owned(),
+        stream_id,
+        mass_unit,
+        input_mass_mg,
+        accounted_mass_mg,
+        unaccounted_mass_mg: computed_unaccounted,
+        tolerance_mg,
+        closure_basis_points_floor,
+        accepted_yield_basis_points_floor,
+    })
+}
+
 /// Compare candidate delivered cost per accepted unit against a reference.
 ///
 /// Uses integer cross-multiplication so the pass/fail decision does not depend
