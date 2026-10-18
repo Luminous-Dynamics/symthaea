@@ -4,6 +4,8 @@
 //!
 //! This measures signal health and selected renderer/source evidence for
 //! either a common smoke grid or a user-selected inclusive MIDI semitone sweep.
+//! An optional synthetic-tone calibration mode checks the pitch estimator against
+//! known sine-wave frequencies; it does not qualify any instrument.
 //! Exploratory pitch/velocity metrics do not prove instrument range or
 //! perceptual fidelity of the timbre/source.
 
@@ -81,6 +83,7 @@ struct Options {
     tail_ms: u64,
     repeats: usize,
     midi_range: Option<(u8, u8)>,
+    calibrate_pitch_estimator: bool,
 }
 
 #[derive(Debug, Serialize)]
@@ -164,6 +167,41 @@ struct PitchDiagnostic {
     periodicity_confidence: Option<f64>,
 }
 
+#[derive(Debug, Serialize)]
+struct PitchCalibrationReport {
+    schema_version: &'static str,
+    benchmark: &'static str,
+    code_revision: &'static str,
+    sample_rate_hz: u32,
+    note_duration_ms: u64,
+    midi_range: (u8, u8),
+    stimulus: &'static str,
+    estimator: &'static str,
+    cases_total: usize,
+    cases_with_numeric_estimate: usize,
+    cases_with_periodic_estimate: usize,
+    cases_without_numeric_estimate: usize,
+    absolute_error_cents_median: Option<f64>,
+    absolute_error_cents_p95: Option<f64>,
+    absolute_error_cents_max: Option<f64>,
+    cases_over_2_cents: usize,
+    cases_over_5_cents: usize,
+    cases_over_15_cents: usize,
+    evidence_boundary: &'static str,
+    cases: Vec<PitchCalibrationCase>,
+}
+
+#[derive(Debug, Serialize)]
+struct PitchCalibrationCase {
+    midi_note: u8,
+    target_frequency_hz: f32,
+    estimated_frequency_hz: Option<f64>,
+    signed_error_cents: Option<f64>,
+    absolute_error_cents: Option<f64>,
+    periodicity_confidence: Option<f64>,
+    status: &'static str,
+}
+
 fn main() -> ExitCode {
     match run() {
         Ok(()) => ExitCode::SUCCESS,
@@ -176,6 +214,9 @@ fn main() -> ExitCode {
 
 fn run() -> Result<(), String> {
     let options = parse_args()?;
+    if options.calibrate_pitch_estimator {
+        return run_pitch_estimator_calibration(&options);
+    }
     let pitch_cells = build_pitch_cells(options.midi_range);
     let cases_expected =
         options.instruments.len() * pitch_cells.len() * VELOCITY_GRID.len();
@@ -422,6 +463,118 @@ fn run() -> Result<(), String> {
     Ok(())
 }
 
+fn run_pitch_estimator_calibration(options: &Options) -> Result<(), String> {
+    // The current estimator has a quadratic difference-function loop. Keep this
+    // self-calibration deliberately bounded and repeatable instead of accepting
+    // large settings that can accidentally turn a diagnostic into a long run.
+    if options.sample_rate > SAMPLE_RATE {
+        return Err(format!(
+            "pitch-estimator calibration is currently capped at {SAMPLE_RATE} Hz; omit --sample-rate or lower it"
+        ));
+    }
+    if options.note_ms > NOTE_MS {
+        return Err(format!(
+            "pitch-estimator calibration is currently capped at {NOTE_MS} ms; omit --note-ms or lower it"
+        ));
+    }
+
+    let (minimum_midi, maximum_midi) = options.midi_range.unwrap_or((36, 96));
+    let pitch_count = usize::from(maximum_midi) - usize::from(minimum_midi) + 1;
+    if pitch_count > 96 {
+        return Err(format!(
+            "pitch-estimator calibration accepts at most 96 semitones per run; requested {pitch_count}"
+        ));
+    }
+
+    let frames = ((u128::from(options.sample_rate) * u128::from(options.note_ms)) / 1_000)
+        .try_into()
+        .map_err(|_| "calibration frame count does not fit usize".to_string())?;
+    if frames < 64 {
+        return Err("pitch-estimator calibration window is too short".into());
+    }
+
+    let mut cases = Vec::with_capacity(pitch_count);
+    for midi_note in minimum_midi..=maximum_midi {
+        let target_frequency_hz = midi_to_hz(midi_note);
+        let samples = synthetic_stereo_sine(target_frequency_hz, options.sample_rate, frames);
+        let diagnostic = estimate_pitch_yin(
+            &samples,
+            options.sample_rate,
+            2,
+            options.note_ms,
+            target_frequency_hz,
+        );
+        cases.push(PitchCalibrationCase {
+            midi_note,
+            target_frequency_hz,
+            estimated_frequency_hz: diagnostic.estimated_pitch_hz,
+            signed_error_cents: diagnostic.error_cents,
+            absolute_error_cents: diagnostic.error_cents.map(|error| error.abs()),
+            periodicity_confidence: diagnostic.periodicity_confidence,
+            status: diagnostic.status,
+        });
+    }
+
+    let mut absolute_errors = cases
+        .iter()
+        .filter_map(|case| case.absolute_error_cents)
+        .collect::<Vec<_>>();
+    absolute_errors.sort_by(f64::total_cmp);
+    let cases_with_numeric_estimate = absolute_errors.len();
+    let cases_with_periodic_estimate = cases
+        .iter()
+        .filter(|case| case.status == "periodic_estimate_available")
+        .count();
+    let report = PitchCalibrationReport {
+        schema_version: "melothaea.pitch-estimator-calibration.v1",
+        benchmark: "MEL-PITCH-CAL-001",
+        code_revision: option_env!("MEL_INSTRUMENT_PROBE_REV").unwrap_or("not_embedded"),
+        sample_rate_hz: options.sample_rate,
+        note_duration_ms: options.note_ms,
+        midi_range: (minimum_midi, maximum_midi),
+        stimulus: "stereo, 0.5-amplitude, phase-zero synthetic sine wave; one frequency per MIDI note; no noise, vibrato, harmonics, instrument renderer, or sample bank",
+        estimator: "current target-relative YIN-style estimator used by MEL-INST-PROBE-001",
+        cases_total: cases.len(),
+        cases_with_numeric_estimate,
+        cases_with_periodic_estimate,
+        cases_without_numeric_estimate: cases.len() - cases_with_numeric_estimate,
+        absolute_error_cents_median: percentile(&absolute_errors, 0.50),
+        absolute_error_cents_p95: percentile(&absolute_errors, 0.95),
+        absolute_error_cents_max: absolute_errors.last().copied(),
+        cases_over_2_cents: absolute_errors.iter().filter(|error| **error > 2.0).count(),
+        cases_over_5_cents: absolute_errors.iter().filter(|error| **error > 5.0).count(),
+        cases_over_15_cents: absolute_errors.iter().filter(|error| **error > 15.0).count(),
+        evidence_boundary: "known-frequency synthetic-tone calibration only; does not establish the pitch accuracy, playable range, timbral fidelity, or perceptual quality of any procedural or sample-backed instrument",
+        cases,
+    };
+
+    let stdout = io::stdout();
+    let mut lock = stdout.lock();
+    serde_json::to_writer_pretty(&mut lock, &report)
+        .map_err(|error| format!("cannot serialize calibration JSON: {error}"))?;
+    writeln!(lock).map_err(|error| format!("cannot flush calibration report: {error}"))?;
+    Ok(())
+}
+
+fn synthetic_stereo_sine(frequency_hz: f32, sample_rate: u32, frames: usize) -> Vec<f32> {
+    let angular_step = std::f64::consts::TAU * f64::from(frequency_hz) / f64::from(sample_rate);
+    let mut samples = Vec::with_capacity(frames.saturating_mul(2));
+    for frame in 0..frames {
+        let sample = (angular_step * frame as f64).sin() as f32 * 0.5;
+        samples.push(sample);
+        samples.push(sample);
+    }
+    samples
+}
+
+fn percentile(sorted_values: &[f64], percentile: f64) -> Option<f64> {
+    if sorted_values.is_empty() {
+        return None;
+    }
+    let index = (((sorted_values.len() - 1) as f64) * percentile.clamp(0.0, 1.0)).ceil() as usize;
+    sorted_values.get(index).copied()
+}
+
 struct SignalMetrics {
     frames: usize,
     scalar_sample_count: usize,
@@ -577,7 +730,7 @@ fn estimate_pitch_yin(
     let target = f64::from(target_hz);
     let min_frequency = (target * 0.5).max(20.0);
     let max_frequency = (target * 2.0).min(f64::from(sample_rate) * 0.24);
-    if max_frequency <= min_frequency {
+    if max_frequency <= min_frequency || target < min_frequency || target > max_frequency {
         return unavailable("target_outside_pitch_analysis_band");
     }
     let min_lag = (f64::from(sample_rate) / max_frequency).floor().max(2.0) as usize;
@@ -713,6 +866,7 @@ fn parse_args() -> Result<Options, String> {
         tail_ms: TAIL_MS,
         repeats: REPEATS,
         midi_range: None,
+        calibrate_pitch_estimator: false,
     };
     let mut args = std::env::args().skip(1);
     while let Some(arg) = args.next() {
@@ -766,6 +920,9 @@ fn parse_args() -> Result<Options, String> {
                     .next()
                     .ok_or_else(|| "--midi-range requires MIN:MAX".to_string())?;
                 options.midi_range = Some(parse_midi_range(&value)?);
+            }
+            "--calibrate-pitch-estimator" => {
+                options.calibrate_pitch_estimator = true;
             }
             "--repeats" => {
                 options.repeats = args
@@ -833,10 +990,12 @@ fn print_help() {
            --tail-ms MS           Rendered tail, 0..1000 (default: 100)\n\
            --repeats N            Exact rerenders, 1..5 (default: 2)\n\
            --midi-range MIN:MAX   Inclusive semitone sweep, MIDI 0..127 (default: A3/A4/A5)\n\
+           --calibrate-pitch-estimator  Calibrate pitch analysis on synthetic tones only\n\
            -h, --help             Show this help\n\
          JSON is written to stdout. Redirect it to a file if a local report is desired.\n\
          Per-note render/source receipts are included; they do not prove perceptual fidelity.\n\
-         The default pitch grid is a smoke test; a user-selected sweep tests rendered cells, not certified playability."
+         The default pitch grid is a smoke test; a user-selected sweep tests rendered cells, not certified playability.\n\
+         Calibration defaults to MIDI 36:96 and is capped at 22050 Hz and 100 ms; it does not qualify instruments."
     );
 }
 
@@ -937,6 +1096,25 @@ mod tests {
     }
 
     #[test]
+    fn yin_rejects_target_above_sample_rate_capped_search_band() {
+        let sample_rate = 8_000_u32;
+        let frames = sample_rate as usize / 10;
+        let samples: Vec<f32> = (0..frames)
+            .flat_map(|index| {
+                let sample = (2.0 * std::f64::consts::PI * 2_000.0 * index as f64
+                    / sample_rate as f64)
+                    .sin() as f32
+                    * 0.5;
+                [sample, sample]
+            })
+            .collect();
+        let result = estimate_pitch_yin(&samples, sample_rate, 2, 100, 2_000.0);
+        assert_eq!(result.status, "target_outside_pitch_analysis_band");
+        assert!(result.estimated_pitch_hz.is_none());
+        assert!(result.error_cents.is_none());
+    }
+
+    #[test]
     fn yin_never_claims_pitch_from_silence() {
         let result = estimate_pitch_yin(&vec![0.0; 4_410], 22_050, 2, 100, 440.0);
         assert_eq!(result.status, "near_silent_window");
@@ -997,6 +1175,41 @@ mod tests {
         ]);
         assert!(!non_monotonic[0].rms_is_monotonic_non_decreasing);
         assert_eq!(non_monotonic[0].adjacent_level_steps_db.len(), 2);
+    }
+
+    #[test]
+    fn synthetic_calibration_signal_is_stereo_finite_and_repeatable() {
+        let first = synthetic_stereo_sine(440.0, 22_050, 2_205);
+        let second = synthetic_stereo_sine(440.0, 22_050, 2_205);
+        assert_eq!(first.len(), 4_410);
+        assert_eq!(first, second);
+        assert!(first.iter().all(|sample| sample.is_finite()));
+        assert!(first.iter().any(|sample| sample.abs() > 0.49));
+        assert!(first.iter().all(|sample| sample.abs() <= 0.5));
+    }
+
+    #[test]
+    fn pitch_estimator_calibration_recovers_reference_frequency_across_register() {
+        for midi_note in [48_u8, 60, 69, 81, 96] {
+            let target_hz = midi_to_hz(midi_note);
+            let samples = synthetic_stereo_sine(target_hz, 22_050, 2_205);
+            let diagnostic = estimate_pitch_yin(&samples, 22_050, 2, 100, target_hz);
+            assert_eq!(
+                diagnostic.status,
+                "periodic_estimate_available",
+                "MIDI {midi_note}: {diagnostic:?}"
+            );
+            let error = diagnostic.error_cents.expect("reference pitch should be estimated");
+            assert!(error.abs() < 15.0, "MIDI {midi_note}: {diagnostic:?}");
+        }
+    }
+
+    #[test]
+    fn percentile_handles_empty_and_odd_or_even_samples() {
+        assert_eq!(percentile(&[], 0.5), None);
+        assert_eq!(percentile(&[1.0, 2.0, 3.0], 0.5), Some(2.0));
+        assert_eq!(percentile(&[1.0, 2.0, 3.0, 4.0], 0.5), Some(3.0));
+        assert_eq!(percentile(&[1.0, 2.0, 3.0, 4.0], 0.95), Some(4.0));
     }
 
     #[test]

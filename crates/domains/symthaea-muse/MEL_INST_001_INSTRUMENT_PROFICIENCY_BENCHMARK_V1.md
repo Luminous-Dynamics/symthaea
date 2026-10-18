@@ -160,6 +160,13 @@ cargo run -p symthaea-muse --bin muse_instrument_probe -- --instrument all > mel
 # One instrument over 25 semitones, with per-cell source and renderer receipts.
 cargo run -p symthaea-muse --bin muse_instrument_probe -- --instrument recorder --midi-range 60:84 > recorder-semitone-sweep.json
 
+# Calibrate the pitch estimator against known-frequency synthetic tones.
+# Default grid: MIDI 36:96, 22050 Hz, 100 ms; no instrument rendering occurs.
+cargo run -p symthaea-muse --bin muse_instrument_probe -- --calibrate-pitch-estimator > mel-pitch-calibration.json
+
+# Narrow calibration when investigating one register.
+cargo run -p symthaea-muse --bin muse_instrument_probe -- --calibrate-pitch-estimator --midi-range 48:84 > mel-pitch-calibration-48-84.json
+
 # Keep runtime lower while inspecting signal health.
 cargo run -p symthaea-muse --bin muse_instrument_probe -- --instrument harmonica --repeats 1
 ```
@@ -169,6 +176,12 @@ Use `cargo test -p symthaea-muse --bin muse_instrument_qualification` for fail-c
 These tests and commands are authored/documented but are not marked as executed by these changes.
 
 The next increment should couple each selected-file hash to a pinned library/root manifest and add instrument-specific range, pitch-accuracy, and gesture tests. Keep a per-note evidence record linking the requested instrument, selected renderer, selected source sample, signal checks, and exact renderer/asset digests. Do not collapse these fields into a pooled “instrument score.”
+
+### P2a — Calibrate the measurement instrument first
+- Run MEL-PITCH-CAL-001 on the default synthetic-tone sweep (MIDI 36–96) before interpreting instrument pitch errors.
+- Track numeric-estimate coverage and periodic-estimate coverage separately, plus median/p95/maximum absolute error and counts above 2, 5, and 15 cents.
+- Treat this as a check of the estimator against known pure sine waves, not proof of instrument tuning or perceptual quality.
+- Expand the calibration set later with harmonic-rich tones, controlled noise, vibrato, and known inharmonic stimuli; each stimulus class needs explicit limits and failure statuses.
 
 ### P3 — First-class gesture events
 - Add versioned typed events for a small subset of distinctive gestures and prove target sensitivity plus non-target invariance.
@@ -185,7 +198,7 @@ Prioritize the next instrument based on a weighted combination of listener deman
 
 ## 6. Evidence boundary for this increment
 
-This plan is designed to let source work and local evaluation proceed without waiting for unrelated style PRs, while preserving honest qualification. The four procedural profiles and regression code can be inspected statically; compile, formatting, unit-test, local-asset decode, instrument-grid render, and blind-listening outcomes require execution. A queued or skipped runner never passes a gate.
+This plan is designed to let source work and local evaluation proceed without waiting for unrelated style PRs, while preserving honest qualification. The four procedural profiles and regression code can be inspected statically; compile, formatting, unit-test, local-asset decode, synthetic calibration, instrument-grid render, and blind-listening outcomes require execution. A queued or skipped runner never passes a gate. The new calibration mode exercises only clean, generated sine waves; it does not certify any instrument renderer or source bank.
 
 ## 7. Research anchors for evaluation design
 
@@ -205,7 +218,7 @@ These are engineering targets to adopt after the new v2 measurements are locally
 | Identity / receipt fidelity | 100% of probe cells have correct per-note receipts; zero missing or mismatched instrument/control fields | Hard deterministic gate |
 | Deterministic rendering | 100% exact PCM hashes match for deterministic paths under pinned environment/assets | Stochastic paths must declare seed/policy rather than be silently excluded |
 | Signal health | Zero non-finite samples; zero unexplained near-silent cells in declared playable range | Unsupported cells must be explicit, not counted as passes |
-| Periodic-tone pitch accuracy | Synthetic sine fixtures: median absolute error ≤ 2 cents; p95 ≤ 5 cents | Calibrate estimator using exact generated fixtures before using it to score instruments |
+| Periodic-tone pitch accuracy | Synthetic sine fixtures: median absolute error ≤ 2 cents; p95 ≤ 5 cents | Run MEL-PITCH-CAL-001; report coverage, median, p95, maximum, and counts beyond 2/5/15 cents before interpreting instrument pitch results |
 | Instrument pitch accuracy | For calibrated, pitched instruments: median absolute error ≤ 5 cents and p95 ≤ 15 cents over supported range | Exclude or separately model inharmonic/percussive timbres and report low-confidence cells |
 | Velocity controllability | ≥95% of declared velocity-sensitive cells show expected loudness direction; exceptions explicitly documented | Treat this as a target only after per-instrument baseline and within-velocity repeatability are measured |
 | Source coverage | 100% of sample-backed cells trace to a relative source path, source WAV byte hash, source root pitch, and source rate | Selected-file hash is now in each receipt; coupling to a full library/root manifest digest is still open |
