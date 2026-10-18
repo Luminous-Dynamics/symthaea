@@ -53,6 +53,28 @@
       "detail": "Bounding box computed from exported mesh vertex coordinates."
     },
     {
+      "id": "ODRH-CAD-ALTERNATE-DIMENSIONS",
+      "status": "PASS",
+      "override": {
+        "plate_width_mm": 100,
+        "plate_height_mm": 60
+      },
+      "expected_extents_mm": [
+        100,
+        5,
+        60
+      ],
+      "observed_extents_mm": [
+        100,
+        5,
+        60
+      ],
+      "absolute_tolerance_mm": 0.02,
+      "output_sha256": "6016796d3cfd386a11d658c90f8b94f8d969397f2defc3ee5b4fbb129eb222e2",
+      "triangle_count": 2872,
+      "detail": "A second dimensional configuration rendered successfully and exported bounds matching its overridden parameters."
+    },
+    {
       "id": "ODRH-CAD-NEGATIVE-APERTURE-ASSERTION",
       "status": "PASS",
       "override": {
