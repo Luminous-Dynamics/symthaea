@@ -5,7 +5,7 @@
   "created_at": "2026-10-18",
   "disclaimer": "Every candidate, source, amount, gate and digest is synthetic. These fixtures test decision semantics only and must never be interpreted as food composition, formulation advice, biological results, safety evidence, regulatory status, price data, or lifecycle assessment.",
   "schema_file": "bioprotein-gate-schema-v1.json",
-  "case_count": 26,
+  "case_count": 29,
   "cases": [
     {
       "case_id": "BIOP-GATE0-001",
@@ -24,7 +24,8 @@
           "rights_status": "permitted",
           "permission_evidence_present": true,
           "attribution_required": false,
-          "attribution_present": true
+          "attribution_present": true,
+          "permission_evidence_ref": "synthetic-permission-01"
         },
         "identity_match": "match",
         "target_match": "match",
@@ -76,9 +77,10 @@
         "source": {
           "source_id": "synthetic-source-01",
           "rights_status": "unknown",
-          "permission_evidence_present": true,
+          "permission_evidence_present": false,
           "attribution_required": false,
-          "attribution_present": true
+          "attribution_present": true,
+          "permission_evidence_ref": null
         },
         "identity_match": "match",
         "target_match": "match",
@@ -130,7 +132,8 @@
           "rights_status": "revoked",
           "permission_evidence_present": true,
           "attribution_required": false,
-          "attribution_present": true
+          "attribution_present": true,
+          "permission_evidence_ref": "synthetic-permission-03"
         },
         "identity_match": "match",
         "target_match": "match",
@@ -182,7 +185,8 @@
           "rights_status": "expired",
           "permission_evidence_present": true,
           "attribution_required": false,
-          "attribution_present": true
+          "attribution_present": true,
+          "permission_evidence_ref": "synthetic-permission-04"
         },
         "identity_match": "match",
         "target_match": "match",
@@ -234,7 +238,8 @@
           "rights_status": "attribution_required",
           "permission_evidence_present": true,
           "attribution_required": true,
-          "attribution_present": false
+          "attribution_present": false,
+          "permission_evidence_ref": "synthetic-permission-05"
         },
         "identity_match": "match",
         "target_match": "match",
@@ -286,7 +291,8 @@
           "rights_status": "permitted",
           "permission_evidence_present": true,
           "attribution_required": false,
-          "attribution_present": true
+          "attribution_present": true,
+          "permission_evidence_ref": "synthetic-permission-06"
         },
         "identity_match": "match",
         "target_match": "match",
@@ -338,7 +344,8 @@
           "rights_status": "permitted",
           "permission_evidence_present": true,
           "attribution_required": false,
-          "attribution_present": true
+          "attribution_present": true,
+          "permission_evidence_ref": "synthetic-permission-07"
         },
         "identity_match": "match",
         "target_match": "mismatch",
@@ -390,7 +397,8 @@
           "rights_status": "permitted",
           "permission_evidence_present": true,
           "attribution_required": false,
-          "attribution_present": true
+          "attribution_present": true,
+          "permission_evidence_ref": "synthetic-permission-08"
         },
         "identity_match": "mismatch",
         "target_match": "match",
@@ -442,7 +450,8 @@
           "rights_status": "permitted",
           "permission_evidence_present": true,
           "attribution_required": false,
-          "attribution_present": true
+          "attribution_present": true,
+          "permission_evidence_ref": "synthetic-permission-09"
         },
         "identity_match": "match",
         "target_match": "match",
@@ -494,7 +503,8 @@
           "rights_status": "permitted",
           "permission_evidence_present": true,
           "attribution_required": false,
-          "attribution_present": true
+          "attribution_present": true,
+          "permission_evidence_ref": "synthetic-permission-10"
         },
         "identity_match": "match",
         "target_match": "match",
@@ -546,7 +556,8 @@
           "rights_status": "permitted",
           "permission_evidence_present": true,
           "attribution_required": false,
-          "attribution_present": true
+          "attribution_present": true,
+          "permission_evidence_ref": "synthetic-permission-11"
         },
         "identity_match": "match",
         "target_match": "match",
@@ -598,7 +609,8 @@
           "rights_status": "permitted",
           "permission_evidence_present": true,
           "attribution_required": false,
-          "attribution_present": true
+          "attribution_present": true,
+          "permission_evidence_ref": "synthetic-permission-12"
         },
         "identity_match": "match",
         "target_match": "match",
@@ -652,7 +664,8 @@
           "rights_status": "permitted",
           "permission_evidence_present": true,
           "attribution_required": false,
-          "attribution_present": true
+          "attribution_present": true,
+          "permission_evidence_ref": "synthetic-permission-13"
         },
         "identity_match": "match",
         "target_match": "match",
@@ -704,7 +717,8 @@
           "rights_status": "permitted",
           "permission_evidence_present": true,
           "attribution_required": false,
-          "attribution_present": true
+          "attribution_present": true,
+          "permission_evidence_ref": "synthetic-permission-14"
         },
         "identity_match": "match",
         "target_match": "match",
@@ -756,7 +770,8 @@
           "rights_status": "permitted",
           "permission_evidence_present": true,
           "attribution_required": false,
-          "attribution_present": true
+          "attribution_present": true,
+          "permission_evidence_ref": "synthetic-permission-15"
         },
         "identity_match": "match",
         "target_match": "match",
@@ -808,7 +823,8 @@
           "rights_status": "permitted",
           "permission_evidence_present": true,
           "attribution_required": false,
-          "attribution_present": true
+          "attribution_present": true,
+          "permission_evidence_ref": "synthetic-permission-16"
         },
         "identity_match": "match",
         "target_match": "match",
@@ -860,7 +876,8 @@
           "rights_status": "permitted",
           "permission_evidence_present": true,
           "attribution_required": false,
-          "attribution_present": true
+          "attribution_present": true,
+          "permission_evidence_ref": "synthetic-permission-17"
         },
         "identity_match": "match",
         "target_match": "match",
@@ -912,7 +929,8 @@
           "rights_status": "permitted",
           "permission_evidence_present": true,
           "attribution_required": false,
-          "attribution_present": true
+          "attribution_present": true,
+          "permission_evidence_ref": "synthetic-permission-18"
         },
         "identity_match": "match",
         "target_match": "match",
@@ -964,7 +982,8 @@
           "rights_status": "permitted",
           "permission_evidence_present": true,
           "attribution_required": false,
-          "attribution_present": true
+          "attribution_present": true,
+          "permission_evidence_ref": "synthetic-permission-19"
         },
         "identity_match": "match",
         "target_match": "match",
@@ -1016,7 +1035,8 @@
           "rights_status": "permitted",
           "permission_evidence_present": true,
           "attribution_required": false,
-          "attribution_present": true
+          "attribution_present": true,
+          "permission_evidence_ref": "synthetic-permission-20"
         },
         "identity_match": "match",
         "target_match": "match",
@@ -1068,7 +1088,8 @@
           "rights_status": "permitted",
           "permission_evidence_present": true,
           "attribution_required": false,
-          "attribution_present": true
+          "attribution_present": true,
+          "permission_evidence_ref": "synthetic-permission-21"
         },
         "identity_match": "match",
         "target_match": "match",
@@ -1120,7 +1141,8 @@
           "rights_status": "permitted",
           "permission_evidence_present": true,
           "attribution_required": false,
-          "attribution_present": true
+          "attribution_present": true,
+          "permission_evidence_ref": "synthetic-permission-22"
         },
         "identity_match": "match",
         "target_match": "match",
@@ -1172,7 +1194,8 @@
           "rights_status": "permitted",
           "permission_evidence_present": true,
           "attribution_required": false,
-          "attribution_present": true
+          "attribution_present": true,
+          "permission_evidence_ref": "synthetic-permission-23"
         },
         "identity_match": "match",
         "target_match": "match",
@@ -1225,7 +1248,8 @@
           "rights_status": "permitted",
           "permission_evidence_present": true,
           "attribution_required": false,
-          "attribution_present": true
+          "attribution_present": true,
+          "permission_evidence_ref": "synthetic-permission-24"
         },
         "identity_match": "match",
         "target_match": "match",
@@ -1279,7 +1303,8 @@
           "rights_status": "permitted",
           "permission_evidence_present": true,
           "attribution_required": false,
-          "attribution_present": true
+          "attribution_present": true,
+          "permission_evidence_ref": "synthetic-permission-25"
         },
         "identity_match": "match",
         "target_match": "match",
@@ -1332,7 +1357,8 @@
           "rights_status": "permitted",
           "permission_evidence_present": true,
           "attribution_required": false,
-          "attribution_present": true
+          "attribution_present": true,
+          "permission_evidence_ref": "synthetic-permission-26"
         },
         "identity_match": "match",
         "target_match": "match",
@@ -1366,6 +1392,167 @@
         ]
       },
       "rationale": "Cost values with no comparable declared basis cannot drive a cost-efficiency claim."
+    },
+    {
+      "case_id": "BIOP-GATE0-007",
+      "request": {
+        "target_species": "synthetic-companion-animal-target",
+        "life_stage": "synthetic-life-stage-01",
+        "intended_use": "ingredient_screen",
+        "requested_claim": "evidence_eligibility",
+        "scenario_digest": "sha256:synthetic-scenario-a"
+      },
+      "candidate": {
+        "candidate_id": "synthetic-candidate-rights-missing-evidence",
+        "ingredient_class": "synthetic_control",
+        "source": {
+          "source_id": "synthetic-source-01",
+          "rights_status": "permitted",
+          "permission_evidence_present": false,
+          "attribution_required": false,
+          "attribution_present": true,
+          "permission_evidence_ref": null
+        },
+        "identity_match": "match",
+        "target_match": "match",
+        "source_freshness": "current",
+        "basis_state": "normalized",
+        "nutrition_gate": "pass",
+        "safety_gate": "pass",
+        "authorization_gate": "pass",
+        "availability": "available",
+        "evidence_kind": "synthetic",
+        "cost": {
+          "value": 10,
+          "currency_or_unit": "SYNTHETIC_CURRENCY",
+          "basis": "SYNTHETIC_PER_KG_USABLE"
+        },
+        "lca_state": "not_requested",
+        "scenario_digest": "sha256:synthetic-scenario-a"
+      },
+      "expected": {
+        "disposition": "blocked",
+        "reason_codes": [
+          "RIGHTS_EVIDENCE_MISSING"
+        ],
+        "claims_allowed": [],
+        "claims_not_established": [
+          "real nutrient adequacy",
+          "animal safety",
+          "regulatory authorization",
+          "real cost",
+          "environmental superiority"
+        ]
+      },
+      "rationale": "A source marked permitted without the evidence record that substantiates the scoped right must be blocked."
+    },
+    {
+      "case_id": "BIOP-GATE0-008",
+      "request": {
+        "target_species": "synthetic-companion-animal-target",
+        "life_stage": "synthetic-life-stage-01",
+        "intended_use": "ingredient_screen",
+        "requested_claim": "evidence_eligibility",
+        "scenario_digest": "sha256:synthetic-scenario-a"
+      },
+      "candidate": {
+        "candidate_id": "synthetic-candidate-attribution-rights-good",
+        "ingredient_class": "synthetic_control",
+        "source": {
+          "source_id": "synthetic-source-01",
+          "rights_status": "attribution_required",
+          "permission_evidence_present": true,
+          "attribution_required": true,
+          "attribution_present": true,
+          "permission_evidence_ref": "synthetic-scoped-permission-attr-good"
+        },
+        "identity_match": "match",
+        "target_match": "match",
+        "source_freshness": "current",
+        "basis_state": "normalized",
+        "nutrition_gate": "pass",
+        "safety_gate": "pass",
+        "authorization_gate": "pass",
+        "availability": "available",
+        "evidence_kind": "synthetic",
+        "cost": {
+          "value": 10,
+          "currency_or_unit": "SYNTHETIC_CURRENCY",
+          "basis": "SYNTHETIC_PER_KG_USABLE"
+        },
+        "lca_state": "not_requested",
+        "scenario_digest": "sha256:synthetic-scenario-a"
+      },
+      "expected": {
+        "disposition": "eligible_for_declared_comparison",
+        "reason_codes": [
+          "ALL_DECLARED_SYNTHETIC_GATES_PASS"
+        ],
+        "claims_allowed": [
+          "evidence_eligibility"
+        ],
+        "claims_not_established": [
+          "real nutrient adequacy",
+          "animal safety",
+          "regulatory authorization",
+          "real cost",
+          "environmental superiority"
+        ]
+      },
+      "rationale": "Positive control: a scoped permission evidence record and required attribution are both present."
+    },
+    {
+      "case_id": "BIOP-GATE0-009",
+      "request": {
+        "target_species": "synthetic-companion-animal-target",
+        "life_stage": "synthetic-life-stage-01",
+        "intended_use": "ingredient_screen",
+        "requested_claim": "evidence_eligibility",
+        "scenario_digest": "sha256:synthetic-scenario-a"
+      },
+      "candidate": {
+        "candidate_id": "synthetic-candidate-attribution-rights-no-proof",
+        "ingredient_class": "synthetic_control",
+        "source": {
+          "source_id": "synthetic-source-01",
+          "rights_status": "attribution_required",
+          "permission_evidence_present": false,
+          "attribution_required": true,
+          "attribution_present": true,
+          "permission_evidence_ref": null
+        },
+        "identity_match": "match",
+        "target_match": "match",
+        "source_freshness": "current",
+        "basis_state": "normalized",
+        "nutrition_gate": "pass",
+        "safety_gate": "pass",
+        "authorization_gate": "pass",
+        "availability": "available",
+        "evidence_kind": "synthetic",
+        "cost": {
+          "value": 10,
+          "currency_or_unit": "SYNTHETIC_CURRENCY",
+          "basis": "SYNTHETIC_PER_KG_USABLE"
+        },
+        "lca_state": "not_requested",
+        "scenario_digest": "sha256:synthetic-scenario-a"
+      },
+      "expected": {
+        "disposition": "blocked",
+        "reason_codes": [
+          "RIGHTS_EVIDENCE_MISSING"
+        ],
+        "claims_allowed": [],
+        "claims_not_established": [
+          "real nutrient adequacy",
+          "animal safety",
+          "regulatory authorization",
+          "real cost",
+          "environmental superiority"
+        ]
+      },
+      "rationale": "Attribution does not substitute for evidence that the source grants the intended right."
     }
   ]
 }
