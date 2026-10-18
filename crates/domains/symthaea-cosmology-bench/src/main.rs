@@ -9,9 +9,8 @@ use std::path::PathBuf;
 use std::process::ExitCode;
 
 use symthaea_cosmology_bench::{
-    expected_sha256_from_manifest, sha256_bytes, sha256_file, verify_sha256_digest,
-    verify_sha256_file_against_manifest, ChainTable, CHAIN_AUDIT_PROTOCOL,
-    CHAIN_AUDIT_VERSION,
+    CHAIN_AUDIT_PROTOCOL, CHAIN_AUDIT_VERSION, ChainTable, expected_sha256_from_manifest,
+    sha256_bytes, sha256_file, verify_sha256_digest, verify_sha256_file_against_manifest,
 };
 
 #[derive(Clone, Debug, PartialEq, Eq)]
@@ -49,7 +48,10 @@ fn json_optional_string(value: Option<&str>) -> String {
 }
 
 fn json_string_array(values: &[String]) -> String {
-    let items = values.iter().map(|value| json_string(value)).collect::<Vec<_>>();
+    let items = values
+        .iter()
+        .map(|value| json_string(value))
+        .collect::<Vec<_>>();
     format!("[{}]", items.join(", "))
 }
 
@@ -79,7 +81,9 @@ fn summarize_loaded_chains(
     checksum_manifest: Option<(&str, &str)>,
 ) -> Result<bool, String> {
     let chain = ChainTable::combine(tables).map_err(|error| error.to_string())?;
-    let summary = chain.summarize(requested_column).map_err(|error| error.to_string())?;
+    let summary = chain
+        .summarize(requested_column)
+        .map_err(|error| error.to_string())?;
     let paths = input_artifacts
         .iter()
         .map(|artifact| artifact.path.clone())
@@ -101,14 +105,26 @@ fn summarize_loaded_chains(
     println!("  \"input_paths\": {},", json_string_array(&paths));
     println!("  \"input_chain_count\": {},", paths.len());
     println!("  \"checksum_manifest\": {},", manifest_json);
-    println!("  \"input_artifacts\": {},", json_input_artifacts(input_artifacts));
+    println!(
+        "  \"input_artifacts\": {},",
+        json_input_artifacts(input_artifacts)
+    );
     println!("  \"selected_column\": {},", json_string(&summary.name));
     println!("  \"sample_rows\": {},", summary.sample_rows);
-    println!("  \"positive_weight_rows\": {},", summary.positive_weight_rows);
+    println!(
+        "  \"positive_weight_rows\": {},",
+        summary.positive_weight_rows
+    );
     println!("  \"total_weight\": {:.17},", summary.total_weight);
-    println!("  \"weight_effective_sample_size\": {:.17},", summary.weight_effective_sample_size);
+    println!(
+        "  \"weight_effective_sample_size\": {:.17},",
+        summary.weight_effective_sample_size
+    );
     println!("  \"weighted_mean\": {:.17},", summary.weighted_mean);
-    println!("  \"weighted_variance\": {:.17},", summary.weighted_variance);
+    println!(
+        "  \"weighted_variance\": {:.17},",
+        summary.weighted_variance
+    );
     println!("  \"weighted_empirical_q16\": {:.17},", summary.q16);
     println!("  \"weighted_empirical_q50\": {:.17},", summary.q50);
     println!("  \"weighted_empirical_q84\": {:.17}", summary.q84);
@@ -116,7 +132,9 @@ fn summarize_loaded_chains(
     Ok(true)
 }
 
-fn load_unverified_chains(paths: &[String]) -> Result<(Vec<ChainTable>, Vec<InputArtifactAudit>), String> {
+fn load_unverified_chains(
+    paths: &[String],
+) -> Result<(Vec<ChainTable>, Vec<InputArtifactAudit>), String> {
     let mut tables = Vec::with_capacity(paths.len());
     let mut artifacts = Vec::with_capacity(paths.len());
     let mut seen_local_paths = HashSet::<PathBuf>::new();
@@ -166,7 +184,9 @@ fn load_manifest_verified_chains(
             ));
         }
         if !seen_relative_paths.insert(relative_path.to_string()) {
-            return Err(format!("duplicate checksum-manifest input path: {relative_path}"));
+            return Err(format!(
+                "duplicate checksum-manifest input path: {relative_path}"
+            ));
         }
         let canonical_path = fs::canonicalize(local_path)
             .map_err(|error| format!("cannot resolve local artifact {local_path}: {error}"))?;
@@ -179,9 +199,7 @@ fn load_manifest_verified_chains(
         let bytes = fs::read(local_path)
             .map_err(|error| format!("cannot read local artifact {local_path}: {error}"))?;
         let actual = sha256_bytes(&bytes);
-        if !verify_sha256_digest(&actual, &expected)
-            .map_err(|error| error.to_string())?
-        {
+        if !verify_sha256_digest(&actual, &expected).map_err(|error| error.to_string())? {
             return Err(format!(
                 "checksum mismatch for {local_path:?} (manifest path {relative_path:?}): expected {expected}, actual {actual}"
             ));
@@ -189,8 +207,9 @@ fn load_manifest_verified_chains(
 
         // Hash and parse exactly the same bytes. The manifest check completes
         // before these bytes can be included in any reported scientific summary.
-        let size_bytes = u64::try_from(bytes.len())
-            .map_err(|_| format!("input {local_path} is too large to describe in the audit manifest"))?;
+        let size_bytes = u64::try_from(bytes.len()).map_err(|_| {
+            format!("input {local_path} is too large to describe in the audit manifest")
+        })?;
         let table = ChainTable::parse(std::io::Cursor::new(bytes.as_slice()))
             .map_err(|error| format!("{local_path}: {error}"))?;
         tables.push(table);
@@ -214,7 +233,9 @@ fn run() -> Result<bool, String> {
         if args.len() != 5 {
             return Err(format!(
                 "usage: {} --verify-manifest SHA256SUMS RELATIVE_PATH FILE",
-                args.first().map(String::as_str).unwrap_or("symthaea-cosmology-chain-audit")
+                args.first()
+                    .map(String::as_str)
+                    .unwrap_or("symthaea-cosmology-chain-audit")
             ));
         }
         let manifest_path = &args[2];
@@ -232,8 +253,14 @@ fn run() -> Result<bool, String> {
         println!("  \"version\": {},", CHAIN_AUDIT_VERSION);
         println!("  \"mode\": \"sha256_manifest_verification\",");
         println!("  \"manifest_path\": {},", json_string(manifest_path));
-        println!("  \"manifest_sha256\": {},", json_string(&sha256_bytes(&manifest_bytes)));
-        println!("  \"manifest_relative_path\": {},", json_string(relative_path));
+        println!(
+            "  \"manifest_sha256\": {},",
+            json_string(&sha256_bytes(&manifest_bytes))
+        );
+        println!(
+            "  \"manifest_relative_path\": {},",
+            json_string(relative_path)
+        );
         println!("  \"input_path\": {},", json_string(file_path));
         println!("  \"expected_sha256\": {},", json_string(&expected));
         println!("  \"actual_sha256\": {},", json_string(&actual));
@@ -246,7 +273,9 @@ fn run() -> Result<bool, String> {
         if args.len() != 4 {
             return Err(format!(
                 "usage: {} --verify-sha256 FILE EXPECTED_SHA256",
-                args.first().map(String::as_str).unwrap_or("symthaea-cosmology-chain-audit")
+                args.first()
+                    .map(String::as_str)
+                    .unwrap_or("symthaea-cosmology-chain-audit")
             ));
         }
         let path = &args[2];
@@ -269,7 +298,9 @@ fn run() -> Result<bool, String> {
         if args.len() < 5 {
             return Err(format!(
                 "usage: {} --audit-manifest SHA256SUMS COLUMN RELATIVE_PATH=LOCAL_FILE [RELATIVE_PATH=LOCAL_FILE ...]",
-                args.first().map(String::as_str).unwrap_or("symthaea-cosmology-chain-audit")
+                args.first()
+                    .map(String::as_str)
+                    .unwrap_or("symthaea-cosmology-chain-audit")
             ));
         }
         let manifest_path = &args[2];
@@ -292,7 +323,9 @@ fn run() -> Result<bool, String> {
         if args.len() < 4 {
             return Err(format!(
                 "usage: {} --summary-unverified COLUMN_NAME CHAIN_TXT [CHAIN_TXT ...]",
-                args.first().map(String::as_str).unwrap_or("symthaea-cosmology-chain-audit")
+                args.first()
+                    .map(String::as_str)
+                    .unwrap_or("symthaea-cosmology-chain-audit")
             ));
         }
         let requested_column = &args[2];
@@ -308,7 +341,9 @@ fn run() -> Result<bool, String> {
     } else {
         Err(format!(
             "usage: {} --audit-manifest SHA256SUMS COLUMN RELATIVE_PATH=LOCAL_FILE [...] OR --summary-unverified COLUMN_NAME CHAIN_TXT [...] OR --verify-manifest SHA256SUMS RELATIVE_PATH FILE OR --verify-sha256 FILE EXPECTED_SHA256",
-            args.first().map(String::as_str).unwrap_or("symthaea-cosmology-chain-audit")
+            args.first()
+                .map(String::as_str)
+                .unwrap_or("symthaea-cosmology-chain-audit")
         ))
     }
 }
@@ -333,7 +368,9 @@ mod tests {
         let artifacts = vec![InputArtifactAudit {
             path: "chain.1.txt".to_string(),
             manifest_relative_path: Some("cobaya/base/desi-bao-all/chain.1.txt".to_string()),
-            expected_sha256: Some("ba7816bf8f01cfea414140de5dae2223b00361a396177a9cb410ff61f20015ad".to_string()),
+            expected_sha256: Some(
+                "ba7816bf8f01cfea414140de5dae2223b00361a396177a9cb410ff61f20015ad".to_string(),
+            ),
             sha256: "ba7816bf8f01cfea414140de5dae2223b00361a396177a9cb410ff61f20015ad".to_string(),
             size_bytes: 3,
             checksum_verified: true,
@@ -371,12 +408,19 @@ mod tests {
         assert_eq!(tables[0].rows.len(), 2);
         assert_eq!(artifacts.len(), 1);
         assert!(artifacts[0].checksum_verified);
-        assert_eq!(artifacts[0].expected_sha256.as_deref(), Some(digest.as_str()));
+        assert_eq!(
+            artifacts[0].expected_sha256.as_deref(),
+            Some(digest.as_str())
+        );
         assert_eq!(artifacts[0].sha256, digest);
 
         // Mutation after the manifest was frozen must stop the audit before
         // any summary can be returned.
-        std::fs::write(&file_path, b"# weight minuslogpost H0\n1 -10 67\n1 -11 70\n").unwrap();
+        std::fs::write(
+            &file_path,
+            b"# weight minuslogpost H0\n1 -10 67\n1 -11 70\n",
+        )
+        .unwrap();
         assert!(load_manifest_verified_chains(&manifest, &[mapping]).is_err());
         std::fs::remove_dir_all(dir).unwrap();
     }
@@ -385,7 +429,10 @@ mod tests {
     fn duplicate_local_chain_inputs_are_rejected() {
         use std::time::{SystemTime, UNIX_EPOCH};
 
-        let unique = SystemTime::now().duration_since(UNIX_EPOCH).unwrap().as_nanos();
+        let unique = SystemTime::now()
+            .duration_since(UNIX_EPOCH)
+            .unwrap()
+            .as_nanos();
         let dir = std::env::temp_dir().join(format!("symthaea-duplicate-chain-{unique}"));
         std::fs::create_dir_all(&dir).unwrap();
         let file = dir.join("chain.txt");
