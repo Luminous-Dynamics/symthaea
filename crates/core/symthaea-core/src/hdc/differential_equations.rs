@@ -424,6 +424,7 @@ impl AdaptiveImplicitEulerError {
             attempts,
             newton_corrections: work.newton_corrections,
             rhs_evaluations: work.rhs_evaluations,
+            jacobian_evaluations: work.jacobian_evaluations,
             estimated_dense_work_units: work.estimated_dense_work_units,
             max_normalized_newton_residual,
         }
@@ -1451,6 +1452,7 @@ impl DifferentialEquationsEngine {
                 trajectory,
                 newton_corrections: 0,
                 rhs_evaluations: 0,
+                jacobian_evaluations: 0,
                 max_normalized_residual: 0.0,
                 estimated_dense_work_units: 0,
             });
@@ -1735,6 +1737,7 @@ impl DifferentialEquationsEngine {
             trajectory,
             newton_corrections: total_corrections,
             rhs_evaluations,
+            jacobian_evaluations: *jacobian_evaluations,
             max_normalized_residual,
             estimated_dense_work_units: dense_work_units,
         })
@@ -1871,6 +1874,7 @@ impl DifferentialEquationsEngine {
                 max_normalized_newton_residual: 0.0,
                 newton_corrections: 0,
                 rhs_evaluations: 0,
+                jacobian_evaluations: 0,
                 estimated_dense_work_units: 0,
                 attempts: 0,
             });
@@ -2093,6 +2097,7 @@ impl DifferentialEquationsEngine {
             max_normalized_newton_residual: max_newton_residual,
             newton_corrections: work.newton_corrections,
             rhs_evaluations: work.rhs_evaluations,
+            jacobian_evaluations: work.jacobian_evaluations,
             estimated_dense_work_units: work.estimated_dense_work_units,
             attempts,
         })
