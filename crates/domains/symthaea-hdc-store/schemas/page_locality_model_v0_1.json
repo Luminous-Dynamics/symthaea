@@ -1,0 +1,288 @@
+{
+  "schemaVersion": "0.1",
+  "title": "HDC Store vector payload page-locality model",
+  "evidenceClass": "analytical_virtual_page_intersection_model_not_benchmark",
+  "purpose": "Exact count of virtual page intersections for fixed-length BinaryHV payload accesses in current HdcStore format-v2 versus a hypothetical page-aligned packed payload layout.",
+  "sourceConstants": {
+    "headerPageSizeBytes": 4096,
+    "headerPages": 2,
+    "dataOffsetBytes": 8192,
+    "entrySizeBytes": 2080,
+    "payloadOffsetWithinEntryBytes": 32,
+    "payloadBytes": 2048
+  },
+  "limitations": [
+    "This counts virtual-page intersections for the payload byte range only; it does not predict page-cache misses, page faults, filesystem block reads, NVMe physical I/O, NAND read amplification, latency, throughput, energy or speedup.",
+    "The packed candidate keeps the same logical records but puts the 2048-byte payloads in a page-aligned array and moves metadata/ID mapping elsewhere; metadata RAM and lookup/indirection overhead are not modeled.",
+    "Current v2 on-disk format remains unchanged. This model does not authorize a migration or a format-v3 implementation.",
+    "A 2 MiB page-size case is theoretical only. Do not assume transparent huge pages apply to file-backed mmap; verify the actual host mapping behavior.",
+    "Different architectures have different base page sizes; use the appropriate profile and actual OS page size when measuring."
+  ],
+  "calculation": {
+    "payloadPageIntersections": "floor((offset + payload_bytes - 1) / page_size) - floor(offset / page_size) + 1",
+    "v2StartOffset": "(data_offset_bytes + payload_offset_within_entry_bytes + index * entry_size_bytes) mod page_size",
+    "candidateStartOffset": "index * payload_bytes mod page_size",
+    "v2PeriodEntries": "page_size / gcd(entry_size_bytes, page_size)",
+    "candidatePeriodEntries": "page_size / gcd(payload_bytes, page_size)"
+  },
+  "pageProfiles": [
+    {
+      "pageSizeBytes": 4096,
+      "profileNote": "4 KiB base-page reference scenario",
+      "interleavedV2": {
+        "startOffsetFormulaBytes": "(8192 + 32 + index * 2080) mod page_size",
+        "periodEntries": 128,
+        "onePagePayloadCount": 65,
+        "multiPagePayloadCount": 63,
+        "averagePagesPerPayload": 1.4921875,
+        "crossPageFraction": 0.4921875,
+        "totalPageIntersectionsPerFullPeriod": 191
+      },
+      "packedAlignedCandidate": {
+        "startOffsetFormulaBytes": "index * 2048 mod page_size",
+        "periodEntries": 2,
+        "onePagePayloadCount": 2,
+        "multiPagePayloadCount": 0,
+        "averagePagesPerPayload": 1,
+        "totalPageIntersectionsPerFullPeriod": 2,
+        "alignedPayloadBaseOffsetBytes": 8192,
+        "alignmentPaddingAfterCurrentDataOffsetBytes": 0,
+        "vectorsPerPageWhenPageSizeMultipleOf2048": 2
+      },
+      "corpusPrefixResults": [
+        {
+          "vectorCount": 64,
+          "rawPayloadBytes": 131072,
+          "interleavedPayloadPageIntersections": 95,
+          "interleavedCrossPageVectorCount": 31,
+          "interleavedAveragePagesPerPayload": 1.484375,
+          "packedPayloadPageIntersections": 64,
+          "packedAveragePagesPerPayload": 1,
+          "packedBaseAlignmentPaddingBytes": 0
+        },
+        {
+          "vectorCount": 256,
+          "rawPayloadBytes": 524288,
+          "interleavedPayloadPageIntersections": 382,
+          "interleavedCrossPageVectorCount": 126,
+          "interleavedAveragePagesPerPayload": 1.4921875,
+          "packedPayloadPageIntersections": 256,
+          "packedAveragePagesPerPayload": 1,
+          "packedBaseAlignmentPaddingBytes": 0
+        },
+        {
+          "vectorCount": 1024,
+          "rawPayloadBytes": 2097152,
+          "interleavedPayloadPageIntersections": 1528,
+          "interleavedCrossPageVectorCount": 504,
+          "interleavedAveragePagesPerPayload": 1.4921875,
+          "packedPayloadPageIntersections": 1024,
+          "packedAveragePagesPerPayload": 1,
+          "packedBaseAlignmentPaddingBytes": 0
+        },
+        {
+          "vectorCount": 4096,
+          "rawPayloadBytes": 8388608,
+          "interleavedPayloadPageIntersections": 6112,
+          "interleavedCrossPageVectorCount": 2016,
+          "interleavedAveragePagesPerPayload": 1.4921875,
+          "packedPayloadPageIntersections": 4096,
+          "packedAveragePagesPerPayload": 1,
+          "packedBaseAlignmentPaddingBytes": 0
+        },
+        {
+          "vectorCount": 16384,
+          "rawPayloadBytes": 33554432,
+          "interleavedPayloadPageIntersections": 24448,
+          "interleavedCrossPageVectorCount": 8064,
+          "interleavedAveragePagesPerPayload": 1.4921875,
+          "packedPayloadPageIntersections": 16384,
+          "packedAveragePagesPerPayload": 1,
+          "packedBaseAlignmentPaddingBytes": 0
+        },
+        {
+          "vectorCount": 131072,
+          "rawPayloadBytes": 268435456,
+          "interleavedPayloadPageIntersections": 195584,
+          "interleavedCrossPageVectorCount": 64512,
+          "interleavedAveragePagesPerPayload": 1.4921875,
+          "packedPayloadPageIntersections": 131072,
+          "packedAveragePagesPerPayload": 1,
+          "packedBaseAlignmentPaddingBytes": 0
+        }
+      ]
+    },
+    {
+      "pageSizeBytes": 65536,
+      "profileNote": "alternative 64 KiB virtual-page scenario; use only on a host with this real page-size profile",
+      "interleavedV2": {
+        "startOffsetFormulaBytes": "(8192 + 32 + index * 2080) mod page_size",
+        "periodEntries": 2048,
+        "onePagePayloadCount": 1985,
+        "multiPagePayloadCount": 63,
+        "averagePagesPerPayload": 1.03076171875,
+        "crossPageFraction": 0.03076171875,
+        "totalPageIntersectionsPerFullPeriod": 2111
+      },
+      "packedAlignedCandidate": {
+        "startOffsetFormulaBytes": "index * 2048 mod page_size",
+        "periodEntries": 32,
+        "onePagePayloadCount": 32,
+        "multiPagePayloadCount": 0,
+        "averagePagesPerPayload": 1,
+        "totalPageIntersectionsPerFullPeriod": 32,
+        "alignedPayloadBaseOffsetBytes": 65536,
+        "alignmentPaddingAfterCurrentDataOffsetBytes": 57344,
+        "vectorsPerPageWhenPageSizeMultipleOf2048": 32
+      },
+      "corpusPrefixResults": [
+        {
+          "vectorCount": 64,
+          "rawPayloadBytes": 131072,
+          "interleavedPayloadPageIntersections": 66,
+          "interleavedCrossPageVectorCount": 2,
+          "interleavedAveragePagesPerPayload": 1.03125,
+          "packedPayloadPageIntersections": 64,
+          "packedAveragePagesPerPayload": 1,
+          "packedBaseAlignmentPaddingBytes": 57344
+        },
+        {
+          "vectorCount": 256,
+          "rawPayloadBytes": 524288,
+          "interleavedPayloadPageIntersections": 264,
+          "interleavedCrossPageVectorCount": 8,
+          "interleavedAveragePagesPerPayload": 1.03125,
+          "packedPayloadPageIntersections": 256,
+          "packedAveragePagesPerPayload": 1,
+          "packedBaseAlignmentPaddingBytes": 57344
+        },
+        {
+          "vectorCount": 1024,
+          "rawPayloadBytes": 2097152,
+          "interleavedPayloadPageIntersections": 1056,
+          "interleavedCrossPageVectorCount": 32,
+          "interleavedAveragePagesPerPayload": 1.03125,
+          "packedPayloadPageIntersections": 1024,
+          "packedAveragePagesPerPayload": 1,
+          "packedBaseAlignmentPaddingBytes": 57344
+        },
+        {
+          "vectorCount": 4096,
+          "rawPayloadBytes": 8388608,
+          "interleavedPayloadPageIntersections": 4222,
+          "interleavedCrossPageVectorCount": 126,
+          "interleavedAveragePagesPerPayload": 1.03076171875,
+          "packedPayloadPageIntersections": 4096,
+          "packedAveragePagesPerPayload": 1,
+          "packedBaseAlignmentPaddingBytes": 57344
+        },
+        {
+          "vectorCount": 16384,
+          "rawPayloadBytes": 33554432,
+          "interleavedPayloadPageIntersections": 16888,
+          "interleavedCrossPageVectorCount": 504,
+          "interleavedAveragePagesPerPayload": 1.03076171875,
+          "packedPayloadPageIntersections": 16384,
+          "packedAveragePagesPerPayload": 1,
+          "packedBaseAlignmentPaddingBytes": 57344
+        },
+        {
+          "vectorCount": 131072,
+          "rawPayloadBytes": 268435456,
+          "interleavedPayloadPageIntersections": 135104,
+          "interleavedCrossPageVectorCount": 4032,
+          "interleavedAveragePagesPerPayload": 1.03076171875,
+          "packedPayloadPageIntersections": 131072,
+          "packedAveragePagesPerPayload": 1,
+          "packedBaseAlignmentPaddingBytes": 57344
+        }
+      ]
+    },
+    {
+      "pageSizeBytes": 2097152,
+      "profileNote": "theoretical 2 MiB mapping/page-size scenario only; not an assertion that Linux file-backed HdcStore mappings use transparent huge pages",
+      "interleavedV2": {
+        "startOffsetFormulaBytes": "(8192 + 32 + index * 2080) mod page_size",
+        "periodEntries": 65536,
+        "onePagePayloadCount": 65473,
+        "multiPagePayloadCount": 63,
+        "averagePagesPerPayload": 1.0009613037109375,
+        "crossPageFraction": 0.0009613037109375,
+        "totalPageIntersectionsPerFullPeriod": 65599
+      },
+      "packedAlignedCandidate": {
+        "startOffsetFormulaBytes": "index * 2048 mod page_size",
+        "periodEntries": 1024,
+        "onePagePayloadCount": 1024,
+        "multiPagePayloadCount": 0,
+        "averagePagesPerPayload": 1,
+        "totalPageIntersectionsPerFullPeriod": 1024,
+        "alignedPayloadBaseOffsetBytes": 2097152,
+        "alignmentPaddingAfterCurrentDataOffsetBytes": 2088960,
+        "vectorsPerPageWhenPageSizeMultipleOf2048": 1024
+      },
+      "corpusPrefixResults": [
+        {
+          "vectorCount": 64,
+          "rawPayloadBytes": 131072,
+          "interleavedPayloadPageIntersections": 64,
+          "interleavedCrossPageVectorCount": 0,
+          "interleavedAveragePagesPerPayload": 1,
+          "packedPayloadPageIntersections": 64,
+          "packedAveragePagesPerPayload": 1,
+          "packedBaseAlignmentPaddingBytes": 2088960
+        },
+        {
+          "vectorCount": 256,
+          "rawPayloadBytes": 524288,
+          "interleavedPayloadPageIntersections": 256,
+          "interleavedCrossPageVectorCount": 0,
+          "interleavedAveragePagesPerPayload": 1,
+          "packedPayloadPageIntersections": 256,
+          "packedAveragePagesPerPayload": 1,
+          "packedBaseAlignmentPaddingBytes": 2088960
+        },
+        {
+          "vectorCount": 1024,
+          "rawPayloadBytes": 2097152,
+          "interleavedPayloadPageIntersections": 1025,
+          "interleavedCrossPageVectorCount": 1,
+          "interleavedAveragePagesPerPayload": 1.0009765625,
+          "packedPayloadPageIntersections": 1024,
+          "packedAveragePagesPerPayload": 1,
+          "packedBaseAlignmentPaddingBytes": 2088960
+        },
+        {
+          "vectorCount": 4096,
+          "rawPayloadBytes": 8388608,
+          "interleavedPayloadPageIntersections": 4100,
+          "interleavedCrossPageVectorCount": 4,
+          "interleavedAveragePagesPerPayload": 1.0009765625,
+          "packedPayloadPageIntersections": 4096,
+          "packedAveragePagesPerPayload": 1,
+          "packedBaseAlignmentPaddingBytes": 2088960
+        },
+        {
+          "vectorCount": 16384,
+          "rawPayloadBytes": 33554432,
+          "interleavedPayloadPageIntersections": 16398,
+          "interleavedCrossPageVectorCount": 14,
+          "interleavedAveragePagesPerPayload": 1.0008544921875,
+          "packedPayloadPageIntersections": 16384,
+          "packedAveragePagesPerPayload": 1,
+          "packedBaseAlignmentPaddingBytes": 2088960
+        },
+        {
+          "vectorCount": 131072,
+          "rawPayloadBytes": 268435456,
+          "interleavedPayloadPageIntersections": 131198,
+          "interleavedCrossPageVectorCount": 126,
+          "interleavedAveragePagesPerPayload": 1.0009613037109375,
+          "packedPayloadPageIntersections": 131072,
+          "packedAveragePagesPerPayload": 1,
+          "packedBaseAlignmentPaddingBytes": 2088960
+        }
+      ]
+    }
+  ]
+}
