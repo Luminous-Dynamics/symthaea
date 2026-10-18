@@ -304,8 +304,8 @@ fn verify_reports(
         );
     }
 
-    let cases = match probe.get("cases").and_then(Value::as_array) {
-        Some(cases) => cases,
+    let cases: &[Value] = match probe.get("cases").and_then(Value::as_array) {
+        Some(cases) => cases.as_slice(),
         None => {
             push_error(
                 &mut findings,
