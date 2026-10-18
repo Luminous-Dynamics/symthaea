@@ -24,6 +24,8 @@ cargo run --offline --manifest-path crates/tools/mine-comms-benchmark/Cargo.toml
 
 ## Claim ceiling and next step
 
+The next protocol design should evaluate standards-based store-carry-forward (IETF BPv7/RFC 9171) and bundle integrity/confidentiality (BPSec/RFC 9172), rather than assuming a custom protocol is justified. The harness does not yet implement these standards.
+
 The harness does not simulate electromagnetic propagation, stochastic packet loss, routing contention, network queues, physical radio energy, mine safety or regulatory permissibility. Link quality, latency and energy are supplied synthetic measurements. The next increment should add frozen traces and reproducible fault schedules, then calibrate against instrumented link measurements. HDC/CfC is not presumed better; it must beat simpler policies on held-out scenarios.
 
 See [the MINE-COMMS-001 specification](../../../docs/research/MINE_COMMUNICATIONS_BENCHMARK_V0_1.md) and [issue #8010](https://github.com/Luminous-Dynamics/symthaea/issues/8010).

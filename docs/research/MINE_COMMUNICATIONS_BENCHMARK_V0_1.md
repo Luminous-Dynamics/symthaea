@@ -32,6 +32,16 @@ Candidate responsibilities:
 - Continue with a small deterministic fallback when Symthaea, its learned estimator, shared memory or upstream services fail.
 - Make HDC/CfC an ablation, not a premise: compare it to static policies and simpler statistics on the same frozen traces. If it does not improve a decision-relevant metric without safety regressions, omit it.
 
+### 2.1 Reuse established delay-tolerant messaging protocols
+
+Do not invent a proprietary store-carry-forward protocol until standards fit has been tested. Evaluate **Bundle Protocol Version 7 (BPv7, RFC 9171)** for bundle identity, lifetime/age, hop-count protection and optional reception/forwarding/delivery/deletion status reports: https://www.rfc-editor.org/rfc/rfc9171.html. Evaluate **Bundle Protocol Security (BPSec, RFC 9172)** for end-to-end integrity and confidentiality where the deployment's trust and key-management model supports it: https://www.rfc-editor.org/rfc/rfc9172.html.
+
+Important constraints from the standards:
+- Bundle lifetime/age and hop-count semantics help make delayed messages and routing loops explicit, but do not turn an old personnel position into current truth.
+- BPv7 status reports can multiply traffic along a path. RFC 9171 says status-report generation is disabled by default because excessive reports can degrade operation. Enable reports selectively for critical service classes with bounded rate, queue and expiry rules; do not create an alarm storm by acknowledging every telemetry bundle.
+- BPSec protects bundle data integrity/confidentiality; it does not secure a compromised endpoint or make local keys safe automatically. Do not silently drop a distress message solely because an optional identity backend is offline; carry the authentication state as explicit evidence.
+- Keep the Rust harness transport-agnostic. Before adopting BPv7/BPSec, compare an interoperable implementation with the typed lifecycle contract and define how local receiver acknowledgement differs from bundle reception, forwarding and application-level acknowledgement.
+
 Physical layer design, antenna construction, electrical permissibility, installed mine maps, radio licensing and mine emergency procedures stay with the appropriate hardware, mine and regulatory authorities. No software-only benchmark can approve a real installation.
 
 ## 3. Research evidence and limitations
