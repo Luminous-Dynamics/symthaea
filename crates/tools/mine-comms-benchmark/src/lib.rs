@@ -606,6 +606,235 @@ pub fn plan_queue(
     })
 }
 
+/// Single serialized channel service profile. Rate and delays are synthetic
+/// scenario inputs until calibrated against a physical link.
+#[derive(Clone, Debug, Eq, PartialEq)]
+pub struct AirtimeProfile {
+    pub id: String,
+    pub bitrate_bits_per_second: u64,
+    pub framing_overhead_bytes: u64,
+    pub propagation_delay_ms: u64,
+    /// Maximum number of transmission attempts per message, including the first.
+    pub max_attempts: u8,
+}
+
+impl AirtimeProfile {
+    fn validate(&self) -> Result<(), &'static str> {
+        if self.id.trim().is_empty() {
+            return Err("airtime profile id must not be empty");
+        }
+        if self.bitrate_bits_per_second == 0 {
+            return Err("channel bitrate must be positive");
+        }
+        if self.max_attempts == 0 {
+            return Err("maximum transmission attempts must be positive");
+        }
+        Ok(())
+    }
+
+    fn airtime_ms(&self, payload_bytes: u64) -> Result<u64, &'static str> {
+        let frame_bytes = u128::from(payload_bytes)
+            .checked_add(u128::from(self.framing_overhead_bytes))
+            .ok_or("frame byte count overflow")?;
+        if frame_bytes == 0 {
+            return Err("empty payload with no framing overhead is not transmittable");
+        }
+        let frame_bits = frame_bytes
+            .checked_mul(8)
+            .ok_or("frame bit count overflow")?;
+        let numerator = frame_bits
+            .checked_mul(1000)
+            .ok_or("airtime numerator overflow")?;
+        let rate = u128::from(self.bitrate_bits_per_second);
+        let rounded_up = numerator
+            .checked_add(rate - 1)
+            .ok_or("airtime rounding overflow")?
+            / rate;
+        u64::try_from(rounded_up).map_err(|_| "airtime does not fit in milliseconds")
+    }
+}
+
+/// A queued one-hop frame with a deterministic injected receive trace.
+/// Each bool says whether that specific attempt is received by the next hop.
+/// This is not a packet-loss probability and does not model acknowledgements.
+#[derive(Clone, Debug, Eq, PartialEq)]
+pub struct QueuedTransmission {
+    pub message: Message,
+    pub payload_bytes: u64,
+    /// Must contain exactly one outcome for each configured attempt.
+    pub attempt_succeeds: Vec<bool>,
+}
+
+#[derive(Clone, Copy, Debug, Eq, PartialEq)]
+pub enum AirtimeDisposition {
+    Received,
+    ExpiredInQueue,
+    ExpiredBeforeTransmission,
+    ExpiredAfterFailedAttempts,
+    RetryBudgetExhausted,
+}
+
+#[derive(Clone, Debug, Eq, PartialEq)]
+pub struct AirtimePacketResult {
+    pub message_id: String,
+    pub class: MessageClass,
+    pub disposition: AirtimeDisposition,
+    pub attempts: u8,
+    pub failed_attempts: u8,
+    pub first_transmission_at_ms: Option<u64>,
+    pub received_at_ms: Option<u64>,
+    /// Time from function enqueue to first transmission.
+    pub queue_wait_ms: Option<u64>,
+    /// Sum of airtime consumed by all attempts for this message.
+    pub airtime_ms: u64,
+    /// Receiver arrival time minus message creation time.
+    pub creation_to_receive_ms: Option<u64>,
+}
+
+#[derive(Clone, Debug, Eq, PartialEq)]
+pub struct AirtimeSimulation {
+    pub profile_id: String,
+    pub enqueued_at_ms: u64,
+    pub finished_at_ms: u64,
+    pub total_airtime_ms: u64,
+    pub results: Vec<AirtimePacketResult>,
+}
+
+/// Schedule a finite queue on one serialized, half-duplex service channel.
+///
+/// This deliberately models transmission serialization and supplied per-attempt
+/// outcomes only: no stochastic loss, channel contention, acknowledgements,
+/// backoff or multi-hop forwarding. Strict priority is non-preemptive: a frame
+/// gets its bounded retry budget before the next queued frame is served.
+pub fn simulate_airtime_queue(
+    profile: &AirtimeProfile,
+    queued: &[QueuedTransmission],
+    now_ms: u64,
+) -> Result<AirtimeSimulation, &'static str> {
+    profile.validate()?;
+
+    let mut ids = BTreeSet::new();
+    let mut ordered: Vec<&QueuedTransmission> = Vec::with_capacity(queued.len());
+    for packet in queued {
+        let message = &packet.message;
+        if message.id.trim().is_empty() {
+            return Err("queued message id must not be empty");
+        }
+        if message.source.trim().is_empty() || message.destination.trim().is_empty() {
+            return Err("queued message endpoints must not be empty");
+        }
+        if message.created_at_ms > now_ms {
+            return Err("queued message creation timestamp is in the future");
+        }
+        if message.expires_at_ms < message.created_at_ms {
+            return Err("queued message expiry precedes creation");
+        }
+        if packet.attempt_succeeds.len() != usize::from(profile.max_attempts) {
+            return Err("attempt trace length must equal configured maximum attempts");
+        }
+        if !ids.insert(message.id.as_str()) {
+            return Err("queued message ids must be unique");
+        }
+        // Validate the frame duration before simulating any packet.
+        profile.airtime_ms(packet.payload_bytes)?;
+        ordered.push(packet);
+    }
+
+    ordered.sort_by(|a, b| {
+        a.message
+            .class
+            .priority_rank()
+            .cmp(&b.message.class.priority_rank())
+            .then_with(|| a.message.created_at_ms.cmp(&b.message.created_at_ms))
+            .then_with(|| a.message.id.cmp(&b.message.id))
+    });
+
+    let mut current_time_ms = now_ms;
+    let mut total_airtime_ms = 0u64;
+    let mut results = Vec::with_capacity(ordered.len());
+
+    for packet in ordered {
+        let message = &packet.message;
+        let frame_airtime_ms = profile.airtime_ms(packet.payload_bytes)?;
+        let mut attempts = 0u8;
+        let mut failed_attempts = 0u8;
+        let mut packet_airtime_ms = 0u64;
+        let mut first_transmission_at_ms = None;
+        let mut received_at_ms = None;
+        let mut disposition = AirtimeDisposition::RetryBudgetExhausted;
+
+        if current_time_ms > message.expires_at_ms {
+            disposition = AirtimeDisposition::ExpiredInQueue;
+        } else {
+            for attempt_index in 0..profile.max_attempts {
+                let tx_end_ms = current_time_ms
+                    .checked_add(frame_airtime_ms)
+                    .ok_or("transmission end timestamp overflow")?;
+                let arrival_ms = tx_end_ms
+                    .checked_add(profile.propagation_delay_ms)
+                    .ok_or("receiver arrival timestamp overflow")?;
+
+                // Do not spend channel capacity on a frame that cannot arrive
+                // before expiry under the declared profile.
+                if arrival_ms > message.expires_at_ms {
+                    disposition = if attempts == 0 {
+                        AirtimeDisposition::ExpiredBeforeTransmission
+                    } else {
+                        AirtimeDisposition::ExpiredAfterFailedAttempts
+                    };
+                    break;
+                }
+
+                if first_transmission_at_ms.is_none() {
+                    first_transmission_at_ms = Some(current_time_ms);
+                }
+                attempts = attempts.saturating_add(1);
+                packet_airtime_ms = packet_airtime_ms
+                    .checked_add(frame_airtime_ms)
+                    .ok_or("per-message airtime overflow")?;
+                total_airtime_ms = total_airtime_ms
+                    .checked_add(frame_airtime_ms)
+                    .ok_or("total airtime overflow")?;
+                current_time_ms = tx_end_ms;
+
+                if packet.attempt_succeeds[usize::from(attempt_index)] {
+                    received_at_ms = Some(arrival_ms);
+                    disposition = AirtimeDisposition::Received;
+                    break;
+                }
+
+                failed_attempts = failed_attempts.saturating_add(1);
+            }
+        }
+
+        let queue_wait_ms = first_transmission_at_ms
+            .map(|first_tx| first_tx.saturating_sub(now_ms));
+        let creation_to_receive_ms = received_at_ms
+            .map(|arrival| arrival.saturating_sub(message.created_at_ms));
+
+        results.push(AirtimePacketResult {
+            message_id: message.id.clone(),
+            class: message.class,
+            disposition,
+            attempts,
+            failed_attempts,
+            first_transmission_at_ms,
+            received_at_ms,
+            queue_wait_ms,
+            airtime_ms: packet_airtime_ms,
+            creation_to_receive_ms,
+        });
+    }
+
+    Ok(AirtimeSimulation {
+        profile_id: profile.id.clone(),
+        enqueued_at_ms: now_ms,
+        finished_at_ms: current_time_ms,
+        total_airtime_ms,
+        results,
+    })
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;
@@ -867,6 +1096,111 @@ mod tests {
         let fallback = evaluate_message(&damaged, &message, 1_000, RoutePolicy::AdaptiveLatencyEnergy).unwrap();
         assert_eq!(fallback.disposition, ReceiptDisposition::Acknowledged);
         assert!(fallback.forward_route.unwrap().link_ids.iter().any(|id| id.starts_with("tte")));
+    }
+
+    fn airtime_profile(rate: u64, overhead: u64, propagation: u64, attempts: u8) -> AirtimeProfile {
+        AirtimeProfile {
+            id: "SYNTHETIC-CHANNEL".to_owned(),
+            bitrate_bits_per_second: rate,
+            framing_overhead_bytes: overhead,
+            propagation_delay_ms: propagation,
+            max_attempts: attempts,
+        }
+    }
+
+    fn queued_packet(
+        id: &str,
+        class: MessageClass,
+        payload_bytes: u64,
+        expires_at_ms: u64,
+        attempt_succeeds: &[bool],
+    ) -> QueuedTransmission {
+        QueuedTransmission {
+            message: Message {
+                id: id.to_owned(),
+                class,
+                source: "surface".to_owned(),
+                destination: "next-hop".to_owned(),
+                created_at_ms: 1_000,
+                expires_at_ms,
+                origin_authenticated: true,
+            },
+            payload_bytes,
+            attempt_succeeds: attempt_succeeds.to_vec(),
+        }
+    }
+
+    #[test]
+    fn airtime_queue_accounts_for_framing_serialization_and_propagation() {
+        // 12 frame bytes at 8,000 bit/s is exactly 12 ms of airtime.
+        let profile = airtime_profile(8_000, 2, 3, 1);
+        let packets = vec![
+            queued_packet("a", MessageClass::Distress, 10, 2_000, &[true]),
+            queued_packet("b", MessageClass::Telemetry, 8, 2_000, &[true]),
+        ];
+        let sim = simulate_airtime_queue(&profile, &packets, 1_000).expect("valid trace");
+        assert_eq!(sim.results.len(), 2);
+        assert_eq!(sim.results[0].airtime_ms, 12);
+        assert_eq!(sim.results[0].received_at_ms, Some(1_015));
+        assert_eq!(sim.results[1].first_transmission_at_ms, Some(1_012));
+        assert_eq!(sim.results[1].received_at_ms, Some(1_025));
+        assert_eq!(sim.total_airtime_ms, 22);
+        assert_eq!(sim.finished_at_ms, 1_022);
+    }
+
+    #[test]
+    fn airtime_scheduler_delivers_critical_alert_before_bulk_under_alarm_storm() {
+        let profile = airtime_profile(8_000, 10, 2, 1);
+        let packets = vec![
+            queued_packet("bulk", MessageClass::Bulk, 500, 10_000, &[true]),
+            queued_packet("telemetry", MessageClass::Telemetry, 100, 10_000, &[true]),
+            queued_packet("evac", MessageClass::Evacuation, 40, 10_000, &[true]),
+            queued_packet("sos", MessageClass::Distress, 20, 10_000, &[true]),
+        ];
+        let sim = simulate_airtime_queue(&profile, &packets, 1_000).expect("valid trace");
+        let sos = sim.results.iter().find(|r| r.message_id == "sos").unwrap();
+        let bulk = sim.results.iter().find(|r| r.message_id == "bulk").unwrap();
+        assert!(sos.received_at_ms.unwrap() < bulk.received_at_ms.unwrap());
+        assert_eq!(sos.queue_wait_ms, Some(0));
+        assert!(bulk.queue_wait_ms.unwrap() > sos.queue_wait_ms.unwrap());
+    }
+
+    #[test]
+    fn critical_message_uses_bounded_retry_budget_before_lower_priority_traffic() {
+        let profile = airtime_profile(8_000, 0, 0, 2);
+        let packets = vec![
+            queued_packet("bulk", MessageClass::Bulk, 20, 5_000, &[true, true]),
+            queued_packet("sos", MessageClass::Distress, 10, 5_000, &[false, true]),
+        ];
+        let sim = simulate_airtime_queue(&profile, &packets, 1_000).expect("valid trace");
+        let sos = sim.results.iter().find(|r| r.message_id == "sos").unwrap();
+        let bulk = sim.results.iter().find(|r| r.message_id == "bulk").unwrap();
+        assert_eq!(sos.disposition, AirtimeDisposition::Received);
+        assert_eq!(sos.attempts, 2);
+        assert!(sos.received_at_ms.unwrap() < bulk.received_at_ms.unwrap());
+        assert_eq!(sos.failed_attempts, 1);
+    }
+
+    #[test]
+    fn expired_packet_does_not_consume_airtime_after_longer_critical_frame() {
+        let profile = airtime_profile(8_000, 0, 0, 1);
+        let packets = vec![
+            queued_packet("sos", MessageClass::Distress, 100, 5_000, &[true]),
+            queued_packet("bulk-expired", MessageClass::Bulk, 10, 1_010, &[true]),
+        ];
+        let sim = simulate_airtime_queue(&profile, &packets, 1_000).expect("valid trace");
+        let expired = sim.results.iter().find(|r| r.message_id == "bulk-expired").unwrap();
+        assert_eq!(expired.disposition, AirtimeDisposition::ExpiredInQueue);
+        assert_eq!(expired.attempts, 0);
+        assert_eq!(expired.airtime_ms, 0);
+    }
+
+    #[test]
+    fn airtime_queue_fails_closed_on_invalid_profile_trace_and_duplicate_ids() {
+        let packet = queued_packet("a", MessageClass::Distress, 10, 2_000, &[true]);
+        assert!(simulate_airtime_queue(&airtime_profile(0, 2, 1, 1), &[packet.clone()], 1_000).is_err());
+        assert!(simulate_airtime_queue(&airtime_profile(8_000, 2, 1, 2), &[packet.clone()], 1_000).is_err());
+        assert!(simulate_airtime_queue(&airtime_profile(8_000, 2, 1, 1), &[packet.clone(), packet], 1_000).is_err());
     }
 
     #[test]

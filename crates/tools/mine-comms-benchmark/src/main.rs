@@ -2,8 +2,8 @@
 // SPDX-License-Identifier: Apache-2.0 OR MIT
 
 use mine_comms_benchmark::{
-    evaluate_message, plan_queue, ChannelKind, Link, LinkState, Message, MessageClass,
-    RoutePolicy,
+    evaluate_message, plan_queue, simulate_airtime_queue, AirtimeProfile, ChannelKind, Link,
+    LinkState, Message, MessageClass, QueuedTransmission, RoutePolicy,
 };
 
 fn add_pair(
@@ -157,6 +157,63 @@ fn main() {
             plan.expired.join(",")
         ),
         Err(error) => println!("case=alarm_storm error={error}"),
+    }
+
+    let airtime_profile = AirtimeProfile {
+        id: "LAB-LOW-RATE-SYNTHETIC".to_owned(),
+        bitrate_bits_per_second: 8_000,
+        framing_overhead_bytes: 10,
+        propagation_delay_ms: 2,
+        max_attempts: 2,
+    };
+    let airtime_queue = vec![
+        QueuedTransmission {
+            message: Message {
+                id: "BULK-AIRTIME".to_owned(),
+                class: MessageClass::Bulk,
+                source: "surface".to_owned(),
+                destination: "level-4".to_owned(),
+                created_at_ms: 900,
+                expires_at_ms: 10_000,
+                origin_authenticated: true,
+            },
+            payload_bytes: 500,
+            attempt_succeeds: vec![true, true],
+        },
+        QueuedTransmission {
+            message: Message {
+                id: "SOS-AIRTIME".to_owned(),
+                class: MessageClass::Distress,
+                source: "surface".to_owned(),
+                destination: "level-4".to_owned(),
+                created_at_ms: 900,
+                expires_at_ms: 10_000,
+                origin_authenticated: true,
+            },
+            payload_bytes: 20,
+            attempt_succeeds: vec![false, true],
+        },
+    ];
+    match simulate_airtime_queue(&airtime_profile, &airtime_queue, 1_000) {
+        Ok(sim) => {
+            println!(
+                "case=airtime_alarm_storm channel={} total_airtime_ms={} finished_at_ms={}",
+                sim.profile_id, sim.total_airtime_ms, sim.finished_at_ms
+            );
+            for result in sim.results {
+                println!(
+                    "airtime_packet={} class={:?} disposition={:?} attempts={} queue_wait_ms={:?} airtime_ms={} received_at_ms={:?}",
+                    result.message_id,
+                    result.class,
+                    result.disposition,
+                    result.attempts,
+                    result.queue_wait_ms,
+                    result.airtime_ms,
+                    result.received_at_ms
+                );
+            }
+        }
+        Err(error) => println!("case=airtime_alarm_storm error={error}"),
     }
 
     println!("claim_ceiling=synthetic routing semantics only; no radio, mine-safety, or field-reliability claim");
