@@ -2,7 +2,7 @@
 
 All fixture values are synthetic and are not food composition data or dietary guidance.
 
-`synthetic-rice-pea-recipe.json` contains three ingredients (rice, peas and water), per-100-g edible ingredient protein values, ingredient-specific protein-retention intervals pinned to the recipe process and each ingredient's input state/output food state, plus an independently stated final recipe mass interval.
+`synthetic-rice-pea-recipe.json` contains two nutrient-bearing ingredients (rice and peas), per-100-g edible ingredient protein values, ingredient-specific protein-retention intervals pinned to the recipe process and each ingredient's input state/output food state, plus an independently stated final recipe mass interval. Water used as the cooking medium is intentionally not treated as a nutrient-bearing ingredient in this fixture.
 
 The validator must:
 - compute each retained nutrient amount as (nutrient per 100 g edible ingredient × ingredient edible mass / 100 × nutrient retention factor);
