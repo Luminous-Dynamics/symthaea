@@ -82,6 +82,8 @@ The literature justifies testing the idea while keeping local validation separat
 
 CF-016 therefore benchmarks tail-risk and nutritional-basket shortfall against declared baselines under matched land, water, labor, and cost constraints. It is blocked until usable interaction data or a clearly labeled synthetic scenario set exists, and physical claims require locally replicated multi-season trials.
 
+A fifth direction is **causal intervention evaluation** rather than treating predictive association as treatment efficacy. CF-018 asks whether recommendations based on fertilizer, irrigation, or other crop treatments correspond to independently supported effects under documented assignment, experimental units, blocking, replication, and predeclared outcomes. If allocation is observational or the protocol is missing, the system may report associations but must not claim an identified treatment effect. This is especially relevant for DS-010: the dataset record states that 27 treatment combinations exist, but those labels alone do not demonstrate randomization or sufficient causal identification, and its referenced accompanying documentation is not listed among the Zenodo files. CF-018 therefore remains blocked until the design evidence is acquired and reviewed.
+
 ## System boundaries
 
 - **Symthaea:** evidence-aware reasoning, candidate generation, uncertainty handling, multi-objective ranking, experiment selection, and recommendation receipts.
