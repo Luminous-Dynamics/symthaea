@@ -18,26 +18,26 @@ const G: f64 = 9.80665;
 const ALLOWED_STATUS: &[&str] = &["COMPUTED", "REJECT_INPUT"];
 
 #[derive(Debug, Clone, Copy, Deserialize, Serialize)]
-struct WheelDemandInput {
-    mass_kg: f64,
-    rotating_equivalent_mass_kg: f64,
-    speed_mps: f64,
-    acceleration_mps2: f64,
-    grade_rad: f64,
-    rolling_resistance_coefficient: f64,
-    air_density_kg_m3: f64,
-    drag_area_m2: f64,
-    wind_speed_mps: f64,
+pub(crate) struct WheelDemandInput {
+    pub(crate) mass_kg: f64,
+    pub(crate) rotating_equivalent_mass_kg: f64,
+    pub(crate) speed_mps: f64,
+    pub(crate) acceleration_mps2: f64,
+    pub(crate) grade_rad: f64,
+    pub(crate) rolling_resistance_coefficient: f64,
+    pub(crate) air_density_kg_m3: f64,
+    pub(crate) drag_area_m2: f64,
+    pub(crate) wind_speed_mps: f64,
 }
 
 #[derive(Debug, Clone, Copy, Deserialize, Serialize)]
-struct WheelDemandOutput {
+pub(crate) struct WheelDemandOutput {
     inertial_force_n: f64,
     rolling_resistance_force_n: f64,
     grade_force_n: f64,
     aerodynamic_force_n: f64,
     wheel_force_required_n: f64,
-    signed_wheel_power_w: f64,
+    pub(crate) signed_wheel_power_w: f64,
     positive_traction_power_w: f64,
     negative_wheel_power_w: f64,
 }
@@ -143,7 +143,7 @@ fn validate_input(input: &WheelDemandInput) -> Result<(), &'static str> {
 /// instant. Positive grade is uphill; positive wind speed is a tailwind.
 /// Negative wheel power is reported as an overrun/braking opportunity, never
 /// as recovered battery energy.
-fn calculate(input: &WheelDemandInput) -> Result<WheelDemandOutput, &'static str> {
+pub(crate) fn calculate(input: &WheelDemandInput) -> Result<WheelDemandOutput, &'static str> {
     validate_input(input)?;
 
     let mass = input.mass_kg;
