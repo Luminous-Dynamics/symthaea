@@ -405,7 +405,10 @@ pub fn evaluate_candidates(
     }
 
     let mut blocking_reasons = Vec::new();
-    let admitted_ids: HashSet<&str> = admitted.iter().map(|candidate| candidate.id.as_str()).collect();
+    let admitted_ids: HashSet<&str> = admitted
+        .iter()
+        .map(|candidate| candidate.id.as_str())
+        .collect();
     if !candidate_ids.contains(profile.baseline_candidate_id.as_str()) {
         blocking_reasons.push(BlockingReason::MissingBaseline(
             profile.baseline_candidate_id.clone(),
@@ -1108,7 +1111,10 @@ mod tests {
                 HardConstraintResult { id: "mass_balance".into(), satisfied: true },
                 HardConstraintResult { id: "manufacturable_geometry".into(), satisfied: true },
             ],
-            assumptions: vec![AssumptionResolution { id: "rigid_tube_proxy".into(), resolved: true }],
+            assumptions: vec![AssumptionResolution {
+                id: "rigid_tube_proxy".into(),
+                resolved: true,
+            }],
             evidence: vec![EvidenceObservation {
                 source_id: "q0-fixture-corpus".into(),
                 sha256: "a".repeat(64),
@@ -1138,7 +1144,8 @@ mod tests {
 
     #[test]
     fn hostile_case_catalog_is_complete_and_unique() {
-        let root: Value = serde_json::from_str(HOSTILE_CASES).expect("hostile case catalog must be valid JSON");
+        let root: Value = serde_json::from_str(HOSTILE_CASES)
+            .expect("hostile case catalog must be valid JSON");
         assert_eq!(root["schema_version"].as_str(), Some("0.1.0"));
         assert_eq!(root["status"].as_str(), Some("FIXTURE_SPECIFICATION_NOT_EXECUTION_RECEIPT"));
         let cases = root["cases"].as_array().expect("cases must be an array");
@@ -1190,12 +1197,18 @@ mod tests {
         let receipt = evaluate_candidates(&p, &candidates).unwrap();
         match decision(&receipt, "unsafe-fast") {
             CandidateDecision::Rejected { reasons, .. } => {
-                assert!(reasons.contains(&CandidateRejectionReason::HardConstraintFailed("mass_balance".into())));
+                assert!(reasons.contains(&CandidateRejectionReason::HardConstraintFailed(
+                    "mass_balance".into()
+                )));
             }
             other => panic!("hard-constraint violator was admitted: {other:?}"),
         }
         assert!(!receipt.decisions.iter().any(|item| {
-            matches!(item, CandidateDecision::ParetoRanked { candidate_id, .. } if candidate_id == "unsafe-fast")
+            matches!(
+                item,
+                CandidateDecision::ParetoRanked { candidate_id, .. }
+                    if candidate_id == "unsafe-fast"
+            )
         }));
     }
 
@@ -1207,9 +1220,13 @@ mod tests {
         candidates[3].metrics[1].unit = "kg".into();
         let receipt = evaluate_candidates(&p, &candidates).unwrap();
         assert!(matches!(decision(&receipt, "design-a"), CandidateDecision::Rejected { reasons, .. }
-            if reasons.contains(&CandidateRejectionReason::WrongMetricUnit("coverage_proxy".into()))));
+            if reasons.contains(&CandidateRejectionReason::WrongMetricUnit(
+                "coverage_proxy".into()
+            ))));
         assert!(matches!(decision(&receipt, "design-b"), CandidateDecision::Rejected { reasons, .. }
-            if reasons.contains(&CandidateRejectionReason::WrongMetricUnit("material_cost_proxy".into()))));
+            if reasons.contains(&CandidateRejectionReason::WrongMetricUnit(
+                "material_cost_proxy".into()
+            ))));
     }
 
     #[test]
@@ -1219,7 +1236,9 @@ mod tests {
         candidates[2].assumptions[0].resolved = false;
         let receipt = evaluate_candidates(&p, &candidates).unwrap();
         assert!(matches!(decision(&receipt, "design-a"), CandidateDecision::Rejected { reasons, .. }
-            if reasons.contains(&CandidateRejectionReason::AssumptionUnresolved("rigid_tube_proxy".into()))));
+            if reasons.contains(&CandidateRejectionReason::AssumptionUnresolved(
+                "rigid_tube_proxy".into()
+            ))));
     }
 
     #[test]
@@ -1230,9 +1249,13 @@ mod tests {
         candidates[3].evidence[0].status = EvidenceStatus::Contradictory;
         let receipt = evaluate_candidates(&p, &candidates).unwrap();
         assert!(matches!(decision(&receipt, "design-a"), CandidateDecision::Rejected { reasons, .. }
-            if reasons.contains(&CandidateRejectionReason::EvidenceStale("q0-fixture-corpus".into()))));
+            if reasons.contains(&CandidateRejectionReason::EvidenceStale(
+                "q0-fixture-corpus".into()
+            ))));
         assert!(matches!(decision(&receipt, "design-b"), CandidateDecision::Rejected { reasons, .. }
-            if reasons.contains(&CandidateRejectionReason::EvidenceContradictory("q0-fixture-corpus".into()))));
+            if reasons.contains(&CandidateRejectionReason::EvidenceContradictory(
+                "q0-fixture-corpus".into()
+            ))));
     }
 
     #[test]
@@ -1240,8 +1263,16 @@ mod tests {
         let p = profile();
         let mut candidates = standard_candidates();
         let first = evaluate_candidates(&p, &candidates).unwrap();
-        candidates.iter_mut().find(|item| item.id == "design-a").unwrap().internal_confidence = Some(1.0);
-        candidates.iter_mut().find(|item| item.id == "design-b").unwrap().internal_confidence = Some(0.01);
+        candidates
+            .iter_mut()
+            .find(|item| item.id == "design-a")
+            .unwrap()
+            .internal_confidence = Some(1.0);
+        candidates
+            .iter_mut()
+            .find(|item| item.id == "design-b")
+            .unwrap()
+            .internal_confidence = Some(0.01);
         let second = evaluate_candidates(&p, &candidates).unwrap();
         assert_eq!(
             front(&first, "design-a"),
@@ -1289,7 +1320,9 @@ mod tests {
         candidates[2].metrics[0].value = f64::NAN;
         let receipt = evaluate_candidates(&p, &candidates).unwrap();
         assert!(matches!(decision(&receipt, "design-a"), CandidateDecision::Rejected { reasons, .. }
-            if reasons.contains(&CandidateRejectionReason::NonFiniteMetric("coverage_proxy".into()))));
+            if reasons.contains(&CandidateRejectionReason::NonFiniteMetric(
+                "coverage_proxy".into()
+            ))));
     }
 
     #[test]
@@ -1299,7 +1332,9 @@ mod tests {
         candidates[2].metrics.retain(|metric| metric.objective_id != "coverage_proxy");
         let receipt = evaluate_candidates(&p, &candidates).unwrap();
         assert!(matches!(decision(&receipt, "design-a"), CandidateDecision::Rejected { reasons, .. }
-            if reasons.contains(&CandidateRejectionReason::MissingMetric("coverage_proxy".into()))));
+            if reasons.contains(&CandidateRejectionReason::MissingMetric(
+                "coverage_proxy".into()
+            ))));
     }
 
     #[test]
@@ -1309,7 +1344,9 @@ mod tests {
         candidates[2].evidence[0].sha256 = "b".repeat(64);
         let receipt = evaluate_candidates(&p, &candidates).unwrap();
         assert!(matches!(decision(&receipt, "design-a"), CandidateDecision::Rejected { reasons, .. }
-            if reasons.contains(&CandidateRejectionReason::EvidenceDigestMismatch("q0-fixture-corpus".into()))));
+            if reasons.contains(&CandidateRejectionReason::EvidenceDigestMismatch(
+                "q0-fixture-corpus".into()
+            ))));
     }
 
     #[test]
@@ -1331,7 +1368,9 @@ mod tests {
         ];
         let receipt = evaluate_candidates(&p, &candidates).unwrap();
         assert_eq!(receipt.status, ReceiptStatus::Blocked);
-        assert!(receipt.blocking_reasons.contains(&BlockingReason::MissingAblation("ablation-naive-heuristic".into())));
+        assert!(receipt.blocking_reasons.contains(&BlockingReason::MissingAblation(
+            "ablation-naive-heuristic".into()
+        )));
     }
 
     #[test]
