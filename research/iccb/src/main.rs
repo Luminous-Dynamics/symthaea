@@ -98,21 +98,27 @@ fn main() {
                 "synthetic constraint evaluation only; not a forecast or authorization".into(),
         };
         match create_decision_receipt(&context, &scenario) {
-            Ok(decision_receipt) => match verify_decision_receipt(&context, &scenario, &decision_receipt) {
-                Ok(()) => println!(
-                    "Synthetic decision receipt: schema={}, input={}, scenario={}, output={}, receipt={}",
-                    decision_receipt.schema_version,
-                    decision_receipt.input_manifest_sha256,
-                    decision_receipt.scenario_sha256,
-                    decision_receipt.output_sha256,
-                    decision_receipt.receipt_sha256,
-                ),
-                Err(error) => eprintln!("Synthetic decision receipt replay failed: {error:?}"),
-            },
+            Ok(decision_receipt) => {
+                match verify_decision_receipt(&context, &scenario, &decision_receipt) {
+                    Ok(()) => println!(
+                        "Synthetic decision receipt: schema={}, input={}, scenario={}, output={}, receipt={}",
+                        decision_receipt.schema_version,
+                        decision_receipt.input_manifest_sha256,
+                        decision_receipt.scenario_sha256,
+                        decision_receipt.output_sha256,
+                        decision_receipt.receipt_sha256,
+                    ),
+                    Err(error) => {
+                        eprintln!("Synthetic decision receipt replay failed: {error:?}")
+                    }
+                }
+            }
             Err(error) => eprintln!("Synthetic decision receipt rejected: {error:?}"),
         }
     } else {
-        println!("Decision receipt demo skipped: GITHUB_SHA is unavailable; producer pin fails closed.");
+        println!(
+            "Decision receipt demo skipped: GITHUB_SHA is unavailable; producer pin fails closed."
+        );
     }
 
     let baseline = cash_maximizing_feasible_baseline(&receipt.evaluated_options);
@@ -368,7 +374,9 @@ fn main() {
         let reference = UncertaintyAssessmentRef {
             scenario_id: "synthetic-uncertainty-router".into(),
             producer_version: "synthetic-producer-v1".into(),
-            source_manifest_digest: "sha256:937a22712ea5c20073d2c8a226f1f4a9c2c30aba40a497f2412a34426f986535".into(),
+            source_manifest_digest:
+                "sha256:937a22712ea5c20073d2c8a226f1f4a9c2c30aba40a497f2412a34426f986535"
+                    .into(),
             evidence_kind,
         };
         match reference.route() {
