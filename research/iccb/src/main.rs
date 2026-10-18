@@ -4,6 +4,9 @@ use iccb_evaluator::{
     policy::{CapitalPolicyScenario, DemandCase},
     robust_decision::{RobustDecisionScenario, RobustPayoff, StateProbabilityBound},
     staging::TrancheRequest,
+    uncertainty_contract::{
+        UncertaintyAssessmentRef, UncertaintyEvidenceKind,
+    },
     value_of_information::{
         DecisionPayoff, InformationState, SignalLikelihood, SignalOutcome,
         ValueOfInformationScenario,
@@ -300,5 +303,39 @@ fn main() {
             }
         }
         Err(error) => eprintln!("Synthetic robust decision scenario rejected: {error:?}"),
+    }
+
+    // The source semantics choose the analysis route. Incompatible uncertainty
+    // types are never silently converted to point probabilities.
+    for evidence_kind in [
+        UncertaintyEvidenceKind::BoundedStateProbabilities {
+            bounds_receipt_id: "synthetic-bounds-receipt".into(),
+        },
+        UncertaintyEvidenceKind::OutcomeCompatibilitySet {
+            compatibility_receipt_id: "synthetic-compatibility-receipt".into(),
+        },
+        UncertaintyEvidenceKind::ModelDiscrepancyEnvelope {
+            envelope_receipt_id: "synthetic-discrepancy-receipt".into(),
+        },
+        UncertaintyEvidenceKind::OutOfDomain {
+            reason: "synthetic-domain-gap".into(),
+        },
+    ] {
+        let reference = UncertaintyAssessmentRef {
+            scenario_id: "synthetic-uncertainty-router".into(),
+            producer_version: "synthetic-producer-v1".into(),
+            source_manifest_digest: "sha256:synthetic-manifest".into(),
+            evidence_kind,
+        };
+        match reference.route() {
+            Ok(receipt) => println!(
+                "Uncertainty route: scenario={}, route={:?}, evidence_ref={}, limit={}",
+                receipt.scenario_id,
+                receipt.route,
+                receipt.evidence_reference,
+                receipt.limitation,
+            ),
+            Err(error) => eprintln!("Uncertainty routing rejected invalid packet: {error:?}"),
+        }
     }
 }
