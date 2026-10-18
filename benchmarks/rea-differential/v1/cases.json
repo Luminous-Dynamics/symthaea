@@ -9,6 +9,10 @@
       "id": "threshold12_o0_debug",
       "args": [
         "-std=c11",
+        "-Wall",
+        "-Wextra",
+        "-Werror",
+        "-pedantic",
         "-O0",
         "-g",
         "-DDEBOUNCE_THRESHOLD_TICKS=12"
@@ -18,6 +22,10 @@
       "id": "threshold12_o2_stripped",
       "args": [
         "-std=c11",
+        "-Wall",
+        "-Wextra",
+        "-Werror",
+        "-pedantic",
         "-O2",
         "-s",
         "-DDEBOUNCE_THRESHOLD_TICKS=12"
@@ -27,6 +35,10 @@
       "id": "threshold20_o0_debug",
       "args": [
         "-std=c11",
+        "-Wall",
+        "-Wextra",
+        "-Werror",
+        "-pedantic",
         "-O0",
         "-g",
         "-DDEBOUNCE_THRESHOLD_TICKS=20"
@@ -36,6 +48,10 @@
       "id": "threshold20_o2_stripped",
       "args": [
         "-std=c11",
+        "-Wall",
+        "-Wextra",
+        "-Werror",
+        "-pedantic",
         "-O2",
         "-s",
         "-DDEBOUNCE_THRESHOLD_TICKS=20"
