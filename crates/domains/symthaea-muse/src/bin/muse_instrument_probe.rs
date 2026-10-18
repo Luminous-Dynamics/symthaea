@@ -22,7 +22,6 @@ const SAMPLE_RATE: u32 = 22_050;
 const NOTE_MS: u64 = 100;
 const TAIL_MS: u64 = 100;
 const REPEATS: usize = 2;
-const PITCH_GRID_MIDI: [u8; 3] = [57, 69, 81];
 const VELOCITY_GRID: [f32; 3] = [0.2, 0.5, 0.9];
 
 const ALL_INSTRUMENTS: [Instrument; 46] = [
@@ -180,9 +179,10 @@ fn run() -> Result<(), String> {
     let pitch_cells = build_pitch_cells(options.midi_range);
     let cases_expected =
         options.instruments.len() * pitch_cells.len() * VELOCITY_GRID.len();
-    if cases_expected > 10_000 {
+    let render_attempts = cases_expected.saturating_mul(options.repeats);
+    if render_attempts > 20_000 {
         return Err(format!(
-            "requested sweep creates {cases_expected} cells; choose one instrument or narrow --midi-range (limit: 10000 cells)"
+            "requested sweep creates {render_attempts} render attempts; choose one instrument, reduce repeats, or narrow --midi-range (limit: 20000 render attempts)"
         ));
     }
     let duration_secs = options.note_ms as f32 / 1_000.0;
@@ -363,7 +363,7 @@ fn run() -> Result<(), String> {
         .filter(|group| !group.rms_is_monotonic_non_decreasing)
         .count();
     let report = ProbeReport {
-        schema_version: "melothaea.instrument-probe.v2",
+        schema_version: "melothaea.instrument-probe.v3",
         benchmark: "MEL-INST-PROBE-001",
         code_revision: option_env!("MEL_INSTRUMENT_PROBE_REV").unwrap_or("not_embedded"),
         sample_rate_hz: options.sample_rate,
