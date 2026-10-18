@@ -203,6 +203,7 @@ fn verify_reports(
     let mut findings = Vec::new();
     let mut root_content_manifests_verified = 0_usize;
     let mut selected_samples_total = 0_usize;
+    let mut selected_samples_with_matching_actual_file_digest = 0_usize;
     let mut selected_samples_with_valid_file_digest = 0_usize;
     let mut selected_samples_with_valid_bank_digest = 0_usize;
     let mut selected_samples_with_matching_inventory_bank_digest = 0_usize;
@@ -1243,6 +1244,7 @@ mod tests {
         assert_eq!(report.verdict, "consistent");
         assert_eq!(report.root_content_manifests_verified, 2);
         assert_eq!(report.selected_samples_total, 1);
+        assert_eq!(report.selected_samples_with_matching_actual_file_digest, 1);
         assert_eq!(report.selected_samples_with_valid_file_digest, 1);
         assert_eq!(report.selected_samples_with_valid_bank_digest, 1);
         assert_eq!(report.selected_samples_with_matching_inventory_bank_digest, 1);
