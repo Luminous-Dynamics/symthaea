@@ -107,6 +107,10 @@ pub struct PendingBaseline {
 pub struct FabricationTelemetry {
     pub manufacturing_free_energy: f64,
     pub design_loop_free_energy: f64,
+    /// Whether the manufacturing free-energy baseline has been explicitly configured.
+    pub manufacturing_reference_calibrated: bool,
+    /// Whether the design-loop free-energy baseline has been explicitly configured.
+    pub design_loop_reference_calibrated: bool,
     pub safety_level: String,
     pub anomaly_count: u32,
     pub anomaly_ema: f32,
@@ -203,6 +207,19 @@ impl FabricationManager {
     pub const INTERVAL: u32 = thresholds::FABRICATION_MANAGER_INTERVAL;
     const MAX_EVENTS_PER_CYCLE: usize = thresholds::FAB_MAX_EVENTS_PER_CYCLE;
 
+    /// Configure the manufacturing twin from a reviewed known-good reference.
+    ///
+    /// Do not pass an arbitrary first reading: the reference is the baseline
+    /// against which later process deviations are scored.
+    pub fn set_manufacturing_reference(&mut self, reading: &ManufacturingReading) {
+        self.manufacturing_twin.set_reference(reading);
+    }
+
+    /// Configure the design-production twin from a reviewed reference.
+    pub fn set_design_loop_reference(&mut self, reading: &DesignLoopReading) {
+        self.design_loop_twin.set_reference(reading);
+    }
+
     pub fn inject_event(&mut self, event: FabricationEvent) {
         self.pending_events.push(event);
     }
@@ -273,6 +290,8 @@ impl FabricationManager {
         FabricationTelemetry {
             manufacturing_free_energy: self.last_manufacturing_fe,
             design_loop_free_energy: self.last_design_loop_fe,
+            manufacturing_reference_calibrated: self.manufacturing_twin.is_reference_calibrated(),
+            design_loop_reference_calibrated: self.design_loop_twin.is_reference_calibrated(),
             safety_level: format!("{:?}", self.safety_level),
             anomaly_count: self.anomaly_count_this_cycle,
             anomaly_ema: self.anomaly_ema,
@@ -414,7 +433,11 @@ impl FabricationManager {
     fn process_twin_reading(&mut self, reading: &ManufacturingReading) {
         let output = self.manufacturing_twin.step(reading, 0.05);
         self.last_manufacturing_fe = output.free_energy;
-        self.last_recommended_action = format!("{:?}", output.recommended_action);
+        self.last_recommended_action = if output.reference_calibrated {
+            format!("{:?}", output.recommended_action)
+        } else {
+            "CalibrationRequired".to_string()
+        };
         if !output.prediction_similarities.is_empty() {
             let sum: f32 = output.prediction_similarities.iter().map(|(_, s)| *s).sum();
             self.last_prediction_coherence = sum / output.prediction_similarities.len() as f32;
@@ -468,9 +491,21 @@ impl FabricationManager {
         // Phase 4: step the manufacturing twin.
         let twin_out = self.manufacturing_twin.step(&mfg_reading, 0.05);
         self.last_manufacturing_fe = twin_out.free_energy;
-        self.last_recommended_action = format!("{:?}", twin_out.recommended_action);
+        self.last_recommended_action = if twin_out.reference_calibrated {
+            format!("{:?}", twin_out.recommended_action)
+        } else {
+            "CalibrationRequired".to_string()
+        };
 
-        // Simple quality estimate: high free energy = poor prediction = higher defect probability.
+        // Free energy is a sentinel before baseline commissioning, not evidence
+        // of poor quality. Do not turn that sentinel into a defect prediction.
+        if !twin_out.reference_calibrated {
+            self.defect_prediction = 0.0;
+            self.defect_confidence = 0.0;
+            return;
+        }
+
+        // Simple quality estimate: high calibrated free energy = poor prediction = higher defect probability.
         let quality_estimate =
             (1.0 - (twin_out.free_energy as f32).clamp(0.0, 1.0)).clamp(0.0, 1.0);
         let confidence_estimate = (1.0 - self.anomaly_ema).clamp(0.0, 1.0);
