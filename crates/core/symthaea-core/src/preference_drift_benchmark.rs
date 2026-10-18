@@ -311,7 +311,8 @@ pub fn validate_preference_drift_fixture(
                         &mut findings,
                         format!("{path}.scenario_family"),
                         format!(
-                            "scenario family `{}` leaks across `{}` and `{}` splits", family, previous_split, split
+                            "scenario family `{}` leaks across `{}` and `{}` splits",
+                            family, previous_split, split
                         ),
                     );
                 }
@@ -474,7 +475,7 @@ pub fn validate_preference_drift_fixture(
                 _ => finding(
                     &mut findings,
                     &observation_path,
-                    "observation must be a pairwise preference or a non-empty explicit reject-all record",
+                    "expected a preference pair or explicit non-empty reject-all list",
                 ),
             }
         }
@@ -539,7 +540,7 @@ pub fn validate_preference_drift_fixture(
                             finding(
                                 &mut findings,
                                 format!("{path}.evaluation_oracle.acceptable_candidate_ids"),
-                                format!("ineligible oracle candidate `{candidate_id}` is marked acceptable"),
+                                format!("oracle accepts ineligible candidate `{candidate_id}`"),
                             );
                         }
                     }
@@ -599,7 +600,7 @@ pub fn validate_preference_drift_fixture(
                                         "{path}.eligibility_constraints[{constraint_index}]"
                                     ),
                                     format!(
-                                        "eligible candidate `{candidate_id}` violates the declared mass ceiling"
+                                        "eligible candidate `{candidate_id}` exceeds mass ceiling"
                                     ),
                                 );
                             }
