@@ -237,6 +237,16 @@ pub fn validate_spatial_corpus(
         issues.push("confirmation set is empty".to_owned());
     }
 
+    // v1 is a frozen, seed-generated corpus definition. Reconstruct it to
+    // prevent a mutated target/oracle from being relabeled as the same fixture.
+    let expected = demo_synthetic_spatial_corpus(corpus.seed);
+    if corpus.discovery != expected.discovery {
+        issues.push("discovery records do not match the seed-generated v1 corpus".to_owned());
+    }
+    if corpus.confirmation != expected.confirmation {
+        issues.push("confirmation records do not match the seed-generated v1 oracle".to_owned());
+    }
+
     let mut observation_ids = HashSet::new();
     let mut positions = Vec::new();
     for observation in &corpus.discovery {
@@ -613,6 +623,10 @@ mod tests {
         let mut duplicated = demo_synthetic_spatial_corpus(42);
         duplicated.confirmation[1].position = duplicated.confirmation[0].position;
         assert!(validate_spatial_corpus(&duplicated).is_err());
+
+        let mut altered_oracle = demo_synthetic_spatial_corpus(42);
+        altered_oracle.confirmation[0].oracle_signed_error_mm += 0.01;
+        assert!(validate_spatial_corpus(&altered_oracle).is_err());
     }
 
     #[test]
