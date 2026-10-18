@@ -6,7 +6,7 @@ use symthaea_experiment_design::{ExperimentDesignInput, galileo_demo_input, rank
 fn main() -> ExitCode {
     let args: Vec<String> = std::env::args().skip(1).collect();
     if args.len() > 1 {
-        eprintln!("usage: physics-experiment-design [--demo|--help] < input.json");
+        eprintln!("usage: symthaea-experiment-design [--demo|--help] < input.json");
         return ExitCode::from(2);
     }
 
@@ -22,7 +22,7 @@ fn main() -> ExitCode {
         Some("--demo") => galileo_demo_input(),
         Some(unknown) => {
             eprintln!("unknown argument: {unknown}");
-            eprintln!("usage: physics-experiment-design [--demo|--help] < input.json");
+            eprintln!("usage: symthaea-experiment-design [--demo|--help] < input.json");
             return ExitCode::from(2);
         }
         None => {
