@@ -718,7 +718,7 @@ fn validate_verification_status(root: &Value, issues: &mut Vec<ValidationIssue>)
         ("human_evaluation", "none"),
         ("independent_replication", "none"),
         ("process_plan_execution", "not_run"),
-        ("independent_qualifier", "not_implemented"),
+        ("independent_qualifier", "implemented_not_executed"),
     ] {
         if status.get(field).and_then(Value::as_str) != Some(expected) {
             push(
