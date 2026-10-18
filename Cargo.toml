@@ -25,6 +25,9 @@ exclude = [
     "crates/domains/symthaea-spore/fuzz",
     "crates/domains/spark-engine",
     "crates/domains/symthaea-lab",
+    # Stale observation-attestation scaffold has no Cargo.toml. Keep the
+    # glob-matched directory out until it is restored as a valid crate.
+    "crates/core/symthaea-observation-attestation",
     # ARCHIVED 2026-07-16 (vision review P2.2): real SigLIP/Moondream/ocrs ONNX
     # stack, but zero consumers — its only reference is foveation's non-default
     # `perception` feature nothing enables, and it duplicates src/perception/'s
