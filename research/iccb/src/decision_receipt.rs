@@ -1,9 +1,10 @@
 //! Versioned, deterministic decision receipts for replayable ICCB runs.
 //!
-//! Input-manifest bytes must already use the canonical encoding named by this
-//! module's version. We hash those exact bytes; we do not canonicalize arbitrary
-//! JSON or claim the manifest's contents are true. Verification re-evaluates the
-//! supplied scenario using this evaluator. A valid receipt is not spending authority.
+//! The input manifest is hashed byte-for-byte with its own declared encoding version.
+//! This module does not canonicalize arbitrary manifest formats or claim its contents
+//! are true. Its own versioned binary encoding applies to scenario, output and receipt
+//! fields. Verification re-evaluates the supplied scenario using this evaluator. A
+//! valid receipt is not spending authority.
 
 use crate::{
     CandidateScenario, EvaluationReceipt, EvidenceState, OptionEvaluation, RejectionReason,
@@ -22,7 +23,9 @@ pub struct DecisionRunContext {
     pub producer_commit: String,
     /// Stable evaluator/package version.
     pub evaluator_version: String,
-    /// Exact bytes of the input manifest, already canonicalized per the version above.
+    /// Version/encoding of the supplied manifest bytes; declared, not independently validated.
+    pub input_manifest_encoding_version: String,
+    /// Exact bytes of that manifest. These bytes are hashed verbatim.
     pub input_manifest_bytes: Vec<u8>,
     /// Must be derived from these same manifest bytes via UncertaintyAssessmentRef::route.
     pub routing: UncertaintyRoutingReceipt,
@@ -34,6 +37,8 @@ pub struct DecisionRunContext {
 pub struct DecisionReceipt {
     pub schema_version: String,
     pub canonicalization_version: String,
+    pub input_manifest_encoding_version: String,
+    pub upstream_producer_version: String,
     pub scenario_id: String,
     pub evaluation_day: u32,
     pub producer_commit: String,
@@ -56,6 +61,8 @@ pub enum DecisionReceiptError {
     MalformedProducerCommit,
     MissingEvaluatorVersion,
     EmptyInputManifest,
+    MissingInputManifestEncodingVersion,
+    MissingUpstreamProducerVersion,
     MissingClaimCeiling,
     RoutingScenarioMismatch,
     MissingRoutingEvidence,
@@ -296,6 +303,8 @@ fn canonical_receipt_bytes(receipt: &DecisionReceipt) -> Vec<u8> {
     let mut bytes = Vec::new();
     put_str(&mut bytes, &receipt.schema_version);
     put_str(&mut bytes, &receipt.canonicalization_version);
+    put_str(&mut bytes, &receipt.input_manifest_encoding_version);
+    put_str(&mut bytes, &receipt.upstream_producer_version);
     put_str(&mut bytes, &receipt.scenario_id);
     put_u64(&mut bytes, u64::from(receipt.evaluation_day));
     put_str(&mut bytes, &receipt.producer_commit);
@@ -326,6 +335,12 @@ fn validate_context(
     if context.input_manifest_bytes.is_empty() {
         return Err(DecisionReceiptError::EmptyInputManifest);
     }
+    if context.input_manifest_encoding_version.trim().is_empty() {
+        return Err(DecisionReceiptError::MissingInputManifestEncodingVersion);
+    }
+    if context.routing.producer_version.trim().is_empty() {
+        return Err(DecisionReceiptError::MissingUpstreamProducerVersion);
+    }
     if context.claim_ceiling.trim().is_empty() {
         return Err(DecisionReceiptError::MissingClaimCeiling);
     }
@@ -345,9 +360,10 @@ fn validate_context(
     Ok(manifest_digest)
 }
 
-/// Build a receipt around the scenario's actual output. The manifest bytes must
-/// already use the named canonical encoding. The manifest digest is recomputed
-/// here, and the scenario/output are hashed separately for replay comparison.
+/// Build a receipt around the scenario's actual output. The manifest digest is
+/// recomputed from exact supplied bytes. The scenario/output are hashed separately
+/// with this module's canonical encoding, while the manifest's own encoding label
+/// is preserved verbatim for later independent replay.
 pub fn create_decision_receipt(
     context: &DecisionRunContext,
     scenario: &CandidateScenario,
@@ -360,6 +376,8 @@ pub fn create_decision_receipt(
     let mut receipt = DecisionReceipt {
         schema_version: DECISION_RECEIPT_SCHEMA.to_owned(),
         canonicalization_version: CANONICALIZATION_VERSION.to_owned(),
+        input_manifest_encoding_version: context.input_manifest_encoding_version.clone(),
+        upstream_producer_version: context.routing.producer_version.clone(),
         scenario_id: scenario.id.clone(),
         evaluation_day: output.evaluation_day,
         producer_commit: context.producer_commit.clone(),
@@ -465,6 +483,7 @@ mod tests {
         DecisionRunContext {
             producer_commit: "0123456789abcdef0123456789abcdef01234567".into(),
             evaluator_version: "iccb-evaluator-0.1.0".into(),
+            input_manifest_encoding_version: "utf8-synthetic-fixture-v1".into(),
             input_manifest_bytes: manifest.to_vec(),
             routing,
             claim_ceiling: "synthetic rule evaluation; not a forecast or authorization".into(),
