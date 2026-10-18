@@ -1,0 +1,73 @@
+name: Ore Assay Benchmark
+
+on:
+  push:
+    branches: ["feat/ore-assay-contract-bench-v0-1"]
+    paths:
+      - "docs/tech/ORE_ASSAY_BENCHMARK_V0_1.md"
+      - "docs/tech/ore-assay-benchmark-corpus-v0.1.json"
+      - "tools/ore-assay-bench/**"
+      - ".github/workflows/ore-assay-bench.yml"
+  pull_request:
+    types: [opened, synchronize, reopened, ready_for_review]
+    paths:
+      - "docs/tech/ORE_ASSAY_BENCHMARK_V0_1.md"
+      - "docs/tech/ore-assay-benchmark-corpus-v0.1.json"
+      - "tools/ore-assay-bench/**"
+      - ".github/workflows/ore-assay-bench.yml"
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+concurrency:
+  group: ore-assay-bench-${{ github.event.pull_request.number || github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  validate-contract:
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          ref: ${{ github.event.pull_request.head.sha || github.sha }}
+          persist-credentials: false
+      - name: Install pinned Rust toolchain
+        uses: dtolnay/rust-toolchain@stable
+        with:
+          toolchain: 1.96.0
+          components: rustfmt
+      - name: Check formatting
+        run: cargo fmt --manifest-path tools/ore-assay-bench/Cargo.toml -- --check
+      - name: Run contract and adversarial tests
+        run: cargo test --manifest-path tools/ore-assay-bench/Cargo.toml
+      - name: Validate corpus at the exact source commit
+        shell: bash
+        run: |
+          set -euo pipefail
+          source_commit="$(git rev-parse HEAD)"
+          test "$source_commit" = "${{ github.event.pull_request.head.sha || github.sha }}"
+          cargo run --quiet --manifest-path tools/ore-assay-bench/Cargo.toml -- \
+            docs/tech/ore-assay-benchmark-corpus-v0.1.json \
+            --source-commit "$source_commit" > ore-assay-benchmark-receipt.json
+          jq -e '
+            .result == "validated"
+            and .scenario_count == 8
+            and .expected_controls_matched == 8
+            and (.corpus_sha256 | test("^[0-9a-f]{64}$"))
+            and (.source_commit | test("^[0-9a-f]{40}$"))
+            and ([.scenarios[].scenario_id] == [
+              "SYNTHETIC_VALID_ASSAY_AND_CLOSED_FLOW",
+              "SYNTHETIC_BELOW_DETECTION_FALSE_ZERO",
+              "SYNTHETIC_GRADE_BASIS_MISMATCH",
+              "SYNTHETIC_SAMPLE_LINEAGE_MISMATCH",
+              "SYNTHETIC_DRY_MASS_CREATION",
+              "SYNTHETIC_ASSAY_QC_UNRESOLVED",
+              "SYNTHETIC_MINERAL_PHASE_TOTAL_TOO_HIGH",
+              "SYNTHETIC_SOURCE_REFERENCE_MISSING"
+            ])
+            and ([.scenarios[].actual_disposition] == [
+              "pass", "reject", "reject", "reject", "reject", "reject", "reject", "reject"
+            ])
+          ' ore-assay-benchmark-receipt.json
