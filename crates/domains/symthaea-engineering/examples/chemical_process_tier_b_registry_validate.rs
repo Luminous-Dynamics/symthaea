@@ -73,7 +73,7 @@ fn is_sha256(value: &Value) -> bool {
 
 
 const FREEZE_RECEIPT_DIGEST_DOMAIN: &[u8] =
-    b"symthaea:chemical-process-tier-b-freeze-receipt:v1\\n";
+    b"symthaea:chemical-process-tier-b-freeze-receipt:v1\n";
 
 /// Append deterministic JSON bytes with object keys sorted independently of
 /// serde_json's optional map backend. This is a repository-local canonical form,
@@ -525,6 +525,20 @@ fn validate_registry(registry: &Value) -> Vec<String> {
     if text(registry, "purpose").is_none_or(|value| value.trim().is_empty()) {
         errors.push("purpose must be explicit".to_owned());
     }
+
+    let digest_policy = &registry["freeze_receipt_digest_policy"];
+    for (field, expected) in [
+        ("field", "reference_outputs.freeze_receipt_sha256"),
+        ("algorithm", "SHA-256"),
+        ("domain_separator", "symthaea:chemical-process-tier-b-freeze-receipt:v1\\n"),
+        ("canonicalization", "Symthaea repository-local canonical JSON v1: object keys sorted lexicographically; array order preserved; strings serialized by serde_json; numbers emitted by serde_json::Number::to_string()."),
+        ("digest_scope", "The freeze_receipt JSON value only; the sibling freeze_receipt_sha256 field is excluded."),
+        ("security_boundary", "Detects stale or accidental receipt mutation. It is not a signature, does not authenticate an author, and does not prove scientific claims true; an actor able to rewrite both receipt and digest can recompute the pair.")
+    ] {
+        if text(digest_policy, field) != Some(expected) {
+            errors.push(format!("freeze_receipt_digest_policy.{field} must exactly match the implementation contract"));
+        }
+    }
     if registry["safety_and_claim_policy"]["no_operational_authority"].as_bool() != Some(true) {
         errors.push("no_operational_authority must remain true".to_owned());
     }
@@ -639,6 +653,7 @@ fn validate_registry(registry: &Value) -> Vec<String> {
         ("transitive_shared_dependency_mutation_detection", 1.0_f64),
         ("malformed_lineage_graph_detection", 1.0_f64),
         ("frozen_receipt_digest_mutation_detection", 1.0_f64),
+        ("freeze_receipt_digest_policy_mutation_detection", 1.0_f64),
     ] {
         let actual = targets[field]["target"].as_f64();
         if actual != Some(expected) || targets[field]["hard_gate"].as_bool() != Some(true) {
@@ -1126,6 +1141,21 @@ mod tests {
             freeze_receipt_digest(&left).unwrap(),
             freeze_receipt_digest(&right).unwrap(),
             "canonical receipt digest must not depend on JSON object insertion order"
+        );
+    }
+
+
+
+    #[test]
+    fn digest_policy_mutation_is_rejected() {
+        let mut value = registry();
+        value["freeze_receipt_digest_policy"]["domain_separator"] =
+            json!("unbound-or-different-domain");
+        assert!(
+            validate_registry(&value)
+                .iter()
+                .any(|error| error.contains("freeze_receipt_digest_policy.domain_separator")),
+            "digest policy cannot drift away from the compiled implementation"
         );
     }
 
