@@ -321,7 +321,7 @@ mod tests {
     fn committed_benchmark_contract_is_well_formed_and_non_passing() {
         let fixture: Value = serde_json::from_str(BENCHMARK_FIXTURE).unwrap();
         let count = validate_benchmark_contract(&fixture).unwrap();
-        assert_eq!(count, 13);
+        assert_eq!(count, 14);
     }
 
     #[test]
