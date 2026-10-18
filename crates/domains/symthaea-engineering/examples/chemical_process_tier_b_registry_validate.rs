@@ -5,6 +5,7 @@
 // It does not execute a simulator or establish chemical-engineering validity.
 
 use serde_json::{json, Value};
+use symthaea_fabrication_kernel::crypto_digest::sha256;
 use std::{
     collections::{BTreeMap, BTreeSet},
     env,
@@ -68,6 +69,60 @@ fn is_sha256(value: &Value) -> bool {
     };
     let value = value.strip_prefix("sha256:").unwrap_or(value);
     value.len() == 64 && value.chars().all(|character| character.is_ascii_hexdigit())
+}
+
+
+const FREEZE_RECEIPT_DIGEST_DOMAIN: &[u8] =
+    b"symthaea:chemical-process-tier-b-freeze-receipt:v1\\n";
+
+/// Append deterministic JSON bytes with object keys sorted independently of
+/// serde_json's optional map backend. This is a repository-local canonical form,
+/// not a claim of RFC 8785/JCS conformance.
+fn append_canonical_json(value: &Value, output: &mut Vec<u8>) -> Result<(), String> {
+    match value {
+        Value::Null => output.extend_from_slice(b"null"),
+        Value::Bool(false) => output.extend_from_slice(b"false"),
+        Value::Bool(true) => output.extend_from_slice(b"true"),
+        Value::Number(number) => output.extend_from_slice(number.to_string().as_bytes()),
+        Value::String(text) => {
+            let encoded = serde_json::to_vec(text).map_err(|error| error.to_string())?;
+            output.extend_from_slice(&encoded);
+        }
+        Value::Array(items) => {
+            output.push(b'[');
+            for (index, item) in items.iter().enumerate() {
+                if index > 0 {
+                    output.push(b',');
+                }
+                append_canonical_json(item, output)?;
+            }
+            output.push(b']');
+        }
+        Value::Object(fields) => {
+            let mut entries = fields.iter().collect::<Vec<_>>();
+            entries.sort_by(|(left, _), (right, _)| left.cmp(right));
+            output.push(b'{');
+            for (index, (key, item)) in entries.into_iter().enumerate() {
+                if index > 0 {
+                    output.push(b',');
+                }
+                let encoded_key = serde_json::to_vec(key).map_err(|error| error.to_string())?;
+                output.extend_from_slice(&encoded_key);
+                output.push(b':');
+                append_canonical_json(item, output)?;
+            }
+            output.push(b'}');
+        }
+    }
+    Ok(())
+}
+
+/// Content digest for stale-receipt detection. This is integrity checking only:
+/// it is neither a signature nor proof that the receipt's statements are true.
+fn freeze_receipt_digest(receipt: &Value) -> Result<String, String> {
+    let mut bytes = FREEZE_RECEIPT_DIGEST_DOMAIN.to_vec();
+    append_canonical_json(receipt, &mut bytes)?;
+    Ok(format!("sha256:{}", sha256(&bytes).to_hex()))
 }
 
 fn source_has_url(source: &Value) -> bool {
@@ -345,6 +400,16 @@ fn validate_frozen_receipt(candidate: &Value, errors: &mut Vec<String>, id: &str
         if !receipt.is_object() {
             errors.push(format!("{id}: frozen outputs require a freeze_receipt object"));
         } else {
+            match freeze_receipt_digest(receipt) {
+                Ok(expected_digest) => {
+                    if !is_sha256(&outputs["freeze_receipt_sha256"])
+                        || text(outputs, "freeze_receipt_sha256") != Some(expected_digest.as_str())
+                    {
+                        errors.push(format!("{id}: freeze_receipt_sha256 does not match the canonical freeze_receipt content"));
+                    }
+                }
+                Err(reason) => errors.push(format!("{id}: cannot canonicalize freeze_receipt: {reason}")),
+            }
             for field in RECEIPT_FIELD_NAMES {
                 if !receipt.get(*field).is_some_and(has_content) {
                     errors.push(format!("{id}: freeze_receipt is missing {field}"));
@@ -367,6 +432,12 @@ fn validate_frozen_receipt(candidate: &Value, errors: &mut Vec<String>, id: &str
         }
         if !outputs["output_digest"].is_null() {
             errors.push(format!("{id}: non-frozen outputs require output_digest=null"));
+        }
+        if !outputs["freeze_receipt_sha256"].is_null() {
+            errors.push(format!("{id}: non-frozen outputs require freeze_receipt_sha256=null"));
+        }
+        if outputs.get("freeze_receipt").is_some_and(has_content) {
+            errors.push(format!("{id}: non-frozen outputs may not carry a freeze_receipt"));
         }
         if status == "PASS" {
             errors.push(format!("{id}: PASS cannot be claimed while exact outputs are unfrozen"));
@@ -448,8 +519,8 @@ fn validate_registry(registry: &Value) -> Vec<String> {
     {
         errors.push("schema_id is missing or unrecognized".to_owned());
     }
-    if text(registry, "schema_version") != Some("1.1.0") {
-        errors.push("schema_version must be 1.1.0".to_owned());
+    if text(registry, "schema_version") != Some("1.2.0") {
+        errors.push("schema_version must be 1.2.0".to_owned());
     }
     if text(registry, "purpose").is_none_or(|value| value.trim().is_empty()) {
         errors.push("purpose must be explicit".to_owned());
@@ -528,6 +599,9 @@ fn validate_registry(registry: &Value) -> Vec<String> {
         if !nonempty_text(&candidate["reference_outputs"], "state") {
             errors.push(format!("{id}: reference_outputs.state is required"));
         }
+        if candidate["reference_outputs"].get("freeze_receipt_sha256").is_none() {
+            errors.push(format!("{id}: reference_outputs.freeze_receipt_sha256 must be explicit (null until frozen)"));
+        }
 
         if !freeze_state.eq("FROZEN")
             && !candidate["freeze_blockers"]
@@ -564,6 +638,7 @@ fn validate_registry(registry: &Value) -> Vec<String> {
         ("negative_control_false_accepts", 0.0_f64),
         ("transitive_shared_dependency_mutation_detection", 1.0_f64),
         ("malformed_lineage_graph_detection", 1.0_f64),
+        ("frozen_receipt_digest_mutation_detection", 1.0_f64),
     ] {
         let actual = targets[field]["target"].as_f64();
         if actual != Some(expected) || targets[field]["hard_gate"].as_bool() != Some(true) {
@@ -670,7 +745,7 @@ fn run() -> Result<bool, Box<dyn Error>> {
     println!(
         "{}",
         serde_json::to_string_pretty(&json!({
-            "validator": "chemical_process_tier_b_registry_contract_v1_1",
+            "validator": "chemical_process_tier_b_registry_contract_v1_2",
             "registry_path": path,
             "registry_bytes": bytes.len(),
             "schema_version": text(&registry, "schema_version"),
@@ -761,6 +836,13 @@ mod tests {
         );
     }
 
+    fn refresh_freeze_receipt_digest(value: &mut Value) {
+        let digest = freeze_receipt_digest(
+            &value["candidates"][0]["reference_outputs"]["freeze_receipt"],
+        ).expect("synthetic freeze receipt should canonicalize");
+        value["candidates"][0]["reference_outputs"]["freeze_receipt_sha256"] = json!(digest);
+    }
+
     fn frozen_receipt_registry() -> Value {
         let mut value = registry();
         let candidate = &mut value["candidates"][0];
@@ -849,6 +931,7 @@ mod tests {
             },
             "claim_ceiling": "only matched-context water-mixer reference reproducibility"
         });
+        refresh_freeze_receipt_digest(&mut value);
         value
     }
 
@@ -894,6 +977,7 @@ mod tests {
             audit["shared_dependency_digests"] = json!([common]);
             audit["independent_corroboration_claimed"] = json!(false);
         }
+        refresh_freeze_receipt_digest(&mut value);
         assert!(
             validate_registry(&value).is_empty(),
             "transitive shared source should be accepted when disclosed without an independence claim: {:?}",
@@ -964,6 +1048,7 @@ mod tests {
             "sha256:dddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddd"
         ]);
         audit["independent_corroboration_claimed"] = json!(false);
+        refresh_freeze_receipt_digest(&mut value);
         assert!(
             validate_registry(&value).is_empty(),
             "shared dependencies are admissible only when explicitly declared and not promoted: {:?}",
@@ -1016,5 +1101,33 @@ mod tests {
             "a frozen receipt with an empty exclusions list must fail closed: {errors:?}"
         );
     }
+
+
+    #[test]
+    fn freeze_receipt_digest_detects_scope_or_provenance_mutation() {
+        let mut value = frozen_receipt_registry();
+        assert!(validate_registry(&value).is_empty());
+
+        value["candidates"][0]["reference_outputs"]["freeze_receipt"]
+            ["declared_context_of_use_and_validity_domain"]["context_of_use"] =
+            json!("unbounded general process design");
+        let errors = validate_registry(&value);
+        assert!(
+            errors.iter().any(|error| error.contains("freeze_receipt_sha256 does not match")),
+            "changing the receipt without updating its content digest must invalidate it: {errors:?}"
+        );
+    }
+
+    #[test]
+    fn canonical_receipt_digest_is_object_key_order_independent() {
+        let left = json!({"z": 9, "a": {"y": true, "b": null}});
+        let right = json!({"a": {"b": null, "y": true}, "z": 9});
+        assert_eq!(
+            freeze_receipt_digest(&left).unwrap(),
+            freeze_receipt_digest(&right).unwrap(),
+            "canonical receipt digest must not depend on JSON object insertion order"
+        );
+    }
+
 
 }
