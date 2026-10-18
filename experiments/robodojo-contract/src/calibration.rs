@@ -353,6 +353,90 @@ mod tests {
         }
     }
 
+    fn intervention_policy() -> InterventionPolicy {
+        InterventionPolicy::new(100.0, 10.0, 5.0, 0.6, 2).unwrap()
+    }
+
+    #[test]
+    fn expected_value_gate_replans_when_predicted_gain_exceeds_cost() {
+        assert_eq!(
+            intervention_policy().decide(0.3, 0.8, 0),
+            Ok(InterventionDecision::RequestReplan {
+                expected_benefit: 40.0,
+                replans_remaining: 2,
+            })
+        );
+    }
+
+    #[test]
+    fn expected_value_gate_continues_when_replanning_is_not_worth_its_cost() {
+        assert_eq!(
+            intervention_policy().decide(0.8, 0.82, 0),
+            Ok(InterventionDecision::Continue { expected_benefit: -8.0 })
+        );
+    }
+
+    #[test]
+    fn low_confidence_with_no_replan_budget_stops_for_review() {
+        assert_eq!(
+            intervention_policy().decide(0.2, 0.9, 2),
+            Ok(InterventionDecision::StopAndEscalate {
+                expected_benefit: 60.0,
+                reason: EscalationReason::ReplanBudgetExhausted,
+            })
+        );
+    }
+
+    #[test]
+    fn low_confidence_stops_when_replan_has_insufficient_expected_benefit() {
+        let policy = InterventionPolicy::new(100.0, 50.0, 5.0, 0.6, 2).unwrap();
+        assert_eq!(
+            policy.decide(0.3, 0.7, 0),
+            Ok(InterventionDecision::StopAndEscalate {
+                expected_benefit: -10.0,
+                reason: EscalationReason::ConfidenceBelowContinueThreshold,
+            })
+        );
+    }
+
+    #[test]
+    fn invalid_probability_is_rejected_before_decision() {
+        assert_eq!(
+            intervention_policy().decide(f64::NAN, 0.9, 0),
+            Err(InterventionError::InvalidCurrentProbability)
+        );
+        assert_eq!(
+            intervention_policy().decide(0.5, f64::INFINITY, 0),
+            Err(InterventionError::InvalidPostInterventionProbability)
+        );
+    }
+
+    #[test]
+    fn intervention_configuration_rejects_invalid_costs_and_thresholds() {
+        assert_eq!(
+            InterventionPolicy::new(0.0, 1.0, 0.0, 0.5, 1),
+            Err(InterventionConfigError::InvalidFailureCost)
+        );
+        assert_eq!(
+            InterventionPolicy::new(1.0, -1.0, 0.0, 0.5, 1),
+            Err(InterventionConfigError::InvalidInterventionCost)
+        );
+        assert_eq!(
+            InterventionPolicy::new(1.0, 1.0, -1.0, 0.5, 1),
+            Err(InterventionConfigError::InvalidMinimumBenefit)
+        );
+        assert_eq!(
+            InterventionPolicy::new(1.0, 1.0, 0.0, 1.1, 1),
+            Err(InterventionConfigError::InvalidContinueProbability)
+        );
+    }
+
+    #[test]
+    fn expected_value_decisions_are_deterministic() {
+        let policy = intervention_policy();
+        assert_eq!(policy.decide(0.45, 0.8, 0), policy.decide(0.45, 0.8, 0));
+    }
+
     #[test]
     fn perfect_forecasts_have_zero_brier_and_calibration_error() {
         let rows = vec![forecast("a", 0.0, false, true), forecast("b", 1.0, true, true)];
