@@ -55,3 +55,25 @@ Do not tune the confidence threshold on held-out test data. Split calibration an
 The statistics layer treats a valid partial grade as scored progress and a missing grade as an invalid run. Invalid runs remain in the attempted-trial and reliability denominators; they are excluded only from the mean of graded progress. Paired progress deltas require the same task/trial IDs on both sides and macro-average tasks equally before bootstrapping so an overrepresented easy task cannot dominate the comparison.
 
 This crate currently validates the integration boundary and scoring logic only. It does not connect to RoboDojo-RC, XPolicyLab, a pretrained policy, a simulator, or actuators. Passing these tests is not a RoboDojo-RC task result. The next integration step is to write the thin XPolicyLab adapter and run a simulator/physical evaluation before comparing baseline versus sidecar task progress.
+
+## Shift manifest and robustness audit
+
+Compare a pinned baseline and candidate within each pre-registered perturbation stratum:
+
+~~~sh
+cargo run --locked --manifest-path experiments/robodojo-contract/Cargo.toml -- --shift-audit \
+  experiments/robodojo-contract/examples/synthetic_trials.tsv \
+  experiments/robodojo-contract/examples/synthetic_shift_plan.tsv baseline symthaea_sidecar
+~~~
+
+The exact shift-plan header is:
+
+~~~text
+task_id trial_id condition_id family severity seed perturbation_spec_sha256
+~~~
+
+Fields are tab-separated. Each task/trial pair has one manifest assignment shared by both variants. Families: nominal, appearance, geometry, lighting, occlusion, dynamics, sensor_latency, instruction_semantics, object_state, tool_failure. Severities: clean, mild, moderate, severe. The SHA-256 identifies the immutable perturbation configuration artifact; this harness validates the digest format but does not dereference or recompute that artifact.
+
+The audit rejects duplicate manifest keys, malformed digests, unmatched or missing rows, unpaired trials, and unexpected variants. Results are kept separate by family, severity, and exact spec digest. They include paired progress deltas/intervals where sample size permits, completion and valid-run deltas, runtime/cost, safety events, and operational failure-class deltas. Sparse strata emit NA intervals rather than implying precision.
+
+The shift-plan fixture is synthetic test data, not an RC benchmark result. Physical evaluation must preserve the canonical configuration payload beside its digest, measure realized perturbations where possible, retain unsuccessful attempts, and pre-register conditions and stopping rules.
