@@ -66,3 +66,12 @@ Do not launch a custom HDMI/eDP PHY and a custom pixel plane together. Start wit
 - **Openness:** publish our preferred editable source files and BOM; preserve third-party notices/licenses; classify each restricted vendor interface honestly.
 
 All candidate entries remain research references. There is no selected, measured or purchase-ready hardware BOM at this stage.
+
+## Measurement-standard and uncertainty gate
+
+The [International Committee for Display Metrology (ICDM)](https://www.sid.org/Standards/ICDM/ICDM) provides the Information Display Measurements Standard (IDMS); the current site identifies v1.3 (2025) and targets v1.4 for 2028. ODRH should reuse applicable method identifiers and record exact edition/adaptations instead of creating competing color, luminance, uniformity or response-time procedures. Do not reproduce the standard or claim project certification.
+
+The new [ODRH-MET-001 reproducibility issue #8049](https://github.com/Luminous-Dynamics/symthaea/issues/8049) and [display metrology protocol](DISPLAY_METROLOGY_REPRODUCIBILITY_PROTOCOL.md) add a decision-capability gate: the proposed expanded uncertainty should be no larger than one third of the minimum engineering effect that would change the design decision. This is an ODRH project hypothesis, not an IDMS requirement. If that condition cannot be met, the metric stays unqualified/NOT_EVALUATED for candidate ranking.
+
+This shifts the first experiment from “which display scores highest?” to “can our instrument and protocol reliably resolve a difference large enough to justify choosing one display?” That is a prerequisite to meaningful optimization.
+
