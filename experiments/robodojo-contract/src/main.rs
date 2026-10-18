@@ -4,11 +4,13 @@ use std::io::{Error as IoError, ErrorKind};
 use std::path::Path;
 
 use symthaea_robodojo_contract::{
+    calibration::{summarize_calibration, SuccessForecast},
     compare_paired_trials, summarize_trials, ActionProposal, ActionRejection, AxisLimit,
     EpisodeGuard, GateConfig, ObservationDecision, ObservationFrame, TrialRecord,
 };
 
 const TRIALS_HEADER: &str = "task_id\tvariant_id\ttrial_id\tprogress\tcompleted\tvalid_run\ttimed_out\telapsed_seconds\tmodel_calls\taction_steps\testimated_cost_usd\tsafety_events";
+const FORECASTS_HEADER: &str = "task_id\tvariant_id\ttrial_id\tpredicted_success_probability\tsuccess\tvalid_run";
 
 fn main() {
     if let Err(error) = run() {
@@ -48,6 +50,28 @@ fn run() -> Result<(), Box<dyn Error>> {
                     valid_completion, optional_pct(row.mean_progress), lo, hi,
                     row.mean_elapsed_seconds, row.mean_model_calls, row.mean_action_steps,
                     row.mean_estimated_cost_usd, row.timeout_count, row.safety_event_count
+                );
+            }
+            Ok(())
+        }
+        Some("--calibrate") => {
+            if !(2..=4).contains(&args.len()) {
+                return Err(invalid_input("usage: --calibrate FORECASTS.tsv [BIN_COUNT] [HIGH_CONFIDENCE_THRESHOLD]").into());
+            }
+            let forecasts = read_forecasts(&args[1])?;
+            let bins = parse_optional(&args, 2, 10usize, "calibration bin count")?;
+            let threshold = parse_optional(&args, 3, 0.8f64, "high-confidence threshold")?;
+            let summaries = summarize_calibration(&forecasts, bins, threshold)
+                .map_err(|error| invalid_input(format!("cannot summarize forecasts: {error:?}")))?;
+            println!("task_id\tvariant_id\ttrials\tvalid_runs\tsuccesses\tfailures\tobserved_success_pct\tmean_predicted_pct\tbrier_score\tlog_loss\tece\thigh_confidence_trials\thigh_confidence_failure_pct\trisk_coverage_auc");
+            for row in summaries {
+                println!(
+                    "{}\t{}\t{}\t{}\t{}\t{}\t{}\t{}\t{:.6}\t{:.6}\t{:.6}\t{}\t{}\t{:.6}",
+                    row.task_id, row.variant_id, row.total_trials, row.valid_runs,
+                    row.successes, row.failures, pct(row.observed_success_rate),
+                    pct(row.mean_predicted_probability), row.brier_score, row.log_loss,
+                    row.expected_calibration_error, row.high_confidence_trials,
+                    optional_pct(row.high_confidence_failure_rate), row.risk_coverage_auc
                 );
             }
             Ok(())
@@ -171,6 +195,55 @@ fn read_trials(path: impl AsRef<Path>) -> Result<Vec<TrialRecord>, Box<dyn Error
     Ok(records)
 }
 
+fn read_forecasts(path: impl AsRef<Path>) -> Result<Vec<SuccessForecast>, Box<dyn Error>> {
+    let contents = fs::read_to_string(path.as_ref())?;
+    let mut lines = contents.lines();
+    let header = lines.next().ok_or_else(|| invalid_input("forecast file is empty"))?;
+    if header.trim_end_matches('\r') != FORECASTS_HEADER {
+        return Err(invalid_input(format!("unexpected forecast header; expected: {FORECASTS_HEADER}")).into());
+    }
+
+    let mut records = Vec::new();
+    for (zero_based_line, line) in lines.enumerate() {
+        let line = line.trim_end_matches('\r');
+        if line.is_empty() || line.starts_with('#') { continue; }
+        let columns: Vec<&str> = line.split('\t').collect();
+        if columns.len() != 6 {
+            return Err(invalid_input(format!(
+                "{}:{} expected 6 tab-separated fields, got {}",
+                path.as_ref().display(), zero_based_line + 2, columns.len()
+            )).into());
+        }
+        let row_line = zero_based_line + 2;
+        let probability = columns[3].parse::<f64>().map_err(|_| invalid_input(format!(
+            "line {row_line} invalid predicted_success_probability: {:?}", columns[3]
+        )))?;
+        let parse_bool = |index: usize, label: &str| -> Result<bool, Box<dyn Error>> {
+            match columns[index] {
+                "true" => Ok(true),
+                "false" => Ok(false),
+                value => Err(invalid_input(format!(
+                    "line {row_line} invalid {label}: {value:?}; use true or false"
+                )).into()),
+            }
+        };
+        let record = SuccessForecast {
+            task_id: columns[0].to_owned(),
+            variant_id: columns[1].to_owned(),
+            trial_id: columns[2].to_owned(),
+            predicted_success_probability: probability,
+            success: parse_bool(4, "success")?,
+            valid_run: parse_bool(5, "valid_run")?,
+        };
+        record.validate().map_err(|error| invalid_input(format!(
+            "line {row_line} invalid forecast: {error:?}"
+        )))?;
+        records.push(record);
+    }
+    if records.is_empty() { return Err(invalid_input("forecast file contains no records").into()); }
+    Ok(records)
+}
+
 fn pct(value: f64) -> String { format!("{:.2}", value * 100.0) }
 
 fn optional_pct(value: Option<f64>) -> String {
@@ -192,6 +265,8 @@ fn print_help() {
     println!("      Emit task-by-variant score/reliability metrics as TSV.");
     println!("  cargo run --locked --manifest-path experiments/robodojo-contract/Cargo.toml -- --compare TRIALS.tsv BASELINE CANDIDATE [BOOTSTRAPS] [SEED]");
     println!("      Compare matched trials; report task-macro partial-progress delta and reliability/cost deltas.");
+    println!("  cargo run --locked --manifest-path experiments/robodojo-contract/Cargo.toml -- --calibrate FORECASTS.tsv [BIN_COUNT] [HIGH_CONFIDENCE_THRESHOLD]");
+    println!("      Score pre-trial completion-probability forecasts with Brier, log loss, ECE, high-confidence failure rate, and risk-coverage AUC.");
     println!();
     println!("TRIALS.tsv must use the exact header documented in README.md. Use NA progress for attempts that have no valid final grade.");
 }
