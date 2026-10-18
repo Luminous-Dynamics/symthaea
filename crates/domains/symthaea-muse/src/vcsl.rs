@@ -2270,7 +2270,7 @@ fn asset_root_content_manifest_sha256(
     use std::io::Read as _;
 
     let mut manifest = Sha256::new();
-    manifest.update(b"muse-asset-root-content-manifest-v1\\0");
+    manifest.update(b"muse-asset-root-content-manifest-v1\0");
     let mut buffer = [0u8; 64 * 1024];
 
     for (relative_path, expected_size) in entries {
