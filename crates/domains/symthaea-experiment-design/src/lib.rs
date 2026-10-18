@@ -336,11 +336,14 @@ pub fn rank_experiments(input: &ExperimentDesignInput) -> Result<DesignReport, P
             });
         }
 
+        let mut settings = experiment.settings.clone();
+        settings.sort_by(|a, b| a.parameter_id.cmp(&b.parameter_id));
+
         ranked.push(RankedExperiment {
             rank: 0,
             experiment_id: experiment.experiment_id.clone(),
             description: experiment.description.clone(),
-            settings: experiment.settings.clone(),
+            settings,
             cost_units: experiment.cost_units,
             duration_hours: experiment.duration_hours,
             worst_case_separation_sigma: worst_distance,
@@ -619,6 +622,7 @@ mod tests {
         permuted.hypothesis_ids.reverse();
         permuted.experiments.reverse();
         for experiment in &mut permuted.experiments {
+            experiment.settings.reverse();
             for observable in &mut experiment.observables {
                 observable.predictions.reverse();
             }
