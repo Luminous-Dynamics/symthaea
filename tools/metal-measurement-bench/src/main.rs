@@ -30,6 +30,7 @@ struct SourceManifest {
     schema_version: String,
     dataset: DatasetIdentity,
     related_sources: Vec<RelatedSource>,
+    source_objects: Vec<SourceObject>,
     challenge_context: ChallengeContext,
     reuse_policy: ReusePolicy,
     artifacts: Vec<SourceArtifact>,
@@ -61,6 +62,19 @@ struct RelatedSource {
 
 #[derive(Debug, Clone, Serialize, Deserialize)]
 #[serde(deny_unknown_fields)]
+struct SourceObject {
+    id: String,
+    source_doi: String,
+    source_url: String,
+    source_revision: String,
+    accessed_on: String,
+    terms_url: String,
+    terms_reviewed: bool,
+    local_use_authorized: bool,
+}
+
+#[derive(Debug, Clone, Serialize, Deserialize)]
+#[serde(deny_unknown_fields)]
 struct ChallengeContext {
     material: String,
     process: String,
@@ -88,6 +102,7 @@ struct ReusePolicy {
 struct SourceArtifact {
     relative_path: String,
     source_object_id: String,
+    source_doi: String,
     artifact_revision: String,
     accessed_on: String,
     source_url: String,
@@ -114,6 +129,8 @@ struct Observation {
     source_doi: String,
     specimen_id: String,
     lineage_group_id: String,
+    source_object_id: String,
+    source_row_id: String,
     source_field: String,
     variable_id: String,
     role: RecordRole,
@@ -338,6 +355,54 @@ fn validate_manifest(manifest: &SourceManifest) -> Result<()> {
         }
     }
 
+    let mut source_object_ids = BTreeSet::new();
+    let mut declared_source_dois = BTreeSet::new();
+    declared_source_dois.insert(manifest.dataset.doi.as_str());
+    for source in &manifest.related_sources {
+        if !source.doi.starts_with("not_applicable_") {
+            declared_source_dois.insert(source.doi.as_str());
+        }
+    }
+    for object in &manifest.source_objects {
+        for (field, value) in [
+            ("id", object.id.as_str()),
+            ("source_doi", object.source_doi.as_str()),
+            ("source_revision", object.source_revision.as_str()),
+        ] {
+            if !nonblank(value) {
+                return Err(AdapterError::Validation(format!(
+                    "source object {field} must not be blank"
+                )));
+            }
+        }
+        if !source_object_ids.insert(object.id.as_str()) {
+            return Err(AdapterError::Validation(format!(
+                "duplicate source object id {:?}", object.id
+            )));
+        }
+        if !declared_source_dois.contains(object.source_doi.as_str()) {
+            return Err(AdapterError::Validation(format!(
+                "source object {:?} references undeclared DOI {:?}",
+                object.id, object.source_doi
+            )));
+        }
+        if !is_http_url(&object.source_url) || !is_http_url(&object.terms_url) {
+            return Err(AdapterError::Validation(format!(
+                "source object {:?} source and terms URLs must be HTTP(S)", object.id
+            )));
+        }
+        if !is_iso_date_shape(&object.accessed_on) {
+            return Err(AdapterError::Validation(format!(
+                "source object {:?} accessed_on must use YYYY-MM-DD syntax", object.id
+            )));
+        }
+        if object.local_use_authorized && !object.terms_reviewed {
+            return Err(AdapterError::Validation(format!(
+                "source object {:?} local use is authorized without terms review", object.id
+            )));
+        }
+    }
+
     let mut artifact_paths = BTreeSet::new();
     for artifact in &manifest.artifacts {
         safe_relative_path(&artifact.relative_path)?;
@@ -381,6 +446,21 @@ fn validate_manifest(manifest: &SourceManifest) -> Result<()> {
             return Err(AdapterError::Validation(format!(
                 "artifact {:?} bundling requires terms review and local-use authorization",
                 artifact.relative_path
+            )));
+        }
+        if !source_object_ids.contains(artifact.source_object_id.as_str()) {
+            return Err(AdapterError::Validation(format!(
+                "artifact {:?} references undeclared source object {:?}",
+                artifact.relative_path, artifact.source_object_id
+            )));
+        }
+        let source_object = manifest.source_objects.iter()
+            .find(|object| object.id == artifact.source_object_id)
+            .expect("source object existence checked above");
+        if source_object.source_doi != artifact.source_doi {
+            return Err(AdapterError::Validation(format!(
+                "artifact {:?} DOI {:?} does not match source object DOI {:?}",
+                artifact.relative_path, artifact.source_doi, source_object.source_doi
             )));
         }
         if !is_hex_sha256(&artifact.sha256) {
@@ -450,6 +530,12 @@ fn validate_records(
             declared_dois.insert(source.doi.as_str());
         }
     }
+    let declared_objects: BTreeMap<String, (String, bool)> = manifest.source_objects.iter()
+        .map(|object| (
+            object.id.clone(),
+            (object.source_doi.clone(), object.terms_reviewed && object.local_use_authorized),
+        ))
+        .collect();
 
     let target_group = manifest.challenge_context.target_parent_specimen_id.as_str();
     let mut record_ids = BTreeSet::new();
@@ -464,6 +550,8 @@ fn validate_records(
             ("source_doi", record.source_doi.as_str()),
             ("specimen_id", record.specimen_id.as_str()),
             ("lineage_group_id", record.lineage_group_id.as_str()),
+            ("source_object_id", record.source_object_id.as_str()),
+            ("source_row_id", record.source_row_id.as_str()),
             ("source_field", record.source_field.as_str()),
             ("variable_id", record.variable_id.as_str()),
         ] {
@@ -485,6 +573,23 @@ fn validate_records(
             return Err(AdapterError::Validation(format!(
                 "record {:?} references undeclared source DOI {:?}",
                 record.record_id, record.source_doi
+            )));
+        }
+        let (object_doi, object_authorized) = declared_objects.get(&record.source_object_id)
+            .ok_or_else(|| AdapterError::Validation(format!(
+                "record {:?} references undeclared source object {:?}",
+                record.record_id, record.source_object_id
+            )))?;
+        if object_doi != &record.source_doi {
+            return Err(AdapterError::Validation(format!(
+                "record {:?} DOI {:?} does not match object {:?} DOI {:?}",
+                record.record_id, record.source_doi, record.source_object_id, object_doi
+            )));
+        }
+        if !object_authorized {
+            return Err(AdapterError::Validation(format!(
+                "record {:?} cannot be evaluated until source-object terms and local-use permission are reviewed",
+                record.record_id
             )));
         }
 
@@ -819,6 +924,16 @@ mod tests {
                 role: "upstream microstructure".into(),
                 url: "https://doi.org/10.18434/mds2-2767".into(),
             }],
+            source_objects: vec![SourceObject {
+                id: "amb2025-02-targets".into(),
+                source_doi: "10.18434/mds2-3735".into(),
+                source_url: "https://data.nist.gov/od/id/mds2-3735".into(),
+                source_revision: "fixture-object-v1".into(),
+                accessed_on: "2026-10-18".into(),
+                terms_url: "https://data.nist.gov/od/id/mds2-3735".into(),
+                terms_reviewed: true,
+                local_use_authorized: true,
+            }],
             challenge_context: ChallengeContext {
                 material: "IN718".into(),
                 process: "PBF-LB".into(),
@@ -850,6 +965,8 @@ mod tests {
             source_doi: "10.18434/mds2-3735".into(),
             specimen_id: specimen.into(),
             lineage_group_id: group.into(),
+            source_object_id: "amb2025-02-targets".into(),
+            source_row_id: record_id.into(),
             source_field: variable.into(),
             variable_id: variable.into(),
             role, split,
@@ -900,9 +1017,13 @@ mod tests {
 
     #[test]
     fn metadata_only_manifest_is_valid_without_claiming_data_verification() {
-        let value = manifest();
+        let mut value = manifest();
+        value.source_objects.clear();
+        value.reuse_policy.artifact_terms_reviewed = false;
+        value.reuse_policy.local_use_authorized = false;
         validate_manifest(&value).unwrap();
         assert!(value.artifacts.is_empty());
+        assert!(value.source_objects.is_empty());
         assert!(!value.reuse_policy.artifact_terms_reviewed);
     }
 
@@ -923,6 +1044,7 @@ mod tests {
         value.artifacts.push(SourceArtifact {
             relative_path: "results.csv".into(),
             source_object_id: "artifact-001".into(),
+            source_doi: "10.18434/mds2-3735".into(),
             artifact_revision: "source-revision-pending".into(),
             accessed_on: "2026-10-18".into(),
             source_url: "https://data.nist.gov/example.csv".into(),
@@ -954,6 +1076,7 @@ mod tests {
         value.artifacts.push(SourceArtifact {
             relative_path: "sample.csv".into(),
             source_object_id: "sample-file-001".into(),
+            source_doi: "10.18434/mds2-3735".into(),
             artifact_revision: "fixture-v1".into(),
             accessed_on: "2026-10-18".into(),
             source_url: "https://data.nist.gov/example.csv".into(),
@@ -1116,7 +1239,8 @@ mod tests {
         value.reuse_policy.local_use_authorized = true;
         value.artifacts.push(SourceArtifact {
             relative_path: "linked.csv".into(),
-            source_object_id: "external-object".into(),
+            source_object_id: "amb2025-02-targets".into(),
+            source_doi: "10.18434/mds2-3735".into(),
             artifact_revision: "v1".into(),
             accessed_on: "2026-10-18".into(),
             source_url: "https://data.nist.gov/external.csv".into(),
