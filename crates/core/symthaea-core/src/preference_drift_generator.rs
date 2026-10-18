@@ -449,6 +449,8 @@ mod tests {
         assert!(generate_preference_drift_suite(SOURCE_FIXTURE, &invalid_split).is_err());
 
         let oversized = PreferenceDriftGeneratorConfigV1 {
+            wearer_session_count: MAX_WEARER_SESSIONS_V1,
+            development_wearer_session_count: MAX_WEARER_SESSIONS_V1 / 2,
             held_out_repetitions_per_family: MAX_REPETITIONS_PER_FAMILY_V1,
             ..PreferenceDriftGeneratorConfigV1::default()
         };
