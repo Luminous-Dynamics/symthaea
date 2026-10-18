@@ -2212,6 +2212,44 @@ mod tests {
     }
 
     #[test]
+    fn test_implicit_euler_fallible_solver_rejects_singular_newton_matrix() {
+        fn identity(_t: f64, y: &[f64]) -> Vec<f64> {
+            y.to_vec()
+        }
+        let system = ODESystem { f: identity, dim: 1 };
+        let error = DifferentialEquationsEngine::try_solve_implicit_euler(
+            &system, 0.0, 1.0, &[1.0], 1, 4,
+        )
+        .expect_err("this step has no backward-Euler root because h*f(y)=y");
+        assert!(matches!(
+            error.kind,
+            ImplicitEulerErrorKind::SingularJacobian { column: 0, .. }
+        ));
+        assert_eq!(error.last_state, vec![1.0]);
+        assert_eq!(error.steps_completed, 0);
+    }
+
+    #[test]
+    fn test_implicit_euler_fallible_solver_rejects_dense_system_oversize() {
+        fn copy_state(_t: f64, y: &[f64]) -> Vec<f64> {
+            y.to_vec()
+        }
+        let system = ODESystem { f: copy_state, dim: MAX_DENSE_NEWTON_DIM + 1 };
+        let initial = vec![0.0; MAX_DENSE_NEWTON_DIM + 1];
+        let error = DifferentialEquationsEngine::try_solve_implicit_euler(
+            &system, 0.0, 1.0, &initial, 1, 4,
+        )
+        .expect_err("the dense solver must reject dimensions outside its declared envelope");
+        assert!(matches!(
+            error.kind,
+            ImplicitEulerErrorKind::SystemTooLargeForDenseNewton {
+                dimension: 65,
+                max_dimension: 64,
+            }
+        ));
+    }
+
+    #[test]
     fn test_implicit_euler_fallible_solver_matches_stiff_decay_reference() {
         fn stiff_decay(_t: f64, y: &[f64]) -> Vec<f64> {
             vec![-1000.0 * y[0] + 1000.0]
