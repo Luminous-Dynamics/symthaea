@@ -4,6 +4,7 @@ on:
   pull_request:
     paths:
       - ".github/workflows/cropfoundry-contract.yml"
+      - "Cargo.toml"
       - "xtask/**"
       - "docs/research/cropfoundry/**"
   push:
