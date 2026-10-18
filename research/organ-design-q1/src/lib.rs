@@ -1282,10 +1282,13 @@ mod tests {
             if reasons.contains(&CandidateRejectionReason::EvidenceContradictory(
                 "q0-fixture-corpus".into()
             ))));
-        assert!(matches!(decision(&receipt, "design-unverified"), CandidateDecision::Rejected { reasons, .. }
-            if reasons.contains(&CandidateRejectionReason::EvidenceUnverified(
-                "q0-fixture-corpus".into()
-            ))));
+        assert!(matches!(
+            decision(&receipt, "design-unverified"),
+            CandidateDecision::Rejected { reasons, .. }
+                if reasons.contains(&CandidateRejectionReason::EvidenceUnverified(
+                    "synthetic-fixture-source".into()
+                ))
+        ));
     }
 
     #[test]
@@ -1353,8 +1356,11 @@ mod tests {
         let mut selection_candidates = standard_candidates();
         selection_candidates[2].data_split = DataSplit::HeldOut;
         let selection = evaluate_candidates(&selection_profile, &selection_candidates).unwrap();
-        assert!(matches!(decision(&selection, "design-a"), CandidateDecision::Rejected { reasons, .. }
-            if reasons.contains(&CandidateRejectionReason::SplitMismatch)));
+        assert!(matches!(
+            decision(&selection, "design-a"),
+            CandidateDecision::Rejected { reasons, .. }
+                if reasons.contains(&CandidateRejectionReason::SplitMismatch)
+        ));
     }
 
     #[test]
