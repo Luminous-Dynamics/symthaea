@@ -595,7 +595,7 @@ mod tests {
                 "opaque-site-a",
                 FarmOperation::Irrigation,
                 Some("season-2026-a".to_owned()),
-                Some(UsefulWindow::new(1_800_000_000, 1_800_086_400).unwrap()),
+                Some(UsefulWindow::new(1_790_000_000, 1_800_086_400).unwrap()),
             ).unwrap(),
             FarmerObjective::new(
                 ObjectiveSource::FarmerDeclared,
@@ -626,10 +626,10 @@ mod tests {
         let e = evidence();
         let case = wcare_case(&e);
         let mut p = profile(&e, &case);
-        let premise = AdvicePremise::new(AdviceEvidenceKind::Measured, [fact("premise-measured")], Some(1_800_000_000)).unwrap();
+        let premise = AdvicePremise::new(AdviceEvidenceKind::Measured, [fact("premise-measured")], Some(1_790_000_000)).unwrap();
         p.add_premise(premise, &e).unwrap();
         assert!(p.add_premise(
-            AdvicePremise::new(AdviceEvidenceKind::Reported, [fact("missing")], Some(1_800_000_000)).unwrap(),
+            AdvicePremise::new(AdviceEvidenceKind::Reported, [fact("missing")], Some(1_790_000_000)).unwrap(),
             &e,
         ).is_err());
     }
@@ -645,7 +645,7 @@ mod tests {
         let premise = AdvicePremise::new(
             AdviceEvidenceKind::Measured,
             [fact("unbacked-measurement")],
-            Some(1_800_000_000),
+            Some(1_790_000_000),
         ).unwrap();
         assert_eq!(
             p.add_premise(premise, &e),
@@ -661,7 +661,7 @@ mod tests {
         let not_actually_conflicting = AdvicePremise::new(
             AdviceEvidenceKind::Conflicting,
             [fact("premise-measured"), fact("forecast-flow")],
-            Some(1_800_000_000),
+            Some(1_790_000_000),
         ).unwrap();
         assert_eq!(
             p.add_premise(not_actually_conflicting, &e),
@@ -674,12 +674,12 @@ mod tests {
         let premise = AdvicePremise::new(
             AdviceEvidenceKind::Conflicting,
             [fact("conflict-a"), fact("conflict-b")],
-            Some(1_800_000_000),
+            Some(1_790_000_000),
         ).unwrap();
         assert_eq!(premise.kind(), AdviceEvidenceKind::Conflicting);
         assert_eq!(premise.fact_claims().len(), 2);
         assert_eq!(
-            AdvicePremise::new(AdviceEvidenceKind::Conflicting, [fact("conflict-a")], Some(1_800_000_000)),
+            AdvicePremise::new(AdviceEvidenceKind::Conflicting, [fact("conflict-a")], Some(1_790_000_000)),
             Err(FarmAdviceError::ConflictingPremisesNeedMultipleClaims)
         );
     }
@@ -715,7 +715,7 @@ mod tests {
         let case = wcare_case(&e);
         let mut p = profile(&e, &case);
         p.add_premise(
-            AdvicePremise::new(AdviceEvidenceKind::Measured, [fact("premise-measured")], Some(1_800_000_000)).unwrap(),
+            AdvicePremise::new(AdviceEvidenceKind::Measured, [fact("premise-measured")], Some(1_790_000_000)).unwrap(),
             &e,
         ).unwrap();
         e.supersede_fact(&fact("premise-measured"), &fact("replacement-premise")).unwrap();
