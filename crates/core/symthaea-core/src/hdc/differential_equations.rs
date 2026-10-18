@@ -497,7 +497,7 @@ pub struct PDEResult {
     pub u_final: Vec<f64>,
     /// Number of time steps taken.
     pub time_steps: usize,
-    /// Phi measure (energy conservation or convergence quality).
+    /// Legacy/domain-specific score; not an error bound or numerical certificate.
     pub phi: f64,
     /// HDC encoding of the final solution.
     pub encoding: BinaryHV,
@@ -522,7 +522,7 @@ pub struct PDE2DResult {
     pub u_final: Vec<f64>,
     /// Number of time steps taken.
     pub time_steps: usize,
-    /// Phi measure.
+    /// Legacy/domain-specific score; not an error bound or numerical certificate.
     pub phi: f64,
     /// HDC encoding.
     pub encoding: BinaryHV,
