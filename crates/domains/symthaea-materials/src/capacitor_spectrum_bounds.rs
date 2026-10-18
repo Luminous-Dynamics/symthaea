@@ -11,7 +11,7 @@
 //! temperature transfer, safety margin, component lifetime or qualification.
 
 use crate::capacitor_spectrum::{
-    CapacitorCurrentSpectrum, CapacitorImpedanceSweep, CapacitorSpectrumConstraintViolation,
+    CapacitorCurrentSpectrum, CapacitorImpedanceSweep,
     CapacitorSpectrumDisposition, CapacitorSpectrumError, CapacitorSpectrumScreeningReport,
     CapacitorSpectrumScreeningRequirements, ImpedanceEvaluationKind,
     calculate_capacitor_spectrum_metrics, screen_capacitor_spectrum,
