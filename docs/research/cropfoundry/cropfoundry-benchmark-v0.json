@@ -273,6 +273,16 @@
       "proposed_target": "On a rights-cleared retrospective dataset or explicitly synthetic scenario set, aim for at least 20% relative reduction in a predeclared severe-shortfall tail-risk measure versus an explicit monoculture/rotation baseline under matched constraints, without violating hard resource or locally defined nutrition constraints. Report per-crop regressions and Pareto trade-offs. Simulation is not field-impact evidence.",
       "split_protocol": "Freeze target basket, objective definitions, baseline, land/water/labor/cost budgets, price window, weather scenarios, and constraints before scoring. Hold out whole site-years or scenario families. Preserve crop-component yields and interaction terms; do not infer intercropping benefit from comparing unrelated crops or from land-equivalent ratio alone. Field claims require replicated multi-season local evaluation.",
       "status": "not_evaluable_until_interaction_data"
+    },
+    {
+      "id": "CF-017",
+      "category": "phenotyping_vision",
+      "name": "Tomato ripeness, segmentation and counting benchmark",
+      "question": "Can an evidence-bounded vision pipeline infer ripeness stage, fruit extent and visible fruit counts from images under a fixed, leak-resistant capture-block split?",
+      "primary_metric": "Task-specific metric vector: macro-F1 and per-stage recall/calibration for ripeness classification; AP50:95 for detection; IoU/Dice for masks; MAE for image-level visible-fruit counts. Do not collapse unlike tasks into one score.",
+      "proposed_target": "First reproduce a source-reported baseline where its exact configuration and split are available. For one preregistered primary task, then target either +5 percentage points macro-F1 or at least 10% relative reduction in count MAE versus the pinned eligible baseline, with no more than 2 percentage-point loss in recall for any ripeness class and no split leakage. Thresholds are provisional engineering goals.",
+      "split_protocol": "Use the dataset's published block-grouped split only after inspection confirms its semantics and integrity; otherwise freeze a capture-block split by source video/sequence before tuning. Check exact duplicates and near-duplicates, preserve modality strata (close-range versus drone), pin all resize/mask transforms, and reserve the test partition for one final evaluation. Report source-site and modality limits explicitly.",
+      "status": "not_evaluable_until_imagery_snapshot_and_splits_pinned"
     }
   ],
   "first_milestone_exit_criteria": [
