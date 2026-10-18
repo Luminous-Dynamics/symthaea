@@ -719,7 +719,14 @@ mod tests {
     #[test]
     fn non_rlc_imaginary_response_is_rejected_by_residual_gate() {
         let mut sample = campaign();
-        sample.observations[1].voltage_imaginary_rms_v += 0.4;
+        let observation = &mut sample.observations[1];
+        let reactive_impedance_error_ohm = 0.4;
+        // Inject j*deltaZ*I, preserving real impedance while corrupting the
+        // imaginary response. Mutating V_imag alone would also rotate V/I.
+        observation.voltage_real_rms_v -=
+            reactive_impedance_error_ohm * observation.current_imaginary_rms_a;
+        observation.voltage_imaginary_rms_v +=
+            reactive_impedance_error_ohm * observation.current_real_rms_a;
         let mut req = requirements();
         req.maximum_relative_imaginary_fit_rmse = 1.0e-4;
         let report = assess_capacitor_identification(&sample, &req).unwrap();
