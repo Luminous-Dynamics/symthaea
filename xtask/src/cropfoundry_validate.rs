@@ -54,6 +54,7 @@ fn validate_benchmark_contract(root: &Value) -> std::result::Result<usize, Vec<S
         "not_evaluable_until_local_cost_and_partner_data",
         "not_evaluable_until_genotype_and_pedigree_data",
         "not_evaluable_until_multi_crop_harmonized_data",
+        "not_evaluable_until_interaction_data",
     ];
     let mut ids = BTreeSet::new();
 
@@ -349,7 +350,7 @@ mod tests {
     fn committed_benchmark_contract_is_well_formed_and_non_passing() {
         let fixture: Value = serde_json::from_str(BENCHMARK_FIXTURE).unwrap();
         let count = validate_benchmark_contract(&fixture).unwrap();
-        assert_eq!(count, 15);
+        assert_eq!(count, 16);
     }
 
     #[test]
