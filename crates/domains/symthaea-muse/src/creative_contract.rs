@@ -12,6 +12,7 @@
 //! Integrate it into candidate selection only after task contracts are calibrated.
 
 use crate::Note;
+use serde::{Deserialize, Serialize};
 use std::collections::BTreeMap;
 
 const MAX_WINDOW_COUNT: usize = 4096;
@@ -22,7 +23,8 @@ const MAX_WINDOW_COUNT: usize = 4096;
 /// universal. For example, a melody brief can require pitch motion while a drone
 /// brief can allow one dominant pitch. The window ratio measures onset coverage,
 /// not sustained-note coverage.
-#[derive(Debug, Clone, PartialEq)]
+#[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
+#[serde(deny_unknown_fields)]
 pub struct CreativeIntentContractV1 {
     pub min_note_count: usize,
     pub min_distinct_pitches: usize,
@@ -51,7 +53,7 @@ impl CreativeIntentContractV1 {
 /// Why a candidate was rejected by the intent contract.
 ///
 /// These are mechanical failures, not artistic judgments.
-#[derive(Debug, Clone, PartialEq)]
+#[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
 pub enum CreativeContractViolation {
     InvalidContract,
     InvalidDuration,
@@ -64,7 +66,7 @@ pub enum CreativeContractViolation {
 }
 
 /// Objective observations and contract result for one candidate.
-#[derive(Debug, Clone, PartialEq)]
+#[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
 pub struct CreativeCandidateAuditV1 {
     /// True only when the contract and duration are valid, every note is valid,
     /// and all declared constraints pass.
@@ -79,6 +81,11 @@ pub struct CreativeCandidateAuditV1 {
     pub active_window_ratio: f32,
     /// Largest share of valid notes belonging to any one rounded MIDI pitch.
     pub dominant_pitch_share: f32,
+    /// Number of distinct onset events after coalescing starts within 1 ms.
+    pub distinct_onset_count: usize,
+    /// Coefficient of variation of consecutive distinct-onset intervals.
+    /// Descriptive only: it is not a universal rhythm-quality or syncopation score.
+    pub onset_interval_cv: f64,
     /// Complete set of contract and input violations found.
     pub violations: Vec<CreativeContractViolation>,
 }
@@ -92,9 +99,55 @@ impl CreativeCandidateAuditV1 {
             pitch_range_semitones: 0.0,
             active_window_ratio: 0.0,
             dominant_pitch_share: 0.0,
+            distinct_onset_count: 0,
+            onset_interval_cv: 0.0,
             violations,
         }
     }
+}
+
+/// Count distinct onset events and compute inter-onset-interval coefficient of variation.
+///
+/// Starts within 1 ms are treated as one event so chord tones do not masquerade as
+/// separate rhythmic attacks. This is descriptive only; it does not know meter, beat
+/// phase, instrument roles, or whether syncopation was intended.
+fn onset_interval_stats(valid_notes: &[(Note, f32)]) -> (usize, f64) {
+    let mut starts: Vec<f64> = valid_notes
+        .iter()
+        .map(|(note, _)| f64::from(note.start_time))
+        .collect();
+    starts.sort_by(f64::total_cmp);
+
+    let mut distinct_starts: Vec<f64> = Vec::with_capacity(starts.len());
+    for start in starts {
+        let add_start = match distinct_starts.last() {
+            Some(previous) => start - *previous > 0.001,
+            None => true,
+        };
+        if add_start {
+            distinct_starts.push(start);
+        }
+    }
+
+    let intervals: Vec<f64> = distinct_starts
+        .windows(2)
+        .map(|pair| pair[1] - pair[0])
+        .collect();
+    if intervals.is_empty() {
+        return (distinct_starts.len(), 0.0);
+    }
+
+    let mean = intervals.iter().sum::<f64>() / intervals.len() as f64;
+    if mean <= 0.0 || !mean.is_finite() {
+        return (distinct_starts.len(), 0.0);
+    }
+    let variance = intervals
+        .iter()
+        .map(|interval| (interval - mean).powi(2))
+        .sum::<f64>()
+        / intervals.len() as f64;
+    let cv = variance.sqrt() / mean;
+    (distinct_starts.len(), if cv.is_finite() { cv } else { 0.0 })
 }
 
 /// Audit notes against an explicit intent contract.
@@ -152,6 +205,7 @@ pub fn audit_candidate(
     }
 
     let valid_note_count = valid_notes.len();
+    let (distinct_onset_count, onset_interval_cv) = onset_interval_stats(&valid_notes);
     let mut pitch_counts: BTreeMap<i32, usize> = BTreeMap::new();
     let mut active_windows = vec![false; contract.window_count];
     let mut lowest_pitch = f32::INFINITY;
@@ -220,6 +274,8 @@ pub fn audit_candidate(
         pitch_range_semitones,
         active_window_ratio,
         dominant_pitch_share,
+        distinct_onset_count,
+        onset_interval_cv,
         violations,
     }
 }

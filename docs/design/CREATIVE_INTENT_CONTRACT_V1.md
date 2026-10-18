@@ -80,3 +80,21 @@ The 90% intent-recognition target is an engineering aspiration, not a literature
 ## Non-claims and follow-up
 
 This prototype is not a creativity test, aesthetic critic, consciousness measurement, music-theory validator, player-experience test, or proof that an output is good. It is a fail-closed mechanical contract boundary. Before production integration, separately audit and repair the known legacy score defects, add human-calibrated criteria, and run the benchmark matrix above against declared baselines.
+
+
+## Executable contract / descriptor-diversity slice
+
+The first frozen corpus and runner are available as a deterministic benchmark fixture:
+- Corpus: crates/domains/symthaea-muse/fixtures/creative_intent_contract_v1.json
+- Rust runner: crates/domains/symthaea-muse/examples/creative_qd_benchmark.rs
+- Reusable receipt/archive implementation: src/creative_qd_bench.rs
+
+Run it with:
+
+    cargo run -p symthaea-muse --example creative_qd_benchmark -- <source-commit-sha>
+
+The corpus has five task families and 16 fixed candidates: ambient drone, lyrical melody, rhythmic groove, formal development, and experimental texture. It contains adversarial controls for one-pitch melodies, clustered events, invalid note values, and onsets at the duration boundary. Each candidate has a preregistered expected acceptance value. The runner emits a SHA-256-bound JSON receipt, candidate-level audits, per-family acceptance counts, and a simple descriptor archive.
+
+The archive uses pitch-diversity, temporal-coverage, onset-density, and inter-onset-interval-CV bins. It keeps the lexicographically smallest candidate ID in a colliding cell so archive membership is independent of candidate enumeration order. It does not score aesthetic quality and does not wire into production selection. The onset-interval CV is only a statistical feature; it cannot tell whether an irregular pattern is intentional syncopation because meter, beat phase, and instrument role are not in this contract.
+
+Proposed first gates: all preregistered fixture outcomes match; unknown corpus fields fail closed; receipts bind the exact fixture bytes; and reversing candidate enumeration leaves occupied cells and representatives unchanged. The 16 fixtures are a synthetic correctness corpus, not a human preference study, generator benchmark, or measured creative-quality result.

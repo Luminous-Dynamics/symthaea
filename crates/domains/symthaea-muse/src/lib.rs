@@ -1028,6 +1028,7 @@ pub mod consciousness_reverb;
 pub mod creative_agency;
 pub mod creative_bench;
 pub mod creative_contract;
+pub mod creative_qd_bench;
 pub mod density_regulator;
 pub mod dramatic;
 pub mod emotional_gestures;
