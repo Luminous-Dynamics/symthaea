@@ -19058,6 +19058,7 @@ dependencies = [
  "serde_json",
  "symthaea-graph-theory",
 ]
+
 [[package]]
 name = "symthaea-hal"
 version = "0.1.0"
