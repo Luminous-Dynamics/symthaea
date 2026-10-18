@@ -327,13 +327,20 @@ fn evaluate_scenario(scenario: &Scenario, tolerance_ppm: u32) -> ScenarioReceipt
                 && grade.required_basis == grade.measured_basis;
             let mut comparable = true;
             let value = if basis_matches {
-                if grade.conversion_evidence_id.as_ref().is_some_and(|id| nonempty(id))
+                if grade
+                    .conversion_evidence_id
+                    .as_ref()
+                    .is_some_and(|id| nonempty(id))
                     || grade.normalized_value_ppm.is_some()
                 {
                     reasons.insert("UNEXPECTED_GRADE_CONVERSION".to_owned());
                 }
                 grade.measured_value_ppm
-            } else if grade.conversion_evidence_id.as_ref().is_some_and(|id| nonempty(id)) {
+            } else if grade
+                .conversion_evidence_id
+                .as_ref()
+                .is_some_and(|id| nonempty(id))
+            {
                 match grade.normalized_value_ppm {
                     Some(normalized) => Some(normalized),
                     None => {
@@ -526,12 +533,17 @@ mod tests {
         let mut corpus = corpus();
         let tolerance = corpus.mass_tolerance_ppm;
         let scenario = &mut corpus.scenarios[2];
-        scenario.grade_comparison.as_mut().unwrap().conversion_evidence_id =
-            Some("conversion-receipt-001".to_owned());
+        scenario
+            .grade_comparison
+            .as_mut()
+            .unwrap()
+            .conversion_evidence_id = Some("conversion-receipt-001".to_owned());
         let result = evaluate_scenario(scenario, tolerance);
-        assert!(result
-            .actual_reason_codes
-            .contains(&"GRADE_BASIS_MISMATCH".to_owned()));
+        assert!(
+            result
+                .actual_reason_codes
+                .contains(&"GRADE_BASIS_MISMATCH".to_owned())
+        );
     }
 
     #[test]
@@ -554,9 +566,11 @@ mod tests {
         let scenario = &mut corpus.scenarios[0];
         scenario.sample.assays[1].basis = AssayBasis::WetMass;
         let result = evaluate_scenario(scenario, tolerance);
-        assert!(result
-            .actual_reason_codes
-            .contains(&"MINERAL_PHASE_BASIS_UNSUPPORTED".to_owned()));
+        assert!(
+            result
+                .actual_reason_codes
+                .contains(&"MINERAL_PHASE_BASIS_UNSUPPORTED".to_owned())
+        );
     }
 
     #[test]
@@ -567,9 +581,11 @@ mod tests {
         scenario.sample.assays[0].value_ppm = None;
         scenario.sample.assays[0].detection_limit_ppm = None;
         let result = evaluate_scenario(scenario, tolerance);
-        assert!(result
-            .actual_reason_codes
-            .contains(&"DETECTION_LIMIT_MISSING_OR_INVALID".to_owned()));
+        assert!(
+            result
+                .actual_reason_codes
+                .contains(&"DETECTION_LIMIT_MISSING_OR_INVALID".to_owned())
+        );
     }
 
     #[test]
@@ -579,8 +595,10 @@ mod tests {
         let scenario = &mut corpus.scenarios[0];
         scenario.sample.source_record_id.clear();
         let result = evaluate_scenario(scenario, tolerance);
-        assert!(result
-            .actual_reason_codes
-            .contains(&"SOURCE_REFERENCE_MISSING".to_owned()));
+        assert!(
+            result
+                .actual_reason_codes
+                .contains(&"SOURCE_REFERENCE_MISSING".to_owned())
+        );
     }
 }
