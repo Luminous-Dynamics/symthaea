@@ -7,7 +7,7 @@
 const BPS: i128 = 10_000;
 const BPS_SQUARED: i128 = 100_000_000;
 const MAX_STATES: usize = 16;
-const MAX_SIGNALS: usize = 16;
+const MAX_SIGNAL_OUTCOMES: usize = 16;
 const MAX_ACTIONS: usize = 16;
 
 #[derive(Clone, Debug, PartialEq, Eq)]
@@ -24,7 +24,7 @@ pub struct SignalLikelihood {
 }
 
 #[derive(Clone, Debug, PartialEq, Eq)]
-pub struct InformationSignal {
+pub struct SignalOutcome {
     pub id: String,
     pub likelihoods: Vec<SignalLikelihood>,
 }
@@ -47,7 +47,7 @@ pub struct ValueOfInformationScenario {
     /// Financing / carrying cost attributable to the acquisition delay.
     pub financing_cost_minor: i64,
     pub states: Vec<InformationState>,
-    pub signals: Vec<InformationSignal>,
+    pub signal_outcomes: Vec<SignalOutcome>,
     pub action_ids: Vec<String>,
     pub payoffs: Vec<DecisionPayoff>,
 }
@@ -56,27 +56,27 @@ pub struct ValueOfInformationScenario {
 pub enum ValueOfInformationError {
     EmptyIdentifier,
     DuplicateIdentifier,
-    EmptyStatesSignalsOrActions,
+    EmptyStatesOutcomesOrActions,
     ScenarioTooLarge,
     PriorProbabilitiesDoNotSumTo10000,
-    SignalLikelihoodsDoNotSumTo10000,
+    OutcomeLikelihoodMassDoesNotSumTo10000,
     IncompleteLikelihoodTable,
     DuplicateLikelihoodEntry,
     IncompletePayoffTable,
     DuplicatePayoffEntry,
     UnknownStateReference,
-    UnknownSignalOrActionReference,
+    UnknownOutcomeOrActionReference,
     NegativeInformationCost,
     InformationCostOverflow,
     ExpectedValueOverflow,
 }
 
 #[derive(Clone, Debug, PartialEq, Eq)]
-pub struct SignalDecision {
-    pub signal_id: String,
+pub struct OutcomeDecision {
+    pub outcome_id: String,
     pub chosen_action_id: String,
     /// Exact probability numerator over 100,000,000 (basis-points squared).
-    pub signal_probability_numerator_bp2: u64,
+    pub outcome_probability_numerator_bp2: u64,
     pub joint_weighted_payoff_numerator: i128,
 }
 
@@ -95,7 +95,7 @@ pub struct ValueOfInformationReport {
     pub perfect_information_expected_value_minor: i64,
     pub evpi_minor: i64,
     pub worthwhile_at_declared_cost: bool,
-    pub decisions_by_signal: Vec<SignalDecision>,
+    pub decisions_by_outcome: Vec<OutcomeDecision>,
 }
 
 impl ValueOfInformationScenario {
@@ -109,12 +109,12 @@ impl ValueOfInformationScenario {
         )?;
 
         let mut with_signal_numerator = 0_i128;
-        let mut decisions_by_signal = Vec::with_capacity(self.signals.len());
+        let mut decisions_by_outcome = Vec::with_capacity(self.signal_outcomes.len());
 
-        let mut signals = self.signals.iter().collect::<Vec<_>>();
-        signals.sort_by(|left, right| left.id.cmp(&right.id));
+        let mut outcomes = self.signal_outcomes.iter().collect::<Vec<_>>();
+        outcomes.sort_by(|left, right| left.id.cmp(&right.id));
 
-        for signal in signals {
+        for outcome in outcomes {
             let mut marginal_probability_numerator = 0_i128;
             for state in &self.states {
                 let likelihood = self.likelihood_bps(signal, &state.id);
@@ -149,10 +149,10 @@ impl ValueOfInformationScenario {
                 .to_owned();
             with_signal_numerator += best_conditional_numerator;
 
-            decisions_by_signal.push(SignalDecision {
-                signal_id: signal.id.clone(),
+            decisions_by_outcome.push(OutcomeDecision {
+                outcome_id: outcome.id.clone(),
                 chosen_action_id,
-                signal_probability_numerator_bp2: u64::try_from(
+                outcome_probability_numerator_bp2: u64::try_from(
                     marginal_probability_numerator,
                 )
                 .map_err(|_| ValueOfInformationError::ExpectedValueOverflow)?,
@@ -205,14 +205,14 @@ impl ValueOfInformationScenario {
             perfect_information_expected_value_minor,
             evpi_minor,
             worthwhile_at_declared_cost: net_evsi_minor > 0,
-            decisions_by_signal,
+            decisions_by_outcome,
         })
     }
 
     fn validate(&self) -> Result<(), ValueOfInformationError> {
         if self.id.trim().is_empty()
             || self.states.iter().any(|state| state.id.trim().is_empty())
-            || self.signals.iter().any(|signal| signal.id.trim().is_empty())
+            || self.signal_outcomes.iter().any(|signal| outcome.id.trim().is_empty())
             || self.action_ids.iter().any(|action| action.trim().is_empty())
             || self.payoffs.iter().any(|payoff| {
                 payoff.action_id.trim().is_empty() || payoff.state_id.trim().is_empty()
@@ -230,18 +230,18 @@ impl ValueOfInformationScenario {
             .checked_add(self.delay_cost_minor)
             .and_then(|cost| cost.checked_add(self.financing_cost_minor))
             .ok_or(ValueOfInformationError::InformationCostOverflow)?;
-        if self.states.is_empty() || self.signals.is_empty() || self.action_ids.is_empty() {
-            return Err(ValueOfInformationError::EmptyStatesSignalsOrActions);
+        if self.states.is_empty() || self.signal_outcomes.is_empty() || self.action_ids.is_empty() {
+            return Err(ValueOfInformationError::EmptyStatesOutcomesOrActions);
         }
         if self.states.len() > MAX_STATES
-            || self.signals.len() > MAX_SIGNALS
+            || self.signal_outcomes.len() > MAX_SIGNAL_OUTCOMES
             || self.action_ids.len() > MAX_ACTIONS
             || self.payoffs.len() > MAX_STATES * MAX_ACTIONS
         {
             return Err(ValueOfInformationError::ScenarioTooLarge);
         }
         ensure_unique(self.states.iter().map(|state| state.id.as_str()))?;
-        ensure_unique(self.signals.iter().map(|signal| signal.id.as_str()))?;
+        ensure_unique(self.signal_outcomes.iter().map(|signal| outcome.id.as_str()))?;
         ensure_unique(self.action_ids.iter().map(String::as_str))?;
 
         if self
@@ -271,25 +271,25 @@ impl ValueOfInformationScenario {
             .map(|state| (state.id.as_str(), 0_u64))
             .collect::<std::collections::BTreeMap<_, _>>();
 
-        for signal in &self.signals {
-            for likelihood in &signal.likelihoods {
+        for outcome in &self.signal_outcomes {
+            for likelihood in &outcome.likelihoods {
                 if !state_ids.contains(likelihood.state_id.as_str()) {
                     return Err(ValueOfInformationError::UnknownStateReference);
                 }
-                if !likelihood_keys.insert((signal.id.as_str(), likelihood.state_id.as_str())) {
+                if !likelihood_keys.insert((outcome.id.as_str(), likelihood.state_id.as_str())) {
                     return Err(ValueOfInformationError::DuplicateLikelihoodEntry);
                 }
                 *likelihood_sums
                     .get_mut(likelihood.state_id.as_str())
                     .expect("state identity checked above") += u64::from(likelihood.likelihood_bps);
             }
-            if signal.likelihoods.len() != self.states.len() {
+            if outcome.likelihoods.len() != self.states.len() {
                 return Err(ValueOfInformationError::IncompleteLikelihoodTable);
             }
         }
 
         if likelihood_sums.values().any(|sum| *sum != 10_000) {
-            return Err(ValueOfInformationError::SignalLikelihoodsDoNotSumTo10000);
+            return Err(ValueOfInformationError::OutcomeLikelihoodMassDoesNotSumTo10000);
         }
 
         let mut payoff_keys = std::collections::BTreeSet::new();
@@ -297,7 +297,7 @@ impl ValueOfInformationScenario {
             if !state_ids.contains(payoff.state_id.as_str())
                 || !action_ids.contains(payoff.action_id.as_str())
             {
-                return Err(ValueOfInformationError::UnknownSignalOrActionReference);
+                return Err(ValueOfInformationError::UnknownOutcomeOrActionReference);
             }
             if !payoff_keys.insert((payoff.action_id.as_str(), payoff.state_id.as_str())) {
                 return Err(ValueOfInformationError::DuplicatePayoffEntry);
@@ -337,7 +337,7 @@ impl ValueOfInformationScenario {
         })
     }
 
-    fn likelihood_bps(&self, signal: &InformationSignal, state_id: &str) -> u32 {
+    fn likelihood_bps(&self, signal: &SignalOutcome, state_id: &str) -> u32 {
         signal
             .likelihoods
             .iter()
@@ -390,8 +390,8 @@ mod tests {
                     prior_probability_bps: 5_000,
                 },
             ],
-            signals: vec![
-                InformationSignal {
+            signal_outcomes: vec![
+                SignalOutcome {
                     id: "signal-high".into(),
                     likelihoods: vec![
                         SignalLikelihood {
@@ -404,7 +404,7 @@ mod tests {
                         },
                     ],
                 },
-                InformationSignal {
+                SignalOutcome {
                     id: "signal-low".into(),
                     likelihoods: vec![
                         SignalLikelihood {
@@ -455,14 +455,14 @@ mod tests {
         assert_eq!(report.perfect_information_expected_value_minor, 50);
         assert_eq!(report.evpi_minor, 50);
         assert!(report.worthwhile_at_declared_cost);
-        assert_eq!(report.decisions_by_signal.len(), 2);
+        assert_eq!(report.decisions_by_outcome.len(), 2);
     }
 
     #[test]
     fn noisy_signal_has_lower_value_than_perfect_information() {
         let mut input = perfect_signal_scenario(0);
-        input.signals = vec![
-            InformationSignal {
+        input.signal_outcomes = vec![
+            SignalOutcome {
                 id: "survey-high".into(),
                 likelihoods: vec![
                     SignalLikelihood {
@@ -475,7 +475,7 @@ mod tests {
                     },
                 ],
             },
-            InformationSignal {
+            SignalOutcome {
                 id: "survey-low".into(),
                 likelihoods: vec![
                     SignalLikelihood {
@@ -517,8 +517,8 @@ mod tests {
                     prior_probability_bps: 6_000,
                 },
             ],
-            signals: vec![
-                InformationSignal {
+            signal_outcomes: vec![
+                SignalOutcome {
                     id: "survey-positive".into(),
                     likelihoods: vec![
                         SignalLikelihood {
@@ -531,7 +531,7 @@ mod tests {
                         },
                     ],
                 },
-                InformationSignal {
+                SignalOutcome {
                     id: "survey-negative".into(),
                     likelihoods: vec![
                         SignalLikelihood {
@@ -636,7 +636,7 @@ mod tests {
     #[test]
     fn uninformative_signal_has_zero_evsi() {
         let mut input = perfect_signal_scenario(0);
-        input.signals = vec![InformationSignal {
+        input.signal_outcomes = vec![SignalOutcome {
             id: "uninformative".into(),
             likelihoods: vec![
                 SignalLikelihood {
@@ -688,10 +688,10 @@ mod tests {
     #[test]
     fn likelihood_mass_must_sum_to_one_for_each_state() {
         let mut input = perfect_signal_scenario(0);
-        input.signals[0].likelihoods[0].likelihood_bps = 9_999;
+        input.signal_outcomes[0].likelihoods[0].likelihood_bps = 9_999;
         assert_eq!(
             input.evaluate(),
-            Err(ValueOfInformationError::SignalLikelihoodsDoNotSumTo10000)
+            Err(ValueOfInformationError::OutcomeLikelihoodMassDoesNotSumTo10000)
         );
     }
 
@@ -727,7 +727,7 @@ mod tests {
     #[test]
     fn zero_probability_signal_does_not_change_expected_value() {
         let mut input = perfect_signal_scenario(20);
-        input.signals.push(InformationSignal {
+        input.signal_outcomes.push(SignalOutcome {
             id: "impossible-signal".into(),
             likelihoods: vec![
                 SignalLikelihood {
@@ -743,28 +743,28 @@ mod tests {
 
         let report = input.evaluate().unwrap();
         assert_eq!(report.gross_evsi_minor, 50);
-        assert_eq!(report.decisions_by_signal.len(), 3);
+        assert_eq!(report.decisions_by_outcome.len(), 3);
         assert_eq!(
             report
-                .decisions_by_signal
+                .decisions_by_outcome
                 .iter()
-                .find(|decision| decision.signal_id == "impossible-signal")
+                .find(|decision| decision.outcome_id == "impossible-signal")
                 .unwrap()
-                .signal_probability_numerator_bp2,
+                .outcome_probability_numerator_bp2,
             0
         );
     }
 
     #[test]
-    fn permuting_states_signals_actions_and_payoffs_preserves_results() {
+    fn permuting_states_signal_outcomes_actions_and_payoffs_preserves_results() {
         let input = perfect_signal_scenario(20);
         let baseline = input.evaluate().unwrap();
 
         let mut permuted = input;
         permuted.states.reverse();
-        permuted.signals.reverse();
-        for signal in &mut permuted.signals {
-            signal.likelihoods.reverse();
+        permuted.signal_outcomes.reverse();
+        for outcome in &mut permuted.signal_outcomes {
+            outcome.likelihoods.reverse();
         }
         permuted.action_ids.reverse();
         permuted.payoffs.reverse();
