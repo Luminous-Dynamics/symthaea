@@ -327,12 +327,12 @@ fn validate_uncertainty_budget(
             "uncertainty budget for {observation_id} needs a finite nonnegative expanded uncertainty"
         ));
     }
-    if let (Some(budget_value), Some(top_level_value)) = (budget_expanded, top_level_expanded) {
-        if !approximately_equal(budget_value, top_level_value) {
-            errors.push(format!(
-                "uncertainty budget expanded uncertainty disagrees with observation {observation_id}"
-            ));
-        }
+    if let (Some(budget_value), Some(top_level_value)) = (budget_expanded, top_level_expanded)
+        && !approximately_equal(budget_value, top_level_value)
+    {
+        errors.push(format!(
+            "uncertainty budget expanded uncertainty disagrees with observation {observation_id}"
+        ));
     }
 
     if method == "LINEARIZED_COVARIANCE" {
@@ -395,21 +395,21 @@ fn validate_uncertainty_budget(
             ));
         } else {
             let expected_combined = variance.sqrt();
-            if let Some(reported_combined) = combined {
-                if !approximately_equal(reported_combined, expected_combined) {
-                    errors.push(format!(
-                        "reported combined standard uncertainty for {observation_id} disagrees with recomputed covariance budget"
-                    ));
-                }
+            if let Some(reported_combined) = combined
+                && !approximately_equal(reported_combined, expected_combined)
+            {
+                errors.push(format!(
+                    "reported combined standard uncertainty for {observation_id} disagrees with recomputed covariance budget"
+                ));
             }
             if let Some(coverage_factor) = coverage {
                 let expected_expanded = coverage_factor * expected_combined;
-                if let Some(reported_expanded) = budget_expanded {
-                    if !approximately_equal(reported_expanded, expected_expanded) {
-                        errors.push(format!(
-                            "reported expanded uncertainty for {observation_id} disagrees with coverage factor times combined uncertainty"
-                        ));
-                    }
+                if let Some(reported_expanded) = budget_expanded
+                    && !approximately_equal(reported_expanded, expected_expanded)
+                {
+                    errors.push(format!(
+                        "reported expanded uncertainty for {observation_id} disagrees with coverage factor times combined uncertainty"
+                    ));
                 }
             }
         }
@@ -487,20 +487,19 @@ fn validate_measurement_run_semantics(record: &Value) -> Vec<String> {
             .get("instrument_id")
             .and_then(Value::as_str)
             .unwrap_or("<missing>");
-        if instrument.get("calibration_state").and_then(Value::as_str) == Some("VALID") {
-            if instrument
+        if instrument.get("calibration_state").and_then(Value::as_str) == Some("VALID")
+            && (instrument
                 .get("calibration_record_digest")
                 .and_then(Value::as_str)
                 .is_none()
                 || instrument
                     .get("calibration_valid_through")
                     .and_then(Value::as_str)
-                    .is_none()
-            {
-                errors.push(format!(
-                    "instrument {instrument_id} cannot claim VALID calibration without record digest and expiry"
-                ));
-            }
+                    .is_none())
+        {
+            errors.push(format!(
+                "instrument {instrument_id} cannot claim VALID calibration without record digest and expiry"
+            ));
         }
     }
 
