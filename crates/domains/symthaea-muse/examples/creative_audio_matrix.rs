@@ -7,7 +7,7 @@
 //! actual Git checkout revision.
 //!
 //! Usage:
-//! cargo run -p symthaea-muse --example creative_audio_matrix -- [expected-git-sha]
+//! cargo run --locked -p symthaea-muse --example creative_audio_matrix -- [expected-git-sha]
 
 use serde::Serialize;
 use sha2::{Digest, Sha256};
