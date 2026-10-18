@@ -429,7 +429,7 @@ pub fn evaluate_spatial_intervals(
             });
         }
         let mut sorted = calibration_residuals;
-        sorted.sort_by(f64::total_cmp);
+        sorted.sort_by(|left, right| left.total_cmp(right));
         let half_width = sorted[required_rank - 1];
 
         let mut points = Vec::with_capacity(corpus.confirmation.len());
@@ -556,6 +556,10 @@ mod tests {
         let mut id_collision = demo_synthetic_spatial_interval_corpus(42);
         id_collision.calibration[0].point_id = id_collision.discovery[0].observation_id.clone();
         assert!(validate_spatial_interval_corpus(&id_collision).is_err());
+
+        let mut non_finite = demo_synthetic_spatial_interval_corpus(42);
+        non_finite.calibration[0].position.x = f64::NAN;
+        assert!(validate_spatial_interval_corpus(&non_finite).is_err());
     }
 
     #[test]
@@ -647,9 +651,12 @@ mod tests {
         assert_eq!(first, second);
 
         let digest = digest_spatial_interval_corpus(&corpus).unwrap();
+        assert_eq!(
+            digest,
+            digest_spatial_interval_corpus(&demo_synthetic_spatial_interval_corpus(7)).unwrap()
+        );
         let mut altered = corpus;
         altered.discovery[0].signed_error_mm += 0.001;
-        assert_ne!(digest, serde_json::to_vec(&altered).map(|bytes| sha256(&bytes).to_hex()).unwrap());
         assert!(digest_spatial_interval_corpus(&altered).is_err());
     }
 }
