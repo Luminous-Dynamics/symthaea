@@ -287,7 +287,6 @@
               "locked_test_outcome_used",
               "inadmissible_experiment_selected",
               "random_seed_missing",
-              "incomplete_trial_denominator",
               "posthoc_policy_change"
             ]
           }
