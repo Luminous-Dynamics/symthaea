@@ -338,7 +338,7 @@ fn evaluate_scenario(scenario: &Scenario) -> ScenarioReceipt {
             scenario
                 .actions
                 .iter()
-                .find(|action| action.action_id == **id)
+                .find(|action| action.action_id == id.as_str())
                 .is_some_and(|action| !action.available)
         })
         .count();
@@ -349,7 +349,7 @@ fn evaluate_scenario(scenario: &Scenario) -> ScenarioReceipt {
             scenario
                 .actions
                 .iter()
-                .find(|action| action.action_id == **id)
+                .find(|action| action.action_id == id.as_str())
                 .is_some_and(|action| action.cost_units > scenario.budget_units)
         })
         .count();
