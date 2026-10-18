@@ -216,8 +216,7 @@
         "posthoc_policy_change": {
           "type": "boolean"
         }
-      },
-      "allOf": []
+      }
     },
     "case": {
       "type": "object",
