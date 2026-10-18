@@ -16,14 +16,16 @@
     "The packed candidate keeps the same logical records but puts the 2048-byte payloads in a page-aligned array and moves metadata/ID mapping elsewhere; metadata RAM and lookup/indirection overhead are not modeled.",
     "Current v2 on-disk format remains unchanged. This model does not authorize a migration or a format-v3 implementation.",
     "A 2 MiB page-size case is theoretical only. Do not assume transparent huge pages apply to file-backed mmap; verify the actual host mapping behavior.",
-    "Different architectures have different base page sizes; use the appropriate profile and actual OS page size when measuring."
+    "Different architectures have different base page sizes; use the appropriate profile and actual OS page size when measuring.",
+    "Per-payload page intersections count touched virtual pages for each individual vector access and can count a page more than once across adjacent records. Separate unique-page counts are included for a full sequential scan. Neither metric is a page-fault or physical-I/O count."
   ],
   "calculation": {
     "payloadPageIntersections": "floor((offset + payload_bytes - 1) / page_size) - floor(offset / page_size) + 1",
     "v2StartOffset": "(data_offset_bytes + payload_offset_within_entry_bytes + index * entry_size_bytes) mod page_size",
     "candidateStartOffset": "index * payload_bytes mod page_size",
     "v2PeriodEntries": "page_size / gcd(entry_size_bytes, page_size)",
-    "candidatePeriodEntries": "page_size / gcd(payload_bytes, page_size)"
+    "candidatePeriodEntries": "page_size / gcd(payload_bytes, page_size)",
+    "uniquePagesFullSequentialScan": "floor((last_payload_byte) / page_size) - floor((first_payload_byte) / page_size) + 1"
   },
   "pageProfiles": [
     {
@@ -58,7 +60,11 @@
           "interleavedAveragePagesPerPayload": 1.484375,
           "packedPayloadPageIntersections": 64,
           "packedAveragePagesPerPayload": 1,
-          "packedBaseAlignmentPaddingBytes": 0
+          "packedBaseAlignmentPaddingBytes": 0,
+          "interleavedUniquePayloadPagesForFullSequentialScan": 33,
+          "packedUniquePayloadPagesForFullSequentialScan": 32,
+          "uniquePageReductionFraction": 0.030303030303030304,
+          "note": "Unique virtual pages intersecting at least one byte of every vector payload in a full sequential pass; does not mean physical pages/blocks read."
         },
         {
           "vectorCount": 256,
@@ -68,7 +74,11 @@
           "interleavedAveragePagesPerPayload": 1.4921875,
           "packedPayloadPageIntersections": 256,
           "packedAveragePagesPerPayload": 1,
-          "packedBaseAlignmentPaddingBytes": 0
+          "packedBaseAlignmentPaddingBytes": 0,
+          "interleavedUniquePayloadPagesForFullSequentialScan": 130,
+          "packedUniquePayloadPagesForFullSequentialScan": 128,
+          "uniquePageReductionFraction": 0.015384615384615385,
+          "note": "Unique virtual pages intersecting at least one byte of every vector payload in a full sequential pass; does not mean physical pages/blocks read."
         },
         {
           "vectorCount": 1024,
@@ -78,7 +88,11 @@
           "interleavedAveragePagesPerPayload": 1.4921875,
           "packedPayloadPageIntersections": 1024,
           "packedAveragePagesPerPayload": 1,
-          "packedBaseAlignmentPaddingBytes": 0
+          "packedBaseAlignmentPaddingBytes": 0,
+          "interleavedUniquePayloadPagesForFullSequentialScan": 520,
+          "packedUniquePayloadPagesForFullSequentialScan": 512,
+          "uniquePageReductionFraction": 0.015384615384615385,
+          "note": "Unique virtual pages intersecting at least one byte of every vector payload in a full sequential pass; does not mean physical pages/blocks read."
         },
         {
           "vectorCount": 4096,
@@ -88,7 +102,11 @@
           "interleavedAveragePagesPerPayload": 1.4921875,
           "packedPayloadPageIntersections": 4096,
           "packedAveragePagesPerPayload": 1,
-          "packedBaseAlignmentPaddingBytes": 0
+          "packedBaseAlignmentPaddingBytes": 0,
+          "interleavedUniquePayloadPagesForFullSequentialScan": 2080,
+          "packedUniquePayloadPagesForFullSequentialScan": 2048,
+          "uniquePageReductionFraction": 0.015384615384615385,
+          "note": "Unique virtual pages intersecting at least one byte of every vector payload in a full sequential pass; does not mean physical pages/blocks read."
         },
         {
           "vectorCount": 16384,
@@ -98,7 +116,11 @@
           "interleavedAveragePagesPerPayload": 1.4921875,
           "packedPayloadPageIntersections": 16384,
           "packedAveragePagesPerPayload": 1,
-          "packedBaseAlignmentPaddingBytes": 0
+          "packedBaseAlignmentPaddingBytes": 0,
+          "interleavedUniquePayloadPagesForFullSequentialScan": 8320,
+          "packedUniquePayloadPagesForFullSequentialScan": 8192,
+          "uniquePageReductionFraction": 0.015384615384615385,
+          "note": "Unique virtual pages intersecting at least one byte of every vector payload in a full sequential pass; does not mean physical pages/blocks read."
         },
         {
           "vectorCount": 131072,
@@ -108,7 +130,11 @@
           "interleavedAveragePagesPerPayload": 1.4921875,
           "packedPayloadPageIntersections": 131072,
           "packedAveragePagesPerPayload": 1,
-          "packedBaseAlignmentPaddingBytes": 0
+          "packedBaseAlignmentPaddingBytes": 0,
+          "interleavedUniquePayloadPagesForFullSequentialScan": 66560,
+          "packedUniquePayloadPagesForFullSequentialScan": 65536,
+          "uniquePageReductionFraction": 0.015384615384615385,
+          "note": "Unique virtual pages intersecting at least one byte of every vector payload in a full sequential pass; does not mean physical pages/blocks read."
         }
       ]
     },
@@ -144,7 +170,11 @@
           "interleavedAveragePagesPerPayload": 1.03125,
           "packedPayloadPageIntersections": 64,
           "packedAveragePagesPerPayload": 1,
-          "packedBaseAlignmentPaddingBytes": 57344
+          "packedBaseAlignmentPaddingBytes": 57344,
+          "interleavedUniquePayloadPagesForFullSequentialScan": 3,
+          "packedUniquePayloadPagesForFullSequentialScan": 2,
+          "uniquePageReductionFraction": 0.3333333333333333,
+          "note": "Unique virtual pages intersecting at least one byte of every vector payload in a full sequential pass; does not mean physical pages/blocks read."
         },
         {
           "vectorCount": 256,
@@ -154,7 +184,11 @@
           "interleavedAveragePagesPerPayload": 1.03125,
           "packedPayloadPageIntersections": 256,
           "packedAveragePagesPerPayload": 1,
-          "packedBaseAlignmentPaddingBytes": 57344
+          "packedBaseAlignmentPaddingBytes": 57344,
+          "interleavedUniquePayloadPagesForFullSequentialScan": 9,
+          "packedUniquePayloadPagesForFullSequentialScan": 8,
+          "uniquePageReductionFraction": 0.1111111111111111,
+          "note": "Unique virtual pages intersecting at least one byte of every vector payload in a full sequential pass; does not mean physical pages/blocks read."
         },
         {
           "vectorCount": 1024,
@@ -164,7 +198,11 @@
           "interleavedAveragePagesPerPayload": 1.03125,
           "packedPayloadPageIntersections": 1024,
           "packedAveragePagesPerPayload": 1,
-          "packedBaseAlignmentPaddingBytes": 57344
+          "packedBaseAlignmentPaddingBytes": 57344,
+          "interleavedUniquePayloadPagesForFullSequentialScan": 33,
+          "packedUniquePayloadPagesForFullSequentialScan": 32,
+          "uniquePageReductionFraction": 0.030303030303030304,
+          "note": "Unique virtual pages intersecting at least one byte of every vector payload in a full sequential pass; does not mean physical pages/blocks read."
         },
         {
           "vectorCount": 4096,
@@ -174,7 +212,11 @@
           "interleavedAveragePagesPerPayload": 1.03076171875,
           "packedPayloadPageIntersections": 4096,
           "packedAveragePagesPerPayload": 1,
-          "packedBaseAlignmentPaddingBytes": 57344
+          "packedBaseAlignmentPaddingBytes": 57344,
+          "interleavedUniquePayloadPagesForFullSequentialScan": 131,
+          "packedUniquePayloadPagesForFullSequentialScan": 128,
+          "uniquePageReductionFraction": 0.022900763358778626,
+          "note": "Unique virtual pages intersecting at least one byte of every vector payload in a full sequential pass; does not mean physical pages/blocks read."
         },
         {
           "vectorCount": 16384,
@@ -184,7 +226,11 @@
           "interleavedAveragePagesPerPayload": 1.03076171875,
           "packedPayloadPageIntersections": 16384,
           "packedAveragePagesPerPayload": 1,
-          "packedBaseAlignmentPaddingBytes": 57344
+          "packedBaseAlignmentPaddingBytes": 57344,
+          "interleavedUniquePayloadPagesForFullSequentialScan": 521,
+          "packedUniquePayloadPagesForFullSequentialScan": 512,
+          "uniquePageReductionFraction": 0.01727447216890595,
+          "note": "Unique virtual pages intersecting at least one byte of every vector payload in a full sequential pass; does not mean physical pages/blocks read."
         },
         {
           "vectorCount": 131072,
@@ -194,7 +240,11 @@
           "interleavedAveragePagesPerPayload": 1.03076171875,
           "packedPayloadPageIntersections": 131072,
           "packedAveragePagesPerPayload": 1,
-          "packedBaseAlignmentPaddingBytes": 57344
+          "packedBaseAlignmentPaddingBytes": 57344,
+          "interleavedUniquePayloadPagesForFullSequentialScan": 4161,
+          "packedUniquePayloadPagesForFullSequentialScan": 4096,
+          "uniquePageReductionFraction": 0.015621244893054553,
+          "note": "Unique virtual pages intersecting at least one byte of every vector payload in a full sequential pass; does not mean physical pages/blocks read."
         }
       ]
     },
@@ -230,7 +280,11 @@
           "interleavedAveragePagesPerPayload": 1,
           "packedPayloadPageIntersections": 64,
           "packedAveragePagesPerPayload": 1,
-          "packedBaseAlignmentPaddingBytes": 2088960
+          "packedBaseAlignmentPaddingBytes": 2088960,
+          "interleavedUniquePayloadPagesForFullSequentialScan": 1,
+          "packedUniquePayloadPagesForFullSequentialScan": 1,
+          "uniquePageReductionFraction": 0,
+          "note": "Unique virtual pages intersecting at least one byte of every vector payload in a full sequential pass; does not mean physical pages/blocks read."
         },
         {
           "vectorCount": 256,
@@ -240,7 +294,11 @@
           "interleavedAveragePagesPerPayload": 1,
           "packedPayloadPageIntersections": 256,
           "packedAveragePagesPerPayload": 1,
-          "packedBaseAlignmentPaddingBytes": 2088960
+          "packedBaseAlignmentPaddingBytes": 2088960,
+          "interleavedUniquePayloadPagesForFullSequentialScan": 1,
+          "packedUniquePayloadPagesForFullSequentialScan": 1,
+          "uniquePageReductionFraction": 0,
+          "note": "Unique virtual pages intersecting at least one byte of every vector payload in a full sequential pass; does not mean physical pages/blocks read."
         },
         {
           "vectorCount": 1024,
@@ -250,7 +308,11 @@
           "interleavedAveragePagesPerPayload": 1.0009765625,
           "packedPayloadPageIntersections": 1024,
           "packedAveragePagesPerPayload": 1,
-          "packedBaseAlignmentPaddingBytes": 2088960
+          "packedBaseAlignmentPaddingBytes": 2088960,
+          "interleavedUniquePayloadPagesForFullSequentialScan": 2,
+          "packedUniquePayloadPagesForFullSequentialScan": 1,
+          "uniquePageReductionFraction": 0.5,
+          "note": "Unique virtual pages intersecting at least one byte of every vector payload in a full sequential pass; does not mean physical pages/blocks read."
         },
         {
           "vectorCount": 4096,
@@ -260,7 +322,11 @@
           "interleavedAveragePagesPerPayload": 1.0009765625,
           "packedPayloadPageIntersections": 4096,
           "packedAveragePagesPerPayload": 1,
-          "packedBaseAlignmentPaddingBytes": 2088960
+          "packedBaseAlignmentPaddingBytes": 2088960,
+          "interleavedUniquePayloadPagesForFullSequentialScan": 5,
+          "packedUniquePayloadPagesForFullSequentialScan": 4,
+          "uniquePageReductionFraction": 0.2,
+          "note": "Unique virtual pages intersecting at least one byte of every vector payload in a full sequential pass; does not mean physical pages/blocks read."
         },
         {
           "vectorCount": 16384,
@@ -270,7 +336,11 @@
           "interleavedAveragePagesPerPayload": 1.0008544921875,
           "packedPayloadPageIntersections": 16384,
           "packedAveragePagesPerPayload": 1,
-          "packedBaseAlignmentPaddingBytes": 2088960
+          "packedBaseAlignmentPaddingBytes": 2088960,
+          "interleavedUniquePayloadPagesForFullSequentialScan": 17,
+          "packedUniquePayloadPagesForFullSequentialScan": 16,
+          "uniquePageReductionFraction": 0.058823529411764705,
+          "note": "Unique virtual pages intersecting at least one byte of every vector payload in a full sequential pass; does not mean physical pages/blocks read."
         },
         {
           "vectorCount": 131072,
@@ -280,7 +350,11 @@
           "interleavedAveragePagesPerPayload": 1.0009613037109375,
           "packedPayloadPageIntersections": 131072,
           "packedAveragePagesPerPayload": 1,
-          "packedBaseAlignmentPaddingBytes": 2088960
+          "packedBaseAlignmentPaddingBytes": 2088960,
+          "interleavedUniquePayloadPagesForFullSequentialScan": 131,
+          "packedUniquePayloadPagesForFullSequentialScan": 128,
+          "uniquePageReductionFraction": 0.022900763358778626,
+          "note": "Unique virtual pages intersecting at least one byte of every vector payload in a full sequential pass; does not mean physical pages/blocks read."
         }
       ]
     }
