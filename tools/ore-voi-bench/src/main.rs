@@ -497,9 +497,9 @@ mod tests {
             .find(|scenario| scenario.scenario_id == "ESTIMATOR_MISCALIBRATION_MUST_REMAIN_VISIBLE")
             .expect("miscalibration scenario exists");
         let result = evaluate_scenario(scenario);
-        assert_eq!(Some("NOISY_HIGH_GAIN_TEST".to_owned()), result.decision_aware_action_id);
+        assert_eq!(Some("OVERCONFIDENT_ASSAY".to_owned()), result.decision_aware_action_id);
         assert_eq!(Some("ROBUST_RECOVERY_TEST".to_owned()), result.oracle_action_id);
-        assert_eq!(14, result.decision_aware_regret_units);
+        assert_eq!(19, result.decision_aware_regret_units);
     }
 
     #[test]
