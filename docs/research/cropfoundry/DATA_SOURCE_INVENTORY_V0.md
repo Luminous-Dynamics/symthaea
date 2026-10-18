@@ -10,13 +10,13 @@
 
 Do not start by bulk-ingesting every crop database. Prefer two sharply separated, small proofs with explicit license evidence:
 
-1. **First tabular pipeline candidate:** [UdeA Mobile and Manual Tomato](https://zenodo.org/records/16745911). Zenodo states CC BY 4.0 and describes 135 plants, 27 treatment combinations and 20 weekly sessions. The accessible CSV preview exposes row-level plant/time identifiers, treatment labels, mixed sensor/manual variables and yield fields. Do not randomly split rows: hold out whole plants for one question and later dates for a separate temporal question. The related GitHub mirror's stated row/column counts conflict with the Zenodo record, so pin and inspect the canonical Zenodo artifact before scoring it.
+1. **First tabular pipeline candidate:** [UdeA Mobile and Manual Tomato](https://zenodo.org/records/16745911). Zenodo states CC BY 4.0 and describes 135 plants, 27 treatment combinations and 20 weekly sessions. The accessible CSV preview exposes row-level plant/time identifiers, treatment labels, mixed sensor/manual variables and yield fields. Do not randomly split rows: hold out whole plants for one question and later dates for a separate temporal question. The related GitHub mirror says 2,664 rows × 44 columns and its README says CC BY 4.0, but the mirror's LICENSE file is CC0 1.0. The canonical Zenodo v1 record says 2,666 rows × 40 columns, identifies CC BY 4.0, and lists the CSV's MD5. Do not merge or substitute the mirror variant; resolve the exact row-count semantics and acquire only the canonical Zenodo artifact. The Zenodo record references a separate data dictionary/processing document, but that document is not included among the record's files, so the missingness procedure, units and treatment assignment details remain an evidence gap.
 2. **Separate phenotyping/vision candidate:** [AerialYield-T2M](https://zenodo.org/records/22071809), a six-stage tomato-ripeness/mask/count dataset with 677 frames, 14,303 annotated tomato instances, explicit block-grouped splits, a checksum list and a bundled CC BY 4.0 LICENSE file. It is a single commercial greenhouse in the UAE, so it cannot establish yield, genotype, or South African transfer.
 3. The **existing Mycelix lettuce/DWC profile and cultivar-admission work** as an integration/contract lane, not as measured yield evidence.
 4. An **ARC partnership/access request** for one locally relevant underutilized leafy vegetable rather than assuming its trial records are openly downloadable.
 5. A **germplasm discovery** lane through Genesys or relevant national/institutional collections, subject to access terms and material-transfer conditions.
 
-The UdeA file preview has been inspected for column headings and example records through Zenodo's web preview, but no data bytes have been pinned locally, normalized, or scored. These non-South-African studies are pipeline/benchmark candidates, not evidence that varieties or models transfer to Johannesburg.
+The UdeA file preview has been inspected for column headings and example records through Zenodo's web preview, but no data bytes have been pinned locally, normalized, or scored. Its treatment labels are not proof of randomization or blocking, so CF-018 must remain unevaluable until the design is documented. These non-South-African studies are pipeline/benchmark candidates, not evidence that varieties or models transfer to Johannesburg.
 
 ## Candidate source register
 
@@ -79,13 +79,13 @@ Before a file enters a training or evaluation dataset, record:
 
 ## Recommended initial work order
 
-1. Use the canonical DS-010 Zenodo artifact as the first small tabular pipeline candidate: verify file identity/checksum, exact headers/units, plant/date/treatment grouping, missingness and the row/column discrepancy before scoring. CC BY 4.0 is recorded on the Zenodo item, but artifact bytes must be pinned for a reproducible run.
+1. Use the canonical DS-010 Zenodo artifact as the first small tabular pipeline candidate: verify exact file identity, retrieve timestamp, local SHA-256 snapshot, headers/units, plant/date/treatment grouping, missingness and the row/column discrepancy before scoring. Zenodo lists an MD5 for the CSV, not SHA-256; a locally calculated SHA-256 is a reproducibility pin, not independent proof of source authenticity.
 2. Design two separate leakage-resistant questions: unseen-plant generalization and future-date prediction. Never use random-row split as the only evaluation because repeated measures of the same plants can leak across partitions.
 3. Start with descriptive QA and simple baselines only if the chosen target has enough non-missing observations and a valid group split. Report dataset coverage before any prediction result; if groups are too few, keep the result at schema-validation level.
 4. Keep DS-011 as a separate image task: start with metadata, bundled license, checksum file and split-integrity review; only then download the minimum authorized components needed for a baseline.
 5. Keep DS-001, DS-002 and DS-003 quarantined until their individual artifact rights/access terms have been resolved.
 6. Open an ARC collaboration/access conversation for the indigenous-crop lane; choose the crop based on local relevance and real evidence/seed access, not on a preconceived model target.
-7. Freeze traits, baselines, splits, metrics and a run receipt only after the applicable inventory gate passes.
+7. Before treatment recommendations, separately verify randomization/allocation, experimental units, blocking, replication, treatment definitions, and source-backed outcomes. If those design details are unavailable, keep the task descriptive/predictive and do not claim causal treatment effects. 8. Freeze traits, baselines, splits, metrics and a run receipt only after the applicable inventory gate passes.
 
 ## Source notes
 
