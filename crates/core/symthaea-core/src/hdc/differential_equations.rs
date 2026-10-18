@@ -159,6 +159,8 @@ pub enum HeatEquationError {
     InvalidStabilityStep,
     /// The stability-preserving step count exceeds the solver's explicit budget.
     StabilityBudgetExceeded { required_steps: f64, max_steps: usize },
+    /// Floating-point updates produced a non-finite solution component.
+    NonFiniteSolution { step: usize, index: usize },
     /// Floating-point evaluation would violate the configured stability ratio.
     UnstableTimestep { ratio: f64 },
 }
@@ -183,6 +185,10 @@ impl std::fmt::Display for HeatEquationError {
             Self::StabilityBudgetExceeded { required_steps, max_steps } => write!(
                 f,
                 "heat solve requires {required_steps:.0} stable steps, exceeding budget {max_steps}"
+            ),
+            Self::NonFiniteSolution { step, index } => write!(
+                f,
+                "heat solve produced a non-finite value at step {step}, index {index}"
             ),
             Self::UnstableTimestep { ratio } => write!(
                 f,
@@ -464,12 +470,18 @@ impl DifferentialEquationsEngine {
         }
 
         let mut u = u0.to_vec();
-        for _ in 0..n_steps {
+        for step in 0..n_steps {
             let mut u_new = u.clone();
             for i in 0..n_x {
                 let u_left = if i == 0 { 0.0 } else { u[i - 1] };
                 let u_right = if i == n_x - 1 { 0.0 } else { u[i + 1] };
                 u_new[i] = u[i] + r * (u_left - 2.0 * u[i] + u_right);
+                if !u_new[i].is_finite() {
+                    return Err(HeatEquationError::NonFiniteSolution {
+                        step: step + 1,
+                        index: i,
+                    });
+                }
             }
             u = u_new;
         }
@@ -1932,6 +1944,17 @@ mod tests {
         assert!(matches!(
             DifferentialEquationsEngine::try_heat_equation_1d(0.01, 1.0, 0.1, 4, &non_finite),
             Err(HeatEquationError::NonFiniteInitialValue { index: 1 })
+        ));
+        let finite_but_overflowing = [1.0e308, -1.0e308, 1.0e308, -1.0e308];
+        assert!(matches!(
+            DifferentialEquationsEngine::try_heat_equation_1d(
+                0.01,
+                1.0,
+                0.1,
+                4,
+                &finite_but_overflowing
+            ),
+            Err(HeatEquationError::NonFiniteSolution { .. })
         ));
     }
 
