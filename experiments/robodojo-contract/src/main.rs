@@ -389,9 +389,13 @@ mod cli_tests {
 
     #[test]
     fn synthetic_forecasts_produce_calibration_and_risk_coverage_metrics() {
-        let rows = read_forecasts(forecast_fixture_path()).expect("synthetic forecasts must parse");
-        assert_eq!(rows.len(), 12);
-        let summaries = summarize_calibration(&rows, 10, 0.8).expect("forecasts must summarize");
+        let probabilities = read_forecast_probabilities(forecast_fixture_path())
+            .expect("synthetic forecasts must parse");
+        assert_eq!(probabilities.len(), 12);
+        let trials = read_trials(fixture_path()).expect("synthetic trial ledger must parse");
+        let forecasts = join_forecasts(probabilities, &trials)
+            .expect("probabilities must join to authoritative trial outcomes");
+        let summaries = summarize_calibration(&forecasts, 10, 0.8).expect("forecasts must summarize");
         assert_eq!(summaries.len(), 4);
         assert!(summaries.iter().all(|row| row.total_trials == 3));
         assert!(summaries.iter().all(|row| row.valid_runs == 2));
@@ -399,6 +403,18 @@ mod cli_tests {
         assert!(summaries.iter().all(|row| row.brier_score.is_finite()));
         assert!(summaries.iter().all(|row| row.log_loss.is_finite()));
         assert!(summaries.iter().all(|row| row.expected_calibration_error.is_finite()));
+    }
+
+    #[test]
+    fn forecast_join_rejects_missing_or_duplicate_ids() {
+        let probabilities = read_forecast_probabilities(forecast_fixture_path())
+            .expect("synthetic forecasts must parse");
+        let trials = read_trials(fixture_path()).expect("synthetic trial ledger must parse");
+        let mut missing = probabilities.clone();
+        missing.pop();
+        assert!(join_forecasts(missing, &trials).is_err());
+        let duplicated = vec![probabilities[0].clone(), probabilities[0].clone()];
+        assert!(join_forecasts(duplicated, &trials).is_err());
     }
 
     #[test]
