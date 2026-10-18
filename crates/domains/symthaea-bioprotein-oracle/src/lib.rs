@@ -748,7 +748,7 @@ pub fn run_corpus(
         results.push(CaseResult {
             case_id: fixture.case_id.clone(),
             status: if pass { RunStatus::Pass } else { RunStatus::Fail },
-            expected_disposition: fixture.expected.disposition.clone(),
+            expected_disposition: fixture.expected.disposition,
             actual_disposition: actual.disposition,
             expected_reason_codes: fixture.expected.reason_codes.clone(),
             actual_reason_codes: actual.reason_codes,
