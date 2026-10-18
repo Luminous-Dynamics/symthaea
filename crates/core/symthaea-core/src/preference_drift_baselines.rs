@@ -571,7 +571,7 @@ mod tests {
                     .as_array()
                     .unwrap()
                     .iter()
-                    .any(|eligible| eligible.as_str() == Some(candidate))
+                    .any(|eligible| eligible.as_str() == Some(candidate.as_str()))
             }));
         }
     }
