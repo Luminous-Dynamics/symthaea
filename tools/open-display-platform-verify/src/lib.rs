@@ -456,9 +456,9 @@ fn validate_measurement_run_semantics(record: &Value) -> Vec<String> {
         .map(Vec::as_slice)
         .unwrap_or(&[]);
 
-    validate_unique_ids(instruments, "run instrument", &mut errors);
-    validate_unique_ids(observations, "run observation", &mut errors);
-    validate_unique_ids(artifacts, "raw artifact", &mut errors);
+    validate_unique_field(instruments, "run instrument", "instrument_id", &mut errors);
+    validate_unique_field(observations, "run observation", "observation_id", &mut errors);
+    validate_unique_field(artifacts, "raw artifact", "artifact_id", &mut errors);
     validate_unique_field(
         exclusions,
         "observation exclusion",
