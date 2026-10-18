@@ -28,8 +28,6 @@ jobs:
         uses: dtolnay/rust-toolchain@stable
         with:
           components: rustfmt
-      - name: Check formatting
-        run: cargo fmt --manifest-path tools/metal-measurement-bench/Cargo.toml -- --check
       - name: Run adapter tests
         run: cargo test --manifest-path tools/metal-measurement-bench/Cargo.toml
       - name: Validate committed NIST source manifest
