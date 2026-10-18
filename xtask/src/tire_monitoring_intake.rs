@@ -86,7 +86,10 @@ fn inspect_csv(raw: &[u8]) -> Result<DataSummary> {
             }
         })
         .collect();
-    if normalized.iter().map(String::as_str).collect::<Vec<_>>() != EXPECTED_HEADER {
+    let header_matches = normalized.len() == EXPECTED_HEADER.len()
+        && normalized.iter().zip(EXPECTED_HEADER.iter())
+            .all(|(actual, expected)| actual.as_str() == *expected);
+    if !header_matches {
         bail!("unexpected tire-monitoring CSV header: {normalized:?}");
     }
 
