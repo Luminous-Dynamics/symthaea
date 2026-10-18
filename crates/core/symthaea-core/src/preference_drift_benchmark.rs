@@ -1492,6 +1492,21 @@ mod tests {
     }
 
     #[test]
+    fn feedback_at_freshness_horizon_is_usable_but_older_feedback_expires() {
+        let fixture = parse_fixture();
+        let mut scenario = scenario_by_id(&fixture, "DEV-WALK-001").clone();
+        scenario["current_step"] = serde_json::json!(3);
+        scenario["preference_max_age_steps"] = serde_json::json!(1);
+
+        let report = replay_preference_episode(&scenario).unwrap();
+        assert_eq!(report.action, PreferenceReplayActionV1::Query);
+        assert_eq!(report.used_observation_count, 1);
+        assert_eq!(report.context_matched_observation_count, 2);
+        assert_eq!(report.expired_preference_observation_count, 1);
+        assert_eq!(report.stale_or_mismatched_observation_count, 0);
+    }
+
+    #[test]
     fn future_dated_feedback_is_rejected_by_fixture_contract() {
         let mut value: Value = serde_json::from_str(FIXTURE).unwrap();
         value["scenarios"][0]["preference_observations"][0]["step"] = serde_json::json!(99);
