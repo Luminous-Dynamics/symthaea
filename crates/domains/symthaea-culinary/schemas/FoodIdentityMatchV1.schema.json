@@ -1,0 +1,355 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "title": "FoodIdentityMatchV1",
+  "description": "Versioned semantic assessment for matching two food records. Names and locale aliases are not sufficient to establish food or product equivalence.",
+  "type": "object",
+  "additionalProperties": false,
+  "required": [
+    "schema_version",
+    "assessment_id",
+    "use_scope",
+    "outcome",
+    "query_record",
+    "candidate_record",
+    "attribute_checks",
+    "deviations",
+    "component_claims",
+    "rationale"
+  ],
+  "properties": {
+    "schema_version": {
+      "const": "1.0.0"
+    },
+    "assessment_id": {
+      "type": "string",
+      "minLength": 1
+    },
+    "use_scope": {
+      "enum": [
+        "nutrition_estimation",
+        "recipe_substitution",
+        "product_lookup",
+        "allergen_screening",
+        "price_comparison"
+      ]
+    },
+    "outcome": {
+      "enum": [
+        "exact_match",
+        "qualified_approximation",
+        "review_required",
+        "no_match"
+      ]
+    },
+    "query_record": {
+      "$ref": "#/$defs/foodRecord"
+    },
+    "candidate_record": {
+      "$ref": "#/$defs/foodRecord"
+    },
+    "attribute_checks": {
+      "type": "array",
+      "minItems": 6,
+      "items": {
+        "$ref": "#/$defs/attributeCheck"
+      }
+    },
+    "deviations": {
+      "type": "array",
+      "items": {
+        "$ref": "#/$defs/deviation"
+      }
+    },
+    "component_claims": {
+      "type": "array",
+      "items": {
+        "$ref": "#/$defs/componentClaim"
+      }
+    },
+    "rationale": {
+      "type": "string"
+    },
+    "review_receipt_ref": {
+      "type": [
+        "string",
+        "null"
+      ]
+    },
+    "policy_version": {
+      "type": [
+        "string",
+        "null"
+      ]
+    }
+  },
+  "$defs": {
+    "foodRecord": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "record_id",
+        "source_ref",
+        "source_version",
+        "names",
+        "identity"
+      ],
+      "properties": {
+        "record_id": {
+          "type": "string",
+          "minLength": 1
+        },
+        "source_ref": {
+          "type": "string",
+          "minLength": 1
+        },
+        "source_version": {
+          "type": "string",
+          "minLength": 1
+        },
+        "names": {
+          "type": "array",
+          "minItems": 1,
+          "items": {
+            "type": "object",
+            "additionalProperties": false,
+            "required": [
+              "text",
+              "language_tag"
+            ],
+            "properties": {
+              "text": {
+                "type": "string",
+                "minLength": 1
+              },
+              "language_tag": {
+                "type": "string",
+                "minLength": 2
+              },
+              "script": {
+                "type": [
+                  "string",
+                  "null"
+                ]
+              },
+              "usage_scope": {
+                "type": [
+                  "string",
+                  "null"
+                ]
+              }
+            }
+          }
+        },
+        "identity": {
+          "type": "object",
+          "additionalProperties": false,
+          "required": [
+            "taxon_id",
+            "food_part",
+            "processing_state",
+            "preparation_state",
+            "product_kind",
+            "edible_basis",
+            "preservation",
+            "brand_id",
+            "fortification",
+            "cultivar",
+            "origin_region"
+          ],
+          "properties": {
+            "taxon_id": {
+              "type": [
+                "string",
+                "null"
+              ]
+            },
+            "food_part": {
+              "type": [
+                "string",
+                "null"
+              ]
+            },
+            "processing_state": {
+              "type": [
+                "string",
+                "null"
+              ]
+            },
+            "preparation_state": {
+              "type": [
+                "string",
+                "null"
+              ]
+            },
+            "product_kind": {
+              "type": [
+                "string",
+                "null"
+              ]
+            },
+            "edible_basis": {
+              "type": [
+                "string",
+                "null"
+              ]
+            },
+            "preservation": {
+              "type": [
+                "string",
+                "null"
+              ]
+            },
+            "brand_id": {
+              "type": [
+                "string",
+                "null"
+              ]
+            },
+            "fortification": {
+              "type": [
+                "string",
+                "null"
+              ]
+            },
+            "cultivar": {
+              "type": [
+                "string",
+                "null"
+              ]
+            },
+            "origin_region": {
+              "type": [
+                "string",
+                "null"
+              ]
+            },
+            "ontology_refs": {
+              "type": "array",
+              "items": {
+                "type": "string"
+              }
+            }
+          }
+        }
+      }
+    },
+    "attributeCheck": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "attribute_id",
+        "query_value",
+        "candidate_value",
+        "relation"
+      ],
+      "properties": {
+        "attribute_id": {
+          "enum": [
+            "taxon_id",
+            "food_part",
+            "processing_state",
+            "preparation_state",
+            "product_kind",
+            "edible_basis",
+            "preservation",
+            "brand_id",
+            "fortification",
+            "cultivar",
+            "origin_region"
+          ]
+        },
+        "query_value": {
+          "type": [
+            "string",
+            "null"
+          ]
+        },
+        "candidate_value": {
+          "type": [
+            "string",
+            "null"
+          ]
+        },
+        "relation": {
+          "enum": [
+            "match",
+            "different",
+            "unknown",
+            "not_applicable"
+          ]
+        },
+        "evidence_ref": {
+          "type": [
+            "string",
+            "null"
+          ]
+        }
+      }
+    },
+    "deviation": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "attribute_id",
+        "reason"
+      ],
+      "properties": {
+        "attribute_id": {
+          "type": "string",
+          "minLength": 1
+        },
+        "reason": {
+          "type": "string",
+          "minLength": 1
+        }
+      }
+    },
+    "componentClaim": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "component_id",
+        "query_basis",
+        "candidate_basis",
+        "comparability"
+      ],
+      "properties": {
+        "component_id": {
+          "type": "string",
+          "minLength": 1
+        },
+        "query_basis": {
+          "type": [
+            "string",
+            "null"
+          ]
+        },
+        "candidate_basis": {
+          "type": [
+            "string",
+            "null"
+          ]
+        },
+        "comparability": {
+          "enum": [
+            "same_basis",
+            "converted",
+            "not_comparable"
+          ]
+        },
+        "conversion_ref": {
+          "type": [
+            "string",
+            "null"
+          ]
+        },
+        "uncertainty_ref": {
+          "type": [
+            "string",
+            "null"
+          ]
+        }
+      }
+    }
+  }
+}
