@@ -47,9 +47,7 @@ fn validate_contract(manifest_text: &str, schema_text: &str) -> Vec<String> {
         Err(error) => errors.push(format!("route schema compilation failed: {error}")),
     }
 
-    if manifest.get("corpus_id").and_then(Value::as_str)
-        != Some("VIS-MFG-ROUTE-CORPUS-001")
-    {
+    if manifest.get("corpus_id").and_then(Value::as_str) != Some("VIS-MFG-ROUTE-CORPUS-001") {
         errors.push("route corpus identity mismatch".to_owned());
     }
     if manifest.get("status").and_then(Value::as_str) != Some("UNQUALIFIED") {
@@ -85,7 +83,10 @@ fn validate_contract(manifest_text: &str, schema_text: &str) -> Vec<String> {
     let mut route_ids = BTreeSet::new();
     let mut component_ids = BTreeSet::new();
     for route in routes {
-        let route_id = route.get("route_id").and_then(Value::as_str).unwrap_or("<missing>");
+        let route_id = route
+            .get("route_id")
+            .and_then(Value::as_str)
+            .unwrap_or("<missing>");
         if !route_ids.insert(route_id.to_owned()) {
             errors.push(format!("duplicate route ID: {route_id}"));
         }
@@ -98,17 +99,25 @@ fn validate_contract(manifest_text: &str, schema_text: &str) -> Vec<String> {
             .filter_map(Value::as_str)
             .collect();
         if route_sources.is_empty()
-            || route_sources.iter().any(|source_id| !sources.contains(*source_id))
+            || route_sources
+                .iter()
+                .any(|source_id| !sources.contains(*source_id))
         {
-            errors.push(format!("route {route_id} has empty or unresolved source references"));
+            errors.push(format!(
+                "route {route_id} has empty or unresolved source references"
+            ));
         }
 
         let Some(components) = route.get("component_interfaces").and_then(Value::as_array) else {
-            errors.push(format!("route {route_id} component_interfaces must be an array"));
+            errors.push(format!(
+                "route {route_id} component_interfaces must be an array"
+            ));
             continue;
         };
         if components.len() < 4 {
-            errors.push(format!("route {route_id} has too few component interface contracts"));
+            errors.push(format!(
+                "route {route_id} has too few component interface contracts"
+            ));
         }
         for component in components {
             let component_id = component
@@ -131,7 +140,9 @@ fn validate_contract(manifest_text: &str, schema_text: &str) -> Vec<String> {
                 .filter_map(Value::as_str)
                 .collect();
             if component_sources.is_empty()
-                || component_sources.iter().any(|source_id| !sources.contains(*source_id))
+                || component_sources
+                    .iter()
+                    .any(|source_id| !sources.contains(*source_id))
             {
                 errors.push(format!(
                     "component {component_id} has empty or unresolved source references"
@@ -149,7 +160,9 @@ fn validate_contract(manifest_text: &str, schema_text: &str) -> Vec<String> {
                     !owner.starts_with("https://github.com/Luminous-Dynamics/symthaea/issues/")
                 })
             {
-                errors.push(format!("component {component_id} lacks canonical process owners"));
+                errors.push(format!(
+                    "component {component_id} lacks canonical process owners"
+                ));
             }
         }
 
@@ -160,18 +173,28 @@ fn validate_contract(manifest_text: &str, schema_text: &str) -> Vec<String> {
 
         let mut stage_sequence = BTreeMap::<String, u64>::new();
         for (index, stage) in stages.iter().enumerate() {
-            let stage_id = stage.get("stage_id").and_then(Value::as_str).unwrap_or("<missing>");
+            let stage_id = stage
+                .get("stage_id")
+                .and_then(Value::as_str)
+                .unwrap_or("<missing>");
             let sequence = stage.get("sequence").and_then(Value::as_u64);
             if sequence != Some((index + 1) as u64) {
                 errors.push(format!(
                     "route {route_id} stage {stage_id} is not in its frozen topological sequence"
                 ));
             }
-            if stage_sequence.insert(stage_id.to_owned(), sequence.unwrap_or(0)).is_some() {
-                errors.push(format!("duplicate stage ID in route {route_id}: {stage_id}"));
+            if stage_sequence
+                .insert(stage_id.to_owned(), sequence.unwrap_or(0))
+                .is_some()
+            {
+                errors.push(format!(
+                    "duplicate stage ID in route {route_id}: {stage_id}"
+                ));
             }
             if stage.get("evidence_status").and_then(Value::as_str) != Some("UNQUALIFIED") {
-                errors.push(format!("stage {stage_id} cannot self-promote evidence status"));
+                errors.push(format!(
+                    "stage {stage_id} cannot self-promote evidence status"
+                ));
             }
             if stage
                 .get("process_semantics_owner")
@@ -197,15 +220,21 @@ fn validate_contract(manifest_text: &str, schema_text: &str) -> Vec<String> {
                 let mode = group.get("mode").and_then(Value::as_str);
                 let predecessors = group.get("predecessors").and_then(Value::as_array);
                 if !matches!(mode, Some("all_of" | "one_of_conditioned")) {
-                    errors.push(format!("stage {stage_id} has an invalid predecessor group mode"));
+                    errors.push(format!(
+                        "stage {stage_id} has an invalid predecessor group mode"
+                    ));
                     continue;
                 }
                 let Some(predecessors) = predecessors else {
-                    errors.push(format!("stage {stage_id} predecessor group has no predecessors"));
+                    errors.push(format!(
+                        "stage {stage_id} predecessor group has no predecessors"
+                    ));
                     continue;
                 };
                 if predecessors.is_empty() {
-                    errors.push(format!("stage {stage_id} contains an empty predecessor group"));
+                    errors.push(format!(
+                        "stage {stage_id} contains an empty predecessor group"
+                    ));
                 }
                 if mode == Some("one_of_conditioned")
                     && predecessors.iter().any(|edge| {
@@ -252,7 +281,10 @@ fn validate_contract(manifest_text: &str, schema_text: &str) -> Vec<String> {
 #[test]
 fn frozen_display_manufacturing_routes_validate_against_schema_and_dag_contract() {
     let errors = validate_contract(MANIFEST_TEXT, SCHEMA_TEXT);
-    assert!(errors.is_empty(), "route contract validation errors: {errors:#?}");
+    assert!(
+        errors.is_empty(),
+        "route contract validation errors: {errors:#?}"
+    );
 }
 
 #[test]
@@ -271,11 +303,12 @@ fn rejects_promoted_component_status_and_unresolved_component_source() {
     let promoted_text = serde_json::to_string(&promoted).expect("promoted fixture serializes");
     assert!(!validate_contract(&promoted_text, SCHEMA_TEXT).is_empty());
 
-    let mut unresolved: Value = serde_json::from_str(MANIFEST_TEXT).expect("fixture manifest JSON");
+    let mut unresolved: Value =
+        serde_json::from_str(MANIFEST_TEXT).expect("fixture manifest JSON");
     unresolved["routes"][0]["component_interfaces"][0]["reference_source_ids"][0] =
         Value::String("SRC-NOT-DEFINED".to_owned());
-    let unresolved_text = serde_json::to_string(&unresolved)
-        .expect("unresolved fixture serializes");
+    let unresolved_text =
+        serde_json::to_string(&unresolved).expect("unresolved fixture serializes");
     assert!(!validate_contract(&unresolved_text, SCHEMA_TEXT).is_empty());
 }
 
@@ -283,15 +316,14 @@ fn rejects_promoted_component_status_and_unresolved_component_source() {
 fn rejects_unresolved_source_and_predecessor_references() {
     let mut source_mutation: Value =
         serde_json::from_str(MANIFEST_TEXT).expect("fixture manifest JSON");
-    source_mutation["routes"][0]["source_ids"][0] =
-        Value::String("SRC-NOT-DEFINED".to_owned());
+    source_mutation["routes"][0]["source_ids"][0] = Value::String("SRC-NOT-DEFINED".to_owned());
     let source_text = serde_json::to_string(&source_mutation).expect("source mutation serializes");
     assert!(!validate_contract(&source_text, SCHEMA_TEXT).is_empty());
 
     let mut predecessor_mutation: Value =
         serde_json::from_str(MANIFEST_TEXT).expect("fixture manifest JSON");
-    predecessor_mutation["routes"][0]["stages"][2]["predecessor_groups"][0]["predecessors"][0]
-        ["stage_id"] = Value::String("MICLED-99".to_owned());
+    predecessor_mutation["routes"][0]["stages"][2]["predecessor_groups"][0]["predecessors"][0]["stage_id"] =
+        Value::String("MICLED-99".to_owned());
     let predecessor_text =
         serde_json::to_string(&predecessor_mutation).expect("predecessor mutation serializes");
     assert!(!validate_contract(&predecessor_text, SCHEMA_TEXT).is_empty());
@@ -309,15 +341,13 @@ fn rejects_duplicate_stage_ids_and_non_topological_dependencies() {
 
     let mut order_mutation: Value =
         serde_json::from_str(MANIFEST_TEXT).expect("fixture manifest JSON");
-    order_mutation["routes"][0]["stages"][0]["predecessor_groups"] =
-        serde_json::json!([{
-            "mode":"all_of",
-            "predecessors":[{
-                "stage_id":"MICLED-02",
-                "condition":"deliberately forward dependency for negative control"
-            }]
-        }]);
-    let order_text =
-        serde_json::to_string(&order_mutation).expect("order mutation serializes");
+    order_mutation["routes"][0]["stages"][0]["predecessor_groups"] = serde_json::json!([{
+        "mode":"all_of",
+        "predecessors":[{
+            "stage_id":"MICLED-02",
+            "condition":"deliberately forward dependency for negative control"
+        }]
+    }]);
+    let order_text = serde_json::to_string(&order_mutation).expect("order mutation serializes");
     assert!(!validate_contract(&order_text, SCHEMA_TEXT).is_empty());
 }
