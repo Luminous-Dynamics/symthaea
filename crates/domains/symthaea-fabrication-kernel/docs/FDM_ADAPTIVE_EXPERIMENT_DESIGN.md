@@ -33,16 +33,17 @@ These sources support measuring across features/positions and preserving context
 1. `fixed_stratified`: frozen inner-grid positions.
 2. `farthest_point`: choose the candidate with greatest distance from any previously measured position.
 3. `model_disagreement`: choose the candidate where nearest-neighbor and inverse-distance-weighted predictions disagree most.
-4. `seeded_random`: deterministic random candidate baseline.
+4. `coverage_guarded_disagreement`: alternate farthest-point exploration and model-disagreement exploitation, reserving half of its incremental budget for space-filling.
+5. `seeded_random`: deterministic random candidate baseline.
 
-The selector logic receives only observed values and the candidate pool. No strategy is presumed best. The disagreement policy is a simple baseline, not a claim of optimal Bayesian experimental design.
+The selector logic receives only observed values and the candidate pool. No strategy is presumed best. The disagreement policy is a simple baseline, not a claim of optimal Bayesian experimental design. The guarded hybrid tests whether an explicit exploration reserve is more robust than purely exploitation-driven sampling.
 
 ## Adversarial surface panel
 
 - Smooth quadratic variation.
 - Anisotropic/directional response.
 - Edge roll-off.
-- Narrow localized hotspot.
+- Narrow localized hotspot, deliberately offset between fixed-stratified lattice points so the coarse grid can miss it.
 - Piecewise discontinuous boundary.
 - Smooth latent response with heteroskedastic measurement noise.
 - Null latent spatial effect with measurement noise, to detect spurious confidence in apparent patterns.
@@ -70,6 +71,7 @@ The critical threshold (0.10 mm), detection radius (0.08 normalized units), eval
 - Duplicate positions, invalid/non-finite measurements, altered report lineage, and accidental split overlap must be rejected as extensions add importable corpora.
 - Null effect: latent critical-region count is zero and recall is undefined (not zero or 100%).
 - Localized hotspot and piecewise boundary must remain present as adversarial cases.
+- The frozen hotspot negative control must remain missed by the fixed-stratified arm at its current budget; this verifies that the fixture actually exercises a coarse-grid blind spot. It does not require any adaptive arm to win.
 - Compare Pareto trade-offs; do not declare an adaptive winner based on one surface or one seed.
 - A stronger claim requires repeated surface/noise seeds, alternative grid resolutions, budget curves, equal realistic measurement costs, and independent evaluation of uncertainty and critical-feature strata.
 - Physical-pilot claims require an identified machine/profile, material lot, feature and orientation, instrument/calibration, repeated builds, uncertainty and failure/missingness lineage. No synthetic result counts as physical confirmation.
