@@ -359,7 +359,7 @@ fn score_selections(
                 let acceptable = oracle
                     .get("acceptable_candidate_ids")
                     .and_then(Value::as_array)
-                    .is_some_and(|items| items.iter().any(|item| item.as_str() == Some(candidate_id)));
+                    .is_some_and(|items| items.iter().any(|item| item.as_str() == Some(candidate_id.as_str())));
                 if acceptable {
                     score.acceptable_selection_count += 1;
                 } else {
@@ -516,6 +516,38 @@ mod tests {
         {
             assert_eq!(before.selected_candidate_id, after.selected_candidate_id);
         }
+    }
+
+    #[test]
+    fn fixed_weights_sum_to_one_and_are_not_fitted_at_runtime() {
+        let sum = FIXED_WEIGHT_TASK_SUCCESS_V1
+            + FIXED_WEIGHT_STABILITY_V1
+            + FIXED_WEIGHT_MASS_V1
+            + FIXED_WEIGHT_ENERGY_V1
+            + FIXED_WEIGHT_MOVEMENT_FREEDOM_V1;
+        assert!((sum - 1.0).abs() < f64::EPSILON);
+        assert_eq!(FIXED_WEIGHT_TASK_SUCCESS_V1, 0.40);
+        assert_eq!(FIXED_WEIGHT_STABILITY_V1, 0.20);
+        assert_eq!(FIXED_WEIGHT_MASS_V1, 0.15);
+        assert_eq!(FIXED_WEIGHT_ENERGY_V1, 0.10);
+        assert_eq!(FIXED_WEIGHT_MOVEMENT_FREEDOM_V1, 0.15);
+    }
+
+    #[test]
+    fn non_finite_or_out_of_range_profile_is_rejected() {
+        let mut root: Value = serde_json::from_str(FIXTURE).unwrap();
+        root["candidate_catalog"][0]["synthetic_engineering_profile"]
+            ["movement_restriction_index_0_to_1"] = serde_json::json!(1.5);
+        let modified = serde_json::to_string(&root).unwrap();
+        assert!(evaluate_preference_selection_baselines(&modified, 1).is_err());
+    }
+
+    #[test]
+    fn unsupported_task_success_key_fails_closed() {
+        let mut root: Value = serde_json::from_str(FIXTURE).unwrap();
+        root["scenarios"][0]["task_id"] = serde_json::json!("unsupported_task");
+        let modified = serde_json::to_string(&root).unwrap();
+        assert!(evaluate_preference_selection_baselines(&modified, 1).is_err());
     }
 
     #[test]
