@@ -76,6 +76,10 @@ pub struct PreferenceDriftGenerationManifestV1 {
     pub scenario_count: usize,
     /// Number of candidates in the shared synthetic catalog.
     pub candidate_count: usize,
+    /// Scenario counts keyed by scenario-family ID, in canonical key order.
+    pub scenario_counts_by_family: BTreeMap<String, usize>,
+    /// Split assignment keyed by scenario-family ID, in canonical key order.
+    pub scenario_family_splits: BTreeMap<String, String>,
     /// BLAKE3 digest of the exact serialized fixture bytes, including trailing newline.
     pub fixture_blake3_hex: String,
     /// Explicit limitation on interpretation.
@@ -329,6 +333,30 @@ pub fn generate_preference_drift_suite(
         }
     }
 
+    let mut scenario_counts_by_family = BTreeMap::<String, usize>::new();
+    let mut scenario_family_splits = BTreeMap::<String, String>::new();
+    for scenario in &generated_scenarios {
+        let family = scenario
+            .get("scenario_family")
+            .and_then(Value::as_str)
+            .ok_or_else(|| finding("$.scenarios.scenario_family", "generated scenario lacks family ID"))?
+            .to_owned();
+        let split = scenario
+            .get("split")
+            .and_then(Value::as_str)
+            .ok_or_else(|| finding("$.scenarios.split", "generated scenario lacks split"))?
+            .to_owned();
+        *scenario_counts_by_family.entry(family.clone()).or_default() += 1;
+        if let Some(previous) = scenario_family_splits.insert(family.clone(), split.clone()) {
+            if previous != split {
+                return Err(finding(
+                    "$.scenarios.scenario_family",
+                    format!("scenario family {family} was assigned to both {previous} and {split}"),
+                ));
+            }
+        }
+    }
+
     root["fixture_version"] = json!("0.3.0");
     root["generation"] = json!({
         "method": PREFERENCE_DRIFT_GENERATOR_ID_V1,
@@ -376,6 +404,8 @@ pub fn generate_preference_drift_suite(
         held_out_scenario_count: held_out_count,
         scenario_count: validated.scenario_count,
         candidate_count,
+        scenario_counts_by_family,
+        scenario_family_splits,
         fixture_blake3_hex,
         claim_ceiling: "Synthetic scenario-generator determinism, structural validity, split isolation, and policy-contract stress only. No real-wearer preference, safety, clinical, or deployment claim.".to_owned(),
     };
@@ -423,6 +453,15 @@ mod tests {
         assert_eq!(suite.manifest.held_out_scenario_count, 1200);
         assert_eq!(suite.manifest.scenario_count, 1220);
         assert_eq!(scenarios.len(), 1220);
+        assert_eq!(
+            suite.manifest.scenario_counts_by_family.get("steady_context_explicit_preference"),
+            Some(&20)
+        );
+        assert_eq!(suite.manifest.scenario_family_splits.len(), 11);
+        assert_eq!(
+            suite.manifest.scenario_counts_by_family.values().sum::<usize>(),
+            1220
+        );
 
         let mut split_by_family = BTreeMap::<String, String>::new();
         let mut split_by_wearer = BTreeMap::<String, String>::new();
