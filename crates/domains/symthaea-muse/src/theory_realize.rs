@@ -1640,11 +1640,8 @@ fn realize_core(
     // path before this -- render_arrangement's own normalization/limiter
     // is a simpler RMS-target pass, not a real mastering chain.
     if let AudioData::StereoF32(frames) = &mut audio {
-        crate::auto_master::auto_master(
-            frames,
-            sample_rate,
-            &crate::auto_master::MasteringConfig::default(),
-        );
+        let mastering = crate::auto_master::MasteringConfig::for_dialect(dialect);
+        crate::auto_master::auto_master(frames, sample_rate, &mastering);
     }
 
     // Flatten notes for the Composition record.
