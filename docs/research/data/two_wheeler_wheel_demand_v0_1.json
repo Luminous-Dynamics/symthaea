@@ -22,7 +22,6 @@
   },
   "cases": [
     {
-      "id": "WD-POS-001",
       "title": "Flat steady cruise",
       "input": {
         "mass_kg": 180,
@@ -55,10 +54,11 @@
         "energy_consumption",
         "regenerative_energy_recovered",
         "vehicle_qualification"
-      ]
+      ],
+      "scenario_id": "WD-POS-001",
+      "class": "positive_control"
     },
     {
-      "id": "WD-POS-002",
       "title": "Steady climb",
       "input": {
         "mass_kg": 180,
@@ -91,10 +91,11 @@
         "energy_consumption",
         "regenerative_energy_recovered",
         "vehicle_qualification"
-      ]
+      ],
+      "scenario_id": "WD-POS-002",
+      "class": "positive_control"
     },
     {
-      "id": "WD-POS-003",
       "title": "Flat acceleration with equivalent rotating inertia",
       "input": {
         "mass_kg": 180,
@@ -127,10 +128,11 @@
         "energy_consumption",
         "regenerative_energy_recovered",
         "vehicle_qualification"
-      ]
+      ],
+      "scenario_id": "WD-POS-003",
+      "class": "positive_control"
     },
     {
-      "id": "WD-POS-004",
       "title": "Tailwind reduces aerodynamic load",
       "input": {
         "mass_kg": 180,
@@ -163,10 +165,11 @@
         "energy_consumption",
         "regenerative_energy_recovered",
         "vehicle_qualification"
-      ]
+      ],
+      "scenario_id": "WD-POS-004",
+      "class": "positive_control"
     },
     {
-      "id": "WD-POS-005",
       "title": "Headwind increases aerodynamic load",
       "input": {
         "mass_kg": 180,
@@ -199,10 +202,11 @@
         "energy_consumption",
         "regenerative_energy_recovered",
         "vehicle_qualification"
-      ]
+      ],
+      "scenario_id": "WD-POS-005",
+      "class": "positive_control"
     },
     {
-      "id": "WD-POS-006",
       "title": "Downhill overrun remains signed negative power",
       "input": {
         "mass_kg": 180,
@@ -235,10 +239,11 @@
         "energy_consumption",
         "regenerative_energy_recovered",
         "vehicle_qualification"
-      ]
+      ],
+      "scenario_id": "WD-POS-006",
+      "class": "positive_control"
     },
     {
-      "id": "WD-POS-007",
       "title": "From-rest force without fabricated power",
       "input": {
         "mass_kg": 180,
@@ -271,10 +276,11 @@
         "energy_consumption",
         "regenerative_energy_recovered",
         "vehicle_qualification"
-      ]
+      ],
+      "scenario_id": "WD-POS-007",
+      "class": "positive_control"
     },
     {
-      "id": "WD-POS-008",
       "title": "Zero-demand stationary control",
       "input": {
         "mass_kg": 100,
@@ -307,10 +313,11 @@
         "energy_consumption",
         "regenerative_energy_recovered",
         "vehicle_qualification"
-      ]
+      ],
+      "scenario_id": "WD-POS-008",
+      "class": "positive_control"
     },
     {
-      "id": "WD-NEG-001",
       "title": "Negative physical mass rejected",
       "input": {
         "mass_kg": -1,
@@ -328,10 +335,11 @@
       "evidence_class": "Synthetic",
       "must_not_claim": [
         "physical_vehicle_performance"
-      ]
+      ],
+      "scenario_id": "WD-NEG-001",
+      "class": "negative_control"
     },
     {
-      "id": "WD-NEG-002",
       "title": "Reverse/negative speed outside v0 model contract",
       "input": {
         "mass_kg": 180,
@@ -349,10 +357,11 @@
       "evidence_class": "Synthetic",
       "must_not_claim": [
         "physical_vehicle_performance"
-      ]
+      ],
+      "scenario_id": "WD-NEG-002",
+      "class": "negative_control"
     },
     {
-      "id": "WD-NEG-003",
       "title": "Vertical wall is outside road-grade model scope",
       "input": {
         "mass_kg": 180,
@@ -370,10 +379,11 @@
       "evidence_class": "Synthetic",
       "must_not_claim": [
         "physical_vehicle_performance"
-      ]
+      ],
+      "scenario_id": "WD-NEG-003",
+      "class": "negative_control"
     },
     {
-      "id": "WD-NEG-004",
       "title": "Negative drag area rejected",
       "input": {
         "mass_kg": 180,
@@ -391,7 +401,9 @@
       "evidence_class": "Synthetic",
       "must_not_claim": [
         "physical_vehicle_performance"
-      ]
+      ],
+      "scenario_id": "WD-NEG-004",
+      "class": "negative_control"
     }
   ]
 }
