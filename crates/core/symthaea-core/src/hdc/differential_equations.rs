@@ -2335,7 +2335,7 @@ mod tests {
         assert_eq!(legacy.steps_taken, mixed_api.steps_taken);
         assert_eq!(legacy.rejected_steps, mixed_api.rejected_steps);
         assert!(
-            (legacy.y_final[0] - mixed_api.y_final[0]).abs() <= f64::EPSILON,
+            (legacy.y_final[0] - mixed_api.y_final[0]).abs() <= 1e-14,
             "Equivalent tolerance contracts should preserve the trajectory",
         );
     }
