@@ -5,6 +5,7 @@ mod crate_status;
 mod duplicate_scan;
 mod manifest;
 mod rhn_sweep;
+mod tire_monitoring_intake;
 
 #[derive(Parser)]
 struct Cli {
