@@ -22,6 +22,7 @@ The default fixture is embedded at compile time from `docs/research/fixtures/hab
 ## Checks
 
 - delivered-cost known-answer arithmetic across 12 mandatory cost categories, positive accepted-unit denominators, exact currency matching, checked integer summation, and exact-ratio comparison without floating-point pass/fail rounding;
+- single-stream material-balance accounting with explicit units/boundary, checked integer totals, required residual matching, tolerance enforcement, closure ratio and accepted-mass yield;
 
 - required schema/program/evidence identity and synthetic-only claim ceiling;
 - unique IDs for supplier, lot, resource, operation, target, metric, disruption, negative-control, owner and factory-zone records;
