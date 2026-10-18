@@ -1042,7 +1042,7 @@ mod tests {
         let schema: serde_json::Value = serde_json::from_str(include_str!("../schemas/observation-set-v0.1.schema.json")).unwrap();
         let record = &schema["properties"]["records"]["items"];
         assert_eq!(record["properties"]["raw_unit"]["type"], "string");
-        for field in ["source_field", "raw_unit", "censor_lower_bound", "censor_upper_bound"] {
+        for field in ["source_object_id", "source_row_id", "source_field", "raw_unit", "censor_lower_bound", "censor_upper_bound"] {
             assert!(record["properties"].get(field).is_some(), "missing schema field {field}");
         }
         for state in ["uncensored", "left_censored", "right_censored", "interval_censored"] {
@@ -1066,7 +1066,7 @@ mod tests {
     fn committed_manifest_schema_requires_per_artifact_rights_evidence() {
         let schema: serde_json::Value = serde_json::from_str(include_str!("../schemas/measurement-manifest-v0.1.schema.json")).unwrap();
         let required = schema["properties"]["artifacts"]["items"]["required"].as_array().unwrap();
-        for field in ["source_object_id", "artifact_revision", "accessed_on", "terms_url", "terms_reviewed", "local_use_authorized", "repository_bundling_authorized", "sha256", "size_bytes"] {
+        for field in ["source_object_id", "source_doi", "artifact_revision", "accessed_on", "terms_url", "terms_reviewed", "local_use_authorized", "repository_bundling_authorized", "sha256", "size_bytes"] {
             assert!(required.iter().any(|value| value == field), "artifact schema does not require {field}");
         }
     }
