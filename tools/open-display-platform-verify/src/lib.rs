@@ -304,10 +304,13 @@ mod tests {
     #[test]
     fn missing_module_id_is_rejected_by_schema() {
         let mut manifest = parse_manifest();
-        manifest["modules"][0]
-            .as_object_mut()
-            .expect("module must be an object")
-            .remove("id");
+        assert!(
+            manifest["modules"][0]
+                .as_object_mut()
+                .expect("module must be an object")
+                .remove("id")
+                .is_some()
+        );
         assert!(validate_platform_str(&encoded(&manifest), SCHEMA_TEXT).is_err());
     }
 
