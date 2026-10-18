@@ -51,3 +51,25 @@ This crate owns only the matched-experiment contract audit and outcome-accountin
 ## Claim ceiling
 
 A passing audit means this synthetic input satisfies the evaluator's current contract and arithmetic checks. It does not establish real diagnostic accuracy, reduced repair time, product safety, measurement fitness, durability, human-factors benefit, legal conformity, or general performance across device families.
+
+
+## Contract hardening follow-on (2026-10-18)
+
+The evaluator now requires a frozen `contract_sha256`, exact `protocol_id`, a single root currency (no silent cross-currency cost comparison), non-empty per-episode procedure identity, and observation references for every started attempt. A2 recommendations must reference only observations recorded for that same episode and carry a versioned advisory profile and non-empty rationale. A safety-stopped episode must have a failed safety gate; a not-restored episode cannot report a passed function gate.
+
+The canonical contract-digest preimage is the following UTF-8 text, including a newline after every line:
+
+```text
+HUMAN-TOOL-CONTRACT-v0.1
+arms=A0,A1,A2
+success=verified_restoration AND function_gate=pass AND safety_gate=pass AND distinct_function_safety_receipts
+unknown_cost=null_never_zero
+critical_fault_safe_to_operate=forbidden
+recurrence_claim=verified_restoration AND positive_follow_up_use_exposure_hours
+A2_claim=hypothesis_or_abstain_only
+advisory_evidence_refs=nonempty_subset_of_episode_observation_refs
+all_started_episodes=require_observation_refs
+currency=single_root_currency
+```
+
+Its SHA-256 is `c7ffbabaca875faf066ee63e5d12acf7e46d36001cf36c9590799bffbea61577`. This digest fingerprints only the named v0.1 contract preimage; the report separately fingerprints the exact JSON fixture bytes. The advisory profile ID in this synthetic fixture is an identifier, not a real model/code digest.
