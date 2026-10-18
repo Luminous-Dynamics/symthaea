@@ -607,6 +607,37 @@ mod tests {
     }
 
     #[test]
+    fn upstream_producer_version_mutation_invalidates_old_receipt() {
+        let scenario = scenario();
+        let original_context = context(b"canonical-manifest-v1", &scenario.id);
+        let receipt = create_decision_receipt(&original_context, &scenario).unwrap();
+        let mut changed_context = original_context.clone();
+        changed_context.routing.producer_version = "fixture-producer-v2".into();
+        assert_eq!(
+            verify_decision_receipt(&changed_context, &scenario, &receipt),
+            Err(DecisionReceiptError::ReceiptMismatch)
+        );
+    }
+
+    #[test]
+    fn missing_manifest_encoding_or_upstream_version_fails_closed() {
+        let scenario = scenario();
+        let mut context = context(b"canonical-manifest-v1", &scenario.id);
+        context.input_manifest_encoding_version.clear();
+        assert_eq!(
+            create_decision_receipt(&context, &scenario),
+            Err(DecisionReceiptError::MissingInputManifestEncodingVersion)
+        );
+
+        let mut context = context(b"canonical-manifest-v1", &scenario.id);
+        context.routing.producer_version.clear();
+        assert_eq!(
+            create_decision_receipt(&context, &scenario),
+            Err(DecisionReceiptError::MissingUpstreamProducerVersion)
+        );
+    }
+
+    #[test]
     fn invalid_pinned_metadata_fails_closed() {
         let scenario = scenario();
         let mut context = context(b"canonical-manifest-v1", &scenario.id);
