@@ -591,4 +591,45 @@ mod tests {
         let second = evaluate_fdm_case(&case(EvidenceClass::Synthetic, Some(10.01), Some(0.0)));
         assert_ne!(first.input_digest_sha256, second.input_digest_sha256);
     }
+
+    #[derive(serde::Deserialize)]
+    struct FrozenFdmFixtureCorpus {
+        schema_version: String,
+        cases: Vec<FrozenFdmFixtureCase>,
+    }
+
+    #[derive(serde::Deserialize)]
+    struct FrozenFdmFixtureCase {
+        case_id: String,
+        value_mm: Option<f64>,
+        uncertainty_mm: Option<f64>,
+        expected_geometry_disposition: GeometryDisposition,
+        expected_feature_disposition: FeatureDisposition,
+    }
+
+    #[test]
+    fn frozen_fixture_corpus_matches_independent_expected_outcomes() {
+        let corpus: FrozenFdmFixtureCorpus = serde_json::from_str(include_str!(
+            "../tests/fixtures/fdm_quality_v0_1.json"
+        ))
+        .expect("frozen FDM fixture JSON must parse");
+        assert_eq!(corpus.schema_version, "fdm-quality-v0.1");
+        assert!(!corpus.cases.is_empty());
+
+        for fixture in corpus.cases {
+            let input = case(EvidenceClass::Synthetic, fixture.value_mm, fixture.uncertainty_mm);
+            let result = evaluate_fdm_case(&input);
+            assert_eq!(
+                result.disposition, fixture.expected_geometry_disposition,
+                "geometry result mismatch for frozen case {}",
+                fixture.case_id
+            );
+            assert_eq!(
+                result.features[0].disposition, fixture.expected_feature_disposition,
+                "feature result mismatch for frozen case {}",
+                fixture.case_id
+            );
+        }
+    }
+
 }
