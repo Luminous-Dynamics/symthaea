@@ -61,6 +61,13 @@
       "year": 2007,
       "url": "https://www.hitachi.com/ICSFiles/afieldfile/2007/08/27/r2007_03_108.pdf",
       "role": "Historical industrial overview of array, color-filter, cell and module assembly; use only for high-level sequence cross-checking."
+    },
+    {
+      "id": "SRC-NIL-MFG-2026",
+      "title": "Nanoimprint lithography for scalable electronic and photonic nanomanufacturing",
+      "year": 2026,
+      "url": "https://doi.org/10.1186/s11671-026-04870-6",
+      "role": "Review of nanoimprint process variants, master/template fidelity and wear, resist fill, residual-layer control, demolding, overlay, defect mitigation and scale-up for photonics/electronics."
     }
   ],
   "routes": [
@@ -1796,15 +1803,19 @@
       "technology_family": "ar_waveguide_module",
       "target_module": "Calibrated AR light-engine and waveguide module",
       "architecture_variants": [
-        "surface-relief grating by nanoimprint",
-        "grating by declared lithography/etch route",
+        "surface-relief grating by thermal nanoimprint",
+        "surface-relief grating by UV nanoimprint",
+        "step-and-flash or jet-and-flash nanoimprint",
+        "roll-to-roll nanoimprint for compatible flexible/large-area substrates",
+        "grating by declared lithography-and-etch route",
         "single-layer or multilayer optical stack",
         "RGB or color-conversion/light-engine variants"
       ],
       "scope_note": "Component and assembly route only; no optical design or nanofabrication recipe is prescribed and sourced optics remain supplier-qualified inputs.",
       "source_ids": [
         "SRC-WAVEGUIDE-NIL-2025",
-        "SRC-MICROLED-CMOS-2026"
+        "SRC-MICROLED-CMOS-2026",
+        "SRC-NIL-MFG-2026"
       ],
       "stages": [
         {
@@ -1874,15 +1885,22 @@
           "intended_output_state": "patterned_waveguide_with_grating_identity_and_map",
           "inspection_gate": "required_hold",
           "required_evidence": [
-            "pattern-route/profile ID",
-            "tool and material lot identity",
-            "grating geometry/pattern digest",
-            "inspection/defect coverage"
+            "pattern-route/profile and master/tool revision identity",
+            "master/replica pattern digest and mold-cycle/wear state",
+            "resist/material lot and profile reference",
+            "grating geometry/period/profile measurements across the declared field",
+            "residual-layer thickness and spatial-uniformity map",
+            "overlay/alignment and fill/demold defect coverage",
+            "inspection/calibration records and raw output digest"
           ],
           "known_failure_modes": [
             "replica defects",
-            "linewidth/depth variation",
-            "overlay/alignment errors",
+            "feature-size or duty-cycle drift",
+            "overlay/alignment error",
+            "mold wear or template damage",
+            "incomplete resist filling",
+            "residual-layer nonuniformity",
+            "demolding deformation or fracture",
             "particle contamination"
           ],
           "evidence_status": "UNQUALIFIED",
@@ -2208,22 +2226,31 @@
             "https://github.com/Luminous-Dynamics/symthaea/issues/5675"
           ],
           "reference_source_ids": [
-            "SRC-WAVEGUIDE-NIL-2025"
+            "SRC-WAVEGUIDE-NIL-2025",
+            "SRC-NIL-MFG-2026"
           ],
           "incoming_acceptance_evidence": [
-            "route/profile and master/tool ID",
-            "replica/substrate lot and pattern digest"
+            "route/profile and master/tool ID with inspection state",
+            "replica/substrate lot and pattern digest",
+            "template defect/contamination inspection coverage",
+            "resist/material lot and documented compatibility profile"
           ],
           "interface_characteristics": [
-            "period/duty/profile uniformity measurements",
-            "overlay/alignment",
-            "defect maps and inspection coverage"
+            "period/duty/profile and feature-height uniformity measurements",
+            "residual-layer thickness and across-field variation",
+            "overlay/alignment and field-coordinate registration",
+            "master wear/cycle count and permitted-life evidence",
+            "defect map for fill, demolding, contamination and replication fidelity",
+            "explicit interface to downstream etch or coating/lamination when applicable"
           ],
           "known_failure_modes": [
-            "master wear",
-            "replica defects",
+            "master wear or template damage",
+            "replica defects and particle replication",
             "feature-size drift",
-            "overlay error"
+            "incomplete cavity filling",
+            "residual-layer variation",
+            "demolding deformation/fracture",
+            "overlay/alignment error"
           ],
           "evidence_status": "UNQUALIFIED"
         },
