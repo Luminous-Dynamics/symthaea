@@ -13,7 +13,7 @@ use std::collections::{HashMap, HashSet};
 use std::fs::File;
 use std::io::{self, Read, Write};
 use std::path::{Path, PathBuf};
-use std::process::ExitCode;
+use std::process::{Command, ExitCode};
 
 #[derive(Debug)]
 struct Options {
@@ -22,6 +22,32 @@ struct Options {
     renderer_binary_path: PathBuf,
     vcsl_root: PathBuf,
     vsco2_root: PathBuf,
+}
+
+#[derive(Debug, Default)]
+struct SourceTermsAudit {
+    roots_verified: usize,
+    license_documents_verified: usize,
+    readme_documents_verified: usize,
+    clean_expected_origin_checkouts_verified: usize,
+}
+
+#[derive(Debug, Clone, Copy)]
+struct SourceTermsPolicy {
+    source_library: &'static str,
+    upstream_repository_url: &'static str,
+    expected_remote: &'static str,
+    declared_license_spdx: &'static str,
+    readme_relative_path: &'static str,
+    upstream_readme_request: &'static str,
+}
+
+#[derive(Debug)]
+struct GitCheckoutObservation {
+    source_checkout_revision: Option<String>,
+    origin_matches_expected: bool,
+    clean: Option<bool>,
+    status: &'static str,
 }
 
 #[derive(Debug)]
@@ -50,6 +76,10 @@ struct VerificationReport {
     vcsl_root_content_manifest_sha256: Option<String>,
     vsco2_root_content_manifest_sha256: Option<String>,
     root_content_manifests_verified: usize,
+    source_terms_roots_verified: usize,
+    source_license_documents_verified: usize,
+    source_readme_documents_verified: usize,
+    clean_expected_origin_checkouts_verified: usize,
     selected_samples_total: usize,
     selected_samples_with_matching_actual_file_digest: usize,
     selected_samples_with_valid_file_digest: usize,
@@ -183,10 +213,10 @@ fn print_help() {
     println!(
         "MEL-PROV-VERIFY-001: fail-closed provenance consistency check\n\
          Usage: cargo run -p symthaea-muse --bin muse_instrument_provenance_verify -- --probe REPORT.json --inventory MATRIX.json --renderer-binary /path/to/muse_instrument_probe --vcsl-root /assets/VCSL --vsco2-root /assets/VSCO2-CE\n\
-         Required evidence: supplied executable bytes, independently rehashed root WAV manifests and selected WAV files, matching source revision,\n\
-         indexed-bank manifests, and selected-sample bank digests matching the inventory mapping.\n\
+         Required evidence: same code source revision, supplied executable bytes, rehashed root WAV manifests, selected WAV and indexed-bank digests,\n\
+         matching instrument inventory, hashed LICENSE/README bytes, and clean Git checkouts with expected upstream origins.\n\
          JSON findings are written to stdout. Exit 0 means consistent; exit 1 means incomplete or inconsistent;\n\
-         exit 2 means invocation or input reports could not be processed. This is not instrument qualification."
+         exit 2 means invocation or input files could not be processed. This is not a legal opinion or instrument qualification."
     );
 }
 
@@ -220,12 +250,12 @@ fn verify_reports(
         );
     }
     if string_field(inventory, "schema_version")
-        != Some("melothaea.instrument-capability-matrix.v3")
+        != Some("melothaea.instrument-capability-matrix.v4")
     {
         push_error(
             &mut findings,
             "inventory_schema_unsupported",
-            "capability report must use melothaea.instrument-capability-matrix.v3".into(),
+            "capability report must use melothaea.instrument-capability-matrix.v4".into(),
         );
     }
 
@@ -344,6 +374,13 @@ fn verify_reports(
             root_content_manifests_verified += 1;
         }
     }
+
+    let source_terms_audit = verify_source_terms_evidence(
+        inventory,
+        vcsl_root_observation,
+        vsco2_root_observation,
+        &mut findings,
+    );
 
     if bool_field(inventory, "indexed_sample_content_hashing_enabled") != Some(true) {
         push_incomplete(
@@ -663,6 +700,10 @@ fn verify_reports(
         vcsl_root_content_manifest_sha256: vcsl_root_observation.content_manifest_sha256.clone(),
         vsco2_root_content_manifest_sha256: vsco2_root_observation.content_manifest_sha256.clone(),
         root_content_manifests_verified,
+        source_terms_roots_verified: source_terms_audit.roots_verified,
+        source_license_documents_verified: source_terms_audit.license_documents_verified,
+        source_readme_documents_verified: source_terms_audit.readme_documents_verified,
+        clean_expected_origin_checkouts_verified: source_terms_audit.clean_expected_origin_checkouts_verified,
         selected_samples_total,
         selected_samples_with_valid_file_digest,
         selected_samples_with_valid_bank_digest,
@@ -792,6 +833,465 @@ fn verify_root_evidence(
         }
     }
     true
+}
+
+fn source_terms_policy(source_library: &str) -> Option<SourceTermsPolicy> {
+    match source_library {
+        "vcsl" => Some(SourceTermsPolicy {
+            source_library: "vcsl",
+            upstream_repository_url: "https://github.com/sgossner/VCSL",
+            expected_remote: "sgossner/vcsl",
+            declared_license_spdx: "CC0-1.0",
+            readme_relative_path: "README.md",
+            upstream_readme_request: "No attribution required according to the upstream README; preserve its license/readme bytes for review.",
+        }),
+        "vsco2_ce" => Some(SourceTermsPolicy {
+            source_library: "vsco2_ce",
+            upstream_repository_url: "https://github.com/sgossner/VSCO-2-CE",
+            expected_remote: "sgossner/vsco-2-ce",
+            declared_license_spdx: "CC0-1.0",
+            readme_relative_path: "Readme.txt",
+            upstream_readme_request: "Upstream README asks for courtesy/author credit; keep this request distinct from the declared SPDX license and review the source terms rather than silently discarding the request.",
+        }),
+        _ => None,
+    }
+}
+
+fn verify_source_terms_evidence(
+    inventory: &Value,
+    vcsl_root: &RootObservation,
+    vsco2_root: &RootObservation,
+    findings: &mut Vec<Finding>,
+) -> SourceTermsAudit {
+    let mut audit = SourceTermsAudit::default();
+    let Some(entries) = inventory.get("source_terms_evidence").and_then(Value::as_array) else {
+        push_incomplete(
+            findings,
+            "source_terms_evidence_missing",
+            "capability matrix v4 must contain source_terms_evidence".into(),
+        );
+        return audit;
+    };
+    if entries.len() != 2 {
+        push_incomplete(
+            findings,
+            "source_terms_row_count_incomplete",
+            format!("expected exactly two source-terms rows, found {}", entries.len()),
+        );
+    }
+
+    for (source_library, label, root) in [
+        ("vcsl", "VCSL", vcsl_root),
+        ("vsco2_ce", "VSCO-2-CE", vsco2_root),
+    ] {
+        let matching: Vec<&Value> = entries
+            .iter()
+            .filter(|row| string_field(row, "source_library") == Some(source_library))
+            .collect();
+        match matching.as_slice() {
+            [entry] => {
+                let policy = source_terms_policy(source_library).unwrap();
+                let declarations_match =
+                    source_terms_declarations_match(entry, policy, label, findings);
+                let license_matches = source_terms_document_matches(
+                    entry,
+                    "license_document_relative_path",
+                    "license_document_sha256",
+                    "license_document_status",
+                    "LICENSE",
+                    root,
+                    label,
+                    findings,
+                );
+                let readme_matches = source_terms_document_matches(
+                    entry,
+                    "readme_document_relative_path",
+                    "readme_document_sha256",
+                    "readme_document_status",
+                    policy.readme_relative_path,
+                    root,
+                    label,
+                    findings,
+                );
+                let checkout_matches =
+                    source_terms_checkout_matches(entry, policy, label, root, findings);
+                if license_matches {
+                    audit.license_documents_verified += 1;
+                }
+                if readme_matches {
+                    audit.readme_documents_verified += 1;
+                }
+                if checkout_matches {
+                    audit.clean_expected_origin_checkouts_verified += 1;
+                }
+                if declarations_match && license_matches && readme_matches && checkout_matches {
+                    audit.roots_verified += 1;
+                }
+            }
+            [] => push_incomplete(
+                findings,
+                "source_terms_row_missing",
+                format!("{label} source-terms evidence row is missing"),
+            ),
+            _ => push_error(
+                findings,
+                "source_terms_row_duplicate",
+                format!("{label} has multiple source-terms rows"),
+            ),
+        }
+    }
+
+    for entry in entries {
+        let source_library = string_field(entry, "source_library").unwrap_or("");
+        if source_terms_policy(source_library).is_none() {
+            push_error(
+                findings,
+                "source_terms_library_unknown",
+                format!("source-terms row has an unknown source library {source_library:?}"),
+            );
+        }
+    }
+    audit
+}
+
+fn source_terms_declarations_match(
+    entry: &Value,
+    policy: SourceTermsPolicy,
+    label: &str,
+    findings: &mut Vec<Finding>,
+) -> bool {
+    let declarations_match =
+        string_field(entry, "upstream_repository_url") == Some(policy.upstream_repository_url)
+            && string_field(entry, "declared_license_spdx") == Some(policy.declared_license_spdx)
+            && string_field(entry, "license_document_relative_path") == Some("LICENSE")
+            && string_field(entry, "readme_document_relative_path") == Some(policy.readme_relative_path)
+            && string_field(entry, "upstream_readme_request") == Some(policy.upstream_readme_request)
+            && string_field(entry, "license_declaration_boundary")
+                .is_some_and(|value| value.contains("not a legal opinion"));
+    if !declarations_match {
+        push_error(
+            findings,
+            "source_terms_declaration_mismatch",
+            format!("{label} source-terms declaration differs from the verifier's explicit policy"),
+        );
+    }
+    declarations_match
+}
+
+fn source_terms_document_matches(
+    entry: &Value,
+    path_field: &str,
+    digest_field: &str,
+    status_field: &str,
+    expected_relative_path: &str,
+    root: &RootObservation,
+    label: &str,
+    findings: &mut Vec<Finding>,
+) -> bool {
+    if string_field(entry, path_field) != Some(expected_relative_path) {
+        push_error(
+            findings,
+            "source_terms_document_path_mismatch",
+            format!("{label} {path_field} differs from the required relative path"),
+        );
+        return false;
+    }
+    if string_field(entry, status_field) != Some("hashed") {
+        push_incomplete(
+            findings,
+            "source_terms_document_not_hashed",
+            format!("{label} {expected_relative_path} is not marked hashed"),
+        );
+        return false;
+    }
+    let Some(expected_digest) = string_field(entry, digest_field) else {
+        push_incomplete(
+            findings,
+            "source_terms_document_digest_missing",
+            format!("{label} {expected_relative_path} has no content digest"),
+        );
+        return false;
+    };
+    if !valid_sha256(expected_digest) {
+        push_error(
+            findings,
+            "source_terms_document_digest_invalid",
+            format!("{label} {expected_relative_path} has a malformed SHA-256"),
+        );
+        return false;
+    }
+    let Some(root_path) = root.canonical_path.as_ref() else {
+        push_incomplete(
+            findings,
+            "source_terms_root_unavailable",
+            format!("{label} source root is unavailable for document verification"),
+        );
+        return false;
+    };
+    match hash_relative_source_document(root_path, expected_relative_path) {
+        Ok(actual_digest) if actual_digest == expected_digest => true,
+        Ok(_) => {
+            push_error(
+                findings,
+                "source_terms_document_digest_mismatch",
+                format!("{label} {expected_relative_path} bytes do not match the capability-matrix digest"),
+            );
+            false
+        }
+        Err(error) => {
+            push_incomplete(
+                findings,
+                "source_terms_document_unavailable",
+                format!("{label} {expected_relative_path} cannot be independently read: {error}"),
+            );
+            false
+        }
+    }
+}
+
+fn source_terms_checkout_matches(
+    entry: &Value,
+    policy: SourceTermsPolicy,
+    label: &str,
+    root: &RootObservation,
+    findings: &mut Vec<Finding>,
+) -> bool {
+    let Some(root_path) = root.canonical_path.as_ref() else {
+        push_incomplete(
+            findings,
+            "source_checkout_root_unavailable",
+            format!("{label} source root is unavailable for Git lineage verification"),
+        );
+        return false;
+    };
+    let observed = inspect_source_checkout(root_path, policy.expected_remote);
+    let mut matches = true;
+
+    if string_field(entry, "source_checkout_status") != Some(observed.status) {
+        if string_field(entry, "source_checkout_status") == Some("clean_expected_origin_checkout") {
+            push_error(
+                findings,
+                "source_checkout_status_mismatch",
+                format!("{label} source checkout no longer matches its reported clean upstream status"),
+            );
+        } else {
+            push_incomplete(
+                findings,
+                "source_checkout_not_clean_upstream",
+                format!("{label} checkout status is {}", observed.status),
+            );
+        }
+        matches = false;
+    }
+    if bool_field(entry, "checkout_origin_matches_expected") != Some(observed.origin_matches_expected) {
+        push_error(
+            findings,
+            "source_checkout_origin_status_mismatch",
+            format!("{label} reported origin-match status differs from the actual Git remote"),
+        );
+        matches = false;
+    }
+    if !observed.origin_matches_expected {
+        push_incomplete(
+            findings,
+            "source_checkout_origin_unverified",
+            format!("{label} Git origin does not match the expected upstream repository"),
+        );
+        matches = false;
+    }
+    if bool_field(entry, "source_checkout_clean") != observed.clean {
+        push_error(
+            findings,
+            "source_checkout_clean_status_mismatch",
+            format!("{label} reported clean-worktree status differs from actual Git status"),
+        );
+        matches = false;
+    }
+    if observed.clean != Some(true) {
+        push_incomplete(
+            findings,
+            "source_checkout_dirty_or_unknown",
+            format!("{label} upstream checkout is dirty or its status could not be read"),
+        );
+        matches = false;
+    }
+
+    match string_field(entry, "source_checkout_revision") {
+        Some(reported_revision) if !valid_git_revision(reported_revision) => {
+            push_error(
+                findings,
+                "source_checkout_revision_invalid",
+                format!("{label} upstream revision is not a valid Git object ID"),
+            );
+            matches = false;
+        }
+        Some(reported_revision) => {
+            if observed.source_checkout_revision.as_deref() != Some(reported_revision) {
+                push_error(
+                    findings,
+                    "source_checkout_revision_mismatch",
+                    format!("{label} upstream commit differs from the revision recorded in the matrix"),
+                );
+                matches = false;
+            }
+        }
+        None => {
+            push_incomplete(
+                findings,
+                "source_checkout_revision_missing",
+                format!("{label} has no upstream commit revision"),
+            );
+            matches = false;
+        }
+    }
+    matches
+}
+
+fn hash_relative_source_document(root: &Path, relative_path: &str) -> Result<String, String> {
+    let relative = Path::new(relative_path);
+    if relative.as_os_str().is_empty()
+        || relative.is_absolute()
+        || relative_path.contains('\\')
+        || relative
+            .components()
+            .any(|part| !matches!(part, std::path::Component::Normal(_)))
+    {
+        return Err("document path is not a normalized relative path".into());
+    }
+    let joined = root.join(relative);
+    let canonical = std::fs::canonicalize(&joined).map_err(|error| error.to_string())?;
+    if !canonical.starts_with(root) || !canonical.is_file() {
+        return Err("document path escaped its source root or is not a regular file".into());
+    }
+    file_sha256(&canonical)
+        .map(|(digest, _)| digest)
+        .map_err(|error| error.to_string())
+}
+
+fn inspect_source_checkout(root: &Path, expected_remote: &str) -> GitCheckoutObservation {
+    let canonical_root = match std::fs::canonicalize(root) {
+        Ok(path) if path.is_dir() => path,
+        _ => {
+            return GitCheckoutObservation {
+                source_checkout_revision: None,
+                origin_matches_expected: false,
+                clean: None,
+                status: "root_unavailable",
+            };
+        }
+    };
+    let git = |arguments: &[&str]| {
+        Command::new("git")
+            .arg("-C")
+            .arg(root)
+            .args(arguments)
+            .output()
+    };
+    let top_level = match git(&["rev-parse", "--show-toplevel"]) {
+        Ok(output) if output.status.success() => {
+            let output = String::from_utf8_lossy(&output.stdout).trim().to_owned();
+            match std::fs::canonicalize(output) {
+                Ok(path) if path == canonical_root => path,
+                Ok(_) => {
+                    return GitCheckoutObservation {
+                        source_checkout_revision: None,
+                        origin_matches_expected: false,
+                        clean: None,
+                        status: "asset_root_is_not_repository_root",
+                    };
+                }
+                Err(_) => {
+                    return GitCheckoutObservation {
+                        source_checkout_revision: None,
+                        origin_matches_expected: false,
+                        clean: None,
+                        status: "git_root_unreadable",
+                    };
+                }
+            }
+        }
+        Ok(_) => {
+            return GitCheckoutObservation {
+                source_checkout_revision: None,
+                origin_matches_expected: false,
+                clean: None,
+                status: "not_a_git_checkout",
+            };
+        }
+        Err(_) => {
+            return GitCheckoutObservation {
+                source_checkout_revision: None,
+                origin_matches_expected: false,
+                clean: None,
+                status: "git_unavailable",
+            };
+        }
+    };
+    let _ = top_level;
+
+    let source_checkout_revision = match git(&["rev-parse", "HEAD"]) {
+        Ok(output) if output.status.success() => {
+            let revision = String::from_utf8_lossy(&output.stdout).trim().to_owned();
+            if valid_git_revision(&revision) {
+                Some(revision)
+            } else {
+                return GitCheckoutObservation {
+                    source_checkout_revision: None,
+                    origin_matches_expected: false,
+                    clean: None,
+                    status: "invalid_git_revision",
+                };
+            }
+        }
+        _ => {
+            return GitCheckoutObservation {
+                source_checkout_revision: None,
+                origin_matches_expected: false,
+                clean: None,
+                status: "git_revision_unavailable",
+            };
+        }
+    };
+
+    let remote = match git(&["remote", "get-url", "origin"]) {
+        Ok(output) if output.status.success() => Some(String::from_utf8_lossy(&output.stdout).trim().to_owned()),
+        _ => None,
+    };
+    let origin_matches_expected = remote
+        .as_deref()
+        .and_then(normalize_github_remote)
+        .is_some_and(|remote| remote == expected_remote.to_ascii_lowercase());
+    let clean = match git(&["status", "--porcelain", "--untracked-files=all"]) {
+        Ok(output) if output.status.success() => Some(String::from_utf8_lossy(&output.stdout).trim().is_empty()),
+        _ => None,
+    };
+    let status = match (origin_matches_expected, clean) {
+        (true, Some(true)) => "clean_expected_origin_checkout",
+        (false, _) => "expected_origin_mismatch",
+        (true, Some(false)) => "dirty_worktree",
+        (true, None) => "git_status_unavailable",
+    };
+    GitCheckoutObservation {
+        source_checkout_revision,
+        origin_matches_expected,
+        clean,
+        status,
+    }
+}
+
+fn normalize_github_remote(remote: &str) -> Option<String> {
+    let remote = remote.trim().trim_end_matches('/');
+    let path = remote
+        .strip_prefix("https://github.com/")
+        .or_else(|| remote.strip_prefix("http://github.com/"))
+        .or_else(|| remote.strip_prefix("ssh://git@github.com/"))
+        .or_else(|| remote.strip_prefix("git@github.com:"))?;
+    let path = path.split(['?', '#']).next().unwrap_or(path).trim_end_matches('/');
+    let path = path.strip_suffix(".git").unwrap_or(path);
+    if path.is_empty() || path.contains(':') || path.contains('@') || path.contains("..") {
+        return None;
+    }
+    Some(path.to_ascii_lowercase())
 }
 
 fn verify_selected_sample_file(
@@ -1330,6 +1830,22 @@ mod tests {
         std::fs::create_dir_all(&vsco2_root).expect("VSCO2 fixture should be created");
         std::fs::write(&sample_wav, b"sample-WAV-content-for-provenance-test")
             .expect("source sample fixture should be written");
+        std::fs::write(vcsl_root.join("LICENSE"), b"CC0 1.0 Universal test license\n")
+            .expect("VCSL license fixture should be written");
+        std::fs::write(
+            vcsl_root.join("README.md"),
+            b"VCSL fixture README: CC0; no attribution required.\n",
+        )
+        .expect("VCSL README fixture should be written");
+        std::fs::write(vsco2_root.join("LICENSE"), b"CC0 1.0 Universal test license\n")
+            .expect("VSCO-2-CE license fixture should be written");
+        std::fs::write(
+            vsco2_root.join("Readme.txt"),
+            b"VSCO-2-CE fixture README: use allowed; credit requested.\n",
+        )
+        .expect("VSCO-2-CE README fixture should be written");
+        initialize_git_fixture(&vcsl_root, "https://github.com/sgossner/VCSL.git");
+        initialize_git_fixture(&vsco2_root, "https://github.com/sgossner/VSCO-2-CE.git");
 
         let source_file_sha256 = file_sha256(&sample_wav)
             .expect("source sample fixture should hash")
@@ -1378,8 +1894,12 @@ mod tests {
             "indexed_sample_content_manifest_sha256": bank_digest
         });
         let inventory = json!({
-            "schema_version": "melothaea.instrument-capability-matrix.v3",
+            "schema_version": "melothaea.instrument-capability-matrix.v4",
             "source_revision": revision,
+            "source_terms_evidence": [
+                fixture_source_terms(&vcsl_root, "vcsl"),
+                fixture_source_terms(&vsco2_root, "vsco2_ce")
+            ],
             "indexed_sample_content_hashing_enabled": true,
             "root_content_manifest_hashing_enabled": true,
             "vcsl_root": {
@@ -1408,6 +1928,56 @@ mod tests {
         )
     }
 
+    fn initialize_git_fixture(root: &Path, origin: &str) {
+        let run = |arguments: &[&str]| {
+            let output = Command::new("git")
+                .arg("-C")
+                .arg(root)
+                .args(arguments)
+                .output()
+                .expect("git must be available for upstream provenance fixtures");
+            assert!(
+                output.status.success(),
+                "git {:?} failed: {}",
+                arguments,
+                String::from_utf8_lossy(&output.stderr)
+            );
+        };
+        run(&["init", "-q"]);
+        run(&["config", "user.name", "Melothaea verifier fixture"]);
+        run(&["config", "user.email", "muse-provenance-fixture@example.invalid"]);
+        run(&["remote", "add", "origin", origin]);
+        run(&["add", "--all"]);
+        run(&["commit", "-q", "-m", "fixture source terms"]);
+    }
+
+    fn fixture_source_terms(root: &Path, source_library: &str) -> Value {
+        let policy = source_terms_policy(source_library).expect("known fixture source");
+        let canonical = std::fs::canonicalize(root).expect("source root should canonicalize");
+        let license_digest =
+            hash_relative_source_document(&canonical, "LICENSE").expect("license should hash");
+        let readme_digest = hash_relative_source_document(&canonical, policy.readme_relative_path)
+            .expect("README should hash");
+        let checkout = inspect_source_checkout(&canonical, policy.expected_remote);
+        json!({
+            "source_library": policy.source_library,
+            "upstream_repository_url": policy.upstream_repository_url,
+            "declared_license_spdx": policy.declared_license_spdx,
+            "license_declaration_boundary": "Expected SPDX-style license identifier from reviewed upstream-repository policy; not automatically inferred from local bytes, not a legal opinion, and never a substitute for inspecting the hashed license/readme files.",
+            "license_document_relative_path": "LICENSE",
+            "license_document_sha256": license_digest,
+            "license_document_status": "hashed",
+            "readme_document_relative_path": policy.readme_relative_path,
+            "readme_document_sha256": readme_digest,
+            "readme_document_status": "hashed",
+            "upstream_readme_request": policy.upstream_readme_request,
+            "source_checkout_revision": checkout.source_checkout_revision,
+            "checkout_origin_matches_expected": checkout.origin_matches_expected,
+            "source_checkout_clean": checkout.clean,
+            "source_checkout_status": checkout.status
+        })
+    }
+
     fn test_report(
         probe: &Value,
         inventory: &Value,
@@ -1434,6 +2004,10 @@ mod tests {
         let report = test_report(&probe, &inventory, &assets);
         assert_eq!(report.verdict, "consistent");
         assert_eq!(report.root_content_manifests_verified, 2);
+        assert_eq!(report.source_terms_roots_verified, 2);
+        assert_eq!(report.source_license_documents_verified, 2);
+        assert_eq!(report.source_readme_documents_verified, 2);
+        assert_eq!(report.clean_expected_origin_checkouts_verified, 2);
         assert_eq!(report.selected_samples_total, 1);
         assert_eq!(report.selected_samples_with_matching_actual_file_digest, 1);
         assert_eq!(report.selected_samples_with_valid_file_digest, 1);
@@ -1442,6 +2016,33 @@ mod tests {
         assert_eq!(report.selected_samples_with_matching_actual_bank_digest, 1);
         assert_eq!(report.error_count, 0);
         assert_eq!(report.incomplete_count, 0);
+    }
+
+    #[test]
+    fn modified_license_document_is_rejected_even_when_wav_assets_are_unchanged() {
+        let (probe, inventory, assets) = fixtures();
+        std::fs::write(assets.vcsl_root.join("LICENSE"), b"different license bytes\\n")
+            .expect("modified license should be written");
+        let report = test_report(&probe, &inventory, &assets);
+        assert_eq!(report.verdict, "inconsistent");
+        assert!(report.findings.iter().any(|finding| finding.code == "source_terms_document_digest_mismatch"));
+        assert!(report.findings.iter().any(|finding| finding.code == "source_checkout_status_mismatch"));
+    }
+
+    #[test]
+    fn changed_upstream_origin_is_not_accepted_as_clean_source_lineage() {
+        let (probe, inventory, assets) = fixtures();
+        let output = Command::new("git")
+            .arg("-C")
+            .arg(&assets.vcsl_root)
+            .args(["remote", "set-url", "origin", "https://example.com/sgossner/VCSL.git"])
+            .output()
+            .expect("git must be available");
+        assert!(output.status.success());
+        let report = test_report(&probe, &inventory, &assets);
+        assert_eq!(report.verdict, "inconsistent");
+        assert!(report.findings.iter().any(|finding| finding.code == "source_checkout_status_mismatch"));
+        assert!(report.findings.iter().any(|finding| finding.code == "source_checkout_origin_status_mismatch"));
     }
 
     #[test]

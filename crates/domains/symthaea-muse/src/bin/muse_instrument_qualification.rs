@@ -8,8 +8,10 @@
 //! qualified.
 
 use serde::Serialize;
+use sha2::{Digest, Sha256};
+use std::io::Read;
 use std::path::{Path, PathBuf};
-use std::process::ExitCode;
+use std::process::{Command, ExitCode};
 use symthaea_muse::vcsl::{
     AssetRootEvidenceV1, InstrumentCapabilityV1, InstrumentCapabilityInventoryV1,
     SampleDirectoryEvidenceV1, capability_inventory_with_provenance_options,
@@ -35,8 +37,30 @@ struct QualificationMatrixV1 {
     vsco2_root: AssetRootEvidenceV1,
     indexed_sample_content_hashing_enabled: bool,
     root_content_manifest_hashing_enabled: bool,
+    source_terms_evidence: Vec<AssetSourceTermsEvidenceV1>,
     instruments: Vec<InstrumentQualificationRowV1>,
     next_evidence_gates: Vec<&'static str>,
+}
+
+/// License/readme bytes and upstream checkout identity are independent from WAV
+/// integrity: a valid audio digest is not evidence of licensing or source lineage.
+#[derive(Debug, Serialize)]
+struct AssetSourceTermsEvidenceV1 {
+    source_library: &'static str,
+    upstream_repository_url: &'static str,
+    declared_license_spdx: &'static str,
+    license_declaration_boundary: &'static str,
+    license_document_relative_path: &'static str,
+    license_document_sha256: Option<String>,
+    license_document_status: &'static str,
+    readme_document_relative_path: &'static str,
+    readme_document_sha256: Option<String>,
+    readme_document_status: &'static str,
+    upstream_readme_request: &'static str,
+    source_checkout_revision: Option<String>,
+    checkout_origin_matches_expected: bool,
+    source_checkout_clean: Option<bool>,
+    source_checkout_status: &'static str,
 }
 
 #[derive(Debug, Serialize)]
@@ -117,16 +141,35 @@ fn run() -> Result<(), String> {
         .iter()
         .map(qualification_row)
         .collect::<Vec<_>>();
+    let source_terms_evidence = vec![
+        inspect_asset_source_terms(
+            &options.vcsl_dir,
+            "vcsl",
+            "https://github.com/sgossner/VCSL",
+            "sgossner/VCSL",
+            "README.md",
+            "No attribution required according to the upstream README; preserve its license/readme bytes for review.",
+        ),
+        inspect_asset_source_terms(
+            &options.vsco2_dir,
+            "vsco2_ce",
+            "https://github.com/sgossner/VSCO-2-CE",
+            "sgossner/VSCO-2-CE",
+            "Readme.txt",
+            "Upstream README asks for courtesy/author credit; keep this request distinct from the declared SPDX license and review the source terms rather than silently discarding the request.",
+        ),
+    ];
     let report = QualificationMatrixV1 {
-        schema_version: "melothaea.instrument-capability-matrix.v3",
+        schema_version: "melothaea.instrument-capability-matrix.v4",
         benchmark: "MEL-INST-CAP-001",
         qualification_result: "not_qualified_by_source_inventory_alone",
-        evidence_boundary: "source inventory, filename pitch coverage, WAV decode and silence audit only; optional root content manifests hash all WAVs found by the root walker, including files outside the pitch indexer; no render-grid, gesture, or human-preference result is implied",
+        evidence_boundary: "source inventory, filename pitch coverage, WAV decode and silence audit only; optional root content manifests hash all WAVs found by the root walker, including files outside the pitch indexer; license/readme hashes and Git origin/HEAD/clean-worktree status are source-term evidence, not legal clearance or a signed upstream attestation; no render-grid, gesture, or human-preference result is implied",
         source_revision: inventory.source_revision.clone(),
         vcsl_root: inventory.vcsl_root,
         vsco2_root: inventory.vsco2_root,
         indexed_sample_content_hashing_enabled: inventory.indexed_sample_content_hashing_enabled,
         root_content_manifest_hashing_enabled: inventory.root_content_manifest_hashing_enabled,
+        source_terms_evidence,
         instruments: rows,
         next_evidence_gates: vec![
             "instrument-specific render sweep with per-note renderer/source receipts",
@@ -141,6 +184,167 @@ fn run() -> Result<(), String> {
         .map_err(|error| format!("could not serialize qualification matrix: {error}"))?;
     println!();
     Ok(())
+}
+
+fn inspect_asset_source_terms(
+    root: &Path,
+    source_library: &'static str,
+    upstream_repository_url: &'static str,
+    expected_remote: &str,
+    readme_document_relative_path: &'static str,
+    upstream_readme_request: &'static str,
+) -> AssetSourceTermsEvidenceV1 {
+    let (license_document_sha256, license_document_status) =
+        hash_local_source_document(root, "LICENSE");
+    let (readme_document_sha256, readme_document_status) =
+        hash_local_source_document(root, readme_document_relative_path);
+    let (source_checkout_revision, checkout_origin_matches_expected, source_checkout_clean, source_checkout_status) =
+        inspect_source_checkout(root, expected_remote);
+
+    AssetSourceTermsEvidenceV1 {
+        source_library,
+        upstream_repository_url,
+        declared_license_spdx: "CC0-1.0",
+        license_declaration_boundary: "Expected SPDX-style license identifier from reviewed upstream-repository policy; not automatically inferred from local bytes, not a legal opinion, and never a substitute for inspecting the hashed license/readme files.",
+        license_document_relative_path: "LICENSE",
+        license_document_sha256,
+        license_document_status,
+        readme_document_relative_path,
+        readme_document_sha256,
+        readme_document_status,
+        upstream_readme_request,
+        source_checkout_revision,
+        checkout_origin_matches_expected,
+        source_checkout_clean,
+        source_checkout_status,
+    }
+}
+
+fn hash_local_source_document(
+    root: &Path,
+    relative_path: &str,
+) -> (Option<String>, &'static str) {
+    let canonical_root = match std::fs::canonicalize(root) {
+        Ok(path) if path.is_dir() => path,
+        _ => return (None, "root_unavailable"),
+    };
+    let requested = root.join(relative_path);
+    let canonical_file = match std::fs::canonicalize(&requested) {
+        Ok(path) if path.starts_with(&canonical_root) && path.is_file() => path,
+        Ok(_) => return (None, "unsafe_or_not_regular_file"),
+        Err(error) if error.kind() == std::io::ErrorKind::NotFound => return (None, "missing"),
+        Err(_) => return (None, "read_error"),
+    };
+    match sha256_file(&canonical_file) {
+        Ok(digest) => (Some(digest), "hashed"),
+        Err(_) => (None, "read_error"),
+    }
+}
+
+fn sha256_file(path: &Path) -> std::io::Result<String> {
+    let mut file = std::fs::File::open(path)?;
+    let mut hasher = Sha256::new();
+    let mut buffer = [0_u8; 64 * 1024];
+    loop {
+        let count = file.read(&mut buffer)?;
+        if count == 0 {
+            break;
+        }
+        hasher.update(&buffer[..count]);
+    }
+    Ok(format!("{:x}", hasher.finalize()))
+}
+
+fn inspect_source_checkout(
+    root: &Path,
+    expected_remote: &str,
+) -> (Option<String>, bool, Option<bool>, &'static str) {
+    let canonical_root = match std::fs::canonicalize(root) {
+        Ok(path) if path.is_dir() => path,
+        _ => return (None, false, None, "root_unavailable"),
+    };
+    let git = |arguments: &[&str]| {
+        Command::new("git")
+            .arg("-C")
+            .arg(root)
+            .args(arguments)
+            .output()
+    };
+
+    let top_level_output = match git(&["rev-parse", "--show-toplevel"]) {
+        Ok(output) if output.status.success() => output,
+        Ok(_) => return (None, false, None, "not_a_git_checkout"),
+        Err(_) => return (None, false, None, "git_unavailable"),
+    };
+    let top_level_text = String::from_utf8_lossy(&top_level_output.stdout).trim().to_owned();
+    let top_level = match std::fs::canonicalize(&top_level_text) {
+        Ok(path) => path,
+        Err(_) => return (None, false, None, "git_root_unreadable"),
+    };
+    if top_level != canonical_root {
+        return (None, false, None, "asset_root_is_not_repository_root");
+    }
+
+    let source_checkout_revision = match git(&["rev-parse", "HEAD"]) {
+        Ok(output) if output.status.success() => {
+            let revision = String::from_utf8_lossy(&output.stdout).trim().to_owned();
+            if valid_git_revision(&revision) {
+                Some(revision)
+            } else {
+                return (None, false, None, "invalid_git_revision");
+            }
+        }
+        _ => return (None, false, None, "git_revision_unavailable"),
+    };
+
+    let remote = match git(&["remote", "get-url", "origin"]) {
+        Ok(output) if output.status.success() => {
+            Some(String::from_utf8_lossy(&output.stdout).trim().to_owned())
+        }
+        _ => None,
+    };
+    let checkout_origin_matches_expected = remote
+        .as_deref()
+        .and_then(normalize_github_remote)
+        .is_some_and(|remote| remote == expected_remote.to_ascii_lowercase());
+
+    let clean = match git(&["status", "--porcelain", "--untracked-files=all"]) {
+        Ok(output) if output.status.success() => {
+            Some(String::from_utf8_lossy(&output.stdout).trim().is_empty())
+        }
+        _ => None,
+    };
+    let status = match (checkout_origin_matches_expected, clean) {
+        (true, Some(true)) => "clean_expected_origin_checkout",
+        (false, _) => "expected_origin_mismatch",
+        (true, Some(false)) => "dirty_worktree",
+        (true, None) => "git_status_unavailable",
+    };
+    (
+        source_checkout_revision,
+        checkout_origin_matches_expected,
+        clean,
+        status,
+    )
+}
+
+fn normalize_github_remote(remote: &str) -> Option<String> {
+    let remote = remote.trim().trim_end_matches('/');
+    let path = remote
+        .strip_prefix("https://github.com/")
+        .or_else(|| remote.strip_prefix("http://github.com/"))
+        .or_else(|| remote.strip_prefix("ssh://git@github.com/"))
+        .or_else(|| remote.strip_prefix("git@github.com:"))?;
+    let path = path.split(['?', '#']).next().unwrap_or(path).trim_end_matches('/');
+    let path = path.strip_suffix(".git").unwrap_or(path);
+    if path.is_empty() || path.contains(':') || path.contains('@') || path.contains("..") {
+        return None;
+    }
+    Some(path.to_ascii_lowercase())
+}
+
+fn valid_git_revision(value: &str) -> bool {
+    matches!(value.len(), 40 | 64) && value.bytes().all(|byte| byte.is_ascii_hexdigit())
 }
 
 fn qualification_row(instrument: &InstrumentCapabilityV1) -> InstrumentQualificationRowV1 {
@@ -320,13 +524,79 @@ fn print_help() {
            --hash-root-wav-contents Hash all WAV bytes under each complete root (very I/O intensive)\n\
            -h, --help              Show this help\n\
          Writes JSON to stdout. Source inventory does not certify playable range or instrument proficiency.\n\
-         Indexed-bank and root-wide content hashing are independently opt-in; root hashing includes WAVs rejected by the pitch indexer."
+         Indexed-bank and root-wide content hashing are independently opt-in; root hashing includes WAVs rejected by the pitch indexer.\n\
+         Source terms evidence hashes each root's LICENSE/readme and separately checks Git root, expected origin, revision, and worktree state. Missing docs or non-upstream/non-clean roots remain explicit; digest evidence is not legal advice."
     );
 }
 
 #[cfg(test)]
 mod tests {
     use super::*;
+
+    #[test]
+    fn upstream_remote_normalization_accepts_expected_github_forms() {
+        assert_eq!(
+            normalize_github_remote("https://github.com/sgossner/VCSL.git"),
+            Some("sgossner/vcsl".into())
+        );
+        assert_eq!(
+            normalize_github_remote("git@github.com:sgossner/VSCO-2-CE.git"),
+            Some("sgossner/vsco-2-ce".into())
+        );
+        assert_eq!(
+            normalize_github_remote("ssh://git@github.com/sgossner/VCSL"),
+            Some("sgossner/vcsl".into())
+        );
+    }
+
+    #[test]
+    fn upstream_remote_normalization_rejects_unknown_hosts_and_paths() {
+        assert_eq!(normalize_github_remote("https://example.com/sgossner/VCSL"), None);
+        assert_eq!(normalize_github_remote("https://github.com/sgossner/../VCSL"), None);
+        assert_eq!(normalize_github_remote("git@github.com:sgossner/VCSL:other.git"), None);
+    }
+
+    #[test]
+    fn source_document_hashing_reports_missing_files_explicitly() {
+        let nonce = std::time::SystemTime::now()
+            .duration_since(std::time::UNIX_EPOCH)
+            .unwrap_or_default()
+            .as_nanos();
+        let root = std::env::temp_dir().join(format!(
+            "muse-source-terms-{}-{nonce}",
+            std::process::id()
+        ));
+        std::fs::create_dir_all(&root).expect("temporary source root should be created");
+        let (digest, status) = hash_local_source_document(&root, "LICENSE");
+        assert_eq!(digest, None);
+        assert_eq!(status, "missing");
+
+        std::fs::write(root.join("LICENSE"), b"CC0 fixture document")
+            .expect("license fixture should be written");
+        let (digest, status) = hash_local_source_document(&root, "LICENSE");
+        assert_eq!(status, "hashed");
+        assert_eq!(
+            digest,
+            Some(sha256_file(&root.join("LICENSE")).expect("fixture should hash"))
+        );
+        std::fs::remove_dir_all(&root).expect("temporary source root should be removed");
+    }
+
+    #[test]
+    fn source_license_and_readme_requests_are_separate_fields() {
+        let source = inspect_asset_source_terms(
+            Path::new("/path/that/does/not/exist"),
+            "vsco2_ce",
+            "https://github.com/sgossner/VSCO-2-CE",
+            "sgossner/VSCO-2-CE",
+            "Readme.txt",
+            "Upstream README asks for courtesy/author credit; keep this request distinct from the declared SPDX license and review the source terms rather than silently discarding the request.",
+        );
+        assert_eq!(source.declared_license_spdx, "CC0-1.0");
+        assert!(source.upstream_readme_request.contains("courtesy/author credit"));
+        assert_eq!(source.license_document_status, "root_unavailable");
+        assert_ne!(source.upstream_readme_request, source.license_declaration_boundary);
+    }
 
     #[test]
     fn source_bank_status_never_promotes_inventory_to_playability() {
