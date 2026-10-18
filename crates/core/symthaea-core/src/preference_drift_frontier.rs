@@ -275,7 +275,11 @@ fn select_next_pair(
     eligible.sort_unstable();
     eligible.dedup();
 
-    let known = known_current_pairs(policy_view);
+    let eligible_set: HashSet<String> = eligible.iter().cloned().collect();
+    let known: HashSet<(String, String)> = known_current_pairs(policy_view)
+        .into_iter()
+        .filter(|(a, b)| eligible_set.contains(a) && eligible_set.contains(b))
+        .collect();
     let mut candidates = Vec::new();
     for i in 0..eligible.len() {
         for j in (i + 1)..eligible.len() {
@@ -932,18 +936,23 @@ mod tests {
         assert_eq!(report.scenario_count, 84);
         assert_eq!(report.lexicographic_unasked_pair.len(), 3);
         assert_eq!(report.seeded_random_unasked_pair.len(), 3);
+        assert_eq!(report.coverage_deficit_unasked_pair.len(), 3);
         assert_eq!(
             report.lexicographic_unasked_pair[2].family_scores.len(),
             11
         );
-        assert_eq!(
-            report.lexicographic_unasked_pair[2]
-                .family_scores
-                .values()
-                .map(|score| score.scenario_count)
-                .sum::<usize>(),
-            84
-        );
+        for frontier in [
+            &report.lexicographic_unasked_pair,
+            &report.seeded_random_unasked_pair,
+            &report.coverage_deficit_unasked_pair,
+        ] {
+            assert_eq!(
+                frontier[2].family_scores.values()
+                    .map(|score| score.scenario_count)
+                    .sum::<usize>(),
+                84
+            );
+        }
     }
 
     #[test]
