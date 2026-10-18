@@ -70,7 +70,9 @@ fn identity_record_errors(record: &Value, label: &str, errors: &mut Vec<String>)
                 if non_empty(name, "text").is_none() || non_empty(name, "language_tag").is_none() {
                     errors.push(format!("{label}.names[{index}] requires text and language_tag"));
                 } else if !language_tag_is_well_formed(non_empty(name, "language_tag").unwrap()) {
-                    errors.push(format!("{label}.names[{index}].language_tag is not a valid-looking BCP 47 tag"));
+                    errors.push(format!(
+                        "{label}.names[{index}].language_tag is not a valid-looking BCP 47 tag"
+                    ));
                 }
             }
         }
@@ -110,8 +112,12 @@ fn relation_is_consistent(check: &Value) -> bool {
     };
     let relation = non_empty(check, "relation").unwrap_or("");
     match relation {
-        "match" => query_value.is_some() && candidate_value.is_some() && query_value == candidate_value,
-        "different" => query_value.is_some() && candidate_value.is_some() && query_value != candidate_value,
+        "match" => {
+            query_value.is_some() && candidate_value.is_some() && query_value == candidate_value
+        },
+        "different" => {
+            query_value.is_some() && candidate_value.is_some() && query_value != candidate_value
+        },
         "unknown" => query_value.is_none() || candidate_value.is_none(),
         "not_applicable" => query_value.is_none() && candidate_value.is_none(),
         _ => false,
@@ -139,12 +145,21 @@ pub fn validate_food_identity_match_v1(assessment: &Value) -> Result<(), Vec<Str
     let scope = non_empty(assessment, "use_scope");
     if !matches!(
         scope,
-        Some("nutrition_estimation" | "recipe_substitution" | "product_lookup" | "allergen_screening" | "price_comparison")
+        Some(
+            "nutrition_estimation"
+                | "recipe_substitution"
+                | "product_lookup"
+                | "allergen_screening"
+                | "price_comparison"
+        )
     ) {
         errors.push("use_scope must be an explicitly supported comparison context".to_owned());
     }
     let outcome = non_empty(assessment, "outcome");
-    if !matches!(outcome, Some("exact_match" | "qualified_approximation" | "review_required" | "no_match")) {
+    if !matches!(
+        outcome,
+        Some("exact_match" | "qualified_approximation" | "review_required" | "no_match")
+    ) {
         errors.push("outcome is invalid".to_owned());
     }
 
@@ -172,7 +187,9 @@ pub fn validate_food_identity_match_v1(assessment: &Value) -> Result<(), Vec<Str
             errors.push(format!("duplicate attribute check {attribute_id:?}"));
         }
         if !relation_is_consistent(check) {
-            errors.push(format!("attribute check {attribute_id:?} has an inconsistent relation/value pair"));
+            errors.push(format!(
+                "attribute check {attribute_id:?} has an inconsistent relation/value pair"
+            ));
         }
         if ![
             "taxon_id", "food_part", "processing_state", "preparation_state",
@@ -181,12 +198,18 @@ pub fn validate_food_identity_match_v1(assessment: &Value) -> Result<(), Vec<Str
         ].contains(&attribute_id) {
             errors.push(format!("unsupported attribute_id {attribute_id:?}"));
         }
-        let query_identity_value = value_string_or_null(query.get("identity").and_then(|v| v.get(attribute_id)));
-        let candidate_identity_value = value_string_or_null(candidate.get("identity").and_then(|v| v.get(attribute_id)));
+        let query_identity_value =
+            value_string_or_null(query.get("identity").and_then(|v| v.get(attribute_id)));
+        let candidate_identity_value =
+            value_string_or_null(candidate.get("identity").and_then(|v| v.get(attribute_id)));
         let query_check_value = value_string_or_null(check.get("query_value"));
         let candidate_check_value = value_string_or_null(check.get("candidate_value"));
-        if query_identity_value != query_check_value || candidate_identity_value != candidate_check_value {
-            errors.push(format!("attribute check {attribute_id:?} does not match the referenced record identity fields"));
+        if query_identity_value != query_check_value
+            || candidate_identity_value != candidate_check_value
+        {
+            errors.push(format!(
+                "attribute check {attribute_id:?} does not match the referenced record identity fields"
+            ));
         }
         if let Some(relation) = non_empty(check, "relation") {
             relation_by_attribute.insert(attribute_id.to_owned(), relation.to_owned());
@@ -200,7 +223,9 @@ pub fn validate_food_identity_match_v1(assessment: &Value) -> Result<(), Vec<Str
     }
     for required in ASSESSED_HARD_BLOCK_ATTRIBUTES {
         if !relation_by_attribute.contains_key(*required) {
-            errors.push(format!("hard-block identity attribute {required:?} must be explicitly assessed"));
+            errors.push(format!(
+                "hard-block identity attribute {required:?} must be explicitly assessed"
+            ));
         }
     }
 
@@ -232,7 +257,8 @@ pub fn validate_food_identity_match_v1(assessment: &Value) -> Result<(), Vec<Str
     let hard_unknowns: BTreeSet<String> = relation_by_attribute
         .iter()
         .filter(|(attribute, relation)| {
-            REQUIRED_IDENTITY_ATTRIBUTES.contains(&attribute.as_str()) && relation.as_str() != "match"
+            REQUIRED_IDENTITY_ATTRIBUTES.contains(&attribute.as_str())
+                && relation.as_str() != "match"
         })
         .map(|(attribute, _)| attribute.clone())
         .collect();
@@ -254,11 +280,18 @@ pub fn validate_food_identity_match_v1(assessment: &Value) -> Result<(), Vec<Str
         query_identity,
         candidate_identity,
     ].iter().any(|identity| {
-        identity.and_then(|value| value.get("product_kind")).and_then(Value::as_str) == Some("branded_product")
+        identity
+            .and_then(|value| value.get("product_kind"))
+            .and_then(Value::as_str)
+            == Some("branded_product")
             && identity.and_then(|value| value.get("brand_id")).and_then(Value::as_str).is_none()
     });
-    if matches!(outcome, Some("exact_match" | "qualified_approximation")) && branded_without_identity {
-        errors.push("exact/approximate identity of a branded product requires a known brand_id".to_owned());
+    if matches!(outcome, Some("exact_match" | "qualified_approximation"))
+        && branded_without_identity
+    {
+        errors.push(
+            "exact/approximate identity of a branded product requires a known brand_id".to_owned()
+        );
     }
 
     if outcome == Some("exact_match") {
@@ -268,14 +301,20 @@ pub fn validate_food_identity_match_v1(assessment: &Value) -> Result<(), Vec<Str
             }
         }
         if !hard_differences.is_empty() {
-            errors.push(format!("exact_match cannot claim identity across hard-block differences: {hard_differences:?}"));
+            errors.push(format!(
+                "exact_match cannot claim identity across hard-block differences: {hard_differences:?}"
+            ));
         }
         if !hard_unknowns.is_empty() {
-            errors.push(format!("exact_match cannot leave required identity attributes unknown/different: {hard_unknowns:?}"));
+            errors.push(format!(
+                "exact_match cannot leave required identity attributes unknown/different: {hard_unknowns:?}"
+            ));
         }
         for (attribute, relation) in &relation_by_attribute {
             if relation != "match" && relation != "not_applicable" {
-                errors.push(format!("exact_match cannot accept {attribute:?} relation {relation:?}"));
+                errors.push(format!(
+                    "exact_match cannot accept {attribute:?} relation {relation:?}"
+                ));
             }
         }
         if !deviation_ids.is_empty() {
@@ -285,7 +324,10 @@ pub fn validate_food_identity_match_v1(assessment: &Value) -> Result<(), Vec<Str
 
     if outcome == Some("qualified_approximation") {
         if !scope.is_some_and(match_scope_allows_approximation) {
-            errors.push("qualified_approximation is not permitted for product_lookup, price_comparison, or allergen_screening".to_owned());
+            errors.push(
+                "qualified_approximation is not permitted for product_lookup, price_comparison, or allergen_screening"
+                    .to_owned(),
+            );
         }
         if rationale.is_none() {
             errors.push("qualified_approximation requires a non-empty rationale".to_owned());
@@ -295,17 +337,25 @@ pub fn validate_food_identity_match_v1(assessment: &Value) -> Result<(), Vec<Str
         }
         for attribute in &all_differences_or_unknowns {
             if !deviation_ids.contains(attribute) {
-                errors.push(format!("difference/unknown for {attribute:?} must be explicitly declared as a deviation"));
+                errors.push(format!(
+                    "difference/unknown for {attribute:?} must be explicitly declared as a deviation"
+                ));
             }
         }
         if !hard_unknowns.is_empty() {
-            errors.push(format!("qualified_approximation cannot leave required identity attributes unknown/different: {hard_unknowns:?}"));
+            errors.push(format!(
+                "qualified_approximation cannot leave required identity attributes unknown/different: {hard_unknowns:?}"
+            ));
         }
         if !hard_block_unknowns.is_empty() {
-            errors.push(format!("qualified_approximation cannot leave hard-block identity attributes unknown: {hard_block_unknowns:?}"));
+            errors.push(format!(
+                "qualified_approximation cannot leave hard-block identity attributes unknown: {hard_block_unknowns:?}"
+            ));
         }
         if scope == Some("nutrition_estimation") && !hard_differences.is_empty() {
-            errors.push(format!("nutrition_estimation cannot silently use hard-block identity differences as a nutrient proxy: {hard_differences:?}"));
+            errors.push(format!(
+                "nutrition_estimation cannot silently use hard-block identity differences as a nutrient proxy: {hard_differences:?}"
+            ));
         }
     }
 
@@ -318,7 +368,9 @@ pub fn validate_food_identity_match_v1(assessment: &Value) -> Result<(), Vec<Str
         && hard_unknowns.is_empty()
         && rationale.is_none()
     {
-        errors.push("no_match requires a known conflict/unknown or an explicit rationale".to_owned());
+        errors.push(
+            "no_match requires a known conflict/unknown or an explicit rationale".to_owned()
+        );
     }
 
     let claims = match assessment.get("component_claims").and_then(Value::as_array) {
@@ -336,22 +388,35 @@ pub fn validate_food_identity_match_v1(assessment: &Value) -> Result<(), Vec<Str
         match comparability {
             "same_basis" => {
                 if query_basis.is_none() || query_basis != candidate_basis {
-                    errors.push(format!("component_claims[{index}] {component:?} claims same_basis but bases differ or are absent"));
+                    errors.push(format!(
+                        "component_claims[{index}] {component:?} claims same_basis but bases differ or are absent"
+                    ));
                 }
             }
             "converted" => {
                 if non_empty(claim, "conversion_ref").is_none() {
-                    errors.push(format!("component_claims[{index}] {component:?} requires conversion_ref"));
+                    errors.push(format!(
+                        "component_claims[{index}] {component:?} requires conversion_ref"
+                    ));
                 }
             }
             "not_comparable" => {}
-            _ => errors.push(format!("component_claims[{index}] {component:?} has invalid comparability")),
+            _ => errors.push(format!(
+                "component_claims[{index}] {component:?} has invalid comparability"
+            )),
         }
         if outcome == Some("exact_match") && comparability == "not_comparable" {
-            errors.push(format!("exact_match cannot claim component {component:?} is comparable when it is not"));
+            errors.push(format!(
+                "exact_match cannot claim component {component:?} is comparable when it is not"
+            ));
         }
-        if outcome == Some("qualified_approximation") && comparability == "not_comparable" && scope == Some("nutrition_estimation") {
-            errors.push(format!("nutrition_estimation approximation cannot claim uncomparable component {component:?} as an input"));
+        if outcome == Some("qualified_approximation")
+            && comparability == "not_comparable"
+            && scope == Some("nutrition_estimation")
+        {
+            errors.push(format!(
+                "nutrition_estimation approximation cannot claim uncomparable component {component:?} as an input"
+            ));
         }
     }
 
@@ -368,42 +433,10 @@ mod tests {
     use serde_json::json;
 
     fn assessment() -> Value {
-        json!({
-            "schema_version": "1.0.0",
-            "assessment_id": "synthetic:exact-potato-v1",
-            "use_scope": "nutrition_estimation",
-            "outcome": "exact_match",
-            "query_record": {
-                "record_id": "synthetic:query-potato",
-                "source_ref": "synthetic:source-a",
-                "source_version": "fixture-v1",
-                "names": [{"text":"potato","language_tag":"en-ZA"},{"text":"izambane","language_tag":"zu-ZA"}],
-                "identity": {"taxon_id":"taxon:solanum-tuberosum","food_part":"tuber","processing_state":"whole","preparation_state":"raw","product_kind":"whole_food","edible_basis":"edible_portion_100g","preservation":"fresh","brand_id":null,"fortification":null,"cultivar":null,"origin_region":null}
-            },
-            "candidate_record": {
-                "record_id": "synthetic:candidate-potato",
-                "source_ref": "synthetic:source-b",
-                "source_version": "fixture-v1",
-                "names": [{"text":"potato","language_tag":"en-US"},{"text":"potato, flesh and skin, raw","language_tag":"en-US"}],
-                "identity": {"taxon_id":"taxon:solanum-tuberosum","food_part":"tuber","processing_state":"whole","preparation_state":"raw","product_kind":"whole_food","edible_basis":"edible_portion_100g","preservation":"fresh","brand_id":null,"fortification":null,"cultivar":null,"origin_region":null}
-            },
-            "attribute_checks": [
-                {"attribute_id":"taxon_id","query_value":"taxon:solanum-tuberosum","candidate_value":"taxon:solanum-tuberosum","relation":"match"},
-                {"attribute_id":"food_part","query_value":"tuber","candidate_value":"tuber","relation":"match"},
-                {"attribute_id":"processing_state","query_value":"whole","candidate_value":"whole","relation":"match"},
-                {"attribute_id":"preparation_state","query_value":"raw","candidate_value":"raw","relation":"match"},
-                {"attribute_id":"product_kind","query_value":"whole_food","candidate_value":"whole_food","relation":"match"},
-                {"attribute_id":"edible_basis","query_value":"edible_portion_100g","candidate_value":"edible_portion_100g","relation":"match"},
-                {"attribute_id":"preservation","query_value":"fresh","candidate_value":"fresh","relation":"match"},
-                {"attribute_id":"brand_id","query_value":null,"candidate_value":null,"relation":"not_applicable"},
-                {"attribute_id":"fortification","query_value":null,"candidate_value":null,"relation":"not_applicable"}
-            ],
-            "deviations": [],
-            "component_claims": [
-                {"component_id":"component:protein","query_basis":"g/100g edible portion","candidate_basis":"g/100g edible portion","comparability":"same_basis"}
-            ],
-            "rationale": "Synthetic exact-identity contract fixture; no real nutrition values."
-        })
+        serde_json::from_str(include_str!(
+            "../fixtures/food-identity-match-v1/exact-multilingual-potato.json"
+        ))
+        .expect("synthetic food identity fixture must parse")
     }
 
     #[test]
