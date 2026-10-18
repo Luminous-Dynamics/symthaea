@@ -464,10 +464,7 @@ fn validate_resources_and_process_graph(root: &Value, issues: &mut Vec<Validatio
                                     issues,
                                     "RESOURCE_SKILL_MISMATCH",
                                     format!("{prefix}.required_skills"),
-                                    format!(
-                                        "resource {operation_resource_id:?} does not declare skill {skill:?}",
-                                        operation_resource_id = resource_id.unwrap_or("<missing>")
-                                    ),
+                                    format!("resource {:?} does not declare skill {:?}", resource_id.unwrap_or("<missing>"), skill),
                                 );
                             }
                         }
