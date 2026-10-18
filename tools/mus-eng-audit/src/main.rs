@@ -16,7 +16,7 @@ struct CaseResult {
     case_type: String,
     candidate_claim: String,
     expected_disposition: String,
-    audited: bool,
+    evaluated: bool,
 }
 
 #[derive(Debug, Serialize)]
@@ -127,7 +127,7 @@ fn semantic_findings(corpus: &Value) -> Vec<String> {
         }
 
         if case_type == "positive_control" {
-            if faults.as_slice() != ["none"] {
+            if faults.len() != 1 || faults[0] != "none" {
                 findings.push(format!("{prefix}: positive control must declare exactly the 'none' fault"));
             }
             if disposition != "CONSISTENT_UNQUALIFIED" {
@@ -209,7 +209,7 @@ fn audit(schema_path: &PathBuf, corpus_path: &PathBuf) -> Result<AuditReport, St
         case_type: string_at(case, "case_type").to_owned(),
         candidate_claim: string_at(case, "candidate_claim").to_owned(),
         expected_disposition: string_at(case, "expected_disposition").to_owned(),
-        audited: true,
+        evaluated: true,
     }).collect();
 
     Ok(AuditReport {
@@ -327,6 +327,6 @@ mod tests {
     fn human_claim_requires_protocol_and_results() {
         let mut data = corpus();
         data["cases"][9]["expected_disposition"] = json!("CONSISTENT_UNQUALIFIED");
-        assert!(semantic_findings(&data).iter().any(|finding| finding.contains("human_perceptual_claim")));
+        assert!(semantic_findings(&data).iter().any(|finding| finding.contains("human_study_protocol")));
     }
 }
