@@ -291,7 +291,13 @@ fn apply_axis_variation(
                 && observation.get("context_id").and_then(Value::as_str)
                     == Some(source_context_id.as_str());
         if current_task_and_context && feedback_mode != "historical_only" {
+            let source_observation_source = observation
+                .get("source")
+                .and_then(Value::as_str)
+                .map(str::to_owned)
+                .unwrap_or_else(|| "unspecified_synthetic_source".to_owned());
             observation["source_observation_id"] = json!(source_observation_id);
+            observation["source_observation_source"] = json!(source_observation_source);
             observation["context_id"] = json!(current_context_id);
             observation["source"] = json!("explicit_synthetic_generated_ordinal_feedback");
 
