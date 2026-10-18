@@ -63,10 +63,12 @@ fn interval(
         || point > upper
         || (strictly_positive_lower && lower <= 0.0)
     {
-        errors.push(format!(
-            "{label} interval must satisfy {} <= lower <= value <= upper",
-            if strictly_positive_lower { "0 <" } else { "0 <=" }
-        ));
+        let condition = if strictly_positive_lower {
+            "0 < lower <= value <= upper"
+        } else {
+            "0 <= lower <= value <= upper"
+        };
+        errors.push(format!("{label} interval must satisfy {condition}"));
         return None;
     }
     Some((point, lower, upper))
