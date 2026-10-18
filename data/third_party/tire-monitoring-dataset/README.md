@@ -21,3 +21,14 @@ This dataset copy is split into ordered text shards solely because the repositor
 - Vehicle scope: passenger-car 205/55 R16 pressure/temperature/speed monitoring, not motorcycle tire force, wet grip, wear, impact, or structural safety.
 
 The dataset is CC BY 4.0 and must be attributed. It remains third-party-licensed material; it is not under the repository's primary code license.
+
+## Reproducible Rust intake check
+
+From the workspace root, after restoring this checkout:
+
+```sh
+cargo test -p xtask tire_monitoring_intake
+cargo run -p xtask -- tire-monitoring-intake --input-dir data/third_party/tire-monitoring-dataset --out reports/vehicle_data/tire_monitoring_intake.json
+```
+
+These Rust commands have been authored but not executed in the current environment. The source-side row scan and shard comparison documented above are not substitutes for this exact-head Rust run. Do not random-split rows; partition by `Unit_ID` to keep whole acquisition segments in one split.
