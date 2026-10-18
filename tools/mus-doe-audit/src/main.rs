@@ -309,12 +309,28 @@ mod tests {
     }
 
     #[test]
-    fn same_unit_across_fit_and_test_is_rejected() {
-        let mut data = corpus();
-        data["cases"][0]["observations"][4]["group_ids"]["physical_unit_id"] = json!("unit-A");
-        data["cases"][0]["independence_axes"] = json!(["physical_unit_id"]);
-        data["cases"][0]["fault_modes"] = json!(["none"]);
-        assert!(semantic_findings(&data).0.iter().any(|f| f.contains("physical_unit_cross_partition")));
+    fn every_declared_independence_axis_detects_cross_partition_leakage() {
+        let axes = [
+            ("physical_unit_id", "physical_unit_cross_partition"),
+            ("build_batch_id", "build_batch_cross_partition"),
+            ("builder_id", "builder_cross_partition"),
+            ("environment_id", "environment_cross_partition"),
+            ("measurement_session_id", "measurement_session_cross_partition"),
+            ("material_lot_id", "material_lot_cross_partition"),
+        ];
+        for (axis, expected_fault) in axes {
+            let mut data = corpus();
+            data["cases"][0]["observations"][4]["group_ids"][axis] =
+                data["cases"][0]["observations"][0]["group_ids"][axis].clone();
+            data["cases"][0]["independence_axes"] = json!([axis]);
+            data["cases"][0]["fault_modes"] = json!(["none"]);
+            let findings = semantic_findings(&data).0;
+            assert!(
+                findings.iter().any(|f| f.contains(expected_fault)),
+                "axis {axis} did not produce {expected_fault}: {}",
+                findings.join("\\n")
+            );
+        }
     }
 
     #[test]
