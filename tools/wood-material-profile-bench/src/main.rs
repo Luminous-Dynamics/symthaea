@@ -230,7 +230,9 @@ fn evaluate_scenario(scenario: &Scenario) -> ScenarioReceipt {
     }
 
     match profile.profile_level {
-        ProfileLevel::Specimen if !profile.specimen_id.as_ref().is_some_and(|value| nonempty(value)) => {
+        ProfileLevel::Specimen
+            if !profile.specimen_id.as_ref().is_some_and(|value| nonempty(value)) =>
+        {
             reasons.insert("SPECIMEN_ID_MISSING".to_owned());
         }
         ProfileLevel::Lot if !profile.lot_id.as_ref().is_some_and(|value| nonempty(value)) => {
@@ -258,7 +260,9 @@ fn evaluate_scenario(scenario: &Scenario) -> ScenarioReceipt {
         }
         if matches!(
             property.evidence_level,
-            EvidenceLevel::SampleMeasured | EvidenceLevel::LotMeasured | EvidenceLevel::QualifiedDesignValue
+            EvidenceLevel::SampleMeasured
+                | EvidenceLevel::LotMeasured
+                | EvidenceLevel::QualifiedDesignValue
         ) && !property.measurement_record_id.as_ref().is_some_and(|value| nonempty(value))
         {
             reasons.insert("PROPERTY_MEASUREMENT_REFERENCE_MISSING".to_owned());
@@ -294,7 +298,10 @@ fn evaluate_scenario(scenario: &Scenario) -> ScenarioReceipt {
                 reasons.insert("PROPERTY_EVIDENCE_UNRESOLVED".to_owned());
             }
             if query.purpose == QueryPurpose::LotSelection
-                && !matches!(property.evidence_level, EvidenceLevel::SampleMeasured | EvidenceLevel::LotMeasured)
+                && !matches!(
+                    property.evidence_level,
+                    EvidenceLevel::SampleMeasured | EvidenceLevel::LotMeasured
+                )
             {
                 reasons.insert("EVIDENCE_SCOPE_MISMATCH".to_owned());
             }
