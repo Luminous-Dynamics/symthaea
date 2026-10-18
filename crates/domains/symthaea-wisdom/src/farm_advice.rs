@@ -454,7 +454,7 @@ pub enum FarmAdviceError {
 #[cfg(test)]
 mod tests {
     use super::*;
-    use crate::evidence_ledger::{EvidenceObservation, EvidenceRelation, NormativeClaimId};
+    use crate::evidence_ledger::NormativeClaimId;
 
     fn fact(value: &str) -> FactClaimId {
         FactClaimId::new(value).unwrap()
