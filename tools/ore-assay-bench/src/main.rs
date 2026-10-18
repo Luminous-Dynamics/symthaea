@@ -539,11 +539,9 @@ mod tests {
             .unwrap()
             .conversion_evidence_id = Some("conversion-receipt-001".to_owned());
         let result = evaluate_scenario(scenario, tolerance);
-        assert!(
-            result
-                .actual_reason_codes
-                .contains(&"GRADE_BASIS_MISMATCH".to_owned())
-        );
+        assert!(result
+            .actual_reason_codes
+            .contains(&"GRADE_BASIS_MISMATCH".to_owned()));
     }
 
     #[test]
@@ -566,11 +564,9 @@ mod tests {
         let scenario = &mut corpus.scenarios[0];
         scenario.sample.assays[1].basis = AssayBasis::WetMass;
         let result = evaluate_scenario(scenario, tolerance);
-        assert!(
-            result
-                .actual_reason_codes
-                .contains(&"MINERAL_PHASE_BASIS_UNSUPPORTED".to_owned())
-        );
+        assert!(result
+            .actual_reason_codes
+            .contains(&"MINERAL_PHASE_BASIS_UNSUPPORTED".to_owned()));
     }
 
     #[test]
@@ -581,11 +577,9 @@ mod tests {
         scenario.sample.assays[0].value_ppm = None;
         scenario.sample.assays[0].detection_limit_ppm = None;
         let result = evaluate_scenario(scenario, tolerance);
-        assert!(
-            result
-                .actual_reason_codes
-                .contains(&"DETECTION_LIMIT_MISSING_OR_INVALID".to_owned())
-        );
+        assert!(result
+            .actual_reason_codes
+            .contains(&"DETECTION_LIMIT_MISSING_OR_INVALID".to_owned()));
     }
 
     #[test]
@@ -595,10 +589,8 @@ mod tests {
         let scenario = &mut corpus.scenarios[0];
         scenario.sample.source_record_id.clear();
         let result = evaluate_scenario(scenario, tolerance);
-        assert!(
-            result
-                .actual_reason_codes
-                .contains(&"SOURCE_REFERENCE_MISSING".to_owned())
-        );
+        assert!(result
+            .actual_reason_codes
+            .contains(&"SOURCE_REFERENCE_MISSING".to_owned()));
     }
 }
