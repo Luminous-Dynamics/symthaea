@@ -9,3 +9,7 @@ These files are synthetic conformance inputs, not measured food data.
 - `semantic-rejects-unknown-gate-on-frontier.json`: expected to fail semantic validation because an unresolved hard gate is reported as ranked/on-frontier.
 
 The negative fixtures are intentionally invalid. Their presence is useful only if a future independent validator asserts the expected rejection reason. They are not evidence that an executable validator already rejects them.
+
+- `semantic-rejects-false-scenario-frontier.json`: expected to fail semantic validation because the reported observed-basket frontier hides alpha even though its complete objective vector dominates beta in that scenario.
+- `semantic-rejects-false-robust-dominance.json`: expected to fail semantic validation because reciprocal robust-dominance claims are made for candidates whose relative cost reverses across scenarios.
+- `valid-scenario-frontier-with-other-scenario-missing.json`: expected to pass semantic checks. Alpha is on the baseline frontier but is globally incomplete and ineligible for the robust frontier because its price is missing under the shock scenario. Scenario-local rankability and all-scenario robust rankability are distinct.
