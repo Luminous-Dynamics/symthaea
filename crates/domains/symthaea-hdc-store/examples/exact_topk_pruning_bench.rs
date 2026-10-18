@@ -287,7 +287,11 @@ fn time_algorithm(
     let (observed, payload_bytes_processed, vectors_pruned) = match algorithm {
         Algorithm::FullSort => (
             reader.scan_similar(query, top_k),
-            (vector_count as u64).saturating_mul(HV_BYTES as u64),
+            if top_k == 0 {
+                0
+            } else {
+                (vector_count as u64).saturating_mul(HV_BYTES as u64)
+            },
             0,
         ),
         Algorithm::BoundedHeap => bounded_heap_search(reader, query, top_k)?,
