@@ -1091,6 +1091,18 @@ mod tests {
     #[test]
     fn rejects_local_artifacts_until_terms_reviewed() {
         let mut value = manifest();
+        value.reuse_policy.artifact_terms_reviewed = true;
+        value.reuse_policy.local_use_authorized = true;
+        value.source_objects.push(SourceObject {
+            id: "amb2025-02-targets".into(),
+            source_doi: "10.18434/mds2-3735".into(),
+            source_url: "https://data.nist.gov/od/id/mds2-3735".into(),
+            source_revision: "source-revision-pending".into(),
+            accessed_on: "2026-10-18".into(),
+            terms_url: "https://data.nist.gov/terms".into(),
+            terms_reviewed: true,
+            local_use_authorized: true,
+        });
         value.artifacts.push(SourceArtifact {
             relative_path: "results.csv".into(),
             source_object_id: "amb2025-02-targets".into(),
@@ -1120,24 +1132,10 @@ mod tests {
         let tmp = tempdir().unwrap();
         let content = b"source-bound bytes\n";
         fs::write(tmp.path().join("sample.csv"), content).unwrap();
-        let mut value = manifest();
-        value.reuse_policy.artifact_terms_reviewed = true;
-        value.reuse_policy.local_use_authorized = true;
-        value.artifacts.push(SourceArtifact {
-            relative_path: "sample.csv".into(),
-            source_object_id: "amb2025-02-targets".into(),
-            source_doi: "10.18434/mds2-3735".into(),
-            artifact_revision: "fixture-v1".into(),
-            accessed_on: "2026-10-18".into(),
-            source_url: "https://data.nist.gov/example.csv".into(),
-            terms_url: "https://data.nist.gov/terms".into(),
-            terms_reviewed: true,
-            local_use_authorized: true,
-            repository_bundling_authorized: false,
-            sha256: sha256_hex(content),
-            size_bytes: content.len() as u64,
-            media_type: "text/csv".into(),
-        });
+        let mut value = record_manifest();
+        value.artifacts[0].relative_path = "sample.csv".into();
+        value.artifacts[0].sha256 = sha256_hex(content);
+        value.artifacts[0].size_bytes = content.len() as u64;
         validate_manifest(&value).unwrap();
         verify_artifacts(&value, tmp.path()).unwrap();
         value.artifacts[0].sha256 = "0".repeat(64);
@@ -1170,6 +1168,17 @@ mod tests {
         };
         let groups = validate_records(&value, &observations).unwrap();
         assert_eq!(groups, vec![String::from("AMB2022-718-AMMT-B7-P4")]);
+    }
+
+    #[test]
+    fn rejects_record_when_its_source_object_has_no_artifact_digest() {
+        let mut value = record_manifest();
+        value.artifacts.clear();
+        let observations = ObservationSet {
+            schema_version: "0.1.0".into(),
+            records: vec![record("target", "AMB2022-718-AMMT-B7-P4", "aggregate-target", RecordRole::TargetOutcome, Split::HeldOut, "yield_strength", 920.0)],
+        };
+        assert!(validate_records(&value, &observations).is_err());
     }
 
     #[test]
@@ -1284,24 +1293,11 @@ mod tests {
         fs::write(&external, bytes).unwrap();
         symlink(&external, root.path().join("linked.csv")).unwrap();
 
-        let mut value = manifest();
-        value.reuse_policy.artifact_terms_reviewed = true;
-        value.reuse_policy.local_use_authorized = true;
-        value.artifacts.push(SourceArtifact {
-            relative_path: "linked.csv".into(),
-            source_object_id: "amb2025-02-targets".into(),
-            source_doi: "10.18434/mds2-3735".into(),
-            artifact_revision: "v1".into(),
-            accessed_on: "2026-10-18".into(),
-            source_url: "https://data.nist.gov/external.csv".into(),
-            terms_url: "https://data.nist.gov/terms".into(),
-            terms_reviewed: true,
-            local_use_authorized: true,
-            repository_bundling_authorized: false,
-            sha256: sha256_hex(bytes),
-            size_bytes: bytes.len() as u64,
-            media_type: "text/csv".into(),
-        });
+        let mut value = record_manifest();
+        value.artifacts[0].relative_path = "linked.csv".into();
+        value.artifacts[0].sha256 = sha256_hex(bytes);
+        value.artifacts[0].size_bytes = bytes.len() as u64;
+        assert!(validate_manifest(&value).is_ok());
         assert!(verify_artifacts(&value, root.path()).is_err());
     }
     #[test]
