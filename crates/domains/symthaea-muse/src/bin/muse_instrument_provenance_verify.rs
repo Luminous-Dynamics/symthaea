@@ -6,7 +6,7 @@
 //! Input reports are treated as untrusted data. A successful result is a consistency check,
 //! not a signature or an authenticated build attestation.
 
-use serde::Serialize;
+use serde::{Deserialize, Serialize};
 use serde_json::Value;
 use sha2::{Digest, Sha256};
 use std::fs::File;
@@ -62,19 +62,13 @@ fn main() -> ExitCode {
 
 fn run() -> Result<ExitCode, String> {
     let options = parse_args()?;
-    let probe_report_sha256 = file_sha256(&options.probe_path)
-        .map_err(|error| format!("cannot hash probe report: {error}"))?;
-    let capability_report_sha256 = file_sha256(&options.inventory_path)
-        .map_err(|error| format!("cannot hash capability report: {error}"))?;
-
-    let probe_file = File::open(&options.probe_path)
-        .map_err(|error| format!("cannot open probe report: {error}"))?;
-    let probe: Value = serde_json::from_reader(probe_file)
-        .map_err(|error| format!("cannot parse probe report JSON: {error}"))?;
-    let inventory_file = File::open(&options.inventory_path)
-        .map_err(|error| format!("cannot open capability report: {error}"))?;
-    let inventory: Value = serde_json::from_reader(inventory_file)
-        .map_err(|error| format!("cannot parse capability report JSON: {error}"))?;
+    // Hash bytes through the same reader used by the JSON parser, so the
+    // reported input digest binds the exact document that was actually parsed.
+    let (probe, probe_report_sha256) = read_json_with_sha256(&options.probe_path)
+        .map_err(|error| format!("cannot read probe report: {error}"))?;
+    let (inventory, capability_report_sha256) =
+        read_json_with_sha256(&options.inventory_path)
+            .map_err(|error| format!("cannot read capability report: {error}"))?;
 
     let report = verify_reports(
         &probe,
@@ -623,16 +617,36 @@ fn push_incomplete(findings: &mut Vec<Finding>, code: &'static str, detail: Stri
     findings.push(Finding { severity: "incomplete", code, detail });
 }
 
-fn file_sha256(path: &Path) -> io::Result<String> {
-    let mut file = File::open(path)?;
-    let mut hasher = Sha256::new();
-    let mut buffer = [0_u8; 64 * 1024];
-    loop {
-        let count = file.read(&mut buffer)?;
-        if count == 0 { break; }
-        hasher.update(&buffer[..count]);
+struct HashingReader<R> {
+    inner: R,
+    hasher: Sha256,
+}
+
+impl<R: Read> Read for HashingReader<R> {
+    fn read(&mut self, buffer: &mut [u8]) -> io::Result<usize> {
+        let count = self.inner.read(buffer)?;
+        self.hasher.update(&buffer[..count]);
+        Ok(count)
     }
-    Ok(format!("{:x}", hasher.finalize()))
+}
+
+fn read_json_with_sha256(path: &Path) -> Result<(Value, String), String> {
+    let file = File::open(path).map_err(|error| error.to_string())?;
+    let mut reader = HashingReader {
+        inner: file,
+        hasher: Sha256::new(),
+    };
+    let value = {
+        let mut deserializer = serde_json::Deserializer::from_reader(&mut reader);
+        let value = Value::deserialize(&mut deserializer)
+            .map_err(|error| format!("invalid JSON: {error}"))?;
+        deserializer
+            .end()
+            .map_err(|error| format!("trailing data after JSON: {error}"))?;
+        value
+    };
+    let digest = format!("{:x}", reader.hasher.finalize());
+    Ok((value, digest))
 }
 
 #[cfg(test)]
@@ -754,6 +768,24 @@ mod tests {
         let report = test_report(&probe, &inventory);
         assert_eq!(report.verdict, "incomplete");
         assert!(report.findings.iter().any(|finding| finding.code == "root_manifest_incomplete"));
+    }
+
+    #[test]
+    fn report_digest_covers_the_exact_json_bytes_that_were_parsed() {
+        let nonce = std::time::SystemTime::now()
+            .duration_since(std::time::UNIX_EPOCH)
+            .unwrap_or_default()
+            .as_nanos();
+        let path = std::env::temp_dir().join(format!(
+            "muse-provenance-report-{}-{nonce}.json",
+            std::process::id()
+        ));
+        let bytes = br#"{ "schema_version": "fixture", "value": 7 }\n"#;
+        std::fs::write(&path, bytes).expect("fixture should be written");
+        let (value, digest) = read_json_with_sha256(&path).expect("fixture should parse and hash");
+        assert_eq!(value["value"], 7);
+        assert_eq!(digest, format!("{:x}", Sha256::digest(bytes)));
+        std::fs::remove_file(&path).expect("fixture should be removed");
     }
 
     #[test]
