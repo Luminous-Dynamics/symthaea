@@ -318,7 +318,7 @@ pub fn choose_next_location(
             state = (state ^ (state >> 30)).wrapping_mul(0xBF58_476D_1CE4_E5B9);
             state = (state ^ (state >> 27)).wrapping_mul(0x94D0_49BB_1331_11EB);
             state ^= state >> 31;
-            candidates.get((state as usize) % candidates.len()).copied()
+            candidates.get((state % candidates.len() as u64) as usize).copied()
         }
     }
 }
@@ -586,6 +586,27 @@ mod tests {
         let first = run_spatial_experiment_design_benchmark(17).unwrap();
         let second = run_spatial_experiment_design_benchmark(17).unwrap();
         assert_eq!(first, second);
+    }
+
+    #[test]
+    fn seeded_random_selector_returns_only_pool_members_and_replays() {
+        let candidates = candidate_positions();
+        let observations: Vec<_> = initial_positions().into_iter().enumerate().map(|(index, p)| {
+            SpatialDesignObservation {
+                observation_id: format!("obs-{index:03}"),
+                acquisition_step: index,
+                position: p,
+                measured_error_mm: 0.0,
+            }
+        }).collect();
+        let first = choose_next_location(
+            SamplingStrategy::SeededRandom, &candidates, &observations, 42, 3
+        ).unwrap();
+        let replay = choose_next_location(
+            SamplingStrategy::SeededRandom, &candidates, &observations, 42, 3
+        ).unwrap();
+        assert_eq!(first, replay);
+        assert!(candidates.iter().any(|candidate| same_position(*candidate, first)));
     }
 
     #[test]
