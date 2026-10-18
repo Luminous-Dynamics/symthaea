@@ -24,13 +24,13 @@ int main(int argc, char **argv) {
         return 64;
     }
 
-    if (argv[1][0] == '\\0') {
-        fputs("PULSE_TICKS must be a non-negative decimal integer\\n", stderr);
+    if (argv[1][0] == '\0') {
+        fputs("PULSE_TICKS must be a non-negative decimal integer\n", stderr);
         return 65;
     }
-    for (const char *p = argv[1]; *p != '\\0'; ++p) {
+    for (const char *p = argv[1]; *p != '\0'; ++p) {
         if (*p < '0' || *p > '9') {
-            fputs("PULSE_TICKS must be a non-negative decimal integer\\n", stderr);
+            fputs("PULSE_TICKS must be a non-negative decimal integer\n", stderr);
             return 65;
         }
     }
