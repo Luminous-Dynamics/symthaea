@@ -79,6 +79,9 @@ pub mod architecture_robustness;
 /// Report-only decision-sensitive measurement triage for exosuit architecture research.
 #[allow(missing_docs)]
 pub mod measurement_triage;
+/// Deterministic synthetic preference-drift benchmark fixture validation.
+#[allow(missing_docs)]
+pub mod preference_drift_benchmark;
 /// Report-only lifecycle and wearability evidence evaluator for exosuit research.
 #[allow(missing_docs)]
 pub mod wearability;
