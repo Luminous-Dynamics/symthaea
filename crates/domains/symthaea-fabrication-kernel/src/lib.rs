@@ -36,6 +36,7 @@ pub mod fdm_spatial_benchmark;
 pub mod fdm_spatial_uncertainty;
 pub mod fdm_spatial_experiment_design;
 pub mod fdm_spatial_cost_budget;
+pub mod fdm_spatial_multifidelity;
 pub mod export;
 pub mod fault_injection;
 pub mod gateway_consensus;
