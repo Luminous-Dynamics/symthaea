@@ -337,8 +337,8 @@ impl ValueOfInformationScenario {
         })
     }
 
-    fn likelihood_bps(&self, signal: &SignalOutcome, state_id: &str) -> u32 {
-        signal
+    fn likelihood_bps(&self, outcome: &SignalOutcome, state_id: &str) -> u32 {
+        outcome
             .likelihoods
             .iter()
             .find(|likelihood| likelihood.state_id == state_id)
