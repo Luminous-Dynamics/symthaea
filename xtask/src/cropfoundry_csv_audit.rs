@@ -46,7 +46,6 @@ struct CsvAuditReceipt {
     content_sha256: String,
     expected_sha256: Option<String>,
     digest_matches_expected: Option<bool>,
-    artifact_identity_verified: bool,
     byte_length: usize,
     delimiter: char,
     header_field_count: usize,
@@ -274,7 +273,6 @@ fn audit_csv_bytes(
     let content_sha256 = format!("{digest:x}");
     let digest_matches_expected =
         expected_sha256.map(|expected| expected.eq_ignore_ascii_case(&content_sha256));
-    let artifact_identity_verified = digest_matches_expected == Some(true);
     let record_count_matches_expectation =
         expected_data_records.map(|expected| expected == data_record_count);
 
@@ -287,7 +285,6 @@ fn audit_csv_bytes(
         content_sha256,
         expected_sha256: expected_sha256.map(str::to_ascii_lowercase),
         digest_matches_expected,
-        artifact_identity_verified,
         byte_length: bytes.len(),
         delimiter: delimiter as char,
         header_field_count: headers.len(),
@@ -305,7 +302,8 @@ fn audit_csv_bytes(
         record_count_matches_expectation,
         training_authorized: false,
         notes: vec![
-            "The digest identifies these exact local bytes; it does not establish license or access rights.".to_owned(),
+            "The digest identifies these exact local bytes; it does not establish artifact provenance, license, or access rights.".to_owned(),
+            "digest_matches_expected is null when no expected digest was provided; a match is only as trustworthy as the supplied checksum source.".to_owned(),
             "This receipt does not authorize training, prove agronomic validity, or normalize raw values.".to_owned(),
             "Dates, units, treatment encodings, and missing/zero semantics require a source-backed data dictionary review.".to_owned(),
         ],
@@ -509,7 +507,6 @@ mod tests {
         )
         .unwrap();
         assert_eq!(receipt.digest_matches_expected, Some(true));
-        assert!(receipt.artifact_identity_verified);
     }
 
     #[test]
@@ -527,7 +524,6 @@ mod tests {
         )
         .unwrap();
         assert_eq!(receipt.digest_matches_expected, Some(false));
-        assert!(!receipt.artifact_identity_verified);
     }
 
     #[test]
