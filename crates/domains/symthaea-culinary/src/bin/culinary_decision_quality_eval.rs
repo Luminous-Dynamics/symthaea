@@ -21,7 +21,7 @@ fn as_string_set(value: Option<&Value>) -> BTreeSet<String> {
         .collect()
 }
 
-fn output_string(value: &Value, key: &str) -> Option<&str> {
+fn output_string<'a>(value: &'a Value, key: &str) -> Option<&'a str> {
     value.get(key).and_then(Value::as_str)
 }
 
