@@ -42,6 +42,23 @@ pub struct SavingIntervalPercent {
     pub upper_percent: f64,
 }
 
+/// Result of a decision-capability check for one declared measurand.
+///
+/// Uncertainty and minimum decision effect must use the same units and
+/// compatible definitions. The factor of three is a project-level planning
+/// criterion, not a universal metrology standard and not a calibration claim.
+#[derive(Clone, Copy, Debug, PartialEq)]
+pub struct DecisionCapability {
+    /// Expanded uncertainty for the declared measurement, in its native units.
+    pub expanded_uncertainty: f64,
+    /// Smallest engineering difference that would change the decision.
+    pub minimum_decision_effect: f64,
+    /// Maximum uncertainty permitted by the configured one-third rule.
+    pub maximum_allowed_uncertainty: f64,
+    /// Whether the instrument/setup can resolve the declared decision effect.
+    pub capable: bool,
+}
+
 /// Invalid trace, denominator, or comparison inputs.
 #[derive(Clone, Copy, Debug, PartialEq, Eq)]
 pub enum EnergyError {
@@ -73,6 +90,10 @@ pub enum EnergyError {
     InvalidEnergyInterval,
     /// The lower baseline energy bound must be strictly positive.
     BaselineIntervalIncludesZero,
+    /// Measurement uncertainty must be finite and nonnegative.
+    InvalidMeasurementUncertainty,
+    /// Minimum decision effect must be finite and strictly positive.
+    InvalidMinimumDecisionEffect,
 }
 
 impl fmt::Display for EnergyError {
@@ -105,6 +126,12 @@ impl fmt::Display for EnergyError {
             }
             Self::BaselineIntervalIncludesZero => {
                 formatter.write_str("baseline energy interval lower bound must be positive")
+            }
+            Self::InvalidMeasurementUncertainty => {
+                formatter.write_str("measurement uncertainty must be finite and nonnegative")
+            }
+            Self::InvalidMinimumDecisionEffect => {
+                formatter.write_str("minimum decision effect must be finite and positive")
             }
         }
     }
@@ -283,6 +310,34 @@ pub fn task_success_delta_percentage_points(
         return Err(EnergyError::NonFiniteResult);
     }
     Ok(delta)
+}
+
+/// Evaluates whether measurement uncertainty is small enough for a decision.
+///
+/// Returns capable = true only when expanded uncertainty is no more than one
+/// third of the minimum decision effect. Both inputs must be finite; uncertainty
+/// may be zero but cannot be negative, and the minimum decision effect must be
+/// strictly positive. The units are caller-defined but must match. This check
+/// does not establish that the uncertainty estimate itself is valid: the caller
+/// must supply a documented uncertainty budget and valid instrument evidence.
+pub fn decision_capability_gate(
+    expanded_uncertainty: f64,
+    minimum_decision_effect: f64,
+) -> Result<DecisionCapability, EnergyError> {
+    if !expanded_uncertainty.is_finite() || expanded_uncertainty < 0.0 {
+        return Err(EnergyError::InvalidMeasurementUncertainty);
+    }
+    if !minimum_decision_effect.is_finite() || minimum_decision_effect <= 0.0 {
+        return Err(EnergyError::InvalidMinimumDecisionEffect);
+    }
+
+    let maximum_allowed_uncertainty = minimum_decision_effect / 3.0;
+    Ok(DecisionCapability {
+        expanded_uncertainty,
+        minimum_decision_effect,
+        maximum_allowed_uncertainty,
+        capable: expanded_uncertainty <= maximum_allowed_uncertainty,
+    })
 }
 
 #[cfg(test)]
@@ -505,6 +560,44 @@ mod tests {
             .expect("valid energy intervals");
         assert!(interval.lower_percent < 0.0);
         assert!(interval.upper_percent < 0.0);
+    }
+
+    #[test]
+    fn decision_capability_gate_accepts_boundary_and_rejects_uncertainty_too_large() {
+        let boundary = decision_capability_gate(1.0, 3.0).expect("valid boundary");
+        assert_eq!(boundary.maximum_allowed_uncertainty, 1.0);
+        assert!(boundary.capable);
+
+        let inadequate = decision_capability_gate(1.0001, 3.0).expect("valid inputs");
+        assert!(!inadequate.capable);
+        assert_eq!(inadequate.minimum_decision_effect, 3.0);
+
+        let zero_uncertainty = decision_capability_gate(0.0, 0.01).expect("valid inputs");
+        assert!(zero_uncertainty.capable);
+    }
+
+    #[test]
+    fn decision_capability_gate_rejects_invalid_uncertainty_and_effect() {
+        assert_eq!(
+            decision_capability_gate(f64::NAN, 3.0),
+            Err(EnergyError::InvalidMeasurementUncertainty)
+        );
+        assert_eq!(
+            decision_capability_gate(f64::INFINITY, 3.0),
+            Err(EnergyError::InvalidMeasurementUncertainty)
+        );
+        assert_eq!(
+            decision_capability_gate(-0.1, 3.0),
+            Err(EnergyError::InvalidMeasurementUncertainty)
+        );
+        assert_eq!(
+            decision_capability_gate(0.1, 0.0),
+            Err(EnergyError::InvalidMinimumDecisionEffect)
+        );
+        assert_eq!(
+            decision_capability_gate(0.1, f64::NEG_INFINITY),
+            Err(EnergyError::InvalidMinimumDecisionEffect)
+        );
     }
 
     #[test]
