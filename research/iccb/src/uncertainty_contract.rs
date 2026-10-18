@@ -52,8 +52,10 @@ pub enum UncertaintyRoutingError {
     MissingScenarioId,
     MissingProducerVersion,
     MissingSourceManifestDigest,
+    MalformedSourceManifestDigest,
     MissingQualificationReceipt,
     MissingValidationCorpusDigest,
+    MalformedValidationCorpusDigest,
     MissingCompatibilityReceipt,
     MissingDiscrepancyEnvelopeReceipt,
     MissingOutOfDomainReason,
@@ -70,6 +72,15 @@ pub struct UncertaintyRoutingReceipt {
     pub limitation: String,
 }
 
+/// Checks SHA-256 digest syntax only; it does not verify the referenced content.
+///
+/// Both plain 64-character hexadecimal and the explicit sha256: prefix are
+/// accepted so producers can share a simple stable representation.
+fn has_sha256_digest_shape(value: &str) -> bool {
+    let hex = value.strip_prefix("sha256:").unwrap_or(value);
+    hex.len() == 64 && hex.bytes().all(|byte| byte.is_ascii_hexdigit())
+}
+
 impl UncertaintyAssessmentRef {
     pub fn route(&self) -> Result<UncertaintyRoutingReceipt, UncertaintyRoutingError> {
         if self.scenario_id.trim().is_empty() {
@@ -80,6 +91,9 @@ impl UncertaintyAssessmentRef {
         }
         if self.source_manifest_digest.trim().is_empty() {
             return Err(UncertaintyRoutingError::MissingSourceManifestDigest);
+        }
+        if !has_sha256_digest_shape(&self.source_manifest_digest) {
+            return Err(UncertaintyRoutingError::MalformedSourceManifestDigest);
         }
 
         let (route, evidence_reference, limitation) = match &self.evidence_kind {
@@ -92,6 +106,9 @@ impl UncertaintyAssessmentRef {
                 }
                 if validation_corpus_digest.trim().is_empty() {
                     return Err(UncertaintyRoutingError::MissingValidationCorpusDigest);
+                }
+                if !has_sha256_digest_shape(validation_corpus_digest) {
+                    return Err(UncertaintyRoutingError::MalformedValidationCorpusDigest);
                 }
                 (
                     CompatibleAnalysisRoute::ExpectedValueOrValueOfInformation,
@@ -163,7 +180,9 @@ mod tests {
         UncertaintyAssessmentRef {
             scenario_id: "ICCB-UNCERTAINTY-ROUTING-001".into(),
             producer_version: "fixture-producer-v1".into(),
-            source_manifest_digest: "sha256:synthetic-manifest".into(),
+            source_manifest_digest:
+                "sha256:937a22712ea5c20073d2c8a226f1f4a9c2c30aba40a497f2412a34426f986535"
+                    .into(),
             evidence_kind: kind,
         }
     }
@@ -172,10 +191,15 @@ mod tests {
     fn point_probabilities_route_to_ev_not_compatibility_planner() {
         let reference = base(UncertaintyEvidenceKind::PointProbabilityDistribution {
             qualification_receipt_id: "qual-01".into(),
-            validation_corpus_digest: "sha256:heldout-cohort".into(),
+            validation_corpus_digest:
+                "sha256:21c1af4953138dc2e5e83e78aa4254f39c8c54d2d74ad8a13b1fdfba7193f6d4"
+                    .into(),
         });
         let receipt = reference.route().unwrap();
-        assert_eq!(receipt.route, CompatibleAnalysisRoute::ExpectedValueOrValueOfInformation);
+        assert_eq!(
+            receipt.route,
+            CompatibleAnalysisRoute::ExpectedValueOrValueOfInformation
+        );
         assert!(receipt.limitation.contains("does not validate calibration"));
     }
 
@@ -196,7 +220,10 @@ mod tests {
             compatibility_receipt_id: "compat-01".into(),
         });
         let receipt = reference.route().unwrap();
-        assert_eq!(receipt.route, CompatibleAnalysisRoute::ConservativeCompatibilityPlanning);
+        assert_eq!(
+            receipt.route,
+            CompatibleAnalysisRoute::ConservativeCompatibilityPlanning
+        );
         assert!(receipt.limitation.contains("do not imply probabilities"));
     }
 
@@ -216,14 +243,19 @@ mod tests {
         let reference = base(UncertaintyEvidenceKind::OutOfDomain {
             reason: "missing-source-class".into(),
         });
-        assert_eq!(reference.route().unwrap().route, CompatibleAnalysisRoute::Abstain);
+        assert_eq!(
+            reference.route().unwrap().route,
+            CompatibleAnalysisRoute::Abstain
+        );
     }
 
     #[test]
     fn missing_qualification_or_source_metadata_fails_closed() {
         let missing_qualification = base(UncertaintyEvidenceKind::PointProbabilityDistribution {
             qualification_receipt_id: " ".into(),
-            validation_corpus_digest: "sha256:cohort".into(),
+            validation_corpus_digest:
+                "sha256:21c1af4953138dc2e5e83e78aa4254f39c8c54d2d74ad8a13b1fdfba7193f6d4"
+                    .into(),
         });
         assert_eq!(
             missing_qualification.route(),
@@ -289,6 +321,7 @@ mod tests {
             reference.route(),
             Err(UncertaintyRoutingError::MissingScenarioId)
         );
+
         let mut reference = base(UncertaintyEvidenceKind::BoundedStateProbabilities {
             bounds_receipt_id: "bounds-04".into(),
         });
@@ -297,5 +330,38 @@ mod tests {
             reference.route(),
             Err(UncertaintyRoutingError::MissingProducerVersion)
         );
+    }
+
+    #[test]
+    fn malformed_digest_shapes_fail_closed() {
+        let mut reference = base(UncertaintyEvidenceKind::BoundedStateProbabilities {
+            bounds_receipt_id: "bounds-05".into(),
+        });
+        reference.source_manifest_digest = "sha256:synthetic-manifest".into();
+        assert_eq!(
+            reference.route(),
+            Err(UncertaintyRoutingError::MalformedSourceManifestDigest)
+        );
+
+        let mut reference = base(UncertaintyEvidenceKind::PointProbabilityDistribution {
+            qualification_receipt_id: "qual-04".into(),
+            validation_corpus_digest: "sha256:heldout-cohort".into(),
+        });
+        assert_eq!(
+            reference.route(),
+            Err(UncertaintyRoutingError::MalformedValidationCorpusDigest)
+        );
+    }
+
+    #[test]
+    fn digest_shape_accepts_prefixed_and_unprefixed_sha256_hex() {
+        assert!(has_sha256_digest_shape(
+            "sha256:937a22712ea5c20073d2c8a226f1f4a9c2c30aba40a497f2412a34426f986535"
+        ));
+        assert!(has_sha256_digest_shape(
+            "937a22712ea5c20073d2c8a226f1f4a9c2c30aba40a497f2412a34426f986535"
+        ));
+        assert!(!has_sha256_digest_shape("sha256:"));
+        assert!(!has_sha256_digest_shape(&"g".repeat(64)));
     }
 }
