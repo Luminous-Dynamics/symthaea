@@ -29,7 +29,7 @@ bracket_slot_x_mm = 28.5;
 edge_margin_mm = 6;
 
 render_datum_axes = false;
-render_sensor_outline = true;
+render_sensor_outline = false;
 sensor_outline_width_mm = 42;
 sensor_outline_height_mm = 42;
 sensor_outline_depth_mm = 1;
