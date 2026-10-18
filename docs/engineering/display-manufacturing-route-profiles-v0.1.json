@@ -193,7 +193,7 @@
           "conditionality": "required",
           "condition": "The selected route may be mass transfer, stamp/roll transfer, laser transfer, fluidic assembly or another declared architecture; do not mix their metrics.",
           "input_state": "committed_transfer_map_and_preflight_record",
-          "intended_output_state": "placed_emitter_population_with_as-placed_map",
+          "intended_output_state": "placed_emitter_population_with_as_placed_map",
           "inspection_gate": "required_hold",
           "required_evidence": [
             "transferred/attempted/accepted counts",
@@ -230,7 +230,7 @@
           "process_semantics_owner": "https://github.com/Luminous-Dynamics/symthaea/issues/5888",
           "conditionality": "required",
           "condition": "Use the selected route's separately qualified process profile; no generic operating values are prescribed here.",
-          "input_state": "placed_emitter_population_with_as-placed_map",
+          "input_state": "placed_emitter_population_with_as_placed_map",
           "intended_output_state": "bonded_population_with_interconnect_state",
           "inspection_gate": "required_hold",
           "required_evidence": [
@@ -884,7 +884,7 @@
           ],
           "known_failure_modes": [
             "missed dark pixels",
-            "mura",
+            "mura defect",
             "false repair eligibility",
             "unobserved wafer regions"
           ],
