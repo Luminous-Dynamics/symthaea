@@ -323,6 +323,36 @@
       "title": "Display manufacturing route profiles and economics",
       "url": "https://github.com/Luminous-Dynamics/symthaea/issues/8012",
       "purpose": "Reuse existing route, yield, repair and cost accounting ownership"
+    },
+    {
+      "id": "SRC-ANTMICRO-LED-PANEL",
+      "title": "Antmicro Programmable LED Panel Board",
+      "url": "https://github.com/antmicro/programmable-led-panel",
+      "purpose": "Public KiCad 9.x 10x14 independently controllable LED reference board with RP2040 or iCE40 control and an external trigger; candidate for synchronized latency fixtures after build/part review."
+    },
+    {
+      "id": "SRC-FRAMEPROBE",
+      "title": "frameprobe end-to-end display latency reference",
+      "url": "https://github.com/frameprobe/frameprobe",
+      "purpose": "Existing photodiode and RP2040 latency measurement design used as an architecture and test-method reference; review exact hardware/software licenses, parts, sampling limits and independent calibration before any reuse."
+    },
+    {
+      "id": "SRC-COLORHUG2-ARCHIVE",
+      "title": "ColorHug2 archived hardware design",
+      "url": "https://github.com/hughski/colorhug2-hardware",
+      "purpose": "Historical open colorimeter schematics and board design useful as a reference; archived repository is not evidence of current instrument availability, calibration, or active maintenance."
+    },
+    {
+      "id": "SRC-TI-INA226",
+      "title": "Texas Instruments INA226 documentation",
+      "url": "https://www.ti.com/product/INA226",
+      "purpose": "Primary source for current/voltage monitor electrical limits, conversion timing, filtering and shunt design; any implementation still requires range selection and calibration against a suitable reference."
+    },
+    {
+      "id": "SRC-PGENERATOR-PLUS",
+      "title": "PGenerator+ display pattern generator",
+      "url": "https://github.com/BigShoots/PGenerator-Plus",
+      "purpose": "Active third-party reference for HDMI SDR/HDR pattern generation and meter-driven validation; verify its dependency, language, supported hardware, licenses and output behavior before choosing interop."
     }
   ]
 }
