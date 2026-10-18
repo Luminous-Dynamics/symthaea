@@ -550,4 +550,12 @@ mod tests {
             .iter()
             .any(|error| error.contains("unsupported input unit")));
     }
+
+    #[test]
+    fn timestamp_requires_numeric_date_time_and_offset_components() {
+        assert!(timestamp_looks_rfc3339("2026-10-18T00:00:00Z"));
+        assert!(timestamp_looks_rfc3339("2026-10-18T00:00:00.123+02:00"));
+        assert!(!timestamp_looks_rfc3339("abcd-10-18T00:00:00Z"));
+        assert!(!timestamp_looks_rfc3339("2026-10-18T00:00:00+xx:00"));
+    }
 }
