@@ -1,7 +1,7 @@
 use serde::{Deserialize, Serialize};
 use sha2::{Digest, Sha256};
 use std::{
-    collections::BTreeSet,
+    collections::{BTreeMap, BTreeSet},
     env, fs,
     path::{Component, Path, PathBuf},
     process::ExitCode,
@@ -114,11 +114,14 @@ struct Observation {
     source_doi: String,
     specimen_id: String,
     lineage_group_id: String,
+    source_field: String,
     variable_id: String,
     role: RecordRole,
     split: Split,
     raw_value: Option<f64>,
     raw_unit: Option<String>,
+    censor_lower_bound: Option<f64>,
+    censor_upper_bound: Option<f64>,
     normalized_value: Option<f64>,
     normalized_unit: Option<String>,
     conversion_note: Option<String>,
@@ -450,6 +453,8 @@ fn validate_records(
 
     let target_group = manifest.challenge_context.target_parent_specimen_id.as_str();
     let mut record_ids = BTreeSet::new();
+    let mut source_field_contracts: BTreeMap<(String, String), (String, String)> = BTreeMap::new();
+    let mut normalized_units: BTreeMap<String, String> = BTreeMap::new();
     let mut calibration_outcome_groups = BTreeSet::new();
     let mut held_out_outcome_groups = BTreeSet::new();
 
@@ -459,6 +464,7 @@ fn validate_records(
             ("source_doi", record.source_doi.as_str()),
             ("specimen_id", record.specimen_id.as_str()),
             ("lineage_group_id", record.lineage_group_id.as_str()),
+            ("source_field", record.source_field.as_str()),
             ("variable_id", record.variable_id.as_str()),
         ] {
             if !nonblank(value) {
@@ -482,21 +488,84 @@ fn validate_records(
             )));
         }
 
-        if let Some(value) = record.raw_value {
-            if !value.is_finite() {
+        let raw_unit = record.raw_unit.as_deref().filter(|unit| nonblank(unit))
+            .ok_or_else(|| AdapterError::Validation(format!(
+                "record {:?} must retain an explicit raw measurement/bound unit",
+                record.record_id
+            )))?;
+
+        let source_key = (record.source_doi.clone(), record.source_field.clone());
+        let field_contract = (record.variable_id.clone(), raw_unit.to_string());
+        if let Some(previous) = source_field_contracts.get(&source_key) {
+            if previous != &field_contract {
                 return Err(AdapterError::Validation(format!(
-                    "record {:?} raw_value must be finite", record.record_id
+                    "source field {:?} changes variable identity or raw unit within source {:?}: {:?} vs {:?}",
+                    record.source_field, record.source_doi, previous, field_contract
                 )));
             }
-            if record.raw_unit.as_deref().is_none_or(|unit| !nonblank(unit)) {
-                return Err(AdapterError::Validation(format!(
-                    "record {:?} has a raw value without an explicit raw unit", record.record_id
-                )));
+        } else {
+            source_field_contracts.insert(source_key, field_contract);
+        }
+
+        match record.censoring {
+            Censoring::Uncensored => {
+                let value = record.raw_value.ok_or_else(|| AdapterError::Validation(format!(
+                    "record {:?} is uncensored but has no raw value", record.record_id
+                )))?;
+                if !value.is_finite() || record.censor_lower_bound.is_some() || record.censor_upper_bound.is_some() {
+                    return Err(AdapterError::Validation(format!(
+                        "record {:?} uncensored value must be finite and have no censor bounds", record.record_id
+                    )));
+                }
             }
-        } else if record.censoring == Censoring::Uncensored {
-            return Err(AdapterError::Validation(format!(
-                "record {:?} is uncensored but has no raw value", record.record_id
-            )));
+            Censoring::LeftCensored => {
+                if record.raw_value.is_some()
+                    || record.censor_lower_bound.is_some()
+                    || record.censor_upper_bound.is_none_or(|bound| !bound.is_finite())
+                {
+                    return Err(AdapterError::Validation(format!(
+                        "record {:?} left-censored value needs an upper bound only and no fabricated point value",
+                        record.record_id
+                    )));
+                }
+            }
+            Censoring::RightCensored => {
+                if record.raw_value.is_some()
+                    || record.censor_lower_bound.is_none_or(|bound| !bound.is_finite())
+                    || record.censor_upper_bound.is_some()
+                {
+                    return Err(AdapterError::Validation(format!(
+                        "record {:?} right-censored value needs a lower bound only and no fabricated point value",
+                        record.record_id
+                    )));
+                }
+            }
+            Censoring::IntervalCensored => {
+                match (record.raw_value, record.censor_lower_bound, record.censor_upper_bound) {
+                    (None, Some(lower), Some(upper)) if lower.is_finite() && upper.is_finite() && lower < upper => {}
+                    _ => return Err(AdapterError::Validation(format!(
+                        "record {:?} interval-censored value needs finite lower/upper bounds with lower < upper and no fabricated point value",
+                        record.record_id
+                    ))),
+                }
+            }
+            Censoring::Unknown => {
+                if record.metadata_note.as_deref().is_none_or(|note| !nonblank(note)) {
+                    return Err(AdapterError::Validation(format!(
+                        "record {:?} has unknown censoring without an explanatory metadata note",
+                        record.record_id
+                    )));
+                }
+                if record.raw_value.is_some_and(|value| !value.is_finite())
+                    || record.censor_lower_bound.is_some_and(|value| !value.is_finite())
+                    || record.censor_upper_bound.is_some_and(|value| !value.is_finite())
+                {
+                    return Err(AdapterError::Validation(format!(
+                        "record {:?} unknown-censoring fields must still be finite when present",
+                        record.record_id
+                    )));
+                }
+            }
         }
 
         if let Some(value) = record.normalized_value {
@@ -504,6 +573,17 @@ fn validate_records(
                 return Err(AdapterError::Validation(format!(
                     "record {:?} normalized_value must be finite", record.record_id
                 )));
+            }
+            let normalized_unit = record.normalized_unit.as_deref().unwrap_or_default();
+            if let Some(previous) = normalized_units.get(&record.variable_id) {
+                if previous != normalized_unit {
+                    return Err(AdapterError::Validation(format!(
+                        "variable {:?} changes normalized unit from {:?} to {:?}",
+                        record.variable_id, previous, normalized_unit
+                    )));
+                }
+            } else {
+                normalized_units.insert(record.variable_id.clone(), normalized_unit.to_string());
             }
             if record.raw_value.is_none()
                 || record.normalized_unit.as_deref().is_none_or(|unit| !nonblank(unit))
@@ -554,14 +634,6 @@ fn validate_records(
                 }
                 held_out_outcome_groups.insert(record.lineage_group_id.clone());
             }
-        }
-        if record.censoring == Censoring::Unknown
-            && record.metadata_note.as_deref().is_none_or(|note| !nonblank(note))
-        {
-            return Err(AdapterError::Validation(format!(
-                "record {:?} has unknown censoring without an explanatory metadata note",
-                record.record_id
-            )));
         }
     }
 
@@ -778,10 +850,13 @@ mod tests {
             source_doi: "10.18434/mds2-3735".into(),
             specimen_id: specimen.into(),
             lineage_group_id: group.into(),
+            source_field: variable.into(),
             variable_id: variable.into(),
             role, split,
             raw_value: Some(value),
             raw_unit: Some("MPa".into()),
+            censor_lower_bound: None,
+            censor_upper_bound: None,
             normalized_value: None,
             normalized_unit: None,
             conversion_note: None,
@@ -936,6 +1011,53 @@ mod tests {
         let mut row = record("target", "AMB2022-718-AMMT-B7-P4", "aggregate-target", RecordRole::TargetOutcome, Split::HeldOut, "yield_strength", 920.0);
         row.censoring = Censoring::Unknown;
         let observations = ObservationSet { schema_version: "0.1.0".into(), records: vec![row] };
+        assert!(validate_records(&value, &observations).is_err());
+    }
+
+    #[test]
+    fn preserves_left_right_and_interval_censoring_without_fake_point_values() {
+        let value = manifest();
+        let mut left = record("left", "lineage-left", "spec-left", RecordRole::Predictor, Split::Calibration, "porosity", 0.0);
+        left.raw_value = None;
+        left.censoring = Censoring::LeftCensored;
+        left.censor_upper_bound = Some(0.05);
+
+        let mut right = record("right", "lineage-right", "spec-right", RecordRole::Predictor, Split::Calibration, "porosity", 0.0);
+        right.raw_value = None;
+        right.censoring = Censoring::RightCensored;
+        right.censor_lower_bound = Some(0.8);
+
+        let mut interval = record("interval", "lineage-interval", "spec-interval", RecordRole::Predictor, Split::Calibration, "porosity", 0.0);
+        interval.raw_value = None;
+        interval.censoring = Censoring::IntervalCensored;
+        interval.censor_lower_bound = Some(0.1);
+        interval.censor_upper_bound = Some(0.2);
+
+        let mut target = record("target", "AMB2022-718-AMMT-B7-P4", "aggregate-target", RecordRole::TargetOutcome, Split::HeldOut, "yield_strength", 920.0);
+        target.source_field = "target_yield_strength".into();
+        let observations = ObservationSet { schema_version: "0.1.0".into(), records: vec![left, right, interval, target] };
+        assert!(validate_records(&value, &observations).is_ok());
+    }
+
+    #[test]
+    fn rejects_censoring_bounds_that_conflict_with_state() {
+        let value = manifest();
+        let mut row = record("target", "AMB2022-718-AMMT-B7-P4", "aggregate-target", RecordRole::TargetOutcome, Split::HeldOut, "yield_strength", 920.0);
+        row.censoring = Censoring::IntervalCensored;
+        row.censor_lower_bound = Some(950.0);
+        row.censor_upper_bound = Some(900.0);
+        let observations = ObservationSet { schema_version: "0.1.0".into(), records: vec![row] };
+        assert!(validate_records(&value, &observations).is_err());
+    }
+
+    #[test]
+    fn rejects_source_field_with_inconsistent_raw_units_or_identity() {
+        let value = manifest();
+        let one = record("r1", "cal-group", "spec-1", RecordRole::Predictor, Split::Calibration, "process_energy", 20.0);
+        let mut two = record("r2", "AMB2022-718-AMMT-B7-P4", "aggregate-target", RecordRole::TargetOutcome, Split::HeldOut, "yield_strength", 920.0);
+        two.source_field = "process_energy".into();
+        two.raw_unit = Some("GPa".into());
+        let observations = ObservationSet { schema_version: "0.1.0".into(), records: vec![one, two] };
         assert!(validate_records(&value, &observations).is_err());
     }
 
