@@ -253,6 +253,16 @@
       "proposed_target": "On synthetic and retrospective replay with a predeclared utility and equal information budget, aim for at least 15% lower mean decision regret than a fixed baseline while not worsening predeclared worst-case constraints; report per-environment outcomes and sensitivity to utility assumptions. Simulation/replay is not field-impact evidence.",
       "split_protocol": "Freeze utility definitions, comparator policy, environmental/price scenarios, and constraints before scoring. Hold out whole site-years or scenario families. Do not choose utility weights after inspecting final outcomes, and publish a Pareto/robustness view rather than only a mean score.",
       "status": "not_evaluable_until_local_cost_and_partner_data"
+    },
+    {
+      "id": "CF-015",
+      "category": "cross_crop_transfer",
+      "name": "Cold-start transfer to underrepresented crops",
+      "question": "Does a shared mechanistic/phenotypic representation improve prediction for a data-sparse local crop when only a small amount of target-crop evidence is available?",
+      "primary_metric": "target-crop held-out-site-year error at fixed target observation budgets, calibration, and worst-crop / negative-transfer gap",
+      "proposed_target": "Only after at least three crops have comparable, harmonized traits, aim for at least 10% error reduction versus a target-crop-only baseline in predeclared few-shot regimes, without a material worst-crop regression. Report negative transfer explicitly; never imply universal biological transfer.",
+      "split_protocol": "Use whole-species/cultivar and site-year holdouts matched to the intended transfer claim; prevent shared cultivar, parent-family, planting-cycle, or near-duplicate image leakage. Compare within-crop, target-only few-shot, and shared-transfer baselines. Report each target crop and the applicability domain.",
+      "status": "not_evaluable_until_multi_crop_harmonized_data"
     }
   ],
   "first_milestone_exit_criteria": [
