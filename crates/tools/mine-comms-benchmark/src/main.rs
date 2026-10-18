@@ -73,21 +73,64 @@ fn main() {
         expires_at_ms: 10_000,
         origin_authenticated: true,
     };
+    let policies = [RoutePolicy::FixedChannelPreference, RoutePolicy::AdaptiveLatencyEnergy];
 
     println!("MINE-COMMS-001 deterministic route/receipt contract demo");
     println!("synthetic_only=true physical_propagation_model=false");
-    for policy in [RoutePolicy::FixedChannelPreference, RoutePolicy::AdaptiveLatencyEnergy] {
+    for policy in policies {
         report("nominal", &baseline, &message, policy);
     }
 
-    let mut backbone_severed = baseline;
+    let mut backbone_severed = baseline.clone();
     for link in &mut backbone_severed {
         if link.id.starts_with("backbone") {
             link.state = LinkState::Down;
         }
     }
-    for policy in [RoutePolicy::FixedChannelPreference, RoutePolicy::AdaptiveLatencyEnergy] {
+    for policy in policies {
         report("backbone_severed", &backbone_severed, &message, policy);
     }
+
+    let mut local_relay_severed = baseline.clone();
+    for link in &mut local_relay_severed {
+        if link.id.starts_with("local-1") {
+            link.state = LinkState::Down;
+        }
+    }
+    for policy in policies {
+        report("local_relay_severed", &local_relay_severed, &message, policy);
+    }
+
+    let mut stale_tte_after_backbone_loss = baseline.clone();
+    for link in &mut stale_tte_after_backbone_loss {
+        if link.id.starts_with("backbone") {
+            link.state = LinkState::Down;
+        }
+        if link.id.starts_with("tte") {
+            link.observed_at_ms = 500;
+            link.max_observation_age_ms = 100;
+        }
+    }
+    for policy in policies {
+        report("stale_tte_after_backbone_loss", &stale_tte_after_backbone_loss, &message, policy);
+    }
+
+    let mut no_return_path = baseline.clone();
+    for link in &mut no_return_path {
+        if link.id.ends_with("-ba") {
+            link.state = LinkState::Down;
+        }
+    }
+    for policy in policies {
+        report("forward_path_without_ack_path", &no_return_path, &message, policy);
+    }
+
+    let mut short_deadline = message.clone();
+    short_deadline.id = "SOS-EXPIRED-SYNTHETIC-001".to_owned();
+    short_deadline.expires_at_ms = 1_020;
+    for policy in policies {
+        report("expires_before_arrival", &baseline, &short_deadline, policy);
+    }
+
     println!("claim_ceiling=synthetic routing semantics only; no radio, mine-safety, or field-reliability claim");
 }
