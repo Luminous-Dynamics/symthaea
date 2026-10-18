@@ -152,7 +152,7 @@ pub fn fuse_candidate_log_likelihoods(
         }
         if modalities[..index]
             .iter()
-            .any(|previous| previous.modality_id == modality.modality_id)
+            .any(|previous| previous.modality_id.trim() == modality.modality_id.trim())
         {
             return Err(HybridFusionError::DuplicateModalityId);
         }
