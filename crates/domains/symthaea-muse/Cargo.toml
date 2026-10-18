@@ -171,3 +171,6 @@ name = "creative_qd_benchmark"
 
 [[example]]
 name = "creative_audio_audit"
+
+[[example]]
+name = "creative_audio_matrix"
