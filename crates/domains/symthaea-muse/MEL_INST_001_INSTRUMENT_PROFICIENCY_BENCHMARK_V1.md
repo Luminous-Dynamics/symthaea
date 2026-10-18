@@ -177,7 +177,7 @@ SYMTHAEA_MUSE_HASH_SOURCE_BANK_MANIFEST=1 cargo run -p symthaea-muse --bin muse_
 # Generate indexed-bank and whole-root content digests for comparison.
 # Root hashing streams every .wav found under both roots, including files
 # rejected by the pitch indexer; enable only when the I/O cost is acceptable.
-cargo run -p symthaea-muse --bin muse_instrument_qualification -- --hash-indexed-samples --hash-root-wav-contents > mel-instrument-capability-matrix.json
+SYMTHAEA_SOURCE_REV="$(git rev-parse HEAD)" cargo run -p symthaea-muse --bin muse_instrument_qualification -- --hash-indexed-samples --hash-root-wav-contents > mel-instrument-capability-matrix.json
 ```
 
 Use `cargo test -p symthaea-muse --bin muse_instrument_probe` for roster/bounds checks, synthetic sine pitch-estimator sanity tests, silence rejection and velocity-response summary tests.
