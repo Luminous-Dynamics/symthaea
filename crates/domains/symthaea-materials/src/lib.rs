@@ -12,6 +12,7 @@
 #![warn(missing_docs)]
 
 pub mod aging;
+pub mod capacitor_device;
 pub mod compound_stability;
 pub mod database;
 pub mod encoder;
