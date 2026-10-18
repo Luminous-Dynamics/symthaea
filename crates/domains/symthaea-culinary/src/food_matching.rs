@@ -17,6 +17,18 @@ const REQUIRED_IDENTITY_ATTRIBUTES: &[&str] = &[
     "edible_basis",
 ];
 
+const ASSESSED_HARD_BLOCK_ATTRIBUTES: &[&str] = &[
+    "taxon_id",
+    "food_part",
+    "processing_state",
+    "preparation_state",
+    "preservation",
+    "product_kind",
+    "brand_id",
+    "fortification",
+    "edible_basis",
+];
+
 const HARD_BLOCK_ATTRIBUTES: &[&str] = &[
     "taxon_id",
     "food_part",
@@ -129,8 +141,8 @@ pub fn validate_food_identity_match_v1(assessment: &Value) -> Result<(), Vec<Str
 
     let mut check_ids = BTreeSet::new();
     let mut relation_by_attribute = std::collections::BTreeMap::new();
-    let checks = match assessment.get("attribute_checks").and_then(Value::as_array) {
-        Some(checks) => checks,
+    let checks: &[Value] = match assessment.get("attribute_checks").and_then(Value::as_array) {
+        Some(checks) => checks.as_slice(),
         None => {
             errors.push("attribute_checks must be an array".to_owned());
             &[]
@@ -171,6 +183,11 @@ pub fn validate_food_identity_match_v1(assessment: &Value) -> Result<(), Vec<Str
             errors.push(format!("required identity attribute {required:?} is not assessed"));
         }
     }
+    for required in ASSESSED_HARD_BLOCK_ATTRIBUTES {
+        if !relation_by_attribute.contains_key(*required) {
+            errors.push(format!("hard-block identity attribute {required:?} must be explicitly assessed"));
+        }
+    }
 
     let rationale = non_empty(assessment, "rationale");
     let deviations = assessment.get("deviations").and_then(Value::as_array);
@@ -204,6 +221,11 @@ pub fn validate_food_identity_match_v1(assessment: &Value) -> Result<(), Vec<Str
         })
         .map(|(attribute, _)| attribute.clone())
         .collect();
+    let all_differences_or_unknowns: BTreeSet<String> = relation_by_attribute
+        .iter()
+        .filter(|(_, relation)| matches!(relation.as_str(), "different" | "unknown"))
+        .map(|(attribute, _)| attribute.clone())
+        .collect();
 
     if outcome == Some("exact_match") {
         for required in REQUIRED_IDENTITY_ATTRIBUTES {
@@ -216,6 +238,11 @@ pub fn validate_food_identity_match_v1(assessment: &Value) -> Result<(), Vec<Str
         }
         if !hard_unknowns.is_empty() {
             errors.push(format!("exact_match cannot leave required identity attributes unknown/different: {hard_unknowns:?}"));
+        }
+        for (attribute, relation) in &relation_by_attribute {
+            if relation != "match" && relation != "not_applicable" {
+                errors.push(format!("exact_match cannot accept {attribute:?} relation {relation:?}"));
+            }
         }
         if !deviation_ids.is_empty() {
             errors.push("exact_match cannot declare identity deviations".to_owned());
@@ -232,10 +259,13 @@ pub fn validate_food_identity_match_v1(assessment: &Value) -> Result<(), Vec<Str
         if deviation_ids.is_empty() {
             errors.push("qualified_approximation requires explicit deviations".to_owned());
         }
-        for attribute in &hard_differences {
+        for attribute in &all_differences_or_unknowns {
             if !deviation_ids.contains(attribute) {
-                errors.push(format!("hard-block difference {attribute:?} must be explicitly declared as a deviation"));
+                errors.push(format!("difference/unknown for {attribute:?} must be explicitly declared as a deviation"));
             }
+        }
+        if scope == Some("nutrition_estimation") && !hard_differences.is_empty() {
+            errors.push(format!("nutrition_estimation cannot silently use hard-block identity differences as a nutrient proxy: {hard_differences:?}"));
         }
     }
 
