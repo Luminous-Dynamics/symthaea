@@ -2693,17 +2693,22 @@ fn fluidsynth_candidate_wav(
         std::process::id()
     ));
     symthaea_muse::midi_export::export_performance_midi(score, spec, seed, state, &path).ok()?;
-    // The state sliders stay authoritative; the piece's performance dialect only
-    // SHIFTS the room the way the tradition's recording practice would (wetter
-    // for ProcessExact, drier for DanceLocked/JazzLaidBack, bit-identical for
-    // ClassicalRubato/FolkLift). `room_for_dialect` was implemented and tested
-    // but had only test-only callers, so the dialect-conditioned room never
-    // reached audio — the production path used the unmodulated colour.
+    // State sliders remain authoritative for the base room color. The same
+    // performance dialect now selects both the room shift and the mastering
+    // profile, keeping native and FluidSynth renders on the same loudness/peak
+    // targets while testing a restrained spectral-balance hypothesis.
+    let dialect = symthaea_muse::theory_realize::dialect_for_spec(spec);
     let color = symthaea_muse::fluid_render::room_for_dialect(
         symthaea_muse::fluid_render::RenderColor::from_state(state),
-        symthaea_muse::theory_realize::dialect_for_spec(spec),
+        dialect,
     );
-    let wav = symthaea_muse::fluid_render::render_midi_to_wav(&path, SAMPLE_RATE, Some(color));
+    let mastering = symthaea_muse::auto_master::MasteringConfig::for_dialect(dialect);
+    let wav = symthaea_muse::fluid_render::render_midi_to_wav_with_mastering(
+        &path,
+        SAMPLE_RATE,
+        Some(color),
+        &mastering,
+    );
     let _ = std::fs::remove_file(&path);
     wav
 }
