@@ -877,6 +877,7 @@ fn observe_asset_root(path: &Path) -> RootObservation {
             canonical_path: Some(canonical_path),
             content_manifest_sha256: None,
             wav_file_count: None,
+            wav_relative_paths: None,
             error: Some(error.to_string()),
         };
     }
