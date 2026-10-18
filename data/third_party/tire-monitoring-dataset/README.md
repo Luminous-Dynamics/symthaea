@@ -1,0 +1,21 @@
+# Third-party data: Tire Monitoring Dataset
+
+## Attribution and license
+- Upstream repository: https://github.com/kerzeyc/tire-monitoring-dataset
+- Upstream file: `tire_monitoring_dataset.csv`
+- Upstream Git blob SHA-1: `0029b6f156847ecc052f57ae45fd025ad032d086`
+- License stated by upstream: Creative Commons Attribution 4.0 International (CC BY 4.0).
+- The exact upstream license text is preserved in `LICENSE.txt`.
+- The upstream README is preserved in `README.upstream.md`; it currently says the formal academic citation is to be updated.
+
+This dataset copy is split into ordered text shards solely because the repository upload interface rejected the 7.8 MB monolithic file. No row was filtered, reordered or changed. Concatenate `tire_monitoring_dataset.csv.part-0001` through `tire_monitoring_dataset.csv.part-0009` in ascending numeric order without adding separators to reconstruct the source file. Shards preserve the upstream CSV line endings and leading UTF-8 BOM.
+
+## Verification notes
+- Upstream blob SHA-1: `0029b6f156847ecc052f57ae45fd025ad032d086` (this is GitHub's Git object SHA-1, not a SHA-256 digest).
+- Retrieved content length before sharding: 7808266 JavaScript characters.
+- Shards: 9; row/header count: 210128 newline-terminated records plus final-line accounting per original content.
+- Full-file SHA-256 is not asserted by this intake note. Compute it over the reconstructed bytes on the validation host.
+- Use `Unit_ID` as the group/split unit; never randomly mix samples from one acquisition segment across train and test.
+- Vehicle scope: passenger-car 205/55 R16 pressure/temperature/speed monitoring, not motorcycle tire force, wet grip, wear, impact, or structural safety.
+
+The dataset is CC BY 4.0 and must be attributed. It remains third-party-licensed material; it is not under the repository's primary code license.
