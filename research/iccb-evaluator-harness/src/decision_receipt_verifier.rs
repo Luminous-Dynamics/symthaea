@@ -11,7 +11,7 @@ use iccb_evaluator::decision_receipt::{DecisionReceipt, DecisionRunContext};
 const SUPPORTED_RECEIPT_SCHEMA: &str = "iccb-decision-receipt-v1";
 const SUPPORTED_CANONICALIZATION_VERSION: &str = "iccb-canonical-binary-v1";
 use iccb_evaluator::uncertainty_contract::{
-    CompatibleAnalysisRoute, UncertaintyEvidenceKind, UncertaintyRoutingReceipt,
+    CompatibleAnalysisRoute, UncertaintyEvidenceKind,
 };
 use iccb_evaluator::{
     CandidateScenario, EvaluationReceipt, EvidenceState, OptionEvaluation, RejectionReason,
@@ -468,8 +468,14 @@ mod tests {
     fn independent_verifier_accepts_frozen_golden_receipt() {
         let scenario = scenario();
         let context = context(b"canonical-manifest-v1", &scenario.id);
-        verify_decision_receipt_independently(&context, &scenario, &frozen_golden_receipt())
-            .unwrap();
+        let golden = frozen_golden_receipt();
+        let emitted = iccb_evaluator::decision_receipt::create_decision_receipt(
+            &context,
+            &scenario,
+        )
+        .unwrap();
+        assert_eq!(emitted, golden);
+        verify_decision_receipt_independently(&context, &scenario, &golden).unwrap();
     }
 
     #[test]
