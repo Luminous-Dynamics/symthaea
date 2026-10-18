@@ -166,7 +166,7 @@ pub fn evaluate_temporal_holdout(
                     && record.order_in_session <= prior_order)
             {
                 issues.push(BenchmarkIssue::ParticipantChronologyViolation {
-                    participant_token: participant.clone(),
+                    participant_token: participant.as_str().to_owned(),
                     sequence: record.collection_sequence,
                 });
             }
