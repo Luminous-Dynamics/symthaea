@@ -47,6 +47,16 @@ cargo run -q -p xtask -- cropfoundry-audit-csv \
   --out reports/cropfoundry/udea-csv-audit.json
 ```
 
+If an independently trusted file-level checksum is available, supply it with `--expected-sha256 <64-hex-digest>`; the audit will fail when it does not match. A digest computed from the file itself is useful for reproducibility but does not prove that the file came from the claimed source. The current Zenodo page lists an MD5 digest rather than a SHA-256 for this CSV, so do not invent an expected SHA-256 or call the artifact identity verified merely because a local digest was produced.
+
+```bash
+# Optional only when a trustworthy SHA-256 exists for the exact artifact:
+cargo run -q -p xtask -- cropfoundry-audit-csv \
+  --input /path/to/DB_Mobile_Manual_Tomato.csv \
+  --expected-sha256 <64-hex-digest>
+
+```
+
 Do not pass `--expected-data-records` until the canonical file's exact record-count semantics have been reconciled. The command binds to DS-010's canonical record URI and computes a SHA-256 digest over the exact local bytes. It reports header duplication, missing required fields, row-width anomalies, record count, per-column blank/zero/numeric counts, unique/missing Plant/Date/Treatment values, duplicate Plant-Date keys and unitless measurement headers. It writes no normalized training data and always reports `training_authorized: false`.
 
 The audit is intentionally descriptive rather than a source-backed adjudication. A unitless weight field is a warning, not permission to infer grams or kilograms. A zero harvested weight may be a valid early-season observation, not missingness. An audit receipt does not validate license terms, agronomic quality, a model split, or crop performance.
