@@ -125,6 +125,18 @@ All thresholds are proposals for engineering prioritization. Finalize them from 
 
 The 10% relative MAE target is a proposed engineering hurdle, not a published standard or clinical threshold. The calibration target is provisional and meaningful only with enough held-out observations. If pilot data show the margins are not reliable or practically meaningful, revise the plan before preregistration, never after confirmatory results are known.
 
+## Deterministic temporal baseline evaluator
+
+The Rust module src/listener_response_benchmark.rs provides an evaluator for a global temporal cutoff. It reports MAE for four predictors of self-reported pre/post change: no change, a training-only population mean change, a listener-history mean change, and a population/personal shrinkage baseline. The personal estimate only uses prior sessions from that listener; another presentation in the same session is never treated as personal history. The report exposes scored counts, personal-history coverage, the training prior, and an embargoed interval between training and test windows.
+
+Each record includes collection_sequence, a monotonic study-local ordinal assigned at collection. It is not a wall-clock time. The evaluator rejects duplicate sequences/episode IDs, unsupported schema versions, unconfirmed consent, malformed record fields, reversed participant session order, invalid cutoffs, and empty train/test partitions. Records between cutoffs are embargoed. Missing outcomes remain excluded from channel MAE and are reported separately.
+
+This is a deterministic baseline evaluator, not a learned model and not a causal estimator. It asks whether added personalization beats simple baselines on later observations; it cannot establish that music caused the reported change.
+
+## Additional methodological finding
+
+A 2025 RecSys paper, “Time to Split: Exploring Data Splitting Strategies for Offline Evaluation of Sequential Recommenders,” reports that split design can change offline model rankings and that global temporal splitting protects against future-data leakage. We adopt an explicit global ordinal and separate future holdout to make the evaluation task auditable: https://doi.org/10.1145/3705328.3748164
+
 ## Execution plan
 
 1. **Schema tranche (this PR):** land the Rust record, fail-closed range/digest validation, JSON round-trip tests, and tests proving missing responses remain missing.
@@ -140,6 +152,7 @@ Run from repository root:
 
 - cargo fmt --manifest-path crates/domains/symthaea-muse/Cargo.toml -- --check
 - cargo test -p symthaea-muse --lib listener_response::tests
+- cargo test -p symthaea-muse --lib listener_response_benchmark::tests
 - cargo test -p symthaea-muse --lib
 
 These commands have not been run in the authoring environment. Passing CI or a workflow that is pending/queued is not a pass. Schema tests cannot establish model accuracy or positive listener outcomes.
