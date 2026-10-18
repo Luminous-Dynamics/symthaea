@@ -283,6 +283,16 @@
       "proposed_target": "First reproduce a source-reported baseline where its exact configuration and split are available. For one preregistered primary task, then target either +5 percentage points macro-F1 or at least 10% relative reduction in count MAE versus the pinned eligible baseline, with no more than 2 percentage-point loss in recall for any ripeness class and no split leakage. Thresholds are provisional engineering goals.",
       "split_protocol": "Use the dataset's published block-grouped split only after inspection confirms its semantics and integrity; otherwise freeze a capture-block split by source video/sequence before tuning. Check exact duplicates and near-duplicates, preserve modality strata (close-range versus drone), pin all resize/mask transforms, and reserve the test partition for one final evaluation. Report source-site and modality limits explicitly.",
       "status": "not_evaluable_until_imagery_snapshot_and_splits_pinned"
+    },
+    {
+      "id": "CF-018",
+      "category": "causal_intervention",
+      "name": "Treatment-effect evidence and intervention-policy validity",
+      "question": "When the experimental design supports causal identification, can the system estimate treatment effects and select interventions that improve a predeclared outcome on held-out blocks/site-years without confusing association with causation?",
+      "primary_metric": "Absolute error and interval coverage for treatment-effect estimates on held-out experimental units, policy value or regret against a declared comparator, and count of unsupported causal claims",
+      "proposed_target": "Only on datasets with documented randomization or a prespecified defensible causal identification strategy, compare against a simple design-appropriate statistical baseline; target calibrated treatment-effect intervals and lower held-out decision regret without violating safety/resource constraints. If assignment mechanism, blocks, replication, or major confounders cannot be established, causal benchmark status remains blocked and outputs must be labeled associational.",
+      "split_protocol": "Before outcome analysis, pin the allocation mechanism, experimental unit, blocks/replicates, treatments, baseline/comparator, environment, time window, outcomes, exclusions, and causal estimand. Split by independent blocks/site-years and respect treatment assignment. Avoid leakage from repeated observations or post-treatment variables. Compare on held-out units; report uncertainty and sensitivity to assumptions.",
+      "status": "not_evaluable_until_experimental_design_documented"
     }
   ],
   "first_milestone_exit_criteria": [
