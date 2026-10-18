@@ -49,7 +49,8 @@ fn identity_record_errors(record: &Value, label: &str, errors: &mut Vec<String>)
         }
         _ => errors.push(format!("{label}.names must be a non-empty array")),
     }
-    let identity = record.get("identity").unwrap_or(&Value::Null);
+    let null = Value::Null;
+    let identity = record.get("identity").unwrap_or(&null);
     if !identity.is_object() {
         errors.push(format!("{label}.identity must be an object"));
         return;
@@ -306,13 +307,15 @@ mod tests {
                 "record_id": "synthetic:query-potato",
                 "source_ref": "synthetic:source-a",
                 "source_version": "fixture-v1",
-                "names": [{"text":"potato","language_tag":"en-ZA"},{"text":"izambane","language_tag":"zu-ZA"}]
+                "names": [{"text":"potato","language_tag":"en-ZA"},{"text":"izambane","language_tag":"zu-ZA"}],
+                "identity": {"taxon_id":"taxon:solanum-tuberosum","food_part":"tuber","processing_state":"whole","preparation_state":"raw","product_kind":"whole_food","edible_basis":"edible_portion_100g","preservation":"fresh","brand_id":null,"fortification":null,"cultivar":null,"origin_region":null}
             },
             "candidate_record": {
                 "record_id": "synthetic:candidate-potato",
                 "source_ref": "synthetic:source-b",
                 "source_version": "fixture-v1",
-                "names": [{"text":"potato","language_tag":"en-US"},{"text":"potato, flesh and skin, raw","language_tag":"en-US"}]
+                "names": [{"text":"potato","language_tag":"en-US"},{"text":"potato, flesh and skin, raw","language_tag":"en-US"}],
+                "identity": {"taxon_id":"taxon:solanum-tuberosum","food_part":"tuber","processing_state":"whole","preparation_state":"raw","product_kind":"whole_food","edible_basis":"edible_portion_100g","preservation":"fresh","brand_id":null,"fortification":null,"cultivar":null,"origin_region":null}
             },
             "attribute_checks": [
                 {"attribute_id":"taxon_id","query_value":"taxon:solanum-tuberosum","candidate_value":"taxon:solanum-tuberosum","relation":"match"},
@@ -389,6 +392,7 @@ mod tests {
         let mut value = assessment();
         value["outcome"] = json!("review_required");
         value["attribute_checks"][0]["candidate_value"] = Value::Null;
+        value["candidate_record"]["identity"]["taxon_id"] = Value::Null;
         value["attribute_checks"][0]["relation"] = json!("unknown");
         assert!(validate_food_identity_match_v1(&value).is_ok());
     }
