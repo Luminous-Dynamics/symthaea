@@ -10,7 +10,8 @@
     "REJECT",
     "CRYPTOGRAPHICALLY_VALID_CURRENT_AUTHORIZATION_DENIED",
     "VALID_SIGNATURE_TIMESTAMP_NOT_TRUSTED",
-    "REJECT_ONLINE_ACTION_REPLAY"
+    "REJECT_ONLINE_ACTION_REPLAY",
+    "UNRESOLVED_NO_ROLLBACK_CHECKPOINT"
   ],
   "stage_statuses": [
     "PASS",
@@ -278,16 +279,55 @@
     },
     {
       "id": "CPAE-019",
-      "class": "malformed_or_oversized_input",
-      "setup": "Verifier receives an attestation document.",
-      "mutation": "Supply malformed digest bytes, empty/noncanonical key ID, unsupported schema/algorithm, or over-limit fields; split into independently identified subcases during implementation.",
+      "class": "malformed_digest",
+      "setup": "Verifier receives a statement with a digest field.",
+      "mutation": "Provide a digest with invalid length, non-hex characters, or a non-SHA-256 algorithm label.",
       "expected_outcome": "REJECT",
       "expected_stages": {
         "statement_schema": "FAIL"
       },
       "hard_gate": true,
       "scientific_status": "UNCHANGED_FROM_SUBJECT",
-      "rationale": "The final executable corpus must materialize each listed mutation as an independently counted case."
+      "rationale": "Digest syntax and algorithm are checked before cryptographic verification."
+    },
+    {
+      "id": "CPAE-026",
+      "class": "noncanonical_signer_id",
+      "setup": "Verifier receives an attestation with a signer key ID.",
+      "mutation": "Use an empty key ID, surrounding whitespace, control characters, or a duplicate canonical identity.",
+      "expected_outcome": "REJECT",
+      "expected_stages": {
+        "statement_schema": "FAIL"
+      },
+      "hard_gate": true,
+      "scientific_status": "UNCHANGED_FROM_SUBJECT",
+      "rationale": "Ambiguous identity encodings can bypass authorization policy."
+    },
+    {
+      "id": "CPAE-027",
+      "class": "unsupported_schema_or_algorithm",
+      "setup": "Verifier receives an otherwise well-formed attestation.",
+      "mutation": "Use an unrecognized attestation schema version or algorithm tag.",
+      "expected_outcome": "REJECT",
+      "expected_stages": {
+        "statement_schema": "FAIL"
+      },
+      "hard_gate": true,
+      "scientific_status": "UNCHANGED_FROM_SUBJECT",
+      "rationale": "Unknown semantics must not silently fall back to permissive verification."
+    },
+    {
+      "id": "CPAE-028",
+      "class": "oversized_fields",
+      "setup": "Verifier receives a syntactically valid attestation.",
+      "mutation": "Exceed configured limits for signature, key ID, purpose identifier, or variable-length payload fields.",
+      "expected_outcome": "REJECT",
+      "expected_stages": {
+        "statement_schema": "FAIL"
+      },
+      "hard_gate": true,
+      "scientific_status": "UNCHANGED_FROM_SUBJECT",
+      "rationale": "Bound resource use before decoding, allocating, or invoking crypto providers."
     },
     {
       "id": "CPAE-020",
@@ -326,7 +366,7 @@
       "expected_stages": {
         "signature": "PASS",
         "signer_lifecycle": "PASS",
-        "scientific_status": "PASS"
+        "scientific_status": "NOT_RUN"
       },
       "hard_gate": true,
       "scientific_status": "NOT_RUN",
@@ -363,13 +403,13 @@
       "class": "stateless_rollback_limit",
       "setup": "Verifier has no durable trust checkpoint and receives a fresh valid snapshot.",
       "mutation": "Ask the verifier to assert it has proved non-rollback despite having no remembered checkpoint or external checkpoint.",
-      "expected_outcome": "AUTHENTIC_ENDORSEMENT",
+      "expected_outcome": "UNRESOLVED_NO_ROLLBACK_CHECKPOINT",
       "expected_stages": {
         "trust_freshness": "UNRESOLVED"
       },
       "hard_gate": true,
       "scientific_status": "UNCHANGED_FROM_SUBJECT",
-      "rationale": "Do not claim monotonicity without a checkpoint; final policy determines whether this limitation allows endorsement."
+      "rationale": "Without a durable or external checkpoint, the verifier cannot prove non-rollback; fail closed or expose an explicitly unresolved limitation rather than claiming monotonicity."
     }
   ]
 }
