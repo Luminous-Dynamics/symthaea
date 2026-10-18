@@ -50,6 +50,28 @@ Every recommendation carries a prediction interval, applicability domain, proven
 
 Include farmer-defined utility, local culinary knowledge, indigenous crop priorities, labor realities, seed sovereignty, and consent. Do not scrape or publish sensitive location or traditional knowledge without appropriate permissions. Public data does not automatically authorize unrestricted redistribution of every derived dataset.
 
+## Additional paradigm shift: optimize breeding programs, not just candidate rankings
+
+A July 2026 review, [Click Breeding: Toward programmable crop design](https://www.sciencedirect.com/science/article/pii/S1360138526002104), argues that genomic prediction alone can struggle to generalize across environments for complex polygenic traits and describes AI agents that generate and evaluate multi-generation breeding strategies under explicit objectives, constraints, and uncertainty. A 2026 systematic review of agricultural digital twins likewise highlights continuing interoperability and field-validation gaps ([review](https://doi.org/10.1016/j.atech.2026.102283)).
+
+Treat these papers as research directions, not proof that general autonomous breeding agents already work. CropFoundry therefore adds CF-013, a **multi-generation breeding-policy value** benchmark. It is explicitly not evaluable until reliable genotype, pedigree and phenotype histories—and a defensible retrospective simulator or program—exist. First compare sequential policies with a greedy candidate-ranking baseline on synthetic and historical replay under equal budgets, with strict future-information leakage prevention. A simulated improvement is not a realized breeding gain; prospective agronomic validation remains a separate gate.
+
+This suggests a useful long-term transition:
+
+```text
+rank current candidates
+        ↓
+plan a constrained breeding policy over generations
+        ↓
+select the next experiment with high decision value
+        ↓
+measure actual offspring and environments
+        ↓
+update uncertainty and next-generation decisions
+```
+
+Each arrow needs its own evidence contract. If pedigree, genotype, license, or phenotype history is absent, the system must say so and stop short of a breeding-policy claim.
+
 ## System boundaries
 
 - **Symthaea:** evidence-aware reasoning, candidate generation, uncertainty handling, multi-objective ranking, experiment selection, and recommendation receipts.
