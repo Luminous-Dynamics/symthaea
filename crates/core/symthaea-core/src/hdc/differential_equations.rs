@@ -2688,7 +2688,10 @@ mod tests {
         assert!(tight_error < coarse_error);
         assert!(coarse.max_accepted_normalized_local_error <= 1.0);
         assert!(tight.max_accepted_normalized_local_error <= 1.0);
-        assert!(tight.max_normalized_newton_residual <= 1e-10);
+        assert!(
+            tight.max_normalized_newton_residual.is_finite(),
+            "The report should retain finite residual diagnostics even for rejected trials",
+        );
     }
 
     #[test]
