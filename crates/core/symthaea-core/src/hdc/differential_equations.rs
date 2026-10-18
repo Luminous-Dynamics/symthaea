@@ -1579,7 +1579,52 @@ impl DifferentialEquationsEngine {
                     ));
                 }
 
-                let mut jacobian = vec![0.0_f64; matrix_len];
+                let mut jacobian_matrix = vec![0.0_f64; matrix_len];
+                if let Some(jacobian_fn) = jacobian {
+                    if *jacobian_evaluations >= MAX_IMPLICIT_JACOBIAN_EVALUATIONS {
+                        return Err(ImplicitEulerError::new(
+                            ImplicitEulerErrorKind::JacobianEvaluationBudgetExceeded {
+                                max_evaluations: MAX_IMPLICIT_JACOBIAN_EVALUATIONS,
+                            },
+                            *t_values.last().unwrap_or(&t0), &y, step,
+                            total_corrections, rhs_evaluations, step_residual_norm
+                        ));
+                    }
+                    *jacobian_evaluations += 1;
+                    let rhs_jacobian = jacobian_fn(t_next, &y_next);
+                    if rhs_jacobian.len() != matrix_len {
+                        return Err(ImplicitEulerError::new(
+                            ImplicitEulerErrorKind::JacobianDimensionMismatch {
+                                expected: matrix_len,
+                                actual: rhs_jacobian.len(),
+                            },
+                            *t_values.last().unwrap_or(&t0), &y, step,
+                            total_corrections, rhs_evaluations, step_residual_norm
+                        ));
+                    }
+                    if let Some(index) = rhs_jacobian.iter().position(|value| !value.is_finite()) {
+                        return Err(ImplicitEulerError::new(
+                            ImplicitEulerErrorKind::NonFiniteProvidedJacobian { index },
+                            *t_values.last().unwrap_or(&t0), &y, step,
+                            total_corrections, rhs_evaluations, step_residual_norm
+                        ));
+                    }
+                    for row in 0..dimension {
+                        for column in 0..dimension {
+                            let index = row * dimension + column;
+                            let identity = if row == column { 1.0 } else { 0.0 };
+                            let entry = identity - h * rhs_jacobian[index];
+                            if !entry.is_finite() {
+                                return Err(ImplicitEulerError::new(
+                                    ImplicitEulerErrorKind::NonFiniteJacobian { row, column },
+                                    *t_values.last().unwrap_or(&t0), &y, step,
+                                    total_corrections, rhs_evaluations, step_residual_norm
+                                ));
+                            }
+                            jacobian_matrix[index] = entry;
+                        }
+                    }
+                } else {
                 for column in 0..dimension {
                     let original = y_next[column];
                     let perturbation_scale = original.abs().max(state_scales[column]);
@@ -1628,13 +1673,15 @@ impl DifferentialEquationsEngine {
                                 total_corrections, rhs_evaluations, step_residual_norm
                             ));
                         }
-                        jacobian[row * dimension + column] = entry;
+                        jacobian_matrix[row * dimension + column] = entry;
                     }
                 }
 
+
+                }
                 let mut correction: Vec<f64> = residual.iter().map(|value| -*value).collect();
                 if let Err((column, pivot_magnitude)) =
-                    implicit_euler_solve_dense(&mut jacobian, &mut correction, dimension)
+                    implicit_euler_solve_dense(&mut jacobian_matrix, &mut correction, dimension)
                 {
                     let kind = if pivot_magnitude.is_finite() {
                         ImplicitEulerErrorKind::SingularJacobian { column, pivot_magnitude }
