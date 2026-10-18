@@ -24,6 +24,17 @@ int main(int argc, char **argv) {
         return 64;
     }
 
+    if (argv[1][0] == '\\0') {
+        fputs("PULSE_TICKS must be a non-negative decimal integer\\n", stderr);
+        return 65;
+    }
+    for (const char *p = argv[1]; *p != '\\0'; ++p) {
+        if (*p < '0' || *p > '9') {
+            fputs("PULSE_TICKS must be a non-negative decimal integer\\n", stderr);
+            return 65;
+        }
+    }
+
     errno = 0;
     ticks = strtoul(argv[1], &end, 10);
     if (errno != 0 || end == argv[1] || *end != '\0') {
