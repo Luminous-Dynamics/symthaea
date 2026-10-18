@@ -26,9 +26,13 @@ jq -e '.schema_version == "symthaea.rea-differential-manifest.v1" and (.cases | 
     fail "invalid manifest schema or unexpected case count"
 jq -e '.schema_version == "symthaea.rea-differential-oracle.v1" and (.expected_cases | keys | length) == 6' "$ORACLE" >/dev/null ||
     fail "invalid oracle schema or unexpected case count"
+manifest_ids=$(jq -r '.cases[].id' "$MANIFEST" | sort | tr '\\n' ' ')
+oracle_ids=$(jq -r '.expected_cases | keys[]' "$ORACLE" | sort | tr '\\n' ' ')
+[ "$manifest_ids" = "$oracle_ids" ] || fail "manifest case IDs do not match oracle case IDs"
 
 work=$(mktemp -d "${TMPDIR:-/tmp}/rea-differential-v1.XXXXXX")
-trap 'rm -rf "$work"' 0 HUP INT TERM
+trap 'rm -rf "$work"' 0
+trap 'exit 1' HUP INT TERM
 
 compile_profile() {
     profile_id=$1
@@ -45,13 +49,13 @@ compile_profile() {
 }
 
 compile_profile threshold12_o0_debug "$work/threshold12_o0_debug" \
-    -std=c11 -O0 -g -DDEBOUNCE_THRESHOLD_TICKS=12
+    -std=c11 -Wall -Wextra -Werror -pedantic -O0 -g -DDEBOUNCE_THRESHOLD_TICKS=12
 compile_profile threshold12_o2_stripped "$work/threshold12_o2_stripped" \
-    -std=c11 -O2 -s -DDEBOUNCE_THRESHOLD_TICKS=12
+    -std=c11 -Wall -Wextra -Werror -pedantic -O2 -s -DDEBOUNCE_THRESHOLD_TICKS=12
 compile_profile threshold20_o0_debug "$work/threshold20_o0_debug" \
-    -std=c11 -O0 -g -DDEBOUNCE_THRESHOLD_TICKS=20
+    -std=c11 -Wall -Wextra -Werror -pedantic -O0 -g -DDEBOUNCE_THRESHOLD_TICKS=20
 compile_profile threshold20_o2_stripped "$work/threshold20_o2_stripped" \
-    -std=c11 -O2 -s -DDEBOUNCE_THRESHOLD_TICKS=20
+    -std=c11 -Wall -Wextra -Werror -pedantic -O2 -s -DDEBOUNCE_THRESHOLD_TICKS=20
 
 sha256() {
     sha256sum "$1" | awk '{print $1}'
