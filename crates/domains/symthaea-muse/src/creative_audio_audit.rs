@@ -384,7 +384,7 @@ mod tests {
             duration: 0.7,
             velocity: 0.7,
         }];
-        let rendered = crate::render_notes(
+        let rendered = crate::synth::render_notes(
             &notes,
             44_100,
             44_100,
