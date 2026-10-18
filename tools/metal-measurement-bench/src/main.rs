@@ -283,10 +283,11 @@ fn validate_manifest(manifest: &SourceManifest) -> Result<()> {
         return Err(AdapterError::Validation("target_specimen_count must be positive".into()));
     }
     if manifest.reuse_policy.repository_bundling_authorized
-        && !manifest.reuse_policy.artifact_terms_reviewed
+        && (!manifest.reuse_policy.artifact_terms_reviewed
+            || !manifest.reuse_policy.local_use_authorized)
     {
         return Err(AdapterError::Validation(
-            "repository bundling cannot be authorized before artifact-specific terms review".into(),
+            "repository bundling requires artifact-specific terms review and local-use authorization".into(),
         ));
     }
     if manifest.reuse_policy.local_use_authorized
@@ -752,6 +753,17 @@ mod tests {
         validate_manifest(&value).unwrap();
         assert!(value.artifacts.is_empty());
         assert!(!value.reuse_policy.artifact_terms_reviewed);
+    }
+
+    #[test]
+    fn repository_bundling_requires_review_and_local_use() {
+        let mut value = manifest();
+        value.reuse_policy.artifact_terms_reviewed = true;
+        value.reuse_policy.repository_bundling_authorized = true;
+        assert!(validate_manifest(&value).is_err());
+
+        value.reuse_policy.local_use_authorized = true;
+        assert!(validate_manifest(&value).is_ok());
     }
 
     #[test]
