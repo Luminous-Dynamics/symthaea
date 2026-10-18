@@ -1,7 +1,8 @@
 //! Decision-theoretic value of information for capital diligence.
 //!
-//! Estimates the expected value of a specified noisy signal before paying for
-//! it. Inputs are explicit synthetic/elicited priors, likelihoods and payoffs;
+//! Estimates the expected value of one noisy measurement before paying for it.
+//! Its modeled outcomes are mutually exclusive and exhaustive per state.
+//! Inputs are explicit synthetic/elicited priors, likelihoods and payoffs;
 //! this module does not infer calibrated probabilities from raw evidence.
 
 const BPS: i128 = 10_000;
@@ -19,13 +20,16 @@ pub struct InformationState {
 #[derive(Clone, Debug, PartialEq, Eq)]
 pub struct SignalLikelihood {
     pub state_id: String,
-    /// Probability of this signal conditional on this state, in basis points.
+    /// Probability of this outcome conditional on this state, in basis points.
     pub likelihood_bps: u32,
 }
 
 #[derive(Clone, Debug, PartialEq, Eq)]
+/// One possible, mutually exclusive outcome of a single measurement action.
+#[derive(Clone, Debug, PartialEq, Eq)]
 pub struct SignalOutcome {
     pub id: String,
+    /// P(this outcome | each state); the set of outcome likelihoods sums to 1 per state.
     pub likelihoods: Vec<SignalLikelihood>,
 }
 
@@ -142,7 +146,7 @@ impl ValueOfInformationScenario {
                 }
             }
 
-            // A zero-probability signal never affects the expected value; retain a
+            // A zero-probability outcome never affects expected value; retain a
             // deterministic action choice for complete, reproducible reports.
             let chosen_action_id = best_action_id
                 .expect("validated action set must be non-empty")
