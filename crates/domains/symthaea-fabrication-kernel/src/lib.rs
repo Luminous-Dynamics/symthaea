@@ -32,6 +32,7 @@ pub mod evidence_compaction;
 pub mod evidence_retention;
 pub mod execution_guard;
 pub mod fdm_benchmark;
+pub mod fdm_spatial_benchmark;
 pub mod export;
 pub mod fault_injection;
 pub mod gateway_consensus;
