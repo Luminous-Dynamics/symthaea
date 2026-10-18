@@ -37,6 +37,14 @@ pub enum BenchmarkPhase {
 pub struct FdmBenchmarkManifest {
     pub protocol_version: String,
     pub run_id: String,
+    /// Identity of this physical/synthetic specimen within the campaign.
+    pub specimen_id: String,
+    /// Coordinate-frame identity for the declared build position/orientation.
+    pub build_frame_id: String,
+    /// Nominal specimen origin in the declared frame, millimetres.
+    pub build_position_mm: [f64; 3],
+    /// Nominal specimen orientation in the declared frame, degrees.
+    pub build_orientation_deg: [f64; 3],
     pub phase: BenchmarkPhase,
     pub evidence_class: EvidenceClass,
     /// SHA-256 hex digests are identities, not signatures or safety approvals.
@@ -149,10 +157,18 @@ impl FdmBenchmarkManifest {
         for (name, value) in [
             ("protocol_version", self.protocol_version.as_str()),
             ("run_id", self.run_id.as_str()),
+            ("specimen_id", self.specimen_id.as_str()),
+            ("build_frame_id", self.build_frame_id.as_str()),
         ] {
             if value.trim().is_empty() {
                 issues.push(format!("manifest field {name} is empty"));
             }
+        }
+        if self.build_position_mm.iter().any(|value| !value.is_finite()) {
+            issues.push("build position must contain only finite coordinates".to_owned());
+        }
+        if self.build_orientation_deg.iter().any(|value| !value.is_finite()) {
+            issues.push("build orientation must contain only finite angles".to_owned());
         }
         for (name, value) in [
             ("protocol_digest", self.protocol_digest.as_str()),
@@ -433,6 +449,10 @@ mod tests {
         FdmBenchmarkManifest {
             protocol_version: "fdm-quality-v0.1".to_owned(),
             run_id: "run-001".to_owned(),
+            specimen_id: "specimen-001".to_owned(),
+            build_frame_id: "machine_base_frame".to_owned(),
+            build_position_mm: [100.0, 100.0, 0.0],
+            build_orientation_deg: [0.0, 0.0, 0.0],
             phase,
             evidence_class,
             protocol_digest: digest('a'),
@@ -552,6 +572,26 @@ mod tests {
         let result = evaluate_fdm_case(&input);
         assert_eq!(result.disposition, GeometryDisposition::NotEvaluable);
         assert!(result.issues.iter().any(|issue| issue.contains("leaks a discovery observation ID")));
+    }
+
+    #[test]
+    fn non_finite_build_position_blocks_evaluation() {
+        let mut input = case(EvidenceClass::Synthetic, Some(10.0), Some(0.0));
+        input.manifest.build_position_mm[0] = f64::NAN;
+        let result = evaluate_fdm_case(&input);
+        assert_eq!(result.disposition, GeometryDisposition::NotEvaluable);
+        assert!(result.issues.iter().any(|issue| issue.contains("build position")));
+    }
+
+    #[test]
+    fn empty_specimen_or_coordinate_frame_identity_blocks_evaluation() {
+        let mut input = case(EvidenceClass::Synthetic, Some(10.0), Some(0.0));
+        input.manifest.specimen_id.clear();
+        input.manifest.build_frame_id.clear();
+        let result = evaluate_fdm_case(&input);
+        assert_eq!(result.disposition, GeometryDisposition::NotEvaluable);
+        assert!(result.issues.iter().any(|issue| issue.contains("specimen_id")));
+        assert!(result.issues.iter().any(|issue| issue.contains("build_frame_id")));
     }
 
     #[test]
