@@ -60,6 +60,19 @@ Report acceptance rate, runtime, memory, contract-specific feature coverage, pai
 - Independently rate intent adherence, coherence, novelty, diversity, playability/listenability, and overall preference. Preserve disagreements; do not merge all dimensions into one score.
 - Report within-system and across-system diversity. A system can make each individual user's output more pleasing while narrowing collective diversity.
 
+#### Proposed staged evaluation protocol
+
+Use a discovery pilot and a separate confirmatory study; do not tune descriptors on the confirmatory set.
+
+- **Pilot only:** approximately 20 briefs spanning the five intent families, with multiple listeners per brief. Use this stage to find broken instructions, audio-level confounds, unusable rating scales, and prompt/rater variance. Treat all effect estimates as exploratory.
+- **Confirmatory planning target:** begin planning around 100 held-out briefs (about 20 per family) and five independent judgments per pair comparison. This is a starting design, not a guaranteed-power claim: repeated ratings share prompt and listener effects, so finalize sample size with a preregistered mixed-effects power simulation informed by the pilot before collecting confirmatory labels.
+- **Matched candidate budgets:** generate exactly eight candidates per system per brief where feasible, record all candidate IDs, and freeze the selection procedure in advance. If systems use different budgets, show generation cost and report a separate budget-matched comparison rather than hiding best-of-N selection.
+- **Blinding and playback:** hide system identity; randomize A/B position and brief order; use the same player/rendering chain; disclose loudness matching; check pre-normalization RMS/peak and near-silence so gain normalization cannot turn a silent render into a misleadingly comparable sample.
+- **Separate labels:** obtain overall pair preference plus separate ratings for intent adherence, coherence, structure, novelty, and listenability/musicality. Record ties or “no preference” separately, and report disagreement and rater-level effects rather than collapsing them into one scalar.
+- **Frozen analysis:** report pairwise preference with a 95% interval, prompt-family breakdowns, inter-rater reliability, and the best matched baseline. Calibrate automatic evaluators on training/pilot labels only, then report held-out accuracy, balanced accuracy, calibration and slice metrics. Do not promote an evaluator metric into a live reward loop solely because it correlates on the same prompts used to tune it.
+
+This is a prospective protocol, not a claim that the pilot or confirmatory study has run. The scale is deliberately staged: MIREX's symbolic continuation task provides a useful fixed-eight-samples/blind-rating precedent, while the 2025 human-preference study illustrates the scale needed to study metric-to-human correlations. Sources: https://www.music-ir.org/mirex/wiki/2026%3ASymbolic_Music_Generation and https://arxiv.org/abs/2506.19085.
+
 ### Gate D — cross-modal integration
 For a playable prototype, require:
 - all critical interaction paths pass deterministic smoke tests;
