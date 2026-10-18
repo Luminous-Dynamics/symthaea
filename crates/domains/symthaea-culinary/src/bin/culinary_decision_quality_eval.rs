@@ -387,8 +387,9 @@ fn evaluate(corpus: &Value, policy_report: &Value) -> Result<Value, String> {
         per_case.push(scored);
     }
 
+    let output_ids: BTreeSet<String> = outputs_by_id.keys().cloned().collect();
     let missing_ids: BTreeSet<String> = expected_ids
-        .difference(&outputs_by_id.keys().cloned().collect())
+        .difference(&output_ids)
         .cloned()
         .collect();
     let structural_errors = missing_ids.len() + duplicate_ids.len() + unknown_ids.len();
