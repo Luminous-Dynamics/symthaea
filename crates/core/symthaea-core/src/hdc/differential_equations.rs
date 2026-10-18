@@ -147,6 +147,10 @@ pub enum HeatEquationError {
     DimensionMismatch { expected: usize, actual: usize },
     /// A non-empty interior grid is required.
     EmptyGrid,
+    /// A two-dimensional heat grid requires at least two interior points per axis.
+    GridTooSmall2D { nx: usize, ny: usize },
+    /// The two-dimensional grid area cannot be represented as a usize.
+    DimensionProductOverflow { nx: usize, ny: usize },
     /// Thermal diffusivity must be finite and strictly positive.
     InvalidDiffusivity,
     /// Domain length must be finite and strictly positive.
@@ -173,6 +177,13 @@ impl std::fmt::Display for HeatEquationError {
                 "initial condition length {actual} does not match grid size {expected}"
             ),
             Self::EmptyGrid => write!(f, "grid must contain at least one interior point"),
+            Self::GridTooSmall2D { nx, ny } => write!(
+                f,
+                "2-D heat grid needs at least two interior points per axis; got ({nx}, {ny})"
+            ),
+            Self::DimensionProductOverflow { nx, ny } => {
+                write!(f, "2-D heat grid area overflows usize for ({nx}, {ny})")
+            }
             Self::InvalidDiffusivity => write!(f, "thermal diffusivity must be finite and positive"),
             Self::InvalidLength => write!(f, "domain length must be finite and positive"),
             Self::InvalidEndTime => write!(f, "end time must be finite and non-negative"),
@@ -627,27 +638,11 @@ impl DifferentialEquationsEngine {
 
     // ── PDE: 2-D Heat Equation ────────────────────────────────────────────
 
-    /// Solve the 2-D heat equation on a rectangular domain
+    /// Solve the 2-D heat equation using the historical infallible API.
     ///
-    /// ```text
-    /// ∂u/∂t = α (∂²u/∂x² + ∂²u/∂y²),   u = 0 on boundary
-    /// u(x, y, 0) = u0(x, y)
-    /// ```
-    ///
-    /// using a 5-point stencil with explicit Euler time-stepping.
-    ///
-    /// **Stability**: requires `α dt (1/dx² + 1/dy²) ≤ 0.5`. The engine
-    /// enforces this automatically.
-    ///
-    /// # Arguments
-    ///
-    /// * `alpha`  — thermal diffusivity (> 0)
-    /// * `lx, ly` — domain dimensions [0, lx] × [0, ly]
-    /// * `t_end`  — integration end time
-    /// * `nx, ny` — number of interior grid points in each direction
-    /// * `u0`     — initial condition, row-major: u0[i * ny + j] = u(x_i, y_j, 0)
-    ///
-    /// Returns the final solution as a flat row-major array of size nx × ny.
+    /// Invalid data and a stability step count beyond MAX_STEPS panic rather
+    /// than silently clamping to an unsafe time step. Use
+    /// try_heat_equation_2d when recoverable errors are needed.
     pub fn heat_equation_2d(
         alpha: f64,
         lx: f64,
@@ -657,27 +652,95 @@ impl DifferentialEquationsEngine {
         ny: usize,
         u0: &[f64],
     ) -> PDE2DResult {
-        assert_eq!(u0.len(), nx * ny, "u0 length must equal nx * ny");
-        assert!(alpha > 0.0, "thermal diffusivity must be positive");
-        assert!(
-            nx >= 2 && ny >= 2,
-            "need at least 2 interior points per axis"
-        );
+        Self::try_heat_equation_2d(alpha, lx, ly, t_end, nx, ny, u0)
+            .expect("heat_equation_2d rejected invalid input or stability-budget overflow; use try_heat_equation_2d for recoverable errors")
+    }
 
-        let dx = lx / (nx + 1) as f64;
-        let dy = ly / (ny + 1) as f64;
+    /// Fallible 2-D explicit heat solver with a checked stability-step budget.
+    ///
+    /// The scheme must satisfy
+    /// alpha * dt * (1/dx^2 + 1/dy^2) <= 0.4. The method refuses requests
+    /// requiring more than MAX_STEPS; it never clamps a larger requirement
+    /// down to the budget and then labels the result successful.
+    pub fn try_heat_equation_2d(
+        alpha: f64,
+        lx: f64,
+        ly: f64,
+        t_end: f64,
+        nx: usize,
+        ny: usize,
+        u0: &[f64],
+    ) -> Result<PDE2DResult, HeatEquationError> {
+        let expected_len = nx
+            .checked_mul(ny)
+            .ok_or(HeatEquationError::DimensionProductOverflow { nx, ny })?;
+        if u0.len() != expected_len {
+            return Err(HeatEquationError::DimensionMismatch {
+                expected: expected_len,
+                actual: u0.len(),
+            });
+        }
+        if nx < 2 || ny < 2 {
+            return Err(HeatEquationError::GridTooSmall2D { nx, ny });
+        }
+        if !alpha.is_finite() || alpha <= 0.0 {
+            return Err(HeatEquationError::InvalidDiffusivity);
+        }
+        if !lx.is_finite() || lx <= 0.0 || !ly.is_finite() || ly <= 0.0 {
+            return Err(HeatEquationError::InvalidLength);
+        }
+        if !t_end.is_finite() || t_end < 0.0 {
+            return Err(HeatEquationError::InvalidEndTime);
+        }
+        if let Some(index) = u0.iter().position(|value| !value.is_finite()) {
+            return Err(HeatEquationError::NonFiniteInitialValue { index });
+        }
 
-        // CFL-safe time step: r_x + r_y = α·dt·(1/dx² + 1/dy²) ≤ 0.4
-        let dt_max = 0.4 / (alpha * (1.0 / (dx * dx) + 1.0 / (dy * dy)));
-        let n_steps = ((t_end / dt_max).ceil() as usize).max(1).min(MAX_STEPS);
+        let x_intervals = nx
+            .checked_add(1)
+            .ok_or(HeatEquationError::InvalidStabilityStep)?;
+        let y_intervals = ny
+            .checked_add(1)
+            .ok_or(HeatEquationError::InvalidStabilityStep)?;
+        let dx = lx / x_intervals as f64;
+        let dy = ly / y_intervals as f64;
+        if !dx.is_finite() || dx <= 0.0 || !dy.is_finite() || dy <= 0.0 {
+            return Err(HeatEquationError::InvalidStabilityStep);
+        }
+
+        let inverse_spacing_sum = 1.0 / (dx * dx) + 1.0 / (dy * dy);
+        let stability_rate = alpha * inverse_spacing_sum;
+        if !stability_rate.is_finite() || stability_rate <= 0.0 {
+            return Err(HeatEquationError::InvalidStabilityStep);
+        }
+        let dt_max = 0.4 / stability_rate;
+        if !dt_max.is_finite() || dt_max <= 0.0 {
+            return Err(HeatEquationError::InvalidStabilityStep);
+        }
+        let required_steps = (t_end / dt_max).ceil();
+        if !required_steps.is_finite() || required_steps < 0.0 {
+            return Err(HeatEquationError::InvalidStabilityStep);
+        }
+        if required_steps > MAX_STEPS as f64 {
+            return Err(HeatEquationError::StabilityBudgetExceeded {
+                required_steps,
+                max_steps: MAX_STEPS,
+            });
+        }
+
+        let n_steps = (required_steps as usize).max(1);
         let dt = t_end / n_steps as f64;
-
         let rx = alpha * dt / (dx * dx);
         let ry = alpha * dt / (dy * dy);
+        let stability_ratio = rx + ry;
+        if !stability_ratio.is_finite() || stability_ratio > 0.4 + 1e-12 {
+            return Err(HeatEquationError::UnstableTimestep {
+                ratio: stability_ratio,
+            });
+        }
 
         let mut u = u0.to_vec();
-
-        for _ in 0..n_steps {
+        for step in 0..n_steps {
             let mut u_new = u.clone();
             for i in 0..nx {
                 for j in 0..ny {
@@ -694,20 +757,22 @@ impl DifferentialEquationsEngine {
                     } else {
                         u[i * ny + (j + 1)]
                     };
-
                     u_new[idx] = u[idx]
                         + rx * (u_left - 2.0 * u[idx] + u_right)
                         + ry * (u_down - 2.0 * u[idx] + u_up);
+                    if !u_new[idx].is_finite() {
+                        return Err(HeatEquationError::NonFiniteSolution {
+                            step: step + 1,
+                            index: idx,
+                        });
+                    }
                 }
             }
             u = u_new;
         }
 
-        // Build spatial grids
         let x_grid: Vec<f64> = (1..=nx).map(|i| i as f64 * dx).collect();
         let y_grid: Vec<f64> = (1..=ny).map(|j| j as f64 * dy).collect();
-
-        // Phi: energy should decay monotonically for heat equation
         let initial_energy: f64 = u0.iter().map(|&v| v * v).sum::<f64>().sqrt();
         let final_energy: f64 = u.iter().map(|&v| v * v).sum::<f64>().sqrt();
         let energy_ratio = if initial_energy > 0.0 {
@@ -720,10 +785,9 @@ impl DifferentialEquationsEngine {
         } else {
             0.1
         };
-
         let encoding = Self::encode_pde_result(&u, "HEAT_EQ_2D");
 
-        PDE2DResult {
+        Ok(PDE2DResult {
             x_grid,
             y_grid,
             t_end,
@@ -734,7 +798,7 @@ impl DifferentialEquationsEngine {
             time_steps: n_steps,
             phi,
             encoding,
-        }
+        })
     }
 
     // ── Internal RK4 step ────────────────────────────────────────────────
@@ -1976,6 +2040,93 @@ mod tests {
             "Accepted timestep violated stability ratio: {ratio}"
         );
         assert_eq!(result.time_steps, 6);
+        assert!(result.u_final.iter().all(|value| value.is_finite()));
+    }
+
+    // ── 2-D heat equation stability-budget contract ───────────────────────
+
+    #[test]
+    fn test_heat_2d_rejects_stability_budget_overflow() {
+        // Explicit stability needs about 160k steps, beyond the 100k budget.
+        let nx = 400usize;
+        let ny = 400usize;
+        let u0 = vec![0.0; nx * ny];
+        let result = DifferentialEquationsEngine::try_heat_equation_2d(
+            0.01, 1.0, 1.0, 20.0, nx, ny, &u0,
+        );
+        assert!(matches!(
+            result,
+            Err(HeatEquationError::StabilityBudgetExceeded {
+                required_steps,
+                max_steps
+            }) if required_steps > max_steps as f64 && max_steps == MAX_STEPS
+        ));
+    }
+
+    #[test]
+    fn test_heat_2d_validates_grid_and_inputs() {
+        let u0 = vec![1.0; 16];
+        assert!(matches!(
+            DifferentialEquationsEngine::try_heat_equation_2d(
+                f64::NAN, 1.0, 1.0, 0.1, 4, 4, &u0,
+            ),
+            Err(HeatEquationError::InvalidDiffusivity)
+        ));
+        assert!(matches!(
+            DifferentialEquationsEngine::try_heat_equation_2d(
+                0.01, 0.0, 1.0, 0.1, 4, 4, &u0,
+            ),
+            Err(HeatEquationError::InvalidLength)
+        ));
+        assert!(matches!(
+            DifferentialEquationsEngine::try_heat_equation_2d(
+                0.01, 1.0, 1.0, f64::INFINITY, 4, 4, &u0,
+            ),
+            Err(HeatEquationError::InvalidEndTime)
+        ));
+        assert!(matches!(
+            DifferentialEquationsEngine::try_heat_equation_2d(
+                0.01, 1.0, 1.0, 0.1, 5, 4, &u0,
+            ),
+            Err(HeatEquationError::DimensionMismatch { .. })
+        ));
+        assert!(matches!(
+            DifferentialEquationsEngine::try_heat_equation_2d(
+                0.01, 1.0, 1.0, 0.1, 1, 4, &[0.0; 4],
+            ),
+            Err(HeatEquationError::GridTooSmall2D { .. })
+        ));
+        let mut bad_values = vec![0.0; 16];
+        bad_values[7] = f64::NAN;
+        assert!(matches!(
+            DifferentialEquationsEngine::try_heat_equation_2d(
+                0.01, 1.0, 1.0, 0.1, 4, 4, &bad_values,
+            ),
+            Err(HeatEquationError::NonFiniteInitialValue { index: 7 })
+        ));
+    }
+
+    #[test]
+    fn test_heat_2d_accepted_schedule_respects_stability_ratio() {
+        let nx = 4usize;
+        let ny = 4usize;
+        let length = 1.0_f64;
+        let alpha = 0.01_f64;
+        let t_end = 0.1_f64;
+        let u0 = vec![1.0; nx * ny];
+        let result = DifferentialEquationsEngine::try_heat_equation_2d(
+            alpha, length, length, t_end, nx, ny, &u0,
+        )
+        .expect("small valid 2-D heat solve should fit the stability budget");
+        let dx = length / (nx + 1) as f64;
+        let dy = length / (ny + 1) as f64;
+        let dt = t_end / result.time_steps as f64;
+        let ratio = alpha * dt * (1.0 / (dx * dx) + 1.0 / (dy * dy));
+        assert!(
+            ratio <= 0.4 + 1e-12,
+            "Accepted 2-D timestep violated stability ratio: {ratio}"
+        );
+        assert_eq!(result.time_steps, 1);
         assert!(result.u_final.iter().all(|value| value.is_finite()));
     }
 
