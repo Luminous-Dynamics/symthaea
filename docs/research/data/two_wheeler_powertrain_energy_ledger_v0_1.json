@@ -5,11 +5,13 @@
   "status": "frozen_expected_cases_not_yet_executed",
   "evidence_class": "Synthetic",
   "execution": {
-    "runner_connected": false,
-    "executed": false,
-    "independent_verifier_connected": false,
+    "rust_verifier_source_present": true,
+    "cli_command_wired": true,
+    "compiled_or_executed": false,
+    "independent_verifier_connected": true,
     "result": null,
-    "note": "All numeric values are synthetic fixtures for validating accounting rules, not measurements or predicted performance. The Rust verifier must be compiled and run before any pass claim."
+    "command": "cargo run -p xtask -- powertrain-energy-ledger --input docs/research/data/two_wheeler_powertrain_energy_ledger_v0_1.json",
+    "note": "The Rust source and CLI command are present in the PR, but they have not been compiled or executed in this environment. Numeric stream values are synthetic rule fixtures, not measurements."
   },
   "decision_vocabulary": [
     "ACCEPT_LEDGER_ONLY",
