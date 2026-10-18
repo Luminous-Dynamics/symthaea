@@ -13,10 +13,10 @@ The interface should remain JSON-compatible and implementable in Rust without im
 
 | System | Owns / supplies | Must not be treated as |
 |---|---|---|
-| **Symthaea Culinary** | Candidate generation/evaluation; typed objective definitions; hard-gate dispositions; baseline/scenario frontiers; explanations; rank-instability and robust-dominance results. | A source of live stock, legal authority, verified food safety, clinical advice, or physical outcomes. |
+| **Symthaea Culinary** | Per-recipe/per-meal candidate generation and evaluation; typed food/meal objective definitions; hard-gate dispositions; baseline/scenario frontiers; candidate explanations and robust-dominance results. | The community's multi-week production/delivery portfolio optimizer, source of live stock, legal authority, verified food safety, clinical advice, or physical outcomes. |
 | **Mycelix Commons / supplychain** | Canonical cooperative/product/lot/order/fulfilment events; producer claims and source references; consent/access policy; correction, supersession and recall lineage; rights-governed disclosure. | Proof that a physical claim is true merely because it is signed, replicated, attested or has a reputation score. An order or forecast is not fulfilled inventory. |
 | **Sol Atlas Leptos** | Read-only geospatial and temporal context: producer/pickup catchments, market areas, access corridors, seasonal/availability context where actually sourced, and privacy-preserving aggregate demand/coverage. | Canonical product identity, live inventory, nutrient truth, food-safety certification, or permission to expose exact household/farm locations. |
-| **Symtropy** | Deterministic, bounded what-if rehearsal of declared preparation/workcell, storage/transport or harvest mechanics where an adequate model exists; resource/time/energy estimates and synthetic trajectories with receipts. | Physical observation, a calibrated food-process model by default, food-safety validation, a forecast guaranteed to occur, or authorization to actuate hardware. |
+| **Symtropy** | Community food-supply portfolio comparison over a declared population and period; resource/time-window accounting; scenario arithmetic and value-of-information / measurement-action prioritization; optional deterministic, bounded rehearsal of declared preparation/workcell, storage/transport or harvest mechanics where an adequate model exists. | A duplicate ingredient/recipe truth catalogue, physical observation, a calibrated food-process model by default, food-safety validation, a forecast guaranteed to occur, or authorization to actuate hardware. |
 
 Existing work to compose rather than duplicate:
 - Mycelix [MYC-FOOD-001 #5001](https://github.com/Luminous-Dynamics/mycelix/issues/5001).
@@ -67,7 +67,7 @@ Symthaea candidate + gate evaluation + scenario-aligned robust Pareto report
                          |
               optional, declared what-if request
                          v
-Symtropy synthetic run + model/profile identity + run-health/trajectory receipt
+Symtropy portfolio/resource analysis or synthetic run + model/profile identity + run-health/trajectory receipt
                          |
                          v
 Symthaea compares simulated results as simulated evidence,
