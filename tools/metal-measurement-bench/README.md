@@ -1,12 +1,12 @@
 # Metal Measurement Evidence Adapter
 
-A Rust-first, fail-closed validator for source-bound manufacturing measurement datasets. The first profile is NIST AM Bench 2025 challenge AMB2025-02 (PBF-L IN718 tensile testing). This crate intentionally does not bundle NIST data.
+A Rust-first, fail-closed validator for source-bound manufacturing measurement datasets. The first profile is the historical NIST AM Bench 2025 challenge AMB2025-02 (PBF-L IN718 tensile testing). Its original submission deadline was August 29, 2025; this repository uses it as a public scientific-evaluation profile, not an active challenge submission. This crate intentionally does not bundle NIST data.
 
 ## Status boundary
 
 The current source manifest is metadata-only. Artifact-specific terms and local-use permissions have not been reviewed, so it declares no local artifacts and the tool rejects artifact verification until both manifest-level and per-artifact flags have been reviewed. Future artifact entries must bind source object ID/revision, access date, terms URL, byte count, digest, and explicit local-use/bundling permissions. A DOI is provenance, not a license grant.
 
-The source profile reports eight miniature tensile specimens excised from the same original AMB2022-01 specimen, AMB2022-718-AMMT-B7-P4. Do not row-randomize those sibling specimens into train/test and call the result independent-build validation. The manifest records that lineage as one held-out target group.
+The NIST source register separates the AMB2022-01 modeling-description, thermography, microstructure, residual-strain/stress/deflection, and serial-sectioning/XCT DOI records. These are candidate upstream references, not a claim that every file is used; exact feature/field selection must be reconciled to the official submission template. The source profile reports eight miniature tensile specimens excised from the same original AMB2022-01 specimen, AMB2022-718-AMMT-B7-P4. Do not row-randomize those sibling specimens into train/test and call the result independent-build validation. The manifest records that lineage as one held-out target group.
 
 ## Commands
 
