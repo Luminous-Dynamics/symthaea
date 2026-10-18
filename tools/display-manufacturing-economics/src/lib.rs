@@ -388,6 +388,20 @@ mod tests {
     }
 
     #[test]
+    fn inspection_count_overflow_is_rejected_without_wrapping() {
+        assert_eq!(
+            summarize_inspection(InspectionCounts {
+                eligible_units: u64::MAX,
+                inspected_units: u64::MAX,
+                true_positive: u64::MAX,
+                false_positive: 1,
+                false_negative: 0,
+            }),
+            Err(ManufacturingMetricError::InspectionCountsExceedPopulation)
+        );
+    }
+
+    #[test]
     fn inspection_summary_rejects_impossible_population_counts() {
         assert_eq!(
             summarize_inspection(InspectionCounts {
