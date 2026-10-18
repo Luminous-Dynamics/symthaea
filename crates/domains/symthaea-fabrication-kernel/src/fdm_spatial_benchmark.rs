@@ -8,6 +8,7 @@
 //! performs no machine I/O and does not model real printer physics.
 
 use serde::{Deserialize, Serialize};
+use std::collections::HashSet;
 
 pub const FDM_SPATIAL_CORPUS_SCHEMA: &str = "symthaea.fdm-spatial-synthetic.v1";
 
@@ -229,16 +230,15 @@ pub fn validate_spatial_corpus(
         issues.push("confirmation set is empty".to_owned());
     }
 
-    let mut observation_ids = Vec::new();
+    let mut observation_ids = HashSet::new();
     let mut positions = Vec::new();
     for observation in &corpus.discovery {
         if observation.observation_id.trim().is_empty() {
             issues.push("discovery observation ID is empty".to_owned());
         }
-        if observation_ids.iter().any(|id| id == &observation.observation_id) {
+        if !observation_ids.insert(observation.observation_id.as_str()) {
             issues.push(format!("duplicate observation ID: {}", observation.observation_id));
         }
-        observation_ids.push(observation.observation_id.as_str());
         validate_position(observation.position, &observation.observation_id, &mut issues);
         if !observation.signed_error_mm.is_finite() {
             issues.push(format!("non-finite discovery error: {}", observation.observation_id));
@@ -254,22 +254,21 @@ pub fn validate_spatial_corpus(
         positions.push(observation.position);
     }
 
-    let mut confirmation_ids = Vec::new();
+    let mut confirmation_ids = HashSet::new();
     let mut confirmation_positions = Vec::new();
     for point in &corpus.confirmation {
         if point.point_id.trim().is_empty() {
             issues.push("confirmation point ID is empty".to_owned());
         }
-        if confirmation_ids.iter().any(|id| id == &point.point_id) {
+        if !confirmation_ids.insert(point.point_id.as_str()) {
             issues.push(format!("duplicate confirmation point ID: {}", point.point_id));
         }
-        if observation_ids.iter().any(|id| id == &point.point_id) {
+        if observation_ids.contains(point.point_id.as_str()) {
             issues.push(format!(
                 "confirmation point ID leaks discovery identity: {}",
                 point.point_id
             ));
         }
-        confirmation_ids.push(point.point_id.as_str());
         validate_position(point.position, &point.point_id, &mut issues);
         if !point.oracle_signed_error_mm.is_finite() {
             issues.push(format!("non-finite confirmation target: {}", point.point_id));
