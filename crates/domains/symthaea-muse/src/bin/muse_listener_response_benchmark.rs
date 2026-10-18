@@ -38,6 +38,8 @@ struct Options {
 struct BenchmarkArtifact {
     artifact_version: &'static str,
     runner_version: &'static str,
+    /// Compile-time source revision when supplied by the build environment.
+    runner_build_revision: &'static str,
     data_kind: &'static str,
     source_sha256: String,
     source_records: usize,
@@ -282,6 +284,9 @@ fn run(options: Options) -> Result<String, String> {
     let artifact = BenchmarkArtifact {
         artifact_version: "muse-listener-response-evidence-v1",
         runner_version: RUNNER_VERSION,
+        runner_build_revision: option_env!("GIT_COMMIT_SHA")
+            .or(option_env!("GITHUB_SHA"))
+            .unwrap_or("unbound-at-build-time"),
         data_kind,
         source_sha256: source_digest(&raw_bytes),
         source_records: records.len(),
@@ -344,6 +349,8 @@ mod tests {
         let value: serde_json::Value = serde_json::from_str(&output).unwrap();
         assert_eq!(value["data_kind"], "synthetic_fixture");
         assert_eq!(value["source_records"], 8);
+        assert!(value["runner_build_revision"].as_str().is_some_and(|value| !value.is_empty()));
+        assert!(value["source_sha256"].as_str().unwrap().len() == 64);
         assert_eq!(value["report"]["training_records"], 4);
         assert_eq!(value["report"]["embargoed_records"], 2);
         assert_eq!(value["report"]["testing_records"], 2);
