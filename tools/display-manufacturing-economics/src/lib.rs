@@ -71,7 +71,7 @@ pub struct BatchEconomics {
 /// The supplied values are bounds/summary estimates, not raw production truth.
 /// Both candidates must share target-profile, comparison-protocol and evidence-class
 /// identity. Pareto comparison will not trade away mandatory quality/reliability/
-—yield floors or missing evidence for a cheaper cost.
+/// floors or missing evidence for a cheaper cost.
 #[derive(Clone, Debug, PartialEq)]
 pub struct RouteFrontierCandidate {
     pub candidate_id: String,
