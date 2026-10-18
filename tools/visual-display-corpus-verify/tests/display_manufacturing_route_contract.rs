@@ -176,7 +176,7 @@ fn validate_contract(manifest_text: &str, schema_text: &str) -> Vec<String> {
             if stage
                 .get("process_semantics_owner")
                 .and_then(Value::as_str)
-                .map_or(true, |value| {
+                .is_none_or(|value| {
                     !value.starts_with("https://github.com/Luminous-Dynamics/symthaea/issues/")
                 })
             {
@@ -211,7 +211,7 @@ fn validate_contract(manifest_text: &str, schema_text: &str) -> Vec<String> {
                     && predecessors.iter().any(|edge| {
                         edge.get("condition")
                             .and_then(Value::as_str)
-                            .map_or(true, str::is_empty)
+                            .is_none_or(str::is_empty)
                     })
                 {
                     errors.push(format!(
