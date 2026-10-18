@@ -1,0 +1,13 @@
+[package]
+name = "iccb-evaluator-harness"
+version = "0.1.0"
+edition = "2024"
+license = "AGPL-3.0-or-later"
+description = "Evaluator-side scoring contracts for ICCB; separate from the candidate crate"
+
+[dependencies]
+iccb-evaluator = { path = "../iccb" }
+sha2 = "0.10"
+
+# Isolate this harness from Symthaea's main workspace.
+[workspace]
