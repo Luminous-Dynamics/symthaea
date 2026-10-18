@@ -189,8 +189,7 @@ pub fn cash_maximizing_feasible_baseline(evaluations: &[OptionEvaluation]) -> Op
         let replace = match best {
             None => true,
             Some(previous) => {
-                current.outcomes.expected_net_cash_minor
-                    > previous.outcomes.expected_net_cash_minor
+                current.outcomes.expected_net_cash_minor > previous.outcomes.expected_net_cash_minor
                     || (current.outcomes.expected_net_cash_minor
                         == previous.outcomes.expected_net_cash_minor
                         && current.option_id < previous.option_id)
@@ -475,7 +474,10 @@ mod tests {
         unauthorized.authority_granted = false;
 
         let result = scenario(vec![unauthorized]).evaluate();
-        assert_eq!(cash_maximizing_feasible_baseline(&result.evaluated_options), None);
+        assert_eq!(
+            cash_maximizing_feasible_baseline(&result.evaluated_options),
+            None
+        );
         assert!(pareto_frontier(&result.evaluated_options).is_empty());
     }
 
