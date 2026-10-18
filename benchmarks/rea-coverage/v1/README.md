@@ -36,6 +36,7 @@ For a nonempty selection of length `L`:
 | Full known-chunk coverage | No spurious `unreported-input-region` gap |
 | Determinism | Same manifest + oracle yields the same case dispositions and file digests |
 | Small-domain exhaustive coverage | All 510 byte masks for lengths 1–8 agree with an independent bytewise-gap oracle |
+| Interval representation invariance | All 33,866 interval subsets for lengths 1–5 pass in original, reversed and duplicated forms (101,598 representations) |
 
 These are contract targets and the current public fixture results, not measurements of a real REA provider.
 
@@ -46,12 +47,13 @@ Requires `jq` and `sha256sum` only; it does not require Node, Binwalk, Unblob, a
 ```sh
 benchmarks/rea-coverage/v1/verify.sh
 benchmarks/rea-coverage/v1/property-sweep.sh
+benchmarks/rea-coverage/v1/representation-sweep.sh
 ```
 
-Recorded fixed-corpus result: 16/16 case dispositions matched the oracle: 5 internally consistent reports accepted, 8 inconsistent reports rejected, 1 empty input marked invalid, and 2 malformed reports rejected. The independent `property-sweep.sh` also passed all 510 coverage masks for selected-input lengths 1–8, using a bytewise gap oracle and varying source offsets to check root-range mapping. Exact fixture and verifier identities are in `receipt.json`.
+Recorded fixed-corpus result: 16/16 case dispositions matched the oracle: 5 internally consistent reports accepted, 8 inconsistent reports rejected, 1 empty input marked invalid, and 2 malformed reports rejected. The independent `property-sweep.sh` passed all 510 coverage masks for selected-input lengths 1–8, with source-offset checks. `representation-sweep.sh` then exhaustively checked all 33,866 possible subsets of byte intervals for lengths 1–5 in three representations each: original order, reversed order, and duplicate intervals. All 101,598 representations matched the independent bytewise gap-run oracle. Exact tested file identities and run limits are recorded in `receipt.json`.
 
 ## Next evidence gate
 
 Run the pinned upstream REA fixture/oracle lane against the actual Unblob version with both an unrecognized whole input and an unrecognized selected subrange. Compare the current-main behavior with the candidate fix in #4953, checking CLI and MCP output parity, exact selected/root ranges, and source-byte immutability. Only after that should a Rust-native Symthaea importer bind this output to input digests, actual executable/tool identity, version, limitations and explicit partial coverage.
 
-**Not done here:** no REA process or provider, Binwalk, Unblob, Ghidra, emulator, recovered/vendor firmware, MCU, physical device, or hardware-write path was run. The 14/14 result is an executable check of this synthetic normalized-report contract only. The oracle is public, so it is a regression corpus rather than a blind leaderboard.
+**Not done here:** no REA process or provider, Binwalk, Unblob, Ghidra, emulator, recovered/vendor firmware, MCU, physical device, or hardware-write path was run. The 16-case result and the exhaustive sweeps are executable checks of this synthetic normalized-report contract only. The oracle is public, so it is a regression corpus rather than a blind leaderboard.
