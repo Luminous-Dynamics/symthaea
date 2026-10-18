@@ -1,0 +1,11 @@
+Synthetic spacecraft communications design source - revision v0.1
+Mission function: maintain authorized command and telemetry exchange with a ground endpoint.
+Component: comms_transceiver
+Interface: ground_comm_link
+Requirement: REQ-COMM-001 - an unavailable radio link must be detectable within one simulator step.
+Assumption: ASSUMP-COMM-UPLINK-AVAILABLE-AT-START - the link is available before event injection.
+Fault mode: FM-COMM-001 - an injected radio blackout suppresses link availability.
+Expected observation: ground_link_available=false during the declared blackout; orbital line-of-sight state does not change.
+Monitor: MON-COMM-001 - assert RADIO_BLACKOUT_SUSPECTED within one step; LOS-only loss is a negative control.
+Mitigation: MIT-COMM-001 - buffer noncritical telemetry and retry after link recovery.
+Safety invariants: INV-COMMAND-AUTHORITY; INV-POWER-BUDGET.
