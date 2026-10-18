@@ -6,6 +6,9 @@ use std::collections::{BTreeMap, BTreeSet};
 use std::fs;
 use std::path::PathBuf;
 
+const EXPECTED_SOURCE_ID: &str = "DS-010";
+const EXPECTED_SOURCE_URI: &str = "https://zenodo.org/records/16745911";
+
 const REQUIRED_COLUMNS: &[&str] = &[
     "Date",
     "Plant",
@@ -98,8 +101,15 @@ fn audit_csv_bytes(
     if bytes.is_empty() {
         return Err(anyhow!("CSV input is empty"));
     }
-    if source_id.trim().is_empty() || source_uri.trim().is_empty() {
-        return Err(anyhow!("source_id and source_uri must be non-empty"));
+    if source_id != EXPECTED_SOURCE_ID {
+        return Err(anyhow!(
+            "this v0 audit profile is specific to source {EXPECTED_SOURCE_ID}"
+        ));
+    }
+    if source_uri != EXPECTED_SOURCE_URI {
+        return Err(anyhow!(
+            "source_uri must be the canonical record {EXPECTED_SOURCE_URI}"
+        ));
     }
 
     let mut reader = ReaderBuilder::new()
@@ -427,6 +437,19 @@ mod tests {
     #[test]
     fn empty_csv_is_rejected() {
         let result = audit_csv_bytes(b"", b';', SOURCE_ID, SOURCE_URI, "empty.csv", None);
+        assert!(result.is_err());
+    }
+
+    #[test]
+    fn source_identity_cannot_be_relabelled() {
+        let result = audit_csv_bytes(
+            b"Date;Plant;Treatment\n01/01/2024;P1;T1\n",
+            b';',
+            "DS-011",
+            SOURCE_URI,
+            "wrong-source.csv",
+            None,
+        );
         assert!(result.is_err());
     }
 }
