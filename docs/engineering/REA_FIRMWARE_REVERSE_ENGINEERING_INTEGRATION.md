@@ -121,6 +121,14 @@ For a later logic-signal lane, use known-answer captures with explicit sample ra
 - **ENG-SPICE-002 (#5661):** owns transitive solver-input closure. Future circuit results must bind their actual solver inputs and configuration, independently of reverse-engineering observations.
 - **Engineering Trust Kernel / formal-safety boundary:** keeps candidate observations separate from admitted evidence, qualification and execution authority.
 
+## Follow-on: differential firmware-to-behavior benchmark
+
+The next research tranche is tracked separately in [ENG-REA-002 #8057](https://github.com/Luminous-Dynamics/symthaea/issues/8057). It evaluates whether Symthaea can distinguish byte-level build noise from semantic changes and observed behavior changes, localize seeded regressions, and select a useful confirmatory experiment.
+
+This is intentionally a different claim from initial REA interoperability. First pass the pinned provider/fixture lane described above. Then evaluate the differential task using independent, held-out fixture families with behavior-preserving rebuilds, semantic mutations, trace-only disturbances, configuration mismatches and deliberately unidentifiable causes.
+
+Compose with the existing change-impact semantics in #1414 and active acquisition kernel in #7837. Do not add a new change-impact engine or duplicate EIG/EVSI implementation. The principal added benchmark is **incremental diagnosis value**: correct localization and confirmation-test economy versus static diff and REA-evidence-only baselines, with false firmware attribution and justified abstention reported separately.
+
 ## Research conclusion
 
 The promising paradigm shift is **reverse engineering as evidence recovery and uncertainty reduction**. The long-term chain is:
