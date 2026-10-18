@@ -244,3 +244,38 @@ The allowed-use classification is a reviewed capability, not a model-generated c
 ### Benchmark leakage controls
 
 Geographic and source leakage can make perception or habitat classifiers look better than they generalize. Split by survey site/region, cruise or survey campaign, source dataset and time where those identifiers exist—not only by random image tile. Freeze the split before tuning. Report performance by source family, visibility/turbidity, depth range, habitat type and survey effort. Use positive/negative labels only where the sampling method justifies them; unobserved cells are unlabeled, not automatic negatives.
+
+
+## 12. International seabed commons and the CCZ
+
+The high-value Pacific nodule fields most often discussed in deep-sea mining debates include the Clarion–Clipperton Zone (CCZ). Distinguish “claims” as a colloquial description from the legal type of each record. Under UNCLOS Part XI, the international seabed Area and its resources are the common heritage of mankind; an International Seabed Authority (ISA) exploration contract is not sovereign ownership and does not itself authorize commercial exploitation. The atlas must preserve distinct record classes for ISA exploration contracts, reserved areas, Areas of Particular Environmental Interest (APEIs), national maritime zones, domestic-law applications, permits/orders, scientific observations, corporate assertions and disputed/unknown statuses.
+
+Authoritative starting points:
+- UNCLOS Part XI, Articles 136–143: https://www.un.org/depts/los/convention_agreements/texts/unclos/part112.htm
+- ISA exploration contracts and areas: https://isa.org.jm/exploration-contracts/ and https://isa.org.jm/exploration-contracts/exploration-areas/
+- ISA CCZ Environmental Management Plan / APEIs: https://isa.org.jm/protection-of-the-marine-environment/regional-environmental-management-plans/ccz/
+- ISA DeepData: https://isa.org.jm/deepdata-database/about-deepdata/
+- GEBCO_2026 grid and source Type Identifier Grid (TID): https://www.gebco.net/data-products-gridded-bathymetry-data/gebco2026-grid
+- OBIS data access: https://portal.obis.org/data/access/
+
+The CCZ public-evidence Atlas is being specified in Sol-Atlas issue #165 and draft PR #166:
+https://github.com/Luminous-Dynamics/sol-atlas-leptos/issues/165
+https://github.com/Luminous-Dynamics/sol-atlas-leptos/pull/166
+
+### Cross-project boundary
+
+- Sol-Atlas displays source-qualified spatial/temporal evidence using the existing maritime asset/provenance owners; it does not decide legal rights or grant navigation authority.
+- Symtropy provides bounded simulation/scenario and environmental-observation seams; a simulation does not constitute ocean physics or environmental qualification unless the relevant model and operating envelope are independently validated.
+- Symthaea can reason over evidence, propose experiments and create mission packages; it cannot authorize a mission from an opaque score or replace an independent safety kernel.
+- Mycelix may support authorization records, provenance, custody and public-interest governance where these adapters are qualified; hashes, signatures and ledgers do not establish physical truth.
+
+The open-source goal is to improve independent research, environmental monitoring, reviewability and data interoperability for everyone. It is not to confer permission to mine, make non-public data redistributable, or build a production-rate/site-selection optimizer.
+
+### Additional acceptance checks
+
+- Zero fixture promotes an ISA exploration contract into sovereign ownership or commercial-exploitation permission.
+- Source layer, issuer, instrument class, validity interval, retrieval time, license/terms, geometry CRS and uncertainty remain separately represented.
+- Unknown or conflicting legal/document status stays visibly unresolved.
+- Public export reproduces the source manifest and transforms from the same permission-cleared snapshots.
+- Public datasets are not treated as complete habitat truth; missing observations never become species absence.
+- The atlas and mission stack retain the hard separation between public evidence, legal authorization, and onboard physical safety.
