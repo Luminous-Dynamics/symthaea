@@ -646,6 +646,15 @@ mod tests {
     }
 
     #[test]
+    fn timestamp_calendar_and_timezone_ranges_are_checked() {
+        assert!(timestamp_looks_rfc3339("2024-02-29T12:30:15Z"));
+        assert!(!timestamp_looks_rfc3339("2025-02-29T12:30:15Z"));
+        assert!(!timestamp_looks_rfc3339("2026-13-01T12:30:15Z"));
+        assert!(!timestamp_looks_rfc3339("2026-10-18T25:30:15Z"));
+        assert!(!timestamp_looks_rfc3339("2026-10-18T12:30:15+24:00"));
+    }
+
+    #[test]
     fn duplicate_ingredient_ids_are_rejected() {
         let mut value = fixture();
         value["ingredients"][1]["ingredient_id"] = json!("rice");
