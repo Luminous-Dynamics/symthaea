@@ -175,6 +175,8 @@ enum Censoring {
 #[derive(Debug, Clone, Serialize)]
 struct AuditReceipt {
     receipt_schema_version: &'static str,
+    adapter_version: &'static str,
+    source_commit: Option<String>,
     operation: &'static str,
     status: &'static str,
     manifest_sha256: String,
@@ -854,6 +856,8 @@ fn manifest_receipt(
 ) -> AuditReceipt {
     AuditReceipt {
         receipt_schema_version: "0.1.0",
+        adapter_version: env!("CARGO_PKG_VERSION"),
+        source_commit: env::var("GITHUB_SHA").ok().filter(|value| nonblank(value)),
         operation,
         status,
         manifest_sha256: sha256_hex(manifest_bytes),
