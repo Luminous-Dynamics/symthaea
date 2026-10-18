@@ -309,7 +309,7 @@ fn sha256_hex(bytes: &[u8]) -> String {
 
 #[cfg(test)]
 mod tests {
-    use super::validate_platform_str;
+    use super::{sha256_hex, validate_platform_str};
     use serde_json::Value;
 
     const MANIFEST_TEXT: &str =
@@ -323,6 +323,14 @@ mod tests {
 
     fn encoded(value: &Value) -> String {
         serde_json::to_string(value).expect("mutated fixture must serialize")
+    }
+
+    #[test]
+    fn sha256_lower_hex_matches_standard_known_answer() {
+        assert_eq!(
+            sha256_hex(b"abc"),
+            "ba7816bf8f01cfea414140de5dae2223b00361a396177a9cb410ff61f20015ad"
+        );
     }
 
     #[test]
