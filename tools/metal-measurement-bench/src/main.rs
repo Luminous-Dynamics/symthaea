@@ -185,6 +185,19 @@ fn nonblank(value: &str) -> bool {
     !value.trim().is_empty()
 }
 
+fn is_http_url(value: &str) -> bool {
+    value.starts_with("https://") || value.starts_with("http://")
+}
+
+fn is_iso_date_shape(value: &str) -> bool {
+    value.len() == 10
+        && value.as_bytes()[4] == b'-'
+        && value.as_bytes()[7] == b'-'
+        && value[..4].bytes().all(|byte| byte.is_ascii_digit())
+        && value[5..7].bytes().all(|byte| byte.is_ascii_digit())
+        && value[8..10].bytes().all(|byte| byte.is_ascii_digit())
+}
+
 fn is_hex_sha256(value: &str) -> bool {
     value.len() == 64
         && value
@@ -238,6 +251,22 @@ fn validate_manifest(manifest: &SourceManifest) -> Result<()> {
         }
     }
 
+    if !manifest.dataset.doi.starts_with("10.") {
+        return Err(AdapterError::Validation("dataset DOI must be explicit and DOI-shaped".into()));
+    }
+    if !is_iso_date_shape(&manifest.dataset.metadata_accessed_on) {
+        return Err(AdapterError::Validation("metadata_accessed_on must use YYYY-MM-DD syntax".into()));
+    }
+    for (field, url) in [
+        ("dataset.source_url", manifest.dataset.source_url.as_str()),
+        ("dataset.repository_url", manifest.dataset.repository_url.as_str()),
+        ("dataset.descriptive_readme_url", manifest.dataset.descriptive_readme_url.as_str()),
+    ] {
+        if !is_http_url(url) {
+            return Err(AdapterError::Validation(format!("{field} must be an HTTP(S) URL")));
+        }
+    }
+
     let context = &manifest.challenge_context;
     if !context.strain_rate_per_second.is_finite() || context.strain_rate_per_second <= 0.0 {
         return Err(AdapterError::Validation(
@@ -284,6 +313,17 @@ fn validate_manifest(manifest: &SourceManifest) -> Result<()> {
                 "duplicate source id {:?}", source.id
             )));
         }
+        if !source.doi.starts_with("10.") && !source.doi.starts_with("not_applicable_") {
+            return Err(AdapterError::Validation(format!(
+                "related source {:?} must provide a DOI or an explicit non-DOI status",
+                source.id
+            )));
+        }
+        if !is_http_url(&source.url) {
+            return Err(AdapterError::Validation(format!(
+                "related source {:?} URL must be HTTP(S)", source.id
+            )));
+        }
     }
 
     let mut artifact_paths = BTreeSet::new();
@@ -306,16 +346,17 @@ fn validate_manifest(manifest: &SourceManifest) -> Result<()> {
                 artifact.relative_path
             )));
         }
-        for (field, value) in [
-            ("media_type", artifact.media_type.as_str()),
-            ("source_url", artifact.source_url.as_str()),
-        ] {
-            if !nonblank(value) {
-                return Err(AdapterError::Validation(format!(
-                    "artifact {:?} {field} must not be blank",
-                    artifact.relative_path
-                )));
-            }
+        if !nonblank(&artifact.media_type) {
+            return Err(AdapterError::Validation(format!(
+                "artifact {:?} media_type must not be blank",
+                artifact.relative_path
+            )));
+        }
+        if !is_http_url(&artifact.source_url) {
+            return Err(AdapterError::Validation(format!(
+                "artifact {:?} source_url must be HTTP(S)",
+                artifact.relative_path
+            )));
         }
     }
 
