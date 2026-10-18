@@ -1172,6 +1172,23 @@ mod tests {
         assert_eq!(report.abstention_count, 1);
         assert_eq!(report.reject_all_count, 1);
         assert_eq!(report.no_feasible_candidate_count, 0);
+        assert_eq!(report.context_blind_assessments.len(), 12);
+        assert_eq!(report.context_aware_score.oracle_ranking_scenario_count, 9);
+        assert_eq!(report.context_aware_score.recommendation_count, 4);
+        assert_eq!(report.context_aware_score.acceptable_recommendation_count, 4);
+        assert_eq!(
+            report.context_aware_score.recommendations_without_ranking_count,
+            0
+        );
+        assert_eq!(report.context_aware_score.correct_reject_all_count, 1);
+        assert_eq!(report.context_aware_score.stale_context_recommendation_count, 0);
+        assert_eq!(report.context_blind_score.recommendation_count, 5);
+        assert_eq!(report.context_blind_score.acceptable_recommendation_count, 4);
+        assert_eq!(report.context_blind_score.stale_context_recommendation_count, 1);
+        assert_eq!(
+            report.context_blind_score.recommendations_without_ranking_count,
+            0
+        );
     }
 
     #[test]
