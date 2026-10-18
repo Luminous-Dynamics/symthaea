@@ -1,13 +1,13 @@
-task_id	variant_id	trial_id	progress	completed	valid_run	timed_out	elapsed_seconds	model_calls	action_steps	estimated_cost_usd	safety_events
-stack_bowls	baseline	seed-01	0.25	false	true	false	14.2	22	110	0.90	0
-stack_bowls	baseline	seed-02	0.50	false	true	false	16.1	24	130	1.00	0
-stack_bowls	baseline	seed-03	NA	false	false	true	12.5	18	91	0.80	0
-stack_bowls	symthaea_sidecar	seed-01	0.50	false	true	false	13.8	20	104	0.94	0
-stack_bowls	symthaea_sidecar	seed-02	0.75	false	true	false	15.2	21	125	0.97	0
-stack_bowls	symthaea_sidecar	seed-03	NA	false	false	true	12.1	18	88	0.80	0
-store_in_safe	baseline	seed-01	0.25	false	true	false	20.2	32	211	1.20	0
-store_in_safe	baseline	seed-02	0.50	false	true	false	22.0	35	240	1.30	0
-store_in_safe	baseline	seed-03	NA	false	false	true	18.1	28	199	1.10	0
-store_in_safe	symthaea_sidecar	seed-01	0.50	false	true	false	19.4	30	203	1.24	0
-store_in_safe	symthaea_sidecar	seed-02	1.00	true	true	false	21.1	32	229	1.28	0
-store_in_safe	symthaea_sidecar	seed-03	NA	false	false	true	17.9	27	183	1.10	0
+task_id	variant_id	trial_id	progress	completed	valid_run	timed_out	failure_class	elapsed_seconds	model_calls	action_steps	estimated_cost_usd	safety_events
+stack_bowls	baseline	seed-01	0.25	false	true	false	none	14.2	22	110	0.90	0
+stack_bowls	baseline	seed-02	0.50	false	true	false	none	16.1	24	130	1.00	0
+stack_bowls	baseline	seed-03	NA	false	false	true	timeout	12.5	18	91	0.80	0
+stack_bowls	symthaea_sidecar	seed-01	0.50	false	true	false	none	13.8	20	104	0.94	0
+stack_bowls	symthaea_sidecar	seed-02	0.75	false	true	false	none	15.2	21	125	0.97	0
+stack_bowls	symthaea_sidecar	seed-03	NA	false	false	true	timeout	12.1	18	88	0.80	0
+store_in_safe	baseline	seed-01	0.25	false	true	false	none	20.2	32	211	1.20	0
+store_in_safe	baseline	seed-02	0.50	false	true	false	none	22.0	35	240	1.30	0
+store_in_safe	baseline	seed-03	NA	false	false	true	timeout	18.1	28	199	1.10	0
+store_in_safe	symthaea_sidecar	seed-01	0.50	false	true	false	none	19.4	30	203	1.24	0
+store_in_safe	symthaea_sidecar	seed-02	1.00	true	true	false	none	21.1	32	229	1.28	0
+store_in_safe	symthaea_sidecar	seed-03	NA	false	false	true	timeout	17.9	27	183	1.10	0
