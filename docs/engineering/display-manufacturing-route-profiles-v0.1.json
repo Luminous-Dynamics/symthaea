@@ -106,7 +106,8 @@
             "lot identity mismatch",
             "spatially clustered defects"
           ],
-          "evidence_status": "UNQUALIFIED"
+          "evidence_status": "UNQUALIFIED",
+          "predecessor_groups": []
         },
         {
           "stage_id": "MICLED-02",
@@ -131,7 +132,8 @@
             "pad damage",
             "backplane-to-map registration error"
           ],
-          "evidence_status": "UNQUALIFIED"
+          "evidence_status": "UNQUALIFIED",
+          "predecessor_groups": []
         },
         {
           "stage_id": "MICLED-03",
@@ -157,7 +159,22 @@
             "stale fiducials",
             "tool capability not qualified"
           ],
-          "evidence_status": "UNQUALIFIED"
+          "evidence_status": "UNQUALIFIED",
+          "predecessor_groups": [
+            {
+              "mode": "all_of",
+              "predecessors": [
+                {
+                  "stage_id": "MICLED-01",
+                  "condition": "Known-good emitter population and map are accepted."
+                },
+                {
+                  "stage_id": "MICLED-02",
+                  "condition": "Active backplane and pixel map are accepted."
+                }
+              ]
+            }
+          ]
         },
         {
           "stage_id": "MICLED-04",
@@ -184,7 +201,18 @@
             "chip damage",
             "correlated local transfer failures"
           ],
-          "evidence_status": "UNQUALIFIED"
+          "evidence_status": "UNQUALIFIED",
+          "predecessor_groups": [
+            {
+              "mode": "all_of",
+              "predecessors": [
+                {
+                  "stage_id": "MICLED-03",
+                  "condition": "Predecessor output state is observed and dispositioned under its declared profile."
+                }
+              ]
+            }
+          ]
         },
         {
           "stage_id": "MICLED-05",
@@ -211,7 +239,18 @@
             "bond voiding",
             "pitch-dependent alignment failure"
           ],
-          "evidence_status": "UNQUALIFIED"
+          "evidence_status": "UNQUALIFIED",
+          "predecessor_groups": [
+            {
+              "mode": "all_of",
+              "predecessors": [
+                {
+                  "stage_id": "MICLED-04",
+                  "condition": "Predecessor output state is observed and dispositioned under its declared profile."
+                }
+              ]
+            }
+          ]
         },
         {
           "stage_id": "MICLED-06",
@@ -237,7 +276,18 @@
             "unobserved regions",
             "test escape"
           ],
-          "evidence_status": "UNQUALIFIED"
+          "evidence_status": "UNQUALIFIED",
+          "predecessor_groups": [
+            {
+              "mode": "all_of",
+              "predecessors": [
+                {
+                  "stage_id": "MICLED-05",
+                  "condition": "Predecessor output state is observed and dispositioned under its declared profile."
+                }
+              ]
+            }
+          ]
         },
         {
           "stage_id": "MICLED-07",
@@ -264,7 +314,18 @@
             "history overwritten",
             "post-repair drift"
           ],
-          "evidence_status": "UNQUALIFIED"
+          "evidence_status": "UNQUALIFIED",
+          "predecessor_groups": [
+            {
+              "mode": "all_of",
+              "predecessors": [
+                {
+                  "stage_id": "MICLED-06",
+                  "condition": "Post-transfer inspection found a repair-eligible defect."
+                }
+              ]
+            }
+          ]
         },
         {
           "stage_id": "MICLED-08",
@@ -291,7 +352,22 @@
             "cross-contamination",
             "added optical loss"
           ],
-          "evidence_status": "UNQUALIFIED"
+          "evidence_status": "UNQUALIFIED",
+          "predecessor_groups": [
+            {
+              "mode": "one_of_conditioned",
+              "predecessors": [
+                {
+                  "stage_id": "MICLED-06",
+                  "condition": "No repair is required; inspection disposition is recorded."
+                },
+                {
+                  "stage_id": "MICLED-07",
+                  "condition": "Repair was attempted and retest/disposition is recorded."
+                }
+              ]
+            }
+          ]
         },
         {
           "stage_id": "MICLED-09",
@@ -318,7 +394,18 @@
             "optical loss",
             "thermal path degradation"
           ],
-          "evidence_status": "UNQUALIFIED"
+          "evidence_status": "UNQUALIFIED",
+          "predecessor_groups": [
+            {
+              "mode": "all_of",
+              "predecessors": [
+                {
+                  "stage_id": "MICLED-08",
+                  "condition": "Predecessor output state is observed and dispositioned under its declared profile."
+                }
+              ]
+            }
+          ]
         },
         {
           "stage_id": "MICLED-10",
@@ -344,7 +431,18 @@
             "mounting stress",
             "thermal interface variation"
           ],
-          "evidence_status": "UNQUALIFIED"
+          "evidence_status": "UNQUALIFIED",
+          "predecessor_groups": [
+            {
+              "mode": "all_of",
+              "predecessors": [
+                {
+                  "stage_id": "MICLED-09",
+                  "condition": "Predecessor output state is observed and dispositioned under its declared profile."
+                }
+              ]
+            }
+          ]
         },
         {
           "stage_id": "MICLED-11",
@@ -372,7 +470,18 @@
             "stale calibration",
             "test-pattern sensitivity"
           ],
-          "evidence_status": "UNQUALIFIED"
+          "evidence_status": "UNQUALIFIED",
+          "predecessor_groups": [
+            {
+              "mode": "all_of",
+              "predecessors": [
+                {
+                  "stage_id": "MICLED-10",
+                  "condition": "Predecessor output state is observed and dispositioned under its declared profile."
+                }
+              ]
+            }
+          ]
         },
         {
           "stage_id": "MICLED-12",
@@ -400,7 +509,18 @@
             "denominator loss",
             "uncertainty or calibration gaps"
           ],
-          "evidence_status": "UNQUALIFIED"
+          "evidence_status": "UNQUALIFIED",
+          "predecessor_groups": [
+            {
+              "mode": "all_of",
+              "predecessors": [
+                {
+                  "stage_id": "MICLED-11",
+                  "condition": "Predecessor output state is observed and dispositioned under its declared profile."
+                }
+              ]
+            }
+          ]
         }
       ]
     },
@@ -441,7 +561,8 @@
             "line/column faults",
             "lot/revision mismatch"
           ],
-          "evidence_status": "UNQUALIFIED"
+          "evidence_status": "UNQUALIFIED",
+          "predecessor_groups": []
         },
         {
           "stage_id": "OLEDOS-02",
@@ -466,7 +587,18 @@
             "surface damage",
             "contact/injection variation"
           ],
-          "evidence_status": "UNQUALIFIED"
+          "evidence_status": "UNQUALIFIED",
+          "predecessor_groups": [
+            {
+              "mode": "all_of",
+              "predecessors": [
+                {
+                  "stage_id": "OLEDOS-01",
+                  "condition": "Predecessor output state is observed and dispositioned under its declared profile."
+                }
+              ]
+            }
+          ]
         },
         {
           "stage_id": "OLEDOS-03",
@@ -492,7 +624,18 @@
             "shorts/opens",
             "pixel dark spots"
           ],
-          "evidence_status": "UNQUALIFIED"
+          "evidence_status": "UNQUALIFIED",
+          "predecessor_groups": [
+            {
+              "mode": "all_of",
+              "predecessors": [
+                {
+                  "stage_id": "OLEDOS-02",
+                  "condition": "Predecessor output state is observed and dispositioned under its declared profile."
+                }
+              ]
+            }
+          ]
         },
         {
           "stage_id": "OLEDOS-04",
@@ -518,7 +661,18 @@
             "cracking/delamination",
             "optical transmission loss"
           ],
-          "evidence_status": "UNQUALIFIED"
+          "evidence_status": "UNQUALIFIED",
+          "predecessor_groups": [
+            {
+              "mode": "all_of",
+              "predecessors": [
+                {
+                  "stage_id": "OLEDOS-03",
+                  "condition": "Predecessor output state is observed and dispositioned under its declared profile."
+                }
+              ]
+            }
+          ]
         },
         {
           "stage_id": "OLEDOS-05",
@@ -544,7 +698,18 @@
             "false repair eligibility",
             "unobserved wafer regions"
           ],
-          "evidence_status": "UNQUALIFIED"
+          "evidence_status": "UNQUALIFIED",
+          "predecessor_groups": [
+            {
+              "mode": "all_of",
+              "predecessors": [
+                {
+                  "stage_id": "OLEDOS-04",
+                  "condition": "Predecessor output state is observed and dispositioned under its declared profile."
+                }
+              ]
+            }
+          ]
         },
         {
           "stage_id": "OLEDOS-06",
@@ -570,7 +735,18 @@
             "seal damage",
             "kerf-related area loss"
           ],
-          "evidence_status": "UNQUALIFIED"
+          "evidence_status": "UNQUALIFIED",
+          "predecessor_groups": [
+            {
+              "mode": "all_of",
+              "predecessors": [
+                {
+                  "stage_id": "OLEDOS-05",
+                  "condition": "Predecessor output state is observed and dispositioned under its declared profile."
+                }
+              ]
+            }
+          ]
         },
         {
           "stage_id": "OLEDOS-07",
@@ -596,7 +772,18 @@
             "adhesive/cover defects",
             "stray reflections"
           ],
-          "evidence_status": "UNQUALIFIED"
+          "evidence_status": "UNQUALIFIED",
+          "predecessor_groups": [
+            {
+              "mode": "all_of",
+              "predecessors": [
+                {
+                  "stage_id": "OLEDOS-06",
+                  "condition": "Predecessor output state is observed and dispositioned under its declared profile."
+                }
+              ]
+            }
+          ]
         },
         {
           "stage_id": "OLEDOS-08",
@@ -622,7 +809,18 @@
             "black-level defects",
             "mode/profile mismatch"
           ],
-          "evidence_status": "UNQUALIFIED"
+          "evidence_status": "UNQUALIFIED",
+          "predecessor_groups": [
+            {
+              "mode": "all_of",
+              "predecessors": [
+                {
+                  "stage_id": "OLEDOS-07",
+                  "condition": "Predecessor output state is observed and dispositioned under its declared profile."
+                }
+              ]
+            }
+          ]
         },
         {
           "stage_id": "OLEDOS-09",
@@ -648,7 +846,18 @@
             "thermal/mechanical failure",
             "missing qualification evidence"
           ],
-          "evidence_status": "UNQUALIFIED"
+          "evidence_status": "UNQUALIFIED",
+          "predecessor_groups": [
+            {
+              "mode": "all_of",
+              "predecessors": [
+                {
+                  "stage_id": "OLEDOS-08",
+                  "condition": "Predecessor output state is observed and dispositioned under its declared profile."
+                }
+              ]
+            }
+          ]
         }
       ]
     },
@@ -691,7 +900,8 @@
             "particle defects",
             "line-edge/film nonuniformity"
           ],
-          "evidence_status": "UNQUALIFIED"
+          "evidence_status": "UNQUALIFIED",
+          "predecessor_groups": []
         },
         {
           "stage_id": "TFTLCD-02",
@@ -717,7 +927,18 @@
             "unrecorded scrap",
             "spatial cluster defects"
           ],
-          "evidence_status": "UNQUALIFIED"
+          "evidence_status": "UNQUALIFIED",
+          "predecessor_groups": [
+            {
+              "mode": "all_of",
+              "predecessors": [
+                {
+                  "stage_id": "TFTLCD-01",
+                  "condition": "Array inspection identifies eligible repair or a formal pass/reject disposition."
+                }
+              ]
+            }
+          ]
         },
         {
           "stage_id": "TFTLCD-03",
@@ -742,7 +963,8 @@
             "misregistration",
             "black-matrix/pixel contamination"
           ],
-          "evidence_status": "UNQUALIFIED"
+          "evidence_status": "UNQUALIFIED",
+          "predecessor_groups": []
         },
         {
           "stage_id": "TFTLCD-04",
@@ -767,7 +989,18 @@
             "pattern misregistration",
             "insufficient inspection coverage"
           ],
-          "evidence_status": "UNQUALIFIED"
+          "evidence_status": "UNQUALIFIED",
+          "predecessor_groups": [
+            {
+              "mode": "all_of",
+              "predecessors": [
+                {
+                  "stage_id": "TFTLCD-03",
+                  "condition": "Predecessor output state is observed and dispositioned under its declared profile."
+                }
+              ]
+            }
+          ]
         },
         {
           "stage_id": "TFTLCD-05",
@@ -793,7 +1026,31 @@
             "orientation defects",
             "substrate mismatch"
           ],
-          "evidence_status": "UNQUALIFIED"
+          "evidence_status": "UNQUALIFIED",
+          "predecessor_groups": [
+            {
+              "mode": "one_of_conditioned",
+              "predecessors": [
+                {
+                  "stage_id": "TFTLCD-01",
+                  "condition": "Array is accepted without repair."
+                },
+                {
+                  "stage_id": "TFTLCD-02",
+                  "condition": "Array repair/retest disposition is complete."
+                }
+              ]
+            },
+            {
+              "mode": "all_of",
+              "predecessors": [
+                {
+                  "stage_id": "TFTLCD-04",
+                  "condition": "Color-filter inspection disposition is complete."
+                }
+              ]
+            }
+          ]
         },
         {
           "stage_id": "TFTLCD-06",
@@ -819,7 +1076,18 @@
             "seal leak",
             "bond-induced mura"
           ],
-          "evidence_status": "UNQUALIFIED"
+          "evidence_status": "UNQUALIFIED",
+          "predecessor_groups": [
+            {
+              "mode": "all_of",
+              "predecessors": [
+                {
+                  "stage_id": "TFTLCD-05",
+                  "condition": "Predecessor output state is observed and dispositioned under its declared profile."
+                }
+              ]
+            }
+          ]
         },
         {
           "stage_id": "TFTLCD-07",
@@ -844,7 +1112,18 @@
             "repair damage",
             "false acceptance"
           ],
-          "evidence_status": "UNQUALIFIED"
+          "evidence_status": "UNQUALIFIED",
+          "predecessor_groups": [
+            {
+              "mode": "all_of",
+              "predecessors": [
+                {
+                  "stage_id": "TFTLCD-06",
+                  "condition": "Cell inspection identifies a repairable defect."
+                }
+              ]
+            }
+          ]
         },
         {
           "stage_id": "TFTLCD-08",
@@ -870,7 +1149,22 @@
             "driver bonding faults",
             "mechanical stress"
           ],
-          "evidence_status": "UNQUALIFIED"
+          "evidence_status": "UNQUALIFIED",
+          "predecessor_groups": [
+            {
+              "mode": "one_of_conditioned",
+              "predecessors": [
+                {
+                  "stage_id": "TFTLCD-06",
+                  "condition": "Cell repair not required; inspection/disposition complete."
+                },
+                {
+                  "stage_id": "TFTLCD-07",
+                  "condition": "Cell repair/retest disposition complete."
+                }
+              ]
+            }
+          ]
         },
         {
           "stage_id": "TFTLCD-09",
@@ -895,7 +1189,18 @@
             "unexpected power draw",
             "wrong test signal"
           ],
-          "evidence_status": "UNQUALIFIED"
+          "evidence_status": "UNQUALIFIED",
+          "predecessor_groups": [
+            {
+              "mode": "all_of",
+              "predecessors": [
+                {
+                  "stage_id": "TFTLCD-08",
+                  "condition": "Predecessor output state is observed and dispositioned under its declared profile."
+                }
+              ]
+            }
+          ]
         },
         {
           "stage_id": "TFTLCD-10",
@@ -921,7 +1226,18 @@
             "stale profile",
             "hidden bad regions"
           ],
-          "evidence_status": "UNQUALIFIED"
+          "evidence_status": "UNQUALIFIED",
+          "predecessor_groups": [
+            {
+              "mode": "all_of",
+              "predecessors": [
+                {
+                  "stage_id": "TFTLCD-09",
+                  "condition": "Predecessor output state is observed and dispositioned under its declared profile."
+                }
+              ]
+            }
+          ]
         },
         {
           "stage_id": "TFTLCD-11",
@@ -947,7 +1263,18 @@
             "backlight failure",
             "missing evidence"
           ],
-          "evidence_status": "UNQUALIFIED"
+          "evidence_status": "UNQUALIFIED",
+          "predecessor_groups": [
+            {
+              "mode": "all_of",
+              "predecessors": [
+                {
+                  "stage_id": "TFTLCD-10",
+                  "condition": "Predecessor output state is observed and dispositioned under its declared profile."
+                }
+              ]
+            }
+          ]
         }
       ]
     },
@@ -991,7 +1318,8 @@
             "mode mismatch",
             "unmeasured thermal drift"
           ],
-          "evidence_status": "UNQUALIFIED"
+          "evidence_status": "UNQUALIFIED",
+          "predecessor_groups": []
         },
         {
           "stage_id": "ARWG-02",
@@ -1017,7 +1345,8 @@
             "warpage",
             "unknown source/profile"
           ],
-          "evidence_status": "UNQUALIFIED"
+          "evidence_status": "UNQUALIFIED",
+          "predecessor_groups": []
         },
         {
           "stage_id": "ARWG-03",
@@ -1043,7 +1372,18 @@
             "overlay/alignment errors",
             "particle contamination"
           ],
-          "evidence_status": "UNQUALIFIED"
+          "evidence_status": "UNQUALIFIED",
+          "predecessor_groups": [
+            {
+              "mode": "all_of",
+              "predecessors": [
+                {
+                  "stage_id": "ARWG-02",
+                  "condition": "Predecessor output state is observed and dispositioned under its declared profile."
+                }
+              ]
+            }
+          ]
         },
         {
           "stage_id": "ARWG-04",
@@ -1069,7 +1409,18 @@
             "scattering",
             "measurement-method bias"
           ],
-          "evidence_status": "UNQUALIFIED"
+          "evidence_status": "UNQUALIFIED",
+          "predecessor_groups": [
+            {
+              "mode": "all_of",
+              "predecessors": [
+                {
+                  "stage_id": "ARWG-03",
+                  "condition": "Predecessor output state is observed and dispositioned under its declared profile."
+                }
+              ]
+            }
+          ]
         },
         {
           "stage_id": "ARWG-05",
@@ -1096,7 +1447,18 @@
             "added optical loss",
             "thermal stress"
           ],
-          "evidence_status": "UNQUALIFIED"
+          "evidence_status": "UNQUALIFIED",
+          "predecessor_groups": [
+            {
+              "mode": "all_of",
+              "predecessors": [
+                {
+                  "stage_id": "ARWG-04",
+                  "condition": "Execute only for the declared coated/laminated optical-stack architecture."
+                }
+              ]
+            }
+          ]
         },
         {
           "stage_id": "ARWG-06",
@@ -1123,7 +1485,31 @@
             "bond drift",
             "thermo-mechanical misalignment"
           ],
-          "evidence_status": "UNQUALIFIED"
+          "evidence_status": "UNQUALIFIED",
+          "predecessor_groups": [
+            {
+              "mode": "all_of",
+              "predecessors": [
+                {
+                  "stage_id": "ARWG-01",
+                  "condition": "Light engine passed its incoming acceptance gate."
+                }
+              ]
+            },
+            {
+              "mode": "one_of_conditioned",
+              "predecessors": [
+                {
+                  "stage_id": "ARWG-04",
+                  "condition": "No additional coating/lamination stage is required."
+                },
+                {
+                  "stage_id": "ARWG-05",
+                  "condition": "Required coating/lamination is inspected and dispositioned."
+                }
+              ]
+            }
+          ]
         },
         {
           "stage_id": "ARWG-07",
@@ -1152,7 +1538,18 @@
             "distortion",
             "test-angle cherry-picking"
           ],
-          "evidence_status": "UNQUALIFIED"
+          "evidence_status": "UNQUALIFIED",
+          "predecessor_groups": [
+            {
+              "mode": "all_of",
+              "predecessors": [
+                {
+                  "stage_id": "ARWG-06",
+                  "condition": "Predecessor output state is observed and dispositioned under its declared profile."
+                }
+              ]
+            }
+          ]
         },
         {
           "stage_id": "ARWG-08",
@@ -1177,7 +1574,18 @@
             "profile mismatch",
             "drift outside calibration set"
           ],
-          "evidence_status": "UNQUALIFIED"
+          "evidence_status": "UNQUALIFIED",
+          "predecessor_groups": [
+            {
+              "mode": "all_of",
+              "predecessors": [
+                {
+                  "stage_id": "ARWG-07",
+                  "condition": "Predecessor output state is observed and dispositioned under its declared profile."
+                }
+              ]
+            }
+          ]
         },
         {
           "stage_id": "ARWG-09",
@@ -1203,7 +1611,18 @@
             "temperature-dependent color shift",
             "latent surface damage"
           ],
-          "evidence_status": "UNQUALIFIED"
+          "evidence_status": "UNQUALIFIED",
+          "predecessor_groups": [
+            {
+              "mode": "all_of",
+              "predecessors": [
+                {
+                  "stage_id": "ARWG-08",
+                  "condition": "Predecessor output state is observed and dispositioned under its declared profile."
+                }
+              ]
+            }
+          ]
         }
       ]
     }
