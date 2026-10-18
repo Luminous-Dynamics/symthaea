@@ -3,7 +3,7 @@
   "schema_version": "0.1.0",
   "created_date": "2026-10-18",
   "status": "source_transcription_summary_not_raw_data",
-  "evidence_class": "SourceReported",
+  "evidence_class": "Source",
   "purpose": "Freeze source-reported validation summary values for benchmark design. This file is not the authors' raw telemetry, the authors' simulation, or an independent replication.",
   "references": [
     {
