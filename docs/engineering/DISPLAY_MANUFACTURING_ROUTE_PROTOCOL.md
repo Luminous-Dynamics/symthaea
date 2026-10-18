@@ -38,6 +38,23 @@ The current data-only corpus has four route families:
 
 This is a representative first slice, not an exhaustive list of display technologies. LCOS, OLED projection, other micro-OLED stacks, DLP/LCOS projectors, direct-view OLED and alternative waveguide/combiner routes can become separate profiles when specific process ownership and evidence need justify them. Conditional steps must stay conditional; the corpus does not imply all routes share the same stack.
 
+## 3A. Component-interface contracts
+
+The route manifest currently defines **23 component-interface records** across the four route profiles. These are interface contracts, not a component catalogue or alternate BOM system. Each record names the relevant existing process/equipment/metrology/component owner references and pins:
+
+- incoming acceptance evidence needed before the component is consumed downstream;
+- interface characteristics that constrain the adjacent stage (geometry, coordinate frame, electrical/optical/thermal behavior or material/lot lineage as applicable);
+- failure modes that must remain visible to inspection and downstream diagnosis;
+- reference-source IDs and an explicit UNQUALIFIED evidence status.
+
+The initial component slices are:
+- **Micro-LED:** emitter wafer/known-good die, CMOS backplane, transfer/carrier/fiducials, bond/interconnect stack, color architecture, encapsulation/package.
+- **OLEDoS:** CMOS/anode, emissive frontplane materials, electrode/barrier/encapsulation, diced die/package, calibration/tester.
+- **TFT-LCD:** TFT-array plate, color-filter plate, LC cell/alignment/seal, polarizer/backlight, driver/flex/power interface, mura/calibration metrology.
+- **AR waveguide:** display light engine, substrate/blank, grating master/replica, coating/laminate, alignment fixture, angle-resolved metrology/calibration.
+
+This is where design-for-testability and design-for-repair become concrete: define measurable incoming/outgoing interfaces, preserve exact configuration/lot IDs, plan an inspection point before an expensive next stage, and show that a repair is detectable/retestable without obscuring the first failure. A component's incoming acceptance is scoped to that component profile and cannot promote the assembled display to final acceptance.
+
 ## 4. Process-step evidence contract
 
 Every step records:
