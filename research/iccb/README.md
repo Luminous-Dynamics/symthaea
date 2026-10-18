@@ -34,6 +34,12 @@ The EvidenceState::Qualified label is supplied by the fixture; it does not indep
 
 The demo should not be interpreted as proving superior decisions or a real investment result. A clean local test run and independent review are still required before treating the code as validated. The current authoring environment did not have rustc or cargo installed, so no local compile/test result is claimed in this change.
 
+## Evaluator / candidate separation
+
+A second isolated package, [`research/iccb-evaluator-harness/`](../iccb-evaluator-harness/src/lib.rs), holds evaluator-side dependency scoring. The candidate contract crate does not depend on it. The harness checks scenario IDs, reports true/false positives and false negatives independently, and marks precision/recall undefined when their denominators are empty rather than making empty cases look perfect.
+
+This is a **code/data-flow boundary, not a sandbox**; source-code access to the scorer is compatible with benchmark transparency, but any actual held-out truth data must remain evaluator-controlled and must not be serialized into candidate-visible requests or artifacts. The public tests in the harness are examples, not a hidden benchmark.
+
 ## Staged commitments and reversibility
 
 The staged-capital protocol is described in [REVERSIBILITY_AND_STAGED_CAPITAL.md](REVERSIBILITY_AND_STAGED_CAPITAL.md). The `staging.rs` module is a fail-closed tranche authorization gate, **not** a real-options valuation model. It makes required evidence, milestone satisfaction, delegated authority, and cumulative commitment limits explicit. The prototype also reports a cash-maximizing feasible baseline and a Pareto frontier without compressing outcomes into one score.
