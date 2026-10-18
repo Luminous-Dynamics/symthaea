@@ -14,9 +14,9 @@
 use crate::crypto_digest::sha256;
 use crate::fdm_spatial_benchmark::NormalizedPosition;
 use crate::fdm_spatial_experiment_design::{
-    ADDITIONAL_OBSERVATION_BUDGET, INITIAL_OBSERVATION_COUNT, SamplingStrategy,
-    SpatialDesignObservation, SyntheticSpatialSurface, candidate_positions, choose_next_location,
-    distance, fixed_stratified_priority, initial_positions, latent_surface, same_position,
+    INITIAL_OBSERVATION_COUNT, SamplingStrategy, SpatialDesignObservation,
+    SyntheticSpatialSurface, choose_next_location, distance, fixed_stratified_priority,
+    initial_positions, latent_surface, same_position,
 };
 use serde::{Deserialize, Serialize};
 
