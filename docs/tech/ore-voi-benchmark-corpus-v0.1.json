@@ -46,7 +46,7 @@
         {"action_id":"NOISY_HIGH_GAIN_TEST","measurement_kind":"contaminant_assay","available":true,"availability_reason":"available","cost_units":1,"uncertainty_reduction_units":40,"estimated_gross_decision_gain_units":9,"fixed_priority":3}
       ],
       "evaluation_only":{"realized_gross_decision_gain_units":[{"action_id":"OVERCONFIDENT_ASSAY","gross_gain_units":0},{"action_id":"ROBUST_RECOVERY_TEST","gross_gain_units":20},{"action_id":"NOISY_HIGH_GAIN_TEST","gross_gain_units":5}]},
-      "expected":{"fixed_order_action_id":"OVERCONFIDENT_ASSAY","uncertainty_first_action_id":"OVERCONFIDENT_ASSAY","decision_aware_action_id":"NOISY_HIGH_GAIN_TEST","oracle_action_id":"ROBUST_RECOVERY_TEST"}
+      "expected":{"fixed_order_action_id":"OVERCONFIDENT_ASSAY","uncertainty_first_action_id":"OVERCONFIDENT_ASSAY","decision_aware_action_id":"OVERCONFIDENT_ASSAY","oracle_action_id":"ROBUST_RECOVERY_TEST"}
     },
     {
       "scenario_id": "UNQUALIFIED_SAMPLE_MUST_BE_BLOCKED",
