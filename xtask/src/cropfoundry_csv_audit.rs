@@ -325,6 +325,30 @@ pub fn run(
         &file_name,
         expected_data_records,
     )?;
+    let mut failures = Vec::new();
+    if !receipt.duplicate_header_names.is_empty() {
+        failures.push(format!("duplicate headers: {:?}", receipt.duplicate_header_names));
+    }
+    if !receipt.missing_required_columns.is_empty() {
+        failures.push(format!(
+            "missing required columns: {:?}",
+            receipt.missing_required_columns
+        ));
+    }
+    if receipt.rows_with_width_mismatch > 0 {
+        failures.push(format!(
+            "{} rows have a field count different from the header",
+            receipt.rows_with_width_mismatch
+        ));
+    }
+    if receipt.record_count_matches_expectation == Some(false) {
+        failures.push(format!(
+            "data record count {} does not match the declared expectation {}",
+            receipt.data_record_count,
+            receipt.expected_data_records.unwrap_or_default()
+        ));
+    }
+
     let rendered = serde_json::to_string_pretty(&receipt)?;
     println!("{rendered}");
     if let Some(path) = out {
@@ -335,7 +359,14 @@ pub fn run(
         fs::write(&path, format!("{rendered}\n"))
             .with_context(|| format!("cannot write audit receipt {}", path.display()))?;
     }
-    Ok(())
+    if failures.is_empty() {
+        Ok(())
+    } else {
+        Err(anyhow!(
+            "CSV schema audit found blocking issues; receipt emitted/saved, no PASS: {}",
+            failures.join("; ")
+        ))
+    }
 }
 
 #[cfg(test)]
@@ -442,8 +473,9 @@ mod tests {
 
     #[test]
     fn source_identity_cannot_be_relabelled() {
+        let bytes = b"Date;Plant;Treatment\n01/01/2024;P1;T1\n";
         let result = audit_csv_bytes(
-            b"Date;Plant;Treatment\n01/01/2024;P1;T1\n",
+            bytes,
             b';',
             "DS-011",
             SOURCE_URI,
@@ -451,5 +483,15 @@ mod tests {
             None,
         );
         assert!(result.is_err());
+
+        let wrong_uri = audit_csv_bytes(
+            bytes,
+            b';',
+            SOURCE_ID,
+            "https://example.invalid/other-source",
+            "wrong-uri.csv",
+            None,
+        );
+        assert!(wrong_uri.is_err());
     }
 }
