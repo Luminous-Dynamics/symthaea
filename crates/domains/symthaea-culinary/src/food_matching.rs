@@ -60,10 +60,10 @@ fn value_string_or_null(value: Option<&Value>) -> Option<Option<&str>> {
 }
 
 fn relation_is_consistent(check: &Value) -> bool {
-    let Some(Some(query_value)) = value_string_or_null(check.get("query_value")) else {
+    let Some(query_value) = value_string_or_null(check.get("query_value")) else {
         return false;
     };
-    let Some(Some(candidate_value)) = value_string_or_null(check.get("candidate_value")) else {
+    let Some(candidate_value) = value_string_or_null(check.get("candidate_value")) else {
         return false;
     };
     let relation = non_empty(check, "relation").unwrap_or("");
@@ -106,8 +106,9 @@ pub fn validate_food_identity_match_v1(assessment: &Value) -> Result<(), Vec<Str
         errors.push("outcome is invalid".to_owned());
     }
 
-    let query = assessment.get("query_record").unwrap_or(&Value::Null);
-    let candidate = assessment.get("candidate_record").unwrap_or(&Value::Null);
+    let null = Value::Null;
+    let query = assessment.get("query_record").unwrap_or(&null);
+    let candidate = assessment.get("candidate_record").unwrap_or(&null);
     identity_record_errors(query, "query_record", &mut errors);
     identity_record_errors(candidate, "candidate_record", &mut errors);
 
