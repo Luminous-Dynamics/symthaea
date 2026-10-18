@@ -48,6 +48,12 @@ From the workspace root, run:
 
 These commands have not been executed in this environment. A successful run would show synthetic fixture conformance only.
 
+### Scoring a rights-cleared measured dataset
+
+Use a separate input manifest with `status: "measured_dataset"`, root `evidence_class` set to either `InstrumentedPhysical` or `FieldObserved`, and the same `metric_contract`. Each case uses a non-empty class such as `measurement`, the same pair fields as the fixture, and omits all oracle fields (`expected_status`, `expected_error`, `expected_output`, `absolute_tolerance`, and `relative_tolerance`). Every row’s evidence class must match the root class. A split other than `HOLDOUT` can be scored diagnostically but does not enter the validation summary. A rejected row is retained in the report; only scoreable rows that satisfy the physical-holdout gate contribute to summary statistics. Split instrumented and field-observed evidence into separate manifests.
+
+The measured-data mode does not certify the authenticity of a measurement or the authority to share it. Preserve source rights, calibration evidence, raw-data custody, and independent evaluation before calling any result a physical validation.
+
 ## Physical benchmark protocol to target next
 
 1. Obtain rights-cleared raw telemetry and full model/component maps from a suitable existing study or instrument one reference vehicle. Preserve source licenses/consent and raw checksums.
