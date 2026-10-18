@@ -855,10 +855,15 @@ fn replay_preference_episode_with_context_mode(
             mismatched_count += 1;
         }
         if task_matches && (!require_context_match || context_matches) {
-            let observation_step = observation
-                .get("step")
-                .and_then(Value::as_u64)
-                .unwrap_or(current_step);
+            let observation_step = match observation.get("step").and_then(Value::as_u64) {
+                Some(step) => step,
+                None => {
+                    return Err(vec![PreferenceDriftFixtureFindingV1 {
+                        path: "$.preference_observations.step".to_owned(),
+                        reason: "observation step is missing or invalid".to_owned(),
+                    }]);
+                }
+            };
             if observation_step > current_step {
                 return Err(vec![PreferenceDriftFixtureFindingV1 {
                     path: "$.preference_observations.step".to_owned(),
