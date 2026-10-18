@@ -56,6 +56,16 @@ Tests intentionally include scenarios where staging wins, waiting wins, one-shot
 
 This is an exhaustive comparison of four named policy templates, **not** a general dynamic-programming oracle or a validated real-options model. The next benchmark step is to independently enumerate small state/action trees with a reference oracle and compare the policy catalog against that upper bound.
 
+## Value of information: deciding which uncertainty to reduce
+
+The `value_of_information.rs` module compares the best action under current priors with the best action after each possible outcome of a specified noisy signal. It reports the baseline expected value, expected value after information, gross expected value of sample information (EVSI), acquisition cost, net EVSI, and expected value of perfect information (EVPI). Signals are not treated as valuable merely because they are informative: their value comes from improving the decision, and the estimated gross value cannot exceed the perfect-information ceiling under the same payoff model.
+
+The inputs—state priors, signal likelihoods, payoffs, and information costs—are supplied assumptions. The prototype does not calibrate them or establish physical truth. It uses small finite state spaces and fixed-point arithmetic to make the decision calculation reproducible and hand-checkable.
+
+This work complements [Sol-Atlas issue #131](https://github.com/Luminous-Dynamics/sol-atlas-leptos/issues/131), which already covers Pareto, sensitivity and value-of-information analysis for site selection. ICCB should consume those qualified investigation assessments rather than build a second site-selection engine. Further tests and independent validation are tracked in [ICCB-003](https://github.com/Luminous-Dynamics/symthaea/issues/8020).
+
+The method follows established decision-analysis literature, including [Strong et al. (2015)](https://journals.sagepub.com/doi/10.1177/0272989X15575286) and [Jackson et al. (2019)](https://www.tandfonline.com/doi/full/10.1080/01621459.2018.1562932). ICCB's contribution is the experimental application to capital-plan and physical-asset evidence workflows—not a claim to have invented EVSI.
+
 ## Staged commitments and reversibility
 
 The staged-capital protocol is described in [REVERSIBILITY_AND_STAGED_CAPITAL.md](REVERSIBILITY_AND_STAGED_CAPITAL.md). The `staging.rs` module is a fail-closed tranche authorization gate, **not** a real-options valuation model. It makes required evidence, milestone satisfaction, delegated authority, and cumulative commitment limits explicit. The prototype also reports a cash-maximizing feasible baseline and a Pareto frontier without compressing outcomes into one score.
