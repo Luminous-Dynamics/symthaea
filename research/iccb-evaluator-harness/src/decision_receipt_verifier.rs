@@ -6,9 +6,10 @@
 //! candidate's public deterministic evaluator to replay outputs; it is not an
 //! independent financial/engineering model or proof of source truth.
 
-use iccb_evaluator::decision_receipt::{
-    CANONICALIZATION_VERSION, DECISION_RECEIPT_SCHEMA, DecisionReceipt, DecisionRunContext,
-};
+use iccb_evaluator::decision_receipt::{DecisionReceipt, DecisionRunContext};
+
+const SUPPORTED_RECEIPT_SCHEMA: &str = "iccb-decision-receipt-v1";
+const SUPPORTED_CANONICALIZATION_VERSION: &str = "iccb-canonical-binary-v1";
 use iccb_evaluator::uncertainty_contract::{
     CompatibleAnalysisRoute, UncertaintyEvidenceKind, UncertaintyRoutingReceipt,
 };
@@ -285,10 +286,10 @@ pub fn verify_decision_receipt_independently(
     scenario: &CandidateScenario,
     recorded: &DecisionReceipt,
 ) -> Result<(), ReceiptVerificationError> {
-    if recorded.schema_version != DECISION_RECEIPT_SCHEMA {
+    if recorded.schema_version != SUPPORTED_RECEIPT_SCHEMA {
         return Err(ReceiptVerificationError::UnsupportedReceiptSchema);
     }
-    if recorded.canonicalization_version != CANONICALIZATION_VERSION {
+    if recorded.canonicalization_version != SUPPORTED_CANONICALIZATION_VERSION {
         return Err(ReceiptVerificationError::UnsupportedCanonicalizationVersion);
     }
     if context.producer_commit.trim().is_empty()
@@ -351,7 +352,6 @@ pub fn verify_decision_receipt_independently(
 #[cfg(test)]
 mod tests {
     use super::*;
-    use iccb_evaluator::decision_receipt::sha256_hex;
     use iccb_evaluator::uncertainty_contract::UncertaintyAssessmentRef;
     use iccb_evaluator::{DecisionOption, EvidenceClaim, Mandate};
 
@@ -407,7 +407,7 @@ mod tests {
     }
 
     fn context(manifest: &[u8], scenario_id: &str) -> DecisionRunContext {
-        let digest = sha256_hex(manifest);
+        let digest = independent_sha256_hex(manifest);
         DecisionRunContext {
             producer_commit: "0123456789abcdef0123456789abcdef01234567".into(),
             evaluator_version: "iccb-evaluator-0.1.0".into(),
@@ -500,7 +500,7 @@ mod tests {
                 &scenario,
                 &frozen_golden_receipt()
             ),
-            Err(ReceiptVerificationError::RoutingManifestDigestMismatch)
+            Err(ReceiptVerificationError::InputManifestDigestMismatch)
         );
     }
 }
