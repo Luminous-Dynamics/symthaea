@@ -668,6 +668,64 @@ mod tests {
     }
 
     #[test]
+    fn generated_context_and_feedback_provenance_are_explicit() {
+        let suite = generate_preference_drift_suite(
+            SOURCE_FIXTURE,
+            &PreferenceDriftGeneratorConfigV1::default(),
+        )
+        .unwrap();
+        let fixture: Value = serde_json::from_str(&suite.fixture_json).unwrap();
+        let scenarios = fixture["scenarios"].as_array().unwrap();
+        let mut applied_reversals = 0usize;
+
+        for scenario in scenarios {
+            assert_eq!(
+                scenario["current_context_id"],
+                scenario["evaluation_oracle"]["context_id"],
+                "evaluation context should identify the generated current context"
+            );
+            let variation = scenario
+                .get("generator_variation")
+                .and_then(Value::as_object)
+                .expect("factorized axis receipt");
+            assert!(variation.get("terrain").and_then(Value::as_str).is_some());
+            assert!(variation.get("fatigue").and_then(Value::as_str).is_some());
+            assert!(variation.get("payload_class").and_then(Value::as_str).is_some());
+            assert!(variation.get("time_window").and_then(Value::as_str).is_some());
+
+            if variation.get("preference_reversed").and_then(Value::as_bool) == Some(true) {
+                applied_reversals += 1;
+                assert_eq!(
+                    variation.get("feedback_mode").and_then(Value::as_str),
+                    Some("reversed_synthetic_context")
+                );
+            }
+
+            for observation in scenario["preference_observations"].as_array().unwrap() {
+                if observation.get("source_observation_id").is_some() {
+                    assert!(
+                        observation
+                            .get("source")
+                            .and_then(Value::as_str)
+                            .is_some_and(|source| source.starts_with("explicit_synthetic_"))
+                    );
+                    assert!(
+                        observation
+                            .get("source_observation_source")
+                            .and_then(Value::as_str)
+                            .is_some_and(|source| source.starts_with("explicit_synthetic_"))
+                    );
+                }
+            }
+        }
+
+        assert_eq!(
+            applied_reversals,
+            suite.manifest.preference_reversal_scenario_count
+        );
+    }
+
+    #[test]
     fn generator_rejects_invalid_split_and_runaway_size_configuration() {
         let invalid_split = PreferenceDriftGeneratorConfigV1 {
             development_wearer_session_count: 50,
