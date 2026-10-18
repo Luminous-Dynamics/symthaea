@@ -147,25 +147,6 @@ fn expect_string(
     }
 }
 
-fn get_array<'a>(
-    root: &'a Value,
-    field: &str,
-    issues: &mut Vec<ValidationIssue>,
-) -> Option<&'a Vec<Value>> {
-    match root.get(field).and_then(Value::as_array) {
-        Some(values) => Some(values),
-        None => {
-            push(
-                issues,
-                "MISSING_REQUIRED_ARRAY",
-                field,
-                "required field must be a JSON array",
-            );
-            None
-        }
-    }
-}
-
 fn path_for_item(list: &str, index: usize, field: &str) -> String {
     format!("{list}[{index}].{field}")
 }
