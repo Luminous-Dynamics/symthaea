@@ -12,8 +12,7 @@
 
 use crate::capacitor_spectrum::{
     CapacitorCurrentSpectrum, CapacitorImpedanceSweep, CapacitorSpectrumConstraintViolation,
-    CapacitorSpectrumDisposition, CapacitorSpectrumError, CapacitorSpectrumLimitation,
-    CapacitorSpectrumMetrics, CapacitorSpectrumScreeningReport,
+    CapacitorSpectrumDisposition, CapacitorSpectrumError, CapacitorSpectrumScreeningReport,
     CapacitorSpectrumScreeningRequirements, ImpedanceEvaluationKind,
     calculate_capacitor_spectrum_metrics, screen_capacitor_spectrum,
 };
@@ -606,8 +605,7 @@ pub fn screen_capacitor_spectrum_bounded(
 mod tests {
     use super::*;
     use crate::capacitor_spectrum::{
-        CapacitorDeviceEvidenceKind, CapacitorSpectrumConstraintViolation,
-        CapacitorSpectrumScreeningRequirements, CurrentSpectrumComponent,
+        CapacitorDeviceEvidenceKind, CapacitorSpectrumScreeningRequirements, CurrentSpectrumComponent,
         ImpedanceSweepPoint,
     };
 
@@ -781,12 +779,14 @@ mod tests {
     fn interpolation_without_an_error_bound_is_not_evaluable() {
         let mut current = spectrum();
         current.components[0].frequency_hz = 3.0e3;
+        let mut bounded_currents = current_bounds();
+        bounded_currents[0].frequency_hz = 3.0e3;
         let report = screen_capacitor_spectrum_bounded(
             &sweep(),
             &current,
             &requirements(),
             &impedance_bounds(),
-            &current_bounds(),
+            &bounded_currents,
         )
         .unwrap();
         assert_eq!(report.disposition, BoundedSpectrumDisposition::NotEvaluable);
