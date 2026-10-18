@@ -11,6 +11,9 @@ use crate::{
     creative_contract::{
         CreativeCandidateAuditV1, CreativeIntentContractV1, audit_candidate,
     },
+    creative_temporal_support::{
+        CreativeTemporalSupportError, CreativeTemporalSupportV1, measure_temporal_support,
+    },
 };
 use serde::{Deserialize, Serialize};
 use sha2::{Digest, Sha256};
@@ -20,7 +23,10 @@ use std::{
     fmt,
 };
 
-pub const CREATIVE_QD_BENCH_SCHEMA_VERSION: u32 = 1;
+/// Schema version of the frozen input brief/candidate corpus.
+pub const CREATIVE_QD_CORPUS_SCHEMA_VERSION: u32 = 1;
+/// Schema version of the emitted benchmark receipt.
+pub const CREATIVE_QD_BENCH_SCHEMA_VERSION: u32 = 2;
 pub const CREATIVE_QD_DESCRIPTOR_GRID_CELLS: usize = 6 * 5 * 4 * 5;
 
 /// Frozen input corpus for the first contract/descriptor benchmark.
@@ -86,6 +92,23 @@ pub struct CreativeIntentBenchmarkCandidateReceiptV1 {
     pub descriptor_cell: Option<CreativeArchiveDescriptorCellV1>,
     pub retained_in_archive: bool,
     pub audit: CreativeCandidateAuditV1,
+    /// Descriptive temporal evidence. Not currently used for acceptance or archive bins.
+    pub temporal_support: CreativeTemporalSupportOutcomeV1,
+}
+
+/// Temporal support measurement outcome emitted with every candidate receipt.
+///
+/// Malformed note input stays visible as an explicit measurement error rather than
+/// being omitted or presented as zero coverage.
+#[derive(Debug, Clone, PartialEq, Serialize)]
+#[serde(tag = "status", rename_all = "snake_case")]
+pub enum CreativeTemporalSupportOutcomeV1 {
+    Measured {
+        metrics: CreativeTemporalSupportV1,
+    },
+    Unavailable {
+        error: CreativeTemporalSupportError,
+    },
 }
 
 /// Report for one intent family; hard acceptance and archive coverage stay separate.
@@ -149,7 +172,7 @@ pub fn run_corpus_bytes(
     let corpus: CreativeIntentBenchmarkCorpusV1 = serde_json::from_slice(corpus_bytes)
         .map_err(|error| CreativeBenchmarkError::new(format!("invalid corpus JSON: {error}")))?;
 
-    if corpus.schema_version != CREATIVE_QD_BENCH_SCHEMA_VERSION {
+    if corpus.schema_version != CREATIVE_QD_CORPUS_SCHEMA_VERSION {
         return Err(CreativeBenchmarkError::new(format!(
             "unsupported corpus schema version {}",
             corpus.schema_version
@@ -214,6 +237,14 @@ pub fn run_corpus_bytes(
                 .collect();
             let audit = audit_candidate(&notes, candidate.duration_secs, &intent.contract);
             let observed_accepted = audit.accepted;
+            let temporal_support = match measure_temporal_support(
+                &notes,
+                candidate.duration_secs,
+                intent.contract.window_count,
+            ) {
+                Ok(metrics) => CreativeTemporalSupportOutcomeV1::Measured { metrics },
+                Err(error) => CreativeTemporalSupportOutcomeV1::Unavailable { error },
+            };
 
             if observed_accepted != candidate.expected_accepted {
                 mismatches.push(format!(
@@ -248,6 +279,7 @@ pub fn run_corpus_bytes(
                 observed_accepted,
                 cell,
                 audit,
+                temporal_support,
             ));
         }
 
@@ -263,7 +295,14 @@ pub fn run_corpus_bytes(
             candidate_audits
                 .into_iter()
                 .map(
-                    |(candidate_id, expected_accepted, observed_accepted, descriptor_cell, audit)| {
+                    |(
+                        candidate_id,
+                        expected_accepted,
+                        observed_accepted,
+                        descriptor_cell,
+                        audit,
+                        temporal_support,
+                    )| {
                         CreativeIntentBenchmarkCandidateReceiptV1 {
                             retained_in_archive: retained_ids.contains(candidate_id.as_str()),
                             candidate_id,
@@ -271,6 +310,7 @@ pub fn run_corpus_bytes(
                             observed_accepted,
                             descriptor_cell,
                             audit,
+                            temporal_support,
                         }
                     },
                 )
@@ -372,6 +412,7 @@ mod tests {
     fn frozen_corpus_matches_all_preregistered_outcomes() {
         let report = run_corpus_bytes(FROZEN_CORPUS, Some("test-source-sha"))
             .expect("frozen creative intent corpus should parse and validate");
+        assert_eq!(report.schema_version, CREATIVE_QD_BENCH_SCHEMA_VERSION);
         assert_eq!(report.total_candidate_count, 16);
         assert_eq!(report.accepted_candidate_count, 8);
         assert_eq!(report.rejected_candidate_count, 8);
@@ -424,6 +465,40 @@ mod tests {
             .unwrap();
         assert!(steady_a.retained_in_archive);
         assert!(!steady_z.retained_in_archive);
+        assert!(matches!(
+            steady_a.temporal_support,
+            CreativeTemporalSupportOutcomeV1::Measured { .. }
+        ));
+        if let CreativeTemporalSupportOutcomeV1::Measured { metrics } =
+            &steady_a.temporal_support
+        {
+            assert!((metrics.occupied_time_ratio - 0.4).abs() < 1.0e-6);
+            assert_eq!(metrics.onset_window_coverage_ratio, 1.0);
+            assert_eq!(metrics.sustain_window_coverage_ratio, 1.0);
+        } else {
+            panic!("valid ambient fixture should have temporal support metrics");
+        }
+    }
+
+    #[test]
+    fn invalid_note_has_an_explicit_temporal_measurement_failure() {
+        let report = run_corpus_bytes(FROZEN_CORPUS, None).expect("corpus should be valid");
+        let melody = report
+            .intents
+            .iter()
+            .find(|intent| intent.intent_id == "lyrical-melody")
+            .unwrap();
+        let invalid = melody
+            .candidates
+            .iter()
+            .find(|candidate| candidate.candidate_id == "invalid-note-in-melody")
+            .unwrap();
+        assert!(matches!(
+            invalid.temporal_support,
+            CreativeTemporalSupportOutcomeV1::Unavailable {
+                error: CreativeTemporalSupportError::InvalidNote { index: 3 }
+            }
+        ));
     }
 
     #[test]
