@@ -761,12 +761,10 @@ pub fn replay_preference_episode(
     {
         Some(items) => items,
         None => {
-            finding(
-                &mut findings,
-                "$.preference_observations",
-                "missing or malformed preference-observation array",
-            );
-            &Vec::new()
+            return Err(vec![PreferenceDriftFixtureFindingV1 {
+                path: "$.preference_observations".to_owned(),
+                reason: "missing or malformed preference-observation array".to_owned(),
+            }]);
         }
     };
     if !findings.is_empty() {
@@ -864,10 +862,16 @@ pub fn replay_preference_episode(
     let winner_candidates: Vec<String> = eligible
         .iter()
         .filter(|candidate| {
+            let candidate_id = candidate.as_str();
             eligible
                 .iter()
-                .filter(|other| *other != *candidate)
-                .all(|other| directed_pairs.contains(&(candidate.clone(), other.clone())))
+                .filter(|other| other.as_str() != candidate_id)
+                .all(|other| {
+                    directed_pairs.contains(&(
+                        candidate_id.to_owned(),
+                        other.as_str().to_owned(),
+                    ))
+                })
         })
         .cloned()
         .collect();
@@ -1049,6 +1053,146 @@ mod tests {
         assert!(has_path_error(
             &findings,
             "$.scenarios[0].eligible_candidate_ids"
+        ));
+    }
+
+    fn scenario_by_id<'a>(fixture: &'a Value, scenario_id: &str) -> &'a Value {
+        fixture["scenarios"]
+            .as_array()
+            .expect("fixture scenario array")
+            .iter()
+            .find(|scenario| scenario["scenario_id"] == serde_json::json!(scenario_id))
+            .expect("scenario ID exists")
+    }
+
+    #[test]
+    fn explicit_context_matched_pairwise_winner_is_recommended() {
+        let fixture = parse_fixture();
+        let report = replay_preference_episode(scenario_by_id(&fixture, "DEV-WALK-001"))
+            .expect("valid synthetic episode");
+        assert_eq!(report.action, PreferenceReplayActionV1::Recommend);
+        assert_eq!(report.recommended_candidate_id.as_deref(), Some("flex"));
+        assert_eq!(report.context_matched_observation_count, 2);
+        assert_eq!(report.stale_or_mismatched_observation_count, 0);
+    }
+
+    #[test]
+    fn stale_preference_is_not_transferred_across_fatigue_context() {
+        let fixture = parse_fixture();
+        let report = replay_preference_episode(scenario_by_id(&fixture, "HOLD-SHIFT-001"))
+            .expect("valid synthetic episode");
+        assert_eq!(report.action, PreferenceReplayActionV1::Query);
+        assert_eq!(
+            report.reason,
+            PreferenceReplayReasonV1::NoContextMatchedPreferenceEvidence
+        );
+        assert_eq!(report.context_matched_observation_count, 0);
+        assert_eq!(report.stale_or_mismatched_observation_count, 1);
+    }
+
+    #[test]
+    fn contradictory_pairwise_feedback_requests_clarification() {
+        let fixture = parse_fixture();
+        let report = replay_preference_episode(scenario_by_id(&fixture, "HOLD-CONFLICT-001"))
+            .expect("valid synthetic episode");
+        assert_eq!(report.action, PreferenceReplayActionV1::Query);
+        assert_eq!(report.reason, PreferenceReplayReasonV1::ContradictoryFeedback);
+    }
+
+    #[test]
+    fn hard_ineligible_preferred_candidate_is_never_recommended() {
+        let fixture = parse_fixture();
+        let report = replay_preference_episode(scenario_by_id(&fixture, "HOLD-GATE-001"))
+            .expect("valid synthetic episode");
+        assert_eq!(report.action, PreferenceReplayActionV1::Recommend);
+        assert_eq!(report.recommended_candidate_id.as_deref(), Some("stable"));
+        assert!(!report.eligible_candidate_ids.iter().any(|id| id == "assist"));
+    }
+
+    #[test]
+    fn explicit_rejection_of_every_eligible_option_is_preserved() {
+        let fixture = parse_fixture();
+        let report = replay_preference_episode(scenario_by_id(&fixture, "HOLD-REJECT-001"))
+            .expect("valid synthetic episode");
+        assert_eq!(report.action, PreferenceReplayActionV1::RejectAll);
+        assert_eq!(report.recommended_candidate_id, None);
+    }
+
+    #[test]
+    fn exhausted_query_budget_causes_abstention_on_stale_evidence() {
+        let fixture = parse_fixture();
+        let report = replay_preference_episode(scenario_by_id(&fixture, "HOLD-BUDGET-001"))
+            .expect("valid synthetic episode");
+        assert_eq!(report.action, PreferenceReplayActionV1::Abstain);
+        assert_eq!(report.remaining_query_budget, 0);
+        assert_eq!(report.stale_or_mismatched_observation_count, 1);
+    }
+
+    #[test]
+    fn absence_of_preference_evidence_does_not_create_a_ranking() {
+        let fixture = parse_fixture();
+        let report = replay_preference_episode(scenario_by_id(&fixture, "HOLD-UNKNOWN-001"))
+            .expect("valid synthetic episode");
+        assert_eq!(report.action, PreferenceReplayActionV1::Query);
+        assert_eq!(report.recommended_candidate_id, None);
+    }
+
+    #[test]
+    fn incomplete_pairwise_coverage_queries_instead_of_inventing_a_winner() {
+        let fixture = parse_fixture();
+        let report = replay_preference_episode(scenario_by_id(&fixture, "HOLD-TRANSFER-001"))
+            .expect("valid synthetic episode");
+        assert_eq!(report.action, PreferenceReplayActionV1::Query);
+        assert_eq!(
+            report.reason,
+            PreferenceReplayReasonV1::NoContextMatchedPreferenceEvidence
+        );
+    }
+
+    #[test]
+    fn evaluation_oracle_changes_cannot_change_policy_replay() {
+        let fixture = parse_fixture();
+        let original = scenario_by_id(&fixture, "DEV-WALK-001");
+        let expected = replay_preference_episode(original).expect("valid synthetic episode");
+        let mut changed = original.clone();
+        changed["evaluation_oracle"]["preferred_order"] =
+            serde_json::json!(["assist", "stable", "flex"]);
+        changed["evaluation_oracle"]["acceptable_candidate_ids"] = serde_json::json!(["assist"]);
+        let actual = replay_preference_episode(&changed).expect("mutated evaluation oracle ignored");
+        assert_eq!(actual, expected);
+    }
+
+    #[test]
+    fn replay_output_is_byte_stable_for_one_hundred_repeats() {
+        let fixture = parse_fixture();
+        let scenario = scenario_by_id(&fixture, "HOLD-NOISE-001");
+        let expected = serde_json::to_vec(&replay_preference_episode(scenario).unwrap()).unwrap();
+        for _ in 0..100 {
+            let actual =
+                serde_json::to_vec(&replay_preference_episode(scenario).unwrap()).unwrap();
+            assert_eq!(actual, expected);
+        }
+    }
+
+    #[test]
+    fn malformed_replay_budget_fails_closed() {
+        let fixture = parse_fixture();
+        let mut scenario = scenario_by_id(&fixture, "DEV-WALK-001").clone();
+        scenario["queries_already_used"] = serde_json::json!(99);
+        assert!(replay_preference_episode(&scenario).is_err());
+    }
+
+    #[test]
+    fn malformed_current_context_id_fails_closed() {
+        let mut fixture = parse_fixture();
+        fixture["scenarios"][0]
+            .as_object_mut()
+            .expect("scenario object")
+            .remove("current_context_id");
+        let findings = validate_preference_drift_fixture(&encode(&fixture)).unwrap_err();
+        assert!(has_path_error(
+            &findings,
+            "$.scenarios[0].current_context_id"
         ));
     }
 
