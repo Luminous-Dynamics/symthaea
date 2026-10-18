@@ -372,7 +372,6 @@ fn validate_case_shell(fixture: &CaseFixture) -> Vec<String> {
     }
     if !nonempty(&fixture.request.target_species)
         || !nonempty(&fixture.request.life_stage)
-        || !nonempty(&fixture.request.intended_use)
         || !nonempty(&fixture.request.scenario_digest)
     {
         errors.push("REQUEST_FIELD_EMPTY".to_owned());
