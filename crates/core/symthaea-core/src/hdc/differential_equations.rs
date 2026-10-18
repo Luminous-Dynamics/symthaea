@@ -892,6 +892,15 @@ impl DifferentialEquationsEngine {
         base.bind(&method_hv).bind(&state_hv)
     }
 
+    fn encode_implicit_euler_result(final_y: &[f64]) -> BinaryHV {
+        let state_hash: u64 = final_y
+            .iter()
+            .fold(0u64, |acc, &value| acc.wrapping_add(value.to_bits()));
+        let base = BinaryHV::random(seed_from_name("IMPLICIT_EULER"));
+        let state_hv = BinaryHV::random(seed_from_name(&format!("IE_STATE_{}", state_hash)));
+        base.bind(&state_hv)
+    }
+
     fn encode_pde_result(u_final: &[f64], tag: &str) -> BinaryHV {
         let base = BinaryHV::random(seed_from_name(tag));
         let state_hash: u64 = u_final.iter().enumerate().fold(0u64, |acc, (i, &v)| {
@@ -1144,7 +1153,7 @@ impl DifferentialEquationsEngine {
                 method: ODEMethod::ImplicitEuler,
                 steps: 0,
                 phi: 1.0 / (1.0 + y.iter().map(|value| value.abs()).sum::<f64>() / system.dim as f64),
-                encoding: Self::encode_ode_result(&y, ODEMethod::ImplicitEuler),
+                encoding: Self::encode_implicit_euler_result(&y),
             };
             return Ok(ImplicitEulerSolveReport {
                 trajectory,
@@ -1372,7 +1381,7 @@ impl DifferentialEquationsEngine {
             method: ODEMethod::ImplicitEuler,
             steps: n_steps,
             phi: 1.0 / (1.0 + y.iter().map(|value| value.abs()).sum::<f64>() / dimension as f64),
-            encoding: Self::encode_ode_result(&y, ODEMethod::ImplicitEuler),
+            encoding: Self::encode_implicit_euler_result(&y),
         };
         Ok(ImplicitEulerSolveReport {
             trajectory,
@@ -1456,10 +1465,7 @@ impl DifferentialEquationsEngine {
             y_values.push(y.clone());
         }
 
-        let state_hash: u64 = y.iter().fold(0u64, |acc, &v| acc.wrapping_add(v.to_bits()));
-        let base = BinaryHV::random(seed_from_name("IMPLICIT_EULER"));
-        let state_hv = BinaryHV::random(seed_from_name(&format!("IE_STATE_{}", state_hash)));
-        let encoding = base.bind(&state_hv);
+        let encoding = Self::encode_implicit_euler_result(&y);
         let phi = 1.0 / (1.0 + y.iter().map(|v| v.abs()).sum::<f64>() / dim as f64);
 
         ODEResult {
