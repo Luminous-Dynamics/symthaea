@@ -102,6 +102,21 @@ Targets are provisional and need preregistration before final evaluation.
 
 No aggregate score should hide an unauthorized tranche release or an accounting error. Report the costs of waiting as carefully as the benefits of preserving the option to stop.
 
+## Cross-project architecture boundary
+
+Sol-Atlas already has adjacent work for the physical-resource side of this problem: [PR #116](https://github.com/Luminous-Dynamics/sol-atlas-leptos/pull/116) develops evidence-aware spatial-economic resilience analysis, while [issue #152](https://github.com/Luminous-Dynamics/sol-atlas-leptos/issues/152) covers shared-resource constrained allocation, [#153](https://github.com/Luminous-Dynamics/sol-atlas-leptos/issues/153) adds inventory conservation across time, [#155](https://github.com/Luminous-Dynamics/sol-atlas-leptos/issues/155) proposes independent sparse-allocation oracle validation, and [#131](https://github.com/Luminous-Dynamics/sol-atlas-leptos/issues/131) covers Pareto, sensitivity and value-of-information analysis.
+
+ICCB should **consume qualified, versioned assessments from that physical-resource layer rather than duplicate its allocator, water model, or hydraulic solver**. A future adapter should preserve the scenario digest, as-of time, units, lower/upper service-capacity bounds, critical dependency IDs, evidence references, indeterminate states, distributional floors, and the explicit claim ceiling of the producing model. Unknown topology or stale evidence must widen/taint the relevant capital decision rather than becoming an optimistic default.
+
+The intended responsibilities are complementary:
+- **Sol-Atlas:** geospatial asset and service topology, resource constraints, capacity bounds, network cascades, distributional service floors, and evidence-bound physical assessments.
+- **Symtropy:** dynamic scenarios and system simulation only where the modeled physics, constraints, and validation limits are explicit.
+- **Symthaea / ICCB:** capital options, hard mandates, uncertainty, decision regret, staged commitment policies, Pareto outcomes, and independent decision receipts.
+- **Mycelix:** optional provenance / authority / coordination facilities where they actually exist and are independently reviewed; a signed assertion is not proof of physical truth.
+- **Luminous Platform:** deployment boundaries, access control, recovery, audit export and operator continuity.
+
+**Integration status:** this is a proposed interface boundary, not a claim that these systems are integrated today. The next integration issue should freeze the adapter schema and cross-repository conformance fixtures before implementation.
+
 ## Research questions to resolve before claiming advantage
 
 1. Which uncertainty can actually be resolved by staging, rather than merely postponed?
