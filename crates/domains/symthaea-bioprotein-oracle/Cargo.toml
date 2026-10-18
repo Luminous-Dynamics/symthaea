@@ -6,6 +6,8 @@ license = "AGPL-3.0-or-later"
 description = "Synthetic-first, fail-closed oracle and receipt runner for bioprotein research gates"
 
 [dependencies]
-serde = { workspace = true }
-serde_json = { workspace = true }
-sha2 = { workspace = true }
+serde = { version = "1.0", features = ["derive"] }
+serde_json = "1.0"
+sha2 = "0.10"
+
+[workspace]
