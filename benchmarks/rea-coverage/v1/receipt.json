@@ -113,7 +113,23 @@
       "receipt identity verification",
       "three fail-closed mutation controls"
     ],
-    "status": "authored; no GitHub Actions pass is claimed",
-    "mutation_script_git_blob_sha1": "acfbf3c858e5d72c5e5bb8b755651e715e2a6e52"
+    "status": "pass",
+    "mutation_script_git_blob_sha1": "acfbf3c858e5d72c5e5bb8b755651e715e2a6e52",
+    "last_observed_successful_run": {
+      "run_id": 39168146679,
+      "run_number": 3,
+      "url": "https://github.com/Luminous-Dynamics/symthaea/actions/runs/39168146679",
+      "tested_commit": "df3254651850feb0b50ff79b3dde7c1b8a240d57",
+      "conclusion": "success",
+      "all_steps_passed": [
+        "required tool check",
+        "fixed 16-case known-answer corpus",
+        "510 byte-mask property sweep",
+        "169330 interval-representation sweep",
+        "receipt integrity verification",
+        "three fail-closed mutation controls"
+      ],
+      "note": "A later commit requires its own fresh workflow result; this record is scoped to tested_commit."
+    }
   }
 }
