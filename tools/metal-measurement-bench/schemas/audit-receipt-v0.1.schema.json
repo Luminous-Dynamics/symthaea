@@ -1,0 +1,158 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "title": "Metal Measurement Evidence Audit Receipt v0.1",
+  "type": "object",
+  "additionalProperties": false,
+  "required": [
+    "receipt_schema_version",
+    "adapter_version",
+    "source_commit",
+    "operation",
+    "status",
+    "manifest_sha256",
+    "evidence_input_sha256",
+    "artifact_count",
+    "record_count",
+    "held_out_outcome_groups",
+    "claim_ceiling"
+  ],
+  "properties": {
+    "receipt_schema_version": {
+      "const": "0.1.0"
+    },
+    "adapter_version": {
+      "type": "string",
+      "minLength": 1
+    },
+    "source_commit": {
+      "type": ["string", "null"],
+      "pattern": "^[0-9a-f]{40,64}$"
+    },
+    "operation": {
+      "enum": [
+        "validate-manifest",
+        "verify-artifacts",
+        "inspect-csv",
+        "validate-records"
+      ]
+    },
+    "status": {
+      "type": "string",
+      "minLength": 1
+    },
+    "manifest_sha256": {
+      "type": "string",
+      "pattern": "^[0-9a-f]{64}$"
+    },
+    "evidence_input_sha256": {
+      "type": ["string", "null"],
+      "pattern": "^[0-9a-f]{64}$"
+    },
+    "artifact_count": {
+      "type": "integer",
+      "minimum": 0
+    },
+    "record_count": {
+      "type": "integer",
+      "minimum": 0
+    },
+    "held_out_outcome_groups": {
+      "type": "array",
+      "items": {
+        "type": "string",
+        "minLength": 1
+      },
+      "uniqueItems": true
+    },
+    "csv_inventory": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "artifact_relative_path",
+        "artifact_sha256",
+        "data_row_count",
+        "columns",
+        "row_identity_note",
+        "claim_ceiling"
+      ],
+      "properties": {
+        "artifact_relative_path": {
+          "type": "string",
+          "minLength": 1
+        },
+        "artifact_sha256": {
+          "type": "string",
+          "pattern": "^[0-9a-f]{64}$"
+        },
+        "data_row_count": {
+          "type": "integer",
+          "minimum": 0
+        },
+        "columns": {
+          "type": "array",
+          "minItems": 1,
+          "items": {
+            "type": "object",
+            "additionalProperties": false,
+            "required": [
+              "source_header",
+              "column_index_zero_based",
+              "nonempty_cells",
+              "empty_cells"
+            ],
+            "properties": {
+              "source_header": {
+                "type": "string",
+                "minLength": 1
+              },
+              "column_index_zero_based": {
+                "type": "integer",
+                "minimum": 0
+              },
+              "nonempty_cells": {
+                "type": "integer",
+                "minimum": 0
+              },
+              "empty_cells": {
+                "type": "integer",
+                "minimum": 0
+              }
+            }
+          }
+        },
+        "row_identity_note": {
+          "type": "string",
+          "minLength": 1
+        },
+        "claim_ceiling": {
+          "type": "string",
+          "minLength": 1
+        }
+      }
+    },
+    "claim_ceiling": {
+      "type": "string",
+      "minLength": 1
+    }
+  },
+  "allOf": [
+    {
+      "if": {
+        "properties": {
+          "operation": {
+            "const": "inspect-csv"
+          }
+        },
+        "required": ["operation"]
+      },
+      "then": {
+        "required": ["csv_inventory"]
+      },
+      "else": {
+        "not": {
+          "required": ["csv_inventory"]
+        }
+      }
+    }
+  ]
+}
