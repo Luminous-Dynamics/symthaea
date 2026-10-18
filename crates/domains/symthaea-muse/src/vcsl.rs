@@ -1069,6 +1069,8 @@ pub struct InstrumentCapabilityInventoryV1 {
     pub instrument_count: usize,
     /// True when indexed sample bytes were content-hashed during this inventory run.
     pub indexed_sample_content_hashing_enabled: bool,
+    /// True when all WAV files found by the root walker were content-hashed.
+    pub root_content_manifest_hashing_enabled: bool,
     pub vcsl_root: AssetRootEvidenceV1,
     pub vsco2_root: AssetRootEvidenceV1,
     pub soundfont: Option<SoundFontEvidenceV1>,
@@ -1123,13 +1125,18 @@ pub struct FluidSynthProgramProbeV1 {
     pub rms: Option<f32>,
 }
 
-/// Evidence for one library root. The digest binds sorted relative WAV paths
-/// and file sizes, not file contents; it is a lightweight asset-layout seal.
+/// Evidence for one library root. The path/size digest is a lightweight layout
+/// seal; the optional content digest additionally binds bytes of every WAV file
+/// accepted by the root walker (including WAVs rejected by the pitch indexer).
 #[derive(Debug, Clone, Serialize)]
 pub struct AssetRootEvidenceV1 {
     pub root_present: bool,
     pub wav_file_count: usize,
     pub path_size_manifest_sha256: Option<String>,
+    /// Optional SHA-256 over sorted relative paths, file sizes, and exact WAV bytes.
+    pub content_manifest_sha256: Option<String>,
+    /// "not_requested", "root_missing", or "hashed".
+    pub content_manifest_status: &'static str,
 }
 
 /// Evidence for an optional SoundFont file. Unlike the path/size manifest
@@ -1296,14 +1303,34 @@ pub fn capability_inventory_with_fluidsynth(
 }
 
 /// Build a capability inventory with explicit controls for external probes and
-/// expensive sample-byte hashing. Content hashing is opt-in because it reads
-/// every WAV accepted by the sample indexer a second time.
+/// expensive sample-byte hashing. Content hashing is opt-in because it streams
+/// asset bytes and may cause substantial additional I/O.
 pub fn capability_inventory_with_options(
     vcsl_root: &Path,
     vsco2_root: &Path,
     soundfont_path: Option<&Path>,
     fluidsynth_path: Option<&Path>,
     hash_indexed_samples: bool,
+) -> std::io::Result<InstrumentCapabilityInventoryV1> {
+    capability_inventory_with_provenance_options(
+        vcsl_root,
+        vsco2_root,
+        soundfont_path,
+        fluidsynth_path,
+        hash_indexed_samples,
+        false,
+    )
+}
+
+/// Build an inventory with independent controls for per-bank indexed WAV hashes
+/// and content hashes over every WAV found under each complete asset root.
+pub fn capability_inventory_with_provenance_options(
+    vcsl_root: &Path,
+    vsco2_root: &Path,
+    soundfont_path: Option<&Path>,
+    fluidsynth_path: Option<&Path>,
+    hash_indexed_samples: bool,
+    hash_root_wav_contents: bool,
 ) -> std::io::Result<InstrumentCapabilityInventoryV1> {
     if fluidsynth_path.is_some() && soundfont_path.is_none() {
         return Err(std::io::Error::new(
@@ -1361,8 +1388,8 @@ pub fn capability_inventory_with_options(
         Instrument::Xylophone,
     ];
 
-    let vcsl_evidence = asset_root_evidence(vcsl_root)?;
-    let vsco2_evidence = asset_root_evidence(vsco2_root)?;
+    let vcsl_evidence = asset_root_evidence(vcsl_root, hash_root_wav_contents)?;
+    let vsco2_evidence = asset_root_evidence(vsco2_root, hash_root_wav_contents)?;
     let soundfont = soundfont_path.map(soundfont_evidence).transpose()?;
     let mut sample_directory_cache =
         HashMap::<(SampleSource, String, bool), Option<SampleDirectoryEvidenceV1>>::new();
@@ -1446,6 +1473,7 @@ pub fn capability_inventory_with_options(
         source_revision,
         instrument_count: instruments.len(),
         indexed_sample_content_hashing_enabled: hash_indexed_samples,
+        root_content_manifest_hashing_enabled: hash_root_wav_contents,
         vcsl_root: vcsl_evidence,
         vsco2_root: vsco2_evidence,
         soundfont,
