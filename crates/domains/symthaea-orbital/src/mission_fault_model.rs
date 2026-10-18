@@ -486,7 +486,7 @@ mod tests {
             source_design: SourceDesignRef {
                 system_id: "synthetic-cubesat-communications".to_owned(),
                 revision: "v0.1".to_owned(),
-                sha256: "5236acfe93db6bf5f79992868d0a78a67230875907eef5bb8c8a90bcfe17f6d1"
+                sha256: "748da4fc495778c2b46ef7397ea4a3f435637f837b2aa8e61d10ef4b4d996656"
                     .to_owned(),
             },
             failure_modes: vec![FailureMode {
@@ -542,7 +542,7 @@ mod tests {
         assert!(manifest.critical_modes_with_gaps().is_empty());
         assert_eq!(manifest.schedule.perturbations.len(), 1);
         assert!(matches!(
-            manifest.schedule.perturbations[0],
+            &manifest.schedule.perturbations[0],
             OrbitalPerturbation::CommBlackout {
                 at_step: 4,
                 duration: 3
@@ -615,6 +615,21 @@ mod tests {
             non_finite.validate(),
             Err(MissionFaultModelError::InvalidInjectionParameters { .. })
         ));
+    }
+
+    #[test]
+    fn checked_in_fixture_deserializes_and_compiles_with_source_binding() {
+        let source_design = include_str!("../fixtures/space_fdir_mbse_001/source_design.txt");
+        let model: MissionFaultModel = serde_json::from_str(include_str!(
+            "../fixtures/space_fdir_mbse_001/model.json"
+        ))
+        .expect("versioned JSON fixture must deserialize into the typed IR");
+
+        assert_eq!(model.source_design.sha256, "748da4fc495778c2b46ef7397ea4a3f435637f837b2aa8e61d10ef4b4d996656");
+        assert!(source_design.starts_with("Synthetic spacecraft communications design"));
+        let manifest = model.compile_campaign().expect("fixture model compiles");
+        assert!(manifest.critical_coverage_closed());
+        assert_eq!(manifest.source_design_sha256, model.source_design.sha256);
     }
 
     #[test]
