@@ -10,7 +10,6 @@ use serde::Serialize;
 use sha2::{Digest, Sha256};
 use std::env;
 use std::fs;
-use std::io::{self, Write};
 use std::path::PathBuf;
 use std::process;
 
@@ -163,9 +162,18 @@ fn parse_jsonl(input: &str) -> Result<Vec<ListenerResponseRecord>, String> {
     Ok(records)
 }
 
+fn hex_lower(bytes: &[u8]) -> String {
+    const HEX: &[u8; 16] = b"0123456789abcdef";
+    let mut output = String::with_capacity(bytes.len() * 2);
+    for byte in bytes {
+        output.push(HEX[(byte >> 4) as usize] as char);
+        output.push(HEX[(byte & 0x0f) as usize] as char);
+    }
+    output
+}
+
 fn source_digest(bytes: &[u8]) -> String {
-    let digest = Sha256::digest(bytes);
-    digest.iter().map(|byte| format!("{byte:02x}")).collect()
+    hex_lower(&Sha256::digest(bytes))
 }
 
 fn demo_records() -> Vec<ListenerResponseRecord> {
@@ -193,7 +201,7 @@ fn demo_episode(
     let mut hasher = Sha256::new();
     hasher.update(b"synthetic-placeholder-not-audio:");
     hasher.update(collection_sequence.to_be_bytes());
-    let audio_sha256 = hasher.finalize().iter().map(|byte| format!("{byte:02x}")).collect();
+    let audio_sha256 = hex_lower(&hasher.finalize());
 
     ListenerResponseRecord {
         schema_version: LISTENER_RESPONSE_SCHEMA_VERSION.to_owned(),
@@ -287,25 +295,23 @@ fn main() {
         Ok(None) => {
             println!("{}", usage());
         }
-        Ok(Some(options)) => match run(options) {
-            Ok(output) => {
-                let destination = env::args().skip(1).collect::<Vec<_>>();
-                let output_path = destination
-                    .windows(2)
-                    .find(|pair| pair[0] == "--output")
-                    .map(|pair| PathBuf::from(&pair[1]));
-                if let Some(path) = output_path {
-                    if let Err(error) = fs::write(&path, format!("{output}\n")) {
-                        eprintln!("write {}: {error}", path.display());
-                        process::exit(2);
+        Ok(Some(options)) => {
+            let output_path = options.output.clone();
+            match run(options) {
+                Ok(output) => {
+                    if let Some(path) = output_path {
+                        if let Err(error) = fs::write(&path, format!("{output}\n")) {
+                            eprintln!("write {}: {error}", path.display());
+                            process::exit(2);
+                        }
+                    } else {
+                        println!("{output}");
                     }
-                } else {
-                    println!("{output}");
                 }
-            }
-            Err(error) => {
-                eprintln!("{error}");
-                process::exit(2);
+                Err(error) => {
+                    eprintln!("{error}");
+                    process::exit(2);
+                }
             }
         },
         Err(error) => {
