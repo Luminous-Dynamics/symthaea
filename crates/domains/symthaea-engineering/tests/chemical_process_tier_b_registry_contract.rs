@@ -210,5 +210,7 @@ fn assurance_targets_remain_hard_gates() {
     assert_eq!(targets["malformed_lineage_graph_detection"]["hard_gate"].as_bool(), Some(true));
     assert_eq!(targets["frozen_receipt_digest_mutation_detection"]["target"].as_f64(), Some(1.0));
     assert_eq!(targets["frozen_receipt_digest_mutation_detection"]["hard_gate"].as_bool(), Some(true));
+    assert_eq!(targets["freeze_receipt_digest_policy_mutation_detection"]["target"].as_f64(), Some(1.0));
+    assert_eq!(targets["freeze_receipt_digest_policy_mutation_detection"]["hard_gate"].as_bool(), Some(true));
     assert_eq!(targets["aggregate_scores_may_mask_a_failed_hard_invariant"].as_bool(), Some(false));
 }
