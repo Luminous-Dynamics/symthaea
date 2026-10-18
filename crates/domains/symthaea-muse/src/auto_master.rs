@@ -713,4 +713,46 @@ mod tests {
             balance.high_energy
         );
     }
+
+    #[cfg(feature = "theory")]
+    #[test]
+    fn dialect_mastering_profiles_share_loudness_and_limiter_targets() {
+        use crate::theory_realize::PerformanceDialect as D;
+
+        let default = MasteringConfig::default();
+        let dialects = [
+            D::ClassicalRubato,
+            D::DanceLocked,
+            D::ProcessExact,
+            D::FolkLift,
+            D::JazzLaidBack,
+        ];
+        let profiles: Vec<_> = dialects.iter().map(|d| MasteringConfig::for_dialect(*d)).collect();
+
+        for profile in &profiles {
+            assert_eq!(profile.target_lufs, default.target_lufs);
+            assert_eq!(profile.limiter_ceiling_db, default.limiter_ceiling_db);
+            let ratios = [
+                profile.target_low_ratio,
+                profile.target_mid_ratio,
+                profile.target_high_ratio,
+            ];
+            assert!(ratios.iter().all(|x| x.is_finite() && *x > 0.0 && *x < 1.0));
+            assert!((ratios.iter().sum::<f32>() - 1.0).abs() < 1e-6);
+            assert!(profile.eq_max_correction_db.is_finite() && profile.eq_max_correction_db > 0.0);
+            assert!(profile.eq_max_high_boost_db.is_finite() && profile.eq_max_high_boost_db > 0.0);
+        }
+
+        let classical = MasteringConfig::for_dialect(D::ClassicalRubato);
+        assert_eq!(classical.target_low_ratio, default.target_low_ratio);
+        assert_eq!(classical.target_mid_ratio, default.target_mid_ratio);
+        assert_eq!(classical.target_high_ratio, default.target_high_ratio);
+        assert_eq!(classical.eq_max_correction_db, default.eq_max_correction_db);
+        assert_eq!(classical.eq_max_high_boost_db, default.eq_max_high_boost_db);
+
+        assert_ne!(profiles[0].target_low_ratio, profiles[1].target_low_ratio);
+        assert_ne!(profiles[1].target_high_ratio, profiles[2].target_high_ratio);
+        assert_ne!(profiles[2].target_mid_ratio, profiles[4].target_mid_ratio);
+    }
+
 }
