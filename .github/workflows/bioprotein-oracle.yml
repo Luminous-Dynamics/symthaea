@@ -4,6 +4,7 @@ on:
   pull_request:
     paths:
       - "crates/domains/symthaea-bioprotein-oracle/**"
+      - "Cargo.toml"
       - "docs/research/bioprotein/fixtures/**"
       - ".github/workflows/bioprotein-oracle.yml"
 
@@ -44,20 +45,20 @@ jobs:
           printf 'expected_head=%s\nactual_head=%s\n' "$EXPECTED_HEAD" "$actual"
 
       - name: Format focused crate
-        run: cargo fmt --manifest-path crates/domains/symthaea-bioprotein-oracle/Cargo.toml --package symthaea-bioprotein-oracle -- --check
+        run: cargo fmt --manifest-path crates/domains/symthaea-bioprotein-oracle/Cargo.toml -- --check
 
       - name: Test focused crate
-        run: cargo test --manifest-path Cargo.toml -p symthaea-bioprotein-oracle
+        run: cargo test --manifest-path crates/domains/symthaea-bioprotein-oracle/Cargo.toml
 
       - name: Clippy focused crate
-        run: cargo clippy --manifest-path Cargo.toml -p symthaea-bioprotein-oracle --all-targets -- -D warnings
+        run: cargo clippy --manifest-path crates/domains/symthaea-bioprotein-oracle/Cargo.toml --all-targets -- -D warnings
 
       - name: Produce exact-head evidence receipt
         shell: bash
         run: |
           set -euo pipefail
           mkdir -p target
-          cargo run --manifest-path Cargo.toml -p symthaea-bioprotein-oracle -- --expected-head "$EXPECTED_HEAD" --receipt target/bioprotein-oracle-receipt.json
+          cargo run --manifest-path crates/domains/symthaea-bioprotein-oracle/Cargo.toml -- --expected-head "$EXPECTED_HEAD" --receipt target/bioprotein-oracle-receipt.json
           cat target/bioprotein-oracle-receipt.json
 
       - name: Preserve receipt artifact
