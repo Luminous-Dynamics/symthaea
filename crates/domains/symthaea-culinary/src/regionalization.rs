@@ -50,6 +50,7 @@ fn is_bcp47_like_tag(value: &str) -> bool {
 /// in addition to calling this function, and must independently qualify sources.
 pub fn validate_regional_pack_v1(pack: &Value) -> Result<(), Vec<String>> {
     let mut errors = Vec::new();
+    let null = Value::Null;
 
     if pack.get("schema_version").and_then(Value::as_str) != Some("1.0.0") {
         errors.push("schema_version must be 1.0.0".to_owned());
@@ -64,7 +65,7 @@ pub fn validate_regional_pack_v1(pack: &Value) -> Result<(), Vec<String>> {
         errors.push("profile_status must be synthetic_example, draft, or qualified".to_owned());
     }
 
-    let region = pack.get("region").unwrap_or(&Value::Null);
+    let region = pack.get("region").unwrap_or(&null);
     let country_code = non_empty_string(region, "country_code");
     if !country_code.is_some_and(|code| is_upper_ascii_code(code, 2)) {
         errors.push("region.country_code must be a two-letter uppercase code".to_owned());
@@ -94,7 +95,7 @@ pub fn validate_regional_pack_v1(pack: &Value) -> Result<(), Vec<String>> {
         _ => errors.push("region.language_tags must be a non-empty array".to_owned()),
     }
 
-    let conventions = pack.get("conventions").unwrap_or(&Value::Null);
+    let conventions = pack.get("conventions").unwrap_or(&null);
     if !non_empty_string(conventions, "currency").is_some_and(|s| is_upper_ascii_code(s, 3)) {
         errors.push("conventions.currency must be a three-letter uppercase code".to_owned());
     }
@@ -129,8 +130,8 @@ pub fn validate_regional_pack_v1(pack: &Value) -> Result<(), Vec<String>> {
     }
 
     let mut source_ids = BTreeSet::new();
-    let sources = match pack.get("sources").and_then(Value::as_array) {
-        Some(sources) => sources,
+    let sources: &[Value] = match pack.get("sources").and_then(Value::as_array) {
+        Some(sources) => sources.as_slice(),
         None => {
             errors.push("sources must be an array".to_owned());
             &[]
@@ -175,8 +176,8 @@ pub fn validate_regional_pack_v1(pack: &Value) -> Result<(), Vec<String>> {
         }
     }
 
-    let verticals = match pack.get("verticals").and_then(Value::as_array) {
-        Some(verticals) => verticals,
+    let verticals: &[Value] = match pack.get("verticals").and_then(Value::as_array) {
+        Some(verticals) => verticals.as_slice(),
         None => {
             errors.push("verticals must be an array".to_owned());
             &[]
@@ -231,7 +232,7 @@ pub fn validate_regional_pack_v1(pack: &Value) -> Result<(), Vec<String>> {
         }
     }
 
-    let fallback = pack.get("fallback_policy").unwrap_or(&Value::Null);
+    let fallback = pack.get("fallback_policy").unwrap_or(&null);
     if non_empty_string(fallback, "missing_values").is_none() {
         errors.push("fallback_policy.missing_values must be explicit".to_owned());
     }
