@@ -29,23 +29,20 @@
 //! WORKSPACE root (i.e. `symthaea/audio_output/...`), which `symthaea/.gitignore`
 //! already excludes — the WAVs are ~97 MB for the default cohort.
 //!
-//! # Result of the first run (2026-07-30)
+//! # Historical baseline (2026-07-30; NOT the current eight-profile run)
 //!
-//! Both arms land within 1.1 dB of the −16 LUFS target, confirming the shared
-//! chain works on both paths. **Crest factor differs by +6.52 dB in FluidSynth's
-//! favour, same sign on 5/5 pieces**: native renders 6.36–8.19 dB crest with
-//! peaks at −8.3 to −10.6 dB, FluidSynth 11.77–15.03 dB with peaks near the
-//! −1.5 dB ceiling. Equal loudness, far less dynamic range on the native arm —
-//! a dense, transient-poor signal, which is the measurable shape of the
-//! "instruments sound harsh / fights the composition" complaint. FluidSynth is
-//! also slightly brighter (+0.063 high band) with a little less low weight
-//! (−0.029).
+//! Before the per-style profiles and eight-dialect cohort were added, both arms
+//! landed within 1.1 dB of the −16 LUFS target. Crest factor differed by +6.52 dB
+//! in FluidSynth's favour, with the same sign on 5/5 pieces; native renders had
+//! 6.36–8.19 dB crest and peaks at −8.3 to −10.6 dB, while FluidSynth renders had
+//! 11.77–15.03 dB crest and peaks near the −1.5 dB ceiling. FluidSynth was also
+//! slightly brighter (+0.063 high band) with slightly less low weight (−0.029).
 //!
-//! Caveat stated plainly: crest factor is not a quality metric, and higher is
-//! not automatically better. Its value here is that an INDEPENDENT objective
-//! measure points the same direction as the earlier listening verdict, under
-//! equal post-processing. Two independent lines agreeing is the evidence; neither
-//! alone would be.
+//! Those measurements belong to the older five-piece/default-mastering cohort.
+//! They do NOT validate the new per-dialect profiles and must not be presented as
+//! evidence for this revision. Crest factor is a diagnostic, not a quality metric;
+//! higher is not automatically better. Re-run the current harness under a pinned
+//! SoundFont/VCSL environment and record the new output before interpreting it.
 //!
 //! ```sh
 //! nix shell nixpkgs#fluidsynth nixpkgs#soundfont-fluid --command bash -c '
