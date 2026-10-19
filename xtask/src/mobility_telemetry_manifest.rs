@@ -2316,4 +2316,37 @@ mod tests {
             }
         }
     }
+
+    #[test]
+    fn timestamp_offset_invariance_holds_for_65_generated_offsets() {
+        let fixture = manifest();
+        let mut offsets: Vec<u64> = (0..64).map(|n| n * 1_000_003).collect();
+        offsets.push(u64::MAX - 300_000_001);
+        let mut baseline: Option<TraceReport> = None;
+        for offset in offsets {
+            let t0 = offset + 1;
+            let t1 = offset + 100_000_001;
+            let t2 = offset + 200_000_001;
+            let raw = format!(
+                "timestamp_ns,channel_id,raw_value,sample_status,sequence\n{},gnss.speed_mps,0,VALID,0\n{},gnss.speed_mps,1,VALID,1\n{},gnss.speed_mps,2,VALID,2\n",
+                t0, t1, t2
+            );
+            let report = validate_trace_bytes(raw.as_bytes(), &fixture)
+                .expect("translation of valid monotonic timestamps must preserve acceptance");
+            assert_eq!(report.row_count, 3);
+            assert_eq!(report.valid_sample_count, 3);
+            assert_eq!(report.invalid_or_saturated_sample_count, 0);
+            assert_eq!(report.missing_value_count, 0);
+            assert_eq!(report.suspected_gap_count, 0);
+            if let Some(prior) = &baseline {
+                assert_eq!(report.row_count, prior.row_count);
+                assert_eq!(report.valid_sample_count, prior.valid_sample_count);
+                assert_eq!(report.suspected_gap_count, prior.suspected_gap_count);
+                assert_ne!(report.trace_sha256, prior.trace_sha256,
+                    "a changed raw timestamp trace must produce a different content digest");
+            } else {
+                baseline = Some(report);
+            }
+        }
+    }
 }
