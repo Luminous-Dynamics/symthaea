@@ -61,15 +61,17 @@ enum SelectionPolicy {
     MaximinCoverage,
     ModelDisagreement,
     CoverageGuardedDisagreement,
+    CostAwareIntegratedDisagreement,
 }
 
 impl SelectionPolicy {
-    const ALL: [Self; 5] = [
+    const ALL: [Self; 6] = [
         Self::FixedGrid,
         Self::SeededRandom,
         Self::MaximinCoverage,
         Self::ModelDisagreement,
         Self::CoverageGuardedDisagreement,
+        Self::CostAwareIntegratedDisagreement,
     ];
 
     fn name(self) -> &'static str {
@@ -79,6 +81,7 @@ impl SelectionPolicy {
             Self::MaximinCoverage => "maximin_coverage",
             Self::ModelDisagreement => "model_disagreement",
             Self::CoverageGuardedDisagreement => "coverage_guarded_disagreement",
+            Self::CostAwareIntegratedDisagreement => "cost_aware_integrated_disagreement",
         }
     }
 }
@@ -92,6 +95,7 @@ struct Trial {
     observation_count: usize,
     selected_grid_indices: Vec<usize>,
     held_out_point_count: usize,
+    total_synthetic_cost_units: f64,
     mean_absolute_error: f64,
     root_mean_square_error: f64,
     maximum_absolute_error: f64,
@@ -103,6 +107,8 @@ struct Summary {
     policy: String,
     seed_count: usize,
     experiment_budget: usize,
+    mean_synthetic_cost_units: f64,
+    p90_synthetic_cost_units: f64,
     mean_absolute_error: f64,
     p90_absolute_error: f64,
     mean_root_mean_square_error: f64,
@@ -198,6 +204,124 @@ fn piecewise_linear_prediction(observations: &[(usize, f64)], grid_index: usize)
     left_value + proportion * (right_value - left_value)
 }
 
+
+fn linear_coefficients(observations: &[(usize, f64)]) -> (f64, f64) {
+    if observations.len() == 1 {
+        return (0.0, observations[0].1);
+    }
+    let n = observations.len() as f64;
+    let mean_x = observations
+        .iter()
+        .map(|(index, _)| *index as f64 / GRID_STEPS as f64)
+        .sum::<f64>()
+        / n;
+    let mean_y = observations.iter().map(|(_, y)| *y).sum::<f64>() / n;
+    let covariance = observations
+        .iter()
+        .map(|(index, y)| (*index as f64 / GRID_STEPS as f64 - mean_x) * (*y - mean_y))
+        .sum::<f64>();
+    let variance = observations
+        .iter()
+        .map(|(index, _)| (*index as f64 / GRID_STEPS as f64 - mean_x).powi(2))
+        .sum::<f64>();
+    if variance <= f64::EPSILON {
+        (0.0, mean_y)
+    } else {
+        let slope = covariance / variance;
+        (slope, mean_y - slope * mean_x)
+    }
+}
+
+fn sorted_piecewise_prediction(observations: &[(usize, f64)], grid_index: usize) -> f64 {
+    if let Some((_, value)) = observations.iter().find(|(index, _)| *index == grid_index) {
+        return *value;
+    }
+
+    let right = observations
+        .iter()
+        .position(|(index, _)| *index > grid_index)
+        .unwrap_or(observations.len() - 1);
+    let left = right.saturating_sub(1);
+    let (left_index, left_value) = observations[left];
+    let (right_index, right_value) = observations[right];
+    if left_index == right_index {
+        return left_value;
+    }
+
+    let proportion = (grid_index - left_index) as f64 / (right_index - left_index) as f64;
+    left_value + proportion * (right_value - left_value)
+}
+
+// A predeclared toy cost profile, not currency, measured labor, or procurement data.
+// The center interval represents a synthetic high-setup-cost region so we can test
+// whether a cost-adjusted policy makes different decisions from an equal-cost policy.
+fn synthetic_experiment_cost_units(grid_index: usize) -> f64 {
+    match grid_index {
+        40..=60 => 2.0,
+        20..=39 => 1.25,
+        61..=80 => 1.25,
+        _ => 1.0,
+    }
+}
+
+fn integrated_disagreement_energy(observations: &[(usize, f64)]) -> f64 {
+    if observations.len() < 2 {
+        return 0.0;
+    }
+    let mut sorted = observations.to_vec();
+    sorted.sort_by_key(|(index, _)| *index);
+    let (slope, intercept) = linear_coefficients(&sorted);
+    let mut squared_disagreement = 0.0;
+    for grid_index in 0..=GRID_STEPS {
+        let x = grid_index as f64 / GRID_STEPS as f64;
+        let global = intercept + slope * x;
+        let local = sorted_piecewise_prediction(&sorted, grid_index);
+        squared_disagreement += (global - local).powi(2);
+    }
+    squared_disagreement / (GRID_STEPS + 1) as f64
+}
+
+fn cost_aware_integrated_disagreement_candidate(observations: &[(usize, f64)]) -> usize {
+    let baseline_energy = integrated_disagreement_energy(observations);
+    let mut best_index = None;
+    let mut best_score = f64::NEG_INFINITY;
+
+    for candidate in 0..=GRID_STEPS {
+        if already_sampled(observations, candidate) {
+            continue;
+        }
+        let x = candidate as f64 / GRID_STEPS as f64;
+        let hypothetical_global_value = global_linear_prediction(observations, x);
+        let hypothetical_local_value = piecewise_linear_prediction(observations, candidate);
+
+        let mut after_global = observations.to_vec();
+        after_global.push((candidate, hypothetical_global_value));
+        let global_energy_after = integrated_disagreement_energy(&after_global);
+
+        let mut after_local = observations.to_vec();
+        after_local.push((candidate, hypothetical_local_value));
+        let local_energy_after = integrated_disagreement_energy(&after_local);
+
+        // Two-model committee approximation: average the reduction under either
+        // model's predicted outcome. This is a heuristic, not calibrated Bayesian
+        // expected information gain or a formal IMSPE calculation.
+        let expected_energy_after = 0.5 * (global_energy_after + local_energy_after);
+        let expected_reduction = (baseline_energy - expected_energy_after).max(0.0);
+        let score = expected_reduction / synthetic_experiment_cost_units(candidate);
+
+        if best_index.is_none() || score > best_score {
+            best_index = Some(candidate);
+            best_score = score;
+        }
+    }
+
+    if best_score <= f64::EPSILON {
+        maximin_candidate(observations)
+    } else {
+        best_index.expect("candidate grid has unsampled points")
+    }
+}
+
 fn already_sampled(observations: &[(usize, f64)], index: usize) -> bool {
     observations.iter().any(|(seen, _)| *seen == index)
 }
@@ -284,6 +408,9 @@ fn select_next(
         SelectionPolicy::CoverageGuardedDisagreement => {
             disagreement_candidate(observations, Some(minimum_spacing(budget)))
         }
+        SelectionPolicy::CostAwareIntegratedDisagreement => {
+            cost_aware_integrated_disagreement_candidate(observations)
+        }
     }
 }
 
@@ -365,6 +492,10 @@ fn trial(surface: SurfaceFamily, policy: SelectionPolicy, seed: u64, budget: usi
         observation_count: observations.len(),
         selected_grid_indices: observations.iter().map(|(index, _)| *index).collect(),
         held_out_point_count,
+        total_synthetic_cost_units: observations
+            .iter()
+            .map(|(index, _)| synthetic_experiment_cost_units(*index))
+            .sum(),
         mean_absolute_error,
         root_mean_square_error,
         maximum_absolute_error,
@@ -399,6 +530,20 @@ fn run_tournament(seed_count: usize, budget: usize) -> TournamentReport {
                 .iter()
                 .filter(|result| result.surface == surface.name() && result.policy == policy.name())
                 .collect::<Vec<_>>();
+            let mut costs = matched
+                .iter()
+                .map(|result| result.total_synthetic_cost_units)
+                .collect::<Vec<_>>();
+            let p90_synthetic_cost_units = percentile90(&mut costs);
+            let mean_synthetic_cost_units = if matched.is_empty() {
+                0.0
+            } else {
+                matched
+                    .iter()
+                    .map(|result| result.total_synthetic_cost_units)
+                    .sum::<f64>()
+                    / matched.len() as f64
+            };
             let mut maes = matched
                 .iter()
                 .map(|result| result.mean_absolute_error)
@@ -432,6 +577,8 @@ fn run_tournament(seed_count: usize, budget: usize) -> TournamentReport {
                 policy: policy.name().to_owned(),
                 seed_count,
                 experiment_budget: budget,
+                mean_synthetic_cost_units,
+                p90_synthetic_cost_units,
                 mean_absolute_error,
                 p90_absolute_error,
                 mean_root_mean_square_error,
@@ -560,6 +707,44 @@ mod tests {
             .collect::<Vec<_>>();
         let minimum = minimum_spacing(11);
         assert!(indices.windows(2).all(|pair| pair[1] - pair[0] >= minimum));
+    }
+
+
+    #[test]
+    fn cost_aware_policy_returns_an_unsampled_candidate_and_positive_cost() {
+        let observations = select_observations(
+            SurfaceFamily::LocalizedPeak,
+            SelectionPolicy::CostAwareIntegratedDisagreement,
+            23,
+            11,
+        );
+        let positions = observations.iter().map(|(index, _)| *index).collect::<Vec<_>>();
+        assert_eq!(positions.len(), 11);
+        assert_eq!(positions.iter().copied().collect::<std::collections::BTreeSet<_>>().len(), 11);
+        let total_cost: f64 = positions.iter().map(|index| synthetic_experiment_cost_units(*index)).sum();
+        assert!(total_cost.is_finite() && total_cost > 0.0);
+    }
+
+    #[test]
+    fn integrated_disagreement_energy_is_finite_and_nonnegative() {
+        for surface in SurfaceFamily::ALL {
+            let observations = select_observations(
+                surface,
+                SelectionPolicy::MaximinCoverage,
+                31,
+                11,
+            );
+            let energy = integrated_disagreement_energy(&observations);
+            assert!(energy.is_finite() && energy >= 0.0);
+        }
+    }
+
+    #[test]
+    fn tournament_reports_synthetic_cost_for_every_policy() {
+        let report = run_tournament(3, 11);
+        assert!(report.trials.iter().all(|trial| trial.total_synthetic_cost_units > 0.0));
+        assert!(report.summaries.iter().all(|summary| summary.mean_synthetic_cost_units > 0.0));
+        assert!(report.summaries.iter().all(|summary| summary.p90_synthetic_cost_units >= summary.mean_synthetic_cost_units));
     }
 
     #[test]
