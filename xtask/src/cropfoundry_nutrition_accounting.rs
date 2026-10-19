@@ -59,7 +59,7 @@ struct NutritionAccountingReceipt {
     batch_id: String,
     nutrient_id: String,
     accounting_pass: bool,
-    direct_assay: bool,
+    concentration_is_direct_assay: bool,
     nutrient_mass_at_serving_mg: Option<f64>,
     modeled_nutrient_mass_at_serving_mg: Option<f64>,
     bioavailable_nutrient_mass_mg: Option<f64>,
@@ -81,9 +81,9 @@ fn valid_nonnegative(value: f64) -> bool {
 }
 
 fn ratio(numerator: Option<f64>, denominator: Option<f64>) -> Option<f64> {
-    numerator.zip(denominator).and_then(|(n, d)| {
-        (n.is_finite() && d.is_finite() && n >= 0.0 && d > 0.0).then_some(n / d)
-    })
+    numerator
+        .zip(denominator)
+        .and_then(|(n, d)| (n.is_finite() && d.is_finite() && n >= 0.0 && d > 0.0).then_some(n / d))
 }
 
 fn valid_sha256(value: &str) -> bool {
@@ -109,7 +109,8 @@ fn audit_input(input: NutritionAccountingInput) -> NutritionAccountingReceipt {
         issues.push("concentration_mg_per_kg must be present, finite and non-negative".to_owned());
     }
     if serving_mass.is_none_or(|value| !value.is_finite() || value <= 0.0) {
-        issues.push("served_edible_mass_kg must be present, finite and greater than zero".to_owned());
+        issues
+            .push("served_edible_mass_kg must be present, finite and greater than zero".to_owned());
     }
     if input.concentration_stage.is_none() {
         issues.push("concentration_stage must be explicit".to_owned());
@@ -131,7 +132,11 @@ fn audit_input(input: NutritionAccountingInput) -> NutritionAccountingReceipt {
     {
         issues.push("bioavailability_fraction must be finite and in [0,1]".to_owned());
     }
-    if input.concentration_evidence_uri.as_deref().is_none_or(str::is_empty) {
+    if input
+        .concentration_evidence_uri
+        .as_deref()
+        .is_none_or(str::is_empty)
+    {
         issues.push("concentration_evidence_uri must be explicit".to_owned());
     }
     if input.concentration_provenance == ConcentrationProvenance::DirectAssay
@@ -140,27 +145,41 @@ fn audit_input(input: NutritionAccountingInput) -> NutritionAccountingReceipt {
         issues.push("direct assay provenance requires assay_method".to_owned());
     }
     if input.concentration_provenance == ConcentrationProvenance::DirectAssay
-        && input.source_sha256.as_deref().is_none_or(|digest| !valid_sha256(digest))
+        && input
+            .source_sha256
+            .as_deref()
+            .is_none_or(|digest| !valid_sha256(digest))
     {
         issues.push("direct assay provenance requires a 64-character source_sha256".to_owned());
     }
     if input.concentration_stage == Some(ConcentrationStage::MeasuredAtServing)
         && input.retention_fraction.is_some()
     {
-        issues.push("retention_fraction must be absent when concentration was measured at serving".to_owned());
+        issues.push(
+            "retention_fraction must be absent when concentration was measured at serving"
+                .to_owned(),
+        );
     }
     if input.concentration_stage == Some(ConcentrationStage::MeasuredBeforePreparation)
         && input.retention_fraction.is_none()
     {
-        issues.push("pre-preparation concentration requires an explicit retention_fraction".to_owned());
+        issues.push(
+            "pre-preparation concentration requires an explicit retention_fraction".to_owned(),
+        );
     }
     if input.retention_fraction.is_some()
-        && input.retention_evidence_uri.as_deref().is_none_or(str::is_empty)
+        && input
+            .retention_evidence_uri
+            .as_deref()
+            .is_none_or(str::is_empty)
     {
         issues.push("retention_fraction requires its own evidence URI".to_owned());
     }
     if input.bioavailability_fraction.is_some()
-        && input.bioavailability_evidence_uri.as_deref().is_none_or(str::is_empty)
+        && input
+            .bioavailability_evidence_uri
+            .as_deref()
+            .is_none_or(str::is_empty)
     {
         issues.push("bioavailability_fraction requires its own evidence URI".to_owned());
     }
@@ -176,15 +195,16 @@ fn audit_input(input: NutritionAccountingInput) -> NutritionAccountingReceipt {
         }
     }
     if input.cost_amount.is_some()
-        && input.currency_code.as_deref().is_none_or(|value| value.trim().is_empty())
+        && input
+            .currency_code
+            .as_deref()
+            .is_none_or(|value| value.trim().is_empty())
     {
         issues.push("cost_amount requires an explicit currency_code".to_owned());
     }
-    if input
-        .currency_code
-        .as_deref()
-        .is_some_and(|value| value.trim().len() != 3 || !value.trim().bytes().all(|b| b.is_ascii_alphabetic()))
-    {
+    if input.currency_code.as_deref().is_some_and(|value| {
+        value.trim().len() != 3 || !value.trim().bytes().all(|b| b.is_ascii_alphabetic())
+    }) {
         issues.push("currency_code must be a three-letter alphabetic code".to_owned());
     }
 
@@ -198,7 +218,9 @@ fn audit_input(input: NutritionAccountingInput) -> NutritionAccountingReceipt {
     let measured_or_modeled_mass = match input.concentration_stage {
         Some(ConcentrationStage::MeasuredAtServing) if accounting_pass => pre_preparation_mass,
         Some(ConcentrationStage::MeasuredBeforePreparation) if accounting_pass => {
-            pre_preparation_mass.zip(input.retention_fraction).map(|(mass, retention)| mass * retention)
+            pre_preparation_mass
+                .zip(input.retention_fraction)
+                .map(|(mass, retention)| mass * retention)
         }
         _ => None,
     };
@@ -213,7 +235,7 @@ fn audit_input(input: NutritionAccountingInput) -> NutritionAccountingReceipt {
         batch_id: input.batch_id,
         nutrient_id: input.nutrient_id,
         accounting_pass,
-        direct_assay,
+        concentration_is_direct_assay: direct_assay,
         nutrient_mass_at_serving_mg: if direct_assay
             && input.concentration_stage == Some(ConcentrationStage::MeasuredAtServing)
         {
@@ -236,6 +258,7 @@ fn audit_input(input: NutritionAccountingInput) -> NutritionAccountingReceipt {
         caveats: vec![
             "Concentration x edible mass is an accounting calculation, not a dietary adequacy or health outcome.".to_owned(),
             "Literature/modelled composition and retention values remain estimates, even when the arithmetic passes.".to_owned(),
+            "source_sha256 is format-checked here; the CLI does not authenticate it against an independent artifact registry.".to_owned(),
             "Missing bioavailability evidence yields no bioavailable-mass estimate; it is not assumed to equal nutrient mass.".to_owned(),
             "Resource ratios are only comparable with matching system boundaries, units, crop stage and allocation rules.".to_owned(),
             "Food safety, dietary requirements, upper limits and population suitability are not evaluated.".to_owned(),
@@ -246,8 +269,12 @@ fn audit_input(input: NutritionAccountingInput) -> NutritionAccountingReceipt {
 
 /// Validate one explicit JSON accounting record; no dataset is downloaded or trained on.
 pub fn run(input_path: PathBuf, out: Option<PathBuf>) -> Result<()> {
-    let raw = fs::read(&input_path)
-        .with_context(|| format!("cannot read nutrition-accounting input {}", input_path.display()))?;
+    let raw = fs::read(&input_path).with_context(|| {
+        format!(
+            "cannot read nutrition-accounting input {}",
+            input_path.display()
+        )
+    })?;
     let input: NutritionAccountingInput = serde_json::from_slice(&raw)
         .context("input must be a cropfoundry-nutrition-accounting-input-v0 JSON object")?;
     let mut receipt = audit_input(input);
@@ -255,7 +282,10 @@ pub fn run(input_path: PathBuf, out: Option<PathBuf>) -> Result<()> {
     let rendered = serde_json::to_string_pretty(&receipt)?;
     println!("{rendered}");
     if let Some(path) = out {
-        if let Some(parent) = path.parent().filter(|parent| !parent.as_os_str().is_empty()) {
+        if let Some(parent) = path
+            .parent()
+            .filter(|parent| !parent.as_os_str().is_empty())
+        {
             fs::create_dir_all(parent)
                 .with_context(|| format!("cannot create output directory {}", parent.display()))?;
         }
@@ -265,7 +295,9 @@ pub fn run(input_path: PathBuf, out: Option<PathBuf>) -> Result<()> {
     if receipt.accounting_pass {
         Ok(())
     } else {
-        Err(anyhow!("nutrition accounting contract failed; receipt emitted/saved and missing values were not imputed"))
+        Err(anyhow!(
+            "nutrition accounting contract failed; receipt emitted/saved and missing values were not imputed"
+        ))
     }
 }
 
@@ -356,7 +388,12 @@ mod tests {
         input.concentration_mass_basis = Some(MassBasis::DryEdibleMass);
         let receipt = audit_input(input);
         assert!(!receipt.accounting_pass);
-        assert!(receipt.issues.iter().any(|issue| issue.contains("mass basis")));
+        assert!(
+            receipt
+                .issues
+                .iter()
+                .any(|issue| issue.contains("mass basis"))
+        );
         assert_eq!(receipt.nutrient_mass_at_serving_mg, None);
     }
 
@@ -379,7 +416,12 @@ mod tests {
         input.retention_evidence_uri = Some("urn:retention:bad".to_owned());
         let receipt = audit_input(input);
         assert!(!receipt.accounting_pass);
-        assert!(receipt.issues.iter().any(|issue| issue.contains("retention_fraction")));
+        assert!(
+            receipt
+                .issues
+                .iter()
+                .any(|issue| issue.contains("retention_fraction"))
+        );
     }
 
     #[test]
