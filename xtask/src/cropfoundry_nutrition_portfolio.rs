@@ -317,6 +317,12 @@ fn aggregate_option(
             }
         }
         resource_measured_counts.insert(value_key.to_owned(), measured_batches);
+        if measured_batches == batch_count && values_complete && !total.is_finite() {
+            issues.push(format!(
+                "option {} resource total {value_key} overflowed the finite numeric range",
+                option.option_id
+            ));
+        }
         let total_option = if row_accounting_complete
             && values_complete
             && measured_batches == batch_count
