@@ -106,25 +106,27 @@ Run the paired renderer probe on fixed seeds and a qualified asset environment:
       cargo run --release -p symthaea-muse --features theory --example renderer_ab_fair
     '
 
-The probe now renders three arms per style and writes
+The probe now renders **five arms per style** and writes
 `audio_output/renderer-ab-fair-{synth|vcsl}/renderer-ab-fair-manifest.json`
-alongside the WAV/MIDI cohort: native with the dialect profile, FluidSynth with
-the default/no-dialect profile, and FluidSynth with the dialect profile. The two
-FluidSynth arms use the same exact MIDI file, SoundFont, binary, and requested
-sample rate. This gives a paired signal-level ablation of the *combined*
-dialect-specific room/mastering settings, alongside the separate cross-backend
-native-versus-FluidSynth diagnostic. It does not isolate room from mastering or
-establish a perceptual benefit.
+alongside the WAV/MIDI cohort: native with the dialect profile, plus a 2×2
+FluidSynth design with (1) default room/default mastering, (2) dialect room/
+default mastering, (3) default room/dialect mastering, and (4) dialect room/
+dialect mastering. All four FluidSynth cells use the same exact MIDI file,
+SoundFont, binary, and requested sample rate. This separates the room effect at
+default mastering, the mastering effect at default room, and their interaction
+at the signal-measurement level. The native-versus-FluidSynth comparison remains
+a separate backend diagnostic. Neither factorial signal effects nor cross-backend
+differences establish a perceptual benefit.
 
 The JSON receipt records the caller-supplied source revision, executable
 SHA-256 and byte length, FluidSynth executable hash and version output, SoundFont
-SHA-256 and byte length, per-cell MIDI SHA-256, canonical PCM hashes for all
-three arms, both FluidSynth WAV hashes, profile fingerprints, exact mastering
-values, room settings, signal measurements, default-versus-profile deltas, and
-per-cell failure codes. Native/FluidSynth PCM hashes use interleaved little-endian
-f32 stereo samples; FluidSynth WAV hashes include the file container. Both
-FluidSynth WAVs are kept for a later randomized blind listening study; the probe
-does not itself create or score a blinded listening pack.
+SHA-256 and byte length, per-cell MIDI SHA-256, canonical PCM hashes for all five
+arms, four FluidSynth WAV hashes, profile fingerprints, exact mastering values,
+room settings, signal measurements, factorial contrasts and per-cell failure
+codes. Native/FluidSynth PCM hashes use interleaved little-endian f32 stereo
+samples; FluidSynth WAV hashes include the file container. The four FluidSynth
+variants are retained for a later randomized study; the probe does not itself
+create or score a blinded listening pack.
 
 Set `SYMTHAEA_GIT_REVISION` to the exact checkout SHA before the run. A complete
 status requires all eight cohort rows, a valid 40- or 64-character hexadecimal
@@ -147,13 +149,16 @@ musical quality.
 
 ### Perceptual gate
 
-Use the two FluidSynth WAVs from the same cell for a preregistered, randomized
-blind A/B or ABX: default/no-dialect profile versus dialect profile, level matched
-for presentation, with the exact same MIDI SHA-256, SoundFont SHA-256, renderer
-binary SHA-256, and requested sample rate. The tested treatment is the *combined*
-room-and-mastering profile, so do not claim the experiment isolates individual
-EQ, room, or mastering controls. Keep the composition and instrument ensemble
-constant for the profile ablation. For a separate
+Use a preregistered, randomized **2×2 factorial listening design** on the four
+FluidSynth variants from the same cell: default/default, dialect room only,
+dialect mastering only, and combined dialect room/mastering. Level match for
+presentation and counterbalance order; record any presentation gain separately
+from the original audio receipt. All variants must share the exact MIDI SHA-256,
+SoundFont SHA-256, renderer binary SHA-256 and requested sample rate. Estimate the
+room effect, mastering effect, and their interaction separately; the primary
+preference endpoint may remain default versus combined. Keep composition and
+instrument ensemble fixed. Any human-rated effect is a separate result from the
+objective signal contrasts. For a separate
 style-identity trial, allow the score, ensemble and dialect to vary, and balance
 listener familiarity. Randomize presentation order and hide renderer/model
 identity until debrief; if AI-versus-human labelling is of interest, test that in
@@ -170,20 +175,26 @@ Targets for the first pilot (proposed, not existing results):
   Treat 30 as a pilot floor, not as a powered confirmatory sample size. Preregister
   a power/sample-size plan before a confirmatory study, and cluster uncertainty by
   listener if the same listener contributes multiple ratings.
-- **Profile benefit:** the profile must improve its preregistered listener-rated
-  fit or preference over the neutral profile without reducing audio-quality
-  ratings. If not, revert or revise the profile; objective spectral movement is
-  not sufficient.
+- **Profile benefit:** the combined profile must improve preregistered listener-
+  rated style-fit or preference over default/default without reducing overall
+  quality. Use the room-only/mastering-only variants to identify which change
+  drives an observed benefit and whether the combined effect is non-additive.
+  If not, revert or revise the profile; objective spectral movement is not
+  sufficient. Replicate across multiple seeds/styles and listeners before
+  promoting exploratory findings to confirmatory claims.
 - **Profile-control fidelity:** each successful cell records one MIDI digest
-  reused by both FluidSynth arms; the tool and SoundFont hashes, sample rate,
-  and control settings are explicitly reported. Require 8/8 completed cells and
-  a complete receipt before aggregating results. As a positive control, the
-  ClassicalRubato/default profile has no declared room or mastering changes:
-  compare its default-versus-profile PCM/WAV hashes. Exact equality is the
-  target if the backend is deterministic; any divergence must be investigated
+  reused by all four FluidSynth arms; the tool and SoundFont hashes, sample rate,
+  and controls are explicitly reported. Require 8/8 complete style cells and a
+  complete receipt before aggregation. For every cell, verify identical MIDI
+  hashes and expected sample rates across the factorial arms. As a positive
+  control, the ClassicalRubato/default profile declares no room or mastering
+  changes: compare its default-vs-combined PCM/WAV hashes. Exact equality is
+  the target if the backend is deterministic; any divergence must be investigated
   as possible DSP randomness, hidden defaults, or a parity defect before the
-  control is treated as passed. The current probe reports these hash equalities
-  but does not yet fail the run solely on mismatch.
+  control is treated as passed. The probe reports hash equality but does not yet
+  fail solely on mismatch. The current cohort has one seed/style and is a smoke/
+  diagnostic matrix, not a statistically useful population estimate; add multiple
+  preregistered seeds per style before drawing robust style-general conclusions.
 - **Level fairness:** both arms stay within 1.0 LU of the intended integrated
   loudness target and below the configured peak ceiling, or the comparison is
   invalid. (The current WAV peak check is sample peak; a true-peak meter is
