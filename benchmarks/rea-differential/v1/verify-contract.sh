@@ -22,13 +22,17 @@ jq -e '
 jq -e '
   .schema_version=="symthaea.rea-differential-oracle.v1" and
   .source.byte_length==10 and (.source.sha256|test("^[0-9a-f]{64}$")) and
+  (.coordinate_spaces|length)==2 and (.coordinate_spaces|map(.id)|sort)==["root","tar-stream"] and
+  .coordinate_spaces[0].transform_kind=="source" and
+  ([.coordinate_spaces[]|select(.id=="tar-stream")][0].parent_coordinate_space_id)=="root" and
   (.expected_files|length)==1
 ' "$ORACLE" >/dev/null || fail "known-answer oracle fixture is malformed"
 
 jq -e '
   .schema_version=="symthaea.rea-differential-observation.v1" and
   .capability=="supported" and .complete_extraction_claim==true and
-  (.source.sha256|test("^[0-9a-f]{64}$"))
+  (.source.sha256|test("^[0-9a-f]{64}$")) and (.coordinate_spaces|length)==2 and
+  ([.accounting[].coordinate_space_id]|unique|length)==2
 ' "$OBSERVATION" >/dev/null || fail "known-answer provider observation fixture is malformed"
 
 cd "$REPO_ROOT"
