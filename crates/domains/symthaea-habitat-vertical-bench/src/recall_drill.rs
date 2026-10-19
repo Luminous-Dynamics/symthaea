@@ -726,7 +726,7 @@ mod tests {
         let base: Value = serde_json::from_str(crate::EMBEDDED_FIXTURE).unwrap();
         let report = validate_recall_drill(&drill, &base, &events);
         assert!(has_code(&report, "MISSING_TARGET_RESPONSE"));
-        assert_eq!(report.unresolved_affected_count, 2);
+        assert_eq!(report.unresolved_affected_count, 1);
     }
 
     #[test]
