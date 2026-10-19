@@ -138,7 +138,8 @@
             "string",
             "null"
           ],
-          "format": "date-time"
+          "format": "date-time",
+          "pattern": "Z$"
         },
         "calibration_evidence": {
           "$ref": "#/$defs/evidence"
