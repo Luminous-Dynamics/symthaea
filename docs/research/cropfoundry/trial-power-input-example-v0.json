@@ -18,6 +18,8 @@
     "plots_per_cluster": 5,
     "intracluster_correlation": 0.1,
     "attrition_fraction": 0.1,
-    "planned_site_season_count": 2
+    "planned_site_season_count": 2,
+    "randomization_method": "cluster_randomized",
+    "blocking_unit": "farm"
   }
 }
