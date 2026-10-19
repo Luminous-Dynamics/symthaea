@@ -1,0 +1,69 @@
+{
+  "schema_version": "synthetic-first-aid-change-oracle-v0",
+  "status": "synthetic_contract_tests_only",
+  "clinical_use_authorized": false,
+  "oracle_class": "separate_synthetic_expected_outcomes",
+  "note": "Expected outcomes for software-contract fixtures only. Not a clinical oracle or clinical treatment data. A test ID does not mean runtime behavior has been executed or passed.",
+  "cases": [
+    {
+      "case_id": "KAT-001",
+      "requirement_id": "REQ-001",
+      "case_kind": "known_answer",
+      "input_condition": "A rendered synthetic item carries the candidate source revision identifier.",
+      "expected_predicate": "rendered_item.source_revision equals the active candidate revision",
+      "expected_outcome": "must_match",
+      "fault_injection": null,
+      "oracle_review_record_id": "SYN-ORACLE-001"
+    },
+    {
+      "case_id": "MUT-001",
+      "requirement_id": "REQ-001",
+      "case_kind": "fault_mutation",
+      "input_condition": "Remove the source revision identifier from a rendered synthetic item.",
+      "expected_predicate": "the item cannot be presented as source-traceable",
+      "expected_outcome": "must_reject_or_mark_unknown",
+      "fault_injection": "omit_source_revision",
+      "oracle_review_record_id": "SYN-ORACLE-002"
+    },
+    {
+      "case_id": "KAT-002",
+      "requirement_id": "REQ-002",
+      "case_kind": "known_answer",
+      "input_condition": "A synthetic content item is flagged not-current.",
+      "expected_predicate": "the runtime does not label that item as current",
+      "expected_outcome": "must_preserve_not_current",
+      "fault_injection": null,
+      "oracle_review_record_id": "SYN-ORACLE-003"
+    },
+    {
+      "case_id": "MUT-002",
+      "requirement_id": "REQ-002",
+      "case_kind": "fault_mutation",
+      "input_condition": "Change the currentness label of a not-current synthetic item to current without an approved source change.",
+      "expected_predicate": "the unapproved status mutation is rejected",
+      "expected_outcome": "must_reject",
+      "fault_injection": "flip_not_current_to_current",
+      "oracle_review_record_id": "SYN-ORACLE-004"
+    },
+    {
+      "case_id": "KAT-003",
+      "requirement_id": "REQ-003",
+      "case_kind": "known_answer",
+      "input_condition": "A synthetic resource has an unconfirmed availability claim.",
+      "expected_predicate": "its displayed state remains unconfirmed",
+      "expected_outcome": "must_preserve_unconfirmed",
+      "fault_injection": null,
+      "oracle_review_record_id": "SYN-ORACLE-005"
+    },
+    {
+      "case_id": "MUT-003",
+      "requirement_id": "REQ-003",
+      "case_kind": "fault_mutation",
+      "input_condition": "Change a synthetic resource from unconfirmed to confirmed without new evidence.",
+      "expected_predicate": "the unsupported availability promotion is rejected",
+      "expected_outcome": "must_reject",
+      "fault_injection": "promote_unconfirmed_to_confirmed",
+      "oracle_review_record_id": "SYN-ORACLE-006"
+    }
+  ]
+}
