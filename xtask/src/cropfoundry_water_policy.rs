@@ -798,13 +798,11 @@ mod tests {
                     .iter()
                     .all(|value| *value >= 0.0)
             );
-            assert!(
-                result.max_zone_stress_exposure_proxy
-                    >= result.min_zone_stress_exposure_proxy
-            );
+            assert!(result.max_zone_stress_exposure_proxy >= result.min_zone_stress_exposure_proxy);
             assert_eq!(
                 result.max_zone_stress_exposure_proxy,
-                result.zone_stress_exposure_proxy
+                result
+                    .zone_stress_exposure_proxy
                     .iter()
                     .copied()
                     .max_by(f64::total_cmp)
