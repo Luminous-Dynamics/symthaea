@@ -30,11 +30,11 @@ apply_mutation(){
     chunk-range) jq 'map(if .task.depth==0 then .reports |= map(if .__typename__=="ChunkReport" then (.start_offset=1 | .size=11) else . end) else . end)' "$input" > "$output" ;;
     handler) jq 'map(if .task.depth==0 then .reports |= map(if .__typename__=="ChunkReport" then .handler_name="lzma" else . end) else . end)' "$input" > "$output" ;;
     child-path) jq 'walk(if type=="string" then gsub("rootfs[.]squashfs";"rootfs2.squashfs") else . end)' "$input" > "$output" ;;
-    dangling-subtask) jq 'map(if .task.depth==0 then .subtasks[0].chunk_id="missing:1" else . end)' "$input" > "$output" ;;
+    dangling-subtask) jq 'map(if .task.depth==0 then .subtasks[0].blob_id="missing:1" else . end)' "$input" > "$output" ;;
     duplicate-producer-id) jq 'map(if .task.depth==1 then .reports |= map(if .__typename__=="ChunkReport" then .id="231:7" else . end) else . end)' "$input" > "$output" ;;
     unknown-report) jq 'map(if .task.depth==0 then .reports += [{"payload":"future schema"}] else . end)' "$input" > "$output" ;;
     outside-root-path) jq 'map(if .task.depth==1 then .reports |= map(if .__typename__=="StatReport" then .path="/etc/passwd" else . end) else . end)' "$input" > "$output" ;;
-    mismatched-child-chunk) jq 'map(if .task.depth==1 then .task.chunk_id="231:8" else . end)' "$input" > "$output" ;;
+    mismatched-child-chunk) jq 'map(if .task.depth==1 then .task.blob_id="231:8" else . end)' "$input" > "$output" ;;
     duplicate-task-path) jq 'map(if .task.depth==1 then .task.path="/tmp/rea-run-a/firmware.bin" else . end)' "$input" > "$output" ;;
     missing-root) jq 'map(select(.task.depth!=0))' "$input" > "$output" ;;
     malformed-range) jq 'map(if .task.depth==0 then .reports |= map(if .__typename__=="ChunkReport" then .size=99 else . end) else . end)' "$input" > "$output" ;;
@@ -42,7 +42,7 @@ apply_mutation(){
     duplicate-edge) jq 'map(if .task.depth==0 then .subtasks += [.subtasks[0]] else . end)' "$input" > "$output" ;;
     reverse-order) jq 'map(.reports |= reverse | .subtasks |= reverse) | reverse' "$input" > "$output" ;;
     remove-child-hash) jq 'map(if .task.depth==1 then .reports |= map(select(.__typename__!="HashReport")) else . end)' "$input" > "$output" ;;
-    multifile-dangling) jq 'map(if .task.depth==0 then .subtasks[0].chunk_id="not-present" else . end)' "$input" > "$output" ;;
+    multifile-dangling) jq 'map(if .task.depth==0 then .subtasks[0].blob_id="not-present" else . end)' "$input" > "$output" ;;
     unknown-chunk-id) jq 'map(if .task.depth==0 then .reports |= map(if .__typename__=="UnknownChunkReport" then .id="new-pid:900" else . end) else . end)' "$input" > "$output" ;;
     parent-traversal-path) jq 'map(if .task.depth==1 then .task.path="../escape.bin" else . end)' "$input" > "$output" ;;
     missing-typename) jq 'map(if .task.depth==1 then .reports |= map(if .__typename__=="HashReport" then del(.__typename__) else . end) else . end)' "$input" > "$output" ;;
