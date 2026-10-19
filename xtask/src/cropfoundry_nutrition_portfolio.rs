@@ -45,8 +45,8 @@ struct AuditedRow {
 struct NutrientPortfolioTotal {
     nutrient_id: String,
     batch_count: usize,
-    direct_assay_batch_count: usize,
-    estimated_batch_count: usize,
+    direct_assay_concentration_batch_count: usize,
+    estimated_delivery_batch_count: usize,
     total_delivered_mg: Option<f64>,
     total_delivered_interval_lower_mg: Option<f64>,
     total_delivered_interval_upper_mg: Option<f64>,
@@ -246,6 +246,18 @@ fn aggregate_option(
             ));
         }
         same_batch_resources(batch_rows, &mut issues, batch_id);
+    }
+
+    let currencies_for_option: BTreeSet<String> = grouped_batches
+        .values()
+        .filter_map(|batch_rows| text_field(&batch_rows[0].input, "currency_code"))
+        .map(|value| value.to_ascii_uppercase())
+        .collect();
+    if currencies_for_option.len() > 1 {
+        issues.push(format!(
+            "option {} mixes currencies across batch resource ledgers",
+            option.option_id
+        ));
     }
 
     let batch_count = grouped_batches.len();
