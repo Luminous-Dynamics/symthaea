@@ -137,6 +137,28 @@ Record input event, application response, render/present timestamps, output timi
 
 Use the existing [visual utility-per-joule protocol](VISUAL_UTILITY_PER_JOULE_PROTOCOL.md). Freeze AC-wall vs DC-rail accounting boundary; do not compare unlike boundaries without a justified model. Preserve raw samples, sampling timestamps, missing/gap handling, integration formula, baseline/task denominator, calibration, idle/background subtraction policy, workload, and uncertainty. Report energy per successful task alongside task success, latency and required quality floors.
 
+## 6A. Conservative field-of-view / uniform-patch fit screen
+
+ODRH now includes an optional geometry screen in `tools/open-display-platform-verify/src/geometry.rs`. Its synthetic input is [display-measurement-geometry-synthetic-v0.1.json](display-measurement-geometry-synthetic-v0.1.json), constrained by [display-measurement-geometry.schema.json](display-measurement-geometry.schema.json).
+
+The model estimates an ideal rectangular field-of-view footprint on a planar target:
+
+`W = 2 d tan(theta_h / 2)`, `H = 2 d tan(theta_v / 2)`
+
+where angular inputs are in radians for evaluation. It also calculates first-order standard-uncertainty estimates from distance and angular uncertainty. For the fit decision, it takes the upper coverage-factor bounds for distance and each angle, recomputes the nonlinear footprint, and adds the centering uncertainty and required edge guard on both sides. The resulting required uniform-patch extent must fit inside the declared patch dimensions in both axes.
+
+This is an ideal-geometry screen and an independent cross-check for fixture setup planning; it is **not** a calibrated lens/distortion model, a detector angular-response model, a photometric measurement, or proof that a given instrument's specified FOV describes its effective measurement cone. The coverage factor is an input convention, not a universal guarantee of statistical coverage. Real instrument response, pupil/lens geometry, alignment, target flatness and instrument-specific measurement instructions must still be assessed.
+
+Synthetic known-answer and fail-closed tests cover tangent geometry, conservative bounds, inadequate uniform-patch dimensions, invalid FOV/uncertainty, schema closure, and refusal to promote physical validation. To evaluate the fixture question, use:
+
+```text
+cargo run --manifest-path tools/open-display-platform-verify/Cargo.toml -- \
+  --geometry-record docs/engineering/display-measurement-geometry-synthetic-v0.1.json \
+  --geometry-schema docs/engineering/display-measurement-geometry.schema.json
+```
+
+The sample result is synthetic only; a future device-specific input must bind exact instrument identity, FOV source/evidence, distance measurement, uncertainties, patch definition, and setup revision before it can guide physical comparisons.
+
 ## 7. Benchmark gates
 
 ### G0 — protocol integrity
