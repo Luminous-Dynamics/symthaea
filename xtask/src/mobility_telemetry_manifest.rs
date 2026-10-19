@@ -506,12 +506,12 @@ fn validate_structure(manifest: &Manifest) -> Result<()> {
                 budget.claim_target, budget.measurand, budget.unit
             );
         }
-        if !budget.standard_uncertainty.is_finite() || budget.standard_uncertainty < 0.0
-            || !budget.expanded_uncertainty.is_finite() || budget.expanded_uncertainty < 0.0
+        if !budget.standard_uncertainty.is_finite() || budget.standard_uncertainty <= 0.0
+            || !budget.expanded_uncertainty.is_finite() || budget.expanded_uncertainty <= 0.0
             || !budget.coverage_factor.is_finite() || budget.coverage_factor < 1.0
             || !budget.acceptance_tolerance.is_finite() || budget.acceptance_tolerance <= 0.0
         {
-            bail!("uncertainty budget for {} has invalid numeric values", budget.claim_target);
+            bail!("uncertainty budget for {} has invalid numeric values; standard and expanded uncertainty must be positive", budget.claim_target);
         }
         let expected_expanded = budget.standard_uncertainty * budget.coverage_factor;
         let rounding_allowance = expected_expanded.abs().max(budget.expanded_uncertainty.abs()).max(1e-12) * 0.02;
@@ -2014,5 +2014,30 @@ mod tests {
         });
         let claim = claim_eligibility(&fixture, "ride_energy");
         assert!(claim.reasons.iter().any(|reason| reason == "rights_receipt_id_not_backed_by_artifact"));
+    }
+
+    #[test]
+    fn zero_uncertainty_is_rejected_as_unphysical_overconfidence() {
+        let mut fixture = manifest();
+        let artifact_path = "uncertainty/zero.json".to_owned();
+        fixture.artifacts.push(Artifact {
+            relative_path: artifact_path.clone(),
+            kind: "uncertainty_budget_record".to_owned(),
+            byte_len: 1,
+            sha256: format!("sha256:{}", "2".repeat(64)),
+        });
+        fixture.uncertainty_budgets.push(ClaimUncertaintyBudget {
+            claim_target: "ride_energy".to_owned(),
+            measurand: "net_dc_bus_energy".to_owned(),
+            unit: "Wh".to_owned(),
+            standard_uncertainty: 0.0,
+            expanded_uncertainty: 0.0,
+            coverage_factor: 2.0,
+            acceptance_tolerance: 0.5,
+            evidence_state: "bench_characterized".to_owned(),
+            artifact_path,
+        });
+        let error = validate_structure(&fixture).expect_err("zero uncertainty must not manufacture perfect confidence");
+        assert!(error.to_string().contains("standard and expanded uncertainty must be positive"));
     }
 }
