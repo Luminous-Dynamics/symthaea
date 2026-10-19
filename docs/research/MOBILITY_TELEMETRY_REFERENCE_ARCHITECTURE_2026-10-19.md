@@ -127,4 +127,18 @@ Targets for the first software tranche: zero false accepts across missing-channe
 6. Instrument the dynamometer/tire-rig session class when hardware and lab access are available.
 7. Add MDF 4.x export/interchange after an exact-head conformance suite exists.
 
+### Current implementation
+
+The first implementation is deliberately the **manifest and evidence gate**, not pretend firmware. It is wired into the existing `xtask` binary and has 11 authored unit tests covering duplicate IDs, unknown sensors, rates, missing channels, calibration receipts, path traversal and digest format.
+
+From the workspace root:
+```sh
+cargo test -p xtask mobility_telemetry_manifest
+cargo run -p xtask -- mobility-telemetry-manifest \
+  --input docs/research/data/mobility_telemetry_manifest_v0_1.json \
+  --out reports/mobility_telemetry_manifest.json
+```
+
+The checked-in manifest is intentionally `session_state: planned` and `evidence_class: DesignOnly`. A source-side structural replay found 12 unique sensors, 20 unique channels, valid sensor references and no schema errors; all three requested physical claim profiles remain ineligible. This replay is not execution of the Rust code. Cargo/rustc/rustfmt are unavailable in the current environment, so compilation/tests are still unverified.
+
 No hardware has been purchased or built in this increment, no physical measurements have been made, and this design is not a safety-qualified product.
