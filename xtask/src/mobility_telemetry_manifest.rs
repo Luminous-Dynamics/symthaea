@@ -1530,6 +1530,16 @@ fn evaluate_fault_case(mutation: &str, manifest: &Manifest) -> (String, String) 
     }
 }
 
+fn validate_fault_matrix_fixture_manifest(manifest: &Manifest) -> Result<()> {
+    if manifest.session_state != "planned" {
+        bail!("fault-matrix benchmark accepts only a planned fixture manifest, never recorded/closed sessions");
+    }
+    if manifest.evidence_class != "DesignOnly" {
+        bail!("fault-matrix benchmark accepts only DesignOnly fixtures, never physical/synthetic session claims");
+    }
+    validate_structure(manifest)
+}
+
 pub fn run_benchmark(
     manifest_path: &Path,
     matrix_path: &Path,
@@ -1548,7 +1558,7 @@ pub fn run_benchmark(
         .with_context(|| format!("reading telemetry manifest {}", manifest_path.display()))?;
     let manifest: Manifest = serde_json::from_slice(&manifest_raw)
         .with_context(|| format!("parsing telemetry manifest {}", manifest_path.display()))?;
-    validate_structure(&manifest)?;
+    validate_fault_matrix_fixture_manifest(&manifest)?;
 
     let matrix_raw = fs::read(matrix_path)
         .with_context(|| format!("reading telemetry fault matrix {}", matrix_path.display()))?;
@@ -2348,5 +2358,24 @@ mod tests {
                 baseline = Some(report);
             }
         }
+    }
+
+    #[test]
+    fn fault_matrix_runner_only_accepts_planned_design_fixtures() {
+        let fixture = manifest();
+        validate_fault_matrix_fixture_manifest(&fixture)
+            .expect("planned DesignOnly fixture is the proper input");
+
+        let mut recorded = fixture.clone();
+        recorded.session_state = "recorded".to_owned();
+        let error = validate_fault_matrix_fixture_manifest(&recorded)
+            .expect_err("recorded sessions must use the artifact-verifying manifest command");
+        assert!(error.to_string().contains("only a planned fixture manifest"));
+
+        let mut simulated = fixture;
+        simulated.evidence_class = "Synthetic".to_owned();
+        let error = validate_fault_matrix_fixture_manifest(&simulated)
+            .expect_err("the mutation suite itself must remain DesignOnly");
+        assert!(error.to_string().contains("only DesignOnly fixtures"));
     }
 }
