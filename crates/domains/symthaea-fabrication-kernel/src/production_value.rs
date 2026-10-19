@@ -663,7 +663,7 @@ mod tests {
     fn rejects_missing_extra_and_mismatched_workloads() {
         let (b, mut c) = pair();
         c[0].scenario_id = "other".to_owned();
-        c[0].workload_digest = "workload-other".to_owned();
+        c[0].workload_digest = test_digest("workload-other");
         assert!(matches!(
             compare_production_outcomes("baseline", &b, "candidate", &c),
             Err(EvaluationError::PairSetMismatch { .. })
