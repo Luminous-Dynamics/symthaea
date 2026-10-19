@@ -45,6 +45,15 @@ Campaign audit reports eligible and ineligible pairs, complete/indeterminate/inv
 
 The pairing contract is not a correction method. It does not alter trace values to compensate for wind, waves, current, water depth, trim, displacement, hull fouling, route drift or trial-order effects. Choose an applicable external procedure (for example ISO 15016:2025 for displacement ships in its stated scope) and keep corrected records distinct from raw traces.
 
+
+## Frozen multi-operating-point envelope audit
+
+The `operating_envelope` module checks evidence coverage for a predeclared set of operating cases. Each case declares the mission ID, service-contract digest and exact external condition/profile identity. The envelope manifest declares its digest, campaign, electrical measurement boundary, meter calibration epoch and uncertainty-bound method. Every required case must have exactly one eligible paired-trial result, and all cases must compare the same baseline design ID against the same candidate design ID.
+
+The audit rechecks that each energy pair matches the frozen mission/service/condition identities, measurement boundary, calibration epoch, uncertainty method and distinct trial order. It reports each missing, duplicate, unexpected, incomparable or fingerprint-mismatched case. A single favorable condition cannot compensate for missing evidence at another required point. The audit does not compute a saving, combine unlike operating points into one weighted score, select a design, establish a robust Pareto relation, or validate the physics. Feed the corresponding matched traces into the existing energy-budget comparator and retain each case's result separately for the shared robust-frontier analysis.
+
+Suggested operating cases depend on the vessel class and mission. A profile may include low-speed control, transit/cruise, required maximum service speed and relevant environmental/loading corners, but it must not blindly impose every regime on every craft. Freeze the required cases before reviewing candidate outcomes. Digests are caller-provided identifiers; they are not proof that a source, geometry or environmental measurement is authentic.
+
 ## Claim ceiling
 
 A Complete result means only that the canonical trace passed this crate's metadata, time-coverage, numeric and integration gates. It does not validate the measurement system, prove a hydrodynamic improvement, show corrected speed-power performance, establish lifecycle emissions, demonstrate vessel safety, or certify compliance.
