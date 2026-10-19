@@ -739,6 +739,10 @@ fn validate_measurement_run_semantics(record: &Value) -> Vec<String> {
             .get("measurand")
             .and_then(Value::as_str)
             .unwrap_or("<missing>");
+        let unit = observation
+            .get("unit")
+            .and_then(Value::as_str)
+            .unwrap_or("<missing>");
         let status = observation
             .get("status")
             .and_then(Value::as_str)
@@ -867,17 +871,18 @@ fn validate_measurement_run_semantics(record: &Value) -> Vec<String> {
                         "measured observation {observation_id} uses instrument {id} after its calibration expiry"
                     ));
                 }
-                let supports_measurand = instrument
+                let supports_measurand_and_unit = instrument
                     .get("supported_measurands")
                     .and_then(Value::as_array)
                     .is_some_and(|measurands| {
-                        measurands
-                            .iter()
-                            .any(|item| item.as_str() == Some(measurand))
+                        measurands.iter().any(|item| {
+                            item.get("measurand").and_then(Value::as_str) == Some(measurand)
+                                && item.get("unit").and_then(Value::as_str) == Some(unit)
+                        })
                     });
-                if !supports_measurand {
+                if !supports_measurand_and_unit {
                     errors.push(format!(
-                        "instrument {id} does not declare support for measurand {measurand}"
+                        "instrument {id} does not declare support for measurand {measurand} in unit {unit}"
                     ));
                 }
             }
@@ -1377,7 +1382,7 @@ mod tests {
             "calibration_state":"VALID",
             "calibration_record_digest":"aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
             "calibration_valid_through":"2026-02-30",
-            "supported_measurands":["task-window input energy"]
+            "supported_measurands":[{"measurand":"task-window input energy","unit":"J"}]
         }]);
         assert!(
             validate_measurement_run_str(&encoded(&record), RUN_SCHEMA_TEXT)
@@ -1434,7 +1439,7 @@ mod tests {
             "capability_profile_artifact_id":"ODRH-ART-CAP-POWER-001",
             "capability_profile_sha256":"dddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddd",
             "capability_profile_status":"DECLARED_UNREVIEWED",
-            "supported_measurands":["task-window input energy"]
+            "supported_measurands":[{"measurand":"task-window input energy","unit":"J"}]
         }]);
         record["raw_artifacts"] = serde_json::json!([
             {
@@ -1517,7 +1522,7 @@ mod tests {
             "capability_profile_artifact_id":"ODRH-ART-CAP-POWER-001",
             "capability_profile_sha256":"dddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddd",
             "capability_profile_status":"DECLARED_UNREVIEWED",
-            "supported_measurands":["task-window input energy"]
+            "supported_measurands":[{"measurand":"task-window input energy","unit":"J"}]
         }]);
         record["raw_artifacts"] = serde_json::json!([
             {
@@ -1586,6 +1591,20 @@ mod tests {
 
         validate_measurement_run_str(&encoded(&record), RUN_SCHEMA_TEXT)
             .expect("well-formed linearized covariance budget should validate");
+
+        let mut mismatched_unit = record.clone();
+        mismatched_unit["instruments"][0]["supported_measurands"][0]["unit"] =
+            Value::String("W".to_owned());
+        assert!(
+            validate_measurement_run_str(&encoded(&mismatched_unit), RUN_SCHEMA_TEXT)
+                .expect_err("instrument capability must match the observation unit")
+                .iter()
+                .any(|error| {
+                    error.contains(
+                        "does not declare support for measurand task-window input energy in unit J",
+                    )
+                })
+        );
 
         let mut reviewed = record.clone();
         reviewed["record_state"] = Value::String("INDEPENDENTLY_REVIEWED".to_owned());
@@ -1687,7 +1706,7 @@ mod tests {
                 "capability_profile_artifact_id":"ODRH-ART-CAP-POWER-001",
                 "capability_profile_sha256":"dddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddd",
                 "capability_profile_status":"DECLARED_UNREVIEWED",
-                "supported_measurands":["task-window input energy"]
+                "supported_measurands":[{"measurand":"task-window input energy","unit":"J"}]
             },
             {
                 "instrument_id":"ODRH-RUN-INS-CAMERA-001",
@@ -1698,7 +1717,7 @@ mod tests {
                 "calibration_state":"UNKNOWN",
                 "calibration_record_digest":null,
                 "calibration_valid_through":null,
-                "supported_measurands":["relative image response"]
+                "supported_measurands":[{"measurand":"relative image response","unit":"1"}]
             }
         ]);
         record["raw_artifacts"] = serde_json::json!([
