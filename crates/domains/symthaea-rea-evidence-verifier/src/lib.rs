@@ -14,6 +14,7 @@ const PROVIDER_VERSION: &str = "26.6.4";
 const RECEIPT_SCOPE: &str =
     "Pinned Unblob CLI on owned inert nested gzip/tar/text fixtures only; no REA, recovered firmware execution, emulator, or hardware qualification.";
 const RECEIPT_SCHEMA: &str = "symthaea.rea-provider-smoke-receipt.v1";
+const BUNDLE_MANIFEST_SCHEMA: &str = "symthaea.rea-evidence-bundle-manifest.v1";
 const PROVIDER_META_SCHEMA: &str = "symthaea.rea-provider-metamorphic-receipt.v1";
 
 #[derive(Debug, Serialize, PartialEq, Eq)]
@@ -194,6 +195,73 @@ fn find_files_named(root: &Path, name: &str, output: &mut Vec<PathBuf>) -> VResu
     Ok(())
 }
 
+fn collect_bundle_paths(root: &Path, current: &Path, output: &mut Vec<String>) -> VResult<()> {
+    let entries = fs::read_dir(current)
+        .map_err(|e| err(format!("cannot enumerate bundle directory {}: {e}", current.display())))?;
+    for item in entries {
+        let item = item.map_err(|e| err(format!("cannot read bundle directory entry: {e}")))?;
+        let kind = item.file_type()
+            .map_err(|e| err(format!("cannot inspect bundle entry {}: {e}", item.path().display())))?;
+        if kind.is_symlink() {
+            return Err(err(format!("bundle contains a symlink: {}", item.path().display())));
+        }
+        if kind.is_dir() {
+            collect_bundle_paths(root, &item.path(), output)?;
+        } else if kind.is_file() {
+            let relative = item.path().strip_prefix(root)
+                .map_err(|e| err(format!("bundle path escaped root: {e}")))?
+                .to_string_lossy()
+                .replace('\\', "/");
+            if relative.is_empty() || relative.starts_with('/') || relative.split('/').any(|part| part == "." || part == ".." || part.is_empty()) {
+                return Err(err(format!("bundle contains a non-normal relative path: {relative}")));
+            }
+            output.push(relative);
+        } else {
+            return Err(err(format!("bundle contains a non-regular entry: {}", item.path().display())));
+        }
+    }
+    Ok(())
+}
+
+fn verify_bundle_manifest(root: &Path, expected_digest: &str) -> VResult<()> {
+    let manifest_path = root.join("bundle-manifest.json");
+    verify_digest_at(&manifest_path, expected_digest, "bundle manifest")?;
+    let raw = read_bounded(&manifest_path, 4 * 1024 * 1024, "bundle manifest")?;
+    let manifest: Value = serde_json::from_slice(&raw)
+        .map_err(|e| err(format!("bundle manifest is not valid JSON: {e}")))?;
+    if text_field(&manifest, "schema_version")? != BUNDLE_MANIFEST_SCHEMA {
+        return Err(err("bundle manifest schema version mismatch"));
+    }
+    let files = required(&manifest, "files")?
+        .as_array()
+        .ok_or_else(|| err("bundle manifest files must be an array"))?;
+    let mut manifest_paths = Vec::with_capacity(files.len());
+    for entry in files {
+        let relative = text_field(entry, "path")?;
+        let digest = digest_field(entry, "sha256")?;
+        let parsed = Path::new(&relative);
+        if parsed.is_absolute() || parsed.components().any(|component| !matches!(component, std::path::Component::Normal(_))) {
+            return Err(err(format!("bundle manifest path is not normalized and relative: {relative}")));
+        }
+        if relative == "receipt.json" || relative == "bundle-manifest.json" {
+            return Err(err(format!("bundle manifest must not list its own receipt or manifest: {relative}")));
+        }
+        if manifest_paths.last().is_some_and(|last: &String| last >= &relative) {
+            return Err(err("bundle manifest paths must be unique and sorted"));
+        }
+        verify_digest_at(&root.join(&relative), &digest, &format!("manifest file {relative}"))?;
+        manifest_paths.push(relative);
+    }
+    let mut actual_paths = Vec::new();
+    collect_bundle_paths(root, root, &mut actual_paths)?;
+    actual_paths.retain(|p| p != "receipt.json" && p != "bundle-manifest.json");
+    actual_paths.sort();
+    if actual_paths != manifest_paths {
+        return Err(err("bundle manifest file set does not exactly match the artifact bundle"));
+    }
+    Ok(())
+}
+
 fn verify_payload(root: &Path, lane: &str, expected: &str) -> VResult<()> {
     let extracted = root.join(lane).join("extracted");
     let mut matches = Vec::new();
@@ -247,6 +315,8 @@ pub fn verify_bundle(
     if text_field(&receipt, "claims_ceiling")? != RECEIPT_SCOPE {
         return Err(err("receipt claim scope is missing, broader than, or different from provider-smoke-only"));
     }
+    let bundle_manifest_sha = digest_field(&receipt, "bundle_manifest_sha256")?;
+    verify_bundle_manifest(artifact_root, &bundle_manifest_sha)?;
 
     if text_field(&receipt, "qualification.tier")? != "unblob-provider-smoke"
         || required(&receipt, "qualification.rea_cli_mcp_parity")?.as_bool() != Some(false)
