@@ -23,16 +23,13 @@ fn main() {
         Err(error) => fail(&error, 2),
     };
 
-    let stdin;
+    let stdin = io::stdin();
     let input: Box<dyn BufRead> = match options.input {
         Some(path) => match open_input(&path) {
             Ok(reader) => Box::new(reader),
             Err(error) => fail(&error, 2),
         },
-        None => {
-            stdin = io::stdin();
-            Box::new(stdin.lock())
-        }
+        None => Box::new(stdin.lock())
     };
 
     let stdout = io::stdout();
@@ -161,7 +158,11 @@ fn number(value: Option<f64>) -> String {
 }
 
 fn csv_cell(value: &str) -> String {
-    if value.contains([',', '"', '\n', '\r']) {
+    if value.contains(',')
+        || value.contains('"')
+        || value.contains('\n')
+        || value.contains('\r')
+    {
         format!("\"{}\"", value.replace('"', "\"\""))
     } else {
         value.to_owned()
