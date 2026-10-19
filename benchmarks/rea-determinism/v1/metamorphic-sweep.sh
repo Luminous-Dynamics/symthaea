@@ -51,7 +51,8 @@ project(){
   root=$2
   input=$3
   jq -c --arg f "$fixture" '.fixtures[$f].report' "$CASES" > "$input"
-  jq --arg root "$root" -cS -f "$NORMALIZER" "$input" | sha256sum | awk '{print $1}'
+  jq --arg root "$root" -cS -f "$NORMALIZER" "$input" > "$input.projection" || return 2
+  sha256sum "$input.projection" | awk '{print $1}'
 }
 
 passed=0
@@ -62,8 +63,8 @@ for fixture in baseline multi-file-baseline; do
     multi-file-baseline) new_name=multi-file;;
   esac
   jq -c --arg f "$fixture" '.fixtures[$f].report' "$CASES" > "$TMP/base.json"
-  base_digest=$(jq --arg root "$original_root" -cS -f "$NORMALIZER" "$TMP/base.json" | sha256sum | awk '{print $1}') \
-    || fail "$fixture baseline did not normalize"
+  jq --arg root "$original_root" -cS -f "$NORMALIZER" "$TMP/base.json" > "$TMP/base.projection" || fail "$fixture baseline did not normalize"
+  base_digest=$(sha256sum "$TMP/base.projection" | awk '{print $1}')
   [ -n "$base_digest" ] || fail "$fixture baseline has empty digest"
   seed=1
   while [ "$seed" -le 256 ]; do
