@@ -597,6 +597,176 @@ fn main() {
 #[cfg(test)]
 mod tests {
     use super::*;
+    use std::time::{SystemTime, UNIX_EPOCH};
+
+    fn fixture_root(label: &str) -> PathBuf {
+        let nanos = SystemTime::now()
+            .duration_since(UNIX_EPOCH)
+            .expect("system clock after UNIX epoch")
+            .as_nanos();
+        env::temp_dir().join(format!(
+            "melothaea-blind-pack-{label}-{}-{nanos}",
+            std::process::id()
+        ))
+    }
+
+    fn make_fixture(root: &Path) -> (PathBuf, Vec<u8>) {
+        fs::create_dir_all(root).expect("create fixture root");
+        let wave = valid_test_wave();
+        fs::write(root.join("fixture.wav"), &wave).expect("write fixture WAV");
+        let audio_sha = sha256(&wave);
+        let audio_bytes = wave.len() as u64;
+
+        let arm = || {
+            json!({
+                "wav_path": "fixture.wav",
+                "wav_sha256": audio_sha,
+                "wav_bytes": audio_bytes,
+                "sample_rate_hz": 44_100,
+                "metrics": { "integrated_lufs": -16.0 }
+            })
+        };
+        let mut records = Vec::new();
+        for (index, style) in STYLES.iter().enumerate() {
+            records.push(json!({
+                "style": style,
+                "seed": index + 1,
+                "status": "complete",
+                "input_midi": { "sha256": format!("{:064x}", index + 1) },
+                "arms": {
+                    "fluidsynth_default_profile": arm(),
+                    "fluidsynth_room_only": arm(),
+                    "fluidsynth_mastering_only": arm(),
+                    "fluidsynth_dialect_profile": arm()
+                }
+            }));
+        }
+
+        let manifest = json!({
+            "schema": EXPECTED_SCHEMA,
+            "run_status": "complete",
+            "source_revision": {
+                "value": "a".repeat(40),
+                "format_valid": true
+            },
+            "contract": { "expected_dialect_count": STYLES.len() },
+            "cohort": {
+                "expected": records.len(),
+                "completed": records.len(),
+                "record_count_including_failures": records.len()
+            },
+            "records": records,
+            "failures": []
+        });
+        let manifest_path = root.join("renderer-ab-fair-manifest.json");
+        fs::write(
+            &manifest_path,
+            serde_json::to_vec_pretty(&manifest).expect("serialize manifest"),
+        )
+        .expect("write manifest");
+        (manifest_path, wave)
+    }
+
+    #[test]
+    fn valid_manifest_has_all_styles_and_verified_audio() {
+        let root = fixture_root("valid-manifest");
+        let (manifest_path, _) = make_fixture(&root);
+        let bytes = fs::read(&manifest_path).expect("read manifest");
+        let manifest: Value = serde_json::from_slice(&bytes).expect("parse fixture manifest");
+        let (blocks, revision) = read_blocks(&manifest, &root).expect("valid complete cohort");
+        assert_eq!(blocks.len(), STYLES.len());
+        assert_eq!(revision, "a".repeat(40));
+        assert_eq!(blocks.iter().map(|block| block.arms.len()).sum::<usize>(), STYLES.len() * ARMS.len());
+        fs::remove_dir_all(root).ok();
+    }
+
+    #[test]
+    fn renderer_receipt_hash_mismatch_fails_closed() {
+        let root = fixture_root("hash-mismatch");
+        let (manifest_path, _) = make_fixture(&root);
+        let mut manifest: Value = serde_json::from_slice(&fs::read(&manifest_path).unwrap()).unwrap();
+        manifest["records"][0]["arms"]["fluidsynth_default_profile"]["wav_sha256"] = Value::String("f".repeat(64));
+        let result = read_blocks(&manifest, &root);
+        assert!(result.is_err());
+        assert!(result.unwrap_err().contains("SHA-256"));
+        fs::remove_dir_all(root).ok();
+    }
+
+    #[test]
+    fn failed_render_cell_is_not_silently_dropped() {
+        let root = fixture_root("failed-cell");
+        let (manifest_path, _) = make_fixture(&root);
+        let mut manifest: Value = serde_json::from_slice(&fs::read(&manifest_path).unwrap()).unwrap();
+        manifest["records"][0]["status"] = Value::String("failed".to_owned());
+        let result = read_blocks(&manifest, &root);
+        assert!(result.is_err());
+        assert!(result.unwrap_err().contains("refusing to drop a failed cell"));
+        fs::remove_dir_all(root).ok();
+    }
+
+    #[test]
+    fn missing_style_cell_fails_even_if_counts_are_consistent() {
+        let root = fixture_root("missing-style");
+        let (manifest_path, _) = make_fixture(&root);
+        let mut manifest: Value = serde_json::from_slice(&fs::read(&manifest_path).unwrap()).unwrap();
+        manifest["records"].as_array_mut().unwrap().pop();
+        let count = manifest["records"].as_array().unwrap().len() as u64;
+        manifest["cohort"]["expected"] = json!(count);
+        manifest["cohort"]["completed"] = json!(count);
+        manifest["cohort"]["record_count_including_failures"] = json!(count);
+        let result = read_blocks(&manifest, &root);
+        assert!(result.is_err());
+        assert!(result.unwrap_err().contains("style cohort incomplete"));
+        fs::remove_dir_all(root).ok();
+    }
+
+    #[test]
+    fn complete_pack_is_repeatable_blinded_and_byte_preserving() {
+        let root = fixture_root("pack");
+        let (manifest_path, wave) = make_fixture(&root);
+        let audio_root = root.clone();
+        let first_output = root.join("out-one");
+        let second_output = root.join("out-two");
+        let seed = "c".repeat(64);
+        build_pack(&manifest_path, &audio_root, &first_output, &seed).expect("first pack");
+        build_pack(&manifest_path, &audio_root, &second_output, &seed).expect("second pack");
+
+        let first_participant = first_output.join("participant-pack");
+        let first_operator = first_output.join("operator-only");
+        let csv_one = fs::read(first_participant.join("ratings.csv")).unwrap();
+        let csv_two = fs::read(second_output.join("participant-pack/ratings.csv")).unwrap();
+        assert_eq!(csv_one, csv_two);
+
+        let csv = String::from_utf8(csv_one).unwrap();
+        for treatment in [
+            "default_default",
+            "dialect_room_only",
+            "dialect_mastering_only",
+            "dialect_room_mastering",
+        ] {
+            assert!(!csv.contains(treatment));
+        }
+        assert!(!csv.contains("fixture.wav"));
+        assert!(!csv.contains(&sha256(&wave)));
+        assert!(!first_participant.join("operator-only/answer-key.json").exists());
+
+        let files = fs::read_dir(first_participant.join("stimuli")).unwrap().count();
+        assert_eq!(files, STYLES.len() * ARMS.len());
+        for entry in fs::read_dir(first_participant.join("stimuli")).unwrap() {
+            let path = entry.unwrap().path();
+            assert_eq!(fs::read(path).unwrap(), wave);
+        }
+
+        let key = fs::read_to_string(first_operator.join("answer-key.json")).unwrap();
+        assert!(key.contains("treatment_arm"));
+        assert!(key.contains("default_default"));
+        assert!(key.contains(&sha256(&wave)));
+        assert!(key.contains(&seed));
+        let pack_manifest = fs::read_to_string(first_participant.join("pack-manifest.json")).unwrap();
+        assert!(!pack_manifest.contains(&seed));
+        assert!(pack_manifest.contains(&sha256(seed.as_bytes())));
+        fs::remove_dir_all(root).ok();
+    }
 
     #[test]
     fn sha256_known_vector() {
