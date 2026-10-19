@@ -1162,12 +1162,16 @@ mod tests {
     #[test]
     fn generated_config_does_not_trust_wheel_group() {
         let result = generate(&test_hw(), &test_choices(), &[]);
-        assert!(result
-            .configuration_nix
-            .contains("trusted-users = [ \"root\" ];"));
-        assert!(!result
-            .configuration_nix
-            .contains("trusted-users = [ \"root\" \"@wheel\" ];"));
+        assert!(
+            result
+                .configuration_nix
+                .contains("trusted-users = [ \"root\" ];")
+        );
+        assert!(
+            !result
+                .configuration_nix
+                .contains("trusted-users = [ \"root\" \"@wheel\" ];")
+        );
     }
 
     #[test]

@@ -386,10 +386,15 @@ fn parse_hardware_probe(data: &str) -> Result<RemoteHardware, String> {
         return Err("hardware response has an invalid or missing architecture".into());
     }
 
-    let target_machine_digest =
-        optional_string(object.get("target_machine_digest"), "target_machine_digest", 64)?;
+    let target_machine_digest = optional_string(
+        object.get("target_machine_digest"),
+        "target_machine_digest",
+        64,
+    )?;
     if target_machine_digest.len() != 64
-        || !target_machine_digest.bytes().all(|byte| byte.is_ascii_hexdigit() && !byte.is_ascii_uppercase())
+        || !target_machine_digest
+            .bytes()
+            .all(|byte| byte.is_ascii_hexdigit() && !byte.is_ascii_uppercase())
     {
         return Err("hardware response has an invalid target machine digest".into());
     }
@@ -1316,11 +1321,9 @@ pub fn RemoteInstallPanel(
 
         let requested_layout = disk_layout.get();
         let requested_filesystem = filesystem.get();
-        if let Err(error) = validate_storage_security(
-            &requested_layout,
-            &requested_filesystem,
-            encrypt.get(),
-        ) {
+        if let Err(error) =
+            validate_storage_security(&requested_layout, &requested_filesystem, encrypt.get())
+        {
             relay_state.set(RelayState::Failed(error.to_string()));
             set_install_log.update(|l| l.push(format!("Install blocked: {}", error)));
             return;
@@ -1971,10 +1974,9 @@ mod tests {
             "0123456789abcdef0123456789abcdef0123456789abcdef0123456789abcdef"
         );
 
-        assert!(parse_hardware_probe(
-            r#"{"arch":"x86_64","target_machine_digest":"ABCDEF"}"#
-        )
-        .is_err());
+        assert!(
+            parse_hardware_probe(r#"{"arch":"x86_64","target_machine_digest":"ABCDEF"}"#).is_err()
+        );
         assert!(parse_hardware_probe(r#"{"arch":"x86_64"}"#).is_err());
     }
 
