@@ -9,6 +9,8 @@ From the repository root:
     cargo test --manifest-path tools/open-display-platform-verify/Cargo.toml
     cargo run --manifest-path tools/open-display-platform-verify/Cargo.toml
 
+To validate the checked-in synthetic control-drift plan and print its screening report, run the CLI with `--drift-plan docs/engineering/display-drift-control-plan-v0.1.json --drift-schema docs/engineering/display-drift-control-plan.schema.json`. The plan must remain `SYNTHETIC_TEST_ONLY`; no physical result is asserted. The fixed-guard-band algorithm marks missing, invalid or out-of-band controls and conservatively quarantines observations between acceptable anchors. It does not fit or correct a drift curve.
+
 To validate a run-specific geometry receipt after the OpenSCAD checks:
 
     cargo run --manifest-path tools/open-display-platform-verify/Cargo.toml -- \
