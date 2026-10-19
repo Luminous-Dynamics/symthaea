@@ -857,6 +857,71 @@
           "root_file_range": null
         }
       ]
+    },
+    {
+      "id": "LNG-019",
+      "description": "An edge with unknown range omits the stage identity instead of explicitly reporting an unknown stage.",
+      "selection_offset": 0,
+      "selection_length": 64,
+      "tasks": [
+        {
+          "path": "$input",
+          "size": 64,
+          "blob_id": "blob-root"
+        },
+        {
+          "path": "$output/fw",
+          "size": 512,
+          "blob_id": "blob-fw"
+        }
+      ],
+      "derivations": [
+        {
+          "parent_path": "$input",
+          "child_path": "$output/fw",
+          "provider_blob_id": "blob-fw",
+          "parent_file_range": null
+        }
+      ],
+      "chunks": [
+        {
+          "input_path": "$output/fw",
+          "provider_id": "inner",
+          "range": {
+            "offset": 4,
+            "length": 16
+          },
+          "root_file_range": null
+        }
+      ]
+    },
+    {
+      "id": "LNG-020",
+      "description": "A direct input chunk has an empty provider identity and must not be accepted as provenance evidence.",
+      "selection_offset": 0,
+      "selection_length": 64,
+      "tasks": [
+        {
+          "path": "$input",
+          "size": 64,
+          "blob_id": "blob-root"
+        }
+      ],
+      "derivations": [],
+      "chunks": [
+        {
+          "input_path": "$input",
+          "provider_id": "",
+          "range": {
+            "offset": 0,
+            "length": 8
+          },
+          "root_file_range": {
+            "offset": 0,
+            "length": 8
+          }
+        }
+      ]
     }
   ]
 }
