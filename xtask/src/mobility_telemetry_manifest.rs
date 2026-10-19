@@ -48,7 +48,7 @@ const RIGHTS_STATES: &[&str] = &[
 ];
 const KNOWN_UNITS: &[&str] = &[
     "m/s", "m", "deg", "rad", "rad/s", "m/s^2", "N", "N*m", "V", "A",
-    "W", "J", "Wh", "kg", "kg/s", "s", "ns", "degC", "kPa", "Pa",
+    "W", "J", "Wh", "kg", "kg/s", "s", "ns", "degC", "kPa", "Pa", "1",
 ];
 const ARTIFACT_KINDS: &[&str] = &[
     "raw_sensor_log",
@@ -2291,5 +2291,29 @@ mod tests {
         let error = verify_uncertainty_budget_receipt_bytes(&tampered_bytes, &budget)
             .expect_err("a receipt that disagrees with the manifest must fail");
         assert!(error.to_string().contains("does not match manifest budget"));
+    }
+
+    #[test]
+    fn every_uncertainty_requirement_uses_a_known_unit() {
+        for (claim, requirements) in [
+            ("ride_energy", RIDE_ENERGY_UNCERTAINTY_REQUIREMENTS),
+            ("longitudinal_dynamics", LONGITUDINAL_UNCERTAINTY_REQUIREMENTS),
+            ("tire_health", TIRE_HEALTH_UNCERTAINTY_REQUIREMENTS),
+            ("motor_map", MOTOR_MAP_UNCERTAINTY_REQUIREMENTS),
+            ("tire_force_characterization", TIRE_FORCE_UNCERTAINTY_REQUIREMENTS),
+            ("ice_fuel_energy", ICE_ENERGY_UNCERTAINTY_REQUIREMENTS),
+        ] {
+            assert!(known_claim(claim), "missing claim registry entry: {claim}");
+            for (measurand, allowed_units) in requirements {
+                assert!(!measurand.trim().is_empty());
+                for unit in *allowed_units {
+                    assert!(
+                        KNOWN_UNITS.contains(unit),
+                        "uncertainty requirement {claim}/{measurand} uses unknown unit {unit}"
+                    );
+                    assert!(known_uncertainty_pair(claim, measurand, unit));
+                }
+            }
+        }
     }
 }
