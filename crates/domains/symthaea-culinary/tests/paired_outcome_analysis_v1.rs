@@ -176,9 +176,10 @@ fn non_finite_aggregate_difference_fails_closed() {
     let mut study = qualified_observation_contract_fixture();
     for block in study["blocks"].as_array_mut().unwrap() {
         for run in block["runs"].as_array_mut().unwrap() {
+            let is_variant = run["condition_id"] == "variant";
             for outcome in run["outcomes"].as_array_mut().unwrap() {
                 if outcome["outcome_id"] == "prepared_yield_g" {
-                    let value = if run["condition_id"] == "baseline" { 0.0 } else { 1e308 };
+                    let value = if is_variant { 1e308 } else { 0.0 };
                     outcome["value"] = serde_json::json!(value);
                     outcome["lower"] = serde_json::json!(value);
                     outcome["upper"] = serde_json::json!(value);
