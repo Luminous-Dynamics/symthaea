@@ -464,8 +464,7 @@ mod tests {
     #[test]
     fn larger_distance_and_angular_uncertainty_do_not_shrink_guarded_footprint() {
         let baseline = geometry_input();
-        let baseline_result =
-            evaluate_geometry_screen(&baseline).expect("baseline geometry is valid");
+        let baseline_result = evaluate_geometry_screen(&baseline).expect("baseline geometry is valid");
 
         let mut stressed = baseline;
         stressed.distance_mm += 100.0;
@@ -495,20 +494,18 @@ mod tests {
     #[test]
     fn uniform_patch_fit_boundary_is_inclusive_and_below_boundary_fails() {
         let mut input = geometry_input();
-        let first = evaluate_geometry_screen(&input)
-            .expect("initial geometry must be valid");
+        let first = evaluate_geometry_screen(&input).expect("initial geometry must be valid");
         input.uniform_patch_width_mm = first.total_required_width_mm;
         input.uniform_patch_height_mm = first.total_required_height_mm;
 
-        let exact_edge = evaluate_geometry_screen(&input)
-            .expect("exactly sufficient patch is valid");
+        let exact_edge = evaluate_geometry_screen(&input).expect("exactly sufficient patch is valid");
         assert!(exact_edge.horizontal_fits);
         assert!(exact_edge.vertical_fits);
         assert_eq!(exact_edge.screen_status, "WITHIN_GUARD_BAND");
 
         input.uniform_patch_width_mm -= 1e-9;
-        let just_too_small = evaluate_geometry_screen(&input)
-            .expect("just-too-small patch is still a valid measurement setup");
+        let just_too_small =
+            evaluate_geometry_screen(&input).expect("just-too-small patch is still a valid measurement setup");
         assert!(!just_too_small.horizontal_fits);
         assert!(just_too_small.vertical_fits);
         assert_eq!(just_too_small.screen_status, "OUTSIDE_GUARD_BAND");
