@@ -905,6 +905,17 @@ mod tests {
     }
 
     #[test]
+    fn rejects_differential_adapter_source_drift() {
+        let f = create_fixture();
+        write(
+            &f.source.join("../../rea-differential/v1/unblob-smoke-adapter.sh"),
+            b"changed adapter bytes\n",
+        );
+        assert!(verify_bundle(&f.artifact, &f.source, &f.expected_head, None)
+            .unwrap_err().to_string().contains("Unblob differential adapter"));
+    }
+
+    #[test]
     fn rejects_provider_script_identity_drift() {
         let f = create_fixture();
         write(&f.source.join("provider-smoke.sh"), b"changed provider smoke script\\n");
