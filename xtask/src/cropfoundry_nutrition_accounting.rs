@@ -86,6 +86,10 @@ fn ratio(numerator: Option<f64>, denominator: Option<f64>) -> Option<f64> {
         .and_then(|(n, d)| (n.is_finite() && d.is_finite() && n >= 0.0 && d > 0.0).then_some(n / d))
 }
 
+fn has_nonblank(value: Option<&str>) -> bool {
+    value.is_some_and(|text| !text.trim().is_empty())
+}
+
 fn valid_sha256(value: &str) -> bool {
     value.len() == 64 && value.bytes().all(|byte| byte.is_ascii_hexdigit())
 }
@@ -132,15 +136,11 @@ fn audit_input(input: NutritionAccountingInput) -> NutritionAccountingReceipt {
     {
         issues.push("bioavailability_fraction must be finite and in [0,1]".to_owned());
     }
-    if input
-        .concentration_evidence_uri
-        .as_deref()
-        .is_none_or(str::is_empty)
-    {
+    if !has_nonblank(input.concentration_evidence_uri.as_deref()) {
         issues.push("concentration_evidence_uri must be explicit".to_owned());
     }
     if input.concentration_provenance == ConcentrationProvenance::DirectAssay
-        && input.assay_method.as_deref().is_none_or(str::is_empty)
+        && !has_nonblank(input.assay_method.as_deref())
     {
         issues.push("direct assay provenance requires assay_method".to_owned());
     }
@@ -168,18 +168,12 @@ fn audit_input(input: NutritionAccountingInput) -> NutritionAccountingReceipt {
         );
     }
     if input.retention_fraction.is_some()
-        && input
-            .retention_evidence_uri
-            .as_deref()
-            .is_none_or(str::is_empty)
+        && !has_nonblank(input.retention_evidence_uri.as_deref())
     {
         issues.push("retention_fraction requires its own evidence URI".to_owned());
     }
     if input.bioavailability_fraction.is_some()
-        && input
-            .bioavailability_evidence_uri
-            .as_deref()
-            .is_none_or(str::is_empty)
+        && !has_nonblank(input.bioavailability_evidence_uri.as_deref())
     {
         issues.push("bioavailability_fraction requires its own evidence URI".to_owned());
     }
@@ -411,6 +405,17 @@ mod tests {
                 .any(|issue| issue.contains("mass basis"))
         );
         assert_eq!(receipt.nutrient_mass_at_serving_mg, None);
+    }
+
+    #[test]
+    fn whitespace_only_evidence_fields_fail_closed() {
+        let mut input = fixture();
+        input.concentration_evidence_uri = Some("   ".to_owned());
+        input.assay_method = Some("  ".to_owned());
+        let receipt = audit_input(input);
+        assert!(!receipt.accounting_pass);
+        assert!(receipt.issues.iter().any(|issue| issue.contains("concentration_evidence_uri")));
+        assert!(receipt.issues.iter().any(|issue| issue.contains("assay_method")));
     }
 
     #[test]
