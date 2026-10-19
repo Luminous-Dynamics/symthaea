@@ -183,8 +183,15 @@ pub fn validate_audit_bundle(
         if row.get("schema_version").and_then(Value::as_str) != actual_schema {
             push(&mut issues, "ARTIFACT_SCHEMA_MISMATCH", format!("artifacts[{id}].schema_version"), "manifest schema version differs from the source fixture");
         }
-        if row.get("evidence_status").and_then(Value::as_str) != Some("synthetic_only") {
-            push(&mut issues, "ARTIFACT_EVIDENCE_CEILING_MISSING", format!("artifacts[{id}].evidence_status"), "all component fixtures must remain explicitly synthetic-only");
+        if row.get("evidence_status").and_then(Value::as_str)
+            != value.get("evidence_status").and_then(Value::as_str)
+        {
+            push(
+                &mut issues,
+                "ARTIFACT_EVIDENCE_STATUS_MISMATCH",
+                format!("artifacts[{id}].evidence_status"),
+                "manifest evidence status must exactly match the source fixture status",
+            );
         }
     }
     if rows.len() != artifacts.len() {
