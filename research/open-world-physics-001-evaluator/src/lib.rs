@@ -273,6 +273,14 @@ fn reference_worlds() -> Vec<ReferenceWorld> {
     ]
 }
 
+/// Return the source-visible reference worlds through their query-only API.
+///
+/// This is useful for smoke tests and local agent development. It is not a
+/// blind evaluation interface because the corpus implementation is open source.
+pub fn open_reference_worlds() -> Vec<ReferenceWorld> {
+    reference_worlds()
+}
+
 fn reference_corpus_manifest() -> Vec<CorpusEntry> {
     reference_worlds()
         .into_iter()
