@@ -541,7 +541,7 @@ fn build_receipt() -> Result<WaterPolicyReceipt> {
     }
 
     Ok(WaterPolicyReceipt {
-        schema_version: "cropfoundry-water-policy-receipt-v0".to_owned(),
+        schema_version: "cropfoundry-water-policy-receipt-v1".to_owned(),
         benchmark_id: "CF-022".to_owned(),
         execution_mode: "deterministic_synthetic_algorithm_harness".to_owned(),
         budget_measurement_unit: "plot-mm sum; not physical volume".to_owned(),
@@ -550,13 +550,13 @@ fn build_receipt() -> Result<WaterPolicyReceipt> {
         training_authorized: false,
         scenario_count: all_scenarios.len(),
         policy_count: policies.len(),
-        invariant_summary: "Zero cap violations; synthetic proxy, not a plant model.".to_owned(),
+        invariant_summary: "Zero cap violations; synthetic proxy, not a plant model; per-zone burden is reported.".to_owned(),
         aggregates,
         results,
         caveats: vec![
             "Scenario traces and parameters are illustrative synthetic assumptions.".to_owned(),
             "The stress proxy is not calibrated to a crop or farm economics.".to_owned(),
-            "Aggregate scores can hide uneven burdens; inspect per-plot stress and irrigation before interpretation.".to_owned(),
+            "Aggregate scores hide uneven burdens; inspect per-plot stress and irrigation.".to_owned(),
             "Lower scores do not establish field water savings or yield gains.".to_owned(),
             "This tests deterministic execution and hard water accounting only.".to_owned(),
             "Field use requires calibration, farmer review, and replicated trials.".to_owned(),
@@ -601,6 +601,7 @@ mod tests {
     #[test]
     fn cropfoundry_water_policy_has_all_expected_scenarios_and_baselines() {
         let receipt = build_receipt().unwrap();
+        assert_eq!(receipt.schema_version, "cropfoundry-water-policy-receipt-v1");
         assert_eq!(receipt.benchmark_id, "CF-022");
         assert_eq!(receipt.scenario_count, 6);
         assert_eq!(receipt.policy_count, 3);
