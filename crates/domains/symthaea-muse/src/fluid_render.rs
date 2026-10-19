@@ -450,4 +450,69 @@ mod tests {
         assert!(master_wav(&silent, &crate::auto_master::MasteringConfig::default()).is_none());
         std::fs::remove_file(&silent).ok();
     }
+    #[test]
+    fn mastering_rejects_non_finite_float_samples() {
+        let path = std::env::temp_dir().join(format!(
+            "muse_nonfinite_input_{}.wav",
+            std::process::id()
+        ));
+        let spec = hound::WavSpec {
+            channels: 2,
+            sample_rate: 48000,
+            bits_per_sample: 32,
+            sample_format: hound::SampleFormat::Float,
+        };
+        let mut writer = hound::WavWriter::create(&path, spec).unwrap();
+        for _ in 0..512 {
+            writer.write_sample(0.1f32).unwrap();
+            writer.write_sample(f32::NAN).unwrap();
+        }
+        writer.finalize().unwrap();
+
+        assert!(
+            master_wav(&path, &crate::auto_master::MasteringConfig::default()).is_none(),
+            "non-finite samples must fail the render rather than contaminate measurements"
+        );
+        std::fs::remove_file(&path).ok();
+    }
+
+    #[test]
+    fn mastering_rejects_truncated_pcm_instead_of_dropping_samples() {
+        let valid_path = std::env::temp_dir().join(format!(
+            "muse_truncated_valid_{}.wav",
+            std::process::id()
+        ));
+        let truncated_path = std::env::temp_dir().join(format!(
+            "muse_truncated_input_{}.wav",
+            std::process::id()
+        ));
+        let spec = hound::WavSpec {
+            channels: 2,
+            sample_rate: 48000,
+            bits_per_sample: 16,
+            sample_format: hound::SampleFormat::Int,
+        };
+        let mut writer = hound::WavWriter::create(&valid_path, spec).unwrap();
+        for i in 0..512 {
+            let sample = if i % 2 == 0 { 7000i16 } else { -7000i16 };
+            writer.write_sample(sample).unwrap();
+            writer.write_sample(-sample).unwrap();
+        }
+        writer.finalize().unwrap();
+
+        let mut bytes = std::fs::read(&valid_path).unwrap();
+        bytes.truncate(bytes.len().saturating_sub(1));
+        std::fs::write(&truncated_path, bytes).unwrap();
+        assert!(
+            master_wav(
+                &truncated_path,
+                &crate::auto_master::MasteringConfig::default()
+            )
+            .is_none(),
+            "truncated PCM must fail instead of silently lowering sample/frame counts"
+        );
+        std::fs::remove_file(&valid_path).ok();
+        std::fs::remove_file(&truncated_path).ok();
+    }
+
 }
