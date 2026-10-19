@@ -227,6 +227,16 @@ Begin with a one-screen summary, then include detail links:
 - **Next three tasks:** ordered by expected capability gain, feasibility and risk.
 - **Remote actions:** explicitly state whether any push, PR or merge occurred.
 
+## Execution update — 2026-10-19
+
+This campaign has begun generating scoped research work, not just plans:
+
+- **Mycelix trust uncertainty:** [PR #5221](https://github.com/Luminous-Dynamics/mycelix/pull/5221) freezes a Beta–Bernoulli posterior reference (13 valid / 9 invalid cases), a Rust arithmetic oracle, named mutation controls, and a deterministic 3,456-case property grid. It intentionally does not alter MATL/TCDM or governance behavior. Its dedicated exact-head workflow is being used to expose formatting and test issues before any promotion.
+- **Symtropy graph entropy:** [PR #2086](https://github.com/Luminous-Dynamics/symtropy/pull/2086) received a formatting-only repair based on the exact workflow diff and the missing SPDX header required by the repository's license checker. The dedicated graph-entropy corpus had passed on the earlier exact head; qualification of the new head must be checked separately.
+- **Execution rule:** continue developing independent contracts while hosted runners are queued, but never treat their queue state as test evidence. Read failures, fix narrow defects and record the tested commit each time.
+
+The first Mycelix mathematics comparison is now framed as score-only MATL/TCDM versus posterior mean versus a conservative Cantelli-derived lower bound, evaluated on identical synthetic observations. Before any production adaptation, require calibration and risk/coverage comparison plus separate controls for duplicates, correlated sources, Sybil identities, and time drift. The Bayesian primitive alone makes none of those threat classes safe.
+
 ## Source links
 
 - [OpenAI math repository](https://github.com/openai/math)
