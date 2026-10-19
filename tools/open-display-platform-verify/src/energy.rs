@@ -115,9 +115,7 @@ pub fn integrate_power_trace(
     {
         errors.push("energy window bounds must be finite and end after start".to_owned());
     }
-    if !config.max_sample_gap_seconds.is_finite()
-        || config.max_sample_gap_seconds <= 0.0
-    {
+    if !config.max_sample_gap_seconds.is_finite() || config.max_sample_gap_seconds <= 0.0 {
         errors.push("maximum sample gap must be finite and positive".to_owned());
     }
     if samples.len() < 2 {
@@ -242,7 +240,6 @@ fn interpolate_power(samples: &[PowerSample], time_seconds: f64) -> f64 {
     // Coverage and ordering checks make this branch unreachable for a valid trace.
     f64::NAN
 }
-
 
 /// Validate and integrate a synthetic-only power-trace record against Draft 2020-12.
 ///
@@ -469,7 +466,11 @@ mod tests {
         let mutated = serde_json::to_string(&trace).expect("mutated trace must serialize");
         let errors = super::validate_energy_trace_str(&mutated, ENERGY_SCHEMA_TEXT)
             .expect_err("one-second samples must fail a half-second cap");
-        assert!(errors.iter().any(|error| error.contains("sample gap exceeds")));
+        assert!(
+            errors
+                .iter()
+                .any(|error| error.contains("sample gap exceeds"))
+        );
     }
 
     #[test]
@@ -478,10 +479,12 @@ mod tests {
             serde_json::from_str(ENERGY_TRACE_TEXT).expect("energy trace fixture must parse");
         trace["record_state"] = Value::String("ACQUIRED_UNQUALIFIED".to_owned());
         let mutated = serde_json::to_string(&trace).expect("mutated trace must serialize");
-        assert!(super::validate_energy_trace_str(&mutated, ENERGY_SCHEMA_TEXT)
-            .expect_err("synthetic validator cannot qualify physical data")
-            .iter()
-            .any(|error| error.contains("SYNTHETIC_TEST_ONLY")));
+        assert!(
+            super::validate_energy_trace_str(&mutated, ENERGY_SCHEMA_TEXT)
+                .expect_err("synthetic validator cannot qualify physical data")
+                .iter()
+                .any(|error| error.contains("SYNTHETIC_TEST_ONLY"))
+        );
     }
 
     #[test]
