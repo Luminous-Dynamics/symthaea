@@ -424,11 +424,6 @@ fn round3(value: f64) -> f64 {
 
 fn build_receipt() -> Result<WaterPolicyReceipt> {
     let all_scenarios = scenarios();
-    let policies = [
-        Policy::EqualShareCalendar,
-        Policy::SoilThreshold,
-        Policy::UncertaintyAware,
-    ];
     let mut results = Vec::new();
     for scenario in all_scenarios {
         let (equal_share_result, _) = simulate_one(scenario, Policy::EqualShareCalendar, None);
@@ -714,8 +709,8 @@ mod tests {
         );
         assert_eq!(receipt.benchmark_id, "CF-022");
         assert_eq!(receipt.scenario_count, 6);
-        assert_eq!(receipt.policy_count, 3);
-        assert_eq!(receipt.results.len(), 18);
+        assert_eq!(receipt.policy_count, 4);
+        assert_eq!(receipt.results.len(), 24);
         assert!(receipt.results.iter().any(|result| {
             result.scenario_id == "forecast_bias_only"
                 && result.forecast_bias_fraction < 0.0
@@ -729,7 +724,7 @@ mod tests {
                 && result.forecast_bias_fraction == 0.0
                 && result.sensor_dropout_fraction > 0.0
         }));
-        assert_eq!(receipt.aggregates.len(), 3);
+        assert_eq!(receipt.aggregates.len(), 4);
         assert!(
             receipt
                 .aggregates
@@ -826,6 +821,44 @@ mod tests {
             assert_ne!(
                 policy_result.sensor_dropout_period_days,
                 reference.sensor_dropout_period_days
+            );
+        }
+    }
+
+    #[test]
+    fn cropfoundry_matched_water_baseline_preserves_each_daily_dose() {
+        let receipt = build_receipt().unwrap();
+        for scenario in scenarios() {
+            let risk = receipt
+                .results
+                .iter()
+                .find(|result| {
+                    result.scenario_id == scenario.id
+                        && result.policy == Policy::UncertaintyAware.name()
+                })
+                .unwrap();
+            let matched = receipt
+                .results
+                .iter()
+                .find(|result| {
+                    result.scenario_id == scenario.id
+                        && result.policy == WATER_MATCHED_POLICY_NAME
+                })
+                .unwrap();
+            assert_eq!(
+                risk.total_irrigation_applied_plot_mm,
+                matched.total_irrigation_applied_plot_mm
+            );
+            assert_eq!(matched.water_budget_violation_days, 0);
+            assert!(
+                matched
+                    .relative_stress_change_vs_matched_water_equal_share_pct
+                    .is_none()
+            );
+            assert!(risk.relative_stress_change_vs_matched_water_equal_share_pct.is_some());
+            assert!(
+                matched.plot_allocation_dispersion_plot_mm
+                    <= risk.plot_allocation_dispersion_plot_mm
             );
         }
     }
