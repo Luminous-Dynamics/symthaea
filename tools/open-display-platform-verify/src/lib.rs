@@ -1587,6 +1587,30 @@ mod tests {
         validate_measurement_run_str(&encoded(&record), RUN_SCHEMA_TEXT)
             .expect("well-formed linearized covariance budget should validate");
 
+        let mut reviewed = record.clone();
+        reviewed["record_state"] = Value::String("INDEPENDENTLY_REVIEWED".to_owned());
+        reviewed["physical_validation"] = Value::String("INDEPENDENTLY_REVIEWED".to_owned());
+        reviewed["review"] = serde_json::json!({
+            "reviewer_id":"synthetic independent reviewer",
+            "review_method":"test-only schema/semantics fixture",
+            "reviewed_at":"2026-10-19T09:00:00+02:00",
+            "decision":"ACCEPTED_WITH_LIMITS"
+        });
+        reviewed["observations"][0]["status"] =
+            Value::String("INDEPENDENTLY_REVIEWED".to_owned());
+        reviewed["observations"][0]["uncertainty_budget"]["status"] =
+            Value::String("INDEPENDENTLY_REVIEWED".to_owned());
+        let errors = validate_measurement_run_str(&encoded(&reviewed), RUN_SCHEMA_TEXT)
+            .expect_err("declared-but-unreviewed capability must not support independent result review");
+        assert!(errors.iter().any(|error| {
+            error.contains("capability profile is not independently reviewed")
+        }));
+
+        reviewed["instruments"][0]["capability_profile_status"] =
+            Value::String("INDEPENDENTLY_REVIEWED".to_owned());
+        validate_measurement_run_str(&encoded(&reviewed), RUN_SCHEMA_TEXT)
+            .expect("the same synthetic record may pass the status gate once capability status is reviewed");
+
         let mut bad_profile_digest = record.clone();
         let profile_index = bad_profile_digest["raw_artifacts"]
             .as_array()
