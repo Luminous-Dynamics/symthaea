@@ -20,7 +20,9 @@ cargo run -q -p xtask -- cropfoundry-nutrition-accounting \
 
 The command records the input's own SHA-256 and emits a `cropfoundry-nutrition-accounting-receipt-v1` receipt with nutrient mass per batch and declared serving, plus ratios per litre of water, square metre of land, kWh and currency unit when the corresponding inputs are known. The versioned machine-readable contract is [nutrition-accounting-input-v1.schema.json](./nutrition-accounting-input-v1.schema.json); runtime deserialization rejects unknown fields. Legacy v0 point-only inputs remain accepted; v0 inputs cannot include the new interval fields. A missing resource measurement stays unknown; a zero/absent denominator does not produce an infinite or invented efficiency. Resource ratios are comparable only when the water/land/energy/cost boundaries, unit definitions, crop stage and allocation rules match.
 
-### Accounting equations
+#The checked-in [nutrition-accounting-example-v1.json](./nutrition-accounting-example-v1.json) is a **synthetic fixture only**. Its assay, digest, reference URIs, concentration, mass, resource inputs and uncertainty bounds are illustrative fake values for deterministic tests. Never cite or reuse them as measurements, crop-composition data, nutrition guidance or evidence for a farm decision.
+
+## Accounting equations
 
 For concentration `C` in mg/kg of the stated edible mass basis and edible mass `M` in kg at the same stage:
 
