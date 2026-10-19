@@ -1,0 +1,424 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "title": "Water Repair Closure synthetic input corpus v1",
+  "type": "object",
+  "additionalProperties": false,
+  "required": [
+    "schema_version",
+    "qualification_status",
+    "claim_ceiling",
+    "cases"
+  ],
+  "properties": {
+    "schema_version": {
+      "const": "water-repair-closure-001-inputs-v1"
+    },
+    "qualification_status": {
+      "const": "NotRun"
+    },
+    "claim_ceiling": {
+      "const": "SyntheticFieldRepairLifecycleOnly"
+    },
+    "cases": {
+      "type": "array",
+      "minItems": 22,
+      "maxItems": 22,
+      "uniqueItems": true,
+      "items": {
+        "type": "object",
+        "additionalProperties": false,
+        "required": [
+          "case_id",
+          "profile",
+          "profile_requirements_reviewed",
+          "asset_id",
+          "configuration_id",
+          "event",
+          "authorization_state",
+          "as_found",
+          "as_left",
+          "component",
+          "media",
+          "commissioning",
+          "water_quality",
+          "redundancy",
+          "residual",
+          "service_outcome",
+          "privacy"
+        ],
+        "properties": {
+          "case_id": {
+            "type": "string",
+            "pattern": "^WR-[0-9]{2}$"
+          },
+          "profile": {
+            "enum": [
+              "non_potable_module",
+              "municipal_distribution",
+              "building_plumbing"
+            ]
+          },
+          "profile_requirements_reviewed": {
+            "type": "boolean"
+          },
+          "asset_id": {
+            "type": "string",
+            "minLength": 1
+          },
+          "configuration_id": {
+            "type": "string",
+            "minLength": 1
+          },
+          "event": {
+            "type": "object",
+            "additionalProperties": false,
+            "required": [
+              "event_id",
+              "content_sha256",
+              "delivered_copies",
+              "content_conflict"
+            ],
+            "properties": {
+              "event_id": {
+                "type": "string",
+                "minLength": 1
+              },
+              "content_sha256": {
+                "type": "string",
+                "pattern": "^[0-9a-f]{64}$"
+              },
+              "delivered_copies": {
+                "type": "integer",
+                "minimum": 1
+              },
+              "content_conflict": {
+                "type": "boolean"
+              }
+            }
+          },
+          "authorization_state": {
+            "enum": [
+              "valid",
+              "missing",
+              "expired",
+              "revoked",
+              "scope_mismatch"
+            ]
+          },
+          "as_found": {
+            "type": "object",
+            "additionalProperties": false,
+            "required": [
+              "present",
+              "asset_matches",
+              "kind",
+              "current",
+              "instrument_qualified",
+              "unit_status",
+              "within_window",
+              "passed",
+              "uncertainty",
+              "conflicting"
+            ],
+            "properties": {
+              "present": {
+                "type": "boolean"
+              },
+              "asset_matches": {
+                "type": "boolean"
+              },
+              "kind": {
+                "enum": [
+                  "Observed",
+                  "Simulated",
+                  "Missing"
+                ]
+              },
+              "current": {
+                "type": "boolean"
+              },
+              "instrument_qualified": {
+                "type": "boolean"
+              },
+              "unit_status": {
+                "enum": [
+                  "valid",
+                  "missing",
+                  "unknown",
+                  "conversion_invalid"
+                ]
+              },
+              "within_window": {
+                "type": "boolean"
+              },
+              "passed": {
+                "type": "boolean"
+              },
+              "uncertainty": {
+                "enum": [
+                  "bounded_acceptable",
+                  "wide",
+                  "unknown"
+                ]
+              },
+              "conflicting": {
+                "type": "boolean"
+              }
+            }
+          },
+          "as_left": {
+            "type": "object",
+            "additionalProperties": false,
+            "required": [
+              "present",
+              "asset_matches",
+              "kind",
+              "current",
+              "instrument_qualified",
+              "unit_status",
+              "within_window",
+              "passed",
+              "uncertainty",
+              "conflicting"
+            ],
+            "properties": {
+              "present": {
+                "type": "boolean"
+              },
+              "asset_matches": {
+                "type": "boolean"
+              },
+              "kind": {
+                "enum": [
+                  "Observed",
+                  "Simulated",
+                  "Missing"
+                ]
+              },
+              "current": {
+                "type": "boolean"
+              },
+              "instrument_qualified": {
+                "type": "boolean"
+              },
+              "unit_status": {
+                "enum": [
+                  "valid",
+                  "missing",
+                  "unknown",
+                  "conversion_invalid"
+                ]
+              },
+              "within_window": {
+                "type": "boolean"
+              },
+              "passed": {
+                "type": "boolean"
+              },
+              "uncertainty": {
+                "enum": [
+                  "bounded_acceptable",
+                  "wide",
+                  "unknown"
+                ]
+              },
+              "conflicting": {
+                "type": "boolean"
+              }
+            }
+          },
+          "component": {
+            "type": "object",
+            "additionalProperties": false,
+            "required": [
+              "required",
+              "identity_known",
+              "compatible",
+              "qualified",
+              "reconditioned",
+              "requalified"
+            ],
+            "properties": {
+              "required": {
+                "type": "boolean"
+              },
+              "identity_known": {
+                "type": "boolean"
+              },
+              "compatible": {
+                "type": "boolean"
+              },
+              "qualified": {
+                "type": "boolean"
+              },
+              "reconditioned": {
+                "type": "boolean"
+              },
+              "requalified": {
+                "type": "boolean"
+              }
+            }
+          },
+          "media": {
+            "type": "object",
+            "additionalProperties": false,
+            "required": [
+              "required",
+              "identity_known",
+              "current"
+            ],
+            "properties": {
+              "required": {
+                "type": "boolean"
+              },
+              "identity_known": {
+                "type": "boolean"
+              },
+              "current": {
+                "type": "boolean"
+              }
+            }
+          },
+          "commissioning": {
+            "type": "object",
+            "additionalProperties": false,
+            "required": [
+              "required",
+              "complete"
+            ],
+            "properties": {
+              "required": {
+                "type": "boolean"
+              },
+              "complete": {
+                "type": "boolean"
+              }
+            }
+          },
+          "water_quality": {
+            "type": "object",
+            "additionalProperties": false,
+            "required": [
+              "required",
+              "clearance_present",
+              "passed"
+            ],
+            "properties": {
+              "required": {
+                "type": "boolean"
+              },
+              "clearance_present": {
+                "type": "boolean"
+              },
+              "passed": {
+                "type": "boolean"
+              }
+            }
+          },
+          "redundancy": {
+            "type": "object",
+            "additionalProperties": false,
+            "required": [
+              "independence_claimed",
+              "independent_failure_domain_evidenced",
+              "common_mode_present"
+            ],
+            "properties": {
+              "independence_claimed": {
+                "type": "boolean"
+              },
+              "independent_failure_domain_evidenced": {
+                "type": "boolean"
+              },
+              "common_mode_present": {
+                "type": "boolean"
+              }
+            }
+          },
+          "residual": {
+            "type": "object",
+            "additionalProperties": false,
+            "required": [
+              "required",
+              "disposition_known",
+              "recovery_claimed",
+              "recovery_qualified",
+              "input_mass_g",
+              "recovered_mass_g"
+            ],
+            "properties": {
+              "required": {
+                "type": "boolean"
+              },
+              "disposition_known": {
+                "type": "boolean"
+              },
+              "recovery_claimed": {
+                "type": "boolean"
+              },
+              "recovery_qualified": {
+                "type": "boolean"
+              },
+              "input_mass_g": {
+                "type": "integer",
+                "minimum": 0
+              },
+              "recovered_mass_g": {
+                "type": "integer",
+                "minimum": 0
+              }
+            }
+          },
+          "service_outcome": {
+            "type": "object",
+            "additionalProperties": false,
+            "required": [
+              "required",
+              "observed",
+              "model_digest_matches",
+              "time_aligned",
+              "protected_floor_met"
+            ],
+            "properties": {
+              "required": {
+                "type": "boolean"
+              },
+              "observed": {
+                "type": "boolean"
+              },
+              "model_digest_matches": {
+                "type": "boolean"
+              },
+              "time_aligned": {
+                "type": "boolean"
+              },
+              "protected_floor_met": {
+                "type": "boolean"
+              }
+            }
+          },
+          "privacy": {
+            "type": "object",
+            "additionalProperties": false,
+            "required": [
+              "public_projection_requested",
+              "location_restricted",
+              "access_policy_allows"
+            ],
+            "properties": {
+              "public_projection_requested": {
+                "type": "boolean"
+              },
+              "location_restricted": {
+                "type": "boolean"
+              },
+              "access_policy_allows": {
+                "type": "boolean"
+              }
+            }
+          }
+        }
+      }
+    }
+  }
+}
