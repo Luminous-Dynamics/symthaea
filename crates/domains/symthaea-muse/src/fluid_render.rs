@@ -394,7 +394,11 @@ mod tests {
             w.write_sample((s * 32767.0) as i16).unwrap();
         }
         w.finalize().unwrap();
-        let bytes = master_wav(&quiet, &crate::auto_master::MasteringConfig::default()).expect("real audio masters");
+        let bytes = master_wav(
+            &quiet,
+            &crate::auto_master::MasteringConfig::default(),
+        )
+        .expect("real audio masters");
         let mut r = hound::WavReader::new(std::io::Cursor::new(bytes)).unwrap();
         let out_spec = r.spec();
         // `master_wav` always emits stereo: it upmixes mono before mastering,
