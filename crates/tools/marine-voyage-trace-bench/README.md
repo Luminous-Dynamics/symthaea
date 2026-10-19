@@ -1,12 +1,12 @@
 # Marine voyage trace benchmark (V0)
 
-This dependency-free Rust crate converts a canonical synchronized trace of propulsion and auxiliary electrical input power into separate and total energy bands. It is the data-collection bridge for [MARINE-TRACE-001](https://github.com/Luminous-Dynamics/symthaea/issues/8102) and is intended to compose with [MARINE-ENERGY-BUDGET-001](https://github.com/Luminous-Dynamics/symthaea/issues/8092).
+This small Rust crate converts a canonical synchronized trace of propulsion and auxiliary electrical input power into separate and total energy bands. It is the data-collection bridge for [MARINE-TRACE-001](https://github.com/Luminous-Dynamics/symthaea/issues/8102) and is intended to compose with [MARINE-ENERGY-BUDGET-001](https://github.com/Luminous-Dynamics/symthaea/issues/8092).
 
 ## Run
 
-    cargo test --locked --offline --manifest-path crates/tools/marine-voyage-trace-bench/Cargo.toml
+    cargo test --locked --manifest-path crates/tools/marine-voyage-trace-bench/Cargo.toml
 
-    cargo run --locked --offline --manifest-path crates/tools/marine-voyage-trace-bench/Cargo.toml --example synthetic
+    cargo run --locked --manifest-path crates/tools/marine-voyage-trace-bench/Cargo.toml --example synthetic
 
 The example uses synthetic values only. No result from it is physical evidence.
 
@@ -86,6 +86,15 @@ Two comparison dispositions are kept separate:
 - `Blocked`: missing/unreviewed/invalid intake or split metadata.
 
 A passing result only permits a declared comparison to begin. Hashes do not authenticate the publisher or prove a license; the freeze flag is an attestation, not proof of blinding. This module does not download data, perform unit conversions, execute CFD, validate the model or establish physical performance.
+
+### Content-bound SHA-256 contract
+
+The intake audit now uses the maintained Rust `sha2` crate rather than a hand-written cryptographic primitive. The caller must provide the actual raw artifact bytes and model/configuration bytes; the audit recomputes their SHA-256 and rejects mismatches against the declared digests. The versioned canonical dataset manifest binds the raw-byte digest, citation/source revision, rights reference/status, uncertainty-status declaration, observable contracts, and operating-group inventory. The canonical split digest additionally binds that dataset manifest, model/configuration bytes, the frozen-before-holdout declaration, and normalized calibration/hold-out groups.
+
+Length-prefixed fields prevent delimiter collisions. Set-valued observables and group lists are canonically sorted, so permuting equivalent input vectors does not change the digest; changing bytes, units, rights, source revision, model configuration or a split assignment does change it. The digest field itself is excluded from its own canonical preimage.
+
+This still cannot prove publisher authenticity, legal rights, or that a team never inspected held-out results before declaring the model frozen. Those require independently reviewed evidence and access controls. SHA-256 establishes byte identity and manifest consistency, not truth.
+
 
 ### Candidate reference sources: discovery only
 
