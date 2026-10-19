@@ -1,0 +1,2152 @@
+{
+  "corpus_id": "BIOPROTEIN-DECISION-REGRET-CORPUS-V1",
+  "schema_version": "1.0.0",
+  "scenario_weight_scale": 10000,
+  "family_count": 5,
+  "claim_ceiling": "All utilities, priors, likelihoods, baseline scores, costs, scenario weights, and outcomes are synthetic fixtures. The benchmark measures exact decision-regret calculations for a single research experiment under a fixed abstract budget; it does not establish empirical superiority or biological performance.",
+  "families": [
+    {
+      "family_id": "REGRET-001",
+      "random_seed": 42,
+      "scenarios": [
+        {
+          "scenario_id": "01-low-prior",
+          "weight": 3000,
+          "budget_utility": 3,
+          "assumption_tags": [
+            "prior_low",
+            "nominal_process"
+          ],
+          "case": {
+            "case_id": "REGRET-001-01-low-prior",
+            "scenario_digest": "sha256:regret-001-01-low-prior",
+            "probability_scale": 10000,
+            "states": [
+              {
+                "state_id": "favorable",
+                "prior_weight": 4500
+              },
+              {
+                "state_id": "adverse",
+                "prior_weight": 5500
+              }
+            ],
+            "actions": [
+              {
+                "action_id": "invest",
+                "utilities": {
+                  "favorable": 10,
+                  "adverse": -20
+                }
+              },
+              {
+                "action_id": "defer",
+                "utilities": {
+                  "favorable": 0,
+                  "adverse": 0
+                }
+              }
+            ],
+            "experiments": [
+              {
+                "experiment_id": "assay-a",
+                "cost_utility": 1,
+                "authorization": "permitted",
+                "evidence_state": "complete",
+                "scenario_digest": "sha256:regret-001-01-low-prior",
+                "likelihoods": [
+                  {
+                    "state_id": "favorable",
+                    "outcomes": {
+                      "positive": 9200,
+                      "negative": 800
+                    }
+                  },
+                  {
+                    "state_id": "adverse",
+                    "outcomes": {
+                      "positive": 800,
+                      "negative": 9200
+                    }
+                  }
+                ]
+              },
+              {
+                "experiment_id": "assay-b",
+                "cost_utility": 1,
+                "authorization": "permitted",
+                "evidence_state": "complete",
+                "scenario_digest": "sha256:regret-001-01-low-prior",
+                "likelihoods": [
+                  {
+                    "state_id": "favorable",
+                    "outcomes": {
+                      "positive": 8500,
+                      "negative": 1500
+                    }
+                  },
+                  {
+                    "state_id": "adverse",
+                    "outcomes": {
+                      "positive": 1500,
+                      "negative": 8500
+                    }
+                  }
+                ]
+              },
+              {
+                "experiment_id": "assay-c",
+                "cost_utility": 0,
+                "authorization": "permitted",
+                "evidence_state": "complete",
+                "scenario_digest": "sha256:regret-001-01-low-prior",
+                "likelihoods": [
+                  {
+                    "state_id": "favorable",
+                    "outcomes": {
+                      "positive": 7600,
+                      "negative": 2400
+                    }
+                  },
+                  {
+                    "state_id": "adverse",
+                    "outcomes": {
+                      "positive": 2400,
+                      "negative": 7600
+                    }
+                  }
+                ]
+              }
+            ],
+            "expected": {
+              "status": "selected",
+              "selected_experiment_id": "assay-a",
+              "reason_codes": [
+                "positive_net_evsi",
+                "highest_net_evsi_selected"
+              ]
+            }
+          },
+          "baseline_scores": [
+            {
+              "experiment_id": "assay-a",
+              "expected_output_score": 20,
+              "local_sensitivity_score": 10
+            },
+            {
+              "experiment_id": "assay-b",
+              "expected_output_score": 35,
+              "local_sensitivity_score": 20
+            },
+            {
+              "experiment_id": "assay-c",
+              "expected_output_score": 15,
+              "local_sensitivity_score": 40
+            }
+          ]
+        },
+        {
+          "scenario_id": "02-nominal",
+          "weight": 4000,
+          "budget_utility": 3,
+          "assumption_tags": [
+            "prior_mid",
+            "nominal_process"
+          ],
+          "case": {
+            "case_id": "REGRET-001-02-nominal",
+            "scenario_digest": "sha256:regret-001-02-nominal",
+            "probability_scale": 10000,
+            "states": [
+              {
+                "state_id": "favorable",
+                "prior_weight": 5000
+              },
+              {
+                "state_id": "adverse",
+                "prior_weight": 5000
+              }
+            ],
+            "actions": [
+              {
+                "action_id": "invest",
+                "utilities": {
+                  "favorable": 10,
+                  "adverse": -20
+                }
+              },
+              {
+                "action_id": "defer",
+                "utilities": {
+                  "favorable": 0,
+                  "adverse": 0
+                }
+              }
+            ],
+            "experiments": [
+              {
+                "experiment_id": "assay-a",
+                "cost_utility": 1,
+                "authorization": "permitted",
+                "evidence_state": "complete",
+                "scenario_digest": "sha256:regret-001-02-nominal",
+                "likelihoods": [
+                  {
+                    "state_id": "favorable",
+                    "outcomes": {
+                      "positive": 9200,
+                      "negative": 800
+                    }
+                  },
+                  {
+                    "state_id": "adverse",
+                    "outcomes": {
+                      "positive": 800,
+                      "negative": 9200
+                    }
+                  }
+                ]
+              },
+              {
+                "experiment_id": "assay-b",
+                "cost_utility": 1,
+                "authorization": "permitted",
+                "evidence_state": "complete",
+                "scenario_digest": "sha256:regret-001-02-nominal",
+                "likelihoods": [
+                  {
+                    "state_id": "favorable",
+                    "outcomes": {
+                      "positive": 8500,
+                      "negative": 1500
+                    }
+                  },
+                  {
+                    "state_id": "adverse",
+                    "outcomes": {
+                      "positive": 1500,
+                      "negative": 8500
+                    }
+                  }
+                ]
+              },
+              {
+                "experiment_id": "assay-c",
+                "cost_utility": 0,
+                "authorization": "permitted",
+                "evidence_state": "complete",
+                "scenario_digest": "sha256:regret-001-02-nominal",
+                "likelihoods": [
+                  {
+                    "state_id": "favorable",
+                    "outcomes": {
+                      "positive": 7600,
+                      "negative": 2400
+                    }
+                  },
+                  {
+                    "state_id": "adverse",
+                    "outcomes": {
+                      "positive": 2400,
+                      "negative": 7600
+                    }
+                  }
+                ]
+              }
+            ],
+            "expected": {
+              "status": "selected",
+              "selected_experiment_id": "assay-a",
+              "reason_codes": [
+                "positive_net_evsi",
+                "highest_net_evsi_selected"
+              ]
+            }
+          },
+          "baseline_scores": [
+            {
+              "experiment_id": "assay-a",
+              "expected_output_score": 20,
+              "local_sensitivity_score": 10
+            },
+            {
+              "experiment_id": "assay-b",
+              "expected_output_score": 35,
+              "local_sensitivity_score": 20
+            },
+            {
+              "experiment_id": "assay-c",
+              "expected_output_score": 15,
+              "local_sensitivity_score": 40
+            }
+          ]
+        },
+        {
+          "scenario_id": "03-high-prior",
+          "weight": 3000,
+          "budget_utility": 3,
+          "assumption_tags": [
+            "prior_high",
+            "nominal_process"
+          ],
+          "case": {
+            "case_id": "REGRET-001-03-high-prior",
+            "scenario_digest": "sha256:regret-001-03-high-prior",
+            "probability_scale": 10000,
+            "states": [
+              {
+                "state_id": "favorable",
+                "prior_weight": 5500
+              },
+              {
+                "state_id": "adverse",
+                "prior_weight": 4500
+              }
+            ],
+            "actions": [
+              {
+                "action_id": "invest",
+                "utilities": {
+                  "favorable": 10,
+                  "adverse": -20
+                }
+              },
+              {
+                "action_id": "defer",
+                "utilities": {
+                  "favorable": 0,
+                  "adverse": 0
+                }
+              }
+            ],
+            "experiments": [
+              {
+                "experiment_id": "assay-a",
+                "cost_utility": 1,
+                "authorization": "permitted",
+                "evidence_state": "complete",
+                "scenario_digest": "sha256:regret-001-03-high-prior",
+                "likelihoods": [
+                  {
+                    "state_id": "favorable",
+                    "outcomes": {
+                      "positive": 9200,
+                      "negative": 800
+                    }
+                  },
+                  {
+                    "state_id": "adverse",
+                    "outcomes": {
+                      "positive": 800,
+                      "negative": 9200
+                    }
+                  }
+                ]
+              },
+              {
+                "experiment_id": "assay-b",
+                "cost_utility": 1,
+                "authorization": "permitted",
+                "evidence_state": "complete",
+                "scenario_digest": "sha256:regret-001-03-high-prior",
+                "likelihoods": [
+                  {
+                    "state_id": "favorable",
+                    "outcomes": {
+                      "positive": 8500,
+                      "negative": 1500
+                    }
+                  },
+                  {
+                    "state_id": "adverse",
+                    "outcomes": {
+                      "positive": 1500,
+                      "negative": 8500
+                    }
+                  }
+                ]
+              },
+              {
+                "experiment_id": "assay-c",
+                "cost_utility": 0,
+                "authorization": "permitted",
+                "evidence_state": "complete",
+                "scenario_digest": "sha256:regret-001-03-high-prior",
+                "likelihoods": [
+                  {
+                    "state_id": "favorable",
+                    "outcomes": {
+                      "positive": 7600,
+                      "negative": 2400
+                    }
+                  },
+                  {
+                    "state_id": "adverse",
+                    "outcomes": {
+                      "positive": 2400,
+                      "negative": 7600
+                    }
+                  }
+                ]
+              }
+            ],
+            "expected": {
+              "status": "selected",
+              "selected_experiment_id": "assay-a",
+              "reason_codes": [
+                "positive_net_evsi",
+                "highest_net_evsi_selected"
+              ]
+            }
+          },
+          "baseline_scores": [
+            {
+              "experiment_id": "assay-a",
+              "expected_output_score": 20,
+              "local_sensitivity_score": 10
+            },
+            {
+              "experiment_id": "assay-b",
+              "expected_output_score": 35,
+              "local_sensitivity_score": 20
+            },
+            {
+              "experiment_id": "assay-c",
+              "expected_output_score": 15,
+              "local_sensitivity_score": 40
+            }
+          ]
+        }
+      ],
+      "expected": {
+        "status": "valid",
+        "scenario_selections": [
+          {
+            "scenario_id": "01-low-prior",
+            "selected_by_strategy": {
+              "net_evsi": "assay-a",
+              "yield_only": "assay-b",
+              "local_sensitivity_only": "assay-c",
+              "equal_allocation_round_robin": "assay-a",
+              "seeded_random": "assay-a"
+            }
+          },
+          {
+            "scenario_id": "02-nominal",
+            "selected_by_strategy": {
+              "net_evsi": "assay-a",
+              "yield_only": "assay-b",
+              "local_sensitivity_only": "assay-c",
+              "equal_allocation_round_robin": "assay-b",
+              "seeded_random": "assay-a"
+            }
+          },
+          {
+            "scenario_id": "03-high-prior",
+            "selected_by_strategy": {
+              "net_evsi": "assay-a",
+              "yield_only": "assay-b",
+              "local_sensitivity_only": "assay-c",
+              "equal_allocation_round_robin": "assay-c",
+              "seeded_random": "assay-b"
+            }
+          }
+        ],
+        "weighted_regret_numerators": {
+          "net_evsi": "0",
+          "yield_only": "1050000000000",
+          "local_sensitivity_only": "1400000000000",
+          "equal_allocation_round_robin": "816000000000",
+          "seeded_random": "304500000000"
+        },
+        "maximum_regret_numerators": {
+          "net_evsi": "0",
+          "yield_only": "108500000",
+          "local_sensitivity_only": "148000000",
+          "equal_allocation_round_robin": "132000000",
+          "seeded_random": "101500000"
+        },
+        "reason_codes": [
+          "fixed_budget_scenario_regret_evaluated"
+        ]
+      }
+    },
+    {
+      "family_id": "REGRET-002",
+      "random_seed": 17,
+      "scenarios": [
+        {
+          "scenario_id": "01-supply-constrained",
+          "weight": 3000,
+          "budget_utility": 2,
+          "assumption_tags": [
+            "assay_a_over_budget",
+            "feedstock_constrained"
+          ],
+          "case": {
+            "case_id": "REGRET-002-01-supply-constrained",
+            "scenario_digest": "sha256:regret-002-01-supply-constrained",
+            "probability_scale": 10000,
+            "states": [
+              {
+                "state_id": "favorable",
+                "prior_weight": 4000
+              },
+              {
+                "state_id": "adverse",
+                "prior_weight": 6000
+              }
+            ],
+            "actions": [
+              {
+                "action_id": "invest",
+                "utilities": {
+                  "favorable": 10,
+                  "adverse": -20
+                }
+              },
+              {
+                "action_id": "defer",
+                "utilities": {
+                  "favorable": 0,
+                  "adverse": 0
+                }
+              }
+            ],
+            "experiments": [
+              {
+                "experiment_id": "assay-a",
+                "cost_utility": 4,
+                "authorization": "permitted",
+                "evidence_state": "complete",
+                "scenario_digest": "sha256:regret-002-01-supply-constrained",
+                "likelihoods": [
+                  {
+                    "state_id": "favorable",
+                    "outcomes": {
+                      "positive": 9800,
+                      "negative": 200
+                    }
+                  },
+                  {
+                    "state_id": "adverse",
+                    "outcomes": {
+                      "positive": 200,
+                      "negative": 9800
+                    }
+                  }
+                ]
+              },
+              {
+                "experiment_id": "assay-b",
+                "cost_utility": 2,
+                "authorization": "permitted",
+                "evidence_state": "complete",
+                "scenario_digest": "sha256:regret-002-01-supply-constrained",
+                "likelihoods": [
+                  {
+                    "state_id": "favorable",
+                    "outcomes": {
+                      "positive": 8500,
+                      "negative": 1500
+                    }
+                  },
+                  {
+                    "state_id": "adverse",
+                    "outcomes": {
+                      "positive": 1500,
+                      "negative": 8500
+                    }
+                  }
+                ]
+              },
+              {
+                "experiment_id": "assay-c",
+                "cost_utility": 0,
+                "authorization": "permitted",
+                "evidence_state": "complete",
+                "scenario_digest": "sha256:regret-002-01-supply-constrained",
+                "likelihoods": [
+                  {
+                    "state_id": "favorable",
+                    "outcomes": {
+                      "positive": 7600,
+                      "negative": 2400
+                    }
+                  },
+                  {
+                    "state_id": "adverse",
+                    "outcomes": {
+                      "positive": 2400,
+                      "negative": 7600
+                    }
+                  }
+                ]
+              }
+            ],
+            "expected": {
+              "status": "selected",
+              "selected_experiment_id": "assay-c",
+              "reason_codes": [
+                "positive_net_evsi",
+                "highest_net_evsi_selected"
+              ]
+            }
+          },
+          "baseline_scores": [
+            {
+              "experiment_id": "assay-a",
+              "expected_output_score": 100,
+              "local_sensitivity_score": 100
+            },
+            {
+              "experiment_id": "assay-b",
+              "expected_output_score": 45,
+              "local_sensitivity_score": 15
+            },
+            {
+              "experiment_id": "assay-c",
+              "expected_output_score": 25,
+              "local_sensitivity_score": 80
+            }
+          ]
+        },
+        {
+          "scenario_id": "02-nominal",
+          "weight": 4000,
+          "budget_utility": 2,
+          "assumption_tags": [
+            "assay_a_over_budget",
+            "power_cost_mid"
+          ],
+          "case": {
+            "case_id": "REGRET-002-02-nominal",
+            "scenario_digest": "sha256:regret-002-02-nominal",
+            "probability_scale": 10000,
+            "states": [
+              {
+                "state_id": "favorable",
+                "prior_weight": 5000
+              },
+              {
+                "state_id": "adverse",
+                "prior_weight": 5000
+              }
+            ],
+            "actions": [
+              {
+                "action_id": "invest",
+                "utilities": {
+                  "favorable": 10,
+                  "adverse": -20
+                }
+              },
+              {
+                "action_id": "defer",
+                "utilities": {
+                  "favorable": 0,
+                  "adverse": 0
+                }
+              }
+            ],
+            "experiments": [
+              {
+                "experiment_id": "assay-a",
+                "cost_utility": 4,
+                "authorization": "permitted",
+                "evidence_state": "complete",
+                "scenario_digest": "sha256:regret-002-02-nominal",
+                "likelihoods": [
+                  {
+                    "state_id": "favorable",
+                    "outcomes": {
+                      "positive": 9800,
+                      "negative": 200
+                    }
+                  },
+                  {
+                    "state_id": "adverse",
+                    "outcomes": {
+                      "positive": 200,
+                      "negative": 9800
+                    }
+                  }
+                ]
+              },
+              {
+                "experiment_id": "assay-b",
+                "cost_utility": 2,
+                "authorization": "permitted",
+                "evidence_state": "complete",
+                "scenario_digest": "sha256:regret-002-02-nominal",
+                "likelihoods": [
+                  {
+                    "state_id": "favorable",
+                    "outcomes": {
+                      "positive": 8500,
+                      "negative": 1500
+                    }
+                  },
+                  {
+                    "state_id": "adverse",
+                    "outcomes": {
+                      "positive": 1500,
+                      "negative": 8500
+                    }
+                  }
+                ]
+              },
+              {
+                "experiment_id": "assay-c",
+                "cost_utility": 1,
+                "authorization": "permitted",
+                "evidence_state": "complete",
+                "scenario_digest": "sha256:regret-002-02-nominal",
+                "likelihoods": [
+                  {
+                    "state_id": "favorable",
+                    "outcomes": {
+                      "positive": 7600,
+                      "negative": 2400
+                    }
+                  },
+                  {
+                    "state_id": "adverse",
+                    "outcomes": {
+                      "positive": 2400,
+                      "negative": 7600
+                    }
+                  }
+                ]
+              }
+            ],
+            "expected": {
+              "status": "selected",
+              "selected_experiment_id": "assay-b",
+              "reason_codes": [
+                "positive_net_evsi",
+                "highest_net_evsi_selected"
+              ]
+            }
+          },
+          "baseline_scores": [
+            {
+              "experiment_id": "assay-a",
+              "expected_output_score": 100,
+              "local_sensitivity_score": 100
+            },
+            {
+              "experiment_id": "assay-b",
+              "expected_output_score": 45,
+              "local_sensitivity_score": 15
+            },
+            {
+              "experiment_id": "assay-c",
+              "expected_output_score": 25,
+              "local_sensitivity_score": 80
+            }
+          ]
+        },
+        {
+          "scenario_id": "03-energy-tight",
+          "weight": 3000,
+          "budget_utility": 2,
+          "assumption_tags": [
+            "assay_a_over_budget",
+            "power_cost_high"
+          ],
+          "case": {
+            "case_id": "REGRET-002-03-energy-tight",
+            "scenario_digest": "sha256:regret-002-03-energy-tight",
+            "probability_scale": 10000,
+            "states": [
+              {
+                "state_id": "favorable",
+                "prior_weight": 6000
+              },
+              {
+                "state_id": "adverse",
+                "prior_weight": 4000
+              }
+            ],
+            "actions": [
+              {
+                "action_id": "invest",
+                "utilities": {
+                  "favorable": 10,
+                  "adverse": -20
+                }
+              },
+              {
+                "action_id": "defer",
+                "utilities": {
+                  "favorable": 0,
+                  "adverse": 0
+                }
+              }
+            ],
+            "experiments": [
+              {
+                "experiment_id": "assay-a",
+                "cost_utility": 5,
+                "authorization": "permitted",
+                "evidence_state": "complete",
+                "scenario_digest": "sha256:regret-002-03-energy-tight",
+                "likelihoods": [
+                  {
+                    "state_id": "favorable",
+                    "outcomes": {
+                      "positive": 9800,
+                      "negative": 200
+                    }
+                  },
+                  {
+                    "state_id": "adverse",
+                    "outcomes": {
+                      "positive": 200,
+                      "negative": 9800
+                    }
+                  }
+                ]
+              },
+              {
+                "experiment_id": "assay-b",
+                "cost_utility": 2,
+                "authorization": "permitted",
+                "evidence_state": "complete",
+                "scenario_digest": "sha256:regret-002-03-energy-tight",
+                "likelihoods": [
+                  {
+                    "state_id": "favorable",
+                    "outcomes": {
+                      "positive": 8500,
+                      "negative": 1500
+                    }
+                  },
+                  {
+                    "state_id": "adverse",
+                    "outcomes": {
+                      "positive": 1500,
+                      "negative": 8500
+                    }
+                  }
+                ]
+              },
+              {
+                "experiment_id": "assay-c",
+                "cost_utility": 1,
+                "authorization": "permitted",
+                "evidence_state": "complete",
+                "scenario_digest": "sha256:regret-002-03-energy-tight",
+                "likelihoods": [
+                  {
+                    "state_id": "favorable",
+                    "outcomes": {
+                      "positive": 7600,
+                      "negative": 2400
+                    }
+                  },
+                  {
+                    "state_id": "adverse",
+                    "outcomes": {
+                      "positive": 2400,
+                      "negative": 7600
+                    }
+                  }
+                ]
+              }
+            ],
+            "expected": {
+              "status": "selected",
+              "selected_experiment_id": "assay-b",
+              "reason_codes": [
+                "positive_net_evsi",
+                "highest_net_evsi_selected"
+              ]
+            }
+          },
+          "baseline_scores": [
+            {
+              "experiment_id": "assay-a",
+              "expected_output_score": 100,
+              "local_sensitivity_score": 100
+            },
+            {
+              "experiment_id": "assay-b",
+              "expected_output_score": 45,
+              "local_sensitivity_score": 15
+            },
+            {
+              "experiment_id": "assay-c",
+              "expected_output_score": 25,
+              "local_sensitivity_score": 80
+            }
+          ]
+        }
+      ],
+      "expected": {
+        "status": "valid",
+        "scenario_selections": [
+          {
+            "scenario_id": "01-supply-constrained",
+            "selected_by_strategy": {
+              "net_evsi": "assay-c",
+              "yield_only": "assay-b",
+              "local_sensitivity_only": "assay-c",
+              "equal_allocation_round_robin": "assay-b",
+              "seeded_random": "assay-b"
+            }
+          },
+          {
+            "scenario_id": "02-nominal",
+            "selected_by_strategy": {
+              "net_evsi": "assay-b",
+              "yield_only": "assay-b",
+              "local_sensitivity_only": "assay-c",
+              "equal_allocation_round_robin": "assay-c",
+              "seeded_random": "assay-b"
+            }
+          },
+          {
+            "scenario_id": "03-energy-tight",
+            "selected_by_strategy": {
+              "net_evsi": "assay-b",
+              "yield_only": "assay-b",
+              "local_sensitivity_only": "assay-c",
+              "equal_allocation_round_robin": "assay-b",
+              "seeded_random": "assay-c"
+            }
+          }
+        ],
+        "weighted_regret_numerators": {
+          "net_evsi": "0",
+          "yield_only": "168000000000",
+          "local_sensitivity_only": "218000000000",
+          "equal_allocation_round_robin": "308000000000",
+          "seeded_random": "246000000000"
+        },
+        "maximum_regret_numerators": {
+          "net_evsi": "0",
+          "yield_only": "56000000",
+          "local_sensitivity_only": "35000000",
+          "equal_allocation_round_robin": "56000000",
+          "seeded_random": "56000000"
+        },
+        "reason_codes": [
+          "fixed_budget_scenario_regret_evaluated"
+        ]
+      }
+    },
+    {
+      "family_id": "REGRET-003",
+      "random_seed": 5,
+      "scenarios": [
+        {
+          "scenario_id": "01-low-prior",
+          "weight": 3000,
+          "budget_utility": 10,
+          "assumption_tags": [
+            "all_test_costs_high"
+          ],
+          "case": {
+            "case_id": "REGRET-003-01-low-prior",
+            "scenario_digest": "sha256:regret-003-01-low-prior",
+            "probability_scale": 10000,
+            "states": [
+              {
+                "state_id": "favorable",
+                "prior_weight": 3000
+              },
+              {
+                "state_id": "adverse",
+                "prior_weight": 7000
+              }
+            ],
+            "actions": [
+              {
+                "action_id": "invest",
+                "utilities": {
+                  "favorable": 10,
+                  "adverse": -20
+                }
+              },
+              {
+                "action_id": "defer",
+                "utilities": {
+                  "favorable": 0,
+                  "adverse": 0
+                }
+              }
+            ],
+            "experiments": [
+              {
+                "experiment_id": "assay-a",
+                "cost_utility": 7,
+                "authorization": "permitted",
+                "evidence_state": "complete",
+                "scenario_digest": "sha256:regret-003-01-low-prior",
+                "likelihoods": [
+                  {
+                    "state_id": "favorable",
+                    "outcomes": {
+                      "positive": 9200,
+                      "negative": 800
+                    }
+                  },
+                  {
+                    "state_id": "adverse",
+                    "outcomes": {
+                      "positive": 800,
+                      "negative": 9200
+                    }
+                  }
+                ]
+              },
+              {
+                "experiment_id": "assay-b",
+                "cost_utility": 7,
+                "authorization": "permitted",
+                "evidence_state": "complete",
+                "scenario_digest": "sha256:regret-003-01-low-prior",
+                "likelihoods": [
+                  {
+                    "state_id": "favorable",
+                    "outcomes": {
+                      "positive": 8500,
+                      "negative": 1500
+                    }
+                  },
+                  {
+                    "state_id": "adverse",
+                    "outcomes": {
+                      "positive": 1500,
+                      "negative": 8500
+                    }
+                  }
+                ]
+              },
+              {
+                "experiment_id": "assay-c",
+                "cost_utility": 7,
+                "authorization": "permitted",
+                "evidence_state": "complete",
+                "scenario_digest": "sha256:regret-003-01-low-prior",
+                "likelihoods": [
+                  {
+                    "state_id": "favorable",
+                    "outcomes": {
+                      "positive": 7600,
+                      "negative": 2400
+                    }
+                  },
+                  {
+                    "state_id": "adverse",
+                    "outcomes": {
+                      "positive": 2400,
+                      "negative": 7600
+                    }
+                  }
+                ]
+              }
+            ],
+            "expected": {
+              "status": "no_positive_evsi",
+              "selected_experiment_id": null,
+              "reason_codes": [
+                "no_positive_net_evsi"
+              ]
+            }
+          },
+          "baseline_scores": [
+            {
+              "experiment_id": "assay-a",
+              "expected_output_score": 10,
+              "local_sensitivity_score": 50
+            },
+            {
+              "experiment_id": "assay-b",
+              "expected_output_score": 90,
+              "local_sensitivity_score": 10
+            },
+            {
+              "experiment_id": "assay-c",
+              "expected_output_score": 20,
+              "local_sensitivity_score": 80
+            }
+          ]
+        },
+        {
+          "scenario_id": "02-mid-prior",
+          "weight": 4000,
+          "budget_utility": 10,
+          "assumption_tags": [
+            "all_test_costs_high"
+          ],
+          "case": {
+            "case_id": "REGRET-003-02-mid-prior",
+            "scenario_digest": "sha256:regret-003-02-mid-prior",
+            "probability_scale": 10000,
+            "states": [
+              {
+                "state_id": "favorable",
+                "prior_weight": 5000
+              },
+              {
+                "state_id": "adverse",
+                "prior_weight": 5000
+              }
+            ],
+            "actions": [
+              {
+                "action_id": "invest",
+                "utilities": {
+                  "favorable": 10,
+                  "adverse": -20
+                }
+              },
+              {
+                "action_id": "defer",
+                "utilities": {
+                  "favorable": 0,
+                  "adverse": 0
+                }
+              }
+            ],
+            "experiments": [
+              {
+                "experiment_id": "assay-a",
+                "cost_utility": 7,
+                "authorization": "permitted",
+                "evidence_state": "complete",
+                "scenario_digest": "sha256:regret-003-02-mid-prior",
+                "likelihoods": [
+                  {
+                    "state_id": "favorable",
+                    "outcomes": {
+                      "positive": 9200,
+                      "negative": 800
+                    }
+                  },
+                  {
+                    "state_id": "adverse",
+                    "outcomes": {
+                      "positive": 800,
+                      "negative": 9200
+                    }
+                  }
+                ]
+              },
+              {
+                "experiment_id": "assay-b",
+                "cost_utility": 7,
+                "authorization": "permitted",
+                "evidence_state": "complete",
+                "scenario_digest": "sha256:regret-003-02-mid-prior",
+                "likelihoods": [
+                  {
+                    "state_id": "favorable",
+                    "outcomes": {
+                      "positive": 8500,
+                      "negative": 1500
+                    }
+                  },
+                  {
+                    "state_id": "adverse",
+                    "outcomes": {
+                      "positive": 1500,
+                      "negative": 8500
+                    }
+                  }
+                ]
+              },
+              {
+                "experiment_id": "assay-c",
+                "cost_utility": 7,
+                "authorization": "permitted",
+                "evidence_state": "complete",
+                "scenario_digest": "sha256:regret-003-02-mid-prior",
+                "likelihoods": [
+                  {
+                    "state_id": "favorable",
+                    "outcomes": {
+                      "positive": 7600,
+                      "negative": 2400
+                    }
+                  },
+                  {
+                    "state_id": "adverse",
+                    "outcomes": {
+                      "positive": 2400,
+                      "negative": 7600
+                    }
+                  }
+                ]
+              }
+            ],
+            "expected": {
+              "status": "no_positive_evsi",
+              "selected_experiment_id": null,
+              "reason_codes": [
+                "no_positive_net_evsi"
+              ]
+            }
+          },
+          "baseline_scores": [
+            {
+              "experiment_id": "assay-a",
+              "expected_output_score": 10,
+              "local_sensitivity_score": 50
+            },
+            {
+              "experiment_id": "assay-b",
+              "expected_output_score": 90,
+              "local_sensitivity_score": 10
+            },
+            {
+              "experiment_id": "assay-c",
+              "expected_output_score": 20,
+              "local_sensitivity_score": 80
+            }
+          ]
+        },
+        {
+          "scenario_id": "03-high-prior",
+          "weight": 3000,
+          "budget_utility": 10,
+          "assumption_tags": [
+            "all_test_costs_high"
+          ],
+          "case": {
+            "case_id": "REGRET-003-03-high-prior",
+            "scenario_digest": "sha256:regret-003-03-high-prior",
+            "probability_scale": 10000,
+            "states": [
+              {
+                "state_id": "favorable",
+                "prior_weight": 7000
+              },
+              {
+                "state_id": "adverse",
+                "prior_weight": 3000
+              }
+            ],
+            "actions": [
+              {
+                "action_id": "invest",
+                "utilities": {
+                  "favorable": 10,
+                  "adverse": -20
+                }
+              },
+              {
+                "action_id": "defer",
+                "utilities": {
+                  "favorable": 0,
+                  "adverse": 0
+                }
+              }
+            ],
+            "experiments": [
+              {
+                "experiment_id": "assay-a",
+                "cost_utility": 7,
+                "authorization": "permitted",
+                "evidence_state": "complete",
+                "scenario_digest": "sha256:regret-003-03-high-prior",
+                "likelihoods": [
+                  {
+                    "state_id": "favorable",
+                    "outcomes": {
+                      "positive": 9200,
+                      "negative": 800
+                    }
+                  },
+                  {
+                    "state_id": "adverse",
+                    "outcomes": {
+                      "positive": 800,
+                      "negative": 9200
+                    }
+                  }
+                ]
+              },
+              {
+                "experiment_id": "assay-b",
+                "cost_utility": 7,
+                "authorization": "permitted",
+                "evidence_state": "complete",
+                "scenario_digest": "sha256:regret-003-03-high-prior",
+                "likelihoods": [
+                  {
+                    "state_id": "favorable",
+                    "outcomes": {
+                      "positive": 8500,
+                      "negative": 1500
+                    }
+                  },
+                  {
+                    "state_id": "adverse",
+                    "outcomes": {
+                      "positive": 1500,
+                      "negative": 8500
+                    }
+                  }
+                ]
+              },
+              {
+                "experiment_id": "assay-c",
+                "cost_utility": 7,
+                "authorization": "permitted",
+                "evidence_state": "complete",
+                "scenario_digest": "sha256:regret-003-03-high-prior",
+                "likelihoods": [
+                  {
+                    "state_id": "favorable",
+                    "outcomes": {
+                      "positive": 7600,
+                      "negative": 2400
+                    }
+                  },
+                  {
+                    "state_id": "adverse",
+                    "outcomes": {
+                      "positive": 2400,
+                      "negative": 7600
+                    }
+                  }
+                ]
+              }
+            ],
+            "expected": {
+              "status": "no_positive_evsi",
+              "selected_experiment_id": null,
+              "reason_codes": [
+                "no_positive_net_evsi"
+              ]
+            }
+          },
+          "baseline_scores": [
+            {
+              "experiment_id": "assay-a",
+              "expected_output_score": 10,
+              "local_sensitivity_score": 50
+            },
+            {
+              "experiment_id": "assay-b",
+              "expected_output_score": 90,
+              "local_sensitivity_score": 10
+            },
+            {
+              "experiment_id": "assay-c",
+              "expected_output_score": 20,
+              "local_sensitivity_score": 80
+            }
+          ]
+        }
+      ],
+      "expected": {
+        "status": "valid",
+        "scenario_selections": [
+          {
+            "scenario_id": "01-low-prior",
+            "selected_by_strategy": {
+              "net_evsi": null,
+              "yield_only": "assay-b",
+              "local_sensitivity_only": "assay-c",
+              "equal_allocation_round_robin": "assay-a",
+              "seeded_random": "assay-b"
+            }
+          },
+          {
+            "scenario_id": "02-mid-prior",
+            "selected_by_strategy": {
+              "net_evsi": null,
+              "yield_only": "assay-b",
+              "local_sensitivity_only": "assay-c",
+              "equal_allocation_round_robin": "assay-b",
+              "seeded_random": "assay-b"
+            }
+          },
+          {
+            "scenario_id": "03-high-prior",
+            "selected_by_strategy": {
+              "net_evsi": null,
+              "yield_only": "assay-b",
+              "local_sensitivity_only": "assay-c",
+              "equal_allocation_round_robin": "assay-c",
+              "seeded_random": "assay-b"
+            }
+          }
+        ],
+        "weighted_regret_numerators": {
+          "net_evsi": "0",
+          "yield_only": "4550000000000",
+          "local_sensitivity_only": "5576000000000",
+          "equal_allocation_round_robin": "4544000000000",
+          "seeded_random": "4550000000000"
+        },
+        "maximum_regret_numerators": {
+          "net_evsi": "0",
+          "yield_only": "655000000",
+          "local_sensitivity_only": "700000000",
+          "equal_allocation_round_robin": "536000000",
+          "seeded_random": "655000000"
+        },
+        "reason_codes": [
+          "fixed_budget_scenario_regret_evaluated"
+        ]
+      }
+    },
+    {
+      "family_id": "REGRET-004",
+      "random_seed": 20261019,
+      "scenarios": [
+        {
+          "scenario_id": "01-model-a",
+          "weight": 3000,
+          "budget_utility": 3,
+          "assumption_tags": [
+            "model_variant_a",
+            "energy_cost_low"
+          ],
+          "case": {
+            "case_id": "REGRET-004-01-model-a",
+            "scenario_digest": "sha256:regret-004-01-model-a",
+            "probability_scale": 10000,
+            "states": [
+              {
+                "state_id": "favorable",
+                "prior_weight": 3000
+              },
+              {
+                "state_id": "adverse",
+                "prior_weight": 7000
+              }
+            ],
+            "actions": [
+              {
+                "action_id": "invest",
+                "utilities": {
+                  "favorable": 10,
+                  "adverse": -20
+                }
+              },
+              {
+                "action_id": "defer",
+                "utilities": {
+                  "favorable": 0,
+                  "adverse": 0
+                }
+              }
+            ],
+            "experiments": [
+              {
+                "experiment_id": "assay-a",
+                "cost_utility": 1,
+                "authorization": "permitted",
+                "evidence_state": "complete",
+                "scenario_digest": "sha256:regret-004-01-model-a",
+                "likelihoods": [
+                  {
+                    "state_id": "favorable",
+                    "outcomes": {
+                      "positive": 9800,
+                      "negative": 200
+                    }
+                  },
+                  {
+                    "state_id": "adverse",
+                    "outcomes": {
+                      "positive": 200,
+                      "negative": 9800
+                    }
+                  }
+                ]
+              },
+              {
+                "experiment_id": "assay-b",
+                "cost_utility": 1,
+                "authorization": "permitted",
+                "evidence_state": "complete",
+                "scenario_digest": "sha256:regret-004-01-model-a",
+                "likelihoods": [
+                  {
+                    "state_id": "favorable",
+                    "outcomes": {
+                      "positive": 8500,
+                      "negative": 1500
+                    }
+                  },
+                  {
+                    "state_id": "adverse",
+                    "outcomes": {
+                      "positive": 1500,
+                      "negative": 8500
+                    }
+                  }
+                ]
+              },
+              {
+                "experiment_id": "assay-c",
+                "cost_utility": 2,
+                "authorization": "permitted",
+                "evidence_state": "complete",
+                "scenario_digest": "sha256:regret-004-01-model-a",
+                "likelihoods": [
+                  {
+                    "state_id": "favorable",
+                    "outcomes": {
+                      "positive": 7600,
+                      "negative": 2400
+                    }
+                  },
+                  {
+                    "state_id": "adverse",
+                    "outcomes": {
+                      "positive": 2400,
+                      "negative": 7600
+                    }
+                  }
+                ]
+              }
+            ],
+            "expected": {
+              "status": "selected",
+              "selected_experiment_id": "assay-a",
+              "reason_codes": [
+                "positive_net_evsi",
+                "highest_net_evsi_selected"
+              ]
+            }
+          },
+          "baseline_scores": [
+            {
+              "experiment_id": "assay-a",
+              "expected_output_score": 22,
+              "local_sensitivity_score": 30
+            },
+            {
+              "experiment_id": "assay-b",
+              "expected_output_score": 45,
+              "local_sensitivity_score": 20
+            },
+            {
+              "experiment_id": "assay-c",
+              "expected_output_score": 28,
+              "local_sensitivity_score": 40
+            }
+          ]
+        },
+        {
+          "scenario_id": "02-model-b",
+          "weight": 4000,
+          "budget_utility": 3,
+          "assumption_tags": [
+            "model_variant_b",
+            "energy_cost_high"
+          ],
+          "case": {
+            "case_id": "REGRET-004-02-model-b",
+            "scenario_digest": "sha256:regret-004-02-model-b",
+            "probability_scale": 10000,
+            "states": [
+              {
+                "state_id": "favorable",
+                "prior_weight": 5000
+              },
+              {
+                "state_id": "adverse",
+                "prior_weight": 5000
+              }
+            ],
+            "actions": [
+              {
+                "action_id": "invest",
+                "utilities": {
+                  "favorable": 10,
+                  "adverse": -20
+                }
+              },
+              {
+                "action_id": "defer",
+                "utilities": {
+                  "favorable": 0,
+                  "adverse": 0
+                }
+              }
+            ],
+            "experiments": [
+              {
+                "experiment_id": "assay-a",
+                "cost_utility": 3,
+                "authorization": "permitted",
+                "evidence_state": "complete",
+                "scenario_digest": "sha256:regret-004-02-model-b",
+                "likelihoods": [
+                  {
+                    "state_id": "favorable",
+                    "outcomes": {
+                      "positive": 9800,
+                      "negative": 200
+                    }
+                  },
+                  {
+                    "state_id": "adverse",
+                    "outcomes": {
+                      "positive": 200,
+                      "negative": 9800
+                    }
+                  }
+                ]
+              },
+              {
+                "experiment_id": "assay-b",
+                "cost_utility": 0,
+                "authorization": "permitted",
+                "evidence_state": "complete",
+                "scenario_digest": "sha256:regret-004-02-model-b",
+                "likelihoods": [
+                  {
+                    "state_id": "favorable",
+                    "outcomes": {
+                      "positive": 8500,
+                      "negative": 1500
+                    }
+                  },
+                  {
+                    "state_id": "adverse",
+                    "outcomes": {
+                      "positive": 1500,
+                      "negative": 8500
+                    }
+                  }
+                ]
+              },
+              {
+                "experiment_id": "assay-c",
+                "cost_utility": 0,
+                "authorization": "permitted",
+                "evidence_state": "complete",
+                "scenario_digest": "sha256:regret-004-02-model-b",
+                "likelihoods": [
+                  {
+                    "state_id": "favorable",
+                    "outcomes": {
+                      "positive": 7600,
+                      "negative": 2400
+                    }
+                  },
+                  {
+                    "state_id": "adverse",
+                    "outcomes": {
+                      "positive": 2400,
+                      "negative": 7600
+                    }
+                  }
+                ]
+              }
+            ],
+            "expected": {
+              "status": "selected",
+              "selected_experiment_id": "assay-b",
+              "reason_codes": [
+                "positive_net_evsi",
+                "highest_net_evsi_selected"
+              ]
+            }
+          },
+          "baseline_scores": [
+            {
+              "experiment_id": "assay-a",
+              "expected_output_score": 22,
+              "local_sensitivity_score": 30
+            },
+            {
+              "experiment_id": "assay-b",
+              "expected_output_score": 45,
+              "local_sensitivity_score": 20
+            },
+            {
+              "experiment_id": "assay-c",
+              "expected_output_score": 28,
+              "local_sensitivity_score": 40
+            }
+          ]
+        },
+        {
+          "scenario_id": "03-model-c",
+          "weight": 3000,
+          "budget_utility": 3,
+          "assumption_tags": [
+            "model_variant_c",
+            "recovery_shift"
+          ],
+          "case": {
+            "case_id": "REGRET-004-03-model-c",
+            "scenario_digest": "sha256:regret-004-03-model-c",
+            "probability_scale": 10000,
+            "states": [
+              {
+                "state_id": "favorable",
+                "prior_weight": 6500
+              },
+              {
+                "state_id": "adverse",
+                "prior_weight": 3500
+              }
+            ],
+            "actions": [
+              {
+                "action_id": "invest",
+                "utilities": {
+                  "favorable": 10,
+                  "adverse": -20
+                }
+              },
+              {
+                "action_id": "defer",
+                "utilities": {
+                  "favorable": 0,
+                  "adverse": 0
+                }
+              }
+            ],
+            "experiments": [
+              {
+                "experiment_id": "assay-a",
+                "cost_utility": 3,
+                "authorization": "permitted",
+                "evidence_state": "complete",
+                "scenario_digest": "sha256:regret-004-03-model-c",
+                "likelihoods": [
+                  {
+                    "state_id": "favorable",
+                    "outcomes": {
+                      "positive": 9800,
+                      "negative": 200
+                    }
+                  },
+                  {
+                    "state_id": "adverse",
+                    "outcomes": {
+                      "positive": 200,
+                      "negative": 9800
+                    }
+                  }
+                ]
+              },
+              {
+                "experiment_id": "assay-b",
+                "cost_utility": 0,
+                "authorization": "permitted",
+                "evidence_state": "complete",
+                "scenario_digest": "sha256:regret-004-03-model-c",
+                "likelihoods": [
+                  {
+                    "state_id": "favorable",
+                    "outcomes": {
+                      "positive": 8500,
+                      "negative": 1500
+                    }
+                  },
+                  {
+                    "state_id": "adverse",
+                    "outcomes": {
+                      "positive": 1500,
+                      "negative": 8500
+                    }
+                  }
+                ]
+              },
+              {
+                "experiment_id": "assay-c",
+                "cost_utility": 0,
+                "authorization": "permitted",
+                "evidence_state": "complete",
+                "scenario_digest": "sha256:regret-004-03-model-c",
+                "likelihoods": [
+                  {
+                    "state_id": "favorable",
+                    "outcomes": {
+                      "positive": 7600,
+                      "negative": 2400
+                    }
+                  },
+                  {
+                    "state_id": "adverse",
+                    "outcomes": {
+                      "positive": 2400,
+                      "negative": 7600
+                    }
+                  }
+                ]
+              }
+            ],
+            "expected": {
+              "status": "selected",
+              "selected_experiment_id": "assay-b",
+              "reason_codes": [
+                "positive_net_evsi",
+                "highest_net_evsi_selected"
+              ]
+            }
+          },
+          "baseline_scores": [
+            {
+              "experiment_id": "assay-a",
+              "expected_output_score": 22,
+              "local_sensitivity_score": 30
+            },
+            {
+              "experiment_id": "assay-b",
+              "expected_output_score": 45,
+              "local_sensitivity_score": 20
+            },
+            {
+              "experiment_id": "assay-c",
+              "expected_output_score": 28,
+              "local_sensitivity_score": 40
+            }
+          ]
+        }
+      ],
+      "expected": {
+        "status": "valid",
+        "scenario_selections": [
+          {
+            "scenario_id": "01-model-a",
+            "selected_by_strategy": {
+              "net_evsi": "assay-a",
+              "yield_only": "assay-b",
+              "local_sensitivity_only": "assay-c",
+              "equal_allocation_round_robin": "assay-a",
+              "seeded_random": "assay-b"
+            }
+          },
+          {
+            "scenario_id": "02-model-b",
+            "selected_by_strategy": {
+              "net_evsi": "assay-b",
+              "yield_only": "assay-b",
+              "local_sensitivity_only": "assay-c",
+              "equal_allocation_round_robin": "assay-b",
+              "seeded_random": "assay-a"
+            }
+          },
+          {
+            "scenario_id": "03-model-c",
+            "selected_by_strategy": {
+              "net_evsi": "assay-b",
+              "yield_only": "assay-b",
+              "local_sensitivity_only": "assay-c",
+              "equal_allocation_round_robin": "assay-c",
+              "seeded_random": "assay-c"
+            }
+          }
+        ],
+        "weighted_regret_numerators": {
+          "net_evsi": "0",
+          "yield_only": "663000000000",
+          "local_sensitivity_only": "2002500000000",
+          "equal_allocation_round_robin": "364500000000",
+          "seeded_random": "1447500000000"
+        },
+        "maximum_regret_numerators": {
+          "net_evsi": "0",
+          "yield_only": "221000000",
+          "local_sensitivity_only": "366000000",
+          "equal_allocation_round_robin": "121500000",
+          "seeded_random": "221000000"
+        },
+        "reason_codes": [
+          "fixed_budget_scenario_regret_evaluated"
+        ]
+      }
+    },
+    {
+      "family_id": "REGRET-005",
+      "random_seed": 99,
+      "scenarios": [
+        {
+          "scenario_id": "01-weights-a",
+          "weight": 5000,
+          "budget_utility": 3,
+          "assumption_tags": [
+            "invalid_weight_negative_control"
+          ],
+          "case": {
+            "case_id": "REGRET-005-01-weights-a",
+            "scenario_digest": "sha256:regret-005-01-weights-a",
+            "probability_scale": 10000,
+            "states": [
+              {
+                "state_id": "favorable",
+                "prior_weight": 5000
+              },
+              {
+                "state_id": "adverse",
+                "prior_weight": 5000
+              }
+            ],
+            "actions": [
+              {
+                "action_id": "invest",
+                "utilities": {
+                  "favorable": 10,
+                  "adverse": -20
+                }
+              },
+              {
+                "action_id": "defer",
+                "utilities": {
+                  "favorable": 0,
+                  "adverse": 0
+                }
+              }
+            ],
+            "experiments": [
+              {
+                "experiment_id": "assay-a",
+                "cost_utility": 1,
+                "authorization": "permitted",
+                "evidence_state": "complete",
+                "scenario_digest": "sha256:regret-005-01-weights-a",
+                "likelihoods": [
+                  {
+                    "state_id": "favorable",
+                    "outcomes": {
+                      "positive": 9200,
+                      "negative": 800
+                    }
+                  },
+                  {
+                    "state_id": "adverse",
+                    "outcomes": {
+                      "positive": 800,
+                      "negative": 9200
+                    }
+                  }
+                ]
+              },
+              {
+                "experiment_id": "assay-b",
+                "cost_utility": 1,
+                "authorization": "permitted",
+                "evidence_state": "complete",
+                "scenario_digest": "sha256:regret-005-01-weights-a",
+                "likelihoods": [
+                  {
+                    "state_id": "favorable",
+                    "outcomes": {
+                      "positive": 8500,
+                      "negative": 1500
+                    }
+                  },
+                  {
+                    "state_id": "adverse",
+                    "outcomes": {
+                      "positive": 1500,
+                      "negative": 8500
+                    }
+                  }
+                ]
+              },
+              {
+                "experiment_id": "assay-c",
+                "cost_utility": 0,
+                "authorization": "permitted",
+                "evidence_state": "complete",
+                "scenario_digest": "sha256:regret-005-01-weights-a",
+                "likelihoods": [
+                  {
+                    "state_id": "favorable",
+                    "outcomes": {
+                      "positive": 7600,
+                      "negative": 2400
+                    }
+                  },
+                  {
+                    "state_id": "adverse",
+                    "outcomes": {
+                      "positive": 2400,
+                      "negative": 7600
+                    }
+                  }
+                ]
+              }
+            ],
+            "expected": {
+              "status": "selected",
+              "selected_experiment_id": "assay-a",
+              "reason_codes": [
+                "positive_net_evsi",
+                "highest_net_evsi_selected"
+              ]
+            }
+          },
+          "baseline_scores": [
+            {
+              "experiment_id": "assay-a",
+              "expected_output_score": 20,
+              "local_sensitivity_score": 10
+            },
+            {
+              "experiment_id": "assay-b",
+              "expected_output_score": 35,
+              "local_sensitivity_score": 20
+            },
+            {
+              "experiment_id": "assay-c",
+              "expected_output_score": 15,
+              "local_sensitivity_score": 40
+            }
+          ]
+        },
+        {
+          "scenario_id": "02-weights-b",
+          "weight": 3000,
+          "budget_utility": 3,
+          "assumption_tags": [
+            "invalid_weight_negative_control"
+          ],
+          "case": {
+            "case_id": "REGRET-005-02-weights-b",
+            "scenario_digest": "sha256:regret-005-02-weights-b",
+            "probability_scale": 10000,
+            "states": [
+              {
+                "state_id": "favorable",
+                "prior_weight": 5500
+              },
+              {
+                "state_id": "adverse",
+                "prior_weight": 4500
+              }
+            ],
+            "actions": [
+              {
+                "action_id": "invest",
+                "utilities": {
+                  "favorable": 10,
+                  "adverse": -20
+                }
+              },
+              {
+                "action_id": "defer",
+                "utilities": {
+                  "favorable": 0,
+                  "adverse": 0
+                }
+              }
+            ],
+            "experiments": [
+              {
+                "experiment_id": "assay-a",
+                "cost_utility": 1,
+                "authorization": "permitted",
+                "evidence_state": "complete",
+                "scenario_digest": "sha256:regret-005-02-weights-b",
+                "likelihoods": [
+                  {
+                    "state_id": "favorable",
+                    "outcomes": {
+                      "positive": 9200,
+                      "negative": 800
+                    }
+                  },
+                  {
+                    "state_id": "adverse",
+                    "outcomes": {
+                      "positive": 800,
+                      "negative": 9200
+                    }
+                  }
+                ]
+              },
+              {
+                "experiment_id": "assay-b",
+                "cost_utility": 1,
+                "authorization": "permitted",
+                "evidence_state": "complete",
+                "scenario_digest": "sha256:regret-005-02-weights-b",
+                "likelihoods": [
+                  {
+                    "state_id": "favorable",
+                    "outcomes": {
+                      "positive": 8500,
+                      "negative": 1500
+                    }
+                  },
+                  {
+                    "state_id": "adverse",
+                    "outcomes": {
+                      "positive": 1500,
+                      "negative": 8500
+                    }
+                  }
+                ]
+              },
+              {
+                "experiment_id": "assay-c",
+                "cost_utility": 0,
+                "authorization": "permitted",
+                "evidence_state": "complete",
+                "scenario_digest": "sha256:regret-005-02-weights-b",
+                "likelihoods": [
+                  {
+                    "state_id": "favorable",
+                    "outcomes": {
+                      "positive": 7600,
+                      "negative": 2400
+                    }
+                  },
+                  {
+                    "state_id": "adverse",
+                    "outcomes": {
+                      "positive": 2400,
+                      "negative": 7600
+                    }
+                  }
+                ]
+              }
+            ],
+            "expected": {
+              "status": "selected",
+              "selected_experiment_id": "assay-a",
+              "reason_codes": [
+                "positive_net_evsi",
+                "highest_net_evsi_selected"
+              ]
+            }
+          },
+          "baseline_scores": [
+            {
+              "experiment_id": "assay-a",
+              "expected_output_score": 20,
+              "local_sensitivity_score": 10
+            },
+            {
+              "experiment_id": "assay-b",
+              "expected_output_score": 35,
+              "local_sensitivity_score": 20
+            },
+            {
+              "experiment_id": "assay-c",
+              "expected_output_score": 15,
+              "local_sensitivity_score": 40
+            }
+          ]
+        }
+      ],
+      "expected": {
+        "status": "invalid_input",
+        "scenario_selections": [],
+        "weighted_regret_numerators": {},
+        "maximum_regret_numerators": {},
+        "reason_codes": [
+          "scenario_weight_sum_mismatch"
+        ]
+      }
+    }
+  ]
+}
