@@ -214,6 +214,8 @@ math-transfer-campaign/
 
 The local preflight script creates the inventory reports. Its output includes local paths, branches and repository status; inspect and redact before sharing outside the trusted working environment.
 
+**Local check at campaign PR head `59256ccb07e86264c4ed17de96c7db8ccf12b4c0`:** `bash -n scripts/math-campaign-preflight.sh` passed. The script was executed against a temporary root of symlinks to isolated Symthaea, Symtropy and Mycelix worktrees; it generated the summary and all three repository reports and made no repository changes. The output reports were kept outside version control because they contain local paths and branch/worktree state. This inventory run did not run project tests, benchmarks or proof checkers.
+
 ## Expected final report
 
 Begin with a one-screen summary, then include detail links:
