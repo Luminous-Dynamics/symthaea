@@ -1,0 +1,357 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://luminousdynamics.io/schemas/bioprotein-robust-evsi-corpus-v1.json",
+  "title": "Bioprotein robust EVSI joint-scenario stress corpus v1",
+  "type": "object",
+  "additionalProperties": false,
+  "required": [
+    "corpus_id",
+    "schema_version",
+    "scenario_weight_scale",
+    "family_count",
+    "claim_ceiling",
+    "families"
+  ],
+  "properties": {
+    "corpus_id": {
+      "const": "BIOPROTEIN-ROBUST-EVSI-CORPUS-V1"
+    },
+    "schema_version": {
+      "const": "1.0.0"
+    },
+    "scenario_weight_scale": {
+      "const": 10000
+    },
+    "family_count": {
+      "type": "integer",
+      "minimum": 1
+    },
+    "claim_ceiling": {
+      "type": "string",
+      "minLength": 1
+    },
+    "families": {
+      "type": "array",
+      "minItems": 1,
+      "items": {
+        "$ref": "#/$defs/family"
+      }
+    }
+  },
+  "$defs": {
+    "state": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "state_id",
+        "prior_weight"
+      ],
+      "properties": {
+        "state_id": {
+          "type": "string",
+          "minLength": 1
+        },
+        "prior_weight": {
+          "type": "integer",
+          "minimum": 0,
+          "maximum": 10000
+        }
+      }
+    },
+    "action": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "action_id",
+        "utilities"
+      ],
+      "properties": {
+        "action_id": {
+          "type": "string",
+          "minLength": 1
+        },
+        "utilities": {
+          "type": "object",
+          "minProperties": 1,
+          "additionalProperties": {
+            "type": "integer",
+            "minimum": -1000000,
+            "maximum": 1000000
+          }
+        }
+      }
+    },
+    "likelihoodRow": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "state_id",
+        "outcomes"
+      ],
+      "properties": {
+        "state_id": {
+          "type": "string",
+          "minLength": 1
+        },
+        "outcomes": {
+          "type": "object",
+          "minProperties": 1,
+          "additionalProperties": {
+            "type": "integer",
+            "minimum": 0,
+            "maximum": 10000
+          }
+        }
+      }
+    },
+    "experiment": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "experiment_id",
+        "cost_utility",
+        "authorization",
+        "evidence_state",
+        "scenario_digest",
+        "likelihoods"
+      ],
+      "properties": {
+        "experiment_id": {
+          "type": "string",
+          "minLength": 1
+        },
+        "cost_utility": {
+          "type": "integer",
+          "minimum": 0,
+          "maximum": 1000000
+        },
+        "authorization": {
+          "enum": [
+            "permitted",
+            "restricted",
+            "unknown"
+          ]
+        },
+        "evidence_state": {
+          "enum": [
+            "complete",
+            "incomplete",
+            "unknown"
+          ]
+        },
+        "scenario_digest": {
+          "type": "string",
+          "minLength": 1
+        },
+        "likelihoods": {
+          "type": "array",
+          "minItems": 1,
+          "items": {
+            "$ref": "#/$defs/likelihoodRow"
+          }
+        }
+      }
+    },
+    "expectedCase": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "status",
+        "selected_experiment_id",
+        "reason_codes"
+      ],
+      "properties": {
+        "status": {
+          "enum": [
+            "selected",
+            "no_positive_evsi",
+            "blocked",
+            "indeterminate",
+            "invalid_input"
+          ]
+        },
+        "selected_experiment_id": {
+          "type": [
+            "string",
+            "null"
+          ]
+        },
+        "reason_codes": {
+          "type": "array",
+          "items": {
+            "type": "string",
+            "minLength": 1
+          }
+        }
+      }
+    },
+    "case": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "case_id",
+        "scenario_digest",
+        "probability_scale",
+        "states",
+        "actions",
+        "experiments",
+        "expected"
+      ],
+      "properties": {
+        "case_id": {
+          "type": "string",
+          "minLength": 1
+        },
+        "scenario_digest": {
+          "type": "string",
+          "minLength": 1
+        },
+        "probability_scale": {
+          "const": 10000
+        },
+        "states": {
+          "type": "array",
+          "minItems": 1,
+          "items": {
+            "$ref": "#/$defs/state"
+          }
+        },
+        "actions": {
+          "type": "array",
+          "minItems": 1,
+          "items": {
+            "$ref": "#/$defs/action"
+          }
+        },
+        "experiments": {
+          "type": "array",
+          "items": {
+            "$ref": "#/$defs/experiment"
+          }
+        },
+        "expected": {
+          "$ref": "#/$defs/expectedCase"
+        }
+      }
+    },
+    "scenario": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "scenario_id",
+        "weight",
+        "uncertainty_class",
+        "assumption_tags",
+        "case"
+      ],
+      "properties": {
+        "scenario_id": {
+          "type": "string",
+          "minLength": 1
+        },
+        "weight": {
+          "type": "integer",
+          "minimum": 1,
+          "maximum": 10000
+        },
+        "uncertainty_class": {
+          "enum": [
+            "parameter_shift",
+            "correlated_joint_shock",
+            "structural_model_alternative",
+            "distribution_shift"
+          ]
+        },
+        "assumption_tags": {
+          "type": "array",
+          "minItems": 1,
+          "uniqueItems": true,
+          "items": {
+            "type": "string",
+            "minLength": 1
+          }
+        },
+        "case": {
+          "$ref": "#/$defs/case"
+        }
+      }
+    },
+    "expectedFamily": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "status",
+        "robust_winner",
+        "scenario_winners",
+        "reason_codes"
+      ],
+      "properties": {
+        "status": {
+          "enum": [
+            "robust_winner",
+            "scenario_sensitive",
+            "no_positive_evsi",
+            "indeterminate",
+            "invalid_input"
+          ]
+        },
+        "robust_winner": {
+          "type": [
+            "string",
+            "null"
+          ]
+        },
+        "scenario_winners": {
+          "type": "array",
+          "items": {
+            "type": [
+              "string",
+              "null"
+            ]
+          }
+        },
+        "reason_codes": {
+          "type": "array",
+          "items": {
+            "type": "string",
+            "minLength": 1
+          }
+        }
+      }
+    },
+    "family": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "family_id",
+        "correlation_model",
+        "decision_contract_digest",
+        "scenarios",
+        "expected"
+      ],
+      "properties": {
+        "family_id": {
+          "type": "string",
+          "minLength": 1
+        },
+        "correlation_model": {
+          "const": "joint_scenario_set"
+        },
+        "decision_contract_digest": {
+          "type": "string",
+          "minLength": 1
+        },
+        "scenarios": {
+          "type": "array",
+          "minItems": 2,
+          "items": {
+            "$ref": "#/$defs/scenario"
+          }
+        },
+        "expected": {
+          "$ref": "#/$defs/expectedFamily"
+        }
+      }
+    }
+  }
+}
