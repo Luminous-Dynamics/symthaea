@@ -37,11 +37,11 @@ All four hypotheses are falsifiable. Publish null results and per-stratum regres
 |---|---|---|
 | A | Existing `PatchHdcEncoder`, frozen configuration + seed | Current system baseline |
 | B | Deterministic local pixel / gradient descriptor | Shortcut and low-cost control |
-| C | Frozen learned dense visual encoder using VIS-002 | Representation-strength baseline |
+| C | Frozen learned dense visual encoder using VIS-002 (e.g. DINOv3 or a separately released PE checkpoint with approved terms) | Representation-strength baseline |
 | D | Hybrid of A and C with preregistered fusion | Main research candidate |
-| E | Applicable established video segmentation/tracking system (e.g. SAM 2) | Separate task-level practical comparator |
+| E | Current applicable video segmentation/tracking system (SAM 3.1 / SAM 3 primary; SAM 2 compatibility baseline) | Separate task-level practical comparator |
 
-E is not an interchangeable encoder-only baseline; report it in a distinct comparison lane. Freeze model/version, preprocessing, numerical precision, feature extraction, hardware and license details. Model weights are optional offline inputs and must not be downloaded by CI. Confirm weight licenses against the intended distribution before using any candidate.
+DINOv3 and separately released Perception Encoder (PE) checkpoints are candidate dense-feature baselines. Do not assume a public PE checkpoint is identical to SAM 3's task-specific PE-L+ backbone. E is not an interchangeable encoder-only baseline; report it in a distinct comparison lane. Freeze model/version, preprocessing, numerical precision, feature extraction, hardware and license details. Model weights are optional offline inputs and must not be downloaded by CI. Confirm weight licenses against the intended distribution before using any candidate.
 
 For the controlled A/C/D ablation, keep data splits, evaluator, downstream tracker/belief rules, and resource boundary identical where the adapters permit. Any learned fusion is trained only on training partitions with a declared parameter count and compute/data budget. Validation and test outcomes must not influence fusion, thresholds or checkpoint choice.
 
