@@ -33,7 +33,7 @@ Policies are:
 
 1. `equal_share_calendar`: apply the same irrigation amount to each plot, capped by the per-plot limit.
 2. `soil_threshold`: use held/observed storage to refill the greatest deficit toward a fixed threshold.
-3. `uncertainty_aware_marginal_risk`: allocate in small increments according to estimated marginal reduction of the declared shortfall proxy, increasing priority when readings are stale.
+3. `uncertainty_aware_marginal_risk`: allocate in small increments according to estimated marginal reduction of the declared shortfall proxy. It adds a fixed conservative demand margin and raises plot priority when readings are stale; these are explicit heuristics, not statistically calibrated prediction intervals.
 
 The receipt includes applied irrigation, a simple storage-overflow proxy, synthetic stress-exposure proxy, sensor-dropout fraction and daily budget violations. The executable fails if any policy exceeds a daily water cap or emits non-finite core metrics.
 
