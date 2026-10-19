@@ -11,6 +11,7 @@ const STORAGE_CAP_MM: f64 = 10.0;
 const MAX_IRRIGATION_PER_ZONE_MM: f64 = 3.5;
 const ALLOCATION_STEP_MM: f64 = 0.05;
 const BASE_DEMAND_MM: [f64; ZONES] = [2.2, 2.7, 1.8];
+const WATER_MATCHED_POLICY_NAME: &str = "water_matched_rotating_equal_share";
 
 #[derive(Clone, Copy)]
 struct Scenario {
@@ -113,6 +114,7 @@ struct ScenarioResult {
     stress_delta_vs_reference_proxy: Option<f64>,
     relative_stress_change_vs_reference_pct: Option<f64>,
     relative_stress_change_vs_equal_share_pct: Option<f64>,
+    relative_stress_change_vs_matched_water_equal_share_pct: Option<f64>,
     sensor_dropout_fraction: f64,
     water_budget_violation_days: usize,
 }
@@ -129,6 +131,7 @@ struct PolicyAggregate {
     max_worst_zone_stress_exposure_proxy: f64,
     mean_worst_to_best_zone_stress_ratio: Option<f64>,
     mean_relative_stress_change_vs_equal_share_pct: Option<f64>,
+    mean_relative_stress_change_vs_matched_water_equal_share_pct: Option<f64>,
     total_water_budget_violation_days: usize,
 }
 
@@ -287,12 +290,28 @@ fn allocate_water(
     allocation
 }
 
-fn simulate_one(scenario: Scenario, policy: Policy) -> ScenarioResult {
+fn matched_uniform_allocation(daily_total_mm: f64, day: usize) -> [f64; ZONES] {
+    let units = (daily_total_mm / ALLOCATION_STEP_MM).round() as usize;
+    let base_units = units / ZONES;
+    let remainder = units % ZONES;
+    let mut allocation = [base_units as f64 * ALLOCATION_STEP_MM; ZONES];
+    for offset in 0..remainder {
+        allocation[(day + offset) % ZONES] += ALLOCATION_STEP_MM;
+    }
+    allocation
+}
+
+fn simulate_one(
+    scenario: Scenario,
+    policy: Policy,
+    matched_daily_totals: Option<&[f64; DAYS]>,
+) -> (ScenarioResult, [f64; DAYS]) {
     let mut storage = [6.0; ZONES];
     let mut last_observation = storage;
     let mut stale_age = [0_usize; ZONES];
     let mut irrigation_total = 0.0;
     let mut irrigation_by_zone = [0.0; ZONES];
+    let mut daily_irrigation_trace = [0.0; DAYS];
     let mut overflow_total = 0.0;
     let mut stress_exposure = 0.0;
     let mut zone_stress_exposure = [0.0; ZONES];
@@ -314,8 +333,13 @@ fn simulate_one(scenario: Scenario, policy: Policy) -> ScenarioResult {
             }
         }
 
-        let allocation = allocate_water(policy, observed, stale_age, day, scenario);
+        let allocation = if let Some(matched_totals) = matched_daily_totals {
+            matched_uniform_allocation(matched_totals[day], day)
+        } else {
+            allocate_water(policy, observed, stale_age, day, scenario)
+        };
         let applied: f64 = allocation.iter().sum();
+        daily_irrigation_trace[day] = applied;
         irrigation_total += applied;
         if applied > scenario.daily_water_budget_plot_mm + 1e-8 {
             violation_days += 1;
@@ -355,34 +379,43 @@ fn simulate_one(scenario: Scenario, policy: Policy) -> ScenarioResult {
         .unwrap_or(0.0);
     let worst_to_best_zone_stress_ratio =
         (min_zone_stress > 1e-9).then_some(max_zone_stress / min_zone_stress);
-    ScenarioResult {
-        scenario_id: scenario.id.to_owned(),
-        policy: policy.name().to_owned(),
-        drought_start_day: scenario.drought_start_day,
-        heat_start_day: scenario.heat_start_day,
-        forecast_bias_fraction: scenario.forecast_bias,
-        sensor_dropout_period_days: scenario.sensor_dropout_period,
-        simulated_days: DAYS,
-        daily_water_budget_plot_mm: scenario.daily_water_budget_plot_mm,
-        total_irrigation_applied_plot_mm: round3(irrigation_total),
-        zone_irrigation_applied_plot_mm: irrigation_by_zone.map(round3),
-        plot_allocation_dispersion_plot_mm: round3(variance_zone_irrigation.sqrt()),
-        total_overflow_proxy_plot_mm: round3(overflow_total),
-        stress_exposure_proxy: round3(stress_exposure),
-        zone_stress_exposure_proxy: zone_stress_exposure.map(round3),
-        max_zone_stress_exposure_proxy: round3(max_zone_stress),
-        min_zone_stress_exposure_proxy: round3(min_zone_stress),
-        worst_to_best_zone_stress_ratio: worst_to_best_zone_stress_ratio.map(round3),
-        stress_delta_vs_reference_proxy: None,
-        relative_stress_change_vs_reference_pct: None,
-        relative_stress_change_vs_equal_share_pct: None,
-        sensor_dropout_fraction: if total_reads == 0 {
-            0.0
-        } else {
-            missing_reads as f64 / total_reads as f64
+    let policy_name = if matched_daily_totals.is_some() {
+        WATER_MATCHED_POLICY_NAME
+    } else {
+        policy.name()
+    };
+    (
+        ScenarioResult {
+            scenario_id: scenario.id.to_owned(),
+            policy: policy_name.to_owned(),
+            drought_start_day: scenario.drought_start_day,
+            heat_start_day: scenario.heat_start_day,
+            forecast_bias_fraction: scenario.forecast_bias,
+            sensor_dropout_period_days: scenario.sensor_dropout_period,
+            simulated_days: DAYS,
+            daily_water_budget_plot_mm: scenario.daily_water_budget_plot_mm,
+            total_irrigation_applied_plot_mm: round3(irrigation_total),
+            zone_irrigation_applied_plot_mm: irrigation_by_zone.map(round3),
+            plot_allocation_dispersion_plot_mm: round3(variance_zone_irrigation.sqrt()),
+            total_overflow_proxy_plot_mm: round3(overflow_total),
+            stress_exposure_proxy: round3(stress_exposure),
+            zone_stress_exposure_proxy: zone_stress_exposure.map(round3),
+            max_zone_stress_exposure_proxy: round3(max_zone_stress),
+            min_zone_stress_exposure_proxy: round3(min_zone_stress),
+            worst_to_best_zone_stress_ratio: worst_to_best_zone_stress_ratio.map(round3),
+            stress_delta_vs_reference_proxy: None,
+            relative_stress_change_vs_reference_pct: None,
+            relative_stress_change_vs_equal_share_pct: None,
+            relative_stress_change_vs_matched_water_equal_share_pct: None,
+            sensor_dropout_fraction: if total_reads == 0 {
+                0.0
+            } else {
+                missing_reads as f64 / total_reads as f64
+            },
+            water_budget_violation_days: violation_days,
         },
-        water_budget_violation_days: violation_days,
-    }
+        daily_irrigation_trace,
+    )
 }
 
 fn round3(value: f64) -> f64 {
@@ -398,10 +431,37 @@ fn build_receipt() -> Result<WaterPolicyReceipt> {
     ];
     let mut results = Vec::new();
     for scenario in all_scenarios {
-        for policy in policies {
-            results.push(simulate_one(scenario, policy));
+        let (equal_share_result, _) =
+            simulate_one(scenario, Policy::EqualShareCalendar, None);
+        let (soil_threshold_result, _) = simulate_one(scenario, Policy::SoilThreshold, None);
+        let (risk_aware_result, risk_daily_totals) =
+            simulate_one(scenario, Policy::UncertaintyAware, None);
+        let (matched_uniform_result, matched_daily_totals) =
+            simulate_one(scenario, Policy::EqualShareCalendar, Some(&risk_daily_totals));
+        let dose_diff = risk_aware_result.total_irrigation_applied_plot_mm
+            - matched_uniform_result.total_irrigation_applied_plot_mm;
+        if dose_diff.abs() > 1e-3 {
+            return Err(anyhow!(
+                "matched-water counterfactual did not preserve daily dose trace for {}",
+                scenario.id
+            ));
         }
+        if risk_daily_totals
+            .iter()
+            .zip(matched_daily_totals)
+            .any(|(risk, matched)| (risk - matched).abs() > 1e-8)
+        {
+            return Err(anyhow!(
+                "matched-water counterfactual daily dose mismatch for {}",
+                scenario.id
+            ));
+        }
+        results.push(equal_share_result);
+        results.push(soil_threshold_result);
+        results.push(risk_aware_result);
+        results.push(matched_uniform_result);
     }
+
     let baseline_scores: BTreeMap<String, f64> = results
         .iter()
         .filter(|result| result.policy == Policy::EqualShareCalendar.name())
@@ -418,6 +478,24 @@ fn build_receipt() -> Result<WaterPolicyReceipt> {
             }
         }
     }
+    let matched_uniform_scores: BTreeMap<String, f64> = results
+        .iter()
+        .filter(|result| result.policy == WATER_MATCHED_POLICY_NAME)
+        .map(|result| (result.scenario_id.clone(), result.stress_exposure_proxy))
+        .collect();
+    for result in &mut results {
+        if result.policy == Policy::UncertaintyAware.name() {
+            if let Some(matched) = matched_uniform_scores.get(&result.scenario_id).copied() {
+                if matched > 1e-9 {
+                    result.relative_stress_change_vs_matched_water_equal_share_pct =
+                        Some(round3(
+                            (result.stress_exposure_proxy - matched) / matched * 100.0,
+                        ));
+                }
+            }
+        }
+    }
+
     let reference_scores: BTreeMap<String, f64> = results
         .iter()
         .filter(|result| result.scenario_id == "reference")
@@ -435,15 +513,18 @@ fn build_receipt() -> Result<WaterPolicyReceipt> {
             }
         }
     }
+
+    let policy_names = [
+        Policy::EqualShareCalendar.name(),
+        Policy::SoilThreshold.name(),
+        Policy::UncertaintyAware.name(),
+        WATER_MATCHED_POLICY_NAME,
+    ];
     let mut aggregates = Vec::new();
-    for policy in [
-        Policy::EqualShareCalendar,
-        Policy::SoilThreshold,
-        Policy::UncertaintyAware,
-    ] {
+    for policy_name in policy_names {
         let policy_results: Vec<&ScenarioResult> = results
             .iter()
-            .filter(|result| result.policy == policy.name())
+            .filter(|result| result.policy == policy_name)
             .collect();
         let mut scores: Vec<f64> = policy_results
             .iter()
@@ -483,8 +564,22 @@ fn build_receipt() -> Result<WaterPolicyReceipt> {
                 relative_changes.iter().sum::<f64>() / relative_changes.len() as f64,
             ))
         };
+        let relative_matched_changes: Vec<f64> = policy_results
+            .iter()
+            .filter_map(|result| {
+                result.relative_stress_change_vs_matched_water_equal_share_pct
+            })
+            .collect();
+        let mean_relative_matched_change = if relative_matched_changes.is_empty() {
+            None
+        } else {
+            Some(round3(
+                relative_matched_changes.iter().sum::<f64>()
+                    / relative_matched_changes.len() as f64,
+            ))
+        };
         aggregates.push(PolicyAggregate {
-            policy: policy.name().to_owned(),
+            policy: policy_name.to_owned(),
             scenario_count: policy_results.len(),
             mean_stress_exposure_proxy: round3(mean_stress),
             median_stress_exposure_proxy: round3(median_stress),
@@ -510,12 +605,14 @@ fn build_receipt() -> Result<WaterPolicyReceipt> {
                 .unwrap_or(0.0),
             mean_worst_to_best_zone_stress_ratio: mean_worst_to_best_ratio,
             mean_relative_stress_change_vs_equal_share_pct: mean_relative_change,
+            mean_relative_stress_change_vs_matched_water_equal_share_pct: mean_relative_matched_change,
             total_water_budget_violation_days: policy_results
                 .iter()
                 .map(|result| result.water_budget_violation_days)
                 .sum(),
         });
     }
+
     let violations = results
         .iter()
         .map(|result| result.water_budget_violation_days)
@@ -555,9 +652,9 @@ fn build_receipt() -> Result<WaterPolicyReceipt> {
         biological_performance_claim: false,
         training_authorized: false,
         scenario_count: all_scenarios.len(),
-        policy_count: policies.len(),
+        policy_count: policy_names.len(),
         invariant_summary:
-            "Zero cap violations; synthetic proxy, not a plant model; per-zone burden is reported."
+            "Zero cap violations; synthetic proxy, not a plant model; per-zone burden and water-matched allocation are reported."
                 .to_owned(),
         aggregates,
         results,
@@ -566,6 +663,7 @@ fn build_receipt() -> Result<WaterPolicyReceipt> {
             "The stress proxy is not calibrated to a crop or farm economics.".to_owned(),
             "Aggregate scores hide uneven burdens; inspect per-plot stress and irrigation."
                 .to_owned(),
+            "The water-matched uniform policy holds the risk-aware daily dose trace constant and rotates discrete units across plots.".to_owned(),
             "Lower scores do not establish field water savings or yield gains.".to_owned(),
             "This tests deterministic execution and hard water accounting only.".to_owned(),
             "Field use requires calibration, farmer review, and replicated trials.".to_owned(),
