@@ -159,6 +159,33 @@ provider_metamorphic_sem=$(jq -er '.semantic_projection_sha256' "$provider_metam
 [ "$provider_metamorphic_count" -eq 64 ] || fail "actual-provider metamorphic sweep did not execute 64 variants"
 [ "$provider_metamorphic_sem" = "$sem_a" ] || fail "actual-provider metamorphic digest diverged from run-a"
 
+# Convert the actual provider report into a provider-neutral observation, then
+# recompute a known-answer scorecard. Oracles come from fixture bytes, not Unblob.
+for lane in run-a run-b run-mutated; do
+  run="$OUT/$lane"
+  if [ "$lane" = "run-mutated" ]; then
+    oracle="$OUT/oracle-nested-gzip-tar-mutation-014.json"
+  else
+    oracle="$OUT/oracle-nested-gzip-tar-001.json"
+  fi
+  cp "$oracle" "$run/differential-oracle.json"
+  bash "$DIFFERENTIAL_ROOT/unblob-smoke-adapter.sh" \
+    "$run/raw-report.json" "$run/input.bin" "$run/extracted" \
+    "$run/differential-oracle.json" "$version" "$run/differential-observation.json"
+  cargo run --quiet --package symthaea-rea-evidence-verifier -- \
+    score-case --oracle "$run/differential-oracle.json" \
+    --observation "$run/differential-observation.json" > "$run/differential-scorecard.json" \
+    || fail "$lane known-answer extraction-fidelity score was not a full pass"
+  jq -e '.status=="pass" and .complete_extraction_claim_accepted==true and
+         .metrics.source_identity_match==true and .metrics.known_file_recall_percent==100 and
+         .metrics.extra_or_wrong_files==0 and .metrics.unexplained_bytes==0 and
+         .metrics.overlapping_accounting_bytes==0 and .metrics.missed_or_false_regions==0 and
+         .metrics.coordinate_spaces_missing_or_wrong==0 and .metrics.coordinate_spaces_extra==0' \
+    "$run/differential-scorecard.json" >/dev/null \
+    || fail "$lane scorecard violated a strict known-answer gate"
+  printf 'PASS %s differential extraction score: 100%% known-file recall, zero unexplained/overlapping bytes.\n' "$lane"
+done
+
 manifest_tmp=$(mktemp "${TMPDIR:-/tmp}/rea-evidence-bundle-manifest.XXXXXX") || fail "could not allocate bundle manifest staging file"
 (
   cd "$OUT"
