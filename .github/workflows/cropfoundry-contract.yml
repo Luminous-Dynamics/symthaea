@@ -87,13 +87,23 @@ jobs:
             "concentration_provenance": "direct_assay",
             "concentration_evidence_uri": "urn:synthetic-assay:iron-v0",
             "assay_method": "synthetic-fixture-only",
+            "concentration_lower_mg_per_kg": 75.0,
+            "concentration_upper_mg_per_kg": 85.0,
             "edible_mass_kg_at_concentration_stage": 0.15,
             "edible_mass_basis_at_concentration_stage": "fresh_edible_mass",
+            "edible_mass_lower_kg_at_concentration_stage": 0.14,
+            "edible_mass_upper_kg_at_concentration_stage": 0.16,
             "servings_in_batch": 1,
             "retention_fraction": null,
             "retention_evidence_uri": null,
+            "retention_lower_fraction": null,
+            "retention_upper_fraction": null,
             "bioavailability_fraction": 0.25,
             "bioavailability_evidence_uri": "urn:synthetic-literature-factor:v0",
+            "bioavailability_lower_fraction": 0.20,
+            "bioavailability_upper_fraction": 0.30,
+            "uncertainty_interval_kind": "sensitivity_bounds",
+            "uncertainty_evidence_uri": "urn:synthetic-uncertainty:v0",
             "water_liters": 30.0,
             "land_square_meters": 2.0,
             "energy_kwh": 0.5,
@@ -107,3 +117,7 @@ jobs:
             --out "$RUNNER_TEMP/cropfoundry-nutrition-receipt.json"
           grep -q '"accounting_pass": true' "$RUNNER_TEMP/cropfoundry-nutrition-receipt.json"
           grep -q '"input_sha256":' "$RUNNER_TEMP/cropfoundry-nutrition-receipt.json"
+          grep -q '"nutrient_mass_delivered_interval_lower_mg": 10.5' "$RUNNER_TEMP/cropfoundry-nutrition-receipt.json"
+          grep -q '"nutrient_mass_delivered_interval_upper_mg": 13.6' "$RUNNER_TEMP/cropfoundry-nutrition-receipt.json"
+          grep -q '"bioavailable_nutrient_mass_delivered_interval_lower_mg": 2.1' "$RUNNER_TEMP/cropfoundry-nutrition-receipt.json"
+          grep -q '"bioavailable_nutrient_mass_delivered_interval_upper_mg": 4.08' "$RUNNER_TEMP/cropfoundry-nutrition-receipt.json"
