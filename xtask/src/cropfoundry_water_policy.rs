@@ -206,12 +206,25 @@ fn allocate_water(
                     let forecast_demand = forecast_demand_mm(day, zone, scenario);
                     let forecast_rain = rain_mm(day, scenario);
                     let current_storage = observed_storage[zone] + allocation[zone];
-                    let risk_weight =
-                        criticality(day, zone) * (1.0 + 0.12 * stale_age[zone].min(4) as f64);
-                    let before =
-                        risk_weight * exposure(current_storage, forecast_demand, forecast_rain, day, zone);
+                    let stale = stale_age[zone].min(4) as f64;
+                    let risk_weight = criticality(day, zone) * (1.0 + 0.12 * stale);
+                    let conservative_demand = forecast_demand * (1.10 + 0.05 * stale);
+                    let before = risk_weight
+                        * exposure(
+                            current_storage,
+                            conservative_demand,
+                            forecast_rain,
+                            day,
+                            zone,
+                        );
                     let after = risk_weight
-                        * exposure(current_storage + ALLOCATION_STEP_MM, forecast_demand, forecast_rain, day, zone);
+                        * exposure(
+                            current_storage + ALLOCATION_STEP_MM,
+                            conservative_demand,
+                            forecast_rain,
+                            day,
+                            zone,
+                        );
                     let marginal_gain = before - after;
                     if best.is_none_or(|(_, best_gain)| marginal_gain > best_gain) {
                         best = Some((zone, marginal_gain));
