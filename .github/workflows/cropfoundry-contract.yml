@@ -74,44 +74,10 @@ jobs:
       - name: Check nutrient-accounting CLI
         run: cargo run -q -p xtask -- cropfoundry-nutrition-accounting --help
 
-      - name: Execute synthetic nutrient-accounting fixture
+      - name: Execute checked-in synthetic nutrient-accounting fixture
         run: |
-          cat > "$RUNNER_TEMP/cropfoundry-nutrition-input.json" <<'JSON'
-          {
-            "schema_version": "cropfoundry-nutrition-accounting-input-v1",
-            "batch_id": "synthetic-nutrition-lot",
-            "nutrient_id": "iron",
-            "concentration_mg_per_kg": 80.0,
-            "concentration_mass_basis": "fresh_edible_mass",
-            "concentration_stage": "measured_at_serving",
-            "concentration_provenance": "direct_assay",
-            "concentration_evidence_uri": "urn:synthetic-assay:iron-v0",
-            "assay_method": "synthetic-fixture-only",
-            "concentration_lower_mg_per_kg": 75.0,
-            "concentration_upper_mg_per_kg": 85.0,
-            "edible_mass_kg_at_concentration_stage": 0.15,
-            "edible_mass_basis_at_concentration_stage": "fresh_edible_mass",
-            "edible_mass_lower_kg_at_concentration_stage": 0.14,
-            "edible_mass_upper_kg_at_concentration_stage": 0.16,
-            "servings_in_batch": 1,
-            "retention_fraction": null,
-            "retention_evidence_uri": null,
-            "retention_lower_fraction": null,
-            "retention_upper_fraction": null,
-            "bioavailability_fraction": 0.25,
-            "bioavailability_evidence_uri": "urn:synthetic-literature-factor:v0",
-            "bioavailability_lower_fraction": 0.20,
-            "bioavailability_upper_fraction": 0.30,
-            "uncertainty_interval_kind": "sensitivity_bounds",
-            "uncertainty_evidence_uri": "urn:synthetic-uncertainty:v0",
-            "water_liters": 30.0,
-            "land_square_meters": 2.0,
-            "energy_kwh": 0.5,
-            "cost_amount": 1.25,
-            "currency_code": "ZAR",
-            "source_sha256": "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa"
-          }
-          JSON
+          cp docs/research/cropfoundry/nutrition-accounting-example-v1.json \
+            "$RUNNER_TEMP/cropfoundry-nutrition-input.json"
           cargo run -q -p xtask -- cropfoundry-nutrition-accounting \
             --input "$RUNNER_TEMP/cropfoundry-nutrition-input.json" \
             --out "$RUNNER_TEMP/cropfoundry-nutrition-receipt.json"
