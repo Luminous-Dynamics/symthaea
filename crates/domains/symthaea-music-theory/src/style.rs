@@ -378,7 +378,6 @@ impl Style {
             Style::Classical
             | Style::Waltz
             | Style::Nocturne
-            | Style::March
             | Style::Lullaby
             | Style::Impressionism
             | Style::BaroqueSuite => P::ClassicalRubato,
