@@ -186,7 +186,7 @@ A parameterized OpenSCAD sensor-interface plate now exists at [hardware/open-dis
 
 It is a geometry prototype only: actual sensor dimensions, bracket compatibility, fasteners, fit, material/process tolerance, strength, optical aperture requirements and physical usefulness remain unvalidated. Do not call this a complete metrology stand or purchase-ready design. OpenSCAD 2021.01 successfully rendered/exported the recorded source revision; the STL bounding box matched the nominal 80 × 5 × 80 mm parameters, and an invalid oversized-aperture override triggered the expected assertion. See the [CAD check receipt](../../hardware/open-display-reference/validation/odrh_sensor_plate_cad_check-v0.1.json). This is source/geometry validation, not a physical fit or measurement result.
 
-The next calibration protocol is [ODRH-MET-001 #8049](https://github.com/Luminous-Dynamics/symthaea/issues/8049) and [DISPLAY_METROLOGY_REPRODUCIBILITY_PROTOCOL.md](DISPLAY_METROLOGY_REPRODUCIBILITY_PROTOCOL.md). It uses the applicable current IDMS method as a starting point and introduces a project-level uncertainty-vs-decision-effect gate; it does not replace the standard.
+The next calibration protocol is [ODRH-MET-001 #8049](https://github.com/Luminous-Dynamics/symthaea/issues/8049) and [DISPLAY_METROLOGY_REPRODUCIBILITY_PROTOCOL.md](DISPLAY_METROLOGY_REPRODUCIBILITY_PROTOCOL.md). It uses the applicable current IDMS method as a starting point and introduces a project-level uncertainty-vs-decision-effect gate; it does not replace the standard. The supporting [pattern/context robustness protocol](DISPLAY_PATTERN_ROBUSTNESS_AND_UNCERTAINTY.md) freezes protected test strata, while [visual utility-per-joule](VISUAL_UTILITY_PER_JOULE_PROTOCOL.md) distinguishes energy per successful task from peak brightness or energy measured at a different system boundary. The drift-screening plan now requires a predeclared maximum scheduled control gap; this bounds the planned schedule but cannot be used as evidence that a real drift process will be detected.
 
 ## 10. Ownership
 
@@ -205,5 +205,8 @@ A provenance receipt does not equal calibration; software tests do not equal phy
 - [ODRH-001 implementation issue #8030](https://github.com/Luminous-Dynamics/symthaea/issues/8030).
 - [VIS-TECH-001 research program #7820](https://github.com/Luminous-Dynamics/symthaea/issues/7820).
 - [VIS-MFG-001 display manufacturing routes #8012](https://github.com/Luminous-Dynamics/symthaea/issues/8012).
+- [ICDM / IDMS](https://www.sid.org/Standards/ICDM/ICDM), current release v1.3 (2025); use applicable methods and record adaptations.
+- [IEC 62087-7:2018](https://webstore.iec.ch/en/publication/27420), computer-monitor power-measurement method reference within its scope.
+- [NIST/SEMATECH measurement process characterization](https://www.itl.nist.gov/div898/handbook/mpc/mpc.htm), including control standards, stability, repeatability/reproducibility and uncertainty.
 
 All hardware metrics remain unqualified until the first actual module/instrument configuration is selected and the specified measurements are collected.
