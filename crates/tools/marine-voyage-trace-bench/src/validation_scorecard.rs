@@ -351,7 +351,7 @@ pub fn score_validation(
     let mut id_counts: BTreeMap<String, usize> = BTreeMap::new();
     for observation in observations {
         *id_counts
-            .entry(observation.observation_id.clone())
+            .entry(observation.observation_id.trim().to_owned())
             .or_default() += 1;
     }
     let duplicate_ids: BTreeSet<String> = id_counts
@@ -390,7 +390,7 @@ pub fn score_validation(
 
     let mut sorted_observations: Vec<&ValidationObservation> = observations
         .iter()
-        .filter(|observation| !duplicate_ids.contains(&observation.observation_id))
+        .filter(|observation| !duplicate_ids.contains(observation.observation_id.trim()))
         .collect();
     sorted_observations.sort_by(|a, b| {
         a.operating_case_id
@@ -435,13 +435,13 @@ pub fn score_validation(
                 valid = false;
             }
         }
-        if observation.dataset_manifest_sha256 != profile.dataset_manifest_sha256 {
+        if !observation.dataset_manifest_sha256.eq_ignore_ascii_case(&profile.dataset_manifest_sha256) {
             issues.push(ValidationIssue::DatasetManifestMismatch {
                 observation_id: observation.observation_id.clone(),
             });
             valid = false;
         }
-        if observation.model_configuration_sha256 != profile.model_configuration_sha256 {
+        if !observation.model_configuration_sha256.eq_ignore_ascii_case(&profile.model_configuration_sha256) {
             issues.push(ValidationIssue::ModelConfigurationMismatch {
                 observation_id: observation.observation_id.clone(),
             });
@@ -714,7 +714,9 @@ mod tests {
     #[test]
     fn duplicate_observation_ids_are_excluded_in_full() {
         let mut observations = valid_observations();
-        observations.push(observations[0].clone());
+        let mut whitespace_alias = observations[0].clone();
+        whitespace_alias.observation_id = " deep-1 ".to_owned();
+        observations.push(whitespace_alias);
         let scorecard = score_validation(&profile(), &observations);
         assert_eq!(scorecard.disposition, ValidationDisposition::InvalidObservations);
         assert!(has_issue(&scorecard, &ValidationIssue::DuplicateObservationId {
