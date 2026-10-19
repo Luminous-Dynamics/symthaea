@@ -11,7 +11,11 @@ on:
       - "docs/engineering/OPEN_DISPLAY_REFERENCE_HARDWARE.md"
       - "docs/engineering/display-measurement-run-template-v0.1.json"
       - "docs/engineering/display-measurement-run.schema.json"
+      - "docs/engineering/display-drift-control-plan-v0.1.json"
+      - "docs/engineering/display-drift-control-plan.schema.json"
+      - "docs/engineering/ODRH_DRIFT_SCREENING_ALGORITHM.md"
       - "docs/engineering/open-display-reference-platform-v0.1.json"
+      - "tools/open-display-platform-verify/src/drift_control.rs"
       - "docs/engineering/open-display-reference-platform.schema.json"
       - ".github/workflows/open-display-platform-verify.yml"
   push:
@@ -24,7 +28,11 @@ on:
       - "docs/engineering/OPEN_DISPLAY_REFERENCE_HARDWARE.md"
       - "docs/engineering/display-measurement-run-template-v0.1.json"
       - "docs/engineering/display-measurement-run.schema.json"
+      - "docs/engineering/display-drift-control-plan-v0.1.json"
+      - "docs/engineering/display-drift-control-plan.schema.json"
+      - "docs/engineering/ODRH_DRIFT_SCREENING_ALGORITHM.md"
       - "docs/engineering/open-display-reference-platform-v0.1.json"
+      - "tools/open-display-platform-verify/src/drift_control.rs"
       - "docs/engineering/open-display-reference-platform.schema.json"
       - ".github/workflows/open-display-platform-verify.yml"
   workflow_dispatch:
@@ -60,6 +68,9 @@ jobs:
           cp docs/engineering/open-display-reference-platform.schema.json "$artifact_dir/"
           cp docs/engineering/display-measurement-run-template-v0.1.json "$artifact_dir/"
           cp docs/engineering/display-measurement-run.schema.json "$artifact_dir/"
+          cp docs/engineering/display-drift-control-plan-v0.1.json "$artifact_dir/"
+          cp docs/engineering/display-drift-control-plan.schema.json "$artifact_dir/"
+          cp docs/engineering/ODRH_DRIFT_SCREENING_ALGORITHM.md "$artifact_dir/"
           cp docs/engineering/DISPLAY_METROLOGY_REPRODUCIBILITY_PROTOCOL.md "$artifact_dir/"
           sha256sum "$artifact_dir"/* > "$artifact_dir/input-sha256sums.txt"
 
@@ -238,7 +249,9 @@ jobs:
         run: |
           cargo run --manifest-path tools/open-display-platform-verify/Cargo.toml -- \
             --cad-receipt target/odrh-validation/odrh-cad-runtime-receipt.json \
-            --cad-receipt-schema hardware/open-display-reference/validation/odrh-cad-runtime-receipt.schema.json
+            --cad-receipt-schema hardware/open-display-reference/validation/odrh-cad-runtime-receipt.schema.json \
+            --drift-plan docs/engineering/display-drift-control-plan-v0.1.json \
+            --drift-schema docs/engineering/display-drift-control-plan.schema.json
 
       - name: Upload reproducible CAD and validation artifacts
         if: always()
