@@ -1,0 +1,362 @@
+{
+  "manifest_id": "mobility_telemetry_manifest_v0_1_example",
+  "schema_version": "0.1.0",
+  "session_state": "planned",
+  "evidence_class": "DesignOnly",
+  "claim_ceiling": "This is a planned sensor/channel manifest, not captured data. It provides no physical validation, vehicle safety, tire grip, roadworthiness or approval evidence.",
+  "vehicle": {
+    "vehicle_id": "reference-electric-motorcycle-001",
+    "vehicle_class": "electric_motorcycle",
+    "propulsion": "battery_electric",
+    "configuration_digest": "sha256:0000000000000000000000000000000000000000000000000000000000000000",
+    "mass_kg": null,
+    "payload_kg": null,
+    "tire_front": {
+      "make_model": "TBD",
+      "size": "TBD",
+      "pressure_kpa": null,
+      "tread_state": "not_recorded"
+    },
+    "tire_rear": {
+      "make_model": "TBD",
+      "size": "TBD",
+      "pressure_kpa": null,
+      "tread_state": "not_recorded"
+    }
+  },
+  "timebase": {
+    "master_clock": "logger_monotonic_ns",
+    "sync_method": "planned_gnss_pps_plus_monotonic",
+    "max_alignment_uncertainty_ns": 2000000,
+    "gnss_utc_anchor_required": true,
+    "gap_policy": "explicit_gap_event_never_silent_interpolation"
+  },
+  "data_rights": {
+    "rights_state": "not_applicable_design_only",
+    "owner_or_rightsholder": "Luminous Dynamics",
+    "permission_receipt_id": null,
+    "source_reference": null,
+    "redistribution_status": "not_a_data_artifact"
+  },
+  "sensors": [
+    {
+      "sensor_id": "gnss-01",
+      "sensor_kind": "GNSS",
+      "model": "TBD",
+      "calibration_state": "planned",
+      "calibration_receipt_id": null
+    },
+    {
+      "sensor_id": "imu-01",
+      "sensor_kind": "six_axis_imu",
+      "model": "TBD",
+      "calibration_state": "planned",
+      "calibration_receipt_id": null
+    },
+    {
+      "sensor_id": "wheel-front-01",
+      "sensor_kind": "wheel_speed",
+      "model": "TBD",
+      "calibration_state": "planned",
+      "calibration_receipt_id": null
+    },
+    {
+      "sensor_id": "wheel-rear-01",
+      "sensor_kind": "wheel_speed",
+      "model": "TBD",
+      "calibration_state": "planned",
+      "calibration_receipt_id": null
+    },
+    {
+      "sensor_id": "dc-voltage-01",
+      "sensor_kind": "voltage_probe",
+      "model": "isolated_probe_TBD",
+      "calibration_state": "planned",
+      "calibration_receipt_id": null
+    },
+    {
+      "sensor_id": "dc-current-01",
+      "sensor_kind": "isolated_current_transducer",
+      "model": "TBD",
+      "calibration_state": "planned",
+      "calibration_receipt_id": null
+    },
+    {
+      "sensor_id": "battery-temp-01",
+      "sensor_kind": "temperature",
+      "model": "TBD",
+      "calibration_state": "planned",
+      "calibration_receipt_id": null
+    },
+    {
+      "sensor_id": "front-pressure-01",
+      "sensor_kind": "tire_pressure",
+      "model": "TBD",
+      "calibration_state": "planned",
+      "calibration_receipt_id": null
+    },
+    {
+      "sensor_id": "rear-pressure-01",
+      "sensor_kind": "tire_pressure",
+      "model": "TBD",
+      "calibration_state": "planned",
+      "calibration_receipt_id": null
+    },
+    {
+      "sensor_id": "front-tire-temp-01",
+      "sensor_kind": "tire_temperature",
+      "model": "TBD",
+      "calibration_state": "planned",
+      "calibration_receipt_id": null
+    },
+    {
+      "sensor_id": "rear-tire-temp-01",
+      "sensor_kind": "tire_temperature",
+      "model": "TBD",
+      "calibration_state": "planned",
+      "calibration_receipt_id": null
+    },
+    {
+      "sensor_id": "ambient-temp-01",
+      "sensor_kind": "temperature",
+      "model": "TBD",
+      "calibration_state": "planned",
+      "calibration_receipt_id": null
+    }
+  ],
+  "channels": [
+    {
+      "channel_id": "gnss.speed_mps",
+      "sensor_id": "gnss-01",
+      "quantity": "ground_speed",
+      "unit": "m/s",
+      "sample_rate_hz": 10,
+      "clock_domain": "logger_monotonic_ns",
+      "sign_convention": "nonnegative_forward",
+      "axis_or_frame": "vehicle_ground_track",
+      "source_mode": "external_sensor"
+    },
+    {
+      "channel_id": "gnss.latitude_deg",
+      "sensor_id": "gnss-01",
+      "quantity": "latitude",
+      "unit": "deg",
+      "sample_rate_hz": 10,
+      "clock_domain": "logger_monotonic_ns",
+      "sign_convention": "north_positive",
+      "axis_or_frame": "WGS84",
+      "source_mode": "external_sensor"
+    },
+    {
+      "channel_id": "gnss.longitude_deg",
+      "sensor_id": "gnss-01",
+      "quantity": "longitude",
+      "unit": "deg",
+      "sample_rate_hz": 10,
+      "clock_domain": "logger_monotonic_ns",
+      "sign_convention": "east_positive",
+      "axis_or_frame": "WGS84",
+      "source_mode": "external_sensor"
+    },
+    {
+      "channel_id": "gnss.altitude_m",
+      "sensor_id": "gnss-01",
+      "quantity": "ellipsoidal_altitude",
+      "unit": "m",
+      "sample_rate_hz": 10,
+      "clock_domain": "logger_monotonic_ns",
+      "sign_convention": "up_positive",
+      "axis_or_frame": "WGS84_ellipsoid",
+      "source_mode": "external_sensor"
+    },
+    {
+      "channel_id": "imu.accel_x_mps2",
+      "sensor_id": "imu-01",
+      "quantity": "specific_force_x",
+      "unit": "m/s^2",
+      "sample_rate_hz": 200,
+      "clock_domain": "logger_monotonic_ns",
+      "sign_convention": "sensor_axis_positive",
+      "axis_or_frame": "sensor_frame_declared_in_manifest",
+      "source_mode": "external_sensor"
+    },
+    {
+      "channel_id": "imu.accel_y_mps2",
+      "sensor_id": "imu-01",
+      "quantity": "specific_force_y",
+      "unit": "m/s^2",
+      "sample_rate_hz": 200,
+      "clock_domain": "logger_monotonic_ns",
+      "sign_convention": "sensor_axis_positive",
+      "axis_or_frame": "sensor_frame_declared_in_manifest",
+      "source_mode": "external_sensor"
+    },
+    {
+      "channel_id": "imu.accel_z_mps2",
+      "sensor_id": "imu-01",
+      "quantity": "specific_force_z",
+      "unit": "m/s^2",
+      "sample_rate_hz": 200,
+      "clock_domain": "logger_monotonic_ns",
+      "sign_convention": "sensor_axis_positive",
+      "axis_or_frame": "sensor_frame_declared_in_manifest",
+      "source_mode": "external_sensor"
+    },
+    {
+      "channel_id": "imu.gyro_x_rads",
+      "sensor_id": "imu-01",
+      "quantity": "angular_rate_x",
+      "unit": "rad/s",
+      "sample_rate_hz": 200,
+      "clock_domain": "logger_monotonic_ns",
+      "sign_convention": "right_hand_rule",
+      "axis_or_frame": "sensor_frame_declared_in_manifest",
+      "source_mode": "external_sensor"
+    },
+    {
+      "channel_id": "imu.gyro_y_rads",
+      "sensor_id": "imu-01",
+      "quantity": "angular_rate_y",
+      "unit": "rad/s",
+      "sample_rate_hz": 200,
+      "clock_domain": "logger_monotonic_ns",
+      "sign_convention": "right_hand_rule",
+      "axis_or_frame": "sensor_frame_declared_in_manifest",
+      "source_mode": "external_sensor"
+    },
+    {
+      "channel_id": "imu.gyro_z_rads",
+      "sensor_id": "imu-01",
+      "quantity": "angular_rate_z",
+      "unit": "rad/s",
+      "sample_rate_hz": 200,
+      "clock_domain": "logger_monotonic_ns",
+      "sign_convention": "right_hand_rule",
+      "axis_or_frame": "sensor_frame_declared_in_manifest",
+      "source_mode": "external_sensor"
+    },
+    {
+      "channel_id": "wheel.front_speed_rads",
+      "sensor_id": "wheel-front-01",
+      "quantity": "wheel_angular_speed",
+      "unit": "rad/s",
+      "sample_rate_hz": 100,
+      "clock_domain": "logger_monotonic_ns",
+      "sign_convention": "forward_positive",
+      "axis_or_frame": "front_wheel_axis",
+      "source_mode": "external_sensor"
+    },
+    {
+      "channel_id": "wheel.rear_speed_rads",
+      "sensor_id": "wheel-rear-01",
+      "quantity": "wheel_angular_speed",
+      "unit": "rad/s",
+      "sample_rate_hz": 100,
+      "clock_domain": "logger_monotonic_ns",
+      "sign_convention": "forward_positive",
+      "axis_or_frame": "rear_wheel_axis",
+      "source_mode": "external_sensor"
+    },
+    {
+      "channel_id": "dc_bus.voltage_v",
+      "sensor_id": "dc-voltage-01",
+      "quantity": "dc_bus_voltage",
+      "unit": "V",
+      "sample_rate_hz": 100,
+      "clock_domain": "logger_monotonic_ns",
+      "sign_convention": "source_to_load_positive",
+      "axis_or_frame": "declared_dc_bus_boundary",
+      "source_mode": "isolated_external_measurement"
+    },
+    {
+      "channel_id": "dc_bus.current_a",
+      "sensor_id": "dc-current-01",
+      "quantity": "dc_bus_current",
+      "unit": "A",
+      "sample_rate_hz": 100,
+      "clock_domain": "logger_monotonic_ns",
+      "sign_convention": "discharge_positive_charge_negative",
+      "axis_or_frame": "declared_dc_bus_boundary",
+      "source_mode": "isolated_external_measurement"
+    },
+    {
+      "channel_id": "battery.temperature_c",
+      "sensor_id": "battery-temp-01",
+      "quantity": "battery_temperature",
+      "unit": "degC",
+      "sample_rate_hz": 10,
+      "clock_domain": "logger_monotonic_ns",
+      "sign_convention": "absolute",
+      "axis_or_frame": "sensor_location_in_manifest",
+      "source_mode": "external_sensor"
+    },
+    {
+      "channel_id": "tire.front_pressure_kpa",
+      "sensor_id": "front-pressure-01",
+      "quantity": "tire_cavity_pressure",
+      "unit": "kPa",
+      "sample_rate_hz": 1,
+      "clock_domain": "logger_monotonic_ns",
+      "sign_convention": "absolute",
+      "axis_or_frame": "front_tire",
+      "source_mode": "external_sensor"
+    },
+    {
+      "channel_id": "tire.rear_pressure_kpa",
+      "sensor_id": "rear-pressure-01",
+      "quantity": "tire_cavity_pressure",
+      "unit": "kPa",
+      "sample_rate_hz": 1,
+      "clock_domain": "logger_monotonic_ns",
+      "sign_convention": "absolute",
+      "axis_or_frame": "rear_tire",
+      "source_mode": "external_sensor"
+    },
+    {
+      "channel_id": "tire.front_temperature_c",
+      "sensor_id": "front-tire-temp-01",
+      "quantity": "tire_temperature",
+      "unit": "degC",
+      "sample_rate_hz": 1,
+      "clock_domain": "logger_monotonic_ns",
+      "sign_convention": "absolute",
+      "axis_or_frame": "measurement_method_and_location_required",
+      "source_mode": "external_sensor"
+    },
+    {
+      "channel_id": "tire.rear_temperature_c",
+      "sensor_id": "rear-tire-temp-01",
+      "quantity": "tire_temperature",
+      "unit": "degC",
+      "sample_rate_hz": 1,
+      "clock_domain": "logger_monotonic_ns",
+      "sign_convention": "absolute",
+      "axis_or_frame": "measurement_method_and_location_required",
+      "source_mode": "external_sensor"
+    },
+    {
+      "channel_id": "ambient.temperature_c",
+      "sensor_id": "ambient-temp-01",
+      "quantity": "ambient_temperature",
+      "unit": "degC",
+      "sample_rate_hz": 1,
+      "clock_domain": "logger_monotonic_ns",
+      "sign_convention": "absolute",
+      "axis_or_frame": "sensor_location_in_manifest",
+      "source_mode": "external_sensor"
+    }
+  ],
+  "claim_targets": [
+    "ride_energy",
+    "longitudinal_dynamics",
+    "tire_health"
+  ],
+  "artifacts": [],
+  "limitations": [
+    "Design-only manifest; no observed data or raw files are attached.",
+    "A ride logger cannot measure motor shaft torque or a tire contact-patch force map.",
+    "Voltage/current probes require suitable isolation, ratings, fusing, creepage and qualified electrical review before physical use.",
+    "A 200 Hz IMU sample-rate target is not a validated bandwidth or accuracy claim.",
+    "No control commands may be sent to the vehicle by this logger."
+  ]
+}
