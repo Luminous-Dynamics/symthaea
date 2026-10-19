@@ -21,7 +21,7 @@ Disposition is conservative over the summed interval:
 - within_preferred: the entire interval is inside [97, 103];
 - within_acceptable: the entire interval is inside [95, 105] but not entirely inside [97, 103];
 - outside_acceptable: the entire interval is below 95 or above 105;
-- indeterminate: the interval straddles an acceptance boundary or a required component is unavailable.
+- indeterminate: the interval straddles an acceptance boundary or a required component is unavailable. If the known lower bound alone exceeds 105, the result is outside acceptable even when a component remains unavailable.
 
 This is a screening rule for profile plausibility, not proof that the values are correct. Components can be wrong and still sum to 100.
 
