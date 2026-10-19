@@ -2228,6 +2228,21 @@ mod tests {
         assert!(run(&undeclared_args).is_err());
     }
 
+    fn zip_fixture_symlink() -> Vec<u8> {
+        let mut bytes = zip_fixture(&[("link", b"target.csv", 0o100644)]);
+        let central_signature = [0x50, 0x4b, 0x01, 0x02];
+        let offset = bytes.windows(4)
+            .position(|window| window == central_signature)
+            .expect("ZIP fixture has a central-directory file header");
+        // ZIP's 'version made by' high byte identifies Unix, and the upper
+        // 16 external-attribute bits contain the Unix st_mode value.
+        bytes[offset + 4..offset + 6]
+            .copy_from_slice(&((3u16 << 8) | 20).to_le_bytes());
+        bytes[offset + 38..offset + 42]
+            .copy_from_slice(&((0o120777u32) << 16).to_le_bytes());
+        bytes
+    }
+
     #[test]
     fn zip_inventory_binds_member_paths_sizes_crc_and_archive_digest() {
         let bytes = zip_fixture(&[
@@ -2254,7 +2269,7 @@ mod tests {
 
     #[test]
     fn zip_inventory_rejects_symlinks_duplicates_and_case_collisions() {
-        let symlink = zip_fixture(&[("link", b"target.csv", 0o120777)]);
+        let symlink = zip_fixture_symlink();
         assert!(inspect_zip_bytes(&symlink, "source.zip").is_err());
 
         let duplicate = zip_fixture(&[
