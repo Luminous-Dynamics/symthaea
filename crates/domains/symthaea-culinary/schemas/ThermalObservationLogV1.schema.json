@@ -1,0 +1,378 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://luminousdynamics.io/schemas/ThermalObservationLogV1.schema.json",
+  "title": "ThermalObservationLogV1",
+  "description": "Time-stamped thermal observations bound to a culinary process step, preserving placement, calibration claims and uncertainty. Not a food safety verdict.",
+  "type": "object",
+  "additionalProperties": false,
+  "required": [
+    "schema_version",
+    "log_id",
+    "trace_id",
+    "process_id",
+    "sensors",
+    "observations"
+  ],
+  "properties": {
+    "schema_version": {
+      "const": "1.0.0"
+    },
+    "log_id": {
+      "type": "string",
+      "minLength": 1
+    },
+    "trace_id": {
+      "type": "string",
+      "minLength": 1
+    },
+    "process_id": {
+      "type": "string",
+      "minLength": 1
+    },
+    "sensors": {
+      "type": "array",
+      "minItems": 1,
+      "items": {
+        "$ref": "#/$defs/sensor"
+      }
+    },
+    "observations": {
+      "type": "array",
+      "minItems": 1,
+      "items": {
+        "$ref": "#/$defs/observation"
+      }
+    }
+  },
+  "$defs": {
+    "evidence": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "source_ref",
+        "source_version",
+        "known_at",
+        "evidence_status"
+      ],
+      "properties": {
+        "source_ref": {
+          "type": "string",
+          "minLength": 1
+        },
+        "source_version": {
+          "type": "string",
+          "minLength": 1
+        },
+        "known_at": {
+          "type": "string",
+          "format": "date-time"
+        },
+        "evidence_status": {
+          "enum": [
+            "synthetic",
+            "unreviewed",
+            "reviewed",
+            "qualified"
+          ]
+        }
+      },
+      "allOf": [
+        {
+          "if": {
+            "properties": {
+              "evidence_status": {
+                "const": "qualified"
+              },
+              "source_ref": {
+                "pattern": "^urn:synthetic:"
+              }
+            },
+            "required": [
+              "evidence_status",
+              "source_ref"
+            ]
+          },
+          "then": false
+        }
+      ]
+    },
+    "sensor": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "sensor_id",
+        "sensor_kind",
+        "calibration_status",
+        "stated_accuracy_c",
+        "last_calibrated_at",
+        "calibration_evidence"
+      ],
+      "properties": {
+        "sensor_id": {
+          "type": "string",
+          "minLength": 1
+        },
+        "sensor_kind": {
+          "enum": [
+            "thermocouple",
+            "thermistor",
+            "infrared",
+            "oven_controller",
+            "other"
+          ]
+        },
+        "calibration_status": {
+          "enum": [
+            "calibrated",
+            "unverified",
+            "expired",
+            "unknown"
+          ]
+        },
+        "stated_accuracy_c": {
+          "type": "number",
+          "minimum": 0
+        },
+        "last_calibrated_at": {
+          "type": [
+            "string",
+            "null"
+          ],
+          "format": "date-time",
+          "pattern": "Z$"
+        },
+        "calibration_evidence": {
+          "$ref": "#/$defs/evidence"
+        }
+      },
+      "allOf": [
+        {
+          "if": {
+            "properties": {
+              "calibration_status": {
+                "const": "calibrated"
+              }
+            },
+            "required": [
+              "calibration_status"
+            ]
+          },
+          "then": {
+            "properties": {
+              "last_calibrated_at": {
+                "type": "string",
+                "format": "date-time",
+                "pattern": "Z$"
+              },
+              "calibration_evidence": {
+                "allOf": [
+                  {
+                    "properties": {
+                      "evidence_status": {
+                        "enum": [
+                          "reviewed",
+                          "qualified"
+                        ]
+                      },
+                      "source_ref": {
+                        "not": {
+                          "pattern": "^urn:synthetic:"
+                        }
+                      }
+                    },
+                    "required": [
+                      "evidence_status",
+                      "source_ref"
+                    ]
+                  }
+                ]
+              }
+            },
+            "not": {
+              "properties": {
+                "calibration_evidence": {
+                  "properties": {
+                    "evidence_status": {
+                      "const": "synthetic"
+                    }
+                  },
+                  "required": [
+                    "evidence_status"
+                  ]
+                }
+              },
+              "required": [
+                "calibration_evidence"
+              ]
+            }
+          }
+        }
+      ]
+    },
+    "temperature": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "status",
+        "value_c",
+        "lower_c",
+        "upper_c",
+        "unit"
+      ],
+      "properties": {
+        "status": {
+          "enum": [
+            "observed",
+            "estimated",
+            "unknown"
+          ]
+        },
+        "value_c": {
+          "type": [
+            "number",
+            "null"
+          ]
+        },
+        "lower_c": {
+          "type": [
+            "number",
+            "null"
+          ]
+        },
+        "upper_c": {
+          "type": [
+            "number",
+            "null"
+          ]
+        },
+        "unit": {
+          "const": "degC"
+        },
+        "unknown_reason": {
+          "type": "string",
+          "minLength": 1
+        }
+      },
+      "allOf": [
+        {
+          "if": {
+            "properties": {
+              "status": {
+                "enum": [
+                  "observed",
+                  "estimated"
+                ]
+              }
+            },
+            "required": [
+              "status"
+            ]
+          },
+          "then": {
+            "properties": {
+              "value_c": {
+                "type": "number"
+              },
+              "lower_c": {
+                "type": "number"
+              },
+              "upper_c": {
+                "type": "number"
+              }
+            },
+            "not": {
+              "required": [
+                "unknown_reason"
+              ]
+            }
+          }
+        },
+        {
+          "if": {
+            "properties": {
+              "status": {
+                "const": "unknown"
+              }
+            },
+            "required": [
+              "status"
+            ]
+          },
+          "then": {
+            "properties": {
+              "value_c": {
+                "type": "null"
+              },
+              "lower_c": {
+                "type": "null"
+              },
+              "upper_c": {
+                "type": "null"
+              }
+            },
+            "required": [
+              "unknown_reason"
+            ]
+          }
+        }
+      ]
+    },
+    "observation": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "observation_id",
+        "step_id",
+        "sensor_id",
+        "sequence_index",
+        "measured_at",
+        "measurement_kind",
+        "location_description",
+        "temperature_c",
+        "evidence"
+      ],
+      "properties": {
+        "observation_id": {
+          "type": "string",
+          "minLength": 1
+        },
+        "step_id": {
+          "type": "string",
+          "minLength": 1
+        },
+        "sensor_id": {
+          "type": "string",
+          "minLength": 1
+        },
+        "sequence_index": {
+          "type": "integer",
+          "minimum": 0
+        },
+        "measured_at": {
+          "type": "string",
+          "format": "date-time",
+          "pattern": "Z$"
+        },
+        "measurement_kind": {
+          "enum": [
+            "product_core_temperature",
+            "product_surface_temperature",
+            "process_medium_temperature",
+            "ambient_temperature",
+            "equipment_temperature"
+          ]
+        },
+        "location_description": {
+          "type": "string",
+          "minLength": 1
+        },
+        "temperature_c": {
+          "$ref": "#/$defs/temperature"
+        },
+        "evidence": {
+          "$ref": "#/$defs/evidence"
+        }
+      }
+    }
+  }
+}
