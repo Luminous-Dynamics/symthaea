@@ -19,6 +19,41 @@ assess(){
     def uint($n): ($n|type)=="number" and $n>=0 and ($n|floor)==$n;
     def validrange($r;$limit):
       $r!=null and uint($r.offset) and uint($r.length) and $r.length>0 and ($r.offset+$r.length)<=$limit;
+    def badtask($t):
+      ($t.path|type)!="string" or ($t.blob_id|type)!="string" or
+      ($t.blob_id|length)==0 or ((uint($t.size))|not);
+    def badedge($e;$c;$tasks):
+      ($tasks|map(select(.path==$e.parent_path))) as $parents |
+      ($tasks|map(select(.path==$e.child_path))) as $children |
+      if ($parents|length)!=1 or ($children|length)!=1 or
+         $e.parent_path==$e.child_path or $e.child_path=="$input" or
+         ($e.provider_blob_id|type)!="string" or ($e.provider_blob_id|length)==0 then
+        true
+      elif $children[0].blob_id!=$e.provider_blob_id then true
+      elif $e.stage_kind=="multi-file" then $e.parent_file_range!=null
+      elif $e.parent_file_range==null then false
+      else
+        ($parents[0].size) as $parent_size |
+        (validrange($e.parent_file_range;$parent_size)|not) or
+        (any($c.chunks[]?;
+          .input_path==$e.parent_path and
+          .provider_id==$e.provider_blob_id and
+          .range==$e.parent_file_range)|not)
+      end;
+    def baddegree($p;$c):
+      if $p=="$input" then any($c.derivations[]?; .child_path==$p)
+      else ([$c.derivations[]?|select(.child_path==$p)]|length)!=1 end;
+    def badchunk($ch;$c;$tasks):
+      ($tasks|map(select(.path==$ch.input_path))) as $matches |
+      if ($matches|length)!=1 then true
+      elif (validrange($ch.range;$matches[0].size)|not) then true
+      elif $ch.input_path=="$input" then
+        if $ch.root_file_range==null then true
+        elif (validrange($ch.root_file_range;($c.selection_offset+$c.selection_length))|not) then true
+        elif $ch.root_file_range.offset!=($c.selection_offset+$ch.range.offset) then true
+        elif $ch.root_file_range.length!=$ch.range.length then true
+        else false end
+      else $ch.root_file_range!=null end;
     $c.tasks as $tasks |
     ($tasks|map(.path)) as $paths |
     ($tasks|map(select(.path=="$input"))|length) as $root_count |
@@ -28,46 +63,18 @@ assess(){
       "reject"
     elif ($paths|unique|length)!=($paths|length) or $root_count!=1 then
       "reject"
-    elif any($tasks[] as $t; ($t.path|type)!="string" or ($t.blob_id|type)!="string" or ($t.blob_id|length)==0 or ((uint($t.size))|not)) then
+    elif any($tasks[]; badtask(.)) then
       "reject"
     elif ([$tasks[]|select(.path=="$input")|.size][0])!=$c.selection_length then
       "reject"
     elif ($c.derivations|length)!=(($tasks|length)-1) then
       "reject"
-    elif any($c.derivations[] as $e;
-       ([$tasks[]|select(.path==$e.parent_path)]|length)!=1 or
-       ([$tasks[]|select(.path==$e.child_path)]|length)!=1 or
-       $e.parent_path==$e.child_path or $e.child_path=="$input" or
-       ($e.provider_blob_id|type)!="string" or ($e.provider_blob_id|length)==0 or
-       ([$tasks[]|select(.path==$e.child_path)|.blob_id][0])!=$e.provider_blob_id or
-       (if $e.stage_kind=="multi-file" then $e.parent_file_range!=null
-        elif $e.parent_file_range==null then false
-        else
-          ([$tasks[]|select(.path==$e.parent_path)|.size][0]) as $parent_size |
-          (validrange($e.parent_file_range;$parent_size)|not) or
-          (any($c.chunks[]? as $pc;
-             $pc.input_path==$e.parent_path and
-             $pc.provider_id==$e.provider_blob_id and
-             $pc.range==$e.parent_file_range)|not)
-        end)
-      ) then "reject"
-    elif any($paths[] as $p;
-       if $p=="$input" then any($c.derivations[]?; .child_path==$p)
-       else ([$c.derivations[]?|select(.child_path==$p)]|length)!=1 end) then
+    elif any($c.derivations[]; badedge(.;$c;$tasks)) then
       "reject"
-    elif any($c.chunks[] as $ch;
-       ([$tasks[]|select(.path==$ch.input_path)]|length)!=1 or
-       (
-         ([$tasks[]|select(.path==$ch.input_path)|.size][0]) as $task_size |
-         (validrange($ch.range;$task_size)|not) or
-         (if $ch.input_path=="$input" then
-            $ch.root_file_range==null or
-            $ch.root_file_range.offset!=($c.selection_offset+$ch.range.offset) or
-            $ch.root_file_range.length!=$ch.range.length or
-            (validrange($ch.root_file_range;($c.selection_offset+$c.selection_length))|not)
-          else $ch.root_file_range!=null end)
-       )
-      ) then "reject"
+    elif any($paths[]; baddegree(.;$c)) then
+      "reject"
+    elif any($c.chunks[]; badchunk(.;$c;$tasks)) then
+      "reject"
     else "accept" end
   '
 }
