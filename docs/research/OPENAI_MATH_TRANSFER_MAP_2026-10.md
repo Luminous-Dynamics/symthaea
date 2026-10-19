@@ -139,6 +139,8 @@ No `sorry`, `admit`, unauthorized axiom, changed statement, hidden premise, nume
 ## Source register
 
 - OpenAI math snapshot: [repository at pinned revision](https://github.com/openai/math/tree/1581d4cbdd69a0faf34b2089614fe2a814316a6a).
+- Formalized-result catalogue at the same revision: [`lean/formalization.yaml`](https://github.com/openai/math/blob/1581d4cbdd69a0faf34b2089614fe2a814316a6/lean/formalization.yaml), blob `275eee8cfab7ce49d3a5e88f02cbb8f28fe6fee6`.
+- Gaussian memory/sample and sampling assumptions: [`lean/docs/140.md`](https://github.com/openai/math/blob/1581d4cbdd69a0faf34b2089614fe2a814316a6/lean/docs/140.md), [`lean/docs/139.md`](https://github.com/openai/math/blob/1581d4cbdd69a0faf34b2089614fe2a814316a6/lean/docs/139.md).
 - Existing Symthaea research: [#7585](https://github.com/Luminous-Dynamics/symthaea/pull/7585), [#6210](https://github.com/Luminous-Dynamics/symthaea/issues/6210), [#6216](https://github.com/Luminous-Dynamics/symthaea/issues/6216), [#5723](https://github.com/Luminous-Dynamics/symthaea/issues/5723).
 - Premise retrieval baseline: [LeanSearch v2 paper](https://arxiv.org/abs/2605.13137), [implementation/benchmarks](https://github.com/frenzymath/LeanSearch-v2).
 
