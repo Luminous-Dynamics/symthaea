@@ -65,6 +65,16 @@ The acquisition box must not control traction, brakes, battery management or saf
 
 A ride logger does not produce motor efficiency maps or tire-force curves by itself. Those need additional calibrated equipment: motor dynamometer torque and speed, DC input voltage/current, temperatures and torque-map protocol; or a tire test rig with normal load, longitudinal/lateral force, speed, slip ratio, slip angle, camber, inflation and temperature. Fixture design, guarding and emergency stops require specialist review.
 
+## Interchange formats: preserve semantics, not format lock-in
+
+Keep the versioned JSON manifest and evidence/claim gates format-independent; do not make CSV the forever format or make one vendor-specific container the source of truth.
+
+- **CSV + JSON for the v0.1 conformance fixture:** inspectable in a diff, easy to generate, and sufficient to exercise sequencing/status/gap rules. It is a fixture/intake form, not a complete high-rate storage solution.
+- **MCAP as a candidate raw event-stream container:** its public specification defines timestamped messages with channel/schema records, an optional message sequence, chunk compression/indexes, attachments and metadata; index structures support locating messages by time/topic. That is a useful fit for synchronized GNSS, IMU, CAN frames, event marks, and arbitrary attachments if the logger/host recorder grows beyond CSV. Source: [MCAP specification](https://mcap.dev/spec).
+- **ASAM MDF as an automotive measurement interchange target:** useful for measured signals and automotive measurement ecosystems. The reference architecture should export to it once an actual supported subset is tested against independent readers. Source: [ASAM MDF](https://www.asam.net/standards/detail/mdf/).
+
+Keep raw bytes immutable regardless of container. Any decoder, filter, resampler, unit conversion or derived signal must be a new content-addressed artifact with the parent digest(s), tool version, parameters, units, timestamp mapping and claim scope. A format's checksum, index or container-validity is not proof of physical accuracy.
+
 ## Clock and loss handling
 
 Use a logger-wide monotonic nanosecond clock for every sample and record GNSS UTC/PPS anchors separately. Record measured clock skew and synchronization uncertainty rather than treating GNSS time as exact. Keep original sensor timestamps when available. Never silently interpolate through data loss; emit an explicit gap/overflow event with duration/count. Record raw values before filtering; derived/filter outputs get separate channel IDs and transform versions.
@@ -146,7 +156,7 @@ Targets for the first software tranche: zero false accepts across missing-channe
 
 ### Current implementation
 
-The first implementation is the **manifest, raw-trace validator and fault-matrix runner**, not pretend firmware. All three commands are wired into the existing `xtask` binary and introduce no new dependencies. The telemetry module has 44 authored unit tests covering schema/claim gates, trace failure modes, report-digest determinism, and all 33 frozen matrix cases; five further tests cover the vendored tire-monitoring intake. These tests have not been compiled or run in this environment.
+The first implementation is the **manifest, raw-trace validator and fault-matrix runner**, not pretend firmware. All three commands are wired into the existing `xtask` binary and introduce no new dependencies. The telemetry module has 45 authored unit tests covering schema/claim gates, trace failure modes, report-digest determinism, and all 33 frozen matrix cases; five further tests cover the vendored tire-monitoring intake. These tests have not been compiled or run in this environment.
 
 From the workspace root:
 
