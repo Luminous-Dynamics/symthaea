@@ -72,7 +72,7 @@ jq -n \
     predicateType:"https://github.com/Luminous-Dynamics/symthaea/attestations/rea-provider-smoke/v1",
     subject:{bundleManifestSha256:$manifest,receiptSha256:$receipt},
     providerRun:{
-      runId:$provider_run,url:$provider_url,workflow:"REA Pinned Provider Smoke",event:"push",
+      runId:$provider_run,url:$provider_url,workflow:"REA Pinned Provider Smoke",workflowDatabaseId:389295795,event:"push",
       ref:"refs/heads/main",sourceHeadSha:$source,checkoutCommitSha:$source,providerVersion:"26.6.4",
       semanticProjectionSha256:$semantic,semanticMutationProjectionSha256:$mutated,providerMetamorphicVariants:64
     },
@@ -118,6 +118,7 @@ kill_mutation wrong-manifest-digest '.subject.bundleManifestSha256=("0"*64)'
 kill_mutation wrong-provider-source '.providerRun.sourceHeadSha=("e"*40)'
 kill_mutation wrong-provider-run-id '.providerRun.runId="0"'
 kill_mutation wrong-provider-version '.providerRun.providerVersion="26.6.3"'
+kill_mutation wrong-provider-workflow-id '.providerRun.workflowDatabaseId=123'
 kill_mutation wrong-provider-variant-count '.providerRun.providerMetamorphicVariants=63'
 kill_mutation wrong-attestor-commit '.attestationRun.sourceCommitSha=("e"*40)'
 kill_mutation wrong-attestor-ref '.attestationRun.ref="refs/heads/attacker"'
