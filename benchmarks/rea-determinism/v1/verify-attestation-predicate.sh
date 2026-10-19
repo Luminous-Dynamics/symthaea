@@ -62,7 +62,7 @@ jq -e \
     (.providerRun.semanticMutationProjectionSha256|test("^[0-9a-f]{64}$")) and
     .providerRun.semanticProjectionSha256==$receipt[0].semantic_projection_sha256.equivalent_runs and
     .providerRun.semanticMutationProjectionSha256==$receipt[0].semantic_projection_sha256.semantic_mutation and
-    .providerRun.semanticProjectionSha256!=$providerRun.semanticMutationProjectionSha256 and
+    .providerRun.semanticProjectionSha256!=.providerRun.semanticMutationProjectionSha256 and
     .providerRun.providerMetamorphicVariants==64 and
     .providerRun.providerMetamorphicVariants==$receipt[0].provider_metamorphic.equivalent_variants and
     (.attestationRun|keys|sort)==["event","ref","runId","sourceCommitSha","workflowRef"] and
