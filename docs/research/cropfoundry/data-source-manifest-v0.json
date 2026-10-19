@@ -344,6 +344,56 @@
       "content_sha256": null,
       "next_gate": "Verify rights for the exact eight XLSX artifacts and linked publication terms; if authorized, retrieve the minimum subset, record retrieval time and file digests, inspect workbook structures, units, batches, treatment allocation, loss-stage definitions, replicates, quality criteria and missingness, then design a leakage-resistant baseline audit. Keep training disabled until artifact-specific authorization is explicitly reviewed.",
       "initial_intended_role": "Candidate for CF-023 mass-balance and postharvest-quality schema audit after rights review. Do not infer freshness or food safety from appearance alone; do not treat reported paper summaries as independent row-level data or local South African validation."
+    },
+    {
+      "id": "DS-015",
+      "title": "South African Food Data System (SAFOODS): national food composition reference",
+      "source_uri": "https://safoods.mrc.ac.za/",
+      "source_type": "national_food_composition_reference",
+      "reported_content": [
+        "SAFOODS v.2023 online database describes 1,857 food items and shows energy, carbohydrate, protein, fat and fibre on the free web view",
+        "SAFOODS products page lists Food Composition Tables for South Africa, 6th Edition (2024), with 36 nutrients across 16 food groups, as a paid electronic publication",
+        "site says nutrient values are means, reported per 100 g edible food, and warns natural variation by species/cultivar, soil, climate, practices, processing, storage and transport",
+        "not all values are of South African origin; nutrient-level source references are recorded in the system"
+      ],
+      "observed_metadata": "Highest-priority local reference/access path for CF-024, but not necessarily a cultivar-level trial dataset. The free web view is limited to selected macronutrients and energy; the more detailed 2024 tables are sold through SAFOODS/MRC. The record does not grant unrestricted redistribution or model-training rights. No table, workbook or food records have been downloaded or audited by this workstream.",
+      "license_status": "free_selected_web_view_and_paid_2024_tables_reuse_terms_need_review",
+      "access_status": "public_selected_nutrient_web_view_full_composition_tables_paid",
+      "ingestion_status": "discovery_only",
+      "permitted_current_use": [
+        "public_metadata_review",
+        "citation",
+        "partner_and_data_access_discovery"
+      ],
+      "training_authorized": false,
+      "content_sha256": null,
+      "next_gate": "Ask SAFOODS/MRC about allowed research access, purchase/use rights, attribution, redistribution and machine-learning terms for the specific 2024 table. If authorized, pin exact edition/file digest and nutrient-level source references; capture units, edible portion, fresh/dry basis, analytical/calculated/imputed status, food matching and uncertainty. Do not treat national mean values as the user's crop, cultivar, farm or household observation.",
+      "initial_intended_role": "Local South African food-composition reference and access pathway for CF-024, after terms review. It can support reference values and food matching only within documented limitations; it does not replace directly assayed cultivar, site, post-harvest and preparation-specific observations."
+    },
+    {
+      "id": "DS-016",
+      "title": "USDA FoodData Central (FDC)",
+      "source_uri": "https://fdc.nal.usda.gov/api-guide/",
+      "source_type": "public_domain_food_composition_reference_and_food_metadata",
+      "reported_content": [
+        "USDA FDC API guide states data are public domain and not copyrighted, published under CC0 1.0 Universal",
+        "provides downloadable and API-accessible food and nutrient records across distinct FDC data types",
+        "official API guide documents rate limits and requires an API key for API use",
+        "useful for parser/provenance tests and external reference comparison, not automatic evidence of South African crop composition"
+      ],
+      "observed_metadata": "Official USDA API guide explicitly documents CC0 1.0 for FDC data. FDC contains different data types and food identifiers; each record's source, food type, preparation state, serving and nutrient basis must be preserved. No FDC records or data package have been downloaded, pinned, normalized or scored by this workstream.",
+      "license_status": "verified_cc0_from_official_usda_fdc_api_guide",
+      "access_status": "public_download_or_api_api_key_required_for_api",
+      "ingestion_status": "discovery_only",
+      "permitted_current_use": [
+        "public_metadata_review",
+        "citation",
+        "schema_audit"
+      ],
+      "training_authorized": false,
+      "content_sha256": null,
+      "next_gate": "Select a narrowly scoped food/ingredient comparison only after the question is defined. Download a versioned snapshot, retain data type/food IDs and citation, hash source bytes, preserve nutrient and mass basis, edible portion, preparation state, missingness and data type. Keep US food matches separate from South African items and from measured crop lots. Training requires a later independent review even though FDC's general data license is CC0.",
+      "initial_intended_role": "CC0 comparator and schema/provenance reference for CF-024, especially negative controls for units, nutrient tags, food-state matching and missingness. Do not use as a proxy for Gauteng cultivar nutrient assays or local food availability."
     }
   ]
 }
