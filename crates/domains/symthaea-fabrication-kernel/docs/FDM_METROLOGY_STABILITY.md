@@ -33,7 +33,7 @@ The first implementation is deliberately conservative: once a policy quarantines
 - Five policies are compared: no-monitoring negative control, Shewhart point-limit rule, EWMA, two-sided CUSUM, and a hybrid persistence guard that warns on a single point outlier before quarantining persistent anomalies.
 - Evidence remains explicitly marked synthetic. Nothing in this module reads an instrument, controls a printer, generates G-code or changes a production release decision.
 
-The profiles and thresholds are test fixtures, not universal models of gauge behavior. In particular, a bounded deterministic noise source is not a substitute for estimating a real measurement distribution.
+The profiles and thresholds are test fixtures, not universal models of gauge behavior. In particular, a bounded deterministic noise source is not a substitute for estimating a real measurement distribution. The synthetic baseline assumes each interleaved reference standard has zero residual before a stress is injected; a physical monitor must instead use a validated baseline for each standard/method/configuration and its traceable value and uncertainty.
 
 ## Metrics that matter
 
@@ -41,6 +41,7 @@ The profiles and thresholds are test fixtures, not universal models of gauge beh
 |---|---|
 | False quarantine on stable stream | Measures needless withdrawal of usable evidence |
 | First alert and first quarantine | Separates an early warning from a hard trust withdrawal |
+| Premature quarantine before a known change | Exposes false alarms inside the pre-change stable prefix |
 | Detection delay from injected change | Measures how long an out-of-control stream remains admissible |
 | Trusted readings after change | Exposes the dangerous case where stale trust persists |
 | Warning / quarantined / trusted counts | Makes dispositions auditable rather than reducing them to one score |
