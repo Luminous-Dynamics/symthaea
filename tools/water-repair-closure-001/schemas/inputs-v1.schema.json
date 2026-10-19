@@ -77,7 +77,8 @@
               "content_payload",
               "content_sha256",
               "delivered_copies",
-              "content_conflict"
+              "content_conflict",
+              "conflicting_content_payload"
             ],
             "properties": {
               "event_id": {
@@ -97,6 +98,13 @@
               },
               "content_payload": {
                 "type": "string",
+                "minLength": 1
+              },
+              "conflicting_content_payload": {
+                "type": [
+                  "string",
+                  "null"
+                ],
                 "minLength": 1
               }
             }
