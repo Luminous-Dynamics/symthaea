@@ -66,6 +66,7 @@ pub fn validate_measurement_gate(root: &Value) -> MeasurementGateReport {
     {
         push(&mut issues, "UNCERTAINTY_SEMANTICS_MISSING", "decision_rule.uncertainty_semantics", "interval bounds must not be converted silently into probabilities");
     }
+    reject_probability_fields(root, "$", &mut issues);
 
     let Some(cases) = root.get("cases").and_then(Value::as_array) else {
         push(&mut issues, "CASES_ARRAY_MISSING", "cases", "cases must be a JSON array");
@@ -144,6 +145,39 @@ pub fn evaluate_case(case: &Value) -> String {
         "Conforming".to_owned()
     } else {
         "Indeterminate".to_owned()
+    }
+}
+
+fn reject_probability_fields(value: &Value, path: &str, issues: &mut Vec<MeasurementGateIssue>) {
+    const FORBIDDEN_KEYS: [&str; 6] = [
+        "probability",
+        "scenario_probability",
+        "failure_probability",
+        "probability_of_conformity",
+        "likelihood",
+        "confidence_level",
+    ];
+    match value {
+        Value::Object(object) => {
+            for (key, child) in object {
+                let child_path = format!("{path}.{key}");
+                if FORBIDDEN_KEYS.contains(&key.as_str()) && !child.is_null() {
+                    push(
+                        issues,
+                        "PROBABILITY_CLAIM_NOT_SUPPORTED",
+                        &child_path,
+                        "a deterministic interval fixture cannot supply a probability or likelihood",
+                    );
+                }
+                reject_probability_fields(child, &child_path, issues);
+            }
+        }
+        Value::Array(items) => {
+            for (index, child) in items.iter().enumerate() {
+                reject_probability_fields(child, &format!("{path}[{index}]"), issues);
+            }
+        }
+        _ => {}
     }
 }
 
@@ -244,6 +278,12 @@ mod tests {
     #[test] fn future_calibration_date_blocks() {
         let root=fixture(); let c=root["cases"].as_array().unwrap().iter().find(|c|c["case_id"]=="MM-13-CALIBRATION-NOT-YET-VALID").unwrap();
         assert_eq!(evaluate_case(c), "Blocked");
+    }
+    #[test] fn probability_claim_from_interval_only_is_rejected() {
+        let mut root = fixture();
+        root["decision_rule"]["probability_of_conformity"] = Value::String("0.99".to_owned());
+        let report = validate_measurement_gate(&root);
+        assert!(has_code(&report, "PROBABILITY_CLAIM_NOT_SUPPORTED"));
     }
     #[test] fn changed_expected_disposition_is_detected() {
         let mut root=fixture(); get_case(&mut root, "MM-03-BOUNDARY-INDETERMINATE")["expected_disposition"]=Value::String("Conforming".to_owned());
