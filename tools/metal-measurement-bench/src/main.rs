@@ -295,7 +295,93 @@ fn sha256_hex(bytes: &[u8]) -> String {
     out
 }
 
+fn validate_csv_quote_syntax(bytes: &[u8]) -> Result<()> {
+    let mut index = 0usize;
+    let mut in_quotes = false;
+    let mut at_field_start = true;
+    let mut after_closing_quote = false;
+
+    while index < bytes.len() {
+        let byte = bytes[index];
+        if in_quotes {
+            if byte == b'"' {
+                if bytes.get(index + 1) == Some(&b'"') {
+                    index += 2;
+                    continue;
+                }
+                in_quotes = false;
+                after_closing_quote = true;
+            }
+            index += 1;
+            continue;
+        }
+
+        if after_closing_quote {
+            match byte {
+                b',' => {
+                    at_field_start = true;
+                    after_closing_quote = false;
+                    index += 1;
+                }
+                b'\n' => {
+                    at_field_start = true;
+                    after_closing_quote = false;
+                    index += 1;
+                }
+                b'\r' if bytes.get(index + 1) == Some(&b'\n') => {
+                    at_field_start = true;
+                    after_closing_quote = false;
+                    index += 2;
+                }
+                _ => {
+                    return Err(AdapterError::Validation(
+                        "CSV has characters after a closing quote before the field delimiter".into(),
+                    ));
+                }
+            }
+            continue;
+        }
+
+        match byte {
+            b'"' if at_field_start => {
+                in_quotes = true;
+                at_field_start = false;
+                index += 1;
+            }
+            b'"' => {
+                return Err(AdapterError::Validation(
+                    "CSV quote appears inside an unquoted field".into(),
+                ));
+            }
+            b',' => {
+                at_field_start = true;
+                index += 1;
+            }
+            b'\n' => {
+                at_field_start = true;
+                index += 1;
+            }
+            b'\r' if bytes.get(index + 1) == Some(&b'\n') => {
+                at_field_start = true;
+                index += 2;
+            }
+            _ => {
+                at_field_start = false;
+                index += 1;
+            }
+        }
+    }
+
+    if in_quotes {
+        return Err(AdapterError::Validation(
+            "CSV ends inside an unterminated quoted field".into(),
+        ));
+    }
+    Ok(())
+}
+
 fn inspect_csv_bytes(bytes: &[u8], relative_path: &str) -> Result<CsvInventory> {
+    validate_csv_quote_syntax(bytes)?;
     let mut reader = csv::ReaderBuilder::new()
         .has_headers(true)
         .flexible(false)
@@ -1690,7 +1776,7 @@ mod tests {
         assert_eq!(inventory.columns[0].nonempty_cells, 3);
         assert_eq!(inventory.columns[1].empty_cells, 1);
         assert_eq!(inventory.columns[1].nonempty_cells, 2);
-        assert_eq!(inventory.columns[2].empty_cells, 2);
+        assert_eq!(inventory.columns[2].empty_cells, 1);
         assert!(inventory.row_identity_note.contains("not an upstream row identifier"));
         assert!(inventory.claim_ceiling.contains("no semantic field mapping"));
     }
@@ -1710,6 +1796,16 @@ mod tests {
     fn csv_inventory_rejects_inconsistent_record_width() {
         let input = b"id,value\na,1\nb,2,unexpected\n";
         assert!(inspect_csv_bytes(input, "fixture.csv").is_err());
+    }
+
+    #[test]
+    fn csv_inventory_rejects_quotes_in_unquoted_fields_and_trailing_quote_junk() {
+        for input in [
+            &b"id,note\n1,un"escaped\n"[..],
+            &b"id,note\n1,"quoted" junk\n"[..],
+        ] {
+            assert!(inspect_csv_bytes(input, "fixture.csv").is_err());
+        }
     }
 
     #[test]
