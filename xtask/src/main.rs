@@ -93,6 +93,11 @@ enum Commands {
         #[arg(long)]
         out: Option<PathBuf>,
     },
+    /// Verify canonical digest and internal consistency of a saved mobility telemetry benchmark report.
+    MobilityTelemetryVerifyReport {
+        #[arg(long, default_value = "reports/mobility_telemetry_benchmark.json")]
+        input: PathBuf,
+    },
     /// Validate an append-only multi-rate raw telemetry CSV against the declared manifest channels.
     MobilityTelemetryTrace {
         #[arg(long, default_value = "docs/research/data/mobility_telemetry_manifest_v0_1.json")]
@@ -239,6 +244,14 @@ fn main() -> anyhow::Result<()> {
             mobility_telemetry_manifest::run_benchmark(
                 &manifest, &matrix, &source_commit, &toolchain_id, out.as_deref()
             )?;
+        }
+        Commands::MobilityTelemetryVerifyReport { input } => {
+            let root = PathBuf::from(env!("CARGO_MANIFEST_DIR"))
+                .parent()
+                .expect("xtask lives one level below the workspace root")
+                .to_path_buf();
+            let input = if input.is_absolute() { input } else { root.join(input) };
+            mobility_telemetry_manifest::run_verify_report(&input)?;
         }
         Commands::MobilityTelemetryTrace { manifest, input, out } => {
             let root = PathBuf::from(env!("CARGO_MANIFEST_DIR"))
