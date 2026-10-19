@@ -592,12 +592,46 @@ fn valid_utc_timestamp(value: &str) -> bool {
         || bytes[13] != b':'
         || bytes[16] != b':'
         || bytes[19] != b'Z'
+        || !bytes.iter().enumerate().all(|(index, byte)| {
+            matches!(index, 4 | 7 | 10 | 13 | 16 | 19) || byte.is_ascii_digit()
+        })
     {
         return false;
     }
-    bytes.iter().enumerate().all(|(index, byte)| {
-        matches!(index, 4 | 7 | 10 | 13 | 16 | 19) || byte.is_ascii_digit()
-    })
+
+    let Some(year) = value[0..4].parse::<u32>().ok() else {
+        return false;
+    };
+    let Some(month) = value[5..7].parse::<u32>().ok() else {
+        return false;
+    };
+    let Some(day) = value[8..10].parse::<u32>().ok() else {
+        return false;
+    };
+    let Some(hour) = value[11..13].parse::<u32>().ok() else {
+        return false;
+    };
+    let Some(minute) = value[14..16].parse::<u32>().ok() else {
+        return false;
+    };
+    let Some(second) = value[17..19].parse::<u32>().ok() else {
+        return false;
+    };
+
+    if year == 0 || !(1..=12).contains(&month) || !(0..=23).contains(&hour)
+        || minute > 59 || second > 59
+    {
+        return false;
+    }
+    let leap_year = year % 4 == 0 && (year % 100 != 0 || year % 400 == 0);
+    let days_in_month = match month {
+        1 | 3 | 5 | 7 | 8 | 10 | 12 => 31,
+        4 | 6 | 9 | 11 => 30,
+        2 if leap_year => 29,
+        2 => 28,
+        _ => return false,
+    };
+    (1..=days_in_month).contains(&day)
 }
 
 fn expect_string(root: &Value, field: &str, expected: &str, issues: &mut Vec<ReplayIssue>) {
@@ -727,6 +761,15 @@ mod tests {
         let (mut root, base) = fixture_pair();
         let index = event_index(&root, "EV-01-RECEIVE-FABRIC");
         root["events"][index]["event_time_utc"] = Value::String("yesterday".to_owned());
+        let report = validate_event_log(&root, &base);
+        assert!(has_code(&report, "INVALID_UTC_TIMESTAMP"));
+    }
+
+    #[test]
+    fn impossible_calendar_timestamp_is_rejected() {
+        let (mut root, base) = fixture_pair();
+        let index = event_index(&root, "EV-01-RECEIVE-FABRIC");
+        root["events"][index]["event_time_utc"] = Value::String("2026-02-30T08:00:00Z".to_owned());
         let report = validate_event_log(&root, &base);
         assert!(has_code(&report, "INVALID_UTC_TIMESTAMP"));
     }
