@@ -1,0 +1,579 @@
+{
+  "schema_version": "0.1.0",
+  "campaign_id": "HABITAT-EVENT-REPLAY-001",
+  "program_id": "HABITAT-VERTICAL-001",
+  "evidence_status": "synthetic_contract_only_not_executed",
+  "claim_ceiling": "This event log establishes no physical event authenticity, real material genealogy, inventory accuracy, safety, cost, or factory readiness. Payload digests are not computed, source identities are synthetic, and quantitative material/inventory balances are not modeled.",
+  "interoperability": {
+    "reference_standard": "GS1 EPCIS 2.0.1 and CBV",
+    "mapping_basis": "design inspiration for what/when/where/why and input/output transformation semantics",
+    "conformance": "not_claimed",
+    "reason": "This compact research schema is not EPCIS JSON-LD, does not validate against GS1 schemas, and uses synthetic local identifiers."
+  },
+  "replay_contract": {
+    "ordering": "causal topological order; ties by event_time_utc then event_id",
+    "duplicate_identity": "event_id is stable; exact redelivery ignores ingested_at_utc when comparing payloads",
+    "conflicting_identity": "same event_id with any other payload difference fails closed",
+    "timestamps": "event_time_utc <= recorded_at_utc <= ingested_at_utc; strict UTC Z timestamps only",
+    "ancestry": "every transform input and non-receive subject must occur in the declared causal ancestry",
+    "digest_status": "not_computed",
+    "quantity_semantics": "not_modeled",
+    "source_authentication": "not_modeled"
+  },
+  "expected_known_answer": {
+    "unique_event_count": 22,
+    "exact_redelivery_count": 0,
+    "replay_event_ids": [
+      "EV-01-RECEIVE-FABRIC",
+      "EV-02-RECEIVE-LAYER",
+      "EV-03-RECEIVE-TRIM",
+      "EV-04-RECEIVE-UNRELATED",
+      "EV-05-RELEASE-FABRIC",
+      "EV-06-RELEASE-LAYER",
+      "EV-07-RELEASE-TRIM",
+      "EV-08-RELEASE-UNRELATED",
+      "EV-09-CUT-FABRIC",
+      "EV-10-SEW-COVERS",
+      "EV-19-UNRELATED-ASSEMBLY",
+      "EV-20-UNRELATED-QA",
+      "EV-21-UNRELATED-PACK",
+      "EV-11-ASSEMBLE-A",
+      "EV-12-ASSEMBLE-B",
+      "EV-13-FINAL-QA-A",
+      "EV-14-FINAL-QA-B",
+      "EV-15-PACK-A",
+      "EV-16-PACK-B",
+      "EV-17-DISPATCH-A",
+      "EV-18-DISPATCH-B",
+      "EV-22-UNRELATED-DISPATCH"
+    ]
+  },
+  "events": [
+    {
+      "event_id": "EV-22-UNRELATED-DISPATCH",
+      "event_type": "dispatch",
+      "event_time_utc": "2026-10-18T10:35:00Z",
+      "recorded_at_utc": "2026-10-18T10:35:10Z",
+      "ingested_at_utc": "2026-10-18T12:00:00Z",
+      "location_id": "SYNTHETIC-MICROFACTORY-01",
+      "actor_id": "SYNTHETIC-ACTOR-CELL-01",
+      "business_step": "shipping",
+      "disposition": "dispatched_for_synthetic_fixture",
+      "source_revision": "SYNTHETIC-EVENT-CONTRACT-V0.1",
+      "evidence_status": "synthetic_only",
+      "payload_digest_status": "not_computed",
+      "subject_ids": [
+        "SYN-UNRELATED-PACKED-CONTROL"
+      ],
+      "input_ids": [],
+      "output_ids": [],
+      "caused_by": [
+        "EV-21-UNRELATED-PACK"
+      ]
+    },
+    {
+      "event_id": "EV-18-DISPATCH-B",
+      "event_type": "dispatch",
+      "event_time_utc": "2026-10-18T10:31:00Z",
+      "recorded_at_utc": "2026-10-18T10:31:10Z",
+      "ingested_at_utc": "2026-10-18T12:01:00Z",
+      "location_id": "SYNTHETIC-MICROFACTORY-01",
+      "actor_id": "SYNTHETIC-ACTOR-CELL-01",
+      "business_step": "shipping",
+      "disposition": "dispatched_for_synthetic_fixture",
+      "source_revision": "SYNTHETIC-EVENT-CONTRACT-V0.1",
+      "evidence_status": "synthetic_only",
+      "payload_digest_status": "not_computed",
+      "subject_ids": [
+        "SYN-UNIT-PACKED-B"
+      ],
+      "input_ids": [],
+      "output_ids": [],
+      "caused_by": [
+        "EV-16-PACK-B"
+      ]
+    },
+    {
+      "event_id": "EV-17-DISPATCH-A",
+      "event_type": "dispatch",
+      "event_time_utc": "2026-10-18T10:30:00Z",
+      "recorded_at_utc": "2026-10-18T10:30:10Z",
+      "ingested_at_utc": "2026-10-18T12:02:00Z",
+      "location_id": "SYNTHETIC-MICROFACTORY-01",
+      "actor_id": "SYNTHETIC-ACTOR-CELL-01",
+      "business_step": "shipping",
+      "disposition": "dispatched_for_synthetic_fixture",
+      "source_revision": "SYNTHETIC-EVENT-CONTRACT-V0.1",
+      "evidence_status": "synthetic_only",
+      "payload_digest_status": "not_computed",
+      "subject_ids": [
+        "SYN-UNIT-PACKED-A"
+      ],
+      "input_ids": [],
+      "output_ids": [],
+      "caused_by": [
+        "EV-15-PACK-A"
+      ]
+    },
+    {
+      "event_id": "EV-16-PACK-B",
+      "event_type": "packaging",
+      "event_time_utc": "2026-10-18T10:01:00Z",
+      "recorded_at_utc": "2026-10-18T10:01:10Z",
+      "ingested_at_utc": "2026-10-18T12:03:00Z",
+      "location_id": "SYNTHETIC-MICROFACTORY-01",
+      "actor_id": "SYNTHETIC-ACTOR-CELL-01",
+      "business_step": "packing",
+      "disposition": "packaged_for_synthetic_fixture",
+      "source_revision": "SYNTHETIC-EVENT-CONTRACT-V0.1",
+      "evidence_status": "synthetic_only",
+      "payload_digest_status": "not_computed",
+      "subject_ids": [],
+      "input_ids": [
+        "SYN-ARTICLE-ACCEPTED-B"
+      ],
+      "output_ids": [
+        "SYN-UNIT-PACKED-B"
+      ],
+      "caused_by": [
+        "EV-14-FINAL-QA-B"
+      ],
+      "operation_id": "OP-70-PACK"
+    },
+    {
+      "event_id": "EV-15-PACK-A",
+      "event_type": "packaging",
+      "event_time_utc": "2026-10-18T10:00:00Z",
+      "recorded_at_utc": "2026-10-18T10:00:10Z",
+      "ingested_at_utc": "2026-10-18T12:04:00Z",
+      "location_id": "SYNTHETIC-MICROFACTORY-01",
+      "actor_id": "SYNTHETIC-ACTOR-CELL-01",
+      "business_step": "packing",
+      "disposition": "packaged_for_synthetic_fixture",
+      "source_revision": "SYNTHETIC-EVENT-CONTRACT-V0.1",
+      "evidence_status": "synthetic_only",
+      "payload_digest_status": "not_computed",
+      "subject_ids": [],
+      "input_ids": [
+        "SYN-ARTICLE-ACCEPTED-A"
+      ],
+      "output_ids": [
+        "SYN-UNIT-PACKED-A"
+      ],
+      "caused_by": [
+        "EV-13-FINAL-QA-A"
+      ],
+      "operation_id": "OP-70-PACK"
+    },
+    {
+      "event_id": "EV-14-FINAL-QA-B",
+      "event_type": "final_inspection",
+      "event_time_utc": "2026-10-18T09:46:00Z",
+      "recorded_at_utc": "2026-10-18T09:46:10Z",
+      "ingested_at_utc": "2026-10-18T12:05:00Z",
+      "location_id": "SYNTHETIC-MICROFACTORY-01",
+      "actor_id": "SYNTHETIC-ACTOR-CELL-01",
+      "business_step": "inspection",
+      "disposition": "passed_for_synthetic_fixture",
+      "source_revision": "SYNTHETIC-EVENT-CONTRACT-V0.1",
+      "evidence_status": "synthetic_only",
+      "payload_digest_status": "not_computed",
+      "subject_ids": [],
+      "input_ids": [
+        "SYN-WIP-ASSEMBLED-TOPPER-B"
+      ],
+      "output_ids": [
+        "SYN-ARTICLE-ACCEPTED-B"
+      ],
+      "caused_by": [
+        "EV-12-ASSEMBLE-B"
+      ],
+      "operation_id": "OP-60-FINAL-QA"
+    },
+    {
+      "event_id": "EV-13-FINAL-QA-A",
+      "event_type": "final_inspection",
+      "event_time_utc": "2026-10-18T09:45:00Z",
+      "recorded_at_utc": "2026-10-18T09:45:10Z",
+      "ingested_at_utc": "2026-10-18T12:06:00Z",
+      "location_id": "SYNTHETIC-MICROFACTORY-01",
+      "actor_id": "SYNTHETIC-ACTOR-CELL-01",
+      "business_step": "inspection",
+      "disposition": "passed_for_synthetic_fixture",
+      "source_revision": "SYNTHETIC-EVENT-CONTRACT-V0.1",
+      "evidence_status": "synthetic_only",
+      "payload_digest_status": "not_computed",
+      "subject_ids": [],
+      "input_ids": [
+        "SYN-WIP-ASSEMBLED-TOPPER-A"
+      ],
+      "output_ids": [
+        "SYN-ARTICLE-ACCEPTED-A"
+      ],
+      "caused_by": [
+        "EV-11-ASSEMBLE-A"
+      ],
+      "operation_id": "OP-60-FINAL-QA"
+    },
+    {
+      "event_id": "EV-12-ASSEMBLE-B",
+      "event_type": "transformation",
+      "event_time_utc": "2026-10-18T09:31:00Z",
+      "recorded_at_utc": "2026-10-18T09:31:10Z",
+      "ingested_at_utc": "2026-10-18T12:07:00Z",
+      "location_id": "SYNTHETIC-MICROFACTORY-01",
+      "actor_id": "SYNTHETIC-ACTOR-CELL-01",
+      "business_step": "transformation",
+      "disposition": "completed",
+      "source_revision": "SYNTHETIC-EVENT-CONTRACT-V0.1",
+      "evidence_status": "synthetic_only",
+      "payload_digest_status": "not_computed",
+      "subject_ids": [],
+      "input_ids": [
+        "SYN-WIP-SEWN-COVER-B",
+        "SYN-LOT-LAYER-001",
+        "SYN-LOT-TRIM-001"
+      ],
+      "output_ids": [
+        "SYN-WIP-ASSEMBLED-TOPPER-B"
+      ],
+      "caused_by": [
+        "EV-10-SEW-COVERS",
+        "EV-06-RELEASE-LAYER",
+        "EV-07-RELEASE-TRIM"
+      ],
+      "operation_id": "OP-50-ASSEMBLE"
+    },
+    {
+      "event_id": "EV-11-ASSEMBLE-A",
+      "event_type": "transformation",
+      "event_time_utc": "2026-10-18T09:30:00Z",
+      "recorded_at_utc": "2026-10-18T09:30:10Z",
+      "ingested_at_utc": "2026-10-18T12:08:00Z",
+      "location_id": "SYNTHETIC-MICROFACTORY-01",
+      "actor_id": "SYNTHETIC-ACTOR-CELL-01",
+      "business_step": "transformation",
+      "disposition": "completed",
+      "source_revision": "SYNTHETIC-EVENT-CONTRACT-V0.1",
+      "evidence_status": "synthetic_only",
+      "payload_digest_status": "not_computed",
+      "subject_ids": [],
+      "input_ids": [
+        "SYN-WIP-SEWN-COVER-A",
+        "SYN-LOT-LAYER-001",
+        "SYN-LOT-TRIM-001"
+      ],
+      "output_ids": [
+        "SYN-WIP-ASSEMBLED-TOPPER-A"
+      ],
+      "caused_by": [
+        "EV-10-SEW-COVERS",
+        "EV-06-RELEASE-LAYER",
+        "EV-07-RELEASE-TRIM"
+      ],
+      "operation_id": "OP-50-ASSEMBLE"
+    },
+    {
+      "event_id": "EV-21-UNRELATED-PACK",
+      "event_type": "packaging",
+      "event_time_utc": "2026-10-18T09:20:00Z",
+      "recorded_at_utc": "2026-10-18T09:20:10Z",
+      "ingested_at_utc": "2026-10-18T12:09:00Z",
+      "location_id": "SYNTHETIC-MICROFACTORY-01",
+      "actor_id": "SYNTHETIC-ACTOR-CELL-01",
+      "business_step": "packing",
+      "disposition": "packaged_for_synthetic_fixture",
+      "source_revision": "SYNTHETIC-EVENT-CONTRACT-V0.1",
+      "evidence_status": "synthetic_only",
+      "payload_digest_status": "not_computed",
+      "subject_ids": [],
+      "input_ids": [
+        "SYN-UNRELATED-ARTICLE-CONTROL"
+      ],
+      "output_ids": [
+        "SYN-UNRELATED-PACKED-CONTROL"
+      ],
+      "caused_by": [
+        "EV-20-UNRELATED-QA"
+      ],
+      "operation_id": "OP-70-PACK"
+    },
+    {
+      "event_id": "EV-20-UNRELATED-QA",
+      "event_type": "final_inspection",
+      "event_time_utc": "2026-10-18T09:15:00Z",
+      "recorded_at_utc": "2026-10-18T09:15:10Z",
+      "ingested_at_utc": "2026-10-18T12:10:00Z",
+      "location_id": "SYNTHETIC-MICROFACTORY-01",
+      "actor_id": "SYNTHETIC-ACTOR-CELL-01",
+      "business_step": "inspection",
+      "disposition": "passed_for_synthetic_fixture",
+      "source_revision": "SYNTHETIC-EVENT-CONTRACT-V0.1",
+      "evidence_status": "synthetic_only",
+      "payload_digest_status": "not_computed",
+      "subject_ids": [],
+      "input_ids": [
+        "SYN-UNRELATED-ASSEMBLY-CONTROL"
+      ],
+      "output_ids": [
+        "SYN-UNRELATED-ARTICLE-CONTROL"
+      ],
+      "caused_by": [
+        "EV-19-UNRELATED-ASSEMBLY"
+      ],
+      "operation_id": "OP-60-FINAL-QA"
+    },
+    {
+      "event_id": "EV-19-UNRELATED-ASSEMBLY",
+      "event_type": "transformation",
+      "event_time_utc": "2026-10-18T09:00:00Z",
+      "recorded_at_utc": "2026-10-18T09:00:10Z",
+      "ingested_at_utc": "2026-10-18T12:11:00Z",
+      "location_id": "SYNTHETIC-MICROFACTORY-01",
+      "actor_id": "SYNTHETIC-ACTOR-CELL-01",
+      "business_step": "transformation",
+      "disposition": "completed",
+      "source_revision": "SYNTHETIC-EVENT-CONTRACT-V0.1",
+      "evidence_status": "synthetic_only",
+      "payload_digest_status": "not_computed",
+      "subject_ids": [],
+      "input_ids": [
+        "SYN-LOT-UNRELATED-099"
+      ],
+      "output_ids": [
+        "SYN-UNRELATED-ASSEMBLY-CONTROL"
+      ],
+      "caused_by": [
+        "EV-08-RELEASE-UNRELATED"
+      ],
+      "operation_id": "OP-50-ASSEMBLE"
+    },
+    {
+      "event_id": "EV-10-SEW-COVERS",
+      "event_type": "transformation",
+      "event_time_utc": "2026-10-18T09:00:00Z",
+      "recorded_at_utc": "2026-10-18T09:00:10Z",
+      "ingested_at_utc": "2026-10-18T12:12:00Z",
+      "location_id": "SYNTHETIC-MICROFACTORY-01",
+      "actor_id": "SYNTHETIC-ACTOR-CELL-01",
+      "business_step": "transformation",
+      "disposition": "completed",
+      "source_revision": "SYNTHETIC-EVENT-CONTRACT-V0.1",
+      "evidence_status": "synthetic_only",
+      "payload_digest_status": "not_computed",
+      "subject_ids": [],
+      "input_ids": [
+        "SYN-WIP-COVER-PANELS-BATCH-001"
+      ],
+      "output_ids": [
+        "SYN-WIP-SEWN-COVER-A",
+        "SYN-WIP-SEWN-COVER-B"
+      ],
+      "caused_by": [
+        "EV-09-CUT-FABRIC"
+      ],
+      "operation_id": "OP-40-SEW"
+    },
+    {
+      "event_id": "EV-09-CUT-FABRIC",
+      "event_type": "transformation",
+      "event_time_utc": "2026-10-18T08:30:00Z",
+      "recorded_at_utc": "2026-10-18T08:30:10Z",
+      "ingested_at_utc": "2026-10-18T12:13:00Z",
+      "location_id": "SYNTHETIC-MICROFACTORY-01",
+      "actor_id": "SYNTHETIC-ACTOR-CELL-01",
+      "business_step": "transformation",
+      "disposition": "completed",
+      "source_revision": "SYNTHETIC-EVENT-CONTRACT-V0.1",
+      "evidence_status": "synthetic_only",
+      "payload_digest_status": "not_computed",
+      "subject_ids": [],
+      "input_ids": [
+        "SYN-LOT-FABRIC-001"
+      ],
+      "output_ids": [
+        "SYN-WIP-COVER-PANELS-BATCH-001"
+      ],
+      "caused_by": [
+        "EV-05-RELEASE-FABRIC"
+      ],
+      "operation_id": "OP-30-CUT"
+    },
+    {
+      "event_id": "EV-08-RELEASE-UNRELATED",
+      "event_type": "inspection_disposition",
+      "event_time_utc": "2026-10-18T08:18:00Z",
+      "recorded_at_utc": "2026-10-18T08:18:10Z",
+      "ingested_at_utc": "2026-10-18T12:14:00Z",
+      "location_id": "SYNTHETIC-MICROFACTORY-01",
+      "actor_id": "SYNTHETIC-ACTOR-CELL-01",
+      "business_step": "quality_assurance",
+      "disposition": "released_for_synthetic_fixture",
+      "source_revision": "SYNTHETIC-EVENT-CONTRACT-V0.1",
+      "evidence_status": "synthetic_only",
+      "payload_digest_status": "not_computed",
+      "subject_ids": [
+        "SYN-LOT-UNRELATED-099"
+      ],
+      "input_ids": [],
+      "output_ids": [],
+      "caused_by": [
+        "EV-04-RECEIVE-UNRELATED"
+      ],
+      "operation_id": "OP-20-INCOMING-QA"
+    },
+    {
+      "event_id": "EV-07-RELEASE-TRIM",
+      "event_type": "inspection_disposition",
+      "event_time_utc": "2026-10-18T08:17:00Z",
+      "recorded_at_utc": "2026-10-18T08:17:10Z",
+      "ingested_at_utc": "2026-10-18T12:15:00Z",
+      "location_id": "SYNTHETIC-MICROFACTORY-01",
+      "actor_id": "SYNTHETIC-ACTOR-CELL-01",
+      "business_step": "quality_assurance",
+      "disposition": "released_for_synthetic_fixture",
+      "source_revision": "SYNTHETIC-EVENT-CONTRACT-V0.1",
+      "evidence_status": "synthetic_only",
+      "payload_digest_status": "not_computed",
+      "subject_ids": [
+        "SYN-LOT-TRIM-001"
+      ],
+      "input_ids": [],
+      "output_ids": [],
+      "caused_by": [
+        "EV-03-RECEIVE-TRIM"
+      ],
+      "operation_id": "OP-20-INCOMING-QA"
+    },
+    {
+      "event_id": "EV-06-RELEASE-LAYER",
+      "event_type": "inspection_disposition",
+      "event_time_utc": "2026-10-18T08:16:00Z",
+      "recorded_at_utc": "2026-10-18T08:16:10Z",
+      "ingested_at_utc": "2026-10-18T12:16:00Z",
+      "location_id": "SYNTHETIC-MICROFACTORY-01",
+      "actor_id": "SYNTHETIC-ACTOR-CELL-01",
+      "business_step": "quality_assurance",
+      "disposition": "released_for_synthetic_fixture",
+      "source_revision": "SYNTHETIC-EVENT-CONTRACT-V0.1",
+      "evidence_status": "synthetic_only",
+      "payload_digest_status": "not_computed",
+      "subject_ids": [
+        "SYN-LOT-LAYER-001"
+      ],
+      "input_ids": [],
+      "output_ids": [],
+      "caused_by": [
+        "EV-02-RECEIVE-LAYER"
+      ],
+      "operation_id": "OP-20-INCOMING-QA"
+    },
+    {
+      "event_id": "EV-05-RELEASE-FABRIC",
+      "event_type": "inspection_disposition",
+      "event_time_utc": "2026-10-18T08:15:00Z",
+      "recorded_at_utc": "2026-10-18T08:15:10Z",
+      "ingested_at_utc": "2026-10-18T12:17:00Z",
+      "location_id": "SYNTHETIC-MICROFACTORY-01",
+      "actor_id": "SYNTHETIC-ACTOR-CELL-01",
+      "business_step": "quality_assurance",
+      "disposition": "released_for_synthetic_fixture",
+      "source_revision": "SYNTHETIC-EVENT-CONTRACT-V0.1",
+      "evidence_status": "synthetic_only",
+      "payload_digest_status": "not_computed",
+      "subject_ids": [
+        "SYN-LOT-FABRIC-001"
+      ],
+      "input_ids": [],
+      "output_ids": [],
+      "caused_by": [
+        "EV-01-RECEIVE-FABRIC"
+      ],
+      "operation_id": "OP-20-INCOMING-QA"
+    },
+    {
+      "event_id": "EV-04-RECEIVE-UNRELATED",
+      "event_type": "receiving",
+      "event_time_utc": "2026-10-18T08:03:00Z",
+      "recorded_at_utc": "2026-10-18T08:03:10Z",
+      "ingested_at_utc": "2026-10-18T12:18:00Z",
+      "location_id": "SYNTHETIC-MICROFACTORY-01",
+      "actor_id": "SYNTHETIC-ACTOR-CELL-01",
+      "business_step": "receiving",
+      "disposition": "quarantined",
+      "source_revision": "SYNTHETIC-EVENT-CONTRACT-V0.1",
+      "evidence_status": "synthetic_only",
+      "payload_digest_status": "not_computed",
+      "subject_ids": [
+        "SYN-LOT-UNRELATED-099"
+      ],
+      "input_ids": [],
+      "output_ids": [],
+      "caused_by": [],
+      "operation_id": "OP-10-RECEIVE"
+    },
+    {
+      "event_id": "EV-03-RECEIVE-TRIM",
+      "event_type": "receiving",
+      "event_time_utc": "2026-10-18T08:02:00Z",
+      "recorded_at_utc": "2026-10-18T08:02:10Z",
+      "ingested_at_utc": "2026-10-18T12:19:00Z",
+      "location_id": "SYNTHETIC-MICROFACTORY-01",
+      "actor_id": "SYNTHETIC-ACTOR-CELL-01",
+      "business_step": "receiving",
+      "disposition": "quarantined",
+      "source_revision": "SYNTHETIC-EVENT-CONTRACT-V0.1",
+      "evidence_status": "synthetic_only",
+      "payload_digest_status": "not_computed",
+      "subject_ids": [
+        "SYN-LOT-TRIM-001"
+      ],
+      "input_ids": [],
+      "output_ids": [],
+      "caused_by": [],
+      "operation_id": "OP-10-RECEIVE"
+    },
+    {
+      "event_id": "EV-02-RECEIVE-LAYER",
+      "event_type": "receiving",
+      "event_time_utc": "2026-10-18T08:01:00Z",
+      "recorded_at_utc": "2026-10-18T08:01:10Z",
+      "ingested_at_utc": "2026-10-18T12:20:00Z",
+      "location_id": "SYNTHETIC-MICROFACTORY-01",
+      "actor_id": "SYNTHETIC-ACTOR-CELL-01",
+      "business_step": "receiving",
+      "disposition": "quarantined",
+      "source_revision": "SYNTHETIC-EVENT-CONTRACT-V0.1",
+      "evidence_status": "synthetic_only",
+      "payload_digest_status": "not_computed",
+      "subject_ids": [
+        "SYN-LOT-LAYER-001"
+      ],
+      "input_ids": [],
+      "output_ids": [],
+      "caused_by": [],
+      "operation_id": "OP-10-RECEIVE"
+    },
+    {
+      "event_id": "EV-01-RECEIVE-FABRIC",
+      "event_type": "receiving",
+      "event_time_utc": "2026-10-18T08:00:00Z",
+      "recorded_at_utc": "2026-10-18T08:00:10Z",
+      "ingested_at_utc": "2026-10-18T12:21:00Z",
+      "location_id": "SYNTHETIC-MICROFACTORY-01",
+      "actor_id": "SYNTHETIC-ACTOR-CELL-01",
+      "business_step": "receiving",
+      "disposition": "quarantined",
+      "source_revision": "SYNTHETIC-EVENT-CONTRACT-V0.1",
+      "evidence_status": "synthetic_only",
+      "payload_digest_status": "not_computed",
+      "subject_ids": [
+        "SYN-LOT-FABRIC-001"
+      ],
+      "input_ids": [],
+      "output_ids": [],
+      "caused_by": [],
+      "operation_id": "OP-10-RECEIVE"
+    }
+  ]
+}
