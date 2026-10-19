@@ -77,6 +77,21 @@ pub fn room_for_dialect(
             reverb_level: (base.reverb_level + 0.12).clamp(0.0, 1.0),
             ..base
         },
+        D::DroneElastic => RenderColor {
+            reverb_room: (base.reverb_room + 0.25).clamp(0.0, 1.0),
+            reverb_level: (base.reverb_level + 0.16).clamp(0.0, 1.0),
+            ..base
+        },
+        D::DramaticTiming => RenderColor {
+            reverb_room: (base.reverb_room + 0.12).clamp(0.0, 1.0),
+            reverb_level: (base.reverb_level + 0.08).clamp(0.0, 1.0),
+            ..base
+        },
+        D::ChoralBlend => RenderColor {
+            reverb_room: (base.reverb_room + 0.22).clamp(0.0, 1.0),
+            reverb_level: (base.reverb_level + 0.14).clamp(0.0, 1.0),
+            ..base
+        },
         D::DanceLocked | D::JazzLaidBack => RenderColor {
             reverb_room: (base.reverb_room - 0.12).max(0.0),
             reverb_level: (base.reverb_level * 0.75).clamp(0.0, 1.0),
@@ -304,8 +319,15 @@ mod tests {
         }
         // Process music: a larger, wetter space.
         let process = room_for_dialect(base, D::ProcessExact);
+        let drone = room_for_dialect(base, D::DroneElastic);
+        let drama = room_for_dialect(base, D::DramaticTiming);
+        let choir = room_for_dialect(base, D::ChoralBlend);
         assert!(process.reverb_room > base.reverb_room);
         assert!(process.reverb_level > base.reverb_level);
+        assert!(drone.reverb_room > process.reverb_room);
+        assert!(drone.reverb_level > process.reverb_level);
+        assert!(drama.reverb_room > base.reverb_room);
+        assert!(choir.reverb_room > base.reverb_room);
         // Groove dialects: drier and closer.
         for d in [D::DanceLocked, D::JazzLaidBack] {
             let dry = room_for_dialect(base, d);
