@@ -328,8 +328,8 @@ mod tests {
     #[test]
     fn duplicate_stream_binding_fails_closed() {
         let (trace, assessment, mut binding) = valid_inputs();
-        binding["ingredient_stream_bindings"][1]["stream_id"] =
-            binding["ingredient_stream_bindings"][0]["stream_id"].clone();
+        let first_stream_id = binding["ingredient_stream_bindings"][0]["stream_id"].clone();
+        binding["ingredient_stream_bindings"][1]["stream_id"] = first_stream_id;
         assert!(validate_nutrient_process_binding_v1(&trace, &assessment, &binding).is_err());
     }
 
