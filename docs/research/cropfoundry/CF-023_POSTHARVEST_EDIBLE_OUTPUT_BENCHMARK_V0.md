@@ -16,6 +16,23 @@ Evidence quality is a major part of the problem. A 2025 review of food-loss data
 
 No workbook has been downloaded, parsed, hashed or scored by this workstream. Before use, verify per-file license/access terms, workbook schema, units, batches, replicate counts, intervention assignment, measurement timing, mass balance and exclusion/missingness rules. A paper summary or a visible landing page is not a substitute for the underlying row-level observations or proof of causal identification. Findings in the Uganda study are not evidence of efficacy in South Africa.
 
+## Local mass-balance audit prototype
+
+A local audit command is now being added for CSVs that have already been legitimately acquired and whose source/terms are known. It is intentionally separate from model training:
+
+```bash
+cargo run -q -p xtask -- cropfoundry-postharvest-audit \
+  --input /path/to/postharvest-lot-stages.csv \
+  --source-id DS-014 \
+  --source-uri https://zenodo.org/records/15856413 \
+  --delimiter ';' \
+  --out reports/cropfoundry/postharvest-mass-balance.json
+```
+
+The v0 profile expects one row per lot × stage × replicate × measurement time, a non-empty measurement method, and mass values explicitly labelled in kilograms. Each row must account for input mass across non-overlapping marketable output, edible discard, inedible removed fraction, moisture loss and handling loss. A caller can set absolute and relative closure tolerances; defaults are 0.02 kg and 1% of input mass. The command emits per-row residuals, marketable-mass fraction, source/file SHA-256, duplicate-key and schema findings, and a JSON receipt even when checks fail. It exits nonzero for structural or mass-balance failures.
+
+This profile deliberately does not model added wash water, packaging, coatings, gas exchange, or other inputs. Data with such flows need a different balance schema rather than forcing it into this profile. Mass-balance closure is a data-accounting check, **not** a validation of freshness, food safety, biological quality, nutritional retention, or causal effect. The receipt always records training authorization and safety validation as false.
+
 ## Evaluation contract
 
 1. **Define the accounting boundary.** For each produce lot, record mass at harvest, after handling, after storage, on arrival, saleable/marketable mass, edible discards, inedible fractions, and the reason for each loss. Avoid double-counting dehydration, sorting rejection and spoilage. Every quantity needs a unit, scale, timepoint and measurement method.
