@@ -30,24 +30,19 @@
       "minLength": 1
     },
     "concentration_mg_per_kg": {
-      "type": [
-        "number",
-        "null"
-      ],
+      "type": "number",
       "minimum": 0
     },
     "concentration_mass_basis": {
       "enum": [
         "fresh_edible_mass",
-        "dry_edible_mass",
-        null
+        "dry_edible_mass"
       ]
     },
     "concentration_stage": {
       "enum": [
         "measured_at_serving",
-        "measured_before_preparation",
-        null
+        "measured_before_preparation"
       ]
     },
     "concentration_provenance": {
@@ -58,10 +53,7 @@
       ]
     },
     "concentration_evidence_uri": {
-      "type": [
-        "string",
-        "null"
-      ],
+      "type": "string",
       "minLength": 1
     },
     "assay_method": {
@@ -86,17 +78,13 @@
       "minimum": 0
     },
     "edible_mass_kg_at_concentration_stage": {
-      "type": [
-        "number",
-        "null"
-      ],
+      "type": "number",
       "exclusiveMinimum": 0
     },
     "edible_mass_basis_at_concentration_stage": {
       "enum": [
         "fresh_edible_mass",
-        "dry_edible_mass",
-        null
+        "dry_edible_mass"
       ]
     },
     "edible_mass_lower_kg_at_concentration_stage": {
@@ -331,42 +319,82 @@
           {
             "required": [
               "concentration_lower_mg_per_kg"
-            ]
+            ],
+            "properties": {
+              "concentration_lower_mg_per_kg": {
+                "type": "number"
+              }
+            }
           },
           {
             "required": [
               "concentration_upper_mg_per_kg"
-            ]
+            ],
+            "properties": {
+              "concentration_upper_mg_per_kg": {
+                "type": "number"
+              }
+            }
           },
           {
             "required": [
               "edible_mass_lower_kg_at_concentration_stage"
-            ]
+            ],
+            "properties": {
+              "edible_mass_lower_kg_at_concentration_stage": {
+                "type": "number"
+              }
+            }
           },
           {
             "required": [
               "edible_mass_upper_kg_at_concentration_stage"
-            ]
+            ],
+            "properties": {
+              "edible_mass_upper_kg_at_concentration_stage": {
+                "type": "number"
+              }
+            }
           },
           {
             "required": [
               "retention_lower_fraction"
-            ]
+            ],
+            "properties": {
+              "retention_lower_fraction": {
+                "type": "number"
+              }
+            }
           },
           {
             "required": [
               "retention_upper_fraction"
-            ]
+            ],
+            "properties": {
+              "retention_upper_fraction": {
+                "type": "number"
+              }
+            }
           },
           {
             "required": [
               "bioavailability_lower_fraction"
-            ]
+            ],
+            "properties": {
+              "bioavailability_lower_fraction": {
+                "type": "number"
+              }
+            }
           },
           {
             "required": [
               "bioavailability_upper_fraction"
-            ]
+            ],
+            "properties": {
+              "bioavailability_upper_fraction": {
+                "type": "number"
+              }
+            }
           }
         ]
       },
