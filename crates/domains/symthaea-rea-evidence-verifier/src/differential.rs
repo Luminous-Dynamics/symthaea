@@ -329,6 +329,14 @@ pub fn score_case(oracle: &OracleCase, observed: &Observation) -> Result<Scoreca
         .saturating_add(ambiguous_bytes)
         .saturating_add(unexplained_bytes)
         .saturating_add(overlapping_accounting_bytes);
+    if unexplained_bytes > 0 {
+        reasons.push(format!("{unexplained_bytes} source bytes are not accounted for by any span"));
+    }
+    if unknown_bytes > 0 || unsupported_bytes > 0 || ambiguous_bytes > 0 {
+        reasons.push(format!(
+            "unresolved byte classes: unknown={unknown_bytes}, unsupported={unsupported_bytes}, ambiguous={ambiguous_bytes}"
+        ));
+    }
     if observed.complete_extraction_claim && unresolved_bytes > 0 {
         reasons.push(format!(
             "complete-extraction claim rejected with {unresolved_bytes} unresolved/double-accounted bytes"
