@@ -192,7 +192,7 @@ struct CsvInventory {
     claim_ceiling: &'static str,
 }
 
-#[derive(Debug, Clone, Deserialize)]
+#[derive(Debug, Clone, Deserialize, Serialize)]
 #[serde(deny_unknown_fields)]
 struct CsvMappingSpec {
     schema_version: String,
@@ -201,7 +201,7 @@ struct CsvMappingSpec {
     columns: Vec<CsvColumnMapping>,
 }
 
-#[derive(Debug, Clone, Deserialize)]
+#[derive(Debug, Clone, Deserialize, Serialize)]
 #[serde(deny_unknown_fields)]
 struct CsvColumnMapping {
     source_header: String,
