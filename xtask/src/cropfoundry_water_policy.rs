@@ -841,8 +841,7 @@ mod tests {
                 .results
                 .iter()
                 .find(|result| {
-                    result.scenario_id == scenario.id
-                        && result.policy == WATER_MATCHED_POLICY_NAME
+                    result.scenario_id == scenario.id && result.policy == WATER_MATCHED_POLICY_NAME
                 })
                 .unwrap();
             assert_eq!(
@@ -855,7 +854,10 @@ mod tests {
                     .relative_stress_change_vs_matched_water_equal_share_pct
                     .is_none()
             );
-            assert!(risk.relative_stress_change_vs_matched_water_equal_share_pct.is_some());
+            assert!(
+                risk.relative_stress_change_vs_matched_water_equal_share_pct
+                    .is_some()
+            );
             assert!(
                 matched.plot_allocation_dispersion_plot_mm
                     <= risk.plot_allocation_dispersion_plot_mm
