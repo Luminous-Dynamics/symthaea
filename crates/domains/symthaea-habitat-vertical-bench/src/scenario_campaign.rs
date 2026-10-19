@@ -485,7 +485,7 @@ fn validate_scorecard(
         if hypothesis
             .get("target_direction")
             .and_then(Value::as_str)
-            .is_none_or(|text| !text.contains("10 percent"))
+            .is_none_or(|text| !(text.contains("10 percent") || text.contains("10_percent")))
         {
             push(
                 issues,
