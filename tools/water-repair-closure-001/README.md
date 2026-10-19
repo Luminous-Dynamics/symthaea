@@ -33,11 +33,11 @@ cargo run --manifest-path tools/water-repair-closure-001/Cargo.toml -- \
 
 The CLI compares every computed result against the independent oracle. Mismatches yield a non-zero exit and a receipt marked Failed. A 40-character lowercase exact revision yields PassedExactHead only when every case matches. An unpinned local run is labelled PassedLocalOracle rather than masquerading as exact-head evidence.
 
-The receipt binds the raw input and oracle bytes with SHA-256. That proves which bytes were evaluated, not that an assertion or any source observation is true. The exact implementation SHA is supplied by the invoking environment; it is trustworthy only when captured by the actual execution wrapper or CI.
+The receipt binds the raw input and oracle bytes with SHA-256. Each synthetic event also carries a payload and a SHA-256 which the Rust input validator recomputes; changing the payload without updating its digest fails validation. This proves byte identity, not that an assertion or any source observation is true. The exact implementation SHA is supplied by the invoking environment; it is trustworthy only when captured by the actual execution wrapper or CI.
 
 ## Frozen behavior
 
-The evaluator enforces ordering-sensitive safety semantics: content conflicts and privacy violations reject; absent authorization rejects while expired/revoked/out-of-scope authorization blocks; asset mismatch blocks; missing/simulated observations remain incomplete; stale/unqualified/wide-uncertainty measurements remain indeterminate; missing quality clearance blocks a required quality profile; part/media qualification, commissioning, common-mode redundancy, residual disposition and service outcomes are independently gated.
+The evaluator enforces ordering-sensitive safety semantics: content conflicts and privacy violations reject; absent authorization rejects while expired/revoked/out-of-scope authorization blocks; asset mismatch blocks; missing/simulated observations remain incomplete; stale/unqualified/wide-uncertainty measurements remain indeterminate; missing quality clearance blocks a required quality profile; part/media qualification, commissioning, common-mode redundancy, residual disposition and service outcomes are independently gated. Only VerifiedWithinProfile may report one domain effect; every blocked, incomplete, indeterminate or rejected result reports zero.
 
 The oracle is intentionally checked by tests but is never read by evaluate_case. Do not add expected dispositions to each input fixture. New cases require an independently reviewed input plus oracle row and an explicit schema/corpus version decision.
 
