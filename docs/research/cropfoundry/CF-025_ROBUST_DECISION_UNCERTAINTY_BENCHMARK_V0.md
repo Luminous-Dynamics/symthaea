@@ -79,9 +79,15 @@ For each policy, the receipt reports mean and median synthetic stress, nearest-r
 
 The preference sweep is deliberately transparent, but each weighted score encodes normative trade-offs. A lower water-use objective can inadvertently reward under-irrigation; therefore it is always paired with stress/tail/worst-zone burden and hard constraints, and even a top rank is **not** an agronomic recommendation. Pareto dominance means only that another declared policy is no worse on every one of these five synthetic objectives and strictly better on at least one; omitted objectives may reverse the comparison.
 
+## Fixed robustness sensitivity lattice v0
+
+The robust-policy executable creates 30 fully specified scenario records and executes all five irrigation policies on each record. The original six CF-022 base scenarios remain unchanged and the extra 24 cases expand the same simulator across one-factor and compound changes. Scenario IDs are unique; each policy must appear once for every scenario; the matched-uniform control must preserve the risk-aware policy's per-day dose trace. Water-budget and per-plot actuator violations are hard failures.
+
+This makes the upper-tail metric more informative as a **designed stress-test summary**: for (N=30), the 5% tail includes two ordered scenario scores. The tail sample count is emitted per policy and a negative control should catch changed/missing scenario sets even when row counts happen to match. These 30 cases are not independent draws from weather/climate distributions, and giving each equal weight is a sensitivity convention, not a calibrated probability measure. A field-risk probability needs source-backed joint uncertainty, a defensible distribution/weighting method and held-out empirical validation.
+
 ## Current CropFoundry status
 
-CF-022's five-policy irrigation harness is a useful starting point: it already includes water caps, per-plot actuator limits, per-zone stress, a dose-matched hindsight comparator, and a greedy minimax heuristic. Receipt v2 also corrected a starvation-scoring blind spot and exposes the count of scenarios contributing to its worst-to-best ratio. This is not yet a robust optimization benchmark: it uses a small deterministic synthetic suite, not a calibrated joint uncertainty distribution. CF-025 adds the next gate: scenario sensitivity and preference stability first; calibrated uncertainty and chance constraints only when defensible data exist.
+CF-022's five-policy irrigation harness includes water caps, per-plot actuator limits, per-zone stress, a dose-matched rotating-uniform counterfactual, and a greedy minimax heuristic. Receipt v2 corrected a starvation-scoring blind spot and exposes worst-zone and allocation-distribution metrics. CF-025 now uses the same policy implementations on a 30-case fixed sensitivity lattice rather than reusing the six base scenarios alone. A code-level feasibility pass means all 30 × 5 policy/scenario pairs meet the synthetic water and actuator bounds; it does not validate physical actuators, agronomy or risk probabilities. The next gate remains calibrated joint uncertainty and held-out outcomes before any chance-constraint or field-risk claim.
 
 ## Integration and claim limits
 
