@@ -16,11 +16,26 @@ These papers do not establish that CropFoundry can improve dietary outcomes. The
 
 ## Objective and constraints
 
-For nutrient (n), a transparent accounting quantity is:
+For nutrient `n`, first align the mass with the stage where the concentration was measured:
 
-`delivered\_mass_n = edible\_mass\_at\_serving \times measured\_concentration_n \times documented\_retention_n`
+```text
+nutrient_mass_at_assay_stage_mg =
+  concentration_mg_per_kg * edible_mass_kg_at_concentration_stage
 
-A further bioavailability adjustment can only be used where its factor, source, applicability, and uncertainty are explicitly declared. It must not be silently applied as if it were directly measured.
+if concentration_stage == measured_at_serving:
+  delivered_nutrient_mass_mg = nutrient_mass_at_assay_stage_mg
+  # a retention factor is not applied; the assay already represents the served state
+
+if concentration_stage == measured_before_preparation:
+  delivered_nutrient_mass_mg =
+    nutrient_mass_at_assay_stage_mg * documented_retention_fraction
+  # retention factor and its evidence are required
+
+nutrient_mg_per_serving =
+  delivered_nutrient_mass_mg / explicitly_declared_servings_in_batch
+```
+
+A further bioavailability adjustment can only be used where its factor, source, applicability, and uncertainty are explicitly declared. It must not be silently applied as if it were directly measured. Retention is applied to nutrient mass from the assay-stage edible mass; do not multiply a pre-preparation concentration by a post-preparation mass. Batch-level delivered mass and per-serving delivered mass are separate outputs.
 
 The objective should be a vector before it becomes a scalar: amounts delivered for each declared nutrient, target-requirement coverage for each defined population group, dietary diversity, edible-serving count, cost, water, land, energy, labor and uncertainty. Hard constraints include food-safety gates, resource caps, and any predeclared upper intake limits. Missing nutrient assays are **unknown**, not zero and not imputed from a neighboring crop. Literature factors and modeled quantities stay visibly separate from direct measurements.
 
@@ -37,7 +52,7 @@ cargo run -q -p xtask -- cropfoundry-nutrition-accounting \
 cargo test -p xtask cropfoundry_nutrition
 ```
 
-The input schema distinguishes concentration measured at serving from concentration measured before preparation. Pre-preparation values require an explicit retention fraction and a separate evidence URI. Fresh-edible and dry-edible mass bases must match. Bioavailability is calculated only when an explicit factor and its own evidence URI are provided; unknown factors remain unknown. Direct assays require a method, evidence URI and source artifact digest. The receipt retains the exact input snapshot and its SHA-256, keeps literature/model estimates separate from direct assays, and reports nutrient mass per water, land, energy and currency units only when those resource measurements exist.
+The input schema requires the edible mass to correspond to the exact stage of the concentration assay, distinguishes fresh-edible from dry-edible mass basis, and rejects a mismatched basis. Concentration measured before preparation requires an explicit retention fraction and a separate evidence URI. Batch-level nutrient delivery is distinct from per-serving mass, which is only reported when a serving count is explicitly supplied. Bioavailability is calculated only when an explicit factor and its own evidence URI are provided; unknown factors remain unknown. Direct assays require a method, evidence URI and source artifact digest. The receipt retains the exact input snapshot and its SHA-256, keeps literature/model estimates separate from direct assays, and reports nutrient mass per water, land, energy and currency units only when those resource measurements exist.
 
 The prototype is a calculator and provenance-contract test, not a validated nutrition model. Its synthetic CI fixture uses invented values only to exercise the implementation; it cannot establish a crop nutrient value, nutrient adequacy, health outcome, food safety or farm recommendation.
 
