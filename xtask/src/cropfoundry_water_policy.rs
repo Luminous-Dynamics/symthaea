@@ -529,8 +529,14 @@ fn build_receipt() -> Result<WaterPolicyReceipt> {
         !result.stress_exposure_proxy.is_finite()
             || !result.total_irrigation_applied_plot_mm.is_finite()
             || !result.plot_allocation_dispersion_plot_mm.is_finite()
-            || !result.zone_stress_exposure_proxy.iter().all(|value| value.is_finite())
-            || !result.zone_irrigation_applied_plot_mm.iter().all(|value| value.is_finite())
+            || !result
+                .zone_stress_exposure_proxy
+                .iter()
+                .all(|value| value.is_finite())
+            || !result
+                .zone_irrigation_applied_plot_mm
+                .iter()
+                .all(|value| value.is_finite())
             || !result.max_zone_stress_exposure_proxy.is_finite()
             || !result.min_zone_stress_exposure_proxy.is_finite()
             || !result.sensor_dropout_fraction.is_finite()
@@ -550,13 +556,16 @@ fn build_receipt() -> Result<WaterPolicyReceipt> {
         training_authorized: false,
         scenario_count: all_scenarios.len(),
         policy_count: policies.len(),
-        invariant_summary: "Zero cap violations; synthetic proxy, not a plant model; per-zone burden is reported.".to_owned(),
+        invariant_summary:
+            "Zero cap violations; synthetic proxy, not a plant model; per-zone burden is reported."
+                .to_owned(),
         aggregates,
         results,
         caveats: vec![
             "Scenario traces and parameters are illustrative synthetic assumptions.".to_owned(),
             "The stress proxy is not calibrated to a crop or farm economics.".to_owned(),
-            "Aggregate scores hide uneven burdens; inspect per-plot stress and irrigation.".to_owned(),
+            "Aggregate scores hide uneven burdens; inspect per-plot stress and irrigation."
+                .to_owned(),
             "Lower scores do not establish field water savings or yield gains.".to_owned(),
             "This tests deterministic execution and hard water accounting only.".to_owned(),
             "Field use requires calibration, farmer review, and replicated trials.".to_owned(),
@@ -601,7 +610,10 @@ mod tests {
     #[test]
     fn cropfoundry_water_policy_has_all_expected_scenarios_and_baselines() {
         let receipt = build_receipt().unwrap();
-        assert_eq!(receipt.schema_version, "cropfoundry-water-policy-receipt-v1");
+        assert_eq!(
+            receipt.schema_version,
+            "cropfoundry-water-policy-receipt-v1"
+        );
         assert_eq!(receipt.benchmark_id, "CF-022");
         assert_eq!(receipt.scenario_count, 6);
         assert_eq!(receipt.policy_count, 3);
@@ -774,8 +786,18 @@ mod tests {
             let zone_irrigation_sum = result.zone_irrigation_applied_plot_mm.iter().sum::<f64>();
             assert!((zone_stress_sum - result.stress_exposure_proxy).abs() <= 0.01);
             assert!((zone_irrigation_sum - result.total_irrigation_applied_plot_mm).abs() <= 0.01);
-            assert!(result.zone_stress_exposure_proxy.iter().all(|value| *value >= 0.0));
-            assert!(result.zone_irrigation_applied_plot_mm.iter().all(|value| *value >= 0.0));
+            assert!(
+                result
+                    .zone_stress_exposure_proxy
+                    .iter()
+                    .all(|value| *value >= 0.0)
+            );
+            assert!(
+                result
+                    .zone_irrigation_applied_plot_mm
+                    .iter()
+                    .all(|value| *value >= 0.0)
+            );
             assert!(
                 result.max_zone_stress_exposure_proxy
                     >= result.min_zone_stress_exposure_proxy
