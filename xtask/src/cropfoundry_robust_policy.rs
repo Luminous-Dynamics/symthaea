@@ -3,7 +3,7 @@ use serde::Serialize;
 use std::collections::BTreeMap;
 
 use crate::cropfoundry_water_policy::{
-    ScenarioResult, build_receipt as build_receipt_water_policy,
+    ScenarioResult, robustness_scenarios, simulate_policy_suite,
 };
 
 const TAIL_FRACTION_95: f64 = 0.05;
@@ -373,22 +373,33 @@ fn build_preference_sweep(scores: &[PolicyRobustnessScore]) -> Vec<PreferenceRan
 }
 
 fn build_receipt() -> Result<RobustPolicyReceipt> {
-    let base = build_receipt_water_policy()?;
-    if base.scenario_count != 6 || base.policy_count != 5 {
+    let scenarios = robustness_scenarios();
+    if scenarios.len() != 30 {
         return Err(anyhow!(
-            "robust-policy receipt expected 6 scenarios x 5 policies; received {} x {}",
-            base.scenario_count,
-            base.policy_count
+            "robust-policy evaluator expected 30 declared sensitivity cases, received {}",
+            scenarios.len()
         ));
     }
-    let scores = build_policy_scores(&base.results)?;
-    if scores.len() != base.policy_count
+    let results = simulate_policy_suite(&scenarios)?;
+    let policy_count = results
+        .iter()
+        .map(|result| result.policy.as_str())
+        .collect::<std::collections::BTreeSet<_>>()
+        .len();
+    if policy_count != 5 || results.len() != scenarios.len() * policy_count {
+        return Err(anyhow!(
+            "robust-policy evaluator expected 30 scenarios x 5 policies, received {} rows across {policy_count} policies",
+            results.len()
+        ));
+    }
+    let scores = build_policy_scores(&results)?;
+    if scores.len() != policy_count
         || scores
             .iter()
-            .any(|score| score.scenario_count != base.scenario_count)
+            .any(|score| score.scenario_count != scenarios.len())
     {
         return Err(anyhow!(
-            "robust-policy aggregation did not preserve the base policy/scenario cardinalities"
+            "robust-policy aggregation did not preserve the sensitivity-suite cardinalities"
         ));
     }
     let preference_sweep = build_preference_sweep(&scores);
@@ -423,8 +434,8 @@ fn build_receipt() -> Result<RobustPolicyReceipt> {
         calibrated_probability_claim: false,
         biological_performance_claim: false,
         training_authorized: false,
-        scenario_count: base.scenario_count,
-        policy_count: base.policy_count,
+        scenario_count: scenarios.len(),
+        policy_count,
         robustness_objectives: vec![
             "mean synthetic stress exposure".to_owned(),
             "nearest-rank 95th percentile and upper-tail mean".to_owned(),
@@ -434,12 +445,12 @@ fn build_receipt() -> Result<RobustPolicyReceipt> {
         ],
         preference_count: preference_sweep.len(),
         distinct_top_ranked_policy_count,
-        hard_constraint_summary: "Every base policy/scenario result has zero daily water-budget and per-plot actuator-limit violations; this is a code-level synthetic invariant only.".to_owned(),
+        hard_constraint_summary: "All 30 sensitivity scenarios x 5 policies were re-simulated; every result has zero daily water-budget and per-plot actuator-limit violations. This is a code-level synthetic invariant only.".to_owned(),
         policies: scores,
         preference_sweep,
         caveats: vec![
             "All scenario parameters and objective values are synthetic; no plant, soil or farm is modelled.".to_owned(),
-            "With six scenario values, the nearest-rank p95 and CVaR95 both use only the single worst scenario; they are diagnostics, not calibrated probability estimates.".to_owned(),
+            "The 30-case lattice gives the empirical CVaR95 two upper-tail scenario samples. Cases are fixed sensitivity points, not a random or calibrated probability sample; p95/CVaR95 remain diagnostics, not estimates of field-outcome probabilities.".to_owned(),
             "The per-scenario best policy used for regret is a hindsight oracle diagnostic and is not available prospectively.".to_owned(),
             "Normalized weighted rankings are a declared preference-sensitivity demonstration, not an objectively correct recommendation.".to_owned(),
             "Pareto dominance only applies to these five declared synthetic objectives; omitted constraints or objectives can change conclusions.".to_owned(),
@@ -487,7 +498,7 @@ mod tests {
         assert_eq!(first, second);
         let receipt = build_receipt().unwrap();
         assert_eq!(receipt.benchmark_id, "CF-025");
-        assert_eq!(receipt.scenario_count, 6);
+        assert_eq!(receipt.scenario_count, 30);
         assert_eq!(receipt.policy_count, 5);
         assert_eq!(receipt.preference_count, 4);
         assert!(!receipt.calibrated_probability_claim);
@@ -496,18 +507,19 @@ mod tests {
     }
 
     #[test]
-    fn robust_policy_tail_sample_count_is_explicit_for_six_scenarios() {
+    fn robust_policy_tail_sample_count_uses_two_of_thirty_sensitivity_cases() {
         let receipt = build_receipt().unwrap();
         assert!(
             receipt
                 .policies
                 .iter()
-                .all(|policy| policy.tail_sample_count == 1)
+                .all(|policy| policy.tail_sample_count == 2)
         );
         assert!(receipt.policies.iter().all(|policy| {
-            (policy.cvar95_stress_exposure_proxy - policy.p95_stress_exposure_proxy_nearest_rank)
-                .abs()
-                <= 1e-9
+            policy.cvar95_stress_exposure_proxy.is_finite()
+                && policy.p95_stress_exposure_proxy_nearest_rank.is_finite()
+                && policy.cvar95_stress_exposure_proxy
+                    >= policy.p95_stress_exposure_proxy_nearest_rank - 1e-9
         }));
     }
 
