@@ -122,6 +122,18 @@ sem_mutated=$(awk '{print $1}' "$OUT/run-mutated/semantic-projection.sha256")
 raw_a=$(awk '{print $1}' "$OUT/run-a/raw-report.sha256")
 raw_b=$(awk '{print $1}' "$OUT/run-b/raw-report.sha256")
 raw_mutated=$(awk '{print $1}' "$OUT/run-mutated/raw-report.sha256")
+provider_metamorphic_receipt="$OUT/provider-metamorphic-receipt.json"
+if ! sh "$ROOT/provider-metamorphic-sweep.sh" "$OUT/run-a/raw-report.json" "$OUT/run-a" "$sem_a" "$provider_metamorphic_receipt" > "$OUT/provider-metamorphic.log" 2>&1; then
+  cat "$OUT/provider-metamorphic.log" >&2
+  fail "actual-provider metamorphic sweep failed"
+fi
+cat "$OUT/provider-metamorphic.log"
+provider_metamorphic_sha=$(sha256sum "$provider_metamorphic_receipt" | awk '{print $1}')
+provider_metamorphic_count=$(jq -er '.equivalent_variants' "$provider_metamorphic_receipt")
+provider_metamorphic_sem=$(jq -er '.semantic_projection_sha256' "$provider_metamorphic_receipt")
+[ "$provider_metamorphic_count" -eq 64 ] || fail "actual-provider metamorphic sweep did not execute 64 variants"
+[ "$provider_metamorphic_sem" = "$sem_a" ] || fail "actual-provider metamorphic digest diverged from run-a"
+
 jq -n \
   --arg benchmark "ENG-REA-005-REAL-PROVIDER" \
   --arg provider_version "$version" \
@@ -144,17 +156,21 @@ jq -n \
   --arg raw_report_sha256_mutated "$raw_mutated" \
   --arg semantic_projection_sha256 "$sem_a" \
   --arg mutated_semantic_projection_sha256 "$sem_mutated" \
-  '{benchmark:$benchmark,source:{head_sha:$source_head_sha,checkout_commit_sha:$checkout_commit_sha,workflow_event_sha:$workflow_event_sha,normalizer_sha256:$normalizer_sha256,cases_manifest_sha256:$cases_manifest_sha256,oracle_sha256:$oracle_sha256},provider_version:$provider_version,executable_path:$executable_path,executable_sha256:$executable_sha256,python_version:$python_version,pip_freeze_sha256:$pip_freeze_sha256,fixture_input_sha256:$fixture_sha256,mutated_fixture_input_sha256:$mutated_fixture_sha256,expected_payload_sha256:$expected_payload_sha256,mutated_expected_payload_sha256:$mutated_payload_sha256,raw_report_sha256:{run_a:$raw_report_sha256_run_a,run_b:$raw_report_sha256_run_b,run_mutated:$raw_report_sha256_mutated},semantic_projection_sha256:{equivalent_runs:$semantic_projection_sha256,semantic_mutation:$mutated_semantic_projection_sha256},claims_ceiling:"Pinned Unblob CLI on owned inert nested gzip/tar/text fixtures only; no REA, recovered firmware execution, emulator, or hardware qualification."}' > "$OUT/receipt.json"
+  --arg provider_metamorphic_receipt_sha256 "$provider_metamorphic_sha" \
+  --argjson provider_metamorphic_variant_count "$provider_metamorphic_count" \
+  --arg provider_metamorphic_semantic_sha256 "$provider_metamorphic_sem" \
+  '{benchmark:$benchmark,source:{head_sha:$source_head_sha,checkout_commit_sha:$checkout_commit_sha,workflow_event_sha:$workflow_event_sha,normalizer_sha256:$normalizer_sha256,cases_manifest_sha256:$cases_manifest_sha256,oracle_sha256:$oracle_sha256},provider_version:$provider_version,executable_path:$executable_path,executable_sha256:$executable_sha256,python_version:$python_version,pip_freeze_sha256:$pip_freeze_sha256,fixture_input_sha256:$fixture_sha256,mutated_fixture_input_sha256:$mutated_fixture_sha256,expected_payload_sha256:$expected_payload_sha256,mutated_expected_payload_sha256:$mutated_payload_sha256,raw_report_sha256:{run_a:$raw_report_sha256_run_a,run_b:$raw_report_sha256_run_b,run_mutated:$raw_report_sha256_mutated},semantic_projection_sha256:{equivalent_runs:$semantic_projection_sha256,semantic_mutation:$mutated_semantic_projection_sha256},provider_metamorphic:{receipt_sha256:$provider_metamorphic_receipt_sha256,equivalent_variants:$provider_metamorphic_variant_count,semantic_projection_sha256:$provider_metamorphic_semantic_sha256},claims_ceiling:"Pinned Unblob CLI on owned inert nested gzip/tar/text fixtures only; no REA, recovered firmware execution, emulator, or hardware qualification."}' > "$OUT/receipt.json"
 
-jq -e --arg source "$source_head_sha" --arg checkout "$checkout_commit_sha" --arg normalizer "$normalizer_sha" --arg cases "$cases_manifest_sha" --arg oracle "$oracle_sha" --arg raw_a "$raw_a" --arg raw_b "$raw_b" --arg raw_mutated "$raw_mutated" --arg sem "$sem_a" --arg sem_mutated "$sem_mutated" '
+jq -e --arg source "$source_head_sha" --arg checkout "$checkout_commit_sha" --arg normalizer "$normalizer_sha" --arg cases "$cases_manifest_sha" --arg oracle "$oracle_sha" --arg raw_a "$raw_a" --arg raw_b "$raw_b" --arg raw_mutated "$raw_mutated" --arg sem "$sem_a" --arg sem_mutated "$sem_mutated" --arg provider_meta_sha "$provider_metamorphic_sha" --arg provider_meta_sem "$provider_metamorphic_sem" '
   .benchmark=="ENG-REA-005-REAL-PROVIDER" and
   .source.head_sha==$source and .source.checkout_commit_sha==$checkout and
   .source.normalizer_sha256==$normalizer and .source.cases_manifest_sha256==$cases and
   .source.oracle_sha256==$oracle and
   .raw_report_sha256.run_a==$raw_a and .raw_report_sha256.run_b==$raw_b and .raw_report_sha256.run_mutated==$raw_mutated and
-  .semantic_projection_sha256.equivalent_runs==$sem and .semantic_projection_sha256.semantic_mutation==$sem_mutated
+  .semantic_projection_sha256.equivalent_runs==$sem and .semantic_projection_sha256.semantic_mutation==$sem_mutated and
+  .provider_metamorphic.receipt_sha256==$provider_meta_sha and .provider_metamorphic.semantic_projection_sha256==$provider_meta_sem and .provider_metamorphic.equivalent_variants==64
 ' "$OUT/receipt.json" >/dev/null || fail "provider receipt failed source/report/projection digest consistency validation"
-printf '\nPASS ENG-REA-005 receipt binding: source head, checkout commit, normalizer, manifest, oracle, raw reports and projections match.\n'
+printf '\nPASS ENG-REA-005 receipt binding: source head, checkout commit, normalizer, manifest, oracle, raw reports, projections and provider metamorphic receipt match.\n'
 printf '\nPASS ENG-REA-005 real-provider smoke: 2/2 equivalent runs preserved semantic identity; 1/1 semantic mutation changed the projection; raw reports stayed unchanged.\n'
 printf 'Evidence directory: %s\n' "$OUT"
 printf 'Receipt: %s/receipt.json\n' "$OUT"
