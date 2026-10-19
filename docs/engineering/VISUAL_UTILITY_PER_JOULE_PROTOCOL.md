@@ -101,7 +101,7 @@ After a matched, independently reviewed baseline exists, investigate at least 10
 - [IEC 62087-7:2018 — computer monitor power measurement](https://webstore.iec.ch/en/publication/27420).
 - [ICDM / IDMS](https://www.sid.org/Standards/ICDM/ICDM) for display measurement methods relevant to protected quality floors.
 - [Display pattern robustness and uncertainty](DISPLAY_PATTERN_ROBUSTNESS_AND_UNCERTAINTY.md).
-- [Display manufacturing route protocol](DISPLAY_MANUFACTURING_ROUTE_PROTOCOL.md).
+- [Display manufacturing route protocol](https://github.com/Luminous-Dynamics/symthaea/blob/research/vis-tech-001-program-2026-10-17/docs/engineering/DISPLAY_MANUFACTURING_ROUTE_PROTOCOL.md).
 - [ODRH-MET-001 #8049](https://github.com/Luminous-Dynamics/symthaea/issues/8049).
 
 The protocol remains proposed until a specific physical instrument, workload, task criterion, accounting boundary, baseline, and uncertainty budget are frozen and measured.
