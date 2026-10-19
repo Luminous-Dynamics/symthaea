@@ -22,6 +22,10 @@ exclude = [
     "crates/core/nixward-web",
     "crates/core/symthaea-zkproof/methods",
     "crates/core/symthaea-zkproof/host",
+    # This directory is present in the checkout but has no Cargo.toml. Keep it
+    # out of glob-driven workspace resolution until a valid crate manifest is
+    # restored; do not add fake manifests merely to satisfy workspace loading.
+    "crates/core/symthaea-observation-attestation",
     "crates/domains/symthaea-spore/fuzz",
     "crates/domains/spark-engine",
     "crates/domains/symthaea-lab",
