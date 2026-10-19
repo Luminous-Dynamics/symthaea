@@ -9,6 +9,7 @@ for order/integrity and declared metamorphic comparisons, never as an answer map
 from __future__ import annotations
 
 import argparse
+import copy
 import json
 import math
 import sys
@@ -186,6 +187,29 @@ def model_eig(case: dict[str, Any]) -> dict[str, Any]:
     }
 
 
+def reverse_kl_mutant(case: dict[str, Any]) -> float:
+    """Evaluate the deliberately wrong KL(prior || posterior) mutant."""
+    model = model_eig(case)
+    prior = [parse_probability(v, "reverse-KL prior") for v in case["prior"]]
+    total: list[float] = []
+    for observation_mass, posterior in zip(
+        model["predictive_observation"], model["posterior_by_observation"]
+    ):
+        if observation_mass <= 0.0:
+            continue
+        if posterior is None:
+            raise CorpusError("positive-mass observation unexpectedly has no posterior")
+        terms: list[float] = []
+        for prior_mass, posterior_mass in zip(prior, posterior):
+            if prior_mass <= 0.0:
+                continue
+            if posterior_mass <= 0.0:
+                return math.inf
+            terms.append(prior_mass * math.log(prior_mass / posterior_mass))
+        total.append(observation_mass * math.fsum(terms))
+    return math.fsum(total)
+
+
 def symbolic_expectation(expression: str) -> float:
     """A closed, reviewed expression vocabulary; never evaluates arbitrary code."""
     h = entropy
@@ -341,11 +365,63 @@ def validate_corpus(document: dict[str, Any]) -> dict[str, Any]:
     require(abs(first_branch_only_mutant - asymmetric["eig"]) > TOL,
             "I35 no longer detects dropping the expectation over observations")
 
-    # Explicit sign/orientation mutation: a useful information profile has
-    # EIG >= 0; the score contribution is the negative under the frozen profile.
+    # Mutation 01: flatten state-conditioned likelihoods to the prior-weighted
+    # mean observation distribution. This destroys information in I03 and must
+    # not pass as the genuine state-conditioned likelihood model.
+    informative_case = next(case for case in valid_cases
+                            if case["id"] == "I03-binary-symmetric-error-quarter")
+    flattened = copy.deepcopy(informative_case)
+    prior_for_flatten = [parse_probability(v, "flatten mutant prior")
+                         for v in flattened["prior"]]
+    raw_rows = [
+        [parse_probability(v, "flatten mutant likelihood") for v in row]
+        for row in flattened["likelihood_by_state"]
+    ]
+    mean_observation = [
+        math.fsum(prior_for_flatten[s] * raw_rows[s][o]
+                  for s in range(len(prior_for_flatten)))
+        for o in range(len(flattened["observation_ids"]))
+    ]
+    flattened["likelihood_by_state"] = [
+        [repr(value) for value in mean_observation]
+        for _ in flattened["state_ids"]
+    ]
+    flattened_eig = model_eig(flattened)["eig"]
+    require(abs(flattened_eig - results[informative_case["id"]]["eig"]) > TOL,
+            "state-independent observation-mean mutant was not detected")
+
+    # Mutation 03: the reversed KL direction is a different objective.
+    asymmetric_case = next(case for case in valid_cases
+                           if case["id"] == "I35-asymmetric-observation-branches")
+    reversed_kl = reverse_kl_mutant(asymmetric_case)
+    require(math.isfinite(reversed_kl), "reverse-KL witness should be finite")
+    require(abs(reversed_kl - results[asymmetric_case["id"]]["eig"]) > TOL,
+            "reversed KL direction mutant was not detected")
+
+    # Mutation 07: zero predictive-mass branches have no fabricated posterior.
+    impossible = results["I09-impossible-observation-branch"]
+    zero_indices = [i for i, mass in enumerate(impossible["predictive_observation"])
+                    if mass == 0.0]
+    require(bool(zero_indices), "I09 must contain a zero-mass observation branch")
+    require(all(impossible["posterior_by_observation"][i] is None
+                for i in zero_indices),
+            "zero-mass observation branch must not fabricate a posterior")
+
+    # Mutation 08: the stronger objective identity cannot silently change.
+    require(document["profile"] == EXPECTED_PROFILE,
+            "predicted-entropy proxy/profile promotion mutant not detected")
+
+    # Mutation 10: EIG is nonnegative; its configured minimization contribution
+    # is -EIG and therefore nonpositive (strictly negative for positive EIG).
     revealing_eig = results["I02-perfect-binary-reveal"]["eig"]
     require(revealing_eig > 0.0 and -revealing_eig < 0.0,
             "EIG/score orientation mutation not detected")
+
+    # Input-mutant controls are independently exercised by the malformed cases.
+    require(rejection_reasons.get("I24-unnormalized-prior") == "prior_not_normalized",
+            "silent-prior-renormalization mutant not detected")
+    require(rejection_reasons.get("I26-negative-likelihood") == "negative_likelihood",
+            "negative-likelihood mutant not detected")
 
     controls = document["mutation_controls"]
     require(isinstance(controls, list) and len(controls) == EXPECTED_MUTATION_COUNT,
@@ -376,6 +452,17 @@ def validate_corpus(document: dict[str, Any]) -> dict[str, Any]:
         "metamorphic_comparisons": len(relation_results),
         "invalid_cases_rejected": len(rejection_reasons),
         "asymmetric_branch_contributions": branch_contributions,
+        "mutation_checks_executed": [
+            "state-independent likelihood/mean flattening",
+            "dropping expectation over asymmetric observations",
+            "reversed KL direction",
+            "prior normalization rejection",
+            "negative likelihood rejection",
+            "state/observation relabeling invariance",
+            "zero-mass branch without posterior",
+            "proxy/EIG profile identity",
+            "EIG score orientation",
+        ],
         "invalid_rejection_reasons": rejection_reasons,
         "hypothetical_state_purity": "NOT_TESTED_BY_PROBABILITY_ORACLE",
         "production_correspondence": "NOT_ESTABLISHED",
