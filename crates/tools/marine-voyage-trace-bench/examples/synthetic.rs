@@ -23,6 +23,8 @@ fn main() {
         raw_trace_sha256: "a".repeat(64),
         mission_id: "synthetic-mission-A".to_owned(),
         condition_digest: "synthetic-condition-digest".to_owned(),
+        service_digest: "b".repeat(64),
+        calibration_epoch_id: "synthetic-meter-calibration-epoch".to_owned(),
         energy_boundary_id: "synthetic-dc-input-boundary".to_owned(),
         uncertainty_method_id: "synthetic-absolute-bound-v1".to_owned(),
         expected_start_ms: 0,

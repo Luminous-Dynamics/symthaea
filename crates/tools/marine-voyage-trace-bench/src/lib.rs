@@ -4,6 +4,8 @@
 //! absolute bounds on each power sample. It does not validate the physical sensor,
 //! correct environmental conditions, or implement a sea-trial standard.
 
+pub mod paired_trial;
+
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
 pub enum PowerChannel {
     Propulsion,
@@ -43,7 +45,13 @@ pub struct TraceSpec {
     /// SHA-256 hex digest of the raw trace; format is checked, provenance is not authenticated.
     pub raw_trace_sha256: String,
     pub mission_id: String,
+    /// Externally assessed condition-profile / stratum digest. Equality is checked only;
+    /// this crate does not validate raw environmental measurements or apply corrections.
     pub condition_digest: String,
+    /// SHA-256 digest of the required delivered-service contract (route, distance, payload, speed policy).
+    pub service_digest: String,
+    /// Identity of the meter chain / calibration epoch used for all channels.
+    pub calibration_epoch_id: String,
     /// All channels must refer to the same electrical input boundary convention.
     pub energy_boundary_id: String,
     /// Identifies the declared absolute-bound method; it is not interpreted by this crate.
@@ -66,6 +74,7 @@ pub enum TraceDisposition {
 pub enum TraceIssue {
     EmptyIdentity(&'static str),
     InvalidRawTraceDigest,
+    InvalidServiceDigest,
     InvalidTimeRange,
     ZeroMaximumGap,
     TooFewSamples,
@@ -135,6 +144,8 @@ pub struct TraceEnergy {
     pub raw_trace_sha256: String,
     pub mission_id: String,
     pub condition_digest: String,
+    pub service_digest: String,
+    pub calibration_epoch_id: String,
     pub energy_boundary_id: String,
     pub uncertainty_method_id: String,
     pub start_ms: u64,
@@ -233,6 +244,7 @@ pub fn assess_trace(spec: &TraceSpec) -> TraceOutcome {
         (spec.trace_id.as_str(), "trace_id"),
         (spec.mission_id.as_str(), "mission_id"),
         (spec.condition_digest.as_str(), "condition_digest"),
+        (spec.calibration_epoch_id.as_str(), "calibration_epoch_id"),
         (spec.energy_boundary_id.as_str(), "energy_boundary_id"),
         (spec.uncertainty_method_id.as_str(), "uncertainty_method_id"),
     ] {
@@ -243,6 +255,9 @@ pub fn assess_trace(spec: &TraceSpec) -> TraceOutcome {
 
     if !valid_sha256_hex(&spec.raw_trace_sha256) {
         invalid.push(TraceIssue::InvalidRawTraceDigest);
+    }
+    if !valid_sha256_hex(&spec.service_digest) {
+        invalid.push(TraceIssue::InvalidServiceDigest);
     }
     if spec.expected_end_ms <= spec.expected_start_ms {
         invalid.push(TraceIssue::InvalidTimeRange);
@@ -334,6 +349,8 @@ pub fn assess_trace(spec: &TraceSpec) -> TraceOutcome {
         raw_trace_sha256: spec.raw_trace_sha256.clone(),
         mission_id: spec.mission_id.clone(),
         condition_digest: spec.condition_digest.clone(),
+        service_digest: spec.service_digest.clone(),
+        calibration_epoch_id: spec.calibration_epoch_id.clone(),
         energy_boundary_id: spec.energy_boundary_id.clone(),
         uncertainty_method_id: spec.uncertainty_method_id.clone(),
         start_ms: spec.expected_start_ms,
@@ -372,6 +389,8 @@ mod tests {
             raw_trace_sha256: "a".repeat(64),
             mission_id: "mission-A".to_owned(),
             condition_digest: "condition-sha256:example".to_owned(),
+            service_digest: "b".repeat(64),
+            calibration_epoch_id: "meter-chain-epoch-001".to_owned(),
             energy_boundary_id: "dc-input-boundary-A".to_owned(),
             uncertainty_method_id: "absolute-bound-v1".to_owned(),
             expected_start_ms: 0,

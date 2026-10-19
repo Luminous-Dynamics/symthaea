@@ -13,7 +13,7 @@ The example uses synthetic values only. No result from it is physical evidence.
 ## What it does
 
 - Requires synchronized propulsion and auxiliary electrical input power in watts at one declared energy-boundary convention.
-- Requires start/end coverage, strictly increasing integer-millisecond timestamps, a declared maximum sample gap, a source-trace SHA-256 identifier, mission/condition identifiers, and an explicit absolute-bound method identifier.
+- Requires start/end coverage, strictly increasing integer-millisecond timestamps, a declared maximum sample gap, a source-trace SHA-256 identifier, mission/condition identifiers, a SHA-256 digest of the delivered-service contract, a meter calibration-epoch identifier, and an explicit absolute-bound method identifier.
 - Integrates between adjacent samples using the trapezoidal rule (piecewise-linear interpolation).
 - Carries nominal and conservative lower/upper watt-hour totals for propulsion, auxiliaries and the whole electrical boundary.
 - Returns Indeterminate for missing channel measurements, incomplete endpoints, or gaps larger than the declared limit; returns Invalid for malformed metadata, invalid numbers or nonmonotonic timestamps.
@@ -35,6 +35,15 @@ A missing auxiliary channel is never silently interpreted as zero. An over-limit
 The current ITTC procedure for ship speed/power trials is [7.5-04-01-01.1, Revision 08 (effective 2024)](https://www.ittc.info/media/11972/75-04-01-011.pdf). ISO 15016:2025 defines preparation, execution, reporting and correction of speed-trial data for displacement ships of 50–500 m length between perpendiculars ([official ISO record](https://www.iso.org/standard/82080.html)). ISO 19030-1:2016, reviewed and confirmed current in 2022, provides general principles and indicators for measuring hull/propeller performance changes on the same ship over time ([official ISO record](https://www.iso.org/standard/63774.html)).
 
 This crate implements none of those standards. It supplies only a strict trace arithmetic/quality contract. Raw voyage traces, corrected speed-trial records, simulation output and synthetic fixtures must remain separately labelled. Equivalent mission, condition, energy-boundary and uncertainty semantics are required before energy totals can be compared using issue #8092.
+
+
+## Matched-trial eligibility (paired_trial module)
+
+A follow-on comparator adapter can validate whether a baseline run and a candidate run are eligible for the existing mission-energy comparison. It requires matching campaign/pair identities, mission, delivered-service digest, environment/condition digest, electrical measurement boundary, meter calibration epoch, and uncertainty-method identifier. Candidate/control identities must differ, both traces must be complete, and run order must be explicitly recorded.
+
+Campaign audit reports eligible and ineligible pairs, complete/indeterminate/invalid run counts, and baseline-first versus candidate-first pair counts. It always preserves unmatched runs. Seeing both order directions is only an order-coverage diagnostic; it does not prove randomization, causal attribution, sufficient sample size, or calibrated statistical uncertainty. A valid pair means only EligibleForEnergyComparison, not a saving or validated engineering result.
+
+The pairing contract is not a correction method. It does not alter trace values to compensate for wind, waves, current, water depth, trim, displacement, hull fouling, route drift or trial-order effects. Choose an applicable external procedure (for example ISO 15016:2025 for displacement ships in its stated scope) and keep corrected records distinct from raw traces.
 
 ## Claim ceiling
 
