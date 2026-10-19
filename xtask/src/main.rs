@@ -4,6 +4,7 @@ use std::path::PathBuf;
 mod crate_status;
 mod cropfoundry_csv_audit;
 mod cropfoundry_validate;
+mod cropfoundry_water_policy;
 mod duplicate_scan;
 mod manifest;
 mod rhn_sweep;
@@ -65,6 +66,12 @@ enum Commands {
         #[arg(long)]
         expected_sha256: Option<String>,
         /// Optional path to write the JSON audit receipt.
+        #[arg(long)]
+        out: Option<PathBuf>,
+    },
+    /// Run the deterministic synthetic irrigation-policy harness; no crop-performance claim.
+    CropfoundryWaterPolicyDemo {
+        /// Optional path to write the JSON scenario receipt.
         #[arg(long)]
         out: Option<PathBuf>,
     },
@@ -133,6 +140,9 @@ fn main() -> anyhow::Result<()> {
                 expected_sha256,
                 out,
             )?;
+        }
+        Commands::CropfoundryWaterPolicyDemo { out } => {
+            cropfoundry_water_policy::run(out)?;
         }
         Commands::RhnSweep {
             dims,
