@@ -91,6 +91,18 @@ For two independent estimates with compatible measurands and the same uncertaint
 
 when covariance is negligible. If common calibration/reference or other covariance exists, include the covariance term or do not present the simple independent comparison. Passing pairwise agreement is not proof of absolute accuracy: a shared systematic error can make two instruments agree.
 
+### 4A. Control measurements and drift
+
+A repeatability study can look stable while the instrument drifts slowly enough to bias a candidate-versus-baseline comparison. When a suitable stable control/reference stimulus or artifact exists, define an interleaved schedule before data collection (for example, start/end of each measurement block and after a remount or relevant reconfiguration). Record the control identity, measurand/unit, expected range, calibration/provenance, geometry and uncertainty. Do not call an ordinary DUT remeasurement a traceable reference standard.
+
+If no suitable control is available, mark drift surveillance NOT_EVALUATED. Control results monitor the measurement chain; they do not prove the display itself is stable or accurate.
+
+Freeze the control guard band from the measurand, MDE and uncertainty budget. There is no universal percent threshold for every optical, timing or power channel. Preregister control cadence, test order/randomization, any blind duplicates, and the action on an excursion. Retain the exact order or randomization seed and every failed control.
+
+If a control exceeds the guard band, mark the affected interval NOT_EVALUATED according to the frozen policy and reacquire or investigate. Do not silently interpolate, normalize away or retroactively correct the drift unless that correction model and uncertainty were independently validated and preregistered. Preserve raw traces and deviations.
+
+Synthetic validation cases should cover no drift, drift within the guard band, drift just beyond it, gradual drift crossing between controls, a single outlier, a remount shift, and a control/reference mismatch. Report false-alarm and missed-drift behavior. Passing synthetic cases does not prove that a physical control artifact is stable.
+
 ## 5. Pattern/context robustness
 
 A display result must not silently depend on a single conveniently chosen patch. Reuse the existing [pattern robustness and uncertainty protocol](DISPLAY_PATTERN_ROBUSTNESS_AND_UNCERTAINTY.md) and frozen conventional-display workload.
