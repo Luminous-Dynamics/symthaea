@@ -38,8 +38,8 @@ struct Scenario {
     scenario_type: String,
     synthetic_only: bool,
     clinical_content_required: bool,
-    source_bundle_state: Option<String>,
-    connectivity: Option<String>,
+    source_bundle_state: String,
+    connectivity: String,
     fault_injections: Vec<String>,
     required_invariants: Vec<String>,
     forbidden_behaviors: Vec<String>,
@@ -215,6 +215,8 @@ fn validate_schema_contract(schema: &Value, corpus: &ScenarioCorpus) -> Result<(
         .context("schema is missing scenario required fields")?;
     for field in [
         "scenario_id",
+        "source_bundle_state",
+        "connectivity",
         "scenario_type",
         "synthetic_only",
         "clinical_content_required",
@@ -280,6 +282,12 @@ fn ensure_unique_nonempty(values: &[String], field: &str, scenario_id: &str) -> 
 }
 
 fn validate_corpus(corpus: &ScenarioCorpus, schema: &Value) -> Result<()> {
+    if corpus.status != "synthetic_contract_tests_only" {
+        bail!("scenario corpus status must remain synthetic_contract_tests_only");
+    }
+    if corpus.clinical_use_authorized {
+        bail!("scenario corpus must not authorize clinical use");
+    }
     if corpus.scenarios.is_empty() {
         bail!("scenario corpus must contain at least one scenario");
     }
@@ -330,48 +338,46 @@ fn validate_corpus(corpus: &ScenarioCorpus, schema: &Value) -> Result<()> {
                 scenario.expected_disposition
             );
         }
-        if let Some(state) = &scenario.source_bundle_state {
-            if !enum_contains(schema, "source_bundle_state", state) {
-                bail!(
-                    "{}: source_bundle_state {:?} is not declared by schema",
-                    scenario.scenario_id,
-                    state
-                );
-            }
-            if matches!(
-                state.as_str(),
-                "missing"
-                    | "expired"
-                    | "revoked"
-                    | "digest_mismatch"
-                    | "jurisdiction_mismatch"
-                    | "unsupported_schema"
-                    | "unknown"
-            ) && scenario.expected_disposition != FAIL_CLOSED
-            {
-                bail!(
-                    "{}: invalid/unknown bundle state must fail closed for protocol-specific steps",
-                    scenario.scenario_id
-                );
-            }
+        let state = &scenario.source_bundle_state;
+        if !enum_contains(schema, "source_bundle_state", state) {
+            bail!(
+                "{}: source_bundle_state {:?} is not declared by schema",
+                scenario.scenario_id,
+                state
+            );
         }
-        if let Some(connectivity) = &scenario.connectivity {
-            if !enum_contains(schema, "connectivity", connectivity) {
-                bail!(
-                    "{}: connectivity {:?} is not declared by schema",
-                    scenario.scenario_id,
-                    connectivity
-                );
-            }
-            if connectivity == "offline"
-                && scenario.source_bundle_state.as_deref() == Some(VALID_BUNDLE_STATE)
-                && scenario.expected_disposition != "render_valid_local_bundle_offline"
-            {
-                bail!(
-                    "{}: offline session with a valid local bundle must use the offline disposition",
-                    scenario.scenario_id
-                );
-            }
+        if matches!(
+            state.as_str(),
+            "missing"
+                | "expired"
+                | "revoked"
+                | "digest_mismatch"
+                | "jurisdiction_mismatch"
+                | "unsupported_schema"
+                | "unknown"
+        ) && scenario.expected_disposition != FAIL_CLOSED
+        {
+            bail!(
+                "{}: invalid/unknown bundle state must fail closed for protocol-specific steps",
+                scenario.scenario_id
+            );
+        }
+        let connectivity = &scenario.connectivity;
+        if !enum_contains(schema, "connectivity", connectivity) {
+            bail!(
+                "{}: connectivity {:?} is not declared by schema",
+                scenario.scenario_id,
+                connectivity
+            );
+        }
+        if connectivity == "offline"
+            && scenario.source_bundle_state == VALID_BUNDLE_STATE
+            && scenario.expected_disposition != "render_valid_local_bundle_offline"
+        {
+            bail!(
+                "{}: offline session with a valid local bundle must use the offline disposition",
+                scenario.scenario_id
+            );
         }
 
         ensure_unique_nonempty(
@@ -534,7 +540,7 @@ mod tests {
         let expired = corpus
             .scenarios
             .iter_mut()
-            .find(|scenario| scenario.source_bundle_state.as_deref() == Some("expired"))
+            .find(|scenario| scenario.source_bundle_state == "expired")
             .expect("expired negative control exists");
         expired.expected_disposition = "render_approved_bundle_only".to_string();
         assert!(validate_corpus(&corpus, &schema).is_err());
