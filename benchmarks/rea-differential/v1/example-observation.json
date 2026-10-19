@@ -1,0 +1,44 @@
+{
+  "schema_version": "symthaea.rea-differential-observation.v1",
+  "case_id": "contract-example-001",
+  "provider_id": "synthetic-contract-fixture",
+  "provider_version": "0.0-test",
+  "capability": "supported",
+  "source": {
+    "sha256": "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
+    "byte_length": 10
+  },
+  "accounting": [
+    {
+      "start": 0,
+      "end": 7,
+      "disposition": "identified"
+    },
+    {
+      "start": 7,
+      "end": 10,
+      "disposition": "padding"
+    }
+  ],
+  "regions": [
+    {
+      "kind": "container",
+      "start": 0,
+      "end": 7
+    },
+    {
+      "kind": "trailing-padding",
+      "start": 7,
+      "end": 10
+    }
+  ],
+  "files": [
+    {
+      "path": "root/payload.txt",
+      "sha256": "bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb",
+      "byte_length": 4,
+      "logical_id": "payload-001"
+    }
+  ],
+  "complete_extraction_claim": true
+}
