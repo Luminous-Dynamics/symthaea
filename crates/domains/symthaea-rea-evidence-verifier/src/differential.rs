@@ -20,6 +20,11 @@ pub struct CoordinateSpace {
     pub id: String,
     pub sha256: String,
     pub byte_length: u64,
+    pub parent_coordinate_space_id: Option<String>,
+    pub parent_start: Option<u64>,
+    pub parent_end: Option<u64>,
+    /// "source" for root bytes; otherwise a typed transform such as "decompress:gzip".
+    pub transform_kind: String,
 }
 
 #[derive(Clone, Debug, Deserialize, Serialize, PartialEq, Eq, PartialOrd, Ord)]
@@ -169,6 +174,66 @@ fn coordinate_map(spaces: &[CoordinateSpace], side: &str, reasons: &mut Vec<Stri
         }
     }
     result
+}
+
+fn validate_coordinate_graph(spaces: &BTreeMap<String, CoordinateSpace>, side: &str, reasons: &mut Vec<String>) {
+    if !spaces.contains_key("root") {
+        reasons.push(format!("{side} coordinate graph lacks root space"));
+        return;
+    }
+    for space in spaces.values() {
+        if space.id == "root" {
+            if space.parent_coordinate_space_id.is_some()
+                || space.parent_start.is_some()
+                || space.parent_end.is_some()
+                || space.transform_kind != "source"
+            {
+                reasons.push(format!("{side} root coordinate space must be parentless and use source transform kind"));
+            }
+            continue;
+        }
+        let parent_id = match space.parent_coordinate_space_id.as_deref() {
+            Some(id) if !id.is_empty() => id,
+            _ => {
+                reasons.push(format!("{side} coordinate space {} has no parent identity", space.id));
+                continue;
+            }
+        };
+        let parent = match spaces.get(parent_id) {
+            Some(parent) => parent,
+            None => {
+                reasons.push(format!("{side} coordinate space {} references missing parent {parent_id}", space.id));
+                continue;
+            }
+        };
+        match (space.parent_start, space.parent_end) {
+            (Some(start), Some(end)) if start < end && end <= parent.byte_length => {}
+            _ => reasons.push(format!("{side} coordinate space {} has invalid parent byte range", space.id)),
+        }
+        if space.transform_kind.is_empty() || space.transform_kind == "source" {
+            reasons.push(format!("{side} coordinate space {} has invalid transform kind", space.id));
+        }
+
+        // Every derived coordinate space must reach the root without a cycle.
+        let mut seen = BTreeSet::new();
+        let mut cursor = space.id.as_str();
+        loop {
+            if !seen.insert(cursor.to_owned()) {
+                reasons.push(format!("{side} coordinate graph contains a cycle involving {}", space.id));
+                break;
+            }
+            if cursor == "root" {
+                break;
+            }
+            match spaces.get(cursor).and_then(|node| node.parent_coordinate_space_id.as_deref()) {
+                Some(parent) if spaces.contains_key(parent) => cursor = parent,
+                _ => {
+                    reasons.push(format!("{side} coordinate space {} is not rooted", space.id));
+                    break;
+                }
+            }
+        }
+    }
 }
 
 fn same_root_space(source: &SourceIdentity, spaces: &BTreeMap<String, CoordinateSpace>, side: &str, reasons: &mut Vec<String>) -> bool {
@@ -336,6 +401,8 @@ pub fn score_case(oracle: &OracleCase, observed: &Observation) -> Result<Scoreca
 
     let oracle_spaces = coordinate_map(&oracle.coordinate_spaces, "oracle", &mut reasons);
     let observed_spaces = coordinate_map(&observed.coordinate_spaces, "observed", &mut reasons);
+    validate_coordinate_graph(&oracle_spaces, "oracle", &mut reasons);
+    validate_coordinate_graph(&observed_spaces, "observed", &mut reasons);
     same_root_space(&oracle.source, &oracle_spaces, "oracle", &mut reasons);
     if capability_supported {
         same_root_space(&observed.source, &observed_spaces, "observed", &mut reasons);
@@ -475,6 +542,11 @@ pub fn score_case(oracle: &OracleCase, observed: &Observation) -> Result<Scoreca
             || reason.contains("extra coordinate space")
             || reason.contains("duplicated")
             || reason.contains("does not match the selected source identity")
+            || reason.contains("parent identity")
+            || reason.contains("parent byte range")
+            || reason.contains("transform kind")
+            || reason.contains("coordinate graph")
+            || reason.contains("is not rooted")
             || reason.contains("missed or false-positive")
             || reason.contains("known-answer output tree differs")
             || reason.contains("overlap")
@@ -556,8 +628,8 @@ mod tests {
             case_id: "nested-inert-001".into(),
             source: SourceIdentity { sha256: "a".repeat(64), byte_length: 10 },
             coordinate_spaces: vec![
-                CoordinateSpace { id: "root".into(), sha256: "a".repeat(64), byte_length: 10 },
-                CoordinateSpace { id: "tar-stream".into(), sha256: "b".repeat(64), byte_length: 7 },
+                CoordinateSpace { id: "root".into(), sha256: "a".repeat(64), byte_length: 10, parent_coordinate_space_id: None, parent_start: None, parent_end: None, transform_kind: "source".into() },
+                CoordinateSpace { id: "tar-stream".into(), sha256: "b".repeat(64), byte_length: 7, parent_coordinate_space_id: Some("root".into()), parent_start: Some(0), parent_end: Some(10), transform_kind: "decompress:gzip".into() },
             ],
             expected_regions: vec![
                 Region { coordinate_space_id: "root".into(), kind: "gzip-container".into(), start: 0, end: 10 },
@@ -578,8 +650,8 @@ mod tests {
             capability: "supported".into(),
             source: SourceIdentity { sha256: "a".repeat(64), byte_length: 10 },
             coordinate_spaces: vec![
-                CoordinateSpace { id: "root".into(), sha256: "a".repeat(64), byte_length: 10 },
-                CoordinateSpace { id: "tar-stream".into(), sha256: "b".repeat(64), byte_length: 7 },
+                CoordinateSpace { id: "root".into(), sha256: "a".repeat(64), byte_length: 10, parent_coordinate_space_id: None, parent_start: None, parent_end: None, transform_kind: "source".into() },
+                CoordinateSpace { id: "tar-stream".into(), sha256: "b".repeat(64), byte_length: 7, parent_coordinate_space_id: Some("root".into()), parent_start: Some(0), parent_end: Some(10), transform_kind: "decompress:gzip".into() },
             ],
             accounting: vec![
                 AccountingSpan { coordinate_space_id: "root".into(), start: 0, end: 10, disposition: "identified".into() },
@@ -768,6 +840,24 @@ mod tests {
         let score = score_case(&oracle(), &obs).unwrap();
         assert_eq!(score.status, "fail");
         assert!(score.metrics.missed_or_false_regions > 0);
+    }
+
+    #[test]
+    fn rejects_false_coordinate_parent_edge() {
+        let mut obs = observation();
+        obs.coordinate_spaces[1].parent_coordinate_space_id = Some("missing-parent".into());
+        let score = score_case(&oracle(), &obs).unwrap();
+        assert_eq!(score.status, "fail");
+        assert!(score.reasons.iter().any(|reason| reason.contains("missing parent")));
+    }
+
+    #[test]
+    fn rejects_wrong_transform_kind_for_child_space() {
+        let mut obs = observation();
+        obs.coordinate_spaces[1].transform_kind = "source".into();
+        let score = score_case(&oracle(), &obs).unwrap();
+        assert_eq!(score.status, "fail");
+        assert!(score.reasons.iter().any(|reason| reason.contains("transform kind")));
     }
 
     #[test]
