@@ -243,7 +243,7 @@ fn required_channels(claim: &str) -> Option<&'static [&'static str]> {
 fn valid_relative_path(path: &str) -> bool {
     // Reject both separators when interpreting the manifest on any host OS.
     // Otherwise a Windows-style path could look like a single filename on Unix.
-    if path.trim().is_empty() || path.contains('\\\\') {
+    if path.trim().is_empty() || path.contains('\\') {
         return false;
     }
     let parsed = Path::new(path);
@@ -869,7 +869,7 @@ mod tests {
         assert!(!valid_relative_path("../secrets.txt"));
         assert!(!valid_relative_path("/tmp/raw.csv"));
         assert!(!valid_relative_path("data/../../secret"));
-        assert!(!valid_relative_path(r"raw\\..\\secret.csv"));
+        assert!(!valid_relative_path(r"raw\..\secret.csv"));
         assert!(valid_relative_path("raw/session.csv"));
     }
 
