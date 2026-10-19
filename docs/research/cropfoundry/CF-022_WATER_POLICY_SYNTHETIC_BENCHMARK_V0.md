@@ -53,7 +53,7 @@ These equations describe test fixtures, not agronomy.
 - The exposed demand forecast is `max(0.1, actual_demand * (1 + bias + 0.04*sin(3*d + 5*z)))`, where `bias` is the scenario's declared forecast bias. The simulator retains true demand only to score the trace; the policy receives the generated forecast.
 - Rain is 1.1 units when `d % 7 == 4` before drought onset, and zero otherwise.
 - Per-zone criticality is 1.5 in zone 0 on days 10–25, zone 1 on days 17–34, and zone 2 on days 4–19; it is 0.8 outside those windows. The minimum-storage threshold is `2.6 + 0.9*criticality`.
-- After irrigation, overflow proxy is `max(0, storage + allocation - 10)`, post-use storage is `max(0, min(10, storage + allocation) - actual_demand)`, and end storage is `min(10, post_use + rain)`. Daily synthetic stress exposure is `criticality * max(0, minimum_storage - end_storage)^2`; the run score sums this over days and zones.
+- After irrigation, overflow proxy is `max(0, storage + allocation - 10)`. Physical post-use storage is clamped as `max(0, min(10, storage + allocation) - actual_demand)`, then physical end storage is `min(10, post_use + rain)` for the next step. **Receipt v2 scores a separate water margin** `end_storage_margin = min(10, storage + allocation) - actual_demand + rain` without clipping the margin at zero. Daily synthetic stress is `criticality * max(0, minimum_storage - end_storage_margin)^2`. Negative margin is an unmet-demand severity proxy, not physically negative stored water; it preserves score sensitivity even when that day's demand exceeds all available water.
 - Sensor error is the deterministic term `0.18*sin(11*d + 7*z)`. On dropout days, the controller holds the latest observed reading and increments stale age. The risk-aware policy applies a heuristic demand margin `1.10 + 0.05*min(stale_age, 4)` and criticality multiplier `1 + 0.12*min(stale_age, 4)`. These are uncalibrated heuristics, not probabilistic coverage guarantees.
 - Plot-allocation dispersion is the population standard deviation of each plot's cumulative irrigation across the 42-day run. Equal-share should therefore report zero dispersion apart from numerical-rounding tolerance.
 
@@ -97,6 +97,22 @@ All scores are from the toy scenario equations. "plot-mm" is a sum of synthetic 
 The risk-aware policy has a much lower **aggregate** stress proxy than the dose-matched uniform counterfactual, but its worst-zone stress is not lower, its maximum worst-zone exposure is slightly higher, and its mean worst-to-best zone-stress ratio is extreme. In several scenarios it allocated almost all water to zones 0 and 2 while zone 1 accumulated almost all the stress proxy. The score rewarded protecting two zones and allowed one to be sacrificed. That is a **benchmark failure of the aggregate objective**, even though arithmetic, determinism and resource constraints passed.
 
 Do not describe the historical -57.36% matched-dose stress delta as success. The next research gate is to recompute all policies under the v2 stress proxy and assess the new greedy minimax policy; acceptance must include a predeclared bound on worst-zone stress and disparity alongside aggregate performance. No crop safety or agronomic guarantee can be inferred from the v1 synthetic numbers.
+
+## Receipt v2 exploratory policy comparison
+
+A successful exact-head synthetic smoke run (`39242840320`, head `373a4f4d0859b4e31ac257e46bf3d301f6d28c90`) emitted the following receipt-v2 metrics before the disparity-ratio denominator count was added. The policy calculations were unchanged by that subsequent metadata-only addition; the newest head is being rerun for a fresh receipt. All values below come from the synthetic fixture and do not represent crop outcomes.
+
+| Policy | Mean stress proxy | Median stress proxy | Median worst-zone stress | Maximum worst-zone stress | Mean worst/best ratio | Scenarios with ratio defined | Total irrigation (plot-mm) | Mean dispersion | Mean change vs equal-share |
+|---|---:|---:|---:|---:|---:|---:|---:|---:|---:|
+| Equal-share calendar | 1,471.634 | 1,323.888 | 842.409 | 1,283.220 | 13.405 | 6/6 | 1,386.00 | 0.000 | — |
+| Soil threshold | 1,692.042 | 1,578.861 | 734.069 | 1,243.666 | 2.746 | 6/6 | 1,373.10 | 9.016 | +15.215% |
+| Uncertainty-aware marginal risk | 1,170.348 | 1,029.263 | 385.099 | 892.691 | 1.420 | 6/6 | 1,353.85 | 18.945 | −26.034% |
+| Greedy minimax stress | 1,358.645 | 1,241.649 | 436.532 | 890.410 | 1.198 | 6/6 | 1,353.85 | 19.890 | −10.462% |
+| Water-matched rotating-uniform counterfactual | 1,664.704 | 1,532.213 | 868.059 | 1,301.430 | 5.694 | 3/6 | 1,353.85 | 0.020 | +15.873% |
+
+Every policy had zero daily total-water-budget violations and zero per-plot actuator-limit violations in that run. The ratio is undefined when the minimum zone stress is zero; the mean uses only scenarios with a defined ratio. v2 has corrected the severe starvation blind spot seen in v1, so **the v1 scores are superseded and must not be numerically compared with this table**.
+
+This still isn't one universal "winner." The marginal-risk policy has the lower mean aggregate proxy; the minimax heuristic improves the average worst/best ratio and slightly improves the maximum worst-zone proxy, but pays with a higher aggregate proxy and allocation dispersion. Those trade-offs motivate a Pareto report and explicit limits on worst-zone burden, not a single optimized scalar. The matched-uniform counterfactual is hindsight-based and should not be treated as an achievable controller result.
 
 ## Acceptance tests for the matched-dose comparison
 
