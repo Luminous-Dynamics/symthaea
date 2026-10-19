@@ -118,6 +118,34 @@ jobs:
             --slurpfile receipt "$RECEIPT" \
             '{schemaVersion:"symthaea.rea-provider-smoke-attestation.v1",evidenceTier:"unblob-provider-smoke",repository:$repository,predicateType:$predicate_type,subject:{bundleManifestSha256:$bundle_manifest_sha256,receiptSha256:$receipt_sha256},providerRun:{runId:$provider_run_id,url:$provider_run_url,workflow:"REA Pinned Provider Smoke",event:"push",ref:"refs/heads/main",sourceHeadSha:$source_head_sha,checkoutCommitSha:$receipt[0].source.checkout_commit_sha,providerVersion:$receipt[0].provider_version,semanticProjectionSha256:$receipt[0].semantic_projection_sha256.equivalent_runs,semanticMutationProjectionSha256:$receipt[0].semantic_projection_sha256.semantic_mutation,providerMetamorphicVariants:$receipt[0].provider_metamorphic.equivalent_variants},attestationRun:{workflowRef:$attestation_workflow_ref,sourceCommitSha:$attestation_workflow_sha,runId:$attestation_run_id,event:"workflow_dispatch",ref:"refs/heads/main"},qualification:{reaCliMcpParity:false,firmwareExecution:false,emulation:false,deviceQualification:false},limitations:["Unblob provider smoke on generated inert gzip/tar/text fixtures only","No REA CLI/MCP parity claim","No recovered firmware execution or emulation","No physical-device qualification"]}' > "$RUNNER_TEMP/rea-provider-smoke-predicate.json"
 
+      - name: Validate predicate schema before signing
+        shell: bash
+        env:
+          TARGET_HEAD_SHA: ${{ steps.target.outputs.head_sha }}
+        run: |
+          set -euo pipefail
+          RECEIPT="$RUNNER_TEMP/rea-provider-evidence/receipt.json"
+          MANIFEST="$RUNNER_TEMP/rea-provider-evidence/bundle-manifest.json"
+          MANIFEST_SHA=$(sha256sum "$MANIFEST" | awk '{print $1}')
+          RECEIPT_SHA=$(sha256sum "$RECEIPT" | awk '{print $1}')
+          jq -e --arg repo "$GITHUB_REPOSITORY" --arg type "$PREDICATE_TYPE" --arg source "$TARGET_HEAD_SHA" --arg manifest "$MANIFEST_SHA" --arg receipt "$RECEIPT_SHA" --arg attestor "$GITHUB_SHA" --arg attestor_ref "$GITHUB_WORKFLOW_REF" --arg attestor_run "$GITHUB_RUN_ID" '
+            (keys|sort) == ["attestationRun","evidenceTier","limitations","predicateType","providerRun","qualification","repository","schemaVersion","subject"] and
+            .schemaVersion == "symthaea.rea-provider-smoke-attestation.v1" and
+            .evidenceTier == "unblob-provider-smoke" and .repository == $repo and .predicateType == $type and
+            .subject.bundleManifestSha256 == $manifest and .subject.receiptSha256 == $receipt and
+            (.subject.bundleManifestSha256|test("^[0-9a-f]{64}$")) and (.subject.receiptSha256|test("^[0-9a-f]{64}$")) and
+            .providerRun.workflow == "REA Pinned Provider Smoke" and .providerRun.event == "push" and .providerRun.ref == "refs/heads/main" and
+            .providerRun.sourceHeadSha == $source and .providerRun.checkoutCommitSha == $source and .providerRun.providerVersion == "26.6.4" and
+            .providerRun.providerMetamorphicVariants == 64 and
+            (.providerRun.sourceHeadSha|test("^[0-9a-f]{40}$")) and (.providerRun.semanticProjectionSha256|test("^[0-9a-f]{64}$")) and
+            (.providerRun.semanticMutationProjectionSha256|test("^[0-9a-f]{64}$")) and
+            .providerRun.semanticProjectionSha256 != .providerRun.semanticMutationProjectionSha256 and
+            .attestationRun.workflowRef == $attestor_ref and .attestationRun.sourceCommitSha == $attestor and
+            .attestationRun.runId == $attestor_run and .attestationRun.event == "workflow_dispatch" and .attestationRun.ref == "refs/heads/main" and
+            .qualification == {reaCliMcpParity:false,firmwareExecution:false,emulation:false,deviceQualification:false} and
+            (.limitations|sort) == (["Unblob provider smoke on generated inert gzip/tar/text fixtures only","No REA CLI/MCP parity claim","No recovered firmware execution or emulation","No physical-device qualification"]|sort)
+          ' "$RUNNER_TEMP/rea-provider-smoke-predicate.json" >/dev/null
+
       - name: Sign bundle manifest and evidence predicate
         id: attest-evidence
         uses: actions/attest@1e69f48acb82d1966a394da916b4c1698aa569d6
@@ -130,6 +158,8 @@ jobs:
         shell: bash
         env:
           TARGET_HEAD_SHA: ${{ steps.target.outputs.head_sha }}
+          PROVIDER_RUN_ID: ${{ steps.target.outputs.run_id }}
+          PROVIDER_RUN_URL: ${{ steps.target.outputs.run_url }}
           ATTESTATION_BUNDLE_PATH: ${{ steps.attest-evidence.outputs.bundle-path }}
         run: |
           set -euo pipefail
@@ -145,8 +175,8 @@ jobs:
             --source-digest "$GITHUB_SHA" \
             --source-ref "$GITHUB_REF" \
             --format json > "$RUNNER_TEMP/verified-attestation.json"
-          jq -e --arg predicate "$PREDICATE_TYPE" --arg target "$TARGET_HEAD_SHA" --arg manifest "$MANIFEST_SHA" --arg receipt "$RECEIPT_SHA" --arg attestor_sha "$GITHUB_SHA" \
-            '. as $all | ($all | length) == 1 and ($all[0].verificationResult.statement as $s | $s.predicateType == $predicate and ($s.subject | length) == 1 and $s.subject[0].digest.sha256 == $manifest and $s.predicate.schemaVersion == "symthaea.rea-provider-smoke-attestation.v1" and $s.predicate.evidenceTier == "unblob-provider-smoke" and $s.predicate.providerRun.sourceHeadSha == $target and $s.predicate.subject.bundleManifestSha256 == $manifest and $s.predicate.subject.receiptSha256 == $receipt and $s.predicate.attestationRun.sourceCommitSha == $attestor_sha and $s.predicate.attestationRun.ref == "refs/heads/main" and $s.predicate.qualification.reaCliMcpParity == false and $s.predicate.qualification.deviceQualification == false)' "$RUNNER_TEMP/verified-attestation.json" >/dev/null
+          jq -e --arg predicate "$PREDICATE_TYPE" --arg target "$TARGET_HEAD_SHA" --arg manifest "$MANIFEST_SHA" --arg receipt "$RECEIPT_SHA" --arg attestor_sha "$GITHUB_SHA" --arg attestor_ref "$GITHUB_WORKFLOW_REF" --arg attestor_run "$GITHUB_RUN_ID" --arg provider_run "$PROVIDER_RUN_ID" --arg provider_url "$PROVIDER_RUN_URL" --slurpfile expected_receipt "$RECEIPT" \
+            '. as $all | ($all | length) == 1 and ($all[0].verificationResult.statement as $s | $s.predicateType == $predicate and ($s.subject | length) == 1 and $s.subject[0].digest.sha256 == $manifest and $s.predicate.schemaVersion == "symthaea.rea-provider-smoke-attestation.v1" and $s.predicate.evidenceTier == "unblob-provider-smoke" and $s.predicate.providerRun.sourceHeadSha == $target and $s.predicate.providerRun.runId == $provider_run and $s.predicate.providerRun.url == $provider_url and $s.predicate.providerRun.workflow == "REA Pinned Provider Smoke" and $s.predicate.providerRun.event == "push" and $s.predicate.providerRun.ref == "refs/heads/main" and $s.predicate.providerRun.checkoutCommitSha == $target and $s.predicate.providerRun.providerVersion == "26.6.4" and $s.predicate.providerRun.semanticProjectionSha256 == $expected_receipt[0].semantic_projection_sha256.equivalent_runs and $s.predicate.providerRun.semanticMutationProjectionSha256 == $expected_receipt[0].semantic_projection_sha256.semantic_mutation and $s.predicate.providerRun.providerMetamorphicVariants == 64 and $s.predicate.subject.bundleManifestSha256 == $manifest and $s.predicate.subject.receiptSha256 == $receipt and $s.predicate.attestationRun.workflowRef == $attestor_ref and $s.predicate.attestationRun.sourceCommitSha == $attestor_sha and $s.predicate.attestationRun.runId == $attestor_run and $s.predicate.attestationRun.event == "workflow_dispatch" and $s.predicate.attestationRun.ref == "refs/heads/main" and $s.predicate.qualification == {reaCliMcpParity:false,firmwareExecution:false,emulation:false,deviceQualification:false})' "$RUNNER_TEMP/verified-attestation.json" >/dev/null
 
       - name: Publish signed attestation bundle for portable verification
         uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02
