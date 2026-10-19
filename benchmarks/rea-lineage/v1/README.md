@@ -19,16 +19,16 @@ REA documents that decompressed children have unknown original byte ranges and t
 - A direct selected-input chunk's root range applies the selection's original-file offset exactly.
 - Child-task chunks retain task-local ranges; their root_file_range is null. Do not recursively add parent offsets through transforms.
 - A null range remains unknown; it is never normalized to offset zero.
-- Task, edge and chunk record order must not affect the semantic disposition.
+- Task, edge and chunk record order must not affect the semantic disposition. Required stage identity and nonempty provider IDs must be present; explicit unknown differs from a missing field.
 
 ## Corpus and gates
 
-cases.json and oracle.json contain 18 known-answer cases: nested valid extraction, fabricated descendant root mappings, mismatched blob identity, missing endpoints, disconnected tasks, cycles/self-edges, duplicate task paths, malformed/out-of-bounds ranges, multi-file null ranges and selected-range offset errors.
+cases.json and oracle.json contain 20 known-answer cases: nested valid extraction, fabricated descendant root mappings, mismatched blob identity, missing endpoints, disconnected tasks, cycles/self-edges, duplicate task paths, malformed/out-of-bounds ranges, multi-file null ranges and selected-range offset errors.
 
 | Benchmark | Target |
 |---|---|
 | Graph integrity | 100% detection of malformed/disconnected graphs in the declared corpus |
-| Edge/task identity | 100% agreement of edge blob identity with child task |
+| Edge/task identity | 100% agreement of edge blob identity with child task; no missing stage or provider IDs |
 | Parent range | 100% correct bounds; non-null chunk-backed ranges tie to the parent chunk |
 | Transformed children | 0 fabricated root ranges where the evidence provides only task-local offsets |
 | Unknown range handling | 100% null preservation; never silently default unknown to zero |
@@ -43,7 +43,7 @@ Requires jq.
     sh benchmarks/rea-lineage/v1/verify.sh
     sh benchmarks/rea-lineage/v1/mutation-controls.sh
 
-The verifier checks the fixed oracle and repeats each assessment with task, edge and chunk arrays reversed. Mutation controls alter one accepted graph in three ways and require rejection.
+The verifier checks the fixed oracle and repeats each assessment with task, edge and chunk arrays reversed. Mutation controls alter accepted graphs in five ways (invented root mapping, dropped lineage edge, null-to-zero, missing stage identity and empty provider identity) and require rejection.
 
 ## Claims ceiling
 
