@@ -23,6 +23,10 @@ Inspect a specific manifest-declared CSV after every artifact in the manifest ha
 
     cargo run --manifest-path tools/metal-measurement-bench/Cargo.toml -- inspect-csv MANIFEST.json ARTIFACT_DIR relative/path.csv
 
+Reconcile exact source-native row IDs and an explicit mapping file against the manifest-declared CSV:
+
+    cargo run --manifest-path tools/metal-measurement-bench/Cargo.toml -- reconcile-csv MANIFEST.json ARTIFACT_DIR MAPPING.json relative/path.csv
+
 For a normalized observation set:
 
     cargo run --manifest-path tools/metal-measurement-bench/Cargo.toml -- validate-records MANIFEST.json OBSERVATIONS.json ARTIFACT_DIR
@@ -31,12 +35,15 @@ Machine-readable contracts:
 - `tools/metal-measurement-bench/schemas/measurement-manifest-v0.1.schema.json`
 - `tools/metal-measurement-bench/schemas/observation-set-v0.1.schema.json`
 - `tools/metal-measurement-bench/schemas/audit-receipt-v0.1.schema.json`
+- `tools/metal-measurement-bench/schemas/csv-mapping-v0.1.schema.json`
 
 The CSV inventory is deliberately structural: it records the exact CSV digest, parsed-record count, ordered header names and per-column empty/nonempty counts. It rejects blank/colliding headers and inconsistent row widths. It does not infer measurement units, semantics, specimen IDs or upstream record IDs, and must not be reported as a complete row-level reconciliation.
 
-The `inspect-csv` command parses the verified byte buffer (after rechecking its declared size and digest) and emits a source-bound CSV structure inventory: exact artifact SHA-256, record count, header names/positions, empty/nonempty cell counts, and duplicate/ambiguous header rejection. It does not infer units, semantic meaning, specimen identity, or upstream row IDs. Parsed row ordinals are not claimed to be source-native identifiers. This is an intermediate reconciliation step, not a full data adapter.
+The `inspect-csv` command parses the verified byte buffer (after rechecking its declared size and digest) and emits a source-bound CSV structure inventory: exact artifact SHA-256, record count, header names/positions, empty/nonempty cell counts, and strict quote/duplicate-header rejection. It does not infer units, semantic meaning, specimen identity, or upstream row IDs. Parsed row ordinals are not claimed to be source-native identifiers.
 
-Record rows must bind the manifest's source-object ID and upstream row ID as well as the DOI and source-field identity. The exact source object must be declared, term-reviewed, locally authorized, and linked to a declared artifact whose byte count and SHA-256 are verified before record validation. A later mapping/reconciliation stage must prove every declared source row/field exists in the verified bytes and account for every exclusion. Raw numeric values and units, and censoring bounds, are preserved without replacing censored values with made-up point estimates. A normalized value requires a normalized unit and explicit conversion note. Repeated source fields must maintain one variable identity and raw unit; each normalized variable uses a consistent normalized unit. Uncertainty, censoring, missingness, specimen lineage, source DOI, and calibration/held-out outcome role stay explicit. The validator rejects undeclared source DOIs, duplicate record IDs, unjustified normalization, unexplained unknown censoring, and calibration target outcomes from the held-out target lineage.
+The `reconcile-csv` command accepts an explicit mapping contract. It checks that the chosen CSV path is manifest-declared, that the source-native row-ID header and every mapped header exactly exist, that source row IDs are nonblank and unique, that canonical field IDs are unique, and that each mapped field has an explicitly declared raw unit, role, and missing-cell policy. It binds the exact artifact and mapping bytes, header digest, ordered source-row-ID digest, row counts, and per-field present/missing counts to a versioned receipt. Missing cells either fail under `reject` or remain explicitly counted under `preserve_missing`; they are never imputed. The command does not parse numeric values, validate the physical meaning of units, infer specimen lineage, or produce model observations. Exact source headers and units must be filled from an inspected real source artifact, not guessed.
+
+Record rows must bind the manifest's source-object ID and upstream row ID as well as the DOI and source-field identity. The exact source object must be declared, term-reviewed, locally authorized, and linked to a declared artifact whose byte count and SHA-256 are verified before record validation. The current `reconcile-csv` stage proves the declared row identities and mapped headers exist in the verified bytes and accounts for every parsed row in its receipt. It does not yet define dataset-specific row exclusions or feature transformations; those must be explicit in a later profile-specific adapter. Raw numeric values and units, and censoring bounds, are preserved without replacing censored values with made-up point estimates. A normalized value requires a normalized unit and explicit conversion note. Repeated source fields must maintain one variable identity and raw unit; each normalized variable uses a consistent normalized unit. Uncertainty, censoring, missingness, specimen lineage, source DOI, and calibration/held-out outcome role stay explicit. The validator rejects undeclared source DOIs, duplicate record IDs, unjustified normalization, unexplained unknown censoring, and calibration target outcomes from the held-out target lineage.
 
 ## What a successful receipt means
 
