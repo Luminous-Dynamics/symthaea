@@ -18595,12 +18595,12 @@ dependencies = [
 name = "symthaea-culinary"
 version = "0.1.0"
 dependencies = [
-"serde_json",
-"serde",
-"sha2",
-"symthaea-fep",
-"symthaea-organic-chemistry",
-"symthaea-thermofluids",
+ "serde",
+ "serde_json",
+ "sha2",
+ "symthaea-fep",
+ "symthaea-organic-chemistry",
+ "symthaea-thermofluids",
 ]
 
 [[package]]
