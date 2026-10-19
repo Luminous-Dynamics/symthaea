@@ -347,7 +347,14 @@ mod tests {
                 ..Default::default()
             };
             let b = RenderColor::from_state(&state);
-            for d in [D::ProcessExact, D::DanceLocked, D::JazzLaidBack] {
+            for d in [
+                D::ProcessExact,
+                D::DroneElastic,
+                D::DramaticTiming,
+                D::ChoralBlend,
+                D::DanceLocked,
+                D::JazzLaidBack,
+            ] {
                 let r = room_for_dialect(b, d);
                 assert!((0.0..=1.0).contains(&r.reverb_room));
                 assert!((0.0..=1.0).contains(&r.reverb_level));
