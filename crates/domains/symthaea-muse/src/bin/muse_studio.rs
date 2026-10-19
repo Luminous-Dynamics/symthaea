@@ -237,6 +237,7 @@ mod wire_compat_tests {
             duration_secs: 12.5,
             similarity: Some(0.83),
             renderer: "native",
+            performance_dialect: None,
             phi: 0.013,
             local_coherence: 0.53,
             global_coherence: 0.05,
@@ -436,9 +437,11 @@ struct Candidate {
     created_at_unix_ms: u64,
     score: Score,
     /// The spec this candidate was composed with (the style preset when the
-    /// user didn't author one) — MIDI export re-derives the same performed
-    /// voices from it, so the `.mid` matches the audio.
+    /// user didn't author one).
     spec: symthaea_music_theory::CompositionSpec,
+    /// Explicit style profile used for performance/rendering. None means this
+    /// was a user-authored spec and uses the versioned texture-flag fallback.
+    performance_dialect: Option<symthaea_music_theory::PerformanceDialect>,
     state: symthaea_muse::MusicalState,
     seed: u64,
     renderer: &'static str,
@@ -728,6 +731,9 @@ struct CandidateMeta {
     /// through a real soundfont — preferred when the environment provides
     /// it) or "native" (the in-crate synthesizer fallback).
     renderer: &'static str,
+    /// Declared performance profile; absent only for a custom spec's fallback.
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    performance_dialect: Option<symthaea_music_theory::PerformanceDialect>,
     /// Musical Φ: integration of the score-as-system (spectral MIP over
     /// the voice×segment dependency graph — see
     /// `symthaea_music_theory::integration`). Score analysis, not
@@ -1411,6 +1417,7 @@ async fn cognitive_sonata_return(
         option_env!("SYMTHAEA_PERFORMANCE_MODEL_SHA256").map(str::to_owned);
     renderer_recipe.render_environment_sha256 =
         option_env!("SYMTHAEA_RENDER_ENVIRONMENT_SHA256").map(str::to_owned);
+    renderer_recipe.performance_dialect = Some(performance_dialect);
 
     let calibration = selected.prediction.clone();
     let mut selected_trace = trace.clone();
@@ -1501,6 +1508,7 @@ async fn cognitive_sonata_return(
                 created_at_unix_ms: unix_time_ms(),
                 score: selected.score,
                 spec,
+                performance_dialect: Some(performance_dialect),
                 state,
                 seed: intent.seed,
                 renderer,
@@ -2024,6 +2032,11 @@ async fn compose(
     // network) — the UI shows WHY instead of silently dropping the scores.
     let (similarities, ranking_note) = rank(&prompt, &rendered);
 
+    let candidate_performance_dialect = if is_custom_spec {
+        None
+    } else {
+        Some(style.grammar_profile().performance)
+    };
     let mut metas = Vec::with_capacity(rendered.len());
     // Exact-duplicate detection within this batch: different seeds/premises
     // can still land on byte-identical music (archetype styles whose
@@ -2120,6 +2133,7 @@ async fn compose(
                 option_env!("SYMTHAEA_PERFORMANCE_MODEL_SHA256").map(str::to_owned);
             renderer_recipe.render_environment_sha256 =
                 option_env!("SYMTHAEA_RENDER_ENVIRONMENT_SHA256").map(str::to_owned);
+            renderer_recipe.performance_dialect = candidate_performance_dialect;
             let recipe = PieceRecipe::new(candidate_intent, cand_spec.clone(), renderer_recipe)
                 .with_initial_musical_state(state_used.clone());
             let identity = symthaea_muse_protocol::ArtifactIdentity {
@@ -2137,6 +2151,7 @@ async fn compose(
                 duration_secs: comp.duration_secs,
                 similarity: similarities.as_ref().map(|s| s[idx]),
                 renderer,
+                performance_dialect: candidate_performance_dialect,
                 phi,
                 local_coherence,
                 global_coherence,
@@ -2161,6 +2176,7 @@ async fn compose(
                     created_at_unix_ms: unix_time_ms(),
                     score,
                     spec: cand_spec,
+                    performance_dialect: candidate_performance_dialect,
                     state: state_used.clone(),
                     seed,
                     renderer,
@@ -2679,17 +2695,29 @@ async fn midi(
     State(studio): State<Arc<Studio>>,
     AxPath(id): AxPath<u64>,
 ) -> Result<impl IntoResponse, StatusCode> {
-    let (score, spec, state, seed) = {
+    let (score, spec, state, seed, performance_dialect) = {
         let store = studio.candidates.lock().unwrap();
         let c = store.get(&id).ok_or(StatusCode::NOT_FOUND)?;
-        (c.score.clone(), c.spec.clone(), c.state.clone(), c.seed)
+        (
+            c.score.clone(),
+            c.spec.clone(),
+            c.state.clone(),
+            c.seed,
+            c.performance_dialect,
+        )
     };
-    // The PERFORMED export — swing, rubato, expression, and the contrast
-    // counter-instrument baked in, matching the audio render. Writes to a
-    // path; round-trip through a temp file.
+    // The PERFORMED export — use the exact declared style dialect that shaped
+    // the rendered audio. Custom specs keep the versioned flag-based fallback.
     let path = std::env::temp_dir().join(format!("muse_studio_{id}.mid"));
-    symthaea_muse::midi_export::export_performance_midi(&score, &spec, seed, &state, &path)
-        .map_err(|_| StatusCode::INTERNAL_SERVER_ERROR)?;
+    let export_result = match performance_dialect {
+        Some(dialect) => symthaea_muse::midi_export::export_performance_midi_with_dialect(
+            &score, &spec, seed, &state, dialect, &path,
+        ),
+        None => symthaea_muse::midi_export::export_performance_midi(
+            &score, &spec, seed, &state, &path,
+        ),
+    };
+    export_result.map_err(|_| StatusCode::INTERNAL_SERVER_ERROR)?;
     let bytes = std::fs::read(&path).map_err(|_| StatusCode::INTERNAL_SERVER_ERROR)?;
     let _ = std::fs::remove_file(&path);
     Ok((
@@ -2798,6 +2826,7 @@ fn persist_keeper_bundle(
     spec: &CompositionSpec,
     seed: u64,
     state: &MusicalState,
+    performance_dialect: Option<symthaea_music_theory::PerformanceDialect>,
     sequence: u64,
 ) -> std::io::Result<(PathBuf, bool)> {
     let root = Path::new("data/taste/audio");
@@ -2814,10 +2843,15 @@ fn persist_keeper_bundle(
         write_synced(&staging.join("recipe.json"), recipe_bytes)?;
 
         let midi_path = staging.join("performance.mid");
-        let midi_available = symthaea_muse::midi_export::export_performance_midi(
-            score, spec, seed, state, &midi_path,
-        )
-        .is_ok();
+        let midi_result = match performance_dialect {
+            Some(dialect) => symthaea_muse::midi_export::export_performance_midi_with_dialect(
+                score, spec, seed, state, dialect, &midi_path,
+            ),
+            None => symthaea_muse::midi_export::export_performance_midi(
+                score, spec, seed, state, &midi_path,
+            ),
+        };
+        let midi_available = midi_result.is_ok();
         if midi_available {
             std::fs::File::open(&midi_path)?.sync_all()?;
         } else {
@@ -3056,6 +3090,7 @@ fn keeper_sync(studio: &Studio, id: u64) -> Result<Response, StatusCode> {
         state,
         recipe,
         diversity_plan,
+        performance_dialect,
     ) = {
         let store = studio.candidates.lock().unwrap();
         let c = store.get(&id).ok_or(StatusCode::NOT_FOUND)?;
@@ -3077,6 +3112,7 @@ fn keeper_sync(studio: &Studio, id: u64) -> Result<Response, StatusCode> {
             c.state.clone(),
             c.recipe.clone(),
             c.diversity_plan.clone(),
+            c.performance_dialect,
         )
     };
     if !recipe.is_valid() {
@@ -3122,6 +3158,7 @@ fn keeper_sync(studio: &Studio, id: u64) -> Result<Response, StatusCode> {
         &spec,
         seed,
         &state,
+        performance_dialect,
         keeper_sequence,
     )
     .map_err(|_| StatusCode::INTERNAL_SERVER_ERROR)?;
@@ -4762,12 +4799,23 @@ async fn notes(
     State(studio): State<Arc<Studio>>,
     AxPath(id): AxPath<u64>,
 ) -> Result<impl IntoResponse, StatusCode> {
-    let (score, spec, state, seed) = {
+    let (score, spec, state, seed, performance_dialect) = {
         let store = studio.candidates.lock().unwrap();
         let c = store.get(&id).ok_or(StatusCode::NOT_FOUND)?;
-        (c.score.clone(), c.spec.clone(), c.state.clone(), c.seed)
+        (
+            c.score.clone(),
+            c.spec.clone(),
+            c.state.clone(),
+            c.seed,
+            c.performance_dialect,
+        )
     };
-    let voices = symthaea_muse::theory_realize::perform_with_spec(&score, &spec, seed, &state);
+    let voices = match performance_dialect {
+        Some(dialect) => symthaea_muse::theory_realize::perform_with_spec_and_dialect(
+            &score, &spec, seed, &state, dialect,
+        ),
+        None => symthaea_muse::theory_realize::perform_with_spec(&score, &spec, seed, &state),
+    };
     Ok(axum::Json(voices))
 }
 
