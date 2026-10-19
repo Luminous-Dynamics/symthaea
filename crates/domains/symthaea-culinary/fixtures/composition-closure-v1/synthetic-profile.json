@@ -1,0 +1,122 @@
+{
+  "schema_version": "1.0.0",
+  "profile_id": "synthetic-prepared-staple-closure-v1",
+  "basis": "per_100g_edible_fresh_weight",
+  "food_state": "prepared",
+  "carbohydrate_basis": "available_plus_fibre",
+  "components": [
+    {
+      "component_id": "water",
+      "measurement_status": "measured",
+      "value": 62,
+      "lower": 61.8,
+      "upper": 62.2,
+      "unit": "g/100g",
+      "basis": "per_100g_edible_fresh_weight",
+      "food_state": "prepared",
+      "evidence": {
+        "source_ref": "urn:synthetic:component:water",
+        "source_version": "fixture-v1",
+        "known_at": "2026-10-18T00:00:00Z",
+        "evidence_status": "synthetic"
+      }
+    },
+    {
+      "component_id": "protein",
+      "measurement_status": "measured",
+      "value": 5,
+      "lower": 4.8,
+      "upper": 5.2,
+      "unit": "g/100g",
+      "basis": "per_100g_edible_fresh_weight",
+      "food_state": "prepared",
+      "evidence": {
+        "source_ref": "urn:synthetic:component:protein",
+        "source_version": "fixture-v1",
+        "known_at": "2026-10-18T00:00:00Z",
+        "evidence_status": "synthetic"
+      }
+    },
+    {
+      "component_id": "fat",
+      "measurement_status": "measured",
+      "value": 8,
+      "lower": 7.8,
+      "upper": 8.2,
+      "unit": "g/100g",
+      "basis": "per_100g_edible_fresh_weight",
+      "food_state": "prepared",
+      "evidence": {
+        "source_ref": "urn:synthetic:component:fat",
+        "source_version": "fixture-v1",
+        "known_at": "2026-10-18T00:00:00Z",
+        "evidence_status": "synthetic"
+      }
+    },
+    {
+      "component_id": "available_carbohydrate",
+      "measurement_status": "measured",
+      "value": 20,
+      "lower": 19.8,
+      "upper": 20.2,
+      "unit": "g/100g",
+      "basis": "per_100g_edible_fresh_weight",
+      "food_state": "prepared",
+      "evidence": {
+        "source_ref": "urn:synthetic:component:available_carbohydrate",
+        "source_version": "fixture-v1",
+        "known_at": "2026-10-18T00:00:00Z",
+        "evidence_status": "synthetic"
+      }
+    },
+    {
+      "component_id": "dietary_fibre",
+      "measurement_status": "measured",
+      "value": 3,
+      "lower": 2.8,
+      "upper": 3.2,
+      "unit": "g/100g",
+      "basis": "per_100g_edible_fresh_weight",
+      "food_state": "prepared",
+      "evidence": {
+        "source_ref": "urn:synthetic:component:dietary_fibre",
+        "source_version": "fixture-v1",
+        "known_at": "2026-10-18T00:00:00Z",
+        "evidence_status": "synthetic"
+      }
+    },
+    {
+      "component_id": "ash",
+      "measurement_status": "measured",
+      "value": 2,
+      "lower": 1.8,
+      "upper": 2.2,
+      "unit": "g/100g",
+      "basis": "per_100g_edible_fresh_weight",
+      "food_state": "prepared",
+      "evidence": {
+        "source_ref": "urn:synthetic:component:ash",
+        "source_version": "fixture-v1",
+        "known_at": "2026-10-18T00:00:00Z",
+        "evidence_status": "synthetic"
+      }
+    },
+    {
+      "component_id": "alcohol",
+      "measurement_status": "measured",
+      "value": 1,
+      "lower": 0.8,
+      "upper": 1.2,
+      "unit": "g/100g",
+      "basis": "per_100g_edible_fresh_weight",
+      "food_state": "prepared",
+      "evidence": {
+        "source_ref": "urn:synthetic:component:alcohol",
+        "source_version": "fixture-v1",
+        "known_at": "2026-10-18T00:00:00Z",
+        "evidence_status": "synthetic"
+      }
+    }
+  ],
+  "unavailable_components": []
+}
