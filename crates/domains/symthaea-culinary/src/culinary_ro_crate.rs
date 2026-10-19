@@ -18,7 +18,8 @@ use crate::culinary_evidence_bundle::verify_culinary_evidence_bundle_v1;
 
 const CRATE_METADATA_PATH: &str = "ro-crate-metadata.json";
 const EVIDENCE_MANIFEST_PATH: &str = "culinary-evidence-manifest.json";
-const RO_CRATE_13: &str = "https://w3id.org/ro/crate/1.3";
+const RO_CRATE_PROFILE: &str = "https://w3id.org/ro/crate/1.3";
+const RO_CRATE_CONTEXT: &str = "https://w3id.org/ro/crate/1.3/context";
 const CULINARY_CONTEXT: &str = "https://w3id.org/luminous-dynamics/culinary-evidence#";
 
 #[derive(Debug, Deserialize)]
@@ -103,16 +104,19 @@ pub fn export_culinary_evidence_bundle_ro_crate_v1(
     }
 
     let reserved: [&str; 2] = [CRATE_METADATA_PATH, EVIDENCE_MANIFEST_PATH];
-    if let Some(artifact) = manifest
-        .artifacts
-        .iter()
-        .find(|artifact| reserved.contains(&artifact.path.as_str()))
-    {
+    if let Some(artifact) = manifest.artifacts.iter().find(|artifact| {
+        reserved.iter().any(|reserved_path| artifact.path.eq_ignore_ascii_case(reserved_path))
+    }) {
         return Err(vec![format!(
             "artifact path {:?} collides with an RO-Crate reserved file",
             artifact.path
         )]);
     }
+
+    let protocol_path = manifest.artifacts.iter()
+        .find(|artifact| artifact.artifact_kind == "protocol")
+        .map(|artifact| artifact.path.as_str())
+        .ok_or_else(|| vec!["verified manifest lost its protocol artifact before export".to_owned()])?;
 
     let mut files = BTreeMap::new();
     let mut part_ids = vec![json!({ "@id": EVIDENCE_MANIFEST_PATH })];
@@ -121,7 +125,7 @@ pub fn export_culinary_evidence_bundle_ro_crate_v1(
             "@id": CRATE_METADATA_PATH,
             "@type": "CreativeWork",
             "about": { "@id": "./" },
-            "conformsTo": { "@id": RO_CRATE_13 }
+            "conformsTo": { "@id": RO_CRATE_PROFILE }
         }),
         json!({
             "@id": "./",
@@ -129,12 +133,7 @@ pub fn export_culinary_evidence_bundle_ro_crate_v1(
             "name": format!("Culinary experiment evidence {}", manifest.experiment_id),
             "identifier": manifest.bundle_id,
             "hasPart": part_ids,
-            "isBasedOn": {
-                "@id": manifest.artifacts.iter()
-                    .find(|artifact| artifact.artifact_kind == "protocol")
-                    .map(|artifact| artifact.path.as_str())
-                    .unwrap_or("")
-            },
+            "isBasedOn": { "@id": protocol_path },
             "manifestSha256": verified.manifest_sha256(),
             "experimentId": manifest.experiment_id,
             "protocolSha256": manifest.protocol_sha256,
@@ -192,7 +191,7 @@ pub fn export_culinary_evidence_bundle_ro_crate_v1(
 
     let metadata = json!({
         "@context": [
-            RO_CRATE_13,
+            RO_CRATE_CONTEXT,
             {
                 "culinary": CULINARY_CONTEXT,
                 "artifactId": "culinary:artifactId",
