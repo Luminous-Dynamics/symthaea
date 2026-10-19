@@ -265,9 +265,7 @@ fn audit_csv_bytes(
                 field: name.clone(),
                 present: header_index(&headers, field).is_some(),
                 unique_nonblank_values: values.len(),
-                missing_rows: *group_missing
-                    .get(&name)
-                    .expect("group field initialized"),
+                missing_rows: *group_missing.get(&name).expect("group field initialized"),
                 example_values: group_examples
                     .get(&name)
                     .expect("group field initialized")
