@@ -3,6 +3,9 @@
 
 use std::{env, fs, process};
 
+use symthaea_habitat_vertical_bench::scenario_campaign::{
+    validate_scenario_campaign_str, EMBEDDED_SCENARIO_CAMPAIGN,
+};
 use symthaea_habitat_vertical_bench::{validate_fixture_str, EMBEDDED_FIXTURE};
 
 fn main() {
@@ -68,6 +71,32 @@ fn main() {
                 process::exit(1);
             }
         };
+
+        if input_storage.is_none() {
+            let campaign = match validate_scenario_campaign_str(EMBEDDED_SCENARIO_CAMPAIGN) {
+                Ok(report) => report,
+                Err(error) => {
+                    eprintln!("invalid embedded scenario campaign JSON: {error}");
+                    process::exit(2);
+                }
+            };
+            if !campaign.is_valid() {
+                eprintln!(
+                    "SCENARIO CAMPAIGN DEFINITION: FAIL ({} findings)",
+                    campaign.issues.len()
+                );
+                for issue in campaign.issues {
+                    eprintln!("{} {}: {}", issue.code, issue.path, issue.message);
+                }
+                process::exit(1);
+            }
+            println!(
+                "synthetic disruption campaign definition: PASS ({} scenarios; numeric results={}; simulation=NOT RUN)",
+                campaign.scenario_count, campaign.numeric_result_count
+            );
+        } else {
+            println!("embedded disruption campaign: not checked against the alternate fixture");
+        }
 
         println!("STRUCTURAL FIXTURE VALIDATION: PASS");
         println!(
