@@ -578,6 +578,21 @@ mod tests {
         let meta_sha = sha(&meta_bytes);
         write(&artifact.join("provider-metamorphic-receipt.json"), &meta_bytes);
 
+        let mut bundle_paths = Vec::new();
+        collect_bundle_paths(&artifact, &artifact, &mut bundle_paths).unwrap();
+        bundle_paths.sort();
+        let bundle_entries: Vec<Value> = bundle_paths
+            .iter()
+            .map(|path| json!({"path": path, "sha256": hash_file(&artifact.join(path)).unwrap()}))
+            .collect();
+        let bundle_manifest = json!({
+            "schema_version": BUNDLE_MANIFEST_SCHEMA,
+            "files": bundle_entries,
+        });
+        let bundle_manifest_bytes = serde_json::to_vec_pretty(&bundle_manifest).unwrap();
+        let bundle_manifest_sha = sha(&bundle_manifest_bytes);
+        write(&artifact.join("bundle-manifest.json"), &bundle_manifest_bytes);
+
         let receipt = json!({
             "schema_version": RECEIPT_SCHEMA,
             "benchmark": BENCHMARK,
@@ -610,6 +625,7 @@ mod tests {
             "raw_report_sha256": {"run_a":raw_a_sha,"run_b":raw_b_sha,"run_mutated":raw_mut_sha},
             "semantic_projection_sha256": {"equivalent_runs":proj_sha,"semantic_mutation":proj_mut_sha},
             "provider_metamorphic": {"receipt_sha256":meta_sha,"equivalent_variants":64,"semantic_projection_sha256":proj_sha},
+            "bundle_manifest_sha256": bundle_manifest_sha,
             "claims_ceiling": RECEIPT_SCOPE,
         });
         write(&artifact.join("receipt.json"), serde_json::to_vec_pretty(&receipt).unwrap().as_slice());
