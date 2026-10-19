@@ -32,9 +32,10 @@ jobs:
     runs-on: ubuntu-latest
     timeout-minutes: 10
     steps:
-      - name: Check out the exact triggering head
+      - name: Check out the exact triggering head and source ancestry
         uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262
         with:
+          fetch-depth: 0
           persist-credentials: false
 
       - name: Verify frozen source and qualifier-only overlay
