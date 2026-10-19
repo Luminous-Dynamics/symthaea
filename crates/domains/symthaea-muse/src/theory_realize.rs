@@ -1101,6 +1101,34 @@ pub fn perform_with_spec(
         .collect()
 }
 
+/// As [`perform_with_spec`], but preserve the style's declared grammar-level
+/// performance dialect. Use this when the candidate retained an explicit
+/// preset identity; custom specs should continue through `perform_with_spec`.
+pub fn perform_with_spec_and_dialect(
+    score: &TheoryScore,
+    spec: &symthaea_music_theory::CompositionSpec,
+    seed: u64,
+    state: &MusicalState,
+    dialect: symthaea_music_theory::PerformanceDialect,
+) -> Vec<PerformedVoice> {
+    let ensemble = resolve_spec_ensemble(spec, seed);
+    performance_voices_with_dialect(
+        score,
+        ensemble,
+        spec.texture.swing as f64,
+        state,
+        spec.texture.return_color,
+        map_grammar_dialect(dialect),
+    )
+    .into_iter()
+    .map(|pv| PerformedVoice {
+        name: pv.name.to_string(),
+        instrument: format!("{:?}", pv.instrument),
+        notes: pv.notes,
+    })
+    .collect()
+}
+
 /// Resolve a spec's instrument names into the four performed voices
 /// (melody, harmony, bass, counter). Unknown names fall back LOUDLY
 /// (stderr); an unset `counter_instrument` gets the automatic timbral
