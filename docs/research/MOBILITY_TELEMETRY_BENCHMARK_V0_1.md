@@ -65,7 +65,7 @@ Physical eligibility also requires a claim-specific uncertainty budget (measuran
 
 ## Fault injection matrix and conformance
 
-The machine-readable matrix lists 26 required positive and negative controls, including clock-method spoofing, missing claim-specific uncertainty budgets, and an expanded-uncertainty value that exceeds its pre-registered tolerance. Include positive controls so a validator that rejects everything does not pass. At minimum, exercise:
+The machine-readable matrix lists 27 required positive and negative controls, including clock-method spoofing, missing claim-specific uncertainty budgets, an expanded-uncertainty value that exceeds its pre-registered tolerance, and a calculated-but-not-characterized budget. Include positive controls so a validator that rejects everything does not pass. At minimum, exercise:
 - malformed or reordered headers, empty traces and unknown channels/statuses;
 - VALID samples with missing values, non-finite numbers, sequence gaps, timestamp regression and repeated timestamps for a channel;
 - repeated timestamps across different channels where simultaneous sampling is permitted;
