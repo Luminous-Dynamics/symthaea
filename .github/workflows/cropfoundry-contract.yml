@@ -111,3 +111,6 @@ jobs:
           grep -q '"total_delivered_mg": 19.0' "$RUNNER_TEMP/cropfoundry-nutrition-portfolio-receipt.json"
           grep -q '"total_delivered_mg": 16.5' "$RUNNER_TEMP/cropfoundry-nutrition-portfolio-receipt.json"
           grep -q '"training_authorized": false' "$RUNNER_TEMP/cropfoundry-nutrition-portfolio-receipt.json"
+          grep -q '"nutrient_interval_comparison_available": {' "$RUNNER_TEMP/cropfoundry-nutrition-portfolio-receipt.json"
+          grep -q '"bioavailability_comparison_available": {' "$RUNNER_TEMP/cropfoundry-nutrition-portfolio-receipt.json"
+          grep -q '"iron": false' "$RUNNER_TEMP/cropfoundry-nutrition-portfolio-receipt.json"
