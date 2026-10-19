@@ -39,7 +39,7 @@ Policies are:
 4. `water_matched_rotating_equal_share`: a hindsight counterfactual that reallocates the risk-aware policy's exact daily total water uniformly across zones, rotating discrete rounding remainders. It isolates water-placement effects but is not a deployable policy.
 5. `greedy_minimax_stress`: a greedy fairness-oriented policy that tests each candidate water increment and chooses the allocation that minimizes maximum predicted per-zone stress proxy, using summed proxy as a tie-breaker. This is a heuristic policy, not a global optimality or field-safety guarantee.
 
-The v1 receipt records scenario parameters, per-scenario and per-zone irrigation, overflow proxy, aggregate and per-zone stress-exposure proxies, worst/best zone burden, worst-to-best ratio, cumulative allocation dispersion, percentage change against equal-share, and the risk-aware policy's stress delta versus the dose-matched rotating-uniform counterfactual. It also reports absolute/relative stress change versus the same policy in the reference scenario, plus policy-level mean/median aggregate and worst-zone proxies and water totals. It also reports sensor-dropout fraction and daily budget violations. The executable fails if any policy exceeds a daily total-water budget, exceeds any plot's actuator limit, or emits non-finite core metrics. It now scores the minimax policy alongside the two original optimization policies and the dose-matched hindsight counterfactual.
+The v2 receipt records scenario parameters, per-scenario and per-zone irrigation, overflow proxy, aggregate and per-zone stress-exposure proxies, worst/best zone burden, worst-to-best ratio, cumulative allocation dispersion, percentage change against equal-share, and the risk-aware policy's stress delta versus the dose-matched rotating-uniform counterfactual. It also reports absolute/relative stress change versus the same policy in the reference scenario, plus policy-level mean/median aggregate and worst-zone proxies, both hard-constraint violation counts and water totals. It also reports sensor-dropout fraction and daily budget violations. The executable fails if any policy exceeds a daily total-water budget, exceeds any plot's actuator limit, or emits non-finite core metrics. It now scores the minimax policy alongside the two original optimization policies and the dose-matched hindsight counterfactual.
 
 
 **Unit note:** per-plot storage/demand values are synthetic depth-like values. Global irrigation totals add depths over equally weighted toy plots and are labelled `plot-mm`; without plot areas, flow rates and hydraulics, these sums are not volumetric water use and must not be compared with farm meter readings.
@@ -79,9 +79,9 @@ Keep the two comparisons separate:
 
 The second counterfactual is intended to diagnose whether the risk-aware score gain comes from allocating water to particular plots rather than simply using less water. It is still possible to hide burden by sacrificing one plot, so inspect zone-level stress and distributional metrics alongside aggregate stress. No agronomic or biological claim follows from either comparison.
 
-## Exploratory result: aggregate stress is not a sufficient objective
+## Historical v1 finding: aggregate stress is not a sufficient objective
 
-The first successful matched-dose harness receipt gives a concrete counterexample. All four receipt policies had zero daily total-water-budget violations and zero per-plot-limit violations across the six scenarios.
+The first matched-dose receipt (schema v1) exposed a serious disparity failure, but subsequent review found a scoring defect in that version. The table below is preserved as a historical debugging artifact, not as a valid final benchmark result. All four v1 receipt policies had zero daily total-water-budget violations and zero per-plot-limit violations across the six scenarios.
 
 | Synthetic policy | Mean aggregate stress proxy | Median worst-zone stress proxy | Maximum worst-zone stress proxy | Mean worst-to-best zone stress ratio | Total irrigation (plot-mm) | Mean allocation dispersion |
 |---|---:|---:|---:|---:|---:|---:|
@@ -92,9 +92,11 @@ The first successful matched-dose harness receipt gives a concrete counterexampl
 
 All scores are from the toy scenario equations. "plot-mm" is a sum of synthetic depths, not physical water volume. The matched-uniform row uses the risk-aware policy's exact daily total-water trace, so both policies use the same amount of water on every day.
 
+**Why these v1 scores are superseded:** the old scoring function clipped the predicted end-of-step storage margin to zero before computing stress. When a zone was already predicted to be empty, a small additional water increment could produce zero marginal improvement until it covered that day's demand. That created an artificial dead zone in the optimizer and allowed it to starve a plot while scoring well elsewhere. Receipt schema v2 now retains negative end-of-step water margin as unmet-demand severity for scoring, while the simulated physical storage state remains clamped between zero and capacity. All policy scores must be recomputed under v2; never compare v1 and v2 score levels directly.
+
 The risk-aware policy has a much lower **aggregate** stress proxy than the dose-matched uniform counterfactual, but its worst-zone stress is not lower, its maximum worst-zone exposure is slightly higher, and its mean worst-to-best zone-stress ratio is extreme. In several scenarios it allocated almost all water to zones 0 and 2 while zone 1 accumulated almost all the stress proxy. The score rewarded protecting two zones and allowed one to be sacrificed. That is a **benchmark failure of the aggregate objective**, even though arithmetic, determinism and resource constraints passed.
 
-Do not describe the -57.36% matched-dose stress delta as success. The next research increment should add and test a minimax/fairness-aware allocation policy, and acceptance should include a predeclared bound on worst-zone stress and disparity alongside aggregate performance. No crop safety or agronomic guarantee can be inferred from these synthetic numbers.
+Do not describe the historical -57.36% matched-dose stress delta as success. The next research gate is to recompute all policies under the v2 stress proxy and assess the new greedy minimax policy; acceptance must include a predeclared bound on worst-zone stress and disparity alongside aggregate performance. No crop safety or agronomic guarantee can be inferred from the v1 synthetic numbers.
 
 ## Acceptance tests for the matched-dose comparison
 
@@ -107,11 +109,11 @@ The implementation must demonstrate all of the following before a receipt is con
 
 If any invariant fails, fix the allocator or weaken the claim to match the exact invariant that is proved; do not hide the failure behind a better aggregate score.
 
-## Per-zone safety and distributional reporting — receipt schema v1
+## Per-zone safety and distributional reporting — receipt schema v2
 
 The first working receipt made an important weakness visible: the uncertainty-aware policy concentrated more water on a subset of plots than equal-share allocation. In the earlier exploratory synthetic receipt, equal-share had median aggregate stress proxy 861.376 and total irrigation 1,386 plot-mm; the uncertainty-aware policy had median proxy 562.967 and total irrigation 909.7 plot-mm. Its mean plot-allocation dispersion was 33.4 plot-mm versus 0 for equal share, although all tested policy/scenario combinations had zero water-cap violations. These are outputs from an artificial fixture, not crop observations or physical water volume.
 
-That uneven allocation is why the harness now emits **per-zone cumulative irrigation, per-zone stress exposure, worst-zone and best-zone stress, and worst-to-best stress ratio** in receipt schema v1. Policy-level summaries also report the median and maximum worst-zone stress across scenarios. Inspect these beside total stress and allocation dispersion. A reduction in aggregate proxy must not be considered sufficient if the burden is shifted to one plot or a crop/household subgroup.
+That uneven allocation is why the harness now emits **per-zone cumulative irrigation, per-zone stress exposure, worst-zone and best-zone stress, and worst-to-best stress ratio** in receipt schema v2. Policy-level summaries also report the median and maximum worst-zone stress across scenarios. Inspect these beside total stress and allocation dispersion. A reduction in aggregate proxy must not be considered sufficient if the burden is shifted to one plot or a crop/household subgroup.
 
 The earlier receipt was an **exploratory implementation smoke run under the aggregate-only schema**. It is not a completed evaluation of the expanded reporting contract. Rerun the current harness and preserve the new per-zone metrics before evaluating CF-022 further. The provisional 10% aggregate target is unchanged; no permissible worst-zone burden or fairness bound has been locked, so this synthetic benchmark cannot authorize operational deployment.
 
