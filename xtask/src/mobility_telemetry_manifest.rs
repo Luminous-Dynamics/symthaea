@@ -192,6 +192,19 @@ struct Artifact {
 }
 
 #[derive(Debug, Clone, Deserialize, Serialize)]
+struct ClaimUncertaintyBudget {
+    claim_target: String,
+    measurand: String,
+    unit: String,
+    standard_uncertainty: f64,
+    expanded_uncertainty: f64,
+    coverage_factor: f64,
+    acceptance_tolerance: f64,
+    evidence_state: String,
+    artifact_path: String,
+}
+
+#[derive(Debug, Clone, Deserialize, Serialize)]
 struct Manifest {
     manifest_id: String,
     schema_version: String,
@@ -205,6 +218,8 @@ struct Manifest {
     channels: Vec<Channel>,
     claim_targets: Vec<String>,
     artifacts: Vec<Artifact>,
+    #[serde(default)]
+    uncertainty_budgets: Vec<ClaimUncertaintyBudget>,
     limitations: Vec<String>,
 }
 
@@ -390,6 +405,44 @@ fn validate_structure(manifest: &Manifest) -> Result<()> {
         }
     }
 
+    let mut budget_claims = BTreeSet::new();
+    for budget in &manifest.uncertainty_budgets {
+        if !known_claim(&budget.claim_target)
+            || !manifest.claim_targets.iter().any(|claim| claim == &budget.claim_target)
+        {
+            bail!("uncertainty budget references undeclared claim target: {}", budget.claim_target);
+        }
+        if !budget_claims.insert(budget.claim_target.as_str()) {
+            bail!("duplicate uncertainty budget for claim target: {}", budget.claim_target);
+        }
+        if budget.measurand.trim().is_empty()
+            || !KNOWN_UNITS.contains(&budget.unit.as_str())
+            || !["planned", "calculated", "bench_characterized", "independently_reviewed"]
+                .contains(&budget.evidence_state.as_str())
+            || !valid_relative_path(&budget.artifact_path)
+        {
+            bail!("uncertainty budget for {} has invalid measurand, unit, state or artifact path", budget.claim_target);
+        }
+        if !budget.standard_uncertainty.is_finite() || budget.standard_uncertainty < 0.0
+            || !budget.expanded_uncertainty.is_finite() || budget.expanded_uncertainty < 0.0
+            || !budget.coverage_factor.is_finite() || budget.coverage_factor < 1.0
+            || !budget.acceptance_tolerance.is_finite() || budget.acceptance_tolerance <= 0.0
+        {
+            bail!("uncertainty budget for {} has invalid numeric values", budget.claim_target);
+        }
+        let expected_expanded = budget.standard_uncertainty * budget.coverage_factor;
+        let rounding_allowance = expected_expanded.abs().max(budget.expanded_uncertainty.abs()).max(1e-12) * 0.02;
+        if (budget.expanded_uncertainty - expected_expanded).abs() > rounding_allowance {
+            bail!("uncertainty budget for {} does not satisfy expanded uncertainty ≈ coverage factor × standard uncertainty", budget.claim_target);
+        }
+        let receipt_exists = manifest.artifacts.iter().any(|artifact| {
+            artifact.relative_path == budget.artifact_path && artifact.kind == "uncertainty_budget_record"
+        });
+        if !receipt_exists {
+            bail!("uncertainty budget for {} must reference a declared uncertainty_budget_record artifact", budget.claim_target);
+        }
+    }
+
     if manifest.session_state != "planned" && manifest.artifacts.is_empty() {
         bail!("recorded or closed sessions require at least one content-addressed artifact");
     }
@@ -510,6 +563,18 @@ fn claim_eligibility(manifest: &Manifest, claim: &str) -> ClaimEligibility {
     }
     if !missing_channels.is_empty() {
         reasons.push("claim_required_channels_missing".into());
+    }
+
+    match manifest.uncertainty_budgets.iter().find(|budget| budget.claim_target == claim) {
+        None => reasons.push("missing_claim_uncertainty_budget".into()),
+        Some(budget) => {
+            if !["bench_characterized", "independently_reviewed"].contains(&budget.evidence_state.as_str()) {
+                reasons.push("uncertainty_budget_not_verified".into());
+            }
+            if budget.expanded_uncertainty > budget.acceptance_tolerance {
+                reasons.push("uncertainty_budget_exceeds_tolerance".into());
+            }
+        }
     }
 
     let sensors: std::collections::BTreeMap<&str, &Sensor> = manifest
