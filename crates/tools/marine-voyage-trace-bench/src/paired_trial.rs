@@ -272,10 +272,10 @@ pub fn audit_campaign(campaign_id: &str, runs: &[TrialRun]) -> CampaignAudit {
                 .then_with(|| a.order.cmp(&b.order))
         });
 
-        let assessment = if group.len() != 2 {
+        let mut assessment = if group.len() != 2 {
             PairAssessment::incomparable(
-                group_campaign_id,
-                pair_id,
+                group_campaign_id.clone(),
+                pair_id.clone(),
                 group.len(),
                 vec![PairingIssue::PairCardinality { count: group.len() }],
             )
@@ -285,13 +285,22 @@ pub fn audit_campaign(campaign_id: &str, runs: &[TrialRun]) -> CampaignAudit {
             match (baseline, candidate) {
                 (Some(baseline), Some(candidate)) => assess_pair(baseline, candidate),
                 _ => PairAssessment::incomparable(
-                    group_campaign_id,
-                    pair_id,
+                    group_campaign_id.clone(),
+                    pair_id.clone(),
                     group.len(),
                     vec![PairingIssue::RoleAssignmentMismatch],
                 ),
             }
         };
+
+        if group_campaign_id != campaign_id {
+            if assessment.eligible_pair.take().is_some() {
+                assessment.disposition = PairDisposition::Incomparable;
+            }
+            if !assessment.issues.contains(&PairingIssue::CampaignMismatch) {
+                assessment.issues.push(PairingIssue::CampaignMismatch);
+            }
+        }
 
         match assessment.disposition {
             PairDisposition::EligibleForEnergyComparison => {
