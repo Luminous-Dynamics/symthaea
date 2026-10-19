@@ -40,6 +40,7 @@ impl MaterialLedgerReport {
 
 #[derive(Debug, Clone)]
 struct AccountSpec {
+    account_class: String,
     unit: String,
     traceability_node_id: Option<String>,
     opening: u64,
@@ -141,6 +142,10 @@ pub fn validate_material_ledger(
             push(&mut issues, "ACCOUNT_ID_MISSING", format!("{path}.account_id"), "account_id must be a non-empty string");
             continue;
         };
+        let account_class = account.get("account_class").and_then(Value::as_str).unwrap_or_default().to_owned();
+        if account_class.trim().is_empty() {
+            push(&mut issues, "ACCOUNT_CLASS_MISSING", format!("{path}.account_class"), "account_class must be a non-empty string");
+        }
         let unit = account.get("unit").and_then(Value::as_str).unwrap_or_default().to_owned();
         if unit != "mg" {
             push(&mut issues, "UNIT_MISMATCH", format!("{path}.unit"), "this ledger schema only permits mg");
@@ -164,6 +169,7 @@ pub fn validate_material_ledger(
             }
         }
         let spec = AccountSpec {
+            account_class,
             unit,
             traceability_node_id,
             opening: opening.unwrap_or(0),
@@ -383,6 +389,34 @@ pub fn validate_material_ledger(
     }
     if root.pointer("/expected_known_answer/nonzero_closing_account_count").and_then(Value::as_u64) != Some(nonzero_closing_account_count as u64) {
         push(&mut issues, "KNOWN_ANSWER_NONZERO_ACCOUNT_COUNT_MISMATCH", "expected_known_answer.nonzero_closing_account_count", "nonzero closing account count differs from the frozen known answer");
+    }
+
+    let class_total = |classes: &[&str]| -> Option<u64> {
+        checked_account_total(accounts.iter().filter_map(|(id, spec)| {
+            if classes.contains(&spec.account_class.as_str()) {
+                balances.get(id).copied()
+            } else {
+                None
+            }
+        }))
+    };
+    let delivered_component = class_total(&["delivered_component"]);
+    let recoverable_material = class_total(&["recoverable_offcut", "recovered_feedstock"]);
+    let scrap_and_residue = class_total(&["scrap", "residue"]);
+    for (field, actual) in [
+        ("accepted_component_mass_mg", delivered_component),
+        ("recoverable_material_mg", recoverable_material),
+        ("scrap_and_residue_mg", scrap_and_residue),
+    ] {
+        let expected = root.pointer(&format!("/expected_known_answer/{field}")).and_then(Value::as_u64);
+        if actual.is_none() || expected != actual {
+            push(
+                &mut issues,
+                "KNOWN_ANSWER_CLASS_TOTAL_MISMATCH",
+                format!("expected_known_answer.{field}"),
+                format!("declared value {expected:?} does not match replayed account-class total {actual:?}"),
+            );
+        }
     }
 
     report(issues, accounts.len(), transactions.len(), opening_mass_mg, closing_mass_mg, nonzero_closing_account_count)
