@@ -246,17 +246,27 @@ pub fn render_midi_to_wav_with_mastering(
 fn master_wav(path: &Path, mastering: &crate::auto_master::MasteringConfig) -> Option<Vec<u8>> {
     let mut reader = hound::WavReader::open(path).ok()?;
     let spec_in = reader.spec();
+    if spec_in.channels == 0 || spec_in.sample_rate == 0 {
+        return None;
+    }
     let samples: Vec<f32> = match spec_in.sample_format {
         hound::SampleFormat::Int => {
             let scale = 1.0 / (1i64 << (spec_in.bits_per_sample - 1)) as f32;
             reader
                 .samples::<i32>()
-                .filter_map(Result::ok)
-                .map(|s| s as f32 * scale)
-                .collect()
+                .map(|sample| sample.map(|value| value as f32 * scale))
+                .collect::<Result<Vec<_>, _>>()
+                .ok()?
         }
-        hound::SampleFormat::Float => reader.samples::<f32>().filter_map(Result::ok).collect(),
+        hound::SampleFormat::Float => reader.samples::<f32>().collect::<Result<Vec<_>, _>>().ok()?,
     };
+    let channels = spec_in.channels as usize;
+    if samples.is_empty()
+        || samples.len() % channels != 0
+        || samples.iter().any(|sample| !sample.is_finite())
+    {
+        return None;
+    }
     let peak = samples.iter().fold(0.0f32, |m, s| m.max(s.abs()));
     if peak < 1e-5 {
         return None; // silence — treat as a failed render
@@ -264,12 +274,11 @@ fn master_wav(path: &Path, mastering: &crate::auto_master::MasteringConfig) -> O
 
     // `auto_master` works on stereo frames. FluidSynth renders stereo, but
     // handle mono defensively by duplicating the channel rather than failing.
-    let channels = spec_in.channels.max(1) as usize;
     let mut frames: Vec<[f32; 2]> = match channels {
         1 => samples.iter().map(|&s| [s, s]).collect(),
         _ => samples
             .chunks_exact(channels)
-            .map(|c| [c[0], c[1 % channels]])
+            .map(|c| [c[0], c[1]])
             .collect(),
     };
     crate::auto_master::auto_master(
