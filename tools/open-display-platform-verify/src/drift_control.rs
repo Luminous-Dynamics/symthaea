@@ -563,7 +563,8 @@ mod tests {
             report.observations[1].disposition,
             ObservationDisposition::QuarantinedByControlExcursion
         );
-        assert_eq!(report.observations[1].responsible_control_ids, ["excursion"]);
+        assert_eq!(report.observations[1].responsible_control_ids.len(), 1);
+        assert_eq!(report.observations[1].responsible_control_ids[0], "excursion");
         assert_eq!(
             report.observations[2].disposition,
             ObservationDisposition::NoOutOfBandControlDetected
@@ -691,10 +692,9 @@ mod tests {
             report.observations[0].disposition,
             ObservationDisposition::QuarantinedByControlExcursion
         );
-        assert_eq!(
-            report.observations[0].responsible_control_ids,
-            ["bad_a", "bad_b"]
-        );
+        assert_eq!(report.observations[0].responsible_control_ids.len(), 2);
+        assert_eq!(report.observations[0].responsible_control_ids[0], "bad_a");
+        assert_eq!(report.observations[0].responsible_control_ids[1], "bad_b");
     }
 
     #[test]
