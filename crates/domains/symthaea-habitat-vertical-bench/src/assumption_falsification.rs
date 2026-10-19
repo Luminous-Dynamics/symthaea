@@ -766,7 +766,8 @@ mod tests {
     #[test]
     fn duplicate_experiment_id_is_rejected() {
         let mut value = fixture();
-        value["experiment_candidates"][1]["experiment_id"] = value["experiment_candidates"][0]["experiment_id"].clone();
+        let first_id = value["experiment_candidates"][0]["experiment_id"].clone();
+        value["experiment_candidates"][1]["experiment_id"] = first_id;
         assert!(has_code(
             &validate_assumption_falsification(&value),
             "EXPERIMENT_ID_DUPLICATE"
@@ -794,11 +795,13 @@ mod tests {
     }
 
     #[test]
-    fn input_order_does_not_change_report_order() {
+    fn reversing_valid_assumption_and_experiment_order_preserves_report() {
         let mut value = fixture();
-        value["assumptions"][0]["status"] = json!("supported");
-        let first = validate_assumption_falsification(&value);
-        let second = validate_assumption_falsification(&value);
-        assert_eq!(first, second);
+        let original = validate_assumption_falsification(&value);
+        value["assumptions"].as_array_mut().unwrap().reverse();
+        value["experiment_candidates"].as_array_mut().unwrap().reverse();
+        let reversed = validate_assumption_falsification(&value);
+        assert!(original.is_valid(), "{:?}", original.issues);
+        assert_eq!(original, reversed);
     }
 }
