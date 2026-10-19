@@ -14,7 +14,7 @@ concurrency:
   cancel-in-progress: true
 
 env:
-  SOURCE_SUBJECT_SHA: e343919b10d760f8b1be4222ee4a67cb43029592
+  SOURCE_SUBJECT_SHA: 845bffde9a982f8a94ff6272e8f8d2fd374608c3
 
 jobs:
   generate-and-compare-lock:
