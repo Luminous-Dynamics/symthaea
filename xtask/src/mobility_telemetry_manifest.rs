@@ -1172,6 +1172,41 @@ fn evaluate_fault_case(mutation: &str, manifest: &Manifest) -> (String, String) 
                 ("eligible_or_unexplained".to_owned(), format!("eligibility report: {claim:?}"))
             }
         }
+        "single_budget_does_not_cover_all_claim_measurands" => {
+            let mut candidate = manifest.clone();
+            let artifact_path = "uncertainty/energy-only.json".to_owned();
+            candidate.artifacts.push(Artifact {
+                relative_path: artifact_path.clone(),
+                kind: "uncertainty_budget_record".to_owned(),
+                byte_len: 1,
+                sha256: format!("sha256:{}", "d".repeat(64)),
+            });
+            candidate.uncertainty_budgets.push(ClaimUncertaintyBudget {
+                claim_target: "ride_energy".to_owned(),
+                measurand: "net_dc_bus_energy".to_owned(),
+                unit: "Wh".to_owned(),
+                standard_uncertainty: 0.05,
+                expanded_uncertainty: 0.1,
+                coverage_factor: 2.0,
+                acceptance_tolerance: 0.5,
+                evidence_state: "bench_characterized".to_owned(),
+                artifact_path,
+            });
+            match validate_structure(&candidate) {
+                Err(error) => ("reject".to_owned(), error.to_string()),
+                Ok(()) => {
+                    let claim = claim_eligibility(&candidate, "ride_energy");
+                    let missing_voltage = claim.reasons.iter()
+                        .any(|reason| reason == "missing_uncertainty_budget:dc_bus_voltage");
+                    if !claim.physical_eligible && missing_voltage {
+                        ("ineligible".to_owned(),
+                         "missing_uncertainty_budget:dc_bus_voltage; total-energy-only budget is insufficient".to_owned())
+                    } else {
+                        ("eligible_or_unexplained".to_owned(), format!("claim accepted without all measurand budgets: {claim:?}"))
+                    }
+                }
+            }
+        }
         "calculated_but_unverified_uncertainty_budget" => {
             let mut candidate = manifest.clone();
             let artifact_path = "uncertainty/ride-energy.json".to_owned();
@@ -1676,7 +1711,7 @@ mod tests {
         )).expect("frozen telemetry fault matrix parses");
         let cases = matrix.get("cases").and_then(serde_json::Value::as_array)
             .expect("fault matrix has a case array");
-        assert_eq!(cases.len(), 27, "matrix size changes require deliberate review");
+        assert_eq!(cases.len(), 28, "matrix size changes require deliberate review");
         let mut ids = BTreeSet::new();
         for case in cases {
             let id = case.get("id").and_then(serde_json::Value::as_str)
@@ -1834,5 +1869,57 @@ mod tests {
         report.cases[0].passed = false;
         let changed = canonical_benchmark_report_sha256(&report).expect("changed digest computes");
         assert_ne!(digest_one, changed, "a changed benchmark result must change its digest");
+    }
+
+    #[test]
+    fn single_budget_does_not_cover_all_claim_measurands() {
+        let mut fixture = manifest();
+        let artifact_path = "uncertainty/energy-only.json".to_owned();
+        fixture.artifacts.push(Artifact {
+            relative_path: artifact_path.clone(),
+            kind: "uncertainty_budget_record".to_owned(),
+            byte_len: 1,
+            sha256: format!("sha256:{}", "d".repeat(64)),
+        });
+        fixture.uncertainty_budgets.push(ClaimUncertaintyBudget {
+            claim_target: "ride_energy".to_owned(),
+            measurand: "net_dc_bus_energy".to_owned(),
+            unit: "Wh".to_owned(),
+            standard_uncertainty: 0.05,
+            expanded_uncertainty: 0.1,
+            coverage_factor: 2.0,
+            acceptance_tolerance: 0.5,
+            evidence_state: "bench_characterized".to_owned(),
+            artifact_path,
+        });
+        validate_structure(&fixture).expect("single valid measurand budget is structurally sound");
+        let claim = claim_eligibility(&fixture, "ride_energy");
+        assert!(!claim.physical_eligible);
+        assert!(claim.reasons.iter().any(|reason| reason == "missing_uncertainty_budget:dc_bus_voltage"));
+        assert!(claim.reasons.iter().any(|reason| reason == "missing_uncertainty_budget:dc_bus_current"));
+    }
+
+    #[test]
+    fn uncertainty_budget_rejects_wrong_measurand_unit_pair() {
+        let mut fixture = manifest();
+        let artifact_path = "uncertainty/bad-unit.json".to_owned();
+        fixture.artifacts.push(Artifact {
+            relative_path: artifact_path.clone(),
+            kind: "uncertainty_budget_record".to_owned(),
+            byte_len: 1,
+            sha256: format!("sha256:{}", "e".repeat(64)),
+        });
+        fixture.uncertainty_budgets.push(ClaimUncertaintyBudget {
+            claim_target: "ride_energy".to_owned(),
+            measurand: "net_dc_bus_energy".to_owned(),
+            unit: "kPa".to_owned(),
+            standard_uncertainty: 0.05,
+            expanded_uncertainty: 0.1,
+            coverage_factor: 2.0,
+            acceptance_tolerance: 0.5,
+            evidence_state: "bench_characterized".to_owned(),
+            artifact_path,
+        });
+        assert!(validate_structure(&fixture).is_err());
     }
 }
