@@ -10,6 +10,9 @@ A 2026 paper proposes chance-constrained multi-objective robust programming for 
 
 ## Paradigm shift
 
+A useful agricultural decision-design reference is Burbano-Figueroa's 2025 *Addressing Uncertainty in Agriculture: An Introductory Guide to Robust Decision-Making in the Face of Climate Change*, catalogued by [FAO AGRIS](https://agris.fao.org/search/es/records/691daf5b49e41686f7929a0b). It contrasts point-forecast-driven “predict then act” with exploring multiple plausible futures before selecting strategies. FAO's climate-risk guidance also emphasizes combining hazard, exposure, vulnerability and adaptive capacity rather than collapsing resilience to one nominal result ([FAO climate and disaster risk management](https://www.fao.org/climate-change/cross-cutting-areas/climate-and-disaster-risk-management/en)). These support the method, not a claimed CropFoundry benefit.
+
+
 Do not ask only, "Which plan has the highest mean score?" Ask:
 - Which hard constraints remain feasible across credible uncertainty?
 - How bad is the upper-tail/worst-case outcome for each objective?
