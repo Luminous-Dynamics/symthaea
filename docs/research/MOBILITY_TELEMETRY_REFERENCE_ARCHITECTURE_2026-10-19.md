@@ -129,16 +129,24 @@ Targets for the first software tranche: zero false accepts across missing-channe
 
 ### Current implementation
 
-The first implementation is deliberately the **manifest and evidence gate**, not pretend firmware. It is wired into the existing `xtask` binary and has 11 authored unit tests covering duplicate IDs, unknown sensors, rates, missing channels, calibration receipts, path traversal and digest format.
+The first implementation is the **manifest and raw-trace validation layer**, not pretend firmware. Both commands are wired into the existing `xtask` binary and introduce no new dependencies. The manifest module has 17 authored unit tests covering duplicate IDs, unknown sensors/channels, rates, missing claim coverage, calibration receipts, safe paths/digests, clock regression and invalid/missing samples.
 
 From the workspace root:
+
 ```sh
 cargo test -p xtask mobility_telemetry_manifest
 cargo run -p xtask -- mobility-telemetry-manifest \
   --input docs/research/data/mobility_telemetry_manifest_v0_1.json \
   --out reports/mobility_telemetry_manifest.json
+
+cargo run -p xtask -- mobility-telemetry-trace \
+  --manifest docs/research/data/mobility_telemetry_manifest_v0_1.json \
+  --input docs/research/data/mobility_telemetry_trace_v0_1.csv \
+  --out reports/mobility_telemetry_trace.json
 ```
 
-The checked-in manifest is intentionally `session_state: planned` and `evidence_class: DesignOnly`. A source-side structural replay found 12 unique sensors, 20 unique channels, valid sensor references and no schema errors; all three requested physical claim profiles remain ineligible. This replay is not execution of the Rust code. Cargo/rustc/rustfmt are unavailable in the current environment, so compilation/tests are still unverified.
+The planned manifest declares 12 sensors and 20 semantic channels. The five-row synthetic trace is deliberately small and includes one missing raw value explicitly marked `INVALID`; it is never silently replaced with zero. Source-side replay found no schema/channel/sequence/timestamp/value violations: four valid samples, one invalid-or-saturated sample, and one missing raw value. This replay is not execution of the Rust code.
+
+The manifest is `session_state: planned` and `evidence_class: DesignOnly`; all three requested physical claim profiles remain ineligible. For `recorded`/`closed` sessions the Rust path verifies declared artifact sizes and SHA-256 and rejects paths outside the manifest directory. Cargo/rustc/rustfmt are unavailable in this environment, so compilation/tests remain unverified.
 
 No hardware has been purchased or built in this increment, no physical measurements have been made, and this design is not a safety-qualified product.
