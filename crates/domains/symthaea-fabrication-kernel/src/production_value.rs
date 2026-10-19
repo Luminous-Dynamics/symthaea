@@ -537,7 +537,12 @@ mod tests {
         assert_eq!(report, decoded);
         assert_eq!(decoded.schema_version, PRODUCTION_VALUE_REPORT_SCHEMA_VERSION);
         assert_eq!(decoded.evidence_class, EvidenceClass::InstrumentObserved);
-        assert!(serde_json::from_str::<ProductionRun>(r#"{"unexpected":true}"#).is_err());
+        let mut run_json = serde_json::to_value(&baseline[0]).unwrap();
+        run_json
+            .as_object_mut()
+            .unwrap()
+            .insert("unexpected".to_owned(), serde_json::Value::Bool(true));
+        assert!(serde_json::from_value::<ProductionRun>(run_json).is_err());
     }
 
     #[test]
