@@ -9,7 +9,7 @@
 
 use serde_json::{json, Value};
 use sha2::{Digest, Sha256};
-use std::collections::{BTreeMap, BTreeSet};
+use std::collections::BTreeSet;
 use std::env;
 use std::fs;
 use std::path::{Path, PathBuf};
@@ -133,7 +133,7 @@ fn resolve_wav_path(audio_root: &Path, declared: &str) -> PathBuf {
     }
 }
 
-fn validate_wave_bytes(bytes: &[u8], context: &str) -> Result<()> {
+fn validate_wave_bytes(bytes: &[u8], context: &str) -> Result<u32> {
     if bytes.len() < 44 || &bytes[0..4] != b"RIFF" || &bytes[8..12] != b"WAVE" {
         return Err(format!("{context}: expected a non-empty RIFF/WAVE container"));
     }
@@ -143,7 +143,7 @@ fn validate_wave_bytes(bytes: &[u8], context: &str) -> Result<()> {
     }
 
     let mut offset = 12usize;
-    let mut has_format = false;
+    let mut sample_rate_from_header = None;
     let mut has_audio_data = false;
     while offset < bytes.len() {
         if bytes.len() - offset < 8 {
@@ -166,11 +166,26 @@ fn validate_wave_bytes(bytes: &[u8], context: &str) -> Result<()> {
             if chunk_bytes < 16 {
                 return Err(format!("{context}: WAVE format chunk is shorter than 16 bytes"));
             }
-            has_format = true;
+            if sample_rate_from_header.is_some() {
+                return Err(format!("{context}: duplicate WAVE format chunks"));
+            }
+            let rate_start = payload_start + 4;
+            let rate = u32::from_le_bytes(
+                bytes[rate_start..rate_start + 4]
+                    .try_into()
+                    .expect("validated format chunk has at least 16 bytes"),
+            );
+            if rate == 0 {
+                return Err(format!("{context}: WAVE sample rate must be positive"));
+            }
+            sample_rate_from_header = Some(rate);
         }
         if chunk_id == b"data" {
             if chunk_bytes == 0 {
                 return Err(format!("{context}: WAVE audio data chunk is empty"));
+            }
+            if has_audio_data {
+                return Err(format!("{context}: duplicate WAVE audio data chunks"));
             }
             has_audio_data = true;
         }
@@ -181,10 +196,11 @@ fn validate_wave_bytes(bytes: &[u8], context: &str) -> Result<()> {
             return Err(format!("{context}: WAVE chunk padding exceeds file length"));
         }
     }
-    if offset != bytes.len() || !has_format || !has_audio_data {
+    if offset != bytes.len() || !has_audio_data {
         return Err(format!("{context}: WAVE requires complete fmt and non-empty data chunks"));
     }
-    Ok(())
+    sample_rate_from_header
+        .ok_or_else(|| format!("{context}: WAVE format chunk is missing"))
 }
 
 fn read_blocks(manifest: &Value, audio_root: &Path) -> Result<(Vec<SourceBlock>, String)> {
@@ -302,7 +318,12 @@ fn read_blocks(manifest: &Value, audio_root: &Path) -> Result<(Vec<SourceBlock>,
             let path = resolve_wav_path(audio_root, declared_path);
             let bytes = fs::read(&path)
                 .map_err(|error| format!("{arm_context}: cannot read {}: {error}", path.display()))?;
-            validate_wave_bytes(&bytes, &arm_context)?;
+            let wave_sample_rate_hz = validate_wave_bytes(&bytes, &arm_context)? as u64;
+            if wave_sample_rate_hz != sample_rate_hz {
+                return Err(format!(
+                    "{arm_context}: manifest sample rate {sample_rate_hz} Hz disagrees with WAV header {wave_sample_rate_hz} Hz"
+                ));
+            }
             let actual_bytes = bytes.len() as u64;
             if actual_bytes != declared_bytes {
                 return Err(format!(
