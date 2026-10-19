@@ -1,28 +1,22 @@
 // Copyright (C) 2024-2026 Tristan Stoltz / Luminous Dynamics
 // SPDX-License-Identifier: AGPL-3.0-or-later
-//! The FluidSynth-vs-native A/B, run FAIRLY for the first time.
+//! Controlled FluidSynth-vs-native A/B across all eight performance dialects.
 //!
-//! # Why this exists
+//! Both arms receive the same score, seed, declared style dialect, loudness
+//! target, limiter ceiling, and dialect-derived mastering profile. The renderer
+//! is not isolated from its instrument backend (native synthesis/VCSL versus
+//! SoundFont), but no arm gets a different mastering target. The style's room
+//! and EQ hypotheses are applied symmetrically as well.
 //!
-//! `fluid_render.rs`'s module doc records FluidSynth + FluidR3 beating the
-//! in-crate renderer "decisively" ("no longer fights the composition"). That
-//! test was real but NOT a like-for-like comparison of renderers: the native arm
-//! went through `auto_master` (real BS.1770-4 K-weighting, corrective 3-band EQ,
-//! section leveling, brick-wall limiter — wired into `realize_core` on
-//! 2026-07-08, `4c613f9d49`) while the FluidSynth arm got only a single peak
-//! scan and one gain multiply. FluidSynth won *despite* strictly weaker
-//! post-processing.
+//! # What this measures
 //!
-//! A correction worth recording: an earlier reading of this had the confound
-//! backwards, claiming the NATIVE arm was unmastered. History refutes that —
-//! `fluid_render.rs` first appeared 2026-07-10 (`c0fda87d0b`), two days after
-//! mastering was wired, and the `auto_master` call is verifiably present in
-//! `theory_realize.rs` at that commit. The misreading came from taking
-//! `theory_realize.rs`'s "never called from ANY generation path before this"
-//! comment as describing the state at test time rather than before 2026-07-08.
-//!
-//! Both paths now share one chain and one `MasteringConfig::default()`, so the
-//! comparison finally isolates renderer timbre. This harness runs it.
+//! It prints objective per-arm loudness, sample peak, crest factor, and broad
+//! spectral balance. These identify gross differences and catch failed or
+//! imbalanced renders; none alone is a musical-quality metric. The first
+//! profile A/B predates the eight-dialect mapping and is historical context only.
+//! Re-run this harness for any new profile revision, then use the separate
+//! blind listening protocol in STYLE_RENDER_PROFILE_BENCHMARK_V1.md before
+//! accepting a profile as musically beneficial.
 //!
 //! # What it does NOT do
 //!
@@ -118,15 +112,19 @@ fn wav_to_frames(bytes: &[u8]) -> Option<(Vec<[f32; 2]>, u32)> {
 
 fn main() {
     const SR: u32 = 48_000;
-    // A fixed, deterministic cohort. Styles chosen to span the instrument
-    // families that differ most between a soundfont and additive synthesis:
-    // sustained bowed/blown, plucked/struck, and a groove kit.
+    // One deterministic style per declared grammar performance dialect.
+    // This is a renderer/profile smoke cohort, not a perceptual truth set.
+    // A separate randomized blind study is required to accept/reject profile
+    // hypotheses for style identity or listener preference.
     let cohort: &[(Style, u64)] = &[
-        (Style::Classical, 7),
-        (Style::Nocturne, 7),
-        (Style::BaroqueSuite, 7),
-        (Style::Folk, 3),
-        (Style::JazzBallad, 3),
+        (Style::Classical, 7),       // ClassicalRubato
+        (Style::Tango, 7),           // DanceLocked
+        (Style::JazzBallad, 7),      // JazzLaidBack
+        (Style::Folk, 7),            // FolkLift
+        (Style::Minimalism, 7),      // ProcessExact
+        (Style::HindustaniInspired, 7), // DroneElastic
+        (Style::Cinematic, 7),       // DramaticTiming
+        (Style::SacredChoral, 7),    // ChoralBlend
     ];
 
     let Some((bin, sf)) = fluid_render::available() else {
@@ -248,7 +246,10 @@ fn main() {
         )
         .ok();
 
-        println!("── {style:?} seed={seed} ──");
+        println!(
+            "── {style:?} seed={seed} dialect={:?} ──",
+            symthaea_music_theory::Style::grammar_profile(style).performance
+        );
         for arm in [&a, &b] {
             println!(
                 "  {:<11} LUFS {:>7.2}  peak {:>6.2} dB  crest {:>5.2} dB  \
