@@ -1,9 +1,11 @@
 # Melothaea Style-Conditioned Render Profiles — Benchmark v1
 
-**Status: experimental profile proposal.** This change makes the existing
-PerformanceDialect affect the broad spectral target used by both native and
-FluidSynth mastering. It does not claim the profiles have been perceptually
-validated, and it does not expand the instrument registry or qualify any bank.
+**Status: experimental profile proposal.** The preset path now carries the
+style's declared grammar performance dialect through native rendering, FluidSynth,
+MIDI downloads, performed-note inspection, and keeper bundles. All eight
+grammar-level dialects have distinct renderer counterparts. Profile values remain
+hypotheses: no new perceptual validation is claimed, and this does not expand the
+instrument registry or qualify any bank.
 
 ## The paradigm shift
 
@@ -13,12 +15,20 @@ The layers remain independently switchable in controlled comparisons. We should
 not reward "novelty" as a proxy for quality, nor let mastering cover for weak
 composition or incorrect instruments.
 
-The first incremental seam is narrow: the existing PerformanceDialect selects
-a conservative mastering hypothesis. Every profile retains the same integrated
-loudness target, limiter ceiling, and section-leveling behavior; only three-band
-balance targets and EQ correction limits vary. ClassicalRubato is deliberately
-the historical default. Calling render_midi_to_wav without a profile remains a
-neutral/default render for previews and imported works.
+The first seam is a typed performance contract. Style.grammar_profile() keeps
+grammar family/phrase/harmony architecture but specializes the performance dialect
+by style, so a tango and a bossa do not inherit identical timing merely because
+their specifications happen to share texture flags. The selected dialect then
+controls timing/expression, room hypotheses, and broad mastering balance across
+the native and FluidSynth paths. MIDI downloads, performed notes, and keeper MIDI
+use that same selection. User-authored specs still have no declared style identity
+and are explicitly left on the versioned heuristic fallback.
+
+Every mastering profile retains the same integrated-loudness target, limiter
+ceiling, and section-leveling behavior; only three-band balance targets and EQ
+correction limits vary. ClassicalRubato remains the historical default.
+Calling render_midi_to_wav without an explicit profile remains the default path
+for neutral previews and imported-work audition.
 
 ## Profile hypotheses (not measured truths)
 
@@ -29,14 +39,17 @@ neutral/default render for previews and imported works.
 | ProcessExact | 0.28 / 0.43 / 0.29 | 3.5 dB | 1.0 dB | Less aggressive global correction for sustained/process material |
 | FolkLift | 0.30 / 0.44 / 0.26 | 4.5 dB | 1.25 dB | Slightly open upper band without increasing loudness |
 | JazzLaidBack | 0.29 / 0.47 / 0.24 | 4.0 dB | 0.9 dB | Mid-focused balance and restrained upper-band boosts |
+| DroneElastic | 0.29 / 0.43 / 0.28 | 3.5 dB | 1.0 dB | Less EQ intervention in unfolding drone/modal material |
+| DramaticTiming | 0.31 / 0.44 / 0.25 | 4.5 dB | 1.2 dB | Conservative broad balance for dramatic arcs |
+| ChoralBlend | 0.28 / 0.47 / 0.25 | 3.5 dB | 0.75 dB | Protect a unified midrange; keep treble boosts modest |
 
 The ratios are the mastering algorithm's target band proportions, not spectral
 measurements of a genre and not an assertion about every culture or recording.
-The dialects remain a coarse v1 abstraction, and dialect_for_spec is still
-heuristic; styles not reliably distinguished by the spec may continue to share
-ClassicalRubato. The next architecture step is an explicit, serialized
-style/performance profile carried through CompositionSpec, not ever-more-specific
-inference from incidental flags.
+The preset mapping is now explicit in Style::grammar_profile; dialect_for_spec
+remains the fallback for custom specs only. RendererRecipe schema v4 records the
+declared grammar-level dialect when one exists. The next architecture step is to
+let a user-authored CompositionSpec carry an explicit performance profile too,
+with named, versioned rendering controls rather than adding more heuristic flags.
 
 ## Required evidence
 
@@ -47,8 +60,13 @@ inference from incidental flags.
   to one within floating-point tolerance.
 - Every correction cap is finite and positive.
 - ClassicalRubato is field-by-field compatible with the existing default.
-- The native renderer and FluidSynth receive the profile selected from the same
-  dialect; no renderer receives a privileged target loudness.
+- The eight grammar dialects map one-to-one to renderer dialects; test that
+  each timing scale is finite and bounded, and each mastering profile shares
+  loudness/limiter targets.
+- The native renderer, FluidSynth, MIDI download, notes endpoint and keeper MIDI
+  use the candidate's same declared dialect; custom specs explicitly take the
+  heuristic fallback.
+- The renderer recipe records the dialect in schema v4 whenever it is declared.
 
 ### Audio sanity gate
 
@@ -116,8 +134,15 @@ or stylistic credibility.
 
 - MTG-Jamendo dataset and published tag splits:
   https://github.com/MTG/mtg-jamendo-dataset
-- MusicGen model card summarizing FAD, KL, CLAP, and human evaluations of
-  audio quality and text relevance on held-out evaluation sets:
+- Grötschla et al., *Benchmarking Music Generation Models and Metrics via Human
+  Preference Studies* (2025): 6,000 generated songs, 15,000 pairwise comparisons,
+  2,500 participants; evaluates alignment between objective metrics and human
+  preference: https://arxiv.org/abs/2506.19085
+- *From Aesthetics to Human Preferences* (IEEE MLSP 2025) discusses inconsistent
+  relationships between distributional metrics and human preference:
+  https://doi.org/10.1109/MLSP62443.2025.11204254
+- MusicGen model card summarizing FAD, KL, CLAP, and human evaluations of audio
+  quality and text relevance on held-out evaluation sets:
   https://github.com/aime-labs/MusicGen/blob/main/MODEL_CARD.md
 - Current instrument qualification work:
   https://github.com/Luminous-Dynamics/symthaea/pull/7943
