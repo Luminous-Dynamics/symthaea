@@ -46,7 +46,7 @@ pub fn validate_quantity_genealogy(root: &Value) -> QuantityGenealogyReport {
     let mut opening_total=0u64;
     let Some(initial)=root.get("initial_inventory").and_then(Value::as_array) else {
         push(&mut issues,"INITIAL_INVENTORY_MISSING","initial_inventory","initial inventory must be an array");
-        return finish(issues,0,0,0,Vec::new(),BTreeMap::new(),BTreeMap::new(),BTreeMap::new());
+        return finish(issues,0,0,0,0,Vec::new(),BTreeMap::new(),BTreeMap::new(),BTreeMap::new());
     };
     for (i,row) in initial.iter().enumerate() {
         let path=format!("initial_inventory[{i}]");
@@ -57,7 +57,7 @@ pub fn validate_quantity_genealogy(root: &Value) -> QuantityGenealogyReport {
             push(&mut issues,"DUPLICATE_MATERIAL_ID",format!("{path}.material_id"),format!("duplicate initial material {id:?}")); continue;
         }
         if row.get("material_kind").and_then(Value::as_str)!=Some("source_lot") {
-            push(&mut issues,"INITIAL_KIND_UNSUPPORTED",format!("{path}.material_kind","initial entries must be source_lot records");
+            push(&mut issues,"INITIAL_KIND_UNSUPPORTED",format!("{path}.material_kind"),"initial entries must be source_lot records");
         }
         if row.get("unit").and_then(Value::as_str)!=Some("mg") { push(&mut issues,"UNIT_MISMATCH",format!("{path}.unit"),"all quantities must use mg"); }
         let Some(qty)=row.get("opening_mg").and_then(Value::as_u64).filter(|q|*q>0) else {
@@ -71,7 +71,7 @@ pub fn validate_quantity_genealogy(root: &Value) -> QuantityGenealogyReport {
     if !opening_by_source.contains_key(&suspect) { push(&mut issues,"SUSPECT_SOURCE_UNKNOWN","source_suspect_lot_id",format!("unknown suspect source {suspect:?}")); }
     let Some(operations)=root.get("operations").and_then(Value::as_array) else {
         push(&mut issues,"OPERATIONS_MISSING","operations","operations must be an array");
-        return finish(issues,0,opening_total,0,Vec::new(),BTreeMap::new(),BTreeMap::new(),lineages);
+        return finish(issues,0,opening_total,0,0,Vec::new(),BTreeMap::new(),BTreeMap::new(),lineages);
     };
     let mut op_ids=HashSet::new();
     for (op_i,op) in operations.iter().enumerate() {
@@ -207,9 +207,7 @@ fn finish(mut issues:Vec<QuantityGenealogyIssue>,operation_count:usize,initial_m
 fn push(issues:&mut Vec<QuantityGenealogyIssue>,code:&'static str,path:impl Into<String>,message:impl Into<String>){issues.push(QuantityGenealogyIssue{code,path:path.into(),message:message.into()});}
 fn expect_string(root:&Value,field:&str,expected:&str,issues:&mut Vec<QuantityGenealogyIssue>){if root.get(field).and_then(Value::as_str)!=Some(expected){push(issues,"EXPECTED_STRING_MISMATCH",field,format!("required value is {expected:?}"));}}
 fn add_checked(total:&mut u64,v:u64,issues:&mut Vec<QuantityGenealogyIssue>,path:String){match total.checked_add(v){Some(n)=>*total=n,None=>push(issues,"QUANTITY_OVERFLOW",path,"checked quantity sum overflowed")}}
-fn add_map(map:&mut BTreeMap<String,u64>,id:String,v:u64,issues:&mut Vec<QuantityGenealogyIssue>,path:String){add_checked(map.entry(id).or_default_mut(),v,issues,path);}
-trait EntryDefaultMut { fn or_default_mut(&mut self)->&mut u64; }
-impl EntryDefaultMut for std::collections::btree_map::Entry<'_,String,u64>{fn or_default_mut(&mut self)->&mut u64{self.or_insert(0)}}
+fn add_map(map:&mut BTreeMap<String,u64>,id:String,v:u64,issues:&mut Vec<QuantityGenealogyIssue>,path:String){let total=map.entry(id).or_insert(0);add_checked(total,v,issues,path);}
 fn add_nested(map:&mut BTreeMap<String,BTreeMap<String,u64>>,parent:String,id:String,v:u64,issues:&mut Vec<QuantityGenealogyIssue>,path:String){add_map(map.entry(parent).or_default(),id,v,issues,path);}
 fn sum(values:impl IntoIterator<Item=u64>,issues:&mut Vec<QuantityGenealogyIssue>,path:String)->u64{let mut n=0;for v in values{add_checked(&mut n,v,issues,path.clone());}n}
 fn string_array(value:Option<&Value>,path:&str,issues:&mut Vec<QuantityGenealogyIssue>)->Vec<String>{let Some(rows)=value.and_then(Value::as_array)else{push(issues,"STRING_ARRAY_MISSING",path,"expected array of strings");return Vec::new()};let mut out=Vec::new();for(i,row)in rows.iter().enumerate(){match row.as_str().filter(|s|!s.trim().is_empty()){Some(id)=>out.push(id.to_owned()),None=>push(issues,"STRING_ARRAY_VALUE_INVALID",format!("{path}[{i}]"),"IDs must be non-empty strings")}}out}
