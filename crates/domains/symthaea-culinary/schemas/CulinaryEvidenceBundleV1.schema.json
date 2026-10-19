@@ -58,10 +58,7 @@
           "enum": [
             "protocol",
             "process_trace",
-            "raw_measurement",
-            "derived_outcome",
-            "instrument_calibration",
-            "other"
+            "measurement_record"
           ]
         },
         "path": {
