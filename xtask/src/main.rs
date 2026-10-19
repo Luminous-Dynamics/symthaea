@@ -89,9 +89,6 @@ enum Commands {
         /// Exact full Git commit ID for the code being benchmarked (40 or 64 hex characters).
         #[arg(long)]
         source_commit: String,
-        /// Exact output from "rustc -Vv" and "cargo --version" for this build.
-        #[arg(long)]
-        toolchain_id: String,
         /// Optional path for a JSON report; otherwise report to stdout.
         #[arg(long)]
         out: Option<PathBuf>,
@@ -168,7 +165,7 @@ fn main() -> anyhow::Result<()> {
             let out = out.map(|path| if path.is_absolute() { path } else { root.join(path) });
             mobility_telemetry_manifest::run(&input, out.as_deref())?;
         }
-        Commands::MobilityTelemetryBenchmark { manifest, matrix, source_commit, toolchain_id, out } => {
+        Commands::MobilityTelemetryBenchmark { manifest, matrix, source_commit, out } => {
             let root = PathBuf::from(env!("CARGO_MANIFEST_DIR"))
                 .parent()
                 .expect("xtask lives one level below the workspace root")
@@ -188,6 +185,23 @@ fn main() -> anyhow::Result<()> {
                     actual_head
                 );
             }
+
+            // Capture the executing environment rather than trusting a caller-supplied
+            // string that could falsely label the toolchain used for this report.
+            let rustc = std::process::Command::new("rustc").arg("-Vv").output()?;
+            if !rustc.status.success() {
+                anyhow::bail!("rustc -Vv failed; cannot attest runtime toolchain");
+            }
+            let cargo = std::process::Command::new("cargo").arg("--version").output()?;
+            if !cargo.status.success() {
+                anyhow::bail!("cargo --version failed; cannot attest runtime toolchain");
+            }
+            let toolchain_id = format!(
+                "{}\n{}",
+                String::from_utf8(rustc.stdout)?.trim(),
+                String::from_utf8(cargo.stdout)?.trim()
+            );
+
             let manifest = if manifest.is_absolute() { manifest } else { root.join(manifest) };
             let matrix = if matrix.is_absolute() { matrix } else { root.join(matrix) };
             let out = out.map(|path| if path.is_absolute() { path } else { root.join(path) });
