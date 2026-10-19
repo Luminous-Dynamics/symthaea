@@ -170,6 +170,7 @@ fn main() -> anyhow::Result<()> {
                 .parent()
                 .expect("xtask lives one level below the workspace root")
                 .to_path_buf();
+            let out = out.map(|path| if path.is_absolute() { path } else { root.join(path) });
             let git_head = std::process::Command::new("git")
                 .args(["rev-parse", "HEAD"])
                 .current_dir(&root)
@@ -194,6 +195,28 @@ fn main() -> anyhow::Result<()> {
                     "refusing benchmark on a dirty tracked worktree/index; commit the source and rerun"
                 );
             }
+            let status = std::process::Command::new("git")
+                .args(["status", "--porcelain", "--untracked-files=all"])
+                .current_dir(&root)
+                .output()?;
+            if !status.status.success() {
+                anyhow::bail!("could not verify the benchmark checkout status");
+            }
+            let status_text = String::from_utf8(status.stdout)?;
+            for line in status_text.lines() {
+                let changed_path = line.get(3..).unwrap_or_default().trim();
+                let is_requested_report = out.as_ref().is_some_and(|output_path| {
+                    output_path.strip_prefix(&root).is_ok_and(|relative| {
+                        relative.to_string_lossy().replace('\\', "/") == changed_path
+                    })
+                });
+                if !is_requested_report {
+                    anyhow::bail!(
+                        "refusing benchmark on a checkout with untracked or changed files: {}; commit source files first",
+                        line
+                    );
+                }
+            }
 
             // Capture the executing environment rather than trusting a caller-supplied
             // string that could falsely label the toolchain used for this report.
@@ -213,7 +236,6 @@ fn main() -> anyhow::Result<()> {
 
             let manifest = if manifest.is_absolute() { manifest } else { root.join(manifest) };
             let matrix = if matrix.is_absolute() { matrix } else { root.join(matrix) };
-            let out = out.map(|path| if path.is_absolute() { path } else { root.join(path) });
             mobility_telemetry_manifest::run_benchmark(
                 &manifest, &matrix, &source_commit, &toolchain_id, out.as_deref()
             )?;
