@@ -85,13 +85,24 @@
       "exit_code": 1
     },
     {
-      "id": "ODRH-CAD-PREVIEW-DEFAULT",
+      "id": "ODRH-CAD-NEGATIVE-MOUNT-PITCH",
       "status": "PASS",
-      "detail": "The default preview leaves the optical-axis aperture visually open; the hypothetical sensor-outline overlay is disabled by default to avoid making the aperture look blocked.",
-      "output_format": "PNG preview",
-      "width_px": 1200,
-      "height_px": 900,
-      "output_sha256": "b3e3aee57574f83fff18197d7cd66d30333b82cf7770b4e2c9f2ee3e1129275e"
+      "override": {
+        "mount_pitch_x_mm": 100
+      },
+      "expected": "Reject mounting-hole grid beyond declared edge margin.",
+      "observed": "OpenSCAD exited nonzero and emitted the assertion 'Horizontal mounting-hole grid violates edge margin'.",
+      "exit_code": 1
+    },
+    {
+      "id": "ODRH-CAD-NEGATIVE-PLATE-THICKNESS",
+      "status": "PASS",
+      "override": {
+        "plate_thickness_mm": 0.5
+      },
+      "expected": "Reject a counterbore deeper than plate thickness.",
+      "observed": "OpenSCAD exited nonzero and emitted the assertion 'Counterbore depth must be smaller than plate thickness'.",
+      "exit_code": 1
     }
   ],
   "claim_boundaries": {
@@ -104,12 +115,16 @@
     "dimensional_accuracy_of_printed_part_measured": false,
     "optical_or_metrology_performance_validated": false,
     "physical_validation": "NOT_PERFORMED",
-    "overall_disposition": "GEOMETRY_EXPORT_CHECKED_NOT_PHYSICALLY_QUALIFIED"
+    "overall_disposition": "GEOMETRY_EXPORT_CHECKED_NOT_PHYSICALLY_QUALIFIED",
+    "preview_rendered": false
   },
   "execution": {
     "workflow_run_id": 39147889097,
     "workflow_run_url": "https://github.com/Luminous-Dynamics/symthaea/actions/runs/39147889097",
     "tested_commit_sha": "c417ef92a60309c7f4647b524c4f00a6fd91bfd1",
-    "scope_note": "CAD export, alternate-parameter render, mesh bounds and aperture assertion completed successfully in this run. The overall workflow later failed at cargo fmt; this receipt is only for the listed CAD-specific checks."
-  }
+    "scope_note": "Default and alternate STL export, mesh bounds, triangle-count parity, and three parameter-negative controls completed in the CAD-specific workflow steps. The overall workflow later failed at cargo fmt. The referenced run did not render a PNG preview. This receipt covers only the listed CAD-specific checks and does not indicate overall workflow PASS."
+  },
+  "correction_notes": [
+    "Corrective receipt revision: removed ODRH-CAD-PREVIEW-DEFAULT because the linked workflow run 39147889097 did not include a preview-render step. Preview remains NOT_EVALUATED; do not use the previously associated preview hash or dimensions as evidence from that run."
+  ]
 }
