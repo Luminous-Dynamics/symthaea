@@ -15,6 +15,9 @@ pub const EXPECTED_MANIFEST_ID: &str = "ODRH-001";
 pub const EXPECTED_SCHEMA_VERSION: &str = "0.1.0";
 pub const EXPECTED_SCHEMA_DRAFT: &str = "https://json-schema.org/draft/2020-12/schema";
 
+mod cad_receipt;
+pub use cad_receipt::{CadRuntimeReceiptValidationReport, validate_cad_runtime_receipt_str};
+
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub struct ValidationReport {
     pub manifest_id: String,
