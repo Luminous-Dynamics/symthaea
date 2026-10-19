@@ -806,6 +806,21 @@ mod tests {
         )
     }
 
+    fn add_sensitivity_bounds(option: &mut PortfolioOptionInput) {
+        for record in &mut option.records {
+            let concentration = record["concentration_mg_per_kg"].as_f64().unwrap();
+            record["concentration_lower_mg_per_kg"] =
+                serde_json::json!(concentration * 0.9);
+            record["concentration_upper_mg_per_kg"] =
+                serde_json::json!(concentration * 1.1);
+            record["edible_mass_lower_kg_at_concentration_stage"] = serde_json::json!(0.09);
+            record["edible_mass_upper_kg_at_concentration_stage"] = serde_json::json!(0.11);
+            record["uncertainty_interval_kind"] = serde_json::json!("sensitivity_bounds");
+            record["uncertainty_evidence_uri"] =
+                serde_json::json!("urn:synthetic-interval-method");
+        }
+    }
+
     #[test]
     fn cropfoundry_portfolio_checked_in_fixture_has_reproducible_totals() {
         let raw = include_str!("../../docs/research/cropfoundry/nutrition-portfolio-example-v0.json");
@@ -872,19 +887,10 @@ mod tests {
     #[test]
     fn cropfoundry_portfolio_sums_only_complete_nutrient_intervals() {
         let mut crop_a = option("crop-a", 100.0, 20.0);
-        for record in &mut crop_a.records {
-            let concentration = record["concentration_mg_per_kg"].as_f64().unwrap();
-            record["concentration_lower_mg_per_kg"] =
-                serde_json::json!(concentration * 0.9);
-            record["concentration_upper_mg_per_kg"] =
-                serde_json::json!(concentration * 1.1);
-            record["edible_mass_lower_kg_at_concentration_stage"] = serde_json::json!(0.09);
-            record["edible_mass_upper_kg_at_concentration_stage"] = serde_json::json!(0.11);
-            record["uncertainty_interval_kind"] = serde_json::json!("sensitivity_bounds");
-            record["uncertainty_evidence_uri"] =
-                serde_json::json!("urn:synthetic-interval-method");
-        }
-        let receipt = portfolio(vec![crop_a, option("crop-b", 80.0, 30.0)]);
+        let mut crop_b = option("crop-b", 80.0, 30.0);
+        add_sensitivity_bounds(&mut crop_a);
+        add_sensitivity_bounds(&mut crop_b);
+        let receipt = portfolio(vec![crop_a, crop_b]);
         assert!(receipt.accounting_pass, "{:?}", receipt.issues);
         let iron = receipt.options[0]
             .nutrients
@@ -893,7 +899,17 @@ mod tests {
             .unwrap();
         assert_eq!(iron.total_delivered_interval_lower_mg, Some(16.2));
         assert_eq!(iron.total_delivered_interval_upper_mg, Some(24.2));
+        assert_eq!(receipt.nutrient_interval_comparison_available["iron"], true);
+    }
+
+    #[test]
+    fn cropfoundry_portfolio_does_not_claim_interval_comparability_for_point_only_option() {
+        let mut crop_a = option("crop-a", 100.0, 20.0);
+        add_sensitivity_bounds(&mut crop_a);
+        let receipt = portfolio(vec![crop_a, option("crop-b", 80.0, 30.0)]);
+        assert!(receipt.accounting_pass, "{:?}", receipt.issues);
         assert_eq!(receipt.nutrient_interval_comparison_available["iron"], false);
+        assert_eq!(receipt.nutrient_interval_comparison_available["zinc"], false);
     }
 
     #[test]
