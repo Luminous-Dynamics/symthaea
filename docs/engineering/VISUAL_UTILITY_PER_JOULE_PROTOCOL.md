@@ -31,7 +31,7 @@ Utility is not just the number of pixels emitted or frames rendered. The task mu
 
 ## 3. Measure energy on a declared boundary
 
-Retain time-stamped raw power observations. State the instrument, calibration status, uncertainty/range, sample interval, gaps, synchronization and integration rule.
+Retain time-stamped raw power observations. State the instrument, calibration status, uncertainty/range, sample interval, gaps, synchronization and integration rule. The Rust reference arithmetic is in [energy.rs](../../tools/open-display-platform-verify/src/energy.rs); its known-answer and negative tests validate computation on synthetic traces only, not a physical instrument.
 
 For samples (time_i, power_i), a trapezoidal integration for the declared task window is:
 
