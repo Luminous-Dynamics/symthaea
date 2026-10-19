@@ -693,10 +693,10 @@ mod tests {
     fn food_safety_biology_and_process_failures_are_noncompensatory() {
         let case = fixture()
             .cases
-            .iter()
+            .into_iter()
             .find(|case| case.case_id == "MVP-016-hard-gate-fail-coverage")
             .unwrap();
-        let actual = evaluate_case(case);
+        let actual = evaluate_case(&case);
         assert_eq!(actual.status, CaseStatus::Valid);
         let blocked = actual
             .targets
