@@ -492,6 +492,24 @@ mod tests {
     use super::*;
 
     #[test]
+    fn robustness_lattice_is_unique_and_sweeps_declared_failure_modes() {
+        let scenarios = robustness_scenarios();
+        let ids = scenarios
+            .iter()
+            .map(|scenario| scenario.id)
+            .collect::<std::collections::BTreeSet<_>>();
+        assert_eq!(scenarios.len(), 30);
+        assert_eq!(ids.len(), 30);
+        assert!(scenarios.iter().any(|scenario| scenario.forecast_bias == -0.30));
+        assert!(scenarios.iter().any(|scenario| scenario.forecast_bias == 0.20));
+        assert!(scenarios.iter().any(|scenario| scenario.sensor_dropout_period == Some(3)));
+        assert!(scenarios.iter().any(|scenario| {
+            scenario.heat_start_day.is_some() && scenario.drought_start_day.is_some()
+        }));
+        assert!(scenarios.iter().any(|scenario| scenario.daily_water_budget_plot_mm == 3.5));
+    }
+
+    #[test]
     fn robust_policy_receipt_is_deterministic_and_synthetic_only() {
         let first = serde_json::to_string(&build_receipt().unwrap()).unwrap();
         let second = serde_json::to_string(&build_receipt().unwrap()).unwrap();
@@ -525,8 +543,8 @@ mod tests {
 
     #[test]
     fn robust_policy_rejects_different_scenario_sets_even_when_row_counts_match() {
-        let base = build_receipt_water_policy().unwrap();
-        let mut results = base.results.clone();
+        let scenarios = robustness_scenarios();
+        let mut results = simulate_policy_suite(&scenarios).unwrap();
         let policy = results[0].policy.clone();
         let row = results.iter_mut().find(|row| row.policy == policy).unwrap();
         row.scenario_id = "unexpected-replacement-scenario".to_owned();
@@ -575,10 +593,11 @@ mod tests {
 
     #[test]
     fn policy_scenario_pairing_and_hard_constraints_are_required() {
-        let base = build_receipt_water_policy().unwrap();
-        let scores = build_policy_scores(&base.results).unwrap();
+        let scenarios = robustness_scenarios();
+        let results = simulate_policy_suite(&scenarios).unwrap();
+        let scores = build_policy_scores(&results).unwrap();
         assert_eq!(scores.len(), 5);
-        assert!(scores.iter().all(|score| score.scenario_count == 6));
+        assert!(scores.iter().all(|score| score.scenario_count == 30));
         assert!(scores.iter().all(|score| {
             score.total_water_budget_violation_days == 0
                 && score.total_per_plot_limit_violation_days == 0
