@@ -45,7 +45,11 @@ fn test_only_bundle() -> (Value, Vec<u8>, String, BTreeMap<String, Vec<u8>>) {
         for run in block["runs"].as_array_mut().unwrap() {
             let run_id = run["run_id"].as_str().unwrap().to_owned();
             let trace_id = run["process_trace_id"].as_str().unwrap().to_owned();
-            let trace_payload = format!("test-only process trace payload for {trace_id}\n").into_bytes();
+            let mut trace_payload_value: Value = serde_json::from_str(include_str!(
+                "../fixtures/process-nutrient-binding-v1/synthetic-rice-pea-trace.json"
+            )).unwrap();
+            trace_payload_value["trace_id"] = Value::String(trace_id.clone());
+            let trace_payload = serde_json::to_vec(&trace_payload_value).unwrap();
             artifacts.push(json!({
                 "artifact_id":trace_id,
                 "artifact_kind":"process_trace",
@@ -68,12 +72,22 @@ fn test_only_bundle() -> (Value, Vec<u8>, String, BTreeMap<String, Vec<u8>>) {
                 outcome["evidence"]["source_version"] = Value::String(source_version.into());
                 outcome["evidence"]["known_at"] = Value::String(started_at.clone());
                 outcome["evidence"]["evidence_status"] = Value::String("qualified".into());
-                let payload = format!(
-                    "test-only source payload for {run_id} / {outcome_id}\n"
-                ).into_bytes();
+                let payload_value = json!({
+                    "schema_version":"1.0.0",
+                    "run_id":run_id,
+                    "outcome_id":outcome_id,
+                    "status":outcome["status"].clone(),
+                    "value":outcome["value"].clone(),
+                    "lower":outcome["lower"].clone(),
+                    "upper":outcome["upper"].clone(),
+                    "unit":outcome["unit"].clone(),
+                    "method":outcome["method"].clone(),
+                    "unknown_reason":outcome["unknown_reason"].clone()
+                });
+                let payload = serde_json::to_vec(&payload_value).unwrap();
                 artifacts.push(json!({
                     "artifact_id":artifact_id,
-                    "artifact_kind":"derived_outcome",
+                    "artifact_kind":"measurement_record",
                     "path":format!("measurements/{run_id}/{outcome_id}.json"),
                     "source_ref":source_ref,
                     "source_version":source_version,
