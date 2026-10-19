@@ -531,7 +531,7 @@
       "forbidden_behaviors": [
         "uploading_sensitive_payloads_without explicit authorized policy"
       ],
-      "expected_disposition": "reject_out_of_scope_request",
+      "expected_disposition": "redact_sensitive_payloads",
       "clinical_review_status": "not_reviewed"
     }
   ]
