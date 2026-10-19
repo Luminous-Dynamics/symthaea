@@ -280,38 +280,33 @@ pub fn assess_case(case: &EnergyCase) -> CaseAssessment {
         &mut invalid,
     );
 
-    let (auxiliary_ok, auxiliary_uncertainty_ok) = match case.auxiliary_input_wh {
+    let auxiliary_ok = match case.auxiliary_input_wh {
         None => {
             findings.push(Finding::MissingAuxiliaryEnergy { case_id: case.case_id.clone() });
-            (false, false)
+            false
         }
-        Some(auxiliary) => {
-            let auxiliary_ok = check_nonnegative(
-                case_id,
-                "auxiliary_input_wh",
-                auxiliary,
-                &mut findings,
-                &mut invalid,
-            );
-            match case.auxiliary_uncertainty_wh {
-                None => {
-                    findings.push(Finding::MissingAuxiliaryUncertainty {
-                        case_id: case.case_id.clone(),
-                    });
-                    (auxiliary_ok, false)
-                }
-                Some(uncertainty) => {
-                    let uncertainty_ok = check_nonnegative(
-                        case_id,
-                        "auxiliary_uncertainty_wh",
-                        uncertainty,
-                        &mut findings,
-                        &mut invalid,
-                    );
-                    (auxiliary_ok, uncertainty_ok)
-                }
-            }
+        Some(auxiliary) => check_nonnegative(
+            case_id,
+            "auxiliary_input_wh",
+            auxiliary,
+            &mut findings,
+            &mut invalid,
+        ),
+    };
+    let auxiliary_uncertainty_ok = match case.auxiliary_uncertainty_wh {
+        None => {
+            findings.push(Finding::MissingAuxiliaryUncertainty {
+                case_id: case.case_id.clone(),
+            });
+            false
         }
+        Some(uncertainty) => check_nonnegative(
+            case_id,
+            "auxiliary_uncertainty_wh",
+            uncertainty,
+            &mut findings,
+            &mut invalid,
+        ),
     };
 
     let numeric_ready = distance_ok
