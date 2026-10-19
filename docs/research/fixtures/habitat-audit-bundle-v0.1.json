@@ -25,7 +25,7 @@
       "sha256": "1d5ca9c7bd569644dd213c9b4620626fe9dcbd236ef54e2fcebcc855064c82db",
       "byte_length": 19728,
       "schema_version": "0.1.0",
-      "evidence_status": "synthetic_only"
+      "evidence_status": "synthetic_contract_only_not_executed"
     },
     {
       "artifact_id": "material_ledger_fixture",
@@ -33,7 +33,7 @@
       "sha256": "1a3e9644f4db4e197c03620f7bba680bce5597c4f4d029af0ae7fa621a46b987",
       "byte_length": 14098,
       "schema_version": "0.1.0",
-      "evidence_status": "synthetic_only"
+      "evidence_status": "synthetic_contract_only_not_executed"
     },
     {
       "artifact_id": "measurement_gate_fixture",
@@ -41,7 +41,7 @@
       "sha256": "8d65dab59f89a405e4ed78f51941d59d8eabd62b8da0aaa69e78d4a6f050d7cd",
       "byte_length": 12546,
       "schema_version": "0.1.0",
-      "evidence_status": "synthetic_only"
+      "evidence_status": "synthetic_decision_rule_challenge_only"
     }
   ],
   "expected_results": {
