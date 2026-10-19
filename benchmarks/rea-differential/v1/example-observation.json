@@ -8,34 +8,50 @@
     "sha256": "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
     "byte_length": 10
   },
+  "coordinate_spaces": [
+    {
+      "id": "root",
+      "sha256": "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
+      "byte_length": 10
+    },
+    {
+      "id": "tar-stream",
+      "sha256": "bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb",
+      "byte_length": 7
+    }
+  ],
   "accounting": [
     {
+      "coordinate_space_id": "root",
       "start": 0,
-      "end": 7,
+      "end": 10,
       "disposition": "identified"
     },
     {
-      "start": 7,
-      "end": 10,
-      "disposition": "padding"
+      "coordinate_space_id": "tar-stream",
+      "start": 0,
+      "end": 7,
+      "disposition": "identified"
     }
   ],
   "regions": [
     {
-      "kind": "container",
+      "coordinate_space_id": "root",
+      "kind": "gzip-container",
       "start": 0,
-      "end": 7
+      "end": 10
     },
     {
-      "kind": "trailing-padding",
-      "start": 7,
-      "end": 10
+      "coordinate_space_id": "tar-stream",
+      "kind": "tar-container",
+      "start": 0,
+      "end": 7
     }
   ],
   "files": [
     {
-      "path": "root/payload.txt",
-      "sha256": "bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb",
+      "path": "payload.txt",
+      "sha256": "cccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccc",
       "byte_length": 4,
       "logical_id": "payload-001"
     }
