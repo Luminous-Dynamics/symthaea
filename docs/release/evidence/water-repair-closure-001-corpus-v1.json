@@ -1,0 +1,384 @@
+{
+  "schema_version": "water-repair-closure-001-corpus-v1",
+  "qualification_status": "NotRun",
+  "evaluation_mode": "synthetic_contract_only",
+  "claim_ceiling": "SyntheticFieldRepairLifecycleOnly",
+  "exact_implementation_sha": null,
+  "cases": [
+    {
+      "case_id": "WR-01",
+      "title": "complete non-potable module repair",
+      "profile": "non_potable_module",
+      "class": "positive_control",
+      "expected_disposition": "VerifiedWithinProfile",
+      "reason_codes": [
+        "PROFILE_SCOPED_SUCCESS"
+      ],
+      "assertions": [
+        "asset_and_profile_identity_match",
+        "compatible_component_is_evidenced",
+        "as_found_and_as_left_measurements_are_current",
+        "required_function_test_passes",
+        "commissioning_evidence_is_present",
+        "material_disposition_is_recorded"
+      ],
+      "forbidden_claims": [
+        "potable_water_safety",
+        "public_health_safety",
+        "regulatory_compliance",
+        "municipal_service_adequacy"
+      ]
+    },
+    {
+      "case_id": "WR-02",
+      "title": "synthetic municipal network repair with aligned solver lineage and outcome observations",
+      "profile": "municipal_distribution",
+      "class": "positive_control",
+      "expected_disposition": "VerifiedWithinProfile",
+      "reason_codes": [
+        "PROFILE_SCOPED_SUCCESS"
+      ],
+      "assertions": [
+        "model_and_scenario_digests_match",
+        "solver_result_is_completed_and_versioned",
+        "field_outcome_evidence_is_separate_from_simulation",
+        "protected_service_floor_is_checked"
+      ],
+      "forbidden_claims": [
+        "empirical_accuracy_beyond_fixture",
+        "real_world_water_savings",
+        "physical_delivery_from_simulation_alone"
+      ]
+    },
+    {
+      "case_id": "WR-03",
+      "title": "work order complete but as-left evidence absent",
+      "profile": "non_potable_module",
+      "class": "adversarial",
+      "expected_disposition": "Incomplete",
+      "reason_codes": [
+        "MISSING_AS_LEFT_EVIDENCE"
+      ],
+      "assertions": [
+        "work_status_does_not_imply_function_test",
+        "service_restoration_is_not_verified"
+      ],
+      "forbidden_claims": [
+        "verified_repair",
+        "restored_service"
+      ]
+    },
+    {
+      "case_id": "WR-04",
+      "title": "same logical event delivered twice on retry",
+      "profile": "non_potable_module",
+      "class": "adversarial",
+      "expected_disposition": "VerifiedWithinProfile",
+      "reason_codes": [
+        "DUPLICATE_DELIVERY_IDEMPOTENT"
+      ],
+      "assertions": [
+        "one_logical_event_has_at_most_one_semantic_effect",
+        "canonical_result_is_deterministic"
+      ],
+      "forbidden_claims": [
+        "duplicate_work_execution_effect"
+      ]
+    },
+    {
+      "case_id": "WR-05",
+      "title": "same event identifier reused with different content",
+      "profile": "non_potable_module",
+      "class": "adversarial",
+      "expected_disposition": "Rejected",
+      "reason_codes": [
+        "EVENT_ID_CONTENT_CONFLICT"
+      ],
+      "assertions": [
+        "conflict_is_rejected_or_quarantined",
+        "prior_event_is_not_overwritten"
+      ],
+      "forbidden_claims": [
+        "silent_history_rewrite"
+      ]
+    },
+    {
+      "case_id": "WR-06",
+      "title": "measurement references a different asset or configuration",
+      "profile": "non_potable_module",
+      "class": "adversarial",
+      "expected_disposition": "Blocked",
+      "reason_codes": [
+        "ASSET_IDENTITY_MISMATCH"
+      ],
+      "assertions": [
+        "evidence_target_must_match_requested_asset_and_revision"
+      ],
+      "forbidden_claims": [
+        "accepted_function_test"
+      ]
+    },
+    {
+      "case_id": "WR-07",
+      "title": "measurement outside validity window or instrument qualification missing",
+      "profile": "non_potable_module",
+      "class": "adversarial",
+      "expected_disposition": "Indeterminate",
+      "reason_codes": [
+        "STALE_OR_UNQUALIFIED_MEASUREMENT"
+      ],
+      "assertions": [
+        "freshness_and_instrument_status_are_checked",
+        "missing_calibration_never_improves_disposition"
+      ],
+      "forbidden_claims": [
+        "verified_function_from_unqualified_measurement"
+      ]
+    },
+    {
+      "case_id": "WR-08",
+      "title": "simulation substituted for required physical post-work observation",
+      "profile": "municipal_distribution",
+      "class": "adversarial",
+      "expected_disposition": "Incomplete",
+      "reason_codes": [
+        "PHYSICAL_OBSERVATION_MISSING"
+      ],
+      "assertions": [
+        "simulation_and_observation_are_distinct_evidence_classes"
+      ],
+      "forbidden_claims": [
+        "observed_service_restoration"
+      ]
+    },
+    {
+      "case_id": "WR-09",
+      "title": "required unit absent or unrecognized",
+      "profile": "building_plumbing",
+      "class": "adversarial",
+      "expected_disposition": "Rejected",
+      "reason_codes": [
+        "MISSING_OR_UNKNOWN_UNIT"
+      ],
+      "assertions": [
+        "dimensional_values_require_known_units"
+      ],
+      "forbidden_claims": [
+        "accepted_measurement"
+      ]
+    },
+    {
+      "case_id": "WR-10",
+      "title": "implicit or dimensionally invalid unit conversion",
+      "profile": "building_plumbing",
+      "class": "adversarial",
+      "expected_disposition": "Rejected",
+      "reason_codes": [
+        "INVALID_UNIT_CONVERSION"
+      ],
+      "assertions": [
+        "unit_conversion_is_explicit_and_dimensionally_valid"
+      ],
+      "forbidden_claims": [
+        "accepted_measurement"
+      ]
+    },
+    {
+      "case_id": "WR-11",
+      "title": "potable profile has hydraulic evidence but no required quality clearance",
+      "profile": "building_plumbing",
+      "class": "adversarial",
+      "expected_disposition": "Blocked",
+      "reason_codes": [
+        "REQUIRED_WATER_QUALITY_CLEARANCE_MISSING"
+      ],
+      "assertions": [
+        "hydraulic_pass_does_not_substitute_for_required_quality_evidence"
+      ],
+      "forbidden_claims": [
+        "potable_water_safety",
+        "return_to_potable_service"
+      ]
+    },
+    {
+      "case_id": "WR-12",
+      "title": "filter media identity or currentness unknown",
+      "profile": "non_potable_module",
+      "class": "adversarial",
+      "expected_disposition": "Indeterminate",
+      "reason_codes": [
+        "MEDIA_IDENTITY_OR_CURRENTNESS_UNKNOWN"
+      ],
+      "assertions": [
+        "media_presence_is_not_treatment_efficacy"
+      ],
+      "forbidden_claims": [
+        "verified_treatment_efficacy"
+      ]
+    },
+    {
+      "case_id": "WR-13",
+      "title": "replacement part compatibility or qualification unestablished",
+      "profile": "non_potable_module",
+      "class": "adversarial",
+      "expected_disposition": "Blocked",
+      "reason_codes": [
+        "PART_COMPATIBILITY_UNQUALIFIED"
+      ],
+      "assertions": [
+        "part_installation_does_not_establish_component_qualification"
+      ],
+      "forbidden_claims": [
+        "verified_component_function"
+      ]
+    },
+    {
+      "case_id": "WR-14",
+      "title": "reconditioned pump or valve without requalification",
+      "profile": "municipal_distribution",
+      "class": "adversarial",
+      "expected_disposition": "Blocked",
+      "reason_codes": [
+        "RECONDITIONED_COMPONENT_NOT_REQUALIFIED"
+      ],
+      "assertions": [
+        "reconditioned_state_requires_profile_appropriate_function_requalification"
+      ],
+      "forbidden_claims": [
+        "verified_component_function"
+      ]
+    },
+    {
+      "case_id": "WR-15",
+      "title": "installed asset not commissioned under its declared profile",
+      "profile": "municipal_distribution",
+      "class": "adversarial",
+      "expected_disposition": "Incomplete",
+      "reason_codes": [
+        "COMMISSIONING_MISSING"
+      ],
+      "assertions": [
+        "installation_does_not_imply_commissioning"
+      ],
+      "forbidden_claims": [
+        "available_service"
+      ]
+    },
+    {
+      "case_id": "WR-16",
+      "title": "nominally redundant pumps share one power or control failure domain",
+      "profile": "municipal_distribution",
+      "class": "adversarial",
+      "expected_disposition": "Indeterminate",
+      "reason_codes": [
+        "REDUNDANCY_INDEPENDENCE_UNPROVEN"
+      ],
+      "assertions": [
+        "common_cause_failure_domain_is_explicit",
+        "asset_count_does_not_prove_independent_redundancy"
+      ],
+      "forbidden_claims": [
+        "independent_redundancy_claim"
+      ]
+    },
+    {
+      "case_id": "WR-17",
+      "title": "removed part, media, sludge, or residual has no required disposition",
+      "profile": "non_potable_module",
+      "class": "adversarial",
+      "expected_disposition": "Incomplete",
+      "reason_codes": [
+        "RESIDUAL_DISPOSITION_MISSING"
+      ],
+      "assertions": [
+        "lifecycle_closure_requires_disposition_or_explicit_unknown"
+      ],
+      "forbidden_claims": [
+        "complete_lifecycle_closure",
+        "material_recovery_claim"
+      ]
+    },
+    {
+      "case_id": "WR-18",
+      "title": "work execution lacks a valid matching authorization",
+      "profile": "building_plumbing",
+      "class": "adversarial",
+      "expected_disposition": "Rejected",
+      "reason_codes": [
+        "AUTHORIZATION_MISSING_OR_MISMATCHED"
+      ],
+      "assertions": [
+        "recommendation_and_work_status_cannot_mint_authority"
+      ],
+      "forbidden_claims": [
+        "authorized_work"
+      ]
+    },
+    {
+      "case_id": "WR-19",
+      "title": "authorization expired, revoked, or scope-limited away from this work",
+      "profile": "building_plumbing",
+      "class": "adversarial",
+      "expected_disposition": "Blocked",
+      "reason_codes": [
+        "AUTHORIZATION_NOT_CURRENT_OR_IN_SCOPE"
+      ],
+      "assertions": [
+        "authorization_currentness_scope_and_revocation_are_checked"
+      ],
+      "forbidden_claims": [
+        "authorized_work",
+        "authorized_return_to_service"
+      ]
+    },
+    {
+      "case_id": "WR-20",
+      "title": "as-left observation lies outside requested time window",
+      "profile": "municipal_distribution",
+      "class": "adversarial",
+      "expected_disposition": "Indeterminate",
+      "reason_codes": [
+        "TIME_ALIGNMENT_FAILURE"
+      ],
+      "assertions": [
+        "paired_comparison_requires_declared_time_alignment"
+      ],
+      "forbidden_claims": [
+        "verified_counterfactual_outcome"
+      ]
+    },
+    {
+      "case_id": "WR-21",
+      "title": "public view discloses exact restricted household or critical-asset location",
+      "profile": "building_plumbing",
+      "class": "adversarial",
+      "expected_disposition": "Rejected",
+      "reason_codes": [
+        "ACCESS_POLICY_VIOLATION"
+      ],
+      "assertions": [
+        "public_projection_enforces_location_precision_and_access_policy"
+      ],
+      "forbidden_claims": [
+        "public_disclosure_of_restricted_location"
+      ]
+    },
+    {
+      "case_id": "WR-22",
+      "title": "contradictory post-work observations straddle acceptance threshold",
+      "profile": "non_potable_module",
+      "class": "adversarial",
+      "expected_disposition": "Indeterminate",
+      "reason_codes": [
+        "CONFLICTING_OBSERVATIONS"
+      ],
+      "assertions": [
+        "conflict_remains_visible",
+        "uncertainty_never_improves_claim_strength"
+      ],
+      "forbidden_claims": [
+        "unqualified_verified_repair"
+      ]
+    }
+  ]
+}
