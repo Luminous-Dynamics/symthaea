@@ -101,6 +101,15 @@ fn ensure_regular_non_symlink(path: &Path, label: &str) -> VResult<()> {
     Ok(())
 }
 
+fn ensure_real_directory(path: &Path, label: &str) -> VResult<()> {
+    let metadata = fs::symlink_metadata(path)
+        .map_err(|e| err(format!("cannot inspect {label} {}: {e}", path.display())))?;
+    if metadata.file_type().is_symlink() || !metadata.is_dir() {
+        return Err(err(format!("{label} must be a real non-symlink directory: {}", path.display())));
+    }
+    Ok(())
+}
+
 fn read_bounded(path: &Path, max_bytes: u64, label: &str) -> VResult<Vec<u8>> {
     ensure_regular_non_symlink(path, label)?;
     let metadata = fs::metadata(path)
@@ -249,6 +258,9 @@ fn verify_bundle_manifest(root: &Path, expected_digest: &str) -> VResult<()> {
     let files = required(&manifest, "files")?
         .as_array()
         .ok_or_else(|| err("bundle manifest files must be an array"))?;
+    if files.len() > 10_000 {
+        return Err(err("bundle manifest contains more than 10,000 files"));
+    }
     let mut manifest_paths = Vec::with_capacity(files.len());
     let mut expected_files = Vec::with_capacity(files.len());
     for entry in files {
@@ -331,6 +343,8 @@ pub fn verify_bundle(
     expected_head: &str,
     expected_receipt_sha256: Option<&str>,
 ) -> VResult<VerifiedEvidence> {
+    ensure_real_directory(artifact_root, "artifact root")?;
+    ensure_real_directory(source_root, "source root")?;
     if !is_git_sha(expected_head) {
         return Err(err("expected source head must be a lowercase 40-character Git SHA"));
     }
@@ -830,6 +844,17 @@ mod tests {
         write(&f.source.join("provider-smoke.sh"), b"changed provider smoke script\\n");
         assert!(verify_bundle(&f.artifact, &f.source, &f.expected_head, None)
             .unwrap_err().to_string().contains("provider smoke script"));
+    }
+
+    #[cfg(unix)]
+    #[test]
+    fn rejects_symlinked_artifact_root() {
+        use std::os::unix::fs::symlink;
+        let f = create_fixture();
+        let alias = f.root.join("artifact-alias");
+        symlink(&f.artifact, &alias).unwrap();
+        assert!(verify_bundle(&alias, &f.source, &f.expected_head, None)
+            .unwrap_err().to_string().contains("artifact root"));
     }
 
     #[cfg(unix)]
