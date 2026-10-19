@@ -414,6 +414,18 @@ fn validate_structure(manifest: &Manifest) -> Result<()> {
         {
             bail!("sensor {} claims calibrated without a calibration receipt", sensor.sensor_id);
         }
+        if sensor.calibration_state == "calibrated" {
+            let receipt_path = sensor.calibration_receipt_id.as_deref().unwrap_or_default();
+            if !manifest.artifacts.iter().any(|artifact| {
+                artifact.relative_path == receipt_path && artifact.kind == "calibration_record"
+            }) {
+                bail!(
+                    "sensor {} calibration receipt {} does not reference a declared calibration_record artifact",
+                    sensor.sensor_id,
+                    receipt_path
+                );
+            }
+        }
     }
 
     let mut channel_ids = BTreeSet::new();
@@ -580,6 +592,22 @@ fn claim_eligibility(manifest: &Manifest, claim: &str) -> ClaimEligibility {
     }
     if manifest.data_rights.permission_receipt_id.as_deref().is_none_or(str::is_empty) {
         reasons.push("missing_rights_or_collection_receipt".into());
+    }
+    if let Some(receipt_path) = manifest.data_rights.permission_receipt_id.as_deref() {
+        let expected_kind = if manifest.data_rights.rights_state == "project_owned" {
+            "collection_authorization"
+        } else if ["explicit_permission", "cc_by_4_0", "other_documented_license"]
+            .contains(&manifest.data_rights.rights_state.as_str())
+        {
+            "rights_receipt"
+        } else {
+            ""
+        };
+        if !expected_kind.is_empty() && !manifest.artifacts.iter().any(|artifact| {
+            artifact.relative_path == receipt_path && artifact.kind == expected_kind
+        }) {
+            reasons.push("rights_receipt_id_not_backed_by_artifact".into());
+        }
     }
     if !VERIFIED_SYNC_METHODS.contains(&manifest.timebase.sync_method.as_str()) {
         reasons.push("clock_sync_method_not_verified".into());
@@ -1863,8 +1891,13 @@ mod tests {
             claim_ceiling: "synthetic software conformance only".to_owned(),
         };
         let digest_one = canonical_benchmark_report_sha256(&report).expect("digest computes");
-        let digest_two = canonical_benchmark_report_sha256(&report).expect("digest recomputes");
-        assert_eq!(digest_one, digest_two);
+        for _ in 0..100 {
+            assert_eq!(
+                canonical_benchmark_report_sha256(&report).expect("digest recomputes"),
+                digest_one,
+                "identical canonical report inputs must always produce the same digest"
+            );
+        }
 
         report.cases[0].passed = false;
         let changed = canonical_benchmark_report_sha256(&report).expect("changed digest computes");
@@ -1921,5 +1954,35 @@ mod tests {
             artifact_path,
         });
         assert!(validate_structure(&fixture).is_err());
+    }
+
+    #[test]
+    fn calibration_receipt_must_reference_declared_artifact() {
+        let mut fixture = manifest();
+        fixture.sensors[0].calibration_state = "calibrated".into();
+        fixture.sensors[0].calibration_receipt_id = Some("calibration/gnss.json".into());
+        fixture.artifacts.push(Artifact {
+            relative_path: "calibration/other.json".into(),
+            kind: "calibration_record".into(),
+            byte_len: 1,
+            sha256: format!("sha256:{}", "f".repeat(64)),
+        });
+        let error = validate_structure(&fixture).expect_err("an unrelated calibration file must not back this sensor");
+        assert!(error.to_string().contains("does not reference a declared calibration_record artifact"));
+    }
+
+    #[test]
+    fn rights_receipt_id_must_be_backed_by_matching_artifact() {
+        let mut fixture = manifest();
+        fixture.data_rights.rights_state = "project_owned".into();
+        fixture.data_rights.permission_receipt_id = Some("collection/approval.json".into());
+        fixture.artifacts.push(Artifact {
+            relative_path: "collection/other.json".into(),
+            kind: "collection_authorization".into(),
+            byte_len: 1,
+            sha256: format!("sha256:{}", "1".repeat(64)),
+        });
+        let claim = claim_eligibility(&fixture, "ride_energy");
+        assert!(claim.reasons.iter().any(|reason| reason == "rights_receipt_id_not_backed_by_artifact"));
     }
 }
