@@ -1,0 +1,576 @@
+{
+  "schema_version": "0.1.0",
+  "benchmark_id": "HABITAT-ASSUMPTION-FALSIFICATION-001",
+  "parent_program": "HABITAT-VERTICAL-001",
+  "evidence_class": "proposed_experiment_definitions_not_execution_evidence",
+  "source_contracts": [
+    {
+      "path": "docs/research/fixtures/habitat-resilience-options-v0.1.json",
+      "relation": "option IDs and decision dependencies must resolve exactly"
+    },
+    {
+      "path": "docs/research/fixtures/habitat-vertical-scenarios-v0.1.json",
+      "relation": "scenario IDs must resolve exactly"
+    }
+  ],
+  "claim_ceiling": "This fixture proposes tests but contains no observations or selected experiment. It establishes no supplier/resource/product qualification, probabilities, outcome likelihoods, physical safety, cost, schedule, resilience improvement, ROI or operating authority.",
+  "decision_paradigm": {
+    "question": "What is the cheapest safe observation that could invalidate a decision-critical assumption before committing to a factory resilience option?",
+    "assumptions_are_not_facts": true,
+    "unknown_is_not_zero": true,
+    "interval_is_not_probability": true,
+    "evidence_hash_is_not_truth": true,
+    "no_scalar_confidence": true,
+    "no_probabilities_without_admitted_model": true,
+    "selection_state": "not_selected",
+    "selected_experiment_id": null,
+    "quantitative_experiment_costs": "not_measured",
+    "outcome_probabilities": "not_supplied",
+    "experiment_selection_owner_refs": [
+      "Symthaea MANUFACTURING_ASSUMPTION_FALSIFICATION proposal PR #8080",
+      "Symthaea SE-OPT-BENCH-001 #7803",
+      "Symthaea MFG-VALUE-001 #7608"
+    ],
+    "execution_boundary": "Advisory only; documentary/simulation/physical work retains its own evidence class, qualified practitioners, safety approvals and execution authorization."
+  },
+  "assumptions": [
+    {
+      "assumption_id": "HAF-SUPPLY-001",
+      "revision": 1,
+      "claim": "At least one alternate source can supply the required material grade, pass the applicable qualification, meet the required quantity, and arrive in a usable window after the primary-lot rejection.",
+      "scope": "the declared fabric/layer/trim BOM grades and target production horizon",
+      "status": "unknown",
+      "criticality": "critical",
+      "consequence_if_false": "supplier redundancy does not restore accepted output; substitution or waiting blocks the affected route",
+      "falsifier": "the candidate cannot produce evidence for the exact grade/process envelope, lacks qualified available capacity, or its arrival window misses the required production window",
+      "depends_on_options": [
+        "QUALIFIED_SUPPLY_ALTERNATIVES",
+        "INTEGRATED_FLEXIBLE_MICROFACTORY"
+      ],
+      "depends_on_scenarios": [
+        "SC-01-SUPPLIER-REJECTION",
+        "SC-02-GRADE-SUBSTITUTION",
+        "SC-03-TRANSPORT-DELAY"
+      ],
+      "current_evidence": {
+        "status": "none_admitted",
+        "references": []
+      }
+    },
+    {
+      "assumption_id": "HAF-CAPACITY-001",
+      "revision": 1,
+      "claim": "An alternate sewing resource is capable, qualified, calibrated where required, and available to absorb the relevant workload without creating an unmodelled downstream bottleneck.",
+      "scope": "sewing operation profile for the specified topper variants and output acceptance criteria",
+      "status": "unknown",
+      "criticality": "critical",
+      "consequence_if_false": "nominal redundancy cannot restore throughput or produce accepted articles",
+      "falsifier": "the resource fails the capability/qualification envelope, has no usable calendar capacity, or shifts the bottleneck beyond the declared service threshold",
+      "depends_on_options": [
+        "WORKCELL_AND_SKILL_REDUNDANCY",
+        "INTEGRATED_FLEXIBLE_MICROFACTORY"
+      ],
+      "depends_on_scenarios": [
+        "SC-04-EQUIPMENT-OUTAGE"
+      ],
+      "current_evidence": {
+        "status": "none_admitted",
+        "references": []
+      }
+    },
+    {
+      "assumption_id": "HAF-POWER-001",
+      "revision": 1,
+      "claim": "The proposed essential-utility continuity path can support every required production, inspection, metrology, restart, and calibration dependency within the declared operating envelope.",
+      "scope": "factory utilities and shared dependencies for cutting/sewing/inspection and safe restart",
+      "status": "unknown",
+      "criticality": "critical",
+      "consequence_if_false": "backup power may keep production visible but leave acceptance inspection or recovery unavailable",
+      "falsifier": "load/dependency analysis shows shared failure mode or insufficient capacity; post-restoration checks or requalification requirements cannot be met",
+      "depends_on_options": [
+        "ESSENTIAL_UTILITY_CONTINUITY",
+        "INTEGRATED_FLEXIBLE_MICROFACTORY"
+      ],
+      "depends_on_scenarios": [
+        "SC-05-POWER-COMMON-MODE"
+      ],
+      "current_evidence": {
+        "status": "none_admitted",
+        "references": []
+      }
+    },
+    {
+      "assumption_id": "HAF-SKILL-001",
+      "revision": 1,
+      "claim": "Qualified workers covering each required skill can be available within the actual shift/calendar constraints, without treating training or reassignment as instantaneous.",
+      "scope": "receiving, cutting, sewing, assembly, inspection, measurement, packaging and approved repair work where applicable",
+      "status": "unknown",
+      "criticality": "critical",
+      "consequence_if_false": "equipment redundancy exists on paper but required operations remain unschedulable",
+      "falsifier": "the roster and qualification evidence show no available worker for a required operation/time window, or the proposed training path exceeds the recovery horizon",
+      "depends_on_options": [
+        "WORKCELL_AND_SKILL_REDUNDANCY",
+        "INTEGRATED_FLEXIBLE_MICROFACTORY"
+      ],
+      "depends_on_scenarios": [
+        "SC-06-SKILL-ABSENCE"
+      ],
+      "current_evidence": {
+        "status": "none_admitted",
+        "references": []
+      }
+    },
+    {
+      "assumption_id": "HAF-MODULARITY-001",
+      "revision": 1,
+      "claim": "The proposed common modules and product-family commonality preserve required fit, function, quality, and acceptance across every claimed product variant while reducing actual setup or material burden.",
+      "scope": "topper sizes/configurations and any later furniture/workwear transfer only after separate admission",
+      "status": "unknown",
+      "criticality": "major",
+      "consequence_if_false": "shared-module savings, variant flexibility and reduced inventory are overstated or product acceptance fails",
+      "falsifier": "drawing/BOM comparison or controlled sample assembly reveals incompatible interfaces, variant-specific components, added rework, or no evidenced changeover/yield advantage",
+      "depends_on_options": [
+        "MODULAR_REPAIR_COMMONALITY",
+        "INTEGRATED_FLEXIBLE_MICROFACTORY"
+      ],
+      "depends_on_scenarios": [
+        "SC-07-DEMAND-MIX-CHANGE"
+      ],
+      "current_evidence": {
+        "status": "none_admitted",
+        "references": []
+      }
+    },
+    {
+      "assumption_id": "HAF-REPAIR-001",
+      "revision": 1,
+      "claim": "A named common replacement part is stocked or replenishable, installable with available skills/tools, and can restore the product to its required accepted service state.",
+      "scope": "one specifically identified wear component and repair acceptance profile; no general repairability claim",
+      "status": "unknown",
+      "criticality": "major",
+      "consequence_if_false": "modular design does not reduce downtime; repairable-by-design is mistaken for completed repair",
+      "falsifier": "part identity/interchangeability or inventory/lead-time evidence fails, repair capacity is absent, or the repaired article fails its acceptance test",
+      "depends_on_options": [
+        "MODULAR_REPAIR_COMMONALITY",
+        "INTEGRATED_FLEXIBLE_MICROFACTORY"
+      ],
+      "depends_on_scenarios": [
+        "SC-08-REPAIR-SPARE-SHORTAGE"
+      ],
+      "current_evidence": {
+        "status": "none_admitted",
+        "references": []
+      }
+    },
+    {
+      "assumption_id": "HAF-BOUNDS-001",
+      "revision": 1,
+      "claim": "The synthetic lost-accepted-unit-hour and recovery intervals are adequate only as challenge-oracle test values; using them to choose a real strategy would require a separately justified, scenario-specific model-discrepancy envelope.",
+      "scope": "all option-by-disruption bounds in habitat-resilience-options-v0.1.json",
+      "status": "known_synthetic_only",
+      "criticality": "critical",
+      "consequence_if_false": "constructed test vectors are misinterpreted as predictive estimates and a real investment is selected on unsupported outcomes",
+      "falsifier": "any real-world recommendation cites the current synthetic interval bounds as measured, calibrated, probabilistic, or decision-valid physical evidence",
+      "depends_on_options": [
+        "LEAN_BASELINE",
+        "QUALIFIED_SUPPLY_ALTERNATIVES",
+        "WORKCELL_AND_SKILL_REDUNDANCY",
+        "ESSENTIAL_UTILITY_CONTINUITY",
+        "MODULAR_REPAIR_COMMONALITY",
+        "INTEGRATED_FLEXIBLE_MICROFACTORY"
+      ],
+      "depends_on_scenarios": [
+        "SC-01-SUPPLIER-REJECTION",
+        "SC-02-GRADE-SUBSTITUTION",
+        "SC-03-TRANSPORT-DELAY",
+        "SC-04-EQUIPMENT-OUTAGE",
+        "SC-05-POWER-COMMON-MODE",
+        "SC-06-SKILL-ABSENCE",
+        "SC-07-DEMAND-MIX-CHANGE",
+        "SC-08-REPAIR-SPARE-SHORTAGE"
+      ],
+      "current_evidence": {
+        "status": "scope_control_only",
+        "references": [
+          "docs/research/fixtures/habitat-resilience-options-v0.1.json"
+        ]
+      }
+    },
+    {
+      "assumption_id": "HAF-COST-001",
+      "revision": 1,
+      "claim": "A future delivered-cost comparison uses the same accepted function, accepted-unit denominator, currency/time basis, operating horizon, and fully declared cost categories for every alternative.",
+      "scope": "reference and candidate product/factory configurations in a future admitted cost study",
+      "status": "unknown",
+      "criticality": "critical",
+      "consequence_if_false": "the nominally cheaper strategy appears to win because costs, yield loss, returns, capital utilization, or service differences are omitted",
+      "falsifier": "an independent cost ledger reconciliation finds mismatched units/boundaries, missing required categories, incompatible product service, or non-comparable bases",
+      "depends_on_options": [
+        "LEAN_BASELINE",
+        "QUALIFIED_SUPPLY_ALTERNATIVES",
+        "WORKCELL_AND_SKILL_REDUNDANCY",
+        "ESSENTIAL_UTILITY_CONTINUITY",
+        "MODULAR_REPAIR_COMMONALITY",
+        "INTEGRATED_FLEXIBLE_MICROFACTORY"
+      ],
+      "depends_on_scenarios": [
+        "SC-01-SUPPLIER-REJECTION",
+        "SC-02-GRADE-SUBSTITUTION",
+        "SC-03-TRANSPORT-DELAY",
+        "SC-04-EQUIPMENT-OUTAGE",
+        "SC-05-POWER-COMMON-MODE",
+        "SC-06-SKILL-ABSENCE",
+        "SC-07-DEMAND-MIX-CHANGE",
+        "SC-08-REPAIR-SPARE-SHORTAGE"
+      ],
+      "current_evidence": {
+        "status": "synthetic_cost_arithmetic_only_no_real_cost_evidence",
+        "references": [
+          "docs/research/fixtures/habitat-vertical-v0.1.json"
+        ]
+      }
+    },
+    {
+      "assumption_id": "HAF-BASELINE-001",
+      "revision": 1,
+      "claim": "A later baseline/candidate comparison has a frozen workload and calendar, accepted-output definition, run horizon, resource/worker capabilities, and independent scorecard before outcomes are inspected.",
+      "scope": "all quantitative comparisons under MFG-VALUE-001 for this household-goods vertical",
+      "status": "unknown",
+      "criticality": "critical",
+      "consequence_if_false": "policy comparison is confounded by easier work, changed constraints, selective case removal or post-hoc metric choice",
+      "falsifier": "the baseline and candidate use different inputs or metric definitions, the holdout is exposed to candidate selection, or exclusions cannot be reconciled",
+      "depends_on_options": [
+        "LEAN_BASELINE",
+        "QUALIFIED_SUPPLY_ALTERNATIVES",
+        "WORKCELL_AND_SKILL_REDUNDANCY",
+        "ESSENTIAL_UTILITY_CONTINUITY",
+        "MODULAR_REPAIR_COMMONALITY",
+        "INTEGRATED_FLEXIBLE_MICROFACTORY"
+      ],
+      "depends_on_scenarios": [
+        "SC-01-SUPPLIER-REJECTION",
+        "SC-02-GRADE-SUBSTITUTION",
+        "SC-03-TRANSPORT-DELAY",
+        "SC-04-EQUIPMENT-OUTAGE",
+        "SC-05-POWER-COMMON-MODE",
+        "SC-06-SKILL-ABSENCE",
+        "SC-07-DEMAND-MIX-CHANGE",
+        "SC-08-REPAIR-SPARE-SHORTAGE"
+      ],
+      "current_evidence": {
+        "status": "campaign_contract_defined_policies_unbound",
+        "references": [
+          "docs/research/HABITAT_COUNTERFACTUAL_001_DISRUPTION_CAMPAIGN.md"
+        ]
+      }
+    }
+  ],
+  "experiment_candidates": [
+    {
+      "experiment_id": "HAF-EXP-01",
+      "title": "Audit the current supplier/grade/lead-time evidence",
+      "stage": "existing_evidence_audit",
+      "tests_assumptions": [
+        "HAF-SUPPLY-001"
+      ],
+      "purpose": "Check whether exact grade, qualification, capacity, quantity, lead-time window, source date and quote/offer identity exist; a vendor name or catalogue label is insufficient.",
+      "controlled_variables": [
+        "material grade and revision",
+        "required quantity",
+        "production window",
+        "supplier identity"
+      ],
+      "observations_to_collect": [
+        "grade/profile reference",
+        "qualification scope and freshness",
+        "available capacity and delivery window",
+        "missing/conflicting evidence list"
+      ],
+      "if_assumption_holds": "the exact source/grade/capacity evidence satisfies the preregistered requirements for the declared window",
+      "if_assumption_fails": "at least one mandatory identity, qualification, capacity or timing condition is absent or contradicted",
+      "if_indeterminate": "commercial confidentiality or missing records prevent a decision; preserve unknown",
+      "cost_time_status": "not_measured",
+      "outcome_model_status": "qualitative_discriminator_requires_preregistration",
+      "safety_authority": "documentary_review_only",
+      "execution_state": "not_executed",
+      "selection_state": "not_selected"
+    },
+    {
+      "experiment_id": "HAF-EXP-02",
+      "title": "Bounded incoming material qualification",
+      "stage": "controlled_physical_test",
+      "tests_assumptions": [
+        "HAF-SUPPLY-001"
+      ],
+      "purpose": "If documentary evidence is insufficient and the material owner authorizes it, inspect/test a representative sample under the required material profile before any process substitution.",
+      "controlled_variables": [
+        "exact material grade and batch",
+        "test method and calibration",
+        "sample conditioning",
+        "acceptance criteria frozen before the test"
+      ],
+      "observations_to_collect": [
+        "raw instrument/inspection data",
+        "calibration and uncertainty",
+        "sample/batch provenance",
+        "accept/reject/inconclusive disposition"
+      ],
+      "if_assumption_holds": "observations meet the frozen profile within admitted measurement uncertainty",
+      "if_assumption_fails": "observations violate the frozen material-grade acceptance rule beyond uncertainty",
+      "if_indeterminate": "sample representativeness, calibration or method applicability is unresolved",
+      "cost_time_status": "not_measured",
+      "outcome_model_status": "qualitative_discriminator_requires_preregistration",
+      "safety_authority": "not_approved_requires_material_owner_and_qualified_operator",
+      "execution_state": "not_executed",
+      "selection_state": "not_selected"
+    },
+    {
+      "experiment_id": "HAF-EXP-03",
+      "title": "Audit alternate workcell capability and availability",
+      "stage": "existing_evidence_audit",
+      "tests_assumptions": [
+        "HAF-CAPACITY-001"
+      ],
+      "purpose": "Resolve exact process capability, tooling/configuration, qualification, maintenance/calibration currency and calendar availability before a physical trial.",
+      "controlled_variables": [
+        "operation/profile revision",
+        "tooling/fixture identity",
+        "required accepted function",
+        "time window"
+      ],
+      "observations_to_collect": [
+        "capability evidence class",
+        "qualification scope and expiry",
+        "available capacity/calendar",
+        "resource dependencies"
+      ],
+      "if_assumption_holds": "all required capabilities, qualification and usable capacity are evidenced",
+      "if_assumption_fails": "a hard capability or availability requirement is absent/contradicted",
+      "if_indeterminate": "source refs or resource state are missing/stale",
+      "cost_time_status": "not_measured",
+      "outcome_model_status": "qualitative_discriminator_requires_preregistration",
+      "safety_authority": "documentary_review_only",
+      "execution_state": "not_executed",
+      "selection_state": "not_selected"
+    },
+    {
+      "experiment_id": "HAF-EXP-04",
+      "title": "Map utility and inspection common-mode dependencies",
+      "stage": "engineering_document_review",
+      "tests_assumptions": [
+        "HAF-POWER-001"
+      ],
+      "purpose": "Review actual one-line/dependency diagrams and declared process, metrology, calibration and restart loads; identify whether a purported backup preserves the required full service.",
+      "controlled_variables": [
+        "site and utility revision",
+        "critical-load list",
+        "inspection/calibration requirements",
+        "restart/requalification conditions"
+      ],
+      "observations_to_collect": [
+        "source load data and provenance",
+        "shared failure dependencies",
+        "backup capacity envelope",
+        "post-restoration acceptance/requalification checks"
+      ],
+      "if_assumption_holds": "the declared topology and load envelope support every required critical process and inspection/restart dependency",
+      "if_assumption_fails": "a common-mode failure, capacity shortfall or required unavailable acceptance path remains",
+      "if_indeterminate": "diagram, load or requalification evidence is missing",
+      "cost_time_status": "not_measured",
+      "outcome_model_status": "qualitative_discriminator_requires_preregistration",
+      "safety_authority": "documentary_review_only; physical electrical tests require qualified local authorization",
+      "execution_state": "not_executed",
+      "selection_state": "not_selected"
+    },
+    {
+      "experiment_id": "HAF-EXP-05",
+      "title": "Worker-skill and shift-window audit",
+      "stage": "existing_evidence_audit",
+      "tests_assumptions": [
+        "HAF-SKILL-001"
+      ],
+      "purpose": "Check current qualification, currency, shift roster and feasible coverage for the exact tasks; represent training as elapsed time and assessed competence.",
+      "controlled_variables": [
+        "required skill/profile revision",
+        "shift calendar",
+        "qualification currency",
+        "training and absence policy"
+      ],
+      "observations_to_collect": [
+        "qualified staff coverage by time window",
+        "skill gap and expiration state",
+        "training duration evidence",
+        "uncovered operations"
+      ],
+      "if_assumption_holds": "every required operation has a qualified worker in the needed time window",
+      "if_assumption_fails": "at least one required window has no qualified available worker",
+      "if_indeterminate": "roster or qualification freshness is unresolved",
+      "cost_time_status": "not_measured",
+      "outcome_model_status": "qualitative_discriminator_requires_preregistration",
+      "safety_authority": "documentary_review_only",
+      "execution_state": "not_executed",
+      "selection_state": "not_selected"
+    },
+    {
+      "experiment_id": "HAF-EXP-06",
+      "title": "Variant-BOM and reversible sample-assembly check",
+      "stage": "desk_analysis_then_bounded_sample",
+      "tests_assumptions": [
+        "HAF-MODULARITY-001"
+      ],
+      "purpose": "Compare exact BOM/drawing/interface revisions and, if approved, assemble a bounded non-production sample while recording fit/function acceptance, setup time, rework and waste.",
+      "controlled_variables": [
+        "variant identity and revision",
+        "assembly procedure",
+        "tooling and fixture",
+        "predeclared acceptance criteria"
+      ],
+      "observations_to_collect": [
+        "common and variant-specific parts",
+        "interface mismatch list",
+        "measured changeover/setup time",
+        "first-pass conformance and material loss"
+      ],
+      "if_assumption_holds": "all claimed variants meet the frozen acceptance profile and an independently measured setup/waste benefit is observed",
+      "if_assumption_fails": "a variant fails acceptance, needs unmodelled special parts, or no benefit is observed within the stated measurement resolution",
+      "if_indeterminate": "sample scope, operator effect or metrology uncertainty prevents interpretation",
+      "cost_time_status": "not_measured",
+      "outcome_model_status": "qualitative_discriminator_requires_preregistration",
+      "safety_authority": "sample fabrication/review not approved",
+      "execution_state": "not_executed",
+      "selection_state": "not_selected"
+    },
+    {
+      "experiment_id": "HAF-EXP-07",
+      "title": "Common-spare identity and bounded repair acceptance test",
+      "stage": "records_audit_then_controlled_repair_trial",
+      "tests_assumptions": [
+        "HAF-REPAIR-001"
+      ],
+      "purpose": "Bind the exact spare part, interchangeability envelope, inventory/lead time, tool/skill/capacity and post-repair acceptance before claiming downtime reduction.",
+      "controlled_variables": [
+        "product and module revision",
+        "spare identity and revision",
+        "repair instruction and tools",
+        "acceptance profile"
+      ],
+      "observations_to_collect": [
+        "stock/availability evidence and as-of time",
+        "interchangeability proof",
+        "timed repair and consumed resources if authorized",
+        "post-repair inspection/functional result"
+      ],
+      "if_assumption_holds": "the qualified spare and repair path restore the specified accepted service under the defined test conditions",
+      "if_assumption_fails": "the spare is unavailable/incompatible, repair capacity is missing, or the article fails acceptance",
+      "if_indeterminate": "no admitted spare/repair/acceptance evidence exists",
+      "cost_time_status": "not_measured",
+      "outcome_model_status": "qualitative_discriminator_requires_preregistration",
+      "safety_authority": "not_approved_requires_product_owner_and_qualified_repair_operator",
+      "execution_state": "not_executed",
+      "selection_state": "not_selected"
+    },
+    {
+      "experiment_id": "HAF-EXP-08",
+      "title": "Independent cost-boundary and denominator audit",
+      "stage": "independent_record_audit",
+      "tests_assumptions": [
+        "HAF-COST-001"
+      ],
+      "purpose": "Reconcile source records, all mandatory cost categories, units, currency/date basis, accepted units, returns/warranty and capital allocation before candidate scores are compared.",
+      "controlled_variables": [
+        "functional unit and accepted-unit semantics",
+        "currency/date conversion basis",
+        "cost horizon and utilization",
+        "category coverage"
+      ],
+      "observations_to_collect": [
+        "source citations and date",
+        "category completeness",
+        "denominator reconciliation",
+        "sensitivity and omitted-cost register"
+      ],
+      "if_assumption_holds": "an independent evaluator confirms complete, comparable categories and the declared functional-unit basis",
+      "if_assumption_fails": "any required cost component, unit, boundary or denominator is inconsistent or absent",
+      "if_indeterminate": "commercially withheld records prevent complete cost evaluation",
+      "cost_time_status": "not_measured",
+      "outcome_model_status": "qualitative_discriminator_requires_preregistration",
+      "safety_authority": "documentary_review_only",
+      "execution_state": "not_executed",
+      "selection_state": "not_selected"
+    },
+    {
+      "experiment_id": "HAF-EXP-09",
+      "title": "Baseline and scorecard preregistration audit",
+      "stage": "protocol_audit",
+      "tests_assumptions": [
+        "HAF-BASELINE-001"
+      ],
+      "purpose": "Freeze baseline/candidate policy revisions, task mix, resource calendars, disruption injections, holdout, result states, exclusions, primary metric and guardrails before scoring.",
+      "controlled_variables": [
+        "both policy/source revisions",
+        "same fixture and scenario identities",
+        "metric definitions and evaluation horizon",
+        "holdout and exclusion rule"
+      ],
+      "observations_to_collect": [
+        "manifest hashes",
+        "baseline and candidate identities",
+        "preregistered primary/guardrail metrics",
+        "evaluator build and exclusion report"
+      ],
+      "if_assumption_holds": "both arms share the declared input boundary and a frozen independent evaluator can reproduce case-wise results",
+      "if_assumption_fails": "policy/input differences, holdout leakage or selective exclusions are found",
+      "if_indeterminate": "policy/adapter revisions remain unbound",
+      "cost_time_status": "not_measured",
+      "outcome_model_status": "qualitative_discriminator_requires_preregistration",
+      "safety_authority": "protocol_review_only",
+      "execution_state": "not_executed",
+      "selection_state": "not_selected"
+    },
+    {
+      "experiment_id": "HAF-EXP-10",
+      "title": "Assumption-bound audit of synthetic interval claim limits",
+      "stage": "independent_model_review",
+      "tests_assumptions": [
+        "HAF-BOUNDS-001"
+      ],
+      "purpose": "Ensure synthetic challenge bounds are never admitted as estimates of a real factory, and specify what data/model validation would be required before producing physical bounds.",
+      "controlled_variables": [
+        "fixture and schema revision",
+        "evidence-class labels",
+        "model discrepancy and physical validation requirements"
+      ],
+      "observations_to_collect": [
+        "source/evidence status audit",
+        "claim-language review",
+        "data/model validation plan",
+        "dependent decision invalidation list"
+      ],
+      "if_assumption_holds": "all reports retain synthetic-only semantics and physical claims remain blocked",
+      "if_assumption_fails": "any synthetic value is re-labelled or used as measured, calibrated, probabilistic or predictive evidence",
+      "if_indeterminate": "review/receipt lineage cannot be reconstructed",
+      "cost_time_status": "not_measured",
+      "outcome_model_status": "qualitative_discriminator_requires_preregistration",
+      "safety_authority": "independent_document_review_only",
+      "execution_state": "not_executed",
+      "selection_state": "not_selected"
+    }
+  ],
+  "required_invariants": [
+    "Every critical assumption has a falsifier and at least one candidate experiment.",
+    "Every option/scenario dependency resolves to the exact frozen source sets.",
+    "No candidate experiment is selected from this definition fixture.",
+    "No outcome observation, measured cost/duration, scenario probability, expected value or ROI is inferred from blank fields.",
+    "Every physical or production-affecting test remains unapproved until the applicable qualified owner authorizes it.",
+    "A changed assumption revision invalidates dependent decision receipts; historical results are preserved and not silently rewritten.",
+    "Experiment predictions, thresholds, controls and exclusion rules must be frozen before execution.",
+    "A cheapest test may be chosen only after its ability to discriminate the competing hypotheses and its safety prerequisites are established."
+  ],
+  "execution_status": {
+    "experiments_executed": 0,
+    "observations_admitted": 0,
+    "selection_decision": "not_run",
+    "rust_qualifier": "to_be_added_not_executed",
+    "physical_trials": "none"
+  }
+}
