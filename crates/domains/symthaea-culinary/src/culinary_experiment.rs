@@ -57,7 +57,6 @@ impl UtcTimestamp {
 #[derive(Debug, Clone)]
 struct OutcomeDefinition {
     unit: String,
-    direction: String,
 }
 
 fn non_empty<'a>(value: &'a Value, key: &str) -> Option<&'a str> {
@@ -326,7 +325,6 @@ pub fn validate_culinary_experiment_v1(
         }
         if outcome_definitions.insert(id.to_owned(), OutcomeDefinition {
             unit: unit.to_owned(),
-            direction: direction.to_owned(),
         }).is_some() {
             errors.push(format!("duplicate outcome_id definition {id:?}"));
         }
@@ -359,6 +357,10 @@ pub fn validate_culinary_experiment_v1(
         if non_empty(block, "randomization_seed").is_none() {
             errors.push(format!("{block_label}.randomization_seed is required"));
         }
+        let random_order_raw_len = block
+            .get("randomized_order")
+            .and_then(Value::as_array)
+            .map_or(0, Vec::len);
         let random_order: Vec<&str> = block
             .get("randomized_order")
             .and_then(Value::as_array)
@@ -366,7 +368,7 @@ pub fn validate_culinary_experiment_v1(
             .flatten()
             .filter_map(Value::as_str)
             .collect();
-        if random_order.len() != 2
+        if random_order_raw_len != 2 || random_order.len() != 2
             || !control.is_some_and(|value| random_order.contains(&value))
             || !variant.is_some_and(|value| random_order.contains(&value))
         {
