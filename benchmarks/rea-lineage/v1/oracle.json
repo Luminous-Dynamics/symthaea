@@ -19,7 +19,9 @@
     "LNG-015": "reject",
     "LNG-016": "reject",
     "LNG-017": "accept",
-    "LNG-018": "reject"
+    "LNG-018": "reject",
+    "LNG-019": "reject",
+    "LNG-020": "reject"
   },
   "claim_limits": [
     "A valid derivation edge establishes lineage, not bytewise equivalence or runtime behavior.",
