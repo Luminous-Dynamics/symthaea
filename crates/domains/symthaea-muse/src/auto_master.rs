@@ -130,6 +130,27 @@ impl MasteringConfig {
                 config.eq_max_correction_db = 4.0;
                 config.eq_max_high_boost_db = 0.9;
             }
+            D::DroneElastic => {
+                config.target_low_ratio = 0.29;
+                config.target_mid_ratio = 0.43;
+                config.target_high_ratio = 0.28;
+                config.eq_max_correction_db = 3.5;
+                config.eq_max_high_boost_db = 1.0;
+            }
+            D::DramaticTiming => {
+                config.target_low_ratio = 0.31;
+                config.target_mid_ratio = 0.44;
+                config.target_high_ratio = 0.25;
+                config.eq_max_correction_db = 4.5;
+                config.eq_max_high_boost_db = 1.2;
+            }
+            D::ChoralBlend => {
+                config.target_low_ratio = 0.28;
+                config.target_mid_ratio = 0.47;
+                config.target_high_ratio = 0.25;
+                config.eq_max_correction_db = 3.5;
+                config.eq_max_high_boost_db = 0.75;
+            }
         }
         config
     }
@@ -726,6 +747,9 @@ mod tests {
             D::ProcessExact,
             D::FolkLift,
             D::JazzLaidBack,
+            D::DroneElastic,
+            D::DramaticTiming,
+            D::ChoralBlend,
         ];
         let profiles: Vec<_> = dialects.iter().map(|d| MasteringConfig::for_dialect(*d)).collect();
 
@@ -753,6 +777,8 @@ mod tests {
         assert_ne!(profiles[0].target_low_ratio, profiles[1].target_low_ratio);
         assert_ne!(profiles[1].target_high_ratio, profiles[2].target_high_ratio);
         assert_ne!(profiles[2].target_mid_ratio, profiles[4].target_mid_ratio);
+        assert_ne!(profiles[5].eq_max_correction_db, profiles[6].eq_max_correction_db);
+        assert_ne!(profiles[6].target_mid_ratio, profiles[7].target_mid_ratio);
     }
 
 }
