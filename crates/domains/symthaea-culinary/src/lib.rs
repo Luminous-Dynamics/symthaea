@@ -31,6 +31,9 @@
 //! ```
 //!
 //! No external dependencies; all data is embedded (see `data/PROVENANCE.md`).
+//!
+//! Thermal interval envelopes preserve stated temperature bounds through a
+//! conditional D/z calculation. They are not food-safety verdicts.
 
 pub mod composition_closure;
 pub mod balance;
@@ -56,6 +59,7 @@ pub mod rng;
 pub mod spec;
 pub mod thermal;
 pub mod thermal_observation;
+pub mod thermal_interval;
 pub mod thresholds;
 pub mod validate;
 
