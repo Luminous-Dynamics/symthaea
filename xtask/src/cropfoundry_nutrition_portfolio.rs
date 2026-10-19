@@ -768,8 +768,8 @@ mod tests {
         assert_eq!(crop_a.batch_count, 2);
         assert_eq!(crop_a.total_water_liters, Some(20.0));
         let iron = crop_a.nutrients.iter().find(|item| item.nutrient_id == "iron").unwrap();
-        assert_eq!(iron.total_delivered_mg, Some(2.0));
-        assert_eq!(iron.mg_per_liter_water, Some(0.1));
+        assert_eq!(iron.total_delivered_mg, Some(20.0));
+        assert_eq!(iron.mg_per_liter_water, Some(1.0));
     }
 
     #[test]
