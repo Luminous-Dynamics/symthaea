@@ -420,24 +420,31 @@ mod tests {
     }
 
     #[test]
-    fn receipt_cannot_promote_physical_qualification_or_drop_negative_controls() {
+    fn receipt_cannot_promote_physical_qualification() {
         let mut receipt = synthetic_receipt();
         receipt["physical_validation"] = Value::String("INDEPENDENTLY_REVIEWED".to_owned());
+        let errors = validate_cad_runtime_receipt_str(&encoded(&receipt), SCHEMA_TEXT, CAD_SOURCE)
+            .expect_err("the schema const must reject physical-status promotion");
+        assert!(
+            !errors.is_empty(),
+            "a physical qualification claim must make the receipt invalid"
+        );
+    }
+
+    #[test]
+    fn receipt_cannot_drop_required_negative_controls() {
+        let mut receipt = synthetic_receipt();
         receipt["negative_controls"]
             .as_array_mut()
             .expect("negative controls are an array")
             .remove(0);
         let errors = validate_cad_runtime_receipt_str(&encoded(&receipt), SCHEMA_TEXT, CAD_SOURCE)
-            .expect_err("receipt cannot omit controls or promote physical status");
+            .expect_err("the schema must reject an incomplete negative-control set");
         assert!(
             errors
                 .iter()
-                .any(|error| error.contains("physical_validation"))
-        );
-        assert!(
-            errors
-                .iter()
-                .any(|error| error.contains("negative_controls"))
+                .any(|error| error.contains("negative_controls")),
+            "missing negative control should be reported by the schema"
         );
     }
 }
