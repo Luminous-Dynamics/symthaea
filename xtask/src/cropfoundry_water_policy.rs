@@ -573,6 +573,65 @@ mod tests {
     }
 
     #[test]
+    fn cropfoundry_failure_ablation_scenarios_change_only_the_declared_factor() {
+        let receipt = build_receipt().unwrap();
+        for policy_result in receipt
+            .results
+            .iter()
+            .filter(|result| result.scenario_id == "forecast_bias_only")
+        {
+            let reference = receipt
+                .results
+                .iter()
+                .find(|result| {
+                    result.scenario_id == "reference" && result.policy == policy_result.policy
+                })
+                .unwrap();
+            assert_eq!(
+                policy_result.daily_water_budget_plot_mm,
+                reference.daily_water_budget_plot_mm
+            );
+            assert_eq!(policy_result.drought_start_day, reference.drought_start_day);
+            assert_eq!(policy_result.heat_start_day, reference.heat_start_day);
+            assert_eq!(
+                policy_result.sensor_dropout_period_days,
+                reference.sensor_dropout_period_days
+            );
+            assert_ne!(
+                policy_result.forecast_bias_fraction,
+                reference.forecast_bias_fraction
+            );
+        }
+        for policy_result in receipt
+            .results
+            .iter()
+            .filter(|result| result.scenario_id == "sensor_dropout_only")
+        {
+            let reference = receipt
+                .results
+                .iter()
+                .find(|result| {
+                    result.scenario_id == "reference" && result.policy == policy_result.policy
+                })
+                .unwrap();
+            assert_eq!(
+                policy_result.daily_water_budget_plot_mm,
+                reference.daily_water_budget_plot_mm
+            );
+            assert_eq!(policy_result.drought_start_day, reference.drought_start_day);
+            assert_eq!(policy_result.heat_start_day, reference.heat_start_day);
+            assert_eq!(
+                policy_result.forecast_bias_fraction,
+                reference.forecast_bias_fraction
+            );
+            assert_ne!(
+                policy_result.sensor_dropout_period_days,
+                reference.sensor_dropout_period_days
+            );
+        }
+    }
+
+    #[test]
     fn cropfoundry_policy_results_include_paired_reference_deltas() {
         let receipt = build_receipt().unwrap();
         assert!(receipt.results.iter().all(|result| {
