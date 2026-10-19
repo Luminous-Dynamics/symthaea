@@ -1,8 +1,8 @@
 //! Provider-neutral known-answer scoring for firmware extraction reports.
 //!
-//! Provider-reported regions and output files are untrusted observations. A
-//! provider passes only when source identity, byte accounting, region findings
-//! and emitted file tree match an independent oracle.
+//! A region's offsets are meaningful only relative to its coordinate space.
+//! Nested decompression produces a new coordinate space with its own digest;
+//! child offsets must never be silently reinterpreted as root-file offsets.
 use serde::{Deserialize, Serialize};
 use std::collections::{BTreeMap, BTreeSet};
 
@@ -16,7 +16,15 @@ pub struct SourceIdentity {
 }
 
 #[derive(Clone, Debug, Deserialize, Serialize, PartialEq, Eq, PartialOrd, Ord)]
+pub struct CoordinateSpace {
+    pub id: String,
+    pub sha256: String,
+    pub byte_length: u64,
+}
+
+#[derive(Clone, Debug, Deserialize, Serialize, PartialEq, Eq, PartialOrd, Ord)]
 pub struct Region {
+    pub coordinate_space_id: String,
     pub kind: String,
     pub start: u64,
     pub end: u64,
@@ -36,12 +44,14 @@ pub struct OracleCase {
     pub corpus_id: String,
     pub case_id: String,
     pub source: SourceIdentity,
+    pub coordinate_spaces: Vec<CoordinateSpace>,
     pub expected_regions: Vec<Region>,
     pub expected_files: Vec<ExpectedFile>,
 }
 
 #[derive(Clone, Debug, Deserialize, Serialize, PartialEq, Eq)]
 pub struct AccountingSpan {
+    pub coordinate_space_id: String,
     pub start: u64,
     pub end: u64,
     /// Allowed values: identified, padding, unknown, unsupported, ambiguous.
@@ -57,6 +67,7 @@ pub struct Observation {
     /// Allowed values: supported, unsupported, unknown.
     pub capability: String,
     pub source: SourceIdentity,
+    pub coordinate_spaces: Vec<CoordinateSpace>,
     pub accounting: Vec<AccountingSpan>,
     pub regions: Vec<Region>,
     pub files: Vec<ExpectedFile>,
@@ -66,6 +77,10 @@ pub struct Observation {
 #[derive(Clone, Debug, Deserialize, Serialize, PartialEq, Eq)]
 pub struct Metrics {
     pub source_identity_match: bool,
+    pub coordinate_spaces_expected: usize,
+    pub coordinate_spaces_exact: usize,
+    pub coordinate_spaces_missing_or_wrong: usize,
+    pub coordinate_spaces_extra: usize,
     pub known_files_expected: usize,
     pub known_files_exact: usize,
     pub known_file_recall_percent: u8,
@@ -76,6 +91,7 @@ pub struct Metrics {
     pub exact_regions: usize,
     pub missed_or_false_regions: usize,
     pub source_bytes: u64,
+    pub coordinate_space_bytes: u64,
     pub accounted_unique_bytes: u64,
     pub unexplained_bytes: u64,
     pub overlapping_accounting_bytes: u64,
@@ -139,53 +155,97 @@ fn validate_file(file: &ExpectedFile, side: &str, reasons: &mut Vec<String>) {
     }
 }
 
+fn coordinate_map(spaces: &[CoordinateSpace], side: &str, reasons: &mut Vec<String>) -> BTreeMap<String, CoordinateSpace> {
+    let mut result = BTreeMap::new();
+    for space in spaces {
+        if space.id.is_empty() {
+            reasons.push(format!("{side} coordinate space has an empty ID"));
+        }
+        if !valid_digest(&space.sha256) {
+            reasons.push(format!("{side} coordinate space {} has malformed SHA-256", space.id));
+        }
+        if result.insert(space.id.clone(), space.clone()).is_some() {
+            reasons.push(format!("{side} coordinate space ID is duplicated: {}", space.id));
+        }
+    }
+    result
+}
+
+fn same_root_space(source: &SourceIdentity, spaces: &BTreeMap<String, CoordinateSpace>, side: &str, reasons: &mut Vec<String>) -> bool {
+    match spaces.get("root") {
+        Some(root) if root.sha256 == source.sha256 && root.byte_length == source.byte_length => true,
+        _ => {
+            reasons.push(format!("{side} root coordinate space does not match the selected source identity"));
+            false
+        }
+    }
+}
+
 fn sum_dispositions(
     accounting: &[AccountingSpan],
-    source_length: u64,
+    spaces: &BTreeMap<String, CoordinateSpace>,
     reasons: &mut Vec<String>,
 ) -> (BTreeMap<String, u64>, u64, u64, u64) {
     let allowed: BTreeSet<&str> =
         ["identified", "padding", "unknown", "unsupported", "ambiguous"].into_iter().collect();
-    let mut counts: BTreeMap<String, u64> = BTreeMap::new();
-    let mut spans: Vec<&AccountingSpan> = accounting.iter().collect();
-    spans.sort_by_key(|span| (span.start, span.end, span.disposition.clone()));
-
-    let mut cursor = 0_u64;
-    let mut unique_covered = 0_u64;
-    let mut unexplained = 0_u64;
-    let mut overlapping = 0_u64;
-
-    for span in spans {
+    let mut grouped: BTreeMap<String, Vec<&AccountingSpan>> = BTreeMap::new();
+    for span in accounting {
         if !allowed.contains(span.disposition.as_str()) {
             reasons.push(format!("unknown accounting disposition: {}", span.disposition));
             continue;
         }
-        if span.start >= span.end {
-            reasons.push(format!("accounting span is empty or reversed: {}..{}", span.start, span.end));
+        if !spaces.contains_key(&span.coordinate_space_id) {
+            reasons.push(format!("accounting span references unknown coordinate space: {}", span.coordinate_space_id));
             continue;
         }
-        if span.end > source_length {
-            reasons.push(format!("accounting span exceeds source length: {}..{}", span.start, span.end));
-            continue;
-        }
-        if span.start > cursor {
-            unexplained = unexplained.saturating_add(span.start - cursor);
-        }
-        if span.start < cursor {
-            let duplicate = span.end.min(cursor).saturating_sub(span.start);
-            overlapping = overlapping.saturating_add(duplicate);
-            reasons.push(format!("accounting spans overlap by {duplicate} bytes at {}..{}", span.start, span.end));
-        }
-        let fresh_start = span.start.max(cursor);
-        if span.end > fresh_start {
-            let fresh_length = span.end - fresh_start;
-            unique_covered = unique_covered.saturating_add(fresh_length);
-            *counts.entry(span.disposition.clone()).or_default() += fresh_length;
-        }
-        cursor = cursor.max(span.end);
+        grouped.entry(span.coordinate_space_id.clone()).or_default().push(span);
     }
-    if cursor < source_length {
-        unexplained = unexplained.saturating_add(source_length - cursor);
+
+    let mut counts: BTreeMap<String, u64> = BTreeMap::new();
+    let mut unique_covered = 0_u64;
+    let mut unexplained = 0_u64;
+    let mut overlapping = 0_u64;
+
+    // Every oracle-declared space is evaluated, even if a provider omitted the
+    // corresponding child space; omission cannot silently reduce the denominator.
+    for (space_id, space) in spaces {
+        let mut spans = grouped.remove(space_id).unwrap_or_default();
+        spans.sort_by_key(|span| (span.start, span.end, span.disposition.clone()));
+        let mut cursor = 0_u64;
+        for span in spans {
+            if span.start >= span.end {
+                reasons.push(format!(
+                    "accounting span is empty or reversed in {space_id}: {}..{}",
+                    span.start, span.end
+                ));
+                continue;
+            }
+            if span.end > space.byte_length {
+                reasons.push(format!(
+                    "accounting span exceeds {space_id} length: {}..{}",
+                    span.start, span.end
+                ));
+                continue;
+            }
+            if span.start > cursor {
+                unexplained = unexplained.saturating_add(span.start - cursor);
+            }
+            if span.start < cursor {
+                let duplicate = span.end.min(cursor).saturating_sub(span.start);
+                overlapping = overlapping.saturating_add(duplicate);
+                reasons.push(format!("accounting spans overlap by {duplicate} bytes in {space_id}"));
+            }
+            let fresh_start = span.start.max(cursor);
+            if span.end > fresh_start {
+                let fresh_length = span.end - fresh_start;
+                unique_covered = unique_covered.saturating_add(fresh_length);
+                *counts.entry(span.disposition.clone()).or_default() += fresh_length;
+            }
+            cursor = cursor.max(span.end);
+        }
+        if cursor < space.byte_length {
+            unexplained = unexplained.saturating_add(space.byte_length - cursor);
+        }
     }
     (counts, unique_covered, unexplained, overlapping)
 }
@@ -240,12 +300,13 @@ fn exact_region_overlap(expected: &[Region], observed: &[Region]) -> usize {
     matches
 }
 
-/// Scores one observed provider report against one independently authored oracle.
+/// Scores one observed provider report against an independently authored oracle.
 ///
-/// Unsupported and unknown-capability reports abstain; they never earn a passing
-/// score or known-file recall credit. A complete-extraction claim is rejected
-/// whenever any byte is unknown, unsupported, ambiguous, unexplained, or
-/// double-accounted.
+/// A child coordinate space is a separately digested byte sequence, such as a
+/// decompressed tar stream. Its offsets are never projected onto the root input.
+/// Unsupported/unknown capability abstains without recall credit. A complete
+/// claim fails if any declared coordinate space has unresolved or double-counted
+/// bytes.
 pub fn score_case(oracle: &OracleCase, observed: &Observation) -> Result<Scorecard, ScoreError> {
     if oracle.schema_version != ORACLE_SCHEMA {
         return Err(ScoreError(format!("unsupported oracle schema: {}", oracle.schema_version)));
@@ -262,7 +323,6 @@ pub fn score_case(oracle: &OracleCase, observed: &Observation) -> Result<Scoreca
     if !valid_digest(&oracle.source.sha256) || !valid_digest(&observed.source.sha256) {
         return Err(ScoreError("source SHA-256 must be 64 lowercase hexadecimal characters".into()));
     }
-
     let capability_supported = observed.capability == "supported";
     if !["supported", "unsupported", "unknown"].contains(&observed.capability.as_str()) {
         return Err(ScoreError(format!("invalid capability value: {}", observed.capability)));
@@ -273,6 +333,34 @@ pub fn score_case(oracle: &OracleCase, observed: &Observation) -> Result<Scoreca
     if !source_identity_match {
         reasons.push("observed source length or SHA-256 differs from independent oracle".into());
     }
+
+    let oracle_spaces = coordinate_map(&oracle.coordinate_spaces, "oracle", &mut reasons);
+    let observed_spaces = coordinate_map(&observed.coordinate_spaces, "observed", &mut reasons);
+    same_root_space(&oracle.source, &oracle_spaces, "oracle", &mut reasons);
+    if capability_supported {
+        same_root_space(&observed.source, &observed_spaces, "observed", &mut reasons);
+    }
+
+    let mut coordinate_spaces_exact = 0_usize;
+    let mut coordinate_spaces_missing_or_wrong = 0_usize;
+    let mut coordinate_spaces_extra = 0_usize;
+    if capability_supported {
+        for (id, expected) in &oracle_spaces {
+            if observed_spaces.get(id) == Some(expected) {
+                coordinate_spaces_exact += 1;
+            } else {
+                coordinate_spaces_missing_or_wrong += 1;
+                reasons.push(format!("coordinate space differs from oracle: {id}"));
+            }
+        }
+        for id in observed_spaces.keys() {
+            if !oracle_spaces.contains_key(id) {
+                coordinate_spaces_extra += 1;
+                reasons.push(format!("extra coordinate space not present in oracle: {id}"));
+            }
+        }
+    }
+
     for file in &oracle.expected_files {
         validate_file(file, "oracle", &mut reasons);
     }
@@ -280,7 +368,9 @@ pub fn score_case(oracle: &OracleCase, observed: &Observation) -> Result<Scoreca
         validate_file(file, "observed", &mut reasons);
     }
     for region in &oracle.expected_regions {
-        if region.start >= region.end || region.end > oracle.source.byte_length {
+        if !oracle_spaces.contains_key(&region.coordinate_space_id) {
+            reasons.push(format!("oracle region references unknown coordinate space: {}", region.coordinate_space_id));
+        } else if region.start >= region.end || region.end > oracle_spaces[&region.coordinate_space_id].byte_length {
             reasons.push(format!("oracle region is out of bounds or empty: {} {}..{}", region.kind, region.start, region.end));
         }
     }
@@ -293,7 +383,7 @@ pub fn score_case(oracle: &OracleCase, observed: &Observation) -> Result<Scoreca
     }
 
     let (dispositions, accounted_unique_bytes, unexplained_bytes, overlapping_accounting_bytes) =
-        sum_dispositions(&observed.accounting, oracle.source.byte_length, &mut reasons);
+        sum_dispositions(&observed.accounting, &oracle_spaces, &mut reasons);
     let get = |name: &str| dispositions.get(name).copied().unwrap_or(0);
     let unknown_bytes = get("unknown");
     let unsupported_bytes = get("unsupported");
@@ -302,8 +392,12 @@ pub fn score_case(oracle: &OracleCase, observed: &Observation) -> Result<Scoreca
     let identified_bytes = get("identified");
 
     for region in &observed.regions {
-        if region.start >= region.end || region.end > oracle.source.byte_length {
-            reasons.push(format!("detected region is out of bounds or empty: {} {}..{}", region.kind, region.start, region.end));
+        match oracle_spaces.get(&region.coordinate_space_id) {
+            None => reasons.push(format!("detected region references unknown coordinate space: {}", region.coordinate_space_id)),
+            Some(space) if region.start >= region.end || region.end > space.byte_length => {
+                reasons.push(format!("detected region is out of bounds or empty: {} {} {}..{}", region.coordinate_space_id, region.kind, region.start, region.end));
+            }
+            _ => {}
         }
     }
     let exact_regions = if capability_supported {
@@ -338,8 +432,16 @@ pub fn score_case(oracle: &OracleCase, observed: &Observation) -> Result<Scoreca
             observed.files.len()
         ));
     }
+    if !capability_supported && observed.complete_extraction_claim {
+        reasons.push("unsupported/unknown provider capability cannot claim completeness".into());
+    }
+    if !capability_supported && !observed.files.is_empty() {
+        reasons.push("unsupported/unknown capability emitted files; claim requires review".into());
+    }
 
-    let known_file_recall_percent = if oracle.expected_files.is_empty() {
+    let known_file_recall_percent = if !capability_supported {
+        0
+    } else if oracle.expected_files.is_empty() {
         if observed.files.is_empty() { 100 } else { 0 }
     } else {
         ((known_files_exact * 100) / oracle.expected_files.len()).min(100) as u8
@@ -351,7 +453,7 @@ pub fn score_case(oracle: &OracleCase, observed: &Observation) -> Result<Scoreca
         .saturating_add(unexplained_bytes)
         .saturating_add(overlapping_accounting_bytes);
     if unexplained_bytes > 0 {
-        reasons.push(format!("{unexplained_bytes} source bytes are not accounted for by any span"));
+        reasons.push(format!("{unexplained_bytes} bytes across declared coordinate spaces are not accounted for by any span"));
     }
     if unknown_bytes > 0 || unsupported_bytes > 0 || ambiguous_bytes > 0 {
         reasons.push(format!(
@@ -364,20 +466,13 @@ pub fn score_case(oracle: &OracleCase, observed: &Observation) -> Result<Scoreca
         ));
     }
 
-    if !capability_supported {
-        if observed.complete_extraction_claim {
-            reasons.push("unsupported/unknown provider capability cannot claim completeness".into());
-        }
-        if !observed.files.is_empty() {
-            reasons.push("unsupported/unknown capability emitted files; claim requires review".into());
-        }
-    }
-
     let content_or_structure_failed = reasons.iter().any(|reason| {
         reason.contains("differs")
             || reason.contains("duplicate output paths")
             || reason.contains("collide")
             || reason.contains("out of bounds")
+            || reason.contains("unknown coordinate space")
+            || reason.contains("extra coordinate space")
             || reason.contains("missed or false-positive")
             || reason.contains("known-answer output tree differs")
             || reason.contains("overlap")
@@ -409,6 +504,7 @@ pub fn score_case(oracle: &OracleCase, observed: &Observation) -> Result<Scoreca
         "pass"
     };
 
+    let coordinate_space_bytes = oracle_spaces.values().fold(0_u64, |sum, space| sum.saturating_add(space.byte_length));
     Ok(Scorecard {
         schema_version: "symthaea.rea-differential-scorecard.v1".into(),
         corpus_id: oracle.corpus_id.clone(),
@@ -419,6 +515,10 @@ pub fn score_case(oracle: &OracleCase, observed: &Observation) -> Result<Scoreca
         complete_extraction_claim_accepted: status == "pass" && observed.complete_extraction_claim,
         metrics: Metrics {
             source_identity_match,
+            coordinate_spaces_expected: oracle_spaces.len(),
+            coordinate_spaces_exact,
+            coordinate_spaces_missing_or_wrong,
+            coordinate_spaces_extra,
             known_files_expected: oracle.expected_files.len(),
             known_files_exact,
             known_file_recall_percent,
@@ -429,6 +529,7 @@ pub fn score_case(oracle: &OracleCase, observed: &Observation) -> Result<Scoreca
             exact_regions,
             missed_or_false_regions,
             source_bytes: oracle.source.byte_length,
+            coordinate_space_bytes,
             accounted_unique_bytes,
             unexplained_bytes,
             overlapping_accounting_bytes,
@@ -452,12 +553,16 @@ mod tests {
             corpus_id: "rea-differential-v1".into(),
             case_id: "nested-inert-001".into(),
             source: SourceIdentity { sha256: "a".repeat(64), byte_length: 10 },
+            coordinate_spaces: vec![
+                CoordinateSpace { id: "root".into(), sha256: "a".repeat(64), byte_length: 10 },
+                CoordinateSpace { id: "tar-stream".into(), sha256: "b".repeat(64), byte_length: 7 },
+            ],
             expected_regions: vec![
-                Region { kind: "container".into(), start: 0, end: 7 },
-                Region { kind: "trailing-padding".into(), start: 7, end: 10 },
+                Region { coordinate_space_id: "root".into(), kind: "gzip-container".into(), start: 0, end: 10 },
+                Region { coordinate_space_id: "tar-stream".into(), kind: "tar-container".into(), start: 0, end: 7 },
             ],
             expected_files: vec![
-                ExpectedFile { path: "root/payload.txt".into(), sha256: "b".repeat(64), byte_length: 4, logical_id: "payload-001".into() },
+                ExpectedFile { path: "payload.txt".into(), sha256: "c".repeat(64), byte_length: 4, logical_id: "payload-001".into() },
             ],
         }
     }
@@ -470,50 +575,59 @@ mod tests {
             provider_version: "0.0-test".into(),
             capability: "supported".into(),
             source: SourceIdentity { sha256: "a".repeat(64), byte_length: 10 },
+            coordinate_spaces: vec![
+                CoordinateSpace { id: "root".into(), sha256: "a".repeat(64), byte_length: 10 },
+                CoordinateSpace { id: "tar-stream".into(), sha256: "b".repeat(64), byte_length: 7 },
+            ],
             accounting: vec![
-                AccountingSpan { start: 0, end: 7, disposition: "identified".into() },
-                AccountingSpan { start: 7, end: 10, disposition: "padding".into() },
+                AccountingSpan { coordinate_space_id: "root".into(), start: 0, end: 10, disposition: "identified".into() },
+                AccountingSpan { coordinate_space_id: "tar-stream".into(), start: 0, end: 7, disposition: "identified".into() },
             ],
             regions: vec![
-                Region { kind: "container".into(), start: 0, end: 7 },
-                Region { kind: "trailing-padding".into(), start: 7, end: 10 },
+                Region { coordinate_space_id: "root".into(), kind: "gzip-container".into(), start: 0, end: 10 },
+                Region { coordinate_space_id: "tar-stream".into(), kind: "tar-container".into(), start: 0, end: 7 },
             ],
             files: vec![
-                ExpectedFile { path: "root/payload.txt".into(), sha256: "b".repeat(64), byte_length: 4, logical_id: "payload-001".into() },
+                ExpectedFile { path: "payload.txt".into(), sha256: "c".repeat(64), byte_length: 4, logical_id: "payload-001".into() },
             ],
             complete_extraction_claim: true,
         }
     }
 
     #[test]
-    fn scores_exact_known_answer_as_pass() {
+    fn scores_exact_nested_known_answer_as_pass() {
         let score = score_case(&oracle(), &observation()).unwrap();
         assert_eq!(score.status, "pass");
         assert!(score.complete_extraction_claim_accepted);
         assert_eq!(score.metrics.known_file_recall_percent, 100);
+        assert_eq!(score.metrics.coordinate_spaces_exact, 2);
         assert_eq!(score.metrics.unexplained_bytes, 0);
+        assert_eq!(score.metrics.coordinate_space_bytes, 17);
     }
 
     #[test]
-    fn rejects_complete_claim_when_bytes_are_unknown() {
+    fn child_offsets_are_checked_in_child_space_not_root() {
         let mut obs = observation();
-        obs.accounting = vec![
-            AccountingSpan { start: 0, end: 7, disposition: "identified".into() },
-            AccountingSpan { start: 7, end: 10, disposition: "unknown".into() },
-        ];
+        obs.regions[1].start = 8;
+        let score = score_case(&oracle(), &obs).unwrap();
+        assert_eq!(score.status, "fail");
+        assert!(score.metrics.missed_or_false_regions > 0);
+    }
+
+    #[test]
+    fn rejects_complete_claim_when_child_bytes_are_unknown() {
+        let mut obs = observation();
+        obs.accounting[1].disposition = "unknown".into();
         let score = score_case(&oracle(), &obs).unwrap();
         assert_eq!(score.status, "fail");
         assert!(!score.complete_extraction_claim_accepted);
-        assert_eq!(score.metrics.unknown_bytes, 3);
+        assert_eq!(score.metrics.unknown_bytes, 7);
     }
 
     #[test]
-    fn reports_unexplained_gaps_instead_of_filling_them_with_zero() {
+    fn reports_unexplained_gaps_in_a_child_coordinate_space() {
         let mut obs = observation();
-        obs.accounting = vec![
-            AccountingSpan { start: 0, end: 4, disposition: "identified".into() },
-            AccountingSpan { start: 6, end: 10, disposition: "padding".into() },
-        ];
+        obs.accounting[1] = AccountingSpan { coordinate_space_id: "tar-stream".into(), start: 0, end: 5, disposition: "identified".into() };
         let score = score_case(&oracle(), &obs).unwrap();
         assert_eq!(score.status, "partial");
         assert_eq!(score.metrics.unexplained_bytes, 2);
@@ -521,12 +635,10 @@ mod tests {
     }
 
     #[test]
-    fn fails_overlapping_byte_accounting() {
+    fn fails_overlapping_byte_accounting_in_one_coordinate_space() {
         let mut obs = observation();
-        obs.accounting = vec![
-            AccountingSpan { start: 0, end: 7, disposition: "identified".into() },
-            AccountingSpan { start: 5, end: 10, disposition: "padding".into() },
-        ];
+        obs.accounting[1] = AccountingSpan { coordinate_space_id: "tar-stream".into(), start: 5, end: 7, disposition: "padding".into() };
+        obs.accounting.push(AccountingSpan { coordinate_space_id: "tar-stream".into(), start: 4, end: 6, disposition: "identified".into() });
         let score = score_case(&oracle(), &obs).unwrap();
         assert_eq!(score.status, "fail");
         assert!(score.metrics.overlapping_accounting_bytes > 0);
@@ -535,16 +647,25 @@ mod tests {
     #[test]
     fn wrong_source_hash_is_not_a_valid_reproduction() {
         let mut obs = observation();
-        obs.source.sha256 = "c".repeat(64);
+        obs.source.sha256 = "d".repeat(64);
         let score = score_case(&oracle(), &obs).unwrap();
         assert_eq!(score.status, "fail");
         assert!(!score.metrics.source_identity_match);
     }
 
     #[test]
+    fn wrong_child_space_digest_is_not_a_valid_lineage() {
+        let mut obs = observation();
+        obs.coordinate_spaces[1].sha256 = "d".repeat(64);
+        let score = score_case(&oracle(), &obs).unwrap();
+        assert_eq!(score.status, "fail");
+        assert_eq!(score.metrics.coordinate_spaces_missing_or_wrong, 1);
+    }
+
+    #[test]
     fn wrong_content_hash_is_a_missing_known_answer_file() {
         let mut obs = observation();
-        obs.files[0].sha256 = "f".repeat(64);
+        obs.files[0].sha256 = "e".repeat(64);
         let score = score_case(&oracle(), &obs).unwrap();
         assert_eq!(score.status, "fail");
         assert_eq!(score.metrics.known_files_exact, 0);
@@ -564,6 +685,7 @@ mod tests {
         let mut obs = observation();
         obs.capability = "unsupported".into();
         obs.files.clear();
+        obs.coordinate_spaces.clear();
         obs.accounting.clear();
         obs.regions.clear();
         obs.complete_extraction_claim = false;
@@ -571,6 +693,7 @@ mod tests {
         assert_eq!(score.status, "abstain");
         assert!(!score.complete_extraction_claim_accepted);
         assert_eq!(score.metrics.known_files_exact, 0);
+        assert_eq!(score.metrics.known_file_recall_percent, 0);
     }
 
     #[test]
@@ -595,8 +718,8 @@ mod tests {
     fn rejects_extra_unexpected_output_files() {
         let mut obs = observation();
         obs.files.push(ExpectedFile {
-            path: "root/unexpected.bin".into(),
-            sha256: "e".repeat(64),
+            path: "unexpected.bin".into(),
+            sha256: "f".repeat(64),
             byte_length: 1,
             logical_id: "unexpected-001".into(),
         });
@@ -608,21 +731,18 @@ mod tests {
     #[test]
     fn unsupported_spans_are_accounted_but_never_complete() {
         let mut obs = observation();
-        obs.accounting = vec![
-            AccountingSpan { start: 0, end: 7, disposition: "identified".into() },
-            AccountingSpan { start: 7, end: 10, disposition: "unsupported".into() },
-        ];
+        obs.accounting[1].disposition = "unsupported".into();
         obs.complete_extraction_claim = false;
         let score = score_case(&oracle(), &obs).unwrap();
         assert_eq!(score.status, "partial");
-        assert_eq!(score.metrics.unsupported_bytes, 3);
+        assert_eq!(score.metrics.unsupported_bytes, 7);
         assert!(!score.complete_extraction_claim_accepted);
     }
 
     #[test]
     fn rejects_out_of_bounds_region_even_when_other_results_match() {
         let mut obs = observation();
-        obs.regions.push(Region { kind: "fake".into(), start: 9, end: 11 });
+        obs.regions.push(Region { coordinate_space_id: "tar-stream".into(), kind: "fake".into(), start: 6, end: 9 });
         let score = score_case(&oracle(), &obs).unwrap();
         assert_eq!(score.status, "fail");
         assert!(score.reasons.iter().any(|reason| reason.contains("out of bounds")));
@@ -642,9 +762,18 @@ mod tests {
     fn rejects_missed_and_false_positive_regions() {
         let mut obs = observation();
         obs.regions[1].kind = "unknown".into();
-        obs.regions[1].start = 8;
+        obs.regions[1].start = 1;
         let score = score_case(&oracle(), &obs).unwrap();
         assert_eq!(score.status, "fail");
         assert!(score.metrics.missed_or_false_regions > 0);
+    }
+
+    #[test]
+    fn rejects_duplicate_coordinate_space_ids() {
+        let mut obs = observation();
+        obs.coordinate_spaces.push(obs.coordinate_spaces[1].clone());
+        let score = score_case(&oracle(), &obs).unwrap();
+        assert_eq!(score.status, "fail");
+        assert!(score.reasons.iter().any(|reason| reason.contains("duplicated")));
     }
 }
