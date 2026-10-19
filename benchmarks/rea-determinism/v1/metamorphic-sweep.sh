@@ -10,6 +10,7 @@ command -v jq >/dev/null 2>&1 || fail "jq required"
 command -v sha256sum >/dev/null 2>&1 || fail "sha256sum required"
 [ -f "$CASES" ] && [ -f "$NORMALIZER" ] || fail "fixture or normalizer missing"
 SOURCE_SHA=$(git rev-parse HEAD 2>/dev/null || printf 'unknown')
+CASES_SHA_BEFORE=$(sha256sum "$CASES" | awk '{print $1}')
 TMP=$(mktemp -d)
 trap 'rm -rf "$TMP"' EXIT HUP INT TERM
 
@@ -73,8 +74,9 @@ for fixture in baseline multi-file-baseline; do
     transformed="$TMP/$fixture-$seed.transformed.json"
     jq --arg oldroot "$original_root" --arg newroot "$new_root" --argjson seed "$seed" "$variant_jq" "$TMP/base.json" > "$transformed" \
       || fail "$fixture seed $seed could not transform report"
-    digest=$(jq --arg root "$new_root" -cS -f "$NORMALIZER" "$transformed" | sha256sum | awk '{print $1}') \
-      || fail "$fixture seed $seed did not normalize"
+    projection="$TMP/$fixture-$seed.projection.json"
+    jq --arg root "$new_root" -cS -f "$NORMALIZER" "$transformed" > "$projection" || fail "$fixture seed $seed did not normalize"
+    digest=$(sha256sum "$projection" | awk '{print $1}')
     [ "$digest" = "$base_digest" ] || fail "$fixture seed $seed changed semantic digest: expected $base_digest got $digest"
     passed=$((passed+1))
     if [ "$((seed % 64))" -eq 0 ]; then
