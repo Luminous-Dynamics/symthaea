@@ -691,7 +691,7 @@ mod tests {
                 "value": "a".repeat(40),
                 "format_valid": true
             },
-            "contract": { "expected_dialect_count": STYLES.len() },
+            "contract": { "expected_dialect_count": STYLE_DIALECTS.len() },
             "cohort": {
                 "expected": records.len(),
                 "completed": records.len(),
@@ -716,9 +716,9 @@ mod tests {
         let bytes = fs::read(&manifest_path).expect("read manifest");
         let manifest: Value = serde_json::from_slice(&bytes).expect("parse fixture manifest");
         let (blocks, revision) = read_blocks(&manifest, &root).expect("valid complete cohort");
-        assert_eq!(blocks.len(), STYLES.len());
+        assert_eq!(blocks.len(), STYLE_DIALECTS.len());
         assert_eq!(revision, "a".repeat(40));
-        assert_eq!(blocks.iter().map(|block| block.arms.len()).sum::<usize>(), STYLES.len() * ARMS.len());
+        assert_eq!(blocks.iter().map(|block| block.arms.len()).sum::<usize>(), STYLE_DIALECTS.len() * ARMS.len());
         fs::remove_dir_all(root).ok();
     }
 
@@ -810,7 +810,7 @@ mod tests {
         assert!(!first_participant.join("operator-only/answer-key.json").exists());
 
         let files = fs::read_dir(first_participant.join("stimuli")).unwrap().count();
-        assert_eq!(files, STYLES.len() * ARMS.len());
+        assert_eq!(files, STYLE_DIALECTS.len() * ARMS.len());
         for entry in fs::read_dir(first_participant.join("stimuli")).unwrap() {
             let path = entry.unwrap().path();
             assert_eq!(fs::read(path).unwrap(), wave);
