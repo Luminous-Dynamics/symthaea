@@ -1359,16 +1359,23 @@ async fn cognitive_sonata_return(
     let spec_for_render = spec.clone();
     let state_for_render = state.clone();
     let seed = intent.seed;
+    let performance_dialect = Style::Sonata.grammar_profile().performance;
     let (composition, fluid_wav) = tokio::task::spawn_blocking(move || {
-        let composition = symthaea_muse::theory_realize::realize_with_spec(
+        let composition = symthaea_muse::theory_realize::realize_with_spec_and_dialect(
             &score_for_render,
             &spec_for_render,
             seed,
             &state_for_render,
             SAMPLE_RATE,
+            performance_dialect,
         );
-        let fluid_wav =
-            fluidsynth_candidate_wav(&score_for_render, &spec_for_render, seed, &state_for_render);
+        let fluid_wav = fluidsynth_candidate_wav(
+            &score_for_render,
+            &spec_for_render,
+            seed,
+            &state_for_render,
+            Some(performance_dialect),
+        );
         (composition, fluid_wav)
     })
     .await
@@ -1965,13 +1972,32 @@ async fn compose(
                 );
                 (realized.score, realized.form, Some(realized.plan))
             };
-            let comp = symthaea_muse::theory_realize::realize_with_spec(
-                &score,
-                &cand_spec,
-                intent.seed,
-                &state,
-                SAMPLE_RATE,
-            );
+            // Preset-driven styles already declare a performance dialect
+            // in their grammar profile. Custom specs have no style identity and
+            // keep the explicit heuristic fallback rather than pretending their
+            // incidental texture flags are an authored tradition.
+            let performance_dialect = if is_custom_spec {
+                None
+            } else {
+                Some(style.grammar_profile().performance)
+            };
+            let comp = match performance_dialect {
+                Some(dialect) => symthaea_muse::theory_realize::realize_with_spec_and_dialect(
+                    &score,
+                    &cand_spec,
+                    intent.seed,
+                    &state,
+                    SAMPLE_RATE,
+                    dialect,
+                ),
+                None => symthaea_muse::theory_realize::realize_with_spec(
+                    &score,
+                    &cand_spec,
+                    intent.seed,
+                    &state,
+                    SAMPLE_RATE,
+                ),
+            };
             // Preferred render path: the performed MIDI through FluidSynth
             // (an A/B review settled it: "the sound no longer fights the
             // composition"). None → the native render above serves. Also
@@ -1980,7 +2006,7 @@ async fn compose(
             let fluid_wav = if force_native {
                 None
             } else {
-                fluidsynth_candidate_wav(&score, &cand_spec, seed, &state)
+                fluidsynth_candidate_wav(&score, &cand_spec, seed, &state, performance_dialect)
             };
             (seed, comp, score, fluid_wav, form, plan)
         }));
@@ -2686,18 +2712,29 @@ fn fluidsynth_candidate_wav(
     spec: &symthaea_music_theory::CompositionSpec,
     seed: u64,
     state: &symthaea_muse::MusicalState,
+    declared_dialect: Option<symthaea_music_theory::PerformanceDialect>,
 ) -> Option<Vec<u8>> {
     symthaea_muse::fluid_render::available()?;
     let path = std::env::temp_dir().join(format!(
         "muse_studio_fluid_{}_{seed}.mid",
         std::process::id()
     ));
-    symthaea_muse::midi_export::export_performance_midi(score, spec, seed, state, &path).ok()?;
-    // State sliders remain authoritative for the base room color. The same
-    // performance dialect now selects both the room shift and the mastering
-    // profile, keeping native and FluidSynth renders on the same loudness/peak
-    // targets while testing a restrained spectral-balance hypothesis.
-    let dialect = symthaea_muse::theory_realize::dialect_for_spec(spec);
+    let export_result = match declared_dialect {
+        Some(dialect) => symthaea_muse::midi_export::export_performance_midi_with_dialect(
+            score, spec, seed, state, dialect, &path,
+        ),
+        None => symthaea_muse::midi_export::export_performance_midi(
+            score, spec, seed, state, &path,
+        ),
+    };
+    export_result.ok()?;
+
+    // One declared dialect selects timing in exported MIDI, mastering, and
+    // room behavior. Only a custom spec without an authored style profile
+    // falls back to inferring a dialect from texture flags.
+    let dialect = declared_dialect
+        .map(symthaea_muse::theory_realize::map_grammar_dialect)
+        .unwrap_or_else(|| symthaea_muse::theory_realize::dialect_for_spec(spec));
     let color = symthaea_muse::fluid_render::room_for_dialect(
         symthaea_muse::fluid_render::RenderColor::from_state(state),
         dialect,
