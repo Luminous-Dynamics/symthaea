@@ -312,6 +312,8 @@ fn same_comparison_context(a: &TargetCandidate, b: &TargetCandidate) -> bool {
         && x.product_spec_digest == y.product_spec_digest
         && x.quality_purity_basis == y.quality_purity_basis
         && x.functional_unit == y.functional_unit
+        && x.target_volume_low == y.target_volume_low
+        && x.target_volume_high == y.target_volume_high
         && x.volume_unit == y.volume_unit
         && x.value_basis_id == y.value_basis_id
         && x.evidence_vintage == y.evidence_vintage
@@ -701,6 +703,7 @@ mod tests {
             "MVP-004-functional-unit-mismatch",
             "MVP-007-region-feedstock-scenario-shift",
             "MVP-011-objective-unit-mismatch",
+            "MVP-012-demand-volume-band-mismatch",
         ] {
             let case = corpus.cases.iter().find(|case| case.case_id == id).unwrap();
             let actual = evaluate_case(case);

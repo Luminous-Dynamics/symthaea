@@ -6,7 +6,7 @@
 
 ## Paradigm shift
 
-Do not begin by maximizing strain titer and ask later whether the ingredient is useful or manufacturable. Start from a narrowly specified functional job and compare the product opportunity and route together: product function, compliant usable output, recovery, authorization, scale transfer, cost, energy, water, time, evidence rights, and explicitly bounded TEA/LCA scenarios.
+Do not begin by maximizing strain titer and ask later whether the ingredient is useful or manufacturable. Start from a narrowly specified functional job and compare the product opportunity and route together: product function, compliant usable output, recovery, authorization, scale transfer, cost, energy, water, time, evidence rights, and explicitly bounded TEA/LCA scenarios. Market opportunity is represented by a declared value basis plus an interval for contribution margin per functional unit, not a hidden price-only rank.
 
 This matches the 2026 precision-fermentation MVP review, which frames target selection around a value proposition linking ingredient class, volume, price and functional role, and the 2026 scale-up-gated DBTL review, which argues that downstream-process compatibility and industrial robustness must gate progress while TEA/LCA—not titer plateaus—should be convergence criteria:
 - A. et al., *Minimum viable products in precision fermentation: defining translational milestones for food biotechnology*, Current Opinion in Biotechnology 100 (August 2026), [doi:10.1016/j.copbio.2026.103515](https://doi.org/10.1016/j.copbio.2026.103515).
@@ -15,19 +15,19 @@ This matches the 2026 precision-fermentation MVP review, which frames target sel
 
 ## Contract
 
-A target brief contains a product/application/function, quality and purity basis, functional unit, target volume band, price/value basis and vintage, biology endpoint, process-closure and scale-transfer references, and TEA/LCA plus regional feedstock/electricity scenario digests. All identifiers are provenance hooks, not proof by themselves.
+A target brief contains a product/application/function, quality and purity basis, functional unit, target volume band, price/value basis and vintage, contribution-margin interval, biology endpoint, process-closure and scale-transfer references, and TEA/LCA plus regional feedstock/electricity scenario digests. All identifiers are provenance hooks, not proof by themselves.
 
 Each target has seven explicit gates: food safety, authorization, source rights, market evidence freshness/sufficiency, product-function evidence, process closure, and scale transfer. A failed gate blocks the target; unknown or not-assessed evidence makes the target indeterminate. High estimated value, titer, or another objective cannot compensate for a failed gate. Before real deployment, gate state must be supplied by a named evidence-verification process; this oracle does not certify the underlying source.
 
 ## Interval-aware Pareto semantics
 
-The objectives are typed intervals with explicit direction and unit. Maximization objective A robustly beats B only when A.low is at least B.high; minimization requires A.high to be at most B.low. At least one objective must be strictly better. Overlap is uncertainty—not a tie-break invitation. All objective sets, units, functional units, product specification, price basis/vintage, TEA/LCA boundary, and regional/feedstock/electricity scenario digests must match. Otherwise the case is incomparable and no Pareto frontier is emitted. The contract performs no implicit conversions, imputation, or scalar weighting across unlike objectives.
+The objectives are typed intervals with explicit direction and unit. Maximization objective A robustly beats B only when A.low is at least B.high; minimization requires A.high to be at most B.low. At least one objective must be strictly better. Overlap is uncertainty—not a tie-break invitation. All objective sets, units, functional units, the target volume band, product specification, price basis/vintage, TEA/LCA boundary, and regional/feedstock/electricity scenario digests must match. Otherwise the case is incomparable and no Pareto frontier is emitted. The contract performs no implicit conversions, imputation, or scalar weighting across unlike objectives.
 
 Only eligible targets enter the Pareto relations. A failed or indeterminate target can never dominate an eligible target or appear on the frontier. The frontier is a set, not a forced single winner. EVSI can then prioritize the next evidence acquisition; the decision-regret benchmark can compare that plan to simple baselines under the same budget.
 
 ## Frozen synthetic corpus
 
-Eleven cases exercise:
+Twelve cases exercise:
 1. robustly dominated product target;
 2. attractive market/metric proxy blocked by authorization;
 3. high nominal titer with poor recovered usable output;
@@ -38,7 +38,8 @@ Eleven cases exercise:
 8. overlapping metric intervals;
 9. synthetic fixture mislabeled as measured (negative control);
 10. stale market-value evidence;
-11. objective unit mismatch.
+11. objective unit mismatch;
+12. inconsistent demand/target-volume band.
 
 All data, ranges, values, digests and gate states in the corpus are invented. Pass means the encoded contract matches this frozen fixture—not that any real target is viable.
 

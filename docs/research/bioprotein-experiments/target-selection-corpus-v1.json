@@ -1,7 +1,7 @@
 {
   "corpus_id": "BIOPROTEIN-TARGET-SELECTION-CORPUS-V1",
   "schema_version": "1.0.0",
-  "case_count": 11,
+  "case_count": 12,
   "claim_ceiling": "Synthetic target-selection and interval-Pareto contract only. Every candidate value, digest, and gate is a fabricated fixture; no biological performance, regulatory approval, food safety, commercial viability, TEA/LCA accuracy, or environmental superiority is established.",
   "cases": [
     {
@@ -82,6 +82,13 @@
               "unit": "days",
               "low": 10,
               "high": 14
+            },
+            {
+              "objective_id": "contribution_margin_per_kg",
+              "direction": "maximize",
+              "unit": "synthetic_USD/kg",
+              "low": 45,
+              "high": 50
             }
           ]
         },
@@ -160,6 +167,13 @@
               "unit": "days",
               "low": 15,
               "high": 21
+            },
+            {
+              "objective_id": "contribution_margin_per_kg",
+              "direction": "maximize",
+              "unit": "synthetic_USD/kg",
+              "low": 15,
+              "high": 25
             }
           ]
         }
@@ -266,6 +280,13 @@
               "unit": "days",
               "low": 10,
               "high": 14
+            },
+            {
+              "objective_id": "contribution_margin_per_kg",
+              "direction": "maximize",
+              "unit": "synthetic_USD/kg",
+              "low": 45,
+              "high": 50
             }
           ]
         },
@@ -344,6 +365,13 @@
               "unit": "days",
               "low": 15,
               "high": 21
+            },
+            {
+              "objective_id": "contribution_margin_per_kg",
+              "direction": "maximize",
+              "unit": "synthetic_USD/kg",
+              "low": 15,
+              "high": 25
             }
           ]
         }
@@ -450,6 +478,13 @@
               "unit": "days",
               "low": 18,
               "high": 25
+            },
+            {
+              "objective_id": "contribution_margin_per_kg",
+              "direction": "maximize",
+              "unit": "synthetic_USD/kg",
+              "low": 10,
+              "high": 15
             }
           ]
         },
@@ -528,6 +563,13 @@
               "unit": "days",
               "low": 12,
               "high": 16
+            },
+            {
+              "objective_id": "contribution_margin_per_kg",
+              "direction": "maximize",
+              "unit": "synthetic_USD/kg",
+              "low": 25,
+              "high": 30
             }
           ]
         }
@@ -634,6 +676,13 @@
               "unit": "days",
               "low": 15,
               "high": 21
+            },
+            {
+              "objective_id": "contribution_margin_per_kg",
+              "direction": "maximize",
+              "unit": "synthetic_USD/kg",
+              "low": 15,
+              "high": 25
             }
           ]
         },
@@ -712,6 +761,13 @@
               "unit": "days",
               "low": 15,
               "high": 21
+            },
+            {
+              "objective_id": "contribution_margin_per_kg",
+              "direction": "maximize",
+              "unit": "synthetic_USD/kg",
+              "low": 15,
+              "high": 25
             }
           ]
         }
@@ -816,6 +872,13 @@
               "unit": "days",
               "low": 10,
               "high": 14
+            },
+            {
+              "objective_id": "contribution_margin_per_kg",
+              "direction": "maximize",
+              "unit": "synthetic_USD/kg",
+              "low": 45,
+              "high": 50
             }
           ]
         },
@@ -894,6 +957,13 @@
               "unit": "days",
               "low": 15,
               "high": 21
+            },
+            {
+              "objective_id": "contribution_margin_per_kg",
+              "direction": "maximize",
+              "unit": "synthetic_USD/kg",
+              "low": 15,
+              "high": 25
             }
           ]
         }
@@ -1000,6 +1070,13 @@
               "unit": "days",
               "low": 15,
               "high": 21
+            },
+            {
+              "objective_id": "contribution_margin_per_kg",
+              "direction": "maximize",
+              "unit": "synthetic_USD/kg",
+              "low": 15,
+              "high": 25
             }
           ]
         },
@@ -1078,6 +1155,13 @@
               "unit": "days",
               "low": 10,
               "high": 14
+            },
+            {
+              "objective_id": "contribution_margin_per_kg",
+              "direction": "maximize",
+              "unit": "synthetic_USD/kg",
+              "low": 45,
+              "high": 50
             }
           ]
         }
@@ -1184,6 +1268,13 @@
               "unit": "days",
               "low": 15,
               "high": 21
+            },
+            {
+              "objective_id": "contribution_margin_per_kg",
+              "direction": "maximize",
+              "unit": "synthetic_USD/kg",
+              "low": 15,
+              "high": 25
             }
           ]
         },
@@ -1262,6 +1353,13 @@
               "unit": "days",
               "low": 15,
               "high": 21
+            },
+            {
+              "objective_id": "contribution_margin_per_kg",
+              "direction": "maximize",
+              "unit": "synthetic_USD/kg",
+              "low": 15,
+              "high": 25
             }
           ]
         }
@@ -1366,6 +1464,13 @@
               "unit": "days",
               "low": 12,
               "high": 18
+            },
+            {
+              "objective_id": "contribution_margin_per_kg",
+              "direction": "maximize",
+              "unit": "synthetic_USD/kg",
+              "low": 15,
+              "high": 25
             }
           ]
         },
@@ -1444,6 +1549,13 @@
               "unit": "days",
               "low": 14,
               "high": 19
+            },
+            {
+              "objective_id": "contribution_margin_per_kg",
+              "direction": "maximize",
+              "unit": "synthetic_USD/kg",
+              "low": 15,
+              "high": 25
             }
           ]
         }
@@ -1549,6 +1661,13 @@
               "unit": "days",
               "low": 15,
               "high": 21
+            },
+            {
+              "objective_id": "contribution_margin_per_kg",
+              "direction": "maximize",
+              "unit": "synthetic_USD/kg",
+              "low": 15,
+              "high": 25
             }
           ]
         }
@@ -1640,6 +1759,13 @@
               "unit": "days",
               "low": 10,
               "high": 14
+            },
+            {
+              "objective_id": "contribution_margin_per_kg",
+              "direction": "maximize",
+              "unit": "synthetic_USD/kg",
+              "low": 45,
+              "high": 50
             }
           ]
         },
@@ -1718,6 +1844,13 @@
               "unit": "days",
               "low": 15,
               "high": 21
+            },
+            {
+              "objective_id": "contribution_margin_per_kg",
+              "direction": "maximize",
+              "unit": "synthetic_USD/kg",
+              "low": 15,
+              "high": 25
             }
           ]
         }
@@ -1824,6 +1957,13 @@
               "unit": "days",
               "low": 15,
               "high": 21
+            },
+            {
+              "objective_id": "contribution_margin_per_kg",
+              "direction": "maximize",
+              "unit": "synthetic_USD/kg",
+              "low": 15,
+              "high": 25
             }
           ]
         },
@@ -1902,6 +2042,13 @@
               "unit": "days",
               "low": 15,
               "high": 21
+            },
+            {
+              "objective_id": "contribution_margin_per_kg",
+              "direction": "maximize",
+              "unit": "synthetic_USD/kg",
+              "low": 15,
+              "high": 25
             }
           ]
         }
@@ -1920,6 +2067,202 @@
           },
           {
             "target_id": "energy-mwh-target",
+            "disposition": "eligible",
+            "reason_codes": [],
+            "dominates": []
+          }
+        ],
+        "pareto_frontier_ids": []
+      }
+    },
+    {
+      "case_id": "MVP-012-demand-volume-band-mismatch",
+      "targets": [
+        {
+          "target_id": "volume-band-a",
+          "brief": {
+            "ingredient_class": "single_cell_protein",
+            "intended_application": "food_ingredient",
+            "functional_job": "deliver_compliant_protein_with_declared_function",
+            "product_spec_digest": "sha256:synthetic-product-spec-v1",
+            "quality_purity_basis": "synthetic_food_grade_spec_v1",
+            "functional_unit": "1_kg_compliant_ingredient",
+            "target_volume_low": 2000,
+            "target_volume_high": 8000,
+            "volume_unit": "kg_per_year",
+            "value_basis_id": "synthetic-2026-USD-per-kg-v1",
+            "evidence_vintage": "synthetic-2026-10-19",
+            "biology_endpoint": "synthetic_product_function_endpoint",
+            "process_closure_digest": "sha256:synthetic-closed-process-v1",
+            "scale_transfer_basis": "synthetic_scale_transfer_case_v1",
+            "tea_lca_boundary_digest": "sha256:synthetic-cradle-to-gate-v1",
+            "region_scenario_digest": "sha256:synthetic-za-gp-region-v1",
+            "feedstock_scenario_digest": "sha256:synthetic-feedstock-base-v1",
+            "electricity_scenario_digest": "sha256:synthetic-electricity-base-v1"
+          },
+          "evidence_label": "synthetic",
+          "claim_basis": "synthetic",
+          "gates": {
+            "food_safety": "pass",
+            "authorization": "pass",
+            "source_rights": "pass",
+            "market_evidence": "pass",
+            "biology_function": "pass",
+            "process_closure": "pass",
+            "scale_transfer": "pass"
+          },
+          "objectives": [
+            {
+              "objective_id": "functional_fit",
+              "direction": "maximize",
+              "unit": "score/100",
+              "low": 90,
+              "high": 95
+            },
+            {
+              "objective_id": "compliant_capacity",
+              "direction": "maximize",
+              "unit": "kg/year",
+              "low": 4000,
+              "high": 4500
+            },
+            {
+              "objective_id": "cost_per_kg",
+              "direction": "minimize",
+              "unit": "synthetic_USD/kg",
+              "low": 20,
+              "high": 25
+            },
+            {
+              "objective_id": "energy_per_kg",
+              "direction": "minimize",
+              "unit": "kWh/kg",
+              "low": 10,
+              "high": 12
+            },
+            {
+              "objective_id": "water_per_kg",
+              "direction": "minimize",
+              "unit": "L/kg",
+              "low": 5,
+              "high": 7
+            },
+            {
+              "objective_id": "days_to_ready",
+              "direction": "minimize",
+              "unit": "days",
+              "low": 10,
+              "high": 14
+            },
+            {
+              "objective_id": "contribution_margin_per_kg",
+              "direction": "maximize",
+              "unit": "synthetic_USD/kg",
+              "low": 45,
+              "high": 50
+            }
+          ]
+        },
+        {
+          "target_id": "volume-band-b",
+          "brief": {
+            "ingredient_class": "single_cell_protein",
+            "intended_application": "food_ingredient",
+            "functional_job": "deliver_compliant_protein_with_declared_function",
+            "product_spec_digest": "sha256:synthetic-product-spec-v1",
+            "quality_purity_basis": "synthetic_food_grade_spec_v1",
+            "functional_unit": "1_kg_compliant_ingredient",
+            "target_volume_low": 1000,
+            "target_volume_high": 5000,
+            "volume_unit": "kg_per_year",
+            "value_basis_id": "synthetic-2026-USD-per-kg-v1",
+            "evidence_vintage": "synthetic-2026-10-19",
+            "biology_endpoint": "synthetic_product_function_endpoint",
+            "process_closure_digest": "sha256:synthetic-closed-process-v1",
+            "scale_transfer_basis": "synthetic_scale_transfer_case_v1",
+            "tea_lca_boundary_digest": "sha256:synthetic-cradle-to-gate-v1",
+            "region_scenario_digest": "sha256:synthetic-za-gp-region-v1",
+            "feedstock_scenario_digest": "sha256:synthetic-feedstock-base-v1",
+            "electricity_scenario_digest": "sha256:synthetic-electricity-base-v1"
+          },
+          "evidence_label": "synthetic",
+          "claim_basis": "synthetic",
+          "gates": {
+            "food_safety": "pass",
+            "authorization": "pass",
+            "source_rights": "pass",
+            "market_evidence": "pass",
+            "biology_function": "pass",
+            "process_closure": "pass",
+            "scale_transfer": "pass"
+          },
+          "objectives": [
+            {
+              "objective_id": "functional_fit",
+              "direction": "maximize",
+              "unit": "score/100",
+              "low": 70,
+              "high": 80
+            },
+            {
+              "objective_id": "compliant_capacity",
+              "direction": "maximize",
+              "unit": "kg/year",
+              "low": 2500,
+              "high": 3000
+            },
+            {
+              "objective_id": "cost_per_kg",
+              "direction": "minimize",
+              "unit": "synthetic_USD/kg",
+              "low": 30,
+              "high": 40
+            },
+            {
+              "objective_id": "energy_per_kg",
+              "direction": "minimize",
+              "unit": "kWh/kg",
+              "low": 15,
+              "high": 20
+            },
+            {
+              "objective_id": "water_per_kg",
+              "direction": "minimize",
+              "unit": "L/kg",
+              "low": 8,
+              "high": 10
+            },
+            {
+              "objective_id": "days_to_ready",
+              "direction": "minimize",
+              "unit": "days",
+              "low": 15,
+              "high": 21
+            },
+            {
+              "objective_id": "contribution_margin_per_kg",
+              "direction": "maximize",
+              "unit": "synthetic_USD/kg",
+              "low": 15,
+              "high": 25
+            }
+          ]
+        }
+      ],
+      "expected": {
+        "status": "incomparable",
+        "reason_codes": [
+          "comparison_context_mismatch"
+        ],
+        "targets": [
+          {
+            "target_id": "volume-band-a",
+            "disposition": "eligible",
+            "reason_codes": [],
+            "dominates": []
+          },
+          {
+            "target_id": "volume-band-b",
             "disposition": "eligible",
             "reason_codes": [],
             "dominates": []
