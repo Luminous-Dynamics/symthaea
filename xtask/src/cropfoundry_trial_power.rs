@@ -7,7 +7,8 @@ use std::path::PathBuf;
 const INPUT_SCHEMA: &str = "cropfoundry-trial-power-input-v0";
 const RECEIPT_SCHEMA: &str = "cropfoundry-trial-power-receipt-v0";
 
-#[derive(Debug, Deserialize)]
+#[derive(Debug, Deserialize, Serialize)]
+#[serde(deny_unknown_fields)]
 struct PowerInput {
     schema_version: String,
     study_id: String,
@@ -17,7 +18,8 @@ struct PowerInput {
     design: DesignInput,
 }
 
-#[derive(Debug, Deserialize)]
+#[derive(Debug, Deserialize, Serialize)]
+#[serde(deny_unknown_fields)]
 struct EndpointInput {
     name: String,
     unit: String,
@@ -28,7 +30,8 @@ struct EndpointInput {
     co_primary_endpoint_count: usize,
 }
 
-#[derive(Debug, Deserialize)]
+#[derive(Debug, Deserialize, Serialize)]
+#[serde(deny_unknown_fields)]
 struct DesignInput {
     design_type: String,
     allocation_unit: String,
@@ -381,6 +384,22 @@ mod tests {
                 planned_site_season_count: 2,
             },
         }
+    }
+
+    #[test]
+    fn unsupported_input_fields_fail_closed() {
+        let mut value = serde_json::to_value(fixture()).unwrap();
+        value
+            .as_object_mut()
+            .unwrap()
+            .insert("unrecognized_field".to_owned(), serde_json::json!(true));
+        assert!(serde_json::from_value::<PowerInput>(value).is_err());
+    }
+
+    #[test]
+    fn inverse_normal_cdf_rejects_boundary_probabilities() {
+        assert!(inverse_normal_cdf(0.0).is_err());
+        assert!(inverse_normal_cdf(1.0).is_err());
     }
 
     #[test]
