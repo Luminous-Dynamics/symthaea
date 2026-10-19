@@ -428,9 +428,7 @@ fn parse_ascii_decimal(bytes: &[u8]) -> Option<u32> {
         return None;
     }
     bytes.iter().try_fold(0_u32, |value, byte| {
-        value
-            .checked_mul(10)?
-            .checked_add(u32::from(*byte - b'0'))
+        value.checked_mul(10)?.checked_add(u32::from(*byte - b'0'))
     })
 }
 
@@ -1097,8 +1095,8 @@ fn sha256_hex(bytes: &[u8]) -> String {
 #[cfg(test)]
 mod tests {
     use super::{
-        is_valid_iso_date, is_valid_rfc3339_datetime, sha256_hex,
-        validate_measurement_run_str, validate_platform_str,
+        is_valid_iso_date, is_valid_rfc3339_datetime, sha256_hex, validate_measurement_run_str,
+        validate_platform_str,
     };
     use serde_json::Value;
 
@@ -1227,15 +1225,17 @@ mod tests {
             );
         }
         for value in ["2026-2-03", "2026-02-30", "2026-13-01", "not-a-date"] {
-            assert!(!is_valid_iso_date(value), "malformed date accepted: {value}");
+            assert!(
+                !is_valid_iso_date(value),
+                "malformed date accepted: {value}"
+            );
         }
     }
 
     #[test]
     fn run_semantics_reject_invalid_acquisition_and_review_timestamps() {
         let mut bad_acquisition = parse_run();
-        bad_acquisition["acquired_at"] =
-            Value::String("2026-02-29T10:00:00Z".to_owned());
+        bad_acquisition["acquired_at"] = Value::String("2026-02-29T10:00:00Z".to_owned());
         assert!(
             validate_measurement_run_str(&encoded(&bad_acquisition), RUN_SCHEMA_TEXT)
                 .expect_err("invalid acquisition date must fail")
