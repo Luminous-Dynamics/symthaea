@@ -47,6 +47,25 @@ for neutral previews and imported-work audition.
 
 The ratios are the mastering algorithm's target band proportions, not spectral
 measurements of a genre and not an assertion about every culture or recording.
+
+## Machine-readable renderer evidence receipt
+
+The current `renderer_ab_fair` probe emits a versioned JSON receipt and hashes
+the artifacts that its outputs depend on. The receipt is a diagnostic/replay
+record, not a trust root. SHA-256 ties a claim to bytes, but a caller-provided
+Git revision does not prove those bytes were built from that revision; likewise,
+a declared VCSL manifest digest is not proof of which files were loaded until
+that manifest is independently checked against the asset root. Receipts must
+remain `incomplete` if a planned cell fails, metrics are non-finite, a source
+revision is absent/ill-formed, FluidSynth version probing fails, or VCSL is active
+without a syntactically valid manifest digest.
+
+The emitted profile fingerprint covers grammar/renderer dialect, mastering
+targets/caps, and FluidSynth room controls. It deliberately does not fold asset
+identity into the profile hash: tool, SoundFont, source revision, input MIDI,
+and rendered output hashes remain separate fields so a difference can be
+localized instead of being hidden in a single composite digest.
+
 The preset mapping is now explicit in Style::grammar_profile; dialect_for_spec
 remains the fallback for custom specs only. RendererRecipe schema v4 records the
 declared grammar-level dialect when one exists. The next architecture step is to
@@ -78,17 +97,41 @@ with named, versioned rendering controls rather than adding more heuristic flags
 
 Run the paired renderer probe on fixed seeds and a qualified asset environment:
 
+    export SYMTHAEA_GIT_REVISION="$(git rev-parse HEAD)"
     nix shell nixpkgs#fluidsynth nixpkgs#soundfont-fluid --command bash -c '
       export SYMTHAEA_FLUIDSYNTH=$(which fluidsynth)
       export SYMTHAEA_SOUNDFONT=$(ls /nix/store/*/share/soundfonts/FluidR3_GM2-2.sf2 | head -1)
       cargo run --release -p symthaea-muse --features theory --example renderer_ab_fair
     '
 
-Record the source revision, FluidSynth version, SoundFont SHA-256, VCSL state,
-per-piece LUFS / peak / crest / band balance, failed renders, and exact profile.
-A missing renderer, missing asset, or empty cohort is a failed run, not a null
-result. Objective spectral movement shows the profile is applied; it does not
-prove musical quality.
+The probe now writes
+`audio_output/renderer-ab-fair-{synth|vcsl}/renderer-ab-fair-manifest.json`
+alongside the WAV/MIDI cohort. The JSON receipt records the caller-supplied
+source revision, executable SHA-256 and byte length, FluidSynth executable hash
+and version output, SoundFont SHA-256 and byte length, MIDI SHA-256 per cell,
+canonical native/FluidSynth PCM hashes, FluidSynth WAV hashes, profile
+fingerprints, exact mastering values, room settings, signal measurements, and
+per-cell failure codes. Native PCM hashes use interleaved little-endian f32
+stereo samples; FluidSynth WAV hashes include the file container.
+
+Set `SYMTHAEA_GIT_REVISION` to the exact checkout SHA before the run. A complete
+status requires all eight cohort rows, a valid 40- or 64-character hexadecimal
+revision, successful FluidSynth version output, and valid source provenance
+metadata. If VCSL is enabled, also set
+`SYMTHAEA_VCSL_MANIFEST_SHA256` to the digest of the independently reviewed
+complete VCSL asset manifest used for that checkout. **The probe records and
+format-checks this VCSL digest; it does not recompute the manifest or prove that
+the supplied digest corresponds to the configured root.** This receipt is not a
+signed build attestation. Verify the source revision, manifest-to-root binding,
+and build provenance independently.
+
+Partial cohorts and non-finite measurements are now marked as failed cells;
+the program writes an `incomplete` receipt and exits nonzero rather than
+presenting a partial run as a successful comparison. Missing FluidSynth or
+SoundFont aborts preflight before a cohort can run. A complete receipt proves
+identity/replay metadata was captured, not that either renderer sounds better.
+Objective spectral movement shows the profile is applied; it does not prove
+musical quality.
 
 ### Perceptual gate
 
