@@ -42,8 +42,8 @@ jobs:
         run: |
           set -euo pipefail
           [[ "$PROVIDER_RUN_ID" =~ ^[0-9]+$ ]] || { echo "provider_run_id must be numeric" >&2; exit 2; }
-          gh run view "$PROVIDER_RUN_ID" --repo "$GITHUB_REPOSITORY" --json conclusion,event,headBranch,headSha,workflowName,url > "$RUNNER_TEMP/provider-run.json"
-          jq -e '.conclusion == "success" and .event == "push" and .headBranch == "main" and .workflowName == "REA Pinned Provider Smoke"' "$RUNNER_TEMP/provider-run.json" >/dev/null || {
+          gh run view "$PROVIDER_RUN_ID" --repo "$GITHUB_REPOSITORY" --json conclusion,event,headBranch,headSha,workflowName,workflowDatabaseId,url > "$RUNNER_TEMP/provider-run.json"
+          jq -e '.conclusion == "success" and .event == "push" and .headBranch == "main" and .workflowName == "REA Pinned Provider Smoke" and .workflowDatabaseId == 389295795' "$RUNNER_TEMP/provider-run.json" >/dev/null || {
             cat "$RUNNER_TEMP/provider-run.json" >&2
             echo "Only successful REA Pinned Provider Smoke runs from pushes to main may be attested" >&2
             exit 1
@@ -51,6 +51,7 @@ jobs:
           echo "head_sha=$(jq -er '.headSha' "$RUNNER_TEMP/provider-run.json")" >> "$GITHUB_OUTPUT"
           echo "run_url=$(jq -er '.url' "$RUNNER_TEMP/provider-run.json")" >> "$GITHUB_OUTPUT"
           echo "run_id=$PROVIDER_RUN_ID" >> "$GITHUB_OUTPUT"
+          echo "workflow_id=$(jq -er '.workflowDatabaseId' "$RUNNER_TEMP/provider-run.json")" >> "$GITHUB_OUTPUT"
 
       - name: Download provider evidence artifact
         shell: bash
@@ -95,6 +96,7 @@ jobs:
           TARGET_HEAD_SHA: ${{ steps.target.outputs.head_sha }}
           PROVIDER_RUN_ID: ${{ steps.target.outputs.run_id }}
           PROVIDER_RUN_URL: ${{ steps.target.outputs.run_url }}
+          PROVIDER_WORKFLOW_ID: ${{ steps.target.outputs.workflow_id }}
         run: |
           set -euo pipefail
           ARTIFACT_DIR="$RUNNER_TEMP/rea-provider-evidence"
@@ -109,6 +111,7 @@ jobs:
             --arg predicate_type "$PREDICATE_TYPE" \
             --arg provider_run_id "$PROVIDER_RUN_ID" \
             --arg provider_run_url "$PROVIDER_RUN_URL" \
+            --argjson provider_workflow_id "$PROVIDER_WORKFLOW_ID" \
             --arg source_head_sha "$TARGET_HEAD_SHA" \
             --arg receipt_sha256 "$RECEIPT_SHA" \
             --arg bundle_manifest_sha256 "$MANIFEST_SHA" \
@@ -116,7 +119,7 @@ jobs:
             --arg attestation_workflow_sha "$GITHUB_SHA" \
             --arg attestation_run_id "$GITHUB_RUN_ID" \
             --slurpfile receipt "$RECEIPT" \
-            '{schemaVersion:"symthaea.rea-provider-smoke-attestation.v1",evidenceTier:"unblob-provider-smoke",repository:$repository,predicateType:$predicate_type,subject:{bundleManifestSha256:$bundle_manifest_sha256,receiptSha256:$receipt_sha256},providerRun:{runId:$provider_run_id,url:$provider_run_url,workflow:"REA Pinned Provider Smoke",event:"push",ref:"refs/heads/main",sourceHeadSha:$source_head_sha,checkoutCommitSha:$receipt[0].source.checkout_commit_sha,providerVersion:$receipt[0].provider_version,semanticProjectionSha256:$receipt[0].semantic_projection_sha256.equivalent_runs,semanticMutationProjectionSha256:$receipt[0].semantic_projection_sha256.semantic_mutation,providerMetamorphicVariants:$receipt[0].provider_metamorphic.equivalent_variants},attestationRun:{workflowRef:$attestation_workflow_ref,sourceCommitSha:$attestation_workflow_sha,runId:$attestation_run_id,event:"workflow_dispatch",ref:"refs/heads/main"},qualification:{reaCliMcpParity:false,firmwareExecution:false,emulation:false,deviceQualification:false},limitations:["Unblob provider smoke on generated inert gzip/tar/text fixtures only","No REA CLI/MCP parity claim","No recovered firmware execution or emulation","No physical-device qualification"]}' > "$RUNNER_TEMP/rea-provider-smoke-predicate.json"
+            '{schemaVersion:"symthaea.rea-provider-smoke-attestation.v1",evidenceTier:"unblob-provider-smoke",repository:$repository,predicateType:$predicate_type,subject:{bundleManifestSha256:$bundle_manifest_sha256,receiptSha256:$receipt_sha256},providerRun:{runId:$provider_run_id,url:$provider_run_url,workflow:"REA Pinned Provider Smoke",workflowDatabaseId:$provider_workflow_id,event:"push",ref:"refs/heads/main",sourceHeadSha:$source_head_sha,checkoutCommitSha:$receipt[0].source.checkout_commit_sha,providerVersion:$receipt[0].provider_version,semanticProjectionSha256:$receipt[0].semantic_projection_sha256.equivalent_runs,semanticMutationProjectionSha256:$receipt[0].semantic_projection_sha256.semantic_mutation,providerMetamorphicVariants:$receipt[0].provider_metamorphic.equivalent_variants},attestationRun:{workflowRef:$attestation_workflow_ref,sourceCommitSha:$attestation_workflow_sha,runId:$attestation_run_id,event:"workflow_dispatch",ref:"refs/heads/main"},qualification:{reaCliMcpParity:false,firmwareExecution:false,emulation:false,deviceQualification:false},limitations:["Unblob provider smoke on generated inert gzip/tar/text fixtures only","No REA CLI/MCP parity claim","No recovered firmware execution or emulation","No physical-device qualification"]}' > "$RUNNER_TEMP/rea-provider-smoke-predicate.json"
 
       - name: Validate predicate schema before signing
         shell: bash
