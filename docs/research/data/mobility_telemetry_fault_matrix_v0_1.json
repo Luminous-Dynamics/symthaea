@@ -1,7 +1,7 @@
 {
   "schema_version": "0.1.0",
   "suite_id": "MOBILITY-TELEMETRY-CONFORMANCE-001",
-  "status": "frozen_proposed_matrix_v0_1_with_expected_outcomes_and_detail_tokens_not_yet_executed",
+  "status": "frozen_proposed_matrix_v0_1_with_per_measurand_uncertainty_controls_not_yet_executed",
   "claim_ceiling": "Software conformance only. No demonstrated hardware reliability, measurement accuracy, vehicle performance, tire qualification, or roadworthiness.",
   "interpretation": {
     "positive_controls_required": true,
@@ -306,6 +306,17 @@
       "rust_test": "calculated_uncertainty_budget_is_not_physical_evidence",
       "required_detail_tokens": [
         "calculated-only uncertainty remains below the evidence threshold"
+      ]
+    },
+    {
+      "id": "CLAIM-008",
+      "category": "uncertainty_gate",
+      "mutation": "single_budget_does_not_cover_all_claim_measurands",
+      "expected": "ineligible",
+      "diagnostic": "missing uncertainty budget for dc_bus_voltage",
+      "rust_test": "single_budget_does_not_cover_all_claim_measurands",
+      "required_detail_tokens": [
+        "missing_uncertainty_budget:dc_bus_voltage"
       ]
     }
   ],
